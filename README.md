@@ -8,6 +8,8 @@ En elegant IPTV-klient för Linux i dopeIPTV-stil (macOS-inspirerat mörkt grän
 - Live-TV, Filmer (VOD) och Serier med säsonger och avsnitt
 - Kategorier i sidopanelen och snabb sökning
 - EPG: "Nu spelas" med förloppsindikator + kommande program för vald kanal
+- Uppdatera EPG med ett klick (↻) — uppdateras även automatiskt när programmet tar slut
+- Egen programikon och rätt namn i aktivitetsfältet (i stället för "python3")
 - Kanallogotyper som laddas asynkront
 - Spela i mpv eller VLC (dubbelklick, knappar eller högerklicksmeny)
 - Kopiera ström-URL via högerklick
@@ -37,8 +39,10 @@ Första gången anger du din Xtream-server (t.ex. `http://server:8080`), använd
 ```bash
 mkdir -p ~/.local/share/applications ~/.local/bin
 cp dopeiptv.py ~/.local/bin/dopeiptv.py
-cp swiptv.desktop ~/.local/share/applications/
+cp dopeiptv.desktop ~/.local/share/applications/
 ```
+
+Programikonen installeras automatiskt till `~/.local/share/icons` första gången appen startas.
 
 ## Användning
 
@@ -48,6 +52,7 @@ cp swiptv.desktop ~/.local/share/applications/
 | Byt spelare tillfälligt | Högerklicka på en rad |
 | Öppna en serie | Dubbelklicka på serien → avsnittslista visas |
 | Sök | Skriv i sökfältet överst |
+| Uppdatera EPG | Knappen "↻ Uppdatera EPG" i detaljpanelen |
 | Byt konto | Inställningar → "Byt konto / server" |
 
 ## Felsökning

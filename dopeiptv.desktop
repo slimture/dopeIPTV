@@ -2,8 +2,8 @@
 Type=Application
 Name=dopeIPTV
 Comment=IPTV-klient med Xtream Codes och EPG
-Exec=python3 %h/.local/bin/dopeiptv.py
-Icon=multimedia-video-player
+Exec=sh -c "exec python3 $HOME/.local/bin/dopeiptv.py"
+Icon=dopeiptv
 Terminal=false
 Categories=AudioVideo;Video;TV;
 Keywords=iptv;tv;xtream;epg;
