@@ -97,6 +97,9 @@ class XtreamClient:
     def series_info(self, series_id):
         return self._api(action="get_series_info", series_id=series_id) or {}
 
+    def vod_info(self, vod_id):
+        return self._api(action="get_vod_info", vod_id=vod_id) or {}
+
     def short_epg(self, stream_id, limit=8):
         data = self._api(action="get_short_epg", stream_id=stream_id, limit=limit)
         return (data or {}).get("epg_listings", [])
@@ -489,6 +492,7 @@ class MainWindow(QMainWindow):
         self.mode = "live"                 # live | vod | series
         self.all_items = []                # aktuell (ofiltrerad) lista
         self.series_ctx = None             # vald serie vid avsnittsläge
+        self._info_cache = {}              # (kind, id) -> info-dict
 
         self.setWindowTitle(APP_NAME)
         self.resize(1240, 780)
@@ -744,11 +748,12 @@ class MainWindow(QMainWindow):
             self.logos.get(url, self._set_detail_logo)
 
         if self.series_ctx:
-            info = it.get("info") or {}
+            info = it.get("info") if isinstance(it.get("info"), dict) else {}
             meta = " · ".join(x for x in (
                 f"Säsong {it.get('season')}" if it.get("season") else "",
                 info.get("duration", ""),) if x)
             self.d_meta.setText(meta)
+            self._show_media_info(info, cur)
         elif self.mode == "live":
             self.d_meta.setText("Direktsänd kanal")
             if it.get("stream_id"):
@@ -759,8 +764,12 @@ class MainWindow(QMainWindow):
                 str(it.get("year") or ""),
                 f"⭐ {it['rating']}" if it.get("rating") else "",) if x)
             self.d_meta.setText(meta or "Film")
+            if it.get("stream_id"):
+                self._request_media_info("vod", it["stream_id"], cur)
         else:
             self.d_meta.setText("Serie — dubbelklicka för avsnitt")
+            if it.get("series_id"):
+                self._request_media_info("series", it["series_id"], cur)
 
     def _set_detail_logo(self, pm):
         rounded = QPixmap(84, 84)
@@ -783,6 +792,13 @@ class MainWindow(QMainWindow):
             if w:
                 w.deleteLater()
 
+    def _epg_note(self, text):
+        """Liten grå informationsrad i EPG-/informationsytan."""
+        lbl = QLabel(text)
+        lbl.setStyleSheet("color:#6E6E79; font-size:12px;")
+        lbl.setWordWrap(True)
+        self.epg_lay.insertWidget(self.epg_lay.count() - 1, lbl)
+
     def _request_epg(self):
         """Hämtar (om) EPG för den valda live-kanalen."""
         cur = self.listw.currentItem()
@@ -791,8 +807,66 @@ class MainWindow(QMainWindow):
         sid = cur.data(Qt.ItemDataRole.UserRole).get("stream_id")
         if not sid:
             return
+        self._clear_epg_rows()
+        self._epg_note("Hämtar programguide …")
         run_async(self.pool, lambda: self.client.short_epg(sid, 8),
-                  lambda e: self._show_epg(e, cur), lambda _: None)
+                  lambda e: self._show_epg(e, cur),
+                  lambda _: self._epg_error(cur))
+
+    def _epg_error(self, list_item):
+        if list_item is not self.listw.currentItem():
+            return
+        self.now_card.hide()
+        self._clear_epg_rows()
+        self._epg_note("Kunde inte hämta programguiden.")
+
+    # -- film-/serieinformation -------------------------------------------------
+    def _request_media_info(self, kind, mid, list_item):
+        cached = self._info_cache.get((kind, mid))
+        if cached is not None:
+            self._show_media_info(cached, list_item)
+            return
+        self._epg_note("Hämtar information …")
+        if kind == "vod":
+            fetch = lambda: (self.client.vod_info(mid) or {}).get("info") or {}
+        else:
+            fetch = lambda: (self.client.series_info(mid) or {}).get("info") or {}
+
+        def done(info):
+            if not isinstance(info, dict):
+                info = {}
+            self._info_cache[(kind, mid)] = info
+            self._show_media_info(info, list_item)
+
+        run_async(self.pool, fetch, done, lambda _: None)
+
+    def _show_media_info(self, info, list_item):
+        if list_item is not self.listw.currentItem():
+            return
+        self._clear_epg_rows()
+        plot = str(info.get("plot") or info.get("description") or "").strip()
+        if plot:
+            kort = QFrame(objectName="Card")
+            kl = QVBoxLayout(kort)
+            kl.setContentsMargins(14, 12, 14, 12)
+            handling = QLabel(plot, objectName="NowDesc")
+            handling.setWordWrap(True)
+            kl.addWidget(handling)
+            self.epg_lay.insertWidget(self.epg_lay.count() - 1, kort)
+        rader = (("Genre", info.get("genre")),
+                 ("Skådespelare", info.get("cast") or info.get("actors")),
+                 ("Regi", info.get("director")),
+                 ("Premiär", info.get("releasedate") or info.get("releaseDate")),
+                 ("Längd", info.get("duration")),
+                 ("Betyg", info.get("rating")))
+        nagot = bool(plot)
+        for rubrik, varde in rader:
+            varde = str(varde or "").strip()
+            if varde:
+                self._epg_note(f"{rubrik}: {varde}")
+                nagot = True
+        if not nagot:
+            self._epg_note("Ingen ytterligare information tillgänglig.")
 
     def _show_epg(self, listings, list_item):
         if list_item is not self.listw.currentItem():
@@ -838,6 +912,9 @@ class MainWindow(QMainWindow):
             kl.addWidget(t)
             kl.addWidget(ti)
             self.epg_lay.insertWidget(self.epg_lay.count() - 1, kort)
+
+        if not aktuellt and not kommande:
+            self._epg_note("Ingen programguide tillgänglig för den här kanalen.")
 
     def _refresh_progress(self):
         e = self._current_epg
