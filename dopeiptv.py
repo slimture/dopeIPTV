@@ -1608,6 +1608,13 @@ class MainWindow(QMainWindow):
                     and w.isVisible()):
                 self._det_hidden.append(w)
                 w.hide()
+        # The detail pane's layout keeps its 20px margins otherwise, leaving a
+        # black frame around the video - drop them (and the pane's border)
+        # while fullscreen so the video truly fills the screen.
+        det_lay = self._det.layout()
+        self._det_margins = det_lay.contentsMargins()
+        det_lay.setContentsMargins(0, 0, 0, 0)
+        self._det.setStyleSheet("#DetailPane { background:#000000; border:none; }")
         self.player.set_fullscreen_ui(True)
         self._was_fullscreen = self.isFullScreen()
         self.showFullScreen()
@@ -1621,6 +1628,11 @@ class MainWindow(QMainWindow):
         for w in getattr(self, "_det_hidden", []):
             w.show()
         self._det_hidden = []
+        m = getattr(self, "_det_margins", None)
+        if m is not None:
+            self._det.layout().setContentsMargins(m.left(), m.top(),
+                                                  m.right(), m.bottom())
+        self._det.setStyleSheet("")
         self.player.set_fullscreen_ui(False)
         if not getattr(self, "_was_fullscreen", False):
             self.showNormal()
@@ -1786,7 +1798,8 @@ class MainWindow(QMainWindow):
             self.d_meta.setText("Live channel")
             # "is not None": a perfectly valid stream_id of 0 is falsy
             if it.get("stream_id") is not None:
-                self.epg_refresh.show()
+                if not self._player_fs:
+                    self.epg_refresh.show()
                 self._request_epg()
                 if (self.player and self._autoplay_preview()
                         and self.playback_mode() == "embedded"
@@ -1943,7 +1956,8 @@ class MainWindow(QMainWindow):
             self.now_title.setText(current["title"] or "Unknown programme")
             self.now_desc.setText(current["desc"][:400])
             self._refresh_progress()
-            self.now_card.show()
+            if not self._player_fs:      # in fullscreen the overlay shows it
+                self.now_card.show()
             if self.player:
                 info = (f"{self.d_title.text()}\n"
                         f"{current['title'] or 'Unknown programme'}   "
@@ -2131,9 +2145,12 @@ class MainWindow(QMainWindow):
 
     def _playback_error(self, msg):
         """A stream failed to play (dead/unreachable channel etc.)."""
-        self.stream_error.setText(f"Stream error: {msg}")
-        self.stream_error.show()
         self.count_lbl.setText(f"Stream error: {msg}")
+        if self._player_fs and self.player:
+            self.player.set_overlay_info(f"Stream error: {msg}")
+        else:
+            self.stream_error.setText(f"Stream error: {msg}")
+            self.stream_error.show()
         if self.player:
             self.player.title_lbl.setText("")
 
