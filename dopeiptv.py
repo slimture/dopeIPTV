@@ -28,12 +28,12 @@ from pathlib import Path
 
 import requests
 from PyQt6.QtCore import (
-    QAbstractListModel, QModelIndex, QObject, QRect, QRectF, QRunnable,
-    QSettings, QSize, Qt, QThreadPool, QTimer, pyqtSignal, pyqtSlot,
+    QAbstractListModel, QByteArray, QModelIndex, QObject, QRect, QRectF,
+    QRunnable, QSettings, QSize, Qt, QThreadPool, QTimer, pyqtSignal, pyqtSlot,
 )
 from PyQt6.QtGui import (
-    QColor, QFont, QIcon, QKeySequence, QPainter, QPainterPath, QPixmap,
-    QShortcut,
+    QColor, QFont, QIcon, QKeySequence, QOpenGLContext, QPainter,
+    QPainterPath, QPixmap, QShortcut,
 )
 from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDialog, QDialogButtonBox,
@@ -42,6 +42,7 @@ from PyQt6.QtWidgets import (
     QProgressBar, QPushButton, QScrollArea, QSizePolicy, QSplitter,
     QStyle, QStyledItemDelegate, QVBoxLayout, QWidget,
 )
+from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 
 APP_NAME = "dopeIPTV"
 ORG = "dopeiptv"
@@ -61,24 +62,20 @@ except Exception as _e:
 
 def embedded_playback_reason():
     """Returns None if in-app video is available, otherwise a short
-    human-readable explanation of why it isn't (shown in Settings)."""
+    human-readable explanation of why it isn't (shown in Settings). Embedding
+    uses libmpv's OpenGL render API (frames drawn into a QOpenGLWidget), not
+    native window embedding, so it doesn't depend on X11 vs. Wayland or on
+    any particular compositor - it needs only python-mpv/libmpv and a
+    working OpenGL context, which Qt provides on Linux, macOS and Windows
+    alike."""
     if _libmpv is None:
         return f"python-mpv/libmpv failed to load ({_libmpv_error})"
-    if not sys.platform.startswith("linux"):
-        return "embedded playback needs Linux (X11/XWayland)"
-    app = QApplication.instance()
-    platform = app.platformName() if app else "?"
-    if platform != "xcb":
-        return (f"needs the X11 Qt platform ('xcb'), currently running on "
-                f"'{platform}' - is XWayland installed?")
+    if not hasattr(_libmpv, "MpvRenderContext"):
+        return "installed python-mpv is too old (needs the render-api support)"
     return None
 
 
 def embedded_playback_supported():
-    """True when in-app video is possible: libmpv present and an X11-type
-    window system (mpv's --wid embedding needs X11; on Wayland the app is
-    started under XWayland, see main()). macOS would need mpv's OpenGL
-    render API instead, which is not implemented yet."""
     return embedded_playback_reason() is None
 
 # ----------------------------------------------------------------------------
@@ -648,35 +645,170 @@ class MpvIpcPlayer:
         self.sock = None
 
 # ----------------------------------------------------------------------------
-#  Embedded in-app video (libmpv rendering into a native subwindow)
+#  Persistent mpv window via python-mpv (in-process, key-bindable)
+#
+#  MpvIpcPlayer above spawns mpv as a *separate process*; Qt shortcuts like
+#  Ctrl+Right only fire while the dopeIPTV window itself has keyboard focus,
+#  so zapping stops working the moment the user clicks into that external
+#  window to actually watch. python-mpv instead embeds libmpv in this same
+#  process (no subprocess, no socket), so we can bind zap keys *inside mpv*
+#  - mpv intercepts them itself and calls back into Python regardless of
+#  which window currently has focus. Used automatically when python-mpv is
+#  available; falls back to MpvIpcPlayer (needs only the mpv binary) when it
+#  isn't installed.
 # ----------------------------------------------------------------------------
 
-class EmbeddedPlayer(QWidget):
-    """Video pane inside the app, rendered by libmpv into a native child
-    window (mpv --wid embedding). Linux/X11-only; see
-    embedded_playback_supported()."""
+class MpvWindowPlayer(QObject):
+    zap_requested = pyqtSignal(int)   # emitted from mpv's own event thread
 
-    double_clicked = pyqtSignal()
+    def __init__(self):
+        super().__init__()
+        self._mpv = None
+
+    def _ensure_mpv(self):
+        if self._mpv is None:
+            # Explicitly request mpv's normal standalone behavior (fullscreen
+            # via 'f', quit via 'q', on-screen controller) - without these,
+            # the window mpv opens doesn't respond to its own default keys
+            # at all, which read as "can't fullscreen / can't close it".
+            m = _libmpv.MPV(force_window=True, input_default_bindings=True,
+                            input_vo_keyboard=True, osc=True,
+                            user_agent="dopeIPTV/1.0", keep_open="yes")
+            m.on_key_press("ctrl+right")(lambda: self.zap_requested.emit(1))
+            m.on_key_press("ctrl+left")(lambda: self.zap_requested.emit(-1))
+            self._mpv = m
+        return self._mpv
+
+    def play(self, url, title):
+        for attempt in range(2):
+            try:
+                m = self._ensure_mpv()
+                try:
+                    m["force-media-title"] = title or "dopeIPTV"
+                except Exception:
+                    pass
+                m.play(url)
+                return True
+            except Exception as e:
+                print(f"[dopeIPTV] mpv window playback failed: "
+                     f"{type(e).__name__}: {e}", file=sys.stderr)
+                self._mpv = None   # drop a possibly-dead core, retry once
+        return False
+
+    def toggle_fullscreen(self):
+        if not self._mpv:
+            return
+        try:
+            self._mpv.fullscreen = not self._mpv.fullscreen
+        except Exception as e:
+            print(f"[dopeIPTV] mpv fullscreen toggle failed: "
+                 f"{type(e).__name__}: {e}", file=sys.stderr)
+
+    def is_active(self):
+        return self._mpv is not None
+
+    def stop(self):
+        if self._mpv:
+            try:
+                self._mpv.command("stop")
+            except Exception:
+                pass
+
+    def shutdown(self):
+        if self._mpv:
+            try:
+                self._mpv.terminate()
+            except Exception:
+                pass
+            self._mpv = None
+
+# ----------------------------------------------------------------------------
+#  Embedded in-app video (libmpv's OpenGL render API)
+#
+#  An earlier version used mpv's --wid option, which embeds by reparenting
+#  a native X11 window - that relies on X11 window-manager cooperation that
+#  several Wayland compositors (GNOME/Mutter in particular) don't provide
+#  for XWayland clients: mpv reports success, but the video renders as its
+#  own floating window instead of inside the app. The render API sidesteps
+#  window embedding entirely - mpv just draws video frames into an OpenGL
+#  framebuffer we hand it - so it works the same way regardless of
+#  compositor, and (being pure OpenGL) is the same approach usable on
+#  macOS, unlike --wid which libmpv never supported there at all.
+# ----------------------------------------------------------------------------
+
+class _MpvGLWidget(QOpenGLWidget):
+    """The actual video surface. Owns the mpv render context; EmbeddedPlayer
+    wraps this with the title/stop/fullscreen bar around it."""
+
+    frame_ready = pyqtSignal()
 
     # Extra mpv options, overridable by tests (e.g. {"vo": "null"} headless).
     EXTRA_OPTS = {}
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._mpv = None
+        self.setMinimumHeight(190)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.mpv = None
+        self._ctx = None
+        self.frame_ready.connect(self.update)
+
+    def _get_proc_address(self, _, name):
+        glctx = QOpenGLContext.currentContext()
+        if glctx is None:
+            return 0
+        return int(glctx.getProcAddress(QByteArray(name)))
+
+    def initializeGL(self):
+        opts = {"vo": "libmpv", "user_agent": "dopeIPTV/1.0", "keep_open": "yes"}
+        opts.update(self.EXTRA_OPTS)
+        self.mpv = _libmpv.MPV(**opts)
+        # get_proc_address must be a real ctypes callback - mpv holds a raw
+        # function pointer to it, so the wrapped object is kept alive on
+        # self for as long as the render context exists.
+        self._proc_address_fn = _libmpv.MpvGlGetProcAddressFn(self._get_proc_address)
+        self._ctx = _libmpv.MpvRenderContext(
+            self.mpv, "opengl",
+            opengl_init_params={"get_proc_address": self._proc_address_fn})
+        # Fires on mpv's render thread - only touch Qt via the signal.
+        self._ctx.update_cb = lambda: self.frame_ready.emit()
+
+    def paintGL(self):
+        if not self._ctx:
+            return
+        ratio = self.devicePixelRatioF() if hasattr(self, "devicePixelRatioF") else 1
+        self._ctx.render(flip_y=True, opengl_fbo={
+            "w": int(self.width() * ratio), "h": int(self.height() * ratio),
+            "fbo": self.defaultFramebufferObject(),
+        })
+
+    def shutdown(self):
+        if self._ctx:
+            try:
+                self._ctx.free()
+            except Exception:
+                pass
+            self._ctx = None
+        if self.mpv:
+            try:
+                self.mpv.terminate()
+            except Exception:
+                pass
+            self.mpv = None
+
+
+class EmbeddedPlayer(QWidget):
+    """Video pane inside the app, rendered via libmpv's OpenGL render API."""
+
+    double_clicked = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(6)
 
-        self.video = QWidget(self)
-        # mpv draws straight into this window's X11 surface, so it must be a
-        # real native window and not share one with its ancestors.
-        self.video.setAttribute(Qt.WidgetAttribute.WA_DontCreateNativeAncestors)
-        self.video.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
-        self.video.setStyleSheet("background:#000000;")
-        self.video.setMinimumHeight(190)
-        self.video.setSizePolicy(QSizePolicy.Policy.Expanding,
-                                 QSizePolicy.Policy.Expanding)
+        self.video = _MpvGLWidget(self)
         self.video.installEventFilter(self)
         lay.addWidget(self.video, 1)
 
@@ -697,19 +829,18 @@ class EmbeddedPlayer(QWidget):
             return True
         return super().eventFilter(obj, event)
 
-    def _ensure_mpv(self):
-        if self._mpv is None:
-            opts = {"wid": str(int(self.video.winId())),
-                    "user_agent": "dopeIPTV/1.0",
-                    "keep_open": "yes"}
-            opts.update(self.EXTRA_OPTS)
-            self._mpv = _libmpv.MPV(**opts)
-        return self._mpv
-
     def play(self, url, title):
         try:
-            m = self._ensure_mpv()
             self.title_lbl.setText(title or "")
+            if self.video.mpv is None:
+                # First use: force Qt to create the GL context and run
+                # initializeGL() now (it otherwise only happens lazily on
+                # the next natural paint event).
+                self.video.show()
+                QApplication.instance().processEvents()
+            if self.video.mpv is None:
+                raise RuntimeError("OpenGL context not ready")
+            m = self.video.mpv
             try:
                 m["force-media-title"] = title or "dopeIPTV"
             except Exception:
@@ -722,20 +853,15 @@ class EmbeddedPlayer(QWidget):
             return False
 
     def stop(self):
-        if self._mpv:
+        if self.video.mpv:
             try:
-                self._mpv.command("stop")
+                self.video.mpv.command("stop")
             except Exception:
                 pass
         self.title_lbl.setText("")
 
     def shutdown(self):
-        if self._mpv:
-            try:
-                self._mpv.terminate()
-            except Exception:
-                pass
-            self._mpv = None
+        self.video.shutdown()
 
 # ----------------------------------------------------------------------------
 #  Style - dark, macOS-inspired (dopeIPTV look), unified across all widgets
@@ -1139,6 +1265,9 @@ class MainWindow(QMainWindow):
         self.favs = FavoriteStore(settings)
         self.history = HistoryStore(settings)
         self.mpv = MpvIpcPlayer()
+        self.mpv_window = MpvWindowPlayer() if _libmpv is not None else None
+        if self.mpv_window:
+            self.mpv_window.zap_requested.connect(self._zap)
         self.mode = "live"                 # live | vod | series | fav | history
         self.all_items = []                # current (unfiltered) list
         self.series_ctx = None             # selected series when browsing episodes
@@ -1335,7 +1464,15 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence(Qt.Key.Key_Escape), self,
                   activated=self._exit_player_fullscreen)
         QShortcut(QKeySequence(Qt.Key.Key_F), self,
-                  activated=self._toggle_player_fullscreen)
+                  activated=self._toggle_fullscreen_shortcut)
+
+    # -- fullscreen (F key covers both the embedded pane and, as a fallback,
+    #    the reused external mpv window - no extra buttons for the latter) --
+    def _toggle_fullscreen_shortcut(self):
+        if self.player and self.player.isVisible():
+            self._toggle_player_fullscreen()
+        elif self.mpv_window and self.mpv_window.is_active():
+            self.mpv_window.toggle_fullscreen()
 
     # -- embedded-player fullscreen ---------------------------------------------
     def _toggle_player_fullscreen(self):
@@ -1826,6 +1963,9 @@ class MainWindow(QMainWindow):
             if not self.player.play(url, title):
                 self.player.hide()
                 launch_player(chosen, url, title, self)
+        elif chosen == "mpv" and mode == "window" and self.mpv_window:
+            if not self.mpv_window.play(url, title):
+                launch_player(chosen, url, title, self)
         elif chosen == "mpv" and mode == "window" and self._mpv_reuse():
             run_async(self.pool, lambda: self.mpv.load(url, title),
                      lambda ok: None if ok else self._player_missing("mpv"))
@@ -2013,6 +2153,8 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         if self.player:
             self.player.shutdown()
+        if self.mpv_window:
+            self.mpv_window.shutdown()
         self.mpv.stop()
         super().closeEvent(event)
 
@@ -2060,14 +2202,9 @@ def install_icon(icon):
 # ----------------------------------------------------------------------------
 
 def main():
-    # mpv's --wid embedding needs an X11 window, so when libmpv is available
-    # on a Linux/Wayland session, run under XWayland unless the user has
-    # explicitly chosen a Qt platform themselves.
     if _libmpv is None:
         print(f"[dopeIPTV] Embedded playback disabled: {_libmpv_error}",
               file=sys.stderr)
-    elif sys.platform.startswith("linux") and "QT_QPA_PLATFORM" not in os.environ:
-        os.environ["QT_QPA_PLATFORM"] = "xcb"
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setOrganizationName(ORG)

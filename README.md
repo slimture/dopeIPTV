@@ -15,8 +15,8 @@ An elegant IPTV client for Linux and macOS with a macOS-inspired dark interface,
 - Favorites: save channels into your own groups, browse them under Favorites, remove channels or whole groups via right-click
 - History: every played channel/movie/episode is recorded with a resolved playback URL; browse, replay, remove individual entries, or clear everything
 - A visible loading bar while categories/content are being fetched
-- **Embedded in-app video** (Linux): with `python-mpv` + libmpv installed, channels play directly inside the app's detail panel. Double-click the video or press `F` for fullscreen, `Esc` to leave it. Selecting a new channel switches the stream in place — perfect for zapping through favorites.
-- mpv playback can alternatively reuse a single external window: selecting a new channel loads it into the same mpv instance instead of opening a new one. Ctrl+Right / Ctrl+Left zap to the next/previous channel in both modes. VLC and "open externally" still spawn a normal one-off process/window. Pick the mode under Settings → "Playback (mpv)".
+- **Embedded in-app video** (Linux and macOS): with `python-mpv` + libmpv installed, channels play directly inside the app's detail panel, rendered via libmpv's OpenGL render API — no window embedding involved, so it works the same regardless of desktop/compositor (GNOME, KDE, Hyprland, ...) and is the default whenever available. Double-click the video or press `F` for fullscreen, `Esc` to leave it. Selecting a new channel switches the stream in place — perfect for zapping through favorites.
+- mpv playback can also reuse a single external window instead: selecting a new channel loads it into the same mpv instance rather than opening a new one. With `python-mpv` installed, Ctrl+Right / Ctrl+Left zap to the next/previous channel **even while that mpv window has keyboard focus** — mpv itself intercepts the keys and calls back into the app, since Qt shortcuts alone only fire while the dopeIPTV window is focused. That window's own fullscreen (`f`) and quit (`q`) keys work normally, and the app's `F` shortcut also toggles its fullscreen. VLC and "open externally" still spawn a normal one-off process/window. Pick the mode under Settings → "Playback (mpv)".
 - Channel logos loaded asynchronously and cached
 - Proper application name and icon in the taskbar (instead of "python3")
 - Copy stream URL via right-click; "open externally in mpv/VLC" also available from the same menu
@@ -34,15 +34,18 @@ sudo apt install python3 python3-pip mpv vlc      # Debian/Ubuntu
 
 pip install PyQt6 requests
 
-# Optional but recommended on Linux - enables embedded in-app video:
+# Optional but recommended - enables embedded in-app video (Linux and macOS):
 pip install python-mpv
 ```
 
-> **Embedded playback platform notes:** in-app video uses mpv's window
-> embedding, which requires X11 — on Wayland sessions the app automatically
-> runs under XWayland when libmpv is available. On macOS, embedding isn't
-> supported by libmpv's `wid` mechanism; playback there uses a single reused
-> external mpv window instead (still zappable with Ctrl+Left/Right).
+> **Embedded playback platform notes:** in-app video is rendered via
+> libmpv's OpenGL render API directly into a Qt OpenGL widget, not via
+> window embedding — so it doesn't depend on X11 vs. Wayland or on any
+> particular compositor/window manager, and it's the same technique usable
+> on macOS. It just needs `python-mpv` (which needs libmpv itself, e.g. via
+> `brew install mpv` on macOS) and a working OpenGL context, which Qt
+> provides everywhere. If it's unavailable for any reason, playback falls
+> back to the reused external mpv window automatically.
 
 ## Running
 
@@ -67,7 +70,7 @@ The application icon is installed automatically to `~/.local/share/icons` the fi
 | Action | How |
 |---|---|
 | Play | Double-click, or the "Play in mpv / VLC" buttons |
-| Fullscreen (embedded video) | Double-click the video, or press `F` — `Esc` to exit |
+| Fullscreen | Double-click the embedded video, or press `F` — `Esc` to exit (also toggles fullscreen on the reused mpv window) |
 | Zap to next/previous channel | Ctrl+Right / Ctrl+Left |
 | Switch player temporarily | Right-click a row |
 | Open a series | Double-click the series → episode list appears |
