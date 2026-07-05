@@ -1,6 +1,6 @@
-# SwipTV för Linux
+# dopeIPTV
 
-En elegant IPTV-klient för Linux i SwipTV-stil (macOS-inspirerat mörkt gränssnitt) med stöd för **Xtream Codes API**, **EPG** och uppspelning via **mpv** eller **VLC**.
+En elegant IPTV-klient för Linux i dopeIPTV-stil (macOS-inspirerat mörkt gränssnitt) med stöd för **Xtream Codes API**, **EPG** och uppspelning via **mpv** eller **VLC**.
 
 ## Funktioner
 
@@ -27,7 +27,7 @@ pip install PyQt6 requests
 ## Starta
 
 ```bash
-python3 swiptv.py
+python3 dopeiptv.py
 ```
 
 Första gången anger du din Xtream-server (t.ex. `http://server:8080`), användarnamn och lösenord.
@@ -36,7 +36,7 @@ Första gången anger du din Xtream-server (t.ex. `http://server:8080`), använd
 
 ```bash
 mkdir -p ~/.local/share/applications ~/.local/bin
-cp swiptv.py ~/.local/bin/swiptv.py
+cp dopeiptv.py ~/.local/bin/dopeiptv.py
 cp swiptv.desktop ~/.local/share/applications/
 ```
 

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-SwipTV för Linux — en elegant IPTV-klient med Xtream Codes API och EPG.
+dopeIPTV — en elegant IPTV-klient med Xtream Codes API och EPG.
 Uppspelning via mpv eller VLC. Kräver: python3, PyQt6, requests.
 
     pip install PyQt6 requests
     sudo apt install mpv vlc
 
-Starta med:  python3 swiptv.py
+Starta med:  python3 dopeiptv.py
 """
 
 import base64
@@ -32,8 +32,8 @@ from PyQt6.QtWidgets import (
     QSplitter, QStackedWidget, QToolButton, QVBoxLayout, QWidget,
 )
 
-APP_NAME = "SwipTV för Linux"
-ORG = "swiptv-linux"
+APP_NAME = "dopeIPTV"
+ORG = "dopeiptv"
 
 # ----------------------------------------------------------------------------
 #  Xtream Codes API-klient
@@ -47,7 +47,7 @@ class XtreamClient:
         self.username = username
         self.password = password
         self.session = requests.Session()
-        self.session.headers["User-Agent"] = "SwipTV-Linux/1.0"
+        self.session.headers["User-Agent"] = "dopeIPTV/1.0"
 
     # -- interna hjälpare ----------------------------------------------------
     def _api(self, **params):
@@ -223,15 +223,15 @@ class LogoLoader(QObject):
 # ----------------------------------------------------------------------------
 
 def launch_player(player, url, title, parent=None):
-    title = title or "SwipTV"
+    title = title or "dopeIPTV"
     if player == "mpv":
         exe = shutil.which("mpv")
         cmd = [exe, "--force-media-title=" + title,
-               "--user-agent=SwipTV-Linux/1.0", url] if exe else None
+               "--user-agent=dopeIPTV/1.0", url] if exe else None
         namn = "mpv"
     else:
         exe = shutil.which("vlc") or shutil.which("cvlc")
-        cmd = [exe, "--meta-title", title, "--http-user-agent=SwipTV-Linux/1.0",
+        cmd = [exe, "--meta-title", title, "--http-user-agent=dopeIPTV/1.0",
                url] if exe else None
         namn = "VLC"
     if not cmd:
@@ -243,7 +243,7 @@ def launch_player(player, url, title, parent=None):
                      start_new_session=True)
 
 # ----------------------------------------------------------------------------
-#  Stil — mörkt, macOS-inspirerat (SwipTV-känsla)
+#  Stil — mörkt, macOS-inspirerat (dopeIPTV-känsla)
 # ----------------------------------------------------------------------------
 
 ACCENT = "#4C8DFF"
@@ -354,7 +354,7 @@ class LoginDialog(QDialog):
         lay.setContentsMargins(24, 24, 24, 24)
         lay.setSpacing(14)
 
-        rubrik = QLabel("SwipTV för Linux")
+        rubrik = QLabel("dopeIPTV")
         rubrik.setStyleSheet("font-size:20px; font-weight:700;")
         under = QLabel("Logga in med dina Xtream Codes-uppgifter.")
         under.setStyleSheet("color:#8B8B96;")
@@ -490,7 +490,7 @@ class MainWindow(QMainWindow):
         sl.setContentsMargins(12, 16, 12, 12)
         sl.setSpacing(4)
 
-        titel = QLabel("SwipTV", objectName="AppTitle")
+        titel = QLabel("dopeIPTV", objectName="AppTitle")
         sub = QLabel("för Linux", objectName="AppSub")
         sl.addWidget(titel)
         sl.addWidget(sub)
@@ -845,7 +845,7 @@ class MainWindow(QMainWindow):
 
     # -- uppspelning ----------------------------------------------------------------
     def _stream_for(self, it):
-        titel = it.get("name") or it.get("title") or "SwipTV"
+        titel = it.get("name") or it.get("title") or "dopeIPTV"
         if self.series_ctx:
             return self.client.episode_url(
                 it.get("id"), it.get("container_extension")), titel

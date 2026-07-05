@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=SwipTV
+Name=dopeIPTV
 Comment=IPTV-klient med Xtream Codes och EPG
-Exec=python3 %h/.local/bin/swiptv.py
+Exec=python3 %h/.local/bin/dopeiptv.py
 Icon=multimedia-video-player
 Terminal=false
 Categories=AudioVideo;Video;TV;
