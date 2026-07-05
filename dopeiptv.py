@@ -644,6 +644,24 @@ class MpvIpcPlayer:
                 pass
         self.sock = None
 
+def _register_error_callback(mpv_instance, signal):
+    """Emits `signal` with a human-readable message whenever a loaded file/
+    stream ends because of an error (unreachable server, dead stream, ...).
+    The callback fires on mpv's event thread; emitting a Qt signal is the
+    thread-safe way to get back onto the main thread."""
+    @mpv_instance.event_callback("end-file")
+    def _on_end_file(evt):
+        try:
+            data = evt.data
+            if getattr(data, "reason", None) == _libmpv.MpvEventEndFile.ERROR:
+                try:
+                    msg = _libmpv.ErrorCode.human_readable(data.error)
+                except Exception:
+                    msg = "playback failed"
+                signal.emit(msg)
+        except Exception:
+            pass
+
 # ----------------------------------------------------------------------------
 #  Persistent mpv window via python-mpv (in-process, key-bindable)
 #
@@ -660,6 +678,7 @@ class MpvIpcPlayer:
 
 class MpvWindowPlayer(QObject):
     zap_requested = pyqtSignal(int)   # emitted from mpv's own event thread
+    playback_error = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
@@ -676,6 +695,7 @@ class MpvWindowPlayer(QObject):
                             user_agent="dopeIPTV/1.0", keep_open="yes")
             m.on_key_press("ctrl+right")(lambda: self.zap_requested.emit(1))
             m.on_key_press("ctrl+left")(lambda: self.zap_requested.emit(-1))
+            _register_error_callback(m, self.playback_error)
             self._mpv = m
         return self._mpv
 
@@ -741,6 +761,7 @@ class _MpvGLWidget(QOpenGLWidget):
     wraps this with the title/stop/fullscreen bar around it."""
 
     frame_ready = pyqtSignal()
+    playback_error = pyqtSignal(str)   # emitted from mpv's event thread
 
     # Extra mpv options, overridable by tests (e.g. {"vo": "null"} headless).
     EXTRA_OPTS = {}
@@ -772,6 +793,7 @@ class _MpvGLWidget(QOpenGLWidget):
             opengl_init_params={"get_proc_address": self._proc_address_fn})
         # Fires on mpv's render thread - only touch Qt via the signal.
         self._ctx.update_cb = lambda: self.frame_ready.emit()
+        _register_error_callback(self.mpv, self.playback_error)
 
     def paintGL(self):
         if not self._ctx:
@@ -801,6 +823,7 @@ class EmbeddedPlayer(QWidget):
     """Video pane inside the app, rendered via libmpv's OpenGL render API."""
 
     double_clicked = pyqtSignal()
+    playback_error = pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -810,6 +833,7 @@ class EmbeddedPlayer(QWidget):
 
         self.video = _MpvGLWidget(self)
         self.video.installEventFilter(self)
+        self.video.playback_error.connect(self.playback_error)
         lay.addWidget(self.video, 1)
 
         bar = QHBoxLayout()
@@ -1268,6 +1292,15 @@ class MainWindow(QMainWindow):
         self.mpv_window = MpvWindowPlayer() if _libmpv is not None else None
         if self.mpv_window:
             self.mpv_window.zap_requested.connect(self._zap)
+            self.mpv_window.playback_error.connect(self._playback_error)
+        # One-time migration: older versions auto-persisted playback_mode
+        # ("window") via the Settings dialog while embedding was unreliable
+        # on Wayland compositors. The OpenGL render API made embedded the
+        # right default everywhere, so clear that stale value once - users
+        # who prefer another mode simply pick it again in Settings.
+        if not settings.value("playback_mode_v2"):
+            settings.remove("playback_mode")
+            settings.setValue("playback_mode_v2", "1")
         self.mode = "live"                 # live | vod | series | fav | history
         self.all_items = []                # current (unfiltered) list
         self.series_ctx = None             # selected series when browsing episodes
@@ -1385,7 +1418,15 @@ class MainWindow(QMainWindow):
             self.player.hide()
             self.player.fs_btn.clicked.connect(self._toggle_player_fullscreen)
             self.player.double_clicked.connect(self._toggle_player_fullscreen)
+            self.player.playback_error.connect(self._playback_error)
+            self.player.stop_btn.clicked.connect(self.player.hide)
             dl.addWidget(self.player, 2)
+
+        self.stream_error = QLabel("")
+        self.stream_error.setStyleSheet("color:#FF6B6B; font-size:12px;")
+        self.stream_error.setWordWrap(True)
+        self.stream_error.hide()
+        dl.addWidget(self.stream_error)
 
         self.d_logo = QLabel()
         self.d_logo.setFixedSize(84, 84)
@@ -1955,9 +1996,13 @@ class MainWindow(QMainWindow):
     def _start_playback(self, url, title, icon_url, key, history_kind):
         if history_kind:
             self.history.add(url, title, icon_url, key, history_kind)
+        self.stream_error.hide()
         chosen = self.settings.value("player", "mpv")
         self._last_player = chosen
         mode = self.playback_mode()
+        print(f"[dopeIPTV] Playing via player={chosen} mode={mode} "
+              f"(embedded pane: {'yes' if self.player else 'no'})",
+              file=sys.stderr)
         if chosen == "mpv" and mode == "embedded":
             self.player.show()
             if not self.player.play(url, title):
@@ -1975,6 +2020,14 @@ class MainWindow(QMainWindow):
     def _player_missing(self, name):
         QMessageBox.warning(self, "Player not found",
                            f"{name} was not found. Install it and try again.")
+
+    def _playback_error(self, msg):
+        """A stream failed to play (dead/unreachable channel etc.)."""
+        self.stream_error.setText(f"Stream error: {msg}")
+        self.stream_error.show()
+        self.count_lbl.setText(f"Stream error: {msg}")
+        if self.player:
+            self.player.title_lbl.setText("")
 
     def _zap(self, direction):
         if self.mode not in ("live", "fav"):
