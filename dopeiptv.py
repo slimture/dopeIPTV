@@ -707,14 +707,19 @@ class EmbeddedPlayer(QWidget):
         return self._mpv
 
     def play(self, url, title):
-        m = self._ensure_mpv()
-        self.title_lbl.setText(title or "")
         try:
-            m["force-media-title"] = title or "dopeIPTV"
-        except Exception:
-            pass
-        m.play(url)
-        return True
+            m = self._ensure_mpv()
+            self.title_lbl.setText(title or "")
+            try:
+                m["force-media-title"] = title or "dopeIPTV"
+            except Exception:
+                pass
+            m.play(url)
+            return True
+        except Exception as e:
+            print(f"[dopeIPTV] Embedded playback failed: "
+                 f"{type(e).__name__}: {e}", file=sys.stderr)
+            return False
 
     def stop(self):
         if self._mpv:
@@ -1818,7 +1823,9 @@ class MainWindow(QMainWindow):
         mode = self.playback_mode()
         if chosen == "mpv" and mode == "embedded":
             self.player.show()
-            self.player.play(url, title)
+            if not self.player.play(url, title):
+                self.player.hide()
+                launch_player(chosen, url, title, self)
         elif chosen == "mpv" and mode == "window" and self._mpv_reuse():
             run_async(self.pool, lambda: self.mpv.load(url, title),
                      lambda ok: None if ok else self._player_missing("mpv"))
@@ -2072,11 +2079,14 @@ def main():
     app.setWindowIcon(icon)
     install_icon(icon)
     app.setStyleSheet(STYLE)
+    print(f"[dopeIPTV] Qt platform: {app.platformName()}", file=sys.stderr)
     if _libmpv is not None:
         reason = embedded_playback_reason()
         if reason:
             print(f"[dopeIPTV] Embedded playback disabled: {reason}",
                   file=sys.stderr)
+        else:
+            print("[dopeIPTV] Embedded playback: enabled", file=sys.stderr)
     settings = QSettings(ORG, ORG)
 
     client = None
