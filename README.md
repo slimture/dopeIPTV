@@ -15,7 +15,8 @@ An elegant IPTV client for Linux and macOS with a macOS-inspired dark interface,
 - Favorites: save channels into your own groups, browse them under Favorites, remove channels or whole groups via right-click
 - History: every played channel/movie/episode is recorded with a resolved playback URL; browse, replay, remove individual entries, or clear everything
 - A visible loading bar while categories/content are being fetched
-- mpv playback reuses a single window: selecting a new channel loads it into the same mpv instance instead of opening a new one, and Ctrl+Right / Ctrl+Left zap to the next/previous channel. VLC and "open externally" still spawn a normal one-off process/window.
+- **Embedded in-app video** (Linux): with `python-mpv` + libmpv installed, channels play directly inside the app's detail panel. Double-click the video or press `F` for fullscreen, `Esc` to leave it. Selecting a new channel switches the stream in place — perfect for zapping through favorites.
+- mpv playback can alternatively reuse a single external window: selecting a new channel loads it into the same mpv instance instead of opening a new one. Ctrl+Right / Ctrl+Left zap to the next/previous channel in both modes. VLC and "open externally" still spawn a normal one-off process/window. Pick the mode under Settings → "Playback (mpv)".
 - Channel logos loaded asynchronously and cached
 - Proper application name and icon in the taskbar (instead of "python3")
 - Copy stream URL via right-click; "open externally in mpv/VLC" also available from the same menu
@@ -32,7 +33,16 @@ sudo apt install python3 python3-pip mpv vlc      # Debian/Ubuntu
 # or on macOS: brew install mpv && brew install --cask vlc
 
 pip install PyQt6 requests
+
+# Optional but recommended on Linux - enables embedded in-app video:
+pip install python-mpv
 ```
+
+> **Embedded playback platform notes:** in-app video uses mpv's window
+> embedding, which requires X11 — on Wayland sessions the app automatically
+> runs under XWayland when libmpv is available. On macOS, embedding isn't
+> supported by libmpv's `wid` mechanism; playback there uses a single reused
+> external mpv window instead (still zappable with Ctrl+Left/Right).
 
 ## Running
 
@@ -57,7 +67,8 @@ The application icon is installed automatically to `~/.local/share/icons` the fi
 | Action | How |
 |---|---|
 | Play | Double-click, or the "Play in mpv / VLC" buttons |
-| Zap to next/previous channel | Ctrl+Right / Ctrl+Left (mpv only, while reusing its window) |
+| Fullscreen (embedded video) | Double-click the video, or press `F` — `Esc` to exit |
+| Zap to next/previous channel | Ctrl+Right / Ctrl+Left |
 | Switch player temporarily | Right-click a row |
 | Open a series | Double-click the series → episode list appears |
 | Search | Type in the search field at the top |
