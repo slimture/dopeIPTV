@@ -673,26 +673,45 @@ class MpvWindowPlayer(QObject):
 
     def _ensure_mpv(self):
         if self._mpv is None:
-            m = _libmpv.MPV(force_window=True, user_agent="dopeIPTV/1.0",
-                            keep_open="yes")
+            # Explicitly request mpv's normal standalone behavior (fullscreen
+            # via 'f', quit via 'q', on-screen controller) - without these,
+            # the window mpv opens doesn't respond to its own default keys
+            # at all, which read as "can't fullscreen / can't close it".
+            m = _libmpv.MPV(force_window=True, input_default_bindings=True,
+                            input_vo_keyboard=True, osc=True,
+                            user_agent="dopeIPTV/1.0", keep_open="yes")
             m.on_key_press("ctrl+right")(lambda: self.zap_requested.emit(1))
             m.on_key_press("ctrl+left")(lambda: self.zap_requested.emit(-1))
             self._mpv = m
         return self._mpv
 
     def play(self, url, title):
-        try:
-            m = self._ensure_mpv()
+        for attempt in range(2):
             try:
-                m["force-media-title"] = title or "dopeIPTV"
-            except Exception:
-                pass
-            m.play(url)
-            return True
+                m = self._ensure_mpv()
+                try:
+                    m["force-media-title"] = title or "dopeIPTV"
+                except Exception:
+                    pass
+                m.play(url)
+                return True
+            except Exception as e:
+                print(f"[dopeIPTV] mpv window playback failed: "
+                     f"{type(e).__name__}: {e}", file=sys.stderr)
+                self._mpv = None   # drop a possibly-dead core, retry once
+        return False
+
+    def toggle_fullscreen(self):
+        if not self._mpv:
+            return
+        try:
+            self._mpv.fullscreen = not self._mpv.fullscreen
         except Exception as e:
-            print(f"[dopeIPTV] mpv window playback failed: "
+            print(f"[dopeIPTV] mpv fullscreen toggle failed: "
                  f"{type(e).__name__}: {e}", file=sys.stderr)
-            return False
+
+    def is_active(self):
+        return self._mpv is not None
 
     def stop(self):
         if self._mpv:
@@ -1381,6 +1400,22 @@ class MainWindow(QMainWindow):
         row.addWidget(self.play_vlc)
         dl.addLayout(row)
 
+        # Guaranteed controls for the reused mpv window: mpv's own 'f'/'q'
+        # keys may not reach it on every compositor, so these always work
+        # regardless of that, and regardless of which window has focus.
+        mpv_row = QHBoxLayout()
+        mpv_row.setSpacing(8)
+        self.mpv_fullscreen_btn = QPushButton("Fullscreen mpv")
+        self.mpv_fullscreen_btn.clicked.connect(self._toggle_mpv_window_fullscreen)
+        self.mpv_close_btn = QPushButton("Close mpv window")
+        self.mpv_close_btn.clicked.connect(self._close_mpv_window)
+        mpv_row.addWidget(self.mpv_fullscreen_btn)
+        mpv_row.addWidget(self.mpv_close_btn)
+        if not self.mpv_window:
+            self.mpv_fullscreen_btn.hide()
+            self.mpv_close_btn.hide()
+        dl.addLayout(mpv_row)
+
         root.addWidget(side)
         root.addWidget(mid)
         root.addWidget(det)
@@ -1400,7 +1435,22 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence(Qt.Key.Key_Escape), self,
                   activated=self._exit_player_fullscreen)
         QShortcut(QKeySequence(Qt.Key.Key_F), self,
-                  activated=self._toggle_player_fullscreen)
+                  activated=self._toggle_fullscreen_shortcut)
+
+    # -- mpv window controls (fullscreen/close guaranteed from the app side) ----
+    def _toggle_fullscreen_shortcut(self):
+        if self.player and self.player.isVisible():
+            self._toggle_player_fullscreen()
+        elif self.mpv_window and self.mpv_window.is_active():
+            self.mpv_window.toggle_fullscreen()
+
+    def _toggle_mpv_window_fullscreen(self):
+        if self.mpv_window:
+            self.mpv_window.toggle_fullscreen()
+
+    def _close_mpv_window(self):
+        if self.mpv_window:
+            self.mpv_window.shutdown()
 
     # -- embedded-player fullscreen ---------------------------------------------
     def _toggle_player_fullscreen(self):
