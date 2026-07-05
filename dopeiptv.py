@@ -46,6 +46,25 @@ from PyQt6.QtWidgets import (
 APP_NAME = "dopeIPTV"
 ORG = "dopeiptv"
 
+# Optional embedded playback via libmpv (python-mpv). Imported lazily so the
+# app still runs fine without it - playback then falls back to the reused
+# external mpv window.
+try:
+    import mpv as _libmpv          # pip install python-mpv (needs libmpv)
+except Exception:
+    _libmpv = None
+
+
+def embedded_playback_supported():
+    """True when in-app video is possible: libmpv present and an X11-type
+    window system (mpv's --wid embedding needs X11; on Wayland the app is
+    started under XWayland, see main()). macOS would need mpv's OpenGL
+    render API instead, which is not implemented yet."""
+    if _libmpv is None or not sys.platform.startswith("linux"):
+        return False
+    app = QApplication.instance()
+    return bool(app and app.platformName() == "xcb")
+
 # ----------------------------------------------------------------------------
 #  Xtream Codes API client
 # ----------------------------------------------------------------------------
@@ -613,6 +632,91 @@ class MpvIpcPlayer:
         self.sock = None
 
 # ----------------------------------------------------------------------------
+#  Embedded in-app video (libmpv rendering into a native subwindow)
+# ----------------------------------------------------------------------------
+
+class EmbeddedPlayer(QWidget):
+    """Video pane inside the app, rendered by libmpv into a native child
+    window (mpv --wid embedding). Linux/X11-only; see
+    embedded_playback_supported()."""
+
+    double_clicked = pyqtSignal()
+
+    # Extra mpv options, overridable by tests (e.g. {"vo": "null"} headless).
+    EXTRA_OPTS = {}
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._mpv = None
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(6)
+
+        self.video = QWidget(self)
+        # mpv draws straight into this window's X11 surface, so it must be a
+        # real native window and not share one with its ancestors.
+        self.video.setAttribute(Qt.WidgetAttribute.WA_DontCreateNativeAncestors)
+        self.video.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
+        self.video.setStyleSheet("background:#000000;")
+        self.video.setMinimumHeight(190)
+        self.video.setSizePolicy(QSizePolicy.Policy.Expanding,
+                                 QSizePolicy.Policy.Expanding)
+        self.video.installEventFilter(self)
+        lay.addWidget(self.video, 1)
+
+        bar = QHBoxLayout()
+        bar.setSpacing(8)
+        self.title_lbl = QLabel("", objectName="DetailMeta")
+        self.stop_btn = QPushButton("Stop")
+        self.stop_btn.clicked.connect(self.stop)
+        self.fs_btn = QPushButton("Fullscreen")
+        bar.addWidget(self.title_lbl, 1)
+        bar.addWidget(self.stop_btn)
+        bar.addWidget(self.fs_btn)
+        lay.addLayout(bar)
+
+    def eventFilter(self, obj, event):
+        if obj is self.video and event.type() == event.Type.MouseButtonDblClick:
+            self.double_clicked.emit()
+            return True
+        return super().eventFilter(obj, event)
+
+    def _ensure_mpv(self):
+        if self._mpv is None:
+            opts = {"wid": str(int(self.video.winId())),
+                    "user_agent": "dopeIPTV/1.0",
+                    "keep_open": "yes"}
+            opts.update(self.EXTRA_OPTS)
+            self._mpv = _libmpv.MPV(**opts)
+        return self._mpv
+
+    def play(self, url, title):
+        m = self._ensure_mpv()
+        self.title_lbl.setText(title or "")
+        try:
+            m["force-media-title"] = title or "dopeIPTV"
+        except Exception:
+            pass
+        m.play(url)
+        return True
+
+    def stop(self):
+        if self._mpv:
+            try:
+                self._mpv.command("stop")
+            except Exception:
+                pass
+        self.title_lbl.setText("")
+
+    def shutdown(self):
+        if self._mpv:
+            try:
+                self._mpv.terminate()
+            except Exception:
+                pass
+            self._mpv = None
+
+# ----------------------------------------------------------------------------
 #  Style - dark, macOS-inspired (dopeIPTV look), unified across all widgets
 # ----------------------------------------------------------------------------
 
@@ -1125,6 +1229,14 @@ class MainWindow(QMainWindow):
         dl.setContentsMargins(20, 22, 20, 18)
         dl.setSpacing(12)
 
+        self.player = None
+        if embedded_playback_supported():
+            self.player = EmbeddedPlayer()
+            self.player.hide()
+            self.player.fs_btn.clicked.connect(self._toggle_player_fullscreen)
+            self.player.double_clicked.connect(self._toggle_player_fullscreen)
+            dl.addWidget(self.player, 2)
+
         self.d_logo = QLabel()
         self.d_logo.setFixedSize(84, 84)
         self.d_logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -1189,14 +1301,54 @@ class MainWindow(QMainWindow):
         root.setSizes([220, 560, 380])
         root.setCollapsible(0, False)
         root.setCollapsible(2, False)
+        self._side, self._mid, self._det = side, mid, det
 
         self.tick = QTimer(self)
         self.tick.timeout.connect(self._refresh_progress)
         self.tick.start(60_000)
         self._current_epg = None
+        self._player_fs = False
 
         QShortcut(QKeySequence("Ctrl+Right"), self, activated=lambda: self._zap(1))
         QShortcut(QKeySequence("Ctrl+Left"), self, activated=lambda: self._zap(-1))
+        QShortcut(QKeySequence(Qt.Key.Key_Escape), self,
+                  activated=self._exit_player_fullscreen)
+        QShortcut(QKeySequence(Qt.Key.Key_F), self,
+                  activated=self._toggle_player_fullscreen)
+
+    # -- embedded-player fullscreen ---------------------------------------------
+    def _toggle_player_fullscreen(self):
+        if not self.player or not self.player.isVisible():
+            return
+        if self._player_fs:
+            self._exit_player_fullscreen()
+            return
+        self._player_fs = True
+        # No reparenting (that would recreate the native window mpv draws
+        # into) - instead hide everything around the video and fullscreen
+        # the main window so the player pane stretches to fill it.
+        self._side.hide()
+        self._mid.hide()
+        self._det_hidden = []
+        for i in range(self._det.layout().count()):
+            w = self._det.layout().itemAt(i).widget()
+            if w is not None and w is not self.player and w.isVisible():
+                self._det_hidden.append(w)
+                w.hide()
+        self._was_fullscreen = self.isFullScreen()
+        self.showFullScreen()
+
+    def _exit_player_fullscreen(self):
+        if not self._player_fs:
+            return
+        self._player_fs = False
+        self._side.show()
+        self._mid.show()
+        for w in getattr(self, "_det_hidden", []):
+            w.show()
+        self._det_hidden = []
+        if not getattr(self, "_was_fullscreen", False):
+            self.showNormal()
 
     # -- modes and categories --------------------------------------------------
     def switch_mode(self, mode):
@@ -1635,12 +1787,23 @@ class MainWindow(QMainWindow):
 
         self._start_playback(url, title, icon, key, kind if self.mode != "history" else None)
 
+    def playback_mode(self):
+        default = "embedded" if self.player else "window"
+        mode = self.settings.value("playback_mode", default)
+        if mode == "embedded" and not self.player:
+            mode = "window"
+        return mode
+
     def _start_playback(self, url, title, icon_url, key, history_kind):
         if history_kind:
             self.history.add(url, title, icon_url, key, history_kind)
         chosen = self.settings.value("player", "mpv")
         self._last_player = chosen
-        if chosen == "mpv" and self._mpv_reuse():
+        mode = self.playback_mode()
+        if chosen == "mpv" and mode == "embedded":
+            self.player.show()
+            self.player.play(url, title)
+        elif chosen == "mpv" and mode == "window" and self._mpv_reuse():
             run_async(self.pool, lambda: self.mpv.load(url, title),
                      lambda ok: None if ok else self._player_missing("mpv"))
         else:
@@ -1773,10 +1936,29 @@ class MainWindow(QMainWindow):
         reuse_box = QComboBox()
         reuse_box.addItems(["Yes", "No"])
         reuse_box.setCurrentText("Yes" if self._mpv_reuse() else "No")
+        mode_box = QComboBox()
+        mode_labels = {"embedded": "Embedded (in app)",
+                       "window": "Reused mpv window",
+                       "external": "External player"}
+        for value, label in mode_labels.items():
+            if value == "embedded" and not self.player:
+                continue
+            mode_box.addItem(label, value)
+        current_mode = self.playback_mode()
+        idx = mode_box.findData(current_mode)
+        if idx >= 0:
+            mode_box.setCurrentIndex(idx)
         form.addRow("Default player", player_box)
+        form.addRow("Playback (mpv)", mode_box)
         form.addRow("Live stream format", fmt_box)
         form.addRow("Reuse mpv window (zapping)", reuse_box)
         lay.addLayout(form)
+        if not self.player:
+            hint = QLabel("Embedded playback needs python-mpv + libmpv "
+                          "(Linux/X11). Install with: pip install python-mpv")
+            hint.setStyleSheet("color:#6E6E79; font-size:11px;")
+            hint.setWordWrap(True)
+            lay.addWidget(hint)
 
         switch_btn = QPushButton("Switch account / server...")
         lay.addWidget(switch_btn)
@@ -1798,12 +1980,16 @@ class MainWindow(QMainWindow):
             self.settings.setValue("stream_format", fmt_box.currentText())
             self.settings.setValue("mpv_reuse",
                                    "true" if reuse_box.currentText() == "Yes" else "false")
+            if mode_box.currentData():
+                self.settings.setValue("playback_mode", mode_box.currentData())
 
     def _error(self, msg):
         self.loading_bar.hide()
         self.count_lbl.setText("Error: " + msg)
 
     def closeEvent(self, event):
+        if self.player:
+            self.player.shutdown()
         self.mpv.stop()
         super().closeEvent(event)
 
@@ -1851,6 +2037,12 @@ def install_icon(icon):
 # ----------------------------------------------------------------------------
 
 def main():
+    # mpv's --wid embedding needs an X11 window, so when libmpv is available
+    # on a Linux/Wayland session, run under XWayland unless the user has
+    # explicitly chosen a Qt platform themselves.
+    if (_libmpv is not None and sys.platform.startswith("linux")
+            and "QT_QPA_PLATFORM" not in os.environ):
+        os.environ["QT_QPA_PLATFORM"] = "xcb"
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setOrganizationName(ORG)
