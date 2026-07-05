@@ -11,6 +11,7 @@ An elegant IPTV client for Linux with a macOS-inspired dark interface, supportin
 - Refresh the EPG with one click (↻) — it also refreshes automatically when the current program ends
 - Movie and series details in the detail panel: plot, genre, cast, director, release date, and rating
 - Clear message when a channel has no EPG data (instead of an empty panel)
+- EPG fallback: tries the provider's full EPG table (`get_simple_data_table`) when the short EPG is empty, and still shows listings when the server's timestamps look skewed
 - Channel logos loaded asynchronously
 - Proper application name and icon in the taskbar (instead of "python3")
 - Play in mpv or VLC (double-click, buttons, or right-click menu)

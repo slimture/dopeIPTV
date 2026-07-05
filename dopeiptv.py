@@ -104,6 +104,11 @@ class XtreamClient:
         data = self._api(action="get_short_epg", stream_id=stream_id, limit=limit)
         return (data or {}).get("epg_listings", [])
 
+    def epg_table(self, stream_id):
+        """Full tablå — reservväg när get_short_epg svarar tomt."""
+        data = self._api(action="get_simple_data_table", stream_id=stream_id)
+        return (data or {}).get("epg_listings", [])
+
     # -- ström-URL:er ---------------------------------------------------------
     def live_url(self, stream_id, fmt="ts"):
         ext = "m3u8" if fmt == "m3u8" else "ts"
@@ -809,7 +814,14 @@ class MainWindow(QMainWindow):
             return
         self._clear_epg_rows()
         self._epg_note("Hämtar programguide …")
-        run_async(self.pool, lambda: self.client.short_epg(sid, 8),
+
+        def fetch():
+            listings = self.client.short_epg(sid, 8)
+            if not listings:                     # prova reservvägen
+                listings = self.client.epg_table(sid)
+            return listings
+
+        run_async(self.pool, fetch,
                   lambda e: self._show_epg(e, cur),
                   lambda _: self._epg_error(cur))
 
@@ -875,16 +887,18 @@ class MainWindow(QMainWindow):
         self._clear_epg_rows()
         self._current_epg = None
         now = datetime.now().astimezone()
-        kommande = []
+        alla, kommande = [], []
         aktuellt = None
         for e in listings or []:
             start, stop = epg_times(e)
             post = {"title": b64(e.get("title")), "desc": b64(e.get("description")),
                     "start": start, "stop": stop}
+            alla.append(post)
             if start and stop and start <= now < stop and not aktuellt:
                 aktuellt = post
             elif start and start > now:
                 kommande.append(post)
+        kommande.sort(key=lambda p: p["start"])
 
         if aktuellt:
             self._current_epg = aktuellt
@@ -902,19 +916,34 @@ class MainWindow(QMainWindow):
                 w.set_now("Nu: " + (aktuellt["title"] or ""), pct)
 
         for post in kommande[:6]:
-            kort = QFrame(objectName="Card")
-            kl = QVBoxLayout(kort)
-            kl.setContentsMargins(12, 9, 12, 9)
-            kl.setSpacing(2)
-            t = QLabel(f"{post['start']:%H:%M}", objectName="EpgRowTime")
-            ti = QLabel(post["title"] or "Okänt", objectName="EpgRowTitle")
-            ti.setWordWrap(True)
-            kl.addWidget(t)
-            kl.addWidget(ti)
-            self.epg_lay.insertWidget(self.epg_lay.count() - 1, kort)
+            self._epg_card(post)
 
         if not aktuellt and not kommande:
-            self._epg_note("Ingen programguide tillgänglig för den här kanalen.")
+            daterade = sorted((p for p in alla if p["start"]),
+                              key=lambda p: p["start"])
+            if daterade:
+                # data finns men allt ligger i det förflutna — troligen skickar
+                # servern tider i fel tidszon; visa ändå de senaste posterna
+                self._epg_note("Serverns tablåtider verkar felaktiga — "
+                               "visar de senaste posterna.")
+                for post in daterade[-6:]:
+                    self._epg_card(post, med_datum=True)
+            else:
+                self._epg_note("Ingen programguide tillgänglig "
+                               "för den här kanalen.")
+
+    def _epg_card(self, post, med_datum=False):
+        kort = QFrame(objectName="Card")
+        kl = QVBoxLayout(kort)
+        kl.setContentsMargins(12, 9, 12, 9)
+        kl.setSpacing(2)
+        fmt = "%-d/%-m %H:%M" if med_datum else "%H:%M"
+        t = QLabel(post["start"].strftime(fmt), objectName="EpgRowTime")
+        ti = QLabel(post["title"] or "Okänt", objectName="EpgRowTitle")
+        ti.setWordWrap(True)
+        kl.addWidget(t)
+        kl.addWidget(ti)
+        self.epg_lay.insertWidget(self.epg_lay.count() - 1, kort)
 
     def _refresh_progress(self):
         e = self._current_epg
