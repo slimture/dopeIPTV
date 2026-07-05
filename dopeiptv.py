@@ -644,6 +644,24 @@ class MpvIpcPlayer:
                 pass
         self.sock = None
 
+def _register_error_callback(mpv_instance, signal):
+    """Emits `signal` with a human-readable message whenever a loaded file/
+    stream ends because of an error (unreachable server, dead stream, ...).
+    The callback fires on mpv's event thread; emitting a Qt signal is the
+    thread-safe way to get back onto the main thread."""
+    @mpv_instance.event_callback("end-file")
+    def _on_end_file(evt):
+        try:
+            data = evt.data
+            if getattr(data, "reason", None) == _libmpv.MpvEventEndFile.ERROR:
+                try:
+                    msg = _libmpv.ErrorCode.human_readable(data.error)
+                except Exception:
+                    msg = "playback failed"
+                signal.emit(msg)
+        except Exception:
+            pass
+
 # ----------------------------------------------------------------------------
 #  Persistent mpv window via python-mpv (in-process, key-bindable)
 #
@@ -660,6 +678,7 @@ class MpvIpcPlayer:
 
 class MpvWindowPlayer(QObject):
     zap_requested = pyqtSignal(int)   # emitted from mpv's own event thread
+    playback_error = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
@@ -676,6 +695,7 @@ class MpvWindowPlayer(QObject):
                             user_agent="dopeIPTV/1.0", keep_open="yes")
             m.on_key_press("ctrl+right")(lambda: self.zap_requested.emit(1))
             m.on_key_press("ctrl+left")(lambda: self.zap_requested.emit(-1))
+            _register_error_callback(m, self.playback_error)
             self._mpv = m
         return self._mpv
 
@@ -741,6 +761,7 @@ class _MpvGLWidget(QOpenGLWidget):
     wraps this with the title/stop/fullscreen bar around it."""
 
     frame_ready = pyqtSignal()
+    playback_error = pyqtSignal(str)   # emitted from mpv's event thread
 
     # Extra mpv options, overridable by tests (e.g. {"vo": "null"} headless).
     EXTRA_OPTS = {}
@@ -772,6 +793,7 @@ class _MpvGLWidget(QOpenGLWidget):
             opengl_init_params={"get_proc_address": self._proc_address_fn})
         # Fires on mpv's render thread - only touch Qt via the signal.
         self._ctx.update_cb = lambda: self.frame_ready.emit()
+        _register_error_callback(self.mpv, self.playback_error)
 
     def paintGL(self):
         if not self._ctx:
@@ -798,9 +820,15 @@ class _MpvGLWidget(QOpenGLWidget):
 
 
 class EmbeddedPlayer(QWidget):
-    """Video pane inside the app, rendered via libmpv's OpenGL render API."""
+    """Video pane inside the app, rendered via libmpv's OpenGL render API.
+    In fullscreen the control bar is hidden entirely; instead a translucent
+    overlay with the channel/EPG info fades in on mouse movement and hides
+    itself after a few seconds, so the video keeps the whole screen."""
 
     double_clicked = pyqtSignal()
+    playback_error = pyqtSignal(str)
+
+    OVERLAY_HIDE_MS = 3000
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -810,24 +838,81 @@ class EmbeddedPlayer(QWidget):
 
         self.video = _MpvGLWidget(self)
         self.video.installEventFilter(self)
+        self.video.setMouseTracking(True)
+        self.video.playback_error.connect(self.playback_error)
         lay.addWidget(self.video, 1)
 
-        bar = QHBoxLayout()
-        bar.setSpacing(8)
+        self.bar = QWidget()
+        bl = QHBoxLayout(self.bar)
+        bl.setContentsMargins(0, 0, 0, 0)
+        bl.setSpacing(8)
         self.title_lbl = QLabel("", objectName="DetailMeta")
-        self.stop_btn = QPushButton("Stop")
+        self.stop_btn = QPushButton("Stop", objectName="MiniBtn")
         self.stop_btn.clicked.connect(self.stop)
-        self.fs_btn = QPushButton("Fullscreen")
-        bar.addWidget(self.title_lbl, 1)
-        bar.addWidget(self.stop_btn)
-        bar.addWidget(self.fs_btn)
-        lay.addLayout(bar)
+        self.fs_btn = QPushButton("Fullscreen", objectName="MiniBtn")
+        bl.addWidget(self.title_lbl, 1)
+        bl.addWidget(self.stop_btn)
+        bl.addWidget(self.fs_btn)
+        lay.addWidget(self.bar)
+
+        # Auto-hiding info overlay (fullscreen only)
+        self.overlay = QLabel("", self)
+        self.overlay.setStyleSheet(
+            "background: rgba(16,16,20,210); color:#ECECF1;"
+            "border-radius:10px; padding:10px 14px; font-size:13px;")
+        self.overlay.setWordWrap(True)
+        self.overlay.hide()
+        self._fs_ui = False
+        self._overlay_text = ""
+        self._overlay_timer = QTimer(self)
+        self._overlay_timer.setSingleShot(True)
+        self._overlay_timer.setInterval(self.OVERLAY_HIDE_MS)
+        self._overlay_timer.timeout.connect(self.overlay.hide)
 
     def eventFilter(self, obj, event):
-        if obj is self.video and event.type() == event.Type.MouseButtonDblClick:
-            self.double_clicked.emit()
-            return True
+        if obj is self.video:
+            if event.type() == event.Type.MouseButtonDblClick:
+                self.double_clicked.emit()
+                return True
+            if event.type() == event.Type.MouseMove and self._fs_ui:
+                self._show_overlay()
         return super().eventFilter(obj, event)
+
+    # -- overlay -----------------------------------------------------------
+    def set_overlay_info(self, text):
+        self._overlay_text = text or ""
+        if self._fs_ui and self.overlay.isVisible():
+            self.overlay.setText(self._overlay_text)
+            self._place_overlay()
+
+    def set_fullscreen_ui(self, fullscreen):
+        self._fs_ui = fullscreen
+        self.bar.setVisible(not fullscreen)
+        if fullscreen:
+            self._show_overlay()
+        else:
+            self.overlay.hide()
+            self._overlay_timer.stop()
+
+    def _show_overlay(self):
+        if not self._overlay_text:
+            return
+        self.overlay.setText(self._overlay_text)
+        self._place_overlay()
+        self.overlay.show()
+        self.overlay.raise_()
+        self._overlay_timer.start()
+
+    def _place_overlay(self):
+        margin = 24
+        self.overlay.setFixedWidth(min(self.width() - 2 * margin, 640))
+        self.overlay.adjustSize()
+        self.overlay.move(margin, self.height() - self.overlay.height() - margin)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self.overlay.isVisible():
+            self._place_overlay()
 
     def play(self, url, title):
         try:
@@ -948,6 +1033,7 @@ QPushButton {{
 QPushButton:hover  {{ background: #34343E; }}
 QPushButton#Primary {{ background: {ACCENT}; border: none; color: white; }}
 QPushButton#Primary:hover {{ background: #5E99FF; }}
+QPushButton#MiniBtn {{ padding: 4px 10px; font-size: 11px; border-radius: 7px; }}
 
 QScrollArea {{ background: transparent; border: none; }}
 QScrollArea > QWidget > QWidget {{ background: transparent; }}
@@ -1268,6 +1354,15 @@ class MainWindow(QMainWindow):
         self.mpv_window = MpvWindowPlayer() if _libmpv is not None else None
         if self.mpv_window:
             self.mpv_window.zap_requested.connect(self._zap)
+            self.mpv_window.playback_error.connect(self._playback_error)
+        # One-time migration: older versions auto-persisted playback_mode
+        # ("window") via the Settings dialog while embedding was unreliable
+        # on Wayland compositors. The OpenGL render API made embedded the
+        # right default everywhere, so clear that stale value once - users
+        # who prefer another mode simply pick it again in Settings.
+        if not settings.value("playback_mode_v2"):
+            settings.remove("playback_mode")
+            settings.setValue("playback_mode_v2", "1")
         self.mode = "live"                 # live | vod | series | fav | history
         self.all_items = []                # current (unfiltered) list
         self.series_ctx = None             # selected series when browsing episodes
@@ -1338,6 +1433,13 @@ class MainWindow(QMainWindow):
 
         self.search = QLineEdit(objectName="Search")
         self.search.setPlaceholderText("Search channels, movies or series...")
+        # Debounce for the auto-playing preview: arrowing quickly through the
+        # channel list shouldn't open a stream per row, only for the row the
+        # user actually settles on.
+        self._preview_timer = QTimer(self)
+        self._preview_timer.setSingleShot(True)
+        self._preview_timer.timeout.connect(self._play_preview)
+
         self._search_timer = QTimer(self)
         self._search_timer.setSingleShot(True)
         self._search_timer.timeout.connect(self._apply_filter)
@@ -1385,7 +1487,15 @@ class MainWindow(QMainWindow):
             self.player.hide()
             self.player.fs_btn.clicked.connect(self._toggle_player_fullscreen)
             self.player.double_clicked.connect(self._toggle_player_fullscreen)
+            self.player.playback_error.connect(self._playback_error)
+            self.player.stop_btn.clicked.connect(self.player.hide)
             dl.addWidget(self.player, 2)
+
+        self.stream_error = QLabel("")
+        self.stream_error.setStyleSheet("color:#FF6B6B; font-size:12px;")
+        self.stream_error.setWordWrap(True)
+        self.stream_error.hide()
+        dl.addWidget(self.stream_error)
 
         self.d_logo = QLabel()
         self.d_logo.setFixedSize(84, 84)
@@ -1482,17 +1592,30 @@ class MainWindow(QMainWindow):
             self._exit_player_fullscreen()
             return
         self._player_fs = True
-        # No reparenting (that would recreate the native window mpv draws
+        # No reparenting (that would tear down the GL context mpv renders
         # into) - instead hide everything around the video and fullscreen
         # the main window so the player pane stretches to fill it.
+        # Iterating children() catches every direct child widget, including
+        # ones living inside nested layouts (e.g. the Play in mpv/VLC button
+        # row) - iterating the layout's own items misses those, because
+        # layout items whose content is a sub-layout return None from
+        # .widget().
         self._side.hide()
         self._mid.hide()
         self._det_hidden = []
-        for i in range(self._det.layout().count()):
-            w = self._det.layout().itemAt(i).widget()
-            if w is not None and w is not self.player and w.isVisible():
+        for w in self._det.children():
+            if (isinstance(w, QWidget) and w is not self.player
+                    and w.isVisible()):
                 self._det_hidden.append(w)
                 w.hide()
+        # The detail pane's layout keeps its 20px margins otherwise, leaving a
+        # black frame around the video - drop them (and the pane's border)
+        # while fullscreen so the video truly fills the screen.
+        det_lay = self._det.layout()
+        self._det_margins = det_lay.contentsMargins()
+        det_lay.setContentsMargins(0, 0, 0, 0)
+        self._det.setStyleSheet("#DetailPane { background:#000000; border:none; }")
+        self.player.set_fullscreen_ui(True)
         self._was_fullscreen = self.isFullScreen()
         self.showFullScreen()
 
@@ -1505,6 +1628,12 @@ class MainWindow(QMainWindow):
         for w in getattr(self, "_det_hidden", []):
             w.show()
         self._det_hidden = []
+        m = getattr(self, "_det_margins", None)
+        if m is not None:
+            self._det.layout().setContentsMargins(m.left(), m.top(),
+                                                  m.right(), m.bottom())
+        self._det.setStyleSheet("")
+        self.player.set_fullscreen_ui(False)
         if not getattr(self, "_was_fullscreen", False):
             self.showNormal()
 
@@ -1667,19 +1796,25 @@ class MainWindow(QMainWindow):
             self._show_media_info(info, self._current_key)
         elif self.mode in ("live", "fav"):
             self.d_meta.setText("Live channel")
-            if it.get("stream_id"):
-                self.epg_refresh.show()
+            # "is not None": a perfectly valid stream_id of 0 is falsy
+            if it.get("stream_id") is not None:
+                if not self._player_fs:
+                    self.epg_refresh.show()
                 self._request_epg()
+                if (self.player and self._autoplay_preview()
+                        and self.playback_mode() == "embedded"
+                        and self.settings.value("player", "mpv") == "mpv"):
+                    self._preview_timer.start(350)
         elif self.mode == "vod":
             meta = " * ".join(x for x in (
                 str(it.get("year") or ""),
                 f"* {it['rating']}" if it.get("rating") else "",) if x)
             self.d_meta.setText(meta or "Movie")
-            if it.get("stream_id"):
+            if it.get("stream_id") is not None:
                 self._request_media_info("vod", it["stream_id"], self._current_key)
         else:
             self.d_meta.setText("Series - double-click for episodes")
-            if it.get("series_id"):
+            if it.get("series_id") is not None:
                 self._request_media_info("series", it["series_id"], self._current_key)
 
     def _set_detail_logo(self, pm):
@@ -1714,7 +1849,7 @@ class MainWindow(QMainWindow):
         if not it or self.mode not in ("live", "fav") or self.series_ctx:
             return
         sid = it.get("stream_id")
-        if not sid:
+        if sid is None:
             return
         key = self._item_key(it)
         self._clear_epg_rows()
@@ -1821,7 +1956,16 @@ class MainWindow(QMainWindow):
             self.now_title.setText(current["title"] or "Unknown programme")
             self.now_desc.setText(current["desc"][:400])
             self._refresh_progress()
-            self.now_card.show()
+            if not self._player_fs:      # in fullscreen the overlay shows it
+                self.now_card.show()
+            if self.player:
+                info = (f"{self.d_title.text()}\n"
+                        f"{current['title'] or 'Unknown programme'}   "
+                        f"{current['start']:%H:%M}-{current['stop']:%H:%M}")
+                nxt = upcoming[0] if upcoming else None
+                if nxt:
+                    info += f"\nNext: {nxt['title'] or '?'} at {nxt['start']:%H:%M}"
+                self.player.set_overlay_info(info)
 
         for post in upcoming[:6]:
             self._epg_card(post)
@@ -1866,7 +2010,7 @@ class MainWindow(QMainWindow):
     # -- series -> episodes ---------------------------------------------------------
     def _enter_series(self, series):
         sid = series.get("series_id")
-        if not sid:
+        if sid is None:
             return
         self.loading_bar.show()
         self.count_lbl.setText("Loading episodes...")
@@ -1945,6 +2089,24 @@ class MainWindow(QMainWindow):
 
         self._start_playback(url, title, icon, key, kind if self.mode != "history" else None)
 
+    def _autoplay_preview(self):
+        return self.settings.value("autoplay_preview", "true") == "true"
+
+    def _play_preview(self):
+        """Auto-starts the selected live channel in the embedded preview pane.
+        Intentionally does NOT record history - only explicit plays do."""
+        it = self.list_model.item_at(self.listw.currentIndex().row())
+        if (not it or self.mode not in ("live", "fav") or self.series_ctx
+                or not self.player or self.playback_mode() != "embedded"):
+            return
+        url, title = self._stream_for(it)
+        if not url:
+            return
+        self.stream_error.hide()
+        self.player.show()
+        self.player.set_overlay_info(title)
+        self.player.play(url, title)
+
     def playback_mode(self):
         default = "embedded" if self.player else "window"
         mode = self.settings.value("playback_mode", default)
@@ -1955,11 +2117,16 @@ class MainWindow(QMainWindow):
     def _start_playback(self, url, title, icon_url, key, history_kind):
         if history_kind:
             self.history.add(url, title, icon_url, key, history_kind)
+        self.stream_error.hide()
         chosen = self.settings.value("player", "mpv")
         self._last_player = chosen
         mode = self.playback_mode()
+        print(f"[dopeIPTV] Playing via player={chosen} mode={mode} "
+              f"(embedded pane: {'yes' if self.player else 'no'})",
+              file=sys.stderr)
         if chosen == "mpv" and mode == "embedded":
             self.player.show()
+            self.player.set_overlay_info(title)
             if not self.player.play(url, title):
                 self.player.hide()
                 launch_player(chosen, url, title, self)
@@ -1975,6 +2142,17 @@ class MainWindow(QMainWindow):
     def _player_missing(self, name):
         QMessageBox.warning(self, "Player not found",
                            f"{name} was not found. Install it and try again.")
+
+    def _playback_error(self, msg):
+        """A stream failed to play (dead/unreachable channel etc.)."""
+        self.count_lbl.setText(f"Stream error: {msg}")
+        if self._player_fs and self.player:
+            self.player.set_overlay_info(f"Stream error: {msg}")
+        else:
+            self.stream_error.setText(f"Stream error: {msg}")
+            self.stream_error.show()
+        if self.player:
+            self.player.title_lbl.setText("")
 
     def _zap(self, direction):
         if self.mode not in ("live", "fav"):
@@ -2111,8 +2289,12 @@ class MainWindow(QMainWindow):
         idx = mode_box.findData(current_mode)
         if idx >= 0:
             mode_box.setCurrentIndex(idx)
+        autoplay_box = QComboBox()
+        autoplay_box.addItems(["Yes", "No"])
+        autoplay_box.setCurrentText("Yes" if self._autoplay_preview() else "No")
         form.addRow("Default player", player_box)
         form.addRow("Playback (mpv)", mode_box)
+        form.addRow("Auto-play preview on selection", autoplay_box)
         form.addRow("Live stream format", fmt_box)
         form.addRow("Reuse mpv window (zapping)", reuse_box)
         lay.addLayout(form)
@@ -2141,6 +2323,9 @@ class MainWindow(QMainWindow):
         if d.exec():
             self.settings.setValue("player", player_box.currentText())
             self.settings.setValue("stream_format", fmt_box.currentText())
+            self.settings.setValue(
+                "autoplay_preview",
+                "true" if autoplay_box.currentText() == "Yes" else "false")
             self.settings.setValue("mpv_reuse",
                                    "true" if reuse_box.currentText() == "Yes" else "false")
             if mode_box.currentData():
