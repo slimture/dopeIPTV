@@ -151,20 +151,32 @@ def epg_times(entry):
 class WorkerSignals(QObject):
     done = pyqtSignal(object)
     fail = pyqtSignal(str)
+    finished = pyqtSignal()
 
 
 class Worker(QRunnable):
     def __init__(self, fn, *args, **kwargs):
         super().__init__()
+        # QThreadPool får inte radera oss på pool-tråden: WorkerSignals bor i
+        # huvudtråden och skulle annars förstöras därifrån mitt under
+        # signalleverans (segfault). Livslängden styrs av _ACTIVE_WORKERS.
+        self.setAutoDelete(False)
         self.fn, self.args, self.kwargs = fn, args, kwargs
         self.signals = WorkerSignals()
 
     @pyqtSlot()
     def run(self):
         try:
-            self.signals.done.emit(self.fn(*self.args, **self.kwargs))
+            result = self.fn(*self.args, **self.kwargs)
         except Exception as e:
             self.signals.fail.emit(str(e))
+        else:
+            self.signals.done.emit(result)
+        finally:
+            self.signals.finished.emit()
+
+
+_ACTIVE_WORKERS = set()
 
 
 def run_async(pool, fn, on_done, on_fail=None, *args, **kwargs):
@@ -172,6 +184,10 @@ def run_async(pool, fn, on_done, on_fail=None, *args, **kwargs):
     w.signals.done.connect(on_done)
     if on_fail:
         w.signals.fail.connect(on_fail)
+    # Håll en referens tills alla köade signaler levererats i huvudtråden,
+    # så att arbetaren (och dess signals-objekt) frigörs där och inte i poolen.
+    _ACTIVE_WORKERS.add(w)
+    w.signals.finished.connect(lambda: _ACTIVE_WORKERS.discard(w))
     pool.start(w)
     return w
 
@@ -180,13 +196,11 @@ def run_async(pool, fn, on_done, on_fail=None, *args, **kwargs):
 # ----------------------------------------------------------------------------
 
 class LogoLoader(QObject):
-    loaded = pyqtSignal(str, QPixmap)
-
     def __init__(self, pool):
         super().__init__()
         self.pool = pool
         self.cache = {}
-        self.pending = set()
+        self.waiting = {}          # url -> [callbacks]
 
     def get(self, url, callback):
         if not url:
@@ -194,12 +208,10 @@ class LogoLoader(QObject):
         if url in self.cache:
             callback(self.cache[url])
             return
-        self.loaded.connect(
-            lambda u, pm, cb=callback, want=url: cb(pm) if u == want else None
-        )
-        if url in self.pending:
+        if url in self.waiting:
+            self.waiting[url].append(callback)
             return
-        self.pending.add(url)
+        self.waiting[url] = [callback]
 
         def fetch(u=url):
             r = requests.get(u, timeout=10)
@@ -208,15 +220,19 @@ class LogoLoader(QObject):
 
         def done(result):
             u, data = result
+            callbacks = self.waiting.pop(u, [])
             pm = QPixmap()
             if pm.loadFromData(data):
                 pm = pm.scaled(96, 96, Qt.AspectRatioMode.KeepAspectRatio,
                                Qt.TransformationMode.SmoothTransformation)
                 self.cache[u] = pm
-                self.loaded.emit(u, pm)
-            self.pending.discard(u)
+                for cb in callbacks:
+                    try:
+                        cb(pm)
+                    except RuntimeError:
+                        pass   # widgeten hann tas bort (listan rensades)
 
-        run_async(self.pool, fetch, done, lambda _: self.pending.discard(url))
+        run_async(self.pool, fetch, done, lambda _: self.waiting.pop(url, None))
 
 # ----------------------------------------------------------------------------
 #  Extern uppspelning: mpv / VLC
@@ -941,13 +957,13 @@ def main():
 
     client = None
     while client is None:
-        dlg = LoginDialog(settings)
         # Hoppa över dialogen om vi redan har fungerande uppgifter
         server, user, pw = (settings.value("server", ""),
                             settings.value("username", ""),
                             settings.value("password", ""))
         forsta = not (server and user and pw)
         if forsta:
+            dlg = LoginDialog(settings)
             if not dlg.exec():
                 return 0
             server, user, pw = dlg.values()
