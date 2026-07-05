@@ -74,6 +74,9 @@ def embedded_playback_reason():
     return None
 
 
+_forced_xwayland = False  # set in main(); read by MainWindow.playback_mode()
+
+
 def embedded_playback_supported():
     """True when in-app video is possible: libmpv present and an X11-type
     window system (mpv's --wid embedding needs X11; on Wayland the app is
@@ -648,6 +651,65 @@ class MpvIpcPlayer:
         self.sock = None
 
 # ----------------------------------------------------------------------------
+#  Persistent mpv window via python-mpv (in-process, key-bindable)
+#
+#  MpvIpcPlayer above spawns mpv as a *separate process*; Qt shortcuts like
+#  Ctrl+Right only fire while the dopeIPTV window itself has keyboard focus,
+#  so zapping stops working the moment the user clicks into that external
+#  window to actually watch. python-mpv instead embeds libmpv in this same
+#  process (no subprocess, no socket), so we can bind zap keys *inside mpv*
+#  - mpv intercepts them itself and calls back into Python regardless of
+#  which window currently has focus. Used automatically when python-mpv is
+#  available; falls back to MpvIpcPlayer (needs only the mpv binary) when it
+#  isn't installed.
+# ----------------------------------------------------------------------------
+
+class MpvWindowPlayer(QObject):
+    zap_requested = pyqtSignal(int)   # emitted from mpv's own event thread
+
+    def __init__(self):
+        super().__init__()
+        self._mpv = None
+
+    def _ensure_mpv(self):
+        if self._mpv is None:
+            m = _libmpv.MPV(force_window=True, user_agent="dopeIPTV/1.0",
+                            keep_open="yes")
+            m.on_key_press("ctrl+right")(lambda: self.zap_requested.emit(1))
+            m.on_key_press("ctrl+left")(lambda: self.zap_requested.emit(-1))
+            self._mpv = m
+        return self._mpv
+
+    def play(self, url, title):
+        try:
+            m = self._ensure_mpv()
+            try:
+                m["force-media-title"] = title or "dopeIPTV"
+            except Exception:
+                pass
+            m.play(url)
+            return True
+        except Exception as e:
+            print(f"[dopeIPTV] mpv window playback failed: "
+                 f"{type(e).__name__}: {e}", file=sys.stderr)
+            return False
+
+    def stop(self):
+        if self._mpv:
+            try:
+                self._mpv.command("stop")
+            except Exception:
+                pass
+
+    def shutdown(self):
+        if self._mpv:
+            try:
+                self._mpv.terminate()
+            except Exception:
+                pass
+            self._mpv = None
+
+# ----------------------------------------------------------------------------
 #  Embedded in-app video (libmpv rendering into a native subwindow)
 # ----------------------------------------------------------------------------
 
@@ -1139,6 +1201,9 @@ class MainWindow(QMainWindow):
         self.favs = FavoriteStore(settings)
         self.history = HistoryStore(settings)
         self.mpv = MpvIpcPlayer()
+        self.mpv_window = MpvWindowPlayer() if _libmpv is not None else None
+        if self.mpv_window:
+            self.mpv_window.zap_requested.connect(self._zap)
         self.mode = "live"                 # live | vod | series | fav | history
         self.all_items = []                # current (unfiltered) list
         self.series_ctx = None             # selected series when browsing episodes
@@ -1809,7 +1874,14 @@ class MainWindow(QMainWindow):
         self._start_playback(url, title, icon, key, kind if self.mode != "history" else None)
 
     def playback_mode(self):
-        default = "embedded" if self.player else "window"
+        # --wid embedding relies on X11 window reparenting, which several
+        # Wayland compositors (GNOME/Mutter in particular) don't propagate
+        # correctly for XWayland clients - the video "embeds" without error
+        # but renders as its own floating window. We can't detect that from
+        # here, so when we ourselves forced XWayland to enable embedding,
+        # default to the reused-window mode instead; embedded is still
+        # available as an explicit choice for compositors that do handle it.
+        default = "window" if _forced_xwayland else ("embedded" if self.player else "window")
         mode = self.settings.value("playback_mode", default)
         if mode == "embedded" and not self.player:
             mode = "window"
@@ -1825,6 +1897,9 @@ class MainWindow(QMainWindow):
             self.player.show()
             if not self.player.play(url, title):
                 self.player.hide()
+                launch_player(chosen, url, title, self)
+        elif chosen == "mpv" and mode == "window" and self.mpv_window:
+            if not self.mpv_window.play(url, title):
                 launch_player(chosen, url, title, self)
         elif chosen == "mpv" and mode == "window" and self._mpv_reuse():
             run_async(self.pool, lambda: self.mpv.load(url, title),
@@ -2013,6 +2088,8 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         if self.player:
             self.player.shutdown()
+        if self.mpv_window:
+            self.mpv_window.shutdown()
         self.mpv.stop()
         super().closeEvent(event)
 
@@ -2060,6 +2137,7 @@ def install_icon(icon):
 # ----------------------------------------------------------------------------
 
 def main():
+    global _forced_xwayland
     # mpv's --wid embedding needs an X11 window, so when libmpv is available
     # on a Linux/Wayland session, run under XWayland unless the user has
     # explicitly chosen a Qt platform themselves.
@@ -2068,6 +2146,7 @@ def main():
               file=sys.stderr)
     elif sys.platform.startswith("linux") and "QT_QPA_PLATFORM" not in os.environ:
         os.environ["QT_QPA_PLATFORM"] = "xcb"
+        _forced_xwayland = os.environ.get("XDG_SESSION_TYPE") == "wayland"
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setOrganizationName(ORG)

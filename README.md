@@ -15,8 +15,8 @@ An elegant IPTV client for Linux and macOS with a macOS-inspired dark interface,
 - Favorites: save channels into your own groups, browse them under Favorites, remove channels or whole groups via right-click
 - History: every played channel/movie/episode is recorded with a resolved playback URL; browse, replay, remove individual entries, or clear everything
 - A visible loading bar while categories/content are being fetched
-- **Embedded in-app video** (Linux): with `python-mpv` + libmpv installed, channels play directly inside the app's detail panel. Double-click the video or press `F` for fullscreen, `Esc` to leave it. Selecting a new channel switches the stream in place — perfect for zapping through favorites.
-- mpv playback can alternatively reuse a single external window: selecting a new channel loads it into the same mpv instance instead of opening a new one. Ctrl+Right / Ctrl+Left zap to the next/previous channel in both modes. VLC and "open externally" still spawn a normal one-off process/window. Pick the mode under Settings → "Playback (mpv)".
+- **Embedded in-app video** (Linux, X11 desktops): with `python-mpv` + libmpv installed, channels play directly inside the app's detail panel. Double-click the video or press `F` for fullscreen, `Esc` to leave it. Selecting a new channel switches the stream in place — perfect for zapping through favorites. Not reliable on GNOME/Mutter (see the platform note below), where the reused-window mode is used instead by default.
+- mpv playback can otherwise reuse a single window: selecting a new channel loads it into the same mpv instance instead of opening a new one. With `python-mpv` installed, Ctrl+Right / Ctrl+Left zap to the next/previous channel **even while that mpv window has keyboard focus** — mpv itself intercepts the keys and calls back into the app, since Qt shortcuts alone only fire while the dopeIPTV window is focused. VLC and "open externally" still spawn a normal one-off process/window. Pick the mode under Settings → "Playback (mpv)".
 - Channel logos loaded asynchronously and cached
 - Proper application name and icon in the taskbar (instead of "python3")
 - Copy stream URL via right-click; "open externally in mpv/VLC" also available from the same menu
@@ -40,9 +40,16 @@ pip install python-mpv
 
 > **Embedded playback platform notes:** in-app video uses mpv's window
 > embedding, which requires X11 — on Wayland sessions the app automatically
-> runs under XWayland when libmpv is available. On macOS, embedding isn't
-> supported by libmpv's `wid` mechanism; playback there uses a single reused
-> external mpv window instead (still zappable with Ctrl+Left/Right).
+> runs under XWayland when libmpv is available. Embedding relies on X11
+> window reparenting, which some Wayland compositors (notably GNOME/Mutter)
+> don't propagate correctly for XWayland clients: mpv reports success, but
+> the video renders as its own floating window instead of inside the app.
+> Because this can't be reliably detected, dopeIPTV defaults to the reused
+> **window** mode whenever it had to force XWayland itself, and only
+> defaults to **embedded** on native X11 sessions — you can still pick
+> "Embedded (in app)" manually in Settings if your compositor happens to
+> handle it correctly. On macOS, `wid` embedding isn't supported by libmpv
+> at all; playback there always uses the reused external mpv window.
 
 ## Running
 
