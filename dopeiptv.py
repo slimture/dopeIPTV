@@ -48,11 +48,30 @@ ORG = "dopeiptv"
 
 # Optional embedded playback via libmpv (python-mpv). Imported lazily so the
 # app still runs fine without it - playback then falls back to the reused
-# external mpv window.
+# external mpv window. The exception is kept (not just swallowed) so the UI
+# can explain *why* embedding isn't available instead of silently falling
+# back to an external window with no explanation.
+_libmpv_error = None
 try:
     import mpv as _libmpv          # pip install python-mpv (needs libmpv)
-except Exception:
+except Exception as _e:
     _libmpv = None
+    _libmpv_error = f"{type(_e).__name__}: {_e}"
+
+
+def embedded_playback_reason():
+    """Returns None if in-app video is available, otherwise a short
+    human-readable explanation of why it isn't (shown in Settings)."""
+    if _libmpv is None:
+        return f"python-mpv/libmpv failed to load ({_libmpv_error})"
+    if not sys.platform.startswith("linux"):
+        return "embedded playback needs Linux (X11/XWayland)"
+    app = QApplication.instance()
+    platform = app.platformName() if app else "?"
+    if platform != "xcb":
+        return (f"needs the X11 Qt platform ('xcb'), currently running on "
+                f"'{platform}' - is XWayland installed?")
+    return None
 
 
 def embedded_playback_supported():
@@ -60,10 +79,7 @@ def embedded_playback_supported():
     window system (mpv's --wid embedding needs X11; on Wayland the app is
     started under XWayland, see main()). macOS would need mpv's OpenGL
     render API instead, which is not implemented yet."""
-    if _libmpv is None or not sys.platform.startswith("linux"):
-        return False
-    app = QApplication.instance()
-    return bool(app and app.platformName() == "xcb")
+    return embedded_playback_reason() is None
 
 # ----------------------------------------------------------------------------
 #  Xtream Codes API client
@@ -1954,8 +1970,8 @@ class MainWindow(QMainWindow):
         form.addRow("Reuse mpv window (zapping)", reuse_box)
         lay.addLayout(form)
         if not self.player:
-            hint = QLabel("Embedded playback needs python-mpv + libmpv "
-                          "(Linux/X11). Install with: pip install python-mpv")
+            reason = embedded_playback_reason() or "unknown reason"
+            hint = QLabel(f"Embedded playback unavailable: {reason}")
             hint.setStyleSheet("color:#6E6E79; font-size:11px;")
             hint.setWordWrap(True)
             lay.addWidget(hint)
@@ -2040,8 +2056,10 @@ def main():
     # mpv's --wid embedding needs an X11 window, so when libmpv is available
     # on a Linux/Wayland session, run under XWayland unless the user has
     # explicitly chosen a Qt platform themselves.
-    if (_libmpv is not None and sys.platform.startswith("linux")
-            and "QT_QPA_PLATFORM" not in os.environ):
+    if _libmpv is None:
+        print(f"[dopeIPTV] Embedded playback disabled: {_libmpv_error}",
+              file=sys.stderr)
+    elif sys.platform.startswith("linux") and "QT_QPA_PLATFORM" not in os.environ:
         os.environ["QT_QPA_PLATFORM"] = "xcb"
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
@@ -2054,6 +2072,11 @@ def main():
     app.setWindowIcon(icon)
     install_icon(icon)
     app.setStyleSheet(STYLE)
+    if _libmpv is not None:
+        reason = embedded_playback_reason()
+        if reason:
+            print(f"[dopeIPTV] Embedded playback disabled: {reason}",
+                  file=sys.stderr)
     settings = QSettings(ORG, ORG)
 
     client = None
