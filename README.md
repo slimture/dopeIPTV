@@ -11,7 +11,8 @@ An elegant IPTV client for Linux with a macOS-inspired dark interface, supportin
 - Refresh the EPG with one click (↻) — it also refreshes automatically when the current program ends
 - Movie and series details in the detail panel: plot, genre, cast, director, release date, and rating
 - Clear message when a channel has no EPG data (instead of an empty panel)
-- EPG fallback: tries the provider's full EPG table (`get_simple_data_table`) when the short EPG is empty, and still shows listings when the server's timestamps look skewed
+- EPG fallback chain: short EPG → full EPG table (`get_simple_data_table`) → the provider's XMLTV guide (`xmltv.php`), matched by EPG channel id or channel name — and listings are still shown when the server's timestamps look skewed
+- Favorites: save channels into your own groups (right-click a channel → "Lägg till i favoritgrupp"), browse them under ⭐ Favoriter, remove channels or whole groups via right-click
 - Channel logos loaded asynchronously
 - Proper application name and icon in the taskbar (instead of "python3")
 - Play in mpv or VLC (double-click, buttons, or right-click menu)
@@ -56,6 +57,8 @@ The application icon is installed automatically to `~/.local/share/icons` the fi
 | Open a series | Double-click the series → episode list appears |
 | Search | Type in the search field at the top |
 | Refresh EPG | The "↻ Uppdatera EPG" button in the detail panel |
+| Add a favorite | Right-click a channel → "⭐ Lägg till i favoritgrupp" |
+| Remove a favorite / group | In ⭐ Favoriter: right-click the channel or the group |
 | Switch account | Settings → "Byt konto / server" |
 
 ## Troubleshooting

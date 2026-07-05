@@ -12,9 +12,13 @@ Starta med:  python3 dopeiptv.py
 
 import base64
 import html
+import io
+import json
 import shutil
 import subprocess
 import sys
+import threading
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 
 import requests
@@ -27,9 +31,9 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import (
     QApplication, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QFrame,
-    QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow,
-    QMenu, QMessageBox, QProgressBar, QPushButton, QScrollArea, QSizePolicy,
-    QSplitter, QStackedWidget, QToolButton, QVBoxLayout, QWidget,
+    QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem,
+    QMainWindow, QMenu, QMessageBox, QProgressBar, QPushButton, QScrollArea,
+    QSizePolicy, QSplitter, QStackedWidget, QToolButton, QVBoxLayout, QWidget,
 )
 
 APP_NAME = "dopeIPTV"
@@ -109,6 +113,15 @@ class XtreamClient:
         data = self._api(action="get_simple_data_table", stream_id=stream_id)
         return (data or {}).get("epg_listings", [])
 
+    def xmltv(self):
+        """Hela XMLTV-guiden — sista utvägen när player_api saknar EPG."""
+        r = self.session.get(f"{self.server}/xmltv.php",
+                             params={"username": self.username,
+                                     "password": self.password},
+                             timeout=(20, 180))
+        r.raise_for_status()
+        return r.content
+
     # -- ström-URL:er ---------------------------------------------------------
     def live_url(self, stream_id, fmt="ts"):
         ext = "m3u8" if fmt == "m3u8" else "ts"
@@ -151,6 +164,142 @@ def epg_times(entry):
                     continue
         return None
     return parse("start_timestamp", "start"), parse("stop_timestamp", "end")
+
+# ----------------------------------------------------------------------------
+#  XMLTV-guide (sista utvägen för EPG)
+# ----------------------------------------------------------------------------
+
+def _norm_namn(s):
+    """Normaliserar kanalnamn för matchning ("SE: SVT 1 HD" ~ "svt1hd")."""
+    return "".join(c for c in (s or "").lower() if c.isalnum())
+
+
+def _xmltv_tid(s):
+    """Parsar XMLTV-tid: ÅÅÅÅMMDDTTMMSS [±ZZZZ]."""
+    s = (s or "").strip()
+    try:
+        if len(s) > 14:
+            return datetime.strptime(s, "%Y%m%d%H%M%S %z").astimezone()
+        return datetime.strptime(s[:14], "%Y%m%d%H%M%S").astimezone()
+    except ValueError:
+        return None
+
+
+class XmltvGuide:
+    """Laddar och indexerar leverantörens XMLTV-guide (xmltv.php).
+
+    Många leverantörer skickar ingen EPG via player_api men har full
+    tablå i XMLTV-format. Guiden hämtas högst en gång per session (i
+    bakgrundstråd, först när den behövs) och posterna levereras i samma
+    format som Xtream-EPG fast redan avkodade (markerade med _plain).
+    """
+
+    def __init__(self, client):
+        self.client = client
+        self._lock = threading.Lock()
+        self._loaded = False
+        self._failed = False
+        self._by_id = {}        # kanal-id -> poster sorterade på starttid
+        self._by_name = {}      # normaliserat visningsnamn -> kanal-id
+
+    def listings_for(self, item, limit=8):
+        with self._lock:
+            if not self._loaded and not self._failed:
+                try:
+                    self._parse(self.client.xmltv())
+                    self._loaded = True
+                except Exception:
+                    self._failed = True
+            if not self._loaded:
+                return []
+        cid = (item.get("epg_channel_id") or "").strip().lower()
+        poster = self._by_id.get(cid)
+        if poster is None:      # ingen id-träff — prova kanalnamnet
+            cid = self._by_name.get(_norm_namn(item.get("name")))
+            poster = self._by_id.get(cid, [])
+        nu = datetime.now().astimezone().timestamp()
+        return [p for p in poster if p["stop_timestamp"] > nu][:limit]
+
+    def _parse(self, data):
+        grans = datetime.now().astimezone().timestamp() - 3 * 3600
+        by_id, by_name = {}, {}
+        for _, el in ET.iterparse(io.BytesIO(data)):
+            if el.tag == "channel":
+                cid = (el.get("id") or "").strip().lower()
+                if cid:
+                    for dn in el.findall("display-name"):
+                        namn = _norm_namn(dn.text)
+                        if namn:
+                            by_name.setdefault(namn, cid)
+                el.clear()
+            elif el.tag == "programme":
+                cid = (el.get("channel") or "").strip().lower()
+                start = _xmltv_tid(el.get("start"))
+                stop = _xmltv_tid(el.get("stop"))
+                if cid and start and stop and stop.timestamp() > grans:
+                    by_id.setdefault(cid, []).append({
+                        "_plain": True,
+                        "title": (el.findtext("title") or "").strip(),
+                        "description": (el.findtext("desc") or "").strip(),
+                        "start_timestamp": int(start.timestamp()),
+                        "stop_timestamp": int(stop.timestamp()),
+                    })
+                el.clear()
+        for lst in by_id.values():
+            lst.sort(key=lambda p: p["start_timestamp"])
+        self._by_id, self._by_name = by_id, by_name
+
+# ----------------------------------------------------------------------------
+#  Favoriter
+# ----------------------------------------------------------------------------
+
+class FavoriteStore:
+    """Favoritkanaler i användardefinierade grupper, sparade i QSettings."""
+
+    def __init__(self, settings):
+        self.settings = settings
+        try:
+            self.groups = json.loads(settings.value("favorites", "") or "{}")
+        except Exception:
+            self.groups = {}
+        if not isinstance(self.groups, dict):
+            self.groups = {}
+
+    def _save(self):
+        self.settings.setValue("favorites", json.dumps(self.groups))
+
+    def group_names(self):
+        return sorted(self.groups, key=str.lower)
+
+    def add(self, group, item):
+        lst = self.groups.setdefault(group, [])
+        sid = item.get("stream_id")
+        if not any(x.get("stream_id") == sid for x in lst):
+            lst.append(item)
+        self._save()
+
+    def remove(self, stream_id, group=None):
+        """Tar bort kanalen ur en grupp, eller ur alla om group är None."""
+        for g in ([group] if group else list(self.groups)):
+            self.groups[g] = [x for x in self.groups.get(g, [])
+                              if x.get("stream_id") != stream_id]
+        self._save()
+
+    def remove_group(self, group):
+        self.groups.pop(group, None)
+        self._save()
+
+    def items(self, group=None):
+        if group:
+            return list(self.groups.get(group, []))
+        ut, sedda = [], set()
+        for g in self.group_names():
+            for it in self.groups[g]:
+                sid = it.get("stream_id")
+                if sid not in sedda:
+                    sedda.add(sid)
+                    ut.append(it)
+        return ut
 
 # ----------------------------------------------------------------------------
 #  Trådpool-arbetare
@@ -455,7 +604,7 @@ class ChannelRow(QWidget):
         col.addWidget(self.bar)
         lay.addLayout(col, 1)
 
-        if kind == "live" and item.get("num"):
+        if kind in ("live", "fav") and item.get("num"):
             n = QLabel(str(item["num"]))
             n.setObjectName("ChNum")
             lay.addWidget(n)
@@ -494,7 +643,9 @@ class MainWindow(QMainWindow):
         self.settings = settings
         self.pool = QThreadPool.globalInstance()
         self.logos = LogoLoader(self.pool)
-        self.mode = "live"                 # live | vod | series
+        self.xmltv = XmltvGuide(client)
+        self.favs = FavoriteStore(settings)
+        self.mode = "live"                 # live | vod | series | fav
         self.all_items = []                # aktuell (ofiltrerad) lista
         self.series_ctx = None             # vald serie vid avsnittsläge
         self._info_cache = {}              # (kind, id) -> info-dict
@@ -524,7 +675,8 @@ class MainWindow(QMainWindow):
         self.nav_btns = {}
         for key, text in (("live", "📺  Live-TV"),
                           ("vod", "🎬  Filmer"),
-                          ("series", "🍿  Serier")):
+                          ("series", "🍿  Serier"),
+                          ("fav", "⭐  Favoriter")):
             b = QToolButton(objectName="NavBtn")
             b.setText(text)
             b.setCheckable(True)
@@ -537,6 +689,8 @@ class MainWindow(QMainWindow):
         sl.addWidget(QLabel("KATEGORIER", objectName="SectionLabel"))
         self.cat_list = QListWidget()
         self.cat_list.currentItemChanged.connect(self._category_changed)
+        self.cat_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.cat_list.customContextMenuRequested.connect(self._cat_menu)
         sl.addWidget(self.cat_list, 1)
 
         inst = QPushButton("⚙  Inställningar")
@@ -664,6 +818,18 @@ class MainWindow(QMainWindow):
     def _load_categories(self):
         self.cat_list.clear()
         self.listw.clear()
+        if self.mode == "fav":
+            self.cat_list.blockSignals(True)
+            alla = QListWidgetItem("Alla")
+            alla.setData(Qt.ItemDataRole.UserRole, None)
+            self.cat_list.addItem(alla)
+            for g in self.favs.group_names():
+                it = QListWidgetItem(g)
+                it.setData(Qt.ItemDataRole.UserRole, g)
+                self.cat_list.addItem(it)
+            self.cat_list.blockSignals(False)
+            self.cat_list.setCurrentRow(0)
+            return
         self.count_lbl.setText("Hämtar kategorier …")
         fn = {"live": self.client.live_categories,
               "vod": self.client.vod_categories,
@@ -693,6 +859,10 @@ class MainWindow(QMainWindow):
 
     def _load_items(self, category_id):
         self.listw.clear()
+        if self.mode == "fav":
+            self.all_items = self.favs.items(category_id)
+            self._apply_filter()
+            return
         self.count_lbl.setText("Hämtar innehåll …")
         fn = {"live": self.client.live_streams,
               "vod": self.client.vod_streams,
@@ -726,9 +896,12 @@ class MainWindow(QMainWindow):
             visade += 1
             if visade >= 800 and not text:   # skydda UI:t mot enorma listor
                 break
-        etikett = {"live": "kanaler", "vod": "filmer",
-                   "series": "serier", "episode": "avsnitt"}[kind]
+        etikett = {"live": "kanaler", "vod": "filmer", "series": "serier",
+                   "episode": "avsnitt", "fav": "favoriter"}[kind]
         self.count_lbl.setText(f"{visade} {etikett}")
+        if kind == "fav" and not self.all_items:
+            self.count_lbl.setText(
+                "Inga favoriter ännu — högerklicka på en kanal i Live-TV.")
 
     @staticmethod
     def _normalize(it):
@@ -759,7 +932,7 @@ class MainWindow(QMainWindow):
                 info.get("duration", ""),) if x)
             self.d_meta.setText(meta)
             self._show_media_info(info, cur)
-        elif self.mode == "live":
+        elif self.mode in ("live", "fav"):
             self.d_meta.setText("Direktsänd kanal")
             if it.get("stream_id"):
                 self.epg_refresh.show()
@@ -807,9 +980,10 @@ class MainWindow(QMainWindow):
     def _request_epg(self):
         """Hämtar (om) EPG för den valda live-kanalen."""
         cur = self.listw.currentItem()
-        if not cur or self.mode != "live" or self.series_ctx:
+        if not cur or self.mode not in ("live", "fav") or self.series_ctx:
             return
-        sid = cur.data(Qt.ItemDataRole.UserRole).get("stream_id")
+        it = cur.data(Qt.ItemDataRole.UserRole)
+        sid = it.get("stream_id")
         if not sid:
             return
         self._clear_epg_rows()
@@ -817,8 +991,10 @@ class MainWindow(QMainWindow):
 
         def fetch():
             listings = self.client.short_epg(sid, 8)
-            if not listings:                     # prova reservvägen
+            if not listings:                     # prova fulla tablån
                 listings = self.client.epg_table(sid)
+            if not listings:                     # sista utvägen: XMLTV
+                listings = self.xmltv.listings_for(it)
             return listings
 
         run_async(self.pool, fetch,
@@ -891,7 +1067,11 @@ class MainWindow(QMainWindow):
         aktuellt = None
         for e in listings or []:
             start, stop = epg_times(e)
-            post = {"title": b64(e.get("title")), "desc": b64(e.get("description")),
+            if e.get("_plain"):     # XMLTV-poster är redan avkodade
+                titel, desc = e.get("title") or "", e.get("description") or ""
+            else:
+                titel, desc = b64(e.get("title")), b64(e.get("description"))
+            post = {"title": titel, "desc": desc,
                     "start": start, "stop": stop}
             alla.append(post)
             if start and stop and start <= now < stop and not aktuellt:
@@ -994,7 +1174,7 @@ class MainWindow(QMainWindow):
         if self.series_ctx:
             return self.client.episode_url(
                 it.get("id"), it.get("container_extension")), titel
-        if self.mode == "live":
+        if self.mode in ("live", "fav"):
             fmt = self.settings.value("stream_format", "ts")
             return self.client.live_url(it.get("stream_id"), fmt), titel
         if self.mode == "vod":
@@ -1025,6 +1205,17 @@ class MainWindow(QMainWindow):
         m.addAction("Spela i mpv", lambda: self.play("mpv"))
         m.addAction("Spela i VLC", lambda: self.play("vlc"))
         it = cur.data(Qt.ItemDataRole.UserRole)
+        if self.mode in ("live", "fav") and it.get("stream_id"):
+            m.addSeparator()
+            fmeny = m.addMenu("⭐  Lägg till i favoritgrupp")
+            for g in self.favs.group_names():
+                fmeny.addAction(g, lambda g=g: self._add_fav(g, it))
+            if self.favs.group_names():
+                fmeny.addSeparator()
+            fmeny.addAction("Ny grupp …", lambda: self._add_fav(None, it))
+            if self.mode == "fav":
+                m.addAction("Ta bort från favoriter",
+                            lambda: self._remove_fav(it))
         if not (self.mode == "series" and not self.series_ctx):
             url, _ = self._stream_for(it)
             if url:
@@ -1032,6 +1223,37 @@ class MainWindow(QMainWindow):
                 m.addAction("Kopiera ström-URL",
                             lambda: QApplication.clipboard().setText(url))
         m.exec(self.listw.mapToGlobal(pos))
+
+    # -- favoriter -------------------------------------------------------------
+    def _add_fav(self, group, item):
+        if group is None:
+            group, ok = QInputDialog.getText(
+                self, "Ny favoritgrupp", "Gruppens namn:")
+            group = (group or "").strip()
+            if not ok or not group:
+                return
+        self.favs.add(group, item)
+        if self.mode == "fav":
+            self._load_categories()
+
+    def _remove_fav(self, item):
+        cur = self.cat_list.currentItem()
+        grupp = cur.data(Qt.ItemDataRole.UserRole) if cur else None
+        self.favs.remove(item.get("stream_id"), grupp)
+        self._load_categories()
+
+    def _cat_menu(self, pos):
+        if self.mode != "fav":
+            return
+        it = self.cat_list.itemAt(pos)
+        grupp = it.data(Qt.ItemDataRole.UserRole) if it else None
+        if not grupp:
+            return
+        m = QMenu(self)
+        m.addAction(f'Ta bort gruppen "{grupp}"',
+                    lambda: (self.favs.remove_group(grupp),
+                             self._load_categories()))
+        m.exec(self.cat_list.mapToGlobal(pos))
 
     # -- inställningar och fel -------------------------------------------------------
     def open_settings(self):
