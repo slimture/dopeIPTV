@@ -151,20 +151,32 @@ def epg_times(entry):
 class WorkerSignals(QObject):
     done = pyqtSignal(object)
     fail = pyqtSignal(str)
+    finished = pyqtSignal()
 
 
 class Worker(QRunnable):
     def __init__(self, fn, *args, **kwargs):
         super().__init__()
+        # QThreadPool får inte radera oss på pool-tråden: WorkerSignals bor i
+        # huvudtråden och skulle annars förstöras därifrån mitt under
+        # signalleverans (segfault). Livslängden styrs av _ACTIVE_WORKERS.
+        self.setAutoDelete(False)
         self.fn, self.args, self.kwargs = fn, args, kwargs
         self.signals = WorkerSignals()
 
     @pyqtSlot()
     def run(self):
         try:
-            self.signals.done.emit(self.fn(*self.args, **self.kwargs))
+            result = self.fn(*self.args, **self.kwargs)
         except Exception as e:
             self.signals.fail.emit(str(e))
+        else:
+            self.signals.done.emit(result)
+        finally:
+            self.signals.finished.emit()
+
+
+_ACTIVE_WORKERS = set()
 
 
 def run_async(pool, fn, on_done, on_fail=None, *args, **kwargs):
@@ -172,6 +184,10 @@ def run_async(pool, fn, on_done, on_fail=None, *args, **kwargs):
     w.signals.done.connect(on_done)
     if on_fail:
         w.signals.fail.connect(on_fail)
+    # Håll en referens tills alla köade signaler levererats i huvudtråden,
+    # så att arbetaren (och dess signals-objekt) frigörs där och inte i poolen.
+    _ACTIVE_WORKERS.add(w)
+    w.signals.finished.connect(lambda: _ACTIVE_WORKERS.discard(w))
     pool.start(w)
     return w
 
@@ -180,13 +196,11 @@ def run_async(pool, fn, on_done, on_fail=None, *args, **kwargs):
 # ----------------------------------------------------------------------------
 
 class LogoLoader(QObject):
-    loaded = pyqtSignal(str, QPixmap)
-
     def __init__(self, pool):
         super().__init__()
         self.pool = pool
         self.cache = {}
-        self.pending = set()
+        self.waiting = {}          # url -> [callbacks]
 
     def get(self, url, callback):
         if not url:
@@ -194,12 +208,10 @@ class LogoLoader(QObject):
         if url in self.cache:
             callback(self.cache[url])
             return
-        self.loaded.connect(
-            lambda u, pm, cb=callback, want=url: cb(pm) if u == want else None
-        )
-        if url in self.pending:
+        if url in self.waiting:
+            self.waiting[url].append(callback)
             return
-        self.pending.add(url)
+        self.waiting[url] = [callback]
 
         def fetch(u=url):
             r = requests.get(u, timeout=10)
@@ -208,15 +220,19 @@ class LogoLoader(QObject):
 
         def done(result):
             u, data = result
+            callbacks = self.waiting.pop(u, [])
             pm = QPixmap()
             if pm.loadFromData(data):
                 pm = pm.scaled(96, 96, Qt.AspectRatioMode.KeepAspectRatio,
                                Qt.TransformationMode.SmoothTransformation)
                 self.cache[u] = pm
-                self.loaded.emit(u, pm)
-            self.pending.discard(u)
+                for cb in callbacks:
+                    try:
+                        cb(pm)
+                    except RuntimeError:
+                        pass   # widgeten hann tas bort (listan rensades)
 
-        run_async(self.pool, fetch, done, lambda _: self.pending.discard(url))
+        run_async(self.pool, fetch, done, lambda _: self.waiting.pop(url, None))
 
 # ----------------------------------------------------------------------------
 #  Extern uppspelning: mpv / VLC
@@ -586,6 +602,11 @@ class MainWindow(QMainWindow):
         dl.addWidget(self.now_card)
 
         # Kommande program
+        self.epg_refresh = QPushButton("↻  Uppdatera EPG")
+        self.epg_refresh.clicked.connect(self._request_epg)
+        self.epg_refresh.hide()
+        dl.addWidget(self.epg_refresh)
+
         self.epg_scroll = QScrollArea()
         self.epg_scroll.setWidgetResizable(True)
         self.epg_scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -710,6 +731,7 @@ class MainWindow(QMainWindow):
         self.now_card.hide()
         self._clear_epg_rows()
         self._current_epg = None
+        self.epg_refresh.hide()
         if not cur:
             return
         it = cur.data(Qt.ItemDataRole.UserRole)
@@ -729,10 +751,9 @@ class MainWindow(QMainWindow):
             self.d_meta.setText(meta)
         elif self.mode == "live":
             self.d_meta.setText("Direktsänd kanal")
-            sid = it.get("stream_id")
-            if sid:
-                run_async(self.pool, lambda: self.client.short_epg(sid, 8),
-                          lambda e: self._show_epg(e, cur), lambda _: None)
+            if it.get("stream_id"):
+                self.epg_refresh.show()
+                self._request_epg()
         elif self.mode == "vod":
             meta = " · ".join(x for x in (
                 str(it.get("year") or ""),
@@ -762,9 +783,23 @@ class MainWindow(QMainWindow):
             if w:
                 w.deleteLater()
 
+    def _request_epg(self):
+        """Hämtar (om) EPG för den valda live-kanalen."""
+        cur = self.listw.currentItem()
+        if not cur or self.mode != "live" or self.series_ctx:
+            return
+        sid = cur.data(Qt.ItemDataRole.UserRole).get("stream_id")
+        if not sid:
+            return
+        run_async(self.pool, lambda: self.client.short_epg(sid, 8),
+                  lambda e: self._show_epg(e, cur), lambda _: None)
+
     def _show_epg(self, listings, list_item):
         if list_item is not self.listw.currentItem():
             return                      # användaren hann byta kanal
+        self.now_card.hide()
+        self._clear_epg_rows()
+        self._current_epg = None
         now = datetime.now().astimezone()
         kommande = []
         aktuellt = None
@@ -809,6 +844,10 @@ class MainWindow(QMainWindow):
         if not e:
             return
         now = datetime.now().astimezone()
+        if now >= e["stop"]:            # programmet är slut — hämta ny EPG
+            self._current_epg = None
+            self._request_epg()
+            return
         total = (e["stop"] - e["start"]).total_seconds()
         if total > 0:
             pct = (now - e["start"]).total_seconds() / total * 100
@@ -930,24 +969,74 @@ class MainWindow(QMainWindow):
         self.count_lbl.setText("Fel: " + msg)
 
 # ----------------------------------------------------------------------------
+#  Programikon
+# ----------------------------------------------------------------------------
+
+def make_app_icon():
+    """Ritar appikonen (blå rundad platta med play-symbol) i olika storlekar."""
+    icon = QIcon()
+    for s in (256, 128, 64, 48, 32):
+        pm = QPixmap(s, s)
+        pm.fill(Qt.GlobalColor.transparent)
+        p = QPainter(pm)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        platta = QPainterPath()
+        platta.addRoundedRect(0, 0, s, s, s * 0.22, s * 0.22)
+        p.fillPath(platta, QColor(ACCENT))
+        tri = QPainterPath()
+        tri.moveTo(s * 0.40, s * 0.28)
+        tri.lineTo(s * 0.40, s * 0.72)
+        tri.lineTo(s * 0.76, s * 0.50)
+        tri.closeSubpath()
+        p.fillPath(tri, QColor("white"))
+        p.end()
+        icon.addPixmap(pm)
+    return icon
+
+
+def install_icon(icon):
+    """Sparar ikonen som 'dopeiptv' i användarens ikontema så att
+    skrivbordsfilen (Icon=dopeiptv) hittar den i programmenyn."""
+    import os
+    from pathlib import Path
+    base = Path(os.environ.get("XDG_DATA_HOME",
+                               Path.home() / ".local" / "share"))
+    mal = base / "icons" / "hicolor" / "256x256" / "apps" / "dopeiptv.png"
+    if mal.exists():
+        return
+    try:
+        mal.parent.mkdir(parents=True, exist_ok=True)
+        icon.pixmap(256, 256).save(str(mal), "PNG")
+    except OSError:
+        pass
+
+# ----------------------------------------------------------------------------
 #  Start
 # ----------------------------------------------------------------------------
 
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
+    app.setOrganizationName(ORG)
+    app.setApplicationDisplayName(APP_NAME)
+    # Wayland visar app_id i aktivitetsfältet; utan detta blir det "python3".
+    # Namnet måste matcha skrivbordsfilen (dopeiptv.desktop).
+    app.setDesktopFileName("dopeiptv")
+    ikon = make_app_icon()
+    app.setWindowIcon(ikon)
+    install_icon(ikon)
     app.setStyleSheet(STYLE)
     settings = QSettings(ORG, ORG)
 
     client = None
     while client is None:
-        dlg = LoginDialog(settings)
         # Hoppa över dialogen om vi redan har fungerande uppgifter
         server, user, pw = (settings.value("server", ""),
                             settings.value("username", ""),
                             settings.value("password", ""))
         forsta = not (server and user and pw)
         if forsta:
+            dlg = LoginDialog(settings)
             if not dlg.exec():
                 return 0
             server, user, pw = dlg.values()

@@ -1,57 +1,62 @@
 # dopeIPTV
 
-En elegant IPTV-klient för Linux i dopeIPTV-stil (macOS-inspirerat mörkt gränssnitt) med stöd för **Xtream Codes API**, **EPG** och uppspelning via **mpv** eller **VLC**.
+An elegant IPTV client for Linux with a macOS-inspired dark interface, supporting the **Xtream Codes API**, **EPG**, and playback via **mpv** or **VLC**.
 
-## Funktioner
+## Features
 
-- Logga in med Xtream Codes (server, användarnamn, lösenord) — uppgifterna sparas
-- Live-TV, Filmer (VOD) och Serier med säsonger och avsnitt
-- Kategorier i sidopanelen och snabb sökning
-- EPG: "Nu spelas" med förloppsindikator + kommande program för vald kanal
-- Kanallogotyper som laddas asynkront
-- Spela i mpv eller VLC (dubbelklick, knappar eller högerklicksmeny)
-- Kopiera ström-URL via högerklick
-- Val av standardspelare och live-format (ts / m3u8) i Inställningar
+- Log in with Xtream Codes credentials (server, username, password) — settings are saved
+- Live TV, Movies (VOD), and Series with seasons and episodes
+- Categories in the sidebar and fast search
+- EPG: "Now playing" with progress bar + upcoming programs for the selected channel
+- Refresh the EPG with one click (↻) — it also refreshes automatically when the current program ends
+- Channel logos loaded asynchronously
+- Proper application name and icon in the taskbar (instead of "python3")
+- Play in mpv or VLC (double-click, buttons, or right-click menu)
+- Copy stream URL via right-click
+- Choose default player and live stream format (ts / m3u8) in Settings
 
 ## Installation
 
 ```bash
-# Beroenden
+# Dependencies
 sudo apt install python3 python3-pip mpv vlc      # Debian/Ubuntu
-# eller: sudo dnf install python3 mpv vlc          # Fedora
-# eller: sudo pacman -S python mpv vlc             # Arch
+# or: sudo dnf install python3 mpv vlc             # Fedora
+# or: sudo pacman -S python mpv vlc                # Arch
 
 pip install PyQt6 requests
 ```
 
-## Starta
+## Running
 
 ```bash
 python3 dopeiptv.py
 ```
 
-Första gången anger du din Xtream-server (t.ex. `http://server:8080`), användarnamn och lösenord.
+The first time, enter your Xtream server (e.g. `http://server:8080`), username, and password.
 
-## Lägg till i programmenyn (valfritt)
+## Add to the application menu (optional)
 
 ```bash
 mkdir -p ~/.local/share/applications ~/.local/bin
 cp dopeiptv.py ~/.local/bin/dopeiptv.py
-cp swiptv.desktop ~/.local/share/applications/
+cp dopeiptv.desktop ~/.local/share/applications/
 ```
 
-## Användning
+The application icon is installed automatically to `~/.local/share/icons` the first time the app starts.
 
-| Åtgärd | Så här |
+## Usage
+
+| Action | How |
 |---|---|
-| Spela | Dubbelklicka, eller knapparna "Spela i mpv / VLC" |
-| Byt spelare tillfälligt | Högerklicka på en rad |
-| Öppna en serie | Dubbelklicka på serien → avsnittslista visas |
-| Sök | Skriv i sökfältet överst |
-| Byt konto | Inställningar → "Byt konto / server" |
+| Play | Double-click, or the "Play in mpv / VLC" buttons |
+| Switch player temporarily | Right-click a row |
+| Open a series | Double-click the series → episode list appears |
+| Search | Type in the search field at the top |
+| Refresh EPG | The "↻ Uppdatera EPG" button in the detail panel |
+| Switch account | Settings → "Byt konto / server" |
 
-## Felsökning
+## Troubleshooting
 
-- **"Spelare saknas"** — installera mpv eller VLC (se ovan).
-- **Live-strömmen startar inte** — prova att byta live-format till `m3u8` i Inställningar.
-- **Inga kategorier** — kontrollera server-URL:en (inkludera port, t.ex. `:8080`).
+- **"Player missing"** — install mpv or VLC (see above).
+- **Live stream won't start** — try switching the live format to `m3u8` in Settings.
+- **No categories** — check the server URL (include the port, e.g. `:8080`).
