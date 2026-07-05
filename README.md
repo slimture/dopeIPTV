@@ -1,23 +1,26 @@
 # dopeIPTV
 
-An elegant IPTV client for Linux with a macOS-inspired dark interface, supporting the **Xtream Codes API**, **EPG**, and playback via **mpv** or **VLC**.
+An elegant IPTV client for Linux and macOS with a macOS-inspired dark interface, supporting the **Xtream Codes API**, **EPG**, and playback via **mpv** or **VLC**.
 
 ## Features
 
 - Log in with Xtream Codes credentials (server, username, password) — settings are saved
-- Live TV, Movies (VOD), and Series with seasons and episodes
-- Categories in the sidebar and fast search
-- EPG: "Now playing" with progress bar + upcoming programs for the selected channel
-- Refresh the EPG with one click (↻) — it also refreshes automatically when the current program ends
+- TV, Movies, and Series with seasons and episodes, plus Favorites and History
+- Categories in the sidebar and fast, debounced search — no cap on the number of channels, and no freeze even with thousands of them (the channel list is virtualized, so only visible rows are ever rendered)
+- EPG shown immediately for every visible live channel (not just the one you click), using a "now playing" line and progress bar
+- EPG Guide dialog: browse now/next info for every channel in one searchable list
+- EPG fallback chain: short EPG → full EPG table (`get_simple_data_table`) → the provider's XMLTV guide (`xmltv.php`), matched by EPG channel id or channel name — listings are still shown when the server's timestamps look skewed, and duplicate entries from buggy providers are filtered out
+- Refresh the EPG with one click — it also refreshes automatically when the current program ends
 - Movie and series details in the detail panel: plot, genre, cast, director, release date, and rating
-- Clear message when a channel has no EPG data (instead of an empty panel)
-- EPG fallback chain: short EPG → full EPG table (`get_simple_data_table`) → the provider's XMLTV guide (`xmltv.php`), matched by EPG channel id or channel name — and listings are still shown when the server's timestamps look skewed
-- Favorites: save channels into your own groups (right-click a channel → "Lägg till i favoritgrupp"), browse them under ⭐ Favoriter, remove channels or whole groups via right-click
-- Channel logos loaded asynchronously
+- Favorites: save channels into your own groups, browse them under Favorites, remove channels or whole groups via right-click
+- History: every played channel/movie/episode is recorded with a resolved playback URL; browse, replay, remove individual entries, or clear everything
+- A visible loading bar while categories/content are being fetched
+- mpv playback reuses a single window: selecting a new channel loads it into the same mpv instance instead of opening a new one, and Ctrl+Right / Ctrl+Left zap to the next/previous channel. VLC and "open externally" still spawn a normal one-off process/window.
+- Channel logos loaded asynchronously and cached
 - Proper application name and icon in the taskbar (instead of "python3")
-- Play in mpv or VLC (double-click, buttons, or right-click menu)
-- Copy stream URL via right-click
-- Choose default player and live stream format (ts / m3u8) in Settings
+- Copy stream URL via right-click; "open externally in mpv/VLC" also available from the same menu
+- Choose default player, live stream format (ts / m3u8), and whether mpv reuses its window in Settings
+- Finds VLC on macOS even when it's only installed as an app bundle (not on `PATH`)
 
 ## Installation
 
@@ -26,6 +29,7 @@ An elegant IPTV client for Linux with a macOS-inspired dark interface, supportin
 sudo apt install python3 python3-pip mpv vlc      # Debian/Ubuntu
 # or: sudo dnf install python3 mpv vlc             # Fedora
 # or: sudo pacman -S python mpv vlc                # Arch
+# or on macOS: brew install mpv && brew install --cask vlc
 
 pip install PyQt6 requests
 ```
@@ -38,7 +42,7 @@ python3 dopeiptv.py
 
 The first time, enter your Xtream server (e.g. `http://server:8080`), username, and password.
 
-## Add to the application menu (optional)
+## Add to the application menu (optional, Linux)
 
 ```bash
 mkdir -p ~/.local/share/applications ~/.local/bin
@@ -53,16 +57,20 @@ The application icon is installed automatically to `~/.local/share/icons` the fi
 | Action | How |
 |---|---|
 | Play | Double-click, or the "Play in mpv / VLC" buttons |
+| Zap to next/previous channel | Ctrl+Right / Ctrl+Left (mpv only, while reusing its window) |
 | Switch player temporarily | Right-click a row |
 | Open a series | Double-click the series → episode list appears |
 | Search | Type in the search field at the top |
-| Refresh EPG | The "↻ Uppdatera EPG" button in the detail panel |
-| Add a favorite | Right-click a channel → "⭐ Lägg till i favoritgrupp" |
-| Remove a favorite / group | In ⭐ Favoriter: right-click the channel or the group |
-| Switch account | Settings → "Byt konto / server" |
+| Refresh EPG | The "Refresh EPG" button in the detail panel |
+| Browse the full TV guide | "EPG Guide" button in the sidebar |
+| Add a favorite | Right-click a channel → "Add to favorites group" |
+| Remove a favorite / group | In Favorites: right-click the channel or the group |
+| Remove / clear history | In History: right-click an entry, or "Clear history" |
+| Switch account | Settings → "Switch account / server" |
 
 ## Troubleshooting
 
-- **"Player missing"** — install mpv or VLC (see above).
+- **"Player not found"** — install mpv or VLC (see above). On macOS, VLC is detected even if it's only in `/Applications` and not on `PATH`.
 - **Live stream won't start** — try switching the live format to `m3u8` in Settings.
 - **No categories** — check the server URL (include the port, e.g. `:8080`).
+- **No EPG for a channel** — the provider may not have a programme guide mapped to it at all; dopeIPTV already tries three different sources (short EPG, full EPG table, XMLTV) before giving up.

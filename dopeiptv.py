@@ -1,46 +1,53 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-dopeIPTV — en elegant IPTV-klient med Xtream Codes API och EPG.
-Uppspelning via mpv eller VLC. Kräver: python3, PyQt6, requests.
+dopeIPTV - an elegant IPTV client for Xtream Codes with EPG.
+Plays back via mpv or VLC. Requires: python3, PyQt6, requests.
 
     pip install PyQt6 requests
     sudo apt install mpv vlc
 
-Starta med:  python3 dopeiptv.py
+Run with:  python3 dopeiptv.py
 """
 
 import base64
 import html
 import io
 import json
+import os
 import shutil
+import socket
 import subprocess
 import sys
+import tempfile
 import threading
+import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
+from pathlib import Path
 
 import requests
 from PyQt6.QtCore import (
-    QObject, QRunnable, QSettings, QSize, Qt, QThreadPool, QTimer,
-    pyqtSignal, pyqtSlot,
+    QAbstractListModel, QModelIndex, QObject, QRect, QRectF, QRunnable,
+    QSettings, QSize, Qt, QThreadPool, QTimer, pyqtSignal, pyqtSlot,
 )
 from PyQt6.QtGui import (
-    QAction, QColor, QFont, QIcon, QPainter, QPainterPath, QPixmap,
+    QColor, QFont, QIcon, QKeySequence, QPainter, QPainterPath, QPixmap,
+    QShortcut,
 )
 from PyQt6.QtWidgets import (
-    QApplication, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QFrame,
-    QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-    QMainWindow, QMenu, QMessageBox, QProgressBar, QPushButton, QScrollArea,
-    QSizePolicy, QSplitter, QStackedWidget, QToolButton, QVBoxLayout, QWidget,
+    QAbstractItemView, QApplication, QComboBox, QDialog, QDialogButtonBox,
+    QFormLayout, QFrame, QHBoxLayout, QInputDialog, QLabel, QLineEdit,
+    QListView, QListWidget, QListWidgetItem, QMainWindow, QMenu, QMessageBox,
+    QProgressBar, QPushButton, QScrollArea, QSizePolicy, QSplitter,
+    QStyle, QStyledItemDelegate, QVBoxLayout, QWidget,
 )
 
 APP_NAME = "dopeIPTV"
 ORG = "dopeiptv"
 
 # ----------------------------------------------------------------------------
-#  Xtream Codes API-klient
+#  Xtream Codes API client
 # ----------------------------------------------------------------------------
 
 class XtreamClient:
@@ -53,7 +60,6 @@ class XtreamClient:
         self.session = requests.Session()
         self.session.headers["User-Agent"] = "dopeIPTV/1.0"
 
-    # -- interna hjälpare ----------------------------------------------------
     def _api(self, **params):
         url = f"{self.server}/player_api.php"
         base = {"username": self.username, "password": self.password}
@@ -62,13 +68,12 @@ class XtreamClient:
         r.raise_for_status()
         return r.json()
 
-    # -- publika anrop -------------------------------------------------------
     def authenticate(self):
         data = self._api()
         if not isinstance(data, dict) or "user_info" not in data:
-            raise RuntimeError("Oväntat svar från servern.")
+            raise RuntimeError("Unexpected response from the server.")
         if str(data["user_info"].get("auth", 0)) != "1":
-            raise RuntimeError("Fel användarnamn eller lösenord.")
+            raise RuntimeError("Wrong username or password.")
         return data
 
     def live_categories(self):
@@ -109,12 +114,12 @@ class XtreamClient:
         return (data or {}).get("epg_listings", [])
 
     def epg_table(self, stream_id):
-        """Full tablå — reservväg när get_short_epg svarar tomt."""
+        """Full EPG table - fallback when get_short_epg returns nothing."""
         data = self._api(action="get_simple_data_table", stream_id=stream_id)
         return (data or {}).get("epg_listings", [])
 
     def xmltv(self):
-        """Hela XMLTV-guiden — sista utvägen när player_api saknar EPG."""
+        """The provider's full XMLTV guide - last resort when player_api has no EPG."""
         r = self.session.get(f"{self.server}/xmltv.php",
                              params={"username": self.username,
                                      "password": self.password},
@@ -122,7 +127,6 @@ class XtreamClient:
         r.raise_for_status()
         return r.content
 
-    # -- ström-URL:er ---------------------------------------------------------
     def live_url(self, stream_id, fmt="ts"):
         ext = "m3u8" if fmt == "m3u8" else "ts"
         return f"{self.server}/live/{self.username}/{self.password}/{stream_id}.{ext}"
@@ -137,7 +141,7 @@ class XtreamClient:
 
 
 def b64(text):
-    """Xtream skickar EPG-texter som base64."""
+    """Xtream sends EPG text fields as base64."""
     if not text:
         return ""
     try:
@@ -147,7 +151,7 @@ def b64(text):
 
 
 def epg_times(entry):
-    """Returnerar (start, stop) som lokala datetime eller (None, None)."""
+    """Returns (start, stop) as local datetimes, or (None, None)."""
     def parse(ts_key, str_key):
         v = entry.get(ts_key)
         if v:
@@ -166,16 +170,41 @@ def epg_times(entry):
     return parse("start_timestamp", "start"), parse("stop_timestamp", "end")
 
 # ----------------------------------------------------------------------------
-#  XMLTV-guide (sista utvägen för EPG)
+#  Player executable lookup (handles macOS app bundles not on PATH)
 # ----------------------------------------------------------------------------
 
-def _norm_namn(s):
-    """Normaliserar kanalnamn för matchning ("SE: SVT 1 HD" ~ "svt1hd")."""
+def find_player_executable(player):
+    """Locates the mpv/vlc binary, including common macOS install paths that
+    aren't on PATH when the app is launched outside a terminal."""
+    if player == "mpv":
+        candidates = ["mpv"]
+        if sys.platform == "darwin":
+            candidates += ["/opt/homebrew/bin/mpv", "/usr/local/bin/mpv"]
+    else:
+        candidates = ["vlc", "cvlc"]
+        if sys.platform == "darwin":
+            candidates += ["/Applications/VLC.app/Contents/MacOS/VLC"]
+    for c in candidates:
+        if os.path.isabs(c):
+            if os.path.isfile(c) and os.access(c, os.X_OK):
+                return c
+        else:
+            found = shutil.which(c)
+            if found:
+                return found
+    return None
+
+# ----------------------------------------------------------------------------
+#  XMLTV guide (last-resort EPG source)
+# ----------------------------------------------------------------------------
+
+def _normalize_name(s):
+    """Normalizes a channel name for matching ("SE: SVT 1 HD" ~ "svt1hd")."""
     return "".join(c for c in (s or "").lower() if c.isalnum())
 
 
-def _xmltv_tid(s):
-    """Parsar XMLTV-tid: ÅÅÅÅMMDDTTMMSS [±ZZZZ]."""
+def _parse_xmltv_time(s):
+    """Parses an XMLTV timestamp: YYYYMMDDHHMMSS [+-ZZZZ]."""
     s = (s or "").strip()
     try:
         if len(s) > 14:
@@ -186,12 +215,13 @@ def _xmltv_tid(s):
 
 
 class XmltvGuide:
-    """Laddar och indexerar leverantörens XMLTV-guide (xmltv.php).
+    """Downloads and indexes the provider's XMLTV guide (xmltv.php).
 
-    Många leverantörer skickar ingen EPG via player_api men har full
-    tablå i XMLTV-format. Guiden hämtas högst en gång per session (i
-    bakgrundstråd, först när den behövs) och posterna levereras i samma
-    format som Xtream-EPG fast redan avkodade (markerade med _plain).
+    Many providers send no EPG via player_api but do have a full schedule
+    in XMLTV format. The guide is fetched at most once per session, in a
+    background thread, the first time it's needed. Once loaded, lookups
+    are pure in-memory dict access, so the main channel list can show
+    "now playing" for every visible row without any extra network calls.
     """
 
     def __init__(self, client):
@@ -199,10 +229,13 @@ class XmltvGuide:
         self._lock = threading.Lock()
         self._loaded = False
         self._failed = False
-        self._by_id = {}        # kanal-id -> poster sorterade på starttid
-        self._by_name = {}      # normaliserat visningsnamn -> kanal-id
+        self._by_id = {}        # channel id -> entries sorted by start time
+        self._by_name = {}      # normalized display name -> channel id
 
-    def listings_for(self, item, limit=8):
+    def ensure_loaded(self):
+        """Fetches and indexes the guide if needed. Returns True if it's
+        available in memory (safe to call repeatedly; blocks briefly if
+        another thread is already loading it)."""
         with self._lock:
             if not self._loaded and not self._failed:
                 try:
@@ -210,51 +243,76 @@ class XmltvGuide:
                     self._loaded = True
                 except Exception:
                     self._failed = True
-            if not self._loaded:
-                return []
+            return self._loaded
+
+    def _entries_for(self, item):
         cid = (item.get("epg_channel_id") or "").strip().lower()
-        poster = self._by_id.get(cid)
-        if poster is None:      # ingen id-träff — prova kanalnamnet
-            cid = self._by_name.get(_norm_namn(item.get("name")))
-            poster = self._by_id.get(cid, [])
-        nu = datetime.now().astimezone().timestamp()
-        return [p for p in poster if p["stop_timestamp"] > nu][:limit]
+        entries = self._by_id.get(cid)
+        if entries is None:       # no id match - fall back to channel name
+            cid = self._by_name.get(_normalize_name(item.get("name")))
+            entries = self._by_id.get(cid, [])
+        return entries
+
+    def listings_for(self, item, limit=8):
+        if not self.ensure_loaded():
+            return []
+        now = datetime.now().astimezone().timestamp()
+        return [p for p in self._entries_for(item)
+                if p["stop_timestamp"] > now][:limit]
+
+    def now_for(self, item):
+        """(title, percent) for the currently airing programme, or None.
+        Pure in-memory lookup - safe to call from the paint path."""
+        if not self._loaded:
+            return None
+        now = datetime.now().astimezone().timestamp()
+        for p in self._entries_for(item):
+            if p["start_timestamp"] <= now < p["stop_timestamp"]:
+                length = p["stop_timestamp"] - p["start_timestamp"]
+                pct = (now - p["start_timestamp"]) / length * 100 if length else 0
+                return p["title"], pct
+        return None
 
     def _parse(self, data):
-        grans = datetime.now().astimezone().timestamp() - 3 * 3600
+        cutoff = datetime.now().astimezone().timestamp() - 3 * 3600
         by_id, by_name = {}, {}
+        seen = set()
         for _, el in ET.iterparse(io.BytesIO(data)):
             if el.tag == "channel":
                 cid = (el.get("id") or "").strip().lower()
                 if cid:
                     for dn in el.findall("display-name"):
-                        namn = _norm_namn(dn.text)
-                        if namn:
-                            by_name.setdefault(namn, cid)
+                        name = _normalize_name(dn.text)
+                        if name:
+                            by_name.setdefault(name, cid)
                 el.clear()
             elif el.tag == "programme":
                 cid = (el.get("channel") or "").strip().lower()
-                start = _xmltv_tid(el.get("start"))
-                stop = _xmltv_tid(el.get("stop"))
-                if cid and start and stop and stop.timestamp() > grans:
-                    by_id.setdefault(cid, []).append({
-                        "_plain": True,
-                        "title": (el.findtext("title") or "").strip(),
-                        "description": (el.findtext("desc") or "").strip(),
-                        "start_timestamp": int(start.timestamp()),
-                        "stop_timestamp": int(stop.timestamp()),
-                    })
+                start = _parse_xmltv_time(el.get("start"))
+                stop = _parse_xmltv_time(el.get("stop"))
+                title = (el.findtext("title") or "").strip()
+                if cid and start and stop and stop.timestamp() > cutoff:
+                    dedup_key = (cid, int(start.timestamp()), title.lower())
+                    if dedup_key not in seen:
+                        seen.add(dedup_key)
+                        by_id.setdefault(cid, []).append({
+                            "_plain": True,
+                            "title": title,
+                            "description": (el.findtext("desc") or "").strip(),
+                            "start_timestamp": int(start.timestamp()),
+                            "stop_timestamp": int(stop.timestamp()),
+                        })
                 el.clear()
         for lst in by_id.values():
             lst.sort(key=lambda p: p["start_timestamp"])
         self._by_id, self._by_name = by_id, by_name
 
 # ----------------------------------------------------------------------------
-#  Favoriter
+#  Favorites
 # ----------------------------------------------------------------------------
 
 class FavoriteStore:
-    """Favoritkanaler i användardefinierade grupper, sparade i QSettings."""
+    """Favorite channels in user-defined groups, persisted via QSettings."""
 
     def __init__(self, settings):
         self.settings = settings
@@ -272,14 +330,14 @@ class FavoriteStore:
         return sorted(self.groups, key=str.lower)
 
     def add(self, group, item):
-        lst = self.groups.setdefault(group, [])
-        sid = item.get("stream_id")
-        if not any(x.get("stream_id") == sid for x in lst):
-            lst.append(item)
+        items = self.groups.setdefault(group, [])
+        stream_id = item.get("stream_id")
+        if not any(x.get("stream_id") == stream_id for x in items):
+            items.append(item)
         self._save()
 
     def remove(self, stream_id, group=None):
-        """Tar bort kanalen ur en grupp, eller ur alla om group är None."""
+        """Removes the channel from one group, or from all groups if group is None."""
         for g in ([group] if group else list(self.groups)):
             self.groups[g] = [x for x in self.groups.get(g, [])
                               if x.get("stream_id") != stream_id]
@@ -292,17 +350,65 @@ class FavoriteStore:
     def items(self, group=None):
         if group:
             return list(self.groups.get(group, []))
-        ut, sedda = [], set()
+        result, seen = [], set()
         for g in self.group_names():
             for it in self.groups[g]:
-                sid = it.get("stream_id")
-                if sid not in sedda:
-                    sedda.add(sid)
-                    ut.append(it)
-        return ut
+                stream_id = it.get("stream_id")
+                if stream_id not in seen:
+                    seen.add(stream_id)
+                    result.append(it)
+        return result
 
 # ----------------------------------------------------------------------------
-#  Trådpool-arbetare
+#  Watch history
+# ----------------------------------------------------------------------------
+
+class HistoryStore:
+    """Recently played items, persisted via QSettings. Stores a resolved
+    playback URL directly so replaying an entry doesn't depend on the
+    original category/series context still being available."""
+
+    MAX_ENTRIES = 300
+
+    def __init__(self, settings):
+        self.settings = settings
+        try:
+            self.entries = json.loads(settings.value("history", "") or "[]")
+        except Exception:
+            self.entries = []
+        if not isinstance(self.entries, list):
+            self.entries = []
+
+    def _save(self):
+        self.settings.setValue("history", json.dumps(self.entries[:self.MAX_ENTRIES]))
+
+    def add(self, url, title, icon_url, key, kind):
+        if not url:
+            return
+        self.entries = [e for e in self.entries
+                        if not (e.get("_key") == key and e.get("_kind") == kind)]
+        self.entries.insert(0, {
+            "name": title, "stream_icon": icon_url,
+            "_url": url, "_key": key, "_kind": kind,
+            "_watched_at": datetime.now().isoformat(),
+        })
+        self.entries = self.entries[:self.MAX_ENTRIES]
+        self._save()
+
+    def remove(self, key, kind):
+        self.entries = [e for e in self.entries
+                        if not (e.get("_key") == key and e.get("_kind") == kind)]
+        self._save()
+
+    def clear(self):
+        self.entries = []
+        self._save()
+
+    def items(self):
+        return list(self.entries)
+
+# ----------------------------------------------------------------------------
+#  Thread-pool workers
 # ----------------------------------------------------------------------------
 
 class WorkerSignals(QObject):
@@ -314,9 +420,10 @@ class WorkerSignals(QObject):
 class Worker(QRunnable):
     def __init__(self, fn, *args, **kwargs):
         super().__init__()
-        # QThreadPool får inte radera oss på pool-tråden: WorkerSignals bor i
-        # huvudtråden och skulle annars förstöras därifrån mitt under
-        # signalleverans (segfault). Livslängden styrs av _ACTIVE_WORKERS.
+        # QThreadPool must not delete us on the pool thread: WorkerSignals
+        # lives in the main thread and would otherwise be destroyed from the
+        # wrong thread mid-signal-delivery (segfault). Lifetime is instead
+        # managed by _ACTIVE_WORKERS below.
         self.setAutoDelete(False)
         self.fn, self.args, self.kwargs = fn, args, kwargs
         self.signals = WorkerSignals()
@@ -341,15 +448,15 @@ def run_async(pool, fn, on_done, on_fail=None, *args, **kwargs):
     w.signals.done.connect(on_done)
     if on_fail:
         w.signals.fail.connect(on_fail)
-    # Håll en referens tills alla köade signaler levererats i huvudtråden,
-    # så att arbetaren (och dess signals-objekt) frigörs där och inte i poolen.
+    # Keep a reference until all queued signals are delivered on the main
+    # thread, so the worker (and its signals object) is freed there.
     _ACTIVE_WORKERS.add(w)
     w.signals.finished.connect(lambda: _ACTIVE_WORKERS.discard(w))
     pool.start(w)
     return w
 
 # ----------------------------------------------------------------------------
-#  Logotyp-cache (asynkron nedladdning)
+#  Logo cache (asynchronous download)
 # ----------------------------------------------------------------------------
 
 class LogoLoader(QObject):
@@ -387,36 +494,126 @@ class LogoLoader(QObject):
                     try:
                         cb(pm)
                     except RuntimeError:
-                        pass   # widgeten hann tas bort (listan rensades)
+                        pass   # the widget was already deleted (list rebuilt)
 
         run_async(self.pool, fetch, done, lambda _: self.waiting.pop(url, None))
 
 # ----------------------------------------------------------------------------
-#  Extern uppspelning: mpv / VLC
+#  External playback: mpv / VLC (spawns a new process each time)
 # ----------------------------------------------------------------------------
 
 def launch_player(player, url, title, parent=None):
     title = title or "dopeIPTV"
+    exe = find_player_executable(player)
     if player == "mpv":
-        exe = shutil.which("mpv")
         cmd = [exe, "--force-media-title=" + title,
                "--user-agent=dopeIPTV/1.0", url] if exe else None
-        namn = "mpv"
+        name = "mpv"
     else:
-        exe = shutil.which("vlc") or shutil.which("cvlc")
         cmd = [exe, "--meta-title", title, "--http-user-agent=dopeIPTV/1.0",
                url] if exe else None
-        namn = "VLC"
+        name = "VLC"
     if not cmd:
-        QMessageBox.warning(parent, "Spelare saknas",
-                            f"{namn} hittades inte. Installera med t.ex.\n\n"
-                            f"  sudo apt install {namn.lower()}")
+        QMessageBox.warning(parent, "Player not found",
+                            f"{name} was not found. Install it, e.g.\n\n"
+                            f"  sudo apt install {name.lower()}")
         return
     subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                      start_new_session=True)
 
 # ----------------------------------------------------------------------------
-#  Stil — mörkt, macOS-inspirerat (dopeIPTV-känsla)
+#  Persistent mpv playback via its JSON IPC socket (channel zapping)
+# ----------------------------------------------------------------------------
+
+class MpvIpcPlayer:
+    """Controls a single mpv process over its JSON IPC socket, so switching
+    channels reuses the existing mpv window instead of spawning a new
+    process each time. Falls back to reporting failure if mpv is missing;
+    the caller decides whether to fall back to launch_player()."""
+
+    def __init__(self):
+        self.proc = None
+        self.sock = None
+        self.socket_path = os.path.join(
+            tempfile.gettempdir(), f"dopeiptv-mpv-{os.getpid()}.sock")
+
+    def is_running(self):
+        return self.proc is not None and self.proc.poll() is None
+
+    def _spawn(self):
+        exe = find_player_executable("mpv")
+        if not exe:
+            return False
+        try:
+            os.remove(self.socket_path)
+        except OSError:
+            pass
+        cmd = [exe, f"--input-ipc-server={self.socket_path}",
+               "--idle=yes", "--force-window=yes",
+               "--user-agent=dopeIPTV/1.0"]
+        self.proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
+                                     stderr=subprocess.DEVNULL,
+                                     start_new_session=True)
+        for _ in range(60):          # wait up to ~3s for the socket to appear
+            if os.path.exists(self.socket_path):
+                return True
+            time.sleep(0.05)
+        return False
+
+    def _connect(self):
+        if self.sock:
+            try:
+                self.sock.close()
+            except OSError:
+                pass
+        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.sock.connect(self.socket_path)
+
+    def _send(self, command):
+        payload = (json.dumps({"command": command}) + "\n").encode()
+        self.sock.sendall(payload)
+
+    def load(self, url, title):
+        """Loads url into the running mpv instance, starting one if needed.
+        Call from a worker thread: spawning can block briefly."""
+        if not self.is_running():
+            if not self._spawn():
+                return False
+            self._connect()
+        if self.sock is None:
+            self._connect()
+        try:
+            self._send(["loadfile", url, "replace"])
+            self._send(["set_property", "force-media-title", title])
+            return True
+        except OSError:
+            self.proc = None
+            if self._spawn():
+                self._connect()
+                try:
+                    self._send(["loadfile", url, "replace"])
+                    self._send(["set_property", "force-media-title", title])
+                    return True
+                except OSError:
+                    return False
+            return False
+
+    def stop(self):
+        if self.is_running():
+            try:
+                self._send(["quit"])
+            except OSError:
+                pass
+        self.proc = None
+        if self.sock:
+            try:
+                self.sock.close()
+            except OSError:
+                pass
+        self.sock = None
+
+# ----------------------------------------------------------------------------
+#  Style - dark, macOS-inspired (dopeIPTV look), unified across all widgets
 # ----------------------------------------------------------------------------
 
 ACCENT = "#4C8DFF"
@@ -428,7 +625,7 @@ STYLE = f"""
 }}
 QMainWindow, QDialog {{ background: #17171C; }}
 
-/* Sidopanel */
+/* Sidebar */
 #Sidebar {{
     background: #101014;
     border-right: 1px solid #232329;
@@ -436,12 +633,12 @@ QMainWindow, QDialog {{ background: #17171C; }}
 #AppTitle {{ font-size: 15px; font-weight: 700; letter-spacing: 0.5px; }}
 #AppSub   {{ color: #7A7A85; font-size: 11px; }}
 
-QToolButton#NavBtn {{
+QPushButton#NavBtn {{
     background: transparent; border: none; border-radius: 8px;
     padding: 8px 12px; text-align: left; font-size: 13px; color: #C9C9D2;
 }}
-QToolButton#NavBtn:hover  {{ background: #1D1D24; }}
-QToolButton#NavBtn:checked {{ background: {ACCENT}; color: white; font-weight: 600; }}
+QPushButton#NavBtn:hover  {{ background: #1D1D24; }}
+QPushButton#NavBtn:checked {{ background: {ACCENT}; color: white; font-weight: 600; }}
 
 #SectionLabel {{
     color: #6E6E79; font-size: 10px; font-weight: 700;
@@ -455,7 +652,7 @@ QListWidget::item {{ border-radius: 8px; padding: 7px 10px; margin: 1px 6px; col
 QListWidget::item:hover    {{ background: #1D1D24; }}
 QListWidget::item:selected {{ background: #26262E; color: white; }}
 
-/* Mittenkolumn */
+/* Middle column */
 #MiddlePane {{ background: #17171C; }}
 QLineEdit#Search {{
     background: #222229; border: 1px solid #2C2C34; border-radius: 9px;
@@ -463,19 +660,23 @@ QLineEdit#Search {{
 }}
 QLineEdit#Search:focus {{ border: 1px solid {ACCENT}; }}
 
-QListWidget#Channels::item {{ padding: 0px; margin: 2px 8px; }}
-QListWidget#Channels::item:selected {{ background: #26262E; }}
+QListView#Channels {{
+    background: transparent; border: none; outline: none; font-size: 13px;
+}}
 
-#ChName  {{ font-size: 13px; font-weight: 600; }}
-#ChEpg   {{ font-size: 11px; color: #8B8B96; }}
 #ChNum   {{ font-size: 11px; color: #5A5A64; }}
+
+QProgressBar#LoadBar {{
+    background: transparent; border: none; max-height: 3px;
+}}
+QProgressBar#LoadBar::chunk {{ background: {ACCENT}; }}
 
 QProgressBar#EpgBar {{
     background: #2A2A32; border: none; border-radius: 2px; max-height: 4px;
 }}
 QProgressBar#EpgBar::chunk {{ background: {ACCENT}; border-radius: 2px; }}
 
-/* Detaljpanel */
+/* Detail panel */
 #DetailPane {{ background: #1B1B21; border-left: 1px solid #232329; }}
 #DetailTitle {{ font-size: 20px; font-weight: 700; }}
 #DetailMeta  {{ color: #8B8B96; font-size: 12px; }}
@@ -497,10 +698,33 @@ QPushButton:hover  {{ background: #34343E; }}
 QPushButton#Primary {{ background: {ACCENT}; border: none; color: white; }}
 QPushButton#Primary:hover {{ background: #5E99FF; }}
 
+QScrollArea {{ background: transparent; border: none; }}
+QScrollArea > QWidget > QWidget {{ background: transparent; }}
+
 QScrollBar:vertical {{ background: transparent; width: 8px; margin: 2px; }}
 QScrollBar::handle:vertical {{ background: #33333C; border-radius: 4px; min-height: 30px; }}
 QScrollBar::handle:vertical:hover {{ background: #45454F; }}
 QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; }}
+
+/* Context menus: dark on every platform (Linux GTK/Qt themes default to a
+   white popup menu unless styled explicitly; macOS's native dark menu was
+   the look we want everywhere). */
+QMenu {{
+    background: #1D1D24; border: 1px solid #2C2C34; border-radius: 8px;
+    padding: 6px;
+}}
+QMenu::item {{
+    background: transparent; color: #ECECF1; border-radius: 6px;
+    padding: 6px 24px 6px 12px;
+}}
+QMenu::item:selected {{ background: {ACCENT}; color: white; }}
+QMenu::item:disabled {{ color: #6E6E79; }}
+QMenu::separator {{ height: 1px; background: #2C2C34; margin: 5px 8px; }}
+
+QToolTip {{
+    background: #1D1D24; color: #ECECF1; border: 1px solid #2C2C34;
+    padding: 4px 6px;
+}}
 
 QComboBox {{
     background: #222229; border: 1px solid #2C2C34; border-radius: 8px;
@@ -515,125 +739,268 @@ QLineEdit:focus {{ border: 1px solid {ACCENT}; }}
 """
 
 # ----------------------------------------------------------------------------
-#  Inloggningsdialog
+#  Login dialog
 # ----------------------------------------------------------------------------
 
 class LoginDialog(QDialog):
     def __init__(self, settings: QSettings, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Anslut till Xtream-server")
+        self.setWindowTitle("Connect to an Xtream server")
         self.setMinimumWidth(420)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(24, 24, 24, 24)
         lay.setSpacing(14)
 
-        rubrik = QLabel("dopeIPTV")
-        rubrik.setStyleSheet("font-size:20px; font-weight:700;")
-        under = QLabel("Logga in med dina Xtream Codes-uppgifter.")
-        under.setStyleSheet("color:#8B8B96;")
-        lay.addWidget(rubrik)
-        lay.addWidget(under)
+        heading = QLabel("dopeIPTV")
+        heading.setStyleSheet("font-size:20px; font-weight:700;")
+        subtitle = QLabel("Sign in with your Xtream Codes credentials.")
+        subtitle.setStyleSheet("color:#8B8B96;")
+        lay.addWidget(heading)
+        lay.addWidget(subtitle)
 
         form = QFormLayout()
         form.setSpacing(10)
         self.server = QLineEdit(settings.value("server", ""))
         self.server.setPlaceholderText("http://server:port")
         self.user = QLineEdit(settings.value("username", ""))
-        self.user.setPlaceholderText("användarnamn")
+        self.user.setPlaceholderText("username")
         self.pw = QLineEdit(settings.value("password", ""))
-        self.pw.setPlaceholderText("lösenord")
+        self.pw.setPlaceholderText("password")
         self.pw.setEchoMode(QLineEdit.EchoMode.Password)
         form.addRow("Server", self.server)
-        form.addRow("Användare", self.user)
-        form.addRow("Lösenord", self.pw)
+        form.addRow("Username", self.user)
+        form.addRow("Password", self.pw)
         lay.addLayout(form)
 
         self.status = QLabel("")
         self.status.setStyleSheet("color:#FF6B6B; font-size:12px;")
         lay.addWidget(self.status)
 
-        knappar = QDialogButtonBox()
-        self.ok = knappar.addButton("Anslut", QDialogButtonBox.ButtonRole.AcceptRole)
+        buttons = QDialogButtonBox()
+        self.ok = buttons.addButton("Connect", QDialogButtonBox.ButtonRole.AcceptRole)
         self.ok.setObjectName("Primary")
-        knappar.addButton("Avbryt", QDialogButtonBox.ButtonRole.RejectRole)
-        knappar.accepted.connect(self.accept)
-        knappar.rejected.connect(self.reject)
-        lay.addWidget(knappar)
+        buttons.addButton("Cancel", QDialogButtonBox.ButtonRole.RejectRole)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        lay.addWidget(buttons)
 
     def values(self):
         return self.server.text().strip(), self.user.text().strip(), self.pw.text().strip()
 
 # ----------------------------------------------------------------------------
-#  Kanalrad (widget i listan)
+#  Channel list: virtualized model + delegate
+#
+#  QListWidget with a QWidget per row (the previous approach) creates one
+#  persistent widget subtree per item; with a few thousand channels that
+#  freezes the UI on load and on every search keystroke. A QListView with a
+#  plain data model and a custom-painted delegate only ever touches the
+#  handful of rows actually on screen, so it stays fast regardless of how
+#  many channels a provider has - no artificial cap needed.
 # ----------------------------------------------------------------------------
 
-class ChannelRow(QWidget):
-    def __init__(self, item: dict, kind: str):
-        super().__init__()
-        self.data = item
+class ChannelListModel(QAbstractListModel):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._items = []
+        self.kind = "live"
+
+    def rowCount(self, parent=QModelIndex()):
+        return len(self._items)
+
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
+        if not index.isValid() or not (0 <= index.row() < len(self._items)):
+            return None
+        it = self._items[index.row()]
+        if role == Qt.ItemDataRole.UserRole:
+            return it
+        if role == Qt.ItemDataRole.DisplayRole:
+            return it.get("name") or it.get("title") or "?"
+        return None
+
+    def set_items(self, items, kind):
+        self.beginResetModel()
+        self._items = items
         self.kind = kind
-        lay = QHBoxLayout(self)
-        lay.setContentsMargins(10, 8, 12, 8)
-        lay.setSpacing(12)
+        self.endResetModel()
 
-        self.logo = QLabel()
-        self.logo.setFixedSize(44, 44)
-        self.logo.setStyleSheet(
-            "background:#26262E; border-radius:10px; font-size:16px; font-weight:700;")
-        self.logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        namn = item.get("name") or "?"
-        self.logo.setText(namn.strip()[:1].upper())
-        lay.addWidget(self.logo)
+    def item_at(self, row):
+        if 0 <= row < len(self._items):
+            return self._items[row]
+        return None
 
-        col = QVBoxLayout()
-        col.setSpacing(3)
-        self.name = QLabel(namn)
-        self.name.setObjectName("ChName")
-        col.addWidget(self.name)
+    def refresh_all(self):
+        if self._items:
+            self.dataChanged.emit(self.index(0), self.index(len(self._items) - 1))
 
-        self.epg = QLabel(" ")
-        self.epg.setObjectName("ChEpg")
-        col.addWidget(self.epg)
 
-        self.bar = QProgressBar()
-        self.bar.setObjectName("EpgBar")
-        self.bar.setTextVisible(False)
-        self.bar.setRange(0, 100)
-        self.bar.setValue(0)
-        self.bar.hide()
-        col.addWidget(self.bar)
-        lay.addLayout(col, 1)
+class ChannelDelegate(QStyledItemDelegate):
+    ROW_HEIGHT = 66
+    LOGO_SIZE = 44
 
-        if kind in ("live", "fav") and item.get("num"):
-            n = QLabel(str(item["num"]))
-            n.setObjectName("ChNum")
-            lay.addWidget(n)
+    def __init__(self, window):
+        super().__init__(window)
+        self.window = window
 
-    def set_logo(self, pm: QPixmap):
-        rounded = QPixmap(44, 44)
-        rounded.fill(Qt.GlobalColor.transparent)
-        p = QPainter(rounded)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        path = QPainterPath()
-        path.addRoundedRect(0, 0, 44, 44, 10, 10)
-        p.setClipPath(path)
-        scaled = pm.scaled(44, 44, Qt.AspectRatioMode.KeepAspectRatio,
-                           Qt.TransformationMode.SmoothTransformation)
-        x = (44 - scaled.width()) // 2
-        y = (44 - scaled.height()) // 2
-        p.drawPixmap(x, y, scaled)
-        p.end()
-        self.logo.setText("")
-        self.logo.setPixmap(rounded)
+    def sizeHint(self, option, index):
+        return QSize(0, self.ROW_HEIGHT)
 
-    def set_now(self, title, pct):
-        self.epg.setText(title)
-        if pct is not None:
-            self.bar.setValue(max(0, min(100, int(pct))))
-            self.bar.show()
+    def paint(self, painter, option, index):
+        it = index.data(Qt.ItemDataRole.UserRole) or {}
+        kind = index.model().kind
+        rect = option.rect
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        if option.state & QStyle.StateFlag.State_Selected:
+            painter.fillRect(rect, QColor("#26262E"))
+        elif option.state & QStyle.StateFlag.State_MouseOver:
+            painter.fillRect(rect, QColor("#1D1D24"))
+
+        name = it.get("name") or it.get("title") or "?"
+        logo_rect = QRect(rect.left() + 10,
+                          rect.top() + (rect.height() - self.LOGO_SIZE) // 2,
+                          self.LOGO_SIZE, self.LOGO_SIZE)
+        url = it.get("stream_icon") or it.get("cover")
+        pm = self.window.logos.cache.get(url) if url else None
+        if pm:
+            path = QPainterPath()
+            path.addRoundedRect(QRectF(logo_rect), 10, 10)
+            painter.setClipPath(path)
+            scaled = pm.scaled(self.LOGO_SIZE, self.LOGO_SIZE,
+                               Qt.AspectRatioMode.KeepAspectRatio,
+                               Qt.TransformationMode.SmoothTransformation)
+            x = logo_rect.x() + (self.LOGO_SIZE - scaled.width()) // 2
+            y = logo_rect.y() + (self.LOGO_SIZE - scaled.height()) // 2
+            painter.drawPixmap(x, y, scaled)
+            painter.setClipping(False)
+        else:
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor("#26262E"))
+            painter.drawRoundedRect(logo_rect, 10, 10)
+            painter.setPen(QColor("#ECECF1"))
+            f = QFont()
+            f.setPointSize(14)
+            f.setBold(True)
+            painter.setFont(f)
+            painter.drawText(logo_rect, Qt.AlignmentFlag.AlignCenter,
+                             name.strip()[:1].upper())
+            if url and url not in self.window.logos.waiting:
+                self.window.logos.get(url, lambda _pm: self.window.listw.viewport().update())
+
+        num_w = 0
+        if kind in ("live", "fav") and it.get("num"):
+            num_w = 34
+            painter.setPen(QColor("#5A5A64"))
+            fnum = QFont()
+            fnum.setPointSize(10)
+            painter.setFont(fnum)
+            num_rect = QRect(rect.right() - 12 - num_w, rect.top(), num_w, rect.height())
+            painter.drawText(num_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight,
+                             str(it["num"]))
+
+        text_x = logo_rect.right() + 12
+        text_w = rect.right() - 12 - num_w - text_x
+
+        name_rect = QRect(text_x, rect.top() + 8, max(0, text_w), 18)
+        painter.setPen(QColor("#ECECF1"))
+        fname = QFont()
+        fname.setPointSize(11)
+        fname.setBold(True)
+        painter.setFont(fname)
+        fm = painter.fontMetrics()
+        painter.drawText(name_rect, Qt.AlignmentFlag.AlignVCenter,
+                         fm.elidedText(name, Qt.TextElideMode.ElideRight, name_rect.width()))
+
+        now = self.window.xmltv.now_for(it) if kind in ("live", "fav") else None
+        if now:
+            title, pct = now
+            sub_rect = QRect(text_x, rect.top() + 29, max(0, text_w), 15)
+            painter.setPen(QColor("#8B8B96"))
+            fsub = QFont()
+            fsub.setPointSize(9)
+            painter.setFont(fsub)
+            fm2 = painter.fontMetrics()
+            painter.drawText(sub_rect, Qt.AlignmentFlag.AlignVCenter,
+                             fm2.elidedText("Now: " + title, Qt.TextElideMode.ElideRight,
+                                          sub_rect.width()))
+            bar_rect = QRect(text_x, rect.top() + 48, max(0, text_w), 4)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor("#2A2A32"))
+            painter.drawRoundedRect(bar_rect, 2, 2)
+            fill_w = int(bar_rect.width() * max(0, min(100, pct)) / 100)
+            if fill_w > 0:
+                painter.setBrush(QColor(ACCENT))
+                painter.drawRoundedRect(QRect(bar_rect.x(), bar_rect.y(), fill_w,
+                                              bar_rect.height()), 2, 2)
+        painter.restore()
 
 # ----------------------------------------------------------------------------
-#  Huvudfönster
+#  EPG guide dialog (channel schedule overview)
+# ----------------------------------------------------------------------------
+
+class EpgGuideDialog(QDialog):
+    MAX_ROWS = 2000
+
+    def __init__(self, window, channels):
+        super().__init__(window)
+        self.window = window
+        self.channels = channels
+        self.setWindowTitle("EPG Guide")
+        self.resize(560, 640)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(18, 18, 18, 18)
+        lay.setSpacing(10)
+
+        self.search = QLineEdit(placeholderText="Filter channels...")
+        self.search.textChanged.connect(self._populate)
+        lay.addWidget(self.search)
+
+        self.info_lbl = QLabel("")
+        self.info_lbl.setStyleSheet("color:#6E6E79; font-size:11px;")
+        lay.addWidget(self.info_lbl)
+
+        self.list = QListWidget()
+        self.list.itemDoubleClicked.connect(self._play_selected)
+        lay.addWidget(self.list, 1)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(self.reject)
+        buttons.accepted.connect(self.accept)
+        lay.addWidget(buttons)
+
+        self._populate()
+
+    def _populate(self, _text=None):
+        self.list.clear()
+        text = self.search.text().lower().strip()
+        shown = 0
+        for it in self.channels:
+            name = it.get("name") or "?"
+            if text and text not in name.lower():
+                continue
+            shown += 1
+            if shown > self.MAX_ROWS:
+                break
+            now = self.window.xmltv.now_for(it)
+            if now:
+                label = f"{name}\nNow: {now[0]}  ({int(now[1])}%)"
+            else:
+                label = f"{name}\nNo programme data"
+            item = QListWidgetItem(label)
+            item.setData(Qt.ItemDataRole.UserRole, it)
+            self.list.addItem(item)
+        note = f"{shown} channels"
+        if shown > self.MAX_ROWS:
+            note += f" (showing first {self.MAX_ROWS} - narrow your search)"
+        self.info_lbl.setText(note)
+
+    def _play_selected(self, item):
+        it = item.data(Qt.ItemDataRole.UserRole)
+        self.window.play_live_channel(it)
+        self.accept()
+
+# ----------------------------------------------------------------------------
+#  Main window
 # ----------------------------------------------------------------------------
 
 class MainWindow(QMainWindow):
@@ -645,78 +1012,105 @@ class MainWindow(QMainWindow):
         self.logos = LogoLoader(self.pool)
         self.xmltv = XmltvGuide(client)
         self.favs = FavoriteStore(settings)
-        self.mode = "live"                 # live | vod | series | fav
-        self.all_items = []                # aktuell (ofiltrerad) lista
-        self.series_ctx = None             # vald serie vid avsnittsläge
-        self._info_cache = {}              # (kind, id) -> info-dict
+        self.history = HistoryStore(settings)
+        self.mpv = MpvIpcPlayer()
+        self.mode = "live"                 # live | vod | series | fav | history
+        self.all_items = []                # current (unfiltered) list
+        self.series_ctx = None             # selected series when browsing episodes
+        self._info_cache = {}               # (kind, id) -> info dict
+        self._current_key = None            # identity of the selected row
+        self._last_player = None
 
         self.setWindowTitle(APP_NAME)
         self.resize(1240, 780)
         self._build_ui()
         self._load_categories()
 
-    # -- UI-bygge -------------------------------------------------------------
+    # -- UI construction -------------------------------------------------------
     def _build_ui(self):
         root = QSplitter(Qt.Orientation.Horizontal)
         self.setCentralWidget(root)
 
-        # ---------- Sidopanel ----------
+        # ---------- Sidebar ----------
         side = QWidget(objectName="Sidebar")
         sl = QVBoxLayout(side)
         sl.setContentsMargins(12, 16, 12, 12)
         sl.setSpacing(4)
 
-        titel = QLabel("dopeIPTV", objectName="AppTitle")
-        sub = QLabel("för Linux", objectName="AppSub")
-        sl.addWidget(titel)
+        title = QLabel("dopeIPTV", objectName="AppTitle")
+        sub = QLabel("for Linux & macOS", objectName="AppSub")
+        sl.addWidget(title)
         sl.addWidget(sub)
         sl.addSpacing(14)
 
         self.nav_btns = {}
-        for key, text in (("live", "📺  Live-TV"),
-                          ("vod", "🎬  Filmer"),
-                          ("series", "🍿  Serier"),
-                          ("fav", "⭐  Favoriter")):
-            b = QToolButton(objectName="NavBtn")
-            b.setText(text)
+        for key, text in (("live", "TV"), ("vod", "Movies"), ("series", "Series"),
+                          ("fav", "Favorites"), ("history", "History")):
+            b = QPushButton(text, objectName="NavBtn")
             b.setCheckable(True)
+            b.setFlat(True)
             b.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             b.clicked.connect(lambda _, k=key: self.switch_mode(k))
             sl.addWidget(b)
             self.nav_btns[key] = b
         self.nav_btns["live"].setChecked(True)
 
-        sl.addWidget(QLabel("KATEGORIER", objectName="SectionLabel"))
+        sl.addWidget(QLabel("CATEGORIES", objectName="SectionLabel"))
         self.cat_list = QListWidget()
         self.cat_list.currentItemChanged.connect(self._category_changed)
         self.cat_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.cat_list.customContextMenuRequested.connect(self._cat_menu)
         sl.addWidget(self.cat_list, 1)
 
-        inst = QPushButton("⚙  Inställningar")
-        inst.clicked.connect(self.open_settings)
-        sl.addWidget(inst)
+        guide_btn = QPushButton("EPG Guide")
+        guide_btn.clicked.connect(self._open_epg_guide)
+        sl.addWidget(guide_btn)
 
-        # ---------- Mittenkolumn ----------
+        settings_btn = QPushButton("Settings")
+        settings_btn.clicked.connect(self.open_settings)
+        sl.addWidget(settings_btn)
+
+        # ---------- Middle column ----------
         mid = QWidget(objectName="MiddlePane")
         ml = QVBoxLayout(mid)
         ml.setContentsMargins(14, 14, 14, 10)
         ml.setSpacing(10)
 
+        self.loading_bar = QProgressBar(objectName="LoadBar")
+        self.loading_bar.setRange(0, 0)
+        self.loading_bar.setTextVisible(False)
+        self.loading_bar.hide()
+        ml.addWidget(self.loading_bar)
+
         self.search = QLineEdit(objectName="Search")
-        self.search.setPlaceholderText("Sök kanal, film eller serie …")
-        self.search.textChanged.connect(self._apply_filter)
+        self.search.setPlaceholderText("Search channels, movies or series...")
+        self._search_timer = QTimer(self)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.timeout.connect(self._apply_filter)
+        self.search.textChanged.connect(lambda _t: self._search_timer.start(220))
         ml.addWidget(self.search)
 
-        self.back_btn = QPushButton("←  Tillbaka till serier")
+        self.back_btn = QPushButton("<-  Back to series")
         self.back_btn.hide()
         self.back_btn.clicked.connect(self._leave_series)
         ml.addWidget(self.back_btn)
 
-        self.listw = QListWidget(objectName="Channels")
-        self.listw.setUniformItemSizes(False)
-        self.listw.currentItemChanged.connect(self._item_selected)
-        self.listw.itemDoubleClicked.connect(lambda _: self.play())
+        self.clear_history_btn = QPushButton("Clear history")
+        self.clear_history_btn.hide()
+        self.clear_history_btn.clicked.connect(self._clear_history)
+        ml.addWidget(self.clear_history_btn)
+
+        self.listw = QListView(objectName="Channels")
+        self.list_model = ChannelListModel()
+        self.listw.setModel(self.list_model)
+        self.listw.setItemDelegate(ChannelDelegate(self))
+        self.listw.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.listw.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.listw.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.listw.setUniformItemSizes(True)
+        self.listw.setMouseTracking(True)
+        self.listw.selectionModel().currentChanged.connect(self._on_current_changed)
+        self.listw.doubleClicked.connect(lambda _idx: self.play())
         self.listw.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.listw.customContextMenuRequested.connect(self._context_menu)
         ml.addWidget(self.listw, 1)
@@ -725,7 +1119,7 @@ class MainWindow(QMainWindow):
         self.count_lbl.setStyleSheet("color:#5A5A64; font-size:11px;")
         ml.addWidget(self.count_lbl)
 
-        # ---------- Detaljpanel ----------
+        # ---------- Detail panel ----------
         det = QWidget(objectName="DetailPane")
         dl = QVBoxLayout(det)
         dl.setContentsMargins(20, 22, 20, 18)
@@ -738,7 +1132,7 @@ class MainWindow(QMainWindow):
             "background:#26262E; border-radius:18px; font-size:30px; font-weight:700;")
         dl.addWidget(self.d_logo)
 
-        self.d_title = QLabel("Välj något i listan", objectName="DetailTitle")
+        self.d_title = QLabel("Select something from the list", objectName="DetailTitle")
         self.d_title.setWordWrap(True)
         dl.addWidget(self.d_title)
 
@@ -746,7 +1140,6 @@ class MainWindow(QMainWindow):
         self.d_meta.setWordWrap(True)
         dl.addWidget(self.d_meta)
 
-        # "Nu"-kort
         self.now_card = QFrame(objectName="Card")
         nc = QVBoxLayout(self.now_card)
         nc.setContentsMargins(14, 12, 14, 12)
@@ -764,8 +1157,7 @@ class MainWindow(QMainWindow):
         self.now_card.hide()
         dl.addWidget(self.now_card)
 
-        # Kommande program
-        self.epg_refresh = QPushButton("↻  Uppdatera EPG")
+        self.epg_refresh = QPushButton("Refresh EPG")
         self.epg_refresh.clicked.connect(self._request_epg)
         self.epg_refresh.hide()
         dl.addWidget(self.epg_refresh)
@@ -781,16 +1173,15 @@ class MainWindow(QMainWindow):
         self.epg_scroll.setWidget(self.epg_holder)
         dl.addWidget(self.epg_scroll, 1)
 
-        # Spelknappar
-        rad = QHBoxLayout()
-        rad.setSpacing(8)
-        self.play_mpv = QPushButton("▶  Spela i mpv", objectName="Primary")
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        self.play_mpv = QPushButton("Play in mpv", objectName="Primary")
         self.play_mpv.clicked.connect(lambda: self.play("mpv"))
-        self.play_vlc = QPushButton("▶  Spela i VLC")
+        self.play_vlc = QPushButton("Play in VLC")
         self.play_vlc.clicked.connect(lambda: self.play("vlc"))
-        rad.addWidget(self.play_mpv)
-        rad.addWidget(self.play_vlc)
-        dl.addLayout(rad)
+        row.addWidget(self.play_mpv)
+        row.addWidget(self.play_vlc)
+        dl.addLayout(row)
 
         root.addWidget(side)
         root.addWidget(mid)
@@ -799,47 +1190,56 @@ class MainWindow(QMainWindow):
         root.setCollapsible(0, False)
         root.setCollapsible(2, False)
 
-        # Uppdatera "nu spelas"-klockan varje minut
         self.tick = QTimer(self)
         self.tick.timeout.connect(self._refresh_progress)
         self.tick.start(60_000)
         self._current_epg = None
 
-    # -- lägen och kategorier --------------------------------------------------
+        QShortcut(QKeySequence("Ctrl+Right"), self, activated=lambda: self._zap(1))
+        QShortcut(QKeySequence("Ctrl+Left"), self, activated=lambda: self._zap(-1))
+
+    # -- modes and categories --------------------------------------------------
     def switch_mode(self, mode):
         for k, b in self.nav_btns.items():
             b.setChecked(k == mode)
         self.mode = mode
         self.series_ctx = None
         self.back_btn.hide()
+        self.clear_history_btn.setVisible(mode == "history")
         self.search.clear()
         self._load_categories()
 
+    def _mpv_reuse(self):
+        return self.settings.value("mpv_reuse", "true") == "true"
+
     def _load_categories(self):
         self.cat_list.clear()
-        self.listw.clear()
-        if self.mode == "fav":
+        self.list_model.set_items([], self.mode)
+        if self.mode in ("fav", "history"):
             self.cat_list.blockSignals(True)
-            alla = QListWidgetItem("Alla")
-            alla.setData(Qt.ItemDataRole.UserRole, None)
-            self.cat_list.addItem(alla)
-            for g in self.favs.group_names():
-                it = QListWidgetItem(g)
-                it.setData(Qt.ItemDataRole.UserRole, g)
-                self.cat_list.addItem(it)
+            all_item = QListWidgetItem("All")
+            all_item.setData(Qt.ItemDataRole.UserRole, None)
+            self.cat_list.addItem(all_item)
+            if self.mode == "fav":
+                for g in self.favs.group_names():
+                    it = QListWidgetItem(g)
+                    it.setData(Qt.ItemDataRole.UserRole, g)
+                    self.cat_list.addItem(it)
             self.cat_list.blockSignals(False)
             self.cat_list.setCurrentRow(0)
             return
-        self.count_lbl.setText("Hämtar kategorier …")
+        self.loading_bar.show()
+        self.count_lbl.setText("Loading categories...")
         fn = {"live": self.client.live_categories,
               "vod": self.client.vod_categories,
               "series": self.client.series_categories}[self.mode]
 
         def done(cats):
+            self.loading_bar.hide()
             self.cat_list.blockSignals(True)
-            alla = QListWidgetItem("Alla")
-            alla.setData(Qt.ItemDataRole.UserRole, None)
-            self.cat_list.addItem(alla)
+            all_item = QListWidgetItem("All")
+            all_item.setData(Qt.ItemDataRole.UserRole, None)
+            self.cat_list.addItem(all_item)
             for c in cats:
                 it = QListWidgetItem(c.get("category_name", "?"))
                 it.setData(Qt.ItemDataRole.UserRole, c.get("category_id"))
@@ -858,96 +1258,119 @@ class MainWindow(QMainWindow):
         self._load_items(cat)
 
     def _load_items(self, category_id):
-        self.listw.clear()
         if self.mode == "fav":
             self.all_items = self.favs.items(category_id)
             self._apply_filter()
             return
-        self.count_lbl.setText("Hämtar innehåll …")
+        if self.mode == "history":
+            self.all_items = self.history.items()
+            self._apply_filter()
+            return
+        self.loading_bar.show()
+        self.count_lbl.setText("Loading content...")
         fn = {"live": self.client.live_streams,
               "vod": self.client.vod_streams,
               "series": self.client.series_list}[self.mode]
 
         def done(items):
+            self.loading_bar.hide()
             self.all_items = items or []
             self._apply_filter()
+            if self.mode == "live":
+                self._ensure_xmltv_loaded()
 
         run_async(self.pool, lambda: fn(category_id), done, self._error)
 
-    # -- lista och filter --------------------------------------------------------
+    def _ensure_xmltv_loaded(self):
+        if self.xmltv._loaded or self.xmltv._failed:
+            return
+        run_async(self.pool, self.xmltv.ensure_loaded,
+                  lambda ok: self.list_model.refresh_all() if ok else None)
+
+    # -- list and filtering ------------------------------------------------------
+    LABELS = {"live": "channels", "vod": "movies", "series": "series",
+              "episode": "episodes", "fav": "favorites", "history": "history items"}
+
     def _apply_filter(self):
         text = self.search.text().lower().strip()
-        self.listw.clear()
         kind = "episode" if self.series_ctx else self.mode
-        visade = 0
-        for it in self.all_items:
-            namn = (it.get("name") or it.get("title") or "").lower()
-            if text and text not in namn:
-                continue
-            row = ChannelRow(self._normalize(it), kind)
-            lw = QListWidgetItem()
-            lw.setSizeHint(QSize(0, 66))
-            lw.setData(Qt.ItemDataRole.UserRole, it)
-            self.listw.addItem(lw)
-            self.listw.setItemWidget(lw, row)
-            url = it.get("stream_icon") or it.get("cover")
-            if url:
-                self.logos.get(url, row.set_logo)
-            visade += 1
-            if visade >= 800 and not text:   # skydda UI:t mot enorma listor
-                break
-        etikett = {"live": "kanaler", "vod": "filmer", "series": "serier",
-                   "episode": "avsnitt", "fav": "favoriter"}[kind]
-        self.count_lbl.setText(f"{visade} {etikett}")
+        if text:
+            filtered = [it for it in self.all_items
+                       if text in (it.get("name") or it.get("title") or "").lower()]
+        else:
+            filtered = self.all_items
+        self.list_model.set_items(filtered, kind)
+        self.count_lbl.setText(f"{len(filtered)} {self.LABELS[kind]}")
         if kind == "fav" and not self.all_items:
-            self.count_lbl.setText(
-                "Inga favoriter ännu — högerklicka på en kanal i Live-TV.")
+            self.count_lbl.setText("No favorites yet - right-click a channel in TV to add one.")
+        elif kind == "history" and not self.all_items:
+            self.count_lbl.setText("No watch history yet.")
 
+    # -- item identity -----------------------------------------------------------
     @staticmethod
-    def _normalize(it):
-        return {"name": it.get("name") or it.get("title") or "?",
-                "num": it.get("num")}
+    def _item_key(it):
+        if not it:
+            return None
+        return it.get("stream_id") or it.get("series_id") or it.get("id") or it.get("_key")
 
-    # -- val, EPG och detaljpanel -------------------------------------------------
-    def _item_selected(self, cur, _prev=None):
+    def _history_kind(self):
+        if self.series_ctx:
+            return "episode"
+        return {"live": "live", "fav": "live", "vod": "movie"}.get(self.mode, "other")
+
+    # -- selection, EPG and detail panel -------------------------------------------
+    def _on_current_changed(self, current, _previous=None):
+        it = self.list_model.item_at(current.row()) if current.isValid() else None
+        self._current_key = self._item_key(it)
+        self._show_detail(it)
+
+    def _show_detail(self, it):
         self.now_card.hide()
         self._clear_epg_rows()
         self._current_epg = None
         self.epg_refresh.hide()
-        if not cur:
+        if not it:
+            self.d_title.setText("Select something from the list")
+            self.d_meta.setText("")
+            self.d_logo.setPixmap(QPixmap())
+            self.d_logo.setText("")
             return
-        it = cur.data(Qt.ItemDataRole.UserRole)
-        namn = it.get("name") or it.get("title") or "?"
-        self.d_title.setText(namn)
+        name = it.get("name") or it.get("title") or "?"
+        self.d_title.setText(name)
         self.d_logo.setPixmap(QPixmap())
-        self.d_logo.setText(namn.strip()[:1].upper())
+        self.d_logo.setText(name.strip()[:1].upper())
         url = it.get("stream_icon") or it.get("cover")
         if url:
             self.logos.get(url, self._set_detail_logo)
 
+        if self.mode == "history":
+            self.d_meta.setText({"live": "Live channel", "movie": "Movie",
+                                 "episode": "Episode"}.get(it.get("_kind"), ""))
+            return
+
         if self.series_ctx:
             info = it.get("info") if isinstance(it.get("info"), dict) else {}
-            meta = " · ".join(x for x in (
-                f"Säsong {it.get('season')}" if it.get("season") else "",
+            meta = " * ".join(x for x in (
+                f"Season {it.get('season')}" if it.get("season") else "",
                 info.get("duration", ""),) if x)
             self.d_meta.setText(meta)
-            self._show_media_info(info, cur)
+            self._show_media_info(info, self._current_key)
         elif self.mode in ("live", "fav"):
-            self.d_meta.setText("Direktsänd kanal")
+            self.d_meta.setText("Live channel")
             if it.get("stream_id"):
                 self.epg_refresh.show()
                 self._request_epg()
         elif self.mode == "vod":
-            meta = " · ".join(x for x in (
+            meta = " * ".join(x for x in (
                 str(it.get("year") or ""),
-                f"⭐ {it['rating']}" if it.get("rating") else "",) if x)
-            self.d_meta.setText(meta or "Film")
+                f"* {it['rating']}" if it.get("rating") else "",) if x)
+            self.d_meta.setText(meta or "Movie")
             if it.get("stream_id"):
-                self._request_media_info("vod", it["stream_id"], cur)
+                self._request_media_info("vod", it["stream_id"], self._current_key)
         else:
-            self.d_meta.setText("Serie — dubbelklicka för avsnitt")
+            self.d_meta.setText("Series - double-click for episodes")
             if it.get("series_id"):
-                self._request_media_info("series", it["series_id"], cur)
+                self._request_media_info("series", it["series_id"], self._current_key)
 
     def _set_detail_logo(self, pm):
         rounded = QPixmap(84, 84)
@@ -971,50 +1394,48 @@ class MainWindow(QMainWindow):
                 w.deleteLater()
 
     def _epg_note(self, text):
-        """Liten grå informationsrad i EPG-/informationsytan."""
         lbl = QLabel(text)
         lbl.setStyleSheet("color:#6E6E79; font-size:12px;")
         lbl.setWordWrap(True)
         self.epg_lay.insertWidget(self.epg_lay.count() - 1, lbl)
 
     def _request_epg(self):
-        """Hämtar (om) EPG för den valda live-kanalen."""
-        cur = self.listw.currentItem()
-        if not cur or self.mode not in ("live", "fav") or self.series_ctx:
+        it = self.list_model.item_at(self.listw.currentIndex().row())
+        if not it or self.mode not in ("live", "fav") or self.series_ctx:
             return
-        it = cur.data(Qt.ItemDataRole.UserRole)
         sid = it.get("stream_id")
         if not sid:
             return
+        key = self._item_key(it)
         self._clear_epg_rows()
-        self._epg_note("Hämtar programguide …")
+        self._epg_note("Loading programme guide...")
 
         def fetch():
             listings = self.client.short_epg(sid, 8)
-            if not listings:                     # prova fulla tablån
+            if not listings:
                 listings = self.client.epg_table(sid)
-            if not listings:                     # sista utvägen: XMLTV
+            if not listings:
                 listings = self.xmltv.listings_for(it)
             return listings
 
         run_async(self.pool, fetch,
-                  lambda e: self._show_epg(e, cur),
-                  lambda _: self._epg_error(cur))
+                  lambda e: self._show_epg(e, key),
+                  lambda _: self._epg_error(key))
 
-    def _epg_error(self, list_item):
-        if list_item is not self.listw.currentItem():
+    def _epg_error(self, key):
+        if key != self._current_key:
             return
         self.now_card.hide()
         self._clear_epg_rows()
-        self._epg_note("Kunde inte hämta programguiden.")
+        self._epg_note("Could not load the programme guide.")
 
-    # -- film-/serieinformation -------------------------------------------------
-    def _request_media_info(self, kind, mid, list_item):
+    # -- movie/series info -------------------------------------------------------
+    def _request_media_info(self, kind, mid, key):
         cached = self._info_cache.get((kind, mid))
         if cached is not None:
-            self._show_media_info(cached, list_item)
+            self._show_media_info(cached, key)
             return
-        self._epg_note("Hämtar information …")
+        self._epg_note("Loading information...")
         if kind == "vod":
             fetch = lambda: (self.client.vod_info(mid) or {}).get("info") or {}
         else:
@@ -1024,113 +1445,106 @@ class MainWindow(QMainWindow):
             if not isinstance(info, dict):
                 info = {}
             self._info_cache[(kind, mid)] = info
-            self._show_media_info(info, list_item)
+            self._show_media_info(info, key)
 
         run_async(self.pool, fetch, done, lambda _: None)
 
-    def _show_media_info(self, info, list_item):
-        if list_item is not self.listw.currentItem():
+    def _show_media_info(self, info, key):
+        if key != self._current_key:
             return
         self._clear_epg_rows()
         plot = str(info.get("plot") or info.get("description") or "").strip()
         if plot:
-            kort = QFrame(objectName="Card")
-            kl = QVBoxLayout(kort)
+            card = QFrame(objectName="Card")
+            kl = QVBoxLayout(card)
             kl.setContentsMargins(14, 12, 14, 12)
-            handling = QLabel(plot, objectName="NowDesc")
-            handling.setWordWrap(True)
-            kl.addWidget(handling)
-            self.epg_lay.insertWidget(self.epg_lay.count() - 1, kort)
-        rader = (("Genre", info.get("genre")),
-                 ("Skådespelare", info.get("cast") or info.get("actors")),
-                 ("Regi", info.get("director")),
-                 ("Premiär", info.get("releasedate") or info.get("releaseDate")),
-                 ("Längd", info.get("duration")),
-                 ("Betyg", info.get("rating")))
-        nagot = bool(plot)
-        for rubrik, varde in rader:
-            varde = str(varde or "").strip()
-            if varde:
-                self._epg_note(f"{rubrik}: {varde}")
-                nagot = True
-        if not nagot:
-            self._epg_note("Ingen ytterligare information tillgänglig.")
+            desc = QLabel(plot, objectName="NowDesc")
+            desc.setWordWrap(True)
+            kl.addWidget(desc)
+            self.epg_lay.insertWidget(self.epg_lay.count() - 1, card)
+        rows = (("Genre", info.get("genre")),
+               ("Cast", info.get("cast") or info.get("actors")),
+               ("Director", info.get("director")),
+               ("Released", info.get("releasedate") or info.get("releaseDate")),
+               ("Duration", info.get("duration")),
+               ("Rating", info.get("rating")))
+        has_content = bool(plot)
+        for label, value in rows:
+            value = str(value or "").strip()
+            if value:
+                self._epg_note(f"{label}: {value}")
+                has_content = True
+        if not has_content:
+            self._epg_note("No further information available.")
 
-    def _show_epg(self, listings, list_item):
-        if list_item is not self.listw.currentItem():
-            return                      # användaren hann byta kanal
+    def _show_epg(self, listings, key):
+        if key != self._current_key:
+            return                      # the user already switched channels
         self.now_card.hide()
         self._clear_epg_rows()
         self._current_epg = None
         now = datetime.now().astimezone()
-        alla, kommande = [], []
-        aktuellt = None
+        all_posts, upcoming = [], []
+        current = None
+        seen = set()
         for e in listings or []:
             start, stop = epg_times(e)
-            if e.get("_plain"):     # XMLTV-poster är redan avkodade
-                titel, desc = e.get("title") or "", e.get("description") or ""
+            if e.get("_plain"):     # XMLTV entries are already decoded
+                title, desc = e.get("title") or "", e.get("description") or ""
             else:
-                titel, desc = b64(e.get("title")), b64(e.get("description"))
-            post = {"title": titel, "desc": desc,
-                    "start": start, "stop": stop}
-            alla.append(post)
-            if start and stop and start <= now < stop and not aktuellt:
-                aktuellt = post
+                title, desc = b64(e.get("title")), b64(e.get("description"))
+            dedup_key = (int(start.timestamp()) if start else None, title.strip().lower())
+            if dedup_key in seen:
+                continue               # some providers list the same slot twice
+            seen.add(dedup_key)
+            post = {"title": title, "desc": desc, "start": start, "stop": stop}
+            all_posts.append(post)
+            if start and stop and start <= now < stop and not current:
+                current = post
             elif start and start > now:
-                kommande.append(post)
-        kommande.sort(key=lambda p: p["start"])
+                upcoming.append(post)
+        upcoming.sort(key=lambda p: p["start"])
 
-        if aktuellt:
-            self._current_epg = aktuellt
-            self.now_time.setText(
-                f"NU · {aktuellt['start']:%H:%M}–{aktuellt['stop']:%H:%M}")
-            self.now_title.setText(aktuellt["title"] or "Okänt program")
-            self.now_desc.setText(aktuellt["desc"][:400])
+        if current:
+            self._current_epg = current
+            self.now_time.setText(f"NOW * {current['start']:%H:%M}-{current['stop']:%H:%M}")
+            self.now_title.setText(current["title"] or "Unknown programme")
+            self.now_desc.setText(current["desc"][:400])
             self._refresh_progress()
             self.now_card.show()
-            # uppdatera även raden i listan
-            w = self.listw.itemWidget(list_item)
-            if isinstance(w, ChannelRow):
-                total = (aktuellt["stop"] - aktuellt["start"]).total_seconds()
-                pct = (now - aktuellt["start"]).total_seconds() / total * 100 if total else 0
-                w.set_now("Nu: " + (aktuellt["title"] or ""), pct)
 
-        for post in kommande[:6]:
+        for post in upcoming[:6]:
             self._epg_card(post)
 
-        if not aktuellt and not kommande:
-            daterade = sorted((p for p in alla if p["start"]),
-                              key=lambda p: p["start"])
-            if daterade:
-                # data finns men allt ligger i det förflutna — troligen skickar
-                # servern tider i fel tidszon; visa ändå de senaste posterna
-                self._epg_note("Serverns tablåtider verkar felaktiga — "
-                               "visar de senaste posterna.")
-                for post in daterade[-6:]:
-                    self._epg_card(post, med_datum=True)
+        if not current and not upcoming:
+            dated = sorted((p for p in all_posts if p["start"]), key=lambda p: p["start"])
+            if dated:
+                self._epg_note("The server's schedule times look wrong - "
+                               "showing the most recent entries anyway.")
+                for post in dated[-6:]:
+                    self._epg_card(post, with_date=True)
             else:
-                self._epg_note("Ingen programguide tillgänglig "
-                               "för den här kanalen.")
+                self._epg_note("No programme guide available for this channel.")
 
-    def _epg_card(self, post, med_datum=False):
-        kort = QFrame(objectName="Card")
-        kl = QVBoxLayout(kort)
+    def _epg_card(self, post, with_date=False):
+        card = QFrame(objectName="Card")
+        kl = QVBoxLayout(card)
         kl.setContentsMargins(12, 9, 12, 9)
         kl.setSpacing(2)
-        fmt = "%-d/%-m %H:%M" if med_datum else "%H:%M"
+        fmt = "%-d/%-m %H:%M" if with_date else "%H:%M"
         t = QLabel(post["start"].strftime(fmt), objectName="EpgRowTime")
-        ti = QLabel(post["title"] or "Okänt", objectName="EpgRowTitle")
+        ti = QLabel(post["title"] or "Unknown", objectName="EpgRowTitle")
         ti.setWordWrap(True)
         kl.addWidget(t)
         kl.addWidget(ti)
-        self.epg_lay.insertWidget(self.epg_lay.count() - 1, kort)
+        self.epg_lay.insertWidget(self.epg_lay.count() - 1, card)
 
     def _refresh_progress(self):
         e = self._current_epg
         if not e:
             return
         now = datetime.now().astimezone()
-        if now >= e["stop"]:            # programmet är slut — hämta ny EPG
+        if now >= e["stop"]:
             self._current_epg = None
             self._request_epg()
             return
@@ -1139,22 +1553,24 @@ class MainWindow(QMainWindow):
             pct = (now - e["start"]).total_seconds() / total * 100
             self.now_bar.setValue(max(0, min(100, int(pct))))
 
-    # -- serier → avsnitt ---------------------------------------------------------
-    def _enter_series(self, serie):
-        sid = serie.get("series_id")
+    # -- series -> episodes ---------------------------------------------------------
+    def _enter_series(self, series):
+        sid = series.get("series_id")
         if not sid:
             return
-        self.count_lbl.setText("Hämtar avsnitt …")
+        self.loading_bar.show()
+        self.count_lbl.setText("Loading episodes...")
 
         def done(info):
+            self.loading_bar.hide()
             episodes = []
             for season, eps in (info.get("episodes") or {}).items():
                 for ep in eps:
                     ep["season"] = season
-                    ep["name"] = f"S{season} · E{ep.get('episode_num', '?')} — " \
-                                 f"{ep.get('title') or 'Avsnitt'}"
+                    ep["name"] = f"S{season} * E{ep.get('episode_num', '?')} - " \
+                                 f"{ep.get('title') or 'Episode'}"
                     episodes.append(ep)
-            self.series_ctx = serie
+            self.series_ctx = series
             self.all_items = episodes
             self.back_btn.show()
             self.search.clear()
@@ -1168,67 +1584,125 @@ class MainWindow(QMainWindow):
         cur = self.cat_list.currentItem()
         self._load_items(cur.data(Qt.ItemDataRole.UserRole) if cur else None)
 
-    # -- uppspelning ----------------------------------------------------------------
+    # -- playback ----------------------------------------------------------------
     def _stream_for(self, it):
-        titel = it.get("name") or it.get("title") or "dopeIPTV"
+        title = it.get("name") or it.get("title") or "dopeIPTV"
         if self.series_ctx:
             return self.client.episode_url(
-                it.get("id"), it.get("container_extension")), titel
+                it.get("id"), it.get("container_extension")), title
         if self.mode in ("live", "fav"):
             fmt = self.settings.value("stream_format", "ts")
-            return self.client.live_url(it.get("stream_id"), fmt), titel
+            return self.client.live_url(it.get("stream_id"), fmt), title
         if self.mode == "vod":
             return self.client.vod_url(
-                it.get("stream_id"), it.get("container_extension")), titel
-        return None, titel
+                it.get("stream_id"), it.get("container_extension")), title
+        return None, title
 
-    def play(self, player=None):
-        cur = self.listw.currentItem()
-        if not cur:
+    def play_live_channel(self, it):
+        """Plays a channel directly (used by the EPG Guide dialog)."""
+        fmt = self.settings.value("stream_format", "ts")
+        url = self.client.live_url(it.get("stream_id"), fmt)
+        title = it.get("name") or "dopeIPTV"
+        self._start_playback(url, title, it.get("stream_icon"),
+                             self._item_key(it), "live")
+
+    def play(self, player=None, external=False):
+        it = self.list_model.item_at(self.listw.currentIndex().row())
+        if not it:
             return
-        it = cur.data(Qt.ItemDataRole.UserRole)
         if self.mode == "series" and not self.series_ctx:
             self._enter_series(it)
             return
-        url, titel = self._stream_for(it)
+        if self.mode == "history":
+            url, title = it.get("_url"), it.get("name") or "dopeIPTV"
+            icon, key, kind = it.get("stream_icon"), it.get("_key"), it.get("_kind")
+        else:
+            url, title = self._stream_for(it)
+            icon = it.get("stream_icon") or it.get("cover")
+            key, kind = self._item_key(it), self._history_kind()
         if not url:
             return
-        player = player or self.settings.value("player", "mpv")
-        launch_player(player, url, titel, self)
+
+        if player:
+            self.settings.setValue("player", player)
+
+        if external:
+            chosen = player or self.settings.value("player", "mpv")
+            launch_player(chosen, url, title, self)
+            if self.mode != "history":
+                self.history.add(url, title, icon, key, kind)
+            return
+
+        self._start_playback(url, title, icon, key, kind if self.mode != "history" else None)
+
+    def _start_playback(self, url, title, icon_url, key, history_kind):
+        if history_kind:
+            self.history.add(url, title, icon_url, key, history_kind)
+        chosen = self.settings.value("player", "mpv")
+        self._last_player = chosen
+        if chosen == "mpv" and self._mpv_reuse():
+            run_async(self.pool, lambda: self.mpv.load(url, title),
+                     lambda ok: None if ok else self._player_missing("mpv"))
+        else:
+            launch_player(chosen, url, title, self)
+
+    def _player_missing(self, name):
+        QMessageBox.warning(self, "Player not found",
+                           f"{name} was not found. Install it and try again.")
+
+    def _zap(self, direction):
+        if self.mode not in ("live", "fav"):
+            return
+        count = self.list_model.rowCount()
+        if count == 0:
+            return
+        row = self.listw.currentIndex().row()
+        new_row = (row + direction) % count if row >= 0 else 0
+        idx = self.list_model.index(new_row)
+        self.listw.setCurrentIndex(idx)
+        self.listw.scrollTo(idx)
+        self.play()
 
     def _context_menu(self, pos):
-        cur = self.listw.itemAt(pos)
-        if not cur:
+        idx = self.listw.indexAt(pos)
+        if not idx.isValid():
             return
-        self.listw.setCurrentItem(cur)
+        self.listw.setCurrentIndex(idx)
+        it = self.list_model.item_at(idx.row())
+        if not it:
+            return
         m = QMenu(self)
-        m.addAction("Spela i mpv", lambda: self.play("mpv"))
-        m.addAction("Spela i VLC", lambda: self.play("vlc"))
-        it = cur.data(Qt.ItemDataRole.UserRole)
+        m.addAction("Play in mpv", lambda: self.play("mpv"))
+        m.addAction("Play in VLC", lambda: self.play("vlc"))
+        m.addAction("Open externally in mpv", lambda: self.play("mpv", external=True))
+        m.addAction("Open externally in VLC", lambda: self.play("vlc", external=True))
         if self.mode in ("live", "fav") and it.get("stream_id"):
             m.addSeparator()
-            fmeny = m.addMenu("⭐  Lägg till i favoritgrupp")
+            fav_menu = m.addMenu("Add to favorites group")
             for g in self.favs.group_names():
-                fmeny.addAction(g, lambda g=g: self._add_fav(g, it))
+                fav_menu.addAction(g, lambda g=g: self._add_fav(g, it))
             if self.favs.group_names():
-                fmeny.addSeparator()
-            fmeny.addAction("Ny grupp …", lambda: self._add_fav(None, it))
+                fav_menu.addSeparator()
+            fav_menu.addAction("New group...", lambda: self._add_fav(None, it))
             if self.mode == "fav":
-                m.addAction("Ta bort från favoriter",
-                            lambda: self._remove_fav(it))
-        if not (self.mode == "series" and not self.series_ctx):
+                m.addAction("Remove from favorites", lambda: self._remove_fav(it))
+        if self.mode == "history":
+            m.addSeparator()
+            m.addAction("Remove from history",
+                       lambda: self._remove_history(it))
+        if not (self.mode == "series" and not self.series_ctx) and self.mode != "history":
             url, _ = self._stream_for(it)
             if url:
                 m.addSeparator()
-                m.addAction("Kopiera ström-URL",
-                            lambda: QApplication.clipboard().setText(url))
-        m.exec(self.listw.mapToGlobal(pos))
+                m.addAction("Copy stream URL",
+                           lambda: QApplication.clipboard().setText(url))
+        m.exec(self.listw.viewport().mapToGlobal(pos))
 
-    # -- favoriter -------------------------------------------------------------
+    # -- favorites -------------------------------------------------------------
     def _add_fav(self, group, item):
         if group is None:
             group, ok = QInputDialog.getText(
-                self, "Ny favoritgrupp", "Gruppens namn:")
+                self, "New favorites group", "Group name:")
             group = (group or "").strip()
             if not ok or not group:
                 return
@@ -1238,79 +1712,116 @@ class MainWindow(QMainWindow):
 
     def _remove_fav(self, item):
         cur = self.cat_list.currentItem()
-        grupp = cur.data(Qt.ItemDataRole.UserRole) if cur else None
-        self.favs.remove(item.get("stream_id"), grupp)
+        group = cur.data(Qt.ItemDataRole.UserRole) if cur else None
+        self.favs.remove(item.get("stream_id"), group)
         self._load_categories()
 
     def _cat_menu(self, pos):
         if self.mode != "fav":
             return
         it = self.cat_list.itemAt(pos)
-        grupp = it.data(Qt.ItemDataRole.UserRole) if it else None
-        if not grupp:
+        group = it.data(Qt.ItemDataRole.UserRole) if it else None
+        if not group:
             return
         m = QMenu(self)
-        m.addAction(f'Ta bort gruppen "{grupp}"',
-                    lambda: (self.favs.remove_group(grupp),
-                             self._load_categories()))
+        m.addAction(f'Remove group "{group}"',
+                   lambda: (self.favs.remove_group(group), self._load_categories()))
         m.exec(self.cat_list.mapToGlobal(pos))
 
-    # -- inställningar och fel -------------------------------------------------------
+    # -- history -----------------------------------------------------------------
+    def _remove_history(self, item):
+        self.history.remove(item.get("_key"), item.get("_kind"))
+        self._load_items(None)
+
+    def _clear_history(self):
+        if QMessageBox.question(self, "Clear history",
+                               "Remove all watch history?") == QMessageBox.StandardButton.Yes:
+            self.history.clear()
+            self._load_items(None)
+
+    # -- EPG guide ---------------------------------------------------------------
+    def _open_epg_guide(self):
+        dlg = QDialog(self)
+        dlg.setWindowTitle("EPG Guide")
+        lay = QVBoxLayout(dlg)
+        lay.addWidget(QLabel("Loading channels..."))
+        dlg.resize(300, 100)
+        dlg.show()
+
+        def done(channels):
+            dlg.close()
+            self._ensure_xmltv_loaded()
+            EpgGuideDialog(self, channels or []).exec()
+
+        run_async(self.pool, lambda: self.client.live_streams(None), done,
+                 lambda _: dlg.close())
+
+    # -- settings and errors -------------------------------------------------------
     def open_settings(self):
         d = QDialog(self)
-        d.setWindowTitle("Inställningar")
+        d.setWindowTitle("Settings")
         d.setMinimumWidth(380)
         lay = QVBoxLayout(d)
         lay.setContentsMargins(22, 22, 22, 22)
         form = QFormLayout()
-        spelare = QComboBox()
-        spelare.addItems(["mpv", "vlc"])
-        spelare.setCurrentText(self.settings.value("player", "mpv"))
-        fmt = QComboBox()
-        fmt.addItems(["ts", "m3u8"])
-        fmt.setCurrentText(self.settings.value("stream_format", "ts"))
-        form.addRow("Standardspelare", spelare)
-        form.addRow("Live-format", fmt)
+        player_box = QComboBox()
+        player_box.addItems(["mpv", "vlc"])
+        player_box.setCurrentText(self.settings.value("player", "mpv"))
+        fmt_box = QComboBox()
+        fmt_box.addItems(["ts", "m3u8"])
+        fmt_box.setCurrentText(self.settings.value("stream_format", "ts"))
+        reuse_box = QComboBox()
+        reuse_box.addItems(["Yes", "No"])
+        reuse_box.setCurrentText("Yes" if self._mpv_reuse() else "No")
+        form.addRow("Default player", player_box)
+        form.addRow("Live stream format", fmt_box)
+        form.addRow("Reuse mpv window (zapping)", reuse_box)
         lay.addLayout(form)
 
-        byt = QPushButton("Byt konto / server …")
-        lay.addWidget(byt)
+        switch_btn = QPushButton("Switch account / server...")
+        lay.addWidget(switch_btn)
 
-        knappar = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
-                                   QDialogButtonBox.StandardButton.Cancel)
-        knappar.accepted.connect(d.accept)
-        knappar.rejected.connect(d.reject)
-        lay.addWidget(knappar)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
+                                  QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(d.accept)
+        buttons.rejected.connect(d.reject)
+        lay.addWidget(buttons)
 
-        def logga_ut():
+        def sign_out():
             self.settings.remove("password")
             d.reject()
-            QMessageBox.information(self, APP_NAME,
-                                    "Starta om appen för att logga in på nytt.")
-        byt.clicked.connect(logga_ut)
+            QMessageBox.information(self, APP_NAME, "Restart the app to sign in again.")
+        switch_btn.clicked.connect(sign_out)
 
         if d.exec():
-            self.settings.setValue("player", spelare.currentText())
-            self.settings.setValue("stream_format", fmt.currentText())
+            self.settings.setValue("player", player_box.currentText())
+            self.settings.setValue("stream_format", fmt_box.currentText())
+            self.settings.setValue("mpv_reuse",
+                                   "true" if reuse_box.currentText() == "Yes" else "false")
 
     def _error(self, msg):
-        self.count_lbl.setText("Fel: " + msg)
+        self.loading_bar.hide()
+        self.count_lbl.setText("Error: " + msg)
+
+    def closeEvent(self, event):
+        self.mpv.stop()
+        super().closeEvent(event)
 
 # ----------------------------------------------------------------------------
-#  Programikon
+#  Application icon
 # ----------------------------------------------------------------------------
 
 def make_app_icon():
-    """Ritar appikonen (blå rundad platta med play-symbol) i olika storlekar."""
+    """Draws the app icon (a rounded blue tile with a play symbol) at several sizes."""
     icon = QIcon()
     for s in (256, 128, 64, 48, 32):
         pm = QPixmap(s, s)
         pm.fill(Qt.GlobalColor.transparent)
         p = QPainter(pm)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        platta = QPainterPath()
-        platta.addRoundedRect(0, 0, s, s, s * 0.22, s * 0.22)
-        p.fillPath(platta, QColor(ACCENT))
+        tile = QPainterPath()
+        tile.addRoundedRect(0, 0, s, s, s * 0.22, s * 0.22)
+        p.fillPath(tile, QColor(ACCENT))
         tri = QPainterPath()
         tri.moveTo(s * 0.40, s * 0.28)
         tri.lineTo(s * 0.40, s * 0.72)
@@ -1323,23 +1834,20 @@ def make_app_icon():
 
 
 def install_icon(icon):
-    """Sparar ikonen som 'dopeiptv' i användarens ikontema så att
-    skrivbordsfilen (Icon=dopeiptv) hittar den i programmenyn."""
-    import os
-    from pathlib import Path
-    base = Path(os.environ.get("XDG_DATA_HOME",
-                               Path.home() / ".local" / "share"))
-    mal = base / "icons" / "hicolor" / "256x256" / "apps" / "dopeiptv.png"
-    if mal.exists():
+    """Saves the icon as 'dopeiptv' in the user's icon theme so the desktop
+    file (Icon=dopeiptv) can find it in the application menu."""
+    base = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
+    target = base / "icons" / "hicolor" / "256x256" / "apps" / "dopeiptv.png"
+    if target.exists():
         return
     try:
-        mal.parent.mkdir(parents=True, exist_ok=True)
-        icon.pixmap(256, 256).save(str(mal), "PNG")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        icon.pixmap(256, 256).save(str(target), "PNG")
     except OSError:
         pass
 
 # ----------------------------------------------------------------------------
-#  Start
+#  Startup
 # ----------------------------------------------------------------------------
 
 def main():
@@ -1347,38 +1855,37 @@ def main():
     app.setApplicationName(APP_NAME)
     app.setOrganizationName(ORG)
     app.setApplicationDisplayName(APP_NAME)
-    # Wayland visar app_id i aktivitetsfältet; utan detta blir det "python3".
-    # Namnet måste matcha skrivbordsfilen (dopeiptv.desktop).
+    # Wayland shows the app_id in the taskbar; without this it would be
+    # "python3". The id must match the desktop file (dopeiptv.desktop).
     app.setDesktopFileName("dopeiptv")
-    ikon = make_app_icon()
-    app.setWindowIcon(ikon)
-    install_icon(ikon)
+    icon = make_app_icon()
+    app.setWindowIcon(icon)
+    install_icon(icon)
     app.setStyleSheet(STYLE)
     settings = QSettings(ORG, ORG)
 
     client = None
     while client is None:
-        # Hoppa över dialogen om vi redan har fungerande uppgifter
         server, user, pw = (settings.value("server", ""),
                             settings.value("username", ""),
                             settings.value("password", ""))
-        forsta = not (server and user and pw)
-        if forsta:
+        first_run = not (server and user and pw)
+        if first_run:
             dlg = LoginDialog(settings)
             if not dlg.exec():
                 return 0
             server, user, pw = dlg.values()
 
-        kandidat = XtreamClient(server, user, pw)
+        candidate = XtreamClient(server, user, pw)
         try:
-            kandidat.authenticate()
-            client = kandidat
+            candidate.authenticate()
+            client = candidate
             settings.setValue("server", server)
             settings.setValue("username", user)
             settings.setValue("password", pw)
         except Exception as e:
             settings.remove("password")
-            QMessageBox.critical(None, "Anslutning misslyckades", str(e))
+            QMessageBox.critical(None, "Connection failed", str(e))
 
     w = MainWindow(client, settings)
     w.show()
