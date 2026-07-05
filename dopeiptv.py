@@ -820,10 +820,15 @@ class _MpvGLWidget(QOpenGLWidget):
 
 
 class EmbeddedPlayer(QWidget):
-    """Video pane inside the app, rendered via libmpv's OpenGL render API."""
+    """Video pane inside the app, rendered via libmpv's OpenGL render API.
+    In fullscreen the control bar is hidden entirely; instead a translucent
+    overlay with the channel/EPG info fades in on mouse movement and hides
+    itself after a few seconds, so the video keeps the whole screen."""
 
     double_clicked = pyqtSignal()
     playback_error = pyqtSignal(str)
+
+    OVERLAY_HIDE_MS = 3000
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -833,25 +838,81 @@ class EmbeddedPlayer(QWidget):
 
         self.video = _MpvGLWidget(self)
         self.video.installEventFilter(self)
+        self.video.setMouseTracking(True)
         self.video.playback_error.connect(self.playback_error)
         lay.addWidget(self.video, 1)
 
-        bar = QHBoxLayout()
-        bar.setSpacing(8)
+        self.bar = QWidget()
+        bl = QHBoxLayout(self.bar)
+        bl.setContentsMargins(0, 0, 0, 0)
+        bl.setSpacing(8)
         self.title_lbl = QLabel("", objectName="DetailMeta")
-        self.stop_btn = QPushButton("Stop")
+        self.stop_btn = QPushButton("Stop", objectName="MiniBtn")
         self.stop_btn.clicked.connect(self.stop)
-        self.fs_btn = QPushButton("Fullscreen")
-        bar.addWidget(self.title_lbl, 1)
-        bar.addWidget(self.stop_btn)
-        bar.addWidget(self.fs_btn)
-        lay.addLayout(bar)
+        self.fs_btn = QPushButton("Fullscreen", objectName="MiniBtn")
+        bl.addWidget(self.title_lbl, 1)
+        bl.addWidget(self.stop_btn)
+        bl.addWidget(self.fs_btn)
+        lay.addWidget(self.bar)
+
+        # Auto-hiding info overlay (fullscreen only)
+        self.overlay = QLabel("", self)
+        self.overlay.setStyleSheet(
+            "background: rgba(16,16,20,210); color:#ECECF1;"
+            "border-radius:10px; padding:10px 14px; font-size:13px;")
+        self.overlay.setWordWrap(True)
+        self.overlay.hide()
+        self._fs_ui = False
+        self._overlay_text = ""
+        self._overlay_timer = QTimer(self)
+        self._overlay_timer.setSingleShot(True)
+        self._overlay_timer.setInterval(self.OVERLAY_HIDE_MS)
+        self._overlay_timer.timeout.connect(self.overlay.hide)
 
     def eventFilter(self, obj, event):
-        if obj is self.video and event.type() == event.Type.MouseButtonDblClick:
-            self.double_clicked.emit()
-            return True
+        if obj is self.video:
+            if event.type() == event.Type.MouseButtonDblClick:
+                self.double_clicked.emit()
+                return True
+            if event.type() == event.Type.MouseMove and self._fs_ui:
+                self._show_overlay()
         return super().eventFilter(obj, event)
+
+    # -- overlay -----------------------------------------------------------
+    def set_overlay_info(self, text):
+        self._overlay_text = text or ""
+        if self._fs_ui and self.overlay.isVisible():
+            self.overlay.setText(self._overlay_text)
+            self._place_overlay()
+
+    def set_fullscreen_ui(self, fullscreen):
+        self._fs_ui = fullscreen
+        self.bar.setVisible(not fullscreen)
+        if fullscreen:
+            self._show_overlay()
+        else:
+            self.overlay.hide()
+            self._overlay_timer.stop()
+
+    def _show_overlay(self):
+        if not self._overlay_text:
+            return
+        self.overlay.setText(self._overlay_text)
+        self._place_overlay()
+        self.overlay.show()
+        self.overlay.raise_()
+        self._overlay_timer.start()
+
+    def _place_overlay(self):
+        margin = 24
+        self.overlay.setFixedWidth(min(self.width() - 2 * margin, 640))
+        self.overlay.adjustSize()
+        self.overlay.move(margin, self.height() - self.overlay.height() - margin)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self.overlay.isVisible():
+            self._place_overlay()
 
     def play(self, url, title):
         try:
@@ -972,6 +1033,7 @@ QPushButton {{
 QPushButton:hover  {{ background: #34343E; }}
 QPushButton#Primary {{ background: {ACCENT}; border: none; color: white; }}
 QPushButton#Primary:hover {{ background: #5E99FF; }}
+QPushButton#MiniBtn {{ padding: 4px 10px; font-size: 11px; border-radius: 7px; }}
 
 QScrollArea {{ background: transparent; border: none; }}
 QScrollArea > QWidget > QWidget {{ background: transparent; }}
@@ -1371,6 +1433,13 @@ class MainWindow(QMainWindow):
 
         self.search = QLineEdit(objectName="Search")
         self.search.setPlaceholderText("Search channels, movies or series...")
+        # Debounce for the auto-playing preview: arrowing quickly through the
+        # channel list shouldn't open a stream per row, only for the row the
+        # user actually settles on.
+        self._preview_timer = QTimer(self)
+        self._preview_timer.setSingleShot(True)
+        self._preview_timer.timeout.connect(self._play_preview)
+
         self._search_timer = QTimer(self)
         self._search_timer.setSingleShot(True)
         self._search_timer.timeout.connect(self._apply_filter)
@@ -1523,17 +1592,23 @@ class MainWindow(QMainWindow):
             self._exit_player_fullscreen()
             return
         self._player_fs = True
-        # No reparenting (that would recreate the native window mpv draws
+        # No reparenting (that would tear down the GL context mpv renders
         # into) - instead hide everything around the video and fullscreen
         # the main window so the player pane stretches to fill it.
+        # Iterating children() catches every direct child widget, including
+        # ones living inside nested layouts (e.g. the Play in mpv/VLC button
+        # row) - iterating the layout's own items misses those, because
+        # layout items whose content is a sub-layout return None from
+        # .widget().
         self._side.hide()
         self._mid.hide()
         self._det_hidden = []
-        for i in range(self._det.layout().count()):
-            w = self._det.layout().itemAt(i).widget()
-            if w is not None and w is not self.player and w.isVisible():
+        for w in self._det.children():
+            if (isinstance(w, QWidget) and w is not self.player
+                    and w.isVisible()):
                 self._det_hidden.append(w)
                 w.hide()
+        self.player.set_fullscreen_ui(True)
         self._was_fullscreen = self.isFullScreen()
         self.showFullScreen()
 
@@ -1546,6 +1621,7 @@ class MainWindow(QMainWindow):
         for w in getattr(self, "_det_hidden", []):
             w.show()
         self._det_hidden = []
+        self.player.set_fullscreen_ui(False)
         if not getattr(self, "_was_fullscreen", False):
             self.showNormal()
 
@@ -1708,19 +1784,24 @@ class MainWindow(QMainWindow):
             self._show_media_info(info, self._current_key)
         elif self.mode in ("live", "fav"):
             self.d_meta.setText("Live channel")
-            if it.get("stream_id"):
+            # "is not None": a perfectly valid stream_id of 0 is falsy
+            if it.get("stream_id") is not None:
                 self.epg_refresh.show()
                 self._request_epg()
+                if (self.player and self._autoplay_preview()
+                        and self.playback_mode() == "embedded"
+                        and self.settings.value("player", "mpv") == "mpv"):
+                    self._preview_timer.start(350)
         elif self.mode == "vod":
             meta = " * ".join(x for x in (
                 str(it.get("year") or ""),
                 f"* {it['rating']}" if it.get("rating") else "",) if x)
             self.d_meta.setText(meta or "Movie")
-            if it.get("stream_id"):
+            if it.get("stream_id") is not None:
                 self._request_media_info("vod", it["stream_id"], self._current_key)
         else:
             self.d_meta.setText("Series - double-click for episodes")
-            if it.get("series_id"):
+            if it.get("series_id") is not None:
                 self._request_media_info("series", it["series_id"], self._current_key)
 
     def _set_detail_logo(self, pm):
@@ -1755,7 +1836,7 @@ class MainWindow(QMainWindow):
         if not it or self.mode not in ("live", "fav") or self.series_ctx:
             return
         sid = it.get("stream_id")
-        if not sid:
+        if sid is None:
             return
         key = self._item_key(it)
         self._clear_epg_rows()
@@ -1863,6 +1944,14 @@ class MainWindow(QMainWindow):
             self.now_desc.setText(current["desc"][:400])
             self._refresh_progress()
             self.now_card.show()
+            if self.player:
+                info = (f"{self.d_title.text()}\n"
+                        f"{current['title'] or 'Unknown programme'}   "
+                        f"{current['start']:%H:%M}-{current['stop']:%H:%M}")
+                nxt = upcoming[0] if upcoming else None
+                if nxt:
+                    info += f"\nNext: {nxt['title'] or '?'} at {nxt['start']:%H:%M}"
+                self.player.set_overlay_info(info)
 
         for post in upcoming[:6]:
             self._epg_card(post)
@@ -1907,7 +1996,7 @@ class MainWindow(QMainWindow):
     # -- series -> episodes ---------------------------------------------------------
     def _enter_series(self, series):
         sid = series.get("series_id")
-        if not sid:
+        if sid is None:
             return
         self.loading_bar.show()
         self.count_lbl.setText("Loading episodes...")
@@ -1986,6 +2075,24 @@ class MainWindow(QMainWindow):
 
         self._start_playback(url, title, icon, key, kind if self.mode != "history" else None)
 
+    def _autoplay_preview(self):
+        return self.settings.value("autoplay_preview", "true") == "true"
+
+    def _play_preview(self):
+        """Auto-starts the selected live channel in the embedded preview pane.
+        Intentionally does NOT record history - only explicit plays do."""
+        it = self.list_model.item_at(self.listw.currentIndex().row())
+        if (not it or self.mode not in ("live", "fav") or self.series_ctx
+                or not self.player or self.playback_mode() != "embedded"):
+            return
+        url, title = self._stream_for(it)
+        if not url:
+            return
+        self.stream_error.hide()
+        self.player.show()
+        self.player.set_overlay_info(title)
+        self.player.play(url, title)
+
     def playback_mode(self):
         default = "embedded" if self.player else "window"
         mode = self.settings.value("playback_mode", default)
@@ -2005,6 +2112,7 @@ class MainWindow(QMainWindow):
               file=sys.stderr)
         if chosen == "mpv" and mode == "embedded":
             self.player.show()
+            self.player.set_overlay_info(title)
             if not self.player.play(url, title):
                 self.player.hide()
                 launch_player(chosen, url, title, self)
@@ -2164,8 +2272,12 @@ class MainWindow(QMainWindow):
         idx = mode_box.findData(current_mode)
         if idx >= 0:
             mode_box.setCurrentIndex(idx)
+        autoplay_box = QComboBox()
+        autoplay_box.addItems(["Yes", "No"])
+        autoplay_box.setCurrentText("Yes" if self._autoplay_preview() else "No")
         form.addRow("Default player", player_box)
         form.addRow("Playback (mpv)", mode_box)
+        form.addRow("Auto-play preview on selection", autoplay_box)
         form.addRow("Live stream format", fmt_box)
         form.addRow("Reuse mpv window (zapping)", reuse_box)
         lay.addLayout(form)
@@ -2194,6 +2306,9 @@ class MainWindow(QMainWindow):
         if d.exec():
             self.settings.setValue("player", player_box.currentText())
             self.settings.setValue("stream_format", fmt_box.currentText())
+            self.settings.setValue(
+                "autoplay_preview",
+                "true" if autoplay_box.currentText() == "Yes" else "false")
             self.settings.setValue("mpv_reuse",
                                    "true" if reuse_box.currentText() == "Yes" else "false")
             if mode_box.currentData():
