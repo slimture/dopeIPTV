@@ -1213,6 +1213,7 @@ class EmbeddedPlayer(QWidget):
 
     double_clicked = pyqtSignal()
     playback_error = pyqtSignal(str)
+    zap = pyqtSignal(int)             # -1 previous / +1 next channel
 
     OVERLAY_HIDE_MS = 3000
 
@@ -1232,10 +1233,18 @@ class EmbeddedPlayer(QWidget):
         bl = QHBoxLayout(self.bar)
         bl.setContentsMargins(0, 0, 0, 0)
         bl.setSpacing(8)
+        self.prev_btn = QPushButton("◀", objectName="MiniBtn")
+        self.prev_btn.setToolTip("Previous channel (Ctrl+Left)")
+        self.prev_btn.clicked.connect(lambda: self.zap.emit(-1))
+        self.next_btn = QPushButton("▶", objectName="MiniBtn")
+        self.next_btn.setToolTip("Next channel (Ctrl+Right)")
+        self.next_btn.clicked.connect(lambda: self.zap.emit(1))
         self.title_lbl = QLabel("", objectName="DetailMeta")
         self.stop_btn = QPushButton("Stop", objectName="MiniBtn")
         self.stop_btn.clicked.connect(self.stop)
         self.fs_btn = QPushButton("Fullscreen", objectName="MiniBtn")
+        bl.addWidget(self.prev_btn)
+        bl.addWidget(self.next_btn)
         bl.addWidget(self.title_lbl, 1)
         bl.addWidget(self.stop_btn)
         bl.addWidget(self.fs_btn)
@@ -2239,6 +2248,7 @@ class MainWindow(QMainWindow):
             self.player.fs_btn.clicked.connect(self._toggle_player_fullscreen)
             self.player.double_clicked.connect(self._toggle_player_fullscreen)
             self.player.playback_error.connect(self._playback_error)
+            self.player.zap.connect(self._zap)
             self.player.stop_btn.clicked.connect(self.player.hide)
             dl.addWidget(self.player, 2)
 
@@ -3551,6 +3561,19 @@ class MainWindow(QMainWindow):
         self.loading_bar.hide()
         self.count_lbl.setText("Error: " + msg)
 
+    def keyPressEvent(self, event):
+        # In player fullscreen the list isn't visible, so plain Left/Right
+        # can zap. Outside fullscreen the arrows keep their normal meaning
+        # (list navigation, cursor movement) and Ctrl+Left/Right zap.
+        if self._player_fs:
+            if event.key() == Qt.Key.Key_Right:
+                self._zap(1)
+                return
+            if event.key() == Qt.Key.Key_Left:
+                self._zap(-1)
+                return
+        super().keyPressEvent(event)
+
     def closeEvent(self, event):
         if self.player:
             self.player.shutdown()
@@ -3644,6 +3667,7 @@ def main():
             store.set_active(pl["id"])
 
         candidate = XtreamClient(pl["server"], pl["username"], pl["password"])
+        offline = False
         try:
             candidate.authenticate()
             client = candidate
@@ -3653,14 +3677,34 @@ def main():
             settings.setValue("username", pl["username"])
             settings.setValue("password", pl["password"])
         except Exception as e:
-            QMessageBox.critical(None, "Connection failed",
-                                 f"{pl['name']}: {e}")
-            dlg = PlaylistDialog(None, pl)
-            if not dlg.exec():
+            box = QMessageBox(QMessageBox.Icon.Warning, "Connection failed",
+                              f"{pl['name']}: {e}\n\n"
+                              "You can start anyway - content will load once "
+                              "the server is reachable again (retry by "
+                              "switching category, or manage playlists in "
+                              "Settings) - or fix the playlist details now.",
+                              parent=None)
+            start_btn = box.addButton("Start anyway",
+                                      QMessageBox.ButtonRole.AcceptRole)
+            edit_btn = box.addButton("Edit playlist...",
+                                     QMessageBox.ButtonRole.ActionRole)
+            quit_btn = box.addButton("Quit", QMessageBox.ButtonRole.RejectRole)
+            box.setDefaultButton(start_btn)
+            box.exec()
+            clicked = box.clickedButton()
+            if clicked is quit_btn:
                 return 0
-            store.update(pl["id"], **dlg.values())
+            if clicked is edit_btn:
+                dlg = PlaylistDialog(None, pl)
+                if dlg.exec():
+                    store.update(pl["id"], **dlg.values())
+                continue
+            client = candidate           # offline start
+            offline = True
 
     w = MainWindow(client, settings, store)
+    if offline:
+        w.setWindowTitle(w.windowTitle() + "  (offline)")
     w.show()
     return app.exec()
 

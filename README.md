@@ -28,6 +28,8 @@ An elegant IPTV client for Linux and macOS with a macOS-inspired dark interface,
 - **Content manager**: right-click any category (or "Manage categories...") to hide it, rename it, or lock it — hidden/locked categories' channels are also left out of "All"
 - **Parental control**: a salted+hashed PIN protects locked categories and locked favorite groups; locked favorite groups don't reveal which channels they contain until the PIN is entered. Locking something locks it immediately; unlocks last for the session, with a "Lock now" button in Settings → Parental
 - **Chromecast**: right-click any channel/movie/episode → "Cast to Chromecast..." to scan the network and cast to a device (live streams are cast as HLS). Needs `pip install pychromecast`
+- **Offline start**: if the active playlist's server can't be reached at launch you get a warning with "Start anyway" — the app opens and content loads once the server is reachable again
+- Zap arrows (◀ ▶) in the embedded player's control bar, and in fullscreen the plain Left/Right arrow keys zap channels
 - Finds VLC on macOS even when it's only installed as an app bundle (not on `PATH`)
 
 ## Installation
