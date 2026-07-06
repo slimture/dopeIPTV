@@ -50,7 +50,7 @@ from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 
 APP_NAME = "dopeIPTV"
 ORG = "dopeiptv"
-VERSION = "0.1.0-beta.2"
+VERSION = "0.1.0-beta.3"
 
 # Optional embedded playback via libmpv (python-mpv). Imported lazily so the
 # app still runs fine without it - playback then falls back to the reused
@@ -413,8 +413,27 @@ class XmltvGuide:
                 return p
         return None
 
+    # Keep this much of the past when parsing - catch-up/timeshift browsing
+    # needs old programmes, not just current+future ones. Providers rarely
+    # archive more than a week.
+    KEEP_PAST_DAYS = 7
+
+    def past_programmes(self, item, days):
+        """Programmes that already ended, newest first, at most `days` back -
+        the ones an archiving provider can still play via timeshift."""
+        if not self.ensure_loaded():
+            return []
+        now = datetime.now().astimezone().timestamp()
+        cutoff = now - days * 86400
+        out = [p for p in self._entries_for(item)
+               if p["stop_timestamp"] <= now
+               and p["start_timestamp"] >= cutoff]
+        out.reverse()
+        return out
+
     def _parse(self, data):
-        cutoff = datetime.now().astimezone().timestamp() - 3 * 3600
+        cutoff = (datetime.now().astimezone().timestamp()
+                  - self.KEEP_PAST_DAYS * 86400)
         by_id, by_name = {}, {}
         seen = set()
         for _, el in ET.iterparse(io.BytesIO(data)):
@@ -1279,7 +1298,9 @@ class RecordingManager(QObject):
             data = []
         now = time.time()
         for j in data if isinstance(data, list) else []:
-            if j.get("status") == "scheduled" and (j.get("stop") or 0) > now:
+            # stop=None means "record until stopped manually"
+            if (j.get("status") == "scheduled"
+                    and (j.get("stop") is None or j["stop"] > now)):
                 j["proc"] = None
                 self.jobs.append(j)
 
@@ -1345,13 +1366,20 @@ class RecordingManager(QObject):
             path = os.path.join(target_dir,
                                 f"{safe_filename(j['title'])} {stamp} ({n}).ts")
             n += 1
-        secs = max(1, int(j["stop"] - time.time()))
+        # stop=None -> open-ended: no duration cap, runs until cancel()
+        secs = (max(1, int(j["stop"] - time.time()))
+                if j.get("stop") else None)
         if kind == "ffmpeg":
             cmd = [exe, "-y", "-loglevel", "error", "-i", j["url"],
-                   "-c", "copy", "-t", str(secs), path]
+                   "-c", "copy"]
+            if secs:
+                cmd += ["-t", str(secs)]
+            cmd.append(path)
         else:
             cmd = [exe, j["url"], f"--stream-record={path}", "--vo=null",
-                   "--ao=null", "--no-terminal", f"--length={secs}"]
+                   "--ao=null", "--no-terminal"]
+            if secs:
+                cmd.append(f"--length={secs}")
         try:
             j["proc"] = subprocess.Popen(
                 cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
@@ -1377,7 +1405,7 @@ class RecordingManager(QObject):
         changed = False
         for j in self.jobs:
             if j["status"] == "scheduled" and j["start"] <= now:
-                if j["stop"] <= now:
+                if j.get("stop") is not None and j["stop"] <= now:
                     j["status"] = "failed"
                     j["error"] = "stop time passed before the app could start it"
                 else:
@@ -1386,7 +1414,7 @@ class RecordingManager(QObject):
                 changed = True
             elif j["status"] == "recording":
                 rc = j["proc"].poll() if j.get("proc") else 0
-                if j["stop"] <= now:
+                if j.get("stop") is not None and j["stop"] <= now:
                     self._stop_proc(j)
                     j["status"] = "done"
                     changed = True
@@ -1628,6 +1656,8 @@ class EmbeddedPlayer(QWidget):
     playback_error = pyqtSignal(str)
     zap = pyqtSignal(int)             # -1 previous / +1 next channel
     exit_fullscreen = pyqtSignal()    # the in-video "minimize" button
+    timeshift_menu = pyqtSignal(object)   # anchor widget for the ⏪ menu
+    record_menu = pyqtSignal(object)      # anchor widget for the REC menu
 
     OVERLAY_HIDE_MS = 3000
 
@@ -1666,11 +1696,25 @@ class EmbeddedPlayer(QWidget):
         self.fwd_btn.clicked.connect(lambda: self._relative_seek(30))
         self.fwd_btn.hide()
         self.title_lbl = QLabel("", objectName="DetailMeta")
+        # A long stream title must never force the pane (and with it the
+        # whole app layout) wider - let the label clip instead.
+        self.title_lbl.setSizePolicy(QSizePolicy.Policy.Ignored,
+                                     QSizePolicy.Policy.Preferred)
         self.seek = _SeekSlider()
         self.seek.seek_requested.connect(self._do_seek)
         self.seek.hide()
         self.time_lbl = QLabel("", objectName="DetailMeta")
         self.time_lbl.hide()
+        self.ts_btn = QPushButton("⏪", objectName="MiniBtn")
+        self.ts_btn.setToolTip("Timeshift / catch-up")
+        self.ts_btn.clicked.connect(
+            lambda: self.timeshift_menu.emit(self.ts_btn))
+        self.ts_btn.hide()          # shown when the channel has an archive
+        self.rec_btn = QPushButton("REC", objectName="MiniBtn")
+        self.rec_btn.setToolTip("Record this channel")
+        self.rec_btn.clicked.connect(
+            lambda: self.record_menu.emit(self.rec_btn))
+        self.rec_btn.hide()         # shown when a live channel is playing
         self.opts_btn = QPushButton("⚙", objectName="MiniBtn")
         self.opts_btn.setToolTip("Audio / subtitles / aspect / buffer")
         self.opts_btn.clicked.connect(
@@ -1686,6 +1730,8 @@ class EmbeddedPlayer(QWidget):
         bl.addWidget(self.title_lbl, 1)
         bl.addWidget(self.seek, 2)
         bl.addWidget(self.time_lbl)
+        bl.addWidget(self.ts_btn)
+        bl.addWidget(self.rec_btn)
         bl.addWidget(self.opts_btn)
         bl.addWidget(self.stop_btn)
         bl.addWidget(self.fs_btn)
@@ -1727,6 +1773,16 @@ class EmbeddedPlayer(QWidget):
         self.fs_seek.hide()
         self.fs_time_lbl = QLabel("", objectName="DetailMeta")
         self.fs_time_lbl.hide()
+        self.fs_ts_btn = QPushButton("⏪", objectName="MiniBtn")
+        self.fs_ts_btn.setToolTip("Timeshift / catch-up")
+        self.fs_ts_btn.clicked.connect(
+            lambda: self.timeshift_menu.emit(self.fs_ts_btn))
+        self.fs_ts_btn.hide()
+        self.fs_rec_btn = QPushButton("REC", objectName="MiniBtn")
+        self.fs_rec_btn.setToolTip("Record this channel")
+        self.fs_rec_btn.clicked.connect(
+            lambda: self.record_menu.emit(self.fs_rec_btn))
+        self.fs_rec_btn.hide()
         self.fs_opts_btn = QPushButton("⚙", objectName="MiniBtn")
         self.fs_opts_btn.setToolTip("Audio / subtitles / aspect / buffer")
         self.fs_opts_btn.clicked.connect(
@@ -1741,12 +1797,15 @@ class EmbeddedPlayer(QWidget):
         fc.addWidget(self.fs_fwd_btn)
         fc.addWidget(self.fs_seek, 1)
         fc.addWidget(self.fs_time_lbl)
+        fc.addWidget(self.fs_ts_btn)
+        fc.addWidget(self.fs_rec_btn)
         fc.addWidget(self.fs_opts_btn)
         fc.addWidget(self.fs_exit_btn)
         self.fs_controls.hide()
         for wdg in (self.fs_controls, self.fs_prev_btn, self.fs_next_btn,
                     self.fs_pause_btn, self.fs_back_btn, self.fs_fwd_btn,
-                    self.fs_seek, self.fs_time_lbl, self.fs_opts_btn,
+                    self.fs_seek, self.fs_time_lbl, self.fs_ts_btn,
+                    self.fs_rec_btn, self.fs_opts_btn,
                     self.fs_exit_btn):
             wdg.setMouseTracking(True)
             wdg.installEventFilter(self)
@@ -1787,6 +1846,7 @@ class EmbeddedPlayer(QWidget):
     def set_fullscreen_ui(self, fullscreen):
         self._fs_ui = fullscreen
         self.bar.setVisible(not fullscreen)
+        self._lock_video_box()
         if fullscreen:
             self._show_overlay()
         else:
@@ -1829,8 +1889,21 @@ class EmbeddedPlayer(QWidget):
         self.overlay.move(margin, self.height() - self.fs_controls.height()
                           - margin - 8 - self.overlay.height())
 
+    def _lock_video_box(self):
+        """Pins the video surface to a constant 16:9 outer box derived from
+        the pane width. Changing the content or its aspect-ratio override
+        only letterboxes *inside* this box, and EPG cards etc. appearing
+        below can never squeeze it - the app layout stays put. Fullscreen
+        lifts the pin so the video can fill the screen."""
+        if self._fs_ui:
+            self.video.setMinimumHeight(190)
+            self.video.setMaximumHeight(16777215)
+        else:
+            self.video.setFixedHeight(max(190, int(self.width() * 9 / 16)))
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        self._lock_video_box()
         if self.overlay.isVisible() or self.fs_controls.isVisible():
             self._place_overlay()
 
@@ -2049,46 +2122,146 @@ class EmbeddedPlayer(QWidget):
 #  Style - dark, macOS-inspired (dopeIPTV look), unified across all widgets
 # ----------------------------------------------------------------------------
 
-ACCENT = "#4C8DFF"
+# ----------------------------------------------------------------------------
+#  Themes
+#
+#  Every color in the app comes from the active palette P. The stylesheet is
+#  rebuilt from it (build_style), and the delegate/labels read P at paint
+#  time, so switching theme or accent in Settings applies live.
+# ----------------------------------------------------------------------------
 
-STYLE = f"""
+ACCENTS = {
+    "blue":   ("Blue",   "#4C8DFF", "#5E99FF"),
+    "purple": ("Purple", "#8E6BFF", "#A184FF"),
+    "teal":   ("Teal",   "#2AC3C3", "#4AD4D4"),
+    "green":  ("Green",  "#2FBF71", "#4CD08A"),
+    "orange": ("Orange", "#FF9F43", "#FFB160"),
+    "pink":   ("Pink",   "#FF5C8A", "#FF7AA1"),
+    "red":    ("Red",    "#FF5C5C", "#FF7A7A"),
+}
+
+THEMES = {
+    # role keys: bg (main), side (sidebar/menubar), pane (detail),
+    # hover, sel (selection), input, btn, btn_hover, border, border_in,
+    # scroll, scroll_hover, text, text2, text3, muted..muted4, error, rec
+    "graphite": {
+        "name": "Graphite (default)",
+        "bg": "#17171C", "side": "#101014", "pane": "#1B1B21",
+        "hover": "#1D1D24", "sel": "#26262E", "input": "#222229",
+        "btn": "#2A2A32", "btn_hover": "#34343E",
+        "border": "#232329", "border_in": "#2C2C34",
+        "scroll": "#33333C", "scroll_hover": "#45454F",
+        "text": "#ECECF1", "text2": "#C9C9D2", "text3": "#A7A7B1",
+        "muted": "#8B8B96", "muted2": "#6E6E79", "muted3": "#5A5A64",
+        "muted4": "#7A7A85", "error": "#FF6B6B", "rec": "#FF5C5C",
+    },
+    "midnight": {
+        "name": "Midnight (blue)",
+        "bg": "#0E1526", "side": "#0A101E", "pane": "#121A2E",
+        "hover": "#182238", "sel": "#1E2A45", "input": "#16203A",
+        "btn": "#1C2740", "btn_hover": "#28345A",
+        "border": "#1C2740", "border_in": "#243052",
+        "scroll": "#2A3654", "scroll_hover": "#3A4870",
+        "text": "#E6EAF2", "text2": "#C3CBD9", "text3": "#9AA5B8",
+        "muted": "#8E99AF", "muted2": "#6B7690", "muted3": "#57627B",
+        "muted4": "#77829C", "error": "#FF6B6B", "rec": "#FF5C5C",
+    },
+    "oled": {
+        "name": "OLED (pure black)",
+        "bg": "#000000", "side": "#000000", "pane": "#0A0A0C",
+        "hover": "#16161A", "sel": "#202026", "input": "#121216",
+        "btn": "#1A1A20", "btn_hover": "#26262E",
+        "border": "#1C1C22", "border_in": "#26262C",
+        "scroll": "#2E2E36", "scroll_hover": "#3E3E48",
+        "text": "#F2F2F6", "text2": "#CFCFD8", "text3": "#A8A8B4",
+        "muted": "#8B8B96", "muted2": "#6E6E79", "muted3": "#5A5A64",
+        "muted4": "#7A7A85", "error": "#FF6B6B", "rec": "#FF5C5C",
+    },
+    "nord": {
+        "name": "Nord",
+        "bg": "#2E3440", "side": "#272C36", "pane": "#333947",
+        "hover": "#3B4252", "sel": "#434C5E", "input": "#3B4252",
+        "btn": "#434C5E", "btn_hover": "#4C566A",
+        "border": "#262B35", "border_in": "#4C566A",
+        "scroll": "#4C566A", "scroll_hover": "#5E6A82",
+        "text": "#ECEFF4", "text2": "#D8DEE9", "text3": "#B8C0D0",
+        "muted": "#94A0B8", "muted2": "#7B879D", "muted3": "#6A7590",
+        "muted4": "#8590A6", "error": "#FF6B6B", "rec": "#FF5C5C",
+    },
+    "light": {
+        "name": "Light",
+        "bg": "#F5F5F7", "side": "#ECECEF", "pane": "#FFFFFF",
+        "hover": "#E4E4E9", "sel": "#D8D8DF", "input": "#FFFFFF",
+        "btn": "#E8E8EC", "btn_hover": "#DCDCE2",
+        "border": "#D9D9DE", "border_in": "#C9C9D2",
+        "scroll": "#C5C5CE", "scroll_hover": "#ADADB8",
+        "text": "#1B1B1F", "text2": "#3A3A42", "text3": "#55555F",
+        "muted": "#6E6E79", "muted2": "#8B8B96", "muted3": "#8B8B96",
+        "muted4": "#7A7A85", "error": "#D93025", "rec": "#D93025",
+    },
+}
+
+P = {}                      # the active palette (roles + accent/accent_hi)
+ACCENT = ACCENTS["blue"][1]  # kept in sync by apply_theme()
+
+
+def apply_theme(settings=None, theme=None, accent=None):
+    """Activates a theme + accent into the global palette P."""
+    global ACCENT
+    if settings is not None:
+        theme = theme or settings.value("theme", "graphite")
+        accent = accent or settings.value("accent", "blue")
+    base = THEMES.get(theme or "graphite", THEMES["graphite"])
+    acc = ACCENTS.get(accent or "blue", ACCENTS["blue"])
+    P.clear()
+    P.update(base)
+    P["accent"], P["accent_hi"] = acc[1], acc[2]
+    ACCENT = acc[1]
+
+
+apply_theme()               # defaults until main() reads the settings
+
+
+def build_style():
+    p = dict(P)
+    return f"""
 * {{
     font-family: "SF Pro Text", "Inter", "Cantarell", "Noto Sans", sans-serif;
-    color: #ECECF1;
+    color: {p['text']};
 }}
-QMainWindow, QDialog {{ background: #17171C; }}
+QMainWindow, QDialog {{ background: {p['bg']}; }}
 
 /* Sidebar */
 #Sidebar {{
-    background: #101014;
-    border-right: 1px solid #232329;
+    background: {p['side']};
+    border-right: 1px solid {p['border']};
 }}
 #AppTitle {{ font-size: 15px; font-weight: 700; letter-spacing: 0.5px; }}
-#AppSub   {{ color: #7A7A85; font-size: 11px; }}
+#AppSub   {{ color: {p['muted4']}; font-size: 11px; }}
 
 QPushButton#NavBtn {{
     background: transparent; border: none; border-radius: 8px;
-    padding: 8px 12px; text-align: left; font-size: 13px; color: #C9C9D2;
+    padding: 8px 12px; text-align: left; font-size: 13px; color: {p['text2']};
 }}
-QPushButton#NavBtn:hover  {{ background: #1D1D24; }}
+QPushButton#NavBtn:hover  {{ background: {p['hover']}; }}
 QPushButton#NavBtn:checked {{ background: {ACCENT}; color: white; font-weight: 600; }}
 
 #SectionLabel {{
-    color: #6E6E79; font-size: 10px; font-weight: 700;
+    color: {p['muted2']}; font-size: 10px; font-weight: 700;
     letter-spacing: 1.2px; padding: 10px 14px 4px 14px;
 }}
 
 QListWidget {{
     background: transparent; border: none; outline: none; font-size: 13px;
 }}
-QListWidget::item {{ border-radius: 8px; padding: 7px 10px; margin: 1px 6px; color: #C9C9D2; }}
-QListWidget::item:hover    {{ background: #1D1D24; }}
-QListWidget::item:selected {{ background: #26262E; color: white; }}
+QListWidget::item {{ border-radius: 8px; padding: 7px 10px; margin: 1px 6px; color: {p['text2']}; }}
+QListWidget::item:hover    {{ background: {p['hover']}; }}
+QListWidget::item:selected {{ background: {p['sel']}; color: {p['text']}; }}
 
 /* Middle column */
-#MiddlePane {{ background: #17171C; }}
+#MiddlePane {{ background: {p['bg']}; }}
 QLineEdit#Search {{
-    background: #222229; border: 1px solid #2C2C34; border-radius: 9px;
+    background: {p['input']}; border: 1px solid {p['border_in']}; border-radius: 9px;
     padding: 8px 12px; font-size: 13px;
 }}
 QLineEdit#Search:focus {{ border: 1px solid {ACCENT}; }}
@@ -2097,7 +2270,7 @@ QListView#Channels {{
     background: transparent; border: none; outline: none; font-size: 13px;
 }}
 
-#ChNum   {{ font-size: 11px; color: #5A5A64; }}
+#ChNum   {{ font-size: 11px; color: {p['muted3']}; }}
 
 QProgressBar#LoadBar {{
     background: transparent; border: none; max-height: 3px;
@@ -2105,100 +2278,99 @@ QProgressBar#LoadBar {{
 QProgressBar#LoadBar::chunk {{ background: {ACCENT}; }}
 
 QProgressBar#EpgBar {{
-    background: #2A2A32; border: none; border-radius: 2px; max-height: 4px;
+    background: {p['btn']}; border: none; border-radius: 2px; max-height: 4px;
 }}
 QProgressBar#EpgBar::chunk {{ background: {ACCENT}; border-radius: 2px; }}
 
 QSlider::groove:horizontal {{
-    background: #2A2A32; height: 4px; border-radius: 2px;
+    background: {p['btn']}; height: 4px; border-radius: 2px;
 }}
 QSlider::sub-page:horizontal {{ background: {ACCENT}; border-radius: 2px; }}
 QSlider::handle:horizontal {{
     background: {ACCENT}; width: 12px; height: 12px;
     margin: -4px 0; border-radius: 6px;
 }}
-QSlider::handle:horizontal:hover {{ background: #5E99FF; }}
+QSlider::handle:horizontal:hover {{ background: {p['accent_hi']}; }}
 
 /* Detail panel */
-#DetailPane {{ background: #1B1B21; border-left: 1px solid #232329; }}
+#DetailPane {{ background: {p['pane']}; border-left: 1px solid {p['border']}; }}
 #DetailTitle {{ font-size: 20px; font-weight: 700; }}
-#DetailMeta  {{ color: #8B8B96; font-size: 12px; }}
+#DetailMeta  {{ color: {p['muted']}; font-size: 12px; }}
 #NowTitle    {{ font-size: 14px; font-weight: 600; }}
 #NowTime     {{ color: {ACCENT}; font-size: 11px; font-weight: 600; }}
-#NowDesc     {{ color: #A7A7B1; font-size: 12px; }}
+#NowDesc     {{ color: {p['text3']}; font-size: 12px; }}
 
 QFrame#Card {{
-    background: #222229; border: 1px solid #2C2C34; border-radius: 12px;
+    background: {p['input']}; border: 1px solid {p['border_in']}; border-radius: 12px;
 }}
 QLabel#EpgRowTime  {{ color: {ACCENT}; font-size: 11px; font-weight: 600; }}
 QLabel#EpgRowTitle {{ font-size: 12px; }}
 
 QPushButton {{
-    background: #2A2A32; border: 1px solid #34343E; border-radius: 9px;
+    background: {p['btn']}; border: 1px solid {p['btn_hover']}; border-radius: 9px;
     padding: 9px 16px; font-size: 13px; font-weight: 600;
 }}
-QPushButton:hover  {{ background: #34343E; }}
+QPushButton:hover  {{ background: {p['btn_hover']}; }}
 QPushButton#Primary {{ background: {ACCENT}; border: none; color: white; }}
-QPushButton#Primary:hover {{ background: #5E99FF; }}
+QPushButton#Primary:hover {{ background: {p['accent_hi']}; }}
 QPushButton#MiniBtn {{ padding: 4px 10px; font-size: 11px; border-radius: 7px; }}
 
 QScrollArea {{ background: transparent; border: none; }}
 QScrollArea > QWidget > QWidget {{ background: transparent; }}
 
 QScrollBar:vertical {{ background: transparent; width: 8px; margin: 2px; }}
-QScrollBar::handle:vertical {{ background: #33333C; border-radius: 4px; min-height: 30px; }}
-QScrollBar::handle:vertical:hover {{ background: #45454F; }}
+QScrollBar::handle:vertical {{ background: {p['scroll']}; border-radius: 4px; min-height: 30px; }}
+QScrollBar::handle:vertical:hover {{ background: {p['scroll_hover']}; }}
 QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; }}
 
-/* Menu bar + context menus: dark on every platform (Linux GTK/Qt themes
-   default to a white menu bar and popup unless styled explicitly; macOS's
-   native dark menu was the look we want everywhere). */
+/* Menu bar + context menus: themed on every platform (Linux GTK/Qt themes
+   default to a white menu bar and popup unless styled explicitly). */
 QMenuBar {{
-    background: #101014; color: #C9C9D2; border-bottom: 1px solid #232329;
+    background: {p['side']}; color: {p['text2']}; border-bottom: 1px solid {p['border']};
 }}
 QMenuBar::item {{
     background: transparent; padding: 4px 10px; margin: 0; border-radius: 6px;
     font-size: 12px;
 }}
-QMenuBar::item:selected {{ background: #1D1D24; }}
+QMenuBar::item:selected {{ background: {p['hover']}; }}
 QMenuBar::item:pressed {{ background: {ACCENT}; color: white; }}
 
 QMenu {{
-    background: #1D1D24; border: 1px solid #2C2C34; border-radius: 8px;
+    background: {p['hover']}; border: 1px solid {p['border_in']}; border-radius: 8px;
     padding: 5px; font-size: 12px;
 }}
 QMenu::item {{
-    background: transparent; color: #ECECF1; border-radius: 6px;
+    background: transparent; color: {p['text']}; border-radius: 6px;
     padding: 5px 20px 5px 10px; font-size: 12px;
 }}
 QMenu::item:selected {{ background: {ACCENT}; color: white; }}
-QMenu::item:disabled {{ color: #6E6E79; }}
-QMenu::separator {{ height: 1px; background: #2C2C34; margin: 5px 8px; }}
+QMenu::item:disabled {{ color: {p['muted2']}; }}
+QMenu::separator {{ height: 1px; background: {p['border_in']}; margin: 5px 8px; }}
 
 QToolTip {{
-    background: #1D1D24; color: #ECECF1; border: 1px solid #2C2C34;
+    background: {p['hover']}; color: {p['text']}; border: 1px solid {p['border_in']};
     padding: 4px 6px;
 }}
 
 /* Tab widget (Settings): the platform default renders a white pane/tab bar */
 QTabWidget::pane {{
-    border: 1px solid #2C2C34; border-radius: 8px; background: #1B1B21;
+    border: 1px solid {p['border_in']}; border-radius: 8px; background: {p['pane']};
     top: -1px;
 }}
 QTabBar::tab {{
-    background: transparent; color: #C9C9D2; padding: 7px 16px;
+    background: transparent; color: {p['text2']}; padding: 7px 16px;
     border-radius: 7px; margin: 2px; font-size: 12px;
 }}
-QTabBar::tab:selected {{ background: #2A2A32; color: white; }}
-QTabBar::tab:hover:!selected {{ background: #1D1D24; }}
+QTabBar::tab:selected {{ background: {p['btn']}; color: {p['text']}; }}
+QTabBar::tab:hover:!selected {{ background: {p['hover']}; }}
 
 QComboBox {{
-    background: #222229; border: 1px solid #2C2C34; border-radius: 8px;
+    background: {p['input']}; border: 1px solid {p['border_in']}; border-radius: 8px;
     padding: 5px 10px; font-size: 12px;
     combobox-popup: 0;   /* plain dropdown sized to its items - no scrolling */
 }}
 QComboBox QAbstractItemView {{
-    background: #222229; border: 1px solid #2C2C34; border-radius: 6px;
+    background: {p['input']}; border: 1px solid {p['border_in']}; border-radius: 6px;
     selection-background-color: {ACCENT}; selection-color: white;
     outline: none; font-size: 12px; padding: 3px;
 }}
@@ -2208,9 +2380,9 @@ QPushButton#InlineToggle {{
     padding: 4px 12px; font-size: 11px; border-radius: 7px;
 }}
 QPushButton#InlineToggle:checked {{ background: {ACCENT}; border: none; color: white; }}
-#MiddlePane QLabel {{ color: #6E6E79; font-size: 11px; }}
+#MiddlePane QLabel {{ color: {p['muted2']}; font-size: 11px; }}
 QLineEdit {{
-    background: #222229; border: 1px solid #2C2C34; border-radius: 8px;
+    background: {p['input']}; border: 1px solid {p['border_in']}; border-radius: 8px;
     padding: 8px 10px;
 }}
 QLineEdit:focus {{ border: 1px solid {ACCENT}; }}
@@ -2232,7 +2404,7 @@ class LoginDialog(QDialog):
         heading = QLabel("dopeIPTV")
         heading.setStyleSheet("font-size:20px; font-weight:700;")
         subtitle = QLabel("Sign in with your Xtream Codes credentials.")
-        subtitle.setStyleSheet("color:#8B8B96;")
+        subtitle.setStyleSheet(f"color:{P['muted']};")
         lay.addWidget(heading)
         lay.addWidget(subtitle)
 
@@ -2251,7 +2423,7 @@ class LoginDialog(QDialog):
         lay.addLayout(form)
 
         self.status = QLabel("")
-        self.status.setStyleSheet("color:#FF6B6B; font-size:12px;")
+        self.status.setStyleSheet(f"color:{P['error']}; font-size:12px;")
         lay.addWidget(self.status)
 
         buttons = QDialogButtonBox()
@@ -2463,11 +2635,11 @@ class ChannelDelegate(QStyledItemDelegate):
         inner = rect.adjusted(5, 5, -5, -5)
         if option.state & QStyle.StateFlag.State_Selected:
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor("#26262E"))
+            painter.setBrush(QColor(P["sel"]))
             painter.drawRoundedRect(inner, 12, 12)
         elif option.state & QStyle.StateFlag.State_MouseOver:
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor("#1D1D24"))
+            painter.setBrush(QColor(P["hover"]))
             painter.drawRoundedRect(inner, 12, 12)
         if playing:
             pen = QPen(QColor(ACCENT))
@@ -2494,9 +2666,9 @@ class ChannelDelegate(QStyledItemDelegate):
             painter.setClipping(False)
         else:
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor("#26262E"))
+            painter.setBrush(QColor(P["sel"]))
             painter.drawRoundedRect(logo_rect, radius, radius)
-            painter.setPen(QColor("#ECECF1"))
+            painter.setPen(QColor(P["text"]))
             f = QFont(); f.setPointSize(max(14, logo_sz // 3)); f.setBold(True)
             painter.setFont(f)
             painter.drawText(logo_rect, Qt.AlignmentFlag.AlignCenter,
@@ -2504,7 +2676,7 @@ class ChannelDelegate(QStyledItemDelegate):
             if url and url not in self.window.logos.waiting:
                 self.window.logos.get(url, lambda _pm: self.window.listw.viewport().update())
 
-        painter.setPen(QColor(ACCENT) if playing else QColor("#ECECF1"))
+        painter.setPen(QColor(ACCENT) if playing else QColor(P["text"]))
         fname = QFont(); fname.setPointSize(self.grid_name_pt); fname.setBold(True)
         painter.setFont(fname)
         text_rect = QRect(rect.left() + 4, logo_y + logo_sz + 6,
@@ -2525,9 +2697,9 @@ class ChannelDelegate(QStyledItemDelegate):
         playing = self._is_playing(it, kind)
 
         if option.state & QStyle.StateFlag.State_Selected:
-            painter.fillRect(rect, QColor("#26262E"))
+            painter.fillRect(rect, QColor(P["sel"]))
         elif option.state & QStyle.StateFlag.State_MouseOver:
-            painter.fillRect(rect, QColor("#1D1D24"))
+            painter.fillRect(rect, QColor(P["hover"]))
         if playing:
             # accent bar on the left edge marks the channel that's playing
             painter.fillRect(QRect(rect.left(), rect.top() + 4, 3,
@@ -2553,9 +2725,9 @@ class ChannelDelegate(QStyledItemDelegate):
             painter.setClipping(False)
         else:
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor("#26262E"))
+            painter.setBrush(QColor(P["sel"]))
             painter.drawRoundedRect(logo_rect, radius, radius)
-            painter.setPen(QColor("#ECECF1"))
+            painter.setPen(QColor(P["text"]))
             f = QFont()
             f.setPointSize(max(12, logo_sz // 3))
             f.setBold(True)
@@ -2570,7 +2742,7 @@ class ChannelDelegate(QStyledItemDelegate):
             # ⏪ marks channels whose provider keeps a catch-up archive
             has_archive = self.window._timeshift_days(it) > 0
             num_w = 52 if has_archive else 34
-            painter.setPen(QColor("#5A5A64"))
+            painter.setPen(QColor(P["muted3"]))
             fnum = QFont()
             fnum.setPointSize(10)
             painter.setFont(fnum)
@@ -2590,7 +2762,7 @@ class ChannelDelegate(QStyledItemDelegate):
         block_h = name_h + sub_h + bar_h
         y = rect.top() + (rect.height() - block_h) // 2
 
-        painter.setPen(QColor(ACCENT) if playing else QColor("#ECECF1"))
+        painter.setPen(QColor(ACCENT) if playing else QColor(P["text"]))
         fname = QFont()
         fname.setPointSize(self.name_pt)
         fname.setBold(True)
@@ -2602,7 +2774,7 @@ class ChannelDelegate(QStyledItemDelegate):
 
         if now:
             title, pct = now
-            painter.setPen(QColor("#8B8B96"))
+            painter.setPen(QColor(P["muted"]))
             fsub = QFont()
             fsub.setPointSize(self.sub_pt)
             painter.setFont(fsub)
@@ -2643,7 +2815,7 @@ class EpgGuideDialog(QDialog):
         lay.addWidget(self.search)
 
         self.info_lbl = QLabel("")
-        self.info_lbl.setStyleSheet("color:#6E6E79; font-size:11px;")
+        self.info_lbl.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         lay.addWidget(self.info_lbl)
 
         self.list = QListWidget()
@@ -2706,7 +2878,7 @@ class ContentManagerDialog(QDialog):
         hint = QLabel("Hidden categories disappear from the sidebar and their "
                       "channels are left out of 'All'. Locked categories need "
                       "the parental PIN to open.")
-        hint.setStyleSheet("color:#6E6E79; font-size:11px;")
+        hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         hint.setWordWrap(True)
         lay.addWidget(hint)
 
@@ -2851,6 +3023,7 @@ class MainWindow(QMainWindow):
         self._current_key = None            # identity of the selected row
         self._playing_key = None            # identity of the playing item
         self._playing_group = None          # which list kind that key is from
+        self._playing_item = None           # live channel item, for ⏪/REC
         self._last_player = None
         self._last_playlist_refresh = time.time()
 
@@ -3007,8 +3180,21 @@ class MainWindow(QMainWindow):
         ml.addWidget(self.listw, 1)
 
         self.count_lbl = QLabel("")
-        self.count_lbl.setStyleSheet("color:#5A5A64; font-size:11px;")
-        ml.addWidget(self.count_lbl)
+        self.count_lbl.setStyleSheet(f"color:{P['muted3']}; font-size:11px;")
+        status_row = QHBoxLayout()
+        status_row.addWidget(self.count_lbl, 1)
+        # Persistent "something is recording" indicator - click to stop a
+        # recording or jump to the Recordings section.
+        self.rec_indicator = QPushButton("● REC")
+        self.rec_indicator.setFlat(True)
+        self.rec_indicator.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.rec_indicator.setStyleSheet(
+            f"color:{P['rec']}; font-weight:700; font-size:11px;"
+            "border:none; background:transparent; padding:0 4px;")
+        self.rec_indicator.clicked.connect(self._rec_indicator_menu)
+        self.rec_indicator.hide()
+        status_row.addWidget(self.rec_indicator)
+        ml.addLayout(status_row)
 
         # ---------- Detail panel ----------
         det = QWidget(objectName="DetailPane")
@@ -3023,13 +3209,15 @@ class MainWindow(QMainWindow):
             self.player.fs_btn.clicked.connect(self._toggle_player_fullscreen)
             self.player.double_clicked.connect(self._toggle_player_fullscreen)
             self.player.exit_fullscreen.connect(self._exit_player_fullscreen)
+            self.player.timeshift_menu.connect(self._player_timeshift_menu)
+            self.player.record_menu.connect(self._player_record_menu)
             self.player.playback_error.connect(self._playback_error)
             self.player.zap.connect(self._zap)
             self.player.stop_btn.clicked.connect(self.player.hide)
             dl.addWidget(self.player, 2)
 
         self.stream_error = QLabel("")
-        self.stream_error.setStyleSheet("color:#FF6B6B; font-size:12px;")
+        self.stream_error.setStyleSheet(f"color:{P['error']}; font-size:12px;")
         self.stream_error.setWordWrap(True)
         self.stream_error.hide()
         dl.addWidget(self.stream_error)
@@ -3038,7 +3226,7 @@ class MainWindow(QMainWindow):
         self.d_logo.setFixedSize(84, 84)
         self.d_logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.d_logo.setStyleSheet(
-            "background:#26262E; border-radius:18px; font-size:30px; font-weight:700;")
+            f"background:{P['sel']}; border-radius:18px; font-size:30px; font-weight:700;")
         dl.addWidget(self.d_logo)
 
         self.d_title = QLabel("Select something from the list", objectName="DetailTitle")
@@ -3575,8 +3763,10 @@ class MainWindow(QMainWindow):
             if it.get("series_id") is not None:
                 self._request_media_info("series", it["series_id"], self._current_key)
 
-    PLACEHOLDER_LOGO_STYLE = ("background:#26262E; border-radius:18px; "
-                              "font-size:30px; font-weight:700;")
+    @property
+    def PLACEHOLDER_LOGO_STYLE(self):
+        return (f"background:{P['sel']}; border-radius:18px; "
+                "font-size:30px; font-weight:700;")
 
     def _set_detail_logo(self, pm):
         # No clipping box: draw the logo keep-aspect on a fully transparent
@@ -3602,7 +3792,7 @@ class MainWindow(QMainWindow):
 
     def _epg_note(self, text):
         lbl = QLabel(text)
-        lbl.setStyleSheet("color:#6E6E79; font-size:12px;")
+        lbl.setStyleSheet(f"color:{P['muted2']}; font-size:12px;")
         lbl.setWordWrap(True)
         self.epg_lay.insertWidget(self.epg_lay.count() - 1, lbl)
 
@@ -3820,7 +4010,7 @@ class MainWindow(QMainWindow):
         url = self.client.live_url(it.get("stream_id"), fmt)
         title = it.get("name") or "dopeIPTV"
         self._start_playback(url, title, it.get("stream_icon"),
-                             self._item_key(it), "live")
+                             self._item_key(it), "live", item=it)
 
     def play(self, player=None, external=False):
         it = self.list_model.item_at(self.listw.currentIndex().row())
@@ -3865,7 +4055,7 @@ class MainWindow(QMainWindow):
             return
 
         self._start_playback(url, title, icon, key, kind,
-                             record=self.mode != "history")
+                             record=self.mode != "history", item=it)
 
     def _open_cast_dialog(self, it):
         if not ChromecastManager.available():
@@ -3918,6 +4108,8 @@ class MainWindow(QMainWindow):
         self.stream_error.hide()
         self._playing_key = self._item_key(it)
         self._playing_group = "live"
+        self._playing_item = it
+        self._sync_player_buttons()
         self.listw.viewport().update()
         self.setWindowTitle(title or self._base_title)
         self._set_status(f"Playing: {title}")
@@ -3932,10 +4124,15 @@ class MainWindow(QMainWindow):
             mode = "window"
         return mode
 
-    def _start_playback(self, url, title, icon_url, key, kind, record=True):
+    def _start_playback(self, url, title, icon_url, key, kind, record=True,
+                        item=None):
         if record and kind:
             self.history.add(url, title, icon_url, key, kind)
         self.stream_error.hide()
+        # The live channel item behind this playback (None for movies etc.):
+        # drives the in-player Timeshift/Record buttons.
+        self._playing_item = item if kind == "live" else None
+        self._sync_player_buttons()
         self._playing_key = key
         # Which list kind this key belongs to, so the playing highlight only
         # lights up in the matching list (a movie and a channel can share the
@@ -3980,8 +4177,8 @@ class MainWindow(QMainWindow):
         out, normal grey otherwise. New activity always replaces old errors,
         so a failed channel doesn't stay on screen after a working one."""
         self.count_lbl.setStyleSheet(
-            "color:#FF6B6B; font-size:11px; font-weight:600;" if error
-            else "color:#5A5A64; font-size:11px;")
+            f"color:{P['error']}; font-size:11px; font-weight:600;" if error
+            else f"color:{P['muted3']}; font-size:11px;")
         self.count_lbl.setText(text)
 
     def _playback_error(self, msg):
@@ -4037,34 +4234,12 @@ class MainWindow(QMainWindow):
             m.addAction("Cast to Chromecast...",
                        lambda: self._open_cast_dialog(it))
         if self.mode in ("live", "fav") and it.get("stream_id") is not None:
-            days = self._timeshift_days(it)
-            if days:
+            if self._timeshift_days(it):
                 m.addSeparator()
-                ts_menu = m.addMenu("Timeshift / catch-up")
-                prog = self.xmltv.current_programme(it)
-                if prog:
-                    ts_menu.addAction(
-                        f"Watch '{prog['title']}' from the start",
-                        lambda: self._play_timeshift(
-                            it, from_ts=prog["start_timestamp"]))
-                for label, mins in (("Go back 30 minutes", 30),
-                                    ("Go back 1 hour", 60),
-                                    ("Go back 2 hours", 120)):
-                    ts_menu.addAction(
-                        label, lambda mins=mins: self._play_timeshift(
-                            it, back_min=mins))
-        if self.mode in ("live", "fav") and it.get("stream_id") is not None:
+                self._build_timeshift_menu(
+                    m.addMenu("Timeshift / catch-up"), it)
             m.addSeparator()
-            rec_menu = m.addMenu("Record")
-            for label, mins in (("Record now - 30 min", 30),
-                                ("Record now - 1 hour", 60),
-                                ("Record now - 2 hours", 120),
-                                ("Record now - 4 hours", 240)):
-                rec_menu.addAction(label,
-                                   lambda mins=mins: self._record_now(it, mins))
-            rec_menu.addSeparator()
-            rec_menu.addAction("Schedule recording...",
-                               lambda: self._schedule_recording(it))
+            self._build_record_menu(m.addMenu("Record"), it)
         if self.mode in ("live", "fav") and it.get("stream_id") is not None:
             m.addSeparator()
             fav_menu = m.addMenu("Add to favorites group")
@@ -4291,23 +4466,68 @@ class MainWindow(QMainWindow):
                  "done": "Done", "failed": "Failed",
                  "cancelled": "Cancelled"}.get(j["status"], j["status"])
         start = datetime.fromtimestamp(j["start"]).strftime("%a %d %b %H:%M")
-        stop = datetime.fromtimestamp(j["stop"]).strftime("%H:%M")
+        stop = ("until stopped" if j.get("stop") is None
+                else datetime.fromtimestamp(j["stop"]).strftime("%H:%M"))
         return {"name": f"[{label}] {j['title']}  ({start} – {stop})",
                 "_job": j["id"], "_key": f"job:{j['id']}",
                 "_kind": "recjob", "_status": j["status"],
                 "_error": j.get("error") or "", "_path": j.get("path") or ""}
 
     def _recordings_changed(self):
-        """A recording started/stopped/failed - refresh the view and give a
-        status hint."""
+        """A recording started/stopped/failed - refresh the view and the
+        persistent ● REC indicator."""
+        n = self.rec.active_count()
+        self.rec_indicator.setText(f"● REC ({n})" if n > 1 else "● REC")
+        self.rec_indicator.setVisible(n > 0)
         if self.mode == "rec":
             cur = self.cat_list.currentItem()
             self._load_items(cur.data(Qt.ItemDataRole.UserRole) if cur else None)
-        else:
-            n = self.rec.active_count()
-            if n:
-                self._set_status(
-                    f"● Recording {n} stream{'s' if n > 1 else ''}...")
+        elif n:
+            self._set_status(
+                f"● Recording {n} stream{'s' if n > 1 else ''}...")
+
+    def _rec_indicator_menu(self):
+        m = QMenu(self)
+        active = [j for j in self.rec.jobs if j["status"] == "recording"]
+        for j in active:
+            since = datetime.fromtimestamp(j["start"]).strftime("%H:%M")
+            m.addAction(f"Stop recording: {j['title']} (since {since})",
+                        lambda jid=j["id"]: self.rec.cancel(jid))
+        if active:
+            m.addSeparator()
+        m.addAction("Open Recordings", lambda: self.switch_mode("rec"))
+        m.exec(self.rec_indicator.mapToGlobal(
+            self.rec_indicator.rect().bottomLeft()))
+
+    def _sync_player_buttons(self):
+        """Shows the in-player ⏪ (timeshift) and REC buttons whenever the
+        playing stream is a live channel that supports them - so both are
+        reachable from the video player itself, windowed or fullscreen."""
+        if not self.player:
+            return
+        it = self._playing_item
+        live = bool(it) and it.get("stream_id") is not None
+        ts = live and self._timeshift_days(it) > 0
+        for b in (self.player.ts_btn, self.player.fs_ts_btn):
+            b.setVisible(ts)
+        for b in (self.player.rec_btn, self.player.fs_rec_btn):
+            b.setVisible(live)
+
+    def _player_timeshift_menu(self, anchor):
+        it = self._playing_item
+        if not it or not self._timeshift_days(it):
+            return
+        m = QMenu(self)
+        self._build_timeshift_menu(m, it)
+        m.exec(anchor.mapToGlobal(anchor.rect().bottomLeft()))
+
+    def _player_record_menu(self, anchor):
+        it = self._playing_item
+        if not it or it.get("stream_id") is None:
+            return
+        m = QMenu(self)
+        self._build_record_menu(m, it)
+        m.exec(anchor.mapToGlobal(anchor.rect().bottomLeft()))
 
     def _recorder_ready(self):
         if self.rec.recorder()[1]:
@@ -4318,14 +4538,31 @@ class MainWindow(QMainWindow):
             "Install ffmpeg, e.g.:  sudo apt install ffmpeg")
         return False
 
+    def _build_record_menu(self, rec_menu, it):
+        rec_menu.addAction("Record now - until stopped",
+                           lambda: self._record_now(it, None))
+        for label, mins in (("Record now - 30 min", 30),
+                            ("Record now - 1 hour", 60),
+                            ("Record now - 2 hours", 120),
+                            ("Record now - 4 hours", 240)):
+            rec_menu.addAction(label,
+                               lambda mins=mins: self._record_now(it, mins))
+        rec_menu.addSeparator()
+        rec_menu.addAction("Schedule recording...",
+                           lambda: self._schedule_recording(it))
+
     def _record_now(self, it, minutes):
+        """minutes=None records open-ended, until stopped via the ● REC
+        indicator or the Recordings section."""
         if not self._recorder_ready() or it.get("stream_id") is None:
             return
         url = self.client.live_url(it["stream_id"], "ts")
         title = self.channel_display_name(it)
         now = time.time()
-        self.rec.add_job(url, title, now, now + minutes * 60)
-        self._set_status(f"● Recording {title} for {minutes} min "
+        self.rec.add_job(url, title, now,
+                         None if minutes is None else now + minutes * 60)
+        length = "until stopped" if minutes is None else f"for {minutes} min"
+        self._set_status(f"● Recording {title} {length} "
                          f"→ {self.rec.directory()}")
 
     def _schedule_recording(self, it):
@@ -4354,7 +4591,7 @@ class MainWindow(QMainWindow):
         hint = QLabel(f"Saved under {self.rec.directory()} - change the "
                       "location in Settings → Recording. The app must be "
                       "running when the recording starts.")
-        hint.setStyleSheet("color:#6E6E79; font-size:11px;")
+        hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         hint.setWordWrap(True)
         f.addRow(hint)
         bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
@@ -4466,23 +4703,148 @@ class MainWindow(QMainWindow):
             pass
         return 0
 
-    def _play_timeshift(self, it, from_ts=None, back_min=None):
-        """Plays a channel's archive, either from a programme start
-        timestamp or N minutes back. The chunk the server sends is finite,
-        so the seek bar and skip buttons work like for a movie."""
+    def _play_timeshift(self, it, back_min=None, prog=None):
+        """Plays a channel's archive: either a specific (possibly old) EPG
+        programme, or N minutes back from now. The chunk the server sends is
+        finite, so the seek bar and skip buttons work like for a movie."""
         sid = it.get("stream_id")
         days = self._timeshift_days(it)
         if sid is None or not days:
             return
         now = time.time()
-        start = from_ts if from_ts else now - (back_min or 30) * 60
+        if prog:
+            start = prog["start_timestamp"]
+            # the whole programme (+2 min margin for skewed provider clocks)
+            duration_min = max(
+                1, int((prog["stop_timestamp"] - start) // 60) + 2)
+            what = prog.get("title") or "programme"
+        else:
+            start = now - (back_min or 30) * 60
+            duration_min = max(1, int((now - start) // 60) + 1)
+            what = None
         start = max(start, now - days * 86400)
-        duration_min = max(1, int((now - start) // 60) + 1)
         url = self.client.timeshift_url(
             sid, datetime.fromtimestamp(start), duration_min)
-        title = f"{self.channel_display_name(it)} (timeshift)"
+        name = self.channel_display_name(it)
+        title = (f"{what} ({name}, timeshift)" if what
+                 else f"{name} (timeshift)")
         self._start_playback(url, title, it.get("stream_icon"),
-                             self._item_key(it), "live", record=False)
+                             self._item_key(it), "live", record=False,
+                             item=it)
+
+    TIMESHIFT_STEPS = ((30, "Go back 30 minutes"), (60, "Go back 1 hour"),
+                       (120, "Go back 2 hours"), (360, "Go back 6 hours"),
+                       (720, "Go back 12 hours"), (1440, "Go back 1 day"),
+                       (2880, "Go back 2 days"), (4320, "Go back 3 days"),
+                       (7200, "Go back 5 days"), (10080, "Go back 7 days"))
+
+    def _build_timeshift_menu(self, ts_menu, it):
+        """Fills a Timeshift/catch-up menu for a channel: watch the current
+        programme from the start, browse old programmes from the EPG, or
+        jump back - with steps that scale with how deep the provider's
+        archive actually is."""
+        days = self._timeshift_days(it)
+        prog = self.xmltv.current_programme(it)
+        if prog:
+            ts_menu.addAction(
+                f"Watch '{prog['title']}' from the start",
+                lambda: self._play_timeshift(it, prog=prog))
+        ts_menu.addAction("Browse past programmes (EPG)...",
+                          lambda: self._open_catchup_dialog(it))
+        ts_menu.addSeparator()
+        for mins, label in self.TIMESHIFT_STEPS:
+            if mins > days * 1440:
+                break
+            ts_menu.addAction(
+                label, lambda mins=mins: self._play_timeshift(
+                    it, back_min=mins))
+        note = ts_menu.addAction(
+            f"Archive depth: {days} day{'s' if days != 1 else ''}")
+        note.setEnabled(False)
+
+    def _open_catchup_dialog(self, it):
+        """Browse the channel's past programmes (from the EPG) and play one
+        via timeshift. Uses the XMLTV guide first; falls back to the
+        provider's full EPG table which sometimes reaches further back."""
+        days = self._timeshift_days(it)
+        if not days:
+            return
+        d = QDialog(self)
+        d.setWindowTitle(f"Catch-up - {self.channel_display_name(it)}")
+        d.setMinimumSize(480, 500)
+        lay = QVBoxLayout(d)
+        lay.setContentsMargins(18, 18, 18, 18)
+        lay.setSpacing(10)
+        info = QLabel("Loading past programmes from the guide...")
+        info.setWordWrap(True)
+        lay.addWidget(info)
+        lst = QListWidget()
+        lay.addWidget(lst, 1)
+        btns = QHBoxLayout()
+        watch_btn = QPushButton("Watch", objectName="Primary")
+        close_btn = QPushButton("Close")
+        btns.addStretch()
+        btns.addWidget(watch_btn)
+        btns.addWidget(close_btn)
+        lay.addLayout(btns)
+        close_btn.clicked.connect(d.reject)
+
+        def watch(_item=None):
+            cur = lst.currentItem()
+            p = cur.data(Qt.ItemDataRole.UserRole) if cur else None
+            if p:
+                self._play_timeshift(it, prog=p)
+                d.accept()
+
+        watch_btn.clicked.connect(watch)
+        lst.itemDoubleClicked.connect(watch)
+
+        def fetch():
+            progs = self.xmltv.past_programmes(it, days)
+            if progs or it.get("stream_id") is None:
+                return progs
+            # Fallback: the provider's own full table
+            now = time.time()
+            out = []
+            for e in self.client.epg_table(it["stream_id"]):
+                start, stop = epg_times(e)
+                if not start or not stop:
+                    continue
+                start_ts, stop_ts = start.timestamp(), stop.timestamp()
+                if stop_ts <= now and start_ts >= now - days * 86400:
+                    out.append({"title": b64(e.get("title")) or "?",
+                                "start_timestamp": int(start_ts),
+                                "stop_timestamp": int(stop_ts)})
+            out.sort(key=lambda p: p["start_timestamp"], reverse=True)
+            return out
+
+        def done(progs):
+            if not progs:
+                info.setText("The guide has no past programmes for this "
+                             "channel - use 'Go back ...' instead.")
+                return
+            info.setText(f"{len(progs)} programmes - the provider archives "
+                         f"{days} day{'s' if days != 1 else ''} back. "
+                         "Double-click to watch.")
+            last_day = None
+            for p in progs:
+                start = datetime.fromtimestamp(p["start_timestamp"])
+                stop = datetime.fromtimestamp(p["stop_timestamp"])
+                day = start.strftime("%A %d %B")
+                if day != last_day:
+                    last_day = day
+                    head = QListWidgetItem(f"—  {day}  —")
+                    head.setFlags(Qt.ItemFlag.NoItemFlags)
+                    lst.addItem(head)
+                row = QListWidgetItem(
+                    f"{start.strftime('%H:%M')}–{stop.strftime('%H:%M')}   "
+                    f"{p.get('title') or '?'}")
+                row.setData(Qt.ItemDataRole.UserRole, p)
+                lst.addItem(row)
+
+        run_async(self.pool, fetch, done,
+                  lambda e: info.setText(f"Could not load the guide: {e}"))
+        d.exec()
 
     def _rec_context_menu(self, pos, it):
         m = QMenu(self)
@@ -4597,6 +4959,20 @@ class MainWindow(QMainWindow):
             self.grid_btn.blockSignals(False)
         self._apply_filter()
 
+    def _set_theme(self, theme, accent):
+        """Persists and applies a theme + accent live: rebuilds the global
+        stylesheet and repaints the palette-driven parts (channel list,
+        status label, detail placeholder)."""
+        self.settings.setValue("theme", theme)
+        self.settings.setValue("accent", accent)
+        apply_theme(self.settings)
+        QApplication.instance().setStyleSheet(build_style())
+        self.listw.viewport().update()
+        self.count_lbl.setStyleSheet(f"color:{P['muted3']}; font-size:11px;")
+        it = self.list_model.item_at(self.listw.currentIndex().row())
+        if it:
+            self._show_detail(it)
+
     def _inline_view_changed(self, *_):
         """Persists the inline size/sort/grid controls and re-applies them."""
         self.settings.setValue("view_density", self.size_box.currentData())
@@ -4649,13 +5025,13 @@ class MainWindow(QMainWindow):
         mode_hint = QLabel("Embedded plays in the app. Reused mpv window keeps "
                            "one external window you can zap in (Ctrl+←/→). "
                            "External opens a fresh window each time.")
-        mode_hint.setStyleSheet("color:#6E6E79; font-size:11px;")
+        mode_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         mode_hint.setWordWrap(True)
         pf.addRow(mode_hint)
         if not self.player:
             reason = embedded_playback_reason() or "unknown reason"
             hint = QLabel(f"Embedded playback unavailable: {reason}")
-            hint.setStyleSheet("color:#6E6E79; font-size:11px;")
+            hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
             hint.setWordWrap(True)
             pf.addRow(hint)
         tabs.addTab(play_tab, "Playback")
@@ -4673,8 +5049,26 @@ class MainWindow(QMainWindow):
              ("alpha_desc", "Name Z -> A"),
              ("recent", "Recently added")],
             self.settings.value("sort_order", "default"))
+        theme_box = self._combo(
+            [(key, t["name"]) for key, t in THEMES.items()],
+            self.settings.value("theme", "graphite"))
+        accent_box = self._combo(
+            [(key, a[0]) for key, a in ACCENTS.items()],
+            self.settings.value("accent", "blue"))
+        theme_box.currentIndexChanged.connect(
+            lambda _i: self._set_theme(theme_box.currentData(),
+                                       accent_box.currentData()))
+        accent_box.currentIndexChanged.connect(
+            lambda _i: self._set_theme(theme_box.currentData(),
+                                       accent_box.currentData()))
         uf.addRow("List size", density_box)
         uf.addRow("Sort lists by", sort_box)
+        uf.addRow("Theme", theme_box)
+        uf.addRow("Accent color", accent_box)
+        theme_hint = QLabel("Theme and accent apply immediately.")
+        theme_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        theme_hint.setWordWrap(True)
+        uf.addRow(theme_hint)
         tabs.addTab(ui_tab, "Interface")
 
         # ---- Playlists tab ----
@@ -4710,7 +5104,7 @@ class MainWindow(QMainWindow):
                           "category in TV/Movies/Series). Locked content is "
                           "hidden - including from 'All' - until the PIN is "
                           "entered.")
-        par_hint.setStyleSheet("color:#6E6E79; font-size:11px;")
+        par_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         par_hint.setWordWrap(True)
         parv.addWidget(par_hint)
         parv.addStretch()
@@ -4741,7 +5135,7 @@ class MainWindow(QMainWindow):
         rec_hint = QLabel(
             f"Recorder: {rk} ({rexe})" if rexe else
             "No recorder found - install ffmpeg (recommended) or mpv.")
-        rec_hint.setStyleSheet("color:#6E6E79; font-size:11px;")
+        rec_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         rec_hint.setWordWrap(True)
         recv.addWidget(rec_hint)
         rec_hint2 = QLabel("Right-click a TV channel → Record to record "
@@ -4749,7 +5143,7 @@ class MainWindow(QMainWindow):
                            "recordings need the app to be running when they "
                            "start. Manage files under Recordings in the "
                            "sidebar.")
-        rec_hint2.setStyleSheet("color:#6E6E79; font-size:11px;")
+        rec_hint2.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         rec_hint2.setWordWrap(True)
         recv.addWidget(rec_hint2)
         recv.addStretch()
@@ -4999,7 +5393,9 @@ def main():
     icon = make_app_icon()
     app.setWindowIcon(icon)
     install_icon(icon)
-    app.setStyleSheet(STYLE)
+    settings = QSettings(ORG, ORG)
+    apply_theme(settings)
+    app.setStyleSheet(build_style())
     print(f"[dopeIPTV] Qt platform: {app.platformName()}", file=sys.stderr)
     if _libmpv is not None:
         reason = embedded_playback_reason()
@@ -5008,7 +5404,6 @@ def main():
                   file=sys.stderr)
         else:
             print("[dopeIPTV] Embedded playback: enabled", file=sys.stderr)
-    settings = QSettings(ORG, ORG)
     store = PlaylistStore(settings)
 
     client = None
