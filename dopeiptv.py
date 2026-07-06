@@ -1257,12 +1257,34 @@ class EmbeddedPlayer(QWidget):
             "border-radius:10px; padding:10px 14px; font-size:13px;")
         self.overlay.setWordWrap(True)
         self.overlay.hide()
+
+        # Floating zap controls (fullscreen only) - appear together with the
+        # overlay on mouse movement and auto-hide on inactivity.
+        self.fs_controls = QWidget(self)
+        self.fs_controls.setStyleSheet(
+            "background: rgba(16,16,20,210); border-radius: 10px;")
+        fc = QHBoxLayout(self.fs_controls)
+        fc.setContentsMargins(8, 6, 8, 6)
+        fc.setSpacing(8)
+        self.fs_prev_btn = QPushButton("◀", objectName="MiniBtn")
+        self.fs_prev_btn.setToolTip("Previous channel (Left)")
+        self.fs_prev_btn.clicked.connect(lambda: self.zap.emit(-1))
+        self.fs_next_btn = QPushButton("▶", objectName="MiniBtn")
+        self.fs_next_btn.setToolTip("Next channel (Right)")
+        self.fs_next_btn.clicked.connect(lambda: self.zap.emit(1))
+        fc.addWidget(self.fs_prev_btn)
+        fc.addWidget(self.fs_next_btn)
+        self.fs_controls.hide()
+        for wdg in (self.fs_controls, self.fs_prev_btn, self.fs_next_btn):
+            wdg.setMouseTracking(True)
+            wdg.installEventFilter(self)
+
         self._fs_ui = False
         self._overlay_text = ""
         self._overlay_timer = QTimer(self)
         self._overlay_timer.setSingleShot(True)
         self._overlay_timer.setInterval(self.OVERLAY_HIDE_MS)
-        self._overlay_timer.timeout.connect(self.overlay.hide)
+        self._overlay_timer.timeout.connect(self._hide_fs_ui)
 
     def eventFilter(self, obj, event):
         if obj is self.video:
@@ -1271,6 +1293,10 @@ class EmbeddedPlayer(QWidget):
                 return True
             if event.type() == event.Type.MouseMove and self._fs_ui:
                 self._show_overlay()
+        elif self._fs_ui and event.type() in (event.Type.Enter,
+                                              event.Type.MouseMove):
+            # hovering the floating controls keeps them alive
+            self._overlay_timer.start()
         return super().eventFilter(obj, event)
 
     # -- overlay -----------------------------------------------------------
@@ -1286,27 +1312,37 @@ class EmbeddedPlayer(QWidget):
         if fullscreen:
             self._show_overlay()
         else:
-            self.overlay.hide()
+            self._hide_fs_ui()
             self._overlay_timer.stop()
 
+    def _hide_fs_ui(self):
+        self.overlay.hide()
+        self.fs_controls.hide()
+
     def _show_overlay(self):
-        if not self._overlay_text:
-            return
-        self.overlay.setText(self._overlay_text)
+        if self._overlay_text:
+            self.overlay.setText(self._overlay_text)
+            self.overlay.show()
+        self.fs_controls.show()
         self._place_overlay()
-        self.overlay.show()
         self.overlay.raise_()
+        self.fs_controls.raise_()
         self._overlay_timer.start()
 
     def _place_overlay(self):
         margin = 24
-        self.overlay.setFixedWidth(min(self.width() - 2 * margin, 640))
+        self.fs_controls.adjustSize()
+        controls_w = self.fs_controls.width()
+        self.fs_controls.move(self.width() - controls_w - margin,
+                              self.height() - self.fs_controls.height() - margin)
+        max_w = self.width() - controls_w - 3 * margin
+        self.overlay.setFixedWidth(max(120, min(max_w, 640)))
         self.overlay.adjustSize()
         self.overlay.move(margin, self.height() - self.overlay.height() - margin)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        if self.overlay.isVisible():
+        if self.overlay.isVisible() or self.fs_controls.isVisible():
             self._place_overlay()
 
     def play(self, url, title):
