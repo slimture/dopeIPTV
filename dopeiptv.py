@@ -40,12 +40,13 @@ from PyQt6.QtWidgets import (
     QFormLayout, QFrame, QHBoxLayout, QInputDialog, QLabel, QLineEdit,
     QListView, QListWidget, QListWidgetItem, QMainWindow, QMenu, QMessageBox,
     QProgressBar, QPushButton, QScrollArea, QSizePolicy, QSplitter,
-    QStyle, QStyledItemDelegate, QVBoxLayout, QWidget,
+    QStyle, QStyledItemDelegate, QTabWidget, QVBoxLayout, QWidget,
 )
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 
 APP_NAME = "dopeIPTV"
 ORG = "dopeiptv"
+VERSION = "0.0.2-alpha"
 
 # Optional embedded playback via libmpv (python-mpv). Imported lazily so the
 # app still runs fine without it - playback then falls back to the reused
@@ -1188,20 +1189,28 @@ class ChannelListModel(QAbstractListModel):
 
 
 class ChannelDelegate(QStyledItemDelegate):
-    ROW_HEIGHT = 66
-    LOGO_SIZE = 44
+    # (row height, logo size, name pt, sub pt) per density level
+    DENSITIES = {"compact": (50, 32, 10, 8),
+                 "medium":  (66, 44, 11, 9),
+                 "large":   (92, 64, 13, 10)}
 
-    def __init__(self, window):
+    def __init__(self, window, density="medium"):
         super().__init__(window)
         self.window = window
+        self.set_density(density)
+
+    def set_density(self, level):
+        self.row_h, self.logo_sz, self.name_pt, self.sub_pt = \
+            self.DENSITIES.get(level, self.DENSITIES["medium"])
 
     def sizeHint(self, option, index):
-        return QSize(0, self.ROW_HEIGHT)
+        return QSize(0, self.row_h)
 
     def paint(self, painter, option, index):
         it = index.data(Qt.ItemDataRole.UserRole) or {}
         kind = index.model().kind
         rect = option.rect
+        logo_sz = self.logo_sz
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
@@ -1212,28 +1221,29 @@ class ChannelDelegate(QStyledItemDelegate):
 
         name = it.get("name") or it.get("title") or "?"
         logo_rect = QRect(rect.left() + 10,
-                          rect.top() + (rect.height() - self.LOGO_SIZE) // 2,
-                          self.LOGO_SIZE, self.LOGO_SIZE)
+                          rect.top() + (rect.height() - logo_sz) // 2,
+                          logo_sz, logo_sz)
+        radius = max(6, logo_sz // 4)
         url = it.get("stream_icon") or it.get("cover")
         pm = self.window.logos.cache.get(url) if url else None
         if pm:
             path = QPainterPath()
-            path.addRoundedRect(QRectF(logo_rect), 10, 10)
+            path.addRoundedRect(QRectF(logo_rect), radius, radius)
             painter.setClipPath(path)
-            scaled = pm.scaled(self.LOGO_SIZE, self.LOGO_SIZE,
+            scaled = pm.scaled(logo_sz, logo_sz,
                                Qt.AspectRatioMode.KeepAspectRatio,
                                Qt.TransformationMode.SmoothTransformation)
-            x = logo_rect.x() + (self.LOGO_SIZE - scaled.width()) // 2
-            y = logo_rect.y() + (self.LOGO_SIZE - scaled.height()) // 2
+            x = logo_rect.x() + (logo_sz - scaled.width()) // 2
+            y = logo_rect.y() + (logo_sz - scaled.height()) // 2
             painter.drawPixmap(x, y, scaled)
             painter.setClipping(False)
         else:
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(QColor("#26262E"))
-            painter.drawRoundedRect(logo_rect, 10, 10)
+            painter.drawRoundedRect(logo_rect, radius, radius)
             painter.setPen(QColor("#ECECF1"))
             f = QFont()
-            f.setPointSize(14)
+            f.setPointSize(max(12, logo_sz // 3))
             f.setBold(True)
             painter.setFont(f)
             painter.drawText(logo_rect, Qt.AlignmentFlag.AlignCenter,
@@ -1253,31 +1263,38 @@ class ChannelDelegate(QStyledItemDelegate):
                              str(it["num"]))
 
         text_x = logo_rect.right() + 12
-        text_w = rect.right() - 12 - num_w - text_x
+        text_w = max(0, rect.right() - 12 - num_w - text_x)
+        now = self.window.xmltv.now_for(it) if kind in ("live", "fav") else None
 
-        name_rect = QRect(text_x, rect.top() + 8, max(0, text_w), 18)
+        # Vertically center the text block (name [+ now line + progress bar])
+        # so it stays balanced at every density.
+        name_h = self.name_pt + 8
+        sub_h = (self.sub_pt + 6) if now else 0
+        bar_h = 6 if now else 0
+        block_h = name_h + sub_h + bar_h
+        y = rect.top() + (rect.height() - block_h) // 2
+
         painter.setPen(QColor("#ECECF1"))
         fname = QFont()
-        fname.setPointSize(11)
+        fname.setPointSize(self.name_pt)
         fname.setBold(True)
         painter.setFont(fname)
         fm = painter.fontMetrics()
-        painter.drawText(name_rect, Qt.AlignmentFlag.AlignVCenter,
-                         fm.elidedText(name, Qt.TextElideMode.ElideRight, name_rect.width()))
+        painter.drawText(QRect(text_x, y, text_w, name_h),
+                         Qt.AlignmentFlag.AlignVCenter,
+                         fm.elidedText(name, Qt.TextElideMode.ElideRight, text_w))
 
-        now = self.window.xmltv.now_for(it) if kind in ("live", "fav") else None
         if now:
             title, pct = now
-            sub_rect = QRect(text_x, rect.top() + 29, max(0, text_w), 15)
             painter.setPen(QColor("#8B8B96"))
             fsub = QFont()
-            fsub.setPointSize(9)
+            fsub.setPointSize(self.sub_pt)
             painter.setFont(fsub)
             fm2 = painter.fontMetrics()
-            painter.drawText(sub_rect, Qt.AlignmentFlag.AlignVCenter,
-                             fm2.elidedText("Now: " + title, Qt.TextElideMode.ElideRight,
-                                          sub_rect.width()))
-            bar_rect = QRect(text_x, rect.top() + 48, max(0, text_w), 4)
+            painter.drawText(QRect(text_x, y + name_h, text_w, sub_h),
+                             Qt.AlignmentFlag.AlignVCenter,
+                             fm2.elidedText("Now: " + title, Qt.TextElideMode.ElideRight, text_w))
+            bar_rect = QRect(text_x, y + name_h + sub_h, text_w, 4)
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(QColor("#2A2A32"))
             painter.drawRoundedRect(bar_rect, 2, 2)
@@ -1394,6 +1411,17 @@ class MainWindow(QMainWindow):
 
     # -- UI construction -------------------------------------------------------
     def _build_ui(self):
+        # Menu bar (also gives GNOME's top bar a real app menu, not "python3")
+        menubar = self.menuBar()
+        app_menu = menubar.addMenu(APP_NAME)
+        settings_action = app_menu.addAction("Settings...")
+        settings_action.triggered.connect(self.open_settings)
+        app_menu.addSeparator()
+        about_action = app_menu.addAction("About dopeIPTV")
+        about_action.triggered.connect(self.show_about)
+        quit_action = app_menu.addAction("Quit")
+        quit_action.triggered.connect(self.close)
+
         root = QSplitter(Qt.Orientation.Horizontal)
         self.setCentralWidget(root)
 
@@ -1476,7 +1504,9 @@ class MainWindow(QMainWindow):
         self.listw = QListView(objectName="Channels")
         self.list_model = ChannelListModel()
         self.listw.setModel(self.list_model)
-        self.listw.setItemDelegate(ChannelDelegate(self))
+        self.delegate = ChannelDelegate(
+            self, self.settings.value("view_density", "medium"))
+        self.listw.setItemDelegate(self.delegate)
         self.listw.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.listw.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.listw.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -1747,6 +1777,30 @@ class MainWindow(QMainWindow):
     LABELS = {"live": "channels", "vod": "movies", "series": "series",
               "episode": "episodes", "fav": "favorites", "history": "history items"}
 
+    @staticmethod
+    def _sort_key_name(it):
+        return (it.get("name") or it.get("title") or "").lower()
+
+    def _sorted(self, items):
+        """Applies the current sort order. 'default' preserves provider order
+        (and for History/Favorites their own natural order); 'recent' uses the
+        provider's added timestamp when present, newest first."""
+        order = self.settings.value("sort_order", "default")
+        if order == "alpha_asc":
+            return sorted(items, key=MainWindow._sort_key_name)
+        if order == "alpha_desc":
+            return sorted(items, key=MainWindow._sort_key_name, reverse=True)
+        if order == "recent":
+            def added(it):
+                try:
+                    return int(it.get("added") or 0)
+                except (TypeError, ValueError):
+                    return 0
+            # Only meaningfully reorders when the provider supplies 'added';
+            # otherwise it's a stable no-op that keeps the original order.
+            return sorted(items, key=added, reverse=True)
+        return items
+
     def _apply_filter(self):
         text = self.search.text().lower().strip()
         kind = "episode" if self.series_ctx else self.mode
@@ -1754,7 +1808,8 @@ class MainWindow(QMainWindow):
             filtered = [it for it in self.all_items
                        if text in (it.get("name") or it.get("title") or "").lower()]
         else:
-            filtered = self.all_items
+            filtered = list(self.all_items)
+        filtered = self._sorted(filtered)
         self.list_model.set_items(filtered, kind)
         self.count_lbl.setText(f"{len(filtered)} {self.LABELS[kind]}")
         if kind == "fav" and not self.all_items:
@@ -2106,6 +2161,22 @@ class MainWindow(QMainWindow):
 
         self._start_playback(url, title, icon, key, kind if self.mode != "history" else None)
 
+    def _open_external_both(self, it):
+        """Launches the same stream in both external mpv and VLC at once."""
+        if self.mode == "history":
+            url, title = it.get("_url"), it.get("name") or "dopeIPTV"
+            icon, key, kind = it.get("stream_icon"), it.get("_key"), it.get("_kind")
+        else:
+            url, title = self._stream_for(it)
+            icon = it.get("stream_icon") or it.get("cover")
+            key, kind = self._item_key(it), self._history_kind()
+        if not url:
+            return
+        launch_player("mpv", url, title, self)
+        launch_player("vlc", url, title, self)
+        if self.mode != "history":
+            self.history.add(url, title, icon, key, kind)
+
     def _autoplay_preview(self):
         return self.settings.value("autoplay_preview", "true") == "true"
 
@@ -2195,8 +2266,10 @@ class MainWindow(QMainWindow):
         m = QMenu(self)
         m.addAction("Play in mpv", lambda: self.play("mpv"))
         m.addAction("Play in VLC", lambda: self.play("vlc"))
-        m.addAction("Open externally in mpv", lambda: self.play("mpv", external=True))
-        m.addAction("Open externally in VLC", lambda: self.play("vlc", external=True))
+        ext = m.addMenu("Open externally")
+        ext.addAction("mpv", lambda: self.play("mpv", external=True))
+        ext.addAction("VLC", lambda: self.play("vlc", external=True))
+        ext.addAction("mpv + VLC (both)", lambda: self._open_external_both(it))
         if self.mode in ("live", "fav") and it.get("stream_id"):
             m.addSeparator()
             fav_menu = m.addMenu("Add to favorites group")
@@ -2277,59 +2350,97 @@ class MainWindow(QMainWindow):
         run_async(self.pool, lambda: self.client.live_streams(None), done,
                  lambda _: dlg.close())
 
+    # -- view settings -----------------------------------------------------------
+    def _apply_view_settings(self):
+        """Re-reads density/sort from settings and refreshes the list."""
+        self.delegate.set_density(self.settings.value("view_density", "medium"))
+        self._apply_filter()      # model reset makes the view re-query row heights
+
     # -- settings and errors -------------------------------------------------------
+    @staticmethod
+    def _combo(items, current):
+        """items: list of (value, label). Returns a QComboBox with userData."""
+        box = QComboBox()
+        for value, label in items:
+            box.addItem(label, value)
+        idx = box.findData(current)
+        if idx >= 0:
+            box.setCurrentIndex(idx)
+        return box
+
     def open_settings(self):
         d = QDialog(self)
         d.setWindowTitle("Settings")
-        d.setMinimumWidth(380)
-        lay = QVBoxLayout(d)
-        lay.setContentsMargins(22, 22, 22, 22)
-        form = QFormLayout()
-        player_box = QComboBox()
-        player_box.addItems(["mpv", "vlc"])
-        player_box.setCurrentText(self.settings.value("player", "mpv"))
-        fmt_box = QComboBox()
-        fmt_box.addItems(["ts", "m3u8"])
-        fmt_box.setCurrentText(self.settings.value("stream_format", "ts"))
-        reuse_box = QComboBox()
-        reuse_box.addItems(["Yes", "No"])
-        reuse_box.setCurrentText("Yes" if self._mpv_reuse() else "No")
-        mode_box = QComboBox()
-        mode_labels = {"embedded": "Embedded (in app)",
-                       "window": "Reused mpv window",
-                       "external": "External player"}
-        for value, label in mode_labels.items():
-            if value == "embedded" and not self.player:
-                continue
-            mode_box.addItem(label, value)
-        current_mode = self.playback_mode()
-        idx = mode_box.findData(current_mode)
-        if idx >= 0:
-            mode_box.setCurrentIndex(idx)
-        autoplay_box = QComboBox()
-        autoplay_box.addItems(["Yes", "No"])
-        autoplay_box.setCurrentText("Yes" if self._autoplay_preview() else "No")
-        form.addRow("Default player", player_box)
-        form.addRow("Playback (mpv)", mode_box)
-        form.addRow("Auto-play preview on selection", autoplay_box)
-        form.addRow("Live stream format", fmt_box)
-        form.addRow("Reuse mpv window (zapping)", reuse_box)
-        lay.addLayout(form)
+        d.setMinimumWidth(440)
+        outer = QVBoxLayout(d)
+        outer.setContentsMargins(18, 18, 18, 18)
+        tabs = QTabWidget()
+        outer.addWidget(tabs)
+
+        # ---- Playback tab ----
+        play_tab = QWidget()
+        pf = QFormLayout(play_tab)
+        pf.setSpacing(10)
+        player_box = self._combo([("mpv", "mpv"), ("vlc", "VLC")],
+                                 self.settings.value("player", "mpv"))
+        mode_items = [("embedded", "Embedded (in app)"),
+                      ("window", "Reused mpv window"),
+                      ("external", "External player")]
+        if not self.player:
+            mode_items = [m for m in mode_items if m[0] != "embedded"]
+        mode_box = self._combo(mode_items, self.playback_mode())
+        autoplay_box = self._combo([("true", "Yes"), ("false", "No")],
+                                   "true" if self._autoplay_preview() else "false")
+        fmt_box = self._combo([("ts", "ts"), ("m3u8", "m3u8")],
+                              self.settings.value("stream_format", "ts"))
+        reuse_box = self._combo([("true", "Yes"), ("false", "No")],
+                                "true" if self._mpv_reuse() else "false")
+        pf.addRow("Default player", player_box)
+        pf.addRow("Playback mode (mpv)", mode_box)
+        pf.addRow("Auto-play preview on selection", autoplay_box)
+        pf.addRow("Live stream format", fmt_box)
+        pf.addRow("Reuse mpv window (zapping)", reuse_box)
         if not self.player:
             reason = embedded_playback_reason() or "unknown reason"
             hint = QLabel(f"Embedded playback unavailable: {reason}")
             hint.setStyleSheet("color:#6E6E79; font-size:11px;")
             hint.setWordWrap(True)
-            lay.addWidget(hint)
+            pf.addRow(hint)
+        tabs.addTab(play_tab, "Playback")
 
+        # ---- Interface tab ----
+        ui_tab = QWidget()
+        uf = QFormLayout(ui_tab)
+        uf.setSpacing(10)
+        density_box = self._combo(
+            [("compact", "Compact"), ("medium", "Medium"), ("large", "Large")],
+            self.settings.value("view_density", "medium"))
+        sort_box = self._combo(
+            [("default", "Default (provider order)"),
+             ("alpha_asc", "Name A -> Z"),
+             ("alpha_desc", "Name Z -> A"),
+             ("recent", "Recently added")],
+            self.settings.value("sort_order", "default"))
+        uf.addRow("List size", density_box)
+        uf.addRow("Sort lists by", sort_box)
+        tabs.addTab(ui_tab, "Interface")
+
+        # ---- Account tab ----
+        acc_tab = QWidget()
+        af = QVBoxLayout(acc_tab)
+        af.setSpacing(10)
+        af.addWidget(QLabel(f"Server: {self.client.server}"))
+        af.addWidget(QLabel(f"User: {self.client.username}"))
         switch_btn = QPushButton("Switch account / server...")
-        lay.addWidget(switch_btn)
+        af.addWidget(switch_btn)
+        af.addStretch()
+        tabs.addTab(acc_tab, "Account")
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
                                   QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(d.accept)
         buttons.rejected.connect(d.reject)
-        lay.addWidget(buttons)
+        outer.addWidget(buttons)
 
         def sign_out():
             self.settings.remove("password")
@@ -2338,15 +2449,23 @@ class MainWindow(QMainWindow):
         switch_btn.clicked.connect(sign_out)
 
         if d.exec():
-            self.settings.setValue("player", player_box.currentText())
-            self.settings.setValue("stream_format", fmt_box.currentText())
-            self.settings.setValue(
-                "autoplay_preview",
-                "true" if autoplay_box.currentText() == "Yes" else "false")
-            self.settings.setValue("mpv_reuse",
-                                   "true" if reuse_box.currentText() == "Yes" else "false")
+            self.settings.setValue("player", player_box.currentData())
+            self.settings.setValue("stream_format", fmt_box.currentData())
+            self.settings.setValue("autoplay_preview", autoplay_box.currentData())
+            self.settings.setValue("mpv_reuse", reuse_box.currentData())
             if mode_box.currentData():
                 self.settings.setValue("playback_mode", mode_box.currentData())
+            self.settings.setValue("view_density", density_box.currentData())
+            self.settings.setValue("sort_order", sort_box.currentData())
+            self._apply_view_settings()
+
+    def show_about(self):
+        QMessageBox.about(
+            self, f"About {APP_NAME}",
+            f"<b>{APP_NAME}</b> {VERSION}<br><br>"
+            "An elegant IPTV client for Xtream Codes with EPG,<br>"
+            "embedded playback, favorites and history.<br><br>"
+            "Playback via mpv (embedded/window) or VLC.")
 
     def _error(self, msg):
         self.loading_bar.hide()

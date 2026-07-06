@@ -18,9 +18,11 @@ An elegant IPTV client for Linux and macOS with a macOS-inspired dark interface,
 - **Embedded in-app video** (Linux and macOS): with `python-mpv` + libmpv installed, channels play directly inside the app's detail panel, rendered via libmpv's OpenGL render API — no window embedding involved, so it works the same regardless of desktop/compositor (GNOME, KDE, Hyprland, ...) and is the default whenever available. Double-click the video or press `F` for fullscreen, `Esc` to leave it. Selecting a new channel switches the stream in place — perfect for zapping through favorites.
 - mpv playback can also reuse a single external window instead: selecting a new channel loads it into the same mpv instance rather than opening a new one. With `python-mpv` installed, Ctrl+Right / Ctrl+Left zap to the next/previous channel **even while that mpv window has keyboard focus** — mpv itself intercepts the keys and calls back into the app, since Qt shortcuts alone only fire while the dopeIPTV window is focused. That window's own fullscreen (`f`) and quit (`q`) keys work normally, and the app's `F` shortcut also toggles its fullscreen. VLC and "open externally" still spawn a normal one-off process/window. Pick the mode under Settings → "Playback (mpv)".
 - Channel logos loaded asynchronously and cached
-- Proper application name and icon in the taskbar (instead of "python3")
-- Copy stream URL via right-click; "open externally in mpv/VLC" also available from the same menu
-- Choose default player, live stream format (ts / m3u8), and whether mpv reuses its window in Settings
+- Proper application name and icon in the taskbar (instead of "python3"), an app menu with **About** in GNOME's top bar, and a version number
+- Copy stream URL via right-click; "Open externally" in mpv, VLC, or **both at once** from the same menu
+- Sort any list by provider order, name A→Z / Z→A, or recently added
+- Three list sizes (compact / medium / large icons)
+- Settings organized into tabs (Playback / Interface / Account)
 - Finds VLC on macOS even when it's only installed as an app bundle (not on `PATH`)
 
 ## Installation
