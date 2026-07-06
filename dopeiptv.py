@@ -41,7 +41,7 @@ from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDialog, QDialogButtonBox,
     QFormLayout, QFrame, QHBoxLayout, QInputDialog, QLabel, QLineEdit,
     QListView, QListWidget, QListWidgetItem, QMainWindow, QMenu, QMessageBox,
-    QProgressBar, QPushButton, QScrollArea, QSizePolicy, QSplitter,
+    QProgressBar, QPushButton, QScrollArea, QSizePolicy, QSlider, QSplitter,
     QStyle, QStyledItemDelegate, QTabWidget, QVBoxLayout, QWidget,
 )
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
@@ -1205,6 +1205,53 @@ class _MpvGLWidget(QOpenGLWidget):
             self.mpv = None
 
 
+class _SeekSlider(QSlider):
+    """Horizontal seek bar where a click jumps straight to that position
+    (Qt's default is page-stepping) and dragging scrubs; the seek itself is
+    only requested on release so mpv isn't hammered mid-drag."""
+
+    seek_requested = pyqtSignal(int)   # seconds
+
+    def __init__(self, parent=None):
+        super().__init__(Qt.Orientation.Horizontal, parent)
+        self.dragging = False
+
+    def _value_for(self, event):
+        ratio = event.position().x() / max(1, self.width())
+        span = self.maximum() - self.minimum()
+        return int(self.minimum() + max(0.0, min(1.0, ratio)) * span)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.dragging = True
+            self.setValue(self._value_for(event))
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self.dragging:
+            self.setValue(self._value_for(event))
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if self.dragging and event.button() == Qt.MouseButton.LeftButton:
+            self.dragging = False
+            self.seek_requested.emit(self.value())
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+
+def _format_time(seconds):
+    seconds = max(0, int(seconds or 0))
+    h, rem = divmod(seconds, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+
+
 class EmbeddedPlayer(QWidget):
     """Video pane inside the app, rendered via libmpv's OpenGL render API.
     In fullscreen the control bar is hidden entirely; instead a translucent
@@ -1240,12 +1287,19 @@ class EmbeddedPlayer(QWidget):
         self.next_btn.setToolTip("Next channel (Ctrl+Right)")
         self.next_btn.clicked.connect(lambda: self.zap.emit(1))
         self.title_lbl = QLabel("", objectName="DetailMeta")
+        self.seek = _SeekSlider()
+        self.seek.seek_requested.connect(self._do_seek)
+        self.seek.hide()
+        self.time_lbl = QLabel("", objectName="DetailMeta")
+        self.time_lbl.hide()
         self.stop_btn = QPushButton("Stop", objectName="MiniBtn")
         self.stop_btn.clicked.connect(self.stop)
         self.fs_btn = QPushButton("Fullscreen", objectName="MiniBtn")
         bl.addWidget(self.prev_btn)
         bl.addWidget(self.next_btn)
         bl.addWidget(self.title_lbl, 1)
+        bl.addWidget(self.seek, 2)
+        bl.addWidget(self.time_lbl)
         bl.addWidget(self.stop_btn)
         bl.addWidget(self.fs_btn)
         lay.addWidget(self.bar)
@@ -1272,12 +1326,26 @@ class EmbeddedPlayer(QWidget):
         self.fs_next_btn = QPushButton("▶", objectName="MiniBtn")
         self.fs_next_btn.setToolTip("Next channel (Right)")
         self.fs_next_btn.clicked.connect(lambda: self.zap.emit(1))
+        self.fs_seek = _SeekSlider()
+        self.fs_seek.seek_requested.connect(self._do_seek)
+        self.fs_seek.hide()
+        self.fs_time_lbl = QLabel("", objectName="DetailMeta")
+        self.fs_time_lbl.hide()
         fc.addWidget(self.fs_prev_btn)
         fc.addWidget(self.fs_next_btn)
+        fc.addWidget(self.fs_seek, 1)
+        fc.addWidget(self.fs_time_lbl)
         self.fs_controls.hide()
-        for wdg in (self.fs_controls, self.fs_prev_btn, self.fs_next_btn):
+        for wdg in (self.fs_controls, self.fs_prev_btn, self.fs_next_btn,
+                    self.fs_seek, self.fs_time_lbl):
             wdg.setMouseTracking(True)
             wdg.installEventFilter(self)
+
+        # Poll position/duration for the seek bar (only meaningful content
+        # is seekable - live streams keep the bar hidden).
+        self._pos_timer = QTimer(self)
+        self._pos_timer.setInterval(500)
+        self._pos_timer.timeout.connect(self._poll_position)
 
         self._fs_ui = False
         self._overlay_text = ""
@@ -1331,14 +1399,20 @@ class EmbeddedPlayer(QWidget):
 
     def _place_overlay(self):
         margin = 24
+        if self.fs_seek.isVisibleTo(self.fs_controls):
+            # seekable content: stretch the control row across the bottom
+            controls_w = self.width() - 2 * margin
+        else:
+            controls_w = self.fs_controls.sizeHint().width()
+        self.fs_controls.setFixedWidth(max(80, controls_w))
         self.fs_controls.adjustSize()
-        controls_w = self.fs_controls.width()
-        self.fs_controls.move(self.width() - controls_w - margin,
+        self.fs_controls.move(self.width() - self.fs_controls.width() - margin,
                               self.height() - self.fs_controls.height() - margin)
-        max_w = self.width() - controls_w - 3 * margin
-        self.overlay.setFixedWidth(max(120, min(max_w, 640)))
+        self.overlay.setFixedWidth(max(120, min(self.width() - 2 * margin, 640)))
         self.overlay.adjustSize()
-        self.overlay.move(margin, self.height() - self.overlay.height() - margin)
+        # the overlay sits above the control row so they never overlap
+        self.overlay.move(margin, self.height() - self.fs_controls.height()
+                          - margin - 8 - self.overlay.height())
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -1348,6 +1422,7 @@ class EmbeddedPlayer(QWidget):
     def play(self, url, title):
         try:
             self.title_lbl.setText(title or "")
+            self._hide_seek_ui()          # until the new content proves seekable
             if self.video.mpv is None:
                 # First use: force Qt to create the GL context and run
                 # initializeGL() now (it otherwise only happens lazily on
@@ -1362,11 +1437,49 @@ class EmbeddedPlayer(QWidget):
             except Exception:
                 pass
             m.play(url)
+            self._pos_timer.start()
             return True
         except Exception as e:
             print(f"[dopeIPTV] Embedded playback failed: "
                  f"{type(e).__name__}: {e}", file=sys.stderr)
             return False
+
+    # -- seeking (movies/series/catch-up; live streams aren't seekable) -------
+    def _hide_seek_ui(self):
+        for wdg in (self.seek, self.time_lbl, self.fs_seek, self.fs_time_lbl):
+            wdg.hide()
+
+    def _do_seek(self, seconds):
+        m = self.video.mpv
+        if m is None:
+            return
+        try:
+            m.command("seek", seconds, "absolute")
+        except Exception:
+            pass
+
+    def _poll_position(self):
+        m = self.video.mpv
+        if m is None:
+            return
+        try:
+            dur = m.duration
+            pos = m.playback_time
+        except Exception:
+            return
+        seekable = bool(dur) and dur > 1
+        pairs = ((self.seek, self.time_lbl), (self.fs_seek, self.fs_time_lbl))
+        if not seekable:
+            self._hide_seek_ui()
+            return
+        text = f"{_format_time(pos)} / {_format_time(dur)}"
+        for slider, label in pairs:
+            label.setText(text)
+            slider.setVisible(True)
+            label.setVisible(True)
+            if not slider.dragging:
+                slider.setMaximum(int(dur))
+                slider.setValue(int(pos or 0))
 
     def stop(self):
         if self.video.mpv:
@@ -1375,8 +1488,10 @@ class EmbeddedPlayer(QWidget):
             except Exception:
                 pass
         self.title_lbl.setText("")
+        self._hide_seek_ui()
 
     def shutdown(self):
+        self._pos_timer.stop()
         self.video.shutdown()
 
 # ----------------------------------------------------------------------------
@@ -1442,6 +1557,16 @@ QProgressBar#EpgBar {{
     background: #2A2A32; border: none; border-radius: 2px; max-height: 4px;
 }}
 QProgressBar#EpgBar::chunk {{ background: {ACCENT}; border-radius: 2px; }}
+
+QSlider::groove:horizontal {{
+    background: #2A2A32; height: 4px; border-radius: 2px;
+}}
+QSlider::sub-page:horizontal {{ background: {ACCENT}; border-radius: 2px; }}
+QSlider::handle:horizontal {{
+    background: {ACCENT}; width: 12px; height: 12px;
+    margin: -4px 0; border-radius: 6px;
+}}
+QSlider::handle:horizontal:hover {{ background: #5E99FF; }}
 
 /* Detail panel */
 #DetailPane {{ background: #1B1B21; border-left: 1px solid #232329; }}

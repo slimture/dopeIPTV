@@ -30,6 +30,7 @@ An elegant IPTV client for Linux and macOS with a macOS-inspired dark interface,
 - **Chromecast**: right-click any channel/movie/episode → "Cast to Chromecast..." to scan the network and cast to a device (live streams are cast as HLS). Needs `pip install pychromecast`
 - **Offline start**: if the active playlist's server can't be reached at launch you get a warning with "Start anyway" — the app opens and content loads once the server is reachable again
 - Zap arrows (◀ ▶) in the embedded player's control bar; in fullscreen, floating zap buttons appear on mouse movement (bottom-right, auto-hiding with the info overlay) and the plain Left/Right arrow keys zap channels
+- **Seek bar** in the embedded player for movies, series and catch-up content: click or drag the timeline to jump, with elapsed/total time shown — in both the windowed pane and the fullscreen floating controls. Live streams (which aren't seekable) keep the bar hidden
 - Finds VLC on macOS even when it's only installed as an app bundle (not on `PATH`)
 
 ## Installation
