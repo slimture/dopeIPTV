@@ -19,7 +19,11 @@ An elegant IPTV client for Linux and macOS with a macOS-inspired dark interface,
 - **Player controls**: pause/resume plus −10s / +30s skip buttons for seekable content (movies, series, catch-up), in both the mini player bar and the fullscreen floating controls
 - **In-player options menu** (the ⚙ button): pick the audio track (language) and subtitle track, adjust audio delay, force an aspect ratio (16:9, 4:3, stretch, ...), and set the network buffer/cache size — applied live and remembered
 - Fullscreen niceties: an **"Exit fullscreen" button** right in the floating controls (no need to know about `Esc`), the mouse cursor auto-hides with the controls, and leaving fullscreen returns the channel list to the playing channel instead of jumping to the top
-- The window title shows what's currently playing, and the **playing channel is highlighted** in the list with an accent bar and colored name
+- The window title shows what's currently playing, and the **playing item is highlighted** in every list — TV, Movies, series episodes, Favorites, Recordings and History, in both list and grid view (accent bar/border + colored name)
+- **Back / Next** buttons in the player bar zap not only through TV channels but also through Movies, a series' episodes, Recordings and History entries
+- **Recording**: right-click a TV channel → Record to record the stream locally — immediately (30 min / 1 h / 2 h / 4 h) or **scheduled with start and stop timers**. Recordings are stream-copied with ffmpeg (falls back to mpv), saved where you choose (Settings → Recording), and scheduled jobs survive an app restart (the app must be running when they fire)
+- **Recordings section** in the sidebar: browse recordings with subfolders as categories, create folders, rename, move between folders, multi-select delete (right-click or the Delete key), sort with the usual Sort control — and watch a recording **while it's still being recorded**. "Active & scheduled" shows running/pending jobs with stop/cancel
+- **Timeshift / catch-up detection**: channels whose provider keeps an archive (`tv_archive`) get a ⏪ marker in the list and a "Catch-up: N days" note in the detail panel; right-click → Timeshift to **watch the current programme from the start** (via the EPG) or jump back 30 min / 1 h / 2 h — the archive chunk is seekable like a movie
 - **"Play in VLC" is always a one-off external launch** — it never changes the default player, so the embedded mini player keeps working right after
 - **Edit your channel list**: right-click any channel/movie/series to rename or hide it (persisted per playlist — effectively your own edited playlist), and "Restore default channels..." undoes it all back to exactly what the provider sends. Right-clicking never switches the playing channel — only left-click selects
 - Stream errors are shown in red in the status bar and cleared automatically as soon as something else plays
@@ -45,11 +49,12 @@ An elegant IPTV client for Linux and macOS with a macOS-inspired dark interface,
 ## Installation
 
 ```bash
-# Dependencies
-sudo apt install python3 python3-pip mpv vlc      # Debian/Ubuntu
-# or: sudo dnf install python3 mpv vlc             # Fedora
-# or: sudo pacman -S python mpv vlc                # Arch
-# or on macOS: brew install mpv && brew install --cask vlc
+# Dependencies (ffmpeg is optional - it's the preferred recorder for the
+# Record feature; without it, mpv records instead)
+sudo apt install python3 python3-pip mpv vlc ffmpeg   # Debian/Ubuntu
+# or: sudo dnf install python3 mpv vlc ffmpeg          # Fedora
+# or: sudo pacman -S python mpv vlc ffmpeg             # Arch
+# or on macOS: brew install mpv ffmpeg && brew install --cask vlc
 
 pip install PyQt6 requests
 
@@ -97,6 +102,9 @@ The application icon is installed automatically to `~/.local/share/icons` the fi
 | Fullscreen | Double-click the embedded video, or press `F` — `Esc` or the "Exit fullscreen" button to leave (also toggles fullscreen on the reused mpv window) |
 | Zap to next/previous channel | Ctrl+Right / Ctrl+Left |
 | Rename / hide a channel | Right-click it (restore with "Restore default channels...") |
+| Record a channel | Right-click it → Record → now (30 min–4 h) or "Schedule recording..." |
+| Manage recordings | Recordings in the sidebar: folders as categories, right-click to rename/move/delete, Delete key works |
+| Watch a programme from the start | Right-click a ⏪ channel → Timeshift / catch-up |
 | Change list size / sort / grid | The Size, Sort and Grid controls above the list — no need to open Settings |
 | Switch player temporarily | Right-click a row |
 | Open a series | Double-click the series → episode list appears |

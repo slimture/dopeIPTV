@@ -30,26 +30,27 @@ from pathlib import Path
 
 import requests
 from PyQt6.QtCore import (
-    QAbstractListModel, QByteArray, QModelIndex, QObject, QRect, QRectF,
-    QRunnable, QSettings, QSize, QStandardPaths, Qt, QThreadPool, QTimer,
-    pyqtSignal, pyqtSlot,
+    QAbstractListModel, QByteArray, QDateTime, QModelIndex, QObject, QRect,
+    QRectF, QRunnable, QSettings, QSize, QStandardPaths, Qt, QThreadPool,
+    QTimer, pyqtSignal, pyqtSlot,
 )
 from PyQt6.QtGui import (
     QColor, QFont, QIcon, QKeySequence, QOpenGLContext, QPainter,
-    QPainterPath, QPixmap, QShortcut,
+    QPainterPath, QPen, QPixmap, QShortcut,
 )
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QApplication, QComboBox, QDialog, QDialogButtonBox,
-    QFormLayout, QFrame, QHBoxLayout, QInputDialog, QLabel, QLineEdit,
-    QListView, QListWidget, QListWidgetItem, QMainWindow, QMenu, QMessageBox,
-    QProgressBar, QPushButton, QScrollArea, QSizePolicy, QSlider, QSplitter,
-    QStyle, QStyledItemDelegate, QTabWidget, QVBoxLayout, QWidget,
+    QAbstractItemView, QApplication, QComboBox, QDateTimeEdit, QDialog,
+    QDialogButtonBox, QFileDialog, QFormLayout, QFrame, QHBoxLayout,
+    QInputDialog, QLabel, QLineEdit, QListView, QListWidget, QListWidgetItem,
+    QMainWindow, QMenu, QMessageBox, QProgressBar, QPushButton, QScrollArea,
+    QSizePolicy, QSlider, QSplitter, QStyle, QStyledItemDelegate, QTabWidget,
+    QVBoxLayout, QWidget,
 )
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 
 APP_NAME = "dopeIPTV"
 ORG = "dopeiptv"
-VERSION = "0.1.0-beta.1"
+VERSION = "0.1.0-beta.2"
 
 # Optional embedded playback via libmpv (python-mpv). Imported lazily so the
 # app still runs fine without it - playback then falls back to the reused
@@ -181,6 +182,14 @@ class XtreamClient:
     def episode_url(self, episode_id, ext):
         ext = ext or "mp4"
         return f"{self.server}/series/{self.username}/{self.password}/{episode_id}.{ext}"
+
+    def timeshift_url(self, stream_id, start_dt, duration_min):
+        """Catch-up/timeshift chunk: starts at start_dt and is duration_min
+        minutes long. Only works for channels the provider archives
+        (tv_archive)."""
+        stamp = start_dt.strftime("%Y-%m-%d:%H-%M")
+        return (f"{self.server}/timeshift/{self.username}/{self.password}/"
+                f"{int(duration_min)}/{stamp}/{stream_id}.ts")
 
 
 def b64(text):
@@ -385,14 +394,23 @@ class XmltvGuide:
     def now_for(self, item):
         """(title, percent) for the currently airing programme, or None.
         Pure in-memory lookup - safe to call from the paint path."""
+        p = self.current_programme(item)
+        if p is None:
+            return None
+        length = p["stop_timestamp"] - p["start_timestamp"]
+        now = datetime.now().astimezone().timestamp()
+        pct = (now - p["start_timestamp"]) / length * 100 if length else 0
+        return p["title"], pct
+
+    def current_programme(self, item):
+        """The full entry for the currently airing programme, or None -
+        used by timeshift's 'watch from start'."""
         if not self._loaded:
             return None
         now = datetime.now().astimezone().timestamp()
         for p in self._entries_for(item):
             if p["start_timestamp"] <= now < p["stop_timestamp"]:
-                length = p["stop_timestamp"] - p["start_timestamp"]
-                pct = (now - p["start_timestamp"]) / length * 100 if length else 0
-                return p["title"], pct
+                return p
         return None
 
     def _parse(self, data):
@@ -1157,6 +1175,239 @@ class ChromecastManager:
                 pass
 
 
+def safe_filename(name):
+    """Strips characters that are unsafe in filenames."""
+    cleaned = "".join(c for c in (name or "recording")
+                      if c not in '/\\:*?"<>|').strip()
+    return cleaned[:120] or "recording"
+
+
+def format_size(nbytes):
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if nbytes < 1024 or unit == "TB":
+            return (f"{nbytes:.1f} {unit}" if unit not in ("B", "KB")
+                    else f"{int(nbytes)} {unit}")
+        nbytes /= 1024
+
+
+class RecordingManager(QObject):
+    """Records live streams to local files, immediately or on a start/stop
+    timer. Uses ffmpeg (stream copy, no re-encode) when available, otherwise
+    mpv's --stream-record. A 5-second tick starts due jobs, stops jobs that
+    reached their stop time, and reaps recorder processes that exited on
+    their own. Scheduled-but-not-yet-started jobs survive an app restart
+    (persisted via QSettings); an active recording dies with the app."""
+
+    jobs_changed = pyqtSignal()
+
+    VIDEO_EXTS = {".ts", ".mp4", ".mkv", ".avi", ".mov", ".webm", ".m2ts"}
+
+    def __init__(self, settings, parent=None):
+        super().__init__(parent)
+        self.settings = settings
+        self.jobs = []
+        self._load()
+        self._timer = QTimer(self)
+        self._timer.setInterval(5000)
+        self._timer.timeout.connect(self.tick)
+        self._timer.start()
+
+    # -- storage location ---------------------------------------------------
+    def directory(self):
+        d = self.settings.value("recordings_dir", "")
+        if not d:
+            d = os.path.join(os.path.expanduser("~"), "Videos", "dopeIPTV")
+        return d
+
+    def set_directory(self, d):
+        self.settings.setValue("recordings_dir", d)
+
+    def folders(self):
+        """All subfolders (relative paths) below the recordings directory."""
+        root = self.directory()
+        found = []
+        if os.path.isdir(root):
+            for base, dirs, _files in os.walk(root):
+                dirs.sort()
+                for d in dirs:
+                    found.append(os.path.relpath(os.path.join(base, d), root))
+        return found
+
+    def files(self, folder=None):
+        """Recording files as list items. folder=None -> everything
+        (recursive); otherwise only the given subfolder."""
+        root = self.directory()
+        base = os.path.join(root, folder) if folder else root
+        out = []
+        if not os.path.isdir(base):
+            return out
+        walker = (os.walk(base) if folder is None or folder == ""
+                  else [(base, [], os.listdir(base))])
+        for dirpath, _dirs, names in walker:
+            for n in names:
+                p = os.path.join(dirpath, n)
+                if (os.path.splitext(n)[1].lower() in self.VIDEO_EXTS
+                        and os.path.isfile(p)):
+                    try:
+                        st = os.stat(p)
+                    except OSError:
+                        continue
+                    out.append({"name": os.path.splitext(n)[0], "_path": p,
+                                "_key": p, "_kind": "recording",
+                                "_size": st.st_size,
+                                "added": str(int(st.st_mtime))})
+        out.sort(key=lambda f: f["added"], reverse=True)
+        return out
+
+    # -- recorder backend -----------------------------------------------------
+    @staticmethod
+    def recorder():
+        """(kind, executable) of the available recorder, or (None, None)."""
+        ff = shutil.which("ffmpeg")
+        if ff:
+            return "ffmpeg", ff
+        mpv = find_player_executable("mpv")
+        if mpv:
+            return "mpv", mpv
+        return None, None
+
+    # -- jobs -----------------------------------------------------------------
+    def _load(self):
+        try:
+            data = json.loads(self.settings.value("recording_jobs", "") or "[]")
+        except Exception:
+            data = []
+        now = time.time()
+        for j in data if isinstance(data, list) else []:
+            if j.get("status") == "scheduled" and (j.get("stop") or 0) > now:
+                j["proc"] = None
+                self.jobs.append(j)
+
+    def _save(self):
+        keep = [{k: v for k, v in j.items() if k != "proc"}
+                for j in self.jobs if j.get("status") == "scheduled"]
+        self.settings.setValue("recording_jobs", json.dumps(keep))
+
+    def add_job(self, url, title, start_ts, stop_ts, folder=""):
+        job = {"id": uuid.uuid4().hex[:10], "url": url, "title": title,
+               "start": start_ts, "stop": stop_ts, "folder": folder or "",
+               "status": "scheduled", "path": "", "error": "", "proc": None}
+        self.jobs.append(job)
+        self._save()
+        self.tick()
+        self.jobs_changed.emit()
+        return job
+
+    def cancel(self, job_id):
+        """Cancels a scheduled job or stops an active recording (the partial
+        file is kept)."""
+        for j in self.jobs:
+            if j["id"] != job_id:
+                continue
+            if j["status"] == "recording":
+                self._stop_proc(j)
+                j["status"] = "done"
+            elif j["status"] == "scheduled":
+                j["status"] = "cancelled"
+            self._save()
+            self.jobs_changed.emit()
+            return
+
+    def remove_job(self, job_id):
+        """Drops a finished/failed/cancelled job from the list."""
+        self.jobs = [j for j in self.jobs
+                     if j["id"] != job_id
+                     or j["status"] in ("recording", "scheduled")]
+        self._save()
+        self.jobs_changed.emit()
+
+    def active_count(self):
+        return sum(1 for j in self.jobs if j["status"] == "recording")
+
+    def _spawn(self, j):
+        kind, exe = self.recorder()
+        if not exe:
+            j["status"] = "failed"
+            j["error"] = "neither ffmpeg nor mpv found"
+            return
+        stamp = datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d %H.%M")
+        target_dir = os.path.join(self.directory(), j.get("folder") or "")
+        try:
+            os.makedirs(target_dir, exist_ok=True)
+        except OSError as e:
+            j["status"] = "failed"
+            j["error"] = str(e)
+            return
+        path = os.path.join(target_dir,
+                            f"{safe_filename(j['title'])} {stamp}.ts")
+        n = 1
+        while os.path.exists(path):
+            path = os.path.join(target_dir,
+                                f"{safe_filename(j['title'])} {stamp} ({n}).ts")
+            n += 1
+        secs = max(1, int(j["stop"] - time.time()))
+        if kind == "ffmpeg":
+            cmd = [exe, "-y", "-loglevel", "error", "-i", j["url"],
+                   "-c", "copy", "-t", str(secs), path]
+        else:
+            cmd = [exe, j["url"], f"--stream-record={path}", "--vo=null",
+                   "--ao=null", "--no-terminal", f"--length={secs}"]
+        try:
+            j["proc"] = subprocess.Popen(
+                cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL, start_new_session=True)
+            j["path"] = path
+            j["status"] = "recording"
+        except Exception as e:
+            j["status"] = "failed"
+            j["error"] = str(e)
+
+    @staticmethod
+    def _stop_proc(j):
+        p = j.get("proc")
+        if p and p.poll() is None:
+            p.terminate()          # SIGTERM lets ffmpeg finalize the file
+            try:
+                p.wait(5)
+            except subprocess.TimeoutExpired:
+                p.kill()
+
+    def tick(self):
+        now = time.time()
+        changed = False
+        for j in self.jobs:
+            if j["status"] == "scheduled" and j["start"] <= now:
+                if j["stop"] <= now:
+                    j["status"] = "failed"
+                    j["error"] = "stop time passed before the app could start it"
+                else:
+                    self._spawn(j)
+                self._save()
+                changed = True
+            elif j["status"] == "recording":
+                rc = j["proc"].poll() if j.get("proc") else 0
+                if j["stop"] <= now:
+                    self._stop_proc(j)
+                    j["status"] = "done"
+                    changed = True
+                elif rc is not None:
+                    ok = (rc == 0 and j.get("path")
+                          and os.path.exists(j["path"])
+                          and os.path.getsize(j["path"]) > 0)
+                    j["status"] = "done" if ok else "failed"
+                    if not ok:
+                        j["error"] = f"recorder exited early (code {rc})"
+                    changed = True
+        if changed:
+            self.jobs_changed.emit()
+
+    def shutdown(self):
+        for j in self.jobs:
+            if j["status"] == "recording":
+                self._stop_proc(j)
+        self._save()
+
+
 class CastDialog(QDialog):
     """Scan for Chromecast devices and cast the given stream to one."""
 
@@ -1397,10 +1648,10 @@ class EmbeddedPlayer(QWidget):
         bl = QHBoxLayout(self.bar)
         bl.setContentsMargins(0, 0, 0, 0)
         bl.setSpacing(8)
-        self.prev_btn = QPushButton("◀", objectName="MiniBtn")
+        self.prev_btn = QPushButton("Back", objectName="MiniBtn")
         self.prev_btn.setToolTip("Previous channel (Ctrl+Left)")
         self.prev_btn.clicked.connect(lambda: self.zap.emit(-1))
-        self.next_btn = QPushButton("▶", objectName="MiniBtn")
+        self.next_btn = QPushButton("Next", objectName="MiniBtn")
         self.next_btn.setToolTip("Next channel (Ctrl+Right)")
         self.next_btn.clicked.connect(lambda: self.zap.emit(1))
         self.pause_btn = QPushButton("⏸", objectName="MiniBtn")
@@ -1456,10 +1707,10 @@ class EmbeddedPlayer(QWidget):
         fc = QHBoxLayout(self.fs_controls)
         fc.setContentsMargins(8, 6, 8, 6)
         fc.setSpacing(8)
-        self.fs_prev_btn = QPushButton("◀", objectName="MiniBtn")
+        self.fs_prev_btn = QPushButton("Back", objectName="MiniBtn")
         self.fs_prev_btn.setToolTip("Previous channel (Left)")
         self.fs_prev_btn.clicked.connect(lambda: self.zap.emit(-1))
-        self.fs_next_btn = QPushButton("▶", objectName="MiniBtn")
+        self.fs_next_btn = QPushButton("Next", objectName="MiniBtn")
         self.fs_next_btn.setToolTip("Next channel (Right)")
         self.fs_next_btn.clicked.connect(lambda: self.zap.emit(1))
         self.fs_pause_btn = QPushButton("⏸", objectName="MiniBtn")
@@ -2093,6 +2344,20 @@ class PlaylistDialog(QDialog):
 #  many channels a provider has - no artificial cap needed.
 # ----------------------------------------------------------------------------
 
+class ChannelListView(QListView):
+    """Right-clicking must never move the selection: selecting is what
+    starts the preview player, so a right-click on another channel would
+    switch away from what's playing. The press is swallowed here; Qt still
+    delivers the QContextMenuEvent separately, so the context menu (which
+    targets the item under the cursor, not the selection) works as before."""
+
+    def mousePressEvent(self, e):
+        if e.button() == Qt.MouseButton.RightButton:
+            e.accept()
+            return
+        super().mousePressEvent(e)
+
+
 class ChannelListModel(QAbstractListModel):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -2168,13 +2433,33 @@ class ChannelDelegate(QStyledItemDelegate):
         else:
             self._paint_list(painter, option, index)
 
+    def _is_playing(self, it, kind):
+        """True when this row is the item currently playing. Compared within
+        the matching list kind only - a movie and a live channel can share
+        the same numeric id."""
+        group = {"live": "live", "fav": "live", "vod": "vod",
+                 "episode": "episode", "history": "history",
+                 "rec": "rec"}.get(kind)
+        w = self.window
+        if w._playing_key is None:
+            return False
+        if kind == "history":
+            # history rows carry their own key/kind
+            return (it.get("_key") == w._playing_key
+                    and {"live": "live", "movie": "vod",
+                         "episode": "episode"}.get(it.get("_kind"))
+                    == w._playing_group)
+        return group == w._playing_group and w._item_key(it) == w._playing_key
+
     def _paint_grid(self, painter, option, index):
         it = index.data(Qt.ItemDataRole.UserRole) or {}
+        kind = index.model().kind
         rect = option.rect
         logo_sz = self.grid_logo
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
+        playing = self._is_playing(it, kind)
         inner = rect.adjusted(5, 5, -5, -5)
         if option.state & QStyle.StateFlag.State_Selected:
             painter.setPen(Qt.PenStyle.NoPen)
@@ -2183,6 +2468,12 @@ class ChannelDelegate(QStyledItemDelegate):
         elif option.state & QStyle.StateFlag.State_MouseOver:
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(QColor("#1D1D24"))
+            painter.drawRoundedRect(inner, 12, 12)
+        if playing:
+            pen = QPen(QColor(ACCENT))
+            pen.setWidth(2)
+            painter.setPen(pen)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawRoundedRect(inner, 12, 12)
 
         name = self.window.channel_display_name(it)
@@ -2213,7 +2504,7 @@ class ChannelDelegate(QStyledItemDelegate):
             if url and url not in self.window.logos.waiting:
                 self.window.logos.get(url, lambda _pm: self.window.listw.viewport().update())
 
-        painter.setPen(QColor("#ECECF1"))
+        painter.setPen(QColor(ACCENT) if playing else QColor("#ECECF1"))
         fname = QFont(); fname.setPointSize(self.grid_name_pt); fname.setBold(True)
         painter.setFont(fname)
         text_rect = QRect(rect.left() + 4, logo_y + logo_sz + 6,
@@ -2231,9 +2522,7 @@ class ChannelDelegate(QStyledItemDelegate):
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        playing = (kind in ("live", "fav")
-                   and self.window._playing_key is not None
-                   and self.window._item_key(it) == self.window._playing_key)
+        playing = self._is_playing(it, kind)
 
         if option.state & QStyle.StateFlag.State_Selected:
             painter.fillRect(rect, QColor("#26262E"))
@@ -2278,14 +2567,16 @@ class ChannelDelegate(QStyledItemDelegate):
 
         num_w = 0
         if kind in ("live", "fav") and it.get("num"):
-            num_w = 34
+            # ⏪ marks channels whose provider keeps a catch-up archive
+            has_archive = self.window._timeshift_days(it) > 0
+            num_w = 52 if has_archive else 34
             painter.setPen(QColor("#5A5A64"))
             fnum = QFont()
             fnum.setPointSize(10)
             painter.setFont(fnum)
             num_rect = QRect(rect.right() - 12 - num_w, rect.top(), num_w, rect.height())
             painter.drawText(num_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight,
-                             str(it["num"]))
+                             ("⏪ " if has_archive else "") + str(it["num"]))
 
         text_x = logo_rect.right() + 12
         text_w = max(0, rect.right() - 12 - num_w - text_x)
@@ -2537,6 +2828,8 @@ class MainWindow(QMainWindow):
             settings, f"channel_overrides_{pid}" if pid else "channel_overrides")
         self.parental = ParentalControl(settings)
         self.cast = ChromecastManager()
+        self.rec = RecordingManager(settings, self)
+        self.rec.jobs_changed.connect(self._recordings_changed)
         self._raw_categories = []          # unfiltered, for the content manager
         self.mpv = MpvIpcPlayer()
         self.mpv_window = MpvWindowPlayer() if _libmpv is not None else None
@@ -2557,6 +2850,7 @@ class MainWindow(QMainWindow):
         self._info_cache = {}               # (kind, id) -> info dict
         self._current_key = None            # identity of the selected row
         self._playing_key = None            # identity of the playing item
+        self._playing_group = None          # which list kind that key is from
         self._last_player = None
         self._last_playlist_refresh = time.time()
 
@@ -2605,7 +2899,8 @@ class MainWindow(QMainWindow):
 
         self.nav_btns = {}
         for key, text in (("live", "TV"), ("vod", "Movies"), ("series", "Series"),
-                          ("fav", "Favorites"), ("history", "History")):
+                          ("fav", "Favorites"), ("rec", "Recordings"),
+                          ("history", "History")):
             b = QPushButton(text, objectName="NavBtn")
             b.setCheckable(True)
             b.setFlat(True)
@@ -2694,7 +2989,7 @@ class MainWindow(QMainWindow):
         self.clear_history_btn.clicked.connect(self._clear_history)
         ml.addWidget(self.clear_history_btn)
 
-        self.listw = QListView(objectName="Channels")
+        self.listw = ChannelListView(objectName="Channels")
         self.list_model = ChannelListModel()
         self.listw.setModel(self.list_model)
         self.delegate = ChannelDelegate(
@@ -2968,11 +3263,11 @@ class MainWindow(QMainWindow):
         self.series_ctx = None
         self.back_btn.hide()
         self.clear_history_btn.setVisible(mode == "history")
-        # History supports multi-select (Ctrl/Shift-click, Ctrl+A, rubber
-        # band) so several entries can be removed at once.
+        # History and Recordings support multi-select (Ctrl/Shift-click,
+        # Ctrl+A, rubber band) so several entries can be removed at once.
         self.listw.setSelectionMode(
             QAbstractItemView.SelectionMode.ExtendedSelection
-            if mode == "history"
+            if mode in ("history", "rec")
             else QAbstractItemView.SelectionMode.SingleSelection)
         self.search.clear()
         self._load_categories()
@@ -2980,6 +3275,20 @@ class MainWindow(QMainWindow):
     def _load_categories(self):
         self.cat_list.clear()
         self.list_model.set_items([], self.mode)
+        if self.mode == "rec":
+            self.cat_list.blockSignals(True)
+            for label, data in [("All recordings", None),
+                                ("Active & scheduled", "__jobs__")]:
+                item = QListWidgetItem(label)
+                item.setData(Qt.ItemDataRole.UserRole, data)
+                self.cat_list.addItem(item)
+            for rel in self.rec.folders():
+                item = QListWidgetItem(rel)
+                item.setData(Qt.ItemDataRole.UserRole, rel)
+                self.cat_list.addItem(item)
+            self.cat_list.blockSignals(False)
+            self.cat_list.setCurrentRow(0)
+            return
         if self.mode in ("fav", "history"):
             self.cat_list.blockSignals(True)
             all_item = QListWidgetItem("All")
@@ -3054,6 +3363,14 @@ class MainWindow(QMainWindow):
         self._load_items(cat)
 
     def _load_items(self, category_id):
+        if self.mode == "rec":
+            if category_id == "__jobs__":
+                self.all_items = [self._job_item(j)
+                                  for j in reversed(self.rec.jobs)]
+            else:
+                self.all_items = self.rec.files(category_id)
+            self._apply_filter()
+            return
         if self.mode == "fav":
             exclude = (() if self.parental.session_unlocked
                        else self.favs.locked_groups())
@@ -3099,7 +3416,8 @@ class MainWindow(QMainWindow):
 
     # -- list and filtering ------------------------------------------------------
     LABELS = {"live": "channels", "vod": "movies", "series": "series",
-              "episode": "episodes", "fav": "favorites", "history": "history items"}
+              "episode": "episodes", "fav": "favorites",
+              "history": "history items", "rec": "recordings"}
 
     @staticmethod
     def _sort_key_name(it):
@@ -3201,6 +3519,24 @@ class MainWindow(QMainWindow):
         if url:
             self.logos.get(url, self._set_detail_logo)
 
+        if self.mode == "rec":
+            if it.get("_kind") == "recjob":
+                status = {"recording": "Recording now",
+                          "scheduled": "Scheduled",
+                          "done": "Finished", "failed": "Failed",
+                          "cancelled": "Cancelled"}.get(it.get("_status"), "")
+                err = it.get("_error")
+                self.d_meta.setText(f"{status} - {err}" if err else status)
+            else:
+                try:
+                    mtime = datetime.fromtimestamp(
+                        os.stat(it["_path"]).st_mtime).strftime("%Y-%m-%d %H:%M")
+                except OSError:
+                    mtime = "?"
+                self.d_meta.setText(
+                    f"Recording * {format_size(it.get('_size') or 0)} * {mtime}")
+            return
+
         if self.mode == "history":
             self.d_meta.setText({"live": "Live channel", "movie": "Movie",
                                  "episode": "Episode"}.get(it.get("_kind"), ""))
@@ -3214,7 +3550,10 @@ class MainWindow(QMainWindow):
             self.d_meta.setText(meta)
             self._show_media_info(info, self._current_key)
         elif self.mode in ("live", "fav"):
-            self.d_meta.setText("Live channel")
+            days = self._timeshift_days(it)
+            self.d_meta.setText(
+                f"Live channel * ⏪ Catch-up: {days} "
+                f"day{'s' if days != 1 else ''}" if days else "Live channel")
             # "is not None": a perfectly valid stream_id of 0 is falsy
             if it.get("stream_id") is not None:
                 if not self._player_fs:
@@ -3496,6 +3835,19 @@ class MainWindow(QMainWindow):
         if self.mode == "series" and not self.series_ctx:
             self._enter_series(it)
             return
+        if self.mode == "rec":
+            # Local files: recordings, or a job that has started writing one
+            # (an in-progress recording is watchable while it records).
+            path = it.get("_path")
+            if not path or not os.path.exists(path):
+                return
+            title = it.get("name") or "Recording"
+            if external or player == "vlc":
+                launch_player(player or "mpv", path, title, self)
+                return
+            self._start_playback(path, title, None, path, "recording",
+                                 record=False)
+            return
         if self.mode == "history":
             url, title = it.get("_url"), it.get("name") or "dopeIPTV"
             icon, key, kind = it.get("stream_icon"), it.get("_key"), it.get("_kind")
@@ -3512,7 +3864,8 @@ class MainWindow(QMainWindow):
                 self.history.add(url, title, icon, key, kind)
             return
 
-        self._start_playback(url, title, icon, key, kind if self.mode != "history" else None)
+        self._start_playback(url, title, icon, key, kind,
+                             record=self.mode != "history")
 
     def _open_cast_dialog(self, it):
         if not ChromecastManager.available():
@@ -3564,6 +3917,7 @@ class MainWindow(QMainWindow):
             return
         self.stream_error.hide()
         self._playing_key = self._item_key(it)
+        self._playing_group = "live"
         self.listw.viewport().update()
         self.setWindowTitle(title or self._base_title)
         self._set_status(f"Playing: {title}")
@@ -3578,11 +3932,17 @@ class MainWindow(QMainWindow):
             mode = "window"
         return mode
 
-    def _start_playback(self, url, title, icon_url, key, history_kind):
-        if history_kind:
-            self.history.add(url, title, icon_url, key, history_kind)
+    def _start_playback(self, url, title, icon_url, key, kind, record=True):
+        if record and kind:
+            self.history.add(url, title, icon_url, key, kind)
         self.stream_error.hide()
         self._playing_key = key
+        # Which list kind this key belongs to, so the playing highlight only
+        # lights up in the matching list (a movie and a channel can share the
+        # same numeric id).
+        self._playing_group = {"live": "live", "movie": "vod",
+                               "episode": "episode",
+                               "recording": "rec"}.get(kind)
         self.listw.viewport().update()      # repaint the playing highlight
         self.setWindowTitle(title or self._base_title)
         self._set_status(f"Playing: {title}")
@@ -3636,7 +3996,12 @@ class MainWindow(QMainWindow):
             self.player.title_lbl.setText("")
 
     def _zap(self, direction):
-        if self.mode not in ("live", "fav"):
+        # Works in TV/Favorites, Movies, and inside a series' episode list.
+        # A list of *series* is excluded: 'playing' the next series would
+        # open its episode list rather than actually play anything.
+        if self.mode not in ("live", "fav", "vod", "series", "history", "rec"):
+            return
+        if self.mode == "series" and not self.series_ctx:
             return
         count = self.list_model.rowCount()
         if count == 0:
@@ -3658,6 +4023,9 @@ class MainWindow(QMainWindow):
         it = self.list_model.item_at(idx.row())
         if not it:
             return
+        if self.mode == "rec":
+            self._rec_context_menu(pos, it)
+            return
         m = QMenu(self)
         m.addAction("Play in mpv", lambda: self.play_item(it, "mpv"))
         m.addAction("Play in VLC", lambda: self.play_item(it, "vlc"))
@@ -3668,7 +4036,36 @@ class MainWindow(QMainWindow):
         if not (self.mode == "series" and not self.series_ctx):
             m.addAction("Cast to Chromecast...",
                        lambda: self._open_cast_dialog(it))
-        if self.mode in ("live", "fav") and it.get("stream_id"):
+        if self.mode in ("live", "fav") and it.get("stream_id") is not None:
+            days = self._timeshift_days(it)
+            if days:
+                m.addSeparator()
+                ts_menu = m.addMenu("Timeshift / catch-up")
+                prog = self.xmltv.current_programme(it)
+                if prog:
+                    ts_menu.addAction(
+                        f"Watch '{prog['title']}' from the start",
+                        lambda: self._play_timeshift(
+                            it, from_ts=prog["start_timestamp"]))
+                for label, mins in (("Go back 30 minutes", 30),
+                                    ("Go back 1 hour", 60),
+                                    ("Go back 2 hours", 120)):
+                    ts_menu.addAction(
+                        label, lambda mins=mins: self._play_timeshift(
+                            it, back_min=mins))
+        if self.mode in ("live", "fav") and it.get("stream_id") is not None:
+            m.addSeparator()
+            rec_menu = m.addMenu("Record")
+            for label, mins in (("Record now - 30 min", 30),
+                                ("Record now - 1 hour", 60),
+                                ("Record now - 2 hours", 120),
+                                ("Record now - 4 hours", 240)):
+                rec_menu.addAction(label,
+                                   lambda mins=mins: self._record_now(it, mins))
+            rec_menu.addSeparator()
+            rec_menu.addAction("Schedule recording...",
+                               lambda: self._schedule_recording(it))
+        if self.mode in ("live", "fav") and it.get("stream_id") is not None:
             m.addSeparator()
             fav_menu = m.addMenu("Add to favorites group")
             for g in self.favs.group_names():
@@ -3884,6 +4281,257 @@ class MainWindow(QMainWindow):
     def _delete_pressed(self):
         if self.mode == "history":
             self._remove_history_selected()
+        elif self.mode == "rec":
+            self._delete_recordings_selected()
+
+    # -- recordings ---------------------------------------------------------------
+    def _job_item(self, j):
+        """A recording job (active/scheduled/finished) as a list item."""
+        label = {"recording": "● REC", "scheduled": "Scheduled",
+                 "done": "Done", "failed": "Failed",
+                 "cancelled": "Cancelled"}.get(j["status"], j["status"])
+        start = datetime.fromtimestamp(j["start"]).strftime("%a %d %b %H:%M")
+        stop = datetime.fromtimestamp(j["stop"]).strftime("%H:%M")
+        return {"name": f"[{label}] {j['title']}  ({start} – {stop})",
+                "_job": j["id"], "_key": f"job:{j['id']}",
+                "_kind": "recjob", "_status": j["status"],
+                "_error": j.get("error") or "", "_path": j.get("path") or ""}
+
+    def _recordings_changed(self):
+        """A recording started/stopped/failed - refresh the view and give a
+        status hint."""
+        if self.mode == "rec":
+            cur = self.cat_list.currentItem()
+            self._load_items(cur.data(Qt.ItemDataRole.UserRole) if cur else None)
+        else:
+            n = self.rec.active_count()
+            if n:
+                self._set_status(
+                    f"● Recording {n} stream{'s' if n > 1 else ''}...")
+
+    def _recorder_ready(self):
+        if self.rec.recorder()[1]:
+            return True
+        QMessageBox.warning(
+            self, "Recording",
+            "Recording needs ffmpeg (recommended) or mpv on the PATH.\n\n"
+            "Install ffmpeg, e.g.:  sudo apt install ffmpeg")
+        return False
+
+    def _record_now(self, it, minutes):
+        if not self._recorder_ready() or it.get("stream_id") is None:
+            return
+        url = self.client.live_url(it["stream_id"], "ts")
+        title = self.channel_display_name(it)
+        now = time.time()
+        self.rec.add_job(url, title, now, now + minutes * 60)
+        self._set_status(f"● Recording {title} for {minutes} min "
+                         f"→ {self.rec.directory()}")
+
+    def _schedule_recording(self, it):
+        if not self._recorder_ready() or it.get("stream_id") is None:
+            return
+        d = QDialog(self)
+        d.setWindowTitle("Schedule recording")
+        d.setMinimumWidth(380)
+        f = QFormLayout(d)
+        f.setSpacing(10)
+        name_edit = QLineEdit(self.channel_display_name(it))
+        start_edit = QDateTimeEdit(QDateTime.currentDateTime())
+        start_edit.setCalendarPopup(True)
+        start_edit.setDisplayFormat("yyyy-MM-dd HH:mm")
+        stop_edit = QDateTimeEdit(QDateTime.currentDateTime().addSecs(3600))
+        stop_edit.setCalendarPopup(True)
+        stop_edit.setDisplayFormat("yyyy-MM-dd HH:mm")
+        folder_box = QComboBox()
+        folder_box.addItem("(Recordings folder)", "")
+        for rel in self.rec.folders():
+            folder_box.addItem(rel, rel)
+        f.addRow("Name", name_edit)
+        f.addRow("Start", start_edit)
+        f.addRow("Stop", stop_edit)
+        f.addRow("Save in", folder_box)
+        hint = QLabel(f"Saved under {self.rec.directory()} - change the "
+                      "location in Settings → Recording. The app must be "
+                      "running when the recording starts.")
+        hint.setStyleSheet("color:#6E6E79; font-size:11px;")
+        hint.setWordWrap(True)
+        f.addRow(hint)
+        bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+                              | QDialogButtonBox.StandardButton.Cancel)
+        bb.accepted.connect(d.accept)
+        bb.rejected.connect(d.reject)
+        f.addRow(bb)
+        if d.exec() != QDialog.DialogCode.Accepted:
+            return
+        start_ts = start_edit.dateTime().toSecsSinceEpoch()
+        stop_ts = stop_edit.dateTime().toSecsSinceEpoch()
+        if stop_ts <= start_ts or stop_ts <= time.time():
+            QMessageBox.warning(self, "Schedule recording",
+                                "The stop time must be in the future and "
+                                "after the start time.")
+            return
+        url = self.client.live_url(it["stream_id"], "ts")
+        title = name_edit.text().strip() or self.channel_display_name(it)
+        self.rec.add_job(url, title, start_ts, stop_ts,
+                         folder_box.currentData())
+        when = datetime.fromtimestamp(start_ts).strftime("%a %d %b %H:%M")
+        self._set_status(f"Recording of {title} scheduled for {when}")
+
+    def _selected_recordings(self, clicked_item=None):
+        items = [self.list_model.item_at(ix.row())
+                 for ix in self.listw.selectionModel().selectedRows()]
+        items = [it for it in items if it and it.get("_path")
+                 and it.get("_kind") == "recording"]
+        if not items and clicked_item and clicked_item.get("_path") \
+                and clicked_item.get("_kind") == "recording":
+            items = [clicked_item]
+        return items
+
+    def _delete_recordings_selected(self, clicked_item=None):
+        items = self._selected_recordings(clicked_item)
+        if not items:
+            return
+        what = (f"{len(items)} recordings" if len(items) > 1
+                else f"'{items[0]['name']}'")
+        if QMessageBox.question(self, "Delete recording",
+                                f"Delete {what} from disk?") \
+                != QMessageBox.StandardButton.Yes:
+            return
+        for it in items:
+            try:
+                os.remove(it["_path"])
+            except OSError as e:
+                self._set_status(f"Could not delete: {e}", error=True)
+        cur = self.cat_list.currentItem()
+        self._load_items(cur.data(Qt.ItemDataRole.UserRole) if cur else None)
+
+    def _rename_recording(self, it):
+        path = it.get("_path")
+        if not path:
+            return
+        name, ok = QInputDialog.getText(self, "Rename recording",
+                                        "New name:", text=it.get("name", ""))
+        name = safe_filename(name.strip()) if ok and name.strip() else ""
+        if not name:
+            return
+        new_path = os.path.join(os.path.dirname(path),
+                                name + os.path.splitext(path)[1])
+        try:
+            os.rename(path, new_path)
+        except OSError as e:
+            QMessageBox.warning(self, "Rename recording", str(e))
+        cur = self.cat_list.currentItem()
+        self._load_items(cur.data(Qt.ItemDataRole.UserRole) if cur else None)
+
+    def _move_recordings(self, items, folder):
+        """Moves recordings into a subfolder ('' = the recordings root)."""
+        target = os.path.join(self.rec.directory(), folder)
+        try:
+            os.makedirs(target, exist_ok=True)
+            for it in items:
+                shutil.move(it["_path"], os.path.join(
+                    target, os.path.basename(it["_path"])))
+        except OSError as e:
+            QMessageBox.warning(self, "Move recording", str(e))
+        self._load_categories()
+
+    def _new_rec_folder(self, items=None):
+        """Creates a subfolder; optionally moves recordings into it."""
+        name, ok = QInputDialog.getText(self, "New folder", "Folder name:")
+        name = safe_filename(name.strip()) if ok and name.strip() else ""
+        if not name:
+            return
+        try:
+            os.makedirs(os.path.join(self.rec.directory(), name),
+                        exist_ok=True)
+        except OSError as e:
+            QMessageBox.warning(self, "New folder", str(e))
+            return
+        if items:
+            self._move_recordings(items, name)
+        else:
+            self._load_categories()
+
+    # -- timeshift / catch-up -------------------------------------------------------
+    @staticmethod
+    def _timeshift_days(it):
+        """Days of catch-up archive the provider keeps for this channel
+        (0 = no timeshift). Xtream reports tv_archive/tv_archive_duration
+        on each live stream."""
+        try:
+            if int(it.get("tv_archive") or 0):
+                return int(it.get("tv_archive_duration") or 1) or 1
+        except (TypeError, ValueError):
+            pass
+        return 0
+
+    def _play_timeshift(self, it, from_ts=None, back_min=None):
+        """Plays a channel's archive, either from a programme start
+        timestamp or N minutes back. The chunk the server sends is finite,
+        so the seek bar and skip buttons work like for a movie."""
+        sid = it.get("stream_id")
+        days = self._timeshift_days(it)
+        if sid is None or not days:
+            return
+        now = time.time()
+        start = from_ts if from_ts else now - (back_min or 30) * 60
+        start = max(start, now - days * 86400)
+        duration_min = max(1, int((now - start) // 60) + 1)
+        url = self.client.timeshift_url(
+            sid, datetime.fromtimestamp(start), duration_min)
+        title = f"{self.channel_display_name(it)} (timeshift)"
+        self._start_playback(url, title, it.get("stream_icon"),
+                             self._item_key(it), "live", record=False)
+
+    def _rec_context_menu(self, pos, it):
+        m = QMenu(self)
+        if it.get("_kind") == "recjob":
+            status = it.get("_status")
+            if it.get("_path"):
+                m.addAction("Watch", lambda: self.play_item(it))
+            if status == "recording":
+                m.addAction("Stop recording",
+                            lambda: self.rec.cancel(it["_job"]))
+            elif status == "scheduled":
+                m.addAction("Cancel scheduled recording",
+                            lambda: self.rec.cancel(it["_job"]))
+            else:
+                m.addAction("Remove from list",
+                            lambda: self.rec.remove_job(it["_job"]))
+        else:
+            items = self._selected_recordings(it)
+            many = len(items) > 1
+            m.addAction("Play in mpv", lambda: self.play_item(it, "mpv"))
+            m.addAction("Play in VLC", lambda: self.play_item(it, "vlc"))
+            m.addSeparator()
+            m.addAction("Rename...", lambda: self._rename_recording(it))
+            move = m.addMenu("Move to" if not many
+                             else f"Move {len(items)} recordings to")
+            move.addAction("(Recordings folder)",
+                           lambda: self._move_recordings(items, ""))
+            for rel in self.rec.folders():
+                move.addAction(rel,
+                               lambda rel=rel: self._move_recordings(items, rel))
+            move.addSeparator()
+            move.addAction("New folder...",
+                           lambda: self._new_rec_folder(items))
+            m.addAction("Delete" if not many
+                        else f"Delete {len(items)} recordings",
+                        lambda: self._delete_recordings_selected(it))
+        m.addSeparator()
+        m.addAction("New folder...", lambda: self._new_rec_folder())
+        m.addAction("Change recordings folder...",
+                    lambda: self._choose_rec_dir())
+        m.exec(self.listw.viewport().mapToGlobal(pos))
+
+    def _choose_rec_dir(self):
+        d = QFileDialog.getExistingDirectory(
+            self, "Choose recordings folder", self.rec.directory())
+        if d:
+            self.rec.set_directory(d)
+            if self.mode == "rec":
+                self._load_categories()
 
     def _clear_history(self):
         if QMessageBox.question(self, "Clear history",
@@ -4068,6 +4716,45 @@ class MainWindow(QMainWindow):
         parv.addStretch()
         tabs.addTab(par_tab, "Parental")
 
+        # ---- Recording tab ----
+        rec_tab = QWidget()
+        recv = QVBoxLayout(rec_tab)
+        recv.setSpacing(10)
+        rec_dir_lbl = QLabel(self.rec.directory())
+        rec_dir_lbl.setWordWrap(True)
+        recv.addWidget(QLabel("Recordings are saved in:"))
+        recv.addWidget(rec_dir_lbl)
+        rec_dir_btn = QPushButton("Choose folder...")
+
+        def pick_rec_dir():
+            path = QFileDialog.getExistingDirectory(
+                d, "Choose recordings folder", self.rec.directory())
+            if path:
+                self.rec.set_directory(path)
+                rec_dir_lbl.setText(path)
+                if self.mode == "rec":
+                    self._load_categories()
+
+        rec_dir_btn.clicked.connect(pick_rec_dir)
+        recv.addWidget(rec_dir_btn)
+        rk, rexe = self.rec.recorder()
+        rec_hint = QLabel(
+            f"Recorder: {rk} ({rexe})" if rexe else
+            "No recorder found - install ffmpeg (recommended) or mpv.")
+        rec_hint.setStyleSheet("color:#6E6E79; font-size:11px;")
+        rec_hint.setWordWrap(True)
+        recv.addWidget(rec_hint)
+        rec_hint2 = QLabel("Right-click a TV channel → Record to record "
+                           "immediately or on a start/stop timer. Scheduled "
+                           "recordings need the app to be running when they "
+                           "start. Manage files under Recordings in the "
+                           "sidebar.")
+        rec_hint2.setStyleSheet("color:#6E6E79; font-size:11px;")
+        rec_hint2.setWordWrap(True)
+        recv.addWidget(rec_hint2)
+        recv.addStretch()
+        tabs.addTab(rec_tab, "Recording")
+
         def refresh_pin_status():
             if self.parental.has_pin():
                 state = ("unlocked for this session"
@@ -4245,6 +4932,7 @@ class MainWindow(QMainWindow):
         super().keyPressEvent(event)
 
     def closeEvent(self, event):
+        self.rec.shutdown()      # stop recorder processes, persist schedules
         if self.player:
             self.player.shutdown()
         if self.mpv_window:
