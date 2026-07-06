@@ -74,6 +74,7 @@ The application icon is installed automatically to `~/.local/share/icons` the fi
 | Play | Double-click, or the "Play in mpv / VLC" buttons |
 | Fullscreen | Double-click the embedded video, or press `F` — `Esc` to exit (also toggles fullscreen on the reused mpv window) |
 | Zap to next/previous channel | Ctrl+Right / Ctrl+Left |
+| Change list size / sort / grid | The Size, Sort and Grid controls above the list — no need to open Settings |
 | Switch player temporarily | Right-click a row |
 | Open a series | Double-click the series → episode list appears |
 | Search | Type in the search field at the top |

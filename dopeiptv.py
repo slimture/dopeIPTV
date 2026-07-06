@@ -1061,9 +1061,18 @@ QScrollBar::handle:vertical {{ background: #33333C; border-radius: 4px; min-heig
 QScrollBar::handle:vertical:hover {{ background: #45454F; }}
 QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; }}
 
-/* Context menus: dark on every platform (Linux GTK/Qt themes default to a
-   white popup menu unless styled explicitly; macOS's native dark menu was
-   the look we want everywhere). */
+/* Menu bar + context menus: dark on every platform (Linux GTK/Qt themes
+   default to a white menu bar and popup unless styled explicitly; macOS's
+   native dark menu was the look we want everywhere). */
+QMenuBar {{
+    background: #101014; color: #C9C9D2; border-bottom: 1px solid #232329;
+}}
+QMenuBar::item {{
+    background: transparent; padding: 6px 12px; margin: 0; border-radius: 6px;
+}}
+QMenuBar::item:selected {{ background: #1D1D24; }}
+QMenuBar::item:pressed {{ background: {ACCENT}; color: white; }}
+
 QMenu {{
     background: #1D1D24; border: 1px solid #2C2C34; border-radius: 8px;
     padding: 6px;
@@ -1086,6 +1095,12 @@ QComboBox {{
     padding: 6px 10px;
 }}
 QComboBox QAbstractItemView {{ background: #222229; selection-background-color: {ACCENT}; }}
+QComboBox#InlineCombo {{ padding: 3px 8px; font-size: 11px; }}
+QPushButton#InlineToggle {{
+    padding: 4px 12px; font-size: 11px; border-radius: 7px;
+}}
+QPushButton#InlineToggle:checked {{ background: {ACCENT}; border: none; color: white; }}
+#MiddlePane QLabel {{ color: #6E6E79; font-size: 11px; }}
 QLineEdit {{
     background: #222229; border: 1px solid #2C2C34; border-radius: 8px;
     padding: 8px 10px;
@@ -1189,24 +1204,101 @@ class ChannelListModel(QAbstractListModel):
 
 
 class ChannelDelegate(QStyledItemDelegate):
-    # (row height, logo size, name pt, sub pt) per density level
+    # List mode: (row height, logo size, name pt, sub pt) per density level
     DENSITIES = {"compact": (50, 32, 10, 8),
                  "medium":  (66, 44, 11, 9),
                  "large":   (92, 64, 13, 10)}
+    # Grid mode: (cell w, cell h, logo size, name pt) per density level
+    GRID = {"compact": (108, 116, 60, 9),
+            "medium":  (140, 150, 84, 10),
+            "large":   (184, 196, 120, 11)}
 
-    def __init__(self, window, density="medium"):
+    def __init__(self, window, density="medium", grid=False):
         super().__init__(window)
         self.window = window
+        self.grid = grid
         self.set_density(density)
 
     def set_density(self, level):
+        self.level = level if level in self.DENSITIES else "medium"
         self.row_h, self.logo_sz, self.name_pt, self.sub_pt = \
-            self.DENSITIES.get(level, self.DENSITIES["medium"])
+            self.DENSITIES[self.level]
+        self.cell_w, self.cell_h, self.grid_logo, self.grid_name_pt = \
+            self.GRID[self.level]
+
+    def set_grid(self, grid):
+        self.grid = grid
+
+    def grid_size(self):
+        return QSize(self.cell_w, self.cell_h)
 
     def sizeHint(self, option, index):
+        if self.grid:
+            return QSize(self.cell_w, self.cell_h)
         return QSize(0, self.row_h)
 
     def paint(self, painter, option, index):
+        if self.grid:
+            self._paint_grid(painter, option, index)
+        else:
+            self._paint_list(painter, option, index)
+
+    def _paint_grid(self, painter, option, index):
+        it = index.data(Qt.ItemDataRole.UserRole) or {}
+        rect = option.rect
+        logo_sz = self.grid_logo
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        inner = rect.adjusted(5, 5, -5, -5)
+        if option.state & QStyle.StateFlag.State_Selected:
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor("#26262E"))
+            painter.drawRoundedRect(inner, 12, 12)
+        elif option.state & QStyle.StateFlag.State_MouseOver:
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor("#1D1D24"))
+            painter.drawRoundedRect(inner, 12, 12)
+
+        name = it.get("name") or it.get("title") or "?"
+        logo_x = rect.left() + (rect.width() - logo_sz) // 2
+        logo_y = rect.top() + 12
+        logo_rect = QRect(logo_x, logo_y, logo_sz, logo_sz)
+        radius = max(8, logo_sz // 5)
+        url = it.get("stream_icon") or it.get("cover")
+        pm = self.window.logos.cache.get(url) if url else None
+        if pm:
+            path = QPainterPath()
+            path.addRoundedRect(QRectF(logo_rect), radius, radius)
+            painter.setClipPath(path)
+            scaled = pm.scaled(logo_sz, logo_sz, Qt.AspectRatioMode.KeepAspectRatio,
+                               Qt.TransformationMode.SmoothTransformation)
+            painter.drawPixmap(logo_x + (logo_sz - scaled.width()) // 2,
+                               logo_y + (logo_sz - scaled.height()) // 2, scaled)
+            painter.setClipping(False)
+        else:
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor("#26262E"))
+            painter.drawRoundedRect(logo_rect, radius, radius)
+            painter.setPen(QColor("#ECECF1"))
+            f = QFont(); f.setPointSize(max(14, logo_sz // 3)); f.setBold(True)
+            painter.setFont(f)
+            painter.drawText(logo_rect, Qt.AlignmentFlag.AlignCenter,
+                             name.strip()[:1].upper())
+            if url and url not in self.window.logos.waiting:
+                self.window.logos.get(url, lambda _pm: self.window.listw.viewport().update())
+
+        painter.setPen(QColor("#ECECF1"))
+        fname = QFont(); fname.setPointSize(self.grid_name_pt); fname.setBold(True)
+        painter.setFont(fname)
+        text_rect = QRect(rect.left() + 4, logo_y + logo_sz + 6,
+                          rect.width() - 8, rect.bottom() - (logo_y + logo_sz + 6))
+        fm = painter.fontMetrics()
+        painter.drawText(text_rect, Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop,
+                         fm.elidedText(name, Qt.TextElideMode.ElideRight, text_rect.width()))
+        painter.restore()
+
+    def _paint_list(self, painter, option, index):
         it = index.data(Qt.ItemDataRole.UserRole) or {}
         kind = index.model().kind
         rect = option.rect
@@ -1491,6 +1583,33 @@ class MainWindow(QMainWindow):
         self.search.textChanged.connect(lambda _t: self._search_timer.start(220))
         ml.addWidget(self.search)
 
+        # Inline view controls: size, sort, and grid toggle - so these don't
+        # require opening Settings. They read/write the same settings keys.
+        ctl = QHBoxLayout()
+        ctl.setSpacing(6)
+        self.size_box = self._combo(
+            [("compact", "Compact"), ("medium", "Medium"), ("large", "Large")],
+            self.settings.value("view_density", "medium"))
+        self.size_box.setObjectName("InlineCombo")
+        self.size_box.currentIndexChanged.connect(self._inline_view_changed)
+        self.sort_box = self._combo(
+            [("default", "Default"), ("alpha_asc", "A→Z"), ("alpha_desc", "Z→A"),
+             ("recent", "Recent")],
+            self.settings.value("sort_order", "default"))
+        self.sort_box.setObjectName("InlineCombo")
+        self.sort_box.currentIndexChanged.connect(self._inline_view_changed)
+        self.grid_btn = QPushButton("Grid", objectName="InlineToggle")
+        self.grid_btn.setCheckable(True)
+        self.grid_btn.setChecked(self.settings.value("view_grid", "false") == "true")
+        self.grid_btn.toggled.connect(self._inline_view_changed)
+        ctl.addWidget(QLabel("Size"))
+        ctl.addWidget(self.size_box)
+        ctl.addWidget(QLabel("Sort"))
+        ctl.addWidget(self.sort_box)
+        ctl.addStretch()
+        ctl.addWidget(self.grid_btn)
+        ml.addLayout(ctl)
+
         self.back_btn = QPushButton("<-  Back to series")
         self.back_btn.hide()
         self.back_btn.clicked.connect(self._leave_series)
@@ -1623,6 +1742,9 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence(Qt.Key.Key_F), self,
                   activated=self._toggle_fullscreen_shortcut)
 
+        # Apply the saved list/grid view mode before any content loads.
+        self._apply_view_settings()
+
     # -- fullscreen (F key covers both the embedded pane and, as a fallback,
     #    the reused external mpv window - no extra buttons for the latter) --
     def _toggle_fullscreen_shortcut(self):
@@ -1662,6 +1784,7 @@ class MainWindow(QMainWindow):
         self._det_margins = det_lay.contentsMargins()
         det_lay.setContentsMargins(0, 0, 0, 0)
         self._det.setStyleSheet("#DetailPane { background:#000000; border:none; }")
+        self.menuBar().hide()          # no grey menu bar over the video
         self.player.set_fullscreen_ui(True)
         self._was_fullscreen = self.isFullScreen()
         self.showFullScreen()
@@ -1680,6 +1803,7 @@ class MainWindow(QMainWindow):
             self._det.layout().setContentsMargins(m.left(), m.top(),
                                                   m.right(), m.bottom())
         self._det.setStyleSheet("")
+        self.menuBar().show()
         self.player.set_fullscreen_ui(False)
         if not getattr(self, "_was_fullscreen", False):
             self.showNormal()
@@ -1694,9 +1818,6 @@ class MainWindow(QMainWindow):
         self.clear_history_btn.setVisible(mode == "history")
         self.search.clear()
         self._load_categories()
-
-    def _mpv_reuse(self):
-        return self.settings.value("mpv_reuse", "true") == "true"
 
     def _load_categories(self):
         self.cat_list.clear()
@@ -2212,18 +2333,23 @@ class MainWindow(QMainWindow):
         print(f"[dopeIPTV] Playing via player={chosen} mode={mode} "
               f"(embedded pane: {'yes' if self.player else 'no'})",
               file=sys.stderr)
-        if chosen == "mpv" and mode == "embedded":
+        if chosen == "mpv" and mode == "embedded" and self.player:
             self.player.show()
             self.player.set_overlay_info(title)
             if not self.player.play(url, title):
                 self.player.hide()
                 launch_player(chosen, url, title, self)
-        elif chosen == "mpv" and mode == "window" and self.mpv_window:
-            if not self.mpv_window.play(url, title):
-                launch_player(chosen, url, title, self)
-        elif chosen == "mpv" and mode == "window" and self._mpv_reuse():
-            run_async(self.pool, lambda: self.mpv.load(url, title),
-                     lambda ok: None if ok else self._player_missing("mpv"))
+        elif chosen == "mpv" and mode == "window":
+            # A single reused mpv window (zap-able). python-mpv drives it
+            # in-process; without python-mpv, fall back to controlling a
+            # separate mpv process over its IPC socket - still reused, not a
+            # fresh window each time.
+            if self.mpv_window:
+                if not self.mpv_window.play(url, title):
+                    launch_player("mpv", url, title, self)
+            else:
+                run_async(self.pool, lambda: self.mpv.load(url, title),
+                         lambda ok: None if ok else self._player_missing("mpv"))
         else:
             launch_player(chosen, url, title, self)
 
@@ -2352,9 +2478,45 @@ class MainWindow(QMainWindow):
 
     # -- view settings -----------------------------------------------------------
     def _apply_view_settings(self):
-        """Re-reads density/sort from settings and refreshes the list."""
-        self.delegate.set_density(self.settings.value("view_density", "medium"))
-        self._apply_filter()      # model reset makes the view re-query row heights
+        """Re-reads density/sort/grid from settings, syncs the inline controls,
+        switches the list between vertical rows and a wrapping grid, and
+        refreshes so the view re-queries item sizes."""
+        density = self.settings.value("view_density", "medium")
+        grid = self.settings.value("view_grid", "false") == "true"
+        self.delegate.set_density(density)
+        self.delegate.set_grid(grid)
+        if grid:
+            self.listw.setViewMode(QListView.ViewMode.IconMode)
+            self.listw.setFlow(QListView.Flow.LeftToRight)
+            self.listw.setWrapping(True)
+            self.listw.setResizeMode(QListView.ResizeMode.Adjust)
+            self.listw.setGridSize(self.delegate.grid_size())
+        else:
+            self.listw.setViewMode(QListView.ViewMode.ListMode)
+            self.listw.setFlow(QListView.Flow.TopToBottom)
+            self.listw.setWrapping(False)
+            self.listw.setGridSize(QSize())
+        # Keep the inline controls in sync (e.g. when changed from Settings).
+        if hasattr(self, "size_box"):
+            for box, key in ((self.size_box, density),
+                             (self.sort_box, self.settings.value("sort_order", "default"))):
+                box.blockSignals(True)
+                i = box.findData(key)
+                if i >= 0:
+                    box.setCurrentIndex(i)
+                box.blockSignals(False)
+            self.grid_btn.blockSignals(True)
+            self.grid_btn.setChecked(grid)
+            self.grid_btn.blockSignals(False)
+        self._apply_filter()
+
+    def _inline_view_changed(self, *_):
+        """Persists the inline size/sort/grid controls and re-applies them."""
+        self.settings.setValue("view_density", self.size_box.currentData())
+        self.settings.setValue("sort_order", self.sort_box.currentData())
+        self.settings.setValue("view_grid",
+                               "true" if self.grid_btn.isChecked() else "false")
+        self._apply_view_settings()
 
     # -- settings and errors -------------------------------------------------------
     @staticmethod
@@ -2393,13 +2555,16 @@ class MainWindow(QMainWindow):
                                    "true" if self._autoplay_preview() else "false")
         fmt_box = self._combo([("ts", "ts"), ("m3u8", "m3u8")],
                               self.settings.value("stream_format", "ts"))
-        reuse_box = self._combo([("true", "Yes"), ("false", "No")],
-                                "true" if self._mpv_reuse() else "false")
         pf.addRow("Default player", player_box)
         pf.addRow("Playback mode (mpv)", mode_box)
         pf.addRow("Auto-play preview on selection", autoplay_box)
         pf.addRow("Live stream format", fmt_box)
-        pf.addRow("Reuse mpv window (zapping)", reuse_box)
+        mode_hint = QLabel("Embedded plays in the app. Reused mpv window keeps "
+                           "one external window you can zap in (Ctrl+←/→). "
+                           "External opens a fresh window each time.")
+        mode_hint.setStyleSheet("color:#6E6E79; font-size:11px;")
+        mode_hint.setWordWrap(True)
+        pf.addRow(mode_hint)
         if not self.player:
             reason = embedded_playback_reason() or "unknown reason"
             hint = QLabel(f"Embedded playback unavailable: {reason}")
@@ -2452,7 +2617,6 @@ class MainWindow(QMainWindow):
             self.settings.setValue("player", player_box.currentData())
             self.settings.setValue("stream_format", fmt_box.currentData())
             self.settings.setValue("autoplay_preview", autoplay_box.currentData())
-            self.settings.setValue("mpv_reuse", reuse_box.currentData())
             if mode_box.currentData():
                 self.settings.setValue("playback_mode", mode_box.currentData())
             self.settings.setValue("view_density", density_box.currentData())
