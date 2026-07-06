@@ -11,6 +11,7 @@ Run with:  python3 dopeiptv.py
 """
 
 import base64
+import hashlib
 import html
 import io
 import json
@@ -390,13 +391,33 @@ class FavoriteStore:
 
     def remove_group(self, group):
         self.groups.pop(group, None)
+        if group in self.locked_groups():
+            self.set_group_locked(group, False)
         self._save()
 
-    def items(self, group=None):
+    # -- parental locking (stored beside the groups, backward compatible) ----
+    def locked_groups(self):
+        try:
+            locked = json.loads(self.settings.value(f"{self.key}_locked", "") or "[]")
+        except Exception:
+            locked = []
+        return set(locked) if isinstance(locked, list) else set()
+
+    def set_group_locked(self, group, locked):
+        current = self.locked_groups()
+        (current.add if locked else current.discard)(group)
+        self.settings.setValue(f"{self.key}_locked", json.dumps(sorted(current)))
+
+    def is_locked(self, group):
+        return group in self.locked_groups()
+
+    def items(self, group=None, exclude_groups=()):
         if group:
             return list(self.groups.get(group, []))
         result, seen = [], set()
         for g in self.group_names():
+            if g in exclude_groups:
+                continue
             for it in self.groups[g]:
                 stream_id = it.get("stream_id")
                 if stream_id not in seen:
@@ -452,6 +473,93 @@ class HistoryStore:
 
     def items(self):
         return list(self.entries)
+
+# ----------------------------------------------------------------------------
+#  Parental control (PIN) and per-category overrides (content manager)
+# ----------------------------------------------------------------------------
+
+class ParentalControl:
+    """A PIN (stored salted+hashed, never in clear text) gating locked
+    categories and locked favorite groups. Once entered, the unlock lasts
+    for the session or until 'Lock now' is used."""
+
+    def __init__(self, settings):
+        self.settings = settings
+        self.session_unlocked = False
+
+    def has_pin(self):
+        return bool(self.settings.value("parental_pin_hash", ""))
+
+    @staticmethod
+    def _hash(salt, pin):
+        return hashlib.sha256((salt + pin).encode()).hexdigest()
+
+    def set_pin(self, pin):
+        salt = uuid.uuid4().hex
+        self.settings.setValue("parental_salt", salt)
+        self.settings.setValue("parental_pin_hash", self._hash(salt, pin))
+        self.session_unlocked = True
+
+    def clear_pin(self):
+        self.settings.remove("parental_pin_hash")
+        self.settings.remove("parental_salt")
+        self.session_unlocked = False
+
+    def verify(self, pin):
+        salt = self.settings.value("parental_salt", "")
+        stored = self.settings.value("parental_pin_hash", "")
+        return bool(stored) and self._hash(salt, pin) == stored
+
+    def lock_session(self):
+        self.session_unlocked = False
+
+
+class CategoryOverrides:
+    """Per-playlist category customizations for the content manager:
+    hidden (not listed, contents excluded from 'All'), a display-name
+    override, and locked (requires the parental PIN to open; contents
+    excluded from 'All' while locked)."""
+
+    def __init__(self, settings, key="category_overrides"):
+        self.settings = settings
+        self.key = key
+        try:
+            self.data = json.loads(settings.value(key, "") or "{}")
+        except Exception:
+            self.data = {}
+        if not isinstance(self.data, dict):
+            self.data = {}
+
+    def _save(self):
+        self.settings.setValue(self.key, json.dumps(self.data))
+
+    def get(self, mode, cid):
+        return self.data.get(mode, {}).get(str(cid), {})
+
+    def update(self, mode, cid, **fields):
+        entry = self.data.setdefault(mode, {}).setdefault(str(cid), {})
+        entry.update(fields)
+        # drop empty entries to keep the stored JSON tidy
+        if not any(entry.values()):
+            del self.data[mode][str(cid)]
+        self._save()
+
+    def display_name(self, mode, cid, default):
+        return self.get(mode, cid).get("name") or default
+
+    def is_hidden(self, mode, cid):
+        return bool(self.get(mode, cid).get("hidden"))
+
+    def is_locked(self, mode, cid):
+        return bool(self.get(mode, cid).get("locked"))
+
+    def excluded_ids(self, mode, include_locked=True):
+        """Category ids whose contents should be excluded from 'All'."""
+        out = set()
+        for cid, entry in self.data.get(mode, {}).items():
+            if entry.get("hidden") or (include_locked and entry.get("locked")):
+                out.add(str(cid))
+        return out
 
 # ----------------------------------------------------------------------------
 #  Playlists (multiple providers/accounts)
@@ -1154,18 +1262,19 @@ QMenuBar {{
     background: #101014; color: #C9C9D2; border-bottom: 1px solid #232329;
 }}
 QMenuBar::item {{
-    background: transparent; padding: 6px 12px; margin: 0; border-radius: 6px;
+    background: transparent; padding: 4px 10px; margin: 0; border-radius: 6px;
+    font-size: 12px;
 }}
 QMenuBar::item:selected {{ background: #1D1D24; }}
 QMenuBar::item:pressed {{ background: {ACCENT}; color: white; }}
 
 QMenu {{
     background: #1D1D24; border: 1px solid #2C2C34; border-radius: 8px;
-    padding: 6px;
+    padding: 5px; font-size: 12px;
 }}
 QMenu::item {{
     background: transparent; color: #ECECF1; border-radius: 6px;
-    padding: 6px 24px 6px 12px;
+    padding: 5px 20px 5px 10px; font-size: 12px;
 }}
 QMenu::item:selected {{ background: {ACCENT}; color: white; }}
 QMenu::item:disabled {{ color: #6E6E79; }}
@@ -1190,9 +1299,15 @@ QTabBar::tab:hover:!selected {{ background: #1D1D24; }}
 
 QComboBox {{
     background: #222229; border: 1px solid #2C2C34; border-radius: 8px;
-    padding: 6px 10px;
+    padding: 5px 10px; font-size: 12px;
+    combobox-popup: 0;   /* plain dropdown sized to its items - no scrolling */
 }}
-QComboBox QAbstractItemView {{ background: #222229; selection-background-color: {ACCENT}; }}
+QComboBox QAbstractItemView {{
+    background: #222229; border: 1px solid #2C2C34; border-radius: 6px;
+    selection-background-color: {ACCENT}; selection-color: white;
+    outline: none; font-size: 12px; padding: 3px;
+}}
+QComboBox QAbstractItemView::item {{ min-height: 22px; padding: 3px 8px; }}
 QComboBox#InlineCombo {{ padding: 3px 8px; font-size: 11px; }}
 QPushButton#InlineToggle {{
     padding: 4px 12px; font-size: 11px; border-radius: 7px;
@@ -1629,6 +1744,115 @@ class EpgGuideDialog(QDialog):
         self.accept()
 
 # ----------------------------------------------------------------------------
+#  Content manager dialog (hide / rename / lock categories)
+# ----------------------------------------------------------------------------
+
+class ContentManagerDialog(QDialog):
+    def __init__(self, window, mode, categories, overrides):
+        super().__init__(window)
+        self.window = window
+        self.mode = mode
+        self.categories = categories
+        self.overrides = overrides
+        self.setWindowTitle("Manage categories")
+        self.resize(460, 520)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(18, 18, 18, 18)
+        lay.setSpacing(10)
+
+        hint = QLabel("Hidden categories disappear from the sidebar and their "
+                      "channels are left out of 'All'. Locked categories need "
+                      "the parental PIN to open.")
+        hint.setStyleSheet("color:#6E6E79; font-size:11px;")
+        hint.setWordWrap(True)
+        lay.addWidget(hint)
+
+        self.list = QListWidget()
+        lay.addWidget(self.list, 1)
+
+        btns = QHBoxLayout()
+        rename_btn = QPushButton("Rename...")
+        self.hide_btn = QPushButton("Hide")
+        self.lock_btn = QPushButton("Lock")
+        for b in (rename_btn, self.hide_btn, self.lock_btn):
+            btns.addWidget(b)
+        lay.addLayout(btns)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(self.reject)
+        buttons.accepted.connect(self.accept)
+        lay.addWidget(buttons)
+
+        rename_btn.clicked.connect(self._rename)
+        self.hide_btn.clicked.connect(self._toggle_hidden)
+        self.lock_btn.clicked.connect(self._toggle_locked)
+        self.list.currentItemChanged.connect(lambda *_: self._update_buttons())
+        self._populate()
+
+    def _selected_cid(self):
+        item = self.list.currentItem()
+        return item.data(Qt.ItemDataRole.UserRole) if item else None
+
+    def _populate(self):
+        selected = self._selected_cid()
+        self.list.clear()
+        for c in self.categories:
+            cid = c.get("category_id")
+            name = self.overrides.display_name(
+                self.mode, cid, c.get("category_name", "?"))
+            flags = []
+            if self.overrides.is_hidden(self.mode, cid):
+                flags.append("hidden")
+            if self.overrides.is_locked(self.mode, cid):
+                flags.append("locked")
+            label = name + (f"   [{', '.join(flags)}]" if flags else "")
+            item = QListWidgetItem(label)
+            item.setData(Qt.ItemDataRole.UserRole, cid)
+            self.list.addItem(item)
+            if cid == selected:
+                self.list.setCurrentItem(item)
+        self._update_buttons()
+
+    def _update_buttons(self):
+        cid = self._selected_cid()
+        hidden = cid is not None and self.overrides.is_hidden(self.mode, cid)
+        locked = cid is not None and self.overrides.is_locked(self.mode, cid)
+        self.hide_btn.setText("Unhide" if hidden else "Hide")
+        self.lock_btn.setText("Unlock" if locked else "Lock")
+
+    def _rename(self):
+        cid = self._selected_cid()
+        if cid is None:
+            return
+        current = self.overrides.display_name(
+            self.mode, cid,
+            next((c.get("category_name", "") for c in self.categories
+                  if c.get("category_id") == cid), ""))
+        name, ok = QInputDialog.getText(self, "Rename category",
+                                        "New name:", text=current)
+        if ok:
+            self.overrides.update(self.mode, cid, name=name.strip())
+            self._populate()
+
+    def _toggle_hidden(self):
+        cid = self._selected_cid()
+        if cid is None:
+            return
+        hidden = not self.overrides.is_hidden(self.mode, cid)
+        self.overrides.update(self.mode, cid, hidden=hidden)
+        self._populate()
+
+    def _toggle_locked(self):
+        cid = self._selected_cid()
+        if cid is None:
+            return
+        locked = not self.overrides.is_locked(self.mode, cid)
+        if locked and not self.window._ensure_pin_configured():
+            return
+        self.overrides.update(self.mode, cid, locked=locked)
+        self._populate()
+
+# ----------------------------------------------------------------------------
 #  Main window
 # ----------------------------------------------------------------------------
 
@@ -1648,6 +1872,10 @@ class MainWindow(QMainWindow):
             settings, f"favorites_{pid}" if pid else "favorites")
         self.history = HistoryStore(
             settings, f"history_{pid}" if pid else "history")
+        self.overrides = CategoryOverrides(
+            settings, f"category_overrides_{pid}" if pid else "category_overrides")
+        self.parental = ParentalControl(settings)
+        self._raw_categories = []          # unfiltered, for the content manager
         self.mpv = MpvIpcPlayer()
         self.mpv_window = MpvWindowPlayer() if _libmpv is not None else None
         if self.mpv_window:
@@ -2054,7 +2282,9 @@ class MainWindow(QMainWindow):
             self.cat_list.addItem(all_item)
             if self.mode == "fav":
                 for g in self.favs.group_names():
-                    it = QListWidgetItem(g)
+                    locked = (self.favs.is_locked(g)
+                              and not self.parental.session_unlocked)
+                    it = QListWidgetItem(f"{g}  [locked]" if locked else g)
                     it.setData(Qt.ItemDataRole.UserRole, g)
                     self.cat_list.addItem(it)
             self.cat_list.blockSignals(False)
@@ -2068,13 +2298,22 @@ class MainWindow(QMainWindow):
 
         def done(cats):
             self.loading_bar.hide()
+            self._raw_categories = cats or []
             self.cat_list.blockSignals(True)
             all_item = QListWidgetItem("All")
             all_item.setData(Qt.ItemDataRole.UserRole, None)
             self.cat_list.addItem(all_item)
             for c in cats:
-                it = QListWidgetItem(c.get("category_name", "?"))
-                it.setData(Qt.ItemDataRole.UserRole, c.get("category_id"))
+                cid = c.get("category_id")
+                if self.overrides.is_hidden(self.mode, cid):
+                    continue
+                name = self.overrides.display_name(
+                    self.mode, cid, c.get("category_name", "?"))
+                if (self.overrides.is_locked(self.mode, cid)
+                        and not self.parental.session_unlocked):
+                    name += "  [locked]"
+                it = QListWidgetItem(name)
+                it.setData(Qt.ItemDataRole.UserRole, cid)
                 self.cat_list.addItem(it)
             self.cat_list.blockSignals(False)
             self.cat_list.setCurrentRow(0)
@@ -2085,13 +2324,32 @@ class MainWindow(QMainWindow):
         if not cur:
             return
         cat = cur.data(Qt.ItemDataRole.UserRole)
+        # Parental gate: locked categories / locked favorite groups need the
+        # PIN before their contents load.
+        locked = False
+        if cat is not None:
+            if self.mode == "fav":
+                locked = self.favs.is_locked(cat)
+            elif self.mode in ("live", "vod", "series"):
+                locked = self.overrides.is_locked(self.mode, cat)
+        if locked and not self.parental.session_unlocked:
+            if not self._request_unlock():
+                self.cat_list.blockSignals(True)
+                self.cat_list.setCurrentRow(0)
+                self.cat_list.blockSignals(False)
+                self._load_items(None)
+                return
+            self._load_categories()   # redraw without [locked] suffixes
+            return
         self.series_ctx = None
         self.back_btn.hide()
         self._load_items(cat)
 
     def _load_items(self, category_id):
         if self.mode == "fav":
-            self.all_items = self.favs.items(category_id)
+            exclude = (() if self.parental.session_unlocked
+                       else self.favs.locked_groups())
+            self.all_items = self.favs.items(category_id, exclude_groups=exclude)
             self._apply_filter()
             return
         if self.mode == "history":
@@ -2103,10 +2361,20 @@ class MainWindow(QMainWindow):
         fn = {"live": self.client.live_streams,
               "vod": self.client.vod_streams,
               "series": self.client.series_list}[self.mode]
+        mode = self.mode
 
         def done(items):
             self.loading_bar.hide()
-            self.all_items = items or []
+            items = items or []
+            if category_id is None:
+                # 'All': leave out contents of hidden categories, and of
+                # locked ones while the session is still locked.
+                excluded = self.overrides.excluded_ids(
+                    mode, include_locked=not self.parental.session_unlocked)
+                if excluded:
+                    items = [it for it in items
+                             if str(it.get("category_id")) not in excluded]
+            self.all_items = items
             self._apply_filter()
             if self.mode == "live":
                 self._ensure_xmltv_loaded()
@@ -2661,17 +2929,110 @@ class MainWindow(QMainWindow):
         self.favs.remove(item.get("stream_id"), group)
         self._load_categories()
 
+    # -- parental control ---------------------------------------------------------
+    def _request_unlock(self):
+        """Prompts for the parental PIN. Returns True when unlocked."""
+        if self.parental.session_unlocked:
+            return True
+        if not self.parental.has_pin():
+            return True                     # nothing configured -> not locked
+        pin, ok = QInputDialog.getText(
+            self, "Parental control", "Enter PIN:",
+            QLineEdit.EchoMode.Password)
+        if not ok:
+            return False
+        if self.parental.verify(pin.strip()):
+            self.parental.session_unlocked = True
+            return True
+        QMessageBox.warning(self, "Parental control", "Wrong PIN.")
+        return False
+
+    def _ensure_pin_configured(self):
+        """Makes sure a PIN exists before something can be locked."""
+        if self.parental.has_pin():
+            return True
+        pin, ok = QInputDialog.getText(
+            self, "Parental control",
+            "No PIN is set yet. Choose a PIN to protect locked content:",
+            QLineEdit.EchoMode.Password)
+        pin = (pin or "").strip()
+        if ok and pin:
+            self.parental.set_pin(pin)
+            return True
+        return False
+
+    # -- category context menu (content manager + favorites groups) ---------------
     def _cat_menu(self, pos):
-        if self.mode != "fav":
-            return
         it = self.cat_list.itemAt(pos)
-        group = it.data(Qt.ItemDataRole.UserRole) if it else None
-        if not group:
-            return
+        data = it.data(Qt.ItemDataRole.UserRole) if it else None
         m = QMenu(self)
-        m.addAction(f'Remove group "{group}"',
-                   lambda: (self.favs.remove_group(group), self._load_categories()))
+
+        if self.mode == "fav":
+            if not data:
+                return
+            group = data
+            m.addAction(f'Remove group "{group}"',
+                       lambda: (self.favs.remove_group(group),
+                                self._load_categories()))
+            if self.favs.is_locked(group):
+                m.addAction("Unlock group (remove protection)",
+                           lambda: self._set_fav_lock(group, False))
+            else:
+                m.addAction("Lock group (parental control)",
+                           lambda: self._set_fav_lock(group, True))
+            m.exec(self.cat_list.mapToGlobal(pos))
+            return
+
+        if self.mode not in ("live", "vod", "series"):
+            return
+        if data is not None:
+            cid = data
+            m.addAction("Rename category...",
+                       lambda: self._rename_category(cid))
+            m.addAction("Hide category",
+                       lambda: self._set_category_flag(cid, hidden=True))
+            if self.overrides.is_locked(self.mode, cid):
+                m.addAction("Unlock category (remove protection)",
+                           lambda: self._set_category_flag(cid, locked=False))
+            else:
+                m.addAction("Lock category (parental control)",
+                           lambda: self._lock_category(cid))
+            m.addSeparator()
+        m.addAction("Manage categories...", self._open_content_manager)
         m.exec(self.cat_list.mapToGlobal(pos))
+
+    def _set_fav_lock(self, group, locked):
+        if locked and not self._ensure_pin_configured():
+            return
+        self.favs.set_group_locked(group, locked)
+        self._load_categories()
+
+    def _rename_category(self, cid):
+        current = self.overrides.display_name(
+            self.mode, cid,
+            next((c.get("category_name", "") for c in self._raw_categories
+                  if c.get("category_id") == cid), ""))
+        name, ok = QInputDialog.getText(self, "Rename category",
+                                        "New name:", text=current)
+        if ok:
+            self.overrides.update(self.mode, cid, name=name.strip())
+            self._load_categories()
+
+    def _set_category_flag(self, cid, **fields):
+        self.overrides.update(self.mode, cid, **fields)
+        self._load_categories()
+
+    def _lock_category(self, cid):
+        if not self._ensure_pin_configured():
+            return
+        self._set_category_flag(cid, locked=True)
+
+    def _open_content_manager(self):
+        if self.mode not in ("live", "vod", "series"):
+            return
+        ContentManagerDialog(self, self.mode, self._raw_categories,
+                             self.overrides).exec()
+        self._load_categories()
 
     # -- history -----------------------------------------------------------------
     def _remove_history(self, item):
@@ -2830,6 +3191,67 @@ class MainWindow(QMainWindow):
             pl_btns.addWidget(b)
         pv.addLayout(pl_btns)
         tabs.addTab(pl_tab, "Playlists")
+
+        # ---- Parental tab ----
+        par_tab = QWidget()
+        parv = QVBoxLayout(par_tab)
+        parv.setSpacing(10)
+        pin_status = QLabel()
+        parv.addWidget(pin_status)
+        set_pin_btn = QPushButton("Set / change PIN...")
+        remove_pin_btn = QPushButton("Remove PIN")
+        lock_now_btn = QPushButton("Lock now")
+        parv.addWidget(set_pin_btn)
+        parv.addWidget(remove_pin_btn)
+        parv.addWidget(lock_now_btn)
+        par_hint = QLabel("Lock favorite groups (right-click a group under "
+                          "Favorites) or whole categories (right-click a "
+                          "category in TV/Movies/Series). Locked content is "
+                          "hidden - including from 'All' - until the PIN is "
+                          "entered.")
+        par_hint.setStyleSheet("color:#6E6E79; font-size:11px;")
+        par_hint.setWordWrap(True)
+        parv.addWidget(par_hint)
+        parv.addStretch()
+        tabs.addTab(par_tab, "Parental")
+
+        def refresh_pin_status():
+            if self.parental.has_pin():
+                state = ("unlocked for this session"
+                         if self.parental.session_unlocked else "locked")
+                pin_status.setText(f"PIN is set - currently {state}.")
+            else:
+                pin_status.setText("No PIN set.")
+            remove_pin_btn.setEnabled(self.parental.has_pin())
+            lock_now_btn.setEnabled(self.parental.has_pin()
+                                    and self.parental.session_unlocked)
+
+        def set_pin():
+            if self.parental.has_pin() and not self._request_unlock():
+                return
+            pin, ok = QInputDialog.getText(
+                d, "Parental control", "New PIN:", QLineEdit.EchoMode.Password)
+            pin = (pin or "").strip()
+            if ok and pin:
+                self.parental.set_pin(pin)
+            refresh_pin_status()
+
+        def remove_pin():
+            if not self._request_unlock():
+                return
+            self.parental.clear_pin()
+            refresh_pin_status()
+            self._load_categories()
+
+        def lock_now():
+            self.parental.lock_session()
+            refresh_pin_status()
+            self._load_categories()
+
+        set_pin_btn.clicked.connect(set_pin)
+        remove_pin_btn.clicked.connect(remove_pin)
+        lock_now_btn.clicked.connect(lock_now)
+        refresh_pin_status()
 
         store = self.playlist_store
 
