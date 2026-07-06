@@ -13,9 +13,16 @@ An elegant IPTV client for Linux and macOS with a macOS-inspired dark interface,
 - Refresh the EPG with one click — it also refreshes automatically when the current program ends
 - Movie and series details in the detail panel: plot, genre, cast, director, release date, and rating
 - Favorites: save channels into your own groups, browse them under Favorites, remove channels or whole groups via right-click
-- History: every played channel/movie/episode is recorded with a resolved playback URL; browse, replay, remove individual entries, or clear everything
+- History: every played channel/movie/episode is recorded with a resolved playback URL; browse, replay, remove entries (with full **multi-select**: Ctrl/Shift-click, Ctrl+A, rubber-band drag, then right-click → remove or press Delete), or clear everything
 - A visible loading bar while categories/content are being fetched
 - **Embedded in-app video** (Linux and macOS): with `python-mpv` + libmpv installed, channels play directly inside the app's detail panel, rendered via libmpv's OpenGL render API — no window embedding involved, so it works the same regardless of desktop/compositor (GNOME, KDE, Hyprland, ...) and is the default whenever available. Double-click the video or press `F` for fullscreen, `Esc` to leave it. Selecting a new channel switches the stream in place — perfect for zapping through favorites.
+- **Player controls**: pause/resume plus −10s / +30s skip buttons for seekable content (movies, series, catch-up), in both the mini player bar and the fullscreen floating controls
+- **In-player options menu** (the ⚙ button): pick the audio track (language) and subtitle track, adjust audio delay, force an aspect ratio (16:9, 4:3, stretch, ...), and set the network buffer/cache size — applied live and remembered
+- Fullscreen niceties: an **"Exit fullscreen" button** right in the floating controls (no need to know about `Esc`), the mouse cursor auto-hides with the controls, and leaving fullscreen returns the channel list to the playing channel instead of jumping to the top
+- The window title shows what's currently playing, and the **playing channel is highlighted** in the list with an accent bar and colored name
+- **"Play in VLC" is always a one-off external launch** — it never changes the default player, so the embedded mini player keeps working right after
+- **Edit your channel list**: right-click any channel/movie/series to rename or hide it (persisted per playlist — effectively your own edited playlist), and "Restore default channels..." undoes it all back to exactly what the provider sends. Right-clicking never switches the playing channel — only left-click selects
+- Stream errors are shown in red in the status bar and cleared automatically as soon as something else plays
 - mpv playback can also reuse a single external window instead: selecting a new channel loads it into the same mpv instance rather than opening a new one. With `python-mpv` installed, Ctrl+Right / Ctrl+Left zap to the next/previous channel **even while that mpv window has keyboard focus** — mpv itself intercepts the keys and calls back into the app, since Qt shortcuts alone only fire while the dopeIPTV window is focused. That window's own fullscreen (`f`) and quit (`q`) keys work normally, and the app's `F` shortcut also toggles its fullscreen. VLC and "open externally" still spawn a normal one-off process/window. Pick the mode under Settings → "Playback (mpv)".
 - Channel logos loaded asynchronously and cached
 - Proper application name and icon in the taskbar (instead of "python3"), an app menu with **About** in GNOME's top bar, and a version number
@@ -24,7 +31,7 @@ An elegant IPTV client for Linux and macOS with a macOS-inspired dark interface,
 - Three list sizes (compact / medium / large icons)
 - Settings organized into tabs (Playback / Interface / Playlists)
 - **Multiple playlists**: save several Xtream providers/accounts, switch between them at runtime (favorites and history are kept per playlist), edit them, give each an optional **custom TV guide (XMLTV) URL** that overrides the provider's own, and pick an **auto-refresh** cadence per playlist (never / at startup / every 2, 6, 12 hours / daily / weekly)
-- Inline view controls right under the channel list: list size, sort order, and a grid toggle that lays large icons out horizontally
+- Inline view controls right under the channel list: list size, sort order, and a grid toggle that lays large icons out horizontally — with smooth, fast per-pixel wheel scrolling in grid mode
 - **Content manager**: right-click any category (or "Manage categories...") to hide it, rename it, or lock it — hidden/locked categories' channels are also left out of "All"
 - **Parental control**: a salted+hashed PIN protects locked categories and locked favorite groups; locked favorite groups don't reveal which channels they contain until the PIN is entered. Locking something locks it immediately; unlocks last for the session, with a "Lock now" button in Settings → Parental
 - **Chromecast**: right-click any channel/movie/episode → "Cast to Chromecast..." to scan the network and cast to a device (live streams are cast as HLS). Needs `pip install pychromecast`
@@ -85,8 +92,11 @@ The application icon is installed automatically to `~/.local/share/icons` the fi
 | Action | How |
 |---|---|
 | Play | Double-click, or the "Play in mpv / VLC" buttons |
-| Fullscreen | Double-click the embedded video, or press `F` — `Esc` to exit (also toggles fullscreen on the reused mpv window) |
+| Pause / skip | ⏸ and −10s / +30s in the player bar (skips appear for seekable content) |
+| Audio track / subtitles / aspect / buffer / audio delay | The ⚙ button in the player bar (also in fullscreen) |
+| Fullscreen | Double-click the embedded video, or press `F` — `Esc` or the "Exit fullscreen" button to leave (also toggles fullscreen on the reused mpv window) |
 | Zap to next/previous channel | Ctrl+Right / Ctrl+Left |
+| Rename / hide a channel | Right-click it (restore with "Restore default channels...") |
 | Change list size / sort / grid | The Size, Sort and Grid controls above the list — no need to open Settings |
 | Switch player temporarily | Right-click a row |
 | Open a series | Double-click the series → episode list appears |
@@ -95,7 +105,7 @@ The application icon is installed automatically to `~/.local/share/icons` the fi
 | Browse the full TV guide | "EPG Guide" button in the sidebar |
 | Add a favorite | Right-click a channel → "Add to favorites group" |
 | Remove a favorite / group | In Favorites: right-click the channel or the group |
-| Remove / clear history | In History: right-click an entry, or "Clear history" |
+| Remove / clear history | In History: select one or many (Ctrl/Shift-click, Ctrl+A, drag), then right-click or press Delete — or "Clear history" |
 | Switch account | Settings → "Switch account / server" |
 
 ## Troubleshooting

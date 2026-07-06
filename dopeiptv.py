@@ -49,7 +49,7 @@ from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 
 APP_NAME = "dopeIPTV"
 ORG = "dopeiptv"
-VERSION = "0.0.2-alpha"
+VERSION = "0.1.0-beta.1"
 
 # Optional embedded playback via libmpv (python-mpv). Imported lazily so the
 # app still runs fine without it - playback then falls back to the reused
@@ -643,6 +643,49 @@ class CategoryOverrides:
             if entry.get("hidden") or (include_locked and entry.get("locked")):
                 out.add(str(cid))
         return out
+
+
+class ChannelOverrides:
+    """Per-playlist channel customizations: rename or hide individual
+    channels/movies/series. This effectively becomes the user's own edited
+    playlist while 'Restore default channels' brings back exactly what the
+    provider sends."""
+
+    def __init__(self, settings, key="channel_overrides"):
+        self.settings = settings
+        self.key = key
+        try:
+            self.data = json.loads(settings.value(key, "") or "{}")
+        except Exception:
+            self.data = {}
+        if not isinstance(self.data, dict):
+            self.data = {}
+
+    def _save(self):
+        self.settings.setValue(self.key, json.dumps(self.data))
+
+    def get(self, mode, key):
+        return self.data.get(mode, {}).get(str(key), {})
+
+    def update(self, mode, key, **fields):
+        entry = self.data.setdefault(mode, {}).setdefault(str(key), {})
+        entry.update(fields)
+        if not any(entry.values()):
+            del self.data[mode][str(key)]
+        self._save()
+
+    def display_name(self, mode, key, default):
+        return self.get(mode, key).get("name") or default
+
+    def is_hidden(self, mode, key):
+        return bool(self.get(mode, key).get("hidden"))
+
+    def has_overrides(self, mode):
+        return bool(self.data.get(mode))
+
+    def reset_mode(self, mode):
+        self.data.pop(mode, None)
+        self._save()
 
 # ----------------------------------------------------------------------------
 #  Playlists (multiple providers/accounts)
@@ -1333,11 +1376,13 @@ class EmbeddedPlayer(QWidget):
     double_clicked = pyqtSignal()
     playback_error = pyqtSignal(str)
     zap = pyqtSignal(int)             # -1 previous / +1 next channel
+    exit_fullscreen = pyqtSignal()    # the in-video "minimize" button
 
     OVERLAY_HIDE_MS = 3000
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, settings=None):
         super().__init__(parent)
+        self._settings = settings
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(6)
@@ -1358,20 +1403,39 @@ class EmbeddedPlayer(QWidget):
         self.next_btn = QPushButton("▶", objectName="MiniBtn")
         self.next_btn.setToolTip("Next channel (Ctrl+Right)")
         self.next_btn.clicked.connect(lambda: self.zap.emit(1))
+        self.pause_btn = QPushButton("⏸", objectName="MiniBtn")
+        self.pause_btn.setToolTip("Pause / resume")
+        self.pause_btn.clicked.connect(self.toggle_pause)
+        self.back_btn = QPushButton("-10s", objectName="MiniBtn")
+        self.back_btn.setToolTip("Back 10 seconds")
+        self.back_btn.clicked.connect(lambda: self._relative_seek(-10))
+        self.back_btn.hide()
+        self.fwd_btn = QPushButton("+30s", objectName="MiniBtn")
+        self.fwd_btn.setToolTip("Forward 30 seconds")
+        self.fwd_btn.clicked.connect(lambda: self._relative_seek(30))
+        self.fwd_btn.hide()
         self.title_lbl = QLabel("", objectName="DetailMeta")
         self.seek = _SeekSlider()
         self.seek.seek_requested.connect(self._do_seek)
         self.seek.hide()
         self.time_lbl = QLabel("", objectName="DetailMeta")
         self.time_lbl.hide()
+        self.opts_btn = QPushButton("⚙", objectName="MiniBtn")
+        self.opts_btn.setToolTip("Audio / subtitles / aspect / buffer")
+        self.opts_btn.clicked.connect(
+            lambda: self._show_options_menu(self.opts_btn))
         self.stop_btn = QPushButton("Stop", objectName="MiniBtn")
         self.stop_btn.clicked.connect(self.stop)
         self.fs_btn = QPushButton("Fullscreen", objectName="MiniBtn")
         bl.addWidget(self.prev_btn)
         bl.addWidget(self.next_btn)
+        bl.addWidget(self.pause_btn)
+        bl.addWidget(self.back_btn)
+        bl.addWidget(self.fwd_btn)
         bl.addWidget(self.title_lbl, 1)
         bl.addWidget(self.seek, 2)
         bl.addWidget(self.time_lbl)
+        bl.addWidget(self.opts_btn)
         bl.addWidget(self.stop_btn)
         bl.addWidget(self.fs_btn)
         lay.addWidget(self.bar)
@@ -1398,18 +1462,41 @@ class EmbeddedPlayer(QWidget):
         self.fs_next_btn = QPushButton("▶", objectName="MiniBtn")
         self.fs_next_btn.setToolTip("Next channel (Right)")
         self.fs_next_btn.clicked.connect(lambda: self.zap.emit(1))
+        self.fs_pause_btn = QPushButton("⏸", objectName="MiniBtn")
+        self.fs_pause_btn.setToolTip("Pause / resume")
+        self.fs_pause_btn.clicked.connect(self.toggle_pause)
+        self.fs_back_btn = QPushButton("-10s", objectName="MiniBtn")
+        self.fs_back_btn.clicked.connect(lambda: self._relative_seek(-10))
+        self.fs_back_btn.hide()
+        self.fs_fwd_btn = QPushButton("+30s", objectName="MiniBtn")
+        self.fs_fwd_btn.clicked.connect(lambda: self._relative_seek(30))
+        self.fs_fwd_btn.hide()
         self.fs_seek = _SeekSlider()
         self.fs_seek.seek_requested.connect(self._do_seek)
         self.fs_seek.hide()
         self.fs_time_lbl = QLabel("", objectName="DetailMeta")
         self.fs_time_lbl.hide()
+        self.fs_opts_btn = QPushButton("⚙", objectName="MiniBtn")
+        self.fs_opts_btn.setToolTip("Audio / subtitles / aspect / buffer")
+        self.fs_opts_btn.clicked.connect(
+            lambda: self._show_options_menu(self.fs_opts_btn))
+        self.fs_exit_btn = QPushButton("Exit fullscreen", objectName="MiniBtn")
+        self.fs_exit_btn.setToolTip("Back to the mini player (Esc)")
+        self.fs_exit_btn.clicked.connect(self.exit_fullscreen.emit)
         fc.addWidget(self.fs_prev_btn)
         fc.addWidget(self.fs_next_btn)
+        fc.addWidget(self.fs_pause_btn)
+        fc.addWidget(self.fs_back_btn)
+        fc.addWidget(self.fs_fwd_btn)
         fc.addWidget(self.fs_seek, 1)
         fc.addWidget(self.fs_time_lbl)
+        fc.addWidget(self.fs_opts_btn)
+        fc.addWidget(self.fs_exit_btn)
         self.fs_controls.hide()
         for wdg in (self.fs_controls, self.fs_prev_btn, self.fs_next_btn,
-                    self.fs_seek, self.fs_time_lbl):
+                    self.fs_pause_btn, self.fs_back_btn, self.fs_fwd_btn,
+                    self.fs_seek, self.fs_time_lbl, self.fs_opts_btn,
+                    self.fs_exit_btn):
             wdg.setMouseTracking(True)
             wdg.installEventFilter(self)
 
@@ -1454,12 +1541,17 @@ class EmbeddedPlayer(QWidget):
         else:
             self._hide_fs_ui()
             self._overlay_timer.stop()
+            self.video.unsetCursor()
 
     def _hide_fs_ui(self):
         self.overlay.hide()
         self.fs_controls.hide()
+        if self._fs_ui:
+            # inactivity in fullscreen also hides the mouse cursor
+            self.video.setCursor(Qt.CursorShape.BlankCursor)
 
     def _show_overlay(self):
+        self.video.unsetCursor()
         if self._overlay_text:
             self.overlay.setText(self._overlay_text)
             self.overlay.show()
@@ -1508,6 +1600,16 @@ class EmbeddedPlayer(QWidget):
                 m["force-media-title"] = title or "dopeIPTV"
             except Exception:
                 pass
+            try:
+                m["cache"] = "yes"
+                m["cache-secs"] = float(self._cache_secs())
+            except Exception:
+                pass
+            self._sync_pause_label(False)
+            try:
+                m.pause = False           # a new channel always starts playing
+            except Exception:
+                pass
             m.play(url)
             self._pos_timer.start()
             return True
@@ -1517,8 +1619,13 @@ class EmbeddedPlayer(QWidget):
             return False
 
     # -- seeking (movies/series/catch-up; live streams aren't seekable) -------
+    def _seek_widgets(self):
+        return (self.seek, self.time_lbl, self.back_btn, self.fwd_btn,
+                self.fs_seek, self.fs_time_lbl, self.fs_back_btn,
+                self.fs_fwd_btn)
+
     def _hide_seek_ui(self):
-        for wdg in (self.seek, self.time_lbl, self.fs_seek, self.fs_time_lbl):
+        for wdg in self._seek_widgets():
             wdg.hide()
 
     def _do_seek(self, seconds):
@@ -1530,6 +1637,122 @@ class EmbeddedPlayer(QWidget):
         except Exception:
             pass
 
+    def _relative_seek(self, seconds):
+        m = self.video.mpv
+        if m is None:
+            return
+        try:
+            m.command("seek", seconds)
+        except Exception:
+            pass
+
+    def toggle_pause(self):
+        m = self.video.mpv
+        if m is None:
+            return
+        try:
+            m.pause = not m.pause
+            self._sync_pause_label(m.pause)
+        except Exception:
+            pass
+
+    def _sync_pause_label(self, paused):
+        label = "▶" if paused else "⏸"
+        self.pause_btn.setText(label)
+        self.fs_pause_btn.setText(label)
+
+    def _show_options_menu(self, anchor):
+        """Audio track / subtitles / audio delay / aspect ratio / buffer."""
+        m = self.video.mpv
+        menu = QMenu(self)
+
+        def tracks(kind):
+            try:
+                return [t for t in (m.track_list or []) if t.get("type") == kind]
+            except Exception:
+                return []
+
+        def track_label(t):
+            parts = [t.get("lang") or "", t.get("title") or ""]
+            label = " ".join(p for p in parts if p).strip()
+            return label or f"Track {t.get('id')}"
+
+        audio = menu.addMenu("Audio track")
+        for t in (tracks("audio") if m else []):
+            act = audio.addAction(track_label(t))
+            act.setCheckable(True)
+            act.setChecked(bool(t.get("selected")))
+            act.triggered.connect(
+                lambda _c, tid=t.get("id"): self._set_mpv("aid", tid))
+        if audio.isEmpty():
+            audio.addAction("(no audio tracks)").setEnabled(False)
+
+        subs = menu.addMenu("Subtitles")
+        off = subs.addAction("Off")
+        off.setCheckable(True)
+        sub_tracks = tracks("sub") if m else []
+        off.setChecked(not any(t.get("selected") for t in sub_tracks))
+        off.triggered.connect(lambda _c: self._set_mpv("sid", "no"))
+        for t in sub_tracks:
+            act = subs.addAction(track_label(t))
+            act.setCheckable(True)
+            act.setChecked(bool(t.get("selected")))
+            act.triggered.connect(
+                lambda _c, tid=t.get("id"): self._set_mpv("sid", tid))
+
+        delay = menu.addMenu("Audio delay")
+        current_delay = 0.0
+        try:
+            current_delay = float(m["audio-delay"]) if m else 0.0
+        except Exception:
+            pass
+        for val in (-1.0, -0.5, -0.25, 0.0, 0.25, 0.5, 1.0):
+            act = delay.addAction(f"{val:+.2f} s" if val else "0 s (default)")
+            act.setCheckable(True)
+            act.setChecked(abs(current_delay - val) < 0.01)
+            act.triggered.connect(
+                lambda _c, v=val: self._set_mpv("audio-delay", v))
+
+        aspect = menu.addMenu("Aspect ratio")
+        for label, val in (("Auto", "-1"), ("16:9", "16:9"),
+                           ("4:3", "4:3"), ("2.35:1", "2.35:1")):
+            act = aspect.addAction(label)
+            act.triggered.connect(
+                lambda _c, v=val: self._set_mpv("video-aspect-override", v))
+        stretch = aspect.addAction("Stretch to window")
+        stretch.triggered.connect(lambda _c: self._set_mpv("keepaspect", False))
+
+        buf = menu.addMenu("Network buffer")
+        current_buf = self._cache_secs()
+        for secs in (1, 3, 5, 10, 30):
+            act = buf.addAction(f"{secs} s")
+            act.setCheckable(True)
+            act.setChecked(secs == current_buf)
+            act.triggered.connect(lambda _c, s=secs: self._set_cache_secs(s))
+
+        menu.exec(anchor.mapToGlobal(anchor.rect().bottomLeft()))
+
+    def _set_mpv(self, prop, value):
+        m = self.video.mpv
+        if m is None:
+            return
+        try:
+            m[prop] = value
+        except Exception as e:
+            print(f"[dopeIPTV] set {prop}={value} failed: {e}", file=sys.stderr)
+
+    def _cache_secs(self):
+        try:
+            return int(self._settings.value("cache_secs", 10)) \
+                if self._settings else 10
+        except (TypeError, ValueError):
+            return 10
+
+    def _set_cache_secs(self, secs):
+        if self._settings:
+            self._settings.setValue("cache_secs", str(secs))
+        self._set_mpv("cache-secs", float(secs))
+
     def _poll_position(self):
         m = self.video.mpv
         if m is None:
@@ -1537,21 +1760,26 @@ class EmbeddedPlayer(QWidget):
         try:
             dur = m.duration
             pos = m.playback_time
+            paused = bool(m.pause)
         except Exception:
             return
+        self._sync_pause_label(paused)
         seekable = bool(dur) and dur > 1
-        pairs = ((self.seek, self.time_lbl), (self.fs_seek, self.fs_time_lbl))
         if not seekable:
             self._hide_seek_ui()
             return
         text = f"{_format_time(pos)} / {_format_time(dur)}"
-        for slider, label in pairs:
+        for slider, label in ((self.seek, self.time_lbl),
+                              (self.fs_seek, self.fs_time_lbl)):
             label.setText(text)
             slider.setVisible(True)
             label.setVisible(True)
             if not slider.dragging:
                 slider.setMaximum(int(dur))
                 slider.setValue(int(pos or 0))
+        for btn in (self.back_btn, self.fwd_btn,
+                    self.fs_back_btn, self.fs_fwd_btn):
+            btn.setVisible(True)
 
     def stop(self):
         if self.video.mpv:
@@ -1957,7 +2185,7 @@ class ChannelDelegate(QStyledItemDelegate):
             painter.setBrush(QColor("#1D1D24"))
             painter.drawRoundedRect(inner, 12, 12)
 
-        name = it.get("name") or it.get("title") or "?"
+        name = self.window.channel_display_name(it)
         logo_x = rect.left() + (rect.width() - logo_sz) // 2
         logo_y = rect.top() + 12
         logo_rect = QRect(logo_x, logo_y, logo_sz, logo_sz)
@@ -2003,12 +2231,20 @@ class ChannelDelegate(QStyledItemDelegate):
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
+        playing = (kind in ("live", "fav")
+                   and self.window._playing_key is not None
+                   and self.window._item_key(it) == self.window._playing_key)
+
         if option.state & QStyle.StateFlag.State_Selected:
             painter.fillRect(rect, QColor("#26262E"))
         elif option.state & QStyle.StateFlag.State_MouseOver:
             painter.fillRect(rect, QColor("#1D1D24"))
+        if playing:
+            # accent bar on the left edge marks the channel that's playing
+            painter.fillRect(QRect(rect.left(), rect.top() + 4, 3,
+                                   rect.height() - 8), QColor(ACCENT))
 
-        name = it.get("name") or it.get("title") or "?"
+        name = self.window.channel_display_name(it)
         logo_rect = QRect(rect.left() + 10,
                           rect.top() + (rect.height() - logo_sz) // 2,
                           logo_sz, logo_sz)
@@ -2063,7 +2299,7 @@ class ChannelDelegate(QStyledItemDelegate):
         block_h = name_h + sub_h + bar_h
         y = rect.top() + (rect.height() - block_h) // 2
 
-        painter.setPen(QColor("#ECECF1"))
+        painter.setPen(QColor(ACCENT) if playing else QColor("#ECECF1"))
         fname = QFont()
         fname.setPointSize(self.name_pt)
         fname.setBold(True)
@@ -2297,6 +2533,8 @@ class MainWindow(QMainWindow):
             settings, f"history_{pid}" if pid else "history")
         self.overrides = CategoryOverrides(
             settings, f"category_overrides_{pid}" if pid else "category_overrides")
+        self.channel_ov = ChannelOverrides(
+            settings, f"channel_overrides_{pid}" if pid else "channel_overrides")
         self.parental = ParentalControl(settings)
         self.cast = ChromecastManager()
         self._raw_categories = []          # unfiltered, for the content manager
@@ -2318,11 +2556,15 @@ class MainWindow(QMainWindow):
         self.series_ctx = None             # selected series when browsing episodes
         self._info_cache = {}               # (kind, id) -> info dict
         self._current_key = None            # identity of the selected row
+        self._playing_key = None            # identity of the playing item
         self._last_player = None
         self._last_playlist_refresh = time.time()
 
-        self.setWindowTitle(
-            f"{APP_NAME} - {active_pl['name']}" if active_pl else APP_NAME)
+        # Qt appends the application display name ("... - dopeIPTV") itself,
+        # so the window title is just the context: the playlist name, or the
+        # playing channel while something plays.
+        self._base_title = (active_pl or {}).get("name", "")
+        self.setWindowTitle(self._base_title)
         self.resize(1240, 780)
         self._build_ui()
         self._load_categories()
@@ -2481,10 +2723,11 @@ class MainWindow(QMainWindow):
 
         self.player = None
         if embedded_playback_supported():
-            self.player = EmbeddedPlayer()
+            self.player = EmbeddedPlayer(settings=self.settings)
             self.player.hide()
             self.player.fs_btn.clicked.connect(self._toggle_player_fullscreen)
             self.player.double_clicked.connect(self._toggle_player_fullscreen)
+            self.player.exit_fullscreen.connect(self._exit_player_fullscreen)
             self.player.playback_error.connect(self._playback_error)
             self.player.zap.connect(self._zap)
             self.player.stop_btn.clicked.connect(self.player.hide)
@@ -2574,6 +2817,8 @@ class MainWindow(QMainWindow):
                   activated=self._exit_player_fullscreen)
         QShortcut(QKeySequence(Qt.Key.Key_F), self,
                   activated=self._toggle_fullscreen_shortcut)
+        QShortcut(QKeySequence(Qt.Key.Key_Delete), self,
+                  activated=self._delete_pressed)
 
         # Apply the saved list/grid view mode before any content loads.
         self._apply_view_settings()
@@ -2590,10 +2835,19 @@ class MainWindow(QMainWindow):
     def _toggle_player_fullscreen(self):
         if not self.player or not self.player.isVisible():
             return
+        # A double-click on the Fullscreen button fires two toggles back to
+        # back; on Wayland the enter/exit then race the compositor and the
+        # window can end up fullscreen with no player-fullscreen state left
+        # to exit from. Debounce, and let Esc rescue any stray state (below).
+        now = time.time()
+        if now - getattr(self, "_fs_toggled_at", 0.0) < 0.4:
+            return
+        self._fs_toggled_at = now
         if self._player_fs:
             self._exit_player_fullscreen()
             return
         self._player_fs = True
+        self._fs_return_index = self.listw.currentIndex()
         # No reparenting (that would tear down the GL context mpv renders
         # into) - instead hide everything around the video and fullscreen
         # the main window so the player pane stretches to fill it.
@@ -2624,6 +2878,11 @@ class MainWindow(QMainWindow):
 
     def _exit_player_fullscreen(self):
         if not self._player_fs:
+            # Rescue hatch: if the window itself got stuck fullscreen (e.g.
+            # a double-clicked toggle raced the compositor), Esc still
+            # restores a normal window.
+            if self.isFullScreen():
+                self.showNormal()
             return
         self._player_fs = False
         self._side.show()
@@ -2640,6 +2899,14 @@ class MainWindow(QMainWindow):
         self.player.set_fullscreen_ui(False)
         if not getattr(self, "_was_fullscreen", False):
             self.showNormal()
+        # Coming back from fullscreen must land on the playing channel, not
+        # at the top of the list.
+        idx = getattr(self, "_fs_return_index", None)
+        if idx is not None and idx.isValid():
+            QTimer.singleShot(0, lambda: (
+                self.listw.setCurrentIndex(idx),
+                self.listw.scrollTo(
+                    idx, QAbstractItemView.ScrollHint.PositionAtCenter)))
 
     # -- playlists ---------------------------------------------------------------
     REFRESH_SECONDS = {"2h": 2 * 3600, "6h": 6 * 3600, "12h": 12 * 3600,
@@ -2672,7 +2939,7 @@ class MainWindow(QMainWindow):
         if not pl:
             return
         self.loading_bar.show()
-        self.count_lbl.setText(f"Connecting to {pl['name']}...")
+        self._set_status(f"Connecting to {pl['name']}...")
         candidate = XtreamClient(pl["server"], pl["username"], pl["password"])
 
         def done(_auth):
@@ -2681,12 +2948,13 @@ class MainWindow(QMainWindow):
             self.client = candidate
             self.favs = FavoriteStore(self.settings, f"favorites_{pid}")
             self.history = HistoryStore(self.settings, f"history_{pid}")
-            self.setWindowTitle(f"{APP_NAME} - {pl['name']}")
+            self._base_title = pl["name"]
+            self.setWindowTitle(self._base_title)
             self.refresh_playlist()
 
         def fail(msg):
             self.loading_bar.hide()
-            self.count_lbl.setText("")
+            self._set_status("")
             QMessageBox.warning(self, "Playlist",
                                 f"Could not connect to {pl['name']}: {msg}")
 
@@ -2700,6 +2968,12 @@ class MainWindow(QMainWindow):
         self.series_ctx = None
         self.back_btn.hide()
         self.clear_history_btn.setVisible(mode == "history")
+        # History supports multi-select (Ctrl/Shift-click, Ctrl+A, rubber
+        # band) so several entries can be removed at once.
+        self.listw.setSelectionMode(
+            QAbstractItemView.SelectionMode.ExtendedSelection
+            if mode == "history"
+            else QAbstractItemView.SelectionMode.SingleSelection)
         self.search.clear()
         self._load_categories()
 
@@ -2722,7 +2996,7 @@ class MainWindow(QMainWindow):
             self.cat_list.setCurrentRow(0)
             return
         self.loading_bar.show()
-        self.count_lbl.setText("Loading categories...")
+        self._set_status("Loading categories...")
         fn = {"live": self.client.live_categories,
               "vod": self.client.vod_categories,
               "series": self.client.series_categories}[self.mode]
@@ -2791,7 +3065,7 @@ class MainWindow(QMainWindow):
             self._apply_filter()
             return
         self.loading_bar.show()
-        self.count_lbl.setText("Loading content...")
+        self._set_status("Loading content...")
         fn = {"live": self.client.live_streams,
               "vod": self.client.vod_streams,
               "series": self.client.series_list}[self.mode]
@@ -2851,21 +3125,43 @@ class MainWindow(QMainWindow):
             return sorted(items, key=added, reverse=True)
         return items
 
+    def channel_display_name(self, it):
+        """The channel's name with any user rename applied."""
+        base = it.get("name") or it.get("title") or "?"
+        mode = "episode" if self.series_ctx else self.mode
+        if mode in ("live", "vod", "series", "fav"):
+            key = self._item_key(it)
+            if key is not None:
+                ov_mode = "live" if mode == "fav" else mode
+                return self.channel_ov.display_name(ov_mode, key, base)
+        return base
+
+    def _channel_hidden(self, it, kind):
+        if kind not in ("live", "vod", "series", "fav"):
+            return False
+        key = self._item_key(it)
+        if key is None:
+            return False
+        ov_mode = "live" if kind == "fav" else kind
+        return self.channel_ov.is_hidden(ov_mode, key)
+
     def _apply_filter(self):
         text = self.search.text().lower().strip()
         kind = "episode" if self.series_ctx else self.mode
+        items = [it for it in self.all_items
+                 if not self._channel_hidden(it, kind)]
         if text:
-            filtered = [it for it in self.all_items
-                       if text in (it.get("name") or it.get("title") or "").lower()]
+            filtered = [it for it in items
+                        if text in self.channel_display_name(it).lower()]
         else:
-            filtered = list(self.all_items)
+            filtered = items
         filtered = self._sorted(filtered)
         self.list_model.set_items(filtered, kind)
-        self.count_lbl.setText(f"{len(filtered)} {self.LABELS[kind]}")
+        self._set_status(f"{len(filtered)} {self.LABELS[kind]}")
         if kind == "fav" and not self.all_items:
-            self.count_lbl.setText("No favorites yet - right-click a channel in TV to add one.")
+            self._set_status("No favorites yet - right-click a channel in TV to add one.")
         elif kind == "history" and not self.all_items:
-            self.count_lbl.setText("No watch history yet.")
+            self._set_status("No watch history yet.")
 
     # -- item identity -----------------------------------------------------------
     @staticmethod
@@ -2896,9 +3192,10 @@ class MainWindow(QMainWindow):
             self.d_logo.setPixmap(QPixmap())
             self.d_logo.setText("")
             return
-        name = it.get("name") or it.get("title") or "?"
+        name = self.channel_display_name(it)
         self.d_title.setText(name)
         self.d_logo.setPixmap(QPixmap())
+        self.d_logo.setStyleSheet(self.PLACEHOLDER_LOGO_STYLE)
         self.d_logo.setText(name.strip()[:1].upper())
         url = it.get("stream_icon") or it.get("cover")
         if url:
@@ -2939,20 +3236,24 @@ class MainWindow(QMainWindow):
             if it.get("series_id") is not None:
                 self._request_media_info("series", it["series_id"], self._current_key)
 
+    PLACEHOLDER_LOGO_STYLE = ("background:#26262E; border-radius:18px; "
+                              "font-size:30px; font-weight:700;")
+
     def _set_detail_logo(self, pm):
-        rounded = QPixmap(84, 84)
-        rounded.fill(Qt.GlobalColor.transparent)
-        p = QPainter(rounded)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        path = QPainterPath()
-        path.addRoundedRect(0, 0, 84, 84, 18, 18)
-        p.setClipPath(path)
+        # No clipping box: draw the logo keep-aspect on a fully transparent
+        # tile and drop the grey placeholder background, so wide/transparent
+        # logos aren't cropped by an ugly frame.
+        tile = QPixmap(84, 84)
+        tile.fill(Qt.GlobalColor.transparent)
+        p = QPainter(tile)
+        p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         s = pm.scaled(84, 84, Qt.AspectRatioMode.KeepAspectRatio,
                       Qt.TransformationMode.SmoothTransformation)
         p.drawPixmap((84 - s.width()) // 2, (84 - s.height()) // 2, s)
         p.end()
+        self.d_logo.setStyleSheet("background:transparent;")
         self.d_logo.setText("")
-        self.d_logo.setPixmap(rounded)
+        self.d_logo.setPixmap(tile)
 
     def _clear_epg_rows(self):
         while self.epg_lay.count() > 1:
@@ -3135,7 +3436,7 @@ class MainWindow(QMainWindow):
         if sid is None:
             return
         self.loading_bar.show()
-        self.count_lbl.setText("Loading episodes...")
+        self._set_status("Loading episodes...")
 
         def done(info):
             self.loading_bar.hide()
@@ -3184,6 +3485,12 @@ class MainWindow(QMainWindow):
 
     def play(self, player=None, external=False):
         it = self.list_model.item_at(self.listw.currentIndex().row())
+        self.play_item(it, player, external)
+
+    def play_item(self, it, player=None, external=False):
+        """Plays a specific item. 'Play in VLC' is always a one-off external
+        launch - it must never change the default player or take the
+        embedded mini player out of action for subsequent plays."""
         if not it:
             return
         if self.mode == "series" and not self.series_ctx:
@@ -3199,12 +3506,8 @@ class MainWindow(QMainWindow):
         if not url:
             return
 
-        if player:
-            self.settings.setValue("player", player)
-
-        if external:
-            chosen = player or self.settings.value("player", "mpv")
-            launch_player(chosen, url, title, self)
+        if external or player == "vlc":
+            launch_player(player or "mpv", url, title, self)
             if self.mode != "history":
                 self.history.add(url, title, icon, key, kind)
             return
@@ -3260,6 +3563,10 @@ class MainWindow(QMainWindow):
         if not url:
             return
         self.stream_error.hide()
+        self._playing_key = self._item_key(it)
+        self.listw.viewport().update()
+        self.setWindowTitle(title or self._base_title)
+        self._set_status(f"Playing: {title}")
         self.player.show()
         self.player.set_overlay_info(title)
         self.player.play(url, title)
@@ -3275,19 +3582,21 @@ class MainWindow(QMainWindow):
         if history_kind:
             self.history.add(url, title, icon_url, key, history_kind)
         self.stream_error.hide()
-        chosen = self.settings.value("player", "mpv")
-        self._last_player = chosen
+        self._playing_key = key
+        self.listw.viewport().update()      # repaint the playing highlight
+        self.setWindowTitle(title or self._base_title)
+        self._set_status(f"Playing: {title}")
         mode = self.playback_mode()
-        print(f"[dopeIPTV] Playing via player={chosen} mode={mode} "
+        print(f"[dopeIPTV] Playing via mode={mode} "
               f"(embedded pane: {'yes' if self.player else 'no'})",
               file=sys.stderr)
-        if chosen == "mpv" and mode == "embedded" and self.player:
+        if mode == "embedded" and self.player:
             self.player.show()
             self.player.set_overlay_info(title)
             if not self.player.play(url, title):
                 self.player.hide()
-                launch_player(chosen, url, title, self)
-        elif chosen == "mpv" and mode == "window":
+                launch_player("mpv", url, title, self)
+        elif mode == "window":
             # A single reused mpv window (zap-able). python-mpv drives it
             # in-process; without python-mpv, fall back to controlling a
             # separate mpv process over its IPC socket - still reused, not a
@@ -3299,15 +3608,25 @@ class MainWindow(QMainWindow):
                 run_async(self.pool, lambda: self.mpv.load(url, title),
                          lambda ok: None if ok else self._player_missing("mpv"))
         else:
-            launch_player(chosen, url, title, self)
+            launch_player(self.settings.value("player", "mpv"),
+                          url, title, self)
 
     def _player_missing(self, name):
         QMessageBox.warning(self, "Player not found",
                            f"{name} was not found. Install it and try again.")
 
+    def _set_status(self, text, error=False):
+        """Status label under the list: red+bold for errors so they stand
+        out, normal grey otherwise. New activity always replaces old errors,
+        so a failed channel doesn't stay on screen after a working one."""
+        self.count_lbl.setStyleSheet(
+            "color:#FF6B6B; font-size:11px; font-weight:600;" if error
+            else "color:#5A5A64; font-size:11px;")
+        self.count_lbl.setText(text)
+
     def _playback_error(self, msg):
         """A stream failed to play (dead/unreachable channel etc.)."""
-        self.count_lbl.setText(f"Stream error: {msg}")
+        self._set_status(f"Stream error: {msg}", error=True)
         if self._player_fs and self.player:
             self.player.set_overlay_info(f"Stream error: {msg}")
         else:
@@ -3333,16 +3652,18 @@ class MainWindow(QMainWindow):
         idx = self.listw.indexAt(pos)
         if not idx.isValid():
             return
-        self.listw.setCurrentIndex(idx)
+        # Deliberately do NOT change the selection: right-clicking another
+        # channel must not switch away from the one that's playing. All menu
+        # actions target the clicked item directly; only left-click selects.
         it = self.list_model.item_at(idx.row())
         if not it:
             return
         m = QMenu(self)
-        m.addAction("Play in mpv", lambda: self.play("mpv"))
-        m.addAction("Play in VLC", lambda: self.play("vlc"))
+        m.addAction("Play in mpv", lambda: self.play_item(it, "mpv"))
+        m.addAction("Play in VLC", lambda: self.play_item(it, "vlc"))
         ext = m.addMenu("Open externally")
-        ext.addAction("mpv", lambda: self.play("mpv", external=True))
-        ext.addAction("VLC", lambda: self.play("vlc", external=True))
+        ext.addAction("mpv", lambda: self.play_item(it, "mpv", external=True))
+        ext.addAction("VLC", lambda: self.play_item(it, "vlc", external=True))
         ext.addAction("mpv + VLC (both)", lambda: self._open_external_both(it))
         if not (self.mode == "series" and not self.series_ctx):
             m.addAction("Cast to Chromecast...",
@@ -3357,10 +3678,25 @@ class MainWindow(QMainWindow):
             fav_menu.addAction("New group...", lambda: self._add_fav(None, it))
             if self.mode == "fav":
                 m.addAction("Remove from favorites", lambda: self._remove_fav(it))
+        if self.mode in ("live", "vod", "series") and not self.series_ctx:
+            ov_mode = self.mode
+            key = self._item_key(it)
+            m.addSeparator()
+            m.addAction("Rename channel..." if ov_mode == "live"
+                        else "Rename...",
+                        lambda: self._rename_channel(ov_mode, key, it))
+            m.addAction("Hide channel" if ov_mode == "live" else "Hide",
+                        lambda: self._hide_channel(ov_mode, key))
+            if self.channel_ov.get(ov_mode, key):
+                m.addAction("Reset this channel's customizations",
+                            lambda: self._reset_channel(ov_mode, key))
+            if self.channel_ov.has_overrides(ov_mode):
+                m.addAction("Restore default channels...",
+                            lambda: self._restore_default_channels(ov_mode))
         if self.mode == "history":
             m.addSeparator()
-            m.addAction("Remove from history",
-                       lambda: self._remove_history(it))
+            m.addAction("Remove selected from history",
+                       lambda: self._remove_history_selected(it))
         if not (self.mode == "series" and not self.series_ctx) and self.mode != "history":
             url, _ = self._stream_for(it)
             if url:
@@ -3368,6 +3704,37 @@ class MainWindow(QMainWindow):
                 m.addAction("Copy stream URL",
                            lambda: QApplication.clipboard().setText(url))
         m.exec(self.listw.viewport().mapToGlobal(pos))
+
+    # -- channel customizations (rename/hide with restore) -----------------------
+    def _rename_channel(self, mode, key, it):
+        if key is None:
+            return
+        current = self.channel_ov.display_name(
+            mode, key, it.get("name") or it.get("title") or "")
+        name, ok = QInputDialog.getText(self, "Rename channel",
+                                        "New name:", text=current)
+        if ok:
+            self.channel_ov.update(mode, key, name=name.strip())
+            self._apply_filter()
+
+    def _hide_channel(self, mode, key):
+        if key is None:
+            return
+        self.channel_ov.update(mode, key, hidden=True)
+        self._apply_filter()
+
+    def _reset_channel(self, mode, key):
+        self.channel_ov.update(mode, key, name="", hidden=False)
+        self._apply_filter()
+
+    def _restore_default_channels(self, mode):
+        if QMessageBox.question(
+                self, "Restore default channels",
+                "Undo all channel renames and hides for this section and "
+                "go back to the provider's original list?") \
+                == QMessageBox.StandardButton.Yes:
+            self.channel_ov.reset_mode(mode)
+            self._apply_filter()
 
     # -- favorites -------------------------------------------------------------
     def _add_fav(self, group, item):
@@ -3501,6 +3868,23 @@ class MainWindow(QMainWindow):
         self.history.remove(item.get("_key"), item.get("_kind"))
         self._load_items(None)
 
+    def _remove_history_selected(self, clicked_item=None):
+        """Removes every selected history entry (falls back to the
+        right-clicked one when nothing is selected)."""
+        items = [self.list_model.item_at(ix.row())
+                 for ix in self.listw.selectionModel().selectedRows()]
+        items = [it for it in items if it]
+        if not items and clicked_item:
+            items = [clicked_item]
+        for it in items:
+            self.history.remove(it.get("_key"), it.get("_kind"))
+        if items:
+            self._load_items(None)
+
+    def _delete_pressed(self):
+        if self.mode == "history":
+            self._remove_history_selected()
+
     def _clear_history(self):
         if QMessageBox.question(self, "Clear history",
                                "Remove all watch history?") == QMessageBox.StandardButton.Yes:
@@ -3544,6 +3928,13 @@ class MainWindow(QMainWindow):
             self.listw.setFlow(QListView.Flow.TopToBottom)
             self.listw.setWrapping(False)
             self.listw.setGridSize(QSize())
+        # Pixel scrolling with a decent wheel step - IconMode otherwise
+        # crawls compared to the list view.
+        self.listw.setVerticalScrollMode(
+            QAbstractItemView.ScrollMode.ScrollPerPixel)
+        step = (self.delegate.grid_size().height() // 2 if grid
+                else self.delegate.row_h)
+        self.listw.verticalScrollBar().setSingleStep(max(30, step))
         # Keep the inline controls in sync (e.g. when changed from Settings).
         if hasattr(self, "size_box"):
             for box, key in ((self.size_box, density),
@@ -3838,7 +4229,7 @@ class MainWindow(QMainWindow):
 
     def _error(self, msg):
         self.loading_bar.hide()
-        self.count_lbl.setText("Error: " + msg)
+        self._set_status("Error: " + msg, error=True)
 
     def keyPressEvent(self, event):
         # In player fullscreen the list isn't visible, so plain Left/Right
