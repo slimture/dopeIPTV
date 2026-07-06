@@ -62,6 +62,13 @@ except Exception as _e:
     _libmpv = None
     _libmpv_error = f"{type(_e).__name__}: {_e}"
 
+# Optional Chromecast support (pip install pychromecast). Imported lazily so
+# the app runs fine without it; the Cast menu explains what to install.
+try:
+    import pychromecast as _pychromecast
+except Exception:
+    _pychromecast = None
+
 
 def embedded_playback_reason():
     """Returns None if in-app video is available, otherwise a short
@@ -495,10 +502,14 @@ class ParentalControl:
         return hashlib.sha256((salt + pin).encode()).hexdigest()
 
     def set_pin(self, pin):
+        # Deliberately does NOT unlock the session: the common flow is
+        # "create PIN, then lock something" - if creating the PIN unlocked
+        # the session, the freshly locked content would stay browsable until
+        # the next restart, defeating the point of locking it.
         salt = uuid.uuid4().hex
         self.settings.setValue("parental_salt", salt)
         self.settings.setValue("parental_pin_hash", self._hash(salt, pin))
-        self.session_unlocked = True
+        self.session_unlocked = False
 
     def clear_pin(self):
         self.settings.remove("parental_pin_hash")
@@ -953,6 +964,169 @@ class MpvWindowPlayer(QObject):
             except Exception:
                 pass
             self._mpv = None
+
+# ----------------------------------------------------------------------------
+#  Chromecast casting (optional, via pychromecast)
+# ----------------------------------------------------------------------------
+
+def cast_content_type(url):
+    """Best-effort MIME type for the Chromecast receiver."""
+    u = (url or "").lower().split("?")[0]
+    if u.endswith(".m3u8"):
+        return "application/x-mpegURL"
+    if u.endswith(".ts"):
+        return "video/mp2t"
+    if u.endswith(".mkv"):
+        return "video/x-matroska"
+    if u.endswith(".webm"):
+        return "video/webm"
+    return "video/mp4"
+
+
+class ChromecastManager:
+    """Discovers Chromecast devices on the LAN and plays a stream URL on
+    one. All methods that hit the network (scan/cast/stop) block and must be
+    called from a worker thread (run_async)."""
+
+    def __init__(self):
+        self.devices = []
+        self.active = None
+        self._browser = None
+
+    @staticmethod
+    def available():
+        return _pychromecast is not None
+
+    def scan(self):
+        if self._browser is not None:
+            try:
+                self._browser.stop_discovery()
+            except Exception:
+                pass
+            self._browser = None
+        devices, browser = _pychromecast.get_chromecasts(timeout=6)
+        self._browser = browser
+        self.devices = devices
+        return sorted(cc.name for cc in devices)
+
+    def cast(self, device_name, url, title):
+        cc = next((c for c in self.devices if c.name == device_name), None)
+        if cc is None:
+            raise RuntimeError(f"device '{device_name}' not found - rescan")
+        cc.wait(timeout=10)
+        mc = cc.media_controller
+        mc.play_media(url, cast_content_type(url), title=title or "dopeIPTV")
+        mc.block_until_active(timeout=10)
+        self.active = cc
+        return device_name
+
+    def stop(self):
+        if self.active:
+            try:
+                self.active.media_controller.stop()
+            except Exception:
+                pass
+            self.active = None
+
+    def shutdown(self):
+        self.stop()
+        if self._browser is not None:
+            try:
+                self._browser.stop_discovery()
+            except Exception:
+                pass
+        for cc in self.devices:
+            try:
+                cc.disconnect(timeout=2)
+            except Exception:
+                pass
+
+
+class CastDialog(QDialog):
+    """Scan for Chromecast devices and cast the given stream to one."""
+
+    def __init__(self, window, url, title):
+        super().__init__(window)
+        self.window = window
+        self.url = url
+        self.stream_title = title
+        self.setWindowTitle("Cast to Chromecast")
+        self.setMinimumWidth(400)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(18, 18, 18, 18)
+        lay.setSpacing(10)
+
+        self.status = QLabel("Scanning for Chromecast devices...")
+        self.status.setWordWrap(True)
+        lay.addWidget(self.status)
+
+        self.list = QListWidget()
+        self.list.itemDoubleClicked.connect(lambda _i: self._cast())
+        lay.addWidget(self.list, 1)
+
+        btns = QHBoxLayout()
+        self.rescan_btn = QPushButton("Rescan")
+        self.cast_btn = QPushButton("Cast", objectName="Primary")
+        self.stop_btn = QPushButton("Stop casting")
+        close_btn = QPushButton("Close")
+        for b in (self.rescan_btn, self.cast_btn, self.stop_btn, close_btn):
+            btns.addWidget(b)
+        lay.addLayout(btns)
+
+        self.rescan_btn.clicked.connect(self._scan)
+        self.cast_btn.clicked.connect(self._cast)
+        self.stop_btn.clicked.connect(self._stop)
+        close_btn.clicked.connect(self.accept)
+        self._scan()
+
+    def _set_status(self, text):
+        try:
+            self.status.setText(text)
+        except RuntimeError:
+            pass                      # dialog already closed
+
+    def _scan(self):
+        self._set_status("Scanning for Chromecast devices...")
+        self.rescan_btn.setEnabled(False)
+
+        def done(names):
+            try:
+                self.rescan_btn.setEnabled(True)
+                self.list.clear()
+                for name in names or []:
+                    self.list.addItem(name)
+                self._set_status(
+                    f"{len(names)} device(s) found." if names
+                    else "No Chromecast devices found on this network.")
+                if names:
+                    self.list.setCurrentRow(0)
+            except RuntimeError:
+                pass
+
+        def fail(msg):
+            try:
+                self.rescan_btn.setEnabled(True)
+            except RuntimeError:
+                return
+            self._set_status(f"Scan failed: {msg}")
+
+        run_async(self.window.pool, self.window.cast.scan, done, fail)
+
+    def _cast(self):
+        item = self.list.currentItem()
+        if not item:
+            return
+        name = item.text()
+        self._set_status(f"Starting cast to {name}...")
+        run_async(self.window.pool,
+                  lambda: self.window.cast.cast(name, self.url, self.stream_title),
+                  lambda n: self._set_status(f"Casting to {n}."),
+                  lambda msg: self._set_status(f"Cast failed: {msg}"))
+
+    def _stop(self):
+        run_async(self.window.pool, self.window.cast.stop,
+                  lambda _: self._set_status("Casting stopped."),
+                  lambda msg: self._set_status(f"Stop failed: {msg}"))
 
 # ----------------------------------------------------------------------------
 #  Embedded in-app video (libmpv's OpenGL render API)
@@ -1849,6 +2023,8 @@ class ContentManagerDialog(QDialog):
         locked = not self.overrides.is_locked(self.mode, cid)
         if locked and not self.window._ensure_pin_configured():
             return
+        if locked:
+            self.window.parental.lock_session()   # locked means locked *now*
         self.overrides.update(self.mode, cid, locked=locked)
         self._populate()
 
@@ -1875,6 +2051,7 @@ class MainWindow(QMainWindow):
         self.overrides = CategoryOverrides(
             settings, f"category_overrides_{pid}" if pid else "category_overrides")
         self.parental = ParentalControl(settings)
+        self.cast = ChromecastManager()
         self._raw_categories = []          # unfiltered, for the content manager
         self.mpv = MpvIpcPlayer()
         self.mpv_window = MpvWindowPlayer() if _libmpv is not None else None
@@ -2295,8 +2472,11 @@ class MainWindow(QMainWindow):
         fn = {"live": self.client.live_categories,
               "vod": self.client.vod_categories,
               "series": self.client.series_categories}[self.mode]
+        request_mode = self.mode
 
         def done(cats):
+            if self.mode != request_mode:
+                return       # stale response - the user already switched mode
             self.loading_bar.hide()
             self._raw_categories = cats or []
             self.cat_list.blockSignals(True)
@@ -2364,6 +2544,8 @@ class MainWindow(QMainWindow):
         mode = self.mode
 
         def done(items):
+            if self.mode != mode:
+                return       # stale response - the user already switched mode
             self.loading_bar.hide()
             items = items or []
             if category_id is None:
@@ -2775,6 +2957,25 @@ class MainWindow(QMainWindow):
 
         self._start_playback(url, title, icon, key, kind if self.mode != "history" else None)
 
+    def _open_cast_dialog(self, it):
+        if not ChromecastManager.available():
+            QMessageBox.information(
+                self, "Chromecast",
+                "Casting needs the pychromecast package:\n\n"
+                "  pip install pychromecast")
+            return
+        if self.mode == "history":
+            url, title = it.get("_url"), it.get("name") or "dopeIPTV"
+        else:
+            url, title = self._stream_for(it)
+            if (self.mode in ("live", "fav")
+                    and it.get("stream_id") is not None):
+                # Chromecast receivers can't demux raw MPEG-TS; use HLS
+                url = self.client.live_url(it["stream_id"], "m3u8")
+        if not url:
+            return
+        CastDialog(self, url, title).exec()
+
     def _open_external_both(self, it):
         """Launches the same stream in both external mpv and VLC at once."""
         if self.mode == "history":
@@ -2889,6 +3090,9 @@ class MainWindow(QMainWindow):
         ext.addAction("mpv", lambda: self.play("mpv", external=True))
         ext.addAction("VLC", lambda: self.play("vlc", external=True))
         ext.addAction("mpv + VLC (both)", lambda: self._open_external_both(it))
+        if not (self.mode == "series" and not self.series_ctx):
+            m.addAction("Cast to Chromecast...",
+                       lambda: self._open_cast_dialog(it))
         if self.mode in ("live", "fav") and it.get("stream_id"):
             m.addSeparator()
             fav_menu = m.addMenu("Add to favorites group")
@@ -3005,6 +3209,9 @@ class MainWindow(QMainWindow):
         if locked and not self._ensure_pin_configured():
             return
         self.favs.set_group_locked(group, locked)
+        if locked:
+            # locking means locked *now*, not after the next restart
+            self.parental.lock_session()
         self._load_categories()
 
     def _rename_category(self, cid):
@@ -3025,6 +3232,7 @@ class MainWindow(QMainWindow):
     def _lock_category(self, cid):
         if not self._ensure_pin_configured():
             return
+        self.parental.lock_session()   # locked means locked *now*
         self._set_category_flag(cid, locked=True)
 
     def _open_content_manager(self):
@@ -3349,6 +3557,8 @@ class MainWindow(QMainWindow):
         if self.mpv_window:
             self.mpv_window.shutdown()
         self.mpv.stop()
+        # Chromecast teardown talks to the network - don't block app exit
+        threading.Thread(target=self.cast.shutdown, daemon=True).start()
         super().closeEvent(event)
 
 # ----------------------------------------------------------------------------

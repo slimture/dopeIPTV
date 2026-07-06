@@ -26,7 +26,8 @@ An elegant IPTV client for Linux and macOS with a macOS-inspired dark interface,
 - **Multiple playlists**: save several Xtream providers/accounts, switch between them at runtime (favorites and history are kept per playlist), edit them, give each an optional **custom TV guide (XMLTV) URL** that overrides the provider's own, and pick an **auto-refresh** cadence per playlist (never / at startup / every 2, 6, 12 hours / daily / weekly)
 - Inline view controls right under the channel list: list size, sort order, and a grid toggle that lays large icons out horizontally
 - **Content manager**: right-click any category (or "Manage categories...") to hide it, rename it, or lock it — hidden/locked categories' channels are also left out of "All"
-- **Parental control**: a salted+hashed PIN protects locked categories and locked favorite groups; locked favorite groups don't reveal which channels they contain until the PIN is entered. Unlocks last for the session, with a "Lock now" button in Settings → Parental
+- **Parental control**: a salted+hashed PIN protects locked categories and locked favorite groups; locked favorite groups don't reveal which channels they contain until the PIN is entered. Locking something locks it immediately; unlocks last for the session, with a "Lock now" button in Settings → Parental
+- **Chromecast**: right-click any channel/movie/episode → "Cast to Chromecast..." to scan the network and cast to a device (live streams are cast as HLS). Needs `pip install pychromecast`
 - Finds VLC on macOS even when it's only installed as an app bundle (not on `PATH`)
 
 ## Installation
@@ -42,6 +43,9 @@ pip install PyQt6 requests
 
 # Optional but recommended - enables embedded in-app video (Linux and macOS):
 pip install python-mpv
+
+# Optional - enables Chromecast casting:
+pip install pychromecast
 ```
 
 > **Embedded playback platform notes:** in-app video is rendered via
