@@ -31,7 +31,8 @@ from pathlib import Path
 import requests
 from PyQt6.QtCore import (
     QAbstractListModel, QByteArray, QModelIndex, QObject, QRect, QRectF,
-    QRunnable, QSettings, QSize, Qt, QThreadPool, QTimer, pyqtSignal, pyqtSlot,
+    QRunnable, QSettings, QSize, QStandardPaths, Qt, QThreadPool, QTimer,
+    pyqtSignal, pyqtSlot,
 )
 from PyQt6.QtGui import (
     QColor, QFont, QIcon, QKeySequence, QOpenGLContext, QPainter,
@@ -256,43 +257,114 @@ def _parse_xmltv_time(s):
         return None
 
 
+def epg_cache_path(playlist_id):
+    """Per-playlist file for the cached XMLTV guide."""
+    base = QStandardPaths.writableLocation(
+        QStandardPaths.StandardLocation.CacheLocation)
+    if not base:
+        base = str(Path.home() / ".cache" / "dopeiptv")
+    return str(Path(base) / f"epg_{playlist_id or 'default'}.xml")
+
+
 class XmltvGuide:
     """Downloads and indexes the provider's XMLTV guide (xmltv.php).
 
     Many providers send no EPG via player_api but do have a full schedule
-    in XMLTV format. The guide is fetched at most once per session, in a
-    background thread, the first time it's needed. Once loaded, lookups
-    are pure in-memory dict access, so the main channel list can show
-    "now playing" for every visible row without any extra network calls.
+    in XMLTV format. Once loaded, lookups are pure in-memory dict access,
+    so the main channel list can show "now playing" for every visible row
+    without any extra network calls.
+
+    The raw XML is cached on disk (per playlist) so a restart shows EPG
+    immediately from the previous session: a cache younger than CACHE_TTL
+    is used without hitting the network, and if a download fails the stale
+    cache still beats no data. Downloads stream in chunks and report
+    progress through progress_cb (0-100, or -1 when the server sends no
+    content length) - called from the worker thread, so hook it up via a
+    Qt signal.
     """
 
-    def __init__(self, client, custom_url=None):
+    CACHE_TTL = 6 * 3600      # re-download after this; guides update ~daily
+
+    def __init__(self, client, custom_url=None, cache_path=None,
+                 progress_cb=None):
         self.client = client
         self.custom_url = custom_url    # user-supplied XMLTV URL, if any
+        self.cache_path = Path(cache_path) if cache_path else None
+        self.progress_cb = progress_cb
         self._lock = threading.Lock()
         self._loaded = False
         self._failed = False
         self._by_id = {}        # channel id -> entries sorted by start time
         self._by_name = {}      # normalized display name -> channel id
 
-    def _fetch(self):
-        if self.custom_url:
-            r = requests.get(self.custom_url, timeout=(20, 180))
-            r.raise_for_status()
-            return r.content
-        return self.client.xmltv()
+    def _read_cache(self, max_age=None):
+        if not self.cache_path or not self.cache_path.exists():
+            return None
+        try:
+            if (max_age is not None
+                    and time.time() - self.cache_path.stat().st_mtime > max_age):
+                return None
+            return self.cache_path.read_bytes()
+        except OSError:
+            return None
 
-    def ensure_loaded(self):
-        """Fetches and indexes the guide if needed. Returns True if it's
-        available in memory (safe to call repeatedly; blocks briefly if
-        another thread is already loading it)."""
+    def _write_cache(self, data):
+        if not self.cache_path:
+            return
+        try:
+            self.cache_path.parent.mkdir(parents=True, exist_ok=True)
+            self.cache_path.write_bytes(data)
+        except OSError:
+            pass
+
+    def _download(self):
+        if self.custom_url:
+            r = requests.get(self.custom_url, stream=True, timeout=(20, 300))
+        else:
+            r = self.client.session.get(
+                f"{self.client.server}/xmltv.php",
+                params={"username": self.client.username,
+                        "password": self.client.password},
+                stream=True, timeout=(20, 300))
+        r.raise_for_status()
+        total = int(r.headers.get("content-length") or 0)
+        chunks, received = [], 0
+        for chunk in r.iter_content(64 * 1024):
+            chunks.append(chunk)
+            received += len(chunk)
+            if self.progress_cb:
+                self.progress_cb(min(99, received * 100 // total)
+                                 if total else -1)
+        if self.progress_cb:
+            self.progress_cb(100)
+        data = b"".join(chunks)
+        self._write_cache(data)
+        return data
+
+    def ensure_loaded(self, force=False):
+        """Loads the guide if needed (cache first, then network, then stale
+        cache). force=True always re-downloads. Returns True when guide data
+        is available in memory."""
         with self._lock:
-            if not self._loaded and not self._failed:
+            if self._loaded and not force:
+                return True
+            if self._failed and not force:
+                return False
+            data = None if force else self._read_cache(max_age=self.CACHE_TTL)
+            if data is None:
                 try:
-                    self._parse(self._fetch())
-                    self._loaded = True
+                    data = self._download()
                 except Exception:
-                    self._failed = True
+                    data = self._read_cache(max_age=None)   # stale fallback
+            if data is None:
+                self._failed = True
+                return False
+            try:
+                self._parse(data)
+                self._loaded = True
+                self._failed = False
+            except Exception:
+                self._failed = True
             return self._loaded
 
     def _entries_for(self, item):
@@ -2203,6 +2275,8 @@ class ContentManagerDialog(QDialog):
 # ----------------------------------------------------------------------------
 
 class MainWindow(QMainWindow):
+    epg_progress = pyqtSignal(int)   # guide download progress, worker thread
+
     def __init__(self, client: XtreamClient, settings: QSettings,
                  playlists: "PlaylistStore | None" = None):
         super().__init__()
@@ -2212,8 +2286,11 @@ class MainWindow(QMainWindow):
         active_pl = playlists.active() if playlists else None
         self.pool = QThreadPool.globalInstance()
         self.logos = LogoLoader(self.pool)
-        self.xmltv = XmltvGuide(client, (active_pl or {}).get("epg_url") or None)
+        self.epg_progress.connect(self._on_epg_progress)
         pid = (active_pl or {}).get("id")
+        self.xmltv = XmltvGuide(client, (active_pl or {}).get("epg_url") or None,
+                                cache_path=epg_cache_path(pid) if pid else None,
+                                progress_cb=self.epg_progress.emit)
         self.favs = FavoriteStore(
             settings, f"favorites_{pid}" if pid else "favorites")
         self.history = HistoryStore(
@@ -2452,7 +2529,7 @@ class MainWindow(QMainWindow):
         dl.addWidget(self.now_card)
 
         self.epg_refresh = QPushButton("Refresh EPG")
-        self.epg_refresh.clicked.connect(self._request_epg)
+        self.epg_refresh.clicked.connect(self._refresh_epg_clicked)
         self.epg_refresh.hide()
         dl.addWidget(self.epg_refresh)
 
@@ -2575,13 +2652,19 @@ class MainWindow(QMainWindow):
             self.refresh_playlist()
 
     def refresh_playlist(self):
-        """Re-fetches categories/content and resets the XMLTV guide so it is
-        downloaded fresh the next time EPG data is needed."""
+        """Re-fetches categories/content and re-downloads the XMLTV guide."""
         self._last_playlist_refresh = time.time()
         pl = self.playlist_store.active() if self.playlist_store else None
-        self.xmltv = XmltvGuide(self.client, (pl or {}).get("epg_url") or None)
+        pid = (pl or {}).get("id")
+        self.xmltv = XmltvGuide(self.client, (pl or {}).get("epg_url") or None,
+                                cache_path=epg_cache_path(pid) if pid else None,
+                                progress_cb=self.epg_progress.emit)
         self._info_cache.clear()
         self._load_categories()
+        run_async(self.pool, lambda: self.xmltv.ensure_loaded(force=True),
+                  lambda ok: (self._epg_progress_finished(),
+                              self.list_model.refresh_all() if ok else None),
+                  lambda _: self._epg_progress_finished())
 
     def switch_playlist(self, pid):
         """Connects to another saved playlist and reloads everything."""
@@ -3717,6 +3800,41 @@ class MainWindow(QMainWindow):
             "An elegant IPTV client for Xtream Codes with EPG,<br>"
             "embedded playback, favorites and history.<br><br>"
             "Playback via mpv (embedded/window) or VLC.")
+
+    # -- EPG refresh with progress -------------------------------------------------
+    def _on_epg_progress(self, value):
+        """Guide download progress (emitted from the worker thread)."""
+        self.loading_bar.show()
+        if value < 0:                       # server sent no content length
+            self.loading_bar.setRange(0, 0)
+        else:
+            self.loading_bar.setRange(0, 100)
+            self.loading_bar.setValue(value)
+
+    def _epg_progress_finished(self):
+        self.loading_bar.setRange(0, 0)     # back to indeterminate default
+        self.loading_bar.hide()
+
+    def _refresh_epg_clicked(self):
+        """Explicit 'Refresh EPG': re-download the guide (with a progress
+        bar), then re-fetch the selected channel's listings."""
+        self.epg_refresh.setEnabled(False)
+        self._clear_epg_rows()
+        self._epg_note("Refreshing programme guide...")
+
+        def done(_ok):
+            self.epg_refresh.setEnabled(True)
+            self._epg_progress_finished()
+            self.list_model.refresh_all()   # update the Now-lines in the list
+            self._request_epg()
+
+        def fail(_msg):
+            self.epg_refresh.setEnabled(True)
+            self._epg_progress_finished()
+            self._request_epg()
+
+        run_async(self.pool, lambda: self.xmltv.ensure_loaded(force=True),
+                  done, fail)
 
     def _error(self, msg):
         self.loading_bar.hide()
