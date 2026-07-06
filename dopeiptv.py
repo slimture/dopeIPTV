@@ -679,10 +679,14 @@ def _register_error_callback(mpv_instance, signal):
 class MpvWindowPlayer(QObject):
     zap_requested = pyqtSignal(int)   # emitted from mpv's own event thread
     playback_error = pyqtSignal(str)
+    closed = pyqtSignal()             # window closed / quit by the user
 
     def __init__(self):
         super().__init__()
         self._mpv = None
+        # Closing (q / window X) fires on mpv's event thread; terminating the
+        # core from there can deadlock, so bounce to the main thread.
+        self.closed.connect(self._on_closed)
 
     def _ensure_mpv(self):
         if self._mpv is None:
@@ -692,12 +696,25 @@ class MpvWindowPlayer(QObject):
             # at all, which read as "can't fullscreen / can't close it".
             m = _libmpv.MPV(force_window=True, input_default_bindings=True,
                             input_vo_keyboard=True, osc=True,
-                            user_agent="dopeIPTV/1.0", keep_open="yes")
+                            title="dopeIPTV", user_agent="dopeIPTV/1.0",
+                            keep_open="yes")
             m.on_key_press("ctrl+right")(lambda: self.zap_requested.emit(1))
             m.on_key_press("ctrl+left")(lambda: self.zap_requested.emit(-1))
+            # Also give an explicit close key and route the window's own quit
+            # (q / titlebar X -> SHUTDOWN) back to us so the window actually
+            # goes away and the next play can spin up a fresh one.
+            m.on_key_press("q")(lambda: self.closed.emit())
             _register_error_callback(m, self.playback_error)
+
+            @m.event_callback("shutdown")
+            def _on_shutdown(_evt):
+                self.closed.emit()
+
             self._mpv = m
         return self._mpv
+
+    def _on_closed(self):
+        self.shutdown()
 
     def play(self, url, title):
         for attempt in range(2):
