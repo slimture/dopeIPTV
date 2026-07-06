@@ -22,7 +22,9 @@ An elegant IPTV client for Linux and macOS with a macOS-inspired dark interface,
 - Copy stream URL via right-click; "Open externally" in mpv, VLC, or **both at once** from the same menu
 - Sort any list by provider order, name A→Z / Z→A, or recently added
 - Three list sizes (compact / medium / large icons)
-- Settings organized into tabs (Playback / Interface / Account)
+- Settings organized into tabs (Playback / Interface / Playlists)
+- **Multiple playlists**: save several Xtream providers/accounts, switch between them at runtime (favorites and history are kept per playlist), edit them, give each an optional **custom TV guide (XMLTV) URL** that overrides the provider's own, and pick an **auto-refresh** cadence per playlist (never / at startup / every 2, 6, 12 hours / daily / weekly)
+- Inline view controls right under the channel list: list size, sort order, and a grid toggle that lays large icons out horizontally
 - Finds VLC on macOS even when it's only installed as an app bundle (not on `PATH`)
 
 ## Installation

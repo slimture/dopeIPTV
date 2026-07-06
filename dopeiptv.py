@@ -22,6 +22,7 @@ import sys
 import tempfile
 import threading
 import time
+import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
@@ -257,13 +258,21 @@ class XmltvGuide:
     "now playing" for every visible row without any extra network calls.
     """
 
-    def __init__(self, client):
+    def __init__(self, client, custom_url=None):
         self.client = client
+        self.custom_url = custom_url    # user-supplied XMLTV URL, if any
         self._lock = threading.Lock()
         self._loaded = False
         self._failed = False
         self._by_id = {}        # channel id -> entries sorted by start time
         self._by_name = {}      # normalized display name -> channel id
+
+    def _fetch(self):
+        if self.custom_url:
+            r = requests.get(self.custom_url, timeout=(20, 180))
+            r.raise_for_status()
+            return r.content
+        return self.client.xmltv()
 
     def ensure_loaded(self):
         """Fetches and indexes the guide if needed. Returns True if it's
@@ -272,7 +281,7 @@ class XmltvGuide:
         with self._lock:
             if not self._loaded and not self._failed:
                 try:
-                    self._parse(self.client.xmltv())
+                    self._parse(self._fetch())
                     self._loaded = True
                 except Exception:
                     self._failed = True
@@ -345,19 +354,22 @@ class XmltvGuide:
 # ----------------------------------------------------------------------------
 
 class FavoriteStore:
-    """Favorite channels in user-defined groups, persisted via QSettings."""
+    """Favorite channels in user-defined groups, persisted via QSettings.
+    The key is per-playlist so favorites follow the provider they belong to
+    (stream ids are only meaningful within one provider)."""
 
-    def __init__(self, settings):
+    def __init__(self, settings, key="favorites"):
         self.settings = settings
+        self.key = key
         try:
-            self.groups = json.loads(settings.value("favorites", "") or "{}")
+            self.groups = json.loads(settings.value(key, "") or "{}")
         except Exception:
             self.groups = {}
         if not isinstance(self.groups, dict):
             self.groups = {}
 
     def _save(self):
-        self.settings.setValue("favorites", json.dumps(self.groups))
+        self.settings.setValue(self.key, json.dumps(self.groups))
 
     def group_names(self):
         return sorted(self.groups, key=str.lower)
@@ -403,17 +415,18 @@ class HistoryStore:
 
     MAX_ENTRIES = 300
 
-    def __init__(self, settings):
+    def __init__(self, settings, key="history"):
         self.settings = settings
+        self.key = key
         try:
-            self.entries = json.loads(settings.value("history", "") or "[]")
+            self.entries = json.loads(settings.value(key, "") or "[]")
         except Exception:
             self.entries = []
         if not isinstance(self.entries, list):
             self.entries = []
 
     def _save(self):
-        self.settings.setValue("history", json.dumps(self.entries[:self.MAX_ENTRIES]))
+        self.settings.setValue(self.key, json.dumps(self.entries[:self.MAX_ENTRIES]))
 
     def add(self, url, title, icon_url, key, kind):
         if not url:
@@ -439,6 +452,79 @@ class HistoryStore:
 
     def items(self):
         return list(self.entries)
+
+# ----------------------------------------------------------------------------
+#  Playlists (multiple providers/accounts)
+# ----------------------------------------------------------------------------
+
+class PlaylistStore:
+    """User playlists (Xtream accounts/providers), persisted via QSettings.
+    Each playlist: id, name, server, username, password, epg_url (optional
+    custom XMLTV guide URL) and refresh (auto-refresh cadence). Migrates the
+    pre-playlist single server/username/password settings into a 'Default'
+    playlist on first run, carrying favorites/history along."""
+
+    def __init__(self, settings):
+        self.settings = settings
+        try:
+            data = json.loads(settings.value("playlists", "") or "[]")
+        except Exception:
+            data = []
+        self.items = data if isinstance(data, list) else []
+        self.active_id = settings.value("active_playlist", "")
+        if not self.items:
+            server = settings.value("server", "")
+            user = settings.value("username", "")
+            pw = settings.value("password", "")
+            if server and user and pw:
+                self.items = [{"id": "default", "name": "Default",
+                               "server": server, "username": user,
+                               "password": pw, "epg_url": "",
+                               "refresh": "never"}]
+                self.active_id = "default"
+                for legacy in ("favorites", "history"):
+                    value = settings.value(legacy, "")
+                    if value:
+                        settings.setValue(f"{legacy}_default", value)
+                self._save()
+
+    def _save(self):
+        self.settings.setValue("playlists", json.dumps(self.items))
+        self.settings.setValue("active_playlist", self.active_id)
+
+    def playlists(self):
+        return list(self.items)
+
+    def get(self, pid):
+        return next((p for p in self.items if p.get("id") == pid), None)
+
+    def active(self):
+        return self.get(self.active_id) or (self.items[0] if self.items else None)
+
+    def add(self, playlist):
+        playlist.setdefault("id", uuid.uuid4().hex[:8])
+        self.items.append(playlist)
+        if not self.active_id:
+            self.active_id = playlist["id"]
+        self._save()
+        return playlist
+
+    def update(self, pid, **fields):
+        p = self.get(pid)
+        if p:
+            p.update(fields)
+            self._save()
+
+    def remove(self, pid):
+        self.items = [p for p in self.items if p.get("id") != pid]
+        if self.active_id == pid:
+            self.active_id = self.items[0]["id"] if self.items else ""
+        self._save()
+
+    def set_active(self, pid):
+        if self.get(pid):
+            self.active_id = pid
+            self._save()
 
 # ----------------------------------------------------------------------------
 #  Thread-pool workers
@@ -1090,6 +1176,18 @@ QToolTip {{
     padding: 4px 6px;
 }}
 
+/* Tab widget (Settings): the platform default renders a white pane/tab bar */
+QTabWidget::pane {{
+    border: 1px solid #2C2C34; border-radius: 8px; background: #1B1B21;
+    top: -1px;
+}}
+QTabBar::tab {{
+    background: transparent; color: #C9C9D2; padding: 7px 16px;
+    border-radius: 7px; margin: 2px; font-size: 12px;
+}}
+QTabBar::tab:selected {{ background: #2A2A32; color: white; }}
+QTabBar::tab:hover:!selected {{ background: #1D1D24; }}
+
 QComboBox {{
     background: #222229; border: 1px solid #2C2C34; border-radius: 8px;
     padding: 6px 10px;
@@ -1156,6 +1254,74 @@ class LoginDialog(QDialog):
 
     def values(self):
         return self.server.text().strip(), self.user.text().strip(), self.pw.text().strip()
+
+# ----------------------------------------------------------------------------
+#  Playlist add/edit dialog
+# ----------------------------------------------------------------------------
+
+class PlaylistDialog(QDialog):
+    REFRESH_OPTIONS = [("never", "Never"), ("startup", "At startup"),
+                       ("2h", "Every 2 hours"), ("6h", "Every 6 hours"),
+                       ("12h", "Every 12 hours"), ("24h", "Daily"),
+                       ("1w", "Weekly")]
+
+    def __init__(self, parent=None, playlist=None):
+        super().__init__(parent)
+        playlist = playlist or {}
+        self.setWindowTitle("Edit playlist" if playlist else "Add playlist")
+        self.setMinimumWidth(460)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(22, 22, 22, 22)
+        form = QFormLayout()
+        form.setSpacing(10)
+        self.name = QLineEdit(playlist.get("name", ""))
+        self.name.setPlaceholderText("e.g. My provider")
+        self.server = QLineEdit(playlist.get("server", ""))
+        self.server.setPlaceholderText("http://server:port")
+        self.user = QLineEdit(playlist.get("username", ""))
+        self.pw = QLineEdit(playlist.get("password", ""))
+        self.pw.setEchoMode(QLineEdit.EchoMode.Password)
+        self.epg_url = QLineEdit(playlist.get("epg_url", ""))
+        self.epg_url.setPlaceholderText("optional - overrides the provider's xmltv.php")
+        self.refresh = QComboBox()
+        for value, label in self.REFRESH_OPTIONS:
+            self.refresh.addItem(label, value)
+        idx = self.refresh.findData(playlist.get("refresh", "never"))
+        if idx >= 0:
+            self.refresh.setCurrentIndex(idx)
+        form.addRow("Name", self.name)
+        form.addRow("Server", self.server)
+        form.addRow("Username", self.user)
+        form.addRow("Password", self.pw)
+        form.addRow("Custom TV guide URL", self.epg_url)
+        form.addRow("Auto-refresh", self.refresh)
+        lay.addLayout(form)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
+                                  QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self._validate)
+        buttons.rejected.connect(self.reject)
+        lay.addWidget(buttons)
+
+    def _validate(self):
+        if not (self.server.text().strip() and self.user.text().strip()
+                and self.pw.text().strip()):
+            QMessageBox.warning(self, "Playlist",
+                                "Server, username and password are required.")
+            return
+        self.accept()
+
+    def values(self):
+        name = self.name.text().strip()
+        if not name:
+            # fall back to the server host as a display name
+            name = self.server.text().strip().split("//")[-1].split("/")[0]
+        return {"name": name,
+                "server": self.server.text().strip(),
+                "username": self.user.text().strip(),
+                "password": self.pw.text().strip(),
+                "epg_url": self.epg_url.text().strip(),
+                "refresh": self.refresh.currentData()}
 
 # ----------------------------------------------------------------------------
 #  Channel list: virtualized model + delegate
@@ -1467,15 +1633,21 @@ class EpgGuideDialog(QDialog):
 # ----------------------------------------------------------------------------
 
 class MainWindow(QMainWindow):
-    def __init__(self, client: XtreamClient, settings: QSettings):
+    def __init__(self, client: XtreamClient, settings: QSettings,
+                 playlists: "PlaylistStore | None" = None):
         super().__init__()
         self.client = client
         self.settings = settings
+        self.playlist_store = playlists
+        active_pl = playlists.active() if playlists else None
         self.pool = QThreadPool.globalInstance()
         self.logos = LogoLoader(self.pool)
-        self.xmltv = XmltvGuide(client)
-        self.favs = FavoriteStore(settings)
-        self.history = HistoryStore(settings)
+        self.xmltv = XmltvGuide(client, (active_pl or {}).get("epg_url") or None)
+        pid = (active_pl or {}).get("id")
+        self.favs = FavoriteStore(
+            settings, f"favorites_{pid}" if pid else "favorites")
+        self.history = HistoryStore(
+            settings, f"history_{pid}" if pid else "history")
         self.mpv = MpvIpcPlayer()
         self.mpv_window = MpvWindowPlayer() if _libmpv is not None else None
         if self.mpv_window:
@@ -1495,11 +1667,19 @@ class MainWindow(QMainWindow):
         self._info_cache = {}               # (kind, id) -> info dict
         self._current_key = None            # identity of the selected row
         self._last_player = None
+        self._last_playlist_refresh = time.time()
 
-        self.setWindowTitle(APP_NAME)
+        self.setWindowTitle(
+            f"{APP_NAME} - {active_pl['name']}" if active_pl else APP_NAME)
         self.resize(1240, 780)
         self._build_ui()
         self._load_categories()
+
+        # Playlist auto-refresh: check every 5 minutes whether the active
+        # playlist's cadence (2h ... weekly) has elapsed.
+        self._auto_refresh_timer = QTimer(self)
+        self._auto_refresh_timer.timeout.connect(self._maybe_auto_refresh)
+        self._auto_refresh_timer.start(5 * 60_000)
 
     # -- UI construction -------------------------------------------------------
     def _build_ui(self):
@@ -1807,6 +1987,51 @@ class MainWindow(QMainWindow):
         self.player.set_fullscreen_ui(False)
         if not getattr(self, "_was_fullscreen", False):
             self.showNormal()
+
+    # -- playlists ---------------------------------------------------------------
+    REFRESH_SECONDS = {"2h": 2 * 3600, "6h": 6 * 3600, "12h": 12 * 3600,
+                       "24h": 24 * 3600, "1w": 7 * 24 * 3600}
+
+    def _maybe_auto_refresh(self):
+        pl = self.playlist_store.active() if self.playlist_store else None
+        secs = self.REFRESH_SECONDS.get((pl or {}).get("refresh", ""))
+        if secs and time.time() - self._last_playlist_refresh >= secs:
+            self.refresh_playlist()
+
+    def refresh_playlist(self):
+        """Re-fetches categories/content and resets the XMLTV guide so it is
+        downloaded fresh the next time EPG data is needed."""
+        self._last_playlist_refresh = time.time()
+        pl = self.playlist_store.active() if self.playlist_store else None
+        self.xmltv = XmltvGuide(self.client, (pl or {}).get("epg_url") or None)
+        self._info_cache.clear()
+        self._load_categories()
+
+    def switch_playlist(self, pid):
+        """Connects to another saved playlist and reloads everything."""
+        pl = self.playlist_store.get(pid) if self.playlist_store else None
+        if not pl:
+            return
+        self.loading_bar.show()
+        self.count_lbl.setText(f"Connecting to {pl['name']}...")
+        candidate = XtreamClient(pl["server"], pl["username"], pl["password"])
+
+        def done(_auth):
+            self.loading_bar.hide()
+            self.playlist_store.set_active(pid)
+            self.client = candidate
+            self.favs = FavoriteStore(self.settings, f"favorites_{pid}")
+            self.history = HistoryStore(self.settings, f"history_{pid}")
+            self.setWindowTitle(f"{APP_NAME} - {pl['name']}")
+            self.refresh_playlist()
+
+        def fail(msg):
+            self.loading_bar.hide()
+            self.count_lbl.setText("")
+            QMessageBox.warning(self, "Playlist",
+                                f"Could not connect to {pl['name']}: {msg}")
+
+        run_async(self.pool, candidate.authenticate, done, fail)
 
     # -- modes and categories --------------------------------------------------
     def switch_mode(self, mode):
@@ -2590,28 +2815,89 @@ class MainWindow(QMainWindow):
         uf.addRow("Sort lists by", sort_box)
         tabs.addTab(ui_tab, "Interface")
 
-        # ---- Account tab ----
-        acc_tab = QWidget()
-        af = QVBoxLayout(acc_tab)
-        af.setSpacing(10)
-        af.addWidget(QLabel(f"Server: {self.client.server}"))
-        af.addWidget(QLabel(f"User: {self.client.username}"))
-        switch_btn = QPushButton("Switch account / server...")
-        af.addWidget(switch_btn)
-        af.addStretch()
-        tabs.addTab(acc_tab, "Account")
+        # ---- Playlists tab ----
+        pl_tab = QWidget()
+        pv = QVBoxLayout(pl_tab)
+        pv.setSpacing(10)
+        pl_list = QListWidget()
+        pv.addWidget(pl_list, 1)
+        pl_btns = QHBoxLayout()
+        add_btn = QPushButton("Add...")
+        edit_btn = QPushButton("Edit...")
+        remove_btn = QPushButton("Remove")
+        use_btn = QPushButton("Use", objectName="Primary")
+        for b in (add_btn, edit_btn, remove_btn, use_btn):
+            pl_btns.addWidget(b)
+        pv.addLayout(pl_btns)
+        tabs.addTab(pl_tab, "Playlists")
+
+        store = self.playlist_store
+
+        def reload_pl_list():
+            pl_list.clear()
+            if not store:
+                pl_list.addItem("Playlist management unavailable")
+                return
+            for p in store.playlists():
+                suffix = "   (active)" if p["id"] == store.active_id else ""
+                item = QListWidgetItem(f"{p['name']}  -  {p['server']}{suffix}")
+                item.setData(Qt.ItemDataRole.UserRole, p["id"])
+                pl_list.addItem(item)
+
+        def selected_pid():
+            item = pl_list.currentItem()
+            return item.data(Qt.ItemDataRole.UserRole) if item else None
+
+        def add_playlist():
+            dlg = PlaylistDialog(d)
+            if dlg.exec():
+                store.add(dlg.values())
+                reload_pl_list()
+
+        def edit_playlist():
+            pid = selected_pid()
+            pl = store.get(pid) if (store and pid) else None
+            if not pl:
+                return
+            dlg = PlaylistDialog(d, pl)
+            if dlg.exec():
+                store.update(pid, **dlg.values())
+                reload_pl_list()
+                if pid == store.active_id:
+                    self.switch_playlist(pid)   # reconnect with new details
+
+        def remove_playlist():
+            pid = selected_pid()
+            if not (store and pid):
+                return
+            if QMessageBox.question(
+                    d, "Remove playlist",
+                    "Remove this playlist? Its favorites and history are "
+                    "kept until you re-add and clear them.") \
+                    == QMessageBox.StandardButton.Yes:
+                store.remove(pid)
+                reload_pl_list()
+
+        def use_playlist():
+            pid = selected_pid()
+            if store and pid and pid != store.active_id:
+                self.switch_playlist(pid)
+                reload_pl_list()
+
+        add_btn.clicked.connect(add_playlist)
+        edit_btn.clicked.connect(edit_playlist)
+        remove_btn.clicked.connect(remove_playlist)
+        use_btn.clicked.connect(use_playlist)
+        if not store:
+            for b in (add_btn, edit_btn, remove_btn, use_btn):
+                b.setEnabled(False)
+        reload_pl_list()
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
                                   QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(d.accept)
         buttons.rejected.connect(d.reject)
         outer.addWidget(buttons)
-
-        def sign_out():
-            self.settings.remove("password")
-            d.reject()
-            QMessageBox.information(self, APP_NAME, "Restart the app to sign in again.")
-        switch_btn.clicked.connect(sign_out)
 
         if d.exec():
             self.settings.setValue("player", player_box.currentData())
@@ -2710,31 +2996,39 @@ def main():
         else:
             print("[dopeIPTV] Embedded playback: enabled", file=sys.stderr)
     settings = QSettings(ORG, ORG)
+    store = PlaylistStore(settings)
 
     client = None
     while client is None:
-        server, user, pw = (settings.value("server", ""),
-                            settings.value("username", ""),
-                            settings.value("password", ""))
-        first_run = not (server and user and pw)
-        if first_run:
+        pl = store.active()
+        if pl is None:
             dlg = LoginDialog(settings)
             if not dlg.exec():
                 return 0
             server, user, pw = dlg.values()
+            name = server.split("//")[-1].split("/")[0] or "My playlist"
+            pl = store.add({"name": name, "server": server, "username": user,
+                            "password": pw, "epg_url": "", "refresh": "never"})
+            store.set_active(pl["id"])
 
-        candidate = XtreamClient(server, user, pw)
+        candidate = XtreamClient(pl["server"], pl["username"], pl["password"])
         try:
             candidate.authenticate()
             client = candidate
-            settings.setValue("server", server)
-            settings.setValue("username", user)
-            settings.setValue("password", pw)
+            # keep the legacy single-account keys in sync (used by the login
+            # dialog's prefill and as a fallback for tooling)
+            settings.setValue("server", pl["server"])
+            settings.setValue("username", pl["username"])
+            settings.setValue("password", pl["password"])
         except Exception as e:
-            settings.remove("password")
-            QMessageBox.critical(None, "Connection failed", str(e))
+            QMessageBox.critical(None, "Connection failed",
+                                 f"{pl['name']}: {e}")
+            dlg = PlaylistDialog(None, pl)
+            if not dlg.exec():
+                return 0
+            store.update(pl["id"], **dlg.values())
 
-    w = MainWindow(client, settings)
+    w = MainWindow(client, settings, store)
     w.show()
     return app.exec()
 
