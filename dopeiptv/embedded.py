@@ -32,6 +32,13 @@ class _MpvGLWidget(QOpenGLWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        if sys.platform == "darwin":
+            from PyQt6.QtGui import QSurfaceFormat
+            fmt = QSurfaceFormat()
+            fmt.setVersion(4, 1)
+            fmt.setProfile(
+                QSurfaceFormat.OpenGLContextProfile.CoreProfile)
+            self.setFormat(fmt)
         self.setMinimumHeight(190)
         self.setSizePolicy(QSizePolicy.Policy.Expanding,
                            QSizePolicy.Policy.Expanding)
@@ -48,6 +55,10 @@ class _MpvGLWidget(QOpenGLWidget):
     def initializeGL(self) -> None:
         opts = {"vo": "libmpv", "user_agent": "dopeIPTV/1.0",
                 "keep_open": "yes"}
+        if sys.platform == "darwin":
+            # videotoolbox-copy: HW decode to CPU buffer — avoids
+            # interop issues between VideoToolbox and Qt's GL context.
+            opts["hwdec"] = "videotoolbox-copy"
         opts.update(self.EXTRA_OPTS)
         self.mpv = _libmpv.MPV(**opts)
         self._proc_address_fn = _libmpv.MpvGlGetProcAddressFn(
