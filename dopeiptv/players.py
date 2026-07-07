@@ -17,6 +17,26 @@ from PyQt6.QtWidgets import QMessageBox
 from .client import find_player_executable
 
 _libmpv_error: str | None = None
+
+
+def _find_libmpv_macos() -> None:
+    """Help ctypes find libmpv.dylib on macOS (Homebrew installs)."""
+    if sys.platform != "darwin":
+        return
+    import ctypes.util
+    if ctypes.util.find_library("mpv"):
+        return
+    for prefix in ("/opt/homebrew/lib", "/usr/local/lib"):
+        dylib = os.path.join(prefix, "libmpv.dylib")
+        if os.path.isfile(dylib):
+            os.environ.setdefault(
+                "DYLD_LIBRARY_PATH",
+                prefix + ":" + os.environ.get("DYLD_LIBRARY_PATH", ""))
+            break
+
+
+_find_libmpv_macos()
+
 try:
     import mpv as _libmpv
 except Exception as _e:
@@ -27,7 +47,12 @@ except Exception as _e:
 def embedded_playback_reason() -> str | None:
     """Returns None if in-app video is available, otherwise a short explanation."""
     if _libmpv is None:
-        return f"python-mpv/libmpv failed to load ({_libmpv_error})"
+        hint = ""
+        if sys.platform == "darwin":
+            hint = ("\n  Install with: brew install mpv && "
+                    "pip install python-mpv")
+        return (f"python-mpv/libmpv failed to load ({_libmpv_error})"
+                + hint)
     if not hasattr(_libmpv, "MpvRenderContext"):
         return "installed python-mpv is too old (needs the render-api support)"
     return None

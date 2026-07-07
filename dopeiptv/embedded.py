@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import ctypes
+import ctypes.util
 import sys
 
 from PyQt6.QtCore import QByteArray, Qt, QTimer, pyqtSignal
@@ -13,6 +15,16 @@ from PyQt6.QtWidgets import (
 )
 
 from .players import _libmpv, _register_error_callback
+
+# On macOS, Qt's getProcAddress can fail for core GL functions.
+# Load the OpenGL framework directly as a reliable fallback.
+_opengl_dll = None
+if sys.platform == "darwin":
+    try:
+        _opengl_dll = ctypes.cdll.LoadLibrary(
+            ctypes.util.find_library("OpenGL"))
+    except Exception:
+        pass
 
 
 def _format_time(seconds: float | None) -> str:
@@ -32,6 +44,13 @@ class _MpvGLWidget(QOpenGLWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        if sys.platform == "darwin":
+            from PyQt6.QtGui import QSurfaceFormat
+            fmt = QSurfaceFormat()
+            fmt.setVersion(4, 1)
+            fmt.setProfile(
+                QSurfaceFormat.OpenGLContextProfile.CoreProfile)
+            self.setFormat(fmt)
         self.setMinimumHeight(190)
         self.setSizePolicy(QSizePolicy.Policy.Expanding,
                            QSizePolicy.Policy.Expanding)
@@ -41,22 +60,52 @@ class _MpvGLWidget(QOpenGLWidget):
 
     def _get_proc_address(self, _, name: bytes) -> int:
         glctx = QOpenGLContext.currentContext()
-        if glctx is None:
-            return 0
-        return int(glctx.getProcAddress(QByteArray(name)))
+        if glctx is not None:
+            addr = glctx.getProcAddress(QByteArray(name))
+            if addr:
+                v = int(addr)
+                if v:
+                    return v
+        if _opengl_dll is not None:
+            try:
+                return ctypes.cast(
+                    getattr(_opengl_dll, name.decode("utf-8")),
+                    ctypes.c_void_p).value or 0
+            except (AttributeError, OSError):
+                pass
+        return 0
 
     def initializeGL(self) -> None:
+        self.makeCurrent()
+        glctx = QOpenGLContext.currentContext()
+        if glctx is not None:
+            v = glctx.format().version()
+            print(f"[dopeIPTV] GL context: {v[0]}.{v[1]} "
+                  f"profile={glctx.format().profile().name}",
+                  file=sys.stderr)
+        else:
+            print("[dopeIPTV] WARNING: no GL context in initializeGL",
+                  file=sys.stderr)
         opts = {"vo": "libmpv", "user_agent": "dopeIPTV/1.0",
-                "keep_open": "yes"}
+                "keep_open": "yes", "input_default_bindings": False,
+                "input_vo_keyboard": False, "osc": False,
+                "terminal": False}
+        if sys.platform == "darwin":
+            opts["hwdec"] = "videotoolbox-copy"
         opts.update(self.EXTRA_OPTS)
+        print("[dopeIPTV] Creating mpv instance...", file=sys.stderr)
         self.mpv = _libmpv.MPV(**opts)
+        print("[dopeIPTV] mpv created, creating render context...",
+              file=sys.stderr)
         self._proc_address_fn = _libmpv.MpvGlGetProcAddressFn(
             self._get_proc_address)
         self._ctx = _libmpv.MpvRenderContext(
             self.mpv, "opengl",
-            opengl_init_params={"get_proc_address": self._proc_address_fn})
+            opengl_init_params={
+                "get_proc_address": self._proc_address_fn})
         self._ctx.update_cb = lambda: self.frame_ready.emit()
         _register_error_callback(self.mpv, self.playback_error)
+        print("[dopeIPTV] Render context ready", file=sys.stderr)
 
     def paintGL(self) -> None:
         if not self._ctx:
