@@ -16,20 +16,38 @@ See [FEATURES.md](FEATURES.md) for the full feature list.
 
 ## Installation
 
+Make sure Git is installed:
+
+```bash
+# Debian/Ubuntu
+sudo apt install git
+
+# Fedora
+sudo dnf install git
+
+# Arch
+sudo pacman -S git
+```
+
+Install using install.sh:
+
+```bash
+git clone https://github.com/slimture/dopeIPTV.git
+cd dopeIPTV
+./install.sh
+```
+
+The installer will install the required dependencies:
+
 ```bash
 # Dependencies (ffmpeg is optional - preferred recorder for the Record feature)
 sudo apt install python3 python3-pip pipx mpv vlc ffmpeg   # Debian/Ubuntu
 # or: sudo dnf install python3 python3-pip pipx mpv vlc ffmpeg  # Fedora
 # or: sudo pacman -S python python-pipx mpv vlc ffmpeg          # Arch
 
-# Make sure pipx is available in your PATH
 pipx ensurepath
-
-# Clone and install dopeIPTV
-git clone https://github.com/slimture/dopeIPTV.git
-cd dopeIPTV
-
 pipx install .
+```
 
 ## Running
 
@@ -48,6 +66,15 @@ update-desktop-database ~/.local/share/applications
 ```
 
 The application icon is installed automatically to `~/.local/share/icons` the first time the app starts.
+
+
+## Add to the application menu (optional)
+
+mkdir -p ~/.local/share/applications
+cp dopeiptv.desktop ~/.local/share/applications/
+update-desktop-database ~/.local/share/applications
+
+The application icon is installed automatically to ~/.local/share/icons the first time the app starts.
 
 ## Usage
 
