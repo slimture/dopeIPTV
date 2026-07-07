@@ -1,8 +1,6 @@
 PyQt6>=6.5
 requests>=2.28
-
-# Optional - enables embedded in-app video (Linux and macOS):
-# python-mpv>=1.0
+python-mpv>=1.0
 
 # Optional - enables Chromecast casting:
 # pychromecast>=13.0
