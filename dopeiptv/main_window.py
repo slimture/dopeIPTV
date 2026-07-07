@@ -128,6 +128,7 @@ class MainWindow(QMainWindow):
         quit_action.triggered.connect(self.close)
 
         root = QSplitter(Qt.Orientation.Horizontal)
+        root.setHandleWidth(6)
         self.setCentralWidget(root)
 
         # Sidebar
@@ -392,8 +393,14 @@ class MainWindow(QMainWindow):
                   activated=self._toggle_fullscreen_shortcut)
         QShortcut(QKeySequence(Qt.Key.Key_Delete), self,
                   activated=self._delete_pressed)
+        QShortcut(QKeySequence(Qt.Key.Key_Space), self,
+                  activated=self._toggle_pause_shortcut)
 
         self._apply_view_settings()
+
+    def _toggle_pause_shortcut(self) -> None:
+        if self.player and self.player.isVisible():
+            self.player.toggle_pause()
 
     # -- fullscreen ----------------------------------------------------------------
 
@@ -2045,6 +2052,8 @@ class MainWindow(QMainWindow):
 
     def _build_timeshift_menu(self, ts_menu, it) -> None:
         days = self._timeshift_days(it)
+        ts_menu.addAction("Go Live", lambda: self.play_live_channel(it))
+        ts_menu.addSeparator()
         prog = self.xmltv.current_programme(it)
         if prog:
             ts_menu.addAction(

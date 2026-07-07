@@ -85,9 +85,12 @@ def main() -> int:
     if _libmpv is not None:
         os.environ.setdefault("LC_NUMERIC", "C")
 
-    if _libmpv is not None and sys.platform == "darwin":
-        from .platform_macos import setup_opengl
-        setup_opengl()
+    if sys.platform == "darwin":
+        from .platform_macos import fix_app_name
+        fix_app_name(APP_NAME)
+        if _libmpv is not None:
+            from .platform_macos import setup_opengl
+            setup_opengl()
 
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)

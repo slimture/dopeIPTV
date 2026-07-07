@@ -184,7 +184,13 @@ QPushButton {{
 QPushButton:hover  {{ background: {p['btn_hover']}; }}
 QPushButton#Primary {{ background: {ACCENT}; border: none; color: white; }}
 QPushButton#Primary:hover {{ background: {p['accent_hi']}; }}
-QPushButton#MiniBtn {{ padding: 3px 6px; font-size: 11px; border-radius: 6px; }}
+QPushButton#MiniBtn {{
+    padding: 3px 6px; font-size: 11px; border-radius: 6px;
+    min-width: 24px; min-height: 24px; text-align: center;
+}}
+
+QSplitter::handle {{ background: transparent; width: 6px; }}
+QSplitter::handle:hover {{ background: {p['border_in']}; }}
 
 QScrollArea {{ background: transparent; border: none; }}
 QScrollArea > QWidget > QWidget {{ background: transparent; }}
@@ -226,8 +232,8 @@ QTabWidget::pane {{
     top: -1px;
 }}
 QTabBar::tab {{
-    background: transparent; color: {p['text2']}; padding: 7px 16px;
-    border-radius: 7px; margin: 2px; font-size: 12px;
+    background: transparent; color: {p['text2']}; padding: 7px 18px;
+    border-radius: 7px; margin: 2px; font-size: 12px; min-width: 60px;
 }}
 QTabBar::tab:selected {{ background: {p['btn']}; color: {p['text']}; }}
 QTabBar::tab:hover:!selected {{ background: {p['hover']}; }}
