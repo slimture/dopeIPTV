@@ -234,7 +234,7 @@ class EmbeddedPlayer(QWidget):
         self.stop_btn = QPushButton("■", objectName="MiniBtn")
         self.stop_btn.setToolTip("Stop playback")
         self.stop_btn.clicked.connect(self.stop)
-        self.pip_btn = QPushButton("🖼", objectName="MiniBtn")
+        self.pip_btn = QPushButton("PiP", objectName="MiniBtn")
         self.pip_btn.setToolTip("Picture-in-Picture")
         self.pip_btn.clicked.connect(self.pip_requested)
         self.fs_btn = QPushButton("⛶", objectName="MiniBtn")

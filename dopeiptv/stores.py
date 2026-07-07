@@ -48,6 +48,16 @@ class FavoriteStore:
                               if x.get("stream_id") != stream_id]
         self._save()
 
+    def is_favorite(self, stream_id) -> bool:
+        for items in self.groups.values():
+            if any(x.get("stream_id") == stream_id for x in items):
+                return True
+        return False
+
+    def groups_for(self, stream_id) -> list[str]:
+        return [g for g, items in self.groups.items()
+                if any(x.get("stream_id") == stream_id for x in items)]
+
     def remove_group(self, group: str) -> None:
         self.groups.pop(group, None)
         if group in self.locked_groups():

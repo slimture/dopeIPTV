@@ -666,8 +666,15 @@ class MainWindow(QMainWindow):
                 if (self.overrides.is_locked(self.mode, cid)
                         and not self.parental.session_unlocked):
                     name += "  [locked]"
+                ovr = self.overrides.get(self.mode, cid)
+                icon = ovr.get("icon", "")
+                if icon:
+                    name = f"{icon}  {name}"
                 it = QListWidgetItem(name)
                 it.setData(Qt.ItemDataRole.UserRole, cid)
+                color = ovr.get("color", "")
+                if color:
+                    it.setForeground(QColor(color))
                 self.cat_list.addItem(it)
             self.cat_list.blockSignals(False)
             self.cat_list.setCurrentRow(0)
@@ -1593,6 +1600,19 @@ class MainWindow(QMainWindow):
             cid = data
             m.addAction("Rename category...",
                         lambda: self._rename_category(cid))
+            m.addAction("Set icon...",
+                        lambda: self._set_category_icon(cid))
+            color_menu = m.addMenu("Set color")
+            for label, hex_val in (("Default", ""), ("Blue", "#4C8DFF"),
+                                   ("Green", "#2FBF71"), ("Orange", "#FF9F43"),
+                                   ("Red", "#FF5C5C"), ("Purple", "#8E6BFF"),
+                                   ("Teal", "#2AC3C3"), ("Pink", "#FF5C8A")):
+                act = color_menu.addAction(label)
+                act.triggered.connect(
+                    lambda _, c=hex_val: (
+                        self.overrides.update(self.mode, cid, color=c),
+                        self._load_categories()))
+            m.addSeparator()
             m.addAction("Hide category",
                         lambda: self._set_category_flag(cid, hidden=True))
             if self.overrides.is_locked(self.mode, cid):
@@ -1623,6 +1643,16 @@ class MainWindow(QMainWindow):
             self, "Rename category", "New name:", text=current)
         if ok:
             self.overrides.update(self.mode, cid, name=name.strip())
+            self._load_categories()
+
+    def _set_category_icon(self, cid) -> None:
+        current = self.overrides.get(self.mode, cid).get("icon", "")
+        icon, ok = QInputDialog.getText(
+            self, "Set category icon",
+            "Enter an emoji or short text (leave blank to remove):",
+            text=current)
+        if ok:
+            self.overrides.update(self.mode, cid, icon=icon.strip())
             self._load_categories()
 
     def _set_category_flag(self, cid, **fields) -> None:
