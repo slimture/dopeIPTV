@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtCore import QSettings, Qt
-from PyQt6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPixmap, QSurfaceFormat
+from PyQt6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPixmap
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
 from . import APP_NAME, ORG
@@ -15,6 +15,21 @@ from .client import XtreamClient
 from .dialogs import LoginDialog, PlaylistDialog
 from .main_window import MainWindow
 from .players import _libmpv, _libmpv_error, embedded_playback_reason
+
+_SUPPRESSED_QT_WARNINGS = (
+    b"Failed to register with host portal",
+    b"Got leave event for surface",
+)
+_original_msg_handler = None
+
+
+def _qt_message_filter(msg_type, context, message):
+    msg_bytes = message.encode("utf-8", "replace") if isinstance(message, str) else message
+    for pattern in _SUPPRESSED_QT_WARNINGS:
+        if pattern in msg_bytes:
+            return
+    if _original_msg_handler is not None:
+        _original_msg_handler(msg_type, context, message)
 from .stores import PlaylistStore
 from .theme import ACCENT, apply_theme, build_style
 
@@ -55,29 +70,18 @@ def install_icon(icon: QIcon) -> None:
         pass
 
 
-def _setup_opengl_macos() -> None:
-    """Request OpenGL 4.1 Core Profile on macOS (required for mpv render API)."""
-    fmt = QSurfaceFormat()
-    fmt.setVersion(4, 1)
-    fmt.setProfile(QSurfaceFormat.OpenGLContextProfile.CoreProfile)
-    fmt.setDepthBufferSize(0)
-    fmt.setStencilBufferSize(0)
-    QSurfaceFormat.setDefaultFormat(fmt)
-
-
 def main() -> int:
     """Launch the application."""
+    global _original_msg_handler
+    from PyQt6.QtCore import qInstallMessageHandler
+    _original_msg_handler = qInstallMessageHandler(_qt_message_filter)
+
     if _libmpv is None:
         print(f"[dopeIPTV] Embedded playback disabled: {_libmpv_error}",
               file=sys.stderr)
 
     if _libmpv is not None:
         os.environ.setdefault("LC_NUMERIC", "C")
-
-    if _libmpv is not None and sys.platform == "darwin":
-        QApplication.setAttribute(
-            Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
-        _setup_opengl_macos()
 
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)

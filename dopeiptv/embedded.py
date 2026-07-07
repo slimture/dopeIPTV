@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import ctypes
-import ctypes.util
 import sys
 
 from PyQt6.QtCore import QByteArray, Qt, QTimer, pyqtSignal
@@ -15,16 +13,6 @@ from PyQt6.QtWidgets import (
 )
 
 from .players import _libmpv, _register_error_callback
-
-# On macOS, Qt's getProcAddress can fail for core GL functions.
-# Load the OpenGL framework directly as a reliable fallback.
-_opengl_dll = None
-if sys.platform == "darwin":
-    try:
-        _opengl_dll = ctypes.cdll.LoadLibrary(
-            ctypes.util.find_library("OpenGL"))
-    except Exception:
-        pass
 
 
 def _format_time(seconds: float | None) -> str:
@@ -44,13 +32,6 @@ class _MpvGLWidget(QOpenGLWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        if sys.platform == "darwin":
-            from PyQt6.QtGui import QSurfaceFormat
-            fmt = QSurfaceFormat()
-            fmt.setVersion(4, 1)
-            fmt.setProfile(
-                QSurfaceFormat.OpenGLContextProfile.CoreProfile)
-            self.setFormat(fmt)
         self.setMinimumHeight(190)
         self.setSizePolicy(QSizePolicy.Policy.Expanding,
                            QSizePolicy.Policy.Expanding)
@@ -66,13 +47,6 @@ class _MpvGLWidget(QOpenGLWidget):
                 v = int(addr)
                 if v:
                     return v
-        if _opengl_dll is not None:
-            try:
-                return ctypes.cast(
-                    getattr(_opengl_dll, name.decode("utf-8")),
-                    ctypes.c_void_p).value or 0
-            except (AttributeError, OSError):
-                pass
         return 0
 
     def initializeGL(self) -> None:
@@ -90,8 +64,6 @@ class _MpvGLWidget(QOpenGLWidget):
                 "keep_open": "yes", "input_default_bindings": False,
                 "input_vo_keyboard": False, "osc": False,
                 "terminal": False}
-        if sys.platform == "darwin":
-            opts["hwdec"] = "videotoolbox-copy"
         opts.update(self.EXTRA_OPTS)
         print("[dopeIPTV] Creating mpv instance...", file=sys.stderr)
         self.mpv = _libmpv.MPV(**opts)
@@ -374,6 +346,16 @@ class EmbeddedPlayer(QWidget):
         self._overlay_timer.setInterval(self.OVERLAY_HIDE_MS)
         self._overlay_timer.timeout.connect(self._hide_fs_ui)
 
+        self._stats_overlay = QLabel("", self.video)
+        self._stats_overlay.setStyleSheet(
+            "background: rgba(0,0,0,180); color: #ECECF1;"
+            "border-radius: 6px; padding: 8px 10px;"
+            "font-family: monospace; font-size: 11px;")
+        self._stats_overlay.hide()
+        self._stats_timer = QTimer(self)
+        self._stats_timer.setInterval(1000)
+        self._stats_timer.timeout.connect(self._update_stats_text)
+
     # -- event filter ----------------------------------------------------------
 
     def eventFilter(self, obj, event):
@@ -655,8 +637,21 @@ class EmbeddedPlayer(QWidget):
         menu.exec(anchor.mapToGlobal(anchor.rect().bottomLeft()))
 
     def _show_stats(self) -> None:
+        if self._stats_overlay.isVisible():
+            self._stats_overlay.hide()
+            self._stats_timer.stop()
+            return
+        self._update_stats_text()
+        self._stats_overlay.show()
+        self._stats_overlay.raise_()
+        self._place_stats()
+        self._stats_timer.start()
+
+    def _update_stats_text(self) -> None:
         m = self.video.mpv
         if m is None:
+            self._stats_overlay.hide()
+            self._stats_timer.stop()
             return
 
         def prop(name, fmt=str):
@@ -699,27 +694,19 @@ class EmbeddedPlayer(QWidget):
         lines = [
             f"Video: {track_info('video')}",
             f"Audio: {track_info('audio')}",
-            f"Hardware decoding: {prop('hwdec-current')}",
+            f"HW dec: {prop('hwdec-current')}",
             f"A/V sync: {prop('avsync', lambda v: f'{v:.3f} s')}",
-            f"Dropped frames: {prop('frame-drop-count')}",
+            f"Dropped: {prop('frame-drop-count')}",
             f"Cache: {prop('demuxer-cache-duration', lambda v: f'{v:.1f} s')}",
-            f"Network speed: {prop('cache-speed', lambda v: f'{v / 1024:.0f} KB/s' if v else '—')}",
-            f"File format: {prop('file-format')}",
-            f"Demuxer: {prop('demuxer')}",
+            f"Net: {prop('cache-speed', lambda v: f'{v / 1024:.0f} KB/s' if v else '—')}",
+            f"Format: {prop('file-format')}",
         ]
+        self._stats_overlay.setText("\n".join(lines))
+        self._place_stats()
 
-        from PyQt6.QtWidgets import QDialog, QTextEdit
-        dlg = QDialog(self)
-        dlg.setWindowTitle("Stats for nerds")
-        dlg.setMinimumSize(380, 260)
-        lay = QVBoxLayout(dlg)
-        lay.setContentsMargins(12, 12, 12, 12)
-        txt = QTextEdit()
-        txt.setReadOnly(True)
-        txt.setPlainText("\n".join(lines))
-        txt.setStyleSheet("font-family: monospace; font-size: 12px;")
-        lay.addWidget(txt)
-        dlg.show()
+    def _place_stats(self) -> None:
+        self._stats_overlay.adjustSize()
+        self._stats_overlay.move(8, 8)
 
     def _set_mpv(self, prop: str, value) -> None:
         m = self.video.mpv
@@ -832,8 +819,11 @@ class EmbeddedPlayer(QWidget):
                 pass
         self.title_lbl.setText("")
         self._hide_seek_ui()
+        self._stats_overlay.hide()
+        self._stats_timer.stop()
 
     def shutdown(self) -> None:
         self.stop_stream_record()
         self._pos_timer.stop()
+        self._stats_timer.stop()
         self.video.shutdown()

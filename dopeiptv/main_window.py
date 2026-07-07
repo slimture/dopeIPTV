@@ -137,7 +137,7 @@ class MainWindow(QMainWindow):
         sl.setSpacing(4)
 
         title = QLabel("dopeIPTV", objectName="AppTitle")
-        sub = QLabel("for Linux & macOS", objectName="AppSub")
+        sub = QLabel("for Linux", objectName="AppSub")
         sl.addWidget(title)
         sl.addWidget(sub)
         sl.addSpacing(14)

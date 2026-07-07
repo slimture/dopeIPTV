@@ -2,17 +2,13 @@
 
 from __future__ import annotations
 
-import subprocess
-import sys
-
 from . import APP_NAME
 
 
 class WakeLock:
     """Keeps the screen and system awake while video plays.
 
-    Linux: DBus inhibitors (org.freedesktop.ScreenSaver + PowerManagement).
-    macOS: a caffeinate child process.
+    Uses DBus inhibitors (org.freedesktop.ScreenSaver + PowerManagement).
     Acquire/release are idempotent.
     """
 
@@ -26,22 +22,13 @@ class WakeLock:
 
     def __init__(self) -> None:
         self._cookies: list[tuple] = []
-        self._proc: subprocess.Popen | None = None
 
     @property
     def held(self) -> bool:
-        return bool(self._cookies or self._proc)
+        return bool(self._cookies)
 
     def acquire(self, reason: str = "Playing video") -> None:
         if self.held:
-            return
-        if sys.platform == "darwin":
-            try:
-                self._proc = subprocess.Popen(
-                    ["caffeinate", "-di"], stdin=subprocess.DEVNULL,
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            except Exception:
-                pass
             return
         try:
             from PyQt6.QtDBus import QDBusConnection, QDBusInterface
@@ -66,9 +53,3 @@ class WakeLock:
             except Exception:
                 pass
         self._cookies = []
-        if self._proc:
-            try:
-                self._proc.terminate()
-            except Exception:
-                pass
-            self._proc = None
