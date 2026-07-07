@@ -56,16 +56,23 @@ def install_icon(icon: QIcon) -> None:
 
 
 def _setup_opengl() -> None:
-    """Configure OpenGL surface format for embedded mpv on macOS only."""
-    if sys.platform != "darwin":
-        return
+    """Configure OpenGL surface format for embedded mpv playback.
 
+    macOS only supports OpenGL up to 4.1 and requires an explicit Core
+    Profile request — without it Qt creates a Legacy 2.1 context that
+    mpv's render API cannot use.  On Linux the default is fine, but
+    requesting Core Profile is harmless and gives mpv the best context.
+    """
     fmt = QSurfaceFormat()
-    fmt.setVersion(4, 1)
+    if sys.platform == "darwin":
+        fmt.setVersion(4, 1)
+    else:
+        fmt.setVersion(3, 3)
     fmt.setProfile(QSurfaceFormat.OpenGLContextProfile.CoreProfile)
     fmt.setDepthBufferSize(0)
     fmt.setStencilBufferSize(0)
     QSurfaceFormat.setDefaultFormat(fmt)
+
 
 def main() -> int:
     """Launch the application."""
@@ -73,10 +80,11 @@ def main() -> int:
         print(f"[dopeIPTV] Embedded playback disabled: {_libmpv_error}",
               file=sys.stderr)
 
-if _libmpv is not None and sys.platform == "darwin":
-    QApplication.setAttribute(
-        Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
-    _setup_opengl()
+    if _libmpv is not None:
+        os.environ.setdefault("LC_NUMERIC", "C")
+        QApplication.setAttribute(
+            Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
+        _setup_opengl()
 
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
