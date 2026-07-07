@@ -2,7 +2,7 @@
 Type=Application
 Name=dopeIPTV
 Comment=IPTV client with Xtream Codes and EPG
-Exec=sh -c "exec python3 $HOME/.local/bin/dopeiptv.py"
+Exec=dopeiptv
 Icon=dopeiptv
 Terminal=false
 Categories=AudioVideo;Video;TV;
