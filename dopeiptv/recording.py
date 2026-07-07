@@ -152,10 +152,10 @@ class RecordingManager(QObject):
         return job
 
     def add_inplayer_job(self, title: str, path: str,
-                         stop_ts: float | None) -> dict:
+                         stop_ts: float | None, url: str = "") -> dict:
         """Register a recording that rides the embedded player's stream."""
         job: dict[str, Any] = {
-            "id": uuid.uuid4().hex[:10], "url": "", "title": title,
+            "id": uuid.uuid4().hex[:10], "url": url, "title": title,
             "start": time.time(), "stop": stop_ts, "folder": "",
             "status": "recording", "path": path, "error": "",
             "proc": None, "inplayer": True}
