@@ -7,7 +7,7 @@ a = Analysis(
     binaries=[],
     datas=[],
     hiddenimports=[     
-	'mpv',
+		'mpv',
         'pychromecast',
     ],
     hookspath=[],
