@@ -234,9 +234,21 @@ QTabBar::tab:hover:!selected {{ background: {p['hover']}; }}
 
 QComboBox {{
     background: {p['input']}; border: 1px solid {p['border_in']}; border-radius: 8px;
-    padding: 5px 10px; font-size: 12px;
+    padding: 5px 10px 5px 10px; font-size: 12px;
     combobox-popup: 0;
 }}
+QComboBox::drop-down {{
+    subcontrol-origin: padding; subcontrol-position: center right;
+    width: 18px; border: none; background: transparent;
+}}
+QComboBox::down-arrow {{
+    image: none; border: none; background: transparent;
+    width: 0; height: 0;
+    border-left: 4px solid transparent; border-right: 4px solid transparent;
+    border-top: 5px solid {p['muted2']};
+    margin-right: 6px;
+}}
+QComboBox::down-arrow:hover {{ border-top-color: {p['text']}; }}
 QComboBox QAbstractItemView {{
     background: {p['input']}; border: 1px solid {p['border_in']}; border-radius: 6px;
     selection-background-color: {ACCENT}; selection-color: white;
@@ -244,11 +256,37 @@ QComboBox QAbstractItemView {{
 }}
 QComboBox QAbstractItemView::item {{ min-height: 22px; padding: 3px 8px; }}
 QComboBox#InlineCombo {{ padding: 3px 8px; font-size: 11px; }}
+QComboBox#InlineCombo::drop-down {{ width: 14px; }}
+QComboBox#InlineCombo::down-arrow {{
+    border-left: 3px solid transparent; border-right: 3px solid transparent;
+    border-top: 4px solid {p['muted2']}; margin-right: 4px;
+}}
 QPushButton#InlineToggle {{
     padding: 4px 12px; font-size: 11px; border-radius: 7px;
 }}
 QPushButton#InlineToggle:checked {{ background: {ACCENT}; border: none; color: white; }}
 #MiddlePane QLabel {{ color: {p['muted2']}; font-size: 11px; }}
+QDateTimeEdit {{
+    background: {p['input']}; border: 1px solid {p['border_in']}; border-radius: 8px;
+    padding: 5px 10px; font-size: 12px;
+}}
+QDateTimeEdit::up-button, QDateTimeEdit::down-button {{
+    subcontrol-origin: border; width: 16px; border: none;
+    background: transparent;
+}}
+QDateTimeEdit::up-arrow {{
+    image: none; width: 0; height: 0;
+    border-left: 3px solid transparent; border-right: 3px solid transparent;
+    border-bottom: 4px solid {p['muted2']};
+}}
+QDateTimeEdit::down-arrow {{
+    image: none; width: 0; height: 0;
+    border-left: 3px solid transparent; border-right: 3px solid transparent;
+    border-top: 4px solid {p['muted2']};
+}}
+QDateTimeEdit::up-arrow:hover {{ border-bottom-color: {p['text']}; }}
+QDateTimeEdit::down-arrow:hover {{ border-top-color: {p['text']}; }}
+
 QLineEdit {{
     background: {p['input']}; border: 1px solid {p['border_in']}; border-radius: 8px;
     padding: 8px 10px;
