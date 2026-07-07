@@ -50,7 +50,7 @@ from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 
 APP_NAME = "dopeIPTV"
 ORG = "dopeiptv"
-VERSION = "0.1.0-beta.4"
+VERSION = "0.1.0-beta.5"
 
 # Optional embedded playback via libmpv (python-mpv). Imported lazily so the
 # app still runs fine without it - playback then falls back to the reused
@@ -360,11 +360,24 @@ class XmltvGuide:
             if self._failed and not force:
                 return False
             data = None if force else self._read_cache(max_age=self.CACHE_TTL)
+            source = "cache"
             if data is None:
+                stale = None if force else self._read_cache(max_age=None)
+                if stale is not None and not self._loaded:
+                    # Show last session's guide immediately - the fresh
+                    # download replaces it below without blocking the UI on
+                    # an empty EPG in the meantime.
+                    try:
+                        self._parse(stale)
+                        self._loaded = True
+                    except Exception:
+                        pass
                 try:
                     data = self._download()
+                    source = "download"
                 except Exception:
-                    data = self._read_cache(max_age=None)   # stale fallback
+                    data = stale
+                    source = "stale cache (download failed)"
             if data is None:
                 self._failed = True
                 return False
@@ -372,8 +385,10 @@ class XmltvGuide:
                 self._parse(data)
                 self._loaded = True
                 self._failed = False
+                print(f"[dopeIPTV] EPG loaded from {source} "
+                      f"({len(data) // 1024} KB)", file=sys.stderr)
             except Exception:
-                self._failed = True
+                self._failed = self._loaded is False
             return self._loaded
 
     def _entries_for(self, item):
@@ -1194,6 +1209,70 @@ class ChromecastManager:
                 pass
 
 
+class WakeLock:
+    """Keeps the screen and system awake while video plays - fullscreen or
+    mini player. Linux: DBus inhibitors (org.freedesktop.ScreenSaver +
+    PowerManagement, honored by GNOME and KDE). macOS: a caffeinate child
+    process. Acquire/release are idempotent."""
+
+    DBUS_SERVICES = (
+        ("org.freedesktop.ScreenSaver", "/org/freedesktop/ScreenSaver",
+         "org.freedesktop.ScreenSaver"),
+        ("org.freedesktop.PowerManagement.Inhibit",
+         "/org/freedesktop/PowerManagement/Inhibit",
+         "org.freedesktop.PowerManagement.Inhibit"),
+    )
+
+    def __init__(self):
+        self._cookies = []       # (QDBusInterface, cookie)
+        self._proc = None
+
+    @property
+    def held(self):
+        return bool(self._cookies or self._proc)
+
+    def acquire(self, reason="Playing video"):
+        if self.held:
+            return
+        if sys.platform == "darwin":
+            try:
+                self._proc = subprocess.Popen(
+                    ["caffeinate", "-di"], stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
+            return
+        try:
+            from PyQt6.QtDBus import QDBusConnection, QDBusInterface
+        except Exception:
+            return
+        bus = QDBusConnection.sessionBus()
+        if not bus.isConnected():
+            return
+        for svc, path, iface_name in self.DBUS_SERVICES:
+            iface = QDBusInterface(svc, path, iface_name, bus)
+            if not iface.isValid():
+                continue
+            reply = iface.call("Inhibit", APP_NAME, reason)
+            args = reply.arguments()
+            if args and isinstance(args[0], int):
+                self._cookies.append((iface, args[0]))
+
+    def release(self):
+        for iface, cookie in self._cookies:
+            try:
+                iface.call("UnInhibit", cookie)
+            except Exception:
+                pass
+        self._cookies = []
+        if self._proc:
+            try:
+                self._proc.terminate()
+            except Exception:
+                pass
+            self._proc = None
+
+
 def safe_filename(name):
     """Strips characters that are unsafe in filenames."""
     cleaned = "".join(c for c in (name or "recording")
@@ -1218,6 +1297,7 @@ class RecordingManager(QObject):
     (persisted via QSettings); an active recording dies with the app."""
 
     jobs_changed = pyqtSignal()
+    recording_stopped = pyqtSignal(str, str)   # title, reason - for loud UI
 
     VIDEO_EXTS = {".ts", ".mp4", ".mkv", ".avi", ".mov", ".webm", ".m2ts"}
 
@@ -1346,6 +1426,7 @@ class RecordingManager(QObject):
                 except Exception:
                     pass
             j["status"] = "done"
+            self.recording_stopped.emit(j["title"], reason or "stopped")
             self.jobs_changed.emit()
 
             # mpv buffers the recording and only flushes it to disk when
@@ -1456,8 +1537,26 @@ class RecordingManager(QObject):
             except subprocess.TimeoutExpired:
                 p.kill()
 
+    def _max_bytes(self):
+        """Optional size cap for recordings, from Settings (0 = no cap)."""
+        try:
+            val = float(self.settings.value("rec_max_value", 0) or 0)
+        except (TypeError, ValueError):
+            return 0
+        mult = {"MB": 10**6, "GB": 10**9, "TB": 10**12}.get(
+            self.settings.value("rec_max_unit", "GB"), 10**9)
+        return int(val * mult) if val > 0 else 0
+
+    def _over_size_cap(self, j, cap):
+        try:
+            return (cap and j.get("path") and os.path.exists(j["path"])
+                    and os.path.getsize(j["path"]) >= cap)
+        except OSError:
+            return False
+
     def tick(self):
         now = time.time()
+        cap = self._max_bytes()
         changed = False
         for j in self.jobs:
             if j["status"] == "scheduled" and j["start"] <= now:
@@ -1470,12 +1569,19 @@ class RecordingManager(QObject):
                 changed = True
             elif j["status"] == "recording" and j.get("inplayer"):
                 if j.get("stop") is not None and j["stop"] <= now:
-                    self.finish_inplayer(j["id"])   # emits jobs_changed
+                    self.finish_inplayer(j["id"], "finished")
+                elif self._over_size_cap(j, cap):
+                    self.finish_inplayer(j["id"], "size limit reached")
             elif j["status"] == "recording":
                 rc = j["proc"].poll() if j.get("proc") else 0
-                if j.get("stop") is not None and j["stop"] <= now:
+                if ((j.get("stop") is not None and j["stop"] <= now)
+                        or self._over_size_cap(j, cap)):
                     self._stop_proc(j)
                     j["status"] = "done"
+                    self.recording_stopped.emit(
+                        j["title"],
+                        "size limit reached" if self._over_size_cap(j, cap)
+                        else "finished")
                     changed = True
                 elif rc is not None:
                     ok = (rc == 0 and j.get("path")
@@ -1484,6 +1590,9 @@ class RecordingManager(QObject):
                     j["status"] = "done" if ok else "failed"
                     if not ok:
                         j["error"] = f"recorder exited early (code {rc})"
+                    self.recording_stopped.emit(
+                        j["title"], "finished" if ok
+                        else "recorder stopped unexpectedly")
                     changed = True
         if changed:
             self.jobs_changed.emit()
@@ -1913,16 +2022,22 @@ class EmbeddedPlayer(QWidget):
         else:
             self._hide_fs_ui()
             self._overlay_timer.stop()
+            self.unsetCursor()
             self.video.unsetCursor()
 
     def _hide_fs_ui(self):
         self.overlay.hide()
         self.fs_controls.hide()
         if self._fs_ui:
-            # inactivity in fullscreen also hides the mouse cursor
+            # Inactivity in fullscreen also hides the mouse cursor. Set it
+            # on the whole player widget, not just the video surface - the
+            # pointer may rest on a margin or where a control just
+            # disappeared, and then a video-only cursor never applied.
+            self.setCursor(Qt.CursorShape.BlankCursor)
             self.video.setCursor(Qt.CursorShape.BlankCursor)
 
     def _show_overlay(self):
+        self.unsetCursor()
         self.video.unsetCursor()
         if self._overlay_text:
             self.overlay.setText(self._overlay_text)
@@ -1974,6 +2089,38 @@ class EmbeddedPlayer(QWidget):
         if self.overlay.isVisible() or self.fs_controls.isVisible():
             self._place_overlay()
 
+    def apply_default_options(self):
+        """Applies the persistent playback defaults from Settings (audio
+        language, subtitles, aspect ratio, network buffer) to the mpv core.
+        Called on every play and when Settings are saved, so per-session ⚙
+        tweaks still win until the next play."""
+        m = self.video.mpv
+        if m is None or self._settings is None:
+            return
+        s = self._settings
+
+        def set_opt(prop, value):
+            try:
+                m[prop] = value
+            except Exception:
+                pass
+
+        set_opt("alang", s.value("audio_lang", "") or "")
+        sub_mode = s.value("sub_mode", "auto")
+        if sub_mode == "off":
+            set_opt("sid", "no")
+        else:
+            set_opt("sid", "auto")
+            set_opt("slang", (s.value("sub_lang", "") or "")
+                    if sub_mode == "lang" else "")
+        aspect = s.value("aspect_mode", "auto")
+        if aspect == "stretch":
+            set_opt("keepaspect", False)
+        else:
+            set_opt("keepaspect", True)
+            set_opt("video-aspect-override",
+                    aspect if aspect != "auto" else "-1")
+
     def play(self, url, title):
         try:
             self.title_lbl.setText(title or "")
@@ -1996,6 +2143,7 @@ class EmbeddedPlayer(QWidget):
                 m["cache-secs"] = float(self._cache_secs())
             except Exception:
                 pass
+            self.apply_default_options()
             self._sync_pause_label(False)
             try:
                 m.pause = False           # a new channel always starts playing
@@ -3099,12 +3247,15 @@ class MainWindow(QMainWindow):
         self.cast = ChromecastManager()
         self.rec = RecordingManager(settings, self)
         self.rec.jobs_changed.connect(self._recordings_changed)
+        self.rec.recording_stopped.connect(self._on_recording_stopped)
+        self.wake = WakeLock()   # no screensaver/suspend while video plays
         self._raw_categories = []          # unfiltered, for the content manager
         self.mpv = MpvIpcPlayer()
         self.mpv_window = MpvWindowPlayer() if _libmpv is not None else None
         if self.mpv_window:
             self.mpv_window.zap_requested.connect(self._zap)
             self.mpv_window.playback_error.connect(self._playback_error)
+            self.mpv_window.closed.connect(lambda: self.wake.release())
         # One-time migration: older versions auto-persisted playback_mode
         # ("window") via the Settings dialog while embedding was unreliable
         # on Wayland compositors. The OpenGL render API made embedded the
@@ -3313,6 +3464,8 @@ class MainWindow(QMainWindow):
             self.rec.stop_inplayer_cb = self.player.stop_stream_record
             self.player.stop_btn.clicked.connect(
                 lambda: self.rec.finish_all_inplayer("playback stopped"))
+            self.player.stop_btn.clicked.connect(
+                lambda: self.wake.release())
             self.player.playback_error.connect(self._playback_error)
             self.player.zap.connect(self._zap)
             self.player.stop_btn.clicked.connect(self.player.hide)
@@ -3433,6 +3586,7 @@ class MainWindow(QMainWindow):
             return
         self._player_fs = True
         self._fs_return_index = self.listw.currentIndex()
+        self._fs_return_scroll = self.listw.verticalScrollBar().value()
         # No reparenting (that would tear down the GL context mpv renders
         # into) - instead hide everything around the video and fullscreen
         # the main window so the player pane stretches to fill it.
@@ -3487,11 +3641,17 @@ class MainWindow(QMainWindow):
         # Coming back from fullscreen must land on the playing channel, not
         # at the top of the list.
         idx = getattr(self, "_fs_return_index", None)
+        scroll = getattr(self, "_fs_return_scroll", None)
         if idx is not None and idx.isValid():
             QTimer.singleShot(0, lambda: (
                 self.listw.setCurrentIndex(idx),
                 self.listw.scrollTo(
                     idx, QAbstractItemView.ScrollHint.PositionAtCenter)))
+        elif scroll is not None:
+            # Nothing was selected - at least put the scroll position back
+            # where the user left it instead of jumping to the top.
+            QTimer.singleShot(0, lambda: (
+                self.listw.verticalScrollBar().setValue(scroll)))
 
     # -- playlists ---------------------------------------------------------------
     REFRESH_SECONDS = {"2h": 2 * 3600, "6h": 6 * 3600, "12h": 12 * 3600,
@@ -4212,6 +4372,8 @@ class MainWindow(QMainWindow):
             # firing right after an explicit play/zap) - reloading it would
             # reconnect to the provider for nothing.
             return
+        if not self._guard_stream_switch(url, title):
+            return
         self.stream_error.hide()
         self._playing_key = self._item_key(it)
         self._playing_group = "live"
@@ -4223,7 +4385,8 @@ class MainWindow(QMainWindow):
         self.rec.finish_all_inplayer("channel changed")
         self.player.show()
         self.player.set_overlay_info(title)
-        self.player.play(url, title)
+        if self.player.play(url, title):
+            self.wake.acquire(f"Playing {title}")
 
     def playback_mode(self):
         default = "embedded" if self.player else "window"
@@ -4234,6 +4397,8 @@ class MainWindow(QMainWindow):
 
     def _start_playback(self, url, title, icon_url, key, kind, record=True,
                         item=None):
+        if not self._guard_stream_switch(url, title):
+            return
         if record and kind:
             self.history.add(url, title, icon_url, key, kind)
         self.stream_error.hide()
@@ -4261,7 +4426,9 @@ class MainWindow(QMainWindow):
             self.rec.finish_all_inplayer("channel changed")
             self.player.show()
             self.player.set_overlay_info(title)
-            if not self.player.play(url, title):
+            if self.player.play(url, title):
+                self.wake.acquire(f"Playing {title}")
+            else:
                 self.player.hide()
                 launch_player("mpv", url, title, self)
         elif mode == "window":
@@ -4270,7 +4437,9 @@ class MainWindow(QMainWindow):
             # separate mpv process over its IPC socket - still reused, not a
             # fresh window each time.
             if self.mpv_window:
-                if not self.mpv_window.play(url, title):
+                if self.mpv_window.play(url, title):
+                    self.wake.acquire(f"Playing {title}")
+                else:
                     launch_player("mpv", url, title, self)
             else:
                 run_async(self.pool, lambda: self.mpv.load(url, title),
@@ -4295,6 +4464,7 @@ class MainWindow(QMainWindow):
     def _playback_error(self, msg):
         """A stream failed to play (dead/unreachable channel etc.)."""
         self.rec.finish_all_inplayer("stream error")
+        self.wake.release()
         if self.player:
             # let a re-selection of the same channel retry the stream
             self.player.current_url = None
@@ -4594,12 +4764,98 @@ class MainWindow(QMainWindow):
         n = self.rec.active_count()
         self.rec_indicator.setText(f"● REC ({n})" if n > 1 else "● REC")
         self.rec_indicator.setVisible(n > 0)
+        if self.player:
+            # the in-player REC button doubles as a live indicator
+            label = "● REC" if n else "REC"
+            self.player.rec_btn.setText(label)
+            self.player.fs_rec_btn.setText(label)
         if self.mode == "rec":
             cur = self.cat_list.currentItem()
             self._load_items(cur.data(Qt.ItemDataRole.UserRole) if cur else None)
         elif n:
             self._set_status(
                 f"● Recording {n} stream{'s' if n > 1 else ''}...")
+
+    def _on_recording_stopped(self, title, reason):
+        """A recording ended - make it clearly visible, especially when it
+        wasn't a planned stop."""
+        abnormal = reason not in ("finished", "stopped")
+        self._set_status(f"● Recording stopped: {title} ({reason})",
+                         error=abnormal)
+        if self._player_fs and self.player:
+            self.player.set_overlay_info(
+                f"Recording stopped: {title} ({reason})")
+
+    def _guard_stream_switch(self, url, title):
+        """Called before starting a new provider stream while something is
+        recording. Most IPTV accounts allow a single stream, so switching
+        can kill the recording. Returns False when the user backs out."""
+        if not url or not str(url).startswith("http"):
+            return True          # local files don't touch the provider
+        active = [j for j in self.rec.jobs if j["status"] == "recording"]
+        if not active:
+            return True
+        inplayer = [j for j in active if j.get("inplayer")]
+        if not inplayer and getattr(self, "_multi_stream_ok", False):
+            # The user already said their account handles several streams.
+            # That only waives the extra-connection warning - an in-player
+            # recording still dies with the stream it rides, so that dialog
+            # is never skipped.
+            return True
+        if inplayer:
+            if self.player and url == self.player.current_url:
+                return True      # same stream - recording is unaffected
+            j = inplayer[0]
+            box = QMessageBox(self)
+            box.setWindowTitle("Recording in progress")
+            box.setText(f"'{j['title']}' is being recorded from the stream "
+                        f"you're watching.\n\nSwitching to '{title}' will "
+                        "STOP that recording.")
+            stop_btn = box.addButton("Stop recording & switch",
+                                     QMessageBox.ButtonRole.AcceptRole)
+            box.addButton("Keep watching (recording continues)",
+                          QMessageBox.ButtonRole.RejectRole)
+            box.exec()
+            if box.clickedButton() is stop_btn:
+                self.rec.finish_all_inplayer("stopped")
+                return True
+            return False
+        # Separate-connection (ffmpeg) recording running
+        j = active[0]
+        box = QMessageBox(self)
+        box.setWindowTitle("Recording in progress")
+        box.setText(f"'{j['title']}' is being recorded over its own "
+                    f"connection.\n\nIf your account only allows one stream "
+                    f"at a time, starting '{title}' can kill that "
+                    "recording.")
+        watch_btn = box.addButton("Watch the recorded channel (no new stream)",
+                                  QMessageBox.ButtonRole.AcceptRole)
+        anyway_btn = box.addButton("Play anyway (I have multiple streams)",
+                                   QMessageBox.ButtonRole.ActionRole)
+        box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is watch_btn:
+            self._watch_recording_file(j)
+            return False
+        if clicked is anyway_btn:
+            # remember for this session - the user knows their stream limit
+            self._multi_stream_ok = True
+            return True
+        return False
+
+    def _watch_recording_file(self, j):
+        """Plays the growing file of an active recording - same data, no
+        extra provider connection."""
+        path = j.get("path")
+        if not path or not os.path.exists(path):
+            QMessageBox.information(
+                self, "Recording",
+                "The recording file hasn't been created yet - try again in "
+                "a few seconds.")
+            return
+        self._start_playback(path, f"{j['title']} (recording)", None, path,
+                             "recording", record=False)
 
     def _rec_indicator_menu(self):
         m = QMenu(self)
@@ -4654,6 +4910,12 @@ class MainWindow(QMainWindow):
         return False
 
     def _build_record_menu(self, rec_menu, it):
+        active = [j for j in self.rec.jobs if j["status"] == "recording"]
+        for j in active:
+            rec_menu.addAction(f"■ Stop recording: {j['title']}",
+                               lambda jid=j["id"]: self.rec.cancel(jid))
+        if active:
+            rec_menu.addSeparator()
         rec_menu.addAction("Record now - until stopped",
                            lambda: self._record_now(it, None))
         for label, mins in (("Record now - 30 min", 30),
@@ -5033,7 +5295,9 @@ class MainWindow(QMainWindow):
 
     def _choose_rec_dir(self):
         d = QFileDialog.getExistingDirectory(
-            self, "Choose recordings folder", self.rec.directory())
+            self, "Choose recordings folder", self.rec.directory(),
+            QFileDialog.Option.DontUseNativeDialog
+            | QFileDialog.Option.ShowDirsOnly)
         if d:
             self.rec.set_directory(d)
             if self.mode == "rec":
@@ -5113,9 +5377,11 @@ class MainWindow(QMainWindow):
         QApplication.instance().setStyleSheet(build_style())
         self.listw.viewport().update()
         self.count_lbl.setStyleSheet(f"color:{P['muted3']}; font-size:11px;")
-        it = self.list_model.item_at(self.listw.currentIndex().row())
-        if it:
-            self._show_detail(it)
+        # Deliberately NOT re-running _show_detail here: it restarts the
+        # preview and refetches EPG - a theme change must leave the playing
+        # video completely untouched. Only restyle the placeholder tile.
+        if self.d_logo.text():
+            self.d_logo.setStyleSheet(self.PLACEHOLDER_LOGO_STYLE)
 
     def _inline_view_changed(self, *_):
         """Persists the inline size/sort/grid controls and re-applies them."""
@@ -5140,7 +5406,7 @@ class MainWindow(QMainWindow):
     def open_settings(self):
         d = QDialog(self)
         d.setWindowTitle("Settings")
-        d.setMinimumWidth(440)
+        d.setMinimumSize(620, 580)
         outer = QVBoxLayout(d)
         outer.setContentsMargins(18, 18, 18, 18)
         tabs = QTabWidget()
@@ -5162,10 +5428,34 @@ class MainWindow(QMainWindow):
                                    "true" if self._autoplay_preview() else "false")
         fmt_box = self._combo([("ts", "ts"), ("m3u8", "m3u8")],
                               self.settings.value("stream_format", "ts"))
+        LANGS = [("", "Auto / provider default"), ("swe", "Swedish"),
+                 ("eng", "English"), ("nor", "Norwegian"), ("dan", "Danish"),
+                 ("fin", "Finnish"), ("ger", "German"), ("fre", "French"),
+                 ("spa", "Spanish"), ("ita", "Italian"), ("por", "Portuguese"),
+                 ("pol", "Polish"), ("ara", "Arabic"), ("tur", "Turkish")]
+        alang_box = self._combo(LANGS, self.settings.value("audio_lang", ""))
+        sub_box = self._combo(
+            [("off", "Off"), ("auto", "On (player default)"),
+             ("lang", "On - preferred language")],
+            self.settings.value("sub_mode", "auto"))
+        slang_box = self._combo(LANGS, self.settings.value("sub_lang", ""))
+        aspect_box = self._combo(
+            [("auto", "Auto"), ("16:9", "16:9"), ("4:3", "4:3"),
+             ("2.35:1", "2.35:1"), ("stretch", "Stretch to window")],
+            self.settings.value("aspect_mode", "auto"))
+        buf_box = self._combo(
+            [("1", "1 s"), ("3", "3 s"), ("5", "5 s"), ("10", "10 s"),
+             ("30", "30 s")],
+            str(self.settings.value("cache_secs", "10")))
         pf.addRow("Default player", player_box)
         pf.addRow("Playback mode (mpv)", mode_box)
         pf.addRow("Auto-play preview on selection", autoplay_box)
         pf.addRow("Live stream format", fmt_box)
+        pf.addRow("Preferred audio language", alang_box)
+        pf.addRow("Subtitles", sub_box)
+        pf.addRow("Preferred subtitle language", slang_box)
+        pf.addRow("Aspect ratio", aspect_box)
+        pf.addRow("Network buffer", buf_box)
         mode_hint = QLabel("Embedded plays in the app. Reused mpv window keeps "
                            "one external window you can zap in (Ctrl+←/→). "
                            "External opens a fresh window each time.")
@@ -5265,8 +5555,13 @@ class MainWindow(QMainWindow):
         rec_dir_btn = QPushButton("Choose folder...")
 
         def pick_rec_dir():
+            # Qt's own dialog, NOT the native/portal one: the native picker
+            # can open behind the window or arrive seconds late on some
+            # Linux desktops.
             path = QFileDialog.getExistingDirectory(
-                d, "Choose recordings folder", self.rec.directory())
+                d, "Choose recordings folder", self.rec.directory(),
+                QFileDialog.Option.DontUseNativeDialog
+                | QFileDialog.Option.ShowDirsOnly)
             if path:
                 self.rec.set_directory(path)
                 rec_dir_lbl.setText(path)
@@ -5275,6 +5570,17 @@ class MainWindow(QMainWindow):
 
         rec_dir_btn.clicked.connect(pick_rec_dir)
         recv.addWidget(rec_dir_btn)
+        size_row = QHBoxLayout()
+        size_row.addWidget(QLabel("Stop a recording when the file reaches"))
+        rec_max_edit = QLineEdit(str(self.settings.value("rec_max_value", "")))
+        rec_max_edit.setPlaceholderText("no limit")
+        rec_max_edit.setMaximumWidth(90)
+        rec_max_unit = self._combo([("MB", "MB"), ("GB", "GB"), ("TB", "TB")],
+                                   self.settings.value("rec_max_unit", "GB"))
+        size_row.addWidget(rec_max_edit)
+        size_row.addWidget(rec_max_unit)
+        size_row.addStretch()
+        recv.addLayout(size_row)
         rk, rexe = self.rec.recorder()
         rec_hint = QLabel(
             f"Recorder: {rk} ({rexe})" if rexe else
@@ -5407,6 +5713,19 @@ class MainWindow(QMainWindow):
                 self.settings.setValue("playback_mode", mode_box.currentData())
             self.settings.setValue("view_density", density_box.currentData())
             self.settings.setValue("sort_order", sort_box.currentData())
+            self.settings.setValue("audio_lang", alang_box.currentData())
+            self.settings.setValue("sub_mode", sub_box.currentData())
+            self.settings.setValue("sub_lang", slang_box.currentData())
+            self.settings.setValue("aspect_mode", aspect_box.currentData())
+            self.settings.setValue("cache_secs", buf_box.currentData())
+            try:
+                val = float(rec_max_edit.text().replace(",", ".") or 0)
+            except ValueError:
+                val = 0
+            self.settings.setValue("rec_max_value", val if val > 0 else "")
+            self.settings.setValue("rec_max_unit", rec_max_unit.currentData())
+            if self.player:
+                self.player.apply_default_options()
             self._apply_view_settings()
 
     def show_about(self):
@@ -5470,6 +5789,7 @@ class MainWindow(QMainWindow):
         super().keyPressEvent(event)
 
     def closeEvent(self, event):
+        self.wake.release()
         self.rec.shutdown()      # stop recorder processes, persist schedules
         if self.player:
             self.player.shutdown()
