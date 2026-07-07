@@ -442,8 +442,10 @@ class EmbeddedPlayer(QWidget):
             self.video.setMinimumHeight(190)
             self.video.setMaximumHeight(16777215)
         else:
-            self.video.setMinimumHeight(self.VIDEO_BOX_HEIGHT)
-            self.video.setMaximumHeight(16777215)
+            bar_h = self.bar.sizeHint().height() if self.bar.isVisible() else 0
+            spacing = self.layout().spacing()
+            h = max(self.VIDEO_BOX_HEIGHT, self.height() - bar_h - spacing)
+            self.video.setFixedHeight(h)
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
