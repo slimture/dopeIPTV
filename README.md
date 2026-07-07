@@ -69,15 +69,6 @@ update-desktop-database ~/.local/share/applications
 
 The application icon is installed automatically to `~/.local/share/icons` the first time the app starts.
 
-
-## Add to the application menu (optional)
-
-mkdir -p ~/.local/share/applications
-cp dopeiptv.desktop ~/.local/share/applications/
-update-desktop-database ~/.local/share/applications
-
-The application icon is installed automatically to ~/.local/share/icons the first time the app starts.
-
 ## Usage
 
 | Action | How |
