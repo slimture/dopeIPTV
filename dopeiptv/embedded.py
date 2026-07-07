@@ -648,7 +648,78 @@ class EmbeddedPlayer(QWidget):
             act.triggered.connect(
                 lambda _c, s=secs: self._set_cache_secs(s))
 
+        menu.addSeparator()
+        stats_act = menu.addAction("Stats for nerds")
+        stats_act.triggered.connect(self._show_stats)
+
         menu.exec(anchor.mapToGlobal(anchor.rect().bottomLeft()))
+
+    def _show_stats(self) -> None:
+        m = self.video.mpv
+        if m is None:
+            return
+
+        def prop(name, fmt=str):
+            try:
+                v = m[name]
+                return fmt(v) if v is not None else "—"
+            except Exception:
+                return "—"
+
+        def track_info(kind):
+            try:
+                for t in (m.track_list or []):
+                    if t.get("type") == kind and t.get("selected"):
+                        codec = t.get("codec") or "?"
+                        parts = [codec]
+                        if kind == "video":
+                            w = t.get("demux-w") or t.get("width")
+                            h = t.get("demux-h") or t.get("height")
+                            if w and h:
+                                parts.append(f"{w}×{h}")
+                            fps = t.get("demux-fps")
+                            if fps:
+                                parts.append(f"{fps:.1f} fps")
+                        elif kind == "audio":
+                            sr = t.get("demux-samplerate")
+                            ch = t.get("demux-channel-count") or \
+                                t.get("audio-channels")
+                            lang = t.get("lang")
+                            if sr:
+                                parts.append(f"{sr} Hz")
+                            if ch:
+                                parts.append(f"{ch}ch")
+                            if lang:
+                                parts.append(lang)
+                        return " / ".join(parts)
+            except Exception:
+                pass
+            return "—"
+
+        lines = [
+            f"Video: {track_info('video')}",
+            f"Audio: {track_info('audio')}",
+            f"Hardware decoding: {prop('hwdec-current')}",
+            f"A/V sync: {prop('avsync', lambda v: f'{v:.3f} s')}",
+            f"Dropped frames: {prop('frame-drop-count')}",
+            f"Cache: {prop('demuxer-cache-duration', lambda v: f'{v:.1f} s')}",
+            f"Network speed: {prop('cache-speed', lambda v: f'{v / 1024:.0f} KB/s' if v else '—')}",
+            f"File format: {prop('file-format')}",
+            f"Demuxer: {prop('demuxer')}",
+        ]
+
+        from PyQt6.QtWidgets import QDialog, QTextEdit
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Stats for nerds")
+        dlg.setMinimumSize(380, 260)
+        lay = QVBoxLayout(dlg)
+        lay.setContentsMargins(12, 12, 12, 12)
+        txt = QTextEdit()
+        txt.setReadOnly(True)
+        txt.setPlainText("\n".join(lines))
+        txt.setStyleSheet("font-family: monospace; font-size: 12px;")
+        lay.addWidget(txt)
+        dlg.show()
 
     def _set_mpv(self, prop: str, value) -> None:
         m = self.video.mpv
