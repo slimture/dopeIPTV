@@ -1,6 +1,7 @@
 # dopeIPTV
 
-An elegant IPTV client for Linux with a modern dark interface, supporting the **Xtream Codes API**, **EPG**, and playback via **mpv** or **VLC**.
+I was looking for a good IPTV-client on Linux but couldn't find one. So I vibe coded dopeIPTV based on what I think is a good IPTV-player. I think you will like it.
+It's primarily for Linux (works okay on MacOS) with a modern dark interface, supporting the **Xtream Codes API**, **EPG**, and playback via **mpv** or **VLC**.
 
 ## Features
 
