@@ -18,23 +18,23 @@ See [FEATURES.md](FEATURES.md) for the full feature list.
 
 ```bash
 # Dependencies (ffmpeg is optional - preferred recorder for the Record feature)
-sudo apt install python3 python3-pip mpv vlc ffmpeg   # Debian/Ubuntu
-# or: sudo dnf install python3 mpv vlc ffmpeg          # Fedora
-# or: sudo pacman -S python mpv vlc ffmpeg             # Arch
+sudo apt install python3 python3-pip pipx mpv vlc ffmpeg   # Debian/Ubuntu
+# or: sudo dnf install python3 python3-pip pipx mpv vlc ffmpeg  # Fedora
+# or: sudo pacman -S python python-pipx mpv vlc ffmpeg          # Arch
 
-pip install PyQt6 requests
+# Make sure pipx is available in your PATH
+pipx ensurepath
 
-# Optional but recommended - enables embedded in-app video:
-pip install python-mpv
+# Clone and install dopeIPTV
+git clone https://github.com/slimture/dopeIPTV.git
+cd dopeIPTV
 
-# Optional - enables Chromecast casting:
-pip install pychromecast
-```
+pipx install .
 
 ## Running
 
 ```bash
-python3 dopeiptv.py
+dopeiptv
 ```
 
 The first time, enter your Xtream server (e.g. `http://server:8080`), username, and password.
@@ -42,9 +42,9 @@ The first time, enter your Xtream server (e.g. `http://server:8080`), username, 
 ## Add to the application menu (optional)
 
 ```bash
-mkdir -p ~/.local/share/applications ~/.local/bin
-cp dopeiptv.py ~/.local/bin/dopeiptv.py
+mkdir -p ~/.local/share/applications
 cp dopeiptv.desktop ~/.local/share/applications/
+update-desktop-database ~/.local/share/applications
 ```
 
 The application icon is installed automatically to `~/.local/share/icons` the first time the app starts.
