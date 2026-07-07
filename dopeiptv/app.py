@@ -81,6 +81,7 @@ def main() -> int:
               file=sys.stderr)
 
     if _libmpv is not None:
+        os.environ.setdefault("LC_NUMERIC", "C")
         QApplication.setAttribute(
             Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
         _setup_opengl()
