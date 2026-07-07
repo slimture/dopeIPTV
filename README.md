@@ -50,7 +50,9 @@ sudo apt install python3 python3-pip pipx mpv vlc ffmpeg   # Debian/Ubuntu
 
 pipx ensurepath
 pipx install .
+
 ```
+pipx install . will install PyQt6, requests, python-mpv, pychromecast
 
 ## Running
 
