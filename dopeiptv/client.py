@@ -6,6 +6,7 @@ import base64
 import html
 import os
 import shutil
+import sys
 from datetime import datetime, timezone
 from typing import Any
 
@@ -146,6 +147,9 @@ def find_player_executable(player: str) -> str | None:
         candidates = ["mpv"]
     else:
         candidates = ["vlc", "cvlc"]
+    if sys.platform == "darwin":
+        from .platform_macos import extra_player_candidates
+        candidates += extra_player_candidates(player)
     for c in candidates:
         if os.path.isabs(c):
             if os.path.isfile(c) and os.access(c, os.X_OK):

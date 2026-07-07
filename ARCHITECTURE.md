@@ -25,7 +25,8 @@ dopeiptv/
   workers.py           QThreadPool helpers, LogoLoader
   chromecast.py        ChromecastManager, CastDialog
   theme.py             5 themes x 7 accents, palette dict P, QSS generator
-  wakelock.py          Screensaver/suspend inhibitor (DBus)
+  wakelock.py          Screensaver/suspend inhibitor (DBus + macOS caffeinate)
+  platform_macos.py    macOS-specific helpers (OpenGL, libmpv, wakelock, paths)
 ```
 
 ## Data flow

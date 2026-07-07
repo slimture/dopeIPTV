@@ -30,6 +30,8 @@ def _qt_message_filter(msg_type, context, message):
             return
     if _original_msg_handler is not None:
         _original_msg_handler(msg_type, context, message)
+
+
 from .stores import PlaylistStore
 from .theme import ACCENT, apply_theme, build_style
 
@@ -82,6 +84,10 @@ def main() -> int:
 
     if _libmpv is not None:
         os.environ.setdefault("LC_NUMERIC", "C")
+
+    if _libmpv is not None and sys.platform == "darwin":
+        from .platform_macos import setup_opengl
+        setup_opengl()
 
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)

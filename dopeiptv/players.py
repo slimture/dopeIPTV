@@ -18,6 +18,10 @@ from .client import find_player_executable
 
 _libmpv_error: str | None = None
 
+if sys.platform == "darwin":
+    from .platform_macos import find_libmpv
+    find_libmpv()
+
 try:
     import mpv as _libmpv
 except Exception as _e:
@@ -28,7 +32,12 @@ except Exception as _e:
 def embedded_playback_reason() -> str | None:
     """Returns None if in-app video is available, otherwise a short explanation."""
     if _libmpv is None:
-        return f"python-mpv/libmpv failed to load ({_libmpv_error})"
+        hint = ""
+        if sys.platform == "darwin":
+            from .platform_macos import libmpv_install_hint
+            hint = libmpv_install_hint()
+        return (f"python-mpv/libmpv failed to load ({_libmpv_error})"
+                + hint)
     if not hasattr(_libmpv, "MpvRenderContext"):
         return "installed python-mpv is too old (needs the render-api support)"
     return None

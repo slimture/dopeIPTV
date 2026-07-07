@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import sys
+
 from . import APP_NAME
 
 
 class WakeLock:
     """Keeps the screen and system awake while video plays.
 
-    Uses DBus inhibitors (org.freedesktop.ScreenSaver + PowerManagement).
+    Linux: DBus inhibitors (org.freedesktop.ScreenSaver + PowerManagement).
+    macOS: a caffeinate child process (via platform_macos).
     Acquire/release are idempotent.
     """
 
@@ -22,13 +25,22 @@ class WakeLock:
 
     def __init__(self) -> None:
         self._cookies: list[tuple] = []
+        self._macos_lock = None
+        if sys.platform == "darwin":
+            from .platform_macos import WakeLockMacOS
+            self._macos_lock = WakeLockMacOS()
 
     @property
     def held(self) -> bool:
+        if self._macos_lock is not None:
+            return self._macos_lock.held
         return bool(self._cookies)
 
     def acquire(self, reason: str = "Playing video") -> None:
         if self.held:
+            return
+        if self._macos_lock is not None:
+            self._macos_lock.acquire(reason)
             return
         try:
             from PyQt6.QtDBus import QDBusConnection, QDBusInterface
@@ -47,6 +59,9 @@ class WakeLock:
                 self._cookies.append((iface, args[0]))
 
     def release(self) -> None:
+        if self._macos_lock is not None:
+            self._macos_lock.release()
+            return
         for iface, cookie in self._cookies:
             try:
                 iface.call("UnInhibit", cookie)

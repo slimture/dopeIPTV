@@ -32,6 +32,9 @@ class _MpvGLWidget(QOpenGLWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        if sys.platform == "darwin":
+            from .platform_macos import apply_widget_surface_format
+            apply_widget_surface_format(self)
         self.setMinimumHeight(190)
         self.setSizePolicy(QSizePolicy.Policy.Expanding,
                            QSizePolicy.Policy.Expanding)
@@ -47,6 +50,9 @@ class _MpvGLWidget(QOpenGLWidget):
                 v = int(addr)
                 if v:
                     return v
+        if sys.platform == "darwin":
+            from .platform_macos import gl_get_proc_address_fallback
+            return gl_get_proc_address_fallback(name)
         return 0
 
     def initializeGL(self) -> None:
@@ -64,6 +70,9 @@ class _MpvGLWidget(QOpenGLWidget):
                 "keep_open": "yes", "input_default_bindings": False,
                 "input_vo_keyboard": False, "osc": False,
                 "terminal": False}
+        if sys.platform == "darwin":
+            from .platform_macos import extra_mpv_opts
+            opts.update(extra_mpv_opts())
         opts.update(self.EXTRA_OPTS)
         print("[dopeIPTV] Creating mpv instance...", file=sys.stderr)
         self.mpv = _libmpv.MPV(**opts)
