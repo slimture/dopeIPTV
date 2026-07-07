@@ -16,6 +16,8 @@ See [FEATURES.md](FEATURES.md) for the full feature list.
 
 ## Installation
 
+Download [AppImage](https://github.com/slimture/dopeIPTV/releases/download/0.1.1-stable/dopeIPTV-x86_64.AppImage) or follow instructions below:
+
 Make sure Git is installed:
 
 ```bash
