@@ -690,16 +690,14 @@ class EmbeddedPlayer(QWidget):
             self._hide_seek_ui()
             return
         text = f"{_format_time(pos)} / {_format_time(dur)}"
-        for slider, label in ((self.seek, self.time_lbl),
-                              (self.fs_seek, self.fs_time_lbl)):
+        for slider, label in ((self.fs_seek, self.fs_time_lbl),):
             label.setText(text)
             slider.setVisible(True)
             label.setVisible(True)
             if not slider.dragging:
                 slider.setMaximum(int(dur))
                 slider.setValue(int(pos or 0))
-        for btn in (self.back_btn, self.fwd_btn,
-                    self.fs_back_btn, self.fs_fwd_btn):
+        for btn in (self.fs_back_btn, self.fs_fwd_btn):
             btn.setVisible(True)
 
     # -- volume ----------------------------------------------------------------

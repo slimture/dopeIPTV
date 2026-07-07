@@ -2438,8 +2438,10 @@ class MainWindow(QMainWindow):
         add_btn = QPushButton("Add...")
         edit_btn = QPushButton("Edit...")
         remove_btn = QPushButton("Remove")
+        refresh_pl_btn = QPushButton("Refresh")
+        refresh_pl_btn.setToolTip("Reload channels and EPG from server")
         use_btn = QPushButton("Use", objectName="Primary")
-        for b in (add_btn, edit_btn, remove_btn, use_btn):
+        for b in (add_btn, edit_btn, remove_btn, refresh_pl_btn, use_btn):
             pl_btns.addWidget(b)
         pv.addLayout(pl_btns)
         tabs.addTab(pl_tab, "Playlists")
@@ -2628,9 +2630,11 @@ class MainWindow(QMainWindow):
         add_btn.clicked.connect(add_playlist)
         edit_btn.clicked.connect(edit_playlist)
         remove_btn.clicked.connect(remove_playlist)
+        refresh_pl_btn.clicked.connect(self.refresh_playlist)
         use_btn.clicked.connect(use_playlist)
         if not store:
-            for b in (add_btn, edit_btn, remove_btn, use_btn):
+            for b in (add_btn, edit_btn, remove_btn,
+                      refresh_pl_btn, use_btn):
                 b.setEnabled(False)
         reload_pl_list()
 
