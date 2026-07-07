@@ -4,7 +4,7 @@
 
 ```bash
 pip install PyQt6 requests
-sudo apt install mpv          # or: brew install mpv
+sudo apt install mpv
 python3 dopeiptv.py
 ```
 

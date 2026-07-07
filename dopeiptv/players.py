@@ -18,24 +18,9 @@ from .client import find_player_executable
 
 _libmpv_error: str | None = None
 
-
-def _find_libmpv_macos() -> None:
-    """Help ctypes find libmpv.dylib on macOS (Homebrew installs)."""
-    if sys.platform != "darwin":
-        return
-    import ctypes.util
-    if ctypes.util.find_library("mpv"):
-        return
-    for prefix in ("/opt/homebrew/lib", "/usr/local/lib"):
-        dylib = os.path.join(prefix, "libmpv.dylib")
-        if os.path.isfile(dylib):
-            os.environ.setdefault(
-                "DYLD_LIBRARY_PATH",
-                prefix + ":" + os.environ.get("DYLD_LIBRARY_PATH", ""))
-            break
-
-
-_find_libmpv_macos()
+if sys.platform == "darwin":
+    from .platform_macos import find_libmpv
+    find_libmpv()
 
 try:
     import mpv as _libmpv
@@ -49,8 +34,8 @@ def embedded_playback_reason() -> str | None:
     if _libmpv is None:
         hint = ""
         if sys.platform == "darwin":
-            hint = ("\n  Install with: brew install mpv && "
-                    "pip install python-mpv")
+            from .platform_macos import libmpv_install_hint
+            hint = libmpv_install_hint()
         return (f"python-mpv/libmpv failed to load ({_libmpv_error})"
                 + hint)
     if not hasattr(_libmpv, "MpvRenderContext"):

@@ -142,15 +142,14 @@ def epg_times(entry: dict) -> tuple[datetime | None, datetime | None]:
 
 
 def find_player_executable(player: str) -> str | None:
-    """Locate the mpv or vlc binary, including macOS app-bundle paths."""
+    """Locate the mpv or vlc binary."""
     if player == "mpv":
         candidates = ["mpv"]
-        if sys.platform == "darwin":
-            candidates += ["/opt/homebrew/bin/mpv", "/usr/local/bin/mpv"]
     else:
         candidates = ["vlc", "cvlc"]
-        if sys.platform == "darwin":
-            candidates += ["/Applications/VLC.app/Contents/MacOS/VLC"]
+    if sys.platform == "darwin":
+        from .platform_macos import extra_player_candidates
+        candidates += extra_player_candidates(player)
     for c in candidates:
         if os.path.isabs(c):
             if os.path.isfile(c) and os.access(c, os.X_OK):

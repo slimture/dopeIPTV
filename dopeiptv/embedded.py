@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import ctypes
-import ctypes.util
 import sys
 
 from PyQt6.QtCore import QByteArray, Qt, QTimer, pyqtSignal
@@ -15,16 +13,6 @@ from PyQt6.QtWidgets import (
 )
 
 from .players import _libmpv, _register_error_callback
-
-# On macOS, Qt's getProcAddress can fail for core GL functions.
-# Load the OpenGL framework directly as a reliable fallback.
-_opengl_dll = None
-if sys.platform == "darwin":
-    try:
-        _opengl_dll = ctypes.cdll.LoadLibrary(
-            ctypes.util.find_library("OpenGL"))
-    except Exception:
-        pass
 
 
 def _format_time(seconds: float | None) -> str:
@@ -45,12 +33,8 @@ class _MpvGLWidget(QOpenGLWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         if sys.platform == "darwin":
-            from PyQt6.QtGui import QSurfaceFormat
-            fmt = QSurfaceFormat()
-            fmt.setVersion(4, 1)
-            fmt.setProfile(
-                QSurfaceFormat.OpenGLContextProfile.CoreProfile)
-            self.setFormat(fmt)
+            from .platform_macos import apply_widget_surface_format
+            apply_widget_surface_format(self)
         self.setMinimumHeight(190)
         self.setSizePolicy(QSizePolicy.Policy.Expanding,
                            QSizePolicy.Policy.Expanding)
@@ -66,13 +50,9 @@ class _MpvGLWidget(QOpenGLWidget):
                 v = int(addr)
                 if v:
                     return v
-        if _opengl_dll is not None:
-            try:
-                return ctypes.cast(
-                    getattr(_opengl_dll, name.decode("utf-8")),
-                    ctypes.c_void_p).value or 0
-            except (AttributeError, OSError):
-                pass
+        if sys.platform == "darwin":
+            from .platform_macos import gl_get_proc_address_fallback
+            return gl_get_proc_address_fallback(name)
         return 0
 
     def initializeGL(self) -> None:
@@ -91,7 +71,8 @@ class _MpvGLWidget(QOpenGLWidget):
                 "input_vo_keyboard": False, "osc": False,
                 "terminal": False}
         if sys.platform == "darwin":
-            opts["hwdec"] = "videotoolbox-copy"
+            from .platform_macos import extra_mpv_opts
+            opts.update(extra_mpv_opts())
         opts.update(self.EXTRA_OPTS)
         print("[dopeIPTV] Creating mpv instance...", file=sys.stderr)
         self.mpv = _libmpv.MPV(**opts)
@@ -190,7 +171,7 @@ class EmbeddedPlayer(QWidget):
         self._settings = settings
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(6)
+        lay.setSpacing(2)
 
         self.video = _MpvGLWidget(self)
         self.video.installEventFilter(self)
@@ -201,21 +182,21 @@ class EmbeddedPlayer(QWidget):
         self.bar = QWidget()
         bl = QHBoxLayout(self.bar)
         bl.setContentsMargins(0, 0, 0, 0)
-        bl.setSpacing(8)
-        self.prev_btn = QPushButton("Back", objectName="MiniBtn")
+        bl.setSpacing(4)
+        self.prev_btn = QPushButton("◀", objectName="MiniBtn")
         self.prev_btn.setToolTip("Previous channel (Ctrl+Left)")
         self.prev_btn.clicked.connect(lambda: self.zap.emit(-1))
-        self.next_btn = QPushButton("Next", objectName="MiniBtn")
+        self.next_btn = QPushButton("▶", objectName="MiniBtn")
         self.next_btn.setToolTip("Next channel (Ctrl+Right)")
         self.next_btn.clicked.connect(lambda: self.zap.emit(1))
         self.pause_btn = QPushButton("⏸", objectName="MiniBtn")
         self.pause_btn.setToolTip("Pause / resume")
         self.pause_btn.clicked.connect(self.toggle_pause)
-        self.back_btn = QPushButton("-10s", objectName="MiniBtn")
+        self.back_btn = QPushButton("-10", objectName="MiniBtn")
         self.back_btn.setToolTip("Back 10 seconds")
         self.back_btn.clicked.connect(lambda: self._relative_seek(-10))
         self.back_btn.hide()
-        self.fwd_btn = QPushButton("+30s", objectName="MiniBtn")
+        self.fwd_btn = QPushButton("+30", objectName="MiniBtn")
         self.fwd_btn.setToolTip("Forward 30 seconds")
         self.fwd_btn.clicked.connect(lambda: self._relative_seek(30))
         self.fwd_btn.hide()
@@ -232,7 +213,7 @@ class EmbeddedPlayer(QWidget):
         self.mute_btn.clicked.connect(self.toggle_mute)
         self.vol = QSlider(Qt.Orientation.Horizontal)
         self.vol.setRange(0, 100)
-        self.vol.setFixedWidth(80)
+        self.vol.setFixedWidth(50)
         self.vol.setToolTip("Volume")
         self.vol.valueChanged.connect(self._set_volume)
         self.ts_btn = QPushButton("⏪", objectName="MiniBtn")
@@ -249,9 +230,11 @@ class EmbeddedPlayer(QWidget):
         self.opts_btn.setToolTip("Audio / subtitles / aspect / buffer")
         self.opts_btn.clicked.connect(
             lambda: self._show_options_menu(self.opts_btn))
-        self.stop_btn = QPushButton("Stop", objectName="MiniBtn")
+        self.stop_btn = QPushButton("■", objectName="MiniBtn")
+        self.stop_btn.setToolTip("Stop playback")
         self.stop_btn.clicked.connect(self.stop)
-        self.fs_btn = QPushButton("Fullscreen", objectName="MiniBtn")
+        self.fs_btn = QPushButton("⛶", objectName="MiniBtn")
+        self.fs_btn.setToolTip("Fullscreen")
         bl.addWidget(self.prev_btn)
         bl.addWidget(self.next_btn)
         bl.addWidget(self.pause_btn)
@@ -282,19 +265,19 @@ class EmbeddedPlayer(QWidget):
         fc = QHBoxLayout(self.fs_controls)
         fc.setContentsMargins(8, 6, 8, 6)
         fc.setSpacing(8)
-        self.fs_prev_btn = QPushButton("Back", objectName="MiniBtn")
+        self.fs_prev_btn = QPushButton("◀", objectName="MiniBtn")
         self.fs_prev_btn.setToolTip("Previous channel (Left)")
         self.fs_prev_btn.clicked.connect(lambda: self.zap.emit(-1))
-        self.fs_next_btn = QPushButton("Next", objectName="MiniBtn")
+        self.fs_next_btn = QPushButton("▶", objectName="MiniBtn")
         self.fs_next_btn.setToolTip("Next channel (Right)")
         self.fs_next_btn.clicked.connect(lambda: self.zap.emit(1))
         self.fs_pause_btn = QPushButton("⏸", objectName="MiniBtn")
         self.fs_pause_btn.setToolTip("Pause / resume")
         self.fs_pause_btn.clicked.connect(self.toggle_pause)
-        self.fs_back_btn = QPushButton("-10s", objectName="MiniBtn")
+        self.fs_back_btn = QPushButton("-10", objectName="MiniBtn")
         self.fs_back_btn.clicked.connect(lambda: self._relative_seek(-10))
         self.fs_back_btn.hide()
-        self.fs_fwd_btn = QPushButton("+30s", objectName="MiniBtn")
+        self.fs_fwd_btn = QPushButton("+30", objectName="MiniBtn")
         self.fs_fwd_btn.clicked.connect(lambda: self._relative_seek(30))
         self.fs_fwd_btn.hide()
         self.fs_seek = _SeekSlider()
@@ -324,8 +307,8 @@ class EmbeddedPlayer(QWidget):
         self.fs_opts_btn.setToolTip("Audio / subtitles / aspect / buffer")
         self.fs_opts_btn.clicked.connect(
             lambda: self._show_options_menu(self.fs_opts_btn))
-        self.fs_exit_btn = QPushButton("Exit fullscreen", objectName="MiniBtn")
-        self.fs_exit_btn.setToolTip("Back to the mini player (Esc)")
+        self.fs_exit_btn = QPushButton("✕", objectName="MiniBtn")
+        self.fs_exit_btn.setToolTip("Exit fullscreen (Esc)")
         self.fs_exit_btn.clicked.connect(self.exit_fullscreen.emit)
         fc.addWidget(self.fs_prev_btn)
         fc.addWidget(self.fs_next_btn)
@@ -371,6 +354,16 @@ class EmbeddedPlayer(QWidget):
         self._overlay_timer.setSingleShot(True)
         self._overlay_timer.setInterval(self.OVERLAY_HIDE_MS)
         self._overlay_timer.timeout.connect(self._hide_fs_ui)
+
+        self._stats_overlay = QLabel("", self.video)
+        self._stats_overlay.setStyleSheet(
+            "background: rgba(0,0,0,180); color: #ECECF1;"
+            "border-radius: 6px; padding: 8px 10px;"
+            "font-family: monospace; font-size: 11px;")
+        self._stats_overlay.hide()
+        self._stats_timer = QTimer(self)
+        self._stats_timer.setInterval(1000)
+        self._stats_timer.timeout.connect(self._update_stats_text)
 
     # -- event filter ----------------------------------------------------------
 
@@ -449,7 +442,10 @@ class EmbeddedPlayer(QWidget):
             self.video.setMinimumHeight(190)
             self.video.setMaximumHeight(16777215)
         else:
-            self.video.setFixedHeight(self.VIDEO_BOX_HEIGHT)
+            bar_h = self.bar.sizeHint().height() if self.bar.isVisible() else 0
+            spacing = self.layout().spacing()
+            h = max(self.VIDEO_BOX_HEIGHT, self.height() - bar_h - spacing)
+            self.video.setFixedHeight(h)
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
@@ -646,7 +642,83 @@ class EmbeddedPlayer(QWidget):
             act.triggered.connect(
                 lambda _c, s=secs: self._set_cache_secs(s))
 
+        menu.addSeparator()
+        stats_act = menu.addAction("Stats for nerds")
+        stats_act.triggered.connect(self._show_stats)
+
         menu.exec(anchor.mapToGlobal(anchor.rect().bottomLeft()))
+
+    def _show_stats(self) -> None:
+        if self._stats_overlay.isVisible():
+            self._stats_overlay.hide()
+            self._stats_timer.stop()
+            return
+        self._update_stats_text()
+        self._stats_overlay.show()
+        self._stats_overlay.raise_()
+        self._place_stats()
+        self._stats_timer.start()
+
+    def _update_stats_text(self) -> None:
+        m = self.video.mpv
+        if m is None:
+            self._stats_overlay.hide()
+            self._stats_timer.stop()
+            return
+
+        def prop(name, fmt=str):
+            try:
+                v = m[name]
+                return fmt(v) if v is not None else "—"
+            except Exception:
+                return "—"
+
+        def track_info(kind):
+            try:
+                for t in (m.track_list or []):
+                    if t.get("type") == kind and t.get("selected"):
+                        codec = t.get("codec") or "?"
+                        parts = [codec]
+                        if kind == "video":
+                            w = t.get("demux-w") or t.get("width")
+                            h = t.get("demux-h") or t.get("height")
+                            if w and h:
+                                parts.append(f"{w}×{h}")
+                            fps = t.get("demux-fps")
+                            if fps:
+                                parts.append(f"{fps:.1f} fps")
+                        elif kind == "audio":
+                            sr = t.get("demux-samplerate")
+                            ch = t.get("demux-channel-count") or \
+                                t.get("audio-channels")
+                            lang = t.get("lang")
+                            if sr:
+                                parts.append(f"{sr} Hz")
+                            if ch:
+                                parts.append(f"{ch}ch")
+                            if lang:
+                                parts.append(lang)
+                        return " / ".join(parts)
+            except Exception:
+                pass
+            return "—"
+
+        lines = [
+            f"Video: {track_info('video')}",
+            f"Audio: {track_info('audio')}",
+            f"HW dec: {prop('hwdec-current')}",
+            f"A/V sync: {prop('avsync', lambda v: f'{v:.3f} s')}",
+            f"Dropped: {prop('frame-drop-count')}",
+            f"Cache: {prop('demuxer-cache-duration', lambda v: f'{v:.1f} s')}",
+            f"Net: {prop('cache-speed', lambda v: f'{v / 1024:.0f} KB/s' if v else '—')}",
+            f"Format: {prop('file-format')}",
+        ]
+        self._stats_overlay.setText("\n".join(lines))
+        self._place_stats()
+
+    def _place_stats(self) -> None:
+        self._stats_overlay.adjustSize()
+        self._stats_overlay.move(8, 8)
 
     def _set_mpv(self, prop: str, value) -> None:
         m = self.video.mpv
@@ -688,16 +760,14 @@ class EmbeddedPlayer(QWidget):
             self._hide_seek_ui()
             return
         text = f"{_format_time(pos)} / {_format_time(dur)}"
-        for slider, label in ((self.seek, self.time_lbl),
-                              (self.fs_seek, self.fs_time_lbl)):
+        for slider, label in ((self.fs_seek, self.fs_time_lbl),):
             label.setText(text)
             slider.setVisible(True)
             label.setVisible(True)
             if not slider.dragging:
                 slider.setMaximum(int(dur))
                 slider.setValue(int(pos or 0))
-        for btn in (self.back_btn, self.fwd_btn,
-                    self.fs_back_btn, self.fs_fwd_btn):
+        for btn in (self.fs_back_btn, self.fs_fwd_btn):
             btn.setVisible(True)
 
     # -- volume ----------------------------------------------------------------
@@ -761,8 +831,11 @@ class EmbeddedPlayer(QWidget):
                 pass
         self.title_lbl.setText("")
         self._hide_seek_ui()
+        self._stats_overlay.hide()
+        self._stats_timer.stop()
 
     def shutdown(self) -> None:
         self.stop_stream_record()
         self._pos_timer.stop()
+        self._stats_timer.stop()
         self.video.shutdown()

@@ -68,9 +68,9 @@ class ChannelDelegate(QStyledItemDelegate):
         "large":   (92, 64, 13, 10),
     }
     GRID = {
-        "compact": (108, 116, 60, 9),
-        "medium":  (140, 150, 84, 10),
-        "large":   (184, 196, 120, 11),
+        "compact": (100, 108, 68, 9),
+        "medium":  (130, 140, 96, 10),
+        "large":   (170, 182, 132, 11),
     }
 
     def __init__(self, window, density: str = "medium",
@@ -128,7 +128,7 @@ class ChannelDelegate(QStyledItemDelegate):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         playing = self._is_playing(it, kind)
-        inner = rect.adjusted(5, 5, -5, -5)
+        inner = rect.adjusted(3, 3, -3, -3)
         if option.state & QStyle.StateFlag.State_Selected:
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(QColor(P["sel"]))
@@ -146,7 +146,7 @@ class ChannelDelegate(QStyledItemDelegate):
 
         name = self.window.channel_display_name(it)
         logo_x = rect.left() + (rect.width() - logo_sz) // 2
-        logo_y = rect.top() + 12
+        logo_y = rect.top() + 8
         logo_rect = QRect(logo_x, logo_y, logo_sz, logo_sz)
         radius = max(8, logo_sz // 5)
         url = it.get("stream_icon") or it.get("cover")
@@ -186,9 +186,9 @@ class ChannelDelegate(QStyledItemDelegate):
         fname.setBold(True)
         painter.setFont(fname)
         text_rect = QRect(
-            rect.left() + 4, logo_y + logo_sz + 6,
+            rect.left() + 4, logo_y + logo_sz + 4,
             rect.width() - 8,
-            rect.bottom() - (logo_y + logo_sz + 6))
+            rect.bottom() - (logo_y + logo_sz + 4))
         fm = painter.fontMetrics()
         painter.drawText(
             text_rect,
