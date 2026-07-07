@@ -50,7 +50,7 @@ from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 
 APP_NAME = "dopeIPTV"
 ORG = "dopeiptv"
-VERSION = "0.1.0-beta.3"
+VERSION = "0.1.0-beta.4"
 
 # Optional embedded playback via libmpv (python-mpv). Imported lazily so the
 # app still runs fine without it - playback then falls back to the reused
@@ -1319,13 +1319,63 @@ class RecordingManager(QObject):
         self.jobs_changed.emit()
         return job
 
+    def add_inplayer_job(self, title, path, stop_ts):
+        """Registers a recording that rides on the embedded player's own
+        stream (mpv stream-record) - the app never opens a second
+        connection to the provider for these. The player side is started/
+        stopped by the caller; stop_inplayer_cb is invoked when the job
+        must end (timer, cancel, channel switch)."""
+        job = {"id": uuid.uuid4().hex[:10], "url": "", "title": title,
+               "start": time.time(), "stop": stop_ts, "folder": "",
+               "status": "recording", "path": path, "error": "",
+               "proc": None, "inplayer": True}
+        self.jobs.append(job)
+        self.jobs_changed.emit()
+        return job
+
+    stop_inplayer_cb = None      # set by the UI: stops mpv's stream-record
+
+    def finish_inplayer(self, job_id, reason=""):
+        for j in self.jobs:
+            if (j["id"] != job_id or not j.get("inplayer")
+                    or j["status"] != "recording"):
+                continue
+            if self.stop_inplayer_cb:
+                try:
+                    self.stop_inplayer_cb()
+                except Exception:
+                    pass
+            j["status"] = "done"
+            self.jobs_changed.emit()
+
+            # mpv buffers the recording and only flushes it to disk when
+            # stream-record is cleared - validate the file after the flush
+            # has had a moment to land, not right now.
+            def validate(j=j, reason=reason):
+                if (j.get("path") and os.path.exists(j["path"])
+                        and os.path.getsize(j["path"]) > 0):
+                    return
+                j["status"] = "failed"
+                j["error"] = reason or "no data captured"
+                self.jobs_changed.emit()
+
+            QTimer.singleShot(1500, validate)
+            return
+
+    def finish_all_inplayer(self, reason=""):
+        for j in list(self.jobs):
+            if j.get("inplayer") and j["status"] == "recording":
+                self.finish_inplayer(j["id"], reason)
+
     def cancel(self, job_id):
         """Cancels a scheduled job or stops an active recording (the partial
         file is kept)."""
         for j in self.jobs:
             if j["id"] != job_id:
                 continue
-            if j["status"] == "recording":
+            if j.get("inplayer") and j["status"] == "recording":
+                self.finish_inplayer(job_id)
+            elif j["status"] == "recording":
                 self._stop_proc(j)
                 j["status"] = "done"
             elif j["status"] == "scheduled":
@@ -1345,27 +1395,33 @@ class RecordingManager(QObject):
     def active_count(self):
         return sum(1 for j in self.jobs if j["status"] == "recording")
 
+    def build_path(self, title, folder=""):
+        """A unique target file for a new recording (creates the folder).
+        Raises OSError when the folder can't be created."""
+        stamp = datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d %H.%M")
+        target_dir = os.path.join(self.directory(), folder or "")
+        os.makedirs(target_dir, exist_ok=True)
+        path = os.path.join(target_dir,
+                            f"{safe_filename(title)} {stamp}.ts")
+        n = 1
+        while os.path.exists(path):
+            path = os.path.join(target_dir,
+                                f"{safe_filename(title)} {stamp} ({n}).ts")
+            n += 1
+        return path
+
     def _spawn(self, j):
         kind, exe = self.recorder()
         if not exe:
             j["status"] = "failed"
             j["error"] = "neither ffmpeg nor mpv found"
             return
-        stamp = datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d %H.%M")
-        target_dir = os.path.join(self.directory(), j.get("folder") or "")
         try:
-            os.makedirs(target_dir, exist_ok=True)
+            path = self.build_path(j["title"], j.get("folder") or "")
         except OSError as e:
             j["status"] = "failed"
             j["error"] = str(e)
             return
-        path = os.path.join(target_dir,
-                            f"{safe_filename(j['title'])} {stamp}.ts")
-        n = 1
-        while os.path.exists(path):
-            path = os.path.join(target_dir,
-                                f"{safe_filename(j['title'])} {stamp} ({n}).ts")
-            n += 1
         # stop=None -> open-ended: no duration cap, runs until cancel()
         secs = (max(1, int(j["stop"] - time.time()))
                 if j.get("stop") else None)
@@ -1412,6 +1468,9 @@ class RecordingManager(QObject):
                     self._spawn(j)
                 self._save()
                 changed = True
+            elif j["status"] == "recording" and j.get("inplayer"):
+                if j.get("stop") is not None and j["stop"] <= now:
+                    self.finish_inplayer(j["id"])   # emits jobs_changed
             elif j["status"] == "recording":
                 rc = j["proc"].poll() if j.get("proc") else 0
                 if j.get("stop") is not None and j["stop"] <= now:
@@ -1430,8 +1489,9 @@ class RecordingManager(QObject):
             self.jobs_changed.emit()
 
     def shutdown(self):
+        self.finish_all_inplayer("app closed")
         for j in self.jobs:
-            if j["status"] == "recording":
+            if j["status"] == "recording" and not j.get("inplayer"):
                 self._stop_proc(j)
         self._save()
 
@@ -1817,6 +1877,7 @@ class EmbeddedPlayer(QWidget):
         self._pos_timer.timeout.connect(self._poll_position)
 
         self._fs_ui = False
+        self.current_url = None      # what the mpv core is playing right now
         self._overlay_text = ""
         self._overlay_timer = QTimer(self)
         self._overlay_timer.setSingleShot(True)
@@ -1889,17 +1950,23 @@ class EmbeddedPlayer(QWidget):
         self.overlay.move(margin, self.height() - self.fs_controls.height()
                           - margin - 8 - self.overlay.height())
 
+    # Windowed mini-player video height. A constant, deliberately NOT
+    # derived from the pane width: dragging the splitter or resizing the
+    # window must never change the video's size (it did when the height
+    # tracked the width).
+    VIDEO_BOX_HEIGHT = 260
+
     def _lock_video_box(self):
-        """Pins the video surface to a constant 16:9 outer box derived from
-        the pane width. Changing the content or its aspect-ratio override
-        only letterboxes *inside* this box, and EPG cards etc. appearing
-        below can never squeeze it - the app layout stays put. Fullscreen
-        lifts the pin so the video can fill the screen."""
+        """Pins the video surface to a constant height in windowed mode.
+        Whatever happens around it - splitter drags, window resizes, aspect
+        overrides, EPG cards appearing below - the mini player keeps the
+        same size and the content letterboxes inside it. Fullscreen lifts
+        the pin so the video can fill the screen."""
         if self._fs_ui:
             self.video.setMinimumHeight(190)
             self.video.setMaximumHeight(16777215)
         else:
-            self.video.setFixedHeight(max(190, int(self.width() * 9 / 16)))
+            self.video.setFixedHeight(self.VIDEO_BOX_HEIGHT)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -1935,11 +2002,13 @@ class EmbeddedPlayer(QWidget):
             except Exception:
                 pass
             m.play(url)
+            self.current_url = url
             self._pos_timer.start()
             return True
         except Exception as e:
             print(f"[dopeIPTV] Embedded playback failed: "
                  f"{type(e).__name__}: {e}", file=sys.stderr)
+            self.current_url = None
             return False
 
     # -- seeking (movies/series/catch-up; live streams aren't seekable) -------
@@ -2105,7 +2174,34 @@ class EmbeddedPlayer(QWidget):
                     self.fs_back_btn, self.fs_fwd_btn):
             btn.setVisible(True)
 
+    # -- recording the watched stream itself ---------------------------------
+    # mpv's stream-record dumps the exact stream this player is already
+    # receiving to a file - no second connection to the provider, which
+    # matters because most IPTV accounts allow only one stream at a time.
+
+    def start_stream_record(self, path):
+        m = self.video.mpv
+        if m is None:
+            return False
+        try:
+            m["stream-record"] = path
+            return True
+        except Exception as e:
+            print(f"[dopeIPTV] stream-record failed: {e}", file=sys.stderr)
+            return False
+
+    def stop_stream_record(self):
+        m = self.video.mpv
+        if m is None:
+            return
+        try:
+            m["stream-record"] = ""
+        except Exception:
+            pass
+
     def stop(self):
+        self.stop_stream_record()
+        self.current_url = None
         if self.video.mpv:
             try:
                 self.video.mpv.command("stop")
@@ -2115,6 +2211,7 @@ class EmbeddedPlayer(QWidget):
         self._hide_seek_ui()
 
     def shutdown(self):
+        self.stop_stream_record()
         self._pos_timer.stop()
         self.video.shutdown()
 
@@ -3211,6 +3308,11 @@ class MainWindow(QMainWindow):
             self.player.exit_fullscreen.connect(self._exit_player_fullscreen)
             self.player.timeshift_menu.connect(self._player_timeshift_menu)
             self.player.record_menu.connect(self._player_record_menu)
+            # In-player recordings ride on this player's stream; the manager
+            # calls back here to stop mpv's stream-record when a job ends.
+            self.rec.stop_inplayer_cb = self.player.stop_stream_record
+            self.player.stop_btn.clicked.connect(
+                lambda: self.rec.finish_all_inplayer("playback stopped"))
             self.player.playback_error.connect(self._playback_error)
             self.player.zap.connect(self._zap)
             self.player.stop_btn.clicked.connect(self.player.hide)
@@ -4105,6 +4207,11 @@ class MainWindow(QMainWindow):
         url, title = self._stream_for(it)
         if not url:
             return
+        if self.player.current_url == url:
+            # Already playing this exact stream (e.g. the preview timer
+            # firing right after an explicit play/zap) - reloading it would
+            # reconnect to the provider for nothing.
+            return
         self.stream_error.hide()
         self._playing_key = self._item_key(it)
         self._playing_group = "live"
@@ -4113,6 +4220,7 @@ class MainWindow(QMainWindow):
         self.listw.viewport().update()
         self.setWindowTitle(title or self._base_title)
         self._set_status(f"Playing: {title}")
+        self.rec.finish_all_inplayer("channel changed")
         self.player.show()
         self.player.set_overlay_info(title)
         self.player.play(url, title)
@@ -4148,6 +4256,9 @@ class MainWindow(QMainWindow):
               f"(embedded pane: {'yes' if self.player else 'no'})",
               file=sys.stderr)
         if mode == "embedded" and self.player:
+            # An in-player recording taps the *current* stream - switching
+            # away would silently record the wrong channel into the file.
+            self.rec.finish_all_inplayer("channel changed")
             self.player.show()
             self.player.set_overlay_info(title)
             if not self.player.play(url, title):
@@ -4183,6 +4294,10 @@ class MainWindow(QMainWindow):
 
     def _playback_error(self, msg):
         """A stream failed to play (dead/unreachable channel etc.)."""
+        self.rec.finish_all_inplayer("stream error")
+        if self.player:
+            # let a re-selection of the same channel retry the stream
+            self.player.current_url = None
         self._set_status(f"Stream error: {msg}", error=True)
         if self._player_fs and self.player:
             self.player.set_overlay_info(f"Stream error: {msg}")
@@ -4553,15 +4668,44 @@ class MainWindow(QMainWindow):
 
     def _record_now(self, it, minutes):
         """minutes=None records open-ended, until stopped via the ● REC
-        indicator or the Recordings section."""
-        if not self._recorder_ready() or it.get("stream_id") is None:
+        indicator or the Recordings section.
+
+        When the channel to record is the one already playing in the
+        embedded player, the recording taps that player's own stream
+        (mpv stream-record) - no second connection to the provider, which
+        matters because most IPTV accounts allow only one stream at a
+        time. Recording a *different* channel (or a scheduled job firing
+        later) necessarily opens its own connection."""
+        if it.get("stream_id") is None:
             return
-        url = self.client.live_url(it["stream_id"], "ts")
         title = self.channel_display_name(it)
         now = time.time()
-        self.rec.add_job(url, title, now,
-                         None if minutes is None else now + minutes * 60)
+        stop_ts = None if minutes is None else now + minutes * 60
         length = "until stopped" if minutes is None else f"for {minutes} min"
+
+        watching_this = (self.player is not None
+                         and self.player.isVisible()
+                         and self.playback_mode() == "embedded"
+                         and self._playing_group == "live"
+                         and self._playing_key == self._item_key(it))
+        if watching_this:
+            try:
+                path = self.rec.build_path(title)
+            except OSError as e:
+                QMessageBox.warning(self, "Recording", str(e))
+                return
+            if self.player.start_stream_record(path):
+                self.rec.add_inplayer_job(title, path, stop_ts)
+                self._set_status(f"● Recording {title} {length} - capturing "
+                                 "the stream you're watching (no extra "
+                                 "connection)")
+                return
+            # stream-record refused (no mpv core?) - fall through to ffmpeg
+
+        if not self._recorder_ready():
+            return
+        url = self.client.live_url(it["stream_id"], "ts")
+        self.rec.add_job(url, title, now, stop_ts)
         self._set_status(f"● Recording {title} {length} "
                          f"→ {self.rec.directory()}")
 
