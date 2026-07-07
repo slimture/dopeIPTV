@@ -98,6 +98,7 @@ class MainWindow(QMainWindow):
         self._playing_key = None
         self._playing_group: str | None = None
         self._playing_item = None
+        self._pip_win = None
         self._last_player = None
         self._last_playlist_refresh = time.time()
         self._load_gen = 0
@@ -295,6 +296,8 @@ class MainWindow(QMainWindow):
                 lambda: self.wake.release())
             self.player.playback_error.connect(self._playback_error)
             self.player.zap.connect(self._zap)
+            self.player.pip_requested.connect(self._toggle_pip)
+            self.player.stop_btn.clicked.connect(self._exit_pip_if_active)
             self.player.stop_btn.clicked.connect(self.player.hide)
             dl.addWidget(self.player, 2)
 
@@ -471,6 +474,64 @@ class MainWindow(QMainWindow):
         elif scroll is not None:
             QTimer.singleShot(0, lambda: (
                 self.listw.verticalScrollBar().setValue(scroll)))
+
+    # -- picture-in-picture --------------------------------------------------------
+
+    def _toggle_pip(self) -> None:
+        if not self.player:
+            return
+        if self._pip_win is not None:
+            self._exit_pip()
+            return
+        if self._player_fs:
+            self._exit_player_fullscreen()
+        mw = self
+
+        class _PipWin(QWidget):
+            def closeEvent(self_, event):
+                if mw._pip_win is self_:
+                    event.ignore()
+                    mw._exit_pip()
+                else:
+                    super().closeEvent(event)
+
+        win = _PipWin(None, Qt.WindowType.Window
+                      | Qt.WindowType.WindowStaysOnTopHint)
+        win.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
+        win.setWindowTitle("dopeIPTV PiP")
+        win.setMinimumSize(320, 180)
+        lay = QVBoxLayout(win)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(0)
+        self.player.setParent(win)
+        lay.addWidget(self.player)
+        self.player.show()
+        self.player.pip_btn.setToolTip("Exit Picture-in-Picture")
+        self.player.fs_btn.hide()
+        geo = self.geometry()
+        win.resize(480, 270)
+        win.move(geo.right() - 500, geo.bottom() - 300)
+        win.show()
+        self._pip_win = win
+
+    def _exit_pip(self) -> None:
+        if self._pip_win is None:
+            return
+        win = self._pip_win
+        self._pip_win = None
+        self.player.setParent(self._det)
+        det_lay = self._det.layout()
+        det_lay.insertWidget(det_lay.indexOf(self.stream_error), self.player, 2)
+        if self.player.current_url:
+            self.player.show()
+        self.player.pip_btn.setToolTip("Picture-in-Picture")
+        self.player.fs_btn.show()
+        win.hide()
+        win.deleteLater()
+
+    def _exit_pip_if_active(self) -> None:
+        if self._pip_win is not None:
+            self._exit_pip()
 
     # -- playlists -----------------------------------------------------------------
 
@@ -2233,6 +2294,12 @@ class MainWindow(QMainWindow):
     # -- EPG guide -----------------------------------------------------------------
 
     def _open_epg_guide(self) -> None:
+        self._ensure_xmltv_loaded()
+        if self.mode == "live" and self.all_items:
+            cat = self.cat_list.currentItem()
+            cat_name = cat.text() if cat else "All"
+            EpgGuideDialog(self, list(self.all_items), cat_name).exec()
+            return
         dlg = QDialog(self)
         dlg.setWindowTitle("EPG Guide")
         lay = QVBoxLayout(dlg)
@@ -2242,7 +2309,6 @@ class MainWindow(QMainWindow):
 
         def done(channels):
             dlg.close()
-            self._ensure_xmltv_loaded()
             EpgGuideDialog(self, channels or []).exec()
 
         run_async(self.pool, lambda: self.client.live_streams(None),

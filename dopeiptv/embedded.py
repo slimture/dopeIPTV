@@ -161,6 +161,7 @@ class EmbeddedPlayer(QWidget):
     exit_fullscreen = pyqtSignal()
     timeshift_menu = pyqtSignal(object)
     record_menu = pyqtSignal(object)
+    pip_requested = pyqtSignal()
 
     OVERLAY_HIDE_MS = 3000
     VIDEO_BOX_HEIGHT = 260
@@ -233,6 +234,9 @@ class EmbeddedPlayer(QWidget):
         self.stop_btn = QPushButton("■", objectName="MiniBtn")
         self.stop_btn.setToolTip("Stop playback")
         self.stop_btn.clicked.connect(self.stop)
+        self.pip_btn = QPushButton("🖼", objectName="MiniBtn")
+        self.pip_btn.setToolTip("Picture-in-Picture")
+        self.pip_btn.clicked.connect(self.pip_requested)
         self.fs_btn = QPushButton("⛶", objectName="MiniBtn")
         self.fs_btn.setToolTip("Fullscreen")
         bl.addWidget(self.prev_btn)
@@ -248,6 +252,7 @@ class EmbeddedPlayer(QWidget):
         bl.addWidget(self.ts_btn)
         bl.addWidget(self.rec_btn)
         bl.addWidget(self.opts_btn)
+        bl.addWidget(self.pip_btn)
         bl.addWidget(self.stop_btn)
         bl.addWidget(self.fs_btn)
         lay.addWidget(self.bar)
@@ -703,15 +708,28 @@ class EmbeddedPlayer(QWidget):
                 pass
             return "—"
 
+        hwdec = prop("hwdec-current")
+        if not hwdec or hwdec == "—":
+            hwdec = prop("hwdec")
+        if not hwdec or hwdec in ("—", "no"):
+            hwdec = "software"
+        dropped = prop("frame-drop-count", lambda v: str(int(v)))
+        vo_drops = prop("vo-drop-frame-count", lambda v: str(int(v)))
+        if dropped != "—" and vo_drops != "—":
+            dropped = f"{dropped} / {vo_drops} vo"
+
         lines = [
             f"Video: {track_info('video')}",
             f"Audio: {track_info('audio')}",
-            f"HW dec: {prop('hwdec-current')}",
+            f"HW dec: {hwdec}",
             f"A/V sync: {prop('avsync', lambda v: f'{v:.3f} s')}",
-            f"Dropped: {prop('frame-drop-count')}",
+            f"Dropped: {dropped}",
+            f"FPS: {prop('estimated-vf-fps', lambda v: f'{v:.1f}')}",
+            f"Bitrate: {prop('video-bitrate', lambda v: f'{v / 1000:.0f} kbps' if v else '—')}",
             f"Cache: {prop('demuxer-cache-duration', lambda v: f'{v:.1f} s')}",
-            f"Net: {prop('cache-speed', lambda v: f'{v / 1024:.0f} KB/s' if v else '—')}",
+            f"Net: {prop('cache-speed', lambda v: f'{v / 1024:.0f} KB/s' if v else '0 KB/s')}",
             f"Format: {prop('file-format')}",
+            f"Protocol: {prop('stream-path', lambda v: v.split('://')[0] if '://' in str(v) else str(v))}",
         ]
         self._stats_overlay.setText("\n".join(lines))
         self._place_stats()

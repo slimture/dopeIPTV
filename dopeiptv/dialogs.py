@@ -140,11 +140,14 @@ class EpgGuideDialog(QDialog):
 
     MAX_ROWS = 2000
 
-    def __init__(self, window, channels) -> None:
+    def __init__(self, window, channels, category_name=None) -> None:
         super().__init__(window)
         self.window = window
         self.channels = channels
-        self.setWindowTitle("EPG Guide")
+        title = "EPG Guide"
+        if category_name:
+            title += f" — {category_name}"
+        self.setWindowTitle(title)
         self.resize(560, 640)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(18, 18, 18, 18)
