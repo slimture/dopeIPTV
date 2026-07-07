@@ -100,6 +100,7 @@ class MainWindow(QMainWindow):
         self._playing_item = None
         self._last_player = None
         self._last_playlist_refresh = time.time()
+        self._load_gen = 0
 
         self._base_title = (active_pl or {}).get("name", "")
         self.setWindowTitle(self._base_title)
@@ -118,6 +119,8 @@ class MainWindow(QMainWindow):
         app_menu = menubar.addMenu(APP_NAME)
         settings_action = app_menu.addAction("Settings...")
         settings_action.triggered.connect(self.open_settings)
+        refresh_action = app_menu.addAction("Refresh playlist")
+        refresh_action.triggered.connect(self.refresh_playlist)
         app_menu.addSeparator()
         about_action = app_menu.addAction("About dopeIPTV")
         about_action.triggered.connect(self.show_about)
@@ -162,6 +165,11 @@ class MainWindow(QMainWindow):
         guide_btn = QPushButton("EPG Guide")
         guide_btn.clicked.connect(self._open_epg_guide)
         sl.addWidget(guide_btn)
+
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.setToolTip("Reload channels and EPG from server")
+        refresh_btn.clicked.connect(self.refresh_playlist)
+        sl.addWidget(refresh_btn)
 
         settings_btn = QPushButton("Settings")
         settings_btn.clicked.connect(self.open_settings)
@@ -362,6 +370,10 @@ class MainWindow(QMainWindow):
         root.setSizes([220, 560, 380])
         root.setCollapsible(0, False)
         root.setCollapsible(2, False)
+        root.setStretchFactor(0, 0)
+        root.setStretchFactor(1, 1)
+        root.setStretchFactor(2, 0)
+        det.setMinimumWidth(280)
         self._side, self._mid, self._det = side, mid, det
 
         self.tick = QTimer(self)
@@ -475,6 +487,7 @@ class MainWindow(QMainWindow):
             cache_path=epg_cache_path(pid) if pid else None,
             progress_cb=self.epg_progress.emit)
         self._info_cache.clear()
+        self._set_status("Refreshing playlist...")
         self._load_categories()
         run_async(
             self.pool, lambda: self.xmltv.ensure_loaded(force=True),
@@ -526,6 +539,8 @@ class MainWindow(QMainWindow):
         self._load_categories()
 
     def _load_categories(self) -> None:
+        self._load_gen += 1
+        gen = self._load_gen
         self.cat_list.clear()
         self.list_model.set_items([], self.mode)
         if self.mode == "rec":
@@ -565,11 +580,12 @@ class MainWindow(QMainWindow):
         request_mode = self.mode
 
         def done(cats):
-            if self.mode != request_mode:
+            if gen != self._load_gen or self.mode != request_mode:
                 return
             self.loading_bar.hide()
             self._raw_categories = cats or []
             self.cat_list.blockSignals(True)
+            self.cat_list.clear()
             all_item = QListWidgetItem("All")
             all_item.setData(Qt.ItemDataRole.UserRole, None)
             self.cat_list.addItem(all_item)
@@ -588,7 +604,12 @@ class MainWindow(QMainWindow):
             self.cat_list.blockSignals(False)
             self.cat_list.setCurrentRow(0)
 
-        run_async(self.pool, fn, done, self._error)
+        def fail(msg):
+            if gen != self._load_gen:
+                return
+            self._error(msg)
+
+        run_async(self.pool, fn, done, fail)
 
     def _category_changed(self, cur, _prev=None) -> None:
         if not cur:
@@ -639,9 +660,10 @@ class MainWindow(QMainWindow):
               "vod": self.client.vod_streams,
               "series": self.client.series_list}[self.mode]
         mode = self.mode
+        gen = self._load_gen
 
         def done(items):
-            if self.mode != mode:
+            if gen != self._load_gen or self.mode != mode:
                 return
             self.loading_bar.hide()
             items = items or []
@@ -657,7 +679,12 @@ class MainWindow(QMainWindow):
             if self.mode == "live":
                 self._ensure_xmltv_loaded()
 
-        run_async(self.pool, lambda: fn(category_id), done, self._error)
+        def fail(msg):
+            if gen != self._load_gen:
+                return
+            self._error(msg)
+
+        run_async(self.pool, lambda: fn(category_id), done, fail)
 
     def _ensure_xmltv_loaded(self) -> None:
         if self.xmltv._loaded or self.xmltv._failed:
@@ -1592,7 +1619,7 @@ class MainWindow(QMainWindow):
             f"● REC ({n})" if n > 1 else "● REC")
         self.rec_indicator.setVisible(n > 0)
         if self.player:
-            label = "● REC" if n else "REC"
+            label = "●" if n else "REC"
             self.player.rec_btn.setText(label)
             self.player.fs_rec_btn.setText(label)
         if self.mode == "rec":

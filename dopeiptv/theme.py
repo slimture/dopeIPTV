@@ -184,7 +184,7 @@ QPushButton {{
 QPushButton:hover  {{ background: {p['btn_hover']}; }}
 QPushButton#Primary {{ background: {ACCENT}; border: none; color: white; }}
 QPushButton#Primary:hover {{ background: {p['accent_hi']}; }}
-QPushButton#MiniBtn {{ padding: 4px 10px; font-size: 11px; border-radius: 7px; }}
+QPushButton#MiniBtn {{ padding: 3px 6px; font-size: 11px; border-radius: 6px; }}
 
 QScrollArea {{ background: transparent; border: none; }}
 QScrollArea > QWidget > QWidget {{ background: transparent; }}
