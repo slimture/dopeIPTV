@@ -50,7 +50,7 @@ from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 
 APP_NAME = "dopeIPTV"
 ORG = "dopeiptv"
-VERSION = "0.1.0-beta.5"
+VERSION = "0.1.0-beta.6"
 
 # Optional embedded playback via libmpv (python-mpv). Imported lazily so the
 # app still runs fine without it - playback then falls back to the reused
@@ -1305,6 +1305,9 @@ class RecordingManager(QObject):
         super().__init__(parent)
         self.settings = settings
         self.jobs = []
+        # Session-only size-cap override from the player's REC menu:
+        # None = follow Settings, 0 = no limit, >0 = bytes.
+        self.session_cap = None
         self._load()
         self._timer = QTimer(self)
         self._timer.setInterval(5000)
@@ -1399,13 +1402,13 @@ class RecordingManager(QObject):
         self.jobs_changed.emit()
         return job
 
-    def add_inplayer_job(self, title, path, stop_ts):
+    def add_inplayer_job(self, title, path, stop_ts, url=""):
         """Registers a recording that rides on the embedded player's own
         stream (mpv stream-record) - the app never opens a second
         connection to the provider for these. The player side is started/
         stopped by the caller; stop_inplayer_cb is invoked when the job
         must end (timer, cancel, channel switch)."""
-        job = {"id": uuid.uuid4().hex[:10], "url": "", "title": title,
+        job = {"id": uuid.uuid4().hex[:10], "url": url, "title": title,
                "start": time.time(), "stop": stop_ts, "folder": "",
                "status": "recording", "path": path, "error": "",
                "proc": None, "inplayer": True}
@@ -1473,6 +1476,19 @@ class RecordingManager(QObject):
         self._save()
         self.jobs_changed.emit()
 
+    def clear_finished(self):
+        """Drops every finished/failed/cancelled job from the list."""
+        self.jobs = [j for j in self.jobs
+                     if j["status"] in ("recording", "scheduled")]
+        self.jobs_changed.emit()
+
+    def prune_path(self, path):
+        """Forgets finished jobs whose file was just deleted."""
+        self.jobs = [j for j in self.jobs
+                     if j["status"] in ("recording", "scheduled")
+                     or j.get("path") != path]
+        self.jobs_changed.emit()
+
     def active_count(self):
         return sum(1 for j in self.jobs if j["status"] == "recording")
 
@@ -1538,7 +1554,10 @@ class RecordingManager(QObject):
                 p.kill()
 
     def _max_bytes(self):
-        """Optional size cap for recordings, from Settings (0 = no cap)."""
+        """Optional size cap for recordings: the session override from the
+        player's REC menu wins; otherwise the Settings value (0 = no cap)."""
+        if self.session_cap is not None:
+            return self.session_cap
         try:
             val = float(self.settings.value("rec_max_value", 0) or 0)
         except (TypeError, ValueError):
@@ -1874,6 +1893,14 @@ class EmbeddedPlayer(QWidget):
         self.seek.hide()
         self.time_lbl = QLabel("", objectName="DetailMeta")
         self.time_lbl.hide()
+        self.mute_btn = QPushButton("🔊", objectName="MiniBtn")
+        self.mute_btn.setToolTip("Mute / unmute")
+        self.mute_btn.clicked.connect(self.toggle_mute)
+        self.vol = QSlider(Qt.Orientation.Horizontal)
+        self.vol.setRange(0, 100)
+        self.vol.setFixedWidth(80)
+        self.vol.setToolTip("Volume")
+        self.vol.valueChanged.connect(self._set_volume)
         self.ts_btn = QPushButton("⏪", objectName="MiniBtn")
         self.ts_btn.setToolTip("Timeshift / catch-up")
         self.ts_btn.clicked.connect(
@@ -1899,6 +1926,8 @@ class EmbeddedPlayer(QWidget):
         bl.addWidget(self.title_lbl, 1)
         bl.addWidget(self.seek, 2)
         bl.addWidget(self.time_lbl)
+        bl.addWidget(self.mute_btn)
+        bl.addWidget(self.vol)
         bl.addWidget(self.ts_btn)
         bl.addWidget(self.rec_btn)
         bl.addWidget(self.opts_btn)
@@ -1942,6 +1971,14 @@ class EmbeddedPlayer(QWidget):
         self.fs_seek.hide()
         self.fs_time_lbl = QLabel("", objectName="DetailMeta")
         self.fs_time_lbl.hide()
+        self.fs_mute_btn = QPushButton("🔊", objectName="MiniBtn")
+        self.fs_mute_btn.setToolTip("Mute / unmute")
+        self.fs_mute_btn.clicked.connect(self.toggle_mute)
+        self.fs_vol = QSlider(Qt.Orientation.Horizontal)
+        self.fs_vol.setRange(0, 100)
+        self.fs_vol.setFixedWidth(80)
+        self.fs_vol.setToolTip("Volume")
+        self.fs_vol.valueChanged.connect(self._set_volume)
         self.fs_ts_btn = QPushButton("⏪", objectName="MiniBtn")
         self.fs_ts_btn.setToolTip("Timeshift / catch-up")
         self.fs_ts_btn.clicked.connect(
@@ -1966,6 +2003,8 @@ class EmbeddedPlayer(QWidget):
         fc.addWidget(self.fs_fwd_btn)
         fc.addWidget(self.fs_seek, 1)
         fc.addWidget(self.fs_time_lbl)
+        fc.addWidget(self.fs_mute_btn)
+        fc.addWidget(self.fs_vol)
         fc.addWidget(self.fs_ts_btn)
         fc.addWidget(self.fs_rec_btn)
         fc.addWidget(self.fs_opts_btn)
@@ -1973,7 +2012,8 @@ class EmbeddedPlayer(QWidget):
         self.fs_controls.hide()
         for wdg in (self.fs_controls, self.fs_prev_btn, self.fs_next_btn,
                     self.fs_pause_btn, self.fs_back_btn, self.fs_fwd_btn,
-                    self.fs_seek, self.fs_time_lbl, self.fs_ts_btn,
+                    self.fs_seek, self.fs_time_lbl, self.fs_mute_btn,
+                    self.fs_vol, self.fs_ts_btn,
                     self.fs_rec_btn, self.fs_opts_btn,
                     self.fs_exit_btn):
             wdg.setMouseTracking(True)
@@ -1987,6 +2027,15 @@ class EmbeddedPlayer(QWidget):
 
         self._fs_ui = False
         self.current_url = None      # what the mpv core is playing right now
+        self._muted = False
+        try:
+            vol = int(self._settings.value("volume", 100)) if self._settings else 100
+        except (TypeError, ValueError):
+            vol = 100
+        for s in (self.vol, self.fs_vol):
+            s.blockSignals(True)
+            s.setValue(vol)
+            s.blockSignals(False)
         self._overlay_text = ""
         self._overlay_timer = QTimer(self)
         self._overlay_timer.setSingleShot(True)
@@ -2144,6 +2193,11 @@ class EmbeddedPlayer(QWidget):
             except Exception:
                 pass
             self.apply_default_options()
+            try:
+                m["volume"] = float(self.vol.value())
+                m["mute"] = self._muted
+            except Exception:
+                pass
             self._sync_pause_label(False)
             try:
                 m.pause = False           # a new channel always starts playing
@@ -2321,6 +2375,36 @@ class EmbeddedPlayer(QWidget):
         for btn in (self.back_btn, self.fwd_btn,
                     self.fs_back_btn, self.fs_fwd_btn):
             btn.setVisible(True)
+
+    # -- volume ---------------------------------------------------------------
+    def _set_volume(self, value):
+        """Volume slider moved (either of them) - drive mpv, keep both
+        sliders in sync, persist across sessions."""
+        m = self.video.mpv
+        if m is not None:
+            try:
+                m["volume"] = float(value)
+            except Exception:
+                pass
+        for s in (self.vol, self.fs_vol):
+            if s.value() != value:
+                s.blockSignals(True)
+                s.setValue(value)
+                s.blockSignals(False)
+        if self._settings is not None:
+            self._settings.setValue("volume", int(value))
+
+    def toggle_mute(self):
+        self._muted = not self._muted
+        m = self.video.mpv
+        if m is not None:
+            try:
+                m["mute"] = self._muted
+            except Exception:
+                pass
+        label = "🔇" if self._muted else "🔊"
+        self.mute_btn.setText(label)
+        self.fs_mute_btn.setText(label)
 
     # -- recording the watched stream itself ---------------------------------
     # mpv's stream-record dumps the exact stream this player is already
@@ -2631,6 +2715,31 @@ QLineEdit {{
     padding: 8px 10px;
 }}
 QLineEdit:focus {{ border: 1px solid {ACCENT}; }}
+
+/* The non-native file dialog (recordings folder picker): without these its
+   views keep the platform's white background under our light text. */
+QFileDialog QTreeView, QFileDialog QListView {{
+    background: {p['input']}; border: 1px solid {p['border_in']};
+    border-radius: 6px; color: {p['text']}; outline: none;
+}}
+QFileDialog QTreeView::item, QFileDialog QListView::item {{
+    padding: 3px 6px; color: {p['text']};
+}}
+QFileDialog QTreeView::item:hover, QFileDialog QListView::item:hover {{
+    background: {p['hover']};
+}}
+QFileDialog QTreeView::item:selected, QFileDialog QListView::item:selected {{
+    background: {ACCENT}; color: white;
+}}
+QHeaderView::section {{
+    background: {p['btn']}; color: {p['text2']}; border: none;
+    padding: 4px 8px; font-size: 11px;
+}}
+QFileDialog QToolButton {{
+    background: {p['btn']}; border: 1px solid {p['btn_hover']};
+    border-radius: 6px; padding: 4px 8px;
+}}
+QFileDialog QToolButton:hover {{ background: {p['btn_hover']}; }}
 """
 
 # ----------------------------------------------------------------------------
@@ -4810,14 +4919,27 @@ class MainWindow(QMainWindow):
             box.setWindowTitle("Recording in progress")
             box.setText(f"'{j['title']}' is being recorded from the stream "
                         f"you're watching.\n\nSwitching to '{title}' will "
-                        "STOP that recording.")
+                        "STOP that recording - unless you continue it over "
+                        "a second connection (needs a multi-stream account).")
             stop_btn = box.addButton("Stop recording & switch",
                                      QMessageBox.ButtonRole.AcceptRole)
+            cont_btn = (box.addButton(
+                "Switch & keep recording (new connection)",
+                QMessageBox.ButtonRole.ActionRole) if j.get("url") else None)
             box.addButton("Keep watching (recording continues)",
                           QMessageBox.ButtonRole.RejectRole)
             box.exec()
-            if box.clickedButton() is stop_btn:
+            clicked = box.clickedButton()
+            if clicked is stop_btn:
                 self.rec.finish_all_inplayer("stopped")
+                return True
+            if cont_btn is not None and clicked is cont_btn:
+                # Hand the recording over to its own ffmpeg connection and
+                # keep going into a continuation file.
+                self.rec.finish_all_inplayer("continued over a new connection")
+                self.rec.add_job(j["url"], f"{j['title']} (cont.)",
+                                 time.time(), j.get("stop"))
+                self._multi_stream_ok = True
                 return True
             return False
         # Separate-connection (ffmpeg) recording running
@@ -4927,6 +5049,17 @@ class MainWindow(QMainWindow):
         rec_menu.addSeparator()
         rec_menu.addAction("Schedule recording...",
                            lambda: self._schedule_recording(it))
+        cap_menu = rec_menu.addMenu("Size limit (this session)")
+        current = self.rec.session_cap
+        for label, cap in (("From Settings", None), ("No limit", 0),
+                           ("250 MB", 250 * 10**6), ("500 MB", 500 * 10**6),
+                           ("1 GB", 10**9), ("2 GB", 2 * 10**9),
+                           ("5 GB", 5 * 10**9), ("10 GB", 10 * 10**9)):
+            act = cap_menu.addAction(label)
+            act.setCheckable(True)
+            act.setChecked(cap == current)
+            act.triggered.connect(
+                lambda _c, cap=cap: setattr(self.rec, "session_cap", cap))
 
     def _record_now(self, it, minutes):
         """minutes=None records open-ended, until stopped via the ● REC
@@ -4957,7 +5090,9 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Recording", str(e))
                 return
             if self.player.start_stream_record(path):
-                self.rec.add_inplayer_job(title, path, stop_ts)
+                self.rec.add_inplayer_job(
+                    title, path, stop_ts,
+                    url=self.client.live_url(it["stream_id"], "ts"))
                 self._set_status(f"● Recording {title} {length} - capturing "
                                  "the stream you're watching (no extra "
                                  "connection)")
@@ -5031,7 +5166,27 @@ class MainWindow(QMainWindow):
             items = [clicked_item]
         return items
 
+    def _remove_jobs_selected(self, clicked_item=None):
+        """Removes every selected job row from Active & scheduled: finished
+        ones are dropped, scheduled ones cancelled first; recordings that
+        are still running are skipped (stop them explicitly)."""
+        items = [self.list_model.item_at(ix.row())
+                 for ix in self.listw.selectionModel().selectedRows()]
+        items = [it for it in items if it and it.get("_job")]
+        if not items and clicked_item and clicked_item.get("_job"):
+            items = [clicked_item]
+        for it in items:
+            if it.get("_status") == "recording":
+                continue
+            if it.get("_status") == "scheduled":
+                self.rec.cancel(it["_job"])
+            self.rec.remove_job(it["_job"])
+
     def _delete_recordings_selected(self, clicked_item=None):
+        cur = self.cat_list.currentItem()
+        if cur and cur.data(Qt.ItemDataRole.UserRole) == "__jobs__":
+            self._remove_jobs_selected(clicked_item)
+            return
         items = self._selected_recordings(clicked_item)
         if not items:
             return
@@ -5044,6 +5199,7 @@ class MainWindow(QMainWindow):
         for it in items:
             try:
                 os.remove(it["_path"])
+                self.rec.prune_path(it["_path"])   # drop its job entry too
             except OSError as e:
                 self._set_status(f"Could not delete: {e}", error=True)
         cur = self.cat_list.currentItem()
@@ -5265,8 +5421,11 @@ class MainWindow(QMainWindow):
                 m.addAction("Cancel scheduled recording",
                             lambda: self.rec.cancel(it["_job"]))
             else:
-                m.addAction("Remove from list",
-                            lambda: self.rec.remove_job(it["_job"]))
+                m.addAction("Remove selected from list",
+                            lambda: self._remove_jobs_selected(it))
+            m.addSeparator()
+            m.addAction("Clear all finished from list",
+                        lambda: self.rec.clear_finished())
         else:
             items = self._selected_recordings(it)
             many = len(items) > 1
