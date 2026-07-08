@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import sys
 
-from PyQt6.QtCore import QByteArray, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QOpenGLContext
+from PyQt6.QtCore import QByteArray, QPointF, QRectF, QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import (
+    QColor, QIcon, QOpenGLContext, QPainter, QPen, QPixmap, QPolygonF,
+)
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 from PyQt6.QtWidgets import (
     QApplication, QHBoxLayout, QLabel, QMenu, QSizePolicy, QSlider,
@@ -14,6 +16,107 @@ from PyQt6.QtWidgets import (
 
 from .i18n import tr
 from .players import _libmpv, _register_error_callback
+from .theme import P
+
+
+def _control_icon(name: str, color: str, px: int = 28) -> QIcon:
+    """Draw a media-control glyph as a crisp, perfectly centred monochrome
+    icon. Hand-drawing (instead of relying on Unicode glyphs, whose ink sits
+    at glyph-specific offsets inside the em box) is what makes every button's
+    symbol line up at the exact same height and size."""
+    scale = 3
+    S = px * scale
+    pm = QPixmap(S, S)
+    pm.fill(Qt.GlobalColor.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    col = QColor(color)
+    m = S * 0.30
+    L, R, T, B = m, S - m, m, S - m
+    w, h = R - L, B - T
+    midx, midy = S / 2, S / 2
+    solid = Qt.PenStyle.SolidLine
+    round_cap = Qt.PenCapStyle.RoundCap
+    round_join = Qt.PenJoinStyle.RoundJoin
+
+    def fill():
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(col)
+
+    def stroke(width):
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(QPen(col, width, solid, round_cap, round_join))
+
+    if name in ("play", "next"):
+        fill()
+        p.drawPolygon(QPolygonF([QPointF(L, T), QPointF(L, B), QPointF(R, midy)]))
+    elif name == "prev":
+        fill()
+        p.drawPolygon(QPolygonF([QPointF(R, T), QPointF(R, B), QPointF(L, midy)]))
+    elif name == "pause":
+        fill()
+        bw = w * 0.30
+        p.drawRoundedRect(QRectF(L, T, bw, h), bw * 0.25, bw * 0.25)
+        p.drawRoundedRect(QRectF(R - bw, T, bw, h), bw * 0.25, bw * 0.25)
+    elif name == "stop":
+        fill()
+        p.drawRoundedRect(QRectF(L, T, w, h), w * 0.14, w * 0.14)
+    elif name == "record":
+        fill()
+        p.drawEllipse(QRectF(L, T, w, h))
+    elif name == "rewind":
+        fill()
+        p.drawPolygon(QPolygonF([QPointF(midx, T), QPointF(midx, B),
+                                 QPointF(L, midy)]))
+        p.drawPolygon(QPolygonF([QPointF(R, T), QPointF(R, B),
+                                 QPointF(midx, midy)]))
+    elif name == "exit":
+        stroke(S * 0.11)
+        p.drawLine(QPointF(L, T), QPointF(R, B))
+        p.drawLine(QPointF(R, T), QPointF(L, B))
+    elif name == "fullscreen":
+        stroke(S * 0.09)
+        seg = w * 0.34
+        p.drawPolyline(QPolygonF([QPointF(L, T + seg), QPointF(L, T),
+                                  QPointF(L + seg, T)]))
+        p.drawPolyline(QPolygonF([QPointF(R - seg, T), QPointF(R, T),
+                                  QPointF(R, T + seg)]))
+        p.drawPolyline(QPolygonF([QPointF(L, B - seg), QPointF(L, B),
+                                  QPointF(L + seg, B)]))
+        p.drawPolyline(QPolygonF([QPointF(R - seg, B), QPointF(R, B),
+                                  QPointF(R, B - seg)]))
+    elif name == "options":
+        rows = (T, midy, B)
+        knobs = (R - w * 0.18, L + w * 0.22, R - w * 0.34)
+        rad = S * 0.07
+        for y, kx in zip(rows, knobs):
+            stroke(S * 0.075)
+            p.drawLine(QPointF(L, y), QPointF(R, y))
+            fill()
+            p.drawEllipse(QPointF(kx, y), rad, rad)
+    elif name in ("volume", "mute"):
+        fill()
+        body_w, body_h = w * 0.28, h * 0.42
+        bx = L - w * 0.04
+        p.drawRect(QRectF(bx, midy - body_h / 2, body_w, body_h))
+        cone_x = bx + body_w + w * 0.26
+        p.drawPolygon(QPolygonF([
+            QPointF(bx + body_w, midy - body_h / 2), QPointF(cone_x, T),
+            QPointF(cone_x, B), QPointF(bx + body_w, midy + body_h / 2)]))
+        if name == "volume":
+            stroke(S * 0.06)
+            for rad in (w * 0.16, w * 0.30):
+                p.drawArc(QRectF(cone_x - rad, midy - rad, rad * 2, rad * 2),
+                          -55 * 16, 110 * 16)
+        else:
+            stroke(S * 0.07)
+            xx = cone_x + w * 0.12
+            dy = h * 0.16
+            p.drawLine(QPointF(xx, midy - dy), QPointF(xx + w * 0.22, midy + dy))
+            p.drawLine(QPointF(xx + w * 0.22, midy - dy), QPointF(xx, midy + dy))
+    p.end()
+    pm.setDevicePixelRatio(scale)
+    return QIcon(pm)
 
 
 def _format_time(seconds: float | None) -> str:
@@ -183,20 +286,7 @@ class EmbeddedPlayer(QWidget):
     OVERLAY_HIDE_MS = 3000
     VIDEO_BOX_HEIGHT = 260
     MINIBTN = 28
-
-    # These control glyphs have very different intrinsic sizes at the same
-    # font size (a triangle vs. a thin double-bar vs. an emoji), which left
-    # the mini-player buttons looking uneven. Pin a per-glyph pixel size so
-    # every icon reads at roughly the same visual weight inside its button.
-    _GLYPH_PX = {
-        "◀": 12, "▶": 12,
-        "‖": 15,
-        "■": 12, "⛶": 15,
-        "⚙": 15, "●": 14,
-        "✕": 13, "⏪": 13,
-        "\U0001f50a": 14, "\U0001f507": 14,
-        "−10": 9, "+30": 9, "-10": 9,
-    }
+    ICON_PX = 15  # drawn control-icon size inside the 28px buttons
 
     def __init__(self, parent: QWidget | None = None,
                  settings=None) -> None:
@@ -386,11 +476,11 @@ class EmbeddedPlayer(QWidget):
             wdg.setMouseTracking(True)
             wdg.installEventFilter(self)
 
-        # Give every control-bar button the exact same square size so the
-        # glyphs line up on one baseline instead of each button sizing to
-        # its own glyph (which left them at slightly different heights and
-        # off the shared line). The one text button (PiP) keeps its width
-        # but shares the height; the volume sliders match the height too.
+        # Give every control-bar button the exact same square size, then
+        # replace its Unicode glyph with a hand-drawn, perfectly centred icon
+        # (see _control_icon) so the symbols line up at identical size and
+        # height. The one text button (PiP) keeps its width but shares the
+        # height; the volume sliders match the height too.
         m = self.MINIBTN
         all_icon_btns = (
             self.prev_btn, self.next_btn, self.pause_btn, self.back_btn,
@@ -408,8 +498,22 @@ class EmbeddedPlayer(QWidget):
         for s in (self.vol, self.fs_vol):
             s.setFixedHeight(m)
 
-        for b in (*all_icon_btns, self.pip_btn):
-            self._apply_glyph(b, b.text())
+        # Map each symbol button to a drawn-icon name. -10/+30 (seek amounts)
+        # and PiP stay as text labels; the pause/mute icons are swapped live
+        # in _sync_pause_label / toggle_mute.
+        self._icon_names = {
+            self.prev_btn: "prev", self.next_btn: "next",
+            self.pause_btn: "pause", self.ts_btn: "rewind",
+            self.rec_btn: "record", self.opts_btn: "options",
+            self.stop_btn: "stop", self.fs_btn: "fullscreen",
+            self.mute_btn: "volume",
+            self.fs_prev_btn: "prev", self.fs_next_btn: "next",
+            self.fs_pause_btn: "pause", self.fs_ts_btn: "rewind",
+            self.fs_rec_btn: "record", self.fs_opts_btn: "options",
+            self.fs_exit_btn: "exit", self.fs_mute_btn: "volume",
+        }
+        self._icon_color = P.get("text2", "#ECECF1")
+        self.refresh_icons()
 
         self._pos_timer = QTimer(self)
         self._pos_timer.setInterval(500)
@@ -819,9 +923,11 @@ class EmbeddedPlayer(QWidget):
             pass
 
     def _sync_pause_label(self, paused: bool) -> None:
-        label = "▶" if paused else "‖"
-        self._apply_glyph(self.pause_btn, label)
-        self._apply_glyph(self.fs_pause_btn, label)
+        self._paused = paused
+        name = "play" if paused else "pause"
+        icon = _control_icon(name, self._icon_color, self.ICON_PX)
+        self.pause_btn.setIcon(icon)
+        self.fs_pause_btn.setIcon(icon)
 
     # -- options menu ----------------------------------------------------------
 
@@ -1068,15 +1174,27 @@ class EmbeddedPlayer(QWidget):
         if self._settings is not None:
             self._settings.setValue("volume", int(value))
 
-    def _apply_glyph(self, btn: QPushButton, text: str) -> None:
-        """Set a button's glyph and normalize its pixel size so all the
-        control icons read at a consistent visual weight."""
-        btn.setText(text)
-        px = self._GLYPH_PX.get(text)
-        if px:
-            f = btn.font()
-            f.setPixelSize(px)
-            btn.setFont(f)
+    def refresh_icons(self) -> None:
+        """(Re)draw every control-button icon in the current theme's text
+        colour. Called at construction and again when the theme changes so
+        the icons stay legible in light and dark themes."""
+        self._icon_color = P.get("text2", "#ECECF1")
+        size = QSize(self.ICON_PX, self.ICON_PX)
+        for btn, name in self._icon_names.items():
+            colour = "#FF5C5C" if name == "record" else self._icon_color
+            btn.setText("")
+            btn.setIcon(_control_icon(name, colour, self.ICON_PX))
+            btn.setIconSize(size)
+        # Reassert the pause/mute icons to match current state.
+        self._sync_pause_label(bool(getattr(self, "_paused", False)))
+        self._apply_mute_icon()
+
+    def _apply_mute_icon(self) -> None:
+        icon = _control_icon(
+            "mute" if getattr(self, "_muted", False) else "volume",
+            self._icon_color, self.ICON_PX)
+        self.mute_btn.setIcon(icon)
+        self.fs_mute_btn.setIcon(icon)
 
     def toggle_mute(self) -> None:
         self._muted = not self._muted
@@ -1086,9 +1204,7 @@ class EmbeddedPlayer(QWidget):
                 m["mute"] = self._muted
             except Exception:
                 pass
-        label = "\U0001f507" if self._muted else "\U0001f50a"
-        for b in (self.mute_btn, self.fs_mute_btn):
-            self._apply_glyph(b, label)
+        self._apply_mute_icon()
 
     # -- stream recording ------------------------------------------------------
 

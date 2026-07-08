@@ -462,18 +462,13 @@ class MainWindow(QMainWindow):
 
         # Movie/series synopsis + metadata, shown to the *right* of the
         # poster (only one of now_card / media_info is ever visible, since
-        # live channels use now_card and VOD/series use this). Capped to
-        # the poster's height with the text scrolling inside, so a long
-        # synopsis doesn't stretch the row taller than the poster.
+        # live channels use now_card and VOD/series use this). Its height is
+        # pinned to the poster's height in _show_detail so the box bottom
+        # lines up with the poster's bottom, with the text scrolling inside.
         self.media_info = QScrollArea()
         self.media_info.setWidgetResizable(True)
         self.media_info.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        # Expand to fill the row so the box bottom lines up with the poster
-        # column instead of collapsing to its content's height (which left
-        # it short and forced early scrolling).
-        self.media_info.setSizePolicy(QSizePolicy.Policy.Preferred,
-                                      QSizePolicy.Policy.Expanding)
         self.media_info.setStyleSheet(
             f"QScrollArea {{ background:{P['input']}; "
             f"border:1px solid {P['border_in']}; border-radius:12px; }}")
@@ -495,10 +490,10 @@ class MainWindow(QMainWindow):
         mi.addStretch(1)
         self.media_info.setWidget(mi_holder)
         self.media_info.hide()
-        # The info box fills the row height (Expanding policy above) so its
-        # bottom lines up with the poster column. now_card (live TV) keeps
-        # its own AlignTop flag below, so this only affects VOD/series.
-        header_row.addWidget(self.media_info, 1)
+        # Top-aligned with the poster; its fixed height (set per-selection in
+        # _show_detail to the poster height) makes the bottoms line up too.
+        header_row.addWidget(self.media_info, 1, Qt.AlignmentFlag.AlignTop)
+        header_row.setAlignment(Qt.AlignmentFlag.AlignTop)
         dl.addLayout(header_row)
 
         self.cast_scroll = QScrollArea()
@@ -1330,18 +1325,33 @@ class MainWindow(QMainWindow):
             return
         name = self.channel_display_name(it)
         self._detail_name = name
-        is_media = self.mode in ("vod", "series")
+        # History rows carry the original content kind in "_kind"; a VOD or
+        # series watched from History should still show its poster + TMDB
+        # metadata, resolved by title (history has no provider stream_id).
+        hist_kind = it.get("_kind") if self.mode == "history" else None
+        media_kind = (
+            "vod" if self.mode == "vod"
+            else "series" if self.mode == "series"
+            else hist_kind if hist_kind in ("vod", "series")
+            else None)
+        is_media = media_kind is not None
         self.d_logo.setFixedSize(
             *(self.POSTER_SIZE_MEDIA if is_media else self.POSTER_SIZE_LIVE))
+        if is_media:
+            # Match the info box to the poster height so their bottoms align.
+            self.media_info.setFixedHeight(self.POSTER_SIZE_MEDIA[1])
         self.d_logo.setPixmap(QPixmap())
         self.d_logo.setStyleSheet(self.PLACEHOLDER_LOGO_STYLE)
         self.d_logo.setText(name.strip()[:1].upper())
-        self._load_detail_poster(it, is_media)
+        self._load_detail_poster(it, is_media, media_kind)
 
         if self.mode == "rec":
             return
 
         if self.mode == "history":
+            # _load_detail_poster -> _apply_media_card fills in the TMDB
+            # rating/cast/synopsis for media titles; nothing more to do for
+            # live/recording history rows.
             return
 
         if self.series_ctx:
@@ -1388,7 +1398,8 @@ class MainWindow(QMainWindow):
                     or self.series_ctx.get("title") or "")
         return it.get("name") or it.get("title") or ""
 
-    def _load_detail_poster(self, it, is_media: bool) -> None:
+    def _load_detail_poster(self, it, is_media: bool,
+                            kind: str | None = None) -> None:
         fallback_url = it.get("stream_icon") or it.get("cover")
         if not (is_media and self.tmdb):
             if fallback_url:
@@ -1399,7 +1410,7 @@ class MainWindow(QMainWindow):
             if fallback_url:
                 self.poster_art.get(fallback_url, self._set_detail_logo)
             return
-        kind = "vod" if self.mode == "vod" else "series"
+        kind = kind or ("vod" if self.mode == "vod" else "series")
         key = self._current_key
 
         def apply(details: dict) -> None:
@@ -3279,6 +3290,10 @@ class MainWindow(QMainWindow):
             f"color:{P['muted3']}; font-size:11px;")
         if self.d_logo.text():
             self.d_logo.setStyleSheet(self.PLACEHOLDER_LOGO_STYLE)
+        if self.player:
+            # The drawn control icons are baked with the old text colour;
+            # redraw them for the new theme.
+            self.player.refresh_icons()
 
     def _set_language(self, code: str) -> None:
         from .i18n import set_language, current_language
@@ -4061,6 +4076,13 @@ class MainWindow(QMainWindow):
         super().keyPressEvent(event)
 
     def closeEvent(self, event) -> None:
+        # Close the non-modal cast panel first: as a separate top-level
+        # window it would otherwise keep the app alive (quitOnLastWindowClosed
+        # never fires) and leave the process hanging after the main window
+        # closes.
+        d = getattr(self, "_cast_dialog", None)
+        if d is not None:
+            d.close()
         self.wake.release()
         if self.tmdb:
             self.tmdb.flush()
@@ -4078,4 +4100,12 @@ class MainWindow(QMainWindow):
             self.mpv_window.shutdown()
         self.mpv.stop()
         threading.Thread(target=self.cast.shutdown, daemon=True).start()
+        # Drop queued background downloads so thread-pool teardown doesn't
+        # stall the exit, then make sure the event loop actually returns.
+        for pool in (self.pool, self._art_pool):
+            try:
+                pool.clear()
+            except Exception:
+                pass
         super().closeEvent(event)
+        QApplication.instance().quit()
