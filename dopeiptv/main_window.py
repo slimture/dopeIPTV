@@ -37,6 +37,7 @@ from .dialogs import (
     ContentManagerDialog, EpgGuideDialog, LoginDialog, PlaylistDialog,
 )
 from .embedded import EmbeddedPlayer
+from .tmdb_match import TmdbMatchDialog
 from .epg import XmltvGuide, epg_cache_path
 from .metadata import PosterResolver, TmdbClient
 from .players import (
@@ -2489,6 +2490,12 @@ class MainWindow(QMainWindow):
                     or self.favs.is_favorite(it.get("stream_id"))):
                 m.addAction(tr("ctx_remove_from_favorites"),
                             lambda: self._remove_fav(it))
+        if (self.mode in ("vod", "series") and not self.series_ctx
+                and self.tmdb):
+            m.addSeparator()
+            m.addAction(tr("ctx_match_tmdb"),
+                        lambda: self._open_tmdb_match_dialog(
+                            it, "vod" if self.mode == "vod" else "series"))
         if (self.mode in ("live", "vod", "series")
                 and not self.series_ctx):
             ov_mode = self.mode
@@ -2545,6 +2552,25 @@ class MainWindow(QMainWindow):
     def _reset_channel(self, mode: str, key) -> None:
         self.channel_ov.update(mode, key, name="", hidden=False)
         self._apply_filter()
+
+    def _open_tmdb_match_dialog(self, it: dict, kind: str) -> None:
+        """Open the manual TMDB-match dialog for a movie/series and refresh
+        the detail panel + list icon once the user picks (or clears) an
+        override. kind is 'vod' for movies or 'series' for TV shows."""
+        title = (it.get("name") or it.get("title") or "").strip()
+        if not title or not self.tmdb:
+            return
+
+        def on_pick(_details) -> None:
+            # Nudge the list model so the delegate re-queries the poster,
+            # and rebuild the detail panel if this item is currently open.
+            self.list_model.refresh_all()
+            current = self.list_model.item_at(
+                self.listw.currentIndex().row())
+            if current and current is it:
+                self._show_detail(it)
+
+        TmdbMatchDialog(self, title, kind, on_pick).exec()
 
     def _restore_default_channels(self, mode: str) -> None:
         if QMessageBox.question(

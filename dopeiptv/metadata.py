@@ -89,6 +89,75 @@ class TmdbClient:
         titles = [c.get("title") or c.get("name") for c in cast]
         return [t for t in titles if t]
 
+    def search(self, title: str, kind: str,
+               year: int | None = None) -> list[dict]:
+        """Return up to 12 candidate matches for a title. Used by the manual
+        'Match on TMDB...' dialog so the user can pick the correct one when
+        auto-match fails (dirty provider titles, ambiguous names, ...)."""
+        endpoint = "movie" if kind == "vod" else "tv"
+        params = {"api_key": self.api_key, "query": title,
+                  "include_adult": "false"}
+        if year is not None:
+            params["year" if endpoint == "movie" else "first_air_date_year"] = year
+        r = requests.get(f"{self.BASE}/search/{endpoint}", params=params,
+                         timeout=10)
+        r.raise_for_status()
+        results = (r.json().get("results") or [])[:12]
+        out: list[dict] = []
+        for it in results:
+            release = (it.get("release_date") or it.get("first_air_date") or "")
+            year_str = release[:4] if release else ""
+            poster = it.get("poster_path")
+            out.append({
+                "tmdb_id": it.get("id"),
+                "title": it.get("title") or it.get("name") or "?",
+                "year": year_str,
+                "overview": it.get("overview") or "",
+                "poster_url": (f"{self.IMG_BASE}{poster}"
+                               if poster else None),
+                "vote": it.get("vote_average") or None,
+            })
+        return out
+
+    def fetch_details_by_id(self, tmdb_id: int, kind: str) -> dict | None:
+        """Same shape as fetch_details() but skips the search step - used
+        by the manual-match flow after the user has picked an id."""
+        endpoint = "movie" if kind == "vod" else "tv"
+        r = requests.get(
+            f"{self.BASE}/{endpoint}/{tmdb_id}",
+            params={"api_key": self.api_key,
+                    "append_to_response": "external_ids,credits"},
+            timeout=10)
+        r.raise_for_status()
+        d = r.json()
+        poster_path = d.get("poster_path")
+        cast = []
+        for c in (d.get("credits") or {}).get("cast") or []:
+            name = c.get("name")
+            if not name:
+                continue
+            profile_path = c.get("profile_path")
+            cast.append({
+                "name": name,
+                "person_id": c.get("id"),
+                "profile_url": (f"{self.PROFILE_IMG_BASE}{profile_path}"
+                                if profile_path else None),
+            })
+            if len(cast) == 8:
+                break
+        genres = ", ".join(g.get("name", "") for g in d.get("genres") or []
+                          if g.get("name"))
+        release = (d.get("release_date") or d.get("first_air_date") or "")
+        return {
+            "poster_url": f"{self.IMG_BASE}{poster_path}" if poster_path else None,
+            "rating": d.get("vote_average") or None,
+            "imdb_id": (d.get("external_ids") or {}).get("imdb_id"),
+            "cast": cast,
+            "overview": d.get("overview") or "",
+            "genres": genres,
+            "release_date": release,
+        }
+
     def search_person(self, name: str) -> int | None:
         """Resolve a person's name to their TMDB id (top match)."""
         r = requests.get(
@@ -182,6 +251,13 @@ class PosterResolver(QObject):
             return self.client.fetch_details(t, k)
 
         def done(details, key=key):
+            # Never overwrite a manual pick with an auto-search result. This
+            # can happen if the cache entry gets evicted and re-fetched.
+            existing = self._cache.get(key) or {}
+            if existing.get("manual"):
+                self._pending.discard(key)
+                self._on_resolved(key)
+                return
             self._cache[key] = details or {}
             self._save()
             self._pending.discard(key)
@@ -193,6 +269,49 @@ class PosterResolver(QObject):
             self._waiting.pop(key, None)
 
         run_async(self.pool, fetch, done, fail)
+
+    def set_manual_match(self, title: str, kind: str, tmdb_id: int,
+                         callback: Callable[[dict], None]) -> None:
+        """User picked a specific TMDB entry for this title. Fetch its full
+        details, cache them with a manual=True flag so they survive future
+        auto-searches, and notify the caller (usually the detail panel) so
+        the poster + metadata refresh live."""
+        key = self._key(title, kind)
+
+        def fetch(tid=tmdb_id, k=kind):
+            return self.client.fetch_details_by_id(tid, k)
+
+        def done(details, key=key):
+            d = dict(details or {})
+            d["manual"] = True
+            d["tmdb_id"] = tmdb_id
+            self._cache[key] = d
+            self._save()
+            # Notify anyone waiting on the auto-search too so we don't
+            # leave callbacks pending indefinitely.
+            for cb in self._waiting.pop(key, []):
+                try:
+                    cb(d)
+                except RuntimeError:
+                    pass
+            try:
+                callback(d)
+            except RuntimeError:
+                pass
+
+        def fail(_msg):
+            pass
+
+        run_async(self.pool, fetch, done, fail)
+
+    def clear_manual_match(self, title: str, kind: str) -> None:
+        """Drop a previously-set manual pick so the next lookup goes back
+        through the automatic search. Removes the whole cache entry rather
+        than just the flag so a fresh auto-search runs."""
+        key = self._key(title, kind)
+        if key in self._cache:
+            del self._cache[key]
+            self._save()
 
     def _on_resolved(self, key: str) -> None:
         for cb in self._waiting.pop(key, []):
