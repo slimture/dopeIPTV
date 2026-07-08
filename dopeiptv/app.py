@@ -25,7 +25,7 @@ class _NoButtonIconsStyle(QProxyStyle):
             return 0
         return super().styleHint(hint, option, widget, returnData)
 
-from . import APP_NAME, ORG
+from . import APP_NAME, ORG, VERSION
 from .client import XtreamClient
 from .dialogs import LoginDialog, PlaylistDialog
 from .main_window import MainWindow
@@ -89,6 +89,9 @@ def install_icon(icon: QIcon) -> None:
 
 def main() -> int:
     """Launch the application."""
+    # One unconditional startup line so packaging smoke tests can prove
+    # Python + our package imported cleanly before any GL/Qt init runs.
+    print(f"[dopeIPTV] {VERSION} starting", file=sys.stderr, flush=True)
     global _original_msg_handler
     from PyQt6.QtCore import qInstallMessageHandler
     _original_msg_handler = qInstallMessageHandler(_qt_message_filter)
