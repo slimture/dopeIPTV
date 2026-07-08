@@ -297,6 +297,7 @@ class EmbeddedPlayer(QWidget):
         # on the control bar) while the rest of __init__ is still running.
         self._fs_ui = False
         self._pip_mode = False
+        self.seek_overlay = None
         self._settings = settings
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
@@ -377,11 +378,7 @@ class EmbeddedPlayer(QWidget):
         bl.addWidget(self.stop_btn)
         bl.addWidget(self.next_btn)
         bl.addWidget(self.pause_btn)
-        bl.addWidget(self.back_btn)
-        bl.addWidget(self.fwd_btn)
         bl.addWidget(self.title_lbl, 1)
-        bl.addWidget(self.seek, 2)
-        bl.addWidget(self.time_lbl)
         bl.addWidget(self.ts_btn)
         bl.addWidget(self.rec_btn)
         bl.addWidget(self.opts_btn)
@@ -394,6 +391,28 @@ class EmbeddedPlayer(QWidget):
         lay.addWidget(self.bar)
         self.bar.setMouseTracking(True)
         self.bar.installEventFilter(self)
+
+        # Floating scrubber shown over the bottom of the docked video on
+        # hover, so the seek bar doesn't permanently occupy the control row.
+        self._seekable = False
+        self.seek_overlay = QWidget(self)
+        self.seek_overlay.setStyleSheet(
+            "background: rgba(16,16,20,215); border-radius: 8px;")
+        so = QHBoxLayout(self.seek_overlay)
+        so.setContentsMargins(8, 5, 8, 5)
+        so.setSpacing(8)
+        so.addWidget(self.back_btn)
+        so.addWidget(self.time_lbl)
+        so.addWidget(self.seek, 1)
+        so.addWidget(self.fwd_btn)
+        self.seek_overlay.hide()
+        self.seek_overlay.setMouseTracking(True)
+        self.seek_overlay.installEventFilter(self)
+        self.seek.installEventFilter(self)
+        self._seek_overlay_timer = QTimer(self)
+        self._seek_overlay_timer.setSingleShot(True)
+        self._seek_overlay_timer.setInterval(2500)
+        self._seek_overlay_timer.timeout.connect(self._hide_seek_overlay)
 
         self.overlay = QLabel("", self)
         self.overlay.setStyleSheet(
@@ -587,6 +606,13 @@ class EmbeddedPlayer(QWidget):
     # -- event filter (fullscreen overlay + pip bar on control hover) ---------
 
     def eventFilter(self, obj, event):
+        if self.seek_overlay is not None and obj in (self.seek_overlay,
+                                                     self.seek):
+            # Keep the hover scrubber alive while the pointer is on it.
+            if event.type() in (event.Type.Enter, event.Type.MouseMove,
+                                 event.Type.MouseButtonPress):
+                self._seek_overlay_timer.start()
+            return super().eventFilter(obj, event)
         if obj is self.video:
             if event.type() == event.Type.MouseMove:
                 if self._fs_ui:
@@ -679,6 +705,9 @@ class EmbeddedPlayer(QWidget):
                     event.position().toPoint(), self.video)
                 cursor = self._EDGE_CURSORS.get(edges)
                 self.video.setCursor(cursor if cursor else Qt.CursorShape.ArrowCursor)
+        elif not self._fs_ui and self._seekable:
+            # Docked, seekable content: reveal the floating scrubber.
+            self._show_seek_overlay()
 
     def _on_video_release(self, event) -> None:
         pass
@@ -690,6 +719,7 @@ class EmbeddedPlayer(QWidget):
     def set_pip_mode(self, enabled: bool) -> None:
         self._pip_mode = enabled
         if enabled:
+            self._hide_seek_overlay(force=True)
             self._show_pip_bar()
         else:
             self._pip_bar_timer.stop()
@@ -706,6 +736,31 @@ class EmbeddedPlayer(QWidget):
         if self._pip_mode:
             self.bar.hide()
 
+    # -- docked hover scrubber -------------------------------------------------
+
+    def _show_seek_overlay(self) -> None:
+        for w in (self.back_btn, self.fwd_btn, self.seek, self.time_lbl):
+            w.show()
+        self._place_seek_overlay()
+        self.seek_overlay.show()
+        self.seek_overlay.raise_()
+        self._seek_overlay_timer.start()
+
+    def _hide_seek_overlay(self, force: bool = False) -> None:
+        if not force and self.seek.dragging:
+            self._seek_overlay_timer.start()
+            return
+        self.seek_overlay.hide()
+
+    def _place_seek_overlay(self) -> None:
+        margin = 10
+        vg = self.video.geometry()
+        self.seek_overlay.setFixedWidth(max(180, vg.width() - 2 * margin))
+        self.seek_overlay.adjustSize()
+        self.seek_overlay.move(
+            vg.x() + margin,
+            vg.y() + vg.height() - self.seek_overlay.height() - margin)
+
     # -- overlay ---------------------------------------------------------------
 
     def set_overlay_info(self, text: str) -> None:
@@ -718,6 +773,7 @@ class EmbeddedPlayer(QWidget):
         self._fs_ui = fullscreen
         self.bar.setVisible(not fullscreen)
         if fullscreen:
+            self._hide_seek_overlay(force=True)
             self._lock_video_box()
             self._show_overlay()
         else:
@@ -806,6 +862,8 @@ class EmbeddedPlayer(QWidget):
         self._lock_video_box()
         if self.overlay.isVisible() or self.fs_controls.isVisible():
             self._place_overlay()
+        if self.seek_overlay.isVisible():
+            self._place_seek_overlay()
 
     # -- playback defaults -----------------------------------------------------
 
@@ -910,13 +968,15 @@ class EmbeddedPlayer(QWidget):
     # -- seeking ---------------------------------------------------------------
 
     def _seek_widgets(self):
-        return (self.seek, self.time_lbl, self.back_btn, self.fwd_btn,
-                self.fs_seek, self.fs_time_lbl, self.fs_back_btn,
+        # Only the fullscreen scrubber set; the docked scrubber lives in the
+        # hover overlay, whose whole container is shown/hidden instead.
+        return (self.fs_seek, self.fs_time_lbl, self.fs_back_btn,
                 self.fs_fwd_btn)
 
     def _hide_seek_ui(self) -> None:
         for wdg in self._seek_widgets():
             wdg.hide()
+        self._hide_seek_overlay(force=True)
 
     def _do_seek(self, seconds: int) -> None:
         m = self.video.mpv
@@ -1154,24 +1214,23 @@ class EmbeddedPlayer(QWidget):
             return
         self._sync_pause_label(paused)
         seekable = bool(dur) and dur > 1
+        self._seekable = seekable
         if not seekable:
             self._hide_seek_ui()
             return
         text = f"{_format_time(pos)} / {_format_time(dur)}"
-        # Show the scrubber + time both on the docked control bar and on the
-        # fullscreen overlay so movies/episodes are seekable in the mini
-        # player, not only in fullscreen.
+        # Keep both scrubbers' values current; the docked one lives in the
+        # hover overlay (shown on mouse-over), the other in the fullscreen
+        # overlay. Only the fullscreen widgets are force-shown here.
         for slider, label in ((self.seek, self.time_lbl),
                               (self.fs_seek, self.fs_time_lbl)):
             label.setText(text)
-            slider.setVisible(True)
-            label.setVisible(True)
             if not slider.dragging:
                 slider.setMaximum(int(dur))
                 slider.setValue(int(pos or 0))
-        for btn in (self.back_btn, self.fwd_btn,
-                    self.fs_back_btn, self.fs_fwd_btn):
-            btn.setVisible(True)
+        for w in (self.fs_seek, self.fs_time_lbl,
+                  self.fs_back_btn, self.fs_fwd_btn):
+            w.setVisible(True)
 
     def progress_percent(self) -> float:
         m = self.video.mpv
