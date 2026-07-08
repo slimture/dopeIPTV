@@ -368,12 +368,13 @@ class MainWindow(QMainWindow):
 
         row = QHBoxLayout()
         row.setSpacing(8)
-        self.play_mpv = QPushButton("Play in mpv", objectName="Primary")
+        self.play_mpv = QPushButton("▶  Play", objectName="Primary")
+        self.play_mpv.setToolTip("Play in mpv")
+        self.play_mpv.setSizePolicy(QSizePolicy.Policy.Fixed,
+                                    QSizePolicy.Policy.Fixed)
         self.play_mpv.clicked.connect(lambda: self.play("mpv"))
-        self.play_vlc = QPushButton("Play in VLC")
-        self.play_vlc.clicked.connect(lambda: self.play("vlc"))
         row.addWidget(self.play_mpv)
-        row.addWidget(self.play_vlc)
+        row.addStretch(1)
         dl.addLayout(row)
 
         root.addWidget(side)
@@ -502,6 +503,7 @@ class MainWindow(QMainWindow):
                 screen_geo = self.screen().availableGeometry()
                 self.move(screen_geo.right() - 500,
                           screen_geo.bottom() - 290)
+            self.player.set_pip_mode(True)
         else:
             self._pip_fs_geo = self.geometry()
             self.setWindowFlags(
@@ -739,7 +741,8 @@ class MainWindow(QMainWindow):
                     it.setForeground(QColor(color))
                 self.cat_list.addItem(it)
             self.cat_list.blockSignals(False)
-            self.cat_list.setCurrentRow(0)
+            self.cat_list.setCurrentRow(
+                1 if self.cat_list.count() > 1 else 0)
 
         def fail(msg):
             if gen != self._load_gen:
@@ -1485,7 +1488,6 @@ class MainWindow(QMainWindow):
             return
         m = QMenu(self)
         m.addAction("Play in mpv", lambda: self.play_item(it, "mpv"))
-        m.addAction("Play in VLC", lambda: self.play_item(it, "vlc"))
         ext = m.addMenu("Open externally")
         ext.addAction("mpv",
                       lambda: self.play_item(it, "mpv", external=True))

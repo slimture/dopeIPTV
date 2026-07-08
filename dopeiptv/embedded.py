@@ -386,9 +386,6 @@ class EmbeddedPlayer(QWidget):
         self._overlay_timer.setInterval(self.OVERLAY_HIDE_MS)
         self._overlay_timer.timeout.connect(self._hide_fs_ui)
 
-        self._drag_start = None
-        self._drag_win_pos = None
-        self._drag_active = False
         self._pip_mode = False
         self._pip_bar_timer = QTimer(self)
         self._pip_bar_timer.setSingleShot(True)
@@ -421,34 +418,60 @@ class EmbeddedPlayer(QWidget):
 
     # -- video mouse handlers (signals from _MpvGLWidget) ------------------
 
+    RESIZE_MARGIN = 12
+
     def _on_video_dbl_click(self) -> None:
-        if not self._drag_active:
-            self.double_clicked.emit()
+        self.double_clicked.emit()
+
+    def _resize_edges(self, pos, size):
+        edges = Qt.Edge(0)
+        if pos.x() <= self.RESIZE_MARGIN:
+            edges |= Qt.Edge.LeftEdge
+        elif pos.x() >= size.width() - self.RESIZE_MARGIN:
+            edges |= Qt.Edge.RightEdge
+        if pos.y() <= self.RESIZE_MARGIN:
+            edges |= Qt.Edge.TopEdge
+        elif pos.y() >= size.height() - self.RESIZE_MARGIN:
+            edges |= Qt.Edge.BottomEdge
+        return edges
 
     def _on_video_press(self, event) -> None:
-        if event.button() == Qt.MouseButton.LeftButton and self._pip_mode:
-            self._drag_start = event.globalPosition().toPoint()
-            self._drag_win_pos = self.window().pos()
-            self._drag_active = False
+        if event.button() != Qt.MouseButton.LeftButton or not self._pip_mode:
+            return
+        win = self.window().windowHandle()
+        if win is None:
+            return
+        edges = self._resize_edges(event.position().toPoint(),
+                                    self.video.size())
+        if edges:
+            win.startSystemResize(edges)
+        else:
+            win.startSystemMove()
 
     def _on_video_move(self, event) -> None:
-        if self._pip_mode:
+        if self._pip_mode and not self._fs_ui:
             self._show_pip_bar()
-        if (self._drag_start is not None
-                and event.buttons() & Qt.MouseButton.LeftButton):
-            delta = event.globalPosition().toPoint() - self._drag_start
-            if not self._drag_active:
-                if abs(delta.x()) > 4 or abs(delta.y()) > 4:
-                    self._drag_active = True
-                else:
-                    return
-            self.window().move(self._drag_win_pos + delta)
+            if not (event.buttons() & Qt.MouseButton.LeftButton):
+                edges = self._resize_edges(event.position().toPoint(),
+                                            self.video.size())
+                cursor = {
+                    Qt.Edge.LeftEdge: Qt.CursorShape.SizeHorCursor,
+                    Qt.Edge.RightEdge: Qt.CursorShape.SizeHorCursor,
+                    Qt.Edge.TopEdge: Qt.CursorShape.SizeVerCursor,
+                    Qt.Edge.BottomEdge: Qt.CursorShape.SizeVerCursor,
+                    Qt.Edge.LeftEdge | Qt.Edge.TopEdge:
+                        Qt.CursorShape.SizeFDiagCursor,
+                    Qt.Edge.RightEdge | Qt.Edge.BottomEdge:
+                        Qt.CursorShape.SizeFDiagCursor,
+                    Qt.Edge.RightEdge | Qt.Edge.TopEdge:
+                        Qt.CursorShape.SizeBDiagCursor,
+                    Qt.Edge.LeftEdge | Qt.Edge.BottomEdge:
+                        Qt.CursorShape.SizeBDiagCursor,
+                }.get(edges)
+                self.video.setCursor(cursor if cursor else Qt.CursorShape.ArrowCursor)
 
     def _on_video_release(self, event) -> None:
-        if (event.button() == Qt.MouseButton.LeftButton
-                and self._drag_start is not None):
-            self._drag_start = None
-            self._drag_active = False
+        pass
 
     # -- pip bar auto-hide -----------------------------------------------------
 
