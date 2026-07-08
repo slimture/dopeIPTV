@@ -504,14 +504,25 @@ class EmbeddedPlayer(QWidget):
     def set_fullscreen_ui(self, fullscreen: bool) -> None:
         self._fs_ui = fullscreen
         self.bar.setVisible(not fullscreen)
-        self._lock_video_box()
         if fullscreen:
+            self._lock_video_box()
             self._show_overlay()
         else:
+            # Reordering the caller to restore the window's geometry
+            # before this runs isn't enough on its own: showNormal() /
+            # setGeometry() request the change but X11/Wayland apply it
+            # asynchronously, so self.height() can still read the old
+            # (fullscreen) size right here. Locking the video against
+            # that stale size is what produced letterboxing that no
+            # later resize could clear (every resize recomputed from
+            # the same wrong baseline). Defer across a couple of ticks
+            # so this runs after the real resize has landed.
             self._hide_fs_ui()
             self._overlay_timer.stop()
             self.unsetCursor()
             self.video.unsetCursor()
+            QTimer.singleShot(0, self._lock_video_box)
+            QTimer.singleShot(200, self._lock_video_box)
 
     def _hide_fs_ui(self) -> None:
         self.overlay.hide()

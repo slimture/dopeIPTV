@@ -92,7 +92,7 @@ class PosterResolver(QObject):
     search that invokes *callback* once done so the caller can repaint.
     """
 
-    CACHE_KEY = "tmdb_poster_cache_v2"
+    CACHE_KEY = "tmdb_poster_cache_v3"
     PERSON_CACHE_KEY = "tmdb_person_cache"
 
     def __init__(self, pool: QThreadPool, settings: QSettings,

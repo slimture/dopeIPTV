@@ -151,6 +151,17 @@ class RecordingManager(QObject):
         self.jobs_changed.emit()
         return job
 
+    def update_job_times(self, job_id: str, start_ts: float,
+                         stop_ts: float | None) -> None:
+        """Adjust a not-yet-started scheduled job's start/stop time."""
+        for j in self.jobs:
+            if j["id"] == job_id and j["status"] == "scheduled":
+                j["start"] = start_ts
+                j["stop"] = stop_ts
+                self._save()
+                self.jobs_changed.emit()
+                return
+
     def add_inplayer_job(self, title: str, path: str,
                          stop_ts: float | None, url: str = "") -> dict:
         """Register a recording that rides the embedded player's stream."""

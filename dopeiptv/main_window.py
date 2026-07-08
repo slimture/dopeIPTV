@@ -365,6 +365,16 @@ class MainWindow(QMainWindow):
             f"background:{P['sel']}; border-radius:18px; "
             "font-size:30px; font-weight:700;")
         left_col.addWidget(self.d_logo)
+
+        # Movie/series rating, linked to IMDb when TMDB has the id. Sits
+        # directly under the poster with no card/border around it - the
+        # rating is a single line of text and doesn't need its own box.
+        self.media_rating_lbl = QLabel("")
+        self.media_rating_lbl.setOpenExternalLinks(True)
+        self.media_rating_lbl.setStyleSheet("font-size:13px; font-weight:600;")
+        self.media_rating_lbl.hide()
+        left_col.addWidget(self.media_rating_lbl)
+
         self.play_mpv = QPushButton("▶  Play", objectName="Primary")
         self.play_mpv.setToolTip("Play in mpv")
         self.play_mpv.setSizePolicy(QSizePolicy.Policy.Fixed,
@@ -393,23 +403,7 @@ class MainWindow(QMainWindow):
             nc.addWidget(w)
         self.now_card.hide()
         header_row.addWidget(self.now_card, 1)
-
-        # Movie/series rating, linked to IMDb when TMDB has the id - shown
-        # in the same spot as "now playing" since only one of the two is
-        # ever relevant at a time. Cast gets its own full-width strip below
-        # (photos need more horizontal room than fits beside a big poster).
-        self.media_card = QFrame(objectName="Card")
-        mc = QVBoxLayout(self.media_card)
-        mc.setContentsMargins(16, 14, 16, 14)
-        mc.setSpacing(8)
-        self.media_rating_lbl = QLabel("")
-        self.media_rating_lbl.setOpenExternalLinks(True)
-        self.media_rating_lbl.setStyleSheet("font-size:13px; font-weight:600;")
-        self.media_rating_lbl.hide()
-        mc.addWidget(self.media_rating_lbl)
-        mc.addStretch(1)
-        self.media_card.hide()
-        header_row.addWidget(self.media_card, 1)
+        header_row.addStretch(1)
         dl.addLayout(header_row)
 
         self.cast_scroll = QScrollArea()
@@ -749,7 +743,8 @@ class MainWindow(QMainWindow):
         if self.mode == "rec":
             self.cat_list.blockSignals(True)
             for label, data in [("All recordings", None),
-                                ("Active & scheduled", "__jobs__")]:
+                                ("Active & scheduled", "__jobs__"),
+                                ("Upcoming", "__upcoming__")]:
                 item = QListWidgetItem(label)
                 item.setData(Qt.ItemDataRole.UserRole, data)
                 self.cat_list.addItem(item)
@@ -850,6 +845,10 @@ class MainWindow(QMainWindow):
             if category_id == "__jobs__":
                 self.all_items = [self._job_item(j)
                                   for j in reversed(self.rec.jobs)]
+            elif category_id == "__upcoming__":
+                self.all_items = [
+                    self._job_item(j) for j in reversed(self.rec.jobs)
+                    if j["status"] == "scheduled"]
             else:
                 self.all_items = self.rec.files(category_id)
             self._apply_filter()
@@ -1210,7 +1209,7 @@ class MainWindow(QMainWindow):
 
     def _show_detail(self, it) -> None:
         self.now_card.hide()
-        self.media_card.hide()
+        self.media_rating_lbl.hide()
         self._clear_cast_row()
         self._clear_epg_rows()
         self._current_epg = None
@@ -1244,8 +1243,7 @@ class MainWindow(QMainWindow):
             if it.get("stream_id") is not None:
                 self._request_epg()
                 if (self.player and self._autoplay_preview()
-                        and self.playback_mode() == "embedded"
-                        and self.settings.value("player", "mpv") == "mpv"):
+                        and self.playback_mode() == "embedded"):
                     self._preview_timer.start(350)
         elif self.mode == "vod":
             if it.get("stream_id") is not None:
@@ -1326,7 +1324,6 @@ class MainWindow(QMainWindow):
             self.media_rating_lbl.show()
         else:
             self.media_rating_lbl.hide()
-        self.media_card.setVisible(bool(stars or imdb_id))
         self._clear_cast_row()
         if cast:
             for member in cast:
@@ -1805,22 +1802,6 @@ class MainWindow(QMainWindow):
             return
         CastDialog(self, url, title).exec()
 
-    def _open_external_both(self, it) -> None:
-        if self.mode == "history":
-            url, title = it.get("_url"), it.get("name") or "dopeIPTV"
-            icon, key, kind = (it.get("stream_icon"), it.get("_key"),
-                               it.get("_kind"))
-        else:
-            url, title = self._stream_for(it)
-            icon = it.get("stream_icon") or it.get("cover")
-            key, kind = self._item_key(it), self._history_kind()
-        if not url:
-            return
-        launch_player("mpv", url, title, self)
-        launch_player("vlc", url, title, self)
-        if self.mode != "history":
-            self.history.add(url, title, icon, key, kind)
-
     def _autoplay_preview(self) -> bool:
         return self.settings.value("autoplay_preview", "true") == "true"
 
@@ -1903,8 +1884,7 @@ class MainWindow(QMainWindow):
                     lambda ok: None if ok
                     else self._player_missing("mpv"))
         else:
-            launch_player(self.settings.value("player", "mpv"),
-                          url, title, self)
+            launch_player("mpv", url, title, self)
 
     def _player_missing(self, name: str) -> None:
         QMessageBox.warning(
@@ -1968,8 +1948,6 @@ class MainWindow(QMainWindow):
                       lambda: self.play_item(it, "mpv", external=True))
         ext.addAction("VLC",
                       lambda: self.play_item(it, "vlc", external=True))
-        ext.addAction("mpv + VLC (both)",
-                      lambda: self._open_external_both(it))
         if not (self.mode == "series" and not self.series_ctx):
             m.addAction("Cast to Chromecast...",
                         lambda: self._open_cast_dialog(it))
@@ -2587,6 +2565,44 @@ class MainWindow(QMainWindow):
         self._set_status(
             f"Recording of {title} scheduled for {when}")
 
+    def _edit_job_times(self, job_id: str) -> None:
+        job = next((j for j in self.rec.jobs if j["id"] == job_id), None)
+        if not job or job["status"] != "scheduled":
+            return
+        d = QDialog(self)
+        d.setWindowTitle("Edit recording time")
+        d.setMinimumWidth(380)
+        f = QFormLayout(d)
+        f.setSpacing(10)
+        start_edit = QDateTimeEdit(
+            QDateTime.fromSecsSinceEpoch(int(job["start"])))
+        start_edit.setCalendarPopup(True)
+        start_edit.setDisplayFormat("yyyy-MM-dd HH:mm")
+        stop_edit = QDateTimeEdit(
+            QDateTime.fromSecsSinceEpoch(int(job["stop"] or (
+                job["start"] + 3600))))
+        stop_edit.setCalendarPopup(True)
+        stop_edit.setDisplayFormat("yyyy-MM-dd HH:mm")
+        f.addRow("Title", QLabel(job["title"]))
+        f.addRow("Start", start_edit)
+        f.addRow("Stop", stop_edit)
+        bb = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel)
+        bb.accepted.connect(d.accept)
+        bb.rejected.connect(d.reject)
+        f.addRow(bb)
+        if d.exec() != QDialog.DialogCode.Accepted:
+            return
+        start_ts = start_edit.dateTime().toSecsSinceEpoch()
+        stop_ts = stop_edit.dateTime().toSecsSinceEpoch()
+        if stop_ts <= start_ts:
+            QMessageBox.warning(
+                self, "Edit recording time",
+                "The stop time must be after the start time.")
+            return
+        self.rec.update_job_times(job_id, start_ts, stop_ts)
+
     def _selected_recordings(self, clicked_item=None) -> list[dict]:
         items = [self.list_model.item_at(ix.row())
                  for ix in self.listw.selectionModel().selectedRows()]
@@ -2878,6 +2894,8 @@ class MainWindow(QMainWindow):
                 m.addAction("Stop recording",
                             lambda: self.rec.cancel(it["_job"]))
             elif status == "scheduled":
+                m.addAction("Edit start/stop time...",
+                            lambda: self._edit_job_times(it["_job"]))
                 m.addAction("Cancel scheduled recording",
                             lambda: self.rec.cancel(it["_job"]))
             else:
@@ -3045,9 +3063,6 @@ class MainWindow(QMainWindow):
         play_tab = QWidget()
         pf = QFormLayout(play_tab)
         pf.setSpacing(10)
-        player_box = self._combo(
-            [("mpv", "mpv"), ("vlc", "VLC")],
-            self.settings.value("player", "mpv"))
         mode_items = [("embedded", "Embedded (in app)"),
                       ("window", "Reused mpv window"),
                       ("external", "External player")]
@@ -3114,7 +3129,6 @@ class MainWindow(QMainWindow):
          replay_minutes_box) = delay_row("replay_delay_min")
         (epg_delay_row, epg_sign_box, epg_hours_box,
          epg_minutes_box) = delay_row("epg_delay_min")
-        pf.addRow("Default player", player_box)
         pf.addRow("Playback mode (mpv)", mode_box)
         pf.addRow("Auto-play preview on selection", autoplay_box)
         pf.addRow("Live stream format", fmt_box)
@@ -3646,8 +3660,6 @@ class MainWindow(QMainWindow):
         outer.addWidget(buttons)
 
         if d.exec():
-            self.settings.setValue(
-                "player", player_box.currentData())
             self.settings.setValue(
                 "stream_format", fmt_box.currentData())
             self.settings.setValue(
