@@ -24,6 +24,15 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install --upgrade build
       - run: python -m build
+      - name: Smoke test - install wheel in a fresh venv
+        run: |
+          # Verify the wheel actually installs into a clean environment and
+          # every import path is intact. python-mpv is the risky one - if it
+          # can't find libmpv at import time the app is dead on arrival.
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install --upgrade pip
+          /tmp/smoke/bin/pip install dist/*.whl
+          /tmp/smoke/bin/python -c 'import dopeiptv, dopeiptv.app, dopeiptv.i18n, dopeiptv.main_window; print("wheel imports OK, VERSION =", dopeiptv.VERSION)'
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
@@ -102,6 +111,39 @@ jobs:
             --depends libgl1 --depends libegl1 --depends libxcb-cursor0 \
             --depends libpulse0 \
             -C "$root" .
+      - name: Smoke test - launch AppImage and .deb
+        run: |
+          # Both packages should be able to launch far enough that the login
+          # dialog would appear (there's no saved config in CI). We give it a
+          # few seconds to reach the Qt event loop, then kill it - if the
+          # process died on its own that means Qt failed to start, libmpv
+          # didn't resolve, or one of the ctypes/dlopen calls faulted.
+          sudo apt-get install -y --no-install-recommends xvfb
+          launch_and_check() {
+            local exe="$1" name="$2"
+            echo "::group::Smoke: $name"
+            xvfb-run --auto-servernum --server-args='-screen 0 1024x768x24' \
+              "$exe" >/tmp/$name.log 2>&1 &
+            local pid=$!
+            sleep 6
+            if kill -0 "$pid" 2>/dev/null; then
+              echo "$name: process $pid alive after 6s - PASS"
+              kill "$pid" 2>/dev/null || true
+              wait "$pid" 2>/dev/null || true
+              echo "::endgroup::"
+              return 0
+            fi
+            echo "::error::$name failed to stay running. Log:"
+            tail -60 /tmp/$name.log
+            echo "::endgroup::"
+            return 1
+          }
+          # AppImage: no install needed, just chmod+run.
+          chmod +x dopeIPTV-*.AppImage
+          launch_and_check "$PWD/$(ls dopeIPTV-*.AppImage | head -1)" appimage
+          # .deb: install then run via the /usr/bin/dopeiptv wrapper.
+          sudo apt-get install -y ./dopeiptv_*.deb
+          launch_and_check "$(command -v dopeiptv)" deb
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
@@ -170,6 +212,50 @@ jobs:
             --skip-jenkins \
             "dopeIPTV-${V}-macOS-arm64.dmg" \
             "dist/dopeIPTV.app"
+      - name: Smoke test - mount .dmg and inspect the bundle
+        run: |
+          # Full GUI launch isn't feasible on a headless macOS runner (Cocoa
+          # needs a real window server), so we verify the .app STRUCTURE
+          # instead: Info.plist keys, the main binary, libmpv and its rpath,
+          # icon file, and that hdiutil can actually mount the .dmg.
+          V=${{ steps.v.outputs.version }}
+          DMG="dopeIPTV-${V}-macOS-arm64.dmg"
+          echo "::group::Mount and inspect $DMG"
+          MOUNT=$(hdiutil attach -readonly -mountrandom /tmp "$DMG" | tail -1 | awk '{print $NF}')
+          APP="$MOUNT/dopeIPTV.app"
+          test -d "$APP" || { echo "::error::.app missing inside mounted .dmg"; hdiutil detach "$MOUNT" || true; exit 1; }
+          BIN="$APP/Contents/MacOS/dopeiptv"
+          PLIST="$APP/Contents/Info.plist"
+          test -x "$BIN" || { echo "::error::binary missing or not executable: $BIN"; hdiutil detach "$MOUNT" || true; exit 1; }
+          test -f "$PLIST" || { echo "::error::Info.plist missing"; hdiutil detach "$MOUNT" || true; exit 1; }
+          NAME=$(defaults read "${APP}/Contents/Info" CFBundleName)
+          VER=$(defaults read "${APP}/Contents/Info" CFBundleShortVersionString)
+          echo "CFBundleName=$NAME  CFBundleShortVersionString=$VER"
+          test "$NAME" = "dopeIPTV" || { echo "::error::wrong CFBundleName ($NAME)"; hdiutil detach "$MOUNT" || true; exit 1; }
+          # libmpv must be bundled and linked via a resolvable path.
+          find "$APP/Contents" -name 'libmpv*' -print
+          otool -L "$BIN" | head -20 || true
+          # Check the icon actually made it in.
+          test -f "$APP/Contents/Resources/dopeiptv.icns" \
+            && echo "icon: present" \
+            || echo "::warning::icon missing (Info.plist references it but file not found)"
+          hdiutil detach "$MOUNT"
+          echo "::endgroup::"
+          # As a final sanity check try to launch the .app briefly. On a
+          # headless runner Cocoa may fail to fully init but a segfault-on-
+          # startup would still surface within a couple of seconds.
+          echo "::group::Try launching the .app"
+          open --wait-apps --new "dist/dopeIPTV.app" &
+          OPEN_PID=$!
+          sleep 6
+          if pgrep -x dopeiptv >/dev/null; then
+            echo "dopeiptv is running - PASS"
+            pkill -x dopeiptv 2>/dev/null || true
+          else
+            echo "::warning::dopeiptv didn't appear in pgrep - Cocoa may need a window server"
+          fi
+          kill "$OPEN_PID" 2>/dev/null || true
+          echo "::endgroup::"
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
@@ -197,6 +283,29 @@ jobs:
           bundle: dopeIPTV.flatpak
           manifest-path: packaging/flatpak/io.github.slimture.dopeIPTV.yaml
           cache-key: flatpak-builder-${{ github.sha }}
+      - name: Smoke test - install flatpak and launch
+        run: |
+          # Install our just-built bundle system-wide and try to run it. If
+          # the runtime is missing or the app portal fails, this catches it
+          # before any user ever downloads the .flatpak.
+          echo "::group::Install and launch"
+          flatpak install --system --bundle --noninteractive --assumeyes dopeIPTV.flatpak
+          apt-get install -y --no-install-recommends xvfb || \
+            (yum -y install xorg-x11-server-Xvfb || dnf -y install xorg-x11-server-Xvfb)
+          xvfb-run --auto-servernum --server-args='-screen 0 1024x768x24' \
+            flatpak run io.github.slimture.dopeIPTV >/tmp/flatpak.log 2>&1 &
+          PID=$!
+          sleep 8
+          if kill -0 "$PID" 2>/dev/null; then
+            echo "flatpak run stayed alive - PASS"
+            kill "$PID" 2>/dev/null || true
+          else
+            echo "::error::flatpak run died. Log:"
+            tail -80 /tmp/flatpak.log
+            echo "::endgroup::"
+            exit 1
+          fi
+          echo "::endgroup::"
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
