@@ -38,7 +38,7 @@ from .players import (
     MpvIpcPlayer, MpvWindowPlayer, _libmpv, embedded_playback_reason,
     embedded_playback_supported, launch_player,
 )
-from .recording import RecordingManager, format_size, safe_filename
+from .recording import RecordingManager, safe_filename
 from .stores import (
     CategoryOverrides, ChannelOverrides, FavoriteStore, HistoryStore,
     ParentalControl, PlaylistStore,
@@ -343,10 +343,12 @@ class MainWindow(QMainWindow):
             f"background:{P['sel']}; border-radius:18px; "
             "font-size:30px; font-weight:700;")
         left_col.addWidget(self.d_logo)
-        self.d_meta = QLabel("", objectName="DetailMeta")
-        self.d_meta.setWordWrap(True)
-        self.d_meta.setFixedWidth(84)
-        left_col.addWidget(self.d_meta)
+        self.play_mpv = QPushButton("▶  Play", objectName="Primary")
+        self.play_mpv.setToolTip("Play in mpv")
+        self.play_mpv.setSizePolicy(QSizePolicy.Policy.Fixed,
+                                    QSizePolicy.Policy.Fixed)
+        self.play_mpv.clicked.connect(lambda: self.play("mpv"))
+        left_col.addWidget(self.play_mpv)
         left_col.addStretch(1)
         header_row.addLayout(left_col)
 
@@ -370,17 +372,6 @@ class MainWindow(QMainWindow):
         self.now_card.hide()
         header_row.addWidget(self.now_card, 1)
         dl.addLayout(header_row)
-
-        play_row = QHBoxLayout()
-        play_row.setSpacing(8)
-        self.play_mpv = QPushButton("▶  Play", objectName="Primary")
-        self.play_mpv.setToolTip("Play in mpv")
-        self.play_mpv.setSizePolicy(QSizePolicy.Policy.Fixed,
-                                    QSizePolicy.Policy.Fixed)
-        self.play_mpv.clicked.connect(lambda: self.play("mpv"))
-        play_row.addWidget(self.play_mpv)
-        play_row.addStretch(1)
-        dl.addLayout(play_row)
 
         self.epg_scroll = QScrollArea()
         self.epg_scroll.setWidgetResizable(True)
@@ -1156,7 +1147,6 @@ class MainWindow(QMainWindow):
         self._current_epg = None
         if not it:
             self._detail_name = "Select something from the list"
-            self.d_meta.setText("")
             self.d_logo.setPixmap(QPixmap())
             self.d_logo.setText("")
             return
@@ -1170,47 +1160,16 @@ class MainWindow(QMainWindow):
             self.logos.get(url, self._set_detail_logo)
 
         if self.mode == "rec":
-            if it.get("_kind") == "recjob":
-                status = {"recording": "Recording now",
-                          "scheduled": "Scheduled",
-                          "done": "Finished", "failed": "Failed",
-                          "cancelled": "Cancelled"}.get(
-                    it.get("_status"), "")
-                err = it.get("_error")
-                self.d_meta.setText(
-                    f"{status} - {err}" if err else status)
-            else:
-                try:
-                    mtime = datetime.fromtimestamp(
-                        os.stat(it["_path"]).st_mtime
-                    ).strftime("%Y-%m-%d %H:%M")
-                except OSError:
-                    mtime = "?"
-                self.d_meta.setText(
-                    f"Recording * {format_size(it.get('_size') or 0)}"
-                    f" * {mtime}")
             return
 
         if self.mode == "history":
-            self.d_meta.setText(
-                {"live": "Live channel", "movie": "Movie",
-                 "episode": "Episode"}.get(it.get("_kind"), ""))
             return
 
         if self.series_ctx:
             info = (it.get("info")
                     if isinstance(it.get("info"), dict) else {})
-            meta = " * ".join(x for x in (
-                f"Season {it.get('season')}" if it.get("season") else "",
-                info.get("duration", ""),) if x)
-            self.d_meta.setText(meta)
             self._show_media_info(info, self._current_key)
         elif self.mode in ("live", "fav"):
-            days = self._timeshift_days(it)
-            self.d_meta.setText(
-                f"Live channel * ⏪ Catch-up: {days} "
-                f"day{'s' if days != 1 else ''}" if days
-                else "Live channel")
             if it.get("stream_id") is not None:
                 self._request_epg()
                 if (self.player and self._autoplay_preview()
@@ -1218,15 +1177,10 @@ class MainWindow(QMainWindow):
                         and self.settings.value("player", "mpv") == "mpv"):
                     self._preview_timer.start(350)
         elif self.mode == "vod":
-            meta = " * ".join(x for x in (
-                str(it.get("year") or ""),
-                f"* {it['rating']}" if it.get("rating") else "",) if x)
-            self.d_meta.setText(meta or "Movie")
             if it.get("stream_id") is not None:
                 self._request_media_info(
                     "vod", it["stream_id"], self._current_key)
         else:
-            self.d_meta.setText("Series - double-click for episodes")
             if it.get("series_id") is not None:
                 self._request_media_info(
                     "series", it["series_id"], self._current_key)
