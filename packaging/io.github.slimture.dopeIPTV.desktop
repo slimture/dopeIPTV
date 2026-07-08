@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=dopeIPTV
+Comment=IPTV client with Xtream Codes and EPG
+Exec=dopeiptv
+Icon=io.github.slimture.dopeIPTV
+Terminal=false
+Categories=AudioVideo;Video;TV;
+Keywords=iptv;tv;xtream;epg;
+StartupWMClass=dopeiptv

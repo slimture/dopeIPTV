@@ -1,0 +1,140 @@
+name: Release
+
+# Build the installable packages and attach them to the GitHub Release when a
+# version tag (e.g. v0.3.0) is pushed. Each job uploads its own assets, so a
+# failure in one format never blocks the others.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # ---------------------------------------------------------------- Python ---
+  python-dist:
+    name: sdist + wheel (pipx / PyPI)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --upgrade build
+      - run: python -m build
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: dist/*
+
+  # ------------------------------------------------ AppImage + Debian pkg ---
+  linux-bundle:
+    name: AppImage + .deb
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: System deps (libmpv, ffmpeg, Qt runtime, fpm, appimagetool)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            mpv libmpv-dev ffmpeg ruby ruby-dev build-essential \
+            libgl1 libegl1 libxcb-cursor0 libpulse0 desktop-file-utils \
+            libfuse2
+          sudo gem install --no-document fpm
+          wget -q -O /usr/local/bin/appimagetool \
+            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x /usr/local/bin/appimagetool
+      - name: Python build deps
+        run: |
+          python -m pip install --upgrade pip pyinstaller
+          python -m pip install -r requirements.txt
+      - name: PyInstaller bundle
+        run: pyinstaller --noconfirm dopeiptv.spec   # -> dist/dopeiptv/
+      - name: Render icons
+        run: QT_QPA_PLATFORM=offscreen python packaging/gen_icon.py build/icons
+      - name: Version
+        id: v
+        run: echo "version=$(python -c 'import dopeiptv,sys;print(dopeiptv.VERSION)')" >> "$GITHUB_OUTPUT"
+      - name: Build AppImage
+        run: |
+          V=${{ steps.v.outputs.version }}
+          mkdir -p AppDir/usr
+          cp -r dist/dopeiptv AppDir/usr/dopeiptv
+          cp build/icons/dopeiptv.png AppDir/dopeiptv.png
+          sed 's/^Icon=.*/Icon=dopeiptv/' dopeiptv.desktop > AppDir/dopeiptv.desktop
+          cat > AppDir/AppRun <<'EOF'
+          #!/bin/sh
+          HERE="$(dirname "$(readlink -f "$0")")"
+          exec "$HERE/usr/dopeiptv/dopeiptv" "$@"
+          EOF
+          chmod +x AppDir/AppRun
+          ARCH=x86_64 appimagetool --no-appstream AppDir "dopeIPTV-${V}-x86_64.AppImage"
+      - name: Build .deb
+        run: |
+          V=${{ steps.v.outputs.version }}
+          root=pkgroot
+          mkdir -p "$root/opt/dopeiptv" "$root/usr/bin" \
+                   "$root/usr/share/applications" \
+                   "$root/usr/share/icons/hicolor/256x256/apps"
+          cp -r dist/dopeiptv/* "$root/opt/dopeiptv/"
+          cat > "$root/usr/bin/dopeiptv" <<'EOF'
+          #!/bin/sh
+          exec /opt/dopeiptv/dopeiptv "$@"
+          EOF
+          chmod +x "$root/usr/bin/dopeiptv"
+          install -m644 dopeiptv.desktop "$root/usr/share/applications/dopeiptv.desktop"
+          install -m644 build/icons/dopeiptv.png \
+            "$root/usr/share/icons/hicolor/256x256/apps/dopeiptv.png"
+          fpm -s dir -t deb -n dopeiptv -v "$V" \
+            --license GPL-3.0-or-later \
+            --description "Modern IPTV player for Xtream Codes with EPG" \
+            --url https://github.com/slimture/dopeiptv \
+            --depends libgl1 --depends libegl1 --depends libxcb-cursor0 \
+            --depends libpulse0 \
+            -C "$root" .
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            *.AppImage
+            *.deb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-bundle
+          path: |
+            *.AppImage
+            *.deb
+
+  # --------------------------------------------------------------- Flatpak ---
+  # Most likely to need iteration (building libmpv in Flatpak). Kept from
+  # blocking the release with continue-on-error.
+  flatpak:
+    name: Flatpak (experimental)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-23.08
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: dopeIPTV.flatpak
+          manifest-path: packaging/flatpak/io.github.slimture.dopeIPTV.yaml
+          cache-key: flatpak-builder-${{ github.sha }}
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dopeIPTV.flatpak

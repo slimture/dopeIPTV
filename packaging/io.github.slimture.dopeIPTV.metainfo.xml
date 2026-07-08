@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.slimture.dopeIPTV</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>dopeIPTV</name>
+  <summary>Modern IPTV player for Xtream Codes with EPG</summary>
+  <description>
+    <p>
+      dopeIPTV is a clean, modern IPTV client for Xtream Codes providers. It
+      offers an embedded mpv player, an electronic programme guide, movies and
+      series with TMDB metadata, recording and timeshift, Chromecast support,
+      multiple playlists, themes and translations.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.slimture.dopeIPTV.desktop</launchable>
+  <categories>
+    <category>AudioVideo</category>
+    <category>Video</category>
+    <category>TV</category>
+  </categories>
+  <url type="homepage">https://github.com/slimture/dopeiptv</url>
+  <url type="bugtracker">https://github.com/slimture/dopeiptv/issues</url>
+  <developer id="io.github.slimture">
+    <name>dopeIPTV contributors</name>
+  </developer>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.3.0" date="2026-07-08"/>
+  </releases>
+</component>
