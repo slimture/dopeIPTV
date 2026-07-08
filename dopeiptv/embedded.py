@@ -190,7 +190,7 @@ class EmbeddedPlayer(QWidget):
         self.next_btn = QPushButton("▶", objectName="MiniBtn")
         self.next_btn.setToolTip("Next channel (Ctrl+Right)")
         self.next_btn.clicked.connect(lambda: self.zap.emit(1))
-        self.pause_btn = QPushButton("⏸", objectName="MiniBtn")
+        self.pause_btn = QPushButton("‖", objectName="MiniBtn")
         self.pause_btn.setToolTip("Pause / resume")
         self.pause_btn.clicked.connect(self.toggle_pause)
         self.back_btn = QPushButton("−10", objectName="MiniBtn")
@@ -277,7 +277,7 @@ class EmbeddedPlayer(QWidget):
         self.fs_next_btn = QPushButton("▶", objectName="MiniBtn")
         self.fs_next_btn.setToolTip("Next channel (Right)")
         self.fs_next_btn.clicked.connect(lambda: self.zap.emit(1))
-        self.fs_pause_btn = QPushButton("⏸", objectName="MiniBtn")
+        self.fs_pause_btn = QPushButton("‖", objectName="MiniBtn")
         self.fs_pause_btn.setToolTip("Pause / resume")
         self.fs_pause_btn.clicked.connect(self.toggle_pause)
         self.fs_back_btn = QPushButton("-10", objectName="MiniBtn")
@@ -571,7 +571,7 @@ class EmbeddedPlayer(QWidget):
             pass
 
     def _sync_pause_label(self, paused: bool) -> None:
-        label = "▶" if paused else "⏸"
+        label = "▶" if paused else "‖"
         self.pause_btn.setText(label)
         self.fs_pause_btn.setText(label)
 

@@ -2582,6 +2582,15 @@ class MainWindow(QMainWindow):
         for b in (add_btn, edit_btn, remove_btn, refresh_pl_btn, use_btn):
             pl_btns.addWidget(b)
         pv.addLayout(pl_btns)
+        io_btns = QHBoxLayout()
+        export_btn = QPushButton("Export...")
+        export_btn.setToolTip("Export all playlists to a JSON file")
+        import_btn = QPushButton("Import...")
+        import_btn.setToolTip("Import playlists from a JSON file")
+        io_btns.addWidget(export_btn)
+        io_btns.addWidget(import_btn)
+        io_btns.addStretch()
+        pv.addLayout(io_btns)
         tabs.addTab(pl_tab, "Playlists")
 
         # Parental tab
@@ -2765,14 +2774,87 @@ class MainWindow(QMainWindow):
                 self.switch_playlist(pid)
                 reload_pl_list()
 
+        def export_playlists():
+            if not store or not store.playlists():
+                QMessageBox.information(
+                    d, "Export", "No playlists to export.")
+                return
+            path, _ = QFileDialog.getSaveFileName(
+                d, "Export playlists", "playlists.json",
+                "JSON files (*.json)",
+                options=QFileDialog.Option.DontUseNativeDialog)
+            if not path:
+                return
+            import json
+            data = []
+            for p in store.playlists():
+                data.append({
+                    "name": p.get("name", ""),
+                    "server": p.get("server", ""),
+                    "username": p.get("username", ""),
+                    "password": p.get("password", ""),
+                    "epg_url": p.get("epg_url", ""),
+                    "refresh": p.get("refresh", "never"),
+                })
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            QMessageBox.information(
+                d, "Export",
+                f"Exported {len(data)} playlist(s) to:\n{path}")
+
+        def import_playlists():
+            if not store:
+                return
+            path, _ = QFileDialog.getOpenFileName(
+                d, "Import playlists", "",
+                "JSON files (*.json);;All files (*)",
+                options=QFileDialog.Option.DontUseNativeDialog)
+            if not path:
+                return
+            import json
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception as exc:
+                QMessageBox.warning(
+                    d, "Import", f"Could not read file:\n{exc}")
+                return
+            if not isinstance(data, list):
+                QMessageBox.warning(
+                    d, "Import", "Invalid format — expected a JSON list.")
+                return
+            added = 0
+            for entry in data:
+                if not isinstance(entry, dict):
+                    continue
+                server = entry.get("server", "").strip()
+                user = entry.get("username", "").strip()
+                pw = entry.get("password", "").strip()
+                if not (server and user and pw):
+                    continue
+                store.add({
+                    "name": entry.get("name", "").strip()
+                            or server.split("//")[-1].split("/")[0],
+                    "server": server, "username": user,
+                    "password": pw,
+                    "epg_url": entry.get("epg_url", "").strip(),
+                    "refresh": entry.get("refresh", "never"),
+                })
+                added += 1
+            reload_pl_list()
+            QMessageBox.information(
+                d, "Import", f"Imported {added} playlist(s).")
+
         add_btn.clicked.connect(add_playlist)
         edit_btn.clicked.connect(edit_playlist)
         remove_btn.clicked.connect(remove_playlist)
         refresh_pl_btn.clicked.connect(self.refresh_playlist)
         use_btn.clicked.connect(use_playlist)
+        export_btn.clicked.connect(export_playlists)
+        import_btn.clicked.connect(import_playlists)
         if not store:
             for b in (add_btn, edit_btn, remove_btn,
-                      refresh_pl_btn, use_btn):
+                      refresh_pl_btn, use_btn, export_btn, import_btn):
                 b.setEnabled(False)
         reload_pl_list()
 

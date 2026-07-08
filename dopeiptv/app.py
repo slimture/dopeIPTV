@@ -136,14 +136,30 @@ def main() -> int:
         splash.adjustSize()
         splash.show()
         app.processEvents()
-        try:
-            candidate.authenticate()
+
+        import threading
+        auth_err = [None]
+
+        def _do_auth():
+            try:
+                candidate.authenticate()
+            except Exception as exc:
+                auth_err[0] = exc
+
+        t = threading.Thread(target=_do_auth, daemon=True)
+        t.start()
+        while t.is_alive():
+            app.processEvents()
+            t.join(0.05)
+
+        if auth_err[0] is None:
             client = candidate
             settings.setValue("server", pl["server"])
             settings.setValue("username", pl["username"])
             settings.setValue("password", pl["password"])
             splash.close()
-        except Exception as e:
+        else:
+            e = auth_err[0]
             splash.close()
             box = QMessageBox(QMessageBox.Icon.Warning, "Connection failed",
                               f"{pl['name']}: {e}\n\n"
