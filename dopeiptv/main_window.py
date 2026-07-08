@@ -63,6 +63,10 @@ class MainWindow(QMainWindow):
         active_pl = playlists.active() if playlists else None
         self.pool = QThreadPool.globalInstance()
         self.logos = LogoLoader(self.pool)
+        # Separate, higher-res cache for posters/cast photos - reusing
+        # `logos` (capped at 96px for small list icons) would blur badly
+        # once scaled up to the much larger detail-panel sizes.
+        self.poster_art = LogoLoader(self.pool, max_size=320)
         self.epg_progress.connect(self._on_epg_progress)
         pid = (active_pl or {}).get("id")
         self.xmltv = XmltvGuide(
@@ -372,9 +376,10 @@ class MainWindow(QMainWindow):
         self.now_card.hide()
         header_row.addWidget(self.now_card, 1)
 
-        # Movie/series rating (linked to IMDb when TMDB has the id) + cast,
-        # shown in the same spot as "now playing" since only one of the two
-        # is ever relevant at a time.
+        # Movie/series rating, linked to IMDb when TMDB has the id - shown
+        # in the same spot as "now playing" since only one of the two is
+        # ever relevant at a time. Cast gets its own full-width strip below
+        # (photos need more horizontal room than fits beside a big poster).
         self.media_card = QFrame(objectName="Card")
         mc = QVBoxLayout(self.media_card)
         mc.setContentsMargins(16, 14, 16, 14)
@@ -383,15 +388,28 @@ class MainWindow(QMainWindow):
         self.media_rating_lbl.setOpenExternalLinks(True)
         self.media_rating_lbl.setStyleSheet("font-size:13px; font-weight:600;")
         self.media_rating_lbl.hide()
-        self.media_cast_lbl = QLabel("", objectName="NowDesc")
-        self.media_cast_lbl.setWordWrap(True)
-        self.media_cast_lbl.hide()
         mc.addWidget(self.media_rating_lbl)
-        mc.addWidget(self.media_cast_lbl)
         mc.addStretch(1)
         self.media_card.hide()
         header_row.addWidget(self.media_card, 1)
         dl.addLayout(header_row)
+
+        self.cast_scroll = QScrollArea()
+        self.cast_scroll.setWidgetResizable(True)
+        self.cast_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.cast_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.cast_scroll.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.cast_scroll.setFixedHeight(96)
+        self.cast_holder = QWidget()
+        self.cast_lay = QHBoxLayout(self.cast_holder)
+        self.cast_lay.setContentsMargins(2, 2, 2, 2)
+        self.cast_lay.setSpacing(12)
+        self.cast_lay.addStretch()
+        self.cast_scroll.setWidget(self.cast_holder)
+        self.cast_scroll.hide()
+        dl.addWidget(self.cast_scroll)
 
         self.epg_scroll = QScrollArea()
         self.epg_scroll.setWidgetResizable(True)
@@ -1162,11 +1180,12 @@ class MainWindow(QMainWindow):
         self._show_detail(it)
 
     POSTER_SIZE_LIVE = (84, 84)
-    POSTER_SIZE_MEDIA = (130, 195)
+    POSTER_SIZE_MEDIA = (170, 255)
 
     def _show_detail(self, it) -> None:
         self.now_card.hide()
         self.media_card.hide()
+        self._clear_cast_row()
         self._clear_epg_rows()
         self._current_epg = None
         if not it:
@@ -1240,12 +1259,12 @@ class MainWindow(QMainWindow):
         fallback_url = it.get("stream_icon") or it.get("cover")
         if not (is_media and self.tmdb):
             if fallback_url:
-                self.logos.get(fallback_url, self._set_detail_logo)
+                self.poster_art.get(fallback_url, self._set_detail_logo)
             return
         title = self._media_title_for_tmdb(it)
         if not title:
             if fallback_url:
-                self.logos.get(fallback_url, self._set_detail_logo)
+                self.poster_art.get(fallback_url, self._set_detail_logo)
             return
         kind = "vod" if self.mode == "vod" else "series"
         key = self._current_key
@@ -1256,13 +1275,13 @@ class MainWindow(QMainWindow):
             self._apply_media_card(details)
             url = details.get("poster_url") or fallback_url
             if url:
-                self.logos.get(url, self._set_detail_logo)
+                self.poster_art.get(url, self._set_detail_logo)
 
         details = self.tmdb.get_full(title, kind, apply)
         if details is not None:
             apply(details)
         elif fallback_url:
-            self.logos.get(fallback_url, self._set_detail_logo)
+            self.poster_art.get(fallback_url, self._set_detail_logo)
 
     def _apply_media_card(self, details: dict) -> None:
         rating = details.get("rating")
@@ -1281,12 +1300,73 @@ class MainWindow(QMainWindow):
             self.media_rating_lbl.show()
         else:
             self.media_rating_lbl.hide()
+        self.media_card.setVisible(bool(stars or imdb_id))
+        self._clear_cast_row()
         if cast:
-            self.media_cast_lbl.setText("Cast: " + ", ".join(cast[:6]))
-            self.media_cast_lbl.show()
+            for member in cast:
+                self.cast_lay.insertWidget(
+                    self.cast_lay.count() - 1,
+                    self._build_cast_chip(member.get("name") or "",
+                                          member.get("profile_url")))
+            self.cast_scroll.show()
         else:
-            self.media_cast_lbl.hide()
-        self.media_card.setVisible(bool(stars or imdb_id or cast))
+            self.cast_scroll.hide()
+
+    CAST_PHOTO_SIZE = 56
+
+    def _clear_cast_row(self) -> None:
+        while self.cast_lay.count() > 1:
+            w = self.cast_lay.takeAt(0).widget()
+            if w:
+                w.deleteLater()
+        self.cast_scroll.hide()
+
+    def _build_cast_chip(self, name: str, profile_url: str | None) -> QWidget:
+        size = self.CAST_PHOTO_SIZE
+        chip = QWidget()
+        v = QVBoxLayout(chip)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(4)
+        photo = QLabel()
+        photo.setFixedSize(size, size)
+        photo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        photo.setStyleSheet(
+            f"background:{P['sel']}; border-radius:{size // 2}px; "
+            "font-size:18px; font-weight:700;")
+        photo.setText(name.strip()[:1].upper() if name else "?")
+        v.addWidget(photo, 0, Qt.AlignmentFlag.AlignHCenter)
+        name_lbl = QLabel(name)
+        name_lbl.setStyleSheet(f"color:{P['muted']}; font-size:10px;")
+        name_lbl.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        name_lbl.setFixedWidth(size + 16)
+        name_lbl.setWordWrap(True)
+        v.addWidget(name_lbl)
+        if profile_url:
+            def apply_photo(pm, photo=photo) -> None:
+                photo.setPixmap(self._circular_pixmap(pm, size))
+                photo.setText("")
+                photo.setStyleSheet("background:transparent;")
+            self.poster_art.get(profile_url, apply_photo)
+        return chip
+
+    @staticmethod
+    def _circular_pixmap(pm: QPixmap, size: int) -> QPixmap:
+        scaled = pm.scaled(
+            size, size, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+            Qt.TransformationMode.SmoothTransformation)
+        x = max(0, (scaled.width() - size) // 2)
+        y = max(0, (scaled.height() - size) // 2)
+        cropped = scaled.copy(x, y, size, size)
+        out = QPixmap(size, size)
+        out.fill(Qt.GlobalColor.transparent)
+        p = QPainter(out)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        path = QPainterPath()
+        path.addEllipse(0, 0, size, size)
+        p.setClipPath(path)
+        p.drawPixmap(0, 0, cropped)
+        p.end()
+        return out
 
     def _clear_epg_rows(self) -> None:
         while self.epg_lay.count() > 1:

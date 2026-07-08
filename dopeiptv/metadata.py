@@ -16,7 +16,10 @@ from .workers import run_async
 class TmdbClient:
     """Thin wrapper around the TMDB v3 search/details endpoints."""
 
-    IMG_BASE = "https://image.tmdb.org/t/p/w342"
+    # w500 poster: sharp enough to display at a much larger size than the
+    # old w342 without visibly upscaling/blurring in the detail panel.
+    IMG_BASE = "https://image.tmdb.org/t/p/w500"
+    PROFILE_IMG_BASE = "https://image.tmdb.org/t/p/w185"
     BASE = "https://api.themoviedb.org/3"
 
     def __init__(self, api_key: str) -> None:
@@ -49,13 +52,24 @@ class TmdbClient:
         r2.raise_for_status()
         d = r2.json()
         poster_path = d.get("poster_path") or results[0].get("poster_path")
-        cast = [c.get("name") for c in
-                (d.get("credits") or {}).get("cast") or []][:8]
+        cast = []
+        for c in (d.get("credits") or {}).get("cast") or []:
+            name = c.get("name")
+            if not name:
+                continue
+            profile_path = c.get("profile_path")
+            cast.append({
+                "name": name,
+                "profile_url": (f"{self.PROFILE_IMG_BASE}{profile_path}"
+                                if profile_path else None),
+            })
+            if len(cast) == 8:
+                break
         return {
             "poster_url": f"{self.IMG_BASE}{poster_path}" if poster_path else None,
             "rating": d.get("vote_average") or None,
             "imdb_id": (d.get("external_ids") or {}).get("imdb_id"),
-            "cast": [c for c in cast if c],
+            "cast": cast,
         }
 
 
@@ -67,7 +81,7 @@ class PosterResolver(QObject):
     search that invokes *callback* once done so the caller can repaint.
     """
 
-    CACHE_KEY = "tmdb_poster_cache"
+    CACHE_KEY = "tmdb_poster_cache_v2"
 
     def __init__(self, pool: QThreadPool, settings: QSettings,
                  client: TmdbClient) -> None:

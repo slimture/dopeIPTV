@@ -60,11 +60,18 @@ def run_async(pool: QThreadPool, fn: Callable, on_done: Callable,
 
 
 class LogoLoader(QObject):
-    """Asynchronous channel logo downloader with in-memory cache."""
+    """Asynchronous image downloader with in-memory cache.
 
-    def __init__(self, pool: QThreadPool) -> None:
+    *max_size* bounds the cached pixmap (aspect-ratio preserved) - keep
+    this small for tiny list icons and larger for anything meant to be
+    shown big (posters, cast photos), since a low-res cache blurs badly
+    once scaled back up.
+    """
+
+    def __init__(self, pool: QThreadPool, max_size: int = 96) -> None:
         super().__init__()
         self.pool = pool
+        self.max_size = max_size
         self.cache: dict[str, QPixmap] = {}
         self.waiting: dict[str, list[Callable]] = {}
 
@@ -89,7 +96,8 @@ class LogoLoader(QObject):
             callbacks = self.waiting.pop(u, [])
             pm = QPixmap()
             if pm.loadFromData(data):
-                pm = pm.scaled(96, 96, Qt.AspectRatioMode.KeepAspectRatio,
+                pm = pm.scaled(self.max_size, self.max_size,
+                               Qt.AspectRatioMode.KeepAspectRatio,
                                Qt.TransformationMode.SmoothTransformation)
                 self.cache[u] = pm
                 for cb in callbacks:
