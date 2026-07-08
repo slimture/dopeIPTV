@@ -3661,6 +3661,15 @@ class MainWindow(QMainWindow):
         outer = QVBoxLayout(d)
         outer.setContentsMargins(18, 18, 18, 18)
         tabs = QTabWidget()
+        # On macOS the native tab style hands each tab a fixed slot and elides
+        # anything that doesn't fit ("Playba…", "Interfac…"). Ask the tab bar
+        # to never elide and let scroll buttons appear if we run out of room
+        # instead. No effect on Linux, where tabs already size to their text.
+        if sys.platform == "darwin":
+            tabs.tabBar().setElideMode(Qt.TextElideMode.ElideNone)
+            tabs.tabBar().setUsesScrollButtons(True)
+            tabs.setStyleSheet(
+                "QTabBar::tab { padding: 6px 14px; min-width: 90px; }")
         outer.addWidget(tabs)
 
         # Playback tab
