@@ -2326,7 +2326,11 @@ class MainWindow(QMainWindow):
         button routes here when the player is empty)."""
         last = getattr(self, "_last_playback", None)
         if not last:
+            print("[dopeIPTV] _resume_last: no _last_playback stored",
+                  file=sys.stderr)
             return
+        print(f"[dopeIPTV] _resume_last: replaying {last.get('kind')} "
+              f"'{last.get('title')}'", file=sys.stderr)
         self._start_playback(last["url"], last["title"], last["icon_url"],
                              last["key"], last["kind"], record=False,
                              item=last["item"])

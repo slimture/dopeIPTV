@@ -1106,6 +1106,12 @@ class EmbeddedPlayer(QWidget):
             if self.video.mpv is None:
                 raise RuntimeError("OpenGL context not ready")
             m = self.video.mpv
+            # Re-enable mpv's video output in case a previous stop() set it
+            # to "no" - without this the stream would play with audio only.
+            try:
+                m["vid"] = "auto"
+            except Exception:
+                pass
             try:
                 m["force-media-title"] = title or "dopeIPTV"
             except Exception:
@@ -1178,6 +1184,8 @@ class EmbeddedPlayer(QWidget):
         # remembers what it was and resumes where it left off) rather than
         # doing nothing on an empty player.
         if self.current_url is None:
+            print("[dopeIPTV] Play after Stop -> resume_requested",
+                  file=sys.stderr)
             self.resume_requested.emit()
             return
         m = self.video.mpv
@@ -1528,13 +1536,21 @@ class EmbeddedPlayer(QWidget):
         # context that libmpv has already begun tearing down and segfault the
         # whole app. Blanking first makes any late repaint a harmless clear.
         self.video.set_blank(True)
-        self.stop_stream_record()
-        self.current_url = None
-        if self.video.mpv:
+        m = self.video.mpv
+        if m is not None:
+            # Disable mpv's video output too, so nothing at all renders back
+            # through the render context - defeats the "stale last frame" and
+            # "torn artefacts" the pane shows when only Qt clears the FBO.
             try:
-                self.video.mpv.command("stop")
+                m["vid"] = "no"
             except Exception:
                 pass
+            try:
+                m.command("stop")
+            except Exception:
+                pass
+        self.stop_stream_record()
+        self.current_url = None
         self.title_lbl.setText("")
         self._pos_timer.stop()
         self._hide_seek_ui()
@@ -1542,6 +1558,12 @@ class EmbeddedPlayer(QWidget):
         self._stats_timer.stop()
         self._sync_pause_label(True)
         self._mac_show_cursor()
+        # Force several deferred repaints - the compositor sometimes ignores a
+        # single update() while it's still animating the last mpv frame, and
+        # any late mpv update_cb also just re-hits the blank branch.
+        QTimer.singleShot(0, self.video.update)
+        QTimer.singleShot(80, self.video.update)
+        QTimer.singleShot(240, self.video.update)
 
     def shutdown(self) -> None:
         self.stop_stream_record()
