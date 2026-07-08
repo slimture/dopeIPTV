@@ -320,7 +320,7 @@ class MainWindow(QMainWindow):
             self.player.pip_requested.connect(self._toggle_pip)
             self.player.stop_btn.clicked.connect(self._exit_pip_if_active)
             self.player.stop_btn.clicked.connect(self.player.hide)
-            dl.addWidget(self.player, 2)
+            dl.addWidget(self.player, 1)
 
         self.stream_error = QLabel("")
         self.stream_error.setStyleSheet(
@@ -359,8 +359,8 @@ class MainWindow(QMainWindow):
 
         self.now_card = QFrame(objectName="Card")
         nc = QVBoxLayout(self.now_card)
-        nc.setContentsMargins(14, 12, 14, 12)
-        nc.setSpacing(6)
+        nc.setContentsMargins(16, 14, 16, 14)
+        nc.setSpacing(8)
         self.now_time = QLabel("", objectName="NowTime")
         self.now_title = QLabel("", objectName="NowTitle")
         self.now_title.setWordWrap(True)
@@ -374,10 +374,24 @@ class MainWindow(QMainWindow):
         self.now_card.hide()
         dl.addWidget(self.now_card)
 
-        self.epg_refresh = QPushButton("Refresh EPG")
+        epg_header = QHBoxLayout()
+        epg_header.setSpacing(8)
+        self.epg_header_lbl = QLabel("Programme guide")
+        self.epg_header_lbl.setStyleSheet(
+            f"color:{P['muted2']}; font-size:11px; font-weight:700; "
+            "letter-spacing:0.5px;")
+        self.epg_header_lbl.hide()
+        epg_header.addWidget(self.epg_header_lbl)
+        epg_header.addStretch(1)
+        self.epg_refresh = QPushButton("⟳ Refresh", objectName="InlineToggle")
+        self.epg_refresh.setToolTip(
+            "Refresh just this channel's programme guide "
+            "(the sidebar Refresh reloads the whole playlist)")
+        self.epg_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
         self.epg_refresh.clicked.connect(self._refresh_epg_clicked)
         self.epg_refresh.hide()
-        dl.addWidget(self.epg_refresh)
+        epg_header.addWidget(self.epg_refresh)
+        dl.addLayout(epg_header)
 
         self.epg_scroll = QScrollArea()
         self.epg_scroll.setWidgetResizable(True)
@@ -1152,6 +1166,7 @@ class MainWindow(QMainWindow):
         self._clear_epg_rows()
         self._current_epg = None
         self.epg_refresh.hide()
+        self.epg_header_lbl.hide()
         if not it:
             self.d_title.setText("Select something from the list")
             self.d_meta.setText("")
@@ -1212,6 +1227,7 @@ class MainWindow(QMainWindow):
             if it.get("stream_id") is not None:
                 if not self._player_fs:
                     self.epg_refresh.show()
+                    self.epg_header_lbl.show()
                 self._request_epg()
                 if (self.player and self._autoplay_preview()
                         and self.playback_mode() == "embedded"
