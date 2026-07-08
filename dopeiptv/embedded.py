@@ -484,6 +484,9 @@ class EmbeddedPlayer(QWidget):
         else:
             self._pip_bar_timer.stop()
             self.bar.show()
+        # Entering PiP must drop the docked fixed height (so the video fills
+        # the PiP frame); leaving it must restore that constant height.
+        self._lock_video_box()
 
     def _show_pip_bar(self) -> None:
         self.bar.show()
@@ -508,21 +511,17 @@ class EmbeddedPlayer(QWidget):
             self._lock_video_box()
             self._show_overlay()
         else:
-            # Reordering the caller to restore the window's geometry
-            # before this runs isn't enough on its own: showNormal() /
-            # setGeometry() request the change but X11/Wayland apply it
-            # asynchronously, so self.height() can still read the old
-            # (fullscreen) size right here. Locking the video against
-            # that stale size is what produced letterboxing that no
-            # later resize could clear (every resize recomputed from
-            # the same wrong baseline). Defer across a couple of ticks
-            # so this runs after the real resize has landed.
             self._hide_fs_ui()
             self._overlay_timer.stop()
             self.unsetCursor()
             self.video.unsetCursor()
+            # The docked height is now a constant, not derived from
+            # self.height(), so restoring it doesn't depend on the window
+            # having finished its async resize back from fullscreen - it
+            # can't lock in a stale size. Re-apply once now and once on the
+            # next tick to be robust against the transition ordering.
+            self._lock_video_box()
             QTimer.singleShot(0, self._lock_video_box)
-            QTimer.singleShot(200, self._lock_video_box)
 
     def _hide_fs_ui(self) -> None:
         self.overlay.hide()
@@ -563,35 +562,34 @@ class EmbeddedPlayer(QWidget):
             - margin - 8 - self.overlay.height())
 
     def _lock_video_box(self) -> None:
-        if self._fs_ui:
-            self.video.setMinimumHeight(190)
-            self.video.setMaximumHeight(16777215)
+        # The video surface always fills whatever the *player* is given;
+        # only its minimum differs. What varies is who sizes the player.
+        self.video.setMinimumHeight(190 if self._fs_ui else 0)
+        self.video.setMaximumHeight(16777215)
+        if self._fs_ui or self._pip_mode:
+            # Fullscreen and PiP: the window (or the PiP frame) drives the
+            # size, so release every constraint on the player and let its
+            # layout stretch fill the available space. PiP windows are
+            # deliberately small; forcing a docked floor there is what used
+            # to wedge black bars after the PiP<->fullscreen round trip.
+            self.setMinimumHeight(0)
+            self.setMaximumHeight(16777215)
         else:
-            # Clear any fixed height *before* measuring self.height(). A
-            # fixed-height child inflates this widget's own minimum size,
-            # so if the previous call locked in a wrong (too-tall) value -
-            # e.g. read right after leaving fullscreen, before the window
-            # had actually resized - that wrong height keeps reinforcing
-            # itself forever: every later resizeEvent recomputes from the
-            # same stuck self.height() instead of the real available
-            # space, which is exactly the letterboxing that survived a
-            # manual resize and needed an app restart to clear.
-            self.video.setMinimumHeight(0)
-            self.video.setMaximumHeight(16777215)
-            self.layout().activate()
+            # Docked mini player: pin the *player itself* to one constant
+            # height and let the video fill it through the normal layout.
+            #
+            # The old code sized the video from self.height() instead. That
+            # is a feedback loop - a fixed-height video inflates the
+            # player's own height, so self.height() reads back the value we
+            # just wrote. A wrong height computed during the fullscreen ->
+            # normal transition (when self.height() still reported the
+            # fullscreen size) therefore reinforced itself on every later
+            # resize and showed as unclearable letterbox bars until the app
+            # was restarted. A constant player height has no such feedback,
+            # so the bars can't get stuck.
             bar_h = self.bar.sizeHint().height() if self.bar.isVisible() else 0
-            spacing = self.layout().spacing()
-            available = self.height() - bar_h - spacing
-            # The VIDEO_BOX_HEIGHT floor exists so the embedded player
-            # doesn't shrink to nothing while docked in the main window's
-            # detail panel. In PiP mode the window is deliberately small
-            # (as little as ~270px tall) - enforcing that same floor there
-            # forces the video taller than the window actually has room
-            # for, which is exactly the fixed-height mismatch that shows
-            # up as unadjustable black bars after the PiP<->fullscreen
-            # round trip. PiP should just fill whatever space it has.
-            floor = 0 if self._pip_mode else self.VIDEO_BOX_HEIGHT
-            self.video.setFixedHeight(max(floor, available))
+            spacing = self.layout().spacing() if bar_h else 0
+            self.setFixedHeight(self.VIDEO_BOX_HEIGHT + bar_h + spacing)
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
@@ -618,10 +616,19 @@ class EmbeddedPlayer(QWidget):
         sub_mode = s.value("sub_mode", "auto")
         if sub_mode == "off":
             set_opt("sid", "no")
+            set_opt("sub-forced-only", False)
         else:
             set_opt("sid", "auto")
-            set_opt("slang", (s.value("sub_lang", "") or "")
-                    if sub_mode == "lang" else "")
+            if sub_mode == "lang":
+                # A primary + optional fallback language: mpv's slang takes
+                # a comma-separated priority list, so "swe,eng" means prefer
+                # Swedish subs but fall back to English when absent.
+                langs = [s.value("sub_lang", "") or "",
+                         s.value("sub_lang2", "") or ""]
+                set_opt("slang", ",".join(l for l in langs if l))
+            else:
+                set_opt("slang", "")
+            set_opt("sub-forced-only", sub_mode == "forced")
         aspect = s.value("aspect_mode", "auto")
         if aspect == "stretch":
             set_opt("keepaspect", False)

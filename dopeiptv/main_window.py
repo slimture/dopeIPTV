@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import os
 import shutil
 import sys
@@ -364,7 +365,11 @@ class MainWindow(QMainWindow):
         self.d_logo.setStyleSheet(
             f"background:{P['sel']}; border-radius:18px; "
             "font-size:30px; font-weight:700;")
-        left_col.addWidget(self.d_logo)
+        # Pin every item in this column to the left edge. Without an
+        # explicit alignment a fixed-size widget (the poster) is centered
+        # in the column's full width, which is what made the poster look
+        # centered under the mini player instead of left-aligned.
+        left_col.addWidget(self.d_logo, 0, Qt.AlignmentFlag.AlignLeft)
 
         # Movie/series rating, linked to IMDb when TMDB has the id. Sits
         # directly under the poster with no card/border around it - the
@@ -373,14 +378,14 @@ class MainWindow(QMainWindow):
         self.media_rating_lbl.setOpenExternalLinks(True)
         self.media_rating_lbl.setStyleSheet("font-size:13px; font-weight:600;")
         self.media_rating_lbl.hide()
-        left_col.addWidget(self.media_rating_lbl)
+        left_col.addWidget(self.media_rating_lbl, 0, Qt.AlignmentFlag.AlignLeft)
 
         self.play_mpv = QPushButton("▶  Play", objectName="Primary")
         self.play_mpv.setToolTip("Play in mpv")
         self.play_mpv.setSizePolicy(QSizePolicy.Policy.Fixed,
                                     QSizePolicy.Policy.Fixed)
         self.play_mpv.clicked.connect(lambda: self.play("mpv"))
-        left_col.addWidget(self.play_mpv)
+        left_col.addWidget(self.play_mpv, 0, Qt.AlignmentFlag.AlignLeft)
         left_col.addStretch(1)
         header_row.addLayout(left_col)
 
@@ -403,6 +408,42 @@ class MainWindow(QMainWindow):
             nc.addWidget(w)
         self.now_card.hide()
         header_row.addWidget(self.now_card, 1)
+
+        # Movie/series synopsis + metadata, shown to the *right* of the
+        # poster (only one of now_card / media_info is ever visible, since
+        # live channels use now_card and VOD/series use this). Capped to
+        # the poster's height with the text scrolling inside, so a long
+        # synopsis doesn't stretch the row taller than the poster.
+        self.media_info = QScrollArea()
+        self.media_info.setWidgetResizable(True)
+        self.media_info.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.media_info.setMaximumHeight(self.POSTER_SIZE_MEDIA[1])
+        # A QScrollArea doesn't match the QFrame#Card theme rule, so give
+        # it the same card background/border explicitly for consistency
+        # with the live "now playing" card.
+        self.media_info.setStyleSheet(
+            f"QScrollArea {{ background:{P['input']}; "
+            f"border:1px solid {P['border_in']}; border-radius:12px; }}")
+        mi_holder = QWidget()
+        mi = QVBoxLayout(mi_holder)
+        mi.setContentsMargins(16, 14, 16, 14)
+        mi.setSpacing(8)
+        self.media_plot = QLabel("", objectName="NowDesc")
+        self.media_plot.setWordWrap(True)
+        self.media_plot.setAlignment(
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        self.media_meta = QLabel("", objectName="DetailMeta")
+        self.media_meta.setWordWrap(True)
+        self.media_meta.setTextFormat(Qt.TextFormat.RichText)
+        self.media_meta.setOpenExternalLinks(False)
+        self.media_meta.linkActivated.connect(self._on_cast_link)
+        mi.addWidget(self.media_plot)
+        mi.addWidget(self.media_meta)
+        mi.addStretch(1)
+        self.media_info.setWidget(mi_holder)
+        self.media_info.hide()
+        header_row.addWidget(self.media_info, 1)
         dl.addLayout(header_row)
 
         self.cast_scroll = QScrollArea()
@@ -1208,6 +1249,7 @@ class MainWindow(QMainWindow):
 
     def _show_detail(self, it) -> None:
         self.now_card.hide()
+        self.media_info.hide()
         self.media_rating_lbl.hide()
         self._clear_cast_row()
         self._clear_epg_rows()
@@ -1348,7 +1390,7 @@ class MainWindow(QMainWindow):
                          person_id=None) -> QWidget:
         size = self.CAST_PHOTO_SIZE
         chip = _ClickableWidget()
-        if person_id and self.tmdb:
+        if self.tmdb and name:
             chip.setCursor(Qt.CursorShape.PointingHandCursor)
             chip.setToolTip(f"Find other titles with {name} in your playlist")
             chip.clicked.connect(
@@ -1475,9 +1517,25 @@ class MainWindow(QMainWindow):
 
         result_list.itemDoubleClicked.connect(
             lambda item: self._play_cast_match(item, d))
-        credits = self.tmdb.get_person_credits(person_id, show_matches)
-        if credits is not None:
-            show_matches(credits)
+
+        def with_person_id(pid) -> None:
+            if not pid:
+                status.setText(
+                    f"Couldn't find {name} on TMDB.")
+                return
+            credits = self.tmdb.get_person_credits(pid, show_matches)
+            if credits is not None:
+                show_matches(credits)
+
+        if person_id:
+            with_person_id(person_id)
+        else:
+            # Cast names that came from the provider's plain-text list have
+            # no TMDB id yet - resolve it by name first, then fetch credits.
+            status.setText("Looking up cast member...")
+            pid = self.tmdb.resolve_person_id(name, with_person_id)
+            if pid is not None:
+                with_person_id(pid)
         d.exec()
 
     def _play_cast_match(self, item, dialog) -> None:
@@ -1561,31 +1619,46 @@ class MainWindow(QMainWindow):
         self._clear_epg_rows()
         plot = str(
             info.get("plot") or info.get("description") or "").strip()
-        if plot:
-            card = QFrame(objectName="Card")
-            kl = QVBoxLayout(card)
-            kl.setContentsMargins(14, 12, 14, 12)
-            desc = QLabel(plot, objectName="NowDesc")
-            desc.setWordWrap(True)
-            kl.addWidget(desc)
-            self.epg_lay.insertWidget(self.epg_lay.count() - 1, card)
-        rows = (
+        self.media_plot.setText(plot)
+        self.media_plot.setVisible(bool(plot))
+
+        parts: list[str] = []
+        simple = (
             ("Genre", info.get("genre")),
-            ("Cast", info.get("cast") or info.get("actors")),
             ("Director", info.get("director")),
             ("Released",
              info.get("releasedate") or info.get("releaseDate")),
             ("Duration", info.get("duration")),
             ("Rating", info.get("rating")),
         )
-        has_content = bool(plot)
-        for label, value in rows:
+        for label, value in simple:
             value = str(value or "").strip()
             if value:
-                self._epg_note(f"{label}: {value}")
-                has_content = True
-        if not has_content:
+                parts.append(f"<b>{label}:</b> {html.escape(value)}")
+        cast = str(info.get("cast") or info.get("actors") or "").strip()
+        if cast:
+            names = [n.strip() for n in cast.split(",") if n.strip()]
+            if self.tmdb:
+                # Each provider cast name becomes a clickable link that
+                # resolves the actor on TMDB and lists their other titles
+                # from this playlist - the same action as the photo chips.
+                rendered = [
+                    f'<a href="cast:{html.escape(n)}" '
+                    f'style="color:{ACCENT}; text-decoration:none;">'
+                    f'{html.escape(n)}</a>' for n in names]
+            else:
+                rendered = [html.escape(n) for n in names]
+            parts.append("<b>Cast:</b> " + ", ".join(rendered))
+        self.media_meta.setText("<br>".join(parts))
+        self.media_meta.setVisible(bool(parts))
+
+        self.media_info.setVisible(bool(plot or parts))
+        if not (plot or parts):
             self._epg_note("No further information available.")
+
+    def _on_cast_link(self, href: str) -> None:
+        if href.startswith("cast:"):
+            self._on_cast_clicked(href[len("cast:"):], None)
 
     def _show_epg(self, listings, key) -> None:
         if key != self._current_key:
@@ -3087,10 +3160,13 @@ class MainWindow(QMainWindow):
             LANGS, self.settings.value("audio_lang", ""))
         sub_box = self._combo(
             [("off", "Off"), ("auto", "On (player default)"),
-             ("lang", "On - preferred language")],
+             ("lang", "On - preferred language"),
+             ("forced", "On - forced subtitles only")],
             self.settings.value("sub_mode", "auto"))
         slang_box = self._combo(
             LANGS, self.settings.value("sub_lang", ""))
+        slang2_box = self._combo(
+            LANGS, self.settings.value("sub_lang2", ""))
         aspect_box = self._combo(
             [("auto", "Auto"), ("16:9", "16:9"), ("4:3", "4:3"),
              ("2.35:1", "2.35:1"), ("stretch", "Stretch to window")],
@@ -3134,6 +3210,7 @@ class MainWindow(QMainWindow):
         pf.addRow("Preferred audio language", alang_box)
         pf.addRow("Subtitles", sub_box)
         pf.addRow("Preferred subtitle language", slang_box)
+        pf.addRow("Fallback subtitle language", slang2_box)
         pf.addRow("Aspect ratio", aspect_box)
         pf.addRow("Network buffer", buf_box)
         pf.addRow("Replay delay", replay_delay_row)
@@ -3676,6 +3753,8 @@ class MainWindow(QMainWindow):
                 "sub_mode", sub_box.currentData())
             self.settings.setValue(
                 "sub_lang", slang_box.currentData())
+            self.settings.setValue(
+                "sub_lang2", slang2_box.currentData())
             self.settings.setValue(
                 "aspect_mode", aspect_box.currentData())
             self.settings.setValue(

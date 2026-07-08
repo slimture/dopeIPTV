@@ -83,6 +83,17 @@ class TmdbClient:
         titles = [c.get("title") or c.get("name") for c in cast]
         return [t for t in titles if t]
 
+    def search_person(self, name: str) -> int | None:
+        """Resolve a person's name to their TMDB id (top match)."""
+        r = requests.get(
+            f"{self.BASE}/search/person",
+            params={"api_key": self.api_key, "query": name,
+                    "include_adult": "false"},
+            timeout=10)
+        r.raise_for_status()
+        results = r.json().get("results") or []
+        return results[0].get("id") if results else None
+
 
 class PosterResolver(QObject):
     """Async, cached title -> TMDB metadata resolver.
@@ -94,6 +105,7 @@ class PosterResolver(QObject):
 
     CACHE_KEY = "tmdb_poster_cache_v3"
     PERSON_CACHE_KEY = "tmdb_person_cache"
+    PERSON_ID_CACHE_KEY = "tmdb_person_id_cache"
 
     def __init__(self, pool: QThreadPool, settings: QSettings,
                  client: TmdbClient) -> None:
@@ -121,6 +133,13 @@ class PosterResolver(QObject):
             self._person_cache = {}
         self._person_pending: set[str] = set()
         self._person_waiting: dict[str, list[Callable]] = {}
+        try:
+            self._person_id_cache: dict[str, int | None] = json.loads(
+                settings.value(self.PERSON_ID_CACHE_KEY, "") or "{}")
+        except Exception:
+            self._person_id_cache = {}
+        self._person_id_pending: set[str] = set()
+        self._person_id_waiting: dict[str, list[Callable]] = {}
         # A resolved entry writes the whole (growing) cache back to
         # QSettings on the main thread. Doing that synchronously on every
         # single completion - which can arrive in bursts when switching
@@ -227,6 +246,42 @@ class PosterResolver(QObject):
             self._person_cache[key] = []
             self._person_pending.discard(key)
             self._person_waiting.pop(key, None)
+
+        run_async(self.pool, fetch, done, fail)
+        return None
+
+    def resolve_person_id(
+            self, name: str, callback: Callable[[int | None], None]
+    ) -> int | str | None:
+        """Resolve a person's name to a TMDB id (cached), for cast names
+        that came from the provider's plain-text list rather than TMDB."""
+        if not name:
+            return None
+        key = f"name:{name.strip().lower()}"
+        if key in self._person_id_cache:
+            return self._person_id_cache[key]
+        self._person_id_waiting.setdefault(key, []).append(callback)
+        if key in self._person_id_pending:
+            return None
+        self._person_id_pending.add(key)
+
+        def fetch(n=name):
+            return self.client.search_person(n)
+
+        def done(pid, key=key):
+            self._person_id_cache[key] = pid
+            self.settings.setValue(
+                self.PERSON_ID_CACHE_KEY, json.dumps(self._person_id_cache))
+            self._person_id_pending.discard(key)
+            for cb in self._person_id_waiting.pop(key, []):
+                try:
+                    cb(pid)
+                except RuntimeError:
+                    pass
+
+        def fail(_msg, key=key):
+            self._person_id_pending.discard(key)
+            self._person_id_waiting.pop(key, None)
 
         run_async(self.pool, fetch, done, fail)
         return None
