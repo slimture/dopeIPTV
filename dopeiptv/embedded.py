@@ -282,6 +282,7 @@ class EmbeddedPlayer(QWidget):
     timeshift_menu = pyqtSignal(object)
     record_menu = pyqtSignal(object)
     pip_requested = pyqtSignal()
+    pip_context_menu = pyqtSignal(object)
 
     OVERLAY_HIDE_MS = 3000
     VIDEO_BOX_HEIGHT = 260
@@ -640,6 +641,9 @@ class EmbeddedPlayer(QWidget):
         return edges
 
     def _on_video_press(self, event) -> None:
+        if self._pip_mode and event.button() == Qt.MouseButton.RightButton:
+            self.pip_context_menu.emit(event.globalPosition().toPoint())
+            return
         if event.button() != Qt.MouseButton.LeftButton or not self._pip_mode:
             return
         win = self.window().windowHandle()
@@ -1154,14 +1158,19 @@ class EmbeddedPlayer(QWidget):
             self._hide_seek_ui()
             return
         text = f"{_format_time(pos)} / {_format_time(dur)}"
-        for slider, label in ((self.fs_seek, self.fs_time_lbl),):
+        # Show the scrubber + time both on the docked control bar and on the
+        # fullscreen overlay so movies/episodes are seekable in the mini
+        # player, not only in fullscreen.
+        for slider, label in ((self.seek, self.time_lbl),
+                              (self.fs_seek, self.fs_time_lbl)):
             label.setText(text)
             slider.setVisible(True)
             label.setVisible(True)
             if not slider.dragging:
                 slider.setMaximum(int(dur))
                 slider.setValue(int(pos or 0))
-        for btn in (self.fs_back_btn, self.fs_fwd_btn):
+        for btn in (self.back_btn, self.fwd_btn,
+                    self.fs_back_btn, self.fs_fwd_btn):
             btn.setVisible(True)
 
     def progress_percent(self) -> float:

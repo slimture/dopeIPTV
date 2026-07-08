@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 import json
 import os
+import re
 import shutil
 import sys
 import threading
@@ -16,8 +17,8 @@ from PyQt6.QtCore import (
     pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QColor, QDesktopServices, QIcon, QKeySequence, QPainter, QPainterPath,
-    QPixmap, QShortcut,
+    QAction, QColor, QDesktopServices, QIcon, QKeySequence, QPainter,
+    QPainterPath, QPixmap, QShortcut,
 )
 from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDateTimeEdit, QDialog,
@@ -402,6 +403,7 @@ class MainWindow(QMainWindow):
             self.player.playback_error.connect(self._playback_error)
             self.player.zap.connect(self._zap)
             self.player.pip_requested.connect(self._toggle_pip)
+            self.player.pip_context_menu.connect(self._pip_context_menu)
             self.player.stop_btn.clicked.connect(self._exit_pip_if_active)
             self.player.stop_btn.clicked.connect(self.player.hide)
             dl.addWidget(self.player, 1)
@@ -802,6 +804,33 @@ class MainWindow(QMainWindow):
             self.setGeometry(geo)
         if state and state != Qt.WindowState.WindowNoState:
             self.setWindowState(state)
+
+    def _pip_context_menu(self, global_pos) -> None:
+        if self._pip_win is None:
+            return
+        m = QMenu(self)
+        on_top = QAction(tr("pip_always_on_top"), m, checkable=True)
+        on_top.setChecked(bool(
+            self.windowFlags() & Qt.WindowType.WindowStaysOnTopHint))
+        on_top.toggled.connect(self._set_pip_on_top)
+        m.addAction(on_top)
+        m.addAction(tr("tooltip_exit_pip"), self._exit_pip)
+        m.exec(global_pos)
+
+    def _set_pip_on_top(self, enabled: bool) -> None:
+        if self._pip_win is None:
+            return
+        flags = (Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
+        if enabled:
+            flags |= Qt.WindowType.WindowStaysOnTopHint
+        geo = self.geometry()
+        self.setWindowFlags(flags)
+        self.show()
+        self.setGeometry(geo)
+        self.raise_()
+        if enabled and "wayland" in \
+                QApplication.instance().platformName().lower():
+            self._show_toast(tr("pip_wayland_hint"), 5000)
 
     def _exit_pip_if_active(self) -> None:
         if self._pip_win is not None:
@@ -1569,9 +1598,23 @@ class MainWindow(QMainWindow):
 
     # -- cast: find an actor's other titles in this playlist -----------------------
 
-    @staticmethod
-    def _normalize_title(s: str) -> str:
-        return "".join(c for c in (s or "").lower() if c.isalnum())
+    # Noise commonly appended to VOD titles by providers (movies especially:
+    # "Inception (2010) 1080p", "EN| Inception MULTI"), which stopped them
+    # from matching TMDB's clean title.
+    _TITLE_BRACKETS = re.compile(r"[\(\[\{].*?[\)\]\}]")
+    _TITLE_NOISE = re.compile(
+        r"\b(19|20)\d{2}\b|\b(2160p|1080p|720p|480p|4k|uhd|fhd|hd|sd|hevc|"
+        r"x26[45]|h26[45]|web[- ]?dl|webrip|bluray|bdrip|dvdrip|remux|imax|"
+        r"multi|dual|vostfr|truefrench)\b", re.IGNORECASE)
+    _TITLE_PREFIX = re.compile(r"^\s*[a-z]{2,4}\s*[|:\-]\s*", re.IGNORECASE)
+
+    @classmethod
+    def _normalize_title(cls, s: str) -> str:
+        s = (s or "").lower()
+        s = cls._TITLE_BRACKETS.sub(" ", s)
+        s = cls._TITLE_PREFIX.sub("", s)
+        s = cls._TITLE_NOISE.sub(" ", s)
+        return "".join(c for c in s if c.isalnum())
 
     def _ensure_full_catalog(self, callback) -> None:
         if self._full_catalog is not None:
@@ -1593,11 +1636,20 @@ class MainWindow(QMainWindow):
     def _find_playlist_matches(self, titles: list[str], callback) -> None:
         norm_titles = {self._normalize_title(t) for t in titles}
 
+        long_titles = [t for t in norm_titles if len(t) >= 6]
+
         def with_catalog(catalog):
-            matches = [
-                (it, kind) for it, kind in catalog
-                if self._normalize_title(
-                    it.get("name") or it.get("title") or "") in norm_titles]
+            matches = []
+            for it, kind in catalog:
+                cnorm = self._normalize_title(
+                    it.get("name") or it.get("title") or "")
+                if not cnorm:
+                    continue
+                # Exact match, or the provider title begins with a (reasonably
+                # long) TMDB title — catches residual trailing noise.
+                if cnorm in norm_titles or any(
+                        cnorm.startswith(t) for t in long_titles):
+                    matches.append((it, kind))
             callback(matches)
 
         self._ensure_full_catalog(with_catalog)
@@ -3479,41 +3531,42 @@ class MainWindow(QMainWindow):
         play_tab = QWidget()
         pf = QFormLayout(play_tab)
         pf.setSpacing(10)
-        mode_items = [("embedded", "Embedded (in app)"),
-                      ("window", "Reused mpv window"),
-                      ("external", "External player")]
+        mode_items = [("embedded", tr("option_embedded")),
+                      ("window", tr("option_reused_window")),
+                      ("external", tr("option_external_player"))]
         if not self.player:
             mode_items = [m for m in mode_items if m[0] != "embedded"]
         mode_box = self._combo(mode_items, self.playback_mode())
         autoplay_box = self._combo(
-            [("true", "Yes"), ("false", "No")],
+            [("true", tr("option_yes")), ("false", tr("option_no"))],
             "true" if self._autoplay_preview() else "false")
         fmt_box = self._combo(
             [("ts", "ts"), ("m3u8", "m3u8")],
             self.settings.value("stream_format", "ts"))
         LANGS = [
-            ("", "Auto / provider default"), ("swe", "Swedish"),
-            ("eng", "English"), ("nor", "Norwegian"),
-            ("dan", "Danish"), ("fin", "Finnish"),
-            ("ger", "German"), ("fre", "French"),
-            ("spa", "Spanish"), ("ita", "Italian"),
-            ("por", "Portuguese"), ("pol", "Polish"),
-            ("ara", "Arabic"), ("tur", "Turkish"),
+            ("", tr("option_lang_auto")), ("swe", tr("lang_swe")),
+            ("eng", tr("lang_eng")), ("nor", tr("lang_nor")),
+            ("dan", tr("lang_dan")), ("fin", tr("lang_fin")),
+            ("ger", tr("lang_ger")), ("fre", tr("lang_fre")),
+            ("spa", tr("lang_spa")), ("ita", tr("lang_ita")),
+            ("por", tr("lang_por")), ("pol", tr("lang_pol")),
+            ("ara", tr("lang_ara")), ("tur", tr("lang_tur")),
         ]
         alang_box = self._combo(
             LANGS, self.settings.value("audio_lang", ""))
         sub_box = self._combo(
-            [("off", "Off"), ("auto", "On (player default)"),
-             ("lang", "On - preferred language"),
-             ("forced", "On - forced subtitles only")],
+            [("off", tr("option_sub_off")), ("auto", tr("option_sub_auto")),
+             ("lang", tr("option_sub_lang")),
+             ("forced", tr("option_sub_forced"))],
             self.settings.value("sub_mode", "auto"))
         slang_box = self._combo(
             LANGS, self.settings.value("sub_lang", ""))
         slang2_box = self._combo(
             LANGS, self.settings.value("sub_lang2", ""))
         aspect_box = self._combo(
-            [("auto", "Auto"), ("16:9", "16:9"), ("4:3", "4:3"),
-             ("2.35:1", "2.35:1"), ("stretch", "Stretch to window")],
+            [("auto", tr("option_aspect_auto")), ("16:9", "16:9"),
+             ("4:3", "4:3"), ("2.35:1", "2.35:1"),
+             ("stretch", tr("option_aspect_stretch"))],
             self.settings.value("aspect_mode", "auto"))
         buf_box = self._combo(
             [("1", "1 s"), ("3", "3 s"), ("5", "5 s"),
@@ -3590,20 +3643,20 @@ class MainWindow(QMainWindow):
         uf = QFormLayout(ui_tab)
         uf.setSpacing(10)
         density_box = self._combo(
-            [("compact", "Compact"), ("medium", "Medium"),
-             ("large", "Large")],
+            [("compact", tr("option_compact")), ("medium", tr("option_medium")),
+             ("large", tr("option_large"))],
             self.settings.value("view_density", "medium"))
         sort_box = self._combo(
-            [("default", "Default (provider order)"),
-             ("alpha_asc", "Name A -> Z"),
-             ("alpha_desc", "Name Z -> A"),
-             ("recent", "Recently added")],
+            [("default", tr("option_sort_default")),
+             ("alpha_asc", tr("option_sort_az")),
+             ("alpha_desc", tr("option_sort_za")),
+             ("recent", tr("option_sort_recent"))],
             self.settings.value("sort_order", "default"))
         theme_box = self._combo(
-            [(key, t["name"]) for key, t in THEMES.items()],
+            [(key, tr(f"theme_{key}")) for key in THEMES],
             self.settings.value("theme", "graphite"))
         accent_box = self._combo(
-            [(key, a[0]) for key, a in ACCENTS.items()],
+            [(key, tr(f"accent_{key}")) for key in ACCENTS],
             self.settings.value("accent", "blue"))
         theme_box.currentIndexChanged.connect(
             lambda _i: self._set_theme(

@@ -2681,6 +2681,11 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Меню обновлены. Перезапустите dopeIPTV, чтобы перевести всё приложение.",
         "th": "เมนูอัปเดตแล้ว รีสตาร์ท dopeIPTV เพื่อแปลทุกส่วนของแอป",
     },
+    "pip_always_on_top": {
+        "en": "Always on top", "sv": "Alltid överst", "es": "Siempre visible",
+        "de": "Immer im Vordergrund", "fr": "Toujours au premier plan",
+        "zh": "置顶", "ru": "Поверх всех окон", "th": "ปักหมุดบนสุด",
+    },
     "pip_wayland_hint": {
         "en": "Always-on-top needs X11 (Wayland limitation).",
         "sv": "Alltid överst kräver X11 (Wayland-begränsning).",
@@ -2718,6 +2723,114 @@ _STRINGS: dict[str, dict[str, str]] = {
         "es": "Empezar desde el principio", "de": "Von vorne beginnen",
         "fr": "Recommencer depuis le début", "zh": "从头开始",
         "ru": "Начать сначала", "th": "เริ่มจากต้น",
+    },
+    "theme_graphite": {
+        "en": "Graphite (default)", "sv": "Grafit (standard)",
+        "es": "Grafito (predeterminado)", "de": "Graphit (Standard)",
+        "fr": "Graphite (défaut)", "zh": "石墨（默认）",
+        "ru": "Графит (по умолч.)", "th": "กราไฟต์ (เริ่มต้น)",
+    },
+    "theme_midnight": {
+        "en": "Midnight (blue)", "sv": "Midnatt (blå)",
+        "es": "Medianoche (azul)", "de": "Mitternacht (blau)",
+        "fr": "Minuit (bleu)", "zh": "午夜（蓝）",
+        "ru": "Полночь (синий)", "th": "เที่ยงคืน (น้ำเงิน)",
+    },
+    "theme_oled": {
+        "en": "OLED (pure black)", "sv": "OLED (helsvart)",
+        "es": "OLED (negro puro)", "de": "OLED (reines Schwarz)",
+        "fr": "OLED (noir pur)", "zh": "OLED（纯黑）",
+        "ru": "OLED (чёрный)", "th": "OLED (ดำสนิท)",
+    },
+    "theme_nord": {
+        "en": "Nord", "sv": "Nord", "es": "Nord", "de": "Nord",
+        "fr": "Nord", "zh": "Nord", "ru": "Nord", "th": "Nord",
+    },
+    "theme_light": {
+        "en": "Light", "sv": "Ljust", "es": "Claro", "de": "Hell",
+        "fr": "Clair", "zh": "浅色", "ru": "Светлая", "th": "สว่าง",
+    },
+    "accent_blue": {
+        "en": "Blue", "sv": "Blå", "es": "Azul", "de": "Blau",
+        "fr": "Bleu", "zh": "蓝色", "ru": "Синий", "th": "น้ำเงิน",
+    },
+    "accent_purple": {
+        "en": "Purple", "sv": "Lila", "es": "Morado", "de": "Lila",
+        "fr": "Violet", "zh": "紫色", "ru": "Фиолетовый", "th": "ม่วง",
+    },
+    "accent_teal": {
+        "en": "Teal", "sv": "Turkos", "es": "Verde azulado", "de": "Türkis",
+        "fr": "Turquoise", "zh": "青色", "ru": "Бирюзовый", "th": "ครามเขียว",
+    },
+    "accent_green": {
+        "en": "Green", "sv": "Grön", "es": "Verde", "de": "Grün",
+        "fr": "Vert", "zh": "绿色", "ru": "Зелёный", "th": "เขียว",
+    },
+    "accent_orange": {
+        "en": "Orange", "sv": "Orange", "es": "Naranja", "de": "Orange",
+        "fr": "Orange", "zh": "橙色", "ru": "Оранжевый", "th": "ส้ม",
+    },
+    "accent_pink": {
+        "en": "Pink", "sv": "Rosa", "es": "Rosa", "de": "Rosa",
+        "fr": "Rose", "zh": "粉色", "ru": "Розовый", "th": "ชมพู",
+    },
+    "accent_red": {
+        "en": "Red", "sv": "Röd", "es": "Rojo", "de": "Rot",
+        "fr": "Rouge", "zh": "红色", "ru": "Красный", "th": "แดง",
+    },
+    "lang_swe": {
+        "en": "Swedish", "sv": "Svenska", "es": "Sueco", "de": "Schwedisch",
+        "fr": "Suédois", "zh": "瑞典语", "ru": "Шведский", "th": "สวีเดน",
+    },
+    "lang_eng": {
+        "en": "English", "sv": "Engelska", "es": "Inglés", "de": "Englisch",
+        "fr": "Anglais", "zh": "英语", "ru": "Английский", "th": "อังกฤษ",
+    },
+    "lang_nor": {
+        "en": "Norwegian", "sv": "Norska", "es": "Noruego", "de": "Norwegisch",
+        "fr": "Norvégien", "zh": "挪威语", "ru": "Норвежский", "th": "นอร์เวย์",
+    },
+    "lang_dan": {
+        "en": "Danish", "sv": "Danska", "es": "Danés", "de": "Dänisch",
+        "fr": "Danois", "zh": "丹麦语", "ru": "Датский", "th": "เดนมาร์ก",
+    },
+    "lang_fin": {
+        "en": "Finnish", "sv": "Finska", "es": "Finés", "de": "Finnisch",
+        "fr": "Finnois", "zh": "芬兰语", "ru": "Финский", "th": "ฟินแลนด์",
+    },
+    "lang_ger": {
+        "en": "German", "sv": "Tyska", "es": "Alemán", "de": "Deutsch",
+        "fr": "Allemand", "zh": "德语", "ru": "Немецкий", "th": "เยอรมัน",
+    },
+    "lang_fre": {
+        "en": "French", "sv": "Franska", "es": "Francés", "de": "Französisch",
+        "fr": "Français", "zh": "法语", "ru": "Французский", "th": "ฝรั่งเศส",
+    },
+    "lang_spa": {
+        "en": "Spanish", "sv": "Spanska", "es": "Español", "de": "Spanisch",
+        "fr": "Espagnol", "zh": "西班牙语", "ru": "Испанский", "th": "สเปน",
+    },
+    "lang_ita": {
+        "en": "Italian", "sv": "Italienska", "es": "Italiano",
+        "de": "Italienisch", "fr": "Italien", "zh": "意大利语",
+        "ru": "Итальянский", "th": "อิตาลี",
+    },
+    "lang_por": {
+        "en": "Portuguese", "sv": "Portugisiska", "es": "Portugués",
+        "de": "Portugiesisch", "fr": "Portugais", "zh": "葡萄牙语",
+        "ru": "Португальский", "th": "โปรตุเกส",
+    },
+    "lang_pol": {
+        "en": "Polish", "sv": "Polska", "es": "Polaco", "de": "Polnisch",
+        "fr": "Polonais", "zh": "波兰语", "ru": "Польский", "th": "โปแลนด์",
+    },
+    "lang_ara": {
+        "en": "Arabic", "sv": "Arabiska", "es": "Árabe", "de": "Arabisch",
+        "fr": "Arabe", "zh": "阿拉伯语", "ru": "Арабский", "th": "อาหรับ",
+    },
+    "lang_tur": {
+        "en": "Turkish", "sv": "Turkiska", "es": "Turco", "de": "Türkisch",
+        "fr": "Turc", "zh": "土耳其语", "ru": "Турецкий", "th": "ตุรกี",
     },
     "misc_no_playlists_export": {
         "en": "No playlists to export.",
