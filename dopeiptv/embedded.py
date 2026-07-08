@@ -921,6 +921,22 @@ class EmbeddedPlayer(QWidget):
         except Exception:
             return 0.0
 
+    def warm_up(self) -> None:
+        """Realise the mpv/GL context once, up front and with no stream
+        loading, so the first real playback doesn't briefly show the video
+        surface as a separate top-level window while the stream buffers."""
+        if self.video.mpv is not None:
+            return
+        win = self.window()
+        if win is None or not win.isVisible():
+            return
+        was_hidden = self.isHidden()
+        self.show()
+        self.video.show()
+        QApplication.instance().processEvents()
+        if was_hidden:
+            self.hide()
+
     def play(self, url: str, title: str, start: float = 0.0) -> bool:
         try:
             self.title_lbl.setText(title or "")

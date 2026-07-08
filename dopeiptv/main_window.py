@@ -194,6 +194,11 @@ class MainWindow(QMainWindow):
         self.loading_bar.show()
         self._set_status(tr("status_loading_channels"))
         QTimer.singleShot(100, self._load_categories)
+        # Warm the embedded GL/mpv context up once the window is on screen, so
+        # the first real playback doesn't flash the video surface as a
+        # separate top-level window while the stream buffers.
+        if self.player:
+            QTimer.singleShot(200, self.player.warm_up)
 
         self._auto_refresh_timer = QTimer(self)
         self._auto_refresh_timer.timeout.connect(self._maybe_auto_refresh)
