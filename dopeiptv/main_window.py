@@ -329,34 +329,30 @@ class MainWindow(QMainWindow):
         self.stream_error.hide()
         dl.addWidget(self.stream_error)
 
+        self._detail_name = "Select something from the list"
+
+        header_row = QHBoxLayout()
+        header_row.setSpacing(14)
+
+        left_col = QVBoxLayout()
+        left_col.setSpacing(8)
         self.d_logo = QLabel()
         self.d_logo.setFixedSize(84, 84)
         self.d_logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.d_logo.setStyleSheet(
             f"background:{P['sel']}; border-radius:18px; "
             "font-size:30px; font-weight:700;")
-        dl.addWidget(self.d_logo)
-
-        self.d_title = QLabel("Select something from the list",
-                              objectName="DetailTitle")
-        self.d_title.setWordWrap(True)
-        dl.addWidget(self.d_title)
-
+        left_col.addWidget(self.d_logo)
         self.d_meta = QLabel("", objectName="DetailMeta")
         self.d_meta.setWordWrap(True)
-        dl.addWidget(self.d_meta)
+        self.d_meta.setFixedWidth(84)
+        left_col.addWidget(self.d_meta)
+        left_col.addStretch(1)
+        header_row.addLayout(left_col)
 
-        play_row = QHBoxLayout()
-        play_row.setSpacing(8)
-        self.play_mpv = QPushButton("▶  Play", objectName="Primary")
-        self.play_mpv.setToolTip("Play in mpv")
-        self.play_mpv.setSizePolicy(QSizePolicy.Policy.Fixed,
-                                    QSizePolicy.Policy.Fixed)
-        self.play_mpv.clicked.connect(lambda: self.play("mpv"))
-        play_row.addWidget(self.play_mpv)
-        play_row.addStretch(1)
-        dl.addLayout(play_row)
-
+        # "Now playing" sits beside the logo instead of stacked below it -
+        # the channel name is already visible in the middle list, the
+        # window title bar, and the mini player's own control bar.
         self.now_card = QFrame(objectName="Card")
         nc = QVBoxLayout(self.now_card)
         nc.setContentsMargins(16, 14, 16, 14)
@@ -372,26 +368,19 @@ class MainWindow(QMainWindow):
         for w in (self.now_time, self.now_title, self.now_bar, self.now_desc):
             nc.addWidget(w)
         self.now_card.hide()
-        dl.addWidget(self.now_card)
+        header_row.addWidget(self.now_card, 1)
+        dl.addLayout(header_row)
 
-        epg_header = QHBoxLayout()
-        epg_header.setSpacing(8)
-        self.epg_header_lbl = QLabel("Programme guide")
-        self.epg_header_lbl.setStyleSheet(
-            f"color:{P['muted2']}; font-size:11px; font-weight:700; "
-            "letter-spacing:0.5px;")
-        self.epg_header_lbl.hide()
-        epg_header.addWidget(self.epg_header_lbl)
-        epg_header.addStretch(1)
-        self.epg_refresh = QPushButton("⟳ Refresh", objectName="InlineToggle")
-        self.epg_refresh.setToolTip(
-            "Refresh just this channel's programme guide "
-            "(the sidebar Refresh reloads the whole playlist)")
-        self.epg_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.epg_refresh.clicked.connect(self._refresh_epg_clicked)
-        self.epg_refresh.hide()
-        epg_header.addWidget(self.epg_refresh)
-        dl.addLayout(epg_header)
+        play_row = QHBoxLayout()
+        play_row.setSpacing(8)
+        self.play_mpv = QPushButton("▶  Play", objectName="Primary")
+        self.play_mpv.setToolTip("Play in mpv")
+        self.play_mpv.setSizePolicy(QSizePolicy.Policy.Fixed,
+                                    QSizePolicy.Policy.Fixed)
+        self.play_mpv.clicked.connect(lambda: self.play("mpv"))
+        play_row.addWidget(self.play_mpv)
+        play_row.addStretch(1)
+        dl.addLayout(play_row)
 
         self.epg_scroll = QScrollArea()
         self.epg_scroll.setWidgetResizable(True)
@@ -1165,16 +1154,14 @@ class MainWindow(QMainWindow):
         self.now_card.hide()
         self._clear_epg_rows()
         self._current_epg = None
-        self.epg_refresh.hide()
-        self.epg_header_lbl.hide()
         if not it:
-            self.d_title.setText("Select something from the list")
+            self._detail_name = "Select something from the list"
             self.d_meta.setText("")
             self.d_logo.setPixmap(QPixmap())
             self.d_logo.setText("")
             return
         name = self.channel_display_name(it)
-        self.d_title.setText(name)
+        self._detail_name = name
         self.d_logo.setPixmap(QPixmap())
         self.d_logo.setStyleSheet(self.PLACEHOLDER_LOGO_STYLE)
         self.d_logo.setText(name.strip()[:1].upper())
@@ -1225,9 +1212,6 @@ class MainWindow(QMainWindow):
                 f"day{'s' if days != 1 else ''}" if days
                 else "Live channel")
             if it.get("stream_id") is not None:
-                if not self._player_fs:
-                    self.epg_refresh.show()
-                    self.epg_header_lbl.show()
                 self._request_epg()
                 if (self.player and self._autoplay_preview()
                         and self.playback_mode() == "embedded"
@@ -1405,7 +1389,7 @@ class MainWindow(QMainWindow):
                 self.now_card.show()
             if self.player:
                 info = (
-                    f"{self.d_title.text()}\n"
+                    f"{self._detail_name}\n"
                     f"{current['title'] or 'Unknown programme'}   "
                     f"{current['start']:%H:%M}-{current['stop']:%H:%M}")
                 nxt = upcoming[0] if upcoming else None
@@ -3368,25 +3352,6 @@ class MainWindow(QMainWindow):
     def _epg_progress_finished(self) -> None:
         self.loading_bar.setRange(0, 0)
         self.loading_bar.hide()
-
-    def _refresh_epg_clicked(self) -> None:
-        self.epg_refresh.setEnabled(False)
-        self._clear_epg_rows()
-        self._epg_note("Refreshing programme guide...")
-
-        def done(_ok):
-            self.epg_refresh.setEnabled(True)
-            self._epg_progress_finished()
-            self.list_model.refresh_all()
-            self._request_epg()
-
-        def fail(_msg):
-            self.epg_refresh.setEnabled(True)
-            self._epg_progress_finished()
-            self._request_epg()
-
-        run_async(self.pool, lambda: self.xmltv.ensure_loaded(force=True),
-                  done, fail)
 
     def _error(self, msg: str) -> None:
         self.loading_bar.hide()
