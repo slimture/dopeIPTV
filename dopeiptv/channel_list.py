@@ -64,27 +64,37 @@ class ChannelListView(QListView):
         raw_vw = self.viewport().width() + m.left() + m.right()
         if raw_vw <= cell.width():
             return
-        # Empirical Qt IconMode reservation: ~4 px per column plus a small
-        # baseline. Overshoot by starting with a generous estimate; the loop
-        # settles in at most two iterations. Without this the last column is
-        # silently dropped and a huge gap opens on the right.
-        cols = max(1, raw_vw // cell.width())
-        for _ in range(3):
-            reserve = 4 * cols + 4
-            new_cols = max(1, (raw_vw - reserve) // cell.width())
-            if new_cols == cols:
+        # Find the largest N of columns that will ACTUALLY render N (not one
+        # fewer) after we apply the balancing left shift. Qt's IconMode
+        # reserves ~2*N+12 px on the right for its wrap check; the shift eats
+        # another 14 px + 2*qt_reserve of headroom. Combining those the
+        # constraint reduces to:
+        #     slot ≤ (raw_vw - 14 - 2*qt_reserve) / N
+        # so we walk N down from the naive maximum until a natural cell fits.
+        # Without this the previous version predicted N cols and Qt silently
+        # dropped one, leaving the huge right gap the user reported at 2-3
+        # cols despite the balancing working fine at 4+ cols.
+        cell_w = cell.width()
+        slot_w = raw_vw
+        cols = 1
+        for candidate in range(raw_vw // cell_w, 1, -1):
+            qt_reserve = 2 * candidate + 12
+            max_slot = (raw_vw - 14 - 2 * qt_reserve) // candidate
+            if max_slot >= cell_w:
+                cols = candidate
+                slot_w = max_slot
                 break
-            cols = new_cols
-        reserve = 4 * cols + 4
-        slot_w = (raw_vw - reserve) // cols
+        # 1-column fallback: stretch the slot to the full viewport so the icon
+        # is naturally centred with no explicit shift.
+        if cols == 1:
+            slot_w = raw_vw
         self.setGridSize(QSize(slot_w, cell.height()))
-        # Balance left/right visual gaps: half of Qt's baked-in right
-        # reservation becomes an explicit left viewport margin, plus a small
-        # constant compensation for the last few pixels Qt shaves off the
-        # right (the 4*N+4 estimate slightly undershoots). Measured empirically
-        # across window widths - within a couple of pixels of perfect symmetry.
         leftover = raw_vw - cols * slot_w
-        left_pad = leftover // 2 + 7
+        # The +7 fixed offset compensates for Qt's ~14 px vertical-scrollbar
+        # reservation on the right of the viewport - even when the scrollbar
+        # isn't showing, that space is set aside and would otherwise appear as
+        # asymmetric right padding. Same constant applies at every column count.
+        left_pad = (leftover // 2 + 7)
         self.setViewportMargins(left_pad, 0, 0, 0)
 
 
