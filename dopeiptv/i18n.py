@@ -4092,6 +4092,74 @@ _STRINGS: dict[str, dict[str, str]] = {
         "de": "kein Limit", "fr": "aucune limite", "zh": "无限制",
         "ru": "без лимита", "th": "ไม่จำกัด",
     },
+
+    # ── Settings: reset-to-defaults ───────────────────────────────────────
+    "settings_reset_all": {
+        "en": "Reset all settings...",
+        "sv": "Återställ alla inställningar...",
+        "es": "Restablecer todos los ajustes...",
+        "de": "Alle Einstellungen zurücksetzen...",
+        "fr": "Réinitialiser tous les paramètres...",
+        "zh": "重置所有设置……",
+        "ru": "Сбросить все настройки...",
+        "th": "รีเซ็ตการตั้งค่าทั้งหมด...",
+    },
+    "settings_reset_confirm_1": {
+        "en": "This will erase every dopeIPTV preference on this computer: "
+              "your playlists, favorites, history, theme, resume positions, "
+              "PIN, Trakt/TMDB keys and the panel layout.\n\nContinue?",
+        "sv": "Detta raderar alla dopeIPTV-inställningar på den här datorn: "
+              "dina spellistor, favoriter, historik, tema, återupptagnings-"
+              "positioner, PIN, Trakt/TMDB-nycklar och panellayouten.\n\n"
+              "Fortsätt?",
+        "es": "Esto borrará todas las preferencias de dopeIPTV en este "
+              "equipo: tus listas, favoritos, historial, tema, posiciones "
+              "de reanudación, PIN y claves de Trakt/TMDB, y el diseño de "
+              "paneles.\n\n¿Continuar?",
+        "de": "Dies löscht alle dopeIPTV-Einstellungen auf diesem Rechner: "
+              "Playlists, Favoriten, Verlauf, Design, Fortsetzungspositionen, "
+              "PIN, Trakt-/TMDB-Schlüssel und das Panel-Layout.\n\nFortfahren?",
+        "fr": "Cela effacera toutes les préférences dopeIPTV sur cet "
+              "ordinateur : listes, favoris, historique, thème, positions "
+              "de reprise, PIN, clés Trakt/TMDB et disposition des panneaux."
+              "\n\nContinuer ?",
+        "zh": "这将删除这台计算机上的所有 dopeIPTV 设置："
+              "播放列表、收藏、历史、主题、续播位置、PIN、Trakt/TMDB 密钥和面板布局。"
+              "\n\n继续吗？",
+        "ru": "Это удалит все настройки dopeIPTV на этом компьютере: "
+              "плейлисты, избранное, историю, тему, позиции возобновления, "
+              "PIN, ключи Trakt/TMDB и раскладку панелей.\n\nПродолжить?",
+        "th": "การทำเช่นนี้จะลบการตั้งค่า dopeIPTV ทั้งหมดในคอมพิวเตอร์เครื่องนี้: "
+              "เพลย์ลิสต์ รายการโปรด ประวัติ ธีม ตำแหน่งเล่นต่อ "
+              "PIN คีย์ Trakt/TMDB และเลย์เอาต์แผง\n\nดำเนินการต่อหรือไม่?",
+    },
+    "settings_reset_confirm_2": {
+        "en": "Are you really sure? This can't be undone.",
+        "sv": "Är du verkligen säker? Detta kan inte ångras.",
+        "es": "¿Estás realmente seguro? Esto no se puede deshacer.",
+        "de": "Bist du wirklich sicher? Das lässt sich nicht rückgängig machen.",
+        "fr": "Êtes-vous vraiment sûr ? Cette action est irréversible.",
+        "zh": "你真的确定吗？此操作无法撤销。",
+        "ru": "Вы точно уверены? Отменить это будет невозможно.",
+        "th": "คุณแน่ใจจริง ๆ หรือ? การกระทำนี้ไม่สามารถย้อนกลับได้",
+    },
+    "settings_reset_done": {
+        "en": "All settings have been reset. dopeIPTV will now close - start "
+              "it again to set up your first playlist.",
+        "sv": "Alla inställningar är återställda. dopeIPTV stängs nu - "
+              "starta om appen för att lägga upp din första spellista.",
+        "es": "Se han restablecido todos los ajustes. dopeIPTV se cerrará; "
+              "vuelve a abrirlo para configurar tu primera lista.",
+        "de": "Alle Einstellungen wurden zurückgesetzt. dopeIPTV wird jetzt "
+              "beendet - starte es erneut, um deine erste Playlist einzurichten.",
+        "fr": "Tous les paramètres ont été réinitialisés. dopeIPTV va se "
+              "fermer - relancez-le pour configurer votre première liste.",
+        "zh": "所有设置已重置。dopeIPTV 现在将关闭 — 请重新启动以设置你的第一个播放列表。",
+        "ru": "Все настройки сброшены. dopeIPTV сейчас закроется - "
+              "запустите его снова, чтобы настроить первый плейлист.",
+        "th": "รีเซ็ตการตั้งค่าทั้งหมดแล้ว dopeIPTV จะปิดตัวลง - "
+              "เปิดใหม่เพื่อตั้งค่าเพลย์ลิสต์แรกของคุณ",
+    },
 }
 
 

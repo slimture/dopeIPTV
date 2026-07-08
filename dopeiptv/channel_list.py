@@ -46,16 +46,46 @@ class ChannelListView(QListView):
         cell = self._grid_cell
         if cell is None or cell.width() <= 0:
             return
-        vw = self.viewport().width()
-        if vw <= 0:
+        # setViewportMargins fires a resizeEvent that would re-enter here;
+        # guard against that so we settle on the intended layout in one pass.
+        if getattr(self, "_justifying", False):
             return
-        # Fit as many natural-width columns as possible, then stretch each
-        # slot to divide the viewport evenly - the last column then hugs the
-        # right edge. Any leftover pixel (from integer division) sits at the
-        # very right and is imperceptible.
-        cols = max(1, vw // cell.width())
-        slot_w = vw // cols
+        self._justifying = True
+        try:
+            self._do_justify(cell)
+        finally:
+            self._justifying = False
+
+    def _do_justify(self, cell) -> None:
+        # Total width available to the grid = current viewport + any margins
+        # we set on a previous pass. This gives us a stable frame of reference
+        # even if Qt hasn't fully rebuilt the layout between our margin edits.
+        m = self.viewportMargins()
+        raw_vw = self.viewport().width() + m.left() + m.right()
+        if raw_vw <= cell.width():
+            return
+        # Empirical Qt IconMode reservation: ~4 px per column plus a small
+        # baseline. Overshoot by starting with a generous estimate; the loop
+        # settles in at most two iterations. Without this the last column is
+        # silently dropped and a huge gap opens on the right.
+        cols = max(1, raw_vw // cell.width())
+        for _ in range(3):
+            reserve = 4 * cols + 4
+            new_cols = max(1, (raw_vw - reserve) // cell.width())
+            if new_cols == cols:
+                break
+            cols = new_cols
+        reserve = 4 * cols + 4
+        slot_w = (raw_vw - reserve) // cols
         self.setGridSize(QSize(slot_w, cell.height()))
+        # Balance left/right visual gaps: half of Qt's baked-in right
+        # reservation becomes an explicit left viewport margin, plus a small
+        # constant compensation for the last few pixels Qt shaves off the
+        # right (the 4*N+4 estimate slightly undershoots). Measured empirically
+        # across window widths - within a couple of pixels of perfect symmetry.
+        leftover = raw_vw - cols * slot_w
+        left_pad = leftover // 2 + 7
+        self.setViewportMargins(left_pad, 0, 0, 0)
 
 
 class ChannelListModel(QAbstractListModel):

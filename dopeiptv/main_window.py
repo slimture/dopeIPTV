@@ -3555,6 +3555,38 @@ class MainWindow(QMainWindow):
             # redraw them for the new theme.
             self.player.refresh_icons()
 
+    def _reset_all_settings(self, parent_dialog) -> None:
+        """Wipe every stored preference (theme, layout, playlists, favorites,
+        history, credentials, ...) and ask the user to restart. Two-step
+        confirmation because it can't be undone. Playlists live in the same
+        QSettings config, so this really does reset back to the login screen."""
+        first = QMessageBox.question(
+            parent_dialog, tr("settings_reset_all"),
+            tr("settings_reset_confirm_1"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        if first != QMessageBox.StandardButton.Yes:
+            return
+        second = QMessageBox.warning(
+            parent_dialog, tr("settings_reset_all"),
+            tr("settings_reset_confirm_2"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        if second != QMessageBox.StandardButton.Yes:
+            return
+        # Clear() drops every key from this QSettings scope; sync() flushes
+        # it to disk before we tell the user to restart.
+        self.settings.clear()
+        self.settings.sync()
+        QMessageBox.information(
+            parent_dialog, tr("settings_reset_all"),
+            tr("settings_reset_done"))
+        parent_dialog.reject()
+        # Quit so the next launch reads a fresh (empty) config and shows the
+        # login screen. Direct restart is intentionally left to the user so
+        # they can inspect that everything actually went away.
+        QApplication.instance().quit()
+
     def _set_language(self, code: str) -> None:
         from .i18n import set_language, current_language
         if code == current_language():
@@ -4236,9 +4268,13 @@ class MainWindow(QMainWindow):
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel)
+            | QDialogButtonBox.StandardButton.Cancel
+            | QDialogButtonBox.StandardButton.Reset)
         for b in buttons.buttons():
             b.setIcon(QIcon())
+        reset_btn = buttons.button(QDialogButtonBox.StandardButton.Reset)
+        reset_btn.setText(tr("settings_reset_all"))
+        reset_btn.clicked.connect(lambda: self._reset_all_settings(d))
         buttons.accepted.connect(d.accept)
         buttons.rejected.connect(d.reject)
         outer.addWidget(buttons)
