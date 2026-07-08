@@ -7,6 +7,11 @@ Produces <OUTDIR>/<size>/io.github.slimture.dopeIPTV.png for each size.
 import os
 import sys
 
+# Allow running as `python packaging/gen_icon.py` from the repo root: the
+# script's own directory (packaging/) is what lands on sys.path, not the repo
+# root, so add the repo root explicitly before importing the package.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from PyQt6.QtWidgets import QApplication
 
 from dopeiptv.app import make_app_icon
