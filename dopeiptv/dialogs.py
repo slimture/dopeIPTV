@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import time
 from datetime import datetime
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QComboBox, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout,
-    QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-    QMessageBox, QPushButton, QScrollArea, QSplitter, QVBoxLayout,
-    QWidget,
+    QAbstractItemView, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
+    QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
+    QListWidgetItem, QMenu, QMessageBox, QPushButton, QSplitter,
+    QVBoxLayout, QWidget,
 )
 
 from .theme import P
@@ -186,19 +188,27 @@ class EpgGuideDialog(QDialog):
             f"color:{P['accent']}; font-size:12px; font-weight:600;")
         self.now_lbl.setWordWrap(True)
         rl.addWidget(self.now_lbl)
-        self.schedule_scroll = QScrollArea()
-        self.schedule_scroll.setWidgetResizable(True)
-        self.schedule_holder = QWidget()
-        self.schedule_lay = QVBoxLayout(self.schedule_holder)
-        self.schedule_lay.setContentsMargins(0, 0, 0, 0)
-        self.schedule_lay.setSpacing(2)
-        self.schedule_lay.addStretch()
-        self.schedule_scroll.setWidget(self.schedule_holder)
-        rl.addWidget(self.schedule_scroll, 1)
+        self.schedule_list = QListWidget()
+        self.schedule_list.setSelectionMode(
+            QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.schedule_list.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu)
+        self.schedule_list.customContextMenuRequested.connect(
+            self._schedule_context_menu)
+        self.schedule_list.itemDoubleClicked.connect(
+            lambda _it: self._play_current())
+        rl.addWidget(self.schedule_list, 1)
+        rec_hint = QLabel(
+            "Right-click an upcoming or currently-airing programme to "
+            "record it (multi-select works too).")
+        rec_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        rec_hint.setWordWrap(True)
+        rl.addWidget(rec_hint)
         self.play_btn = QPushButton("Play channel", objectName="Primary")
         self.play_btn.clicked.connect(self._play_current)
         self.play_btn.setEnabled(False)
         rl.addWidget(self.play_btn)
+        self.window.rec.jobs_changed.connect(self._refresh_schedule_marks)
 
         splitter.addWidget(left)
         splitter.addWidget(right)
@@ -230,16 +240,15 @@ class EpgGuideDialog(QDialog):
         self.info_lbl.setText(note)
 
     def _channel_selected(self, cur, _prev=None) -> None:
-        while self.schedule_lay.count() > 1:
-            w = self.schedule_lay.takeAt(0).widget()
-            if w:
-                w.deleteLater()
+        self.schedule_list.clear()
+        self._current_channel = None
         if not cur:
             self.ch_title.setText("Select a channel")
             self.now_lbl.setText("")
             self.play_btn.setEnabled(False)
             return
         it = cur.data(Qt.ItemDataRole.UserRole)
+        self._current_channel = it
         name = it.get("name") or "?"
         self.ch_title.setText(name)
         self.play_btn.setEnabled(True)
@@ -262,34 +271,106 @@ class EpgGuideDialog(QDialog):
         past.reverse()
         upcoming = [p for p in entries if p["start_timestamp"] > now_ts][:20]
 
+        if now_prog:
+            self._add_section("Now")
+            self._add_programme(it, now_prog, live=True)
         if upcoming:
             self._add_section("Upcoming")
             for p in upcoming:
-                self._add_programme(p, upcoming=True)
+                self._add_programme(it, p, live=False)
         if past:
             self._add_section("Earlier today")
             for p in past[:20]:
-                self._add_programme(p, upcoming=False)
+                self._add_programme(it, p, live=False, schedulable=False)
 
     def _add_section(self, text: str) -> None:
-        lbl = QLabel(text)
-        lbl.setStyleSheet(
-            f"color:{P['muted2']}; font-size:10px; font-weight:700;"
-            "letter-spacing:1px; padding:6px 0 2px 0;")
-        idx = self.schedule_lay.count() - 1
-        self.schedule_lay.insertWidget(idx, lbl)
+        item = QListWidgetItem(text)
+        item.setFlags(Qt.ItemFlag.NoItemFlags)
+        item.setForeground(QColor(P["muted2"]))
+        f = item.font()
+        f.setBold(True)
+        f.setPointSize(max(8, f.pointSize() - 1))
+        item.setFont(f)
+        self.schedule_list.addItem(item)
 
-    def _add_programme(self, prog: dict, upcoming: bool) -> None:
+    def _matching_job(self, channel_it, prog: dict):
+        url = self.window.client.live_url(
+            channel_it.get("stream_id"), "ts")
+        for j in self.window.rec.jobs:
+            if (j.get("status") in ("scheduled", "recording")
+                    and j.get("url") == url
+                    and abs((j.get("start") or 0)
+                            - prog["start_timestamp"]) < 60):
+                return j
+        return None
+
+    def _add_programme(self, channel_it, prog: dict, live: bool,
+                       schedulable: bool = True) -> None:
         start = datetime.fromtimestamp(prog["start_timestamp"])
         stop = datetime.fromtimestamp(prog["stop_timestamp"])
         time_str = f"{start.strftime('%H:%M')}–{stop.strftime('%H:%M')}"
         title = prog.get("title") or "?"
-        row = QLabel(f"<b>{time_str}</b>  {title}")
-        row.setWordWrap(True)
-        color = P["text2"] if upcoming else P["muted"]
-        row.setStyleSheet(f"color:{color}; font-size:12px; padding:2px 0;")
-        idx = self.schedule_lay.count() - 1
-        self.schedule_lay.insertWidget(idx, row)
+        job = self._matching_job(channel_it, prog) if schedulable else None
+        text = f"{time_str}  {title}"
+        if job:
+            text = "● REC  " + text
+        item = QListWidgetItem(text)
+        item.setData(Qt.ItemDataRole.UserRole,
+                    {"prog": prog, "channel": channel_it, "live": live,
+                     "schedulable": schedulable})
+        if job:
+            item.setForeground(QColor(P["rec"]))
+        elif not schedulable:
+            item.setForeground(QColor(P["muted"]))
+        self.schedule_list.addItem(item)
+
+    def _refresh_schedule_marks(self) -> None:
+        cur = self.list.currentItem()
+        if cur:
+            self._channel_selected(cur)
+
+    def _schedule_context_menu(self, pos) -> None:
+        items = self.schedule_list.selectedItems()
+        entries = [it.data(Qt.ItemDataRole.UserRole) for it in items]
+        entries = [e for e in entries if e and e.get("schedulable")]
+        if not entries:
+            return
+        to_record = [e for e in entries
+                    if not self._matching_job(e["channel"], e["prog"])]
+        to_cancel = [e for e in entries
+                    if self._matching_job(e["channel"], e["prog"])]
+        m = QMenu(self)
+        if to_record:
+            label = ("Record" if len(to_record) == 1
+                     else f"Record {len(to_record)} programmes")
+            m.addAction(label, lambda: self._record_entries(to_record))
+        if to_cancel:
+            label = ("Cancel recording" if len(to_cancel) == 1
+                     else f"Cancel {len(to_cancel)} recordings")
+            m.addAction(label, lambda: self._cancel_entries(to_cancel))
+        if not m.isEmpty():
+            m.exec(self.schedule_list.viewport().mapToGlobal(pos))
+
+    def _record_entries(self, entries: list[dict]) -> None:
+        for e in entries:
+            channel_it, prog, live = e["channel"], e["prog"], e["live"]
+            sid = channel_it.get("stream_id")
+            if sid is None:
+                continue
+            url = self.window.client.live_url(sid, "ts")
+            title = (f"{self.window.channel_display_name(channel_it)} - "
+                    f"{prog.get('title') or '?'}")
+            start_ts = time.time() if live else prog["start_timestamp"]
+            self.window.rec.add_job(url, title, start_ts,
+                                    prog["stop_timestamp"])
+        self._refresh_schedule_marks()
+
+    def _cancel_entries(self, entries: list[dict]) -> None:
+        for e in entries:
+            job = self._matching_job(e["channel"], e["prog"])
+            if job:
+                self.window.rec.cancel(job["id"])
+        self._refresh_schedule_marks()
 
     def _play_selected(self, item) -> None:
         it = item.data(Qt.ItemDataRole.UserRole)

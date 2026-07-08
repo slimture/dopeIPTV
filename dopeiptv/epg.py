@@ -70,6 +70,11 @@ class XmltvGuide:
         self._failed = False
         self._by_id: dict[str, list[dict]] = {}
         self._by_name: dict[str, str] = {}
+        self.delay_minutes = 0
+
+    def _now(self) -> float:
+        return (datetime.now().astimezone().timestamp()
+                - self.delay_minutes * 60)
 
     def _read_cache(self, max_age: float | None = None) -> bytes | None:
         if not self.cache_path or not self.cache_path.exists():
@@ -163,7 +168,7 @@ class XmltvGuide:
     def listings_for(self, item: dict, limit: int = 8) -> list[dict]:
         if not self.ensure_loaded():
             return []
-        now = datetime.now().astimezone().timestamp()
+        now = self._now()
         return [p for p in self._entries_for(item)
                 if p["stop_timestamp"] > now][:limit]
 
@@ -173,7 +178,7 @@ class XmltvGuide:
         if p is None:
             return None
         length = p["stop_timestamp"] - p["start_timestamp"]
-        now = datetime.now().astimezone().timestamp()
+        now = self._now()
         pct = (now - p["start_timestamp"]) / length * 100 if length else 0
         return p["title"], pct
 
@@ -181,7 +186,7 @@ class XmltvGuide:
         """The full entry for the currently airing programme, or None."""
         if not self._loaded:
             return None
-        now = datetime.now().astimezone().timestamp()
+        now = self._now()
         for p in self._entries_for(item):
             if p["start_timestamp"] <= now < p["stop_timestamp"]:
                 return p
@@ -191,7 +196,7 @@ class XmltvGuide:
         """Past programmes (newest first), at most *days* back."""
         if not self.ensure_loaded():
             return []
-        now = datetime.now().astimezone().timestamp()
+        now = self._now()
         cutoff = now - days * 86400
         out = [p for p in self._entries_for(item)
                if p["stop_timestamp"] <= now

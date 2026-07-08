@@ -60,6 +60,7 @@ class TmdbClient:
             profile_path = c.get("profile_path")
             cast.append({
                 "name": name,
+                "person_id": c.get("id"),
                 "profile_url": (f"{self.PROFILE_IMG_BASE}{profile_path}"
                                 if profile_path else None),
             })
@@ -72,6 +73,16 @@ class TmdbClient:
             "cast": cast,
         }
 
+    def person_credits(self, person_id: int) -> list[str]:
+        """Titles (movies + TV shows) a person has appeared in."""
+        r = requests.get(
+            f"{self.BASE}/person/{person_id}/combined_credits",
+            params={"api_key": self.api_key}, timeout=10)
+        r.raise_for_status()
+        cast = r.json().get("cast") or []
+        titles = [c.get("title") or c.get("name") for c in cast]
+        return [t for t in titles if t]
+
 
 class PosterResolver(QObject):
     """Async, cached title -> TMDB metadata resolver.
@@ -82,6 +93,7 @@ class PosterResolver(QObject):
     """
 
     CACHE_KEY = "tmdb_poster_cache_v2"
+    PERSON_CACHE_KEY = "tmdb_person_cache"
 
     def __init__(self, pool: QThreadPool, settings: QSettings,
                  client: TmdbClient) -> None:
@@ -102,6 +114,13 @@ class PosterResolver(QObject):
         self._pending: set[str] = set()
         self._waiting: dict[str, list[Callable]] = {}
         self._dirty = False
+        try:
+            self._person_cache: dict[str, list[str]] = json.loads(
+                settings.value(self.PERSON_CACHE_KEY, "") or "{}")
+        except Exception:
+            self._person_cache = {}
+        self._person_pending: set[str] = set()
+        self._person_waiting: dict[str, list[Callable]] = {}
         # A resolved entry writes the whole (growing) cache back to
         # QSettings on the main thread. Doing that synchronously on every
         # single completion - which can arrive in bursts when switching
@@ -174,4 +193,40 @@ class PosterResolver(QObject):
             return self._cache[key]
         self._waiting.setdefault(key, []).append(callback)
         self._ensure_fetch(title, kind, key)
+        return None
+
+    def get_person_credits(
+            self, person_id, callback: Callable[[list[str]], None]
+    ) -> list[str] | None:
+        """Titles a person has appeared in (movies + TV), cached by id."""
+        if not person_id:
+            return None
+        key = str(person_id)
+        if key in self._person_cache:
+            return self._person_cache[key]
+        self._person_waiting.setdefault(key, []).append(callback)
+        if key in self._person_pending:
+            return None
+        self._person_pending.add(key)
+
+        def fetch(pid=person_id):
+            return self.client.person_credits(pid)
+
+        def done(titles, key=key):
+            self._person_cache[key] = titles or []
+            self.settings.setValue(
+                self.PERSON_CACHE_KEY, json.dumps(self._person_cache))
+            self._person_pending.discard(key)
+            for cb in self._person_waiting.pop(key, []):
+                try:
+                    cb(self._person_cache[key])
+                except RuntimeError:
+                    pass
+
+        def fail(_msg, key=key):
+            self._person_cache[key] = []
+            self._person_pending.discard(key)
+            self._person_waiting.pop(key, None)
+
+        run_async(self.pool, fetch, done, fail)
         return None
