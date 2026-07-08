@@ -13,8 +13,8 @@ import time
 from datetime import datetime, timedelta
 
 from PyQt6.QtCore import (
-    QDateTime, QRect, QRectF, QSettings, QSize, Qt, QThreadPool, QTimer, QUrl,
-    pyqtSignal,
+    QDateTime, QPointF, QRect, QRectF, QSettings, QSize, Qt, QThreadPool,
+    QTimer, QUrl, pyqtSignal,
 )
 from PyQt6.QtGui import (
     QAction, QColor, QDesktopServices, QIcon, QKeySequence, QPainter,
@@ -104,55 +104,69 @@ class _Toast(QLabel):
 
 
 class _SidebarLogo(QWidget):
-    """Small themed mark at the top of the sidebar. A pair of concentric
-    signal arcs (broadcast metaphor) leaning right, sitting inside a rounded
-    accent tile with a play notch cut from the arcs. Recolours live from
-    ``P['accent']`` when the theme or accent changes (call ``update()`` after
-    ``apply_theme``). Identical on Linux and macOS - no OS-specific paths."""
+    """Themed mark at the top of the sidebar. A rounded accent pill with a
+    play triangle on the left and three vertical audio/EQ bars on the right,
+    like a stylised IPTV signal indicator. Wider than tall (roughly 2:1) so
+    it fills the sidebar column nicely without a wordmark. Recolours live
+    from ``P['accent']`` when the theme/accent changes (call ``update()``
+    afterwards). Identical on Linux and macOS - no OS-specific paths."""
 
-    LOGO_PX = 40  # tile edge in device-independent pixels
+    LOGO_W = 92
+    LOGO_H = 40
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setFixedHeight(self.LOGO_PX + 8)
+        self.setFixedHeight(self.LOGO_H + 10)
         self.setToolTip(APP_NAME)
 
     def paintEvent(self, _event) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        s = float(self.LOGO_PX)
-        x0 = (self.width() - s) / 2.0
-        y0 = (self.height() - s) / 2.0
+        w, h = float(self.LOGO_W), float(self.LOGO_H)
+        x0 = (self.width() - w) / 2.0
+        y0 = (self.height() - h) / 2.0
         accent = QColor(P.get("accent", "#4C8DFF"))
-        # Rounded accent tile as the base.
-        tile = QPainterPath()
-        tile.addRoundedRect(x0, y0, s, s, s * 0.28, s * 0.28)
-        painter.fillPath(tile, accent)
-        # A single crisp play triangle centred on the tile; the negative
-        # space around it does the work, so we keep it simple and iconic.
-        # Slight left-inset so the triangle looks optically centred (the
-        # apex draws the eye to the right).
-        cx = x0 + s * 0.54
-        cy = y0 + s * 0.50
-        h = s * 0.44
-        w = s * 0.40
+        # Rounded pill as the base.
+        pill = QPainterPath()
+        pill.addRoundedRect(x0, y0, w, h, h * 0.30, h * 0.30)
+        painter.fillPath(pill, accent)
+
+        # Left half: play triangle. Nudged right by a fraction so its
+        # optical centre lines up with its geometric third of the pill.
+        left_cx = x0 + w * 0.28
+        cy = y0 + h * 0.50
+        tri_h = h * 0.46
+        tri_w = h * 0.42
         tri = QPainterPath()
-        tri.moveTo(cx - w * 0.55, cy - h * 0.5)
-        tri.lineTo(cx - w * 0.55, cy + h * 0.5)
-        tri.lineTo(cx + w * 0.55, cy)
+        tri.moveTo(left_cx - tri_w * 0.55, cy - tri_h * 0.5)
+        tri.lineTo(left_cx - tri_w * 0.55, cy + tri_h * 0.5)
+        tri.lineTo(left_cx + tri_w * 0.55, cy)
         tri.closeSubpath()
         painter.fillPath(tri, QColor("white"))
-        # Two thin signal arcs leaning off the top-right corner: gives the
-        # mark a broadcast/IPTV feel without adding text.
-        pen = QPen(QColor("white"))
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        for i, thickness in enumerate((1.6, 1.6)):
-            pen.setWidthF(thickness)
-            painter.setPen(pen)
-            r = s * (0.14 + i * 0.09)
-            painter.drawArc(
-                QRectF(x0 + s * 0.80 - r, y0 + s * 0.20 - r, r * 2, r * 2),
-                200 * 16, 100 * 16)
+
+        # Slim white divider between the play half and the signal half - a
+        # subtle vertical rule that gives the mark structure.
+        pen_div = QPen(QColor(255, 255, 255, 90))
+        pen_div.setWidthF(1.2)
+        painter.setPen(pen_div)
+        div_x = x0 + w * 0.48
+        painter.drawLine(QPointF(div_x, y0 + h * 0.22),
+                         QPointF(div_x, y0 + h * 0.78))
+
+        # Right half: three vertical bars of varying heights (the middle is
+        # tallest), reading as an EQ / signal-strength indicator.
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("white"))
+        base_y = y0 + h * 0.72
+        bar_w = h * 0.14
+        heights = (h * 0.28, h * 0.46, h * 0.34)
+        first_x = x0 + w * 0.58
+        gap = h * 0.14
+        for i, bh in enumerate(heights):
+            bx = first_x + i * (bar_w + gap)
+            painter.drawRoundedRect(
+                QRectF(bx, base_y - bh, bar_w, bh),
+                bar_w * 0.4, bar_w * 0.4)
         painter.end()
 
 
@@ -343,10 +357,12 @@ class MainWindow(QMainWindow):
         # Middle column
         mid = QWidget(objectName="MiddlePane")
         ml = QVBoxLayout(mid)
-        # Tighter horizontal margins so the grid-view icons sit close to
-        # the panel edges (the icons themselves are already centred inside
-        # their justified cells, but any middle-pane inset compounds on top).
-        ml.setContentsMargins(8, 14, 6, 10)
+        # No horizontal margins on the middle pane. Qt's IconMode reserves
+        # ~16 px at the end of each row for its internal wrap check, and any
+        # extra inset on either side compounds with that - even 6-8 px of
+        # margin was enough to push the last column onto the next row,
+        # leaving a huge gap on the right (see channel_list._justify_grid).
+        ml.setContentsMargins(0, 14, 0, 10)
         ml.setSpacing(10)
 
         self.loading_bar = QProgressBar(objectName="LoadBar")
