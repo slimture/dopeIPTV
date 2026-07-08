@@ -514,12 +514,14 @@ class EmbeddedPlayer(QWidget):
         self.pip_btn.clicked.connect(self.pip_requested)
         self.fs_btn = QPushButton("⛶", objectName="MiniBtn")
         self.fs_btn.setToolTip(tr("tooltip_fullscreen"))
-        # Standard transport order: prev / play-pause / next, with Stop set
-        # slightly apart so it isn't hit by accident in the play-pause spot.
+        # Group by function: prev/next are the "channel zap" pair (same
+        # gesture, opposite direction); play-pause/stop are the "playback
+        # state" pair. A small gap between the groups keeps them visually
+        # distinct so you don't hit Play when reaching for Next.
         bl.addWidget(self.prev_btn)
-        bl.addWidget(self.pause_btn)
         bl.addWidget(self.next_btn)
-        bl.addSpacing(6)
+        bl.addSpacing(10)
+        bl.addWidget(self.pause_btn)
         bl.addWidget(self.stop_btn)
         bl.addStretch(1)
         bl.addWidget(self.ts_btn)
@@ -1216,8 +1218,6 @@ class EmbeddedPlayer(QWidget):
         # remembers what it was and resumes where it left off) rather than
         # doing nothing on an empty player.
         if self.current_url is None:
-            print("[dopeIPTV] Play after Stop -> resume_requested",
-                  file=sys.stderr)
             self.resume_requested.emit()
             return
         m = self.video.mpv

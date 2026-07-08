@@ -183,7 +183,12 @@ class MainWindow(QMainWindow):
         self.playlist_store = playlists
         active_pl = playlists.active() if playlists else None
         self.pool = QThreadPool.globalInstance()
-        self.logos = LogoLoader(self.pool)
+        # 320 px covers the biggest cell we render (xlarge grid uses a 200 px
+        # logo, and a HiDPI screen doubles the pixel budget), so channel
+        # logos stay crisp even when the user picks large/xlarge grid. The
+        # default 96 was fine when only compact/medium existed but blurred
+        # noticeably on 4K displays.
+        self.logos = LogoLoader(self.pool, max_size=320)
         # Separate, higher-res cache for posters/cast photos - reusing
         # `logos` (capped at 96px for small list icons) would blur badly
         # once scaled up to the much larger detail-panel sizes. Also its
@@ -388,7 +393,7 @@ class MainWindow(QMainWindow):
         ctl.setSpacing(6)
         self.size_box = self._combo(
             [("compact", tr("option_compact")), ("medium", tr("option_medium")),
-             ("large", tr("option_large"))],
+             ("large", tr("option_large")), ("xlarge", tr("option_xlarge"))],
             self.settings.value("view_density", "medium"))
         self.size_box.setObjectName("InlineCombo")
         self.size_box.currentIndexChanged.connect(self._inline_view_changed)
@@ -2335,11 +2340,7 @@ class MainWindow(QMainWindow):
         button routes here when the player is empty)."""
         last = getattr(self, "_last_playback", None)
         if not last:
-            print("[dopeIPTV] _resume_last: no _last_playback stored",
-                  file=sys.stderr)
             return
-        print(f"[dopeIPTV] _resume_last: replaying {last.get('kind')} "
-              f"'{last.get('title')}'", file=sys.stderr)
         self._start_playback(last["url"], last["title"], last["icon_url"],
                              last["key"], last["kind"], record=False,
                              item=last["item"])
@@ -3802,7 +3803,7 @@ class MainWindow(QMainWindow):
         uf.setSpacing(10)
         density_box = self._combo(
             [("compact", tr("option_compact")), ("medium", tr("option_medium")),
-             ("large", tr("option_large"))],
+             ("large", tr("option_large")), ("xlarge", tr("option_xlarge"))],
             self.settings.value("view_density", "medium"))
         sort_box = self._combo(
             [("default", tr("option_sort_default")),

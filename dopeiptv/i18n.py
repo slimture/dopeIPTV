@@ -441,6 +441,16 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Крупный",
         "th": "ใหญ่",
     },
+    "option_xlarge": {
+        "en": "Extra large (TV)",
+        "sv": "Extra stor (TV)",
+        "es": "Extra grande (TV)",
+        "de": "Extra groß (TV)",
+        "fr": "Très grand (TV)",
+        "zh": "特大（电视）",
+        "ru": "Очень крупный (ТВ)",
+        "th": "ใหญ่พิเศษ (ทีวี)",
+    },
     "option_sort_default": {
         "en": "Default (provider order)",
         "sv": "Standard (leverantörens ordning)",

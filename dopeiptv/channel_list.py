@@ -143,11 +143,13 @@ class ChannelDelegate(QStyledItemDelegate):
         "compact": (50, 32, 10, 8),
         "medium":  (66, 44, 11, 9),
         "large":   (92, 64, 13, 10),
+        "xlarge":  (130, 90, 15, 11),   # readable from the couch on a TV.
     }
     GRID = {
         "compact": (100, 108, 68, 9),
         "medium":  (130, 140, 96, 10),
         "large":   (170, 182, 132, 11),
+        "xlarge":  (240, 260, 200, 13),  # ~200 px icon, big-screen friendly.
     }
 
     def __init__(self, window, density: str = "medium",
