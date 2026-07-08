@@ -124,3 +124,24 @@ the first time the app starts.
 - **Live stream won't start** — try switching the live format to `m3u8` in Settings.
 - **No categories** — check the server URL (include the port, e.g. `:8080`).
 - **No EPG for a channel** — the provider may not have a programme guide mapped to it; dopeIPTV tries three different sources (short EPG, full EPG table, XMLTV) before giving up.
+
+## Language
+
+dopeIPTV ships with translations for **English, Svenska, Español, Deutsch,
+Français, 中文, Русский and ไทย**. Pick your language under
+**Settings → Interface → Language**. Menus, the sidebar, settings and
+notifications switch immediately.
+
+## License
+
+dopeIPTV is free software, released under the **GNU General Public License
+v3 or later (GPL-3.0-or-later)** — see [`LICENSE`](LICENSE).
+
+It builds on GPL/LGPL components including **mpv/libmpv**, **FFmpeg**,
+**PyQt6** and optionally **VLC**. GPLv3 is the licence that is compatible
+with all of them; see [`THIRD-PARTY-LICENSES.md`](THIRD-PARTY-LICENSES.md)
+for the full rationale and the licence of every dependency.
+
+This product uses the TMDB API but is not endorsed or certified by TMDB.
+dopeIPTV does not include or distribute any media, playlists or channel
+data — you supply your own provider.

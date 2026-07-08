@@ -101,6 +101,8 @@ def main() -> int:
     app.setWindowIcon(icon)
     install_icon(icon)
     settings = QSettings(ORG, ORG)
+    from .i18n import set_language
+    set_language(settings.value("language", "en"))
     apply_theme(settings)
     app.setStyleSheet(build_style())
     print(f"[dopeIPTV] Qt platform: {app.platformName()}", file=sys.stderr)

@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
 )
 
 from . import APP_NAME, ORG, VERSION
+from .i18n import tr
 from .channel_list import ChannelDelegate, ChannelListModel, ChannelListView
 from .chromecast import CastDialog, ChromecastManager
 from .client import XtreamClient, b64, epg_times
@@ -180,7 +181,7 @@ class MainWindow(QMainWindow):
         self.resize(1240, 780)
         self._build_ui()
         self.loading_bar.show()
-        self._set_status("Loading channels...")
+        self._set_status(tr("status_loading_channels"))
         QTimer.singleShot(100, self._load_categories)
 
         self._auto_refresh_timer = QTimer(self)
@@ -192,14 +193,14 @@ class MainWindow(QMainWindow):
     def _build_ui(self) -> None:
         menubar = self.menuBar()
         app_menu = menubar.addMenu(APP_NAME)
-        settings_action = app_menu.addAction("Settings...")
+        settings_action = app_menu.addAction(tr("btn_settings") + "...")
         settings_action.triggered.connect(self.open_settings)
-        refresh_action = app_menu.addAction("Refresh playlist")
+        refresh_action = app_menu.addAction(tr("menu_refresh_playlist"))
         refresh_action.triggered.connect(self.refresh_playlist)
         app_menu.addSeparator()
-        about_action = app_menu.addAction("About dopeIPTV")
+        about_action = app_menu.addAction(tr("menu_about"))
         about_action.triggered.connect(self.show_about)
-        quit_action = app_menu.addAction("Quit")
+        quit_action = app_menu.addAction(tr("menu_quit"))
         quit_action.triggered.connect(self.close)
 
         root = QSplitter(Qt.Orientation.Horizontal)
@@ -219,9 +220,9 @@ class MainWindow(QMainWindow):
         sl.addSpacing(14)
 
         self.nav_btns: dict[str, QPushButton] = {}
-        for key, text in (("live", "TV"), ("vod", "Movies"), ("series", "Series"),
-                          ("fav", "Favorites"), ("rec", "Recordings"),
-                          ("history", "History")):
+        for key, text in (("live", tr("nav_tv")), ("vod", tr("nav_movies")),
+                          ("series", tr("nav_series")), ("fav", tr("nav_favorites")),
+                          ("rec", tr("nav_recordings")), ("history", tr("nav_history"))):
             b = QPushButton(text, objectName="NavBtn")
             b.setCheckable(True)
             b.setFlat(True)
@@ -231,23 +232,23 @@ class MainWindow(QMainWindow):
             self.nav_btns[key] = b
         self.nav_btns["live"].setChecked(True)
 
-        sl.addWidget(QLabel("CATEGORIES", objectName="SectionLabel"))
+        sl.addWidget(QLabel(tr("sidebar_categories"), objectName="SectionLabel"))
         self.cat_list = QListWidget()
         self.cat_list.currentItemChanged.connect(self._category_changed)
         self.cat_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.cat_list.customContextMenuRequested.connect(self._cat_menu)
         sl.addWidget(self.cat_list, 1)
 
-        guide_btn = QPushButton("EPG Guide")
+        guide_btn = QPushButton(tr("btn_epg_guide"))
         guide_btn.clicked.connect(self._open_epg_guide)
         sl.addWidget(guide_btn)
 
-        refresh_btn = QPushButton("Refresh")
-        refresh_btn.setToolTip("Reload channels and EPG from server")
+        refresh_btn = QPushButton(tr("btn_refresh"))
+        refresh_btn.setToolTip(tr("tooltip_reload_channels_epg"))
         refresh_btn.clicked.connect(self.refresh_playlist)
         sl.addWidget(refresh_btn)
 
-        settings_btn = QPushButton("Settings")
+        settings_btn = QPushButton(tr("btn_settings"))
         settings_btn.clicked.connect(self.open_settings)
         sl.addWidget(settings_btn)
 
@@ -264,7 +265,7 @@ class MainWindow(QMainWindow):
         ml.addWidget(self.loading_bar)
 
         self.search = QLineEdit(objectName="Search")
-        self.search.setPlaceholderText("Search channels, movies or series...")
+        self.search.setPlaceholderText(tr("search_placeholder"))
         self.search.setClearButtonEnabled(True)
         self._preview_timer = QTimer(self)
         self._preview_timer.setSingleShot(True)
@@ -279,24 +280,25 @@ class MainWindow(QMainWindow):
         ctl = QHBoxLayout()
         ctl.setSpacing(6)
         self.size_box = self._combo(
-            [("compact", "Compact"), ("medium", "Medium"), ("large", "Large")],
+            [("compact", tr("option_compact")), ("medium", tr("option_medium")),
+             ("large", tr("option_large"))],
             self.settings.value("view_density", "medium"))
         self.size_box.setObjectName("InlineCombo")
         self.size_box.currentIndexChanged.connect(self._inline_view_changed)
         self.sort_box = self._combo(
-            [("default", "Default"), ("alpha_asc", "A→Z"), ("alpha_desc", "Z→A"),
-             ("recent", "Recent")],
+            [("default", tr("label_default")), ("alpha_asc", "A→Z"),
+             ("alpha_desc", "Z→A"), ("recent", tr("label_recent"))],
             self.settings.value("sort_order", "default"))
         self.sort_box.setObjectName("InlineCombo")
         self.sort_box.currentIndexChanged.connect(self._inline_view_changed)
-        self.grid_btn = QPushButton("Grid", objectName="InlineToggle")
+        self.grid_btn = QPushButton(tr("btn_grid"), objectName="InlineToggle")
         self.grid_btn.setCheckable(True)
         self.grid_btn.setChecked(
             self.settings.value("view_grid", "false") == "true")
         self.grid_btn.toggled.connect(self._inline_view_changed)
-        ctl.addWidget(QLabel("Size"))
+        ctl.addWidget(QLabel(tr("label_size")))
         ctl.addWidget(self.size_box)
-        ctl.addWidget(QLabel("Sort"))
+        ctl.addWidget(QLabel(tr("label_sort")))
         ctl.addWidget(self.sort_box)
         ctl.addStretch()
         ctl.addWidget(self.grid_btn)
@@ -492,7 +494,13 @@ class MainWindow(QMainWindow):
             Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.cast_scroll.setVerticalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.cast_scroll.setFixedHeight(96)
+        self.cast_scroll.setFixedHeight(110)
+        self.cast_scroll.setStyleSheet(
+            "QScrollBar:horizontal { height: 5px; background: transparent; }"
+            "QScrollBar::handle:horizontal { border-radius: 2px; }"
+            "QScrollBar::add-line:horizontal, "
+            "QScrollBar::sub-line:horizontal { width: 0; }"
+        )
         self.cast_holder = QWidget()
         self.cast_lay = QHBoxLayout(self.cast_holder)
         self.cast_lay.setContentsMargins(2, 2, 2, 2)
@@ -687,7 +695,7 @@ class MainWindow(QMainWindow):
         self._det.setStyleSheet(
             "#DetailPane { background:#000000; border:none; }")
         self.menuBar().hide()
-        self.player.pip_btn.setToolTip("Exit Picture-in-Picture")
+        self.player.pip_btn.setToolTip(tr("tooltip_exit_pip"))
         self.player.fs_btn.hide()
         self.player.video.setMinimumHeight(0)
         self.player.set_pip_mode(True)
@@ -696,7 +704,7 @@ class MainWindow(QMainWindow):
             self.showNormal()
         self.setMinimumSize(240, 135)
         self.setWindowFlags(
-            self.windowFlags()
+            Qt.WindowType.Tool
             | Qt.WindowType.WindowStaysOnTopHint
             | Qt.WindowType.FramelessWindowHint)
         self.show()
@@ -723,13 +731,11 @@ class MainWindow(QMainWindow):
                 m.left(), m.top(), m.right(), m.bottom())
         self._det.setStyleSheet("")
         self.menuBar().show()
-        self.player.pip_btn.setToolTip("Picture-in-Picture")
+        self.player.pip_btn.setToolTip(tr("tooltip_pip"))
         self.player.fs_btn.show()
 
         self.setWindowFlags(
-            (self.windowFlags()
-             & ~Qt.WindowType.WindowStaysOnTopHint
-             & ~Qt.WindowType.FramelessWindowHint))
+            Qt.WindowType.Window)
         self.show()
         geo = getattr(self, "_pip_geo", None)
         state = getattr(self, "_pip_state", None)
@@ -764,8 +770,8 @@ class MainWindow(QMainWindow):
             cache_path=epg_cache_path(pid) if pid else None,
             progress_cb=self.epg_progress.emit)
         self._info_cache.clear()
-        self._set_status("Refreshing playlist...")
-        self._show_toast("Refreshing playlist...")
+        self._set_status(tr("status_refreshing_playlist"))
+        self._show_toast(tr("status_refreshing_playlist"))
         self._load_categories()
         run_async(
             self.pool, lambda: self.xmltv.ensure_loaded(force=True),
@@ -778,8 +784,8 @@ class MainWindow(QMainWindow):
         if not pl:
             return
         self.loading_bar.show()
-        self._set_status(f"Connecting to {pl['name']}...")
-        self._show_toast(f"Connecting to {pl['name']}...")
+        self._set_status(tr("status_connecting", name=pl['name']))
+        self._show_toast(tr("status_connecting", name=pl['name']))
         candidate = XtreamClient(pl["server"], pl["username"], pl["password"])
 
         def done(_auth):
@@ -853,7 +859,7 @@ class MainWindow(QMainWindow):
             self.cat_list.setCurrentRow(0)
             return
         self.loading_bar.show()
-        self._set_status("Loading categories...")
+        self._set_status(tr("status_loading_categories"))
         fn = {"live": self.client.live_categories,
               "vod": self.client.vod_categories,
               "series": self.client.series_categories}[self.mode]
@@ -947,7 +953,7 @@ class MainWindow(QMainWindow):
             self._apply_filter()
             return
         self.loading_bar.show()
-        self._set_status("Loading content...")
+        self._set_status(tr("status_loading_content"))
         fn = {"live": self.client.live_streams,
               "vod": self.client.vod_streams,
               "series": self.client.series_list}[self.mode]
@@ -1853,7 +1859,7 @@ class MainWindow(QMainWindow):
         if sid is None:
             return
         self.loading_bar.show()
-        self._set_status("Loading episodes...")
+        self._set_status(tr("status_loading_episodes"))
 
         def done(info):
             self.loading_bar.hide()
@@ -2019,8 +2025,8 @@ class MainWindow(QMainWindow):
                                "recording": "rec"}.get(kind)
         self.listw.viewport().update()
         self.setWindowTitle(title or self._base_title)
-        self._set_status(f"Playing: {title}")
-        self._show_toast(f"Playing: {title}")
+        self._set_status(tr("status_playing", title=title))
+        self._show_toast(tr("status_playing", title=title))
         mode = self.playback_mode()
         print(f"[dopeIPTV] Playing via mode={mode} "
               f"(embedded pane: {'yes' if self.player else 'no'})",
@@ -3193,6 +3199,26 @@ class MainWindow(QMainWindow):
         if self.d_logo.text():
             self.d_logo.setStyleSheet(self.PLACEHOLDER_LOGO_STYLE)
 
+    def _set_language(self, code: str) -> None:
+        from .i18n import set_language, current_language
+        if code == current_language():
+            return
+        self.settings.setValue("language", code)
+        set_language(code)
+        # Retranslate the chrome we hold references to so the change is
+        # visible immediately; the rest (settings tabs already open,
+        # context menus) picks up the new language as it is next rebuilt,
+        # and a full relaunch translates everything.
+        labels = {"live": "nav_tv", "vod": "nav_movies", "series": "nav_series",
+                  "fav": "nav_favorites", "rec": "nav_recordings",
+                  "history": "nav_history"}
+        for key, btn in self.nav_btns.items():
+            if key in labels:
+                btn.setText(tr(labels[key]))
+        self.search.setPlaceholderText(tr("search_placeholder"))
+        QMessageBox.information(
+            self, tr("setting_language"), tr("misc_language_restart"))
+
     def _inline_view_changed(self, *_) -> None:
         self.settings.setValue(
             "view_density", self.size_box.currentData())
@@ -3217,7 +3243,7 @@ class MainWindow(QMainWindow):
 
     def open_settings(self) -> None:
         d = QDialog(self)
-        d.setWindowTitle("Settings")
+        d.setWindowTitle(tr("settings_title"))
         d.setMinimumSize(820, 600)
         outer = QVBoxLayout(d)
         outer.setContentsMargins(18, 18, 18, 18)
@@ -3297,17 +3323,17 @@ class MainWindow(QMainWindow):
          replay_minutes_box) = delay_row("replay_delay_min")
         (epg_delay_row, epg_sign_box, epg_hours_box,
          epg_minutes_box) = delay_row("epg_delay_min")
-        pf.addRow("Playback mode (mpv)", mode_box)
-        pf.addRow("Auto-play preview on selection", autoplay_box)
-        pf.addRow("Live stream format", fmt_box)
-        pf.addRow("Preferred audio language", alang_box)
-        pf.addRow("Subtitles", sub_box)
-        pf.addRow("Preferred subtitle language", slang_box)
-        pf.addRow("Fallback subtitle language", slang2_box)
-        pf.addRow("Aspect ratio", aspect_box)
-        pf.addRow("Network buffer", buf_box)
-        pf.addRow("Replay delay", replay_delay_row)
-        pf.addRow("EPG delay", epg_delay_row)
+        pf.addRow(tr("setting_playback_mode"), mode_box)
+        pf.addRow(tr("setting_autoplay_preview"), autoplay_box)
+        pf.addRow(tr("setting_stream_format"), fmt_box)
+        pf.addRow(tr("setting_audio_lang"), alang_box)
+        pf.addRow(tr("setting_subtitles"), sub_box)
+        pf.addRow(tr("setting_sub_lang"), slang_box)
+        pf.addRow(tr("setting_sub_lang_fallback"), slang2_box)
+        pf.addRow(tr("setting_aspect_ratio"), aspect_box)
+        pf.addRow(tr("setting_network_buffer"), buf_box)
+        pf.addRow(tr("setting_replay_delay"), replay_delay_row)
+        pf.addRow(tr("setting_epg_delay"), epg_delay_row)
         delay_hint = QLabel(
             "Replay delay shifts where catch-up/timeshift starts "
             "playback, for providers whose stream lags behind their "
@@ -3332,7 +3358,7 @@ class MainWindow(QMainWindow):
                 f"color:{P['muted2']}; font-size:11px;")
             hint.setWordWrap(True)
             pf.addRow(hint)
-        tabs.addTab(play_tab, "Playback")
+        tabs.addTab(play_tab, tr("tab_playback"))
 
         # Interface tab
         ui_tab = QWidget()
@@ -3360,16 +3386,23 @@ class MainWindow(QMainWindow):
         accent_box.currentIndexChanged.connect(
             lambda _i: self._set_theme(
                 theme_box.currentData(), accent_box.currentData()))
-        uf.addRow("List size", density_box)
-        uf.addRow("Sort lists by", sort_box)
-        uf.addRow("Theme", theme_box)
-        uf.addRow("Accent color", accent_box)
-        theme_hint = QLabel("Theme and accent apply immediately.")
+        from .i18n import LANGUAGES, current_language
+        lang_box = self._combo(
+            [(code, name) for code, name in LANGUAGES.items()],
+            current_language())
+        lang_box.currentIndexChanged.connect(
+            lambda _i: self._set_language(lang_box.currentData()))
+        uf.addRow(tr("setting_language"), lang_box)
+        uf.addRow(tr("setting_list_size"), density_box)
+        uf.addRow(tr("setting_sort_by"), sort_box)
+        uf.addRow(tr("setting_theme"), theme_box)
+        uf.addRow(tr("setting_accent_color"), accent_box)
+        theme_hint = QLabel(tr("misc_theme_applies_immediately"))
         theme_hint.setStyleSheet(
             f"color:{P['muted2']}; font-size:11px;")
         theme_hint.setWordWrap(True)
         uf.addRow(theme_hint)
-        tabs.addTab(ui_tab, "Interface")
+        tabs.addTab(ui_tab, tr("tab_interface"))
 
         # Playlists tab
         pl_tab = QWidget()
@@ -3378,25 +3411,25 @@ class MainWindow(QMainWindow):
         pl_list = QListWidget()
         pv.addWidget(pl_list, 1)
         pl_btns = QHBoxLayout()
-        add_btn = QPushButton("Add...")
-        edit_btn = QPushButton("Edit...")
-        remove_btn = QPushButton("Remove")
-        refresh_pl_btn = QPushButton("Refresh")
-        refresh_pl_btn.setToolTip("Reload channels and EPG from server")
-        use_btn = QPushButton("Use", objectName="Primary")
+        add_btn = QPushButton(tr("btn_add") + "...")
+        edit_btn = QPushButton(tr("btn_edit") + "...")
+        remove_btn = QPushButton(tr("btn_remove"))
+        refresh_pl_btn = QPushButton(tr("btn_refresh"))
+        refresh_pl_btn.setToolTip(tr("tooltip_reload_channels_epg"))
+        use_btn = QPushButton(tr("btn_use"), objectName="Primary")
         for b in (add_btn, edit_btn, remove_btn, refresh_pl_btn, use_btn):
             pl_btns.addWidget(b)
         pv.addLayout(pl_btns)
         io_btns = QHBoxLayout()
-        export_btn = QPushButton("Export...")
+        export_btn = QPushButton(tr("btn_export") + "...")
         export_btn.setToolTip("Export all playlists to a JSON file")
-        import_btn = QPushButton("Import...")
+        import_btn = QPushButton(tr("btn_import") + "...")
         import_btn.setToolTip("Import playlists from a JSON file")
         io_btns.addWidget(export_btn)
         io_btns.addWidget(import_btn)
         io_btns.addStretch()
         pv.addLayout(io_btns)
-        tabs.addTab(pl_tab, "Playlists")
+        tabs.addTab(pl_tab, tr("tab_playlists"))
 
         # Parental tab
         par_tab = QWidget()
@@ -3425,7 +3458,7 @@ class MainWindow(QMainWindow):
         par_hint.setWordWrap(True)
         parv.addWidget(par_hint)
         parv.addStretch()
-        tabs.addTab(par_tab, "Parental")
+        tabs.addTab(par_tab, tr("tab_parental"))
 
         # Recording tab
         rec_tab = QWidget()
@@ -3486,7 +3519,7 @@ class MainWindow(QMainWindow):
         rec_hint2.setWordWrap(True)
         recv.addWidget(rec_hint2)
         recv.addStretch()
-        tabs.addTab(rec_tab, "Recording")
+        tabs.addTab(rec_tab, tr("tab_recording"))
 
         # Metadata tab (TMDB artwork)
         meta_tab = QWidget()
@@ -3516,7 +3549,7 @@ class MainWindow(QMainWindow):
         meta_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         meta_hint.setWordWrap(True)
         mf.addRow(meta_hint)
-        tabs.addTab(meta_tab, "Metadata")
+        tabs.addTab(meta_tab, tr("tab_metadata"))
 
         def update_meta_visibility() -> None:
             show_tmdb = meta_source_box.currentData() == "tmdb"
@@ -3635,7 +3668,7 @@ class MainWindow(QMainWindow):
         trakt_watchlist_btn.clicked.connect(
             lambda: self._open_trakt_dialog(d))
         refresh_trakt_status()
-        tabs.addTab(trakt_tab, "Trakt")
+        tabs.addTab(trakt_tab, tr("tab_trakt"))
 
         def refresh_pin_status():
             if self.parental.has_pin():
@@ -3901,9 +3934,10 @@ class MainWindow(QMainWindow):
     def _on_epg_progress(self, value: int) -> None:
         self.loading_bar.show()
         if value >= 0:
-            self._set_status(f"Loading programme guide... {value}%")
+            self._set_status(
+                tr("status_loading_programme_guide_pct", pct=value))
         if value == 0:
-            self._show_toast("Loading programme guide...")
+            self._show_toast(tr("status_loading_programme_guide"))
         if value < 0:
             self.loading_bar.setRange(0, 0)
         else:

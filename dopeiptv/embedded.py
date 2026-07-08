@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QWidget, QPushButton,
 )
 
+from .i18n import tr
 from .players import _libmpv, _register_error_callback
 
 
@@ -183,6 +184,20 @@ class EmbeddedPlayer(QWidget):
     VIDEO_BOX_HEIGHT = 260
     MINIBTN = 28
 
+    # These control glyphs have very different intrinsic sizes at the same
+    # font size (a triangle vs. a thin double-bar vs. an emoji), which left
+    # the mini-player buttons looking uneven. Pin a per-glyph pixel size so
+    # every icon reads at roughly the same visual weight inside its button.
+    _GLYPH_PX = {
+        "◀": 12, "▶": 12,
+        "‖": 15,
+        "■": 12, "⛶": 15,
+        "⚙": 15, "●": 14,
+        "✕": 13, "⏪": 13,
+        "\U0001f50a": 14, "\U0001f507": 14,
+        "−10": 9, "+30": 9, "-10": 9,
+    }
+
     def __init__(self, parent: QWidget | None = None,
                  settings=None) -> None:
         super().__init__(parent)
@@ -207,20 +222,20 @@ class EmbeddedPlayer(QWidget):
         bl.setSpacing(8)
         bl.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         self.prev_btn = QPushButton("◀", objectName="MiniBtn")
-        self.prev_btn.setToolTip("Previous channel (Ctrl+Left)")
+        self.prev_btn.setToolTip(tr("tooltip_previous_channel") + " (Ctrl+Left)")
         self.prev_btn.clicked.connect(lambda: self.zap.emit(-1))
         self.next_btn = QPushButton("▶", objectName="MiniBtn")
-        self.next_btn.setToolTip("Next channel (Ctrl+Right)")
+        self.next_btn.setToolTip(tr("tooltip_next_channel") + " (Ctrl+Right)")
         self.next_btn.clicked.connect(lambda: self.zap.emit(1))
         self.pause_btn = QPushButton("‖", objectName="MiniBtn")
-        self.pause_btn.setToolTip("Pause / resume")
+        self.pause_btn.setToolTip(tr("tooltip_pause_resume"))
         self.pause_btn.clicked.connect(self.toggle_pause)
         self.back_btn = QPushButton("−10", objectName="MiniBtn")
-        self.back_btn.setToolTip("Back 10 seconds")
+        self.back_btn.setToolTip(tr("tooltip_back_10s"))
         self.back_btn.clicked.connect(lambda: self._relative_seek(-10))
         self.back_btn.hide()
         self.fwd_btn = QPushButton("+30", objectName="MiniBtn")
-        self.fwd_btn.setToolTip("Forward 30 seconds")
+        self.fwd_btn.setToolTip(tr("tooltip_forward_30s"))
         self.fwd_btn.clicked.connect(lambda: self._relative_seek(30))
         self.fwd_btn.hide()
         self.title_lbl = QLabel("", objectName="DetailMeta")
@@ -232,36 +247,36 @@ class EmbeddedPlayer(QWidget):
         self.time_lbl = QLabel("", objectName="DetailMeta")
         self.time_lbl.hide()
         self.mute_btn = QPushButton("🔊", objectName="MiniBtn")
-        self.mute_btn.setToolTip("Mute / unmute")
+        self.mute_btn.setToolTip(tr("tooltip_mute_unmute"))
         self.mute_btn.clicked.connect(self.toggle_mute)
         self.vol = QSlider(Qt.Orientation.Horizontal)
         self.vol.setRange(0, 100)
         self.vol.setFixedWidth(40)
-        self.vol.setToolTip("Volume")
+        self.vol.setToolTip(tr("tooltip_volume"))
         self.vol.valueChanged.connect(self._set_volume)
         self.ts_btn = QPushButton("⏪", objectName="MiniBtn")
-        self.ts_btn.setToolTip("Timeshift / catch-up")
+        self.ts_btn.setToolTip(tr("tooltip_timeshift"))
         self.ts_btn.clicked.connect(
             lambda: self.timeshift_menu.emit(self.ts_btn))
         self.ts_btn.hide()
         self.rec_btn = QPushButton("●", objectName="MiniBtn")
-        self.rec_btn.setToolTip("Record")
+        self.rec_btn.setToolTip(tr("tooltip_record"))
         self.rec_btn.setStyleSheet("color:#FF5C5C;")
         self.rec_btn.clicked.connect(
             lambda: self.record_menu.emit(self.rec_btn))
         self.rec_btn.hide()
         self.opts_btn = QPushButton("⚙", objectName="MiniBtn")
-        self.opts_btn.setToolTip("Audio / subtitles / aspect / buffer")
+        self.opts_btn.setToolTip(tr("tooltip_audio_subs_aspect"))
         self.opts_btn.clicked.connect(
             lambda: self._show_options_menu(self.opts_btn))
         self.stop_btn = QPushButton("■", objectName="MiniBtn")
-        self.stop_btn.setToolTip("Stop playback")
+        self.stop_btn.setToolTip(tr("tooltip_stop_playback"))
         self.stop_btn.clicked.connect(self.stop)
         self.pip_btn = QPushButton("PiP", objectName="MiniBtn")
-        self.pip_btn.setToolTip("Picture-in-Picture")
+        self.pip_btn.setToolTip(tr("tooltip_pip"))
         self.pip_btn.clicked.connect(self.pip_requested)
         self.fs_btn = QPushButton("⛶", objectName="MiniBtn")
-        self.fs_btn.setToolTip("Fullscreen")
+        self.fs_btn.setToolTip(tr("tooltip_fullscreen"))
         bl.addWidget(self.prev_btn)
         bl.addWidget(self.next_btn)
         bl.addWidget(self.pause_btn)
@@ -372,18 +387,24 @@ class EmbeddedPlayer(QWidget):
         # off the shared line). The one text button (PiP) keeps its width
         # but shares the height; the volume sliders match the height too.
         m = self.MINIBTN
-        for b in (self.prev_btn, self.next_btn, self.pause_btn, self.back_btn,
-                  self.fwd_btn, self.ts_btn, self.rec_btn, self.opts_btn,
-                  self.stop_btn, self.fs_btn, self.mute_btn,
-                  self.fs_prev_btn, self.fs_next_btn, self.fs_pause_btn,
-                  self.fs_back_btn, self.fs_fwd_btn, self.fs_ts_btn,
-                  self.fs_rec_btn, self.fs_opts_btn, self.fs_exit_btn,
-                  self.fs_mute_btn):
+        all_icon_btns = (
+            self.prev_btn, self.next_btn, self.pause_btn, self.back_btn,
+            self.fwd_btn, self.ts_btn, self.rec_btn, self.opts_btn,
+            self.stop_btn, self.fs_btn, self.mute_btn,
+            self.fs_prev_btn, self.fs_next_btn, self.fs_pause_btn,
+            self.fs_back_btn, self.fs_fwd_btn, self.fs_ts_btn,
+            self.fs_rec_btn, self.fs_opts_btn, self.fs_exit_btn,
+            self.fs_mute_btn,
+        )
+        for b in all_icon_btns:
             b.setFixedSize(m, m)
         self.pip_btn.setFixedHeight(m)
         self.pip_btn.setMinimumWidth(m)
         for s in (self.vol, self.fs_vol):
             s.setFixedHeight(m)
+
+        for b in (*all_icon_btns, self.pip_btn):
+            self._apply_glyph(b, b.text())
 
         self._pos_timer = QTimer(self)
         self._pos_timer.setInterval(500)
@@ -763,8 +784,8 @@ class EmbeddedPlayer(QWidget):
 
     def _sync_pause_label(self, paused: bool) -> None:
         label = "▶" if paused else "‖"
-        self.pause_btn.setText(label)
-        self.fs_pause_btn.setText(label)
+        self._apply_glyph(self.pause_btn, label)
+        self._apply_glyph(self.fs_pause_btn, label)
 
     # -- options menu ----------------------------------------------------------
 
@@ -1011,6 +1032,16 @@ class EmbeddedPlayer(QWidget):
         if self._settings is not None:
             self._settings.setValue("volume", int(value))
 
+    def _apply_glyph(self, btn: QPushButton, text: str) -> None:
+        """Set a button's glyph and normalize its pixel size so all the
+        control icons read at a consistent visual weight."""
+        btn.setText(text)
+        px = self._GLYPH_PX.get(text)
+        if px:
+            f = btn.font()
+            f.setPixelSize(px)
+            btn.setFont(f)
+
     def toggle_mute(self) -> None:
         self._muted = not self._muted
         m = self.video.mpv
@@ -1020,8 +1051,8 @@ class EmbeddedPlayer(QWidget):
             except Exception:
                 pass
         label = "\U0001f507" if self._muted else "\U0001f50a"
-        self.mute_btn.setText(label)
-        self.fs_mute_btn.setText(label)
+        for b in (self.mute_btn, self.fs_mute_btn):
+            self._apply_glyph(b, label)
 
     # -- stream recording ------------------------------------------------------
 

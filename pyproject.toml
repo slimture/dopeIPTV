@@ -8,6 +8,8 @@ version = "0.2.0"
 description = "Modern IPTV player"
 readme = "README.md"
 requires-python = ">=3.11"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
 
 dependencies = [
     "PyQt6>=6.5",
