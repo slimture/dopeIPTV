@@ -135,6 +135,8 @@ class _MpvGLWidget(QOpenGLWidget):
     video_mouse_move = pyqtSignal(object)
     video_mouse_release = pyqtSignal(object)
     video_dbl_click = pyqtSignal()
+    video_key_press = pyqtSignal(object)
+    video_key_release = pyqtSignal(object)
 
     EXTRA_OPTS: dict = {}
 
@@ -146,11 +148,34 @@ class _MpvGLWidget(QOpenGLWidget):
         self.setMinimumHeight(190)
         self.setSizePolicy(QSizePolicy.Policy.Expanding,
                            QSizePolicy.Policy.Expanding)
+        # Focusable so it can receive Left/Right for seeking once clicked.
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.mpv = None
         self._ctx = None
         self.frame_ready.connect(self.update)
 
+    _SEEK_KEYS = (Qt.Key.Key_Left, Qt.Key.Key_Right)
+
+    def keyPressEvent(self, event) -> None:
+        # Plain (unmodified) Left/Right seek; Ctrl+Left/Right stays a channel
+        # zap shortcut, so only claim the unmodified presses.
+        if (event.key() in self._SEEK_KEYS
+                and event.modifiers() == Qt.KeyboardModifier.NoModifier):
+            self.video_key_press.emit(event)
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def keyReleaseEvent(self, event) -> None:
+        if (event.key() in self._SEEK_KEYS
+                and event.modifiers() == Qt.KeyboardModifier.NoModifier):
+            self.video_key_release.emit(event)
+            event.accept()
+            return
+        super().keyReleaseEvent(event)
+
     def mousePressEvent(self, event) -> None:
+        self.setFocus(Qt.FocusReason.MouseFocusReason)
         self.video_mouse_press.emit(event)
 
     def mouseMoveEvent(self, event) -> None:
@@ -315,6 +340,14 @@ class EmbeddedPlayer(QWidget):
         self.video.video_mouse_press.connect(self._on_video_press)
         self.video.video_mouse_move.connect(self._on_video_move)
         self.video.video_mouse_release.connect(self._on_video_release)
+        self.video.video_key_press.connect(self._on_seek_key_press)
+        self.video.video_key_release.connect(self._on_seek_key_release)
+        # Continuous seek while an arrow key is held down.
+        self._seek_hold_dir = 0
+        self._seek_hold_timer = QTimer(self)
+        self._seek_hold_timer.setInterval(400)
+        self._seek_hold_timer.timeout.connect(
+            lambda: self._relative_seek(self._seek_hold_dir))
         lay.addWidget(self.video, 1)
 
         self.bar = QWidget()
@@ -718,6 +751,27 @@ class EmbeddedPlayer(QWidget):
     def _on_video_release(self, event) -> None:
         pass
 
+    def _is_seekable(self) -> bool:
+        m = self.video.mpv
+        try:
+            return bool(m is not None and m.duration and m.duration > 1)
+        except Exception:
+            return False
+
+    def _on_seek_key_press(self, event) -> None:
+        if not self._is_seekable():
+            return
+        step = -10 if event.key() == Qt.Key.Key_Left else 10
+        if event.isAutoRepeat():
+            return  # the hold timer drives the continuous seek
+        self._relative_seek(step)
+        self._seek_hold_dir = step
+        self._seek_hold_timer.start()
+
+    def _on_seek_key_release(self, event) -> None:
+        if not event.isAutoRepeat():
+            self._seek_hold_timer.stop()
+
     # -- pip bar auto-hide -----------------------------------------------------
 
     PIP_BAR_HIDE_MS = 2500
@@ -782,6 +836,7 @@ class EmbeddedPlayer(QWidget):
             self._hide_seek_overlay(force=True)
             self._lock_video_box()
             self._show_overlay()
+            self.video.setFocus(Qt.FocusReason.OtherFocusReason)
         else:
             self._hide_fs_ui()
             self._overlay_timer.stop()

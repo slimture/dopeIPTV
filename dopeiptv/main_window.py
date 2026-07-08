@@ -554,6 +554,11 @@ class MainWindow(QMainWindow):
         root.setStretchFactor(2, 0)
         det.setMinimumWidth(280)
         self._side, self._mid, self._det = side, mid, det
+        self._root = root
+        # Restore the panel divider positions from last session.
+        st = self.settings.value("splitter_state")
+        if st:
+            root.restoreState(st)
         self._toast = _Toast(root)
 
         self.tick = QTimer(self)
@@ -4231,6 +4236,11 @@ class MainWindow(QMainWindow):
         d = getattr(self, "_cast_dialog", None)
         if d is not None:
             d.close()
+        # Remember the panel divider layout - but not while in PiP or
+        # fullscreen, whose splitter/window sizes are transient.
+        if (self._pip_win is None and not self.isFullScreen()
+                and not self._player_fs):
+            self.settings.setValue("splitter_state", self._root.saveState())
         self._save_resume_position()
         self.wake.release()
         if self.tmdb:
