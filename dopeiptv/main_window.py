@@ -475,7 +475,7 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(0, lambda: (
                 self.listw.verticalScrollBar().setValue(scroll)))
 
-    # -- picture-in-picture --------------------------------------------------------
+    # -- picture-in-picture (mini mode — no reparenting) ----------------------------
 
     def _toggle_pip(self) -> None:
         if not self.player:
@@ -485,49 +485,63 @@ class MainWindow(QMainWindow):
             return
         if self._player_fs:
             self._exit_player_fullscreen()
-        mw = self
 
-        class _PipWin(QWidget):
-            def closeEvent(self_, event):
-                if mw._pip_win is self_:
-                    event.ignore()
-                    mw._exit_pip()
-                else:
-                    super().closeEvent(event)
+        self._pip_win = True
+        self._pip_geo = self.geometry()
+        self._pip_state = self.windowState()
 
-        win = _PipWin(None, Qt.WindowType.Window
-                      | Qt.WindowType.WindowStaysOnTopHint)
-        win.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
-        win.setWindowTitle("dopeIPTV PiP")
-        win.setMinimumSize(320, 180)
-        lay = QVBoxLayout(win)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(0)
-        self.player.setParent(win)
-        lay.addWidget(self.player)
-        self.player.show()
+        self._side.hide()
+        self._mid.hide()
+        self._pip_det_hidden: list[QWidget] = []
+        for w in self._det.children():
+            if (isinstance(w, QWidget) and w is not self.player
+                    and w.isVisible()):
+                self._pip_det_hidden.append(w)
+                w.hide()
+        det_lay = self._det.layout()
+        self._pip_margins = det_lay.contentsMargins()
+        det_lay.setContentsMargins(0, 0, 0, 0)
+        self._det.setStyleSheet(
+            "#DetailPane { background:#000000; border:none; }")
+        self.menuBar().hide()
         self.player.pip_btn.setToolTip("Exit Picture-in-Picture")
         self.player.fs_btn.hide()
-        geo = self.geometry()
-        win.resize(480, 270)
-        win.move(geo.right() - 500, geo.bottom() - 300)
-        win.show()
-        self._pip_win = win
+
+        if self.isFullScreen() or self.isMaximized():
+            self.showNormal()
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+        self.show()
+        self.resize(480, 270)
+        screen_geo = self.screen().availableGeometry()
+        self.move(screen_geo.right() - 500, screen_geo.bottom() - 290)
 
     def _exit_pip(self) -> None:
         if self._pip_win is None:
             return
-        win = self._pip_win
         self._pip_win = None
-        self.player.setParent(self._det)
-        det_lay = self._det.layout()
-        det_lay.insertWidget(det_lay.indexOf(self.stream_error), self.player, 2)
-        if self.player.current_url:
-            self.player.show()
+
+        self._side.show()
+        self._mid.show()
+        for w in getattr(self, "_pip_det_hidden", []):
+            w.show()
+        self._pip_det_hidden = []
+        m = getattr(self, "_pip_margins", None)
+        if m is not None:
+            self._det.layout().setContentsMargins(
+                m.left(), m.top(), m.right(), m.bottom())
+        self._det.setStyleSheet("")
+        self.menuBar().show()
         self.player.pip_btn.setToolTip("Picture-in-Picture")
         self.player.fs_btn.show()
-        win.hide()
-        win.deleteLater()
+
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, False)
+        self.show()
+        geo = getattr(self, "_pip_geo", None)
+        state = getattr(self, "_pip_state", None)
+        if geo:
+            self.setGeometry(geo)
+        if state and state != Qt.WindowState.WindowNoState:
+            self.setWindowState(state)
 
     def _exit_pip_if_active(self) -> None:
         if self._pip_win is not None:
