@@ -2247,7 +2247,6 @@ class MainWindow(QMainWindow):
         self.listw.viewport().update()
         self.setWindowTitle(title or self._base_title)
         self._set_status(tr("status_playing", title=title))
-        self._show_toast(tr("status_playing", title=title))
         mode = self.playback_mode()
         if mode == "embedded" and self.player:
             self.rec.finish_all_inplayer("channel changed")
