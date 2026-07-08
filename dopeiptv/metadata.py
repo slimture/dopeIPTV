@@ -1,5 +1,5 @@
-"""TMDB artwork lookup: resolves movie/series posters by title, with a
-persistent cache so each title is only searched once."""
+"""TMDB metadata lookup: resolves movie/series poster, rating, IMDb id and
+cast by title, with a persistent cache so each title is only searched once."""
 
 from __future__ import annotations
 
@@ -9,21 +9,28 @@ from typing import Callable
 import requests
 from PyQt6.QtCore import QObject, QSettings, QThreadPool, QTimer
 
+
 from .workers import run_async
 
 
 class TmdbClient:
-    """Thin wrapper around the TMDB v3 search endpoints."""
+    """Thin wrapper around the TMDB v3 search/details endpoints."""
 
     IMG_BASE = "https://image.tmdb.org/t/p/w342"
+    BASE = "https://api.themoviedb.org/3"
 
     def __init__(self, api_key: str) -> None:
         self.api_key = api_key
 
     def poster_url(self, title: str, kind: str) -> str | None:
+        return (self.fetch_details(title, kind) or {}).get("poster_url")
+
+    def fetch_details(self, title: str, kind: str) -> dict | None:
+        """Search by title, then fetch poster/rating/IMDb id/cast in one
+        combined request (append_to_response) for the top match."""
         endpoint = "movie" if kind == "vod" else "tv"
         r = requests.get(
-            f"https://api.themoviedb.org/3/search/{endpoint}",
+            f"{self.BASE}/search/{endpoint}",
             params={"api_key": self.api_key, "query": title,
                     "include_adult": "false"},
             timeout=10)
@@ -31,16 +38,31 @@ class TmdbClient:
         results = r.json().get("results") or []
         if not results:
             return None
-        poster_path = results[0].get("poster_path")
-        if not poster_path:
+        tid = results[0].get("id")
+        if tid is None:
             return None
-        return f"{self.IMG_BASE}{poster_path}"
+        r2 = requests.get(
+            f"{self.BASE}/{endpoint}/{tid}",
+            params={"api_key": self.api_key,
+                    "append_to_response": "external_ids,credits"},
+            timeout=10)
+        r2.raise_for_status()
+        d = r2.json()
+        poster_path = d.get("poster_path") or results[0].get("poster_path")
+        cast = [c.get("name") for c in
+                (d.get("credits") or {}).get("cast") or []][:8]
+        return {
+            "poster_url": f"{self.IMG_BASE}{poster_path}" if poster_path else None,
+            "rating": d.get("vote_average") or None,
+            "imdb_id": (d.get("external_ids") or {}).get("imdb_id"),
+            "cast": [c for c in cast if c],
+        }
 
 
 class PosterResolver(QObject):
-    """Async, cached title -> TMDB poster URL resolver.
+    """Async, cached title -> TMDB metadata resolver.
 
-    Mirrors LogoLoader's get()/callback pattern: returns the cached URL
+    Mirrors LogoLoader's get()/callback pattern: returns the cached value
     (or None) immediately and, if unresolved, kicks off a background
     search that invokes *callback* once done so the caller can repaint.
     """
@@ -54,13 +76,19 @@ class PosterResolver(QObject):
         self.settings = settings
         self.client = client
         try:
-            self._cache: dict[str, str] = json.loads(
-                settings.value(self.CACHE_KEY, "") or "{}")
+            raw: dict = json.loads(settings.value(self.CACHE_KEY, "") or "{}")
         except Exception:
-            self._cache = {}
+            raw = {}
+        # Migrate the older cache format (plain poster-URL strings) to the
+        # richer dict format transparently.
+        self._cache: dict[str, dict] = {
+            k: (v if isinstance(v, dict) else {"poster_url": v or None})
+            for k, v in raw.items()
+        }
         self._pending: set[str] = set()
+        self._waiting: dict[str, list[Callable]] = {}
         self._dirty = False
-        # A resolved poster writes the whole (growing) cache back to
+        # A resolved entry writes the whole (growing) cache back to
         # QSettings on the main thread. Doing that synchronously on every
         # single completion - which can arrive in bursts when switching
         # categories triggers many lookups at once - is what made the UI
@@ -87,28 +115,49 @@ class PosterResolver(QObject):
     def _key(title: str, kind: str) -> str:
         return f"{kind}:{title.strip().lower()}"
 
+    def _ensure_fetch(self, title: str, kind: str, key: str) -> None:
+        if key in self._pending:
+            return
+        self._pending.add(key)
+
+        def fetch(t=title, k=kind):
+            return self.client.fetch_details(t, k)
+
+        def done(details, key=key):
+            self._cache[key] = details or {}
+            self._save()
+            self._pending.discard(key)
+            self._on_resolved(key)
+
+        def fail(_msg, key=key):
+            self._cache[key] = {}
+            self._pending.discard(key)
+            self._waiting.pop(key, None)
+
+        run_async(self.pool, fetch, done, fail)
+
+    def _on_resolved(self, key: str) -> None:
+        for cb in self._waiting.pop(key, []):
+            try:
+                cb(self._cache.get(key) or {})
+            except RuntimeError:
+                pass
+
     def get(self, title: str, kind: str,
             callback: Callable[[str | None], None]) -> str | None:
+        """Poster URL only - used by the list/grid delegate."""
+        details = self.get_full(title, kind, lambda d: callback(d.get("poster_url")))
+        return details.get("poster_url") if details else None
+
+    def get_full(self, title: str, kind: str,
+                 callback: Callable[[dict], None]) -> dict | None:
+        """Full metadata dict (poster_url/rating/imdb_id/cast), or None
+        while the lookup is still pending."""
         if not title:
             return None
         key = self._key(title, kind)
         if key in self._cache:
-            return self._cache[key] or None
-        if key not in self._pending:
-            self._pending.add(key)
-
-            def fetch(t=title, k=kind):
-                return self.client.poster_url(t, k)
-
-            def done(url, key=key):
-                self._cache[key] = url or ""
-                self._save()
-                self._pending.discard(key)
-                callback(url)
-
-            def fail(_msg, key=key):
-                self._cache[key] = ""
-                self._pending.discard(key)
-
-            run_async(self.pool, fetch, done, fail)
+            return self._cache[key]
+        self._waiting.setdefault(key, []).append(callback)
+        self._ensure_fetch(title, kind, key)
         return None

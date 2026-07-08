@@ -371,6 +371,26 @@ class MainWindow(QMainWindow):
             nc.addWidget(w)
         self.now_card.hide()
         header_row.addWidget(self.now_card, 1)
+
+        # Movie/series rating (linked to IMDb when TMDB has the id) + cast,
+        # shown in the same spot as "now playing" since only one of the two
+        # is ever relevant at a time.
+        self.media_card = QFrame(objectName="Card")
+        mc = QVBoxLayout(self.media_card)
+        mc.setContentsMargins(16, 14, 16, 14)
+        mc.setSpacing(8)
+        self.media_rating_lbl = QLabel("")
+        self.media_rating_lbl.setOpenExternalLinks(True)
+        self.media_rating_lbl.setStyleSheet("font-size:13px; font-weight:600;")
+        self.media_rating_lbl.hide()
+        self.media_cast_lbl = QLabel("", objectName="NowDesc")
+        self.media_cast_lbl.setWordWrap(True)
+        self.media_cast_lbl.hide()
+        mc.addWidget(self.media_rating_lbl)
+        mc.addWidget(self.media_cast_lbl)
+        mc.addStretch(1)
+        self.media_card.hide()
+        header_row.addWidget(self.media_card, 1)
         dl.addLayout(header_row)
 
         self.epg_scroll = QScrollArea()
@@ -1141,23 +1161,29 @@ class MainWindow(QMainWindow):
         self._current_key = self._item_key(it)
         self._show_detail(it)
 
+    POSTER_SIZE_LIVE = (84, 84)
+    POSTER_SIZE_MEDIA = (130, 195)
+
     def _show_detail(self, it) -> None:
         self.now_card.hide()
+        self.media_card.hide()
         self._clear_epg_rows()
         self._current_epg = None
         if not it:
             self._detail_name = "Select something from the list"
+            self.d_logo.setFixedSize(*self.POSTER_SIZE_LIVE)
             self.d_logo.setPixmap(QPixmap())
             self.d_logo.setText("")
             return
         name = self.channel_display_name(it)
         self._detail_name = name
+        is_media = self.mode in ("vod", "series")
+        self.d_logo.setFixedSize(
+            *(self.POSTER_SIZE_MEDIA if is_media else self.POSTER_SIZE_LIVE))
         self.d_logo.setPixmap(QPixmap())
         self.d_logo.setStyleSheet(self.PLACEHOLDER_LOGO_STYLE)
         self.d_logo.setText(name.strip()[:1].upper())
-        url = it.get("stream_icon") or it.get("cover")
-        if url:
-            self.logos.get(url, self._set_detail_logo)
+        self._load_detail_poster(it, is_media)
 
         if self.mode == "rec":
             return
@@ -1191,17 +1217,76 @@ class MainWindow(QMainWindow):
                 "font-size:30px; font-weight:700;")
 
     def _set_detail_logo(self, pm) -> None:
-        tile = QPixmap(84, 84)
+        w, h = self.d_logo.width(), self.d_logo.height()
+        tile = QPixmap(w, h)
         tile.fill(Qt.GlobalColor.transparent)
         p = QPainter(tile)
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        s = pm.scaled(84, 84, Qt.AspectRatioMode.KeepAspectRatio,
+        s = pm.scaled(w, h, Qt.AspectRatioMode.KeepAspectRatio,
                       Qt.TransformationMode.SmoothTransformation)
-        p.drawPixmap((84 - s.width()) // 2, (84 - s.height()) // 2, s)
+        p.drawPixmap((w - s.width()) // 2, (h - s.height()) // 2, s)
         p.end()
         self.d_logo.setStyleSheet("background:transparent;")
         self.d_logo.setText("")
         self.d_logo.setPixmap(tile)
+
+    def _media_title_for_tmdb(self, it) -> str:
+        if self.series_ctx:
+            return (self.series_ctx.get("name")
+                    or self.series_ctx.get("title") or "")
+        return it.get("name") or it.get("title") or ""
+
+    def _load_detail_poster(self, it, is_media: bool) -> None:
+        fallback_url = it.get("stream_icon") or it.get("cover")
+        if not (is_media and self.tmdb):
+            if fallback_url:
+                self.logos.get(fallback_url, self._set_detail_logo)
+            return
+        title = self._media_title_for_tmdb(it)
+        if not title:
+            if fallback_url:
+                self.logos.get(fallback_url, self._set_detail_logo)
+            return
+        kind = "vod" if self.mode == "vod" else "series"
+        key = self._current_key
+
+        def apply(details: dict) -> None:
+            if key != self._current_key:
+                return
+            self._apply_media_card(details)
+            url = details.get("poster_url") or fallback_url
+            if url:
+                self.logos.get(url, self._set_detail_logo)
+
+        details = self.tmdb.get_full(title, kind, apply)
+        if details is not None:
+            apply(details)
+        elif fallback_url:
+            self.logos.get(fallback_url, self._set_detail_logo)
+
+    def _apply_media_card(self, details: dict) -> None:
+        rating = details.get("rating")
+        imdb_id = details.get("imdb_id")
+        cast = details.get("cast") or []
+        stars = f"★ {rating:.1f}/10" if rating else ""
+        if imdb_id:
+            label = stars or "View on IMDb"
+            self.media_rating_lbl.setText(
+                f'<a href="https://www.imdb.com/title/{imdb_id}/" '
+                f'style="color:{ACCENT}; text-decoration:none;">'
+                f'{label}</a>')
+            self.media_rating_lbl.show()
+        elif stars:
+            self.media_rating_lbl.setText(stars)
+            self.media_rating_lbl.show()
+        else:
+            self.media_rating_lbl.hide()
+        if cast:
+            self.media_cast_lbl.setText("Cast: " + ", ".join(cast[:6]))
+            self.media_cast_lbl.show()
+        else:
+            self.media_cast_lbl.hide()
+        self.media_card.setVisible(bool(stars or imdb_id or cast))
 
     def _clear_epg_rows(self) -> None:
         while self.epg_lay.count() > 1:
