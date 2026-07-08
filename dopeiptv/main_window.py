@@ -17,8 +17,8 @@ from PyQt6.QtCore import (
     pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QAction, QColor, QDesktopServices, QIcon, QKeySequence, QPainter,
-    QPainterPath, QPixmap, QShortcut,
+    QColor, QDesktopServices, QIcon, QKeySequence, QPainter, QPainterPath,
+    QPixmap, QShortcut,
 )
 from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDateTimeEdit, QDialog,
@@ -810,28 +810,8 @@ class MainWindow(QMainWindow):
         if self._pip_win is None:
             return
         m = QMenu(self)
-        on_top = QAction(tr("pip_always_on_top"), m, checkable=True)
-        on_top.setChecked(bool(
-            self.windowFlags() & Qt.WindowType.WindowStaysOnTopHint))
-        on_top.toggled.connect(self._set_pip_on_top)
-        m.addAction(on_top)
         m.addAction(tr("tooltip_exit_pip"), self._exit_pip)
         m.exec(global_pos)
-
-    def _set_pip_on_top(self, enabled: bool) -> None:
-        if self._pip_win is None:
-            return
-        flags = (Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
-        if enabled:
-            flags |= Qt.WindowType.WindowStaysOnTopHint
-        geo = self.geometry()
-        self.setWindowFlags(flags)
-        self.show()
-        self.setGeometry(geo)
-        self.raise_()
-        if enabled and "wayland" in \
-                QApplication.instance().platformName().lower():
-            self._show_toast(tr("pip_wayland_hint"), 5000)
 
     def _exit_pip_if_active(self) -> None:
         if self._pip_win is not None:
@@ -1410,8 +1390,12 @@ class MainWindow(QMainWindow):
             else hist_kind if hist_kind in ("vod", "series")
             else None)
         is_media = media_kind is not None
-        self.d_logo.setFixedSize(
-            *(self.POSTER_SIZE_MEDIA if is_media else self.POSTER_SIZE_LIVE))
+        poster_size = (self.POSTER_SIZE_MEDIA if is_media
+                       else self.POSTER_SIZE_LIVE)
+        self.d_logo.setFixedSize(*poster_size)
+        # Make the Play button span the poster's width so its (centered) label
+        # sits centered under the poster/TV icon rather than off to the left.
+        self.play_mpv.setFixedWidth(poster_size[0])
         if is_media:
             # Match the info box to the poster height so their bottoms align.
             self.media_info.setFixedHeight(self.POSTER_SIZE_MEDIA[1])

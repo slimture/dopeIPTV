@@ -143,6 +143,11 @@ class _MpvGLWidget(QOpenGLWidget):
         if sys.platform == "darwin":
             from .platform_macos import apply_widget_surface_format
             apply_widget_surface_format(self)
+        # Create the native surface eagerly as a child of the player, so the
+        # first playback doesn't briefly flash the GL surface as a separate
+        # top-level window while its context is realised.
+        self.setAttribute(Qt.WidgetAttribute.WA_NativeWindow, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_DontCreateNativeAncestors, True)
         self.setMinimumHeight(190)
         self.setSizePolicy(QSizePolicy.Policy.Expanding,
                            QSizePolicy.Policy.Expanding)
@@ -700,6 +705,8 @@ class EmbeddedPlayer(QWidget):
     def _on_video_move(self, event) -> None:
         if self._pip_mode and not self._fs_ui:
             self._show_pip_bar()
+            if self._seekable:
+                self._show_seek_overlay()
             if not (event.buttons() & Qt.MouseButton.LeftButton):
                 edges = self._resize_edges_for_window(
                     event.position().toPoint(), self.video)
