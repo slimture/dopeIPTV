@@ -7,7 +7,7 @@ import json
 from typing import Callable
 
 import requests
-from PyQt6.QtCore import QObject, QSettings, QThreadPool
+from PyQt6.QtCore import QObject, QSettings, QThreadPool, QTimer
 
 from .workers import run_async
 
@@ -59,9 +59,29 @@ class PosterResolver(QObject):
         except Exception:
             self._cache = {}
         self._pending: set[str] = set()
+        self._dirty = False
+        # A resolved poster writes the whole (growing) cache back to
+        # QSettings on the main thread. Doing that synchronously on every
+        # single completion - which can arrive in bursts when switching
+        # categories triggers many lookups at once - is what made the UI
+        # stall, so batch writes onto a debounce timer instead.
+        self._save_timer = QTimer(self)
+        self._save_timer.setSingleShot(True)
+        self._save_timer.timeout.connect(self._flush_save)
 
     def _save(self) -> None:
-        self.settings.setValue(self.CACHE_KEY, json.dumps(self._cache))
+        self._dirty = True
+        self._save_timer.start(2000)
+
+    def _flush_save(self) -> None:
+        if self._dirty:
+            self._dirty = False
+            self.settings.setValue(self.CACHE_KEY, json.dumps(self._cache))
+
+    def flush(self) -> None:
+        """Force any pending cache write out immediately (e.g. on quit)."""
+        self._save_timer.stop()
+        self._flush_save()
 
     @staticmethod
     def _key(title: str, kind: str) -> str:

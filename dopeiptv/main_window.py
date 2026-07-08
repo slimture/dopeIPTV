@@ -13,8 +13,8 @@ from PyQt6.QtCore import (
     QDateTime, QSettings, QSize, Qt, QThreadPool, QTimer, QUrl, pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QColor, QDesktopServices, QKeySequence, QPainter, QPainterPath, QPixmap,
-    QShortcut,
+    QColor, QDesktopServices, QIcon, QKeySequence, QPainter, QPainterPath,
+    QPixmap, QShortcut,
 )
 from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDateTimeEdit, QDialog,
@@ -204,6 +204,7 @@ class MainWindow(QMainWindow):
 
         self.search = QLineEdit(objectName="Search")
         self.search.setPlaceholderText("Search channels, movies or series...")
+        self.search.setClearButtonEnabled(True)
         self._preview_timer = QTimer(self)
         self._preview_timer.setSingleShot(True)
         self._preview_timer.timeout.connect(self._play_preview)
@@ -847,6 +848,8 @@ class MainWindow(QMainWindow):
     # -- metadata (TMDB artwork) -----------------------------------------------------
 
     def _init_metadata_provider(self) -> None:
+        if self.tmdb:
+            self.tmdb.flush()
         self.tmdb = None
         if self.settings.value("metadata_source", "playlist") != "tmdb":
             return
@@ -3273,6 +3276,8 @@ class MainWindow(QMainWindow):
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel)
+        for b in buttons.buttons():
+            b.setIcon(QIcon())
         buttons.accepted.connect(d.accept)
         buttons.rejected.connect(d.reject)
         outer.addWidget(buttons)
@@ -3385,6 +3390,8 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:
         self.wake.release()
+        if self.tmdb:
+            self.tmdb.flush()
         if self._trakt_active:
             active = self._trakt_active
             progress = self.player.progress_percent() if self.player else 0.0
