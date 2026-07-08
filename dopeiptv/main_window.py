@@ -518,11 +518,15 @@ class MainWindow(QMainWindow):
         self.player.pip_btn.setToolTip("Exit Picture-in-Picture")
         self.player.fs_btn.hide()
         self.player.video.setMinimumHeight(0)
+        self.player.set_pip_mode(True)
 
         if self.isFullScreen() or self.isMaximized():
             self.showNormal()
         self.setMinimumSize(240, 135)
-        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+        self.setWindowFlags(
+            self.windowFlags()
+            | Qt.WindowType.WindowStaysOnTopHint
+            | Qt.WindowType.FramelessWindowHint)
         self.show()
         self.resize(480, 270)
         screen_geo = self.screen().availableGeometry()
@@ -533,6 +537,7 @@ class MainWindow(QMainWindow):
             return
         self._pip_win = None
 
+        self.player.set_pip_mode(False)
         self.player.video.setMinimumHeight(190)
         self.setMinimumSize(0, 0)
         self._side.show()
@@ -549,7 +554,10 @@ class MainWindow(QMainWindow):
         self.player.pip_btn.setToolTip("Picture-in-Picture")
         self.player.fs_btn.show()
 
-        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, False)
+        self.setWindowFlags(
+            (self.windowFlags()
+             & ~Qt.WindowType.WindowStaysOnTopHint
+             & ~Qt.WindowType.FramelessWindowHint))
         self.show()
         geo = getattr(self, "_pip_geo", None)
         state = getattr(self, "_pip_state", None)

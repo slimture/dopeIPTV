@@ -259,6 +259,8 @@ class EmbeddedPlayer(QWidget):
         bl.addWidget(self.stop_btn)
         bl.addWidget(self.fs_btn)
         lay.addWidget(self.bar)
+        self.bar.setMouseTracking(True)
+        self.bar.installEventFilter(self)
 
         self.overlay = QLabel("", self)
         self.overlay.setStyleSheet(
@@ -367,6 +369,10 @@ class EmbeddedPlayer(QWidget):
         self._drag_start = None
         self._drag_win_pos = None
         self._drag_active = False
+        self._pip_mode = False
+        self._pip_bar_timer = QTimer(self)
+        self._pip_bar_timer.setSingleShot(True)
+        self._pip_bar_timer.timeout.connect(self._hide_pip_bar)
 
         self._stats_overlay = QLabel("", self.video)
         self._stats_overlay.setStyleSheet(
@@ -383,17 +389,21 @@ class EmbeddedPlayer(QWidget):
     def eventFilter(self, obj, event):
         if obj is self.video:
             if event.type() == event.Type.MouseButtonDblClick:
-                self.double_clicked.emit()
-                return True
+                if not self._drag_active:
+                    self.double_clicked.emit()
+                    return True
             if event.type() == event.Type.MouseButtonPress:
                 if (event.button() == Qt.MouseButton.LeftButton
                         and self._pip_drag_enabled()):
                     self._drag_start = event.globalPosition().toPoint()
                     self._drag_win_pos = self.window().pos()
                     self._drag_active = False
+                    return True
             if event.type() == event.Type.MouseMove:
                 if self._fs_ui:
                     self._show_overlay()
+                if self._pip_mode:
+                    self._show_pip_bar()
                 if (self._drag_start is not None
                         and event.buttons() & Qt.MouseButton.LeftButton):
                     delta = event.globalPosition().toPoint() - self._drag_start
@@ -401,7 +411,7 @@ class EmbeddedPlayer(QWidget):
                         if (abs(delta.x()) > 4 or abs(delta.y()) > 4):
                             self._drag_active = True
                         else:
-                            return False
+                            return True
                     self.window().move(self._drag_win_pos + delta)
                     return True
             if event.type() == event.Type.MouseButtonRelease:
@@ -412,14 +422,36 @@ class EmbeddedPlayer(QWidget):
                     self._drag_active = False
                     if was_drag:
                         return True
+        elif obj is self.bar and self._pip_mode:
+            if event.type() in (event.Type.Enter, event.Type.MouseMove):
+                self._pip_bar_timer.start(self.PIP_BAR_HIDE_MS)
         elif self._fs_ui and event.type() in (event.Type.Enter,
                                               event.Type.MouseMove):
             self._overlay_timer.start()
         return super().eventFilter(obj, event)
 
     def _pip_drag_enabled(self) -> bool:
-        w = self.window()
-        return hasattr(w, '_pip_win') and w._pip_win is not None
+        return self._pip_mode
+
+    # -- pip bar auto-hide -----------------------------------------------------
+
+    PIP_BAR_HIDE_MS = 2500
+
+    def set_pip_mode(self, enabled: bool) -> None:
+        self._pip_mode = enabled
+        if enabled:
+            self._show_pip_bar()
+        else:
+            self._pip_bar_timer.stop()
+            self.bar.show()
+
+    def _show_pip_bar(self) -> None:
+        self.bar.show()
+        self._pip_bar_timer.start(self.PIP_BAR_HIDE_MS)
+
+    def _hide_pip_bar(self) -> None:
+        if self._pip_mode:
+            self.bar.hide()
 
     # -- overlay ---------------------------------------------------------------
 
