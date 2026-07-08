@@ -23,7 +23,7 @@ class LoginDialog(QDialog):
 
     def __init__(self, settings, parent=None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Connect to an Xtream server")
+        self.setWindowTitle(tr("login_title"))
         self.setMinimumWidth(420)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(24, 24, 24, 24)
@@ -31,7 +31,7 @@ class LoginDialog(QDialog):
 
         heading = QLabel("dopeIPTV")
         heading.setStyleSheet("font-size:20px; font-weight:700;")
-        subtitle = QLabel("Sign in with your Xtream Codes credentials.")
+        subtitle = QLabel(tr("login_subtitle"))
         subtitle.setStyleSheet(f"color:{P['muted']};")
         lay.addWidget(heading)
         lay.addWidget(subtitle)
@@ -41,13 +41,13 @@ class LoginDialog(QDialog):
         self.server = QLineEdit(settings.value("server", ""))
         self.server.setPlaceholderText("http://server:port")
         self.user = QLineEdit(settings.value("username", ""))
-        self.user.setPlaceholderText("username")
+        self.user.setPlaceholderText(tr("login_username").lower())
         self.pw = QLineEdit(settings.value("password", ""))
-        self.pw.setPlaceholderText("password")
+        self.pw.setPlaceholderText(tr("login_password").lower())
         self.pw.setEchoMode(QLineEdit.EchoMode.Password)
-        form.addRow("Server", self.server)
-        form.addRow("Username", self.user)
-        form.addRow("Password", self.pw)
+        form.addRow(tr("login_server"), self.server)
+        form.addRow(tr("login_username"), self.user)
+        form.addRow(tr("login_password"), self.pw)
         lay.addLayout(form)
 
         self.status = QLabel("")
@@ -56,9 +56,10 @@ class LoginDialog(QDialog):
 
         buttons = QDialogButtonBox()
         self.ok = buttons.addButton(
-            "Connect", QDialogButtonBox.ButtonRole.AcceptRole)
+            tr("btn_connect"), QDialogButtonBox.ButtonRole.AcceptRole)
         self.ok.setObjectName("Primary")
-        buttons.addButton("Cancel", QDialogButtonBox.ButtonRole.RejectRole)
+        buttons.addButton(tr("btn_cancel"),
+                          QDialogButtonBox.ButtonRole.RejectRole)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         lay.addWidget(buttons)
@@ -72,44 +73,45 @@ class LoginDialog(QDialog):
 class PlaylistDialog(QDialog):
     """Add or edit a playlist (Xtream provider)."""
 
+    # (value, i18n key) - the label is translated at construction time.
     REFRESH_OPTIONS = [
-        ("never", "Never"), ("startup", "At startup"),
-        ("2h", "Every 2 hours"), ("6h", "Every 6 hours"),
-        ("12h", "Every 12 hours"), ("24h", "Daily"),
-        ("1w", "Weekly"),
+        ("never", "refresh_never"), ("startup", "refresh_at_startup"),
+        ("2h", "refresh_every_2h"), ("6h", "refresh_every_6h"),
+        ("12h", "refresh_every_12h"), ("24h", "refresh_daily"),
+        ("1w", "refresh_weekly"),
     ]
 
     def __init__(self, parent=None, playlist=None) -> None:
         super().__init__(parent)
         playlist = playlist or {}
-        self.setWindowTitle("Edit playlist" if playlist else "Add playlist")
+        self.setWindowTitle(tr("playlist_edit_title") if playlist
+                            else tr("playlist_add_title"))
         self.setMinimumWidth(460)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(22, 22, 22, 22)
         form = QFormLayout()
         form.setSpacing(10)
         self.name = QLineEdit(playlist.get("name", ""))
-        self.name.setPlaceholderText("e.g. My provider")
+        self.name.setPlaceholderText(tr("playlist_name_placeholder"))
         self.server = QLineEdit(playlist.get("server", ""))
         self.server.setPlaceholderText("http://server:port")
         self.user = QLineEdit(playlist.get("username", ""))
         self.pw = QLineEdit(playlist.get("password", ""))
         self.pw.setEchoMode(QLineEdit.EchoMode.Password)
         self.epg_url = QLineEdit(playlist.get("epg_url", ""))
-        self.epg_url.setPlaceholderText(
-            "optional - overrides the provider's xmltv.php")
+        self.epg_url.setPlaceholderText(tr("playlist_epg_placeholder"))
         self.refresh = QComboBox()
-        for value, label in self.REFRESH_OPTIONS:
-            self.refresh.addItem(label, value)
+        for value, key in self.REFRESH_OPTIONS:
+            self.refresh.addItem(tr(key), value)
         idx = self.refresh.findData(playlist.get("refresh", "never"))
         if idx >= 0:
             self.refresh.setCurrentIndex(idx)
-        form.addRow("Name", self.name)
-        form.addRow("Server", self.server)
-        form.addRow("Username", self.user)
-        form.addRow("Password", self.pw)
-        form.addRow("Custom TV guide URL", self.epg_url)
-        form.addRow("Auto-refresh", self.refresh)
+        form.addRow(tr("playlist_name"), self.name)
+        form.addRow(tr("login_server"), self.server)
+        form.addRow(tr("login_username"), self.user)
+        form.addRow(tr("login_password"), self.pw)
+        form.addRow(tr("playlist_custom_epg_url"), self.epg_url)
+        form.addRow(tr("playlist_auto_refresh"), self.refresh)
         lay.addLayout(form)
 
         buttons = QDialogButtonBox(
@@ -122,8 +124,8 @@ class PlaylistDialog(QDialog):
     def _validate(self) -> None:
         if not (self.server.text().strip() and self.user.text().strip()
                 and self.pw.text().strip()):
-            QMessageBox.warning(self, "Playlist",
-                                "Server, username and password are required.")
+            QMessageBox.warning(self, tr("playlist_msg_title"),
+                                tr("playlist_required_fields"))
             return
         self.accept()
 
@@ -376,14 +378,11 @@ class EpgGuideDialog(QDialog):
             scheduled += 1
         self._refresh_schedule_marks()
         if scheduled:
-            self.window._set_status(
-                f"Scheduled {scheduled} recording"
-                f"{'s' if scheduled > 1 else ''} - see Recordings → Upcoming")
+            self.window._set_status(tr("rec_scheduled_status", n=scheduled))
         if skipped:
             QMessageBox.warning(
-                self, "Record",
-                f"{skipped} programme{'s' if skipped > 1 else ''} could "
-                "not be scheduled: missing channel stream id.")
+                self, tr("rec_msg_title"),
+                tr("rec_skipped_warning", n=skipped))
 
     def _cancel_entries(self, entries: list[dict]) -> None:
         for e in entries:
@@ -412,16 +411,13 @@ class ContentManagerDialog(QDialog):
         self.mode = mode
         self.categories = categories
         self.overrides = overrides
-        self.setWindowTitle("Manage categories")
+        self.setWindowTitle(tr("cm_title"))
         self.resize(460, 520)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(18, 18, 18, 18)
         lay.setSpacing(10)
 
-        hint = QLabel(
-            "Hidden categories disappear from the sidebar and their "
-            "channels are left out of 'All'. Locked categories need "
-            "the parental PIN to open.")
+        hint = QLabel(tr("cm_hint"))
         hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         hint.setWordWrap(True)
         lay.addWidget(hint)
@@ -430,9 +426,9 @@ class ContentManagerDialog(QDialog):
         lay.addWidget(self.list, 1)
 
         btns = QHBoxLayout()
-        rename_btn = QPushButton("Rename...")
-        self.hide_btn = QPushButton("Hide")
-        self.lock_btn = QPushButton("Lock")
+        rename_btn = QPushButton(tr("cm_rename"))
+        self.hide_btn = QPushButton(tr("cm_hide"))
+        self.lock_btn = QPushButton(tr("cm_lock"))
         for b in (rename_btn, self.hide_btn, self.lock_btn):
             btns.addWidget(b)
         lay.addLayout(btns)
@@ -462,9 +458,9 @@ class ContentManagerDialog(QDialog):
                 self.mode, cid, c.get("category_name", "?"))
             flags = []
             if self.overrides.is_hidden(self.mode, cid):
-                flags.append("hidden")
+                flags.append(tr("cm_flag_hidden"))
             if self.overrides.is_locked(self.mode, cid):
-                flags.append("locked")
+                flags.append(tr("cm_flag_locked"))
             label = name + (f"   [{', '.join(flags)}]" if flags else "")
             item = QListWidgetItem(label)
             item.setData(Qt.ItemDataRole.UserRole, cid)
@@ -479,8 +475,8 @@ class ContentManagerDialog(QDialog):
                   and self.overrides.is_hidden(self.mode, cid))
         locked = (cid is not None
                   and self.overrides.is_locked(self.mode, cid))
-        self.hide_btn.setText("Unhide" if hidden else "Hide")
-        self.lock_btn.setText("Unlock" if locked else "Lock")
+        self.hide_btn.setText(tr("cm_unhide") if hidden else tr("cm_hide"))
+        self.lock_btn.setText(tr("cm_unlock") if locked else tr("cm_lock"))
 
     def _rename(self) -> None:
         cid = self._selected_cid()
@@ -491,7 +487,7 @@ class ContentManagerDialog(QDialog):
             next((c.get("category_name", "") for c in self.categories
                   if c.get("category_id") == cid), ""))
         name, ok = QInputDialog.getText(
-            self, "Rename category", "New name:", text=current)
+            self, tr("cm_rename_title"), tr("cm_new_name"), text=current)
         if ok:
             self.overrides.update(self.mode, cid, name=name.strip())
             self._populate()

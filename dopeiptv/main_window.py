@@ -337,7 +337,7 @@ class MainWindow(QMainWindow):
         self.back_btn.clicked.connect(self._leave_series)
         ml.addWidget(self.back_btn)
 
-        self.clear_history_btn = QPushButton("Clear history")
+        self.clear_history_btn = QPushButton(tr("msg_clear_history_title"))
         self.clear_history_btn.hide()
         self.clear_history_btn.clicked.connect(self._clear_history)
         ml.addWidget(self.clear_history_btn)
@@ -364,7 +364,7 @@ class MainWindow(QMainWindow):
         self.listw.customContextMenuRequested.connect(self._context_menu)
         ml.addWidget(self.listw, 1)
 
-        self._loading_hint = QLabel("Loading channels...")
+        self._loading_hint = QLabel(tr("status_loading_channels"))
         self._loading_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._loading_hint.setStyleSheet(
             f"color:{P['muted2']}; font-size:13px; padding:40px 0;")
@@ -876,8 +876,8 @@ class MainWindow(QMainWindow):
             self.loading_bar.hide()
             self._set_status("")
             QMessageBox.warning(
-                self, "Playlist",
-                f"Could not connect to {pl['name']}: {msg}")
+                self, tr("playlist_msg_title"),
+                tr("msg_could_not_connect", name=pl['name'], msg=msg))
 
         run_async(self.pool, candidate.authenticate, done, fail)
 
@@ -919,7 +919,7 @@ class MainWindow(QMainWindow):
             return
         if self.mode in ("fav", "history"):
             self.cat_list.blockSignals(True)
-            all_item = QListWidgetItem("All")
+            all_item = QListWidgetItem(tr("cat_all"))
             all_item.setData(Qt.ItemDataRole.UserRole, None)
             self.cat_list.addItem(all_item)
             if self.mode == "fav":
@@ -946,7 +946,7 @@ class MainWindow(QMainWindow):
             self._raw_categories = cats or []
             self.cat_list.blockSignals(True)
             self.cat_list.clear()
-            all_item = QListWidgetItem("All")
+            all_item = QListWidgetItem(tr("cat_all"))
             all_item.setData(Qt.ItemDataRole.UserRole, None)
             self.cat_list.addItem(all_item)
             for c in cats:
@@ -1155,10 +1155,10 @@ class MainWindow(QMainWindow):
 
     def _trakt_device_auth_dialog(self, parent) -> None:
         d = QDialog(parent)
-        d.setWindowTitle("Connect to Trakt")
+        d.setWindowTitle(tr("trakt_connect_title"))
         d.setMinimumWidth(380)
         lay = QVBoxLayout(d)
-        info = QLabel("Requesting a device code...")
+        info = QLabel(tr("trakt_requesting_code"))
         info.setWordWrap(True)
         info.setStyleSheet("font-size:13px;")
         lay.addWidget(info)
@@ -1173,7 +1173,7 @@ class MainWindow(QMainWindow):
             if state["cancelled"] or not state["device_code"]:
                 return
             if time.time() > state["expires_at"]:
-                info.setText("Code expired - try again.")
+                info.setText(tr("trakt_code_expired"))
                 return
             run_async(self.pool,
                       lambda: self.trakt.poll_device_token(
@@ -1186,12 +1186,12 @@ class MainWindow(QMainWindow):
             if data is None:
                 QTimer.singleShot(state["interval"] * 1000, poll)
                 return
-            info.setText("Connected to Trakt!")
+            info.setText(tr("trakt_connected_excl"))
             QTimer.singleShot(700, d.accept)
 
         def poll_failed(msg) -> None:
             if not state["cancelled"]:
-                info.setText(f"Trakt login failed: {msg}")
+                info.setText(tr("trakt_login_failed", msg=msg))
 
         def started(data) -> None:
             if state["cancelled"]:
@@ -1200,14 +1200,14 @@ class MainWindow(QMainWindow):
             state["interval"] = data.get("interval", 5)
             state["expires_at"] = time.time() + data.get("expires_in", 600)
             info.setText(
-                f"Go to <b>{data.get('verification_url')}</b> and enter "
-                f"this code:<br><br><span style='font-size:20px; "
-                f"font-weight:700;'>{data['user_code']}</span>")
+                tr("trakt_enter_code",
+                   url=data.get('verification_url'),
+                   code=data['user_code']))
             QTimer.singleShot(state["interval"] * 1000, poll)
 
         def start_failed(msg) -> None:
             if not state["cancelled"]:
-                info.setText(f"Could not start Trakt login: {msg}")
+                info.setText(tr("trakt_could_not_start", msg=msg))
 
         buttons.rejected.connect(lambda: state.__setitem__("cancelled", True))
         run_async(self.pool, self.trakt.start_device_auth,
@@ -1217,19 +1217,19 @@ class MainWindow(QMainWindow):
     def _open_trakt_dialog(self, parent) -> None:
         if not self.trakt.is_connected():
             QMessageBox.information(
-                parent, "Trakt", "Connect to Trakt first.")
+                parent, "Trakt", tr("msg_connect_trakt_first"))
             return
         d = QDialog(parent)
-        d.setWindowTitle("Trakt Watchlist & History")
+        d.setWindowTitle(tr("trakt_watchlist_title"))
         d.setMinimumSize(480, 500)
         lay = QVBoxLayout(d)
         tw = QTabWidget()
         lay.addWidget(tw)
         wl_list = QListWidget()
         hist_list = QListWidget()
-        tw.addTab(wl_list, "Watchlist")
-        tw.addTab(hist_list, "History")
-        status = QLabel("Loading...")
+        tw.addTab(wl_list, tr("trakt_tab_watchlist"))
+        tw.addTab(hist_list, tr("nav_history"))
+        status = QLabel(tr("common_loading"))
         status.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         lay.addWidget(status)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
@@ -1257,7 +1257,7 @@ class MainWindow(QMainWindow):
             return watched or "?"
 
         def load_failed(msg) -> None:
-            status.setText(f"Could not load Trakt data: {msg}")
+            status.setText(tr("trakt_load_failed", msg=msg))
 
         def load_history(items) -> None:
             hist_list.clear()
@@ -1685,11 +1685,11 @@ class MainWindow(QMainWindow):
         if not self.tmdb:
             return
         d = self._ensure_cast_dialog()
-        d.setWindowTitle(f"{name} — other titles in your playlist")
+        d.setWindowTitle(tr("actor_other_titles", name=name))
         status = self._cast_status
         result_list = self._cast_result_list
         result_list.clear()
-        status.setText("Looking up filmography...")
+        status.setText(tr("actor_lookup_filmography"))
         # Each click starts a new lookup; stamp a token so stale async
         # callbacks from a previously clicked cast member are ignored.
         token = getattr(self, "_cast_token", 0) + 1
@@ -1698,22 +1698,19 @@ class MainWindow(QMainWindow):
         def show_matches(titles: list[str]) -> None:
             if self._cast_token != token:
                 return
-            status.setText("Searching your playlist...")
+            status.setText(tr("actor_searching_playlist"))
 
             def with_matches(matches) -> None:
                 if self._cast_token != token:
                     return
                 result_list.clear()
                 if not matches:
-                    status.setText(
-                        "No other titles from this playlist matched.")
+                    status.setText(tr("actor_no_matches"))
                     return
-                status.setText(
-                    f"{len(matches)} title(s) found in your playlist "
-                    "(double-click to open):")
+                status.setText(tr("actor_matches_found", n=len(matches)))
                 for it, kind in matches:
                     label = (f"{it.get('name') or it.get('title')}"
-                            f"  ({'Movie' if kind == 'vod' else 'Series'})")
+                            f"  ({tr('misc_movie') if kind == 'vod' else tr('misc_series')})")
                     item = QListWidgetItem(label)
                     item.setData(Qt.ItemDataRole.UserRole, (it, kind))
                     result_list.addItem(item)
@@ -1725,7 +1722,7 @@ class MainWindow(QMainWindow):
             if self._cast_token != token:
                 return
             if not pid:
-                status.setText(f"Couldn't find {name} on TMDB.")
+                status.setText(tr("actor_not_found_tmdb", name=name))
                 return
             credits = self.tmdb.get_person_credits(pid, show_matches)
             if credits is not None:
@@ -1736,7 +1733,7 @@ class MainWindow(QMainWindow):
         else:
             # Cast names that came from the provider's plain-text list have
             # no TMDB id yet - resolve it by name first, then fetch credits.
-            status.setText("Looking up cast member...")
+            status.setText(tr("actor_lookup_member"))
             pid = self.tmdb.resolve_person_id(name, with_person_id)
             if pid is not None:
                 with_person_id(pid)
@@ -2134,8 +2131,7 @@ class MainWindow(QMainWindow):
         if not ChromecastManager.available():
             QMessageBox.information(
                 self, "Chromecast",
-                "Casting needs the pychromecast package:\n\n"
-                "  pip install pychromecast")
+                tr("msg_cast_needs_package"))
             return
         if self.mode == "history":
             url, title = it.get("_url"), it.get("name") or "dopeIPTV"
@@ -2305,8 +2301,8 @@ class MainWindow(QMainWindow):
 
     def _player_missing(self, name: str) -> None:
         QMessageBox.warning(
-            self, "Player not found",
-            f"{name} was not found. Install it and try again.")
+            self, tr("status_player_not_found"),
+            tr("status_player_not_found_msg", name=name))
 
     def _show_toast(self, text: str, duration_ms: int = 0) -> None:
         self._toast.show_message(text, duration_ms)
@@ -2328,7 +2324,7 @@ class MainWindow(QMainWindow):
         if self._player_fs and self.player:
             self.player.set_overlay_info(f"Stream error: {msg}")
         else:
-            self.stream_error.setText(f"Stream error: {msg}")
+            self.stream_error.setText(tr("status_stream_error", msg=msg))
             self.stream_error.show()
         if self.player:
             self.player.title_lbl.setText("")
@@ -2362,37 +2358,37 @@ class MainWindow(QMainWindow):
             self._rec_context_menu(pos, it)
             return
         m = QMenu(self)
-        m.addAction("Play in mpv", lambda: self.play_item(it, "mpv"))
-        ext = m.addMenu("Open externally")
+        m.addAction(tr("ctx_play_in_mpv"), lambda: self.play_item(it, "mpv"))
+        ext = m.addMenu(tr("ctx_open_externally"))
         ext.addAction("mpv",
                       lambda: self.play_item(it, "mpv", external=True))
         ext.addAction("VLC",
                       lambda: self.play_item(it, "vlc", external=True))
         if not (self.mode == "series" and not self.series_ctx):
-            m.addAction("Cast to Chromecast...",
+            m.addAction(tr("ctx_cast_to_chromecast"),
                         lambda: self._open_cast_dialog(it))
         if (self.mode in ("live", "fav")
                 and it.get("stream_id") is not None):
             if self._timeshift_days(it):
                 m.addSeparator()
                 self._build_timeshift_menu(
-                    m.addMenu("Timeshift / catch-up"), it)
+                    m.addMenu(tr("tooltip_timeshift")), it)
             m.addSeparator()
-            self._build_record_menu(m.addMenu("Record"), it)
+            self._build_record_menu(m.addMenu(tr("rec_record")), it)
         if (self.mode in ("live", "fav", "vod", "series")
                 and it.get("stream_id") is not None):
             m.addSeparator()
-            fav_menu = m.addMenu("Add to favorites group")
+            fav_menu = m.addMenu(tr("ctx_add_to_favorites"))
             for g in self.favs.group_names():
                 fav_menu.addAction(
                     g, lambda g=g: self._add_fav(g, it))
             if self.favs.group_names():
                 fav_menu.addSeparator()
-            fav_menu.addAction("New group...",
+            fav_menu.addAction(tr("ctx_new_group"),
                                lambda: self._add_fav(None, it))
             if (self.mode == "fav"
                     or self.favs.is_favorite(it.get("stream_id"))):
-                m.addAction("Remove from favorites",
+                m.addAction(tr("ctx_remove_from_favorites"),
                             lambda: self._remove_fav(it))
         if (self.mode in ("live", "vod", "series")
                 and not self.series_ctx):
@@ -2400,23 +2396,23 @@ class MainWindow(QMainWindow):
             key = self._item_key(it)
             m.addSeparator()
             m.addAction(
-                "Rename channel..." if ov_mode == "live"
-                else "Rename...",
+                tr("ctx_rename_channel") if ov_mode == "live"
+                else tr("ctx_rename"),
                 lambda: self._rename_channel(ov_mode, key, it))
             m.addAction(
-                "Hide channel" if ov_mode == "live" else "Hide",
+                tr("ctx_hide_channel") if ov_mode == "live" else tr("ctx_hide"),
                 lambda: self._hide_channel(ov_mode, key))
             if self.channel_ov.get(ov_mode, key):
                 m.addAction(
-                    "Reset this channel's customizations",
+                    tr("ctx_reset_channel"),
                     lambda: self._reset_channel(ov_mode, key))
             if self.channel_ov.has_overrides(ov_mode):
                 m.addAction(
-                    "Restore default channels...",
+                    tr("ctx_restore_defaults"),
                     lambda: self._restore_default_channels(ov_mode))
         if self.mode == "history":
             m.addSeparator()
-            m.addAction("Remove selected from history",
+            m.addAction(tr("ctx_remove_from_history"),
                         lambda: self._remove_history_selected(it))
         if (not (self.mode == "series" and not self.series_ctx)
                 and self.mode != "history"):
@@ -2424,7 +2420,7 @@ class MainWindow(QMainWindow):
             if url:
                 m.addSeparator()
                 m.addAction(
-                    "Copy stream URL",
+                    tr("ctx_copy_stream_url"),
                     lambda: QApplication.clipboard().setText(url))
         m.exec(self.listw.viewport().mapToGlobal(pos))
 
@@ -2453,9 +2449,8 @@ class MainWindow(QMainWindow):
 
     def _restore_default_channels(self, mode: str) -> None:
         if QMessageBox.question(
-                self, "Restore default channels",
-                "Undo all channel renames and hides for this section "
-                "and go back to the provider's original list?") \
+                self, tr("ctx_restore_defaults").rstrip("."),
+                tr("msg_restore_defaults_body")) \
                 == QMessageBox.StandardButton.Yes:
             self.channel_ov.reset_mode(mode)
             self._apply_filter()
@@ -2498,7 +2493,8 @@ class MainWindow(QMainWindow):
         if self.parental.verify(pin.strip()):
             self.parental.session_unlocked = True
             return True
-        QMessageBox.warning(self, "Parental control", "Wrong PIN.")
+        QMessageBox.warning(self, tr("msg_parental_title"),
+                            tr("msg_wrong_pin"))
         return False
 
     def _ensure_pin_configured(self) -> bool:
@@ -2526,14 +2522,14 @@ class MainWindow(QMainWindow):
                 return
             group = data
             m.addAction(
-                f'Remove group "{group}"',
+                tr("ctx_remove_group", group=group),
                 lambda: (self.favs.remove_group(group),
                          self._load_categories()))
             if self.favs.is_locked(group):
-                m.addAction("Unlock group (remove protection)",
+                m.addAction(tr("ctx_unlock_group"),
                             lambda: self._set_fav_lock(group, False))
             else:
-                m.addAction("Lock group (parental control)",
+                m.addAction(tr("ctx_lock_group"),
                             lambda: self._set_fav_lock(group, True))
             m.exec(self.cat_list.mapToGlobal(pos))
             return
@@ -2542,32 +2538,36 @@ class MainWindow(QMainWindow):
             return
         if data is not None:
             cid = data
-            m.addAction("Rename category...",
+            m.addAction(tr("ctx_rename_category"),
                         lambda: self._rename_category(cid))
-            m.addAction("Set icon...",
+            m.addAction(tr("ctx_set_icon"),
                         lambda: self._set_category_icon(cid))
-            color_menu = m.addMenu("Set color")
-            for label, hex_val in (("Default", ""), ("Blue", "#4C8DFF"),
-                                   ("Green", "#2FBF71"), ("Orange", "#FF9F43"),
-                                   ("Red", "#FF5C5C"), ("Purple", "#8E6BFF"),
-                                   ("Teal", "#2AC3C3"), ("Pink", "#FF5C8A")):
+            color_menu = m.addMenu(tr("ctx_set_color"))
+            for label, hex_val in ((tr("color_default"), ""),
+                                   (tr("accent_blue"), "#4C8DFF"),
+                                   (tr("accent_green"), "#2FBF71"),
+                                   (tr("accent_orange"), "#FF9F43"),
+                                   (tr("accent_red"), "#FF5C5C"),
+                                   (tr("accent_purple"), "#8E6BFF"),
+                                   (tr("accent_teal"), "#2AC3C3"),
+                                   (tr("accent_pink"), "#FF5C8A")):
                 act = color_menu.addAction(label)
                 act.triggered.connect(
                     lambda _, c=hex_val: (
                         self.overrides.update(self.mode, cid, color=c),
                         self._load_categories()))
             m.addSeparator()
-            m.addAction("Hide category",
+            m.addAction(tr("ctx_hide_category"),
                         lambda: self._set_category_flag(cid, hidden=True))
             if self.overrides.is_locked(self.mode, cid):
                 m.addAction(
-                    "Unlock category (remove protection)",
+                    tr("ctx_unlock_category"),
                     lambda: self._set_category_flag(cid, locked=False))
             else:
-                m.addAction("Lock category (parental control)",
+                m.addAction(tr("ctx_lock_category"),
                             lambda: self._lock_category(cid))
             m.addSeparator()
-        m.addAction("Manage categories...", self._open_content_manager)
+        m.addAction(tr("ctx_manage_categories"), self._open_content_manager)
         m.exec(self.cat_list.mapToGlobal(pos))
 
     def _set_fav_lock(self, group: str, locked: bool) -> None:
@@ -2775,9 +2775,8 @@ class MainWindow(QMainWindow):
         path = j.get("path")
         if not path or not os.path.exists(path):
             QMessageBox.information(
-                self, "Recording",
-                "The recording file hasn't been created yet - try "
-                "again in a few seconds.")
+                self, tr("rec_status_recording"),
+                tr("msg_rec_file_not_ready"))
             return
         self._start_playback(path, f"{j['title']} (recording)", None,
                              path, "recording", record=False)
@@ -2788,11 +2787,11 @@ class MainWindow(QMainWindow):
         for j in active:
             since = datetime.fromtimestamp(j["start"]).strftime("%H:%M")
             m.addAction(
-                f"Stop recording: {j['title']} (since {since})",
+                tr("rec_stop_named_since", title=j['title'], since=since),
                 lambda jid=j["id"]: self.rec.cancel(jid))
         if active:
             m.addSeparator()
-        m.addAction("Open Recordings",
+        m.addAction(tr("rec_open_recordings"),
                     lambda: self.switch_mode("rec"))
         m.exec(self.rec_indicator.mapToGlobal(
             self.rec_indicator.rect().bottomLeft()))
@@ -2828,32 +2827,29 @@ class MainWindow(QMainWindow):
         if self.rec.recorder()[1]:
             return True
         QMessageBox.warning(
-            self, "Recording",
-            "Recording needs ffmpeg (recommended) or mpv on the PATH.\n\n"
-            "Install ffmpeg, e.g.:  sudo apt install ffmpeg")
+            self, tr("rec_status_recording"),
+            tr("msg_rec_needs_ffmpeg"))
         return False
 
     def _build_record_menu(self, rec_menu, it) -> None:
         active = [j for j in self.rec.jobs if j["status"] == "recording"]
         for j in active:
             rec_menu.addAction(
-                f"■ Stop recording: {j['title']}",
+                "■ " + tr("rec_stop_recording") + f": {j['title']}",
                 lambda jid=j["id"]: self.rec.cancel(jid))
         if active:
             rec_menu.addSeparator()
-        rec_menu.addAction("Record now - until stopped",
+        rec_menu.addAction(tr("rec_record_now_until_stopped"),
                            lambda: self._record_now(it, None))
-        for label, mins in (("Record now - 30 min", 30),
-                            ("Record now - 1 hour", 60),
-                            ("Record now - 2 hours", 120),
-                            ("Record now - 4 hours", 240)):
+        for dur_key, mins in (("dur_30min", 30), ("dur_1h", 60),
+                              ("dur_2h", 120), ("dur_4h", 240)):
             rec_menu.addAction(
-                label,
+                tr("rec_record_now_duration", duration=tr(dur_key)),
                 lambda mins=mins: self._record_now(it, mins))
         rec_menu.addSeparator()
-        rec_menu.addAction("Schedule recording...",
+        rec_menu.addAction(tr("rec_schedule_recording"),
                            lambda: self._schedule_recording(it))
-        cap_menu = rec_menu.addMenu("Size limit (this session)")
+        cap_menu = rec_menu.addMenu(tr("rec_size_limit_session"))
         current = self.rec.session_cap
         presets = (("From Settings", None), ("No limit", 0),
                    ("250 MB", 250 * 10**6),
@@ -2882,7 +2878,7 @@ class MainWindow(QMainWindow):
 
     def _set_custom_rec_cap(self) -> None:
         d = QDialog(self)
-        d.setWindowTitle("Custom size limit")
+        d.setWindowTitle(tr("rec_custom_size_title"))
         d.setMinimumWidth(320)
         f = QFormLayout(d)
         f.setSpacing(10)
@@ -2893,7 +2889,7 @@ class MainWindow(QMainWindow):
             [("MB", "MB"), ("GB", "GB"), ("TB", "TB")], "GB")
         row.addWidget(val_edit)
         row.addWidget(unit_box)
-        f.addRow("Stop recording at", row)
+        f.addRow(tr("rec_stop_recording_at"), row)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel)
@@ -2932,7 +2928,7 @@ class MainWindow(QMainWindow):
             try:
                 path = self.rec.build_path(title)
             except OSError as e:
-                QMessageBox.warning(self, "Recording", str(e))
+                QMessageBox.warning(self, tr("rec_status_recording"), str(e))
                 return
             if self.player.start_stream_record(path):
                 self.rec.add_inplayer_job(
@@ -2954,7 +2950,7 @@ class MainWindow(QMainWindow):
         if not self._recorder_ready() or it.get("stream_id") is None:
             return
         d = QDialog(self)
-        d.setWindowTitle("Schedule recording")
+        d.setWindowTitle(tr("rec_schedule_recording").rstrip("."))
         d.setMinimumWidth(380)
         f = QFormLayout(d)
         f.setSpacing(10)
@@ -2970,10 +2966,10 @@ class MainWindow(QMainWindow):
         folder_box.addItem("(Recordings folder)", "")
         for rel in self.rec.folders():
             folder_box.addItem(rel, rel)
-        f.addRow("Name", name_edit)
-        f.addRow("Start", start_edit)
-        f.addRow("Stop", stop_edit)
-        f.addRow("Save in", folder_box)
+        f.addRow(tr("playlist_name"), name_edit)
+        f.addRow(tr("field_start"), start_edit)
+        f.addRow(tr("field_stop"), stop_edit)
+        f.addRow(tr("field_save_in"), folder_box)
         hint = QLabel(
             f"Saved under {self.rec.directory()} - change the "
             "location in Settings → Recording. The app must be "
@@ -2993,9 +2989,8 @@ class MainWindow(QMainWindow):
         stop_ts = stop_edit.dateTime().toSecsSinceEpoch()
         if stop_ts <= start_ts or stop_ts <= time.time():
             QMessageBox.warning(
-                self, "Schedule recording",
-                "The stop time must be in the future and after the "
-                "start time.")
+                self, tr("rec_schedule_recording").rstrip("."),
+                tr("msg_stop_time_future"))
             return
         url = self.client.live_url(it["stream_id"], "ts")
         title = (name_edit.text().strip()
@@ -3012,7 +3007,7 @@ class MainWindow(QMainWindow):
         if not job or job["status"] != "scheduled":
             return
         d = QDialog(self)
-        d.setWindowTitle("Edit recording time")
+        d.setWindowTitle(tr("msg_edit_time_title"))
         d.setMinimumWidth(380)
         f = QFormLayout(d)
         f.setSpacing(10)
@@ -3025,9 +3020,9 @@ class MainWindow(QMainWindow):
                 job["start"] + 3600))))
         stop_edit.setCalendarPopup(True)
         stop_edit.setDisplayFormat("yyyy-MM-dd HH:mm")
-        f.addRow("Title", QLabel(job["title"]))
-        f.addRow("Start", start_edit)
-        f.addRow("Stop", stop_edit)
+        f.addRow(tr("field_title"), QLabel(job["title"]))
+        f.addRow(tr("field_start"), start_edit)
+        f.addRow(tr("field_stop"), stop_edit)
         bb = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel)
@@ -3040,8 +3035,8 @@ class MainWindow(QMainWindow):
         stop_ts = stop_edit.dateTime().toSecsSinceEpoch()
         if stop_ts <= start_ts:
             QMessageBox.warning(
-                self, "Edit recording time",
-                "The stop time must be after the start time.")
+                self, tr("msg_edit_time_title"),
+                tr("msg_stop_after_start"))
             return
         self.rec.update_job_times(job_id, start_ts, stop_ts)
 
@@ -3077,11 +3072,11 @@ class MainWindow(QMainWindow):
         items = self._selected_recordings(clicked_item)
         if not items:
             return
-        what = (f"{len(items)} recordings" if len(items) > 1
+        what = (tr("rec_n_recordings", n=len(items)) if len(items) > 1
                 else f"'{items[0]['name']}'")
         if QMessageBox.question(
-                self, "Delete recording",
-                f"Delete {what} from disk?") \
+                self, tr("msg_delete_rec_title"),
+                tr("msg_delete_rec_body", what=what)) \
                 != QMessageBox.StandardButton.Yes:
             return
         for it in items:
@@ -3112,7 +3107,7 @@ class MainWindow(QMainWindow):
         try:
             os.rename(path, new_path)
         except OSError as e:
-            QMessageBox.warning(self, "Rename recording", str(e))
+            QMessageBox.warning(self, tr("msg_rename_rec_title"), str(e))
         cur = self.cat_list.currentItem()
         self._load_items(
             cur.data(Qt.ItemDataRole.UserRole) if cur else None)
@@ -3126,12 +3121,12 @@ class MainWindow(QMainWindow):
                 shutil.move(it["_path"], os.path.join(
                     target, os.path.basename(it["_path"])))
         except OSError as e:
-            QMessageBox.warning(self, "Move recording", str(e))
+            QMessageBox.warning(self, tr("msg_move_rec_title"), str(e))
         self._load_categories()
 
     def _new_rec_folder(self, items=None) -> None:
         name, ok = QInputDialog.getText(
-            self, "New folder", "Folder name:")
+            self, tr("msg_new_folder_title"), tr("msg_folder_name"))
         name = (safe_filename(name.strip())
                 if ok and name.strip() else "")
         if not name:
@@ -3205,34 +3200,33 @@ class MainWindow(QMainWindow):
                              self._item_key(it), "live", record=False,
                              item=it)
 
+    # (minutes back, duration i18n key) - the label is "Go back <duration>".
     TIMESHIFT_STEPS = (
-        (30, "Go back 30 minutes"), (60, "Go back 1 hour"),
-        (120, "Go back 2 hours"), (360, "Go back 6 hours"),
-        (720, "Go back 12 hours"), (1440, "Go back 1 day"),
-        (2880, "Go back 2 days"), (4320, "Go back 3 days"),
-        (7200, "Go back 5 days"), (10080, "Go back 7 days"),
+        (30, "dur_30min"), (60, "dur_1h"), (120, "dur_2h"), (360, "dur_6h"),
+        (720, "dur_12h"), (1440, "dur_1d"), (2880, "dur_2d"),
+        (4320, "dur_3d"), (7200, "dur_5d"), (10080, "dur_7d"),
     )
 
     def _build_timeshift_menu(self, ts_menu, it) -> None:
         days = self._timeshift_days(it)
-        ts_menu.addAction("Go Live", lambda: self.play_live_channel(it))
+        ts_menu.addAction(tr("ts_go_live"),
+                          lambda: self.play_live_channel(it))
         ts_menu.addSeparator()
         prog = self.xmltv.current_programme(it)
         if prog:
             ts_menu.addAction(
-                f"Watch '{prog['title']}' from the start",
+                tr("ts_watch_from_start_named", title=prog['title']),
                 lambda: self._play_timeshift(it, prog=prog))
-        ts_menu.addAction("Browse past programmes (EPG)...",
+        ts_menu.addAction(tr("ts_browse_past"),
                           lambda: self._open_catchup_dialog(it))
         ts_menu.addSeparator()
-        for mins, label in self.TIMESHIFT_STEPS:
+        for mins, dur_key in self.TIMESHIFT_STEPS:
             if mins > days * 1440:
                 break
             ts_menu.addAction(
-                label, lambda mins=mins: self._play_timeshift(
-                    it, back_min=mins))
-        note = ts_menu.addAction(
-            f"Archive depth: {days} day{'s' if days != 1 else ''}")
+                tr("ts_go_back", t=tr(dur_key)),
+                lambda mins=mins: self._play_timeshift(it, back_min=mins))
+        note = ts_menu.addAction(tr("ts_archive_depth", n=days))
         note.setEnabled(False)
 
     def _open_catchup_dialog(self, it) -> None:
@@ -3241,19 +3235,19 @@ class MainWindow(QMainWindow):
             return
         d = QDialog(self)
         d.setWindowTitle(
-            f"Catch-up - {self.channel_display_name(it)}")
+            tr("ts_catchup_title", name=self.channel_display_name(it)))
         d.setMinimumSize(480, 500)
         lay = QVBoxLayout(d)
         lay.setContentsMargins(18, 18, 18, 18)
         lay.setSpacing(10)
-        info = QLabel("Loading past programmes from the guide...")
+        info = QLabel(tr("ts_loading_past"))
         info.setWordWrap(True)
         lay.addWidget(info)
         lst = QListWidget()
         lay.addWidget(lst, 1)
         btns = QHBoxLayout()
-        watch_btn = QPushButton("Watch", objectName="Primary")
-        close_btn = QPushButton("Close")
+        watch_btn = QPushButton(tr("common_watch"), objectName="Primary")
+        close_btn = QPushButton(tr("common_close"))
         btns.addStretch()
         btns.addWidget(watch_btn)
         btns.addWidget(close_btn)
@@ -3331,51 +3325,51 @@ class MainWindow(QMainWindow):
         if it.get("_kind") == "recjob":
             status = it.get("_status")
             if it.get("_path"):
-                m.addAction("Watch", lambda: self.play_item(it))
+                m.addAction(tr("common_watch"), lambda: self.play_item(it))
             if status == "recording":
-                m.addAction("Stop recording",
+                m.addAction(tr("rec_stop_recording"),
                             lambda: self.rec.cancel(it["_job"]))
             elif status == "scheduled":
-                m.addAction("Edit start/stop time...",
+                m.addAction(tr("rec_edit_times"),
                             lambda: self._edit_job_times(it["_job"]))
-                m.addAction("Cancel scheduled recording",
+                m.addAction(tr("rec_cancel_scheduled"),
                             lambda: self.rec.cancel(it["_job"]))
             else:
-                m.addAction("Remove selected from list",
+                m.addAction(tr("rec_remove_from_list"),
                             lambda: self._remove_jobs_selected(it))
             m.addSeparator()
-            m.addAction("Clear all finished from list",
+            m.addAction(tr("rec_clear_finished"),
                         lambda: self.rec.clear_finished())
         else:
             items = self._selected_recordings(it)
             many = len(items) > 1
-            m.addAction("Play in mpv",
+            m.addAction(tr("ctx_play_in_mpv"),
                         lambda: self.play_item(it, "mpv"))
-            m.addAction("Play in VLC",
+            m.addAction(tr("ctx_play_in_vlc"),
                         lambda: self.play_item(it, "vlc"))
             m.addSeparator()
-            m.addAction("Rename...",
+            m.addAction(tr("ctx_rename"),
                         lambda: self._rename_recording(it))
             move = m.addMenu(
-                "Move to" if not many
-                else f"Move {len(items)} recordings to")
+                tr("ctx_move_to") if not many
+                else tr("rec_move_n", n=len(items)))
             move.addAction(
-                "(Recordings folder)",
+                tr("rec_move_root"),
                 lambda: self._move_recordings(items, ""))
             for rel in self.rec.folders():
                 move.addAction(
                     rel,
                     lambda rel=rel: self._move_recordings(items, rel))
             move.addSeparator()
-            move.addAction("New folder...",
+            move.addAction(tr("ctx_new_folder"),
                            lambda: self._new_rec_folder(items))
             m.addAction(
-                "Delete" if not many
-                else f"Delete {len(items)} recordings",
+                tr("ctx_delete") if not many
+                else tr("rec_delete_n", n=len(items)),
                 lambda: self._delete_recordings_selected(it))
         m.addSeparator()
-        m.addAction("New folder...", lambda: self._new_rec_folder())
-        m.addAction("Change recordings folder...",
+        m.addAction(tr("ctx_new_folder"), lambda: self._new_rec_folder())
+        m.addAction(tr("rec_change_folder"),
                     lambda: self._choose_rec_dir())
         m.exec(self.listw.viewport().mapToGlobal(pos))
 
@@ -3391,8 +3385,8 @@ class MainWindow(QMainWindow):
 
     def _clear_history(self) -> None:
         if QMessageBox.question(
-                self, "Clear history",
-                "Remove all watch history?") \
+                self, tr("msg_clear_history_title"),
+                tr("msg_clear_history_body")) \
                 == QMessageBox.StandardButton.Yes:
             self.history.clear()
             self._load_items(None)
@@ -3407,9 +3401,9 @@ class MainWindow(QMainWindow):
             EpgGuideDialog(self, list(self.all_items), cat_name).exec()
             return
         dlg = QDialog(self)
-        dlg.setWindowTitle("EPG Guide")
+        dlg.setWindowTitle(tr("btn_epg_guide"))
         lay = QVBoxLayout(dlg)
-        lay.addWidget(QLabel("Loading channels..."))
+        lay.addWidget(QLabel(tr("status_loading_channels")))
         dlg.resize(300, 100)
         dlg.show()
 
@@ -3716,9 +3710,9 @@ class MainWindow(QMainWindow):
         pv.addLayout(pl_btns)
         io_btns = QHBoxLayout()
         export_btn = QPushButton(tr("btn_export") + "...")
-        export_btn.setToolTip("Export all playlists to a JSON file")
+        export_btn.setToolTip(tr("settings_export_tip"))
         import_btn = QPushButton(tr("btn_import") + "...")
-        import_btn.setToolTip("Import playlists from a JSON file")
+        import_btn.setToolTip(tr("settings_import_tip"))
         io_btns.addWidget(export_btn)
         io_btns.addWidget(import_btn)
         io_btns.addStretch()
@@ -3731,9 +3725,9 @@ class MainWindow(QMainWindow):
         parv.setSpacing(10)
         pin_status = QLabel()
         parv.addWidget(pin_status)
-        set_pin_btn = QPushButton("Set / change PIN...")
-        remove_pin_btn = QPushButton("Remove PIN")
-        lock_now_btn = QPushButton("Lock now")
+        set_pin_btn = QPushButton(tr("pin_set_change"))
+        remove_pin_btn = QPushButton(tr("pin_remove"))
+        lock_now_btn = QPushButton(tr("pin_lock_now"))
         pin_btns = QHBoxLayout()
         pin_btns.setSpacing(8)
         pin_btns.addWidget(set_pin_btn)
@@ -3760,9 +3754,9 @@ class MainWindow(QMainWindow):
         recv.setSpacing(10)
         rec_dir_lbl = QLabel(self.rec.directory())
         rec_dir_lbl.setWordWrap(True)
-        recv.addWidget(QLabel("Recordings are saved in:"))
+        recv.addWidget(QLabel(tr("rec_saved_in")))
         recv.addWidget(rec_dir_lbl)
-        rec_dir_btn = QPushButton("Choose folder...")
+        rec_dir_btn = QPushButton(tr("btn_choose_folder"))
 
         def pick_rec_dir():
             path = QFileDialog.getExistingDirectory(
@@ -3785,7 +3779,7 @@ class MainWindow(QMainWindow):
             "Stop a recording when the file reaches"))
         rec_max_edit = QLineEdit(
             str(self.settings.value("rec_max_value", "")))
-        rec_max_edit.setPlaceholderText("no limit")
+        rec_max_edit.setPlaceholderText(tr("ph_no_limit"))
         rec_max_edit.setMaximumWidth(90)
         rec_max_unit = self._combo(
             [("MB", "MB"), ("GB", "GB"), ("TB", "TB")],
@@ -3825,13 +3819,13 @@ class MainWindow(QMainWindow):
             self.settings.value("metadata_source", "playlist"))
         tmdb_key_row = QHBoxLayout()
         tmdb_key_edit = QLineEdit(self.settings.value("tmdb_api_key", ""))
-        tmdb_key_edit.setPlaceholderText("TMDB API key (v3 auth)")
-        tmdb_test_btn = QPushButton("Test")
+        tmdb_key_edit.setPlaceholderText(tr("tmdb_key_placeholder"))
+        tmdb_test_btn = QPushButton(tr("btn_test"))
         tmdb_key_row.addWidget(tmdb_key_edit, 1)
         tmdb_key_row.addWidget(tmdb_test_btn)
-        mf.addRow("Artwork source", meta_source_box)
+        mf.addRow(tr("setting_artwork_source"), meta_source_box)
         key_row_idx = mf.rowCount()
-        mf.addRow("TMDB API key", tmdb_key_row)
+        mf.addRow(tr("setting_tmdb_key"), tmdb_key_row)
         tmdb_status = QLabel()
         tmdb_status.setWordWrap(True)
         status_row_idx = mf.rowCount()
@@ -3853,11 +3847,11 @@ class MainWindow(QMainWindow):
         def test_tmdb_key() -> None:
             key = tmdb_key_edit.text().strip()
             if not key:
-                tmdb_status.setText("Enter an API key first.")
+                tmdb_status.setText(tr("tmdb_enter_key"))
                 tmdb_status.setStyleSheet(
                     f"color:{P['error']}; font-size:11px;")
                 return
-            tmdb_status.setText("Checking...")
+            tmdb_status.setText(tr("tmdb_checking"))
             tmdb_status.setStyleSheet(
                 f"color:{P['muted2']}; font-size:11px;")
 
@@ -3866,12 +3860,12 @@ class MainWindow(QMainWindow):
                 return True
 
             def ok(_r):
-                tmdb_status.setText("Key works.")
+                tmdb_status.setText(tr("tmdb_key_works"))
                 tmdb_status.setStyleSheet(
                     f"color:{P['accent']}; font-size:11px; font-weight:600;")
 
             def fail(msg):
-                tmdb_status.setText(f"Key check failed: {msg}")
+                tmdb_status.setText(tr("tmdb_key_failed", msg=msg))
                 tmdb_status.setStyleSheet(
                     f"color:{P['error']}; font-size:11px;")
 
@@ -3896,7 +3890,7 @@ class MainWindow(QMainWindow):
         trakt_setup_lbl.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         trakt_setup_lbl.setWordWrap(True)
         tf.addWidget(trakt_setup_lbl)
-        create_app_btn = QPushButton("Create a free Trakt app...")
+        create_app_btn = QPushButton(tr("trakt_create_app"))
         create_app_btn.clicked.connect(
             lambda: QDesktopServices.openUrl(
                 QUrl("https://trakt.tv/oauth/applications/new")))
@@ -3907,20 +3901,21 @@ class MainWindow(QMainWindow):
         tform = QFormLayout()
         tform.setSpacing(10)
         trakt_id_edit = QLineEdit(self.trakt.client_id)
-        trakt_id_edit.setPlaceholderText("Client ID (from the app you created)")
+        trakt_id_edit.setPlaceholderText(tr("trakt_client_id_ph"))
         trakt_secret_edit = QLineEdit(self.trakt.client_secret)
-        trakt_secret_edit.setPlaceholderText("Client Secret")
+        trakt_secret_edit.setPlaceholderText(tr("trakt_client_secret_ph"))
         trakt_secret_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        tform.addRow("Client ID", trakt_id_edit)
-        tform.addRow("Client Secret", trakt_secret_edit)
+        tform.addRow(tr("field_client_id"), trakt_id_edit)
+        tform.addRow(tr("field_client_secret"), trakt_secret_edit)
         tf.addLayout(tform)
         trakt_status = QLabel()
         trakt_status.setWordWrap(True)
         tf.addWidget(trakt_status)
         trakt_btns = QHBoxLayout()
-        trakt_connect_btn = QPushButton("Connect to Trakt...", objectName="Primary")
-        trakt_disconnect_btn = QPushButton("Disconnect")
-        trakt_watchlist_btn = QPushButton("Watchlist / History...")
+        trakt_connect_btn = QPushButton(tr("trakt_connect_btn"),
+                                        objectName="Primary")
+        trakt_disconnect_btn = QPushButton(tr("trakt_disconnect"))
+        trakt_watchlist_btn = QPushButton(tr("trakt_watchlist_btn"))
         trakt_btns.addWidget(trakt_connect_btn)
         trakt_btns.addWidget(trakt_disconnect_btn)
         trakt_btns.addWidget(trakt_watchlist_btn)
@@ -3936,9 +3931,9 @@ class MainWindow(QMainWindow):
 
         def refresh_trakt_status():
             if self.trakt.is_connected():
-                trakt_status.setText("Connected to Trakt.")
+                trakt_status.setText(tr("trakt_connected"))
             else:
-                trakt_status.setText("Not connected.")
+                trakt_status.setText(tr("trakt_not_connected"))
             trakt_disconnect_btn.setEnabled(self.trakt.is_connected())
 
         def do_trakt_connect():
@@ -3948,7 +3943,7 @@ class MainWindow(QMainWindow):
                 "trakt_client_secret", trakt_secret_edit.text().strip())
             if not self.trakt.client_id or not self.trakt.client_secret:
                 QMessageBox.warning(
-                    d, "Trakt", "Enter a Client ID and Client Secret first.")
+                    d, "Trakt", tr("msg_trakt_enter_creds"))
                 return
             self._trakt_device_auth_dialog(d)
             refresh_trakt_status()
@@ -3972,7 +3967,7 @@ class MainWindow(QMainWindow):
                 pin_status.setText(
                     f"PIN is set - currently {state}.")
             else:
-                pin_status.setText("No PIN set.")
+                pin_status.setText(tr("pin_none_set"))
             remove_pin_btn.setEnabled(self.parental.has_pin())
             lock_now_btn.setEnabled(
                 self.parental.has_pin()
@@ -4011,7 +4006,7 @@ class MainWindow(QMainWindow):
         def reload_pl_list():
             pl_list.clear()
             if not store:
-                pl_list.addItem("Playlist management unavailable")
+                pl_list.addItem(tr("pl_mgmt_unavailable"))
                 return
             for p in store.playlists():
                 suffix = ("   (active)"
@@ -4049,10 +4044,9 @@ class MainWindow(QMainWindow):
             if not (store and pid):
                 return
             if QMessageBox.question(
-                    d, "Remove playlist",
-                    "Remove this playlist? Its favorites and "
-                    "history are kept until you re-add and clear "
-                    "them.") == QMessageBox.StandardButton.Yes:
+                    d, tr("msg_remove_playlist_title"),
+                    tr("msg_remove_playlist_body")) \
+                    == QMessageBox.StandardButton.Yes:
                 store.remove(pid)
                 reload_pl_list()
 

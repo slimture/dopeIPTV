@@ -12,6 +12,26 @@ Usage::
     print(tr("status_playing", title="CNN"))  # "Spelar: CNN"
 
 No external dependencies beyond the Python standard library.
+
+--------------------------------------------------------------------------
+Contributor guide (how translation works in this codebase)
+--------------------------------------------------------------------------
+* Every user-visible string in the UI goes through ``tr("some_key")``. So to
+  find everything that is translated, grep the code for ``tr(``. Any bare
+  string literal passed to a Qt setter (setText / setWindowTitle / addAction /
+  setPlaceholderText / setToolTip / addTab / QLabel(...) / QPushButton(...))
+  is a bug unless it is a brand/technical token (e.g. "mpv", "VLC", "PiP",
+  "dopeIPTV", "http://server:port").
+* To ADD A STRING: add a key to ``_STRINGS`` below with one line per language,
+  then call ``tr("your_key")`` (with ``{placeholders}`` filled via keyword
+  args, e.g. ``tr("status_playing", title=name)``).
+* To ADD A LANGUAGE: add its code + display name to ``LANGUAGES`` and add that
+  code to every entry in ``_STRINGS``. Run ``tests`` (or the snippet in
+  ``tests/``) - the suite checks that every key covers every language and that
+  every ``tr("...")`` used in the code has a matching key.
+* Dialogs/menus that are rebuilt each time they open pick up the current
+  language automatically; persistent chrome is refreshed live by
+  ``MainWindow.retranslate_ui`` / ``EmbeddedPlayer.retranslate_ui``.
 """
 
 from __future__ import annotations
@@ -2959,6 +2979,1118 @@ _STRINGS: dict[str, dict[str, str]] = {
         "zh": "Linux 版",
         "ru": "для Linux",
         "th": "สำหรับ Linux",
+    },
+
+    # ══════════════════════════════════════════════════════════════════════
+    # To add a new UI string: add a key below with a line per language, then
+    # call tr("your_key") in the code. To add a whole new *language*: add its
+    # code to LANGUAGES above and a matching entry to every key here.
+    # ══════════════════════════════════════════════════════════════════════
+
+    # ── Player options menu (the ⚙ button) ───────────────────────────────
+    "opt_off": {
+        "en": "Off", "sv": "Av", "es": "Desactivado", "de": "Aus",
+        "fr": "Désactivé", "zh": "关闭", "ru": "Выкл.", "th": "ปิด",
+    },
+    "opt_no_audio_tracks": {
+        "en": "(no audio tracks)", "sv": "(inga ljudspår)",
+        "es": "(sin pistas de audio)", "de": "(keine Audiospuren)",
+        "fr": "(aucune piste audio)", "zh": "（无音轨）",
+        "ru": "(нет аудиодорожек)", "th": "(ไม่มีแทร็กเสียง)",
+    },
+    "opt_delay_default": {
+        "en": "0 s (default)", "sv": "0 s (standard)",
+        "es": "0 s (predeterminado)", "de": "0 s (Standard)",
+        "fr": "0 s (défaut)", "zh": "0 秒（默认）",
+        "ru": "0 с (по умолч.)", "th": "0 วินาที (ค่าเริ่มต้น)",
+    },
+    "opt_aspect_auto": {
+        "en": "Auto", "sv": "Auto", "es": "Auto", "de": "Auto",
+        "fr": "Auto", "zh": "自动", "ru": "Авто", "th": "อัตโนมัติ",
+    },
+    "opt_aspect_stretch": {
+        "en": "Stretch to window", "sv": "Sträck till fönster",
+        "es": "Estirar a la ventana", "de": "An Fenster anpassen",
+        "fr": "Étirer à la fenêtre", "zh": "拉伸至窗口",
+        "ru": "Растянуть по окну", "th": "ยืดเต็มหน้าต่าง",
+    },
+
+    # ── Common buttons reused in several dialogs ──────────────────────────
+    "common_close": {
+        "en": "Close", "sv": "Stäng", "es": "Cerrar", "de": "Schließen",
+        "fr": "Fermer", "zh": "关闭", "ru": "Закрыть", "th": "ปิด",
+    },
+    "common_cancel": {
+        "en": "Cancel", "sv": "Avbryt", "es": "Cancelar", "de": "Abbrechen",
+        "fr": "Annuler", "zh": "取消", "ru": "Отмена", "th": "ยกเลิก",
+    },
+    "common_loading": {
+        "en": "Loading...", "sv": "Laddar...", "es": "Cargando...",
+        "de": "Wird geladen...", "fr": "Chargement...", "zh": "加载中……",
+        "ru": "Загрузка...", "th": "กำลังโหลด...",
+    },
+
+    # ── Chromecast dialog ─────────────────────────────────────────────────
+    "cast_title": {
+        "en": "Cast to Chromecast", "sv": "Casta till Chromecast",
+        "es": "Enviar a Chromecast", "de": "An Chromecast streamen",
+        "fr": "Diffuser vers Chromecast", "zh": "投放到 Chromecast",
+        "ru": "Транслировать на Chromecast", "th": "แคสต์ไปยัง Chromecast",
+    },
+    "cast_scanning": {
+        "en": "Scanning for Chromecast devices...",
+        "sv": "Söker efter Chromecast-enheter...",
+        "es": "Buscando dispositivos Chromecast...",
+        "de": "Suche nach Chromecast-Geräten...",
+        "fr": "Recherche d'appareils Chromecast...",
+        "zh": "正在扫描 Chromecast 设备……",
+        "ru": "Поиск устройств Chromecast...",
+        "th": "กำลังค้นหาอุปกรณ์ Chromecast...",
+    },
+    "cast_rescan": {
+        "en": "Rescan", "sv": "Sök igen", "es": "Reescanear",
+        "de": "Erneut suchen", "fr": "Rechercher à nouveau",
+        "zh": "重新扫描", "ru": "Повторить поиск", "th": "สแกนอีกครั้ง",
+    },
+    "cast_cast": {
+        "en": "Cast", "sv": "Casta", "es": "Enviar", "de": "Streamen",
+        "fr": "Diffuser", "zh": "投放", "ru": "Транслировать", "th": "แคสต์",
+    },
+    "cast_stop": {
+        "en": "Stop casting", "sv": "Sluta casta", "es": "Detener envío",
+        "de": "Streaming stoppen", "fr": "Arrêter la diffusion",
+        "zh": "停止投放", "ru": "Остановить трансляцию", "th": "หยุดแคสต์",
+    },
+    "cast_devices_found": {
+        "en": "{n} device(s) found.", "sv": "{n} enhet(er) hittades.",
+        "es": "{n} dispositivo(s) encontrado(s).",
+        "de": "{n} Gerät(e) gefunden.", "fr": "{n} appareil(s) trouvé(s).",
+        "zh": "找到 {n} 个设备。", "ru": "Найдено устройств: {n}.",
+        "th": "พบ {n} อุปกรณ์",
+    },
+    "cast_none_found": {
+        "en": "No Chromecast devices found on this network.",
+        "sv": "Inga Chromecast-enheter hittades i nätverket.",
+        "es": "No se encontraron dispositivos Chromecast en esta red.",
+        "de": "Keine Chromecast-Geräte in diesem Netzwerk gefunden.",
+        "fr": "Aucun appareil Chromecast trouvé sur ce réseau.",
+        "zh": "在此网络上未找到 Chromecast 设备。",
+        "ru": "В этой сети не найдено устройств Chromecast.",
+        "th": "ไม่พบอุปกรณ์ Chromecast ในเครือข่ายนี้",
+    },
+    "cast_scan_failed": {
+        "en": "Scan failed: {msg}", "sv": "Sökning misslyckades: {msg}",
+        "es": "Error de búsqueda: {msg}", "de": "Suche fehlgeschlagen: {msg}",
+        "fr": "Échec de la recherche : {msg}", "zh": "扫描失败：{msg}",
+        "ru": "Ошибка поиска: {msg}", "th": "สแกนล้มเหลว: {msg}",
+    },
+    "cast_starting": {
+        "en": "Starting cast to {name}...",
+        "sv": "Startar casting till {name}...",
+        "es": "Iniciando envío a {name}...",
+        "de": "Streaming zu {name} wird gestartet...",
+        "fr": "Démarrage de la diffusion vers {name}...",
+        "zh": "正在开始投放到 {name}……",
+        "ru": "Запуск трансляции на {name}...",
+        "th": "กำลังเริ่มแคสต์ไปยัง {name}...",
+    },
+    "cast_casting_to": {
+        "en": "Casting to {name}.", "sv": "Castar till {name}.",
+        "es": "Enviando a {name}.", "de": "Streaming zu {name}.",
+        "fr": "Diffusion vers {name}.", "zh": "正在投放到 {name}。",
+        "ru": "Трансляция на {name}.", "th": "กำลังแคสต์ไปยัง {name}",
+    },
+    "cast_failed": {
+        "en": "Cast failed: {msg}", "sv": "Casting misslyckades: {msg}",
+        "es": "Error al enviar: {msg}", "de": "Streaming fehlgeschlagen: {msg}",
+        "fr": "Échec de la diffusion : {msg}", "zh": "投放失败：{msg}",
+        "ru": "Ошибка трансляции: {msg}", "th": "แคสต์ล้มเหลว: {msg}",
+    },
+    "cast_stopped": {
+        "en": "Casting stopped.", "sv": "Casting stoppad.",
+        "es": "Envío detenido.", "de": "Streaming gestoppt.",
+        "fr": "Diffusion arrêtée.", "zh": "投放已停止。",
+        "ru": "Трансляция остановлена.", "th": "หยุดแคสต์แล้ว",
+    },
+    "cast_stop_failed": {
+        "en": "Stop failed: {msg}", "sv": "Kunde inte stoppa: {msg}",
+        "es": "Error al detener: {msg}", "de": "Stoppen fehlgeschlagen: {msg}",
+        "fr": "Échec de l'arrêt : {msg}", "zh": "停止失败：{msg}",
+        "ru": "Не удалось остановить: {msg}", "th": "หยุดล้มเหลว: {msg}",
+    },
+
+    # ── Playlist dialog extras ────────────────────────────────────────────
+    "playlist_msg_title": {
+        "en": "Playlist", "sv": "Spellista", "es": "Lista", "de": "Playlist",
+        "fr": "Liste", "zh": "播放列表", "ru": "Плейлист", "th": "เพลย์ลิสต์",
+    },
+    "playlist_name_placeholder": {
+        "en": "e.g. My provider", "sv": "t.ex. Min leverantör",
+        "es": "p. ej. Mi proveedor", "de": "z. B. Mein Anbieter",
+        "fr": "p. ex. Mon fournisseur", "zh": "例如：我的服务商",
+        "ru": "напр. Мой провайдер", "th": "เช่น ผู้ให้บริการของฉัน",
+    },
+    "playlist_epg_placeholder": {
+        "en": "optional - overrides the provider's xmltv.php",
+        "sv": "valfritt - ersätter leverantörens xmltv.php",
+        "es": "opcional: reemplaza el xmltv.php del proveedor",
+        "de": "optional - ersetzt die xmltv.php des Anbieters",
+        "fr": "facultatif - remplace le xmltv.php du fournisseur",
+        "zh": "可选——覆盖服务商的 xmltv.php",
+        "ru": "необязательно - заменяет xmltv.php провайдера",
+        "th": "ไม่บังคับ - แทนที่ xmltv.php ของผู้ให้บริการ",
+    },
+
+    # ── Recording scheduling messages (EPG guide) ─────────────────────────
+    "rec_msg_title": {
+        "en": "Record", "sv": "Spela in", "es": "Grabar", "de": "Aufnehmen",
+        "fr": "Enregistrer", "zh": "录制", "ru": "Запись", "th": "บันทึก",
+    },
+    "rec_scheduled_status": {
+        "en": "Scheduled {n} recording(s) - see Recordings → Upcoming",
+        "sv": "Schemalade {n} inspelning(ar) - se Inspelningar → Kommande",
+        "es": "Programadas {n} grabación(es) - ve a Grabaciones → Próximas",
+        "de": "{n} Aufnahme(n) geplant - siehe Aufnahmen → Anstehend",
+        "fr": "{n} enregistrement(s) programmé(s) - voir Enregistrements → À venir",
+        "zh": "已安排 {n} 个录制 - 见 录制 → 即将进行",
+        "ru": "Запланировано записей: {n} - см. Записи → Предстоящие",
+        "th": "กำหนดบันทึก {n} รายการ - ดูที่ การบันทึก → ที่กำลังจะมาถึง",
+    },
+    "rec_skipped_warning": {
+        "en": "{n} programme(s) could not be scheduled: missing channel "
+              "stream id.",
+        "sv": "{n} program kunde inte schemaläggas: kanalens stream-id "
+              "saknas.",
+        "es": "No se pudieron programar {n} programa(s): falta el id de "
+              "transmisión del canal.",
+        "de": "{n} Sendung(en) konnten nicht geplant werden: fehlende "
+              "Kanal-Stream-ID.",
+        "fr": "{n} programme(s) n'ont pas pu être programmés : identifiant "
+              "de flux de chaîne manquant.",
+        "zh": "{n} 个节目无法安排：缺少频道流 ID。",
+        "ru": "Не удалось запланировать программ ({n}): отсутствует stream id "
+              "канала.",
+        "th": "ไม่สามารถกำหนด {n} รายการได้: ไม่มี stream id ของช่อง",
+    },
+
+    # ── Content manager dialog ────────────────────────────────────────────
+    "cm_title": {
+        "en": "Manage categories", "sv": "Hantera kategorier",
+        "es": "Gestionar categorías", "de": "Kategorien verwalten",
+        "fr": "Gérer les catégories", "zh": "管理分类",
+        "ru": "Управление категориями", "th": "จัดการหมวดหมู่",
+    },
+    "cm_hint": {
+        "en": "Hidden categories disappear from the sidebar and their "
+              "channels are left out of 'All'. Locked categories need the "
+              "parental PIN to open.",
+        "sv": "Dolda kategorier försvinner från sidofältet och deras kanaler "
+              "utelämnas ur 'Alla'. Låsta kategorier kräver föräldra-PIN för "
+              "att öppnas.",
+        "es": "Las categorías ocultas desaparecen de la barra lateral y sus "
+              "canales quedan fuera de 'Todo'. Las categorías bloqueadas "
+              "necesitan el PIN parental para abrirse.",
+        "de": "Ausgeblendete Kategorien verschwinden aus der Seitenleiste und "
+              "ihre Kanäle fehlen in 'Alle'. Gesperrte Kategorien benötigen "
+              "die Kindersicherungs-PIN.",
+        "fr": "Les catégories masquées disparaissent de la barre latérale et "
+              "leurs chaînes sont exclues de « Tout ». Les catégories "
+              "verrouillées nécessitent le code parental.",
+        "zh": "隐藏的分类会从侧边栏消失，其频道也会被排除在“全部”之外。"
+              "锁定的分类需要家长 PIN 才能打开。",
+        "ru": "Скрытые категории исчезают из боковой панели, а их каналы не "
+              "входят в «Все». Заблокированные категории открываются по "
+              "родительскому PIN-коду.",
+        "th": "หมวดหมู่ที่ซ่อนจะหายไปจากแถบข้างและช่องจะไม่รวมอยู่ใน 'ทั้งหมด' "
+              "หมวดหมู่ที่ล็อกต้องใช้ PIN ผู้ปกครองเพื่อเปิด",
+    },
+    "cm_rename": {
+        "en": "Rename...", "sv": "Byt namn...", "es": "Renombrar...",
+        "de": "Umbenennen...", "fr": "Renommer...", "zh": "重命名……",
+        "ru": "Переименовать...", "th": "เปลี่ยนชื่อ...",
+    },
+    "cm_hide": {
+        "en": "Hide", "sv": "Dölj", "es": "Ocultar", "de": "Ausblenden",
+        "fr": "Masquer", "zh": "隐藏", "ru": "Скрыть", "th": "ซ่อน",
+    },
+    "cm_unhide": {
+        "en": "Unhide", "sv": "Visa", "es": "Mostrar", "de": "Einblenden",
+        "fr": "Afficher", "zh": "取消隐藏", "ru": "Показать", "th": "เลิกซ่อน",
+    },
+    "cm_lock": {
+        "en": "Lock", "sv": "Lås", "es": "Bloquear", "de": "Sperren",
+        "fr": "Verrouiller", "zh": "锁定", "ru": "Заблокировать", "th": "ล็อก",
+    },
+    "cm_unlock": {
+        "en": "Unlock", "sv": "Lås upp", "es": "Desbloquear",
+        "de": "Entsperren", "fr": "Déverrouiller", "zh": "解锁",
+        "ru": "Разблокировать", "th": "ปลดล็อก",
+    },
+    "cm_flag_hidden": {
+        "en": "hidden", "sv": "dold", "es": "oculta", "de": "ausgeblendet",
+        "fr": "masquée", "zh": "已隐藏", "ru": "скрыта", "th": "ซ่อนอยู่",
+    },
+    "cm_flag_locked": {
+        "en": "locked", "sv": "låst", "es": "bloqueada", "de": "gesperrt",
+        "fr": "verrouillée", "zh": "已锁定", "ru": "заблокирована",
+        "th": "ล็อกอยู่",
+    },
+    "cm_rename_title": {
+        "en": "Rename category", "sv": "Byt namn på kategori",
+        "es": "Renombrar categoría", "de": "Kategorie umbenennen",
+        "fr": "Renommer la catégorie", "zh": "重命名分类",
+        "ru": "Переименовать категорию", "th": "เปลี่ยนชื่อหมวดหมู่",
+    },
+    "cm_new_name": {
+        "en": "New name:", "sv": "Nytt namn:", "es": "Nuevo nombre:",
+        "de": "Neuer Name:", "fr": "Nouveau nom :", "zh": "新名称：",
+        "ru": "Новое имя:", "th": "ชื่อใหม่:",
+    },
+
+    # ── Channel / category context menus (extras) ────────────────────────
+    "ctx_reset_channel": {
+        "en": "Reset this channel's customizations",
+        "sv": "Återställ kanalens anpassningar",
+        "es": "Restablecer las personalizaciones de este canal",
+        "de": "Anpassungen dieses Kanals zurücksetzen",
+        "fr": "Réinitialiser les personnalisations de cette chaîne",
+        "zh": "重置此频道的自定义设置", "ru": "Сбросить настройки этого канала",
+        "th": "รีเซ็ตการปรับแต่งของช่องนี้",
+    },
+    "ctx_restore_defaults": {
+        "en": "Restore default channels...",
+        "sv": "Återställ standardkanaler...",
+        "es": "Restaurar canales predeterminados...",
+        "de": "Standardkanäle wiederherstellen...",
+        "fr": "Restaurer les chaînes par défaut...",
+        "zh": "恢复默认频道...", "ru": "Восстановить каналы по умолчанию...",
+        "th": "คืนค่าช่องเริ่มต้น...",
+    },
+    "ctx_remove_group": {
+        "en": 'Remove group "{group}"', "sv": 'Ta bort grupp "{group}"',
+        "es": 'Eliminar grupo "{group}"', "de": 'Gruppe "{group}" entfernen',
+        "fr": 'Supprimer le groupe « {group} »', "zh": '移除组“{group}”',
+        "ru": 'Удалить группу «{group}»', "th": 'ลบกลุ่ม "{group}"',
+    },
+    "ctx_unlock_group": {
+        "en": "Unlock group (remove protection)",
+        "sv": "Lås upp grupp (ta bort skydd)",
+        "es": "Desbloquear grupo (quitar protección)",
+        "de": "Gruppe entsperren (Schutz entfernen)",
+        "fr": "Déverrouiller le groupe (retirer la protection)",
+        "zh": "解锁组（移除保护）",
+        "ru": "Разблокировать группу (снять защиту)",
+        "th": "ปลดล็อกกลุ่ม (ลบการป้องกัน)",
+    },
+    "ctx_lock_group": {
+        "en": "Lock group (parental control)",
+        "sv": "Lås grupp (föräldrakontroll)",
+        "es": "Bloquear grupo (control parental)",
+        "de": "Gruppe sperren (Kindersicherung)",
+        "fr": "Verrouiller le groupe (contrôle parental)",
+        "zh": "锁定组（家长控制）",
+        "ru": "Заблокировать группу (родит. контроль)",
+        "th": "ล็อกกลุ่ม (การควบคุมโดยผู้ปกครอง)",
+    },
+    "ctx_rename_category": {
+        "en": "Rename category...", "sv": "Byt namn på kategori...",
+        "es": "Renombrar categoría...", "de": "Kategorie umbenennen...",
+        "fr": "Renommer la catégorie...", "zh": "重命名分类...",
+        "ru": "Переименовать категорию...", "th": "เปลี่ยนชื่อหมวดหมู่...",
+    },
+    "ctx_set_icon": {
+        "en": "Set icon...", "sv": "Ange ikon...", "es": "Establecer icono...",
+        "de": "Symbol festlegen...", "fr": "Définir l'icône...",
+        "zh": "设置图标...", "ru": "Задать значок...",
+        "th": "ตั้งไอคอน...",
+    },
+    "ctx_set_color": {
+        "en": "Set color", "sv": "Ange färg", "es": "Establecer color",
+        "de": "Farbe festlegen", "fr": "Définir la couleur", "zh": "设置颜色",
+        "ru": "Задать цвет", "th": "ตั้งสี",
+    },
+    "color_default": {
+        "en": "Default", "sv": "Standard", "es": "Predeterminado",
+        "de": "Standard", "fr": "Défaut", "zh": "默认", "ru": "По умолчанию",
+        "th": "ค่าเริ่มต้น",
+    },
+    "ctx_hide_category": {
+        "en": "Hide category", "sv": "Dölj kategori", "es": "Ocultar categoría",
+        "de": "Kategorie ausblenden", "fr": "Masquer la catégorie",
+        "zh": "隐藏分类", "ru": "Скрыть категорию", "th": "ซ่อนหมวดหมู่",
+    },
+    "ctx_unlock_category": {
+        "en": "Unlock category (remove protection)",
+        "sv": "Lås upp kategori (ta bort skydd)",
+        "es": "Desbloquear categoría (quitar protección)",
+        "de": "Kategorie entsperren (Schutz entfernen)",
+        "fr": "Déverrouiller la catégorie (retirer la protection)",
+        "zh": "解锁分类（移除保护）",
+        "ru": "Разблокировать категорию (снять защиту)",
+        "th": "ปลดล็อกหมวดหมู่ (ลบการป้องกัน)",
+    },
+    "ctx_lock_category": {
+        "en": "Lock category (parental control)",
+        "sv": "Lås kategori (föräldrakontroll)",
+        "es": "Bloquear categoría (control parental)",
+        "de": "Kategorie sperren (Kindersicherung)",
+        "fr": "Verrouiller la catégorie (contrôle parental)",
+        "zh": "锁定分类（家长控制）",
+        "ru": "Заблокировать категорию (родит. контроль)",
+        "th": "ล็อกหมวดหมู่ (การควบคุมโดยผู้ปกครอง)",
+    },
+    "ctx_play_in_vlc": {
+        "en": "Play in VLC", "sv": "Spela i VLC", "es": "Reproducir en VLC",
+        "de": "In VLC abspielen", "fr": "Lire dans VLC", "zh": "在 VLC 中播放",
+        "ru": "Воспроизвести в VLC", "th": "เล่นใน VLC",
+    },
+    "cat_all": {
+        "en": "All", "sv": "Alla", "es": "Todo", "de": "Alle", "fr": "Tout",
+        "zh": "全部", "ru": "Все", "th": "ทั้งหมด",
+    },
+
+    # ── Durations (reused by record + timeshift menus) ────────────────────
+    "dur_30min": {"en": "30 min", "sv": "30 min", "es": "30 min",
+                  "de": "30 Min", "fr": "30 min", "zh": "30 分钟",
+                  "ru": "30 мин", "th": "30 นาที"},
+    "dur_1h": {"en": "1 hour", "sv": "1 timme", "es": "1 hora",
+               "de": "1 Stunde", "fr": "1 heure", "zh": "1 小时",
+               "ru": "1 час", "th": "1 ชั่วโมง"},
+    "dur_2h": {"en": "2 hours", "sv": "2 timmar", "es": "2 horas",
+               "de": "2 Stunden", "fr": "2 heures", "zh": "2 小时",
+               "ru": "2 часа", "th": "2 ชั่วโมง"},
+    "dur_4h": {"en": "4 hours", "sv": "4 timmar", "es": "4 horas",
+               "de": "4 Stunden", "fr": "4 heures", "zh": "4 小时",
+               "ru": "4 часа", "th": "4 ชั่วโมง"},
+    "dur_6h": {"en": "6 hours", "sv": "6 timmar", "es": "6 horas",
+               "de": "6 Stunden", "fr": "6 heures", "zh": "6 小时",
+               "ru": "6 часов", "th": "6 ชั่วโมง"},
+    "dur_12h": {"en": "12 hours", "sv": "12 timmar", "es": "12 horas",
+                "de": "12 Stunden", "fr": "12 heures", "zh": "12 小时",
+                "ru": "12 часов", "th": "12 ชั่วโมง"},
+    "dur_1d": {"en": "1 day", "sv": "1 dag", "es": "1 día", "de": "1 Tag",
+               "fr": "1 jour", "zh": "1 天", "ru": "1 день", "th": "1 วัน"},
+    "dur_2d": {"en": "2 days", "sv": "2 dagar", "es": "2 días",
+               "de": "2 Tage", "fr": "2 jours", "zh": "2 天",
+               "ru": "2 дня", "th": "2 วัน"},
+    "dur_3d": {"en": "3 days", "sv": "3 dagar", "es": "3 días",
+               "de": "3 Tage", "fr": "3 jours", "zh": "3 天",
+               "ru": "3 дня", "th": "3 วัน"},
+    "dur_5d": {"en": "5 days", "sv": "5 dagar", "es": "5 días",
+               "de": "5 Tage", "fr": "5 jours", "zh": "5 天",
+               "ru": "5 дней", "th": "5 วัน"},
+    "dur_7d": {"en": "7 days", "sv": "7 dagar", "es": "7 días",
+               "de": "7 Tage", "fr": "7 jours", "zh": "7 天",
+               "ru": "7 дней", "th": "7 วัน"},
+
+    # ── Recording menu / recordings context menu (extras) ─────────────────
+    "rec_size_limit_session": {
+        "en": "Size limit (this session)",
+        "sv": "Storleksgräns (denna session)",
+        "es": "Límite de tamaño (esta sesión)",
+        "de": "Größenlimit (diese Sitzung)",
+        "fr": "Limite de taille (cette session)",
+        "zh": "大小限制（本次会话）", "ru": "Лимит размера (эта сессия)",
+        "th": "จำกัดขนาด (เซสชันนี้)",
+    },
+    "rec_stop_named_since": {
+        "en": "Stop recording: {title} (since {since})",
+        "sv": "Stoppa inspelning: {title} (sedan {since})",
+        "es": "Detener grabación: {title} (desde {since})",
+        "de": "Aufnahme stoppen: {title} (seit {since})",
+        "fr": "Arrêter l'enregistrement : {title} (depuis {since})",
+        "zh": "停止录制：{title}（自 {since}）",
+        "ru": "Остановить запись: {title} (с {since})",
+        "th": "หยุดบันทึก: {title} (ตั้งแต่ {since})",
+    },
+    "rec_edit_times": {
+        "en": "Edit start/stop time...",
+        "sv": "Redigera start-/stopptid...",
+        "es": "Editar hora de inicio/fin...",
+        "de": "Start-/Stoppzeit bearbeiten...",
+        "fr": "Modifier l'heure de début/fin...",
+        "zh": "编辑开始/停止时间...", "ru": "Изменить время начала/окончания...",
+        "th": "แก้ไขเวลาเริ่ม/หยุด...",
+    },
+    "rec_cancel_scheduled": {
+        "en": "Cancel scheduled recording",
+        "sv": "Avbryt schemalagd inspelning",
+        "es": "Cancelar grabación programada",
+        "de": "Geplante Aufnahme abbrechen",
+        "fr": "Annuler l'enregistrement programmé",
+        "zh": "取消计划录制", "ru": "Отменить запланированную запись",
+        "th": "ยกเลิกการบันทึกตามกำหนด",
+    },
+    "rec_remove_from_list": {
+        "en": "Remove selected from list",
+        "sv": "Ta bort markerade från listan",
+        "es": "Eliminar seleccionado de la lista",
+        "de": "Ausgewählte aus Liste entfernen",
+        "fr": "Retirer la sélection de la liste",
+        "zh": "从列表中移除所选", "ru": "Удалить выбранное из списка",
+        "th": "ลบที่เลือกออกจากรายการ",
+    },
+    "rec_clear_finished": {
+        "en": "Clear all finished from list",
+        "sv": "Rensa alla färdiga från listan",
+        "es": "Borrar todas las finalizadas de la lista",
+        "de": "Alle abgeschlossenen aus Liste entfernen",
+        "fr": "Effacer tous les terminés de la liste",
+        "zh": "从列表中清除所有已完成", "ru": "Очистить все завершённые из списка",
+        "th": "ล้างรายการที่เสร็จแล้วทั้งหมด",
+    },
+    "rec_move_n": {
+        "en": "Move {n} recordings to", "sv": "Flytta {n} inspelningar till",
+        "es": "Mover {n} grabaciones a", "de": "{n} Aufnahmen verschieben nach",
+        "fr": "Déplacer {n} enregistrements vers", "zh": "将 {n} 个录制移动到",
+        "ru": "Переместить {n} записей в", "th": "ย้าย {n} การบันทึกไปยัง",
+    },
+    "rec_move_root": {
+        "en": "(Recordings folder)", "sv": "(Inspelningsmapp)",
+        "es": "(Carpeta de grabaciones)", "de": "(Aufnahmeordner)",
+        "fr": "(Dossier des enregistrements)", "zh": "（录制文件夹）",
+        "ru": "(Папка записей)", "th": "(โฟลเดอร์การบันทึก)",
+    },
+    "rec_delete_n": {
+        "en": "Delete {n} recordings", "sv": "Radera {n} inspelningar",
+        "es": "Eliminar {n} grabaciones", "de": "{n} Aufnahmen löschen",
+        "fr": "Supprimer {n} enregistrements", "zh": "删除 {n} 个录制",
+        "ru": "Удалить {n} записей", "th": "ลบ {n} การบันทึก",
+    },
+    "rec_n_recordings": {
+        "en": "{n} recordings", "sv": "{n} inspelningar",
+        "es": "{n} grabaciones", "de": "{n} Aufnahmen",
+        "fr": "{n} enregistrements", "zh": "{n} 个录制",
+        "ru": "{n} записей", "th": "{n} การบันทึก",
+    },
+    "rec_change_folder": {
+        "en": "Change recordings folder...",
+        "sv": "Byt inspelningsmapp...",
+        "es": "Cambiar carpeta de grabaciones...",
+        "de": "Aufnahmeordner ändern...",
+        "fr": "Changer le dossier des enregistrements...",
+        "zh": "更改录制文件夹...", "ru": "Изменить папку записей...",
+        "th": "เปลี่ยนโฟลเดอร์การบันทึก...",
+    },
+    "rec_saved_in": {
+        "en": "Recordings are saved in:", "sv": "Inspelningar sparas i:",
+        "es": "Las grabaciones se guardan en:",
+        "de": "Aufnahmen werden gespeichert in:",
+        "fr": "Les enregistrements sont enregistrés dans :",
+        "zh": "录制保存在：", "ru": "Записи сохраняются в:",
+        "th": "การบันทึกถูกบันทึกไว้ใน:",
+    },
+    "rec_custom_size_title": {
+        "en": "Custom size limit", "sv": "Anpassad storleksgräns",
+        "es": "Límite de tamaño personalizado",
+        "de": "Benutzerdefiniertes Größenlimit",
+        "fr": "Limite de taille personnalisée", "zh": "自定义大小限制",
+        "ru": "Свой лимит размера", "th": "จำกัดขนาดกำหนดเอง",
+    },
+    "rec_stop_recording_at": {
+        "en": "Stop recording at", "sv": "Stoppa inspelning kl.",
+        "es": "Detener grabación a las", "de": "Aufnahme stoppen um",
+        "fr": "Arrêter l'enregistrement à", "zh": "停止录制时间",
+        "ru": "Остановить запись в", "th": "หยุดบันทึกเมื่อ",
+    },
+
+    # ── Timeshift menu (extras) ───────────────────────────────────────────
+    "ts_go_back": {
+        "en": "Go back {t}", "sv": "Gå tillbaka {t}", "es": "Retroceder {t}",
+        "de": "{t} zurück", "fr": "Reculer de {t}", "zh": "回退 {t}",
+        "ru": "Назад на {t}", "th": "ย้อนกลับ {t}",
+    },
+    "ts_watch_from_start_named": {
+        "en": "Watch '{title}' from the start",
+        "sv": "Se '{title}' från början",
+        "es": "Ver '{title}' desde el principio",
+        "de": "'{title}' von Anfang an ansehen",
+        "fr": "Regarder « {title} » depuis le début",
+        "zh": "从头观看“{title}”", "ru": "Смотреть «{title}» с начала",
+        "th": "ดู '{title}' ตั้งแต่ต้น",
+    },
+    "ts_archive_depth": {
+        "en": "Archive depth: {n} day(s)", "sv": "Arkivdjup: {n} dag(ar)",
+        "es": "Profundidad de archivo: {n} día(s)",
+        "de": "Archivtiefe: {n} Tag(e)", "fr": "Profondeur d'archive : {n} jour(s)",
+        "zh": "存档深度：{n} 天", "ru": "Глубина архива: {n} дн.",
+        "th": "ความลึกของคลัง: {n} วัน",
+    },
+    "ts_catchup_title": {
+        "en": "Catch-up - {name}", "sv": "Catch-up - {name}",
+        "es": "Recuperar - {name}", "de": "Nachholen - {name}",
+        "fr": "Rattrapage - {name}", "zh": "回看 - {name}",
+        "ru": "Архив - {name}", "th": "ดูย้อนหลัง - {name}",
+    },
+    "ts_loading_past": {
+        "en": "Loading past programmes from the guide...",
+        "sv": "Laddar tidigare program från guiden...",
+        "es": "Cargando programas anteriores de la guía...",
+        "de": "Vergangene Sendungen aus dem Guide werden geladen...",
+        "fr": "Chargement des programmes passés depuis le guide...",
+        "zh": "正在从指南加载过去的节目...",
+        "ru": "Загрузка прошлых передач из гида...",
+        "th": "กำลังโหลดรายการที่ผ่านมาจากคู่มือ...",
+    },
+
+    # ── Common ────────────────────────────────────────────────────────────
+    "common_watch": {
+        "en": "Watch", "sv": "Se", "es": "Ver", "de": "Ansehen",
+        "fr": "Regarder", "zh": "观看", "ru": "Смотреть", "th": "ดู",
+    },
+    "btn_test": {
+        "en": "Test", "sv": "Testa", "es": "Probar", "de": "Testen",
+        "fr": "Tester", "zh": "测试", "ru": "Проверить", "th": "ทดสอบ",
+    },
+    "btn_choose_folder": {
+        "en": "Choose folder...", "sv": "Välj mapp...",
+        "es": "Elegir carpeta...", "de": "Ordner wählen...",
+        "fr": "Choisir un dossier...", "zh": "选择文件夹...",
+        "ru": "Выбрать папку...", "th": "เลือกโฟลเดอร์...",
+    },
+    "misc_series": {
+        "en": "Series", "sv": "Serie", "es": "Serie", "de": "Serie",
+        "fr": "Série", "zh": "剧集", "ru": "Сериал", "th": "ซีรีส์",
+    },
+
+    # ── Form field labels ─────────────────────────────────────────────────
+    "field_start": {
+        "en": "Start", "sv": "Start", "es": "Inicio", "de": "Start",
+        "fr": "Début", "zh": "开始", "ru": "Начало", "th": "เริ่ม",
+    },
+    "field_stop": {
+        "en": "Stop", "sv": "Stopp", "es": "Fin", "de": "Stopp",
+        "fr": "Fin", "zh": "停止", "ru": "Стоп", "th": "หยุด",
+    },
+    "field_save_in": {
+        "en": "Save in", "sv": "Spara i", "es": "Guardar en",
+        "de": "Speichern in", "fr": "Enregistrer dans", "zh": "保存到",
+        "ru": "Сохранить в", "th": "บันทึกใน",
+    },
+    "field_title": {
+        "en": "Title", "sv": "Titel", "es": "Título", "de": "Titel",
+        "fr": "Titre", "zh": "标题", "ru": "Название", "th": "ชื่อเรื่อง",
+    },
+    "field_client_id": {
+        "en": "Client ID", "sv": "Klient-ID", "es": "ID de cliente",
+        "de": "Client-ID", "fr": "ID client", "zh": "客户端 ID",
+        "ru": "ID клиента", "th": "Client ID",
+    },
+    "field_client_secret": {
+        "en": "Client Secret", "sv": "Klienthemlighet",
+        "es": "Secreto de cliente", "de": "Client-Secret",
+        "fr": "Secret client", "zh": "客户端密钥", "ru": "Секрет клиента",
+        "th": "Client Secret",
+    },
+
+    # ── Settings extras ───────────────────────────────────────────────────
+    "settings_export_tip": {
+        "en": "Export all playlists to a JSON file",
+        "sv": "Exportera alla spellistor till en JSON-fil",
+        "es": "Exportar todas las listas a un archivo JSON",
+        "de": "Alle Playlists in eine JSON-Datei exportieren",
+        "fr": "Exporter toutes les listes vers un fichier JSON",
+        "zh": "将所有播放列表导出为 JSON 文件",
+        "ru": "Экспортировать все плейлисты в файл JSON",
+        "th": "ส่งออกเพลย์ลิสต์ทั้งหมดเป็นไฟล์ JSON",
+    },
+    "settings_import_tip": {
+        "en": "Import playlists from a JSON file",
+        "sv": "Importera spellistor från en JSON-fil",
+        "es": "Importar listas desde un archivo JSON",
+        "de": "Playlists aus einer JSON-Datei importieren",
+        "fr": "Importer des listes depuis un fichier JSON",
+        "zh": "从 JSON 文件导入播放列表",
+        "ru": "Импортировать плейлисты из файла JSON",
+        "th": "นำเข้าเพลย์ลิสต์จากไฟล์ JSON",
+    },
+    "setting_artwork_source": {
+        "en": "Artwork source", "sv": "Bildkälla", "es": "Fuente de imágenes",
+        "de": "Bildquelle", "fr": "Source des visuels", "zh": "封面来源",
+        "ru": "Источник обложек", "th": "แหล่งภาพ",
+    },
+    "setting_tmdb_key": {
+        "en": "TMDB API key", "sv": "TMDB API-nyckel", "es": "Clave de API de TMDB",
+        "de": "TMDB-API-Schlüssel", "fr": "Clé API TMDB", "zh": "TMDB API 密钥",
+        "ru": "Ключ API TMDB", "th": "คีย์ API ของ TMDB",
+    },
+    "tmdb_key_placeholder": {
+        "en": "TMDB API key (v3 auth)", "sv": "TMDB API-nyckel (v3-auth)",
+        "es": "Clave de API de TMDB (auth v3)",
+        "de": "TMDB-API-Schlüssel (v3-Auth)", "fr": "Clé API TMDB (auth v3)",
+        "zh": "TMDB API 密钥（v3 认证）", "ru": "Ключ API TMDB (v3 auth)",
+        "th": "คีย์ API ของ TMDB (v3 auth)",
+    },
+    "tmdb_enter_key": {
+        "en": "Enter an API key first.", "sv": "Ange en API-nyckel först.",
+        "es": "Introduce una clave de API primero.",
+        "de": "Zuerst einen API-Schlüssel eingeben.",
+        "fr": "Saisissez d'abord une clé API.", "zh": "请先输入 API 密钥。",
+        "ru": "Сначала введите ключ API.", "th": "กรุณาใส่คีย์ API ก่อน",
+    },
+    "tmdb_checking": {
+        "en": "Checking...", "sv": "Kontrollerar...", "es": "Comprobando...",
+        "de": "Wird geprüft...", "fr": "Vérification...", "zh": "正在检查……",
+        "ru": "Проверка...", "th": "กำลังตรวจสอบ...",
+    },
+    "tmdb_key_works": {
+        "en": "Key works.", "sv": "Nyckeln fungerar.", "es": "La clave funciona.",
+        "de": "Schlüssel funktioniert.", "fr": "La clé fonctionne.",
+        "zh": "密钥有效。", "ru": "Ключ работает.", "th": "คีย์ใช้งานได้",
+    },
+    "tmdb_key_failed": {
+        "en": "Key check failed: {msg}",
+        "sv": "Nyckelkontroll misslyckades: {msg}",
+        "es": "Error al comprobar la clave: {msg}",
+        "de": "Schlüsselprüfung fehlgeschlagen: {msg}",
+        "fr": "Échec de la vérification de la clé : {msg}",
+        "zh": "密钥检查失败：{msg}", "ru": "Ошибка проверки ключа: {msg}",
+        "th": "ตรวจสอบคีย์ล้มเหลว: {msg}",
+    },
+    "pin_set_change": {
+        "en": "Set / change PIN...", "sv": "Ange / byt PIN...",
+        "es": "Establecer / cambiar PIN...", "de": "PIN festlegen / ändern...",
+        "fr": "Définir / changer le PIN...", "zh": "设置/更改 PIN...",
+        "ru": "Задать / изменить PIN...", "th": "ตั้ง / เปลี่ยน PIN...",
+    },
+    "pin_remove": {
+        "en": "Remove PIN", "sv": "Ta bort PIN", "es": "Quitar PIN",
+        "de": "PIN entfernen", "fr": "Supprimer le PIN", "zh": "移除 PIN",
+        "ru": "Удалить PIN", "th": "ลบ PIN",
+    },
+    "pin_lock_now": {
+        "en": "Lock now", "sv": "Lås nu", "es": "Bloquear ahora",
+        "de": "Jetzt sperren", "fr": "Verrouiller maintenant", "zh": "立即锁定",
+        "ru": "Заблокировать сейчас", "th": "ล็อกตอนนี้",
+    },
+    "pin_none_set": {
+        "en": "No PIN set.", "sv": "Ingen PIN angiven.", "es": "Sin PIN.",
+        "de": "Keine PIN festgelegt.", "fr": "Aucun PIN défini.",
+        "zh": "未设置 PIN。", "ru": "PIN не задан.", "th": "ยังไม่ได้ตั้ง PIN",
+    },
+    "pl_mgmt_unavailable": {
+        "en": "Playlist management unavailable",
+        "sv": "Spellistehantering ej tillgänglig",
+        "es": "Gestión de listas no disponible",
+        "de": "Playlist-Verwaltung nicht verfügbar",
+        "fr": "Gestion des listes indisponible",
+        "zh": "播放列表管理不可用", "ru": "Управление плейлистами недоступно",
+        "th": "ไม่สามารถจัดการเพลย์ลิสต์ได้",
+    },
+
+    # ── Message boxes ─────────────────────────────────────────────────────
+    "msg_could_not_connect": {
+        "en": "Could not connect to {name}: {msg}",
+        "sv": "Kunde inte ansluta till {name}: {msg}",
+        "es": "No se pudo conectar a {name}: {msg}",
+        "de": "Verbindung zu {name} fehlgeschlagen: {msg}",
+        "fr": "Impossible de se connecter à {name} : {msg}",
+        "zh": "无法连接到 {name}：{msg}",
+        "ru": "Не удалось подключиться к {name}: {msg}",
+        "th": "ไม่สามารถเชื่อมต่อกับ {name}: {msg}",
+    },
+    "msg_connect_trakt_first": {
+        "en": "Connect to Trakt first.", "sv": "Anslut till Trakt först.",
+        "es": "Conéctate a Trakt primero.", "de": "Zuerst mit Trakt verbinden.",
+        "fr": "Connectez-vous d'abord à Trakt.", "zh": "请先连接到 Trakt。",
+        "ru": "Сначала подключитесь к Trakt.", "th": "กรุณาเชื่อมต่อ Trakt ก่อน",
+    },
+    "msg_cast_needs_package": {
+        "en": "Casting needs the pychromecast package:\n\n"
+              "  pip install pychromecast",
+        "sv": "Casting kräver paketet pychromecast:\n\n"
+              "  pip install pychromecast",
+        "es": "El envío necesita el paquete pychromecast:\n\n"
+              "  pip install pychromecast",
+        "de": "Streaming benötigt das Paket pychromecast:\n\n"
+              "  pip install pychromecast",
+        "fr": "La diffusion nécessite le paquet pychromecast :\n\n"
+              "  pip install pychromecast",
+        "zh": "投放需要 pychromecast 包：\n\n  pip install pychromecast",
+        "ru": "Для трансляции нужен пакет pychromecast:\n\n"
+              "  pip install pychromecast",
+        "th": "การแคสต์ต้องใช้แพ็กเกจ pychromecast:\n\n"
+              "  pip install pychromecast",
+    },
+    "msg_restore_defaults_body": {
+        "en": "Undo all channel renames and hides for this section and go "
+              "back to the provider's original list?",
+        "sv": "Ångra alla namnbyten och döljningar för den här sektionen och "
+              "gå tillbaka till leverantörens ursprungslista?",
+        "es": "¿Deshacer todos los renombrados y ocultaciones de esta sección "
+              "y volver a la lista original del proveedor?",
+        "de": "Alle Umbenennungen und Ausblendungen dieses Bereichs rückgängig "
+              "machen und zur Originalliste des Anbieters zurückkehren?",
+        "fr": "Annuler tous les renommages et masquages de cette section et "
+              "revenir à la liste d'origine du fournisseur ?",
+        "zh": "撤销此部分的所有频道重命名和隐藏，并恢复到服务商的原始列表？",
+        "ru": "Отменить все переименования и скрытия каналов в этом разделе и "
+              "вернуться к исходному списку провайдера?",
+        "th": "เลิกทำการเปลี่ยนชื่อและซ่อนช่องทั้งหมดในส่วนนี้ "
+              "และกลับไปยังรายการเดิมของผู้ให้บริการหรือไม่?",
+    },
+    "msg_parental_title": {
+        "en": "Parental control", "sv": "Föräldrakontroll",
+        "es": "Control parental", "de": "Kindersicherung",
+        "fr": "Contrôle parental", "zh": "家长控制",
+        "ru": "Родительский контроль", "th": "การควบคุมโดยผู้ปกครอง",
+    },
+    "msg_wrong_pin": {
+        "en": "Wrong PIN.", "sv": "Fel PIN.", "es": "PIN incorrecto.",
+        "de": "Falsche PIN.", "fr": "PIN incorrect.", "zh": "PIN 错误。",
+        "ru": "Неверный PIN.", "th": "PIN ไม่ถูกต้อง",
+    },
+    "msg_rec_file_not_ready": {
+        "en": "The recording file hasn't been created yet - try again in a "
+              "few seconds.",
+        "sv": "Inspelningsfilen har inte skapats ännu - försök igen om några "
+              "sekunder.",
+        "es": "El archivo de grabación aún no se ha creado; inténtalo de nuevo "
+              "en unos segundos.",
+        "de": "Die Aufnahmedatei wurde noch nicht erstellt - versuche es in "
+              "ein paar Sekunden erneut.",
+        "fr": "Le fichier d'enregistrement n'a pas encore été créé - réessayez "
+              "dans quelques secondes.",
+        "zh": "录制文件尚未创建——请几秒后重试。",
+        "ru": "Файл записи ещё не создан - повторите через несколько секунд.",
+        "th": "ยังไม่ได้สร้างไฟล์บันทึก - ลองอีกครั้งในอีกไม่กี่วินาที",
+    },
+    "msg_rec_needs_ffmpeg": {
+        "en": "Recording needs ffmpeg (recommended) or mpv on the PATH.\n\n"
+              "Install ffmpeg, e.g.:  sudo apt install ffmpeg",
+        "sv": "Inspelning kräver ffmpeg (rekommenderas) eller mpv i PATH.\n\n"
+              "Installera ffmpeg, t.ex.:  sudo apt install ffmpeg",
+        "es": "La grabación necesita ffmpeg (recomendado) o mpv en el PATH.\n\n"
+              "Instala ffmpeg, p. ej.:  sudo apt install ffmpeg",
+        "de": "Aufnahme benötigt ffmpeg (empfohlen) oder mpv im PATH.\n\n"
+              "Installiere ffmpeg, z. B.:  sudo apt install ffmpeg",
+        "fr": "L'enregistrement nécessite ffmpeg (recommandé) ou mpv dans le "
+              "PATH.\n\nInstallez ffmpeg, p. ex. :  sudo apt install ffmpeg",
+        "zh": "录制需要 PATH 中有 ffmpeg（推荐）或 mpv。\n\n"
+              "安装 ffmpeg，例如：sudo apt install ffmpeg",
+        "ru": "Для записи нужен ffmpeg (рекомендуется) или mpv в PATH.\n\n"
+              "Установите ffmpeg, напр.:  sudo apt install ffmpeg",
+        "th": "การบันทึกต้องมี ffmpeg (แนะนำ) หรือ mpv ใน PATH\n\n"
+              "ติดตั้ง ffmpeg เช่น:  sudo apt install ffmpeg",
+    },
+    "msg_stop_time_future": {
+        "en": "The stop time must be in the future and after the start time.",
+        "sv": "Stopptiden måste vara i framtiden och efter starttiden.",
+        "es": "La hora de fin debe ser futura y posterior a la de inicio.",
+        "de": "Die Stoppzeit muss in der Zukunft und nach der Startzeit liegen.",
+        "fr": "L'heure de fin doit être future et postérieure au début.",
+        "zh": "停止时间必须在将来且晚于开始时间。",
+        "ru": "Время окончания должно быть в будущем и после времени начала.",
+        "th": "เวลาหยุดต้องอยู่ในอนาคตและหลังเวลาเริ่ม",
+    },
+    "msg_edit_time_title": {
+        "en": "Edit recording time", "sv": "Redigera inspelningstid",
+        "es": "Editar hora de grabación", "de": "Aufnahmezeit bearbeiten",
+        "fr": "Modifier l'heure d'enregistrement", "zh": "编辑录制时间",
+        "ru": "Изменить время записи", "th": "แก้ไขเวลาบันทึก",
+    },
+    "msg_stop_after_start": {
+        "en": "The stop time must be after the start time.",
+        "sv": "Stopptiden måste vara efter starttiden.",
+        "es": "La hora de fin debe ser posterior a la de inicio.",
+        "de": "Die Stoppzeit muss nach der Startzeit liegen.",
+        "fr": "L'heure de fin doit être postérieure à l'heure de début.",
+        "zh": "停止时间必须晚于开始时间。",
+        "ru": "Время окончания должно быть после времени начала.",
+        "th": "เวลาหยุดต้องอยู่หลังเวลาเริ่ม",
+    },
+    "msg_delete_rec_title": {
+        "en": "Delete recording", "sv": "Radera inspelning",
+        "es": "Eliminar grabación", "de": "Aufnahme löschen",
+        "fr": "Supprimer l'enregistrement", "zh": "删除录制",
+        "ru": "Удалить запись", "th": "ลบการบันทึก",
+    },
+    "msg_delete_rec_body": {
+        "en": "Delete {what} from disk?", "sv": "Radera {what} från disken?",
+        "es": "¿Eliminar {what} del disco?", "de": "{what} von der Festplatte löschen?",
+        "fr": "Supprimer {what} du disque ?", "zh": "从磁盘删除 {what}？",
+        "ru": "Удалить {what} с диска?", "th": "ลบ {what} ออกจากดิสก์หรือไม่?",
+    },
+    "msg_clear_history_title": {
+        "en": "Clear history", "sv": "Rensa historik", "es": "Borrar historial",
+        "de": "Verlauf löschen", "fr": "Effacer l'historique", "zh": "清除历史",
+        "ru": "Очистить историю", "th": "ล้างประวัติ",
+    },
+    "msg_clear_history_body": {
+        "en": "Remove all watch history?", "sv": "Ta bort all visningshistorik?",
+        "es": "¿Eliminar todo el historial de reproducción?",
+        "de": "Gesamten Wiedergabeverlauf entfernen?",
+        "fr": "Supprimer tout l'historique de lecture ?",
+        "zh": "移除所有观看历史？", "ru": "Удалить всю историю просмотра?",
+        "th": "ลบประวัติการดูทั้งหมดหรือไม่?",
+    },
+    "msg_rename_rec_title": {
+        "en": "Rename recording", "sv": "Byt namn på inspelning",
+        "es": "Renombrar grabación", "de": "Aufnahme umbenennen",
+        "fr": "Renommer l'enregistrement", "zh": "重命名录制",
+        "ru": "Переименовать запись", "th": "เปลี่ยนชื่อการบันทึก",
+    },
+    "msg_move_rec_title": {
+        "en": "Move recording", "sv": "Flytta inspelning",
+        "es": "Mover grabación", "de": "Aufnahme verschieben",
+        "fr": "Déplacer l'enregistrement", "zh": "移动录制",
+        "ru": "Переместить запись", "th": "ย้ายการบันทึก",
+    },
+    "msg_new_folder_title": {
+        "en": "New folder", "sv": "Ny mapp", "es": "Nueva carpeta",
+        "de": "Neuer Ordner", "fr": "Nouveau dossier", "zh": "新建文件夹",
+        "ru": "Новая папка", "th": "โฟลเดอร์ใหม่",
+    },
+    "msg_folder_name": {
+        "en": "Folder name:", "sv": "Mappnamn:", "es": "Nombre de carpeta:",
+        "de": "Ordnername:", "fr": "Nom du dossier :", "zh": "文件夹名称：",
+        "ru": "Имя папки:", "th": "ชื่อโฟลเดอร์:",
+    },
+    "msg_trakt_enter_creds": {
+        "en": "Enter a Client ID and Client Secret first.",
+        "sv": "Ange klient-ID och klienthemlighet först.",
+        "es": "Introduce primero un ID de cliente y un secreto de cliente.",
+        "de": "Zuerst Client-ID und Client-Secret eingeben.",
+        "fr": "Saisissez d'abord un ID client et un secret client.",
+        "zh": "请先输入客户端 ID 和客户端密钥。",
+        "ru": "Сначала введите ID клиента и секрет клиента.",
+        "th": "กรุณาใส่ Client ID และ Client Secret ก่อน",
+    },
+    "msg_remove_playlist_title": {
+        "en": "Remove playlist", "sv": "Ta bort spellista",
+        "es": "Eliminar lista", "de": "Playlist entfernen",
+        "fr": "Supprimer la liste", "zh": "移除播放列表",
+        "ru": "Удалить плейлист", "th": "ลบเพลย์ลิสต์",
+    },
+    "msg_remove_playlist_body": {
+        "en": "Remove this playlist? Its favorites and history are kept until "
+              "you re-add and clear them.",
+        "sv": "Ta bort den här spellistan? Dess favoriter och historik "
+              "behålls tills du lägger till den igen och rensar dem.",
+        "es": "¿Eliminar esta lista? Sus favoritos e historial se conservan "
+              "hasta que la vuelvas a añadir y los borres.",
+        "de": "Diese Playlist entfernen? Ihre Favoriten und der Verlauf "
+              "bleiben erhalten, bis du sie erneut hinzufügst und löschst.",
+        "fr": "Supprimer cette liste ? Ses favoris et son historique sont "
+              "conservés jusqu'à ce que vous la rajoutiez et les effaciez.",
+        "zh": "移除此播放列表？其收藏和历史将保留，直到你重新添加并清除它们。",
+        "ru": "Удалить этот плейлист? Его избранное и история сохраняются, "
+              "пока вы не добавите его снова и не очистите их.",
+        "th": "ลบเพลย์ลิสต์นี้หรือไม่? รายการโปรดและประวัติจะถูกเก็บไว้ "
+              "จนกว่าคุณจะเพิ่มใหม่และล้างออก",
+    },
+
+    # ── Trakt dialogs ─────────────────────────────────────────────────────
+    "trakt_connect_title": {
+        "en": "Connect to Trakt", "sv": "Anslut till Trakt",
+        "es": "Conectar a Trakt", "de": "Mit Trakt verbinden",
+        "fr": "Se connecter à Trakt", "zh": "连接到 Trakt",
+        "ru": "Подключиться к Trakt", "th": "เชื่อมต่อ Trakt",
+    },
+    "trakt_requesting_code": {
+        "en": "Requesting a device code...",
+        "sv": "Begär en enhetskod...", "es": "Solicitando un código...",
+        "de": "Gerätecode wird angefordert...",
+        "fr": "Demande d'un code d'appareil...", "zh": "正在请求设备代码……",
+        "ru": "Запрос кода устройства...", "th": "กำลังขอรหัสอุปกรณ์...",
+    },
+    "trakt_code_expired": {
+        "en": "Code expired - try again.", "sv": "Koden gick ut - försök igen.",
+        "es": "El código expiró; inténtalo de nuevo.",
+        "de": "Code abgelaufen - erneut versuchen.",
+        "fr": "Code expiré - réessayez.", "zh": "代码已过期——请重试。",
+        "ru": "Код истёк - попробуйте снова.", "th": "รหัสหมดอายุ - ลองอีกครั้ง",
+    },
+    "trakt_connected_excl": {
+        "en": "Connected to Trakt!", "sv": "Ansluten till Trakt!",
+        "es": "¡Conectado a Trakt!", "de": "Mit Trakt verbunden!",
+        "fr": "Connecté à Trakt !", "zh": "已连接到 Trakt！",
+        "ru": "Подключено к Trakt!", "th": "เชื่อมต่อ Trakt แล้ว!",
+    },
+    "trakt_login_failed": {
+        "en": "Trakt login failed: {msg}",
+        "sv": "Trakt-inloggning misslyckades: {msg}",
+        "es": "Error de inicio de sesión en Trakt: {msg}",
+        "de": "Trakt-Anmeldung fehlgeschlagen: {msg}",
+        "fr": "Échec de la connexion à Trakt : {msg}",
+        "zh": "Trakt 登录失败：{msg}", "ru": "Ошибка входа в Trakt: {msg}",
+        "th": "เข้าสู่ระบบ Trakt ล้มเหลว: {msg}",
+    },
+    "trakt_enter_code": {
+        "en": "Go to <b>{url}</b> and enter this code:<br><br>"
+              "<span style='font-size:20px; font-weight:700;'>{code}</span>",
+        "sv": "Gå till <b>{url}</b> och ange den här koden:<br><br>"
+              "<span style='font-size:20px; font-weight:700;'>{code}</span>",
+        "es": "Ve a <b>{url}</b> e introduce este código:<br><br>"
+              "<span style='font-size:20px; font-weight:700;'>{code}</span>",
+        "de": "Gehe zu <b>{url}</b> und gib diesen Code ein:<br><br>"
+              "<span style='font-size:20px; font-weight:700;'>{code}</span>",
+        "fr": "Rendez-vous sur <b>{url}</b> et saisissez ce code :<br><br>"
+              "<span style='font-size:20px; font-weight:700;'>{code}</span>",
+        "zh": "前往 <b>{url}</b> 并输入此代码：<br><br>"
+              "<span style='font-size:20px; font-weight:700;'>{code}</span>",
+        "ru": "Перейдите на <b>{url}</b> и введите этот код:<br><br>"
+              "<span style='font-size:20px; font-weight:700;'>{code}</span>",
+        "th": "ไปที่ <b>{url}</b> แล้วป้อนรหัสนี้:<br><br>"
+              "<span style='font-size:20px; font-weight:700;'>{code}</span>",
+    },
+    "trakt_could_not_start": {
+        "en": "Could not start Trakt login: {msg}",
+        "sv": "Kunde inte starta Trakt-inloggning: {msg}",
+        "es": "No se pudo iniciar el acceso a Trakt: {msg}",
+        "de": "Trakt-Anmeldung konnte nicht gestartet werden: {msg}",
+        "fr": "Impossible de démarrer la connexion à Trakt : {msg}",
+        "zh": "无法开始 Trakt 登录：{msg}",
+        "ru": "Не удалось начать вход в Trakt: {msg}",
+        "th": "ไม่สามารถเริ่มเข้าสู่ระบบ Trakt: {msg}",
+    },
+    "trakt_watchlist_title": {
+        "en": "Trakt Watchlist & History",
+        "sv": "Trakt bevakningslista och historik",
+        "es": "Lista y historial de Trakt",
+        "de": "Trakt-Merkliste & Verlauf",
+        "fr": "Liste de suivi et historique Trakt",
+        "zh": "Trakt 待看列表和历史",
+        "ru": "Список и история Trakt",
+        "th": "รายการที่ติดตามและประวัติ Trakt",
+    },
+    "trakt_tab_watchlist": {
+        "en": "Watchlist", "sv": "Bevakningslista", "es": "Lista de seguimiento",
+        "de": "Merkliste", "fr": "Liste de suivi", "zh": "待看列表",
+        "ru": "Список к просмотру", "th": "รายการที่ติดตาม",
+    },
+    "trakt_load_failed": {
+        "en": "Could not load Trakt data: {msg}",
+        "sv": "Kunde inte ladda Trakt-data: {msg}",
+        "es": "No se pudieron cargar los datos de Trakt: {msg}",
+        "de": "Trakt-Daten konnten nicht geladen werden: {msg}",
+        "fr": "Impossible de charger les données Trakt : {msg}",
+        "zh": "无法加载 Trakt 数据：{msg}",
+        "ru": "Не удалось загрузить данные Trakt: {msg}",
+        "th": "ไม่สามารถโหลดข้อมูล Trakt: {msg}",
+    },
+    "trakt_create_app": {
+        "en": "Create a free Trakt app...",
+        "sv": "Skapa en gratis Trakt-app...",
+        "es": "Crear una app gratuita de Trakt...",
+        "de": "Kostenlose Trakt-App erstellen...",
+        "fr": "Créer une application Trakt gratuite...",
+        "zh": "创建免费的 Trakt 应用……",
+        "ru": "Создать бесплатное приложение Trakt...",
+        "th": "สร้างแอป Trakt ฟรี...",
+    },
+    "trakt_client_id_ph": {
+        "en": "Client ID (from the app you created)",
+        "sv": "Klient-ID (från appen du skapade)",
+        "es": "ID de cliente (de la app que creaste)",
+        "de": "Client-ID (aus der erstellten App)",
+        "fr": "ID client (de l'application créée)",
+        "zh": "客户端 ID（来自你创建的应用）",
+        "ru": "ID клиента (из созданного приложения)",
+        "th": "Client ID (จากแอปที่คุณสร้าง)",
+    },
+    "trakt_client_secret_ph": {
+        "en": "Client Secret", "sv": "Klienthemlighet",
+        "es": "Secreto de cliente", "de": "Client-Secret",
+        "fr": "Secret client", "zh": "客户端密钥", "ru": "Секрет клиента",
+        "th": "Client Secret",
+    },
+    "trakt_connect_btn": {
+        "en": "Connect to Trakt...", "sv": "Anslut till Trakt...",
+        "es": "Conectar a Trakt...", "de": "Mit Trakt verbinden...",
+        "fr": "Se connecter à Trakt...", "zh": "连接到 Trakt……",
+        "ru": "Подключиться к Trakt...", "th": "เชื่อมต่อ Trakt...",
+    },
+    "trakt_disconnect": {
+        "en": "Disconnect", "sv": "Koppla från", "es": "Desconectar",
+        "de": "Trennen", "fr": "Déconnecter", "zh": "断开连接",
+        "ru": "Отключить", "th": "ตัดการเชื่อมต่อ",
+    },
+    "trakt_watchlist_btn": {
+        "en": "Watchlist / History...", "sv": "Bevakningslista / Historik...",
+        "es": "Lista / Historial...", "de": "Merkliste / Verlauf...",
+        "fr": "Liste de suivi / Historique...", "zh": "待看列表 / 历史……",
+        "ru": "Список / История...", "th": "รายการที่ติดตาม / ประวัติ...",
+    },
+    "trakt_connected": {
+        "en": "Connected to Trakt.", "sv": "Ansluten till Trakt.",
+        "es": "Conectado a Trakt.", "de": "Mit Trakt verbunden.",
+        "fr": "Connecté à Trakt.", "zh": "已连接到 Trakt。",
+        "ru": "Подключено к Trakt.", "th": "เชื่อมต่อ Trakt แล้ว",
+    },
+    "trakt_not_connected": {
+        "en": "Not connected.", "sv": "Inte ansluten.", "es": "No conectado.",
+        "de": "Nicht verbunden.", "fr": "Non connecté.", "zh": "未连接。",
+        "ru": "Не подключено.", "th": "ยังไม่ได้เชื่อมต่อ",
+    },
+
+    # ── Cast/actor filmography panel ──────────────────────────────────────
+    "actor_other_titles": {
+        "en": "{name} — other titles in your playlist",
+        "sv": "{name} — andra titlar i din spellista",
+        "es": "{name} — otros títulos en tu lista",
+        "de": "{name} — weitere Titel in deiner Playlist",
+        "fr": "{name} — autres titres dans votre liste",
+        "zh": "{name} — 你播放列表中的其他作品",
+        "ru": "{name} — другие тайтлы в вашем плейлисте",
+        "th": "{name} — เรื่องอื่นในเพลย์ลิสต์ของคุณ",
+    },
+    "actor_lookup_filmography": {
+        "en": "Looking up filmography...", "sv": "Slår upp filmografi...",
+        "es": "Buscando filmografía...", "de": "Filmografie wird gesucht...",
+        "fr": "Recherche de la filmographie...", "zh": "正在查询影视作品……",
+        "ru": "Поиск фильмографии...", "th": "กำลังค้นหาผลงาน...",
+    },
+    "actor_searching_playlist": {
+        "en": "Searching your playlist...", "sv": "Söker i din spellista...",
+        "es": "Buscando en tu lista...", "de": "Deine Playlist wird durchsucht...",
+        "fr": "Recherche dans votre liste...", "zh": "正在搜索你的播放列表……",
+        "ru": "Поиск в вашем плейлисте...", "th": "กำลังค้นหาในเพลย์ลิสต์...",
+    },
+    "actor_no_matches": {
+        "en": "No other titles from this playlist matched.",
+        "sv": "Inga andra titlar från denna spellista matchade.",
+        "es": "No coincidió ningún otro título de esta lista.",
+        "de": "Keine weiteren Titel aus dieser Playlist gefunden.",
+        "fr": "Aucun autre titre de cette liste ne correspond.",
+        "zh": "此播放列表中没有其他匹配的作品。",
+        "ru": "Других совпадений в этом плейлисте нет.",
+        "th": "ไม่มีเรื่องอื่นในเพลย์ลิสต์นี้ที่ตรงกัน",
+    },
+    "actor_matches_found": {
+        "en": "{n} title(s) found in your playlist (double-click to open):",
+        "sv": "{n} titel/titlar hittades i din spellista (dubbelklicka "
+              "för att öppna):",
+        "es": "{n} título(s) encontrado(s) en tu lista (doble clic para abrir):",
+        "de": "{n} Titel in deiner Playlist gefunden (Doppelklick zum Öffnen):",
+        "fr": "{n} titre(s) trouvé(s) dans votre liste (double-clic pour "
+              "ouvrir) :",
+        "zh": "在你的播放列表中找到 {n} 个作品（双击打开）：",
+        "ru": "Найдено тайтлов в плейлисте: {n} (двойной клик - открыть):",
+        "th": "พบ {n} เรื่องในเพลย์ลิสต์ของคุณ (ดับเบิลคลิกเพื่อเปิด):",
+    },
+    "actor_not_found_tmdb": {
+        "en": "Couldn't find {name} on TMDB.",
+        "sv": "Kunde inte hitta {name} på TMDB.",
+        "es": "No se encontró a {name} en TMDB.",
+        "de": "{name} konnte auf TMDB nicht gefunden werden.",
+        "fr": "Impossible de trouver {name} sur TMDB.",
+        "zh": "在 TMDB 上找不到 {name}。",
+        "ru": "Не удалось найти {name} на TMDB.",
+        "th": "ไม่พบ {name} บน TMDB",
+    },
+    "actor_lookup_member": {
+        "en": "Looking up cast member...", "sv": "Slår upp skådespelare...",
+        "es": "Buscando miembro del reparto...",
+        "de": "Darsteller wird gesucht...",
+        "fr": "Recherche du membre de la distribution...",
+        "zh": "正在查询演员……", "ru": "Поиск актёра...",
+        "th": "กำลังค้นหานักแสดง...",
+    },
+    "ph_no_limit": {
+        "en": "no limit", "sv": "ingen gräns", "es": "sin límite",
+        "de": "kein Limit", "fr": "aucune limite", "zh": "无限制",
+        "ru": "без лимита", "th": "ไม่จำกัด",
     },
 }
 

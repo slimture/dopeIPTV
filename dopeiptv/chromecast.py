@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (
     QDialog, QHBoxLayout, QLabel, QListWidget, QPushButton, QVBoxLayout,
 )
 
+from .i18n import tr
 from .workers import run_async
 
 try:
@@ -95,13 +96,13 @@ class CastDialog(QDialog):
         self.window = window
         self.url = url
         self.stream_title = title
-        self.setWindowTitle("Cast to Chromecast")
+        self.setWindowTitle(tr("cast_title"))
         self.setMinimumWidth(400)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(18, 18, 18, 18)
         lay.setSpacing(10)
 
-        self.status = QLabel("Scanning for Chromecast devices...")
+        self.status = QLabel(tr("cast_scanning"))
         self.status.setWordWrap(True)
         lay.addWidget(self.status)
 
@@ -110,10 +111,10 @@ class CastDialog(QDialog):
         lay.addWidget(self.list, 1)
 
         btns = QHBoxLayout()
-        self.rescan_btn = QPushButton("Rescan")
-        self.cast_btn = QPushButton("Cast", objectName="Primary")
-        self.stop_btn = QPushButton("Stop casting")
-        close_btn = QPushButton("Close")
+        self.rescan_btn = QPushButton(tr("cast_rescan"))
+        self.cast_btn = QPushButton(tr("cast_cast"), objectName="Primary")
+        self.stop_btn = QPushButton(tr("cast_stop"))
+        close_btn = QPushButton(tr("common_close"))
         for b in (self.rescan_btn, self.cast_btn, self.stop_btn, close_btn):
             btns.addWidget(b)
         lay.addLayout(btns)
@@ -131,7 +132,7 @@ class CastDialog(QDialog):
             pass
 
     def _scan(self) -> None:
-        self._set_status("Scanning for Chromecast devices...")
+        self._set_status(tr("cast_scanning"))
         self.rescan_btn.setEnabled(False)
 
         def done(names):
@@ -141,8 +142,8 @@ class CastDialog(QDialog):
                 for name in names or []:
                     self.list.addItem(name)
                 self._set_status(
-                    f"{len(names)} device(s) found." if names
-                    else "No Chromecast devices found on this network.")
+                    tr("cast_devices_found", n=len(names)) if names
+                    else tr("cast_none_found"))
                 if names:
                     self.list.setCurrentRow(0)
             except RuntimeError:
@@ -153,7 +154,7 @@ class CastDialog(QDialog):
                 self.rescan_btn.setEnabled(True)
             except RuntimeError:
                 return
-            self._set_status(f"Scan failed: {msg}")
+            self._set_status(tr("cast_scan_failed", msg=msg))
 
         run_async(self.window.pool, self.window.cast.scan, done, fail)
 
@@ -162,14 +163,14 @@ class CastDialog(QDialog):
         if not item:
             return
         name = item.text()
-        self._set_status(f"Starting cast to {name}...")
+        self._set_status(tr("cast_starting", name=name))
         run_async(self.window.pool,
                   lambda: self.window.cast.cast(name, self.url,
                                                  self.stream_title),
-                  lambda n: self._set_status(f"Casting to {n}."),
-                  lambda msg: self._set_status(f"Cast failed: {msg}"))
+                  lambda n: self._set_status(tr("cast_casting_to", name=n)),
+                  lambda msg: self._set_status(tr("cast_failed", msg=msg)))
 
     def _stop(self) -> None:
         run_async(self.window.pool, self.window.cast.stop,
-                  lambda _: self._set_status("Casting stopped."),
-                  lambda msg: self._set_status(f"Stop failed: {msg}"))
+                  lambda _: self._set_status(tr("cast_stopped")),
+                  lambda msg: self._set_status(tr("cast_stop_failed", msg=msg)))

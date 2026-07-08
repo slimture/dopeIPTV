@@ -1,8 +1,23 @@
 """Smoke tests for the i18n translation module."""
 
+import pathlib
 import re
 
 from dopeiptv import i18n
+
+
+def test_every_tr_key_used_in_code_is_defined():
+    """Guard against typos / forgotten keys: every tr("literal") referenced
+    anywhere in the package must have an entry in _STRINGS."""
+    pkg = pathlib.Path(i18n.__file__).parent
+    used = set()
+    for path in pkg.glob("*.py"):
+        for m in re.finditer(r'tr\(\s*"([a-z0-9_]+)"', path.read_text()):
+            used.add(m.group(1))
+    # Illustrative keys in the module docstring, not real usage.
+    used -= {"your_key", "some_key"}
+    missing = sorted(k for k in used if k not in i18n._STRINGS)
+    assert not missing, f"tr() keys used but not defined: {missing}"
 
 
 def test_all_keys_cover_all_languages():

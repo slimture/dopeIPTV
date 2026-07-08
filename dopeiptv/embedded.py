@@ -484,13 +484,13 @@ class EmbeddedPlayer(QWidget):
         fc.setContentsMargins(8, 6, 8, 6)
         fc.setSpacing(8)
         self.fs_prev_btn = QPushButton("◀", objectName="MiniBtn")
-        self.fs_prev_btn.setToolTip("Previous channel (Left)")
+        self.fs_prev_btn.setToolTip(tr("tooltip_previous_channel"))
         self.fs_prev_btn.clicked.connect(lambda: self.zap.emit(-1))
         self.fs_next_btn = QPushButton("▶", objectName="MiniBtn")
-        self.fs_next_btn.setToolTip("Next channel (Right)")
+        self.fs_next_btn.setToolTip(tr("tooltip_next_channel"))
         self.fs_next_btn.clicked.connect(lambda: self.zap.emit(1))
         self.fs_pause_btn = QPushButton("‖", objectName="MiniBtn")
-        self.fs_pause_btn.setToolTip("Pause / resume")
+        self.fs_pause_btn.setToolTip(tr("tooltip_pause_resume"))
         self.fs_pause_btn.clicked.connect(self.toggle_pause)
         self.fs_back_btn = QPushButton("-10", objectName="MiniBtn")
         self.fs_back_btn.clicked.connect(lambda: self._relative_seek(-10))
@@ -504,30 +504,30 @@ class EmbeddedPlayer(QWidget):
         self.fs_time_lbl = QLabel("", objectName="DetailMeta")
         self.fs_time_lbl.hide()
         self.fs_mute_btn = QPushButton("\U0001f50a", objectName="MiniBtn")
-        self.fs_mute_btn.setToolTip("Mute / unmute")
+        self.fs_mute_btn.setToolTip(tr("tooltip_mute_unmute"))
         self.fs_mute_btn.clicked.connect(self.toggle_mute)
         self.fs_vol = QSlider(Qt.Orientation.Horizontal)
         self.fs_vol.setRange(0, 100)
         self.fs_vol.setFixedWidth(80)
-        self.fs_vol.setToolTip("Volume")
+        self.fs_vol.setToolTip(tr("tooltip_volume"))
         self.fs_vol.valueChanged.connect(self._set_volume)
         self.fs_ts_btn = QPushButton("⏪", objectName="MiniBtn")
-        self.fs_ts_btn.setToolTip("Timeshift / catch-up")
+        self.fs_ts_btn.setToolTip(tr("tooltip_timeshift"))
         self.fs_ts_btn.clicked.connect(
             lambda: self.timeshift_menu.emit(self.fs_ts_btn))
         self.fs_ts_btn.hide()
         self.fs_rec_btn = QPushButton("●", objectName="MiniBtn")
-        self.fs_rec_btn.setToolTip("Record")
+        self.fs_rec_btn.setToolTip(tr("tooltip_record"))
         self.fs_rec_btn.setStyleSheet("color:#FF5C5C;")
         self.fs_rec_btn.clicked.connect(
             lambda: self.record_menu.emit(self.fs_rec_btn))
         self.fs_rec_btn.hide()
         self.fs_opts_btn = QPushButton("⚙", objectName="MiniBtn")
-        self.fs_opts_btn.setToolTip("Audio / subtitles / aspect / buffer")
+        self.fs_opts_btn.setToolTip(tr("tooltip_audio_subs_aspect"))
         self.fs_opts_btn.clicked.connect(
             lambda: self._show_options_menu(self.fs_opts_btn))
         self.fs_exit_btn = QPushButton("✕", objectName="MiniBtn")
-        self.fs_exit_btn.setToolTip("Exit fullscreen (Esc)")
+        self.fs_exit_btn.setToolTip(tr("tooltip_exit_fullscreen"))
         self.fs_exit_btn.clicked.connect(self.exit_fullscreen.emit)
         fc.addWidget(self.fs_prev_btn)
         fc.addWidget(self.fs_next_btn)
@@ -1118,7 +1118,7 @@ class EmbeddedPlayer(QWidget):
             label = " ".join(p for p in parts if p).strip()
             return label or f"Track {t.get('id')}"
 
-        audio = menu.addMenu("Audio track")
+        audio = menu.addMenu(tr("opt_audio_track"))
         for t in (tracks("audio") if m else []):
             act = audio.addAction(track_label(t))
             act.setCheckable(True)
@@ -1126,10 +1126,10 @@ class EmbeddedPlayer(QWidget):
             act.triggered.connect(
                 lambda _c, tid=t.get("id"): self._set_mpv("aid", tid))
         if audio.isEmpty():
-            audio.addAction("(no audio tracks)").setEnabled(False)
+            audio.addAction(tr("opt_no_audio_tracks")).setEnabled(False)
 
-        subs = menu.addMenu("Subtitles")
-        off = subs.addAction("Off")
+        subs = menu.addMenu(tr("opt_subtitles"))
+        off = subs.addAction(tr("opt_off"))
         off.setCheckable(True)
         sub_tracks = tracks("sub") if m else []
         off.setChecked(not any(t.get("selected") for t in sub_tracks))
@@ -1141,7 +1141,7 @@ class EmbeddedPlayer(QWidget):
             act.triggered.connect(
                 lambda _c, tid=t.get("id"): self._set_mpv("sid", tid))
 
-        delay = menu.addMenu("Audio delay")
+        delay = menu.addMenu(tr("opt_audio_delay"))
         current_delay = 0.0
         try:
             current_delay = float(m["audio-delay"]) if m else 0.0
@@ -1149,23 +1149,23 @@ class EmbeddedPlayer(QWidget):
             pass
         for val in (-1.0, -0.5, -0.25, 0.0, 0.25, 0.5, 1.0):
             act = delay.addAction(
-                f"{val:+.2f} s" if val else "0 s (default)")
+                f"{val:+.2f} s" if val else tr("opt_delay_default"))
             act.setCheckable(True)
             act.setChecked(abs(current_delay - val) < 0.01)
             act.triggered.connect(
                 lambda _c, v=val: self._set_mpv("audio-delay", v))
 
-        aspect = menu.addMenu("Aspect ratio")
-        for label, val in (("Auto", "-1"), ("16:9", "16:9"),
+        aspect = menu.addMenu(tr("opt_aspect_ratio"))
+        for label, val in ((tr("opt_aspect_auto"), "-1"), ("16:9", "16:9"),
                            ("4:3", "4:3"), ("2.35:1", "2.35:1")):
             act = aspect.addAction(label)
             act.triggered.connect(
                 lambda _c, v=val: self._set_mpv("video-aspect-override", v))
-        stretch = aspect.addAction("Stretch to window")
+        stretch = aspect.addAction(tr("opt_aspect_stretch"))
         stretch.triggered.connect(
             lambda _c: self._set_mpv("keepaspect", False))
 
-        buf = menu.addMenu("Network buffer")
+        buf = menu.addMenu(tr("opt_network_buffer"))
         current_buf = self._cache_secs()
         for secs in (1, 3, 5, 10, 30):
             act = buf.addAction(f"{secs} s")
@@ -1175,7 +1175,7 @@ class EmbeddedPlayer(QWidget):
                 lambda _c, s=secs: self._set_cache_secs(s))
 
         menu.addSeparator()
-        stats_act = menu.addAction("Stats for nerds")
+        stats_act = menu.addAction(tr("opt_stats_for_nerds"))
         stats_act.triggered.connect(self._show_stats)
 
         menu.exec(anchor.mapToGlobal(anchor.rect().bottomLeft()))
