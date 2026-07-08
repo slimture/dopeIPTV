@@ -7,20 +7,21 @@ import shutil
 import sys
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from PyQt6.QtCore import (
-    QDateTime, QSettings, QSize, Qt, QThreadPool, QTimer, pyqtSignal,
+    QDateTime, QSettings, QSize, Qt, QThreadPool, QTimer, QUrl, pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QColor, QKeySequence, QPainter, QPainterPath, QPixmap, QShortcut,
+    QColor, QDesktopServices, QIcon, QKeySequence, QPainter, QPainterPath,
+    QPixmap, QShortcut,
 )
 from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDateTimeEdit, QDialog,
     QDialogButtonBox, QFileDialog, QFormLayout, QFrame, QHBoxLayout,
     QInputDialog, QLabel, QLineEdit, QListView, QListWidget, QListWidgetItem,
     QMainWindow, QMenu, QMessageBox, QProgressBar, QPushButton, QScrollArea,
-    QSizePolicy, QSplitter, QTabWidget, QVBoxLayout, QWidget,
+    QSizePolicy, QSpinBox, QSplitter, QTabWidget, QVBoxLayout, QWidget,
 )
 
 from . import APP_NAME, ORG, VERSION
@@ -32,6 +33,7 @@ from .dialogs import (
 )
 from .embedded import EmbeddedPlayer
 from .epg import XmltvGuide, epg_cache_path
+from .metadata import PosterResolver, TmdbClient
 from .players import (
     MpvIpcPlayer, MpvWindowPlayer, _libmpv, embedded_playback_reason,
     embedded_playback_supported, launch_player,
@@ -42,8 +44,20 @@ from .stores import (
     ParentalControl, PlaylistStore,
 )
 from .theme import ACCENT, ACCENTS, P, THEMES, apply_theme, build_style
+from .trakt import TraktAuthError, TraktClient
 from .wakelock import WakeLock
 from .workers import LogoLoader, run_async
+
+
+class _ClickableWidget(QWidget):
+    """Plain QWidget that emits clicked() on a left-button press."""
+
+    clicked = pyqtSignal()
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+        super().mousePressEvent(event)
 
 
 class MainWindow(QMainWindow):
@@ -60,12 +74,22 @@ class MainWindow(QMainWindow):
         active_pl = playlists.active() if playlists else None
         self.pool = QThreadPool.globalInstance()
         self.logos = LogoLoader(self.pool)
+        # Separate, higher-res cache for posters/cast photos - reusing
+        # `logos` (capped at 96px for small list icons) would blur badly
+        # once scaled up to the much larger detail-panel sizes. Also its
+        # own thread pool: a poster plus up to 8 cast photos is up to 9
+        # concurrent downloads per selection, which would otherwise
+        # compete with (and delay) channel/EPG loading on the shared pool.
+        self._art_pool = QThreadPool()
+        self._art_pool.setMaxThreadCount(4)
+        self.poster_art = LogoLoader(self._art_pool, max_size=320)
         self.epg_progress.connect(self._on_epg_progress)
         pid = (active_pl or {}).get("id")
         self.xmltv = XmltvGuide(
             client, (active_pl or {}).get("epg_url") or None,
             cache_path=epg_cache_path(pid) if pid else None,
             progress_cb=self.epg_progress.emit)
+        self.xmltv.delay_minutes = self._epg_delay_minutes()
         self.favs = FavoriteStore(
             settings, f"favorites_{pid}" if pid else "favorites")
         self.history = HistoryStore(
@@ -80,6 +104,15 @@ class MainWindow(QMainWindow):
         self.rec.jobs_changed.connect(self._recordings_changed)
         self.rec.recording_stopped.connect(self._on_recording_stopped)
         self.wake = WakeLock()
+        self._full_catalog: list | None = None
+        self.tmdb: PosterResolver | None = None
+        self._tmdb_pool: QThreadPool | None = None
+        self._poster_refresh_timer = QTimer(self)
+        self._poster_refresh_timer.setSingleShot(True)
+        self._poster_refresh_timer.timeout.connect(self._flush_poster_refresh)
+        self._init_metadata_provider()
+        self.trakt = TraktClient(settings)
+        self._trakt_active: dict | None = None
         self._raw_categories: list = []
         self.mpv = MpvIpcPlayer()
         self.mpv_window = MpvWindowPlayer() if _libmpv is not None else None
@@ -193,6 +226,7 @@ class MainWindow(QMainWindow):
 
         self.search = QLineEdit(objectName="Search")
         self.search.setPlaceholderText("Search channels, movies or series...")
+        self.search.setClearButtonEnabled(True)
         self._preview_timer = QTimer(self)
         self._preview_timer.setSingleShot(True)
         self._preview_timer.timeout.connect(self._play_preview)
@@ -302,12 +336,13 @@ class MainWindow(QMainWindow):
                 lambda: self.rec.finish_all_inplayer("playback stopped"))
             self.player.stop_btn.clicked.connect(
                 lambda: self.wake.release())
+            self.player.stop_btn.clicked.connect(self._trakt_stop_current)
             self.player.playback_error.connect(self._playback_error)
             self.player.zap.connect(self._zap)
             self.player.pip_requested.connect(self._toggle_pip)
             self.player.stop_btn.clicked.connect(self._exit_pip_if_active)
             self.player.stop_btn.clicked.connect(self.player.hide)
-            dl.addWidget(self.player, 2)
+            dl.addWidget(self.player, 1)
 
         self.stream_error = QLabel("")
         self.stream_error.setStyleSheet(
@@ -316,27 +351,46 @@ class MainWindow(QMainWindow):
         self.stream_error.hide()
         dl.addWidget(self.stream_error)
 
+        self._detail_name = "Select something from the list"
+
+        header_row = QHBoxLayout()
+        header_row.setSpacing(14)
+
+        left_col = QVBoxLayout()
+        left_col.setSpacing(8)
         self.d_logo = QLabel()
         self.d_logo.setFixedSize(84, 84)
         self.d_logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.d_logo.setStyleSheet(
             f"background:{P['sel']}; border-radius:18px; "
             "font-size:30px; font-weight:700;")
-        dl.addWidget(self.d_logo)
+        left_col.addWidget(self.d_logo)
 
-        self.d_title = QLabel("Select something from the list",
-                              objectName="DetailTitle")
-        self.d_title.setWordWrap(True)
-        dl.addWidget(self.d_title)
+        # Movie/series rating, linked to IMDb when TMDB has the id. Sits
+        # directly under the poster with no card/border around it - the
+        # rating is a single line of text and doesn't need its own box.
+        self.media_rating_lbl = QLabel("")
+        self.media_rating_lbl.setOpenExternalLinks(True)
+        self.media_rating_lbl.setStyleSheet("font-size:13px; font-weight:600;")
+        self.media_rating_lbl.hide()
+        left_col.addWidget(self.media_rating_lbl)
 
-        self.d_meta = QLabel("", objectName="DetailMeta")
-        self.d_meta.setWordWrap(True)
-        dl.addWidget(self.d_meta)
+        self.play_mpv = QPushButton("▶  Play", objectName="Primary")
+        self.play_mpv.setToolTip("Play in mpv")
+        self.play_mpv.setSizePolicy(QSizePolicy.Policy.Fixed,
+                                    QSizePolicy.Policy.Fixed)
+        self.play_mpv.clicked.connect(lambda: self.play("mpv"))
+        left_col.addWidget(self.play_mpv)
+        left_col.addStretch(1)
+        header_row.addLayout(left_col)
 
+        # "Now playing" sits beside the logo instead of stacked below it -
+        # the channel name is already visible in the middle list, the
+        # window title bar, and the mini player's own control bar.
         self.now_card = QFrame(objectName="Card")
         nc = QVBoxLayout(self.now_card)
-        nc.setContentsMargins(14, 12, 14, 12)
-        nc.setSpacing(6)
+        nc.setContentsMargins(16, 14, 16, 14)
+        nc.setSpacing(8)
         self.now_time = QLabel("", objectName="NowTime")
         self.now_title = QLabel("", objectName="NowTitle")
         self.now_title.setWordWrap(True)
@@ -348,12 +402,25 @@ class MainWindow(QMainWindow):
         for w in (self.now_time, self.now_title, self.now_bar, self.now_desc):
             nc.addWidget(w)
         self.now_card.hide()
-        dl.addWidget(self.now_card)
+        header_row.addWidget(self.now_card, 1)
+        dl.addLayout(header_row)
 
-        self.epg_refresh = QPushButton("Refresh EPG")
-        self.epg_refresh.clicked.connect(self._refresh_epg_clicked)
-        self.epg_refresh.hide()
-        dl.addWidget(self.epg_refresh)
+        self.cast_scroll = QScrollArea()
+        self.cast_scroll.setWidgetResizable(True)
+        self.cast_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.cast_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.cast_scroll.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.cast_scroll.setFixedHeight(96)
+        self.cast_holder = QWidget()
+        self.cast_lay = QHBoxLayout(self.cast_holder)
+        self.cast_lay.setContentsMargins(2, 2, 2, 2)
+        self.cast_lay.setSpacing(12)
+        self.cast_lay.addStretch()
+        self.cast_scroll.setWidget(self.cast_holder)
+        self.cast_scroll.hide()
+        dl.addWidget(self.cast_scroll)
 
         self.epg_scroll = QScrollArea()
         self.epg_scroll.setWidgetResizable(True)
@@ -365,16 +432,6 @@ class MainWindow(QMainWindow):
         self.epg_lay.addStretch()
         self.epg_scroll.setWidget(self.epg_holder)
         dl.addWidget(self.epg_scroll, 1)
-
-        row = QHBoxLayout()
-        row.setSpacing(8)
-        self.play_mpv = QPushButton("Play in mpv", objectName="Primary")
-        self.play_mpv.clicked.connect(lambda: self.play("mpv"))
-        self.play_vlc = QPushButton("Play in VLC")
-        self.play_vlc.clicked.connect(lambda: self.play("vlc"))
-        row.addWidget(self.play_mpv)
-        row.addWidget(self.play_vlc)
-        dl.addLayout(row)
 
         root.addWidget(side)
         root.addWidget(mid)
@@ -472,9 +529,14 @@ class MainWindow(QMainWindow):
                 m.left(), m.top(), m.right(), m.bottom())
         self._det.setStyleSheet("")
         self.menuBar().show()
-        self.player.set_fullscreen_ui(False)
         if not getattr(self, "_was_fullscreen", False):
             self.showNormal()
+        # Restore the window geometry *before* unlocking the video's
+        # fixed height - _lock_video_box() reads the player's current
+        # size, and computing it while the window is still fullscreen-
+        # sized bakes in a wrong height that a later resize doesn't
+        # reliably clear (the same class of bug as the PiP letterboxing).
+        self.player.set_fullscreen_ui(False)
         idx = getattr(self, "_fs_return_index", None)
         scroll = getattr(self, "_fs_return_scroll", None)
         if idx is not None and idx.isValid():
@@ -488,7 +550,6 @@ class MainWindow(QMainWindow):
 
     def _toggle_pip_fullscreen(self) -> None:
         if self.isFullScreen():
-            self.player.set_fullscreen_ui(False)
             self.setWindowFlags(
                 self.windowFlags()
                 | Qt.WindowType.FramelessWindowHint
@@ -502,6 +563,11 @@ class MainWindow(QMainWindow):
                 screen_geo = self.screen().availableGeometry()
                 self.move(screen_geo.right() - 500,
                           screen_geo.bottom() - 290)
+            # Restore the small PiP geometry *before* unlocking the video's
+            # fixed height, so _lock_video_box() sizes it to the final PiP
+            # dimensions instead of the still-fullscreen ones.
+            self.player.set_fullscreen_ui(False)
+            self.player.set_pip_mode(True)
         else:
             self._pip_fs_geo = self.geometry()
             self.setWindowFlags(
@@ -676,7 +742,8 @@ class MainWindow(QMainWindow):
         if self.mode == "rec":
             self.cat_list.blockSignals(True)
             for label, data in [("All recordings", None),
-                                ("Active & scheduled", "__jobs__")]:
+                                ("Active & scheduled", "__jobs__"),
+                                ("Upcoming", "__upcoming__")]:
                 item = QListWidgetItem(label)
                 item.setData(Qt.ItemDataRole.UserRole, data)
                 self.cat_list.addItem(item)
@@ -739,7 +806,8 @@ class MainWindow(QMainWindow):
                     it.setForeground(QColor(color))
                 self.cat_list.addItem(it)
             self.cat_list.blockSignals(False)
-            self.cat_list.setCurrentRow(0)
+            self.cat_list.setCurrentRow(
+                1 if self.cat_list.count() > 1 else 0)
 
         def fail(msg):
             if gen != self._load_gen:
@@ -776,6 +844,10 @@ class MainWindow(QMainWindow):
             if category_id == "__jobs__":
                 self.all_items = [self._job_item(j)
                                   for j in reversed(self.rec.jobs)]
+            elif category_id == "__upcoming__":
+                self.all_items = [
+                    self._job_item(j) for j in reversed(self.rec.jobs)
+                    if j["status"] == "scheduled"]
             else:
                 self.all_items = self.rec.files(category_id)
             self._apply_filter()
@@ -828,6 +900,218 @@ class MainWindow(QMainWindow):
             return
         run_async(self.pool, self.xmltv.ensure_loaded,
                   lambda ok: self.list_model.refresh_all() if ok else None)
+
+    # -- metadata (TMDB artwork) -----------------------------------------------------
+
+    def _init_metadata_provider(self) -> None:
+        if self.tmdb:
+            self.tmdb.flush()
+        self.tmdb = None
+        if self.settings.value("metadata_source", "playlist") != "tmdb":
+            return
+        key = self.settings.value("tmdb_api_key", "") or ""
+        if not key:
+            return
+        # Dedicated, small thread pool: TMDB lookups must never compete
+        # with the shared pool used for channel/EPG loading, or a burst
+        # of poster searches can starve real work and look like a freeze.
+        pool = QThreadPool()
+        pool.setMaxThreadCount(2)
+        self._tmdb_pool = pool
+        self.tmdb = PosterResolver(pool, self.settings, TmdbClient(key))
+
+    def _flush_poster_refresh(self) -> None:
+        self.list_model.refresh_all()
+
+    def poster_for(self, it, kind: str) -> str | None:
+        if not self.tmdb or kind not in ("vod", "series"):
+            return None
+        title = it.get("name") or it.get("title") or ""
+        if not title:
+            return None
+        return self.tmdb.get(
+            title, kind,
+            lambda _url: self._poster_refresh_timer.start(150))
+
+    # -- trakt scrobbling -------------------------------------------------------------
+
+    def _trakt_start_for_item(self, kind: str, item) -> None:
+        if not item or not self.trakt.is_connected():
+            return
+        if kind == "movie":
+            title = item.get("name") or item.get("title") or ""
+            if not title:
+                return
+
+            def job(title=title):
+                movie = self.trakt.find_movie(title)
+                if not movie:
+                    return None
+                payload = {"movie": movie}
+                self.trakt.scrobble_start(payload, 0.0)
+                return payload
+
+        elif kind == "episode":
+            show_title = ((self.series_ctx or {}).get("name")
+                          or (self.series_ctx or {}).get("title") or "")
+            try:
+                season = int(item.get("season"))
+                episode = int(item.get("episode_num"))
+            except (TypeError, ValueError):
+                return
+            if not show_title:
+                return
+
+            def job(show_title=show_title, season=season, episode=episode):
+                ep = self.trakt.find_episode(show_title, season, episode)
+                if not ep:
+                    return None
+                payload = {"episode": ep}
+                self.trakt.scrobble_start(payload, 0.0)
+                return payload
+        else:
+            return
+
+        def done(payload):
+            if payload:
+                self._trakt_active = {"payload": payload}
+
+        run_async(self.pool, job, done, lambda _e: None)
+
+    def _trakt_stop_current(self) -> None:
+        if not self._trakt_active:
+            return
+        active = self._trakt_active
+        self._trakt_active = None
+        progress = self.player.progress_percent() if self.player else 0.0
+
+        def job(active=active, progress=progress):
+            self.trakt.scrobble_stop(active["payload"], progress)
+
+        run_async(self.pool, job, lambda _r: None, lambda _e: None)
+
+    def _trakt_device_auth_dialog(self, parent) -> None:
+        d = QDialog(parent)
+        d.setWindowTitle("Connect to Trakt")
+        d.setMinimumWidth(380)
+        lay = QVBoxLayout(d)
+        info = QLabel("Requesting a device code...")
+        info.setWordWrap(True)
+        info.setStyleSheet("font-size:13px;")
+        lay.addWidget(info)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel)
+        buttons.rejected.connect(d.reject)
+        lay.addWidget(buttons)
+
+        state = {"cancelled": False, "device_code": None,
+                 "interval": 5, "expires_at": 0.0}
+
+        def poll() -> None:
+            if state["cancelled"] or not state["device_code"]:
+                return
+            if time.time() > state["expires_at"]:
+                info.setText("Code expired - try again.")
+                return
+            run_async(self.pool,
+                      lambda: self.trakt.poll_device_token(
+                          state["device_code"]),
+                      poll_done, poll_failed)
+
+        def poll_done(data) -> None:
+            if state["cancelled"]:
+                return
+            if data is None:
+                QTimer.singleShot(state["interval"] * 1000, poll)
+                return
+            info.setText("Connected to Trakt!")
+            QTimer.singleShot(700, d.accept)
+
+        def poll_failed(msg) -> None:
+            if not state["cancelled"]:
+                info.setText(f"Trakt login failed: {msg}")
+
+        def started(data) -> None:
+            if state["cancelled"]:
+                return
+            state["device_code"] = data["device_code"]
+            state["interval"] = data.get("interval", 5)
+            state["expires_at"] = time.time() + data.get("expires_in", 600)
+            info.setText(
+                f"Go to <b>{data.get('verification_url')}</b> and enter "
+                f"this code:<br><br><span style='font-size:20px; "
+                f"font-weight:700;'>{data['user_code']}</span>")
+            QTimer.singleShot(state["interval"] * 1000, poll)
+
+        def start_failed(msg) -> None:
+            if not state["cancelled"]:
+                info.setText(f"Could not start Trakt login: {msg}")
+
+        buttons.rejected.connect(lambda: state.__setitem__("cancelled", True))
+        run_async(self.pool, self.trakt.start_device_auth,
+                  started, start_failed)
+        d.exec()
+
+    def _open_trakt_dialog(self, parent) -> None:
+        if not self.trakt.is_connected():
+            QMessageBox.information(
+                parent, "Trakt", "Connect to Trakt first.")
+            return
+        d = QDialog(parent)
+        d.setWindowTitle("Trakt Watchlist & History")
+        d.setMinimumSize(480, 500)
+        lay = QVBoxLayout(d)
+        tw = QTabWidget()
+        lay.addWidget(tw)
+        wl_list = QListWidget()
+        hist_list = QListWidget()
+        tw.addTab(wl_list, "Watchlist")
+        tw.addTab(hist_list, "History")
+        status = QLabel("Loading...")
+        status.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        lay.addWidget(status)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(d.reject)
+        buttons.accepted.connect(d.accept)
+        lay.addWidget(buttons)
+
+        def fmt_watchlist(e) -> str:
+            for kind in ("movie", "show"):
+                if e.get(kind):
+                    x = e[kind]
+                    return f"{x.get('title')} ({x.get('year') or '?'})"
+            return "?"
+
+        def fmt_history(e) -> str:
+            watched = (e.get("watched_at") or "")[:10]
+            if e.get("movie"):
+                m = e["movie"]
+                return f"{watched}  {m.get('title')} ({m.get('year') or '?'})"
+            if e.get("episode") and e.get("show"):
+                ep, s = e["episode"], e["show"]
+                return (f"{watched}  {s.get('title')} "
+                        f"S{ep.get('season')}E{ep.get('number')} - "
+                        f"{ep.get('title') or ''}")
+            return watched or "?"
+
+        def load_failed(msg) -> None:
+            status.setText(f"Could not load Trakt data: {msg}")
+
+        def load_history(items) -> None:
+            hist_list.clear()
+            for e in items:
+                hist_list.addItem(fmt_history(e))
+            status.setText("")
+
+        def load_watchlist(items) -> None:
+            wl_list.clear()
+            for e in items:
+                wl_list.addItem(fmt_watchlist(e))
+            run_async(self.pool, lambda: self.trakt.history(50),
+                      load_history, load_failed)
+
+        run_async(self.pool, self.trakt.watchlist,
+                  load_watchlist, load_failed)
+        d.exec()
 
     # -- list and filtering --------------------------------------------------------
 
@@ -919,86 +1203,52 @@ class MainWindow(QMainWindow):
         self._current_key = self._item_key(it)
         self._show_detail(it)
 
+    POSTER_SIZE_LIVE = (84, 84)
+    POSTER_SIZE_MEDIA = (170, 255)
+
     def _show_detail(self, it) -> None:
         self.now_card.hide()
+        self.media_rating_lbl.hide()
+        self._clear_cast_row()
         self._clear_epg_rows()
         self._current_epg = None
-        self.epg_refresh.hide()
         if not it:
-            self.d_title.setText("Select something from the list")
-            self.d_meta.setText("")
+            self._detail_name = "Select something from the list"
+            self.d_logo.setFixedSize(*self.POSTER_SIZE_LIVE)
             self.d_logo.setPixmap(QPixmap())
             self.d_logo.setText("")
             return
         name = self.channel_display_name(it)
-        self.d_title.setText(name)
+        self._detail_name = name
+        is_media = self.mode in ("vod", "series")
+        self.d_logo.setFixedSize(
+            *(self.POSTER_SIZE_MEDIA if is_media else self.POSTER_SIZE_LIVE))
         self.d_logo.setPixmap(QPixmap())
         self.d_logo.setStyleSheet(self.PLACEHOLDER_LOGO_STYLE)
         self.d_logo.setText(name.strip()[:1].upper())
-        url = it.get("stream_icon") or it.get("cover")
-        if url:
-            self.logos.get(url, self._set_detail_logo)
+        self._load_detail_poster(it, is_media)
 
         if self.mode == "rec":
-            if it.get("_kind") == "recjob":
-                status = {"recording": "Recording now",
-                          "scheduled": "Scheduled",
-                          "done": "Finished", "failed": "Failed",
-                          "cancelled": "Cancelled"}.get(
-                    it.get("_status"), "")
-                err = it.get("_error")
-                self.d_meta.setText(
-                    f"{status} - {err}" if err else status)
-            else:
-                try:
-                    mtime = datetime.fromtimestamp(
-                        os.stat(it["_path"]).st_mtime
-                    ).strftime("%Y-%m-%d %H:%M")
-                except OSError:
-                    mtime = "?"
-                self.d_meta.setText(
-                    f"Recording * {format_size(it.get('_size') or 0)}"
-                    f" * {mtime}")
             return
 
         if self.mode == "history":
-            self.d_meta.setText(
-                {"live": "Live channel", "movie": "Movie",
-                 "episode": "Episode"}.get(it.get("_kind"), ""))
             return
 
         if self.series_ctx:
             info = (it.get("info")
                     if isinstance(it.get("info"), dict) else {})
-            meta = " * ".join(x for x in (
-                f"Season {it.get('season')}" if it.get("season") else "",
-                info.get("duration", ""),) if x)
-            self.d_meta.setText(meta)
             self._show_media_info(info, self._current_key)
         elif self.mode in ("live", "fav"):
-            days = self._timeshift_days(it)
-            self.d_meta.setText(
-                f"Live channel * ⏪ Catch-up: {days} "
-                f"day{'s' if days != 1 else ''}" if days
-                else "Live channel")
             if it.get("stream_id") is not None:
-                if not self._player_fs:
-                    self.epg_refresh.show()
                 self._request_epg()
                 if (self.player and self._autoplay_preview()
-                        and self.playback_mode() == "embedded"
-                        and self.settings.value("player", "mpv") == "mpv"):
+                        and self.playback_mode() == "embedded"):
                     self._preview_timer.start(350)
         elif self.mode == "vod":
-            meta = " * ".join(x for x in (
-                str(it.get("year") or ""),
-                f"* {it['rating']}" if it.get("rating") else "",) if x)
-            self.d_meta.setText(meta or "Movie")
             if it.get("stream_id") is not None:
                 self._request_media_info(
                     "vod", it["stream_id"], self._current_key)
         else:
-            self.d_meta.setText("Series - double-click for episodes")
             if it.get("series_id") is not None:
                 self._request_media_info(
                     "series", it["series_id"], self._current_key)
@@ -1009,17 +1259,236 @@ class MainWindow(QMainWindow):
                 "font-size:30px; font-weight:700;")
 
     def _set_detail_logo(self, pm) -> None:
-        tile = QPixmap(84, 84)
+        w, h = self.d_logo.width(), self.d_logo.height()
+        tile = QPixmap(w, h)
         tile.fill(Qt.GlobalColor.transparent)
         p = QPainter(tile)
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        s = pm.scaled(84, 84, Qt.AspectRatioMode.KeepAspectRatio,
+        s = pm.scaled(w, h, Qt.AspectRatioMode.KeepAspectRatio,
                       Qt.TransformationMode.SmoothTransformation)
-        p.drawPixmap((84 - s.width()) // 2, (84 - s.height()) // 2, s)
+        p.drawPixmap((w - s.width()) // 2, (h - s.height()) // 2, s)
         p.end()
         self.d_logo.setStyleSheet("background:transparent;")
         self.d_logo.setText("")
         self.d_logo.setPixmap(tile)
+
+    def _media_title_for_tmdb(self, it) -> str:
+        if self.series_ctx:
+            return (self.series_ctx.get("name")
+                    or self.series_ctx.get("title") or "")
+        return it.get("name") or it.get("title") or ""
+
+    def _load_detail_poster(self, it, is_media: bool) -> None:
+        fallback_url = it.get("stream_icon") or it.get("cover")
+        if not (is_media and self.tmdb):
+            if fallback_url:
+                self.poster_art.get(fallback_url, self._set_detail_logo)
+            return
+        title = self._media_title_for_tmdb(it)
+        if not title:
+            if fallback_url:
+                self.poster_art.get(fallback_url, self._set_detail_logo)
+            return
+        kind = "vod" if self.mode == "vod" else "series"
+        key = self._current_key
+
+        def apply(details: dict) -> None:
+            if key != self._current_key:
+                return
+            self._apply_media_card(details)
+            url = details.get("poster_url") or fallback_url
+            if url:
+                self.poster_art.get(url, self._set_detail_logo)
+
+        details = self.tmdb.get_full(title, kind, apply)
+        if details is not None:
+            apply(details)
+        elif fallback_url:
+            self.poster_art.get(fallback_url, self._set_detail_logo)
+
+    def _apply_media_card(self, details: dict) -> None:
+        rating = details.get("rating")
+        imdb_id = details.get("imdb_id")
+        cast = details.get("cast") or []
+        stars = f"★ {rating:.1f}/10" if rating else ""
+        if imdb_id:
+            label = stars or "View on IMDb"
+            self.media_rating_lbl.setText(
+                f'<a href="https://www.imdb.com/title/{imdb_id}/" '
+                f'style="color:{ACCENT}; text-decoration:none;">'
+                f'{label}</a>')
+            self.media_rating_lbl.show()
+        elif stars:
+            self.media_rating_lbl.setText(stars)
+            self.media_rating_lbl.show()
+        else:
+            self.media_rating_lbl.hide()
+        self._clear_cast_row()
+        if cast:
+            for member in cast:
+                self.cast_lay.insertWidget(
+                    self.cast_lay.count() - 1,
+                    self._build_cast_chip(member.get("name") or "",
+                                          member.get("profile_url"),
+                                          member.get("person_id")))
+            self.cast_scroll.show()
+        else:
+            self.cast_scroll.hide()
+
+    CAST_PHOTO_SIZE = 56
+
+    def _clear_cast_row(self) -> None:
+        while self.cast_lay.count() > 1:
+            w = self.cast_lay.takeAt(0).widget()
+            if w:
+                w.deleteLater()
+        self.cast_scroll.hide()
+
+    def _build_cast_chip(self, name: str, profile_url: str | None,
+                         person_id=None) -> QWidget:
+        size = self.CAST_PHOTO_SIZE
+        chip = _ClickableWidget()
+        if person_id and self.tmdb:
+            chip.setCursor(Qt.CursorShape.PointingHandCursor)
+            chip.setToolTip(f"Find other titles with {name} in your playlist")
+            chip.clicked.connect(
+                lambda: self._on_cast_clicked(name, person_id))
+        v = QVBoxLayout(chip)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(4)
+        photo = QLabel()
+        photo.setFixedSize(size, size)
+        photo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        photo.setStyleSheet(
+            f"background:{P['sel']}; border-radius:{size // 2}px; "
+            "font-size:18px; font-weight:700;")
+        photo.setText(name.strip()[:1].upper() if name else "?")
+        v.addWidget(photo, 0, Qt.AlignmentFlag.AlignHCenter)
+        name_lbl = QLabel(name)
+        name_lbl.setStyleSheet(f"color:{P['muted']}; font-size:10px;")
+        name_lbl.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        name_lbl.setFixedWidth(size + 16)
+        name_lbl.setWordWrap(True)
+        v.addWidget(name_lbl)
+        if profile_url:
+            def apply_photo(pm, photo=photo) -> None:
+                photo.setPixmap(self._circular_pixmap(pm, size))
+                photo.setText("")
+                photo.setStyleSheet("background:transparent;")
+            self.poster_art.get(profile_url, apply_photo)
+        return chip
+
+    @staticmethod
+    def _circular_pixmap(pm: QPixmap, size: int) -> QPixmap:
+        scaled = pm.scaled(
+            size, size, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+            Qt.TransformationMode.SmoothTransformation)
+        x = max(0, (scaled.width() - size) // 2)
+        y = max(0, (scaled.height() - size) // 2)
+        cropped = scaled.copy(x, y, size, size)
+        out = QPixmap(size, size)
+        out.fill(Qt.GlobalColor.transparent)
+        p = QPainter(out)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        path = QPainterPath()
+        path.addEllipse(0, 0, size, size)
+        p.setClipPath(path)
+        p.drawPixmap(0, 0, cropped)
+        p.end()
+        return out
+
+    # -- cast: find an actor's other titles in this playlist -----------------------
+
+    @staticmethod
+    def _normalize_title(s: str) -> str:
+        return "".join(c for c in (s or "").lower() if c.isalnum())
+
+    def _ensure_full_catalog(self, callback) -> None:
+        if self._full_catalog is not None:
+            callback(self._full_catalog)
+            return
+
+        def fetch():
+            vod = self.client.vod_streams(None) or []
+            series = self.client.series_list(None) or []
+            return ([(it, "vod") for it in vod]
+                    + [(it, "series") for it in series])
+
+        def done(items):
+            self._full_catalog = items
+            callback(items)
+
+        run_async(self.pool, fetch, done, lambda _e: callback([]))
+
+    def _find_playlist_matches(self, titles: list[str], callback) -> None:
+        norm_titles = {self._normalize_title(t) for t in titles}
+
+        def with_catalog(catalog):
+            matches = [
+                (it, kind) for it, kind in catalog
+                if self._normalize_title(
+                    it.get("name") or it.get("title") or "") in norm_titles]
+            callback(matches)
+
+        self._ensure_full_catalog(with_catalog)
+
+    def _on_cast_clicked(self, name: str, person_id) -> None:
+        if not self.tmdb:
+            return
+        d = QDialog(self)
+        d.setWindowTitle(f"{name} — other titles in your playlist")
+        d.setMinimumSize(420, 480)
+        lay = QVBoxLayout(d)
+        status = QLabel("Looking up filmography...")
+        status.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        status.setWordWrap(True)
+        lay.addWidget(status)
+        result_list = QListWidget()
+        lay.addWidget(result_list, 1)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(d.reject)
+        buttons.accepted.connect(d.accept)
+        for b in buttons.buttons():
+            b.setIcon(QIcon())
+        lay.addWidget(buttons)
+
+        def show_matches(titles: list[str]) -> None:
+            status.setText("Searching your playlist...")
+
+            def with_matches(matches) -> None:
+                result_list.clear()
+                if not matches:
+                    status.setText(
+                        "No other titles from this playlist matched.")
+                    return
+                status.setText(
+                    f"{len(matches)} title(s) found in your playlist "
+                    "(double-click to open):")
+                for it, kind in matches:
+                    label = (f"{it.get('name') or it.get('title')}"
+                            f"  ({'Movie' if kind == 'vod' else 'Series'})")
+                    item = QListWidgetItem(label)
+                    item.setData(Qt.ItemDataRole.UserRole, (it, kind))
+                    result_list.addItem(item)
+
+            self._find_playlist_matches(titles, with_matches)
+
+        result_list.itemDoubleClicked.connect(
+            lambda item: self._play_cast_match(item, d))
+        credits = self.tmdb.get_person_credits(person_id, show_matches)
+        if credits is not None:
+            show_matches(credits)
+        d.exec()
+
+    def _play_cast_match(self, item, dialog) -> None:
+        it, kind = item.data(Qt.ItemDataRole.UserRole)
+        dialog.accept()
+        if kind == "vod":
+            self.switch_mode("vod")
+            self.play_item(it, "mpv")
+        else:
+            self.switch_mode("series")
+            self._enter_series(it)
 
     def _clear_epg_rows(self) -> None:
         while self.epg_lay.count() > 1:
@@ -1130,6 +1599,7 @@ class MainWindow(QMainWindow):
         seen: set = set()
         for e in listings or []:
             start, stop = epg_times(e)
+            start, stop = self._apply_epg_delay(start), self._apply_epg_delay(stop)
             if e.get("_plain"):
                 title, desc = (e.get("title") or "",
                                e.get("description") or "")
@@ -1161,7 +1631,7 @@ class MainWindow(QMainWindow):
                 self.now_card.show()
             if self.player:
                 info = (
-                    f"{self.d_title.text()}\n"
+                    f"{self._detail_name}\n"
                     f"{current['title'] or 'Unknown programme'}   "
                     f"{current['start']:%H:%M}-{current['stop']:%H:%M}")
                 nxt = upcoming[0] if upcoming else None
@@ -1331,22 +1801,6 @@ class MainWindow(QMainWindow):
             return
         CastDialog(self, url, title).exec()
 
-    def _open_external_both(self, it) -> None:
-        if self.mode == "history":
-            url, title = it.get("_url"), it.get("name") or "dopeIPTV"
-            icon, key, kind = (it.get("stream_icon"), it.get("_key"),
-                               it.get("_kind"))
-        else:
-            url, title = self._stream_for(it)
-            icon = it.get("stream_icon") or it.get("cover")
-            key, kind = self._item_key(it), self._history_kind()
-        if not url:
-            return
-        launch_player("mpv", url, title, self)
-        launch_player("vlc", url, title, self)
-        if self.mode != "history":
-            self.history.add(url, title, icon, key, kind)
-
     def _autoplay_preview(self) -> bool:
         return self.settings.value("autoplay_preview", "true") == "true"
 
@@ -1389,8 +1843,11 @@ class MainWindow(QMainWindow):
                         item=None) -> None:
         if not self._guard_stream_switch(url, title):
             return
+        self._trakt_stop_current()
         if record and kind:
             self.history.add(url, title, icon_url, key, kind)
+        if kind in ("movie", "episode"):
+            self._trakt_start_for_item(kind, item)
         self.stream_error.hide()
         self._playing_item = item if kind == "live" else None
         self._sync_player_buttons()
@@ -1426,8 +1883,7 @@ class MainWindow(QMainWindow):
                     lambda ok: None if ok
                     else self._player_missing("mpv"))
         else:
-            launch_player(self.settings.value("player", "mpv"),
-                          url, title, self)
+            launch_player("mpv", url, title, self)
 
     def _player_missing(self, name: str) -> None:
         QMessageBox.warning(
@@ -1444,6 +1900,7 @@ class MainWindow(QMainWindow):
     def _playback_error(self, msg: str) -> None:
         self.rec.finish_all_inplayer("stream error")
         self.wake.release()
+        self._trakt_active = None
         if self.player:
             self.player.current_url = None
         self._set_status(f"Stream error: {msg}", error=True)
@@ -1485,14 +1942,11 @@ class MainWindow(QMainWindow):
             return
         m = QMenu(self)
         m.addAction("Play in mpv", lambda: self.play_item(it, "mpv"))
-        m.addAction("Play in VLC", lambda: self.play_item(it, "vlc"))
         ext = m.addMenu("Open externally")
         ext.addAction("mpv",
                       lambda: self.play_item(it, "mpv", external=True))
         ext.addAction("VLC",
                       lambda: self.play_item(it, "vlc", external=True))
-        ext.addAction("mpv + VLC (both)",
-                      lambda: self._open_external_both(it))
         if not (self.mode == "series" and not self.series_ctx):
             m.addAction("Cast to Chromecast...",
                         lambda: self._open_cast_dialog(it))
@@ -1958,18 +2412,63 @@ class MainWindow(QMainWindow):
                            lambda: self._schedule_recording(it))
         cap_menu = rec_menu.addMenu("Size limit (this session)")
         current = self.rec.session_cap
-        for label, cap in (("From Settings", None), ("No limit", 0),
-                           ("250 MB", 250 * 10**6),
-                           ("500 MB", 500 * 10**6),
-                           ("1 GB", 10**9), ("2 GB", 2 * 10**9),
-                           ("5 GB", 5 * 10**9),
-                           ("10 GB", 10 * 10**9)):
+        presets = (("From Settings", None), ("No limit", 0),
+                   ("250 MB", 250 * 10**6),
+                   ("500 MB", 500 * 10**6),
+                   ("1 GB", 10**9), ("2 GB", 2 * 10**9),
+                   ("5 GB", 5 * 10**9),
+                   ("10 GB", 10 * 10**9),
+                   ("50 GB", 50 * 10**9),
+                   ("100 GB", 100 * 10**9))
+        for label, cap in presets:
             act = cap_menu.addAction(label)
             act.setCheckable(True)
             act.setChecked(cap == current)
             act.triggered.connect(
                 lambda _c, cap=cap: setattr(
                     self.rec, "session_cap", cap))
+        cap_menu.addSeparator()
+        known_caps = {cap for _label, cap in presets}
+        custom_label = "Custom size..."
+        if current and current not in known_caps:
+            custom_label = f"Custom size... (currently {format_size(current)})"
+        custom_act = cap_menu.addAction(custom_label)
+        custom_act.setCheckable(True)
+        custom_act.setChecked(bool(current) and current not in known_caps)
+        custom_act.triggered.connect(self._set_custom_rec_cap)
+
+    def _set_custom_rec_cap(self) -> None:
+        d = QDialog(self)
+        d.setWindowTitle("Custom size limit")
+        d.setMinimumWidth(320)
+        f = QFormLayout(d)
+        f.setSpacing(10)
+        row = QHBoxLayout()
+        val_edit = QLineEdit()
+        val_edit.setPlaceholderText("e.g. 75")
+        unit_box = self._combo(
+            [("MB", "MB"), ("GB", "GB"), ("TB", "TB")], "GB")
+        row.addWidget(val_edit)
+        row.addWidget(unit_box)
+        f.addRow("Stop recording at", row)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel)
+        for b in buttons.buttons():
+            b.setIcon(QIcon())
+        buttons.accepted.connect(d.accept)
+        buttons.rejected.connect(d.reject)
+        f.addRow(buttons)
+        if not d.exec():
+            return
+        try:
+            val = float(val_edit.text().strip().replace(",", "."))
+        except ValueError:
+            return
+        if val <= 0:
+            return
+        mult = {"MB": 10**6, "GB": 10**9, "TB": 10**12}[unit_box.currentData()]
+        self.rec.session_cap = int(val * mult)
 
     def _record_now(self, it, minutes) -> None:
         if it.get("stream_id") is None:
@@ -2064,6 +2563,44 @@ class MainWindow(QMainWindow):
             "%a %d %b %H:%M")
         self._set_status(
             f"Recording of {title} scheduled for {when}")
+
+    def _edit_job_times(self, job_id: str) -> None:
+        job = next((j for j in self.rec.jobs if j["id"] == job_id), None)
+        if not job or job["status"] != "scheduled":
+            return
+        d = QDialog(self)
+        d.setWindowTitle("Edit recording time")
+        d.setMinimumWidth(380)
+        f = QFormLayout(d)
+        f.setSpacing(10)
+        start_edit = QDateTimeEdit(
+            QDateTime.fromSecsSinceEpoch(int(job["start"])))
+        start_edit.setCalendarPopup(True)
+        start_edit.setDisplayFormat("yyyy-MM-dd HH:mm")
+        stop_edit = QDateTimeEdit(
+            QDateTime.fromSecsSinceEpoch(int(job["stop"] or (
+                job["start"] + 3600))))
+        stop_edit.setCalendarPopup(True)
+        stop_edit.setDisplayFormat("yyyy-MM-dd HH:mm")
+        f.addRow("Title", QLabel(job["title"]))
+        f.addRow("Start", start_edit)
+        f.addRow("Stop", stop_edit)
+        bb = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel)
+        bb.accepted.connect(d.accept)
+        bb.rejected.connect(d.reject)
+        f.addRow(bb)
+        if d.exec() != QDialog.DialogCode.Accepted:
+            return
+        start_ts = start_edit.dateTime().toSecsSinceEpoch()
+        stop_ts = stop_edit.dateTime().toSecsSinceEpoch()
+        if stop_ts <= start_ts:
+            QMessageBox.warning(
+                self, "Edit recording time",
+                "The stop time must be after the start time.")
+            return
+        self.rec.update_job_times(job_id, start_ts, stop_ts)
 
     def _selected_recordings(self, clicked_item=None) -> list[dict]:
         items = [self.list_model.item_at(ix.row())
@@ -2168,6 +2705,26 @@ class MainWindow(QMainWindow):
         else:
             self._load_categories()
 
+    # -- EPG / replay time offsets ---------------------------------------------------
+
+    def _epg_delay_minutes(self) -> int:
+        try:
+            return int(self.settings.value("epg_delay_min", 0))
+        except (TypeError, ValueError):
+            return 0
+
+    def _replay_delay_minutes(self) -> int:
+        try:
+            return int(self.settings.value("replay_delay_min", 0))
+        except (TypeError, ValueError):
+            return 0
+
+    def _apply_epg_delay(self, dt):
+        if dt is None:
+            return None
+        mins = self._epg_delay_minutes()
+        return dt + timedelta(minutes=mins) if mins else dt
+
     # -- timeshift / catch-up ------------------------------------------------------
 
     @staticmethod
@@ -2195,6 +2752,7 @@ class MainWindow(QMainWindow):
             duration_min = max(1, int((now - start) // 60) + 1)
             what = None
         start = max(start, now - days * 86400)
+        start += self._replay_delay_minutes() * 60
         url = self.client.timeshift_url(
             sid, datetime.fromtimestamp(start), duration_min)
         name = self.channel_display_name(it)
@@ -2277,6 +2835,8 @@ class MainWindow(QMainWindow):
             out = []
             for e in self.client.epg_table(it["stream_id"]):
                 start, stop = epg_times(e)
+                start, stop = (self._apply_epg_delay(start),
+                              self._apply_epg_delay(stop))
                 if not start or not stop:
                     continue
                 start_ts, stop_ts = start.timestamp(), stop.timestamp()
@@ -2333,6 +2893,8 @@ class MainWindow(QMainWindow):
                 m.addAction("Stop recording",
                             lambda: self.rec.cancel(it["_job"]))
             elif status == "scheduled":
+                m.addAction("Edit start/stop time...",
+                            lambda: self._edit_job_times(it["_job"]))
                 m.addAction("Cancel scheduled recording",
                             lambda: self.rec.cancel(it["_job"]))
             else:
@@ -2490,7 +3052,7 @@ class MainWindow(QMainWindow):
     def open_settings(self) -> None:
         d = QDialog(self)
         d.setWindowTitle("Settings")
-        d.setMinimumSize(620, 580)
+        d.setMinimumSize(820, 600)
         outer = QVBoxLayout(d)
         outer.setContentsMargins(18, 18, 18, 18)
         tabs = QTabWidget()
@@ -2500,9 +3062,6 @@ class MainWindow(QMainWindow):
         play_tab = QWidget()
         pf = QFormLayout(play_tab)
         pf.setSpacing(10)
-        player_box = self._combo(
-            [("mpv", "mpv"), ("vlc", "VLC")],
-            self.settings.value("player", "mpv"))
         mode_items = [("embedded", "Embedded (in app)"),
                       ("window", "Reused mpv window"),
                       ("external", "External player")]
@@ -2540,7 +3099,35 @@ class MainWindow(QMainWindow):
             [("1", "1 s"), ("3", "3 s"), ("5", "5 s"),
              ("10", "10 s"), ("30", "30 s")],
             str(self.settings.value("cache_secs", "10")))
-        pf.addRow("Default player", player_box)
+
+        def delay_row(key: str):
+            try:
+                total = int(self.settings.value(key, 0))
+            except (TypeError, ValueError):
+                total = 0
+            sign_box = self._combo(
+                [("+", "+ (later)"), ("-", "- (earlier)")],
+                "-" if total < 0 else "+")
+            hours, minutes = divmod(abs(total), 60)
+            hours_box = QSpinBox()
+            hours_box.setRange(0, 23)
+            hours_box.setSuffix(" h")
+            hours_box.setValue(hours)
+            minutes_box = QSpinBox()
+            minutes_box.setRange(0, 59)
+            minutes_box.setSuffix(" m")
+            minutes_box.setValue(minutes)
+            row = QHBoxLayout()
+            row.addWidget(sign_box)
+            row.addWidget(hours_box)
+            row.addWidget(minutes_box)
+            row.addStretch(1)
+            return row, sign_box, hours_box, minutes_box
+
+        (replay_delay_row, replay_sign_box, replay_hours_box,
+         replay_minutes_box) = delay_row("replay_delay_min")
+        (epg_delay_row, epg_sign_box, epg_hours_box,
+         epg_minutes_box) = delay_row("epg_delay_min")
         pf.addRow("Playback mode (mpv)", mode_box)
         pf.addRow("Auto-play preview on selection", autoplay_box)
         pf.addRow("Live stream format", fmt_box)
@@ -2549,6 +3136,16 @@ class MainWindow(QMainWindow):
         pf.addRow("Preferred subtitle language", slang_box)
         pf.addRow("Aspect ratio", aspect_box)
         pf.addRow("Network buffer", buf_box)
+        pf.addRow("Replay delay", replay_delay_row)
+        pf.addRow("EPG delay", epg_delay_row)
+        delay_hint = QLabel(
+            "Replay delay shifts where catch-up/timeshift starts "
+            "playback, for providers whose stream lags behind their "
+            "listed schedule. EPG delay shifts all programme guide "
+            "times shown in the app. Both default to no offset.")
+        delay_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        delay_hint.setWordWrap(True)
+        pf.addRow(delay_hint)
         mode_hint = QLabel(
             "Embedded plays in the app. Reused mpv window keeps "
             "one external window you can zap in (Ctrl+←/→). "
@@ -2640,9 +3237,13 @@ class MainWindow(QMainWindow):
         set_pin_btn = QPushButton("Set / change PIN...")
         remove_pin_btn = QPushButton("Remove PIN")
         lock_now_btn = QPushButton("Lock now")
-        parv.addWidget(set_pin_btn)
-        parv.addWidget(remove_pin_btn)
-        parv.addWidget(lock_now_btn)
+        pin_btns = QHBoxLayout()
+        pin_btns.setSpacing(8)
+        pin_btns.addWidget(set_pin_btn)
+        pin_btns.addWidget(remove_pin_btn)
+        pin_btns.addWidget(lock_now_btn)
+        pin_btns.addStretch(1)
+        parv.addLayout(pin_btns)
         par_hint = QLabel(
             "Lock favorite groups (right-click a group under "
             "Favorites) or whole categories (right-click a "
@@ -2678,7 +3279,10 @@ class MainWindow(QMainWindow):
                     self._load_categories()
 
         rec_dir_btn.clicked.connect(pick_rec_dir)
-        recv.addWidget(rec_dir_btn)
+        rec_dir_row = QHBoxLayout()
+        rec_dir_row.addWidget(rec_dir_btn)
+        rec_dir_row.addStretch(1)
+        recv.addLayout(rec_dir_row)
         size_row = QHBoxLayout()
         size_row.addWidget(QLabel(
             "Stop a recording when the file reaches"))
@@ -2713,6 +3317,155 @@ class MainWindow(QMainWindow):
         recv.addWidget(rec_hint2)
         recv.addStretch()
         tabs.addTab(rec_tab, "Recording")
+
+        # Metadata tab (TMDB artwork)
+        meta_tab = QWidget()
+        mf = QFormLayout(meta_tab)
+        mf.setSpacing(10)
+        meta_source_box = self._combo(
+            [("playlist", "Playlist (provider artwork)"),
+             ("tmdb", "TMDB (fetch posters by title)")],
+            self.settings.value("metadata_source", "playlist"))
+        tmdb_key_row = QHBoxLayout()
+        tmdb_key_edit = QLineEdit(self.settings.value("tmdb_api_key", ""))
+        tmdb_key_edit.setPlaceholderText("TMDB API key (v3 auth)")
+        tmdb_test_btn = QPushButton("Test")
+        tmdb_key_row.addWidget(tmdb_key_edit, 1)
+        tmdb_key_row.addWidget(tmdb_test_btn)
+        mf.addRow("Artwork source", meta_source_box)
+        key_row_idx = mf.rowCount()
+        mf.addRow("TMDB API key", tmdb_key_row)
+        tmdb_status = QLabel()
+        tmdb_status.setWordWrap(True)
+        status_row_idx = mf.rowCount()
+        mf.addRow("", tmdb_status)
+        meta_hint = QLabel(
+            "Get a free key at themoviedb.org -> Settings -> API. "
+            "Posters are matched by title and cached, so lookups "
+            "only happen once per movie/series. Not used for live TV.")
+        meta_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        meta_hint.setWordWrap(True)
+        mf.addRow(meta_hint)
+        tabs.addTab(meta_tab, "Metadata")
+
+        def update_meta_visibility() -> None:
+            show_tmdb = meta_source_box.currentData() == "tmdb"
+            mf.setRowVisible(key_row_idx, show_tmdb)
+            mf.setRowVisible(status_row_idx, show_tmdb)
+
+        def test_tmdb_key() -> None:
+            key = tmdb_key_edit.text().strip()
+            if not key:
+                tmdb_status.setText("Enter an API key first.")
+                tmdb_status.setStyleSheet(
+                    f"color:{P['error']}; font-size:11px;")
+                return
+            tmdb_status.setText("Checking...")
+            tmdb_status.setStyleSheet(
+                f"color:{P['muted2']}; font-size:11px;")
+
+            def check():
+                TmdbClient(key).poster_url("Inception", "vod")
+                return True
+
+            def ok(_r):
+                tmdb_status.setText("Key works.")
+                tmdb_status.setStyleSheet(
+                    f"color:{P['accent']}; font-size:11px; font-weight:600;")
+
+            def fail(msg):
+                tmdb_status.setText(f"Key check failed: {msg}")
+                tmdb_status.setStyleSheet(
+                    f"color:{P['error']}; font-size:11px;")
+
+            run_async(self.pool, check, ok, fail)
+
+        meta_source_box.currentIndexChanged.connect(
+            lambda _i: update_meta_visibility())
+        tmdb_test_btn.clicked.connect(test_tmdb_key)
+        update_meta_visibility()
+
+        # Trakt tab
+        trakt_tab = QWidget()
+        tf = QVBoxLayout(trakt_tab)
+        tf.setSpacing(10)
+        trakt_setup_lbl = QLabel(
+            "One-time setup (about 2 minutes): Trakt requires every app "
+            "to have its own free API app for sign-in. Click below, "
+            "create one (any name, redirect URI doesn't matter), then "
+            "paste the Client ID and Secret it shows you. You only do "
+            "this once - after that, Connect just shows you a short "
+            "code to enter at trakt.tv, no password typing.")
+        trakt_setup_lbl.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        trakt_setup_lbl.setWordWrap(True)
+        tf.addWidget(trakt_setup_lbl)
+        create_app_btn = QPushButton("Create a free Trakt app...")
+        create_app_btn.clicked.connect(
+            lambda: QDesktopServices.openUrl(
+                QUrl("https://trakt.tv/oauth/applications/new")))
+        create_app_row = QHBoxLayout()
+        create_app_row.addWidget(create_app_btn)
+        create_app_row.addStretch(1)
+        tf.addLayout(create_app_row)
+        tform = QFormLayout()
+        tform.setSpacing(10)
+        trakt_id_edit = QLineEdit(self.trakt.client_id)
+        trakt_id_edit.setPlaceholderText("Client ID (from the app you created)")
+        trakt_secret_edit = QLineEdit(self.trakt.client_secret)
+        trakt_secret_edit.setPlaceholderText("Client Secret")
+        trakt_secret_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        tform.addRow("Client ID", trakt_id_edit)
+        tform.addRow("Client Secret", trakt_secret_edit)
+        tf.addLayout(tform)
+        trakt_status = QLabel()
+        trakt_status.setWordWrap(True)
+        tf.addWidget(trakt_status)
+        trakt_btns = QHBoxLayout()
+        trakt_connect_btn = QPushButton("Connect to Trakt...", objectName="Primary")
+        trakt_disconnect_btn = QPushButton("Disconnect")
+        trakt_watchlist_btn = QPushButton("Watchlist / History...")
+        trakt_btns.addWidget(trakt_connect_btn)
+        trakt_btns.addWidget(trakt_disconnect_btn)
+        trakt_btns.addWidget(trakt_watchlist_btn)
+        trakt_btns.addStretch()
+        tf.addLayout(trakt_btns)
+        trakt_hint = QLabel(
+            "While connected, movies and episodes you play are "
+            "scrobbled to Trakt. Live TV and recordings are not.")
+        trakt_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        trakt_hint.setWordWrap(True)
+        tf.addWidget(trakt_hint)
+        tf.addStretch()
+
+        def refresh_trakt_status():
+            if self.trakt.is_connected():
+                trakt_status.setText("Connected to Trakt.")
+            else:
+                trakt_status.setText("Not connected.")
+            trakt_disconnect_btn.setEnabled(self.trakt.is_connected())
+
+        def do_trakt_connect():
+            self.settings.setValue(
+                "trakt_client_id", trakt_id_edit.text().strip())
+            self.settings.setValue(
+                "trakt_client_secret", trakt_secret_edit.text().strip())
+            if not self.trakt.client_id or not self.trakt.client_secret:
+                QMessageBox.warning(
+                    d, "Trakt", "Enter a Client ID and Client Secret first.")
+                return
+            self._trakt_device_auth_dialog(d)
+            refresh_trakt_status()
+
+        def do_trakt_disconnect():
+            self.trakt.disconnect()
+            refresh_trakt_status()
+
+        trakt_connect_btn.clicked.connect(do_trakt_connect)
+        trakt_disconnect_btn.clicked.connect(do_trakt_disconnect)
+        trakt_watchlist_btn.clicked.connect(
+            lambda: self._open_trakt_dialog(d))
+        refresh_trakt_status()
+        tabs.addTab(trakt_tab, "Trakt")
 
         def refresh_pin_status():
             if self.parental.has_pin():
@@ -2899,13 +3652,13 @@ class MainWindow(QMainWindow):
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel)
+        for b in buttons.buttons():
+            b.setIcon(QIcon())
         buttons.accepted.connect(d.accept)
         buttons.rejected.connect(d.reject)
         outer.addWidget(buttons)
 
         if d.exec():
-            self.settings.setValue(
-                "player", player_box.currentData())
             self.settings.setValue(
                 "stream_format", fmt_box.currentData())
             self.settings.setValue(
@@ -2927,6 +3680,19 @@ class MainWindow(QMainWindow):
                 "aspect_mode", aspect_box.currentData())
             self.settings.setValue(
                 "cache_secs", buf_box.currentData())
+
+            def delay_value(sign_box, hours_box, minutes_box) -> int:
+                total = hours_box.value() * 60 + minutes_box.value()
+                return -total if sign_box.currentData() == "-" else total
+
+            self.settings.setValue(
+                "replay_delay_min",
+                delay_value(replay_sign_box, replay_hours_box,
+                           replay_minutes_box))
+            self.settings.setValue(
+                "epg_delay_min",
+                delay_value(epg_sign_box, epg_hours_box, epg_minutes_box))
+            self.xmltv.delay_minutes = self._epg_delay_minutes()
             try:
                 val = float(
                     rec_max_edit.text().replace(",", ".") or 0)
@@ -2936,9 +3702,19 @@ class MainWindow(QMainWindow):
                 "rec_max_value", val if val > 0 else "")
             self.settings.setValue(
                 "rec_max_unit", rec_max_unit.currentData())
+            self.settings.setValue(
+                "metadata_source", meta_source_box.currentData())
+            self.settings.setValue(
+                "tmdb_api_key", tmdb_key_edit.text().strip())
+            self._init_metadata_provider()
+            self.settings.setValue(
+                "trakt_client_id", trakt_id_edit.text().strip())
+            self.settings.setValue(
+                "trakt_client_secret", trakt_secret_edit.text().strip())
             if self.player:
                 self.player.apply_default_options()
             self._apply_view_settings()
+            self.list_model.refresh_all()
 
     def show_about(self) -> None:
         QMessageBox.about(
@@ -2964,25 +3740,6 @@ class MainWindow(QMainWindow):
         self.loading_bar.setRange(0, 0)
         self.loading_bar.hide()
 
-    def _refresh_epg_clicked(self) -> None:
-        self.epg_refresh.setEnabled(False)
-        self._clear_epg_rows()
-        self._epg_note("Refreshing programme guide...")
-
-        def done(_ok):
-            self.epg_refresh.setEnabled(True)
-            self._epg_progress_finished()
-            self.list_model.refresh_all()
-            self._request_epg()
-
-        def fail(_msg):
-            self.epg_refresh.setEnabled(True)
-            self._epg_progress_finished()
-            self._request_epg()
-
-        run_async(self.pool, lambda: self.xmltv.ensure_loaded(force=True),
-                  done, fail)
-
     def _error(self, msg: str) -> None:
         self.loading_bar.hide()
         self._set_status("Error: " + msg, error=True)
@@ -3001,6 +3758,15 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:
         self.wake.release()
+        if self.tmdb:
+            self.tmdb.flush()
+        if self._trakt_active:
+            active = self._trakt_active
+            progress = self.player.progress_percent() if self.player else 0.0
+            threading.Thread(
+                target=lambda: self.trakt.scrobble_stop(
+                    active["payload"], progress),
+                daemon=True).start()
         self.rec.shutdown()
         if self.player:
             self.player.shutdown()

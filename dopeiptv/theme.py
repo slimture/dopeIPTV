@@ -168,8 +168,8 @@ QSlider::handle:horizontal:hover {{ background: {p['accent_hi']}; }}
 #DetailPane {{ background: {p['pane']}; border-left: 1px solid {p['border']}; }}
 #DetailTitle {{ font-size: 20px; font-weight: 700; }}
 #DetailMeta  {{ color: {p['muted']}; font-size: 12px; }}
-#NowTitle    {{ font-size: 14px; font-weight: 600; }}
-#NowTime     {{ color: {ACCENT}; font-size: 11px; font-weight: 600; }}
+#NowTitle    {{ font-size: 15px; font-weight: 600; }}
+#NowTime     {{ color: {ACCENT}; font-size: 12px; font-weight: 600; }}
 #NowDesc     {{ color: {p['text3']}; font-size: 12px; }}
 
 QFrame#Card {{
@@ -233,8 +233,8 @@ QTabWidget::pane {{
     top: -1px;
 }}
 QTabBar::tab {{
-    background: transparent; color: {p['text2']}; padding: 7px 18px;
-    border-radius: 7px; margin: 2px; font-size: 12px; min-width: 60px;
+    background: transparent; color: {p['text2']}; padding: 7px 12px;
+    border-radius: 7px; margin: 1px; font-size: 12px; min-width: 46px;
 }}
 QTabBar::tab:selected {{ background: {p['btn']}; color: {p['text']}; }}
 QTabBar::tab:hover:!selected {{ background: {p['hover']}; }}

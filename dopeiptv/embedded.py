@@ -203,7 +203,7 @@ class EmbeddedPlayer(QWidget):
         self.bar = QWidget()
         bl = QHBoxLayout(self.bar)
         bl.setContentsMargins(4, 2, 4, 2)
-        bl.setSpacing(3)
+        bl.setSpacing(8)
         self.prev_btn = QPushButton("◀", objectName="MiniBtn")
         self.prev_btn.setToolTip("Previous channel (Ctrl+Left)")
         self.prev_btn.clicked.connect(lambda: self.zap.emit(-1))
@@ -268,16 +268,16 @@ class EmbeddedPlayer(QWidget):
         bl.addWidget(self.title_lbl, 1)
         bl.addWidget(self.seek, 2)
         bl.addWidget(self.time_lbl)
-        bl.addWidget(self.mute_btn)
-        bl.addSpacing(2)
-        bl.addWidget(self.vol)
-        bl.addSpacing(4)
         bl.addWidget(self.ts_btn)
         bl.addWidget(self.rec_btn)
         bl.addWidget(self.opts_btn)
         bl.addWidget(self.pip_btn)
         bl.addWidget(self.stop_btn)
         bl.addWidget(self.fs_btn)
+        bl.addSpacing(6)
+        bl.addWidget(self.mute_btn)
+        bl.addSpacing(2)
+        bl.addWidget(self.vol)
         lay.addWidget(self.bar)
         self.bar.setMouseTracking(True)
         self.bar.installEventFilter(self)
@@ -386,9 +386,6 @@ class EmbeddedPlayer(QWidget):
         self._overlay_timer.setInterval(self.OVERLAY_HIDE_MS)
         self._overlay_timer.timeout.connect(self._hide_fs_ui)
 
-        self._drag_start = None
-        self._drag_win_pos = None
-        self._drag_active = False
         self._pip_mode = False
         self._pip_bar_timer = QTimer(self)
         self._pip_bar_timer.setSingleShot(True)
@@ -421,34 +418,60 @@ class EmbeddedPlayer(QWidget):
 
     # -- video mouse handlers (signals from _MpvGLWidget) ------------------
 
+    RESIZE_MARGIN = 12
+
     def _on_video_dbl_click(self) -> None:
-        if not self._drag_active:
-            self.double_clicked.emit()
+        self.double_clicked.emit()
+
+    def _resize_edges(self, pos, size):
+        edges = Qt.Edge(0)
+        if pos.x() <= self.RESIZE_MARGIN:
+            edges |= Qt.Edge.LeftEdge
+        elif pos.x() >= size.width() - self.RESIZE_MARGIN:
+            edges |= Qt.Edge.RightEdge
+        if pos.y() <= self.RESIZE_MARGIN:
+            edges |= Qt.Edge.TopEdge
+        elif pos.y() >= size.height() - self.RESIZE_MARGIN:
+            edges |= Qt.Edge.BottomEdge
+        return edges
 
     def _on_video_press(self, event) -> None:
-        if event.button() == Qt.MouseButton.LeftButton and self._pip_mode:
-            self._drag_start = event.globalPosition().toPoint()
-            self._drag_win_pos = self.window().pos()
-            self._drag_active = False
+        if event.button() != Qt.MouseButton.LeftButton or not self._pip_mode:
+            return
+        win = self.window().windowHandle()
+        if win is None:
+            return
+        edges = self._resize_edges(event.position().toPoint(),
+                                    self.video.size())
+        if edges:
+            win.startSystemResize(edges)
+        else:
+            win.startSystemMove()
 
     def _on_video_move(self, event) -> None:
-        if self._pip_mode:
+        if self._pip_mode and not self._fs_ui:
             self._show_pip_bar()
-        if (self._drag_start is not None
-                and event.buttons() & Qt.MouseButton.LeftButton):
-            delta = event.globalPosition().toPoint() - self._drag_start
-            if not self._drag_active:
-                if abs(delta.x()) > 4 or abs(delta.y()) > 4:
-                    self._drag_active = True
-                else:
-                    return
-            self.window().move(self._drag_win_pos + delta)
+            if not (event.buttons() & Qt.MouseButton.LeftButton):
+                edges = self._resize_edges(event.position().toPoint(),
+                                            self.video.size())
+                cursor = {
+                    Qt.Edge.LeftEdge: Qt.CursorShape.SizeHorCursor,
+                    Qt.Edge.RightEdge: Qt.CursorShape.SizeHorCursor,
+                    Qt.Edge.TopEdge: Qt.CursorShape.SizeVerCursor,
+                    Qt.Edge.BottomEdge: Qt.CursorShape.SizeVerCursor,
+                    Qt.Edge.LeftEdge | Qt.Edge.TopEdge:
+                        Qt.CursorShape.SizeFDiagCursor,
+                    Qt.Edge.RightEdge | Qt.Edge.BottomEdge:
+                        Qt.CursorShape.SizeFDiagCursor,
+                    Qt.Edge.RightEdge | Qt.Edge.TopEdge:
+                        Qt.CursorShape.SizeBDiagCursor,
+                    Qt.Edge.LeftEdge | Qt.Edge.BottomEdge:
+                        Qt.CursorShape.SizeBDiagCursor,
+                }.get(edges)
+                self.video.setCursor(cursor if cursor else Qt.CursorShape.ArrowCursor)
 
     def _on_video_release(self, event) -> None:
-        if (event.button() == Qt.MouseButton.LeftButton
-                and self._drag_start is not None):
-            self._drag_start = None
-            self._drag_active = False
+        pass
 
     # -- pip bar auto-hide -----------------------------------------------------
 
@@ -481,14 +504,25 @@ class EmbeddedPlayer(QWidget):
     def set_fullscreen_ui(self, fullscreen: bool) -> None:
         self._fs_ui = fullscreen
         self.bar.setVisible(not fullscreen)
-        self._lock_video_box()
         if fullscreen:
+            self._lock_video_box()
             self._show_overlay()
         else:
+            # Reordering the caller to restore the window's geometry
+            # before this runs isn't enough on its own: showNormal() /
+            # setGeometry() request the change but X11/Wayland apply it
+            # asynchronously, so self.height() can still read the old
+            # (fullscreen) size right here. Locking the video against
+            # that stale size is what produced letterboxing that no
+            # later resize could clear (every resize recomputed from
+            # the same wrong baseline). Defer across a couple of ticks
+            # so this runs after the real resize has landed.
             self._hide_fs_ui()
             self._overlay_timer.stop()
             self.unsetCursor()
             self.video.unsetCursor()
+            QTimer.singleShot(0, self._lock_video_box)
+            QTimer.singleShot(200, self._lock_video_box)
 
     def _hide_fs_ui(self) -> None:
         self.overlay.hide()
@@ -533,10 +567,31 @@ class EmbeddedPlayer(QWidget):
             self.video.setMinimumHeight(190)
             self.video.setMaximumHeight(16777215)
         else:
+            # Clear any fixed height *before* measuring self.height(). A
+            # fixed-height child inflates this widget's own minimum size,
+            # so if the previous call locked in a wrong (too-tall) value -
+            # e.g. read right after leaving fullscreen, before the window
+            # had actually resized - that wrong height keeps reinforcing
+            # itself forever: every later resizeEvent recomputes from the
+            # same stuck self.height() instead of the real available
+            # space, which is exactly the letterboxing that survived a
+            # manual resize and needed an app restart to clear.
+            self.video.setMinimumHeight(0)
+            self.video.setMaximumHeight(16777215)
+            self.layout().activate()
             bar_h = self.bar.sizeHint().height() if self.bar.isVisible() else 0
             spacing = self.layout().spacing()
-            h = max(self.VIDEO_BOX_HEIGHT, self.height() - bar_h - spacing)
-            self.video.setFixedHeight(h)
+            available = self.height() - bar_h - spacing
+            # The VIDEO_BOX_HEIGHT floor exists so the embedded player
+            # doesn't shrink to nothing while docked in the main window's
+            # detail panel. In PiP mode the window is deliberately small
+            # (as little as ~270px tall) - enforcing that same floor there
+            # forces the video taller than the window actually has room
+            # for, which is exactly the fixed-height mismatch that shows
+            # up as unadjustable black bars after the PiP<->fullscreen
+            # round trip. PiP should just fill whatever space it has.
+            floor = 0 if self._pip_mode else self.VIDEO_BOX_HEIGHT
+            self.video.setFixedHeight(max(floor, available))
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
@@ -873,6 +928,19 @@ class EmbeddedPlayer(QWidget):
                 slider.setValue(int(pos or 0))
         for btn in (self.fs_back_btn, self.fs_fwd_btn):
             btn.setVisible(True)
+
+    def progress_percent(self) -> float:
+        m = self.video.mpv
+        if m is None:
+            return 0.0
+        try:
+            dur = m.duration
+            pos = m.playback_time
+        except Exception:
+            return 0.0
+        if not dur:
+            return 0.0
+        return max(0.0, min(100.0, 100.0 * (pos or 0) / dur))
 
     # -- volume ----------------------------------------------------------------
 

@@ -13,6 +13,8 @@ MODULES = [
     "dopeiptv.recording",
     "dopeiptv.theme",
     "dopeiptv.wakelock",
+    "dopeiptv.metadata",
+    "dopeiptv.trakt",
 ]
 
 MODULES_NEED_DISPLAY = [
