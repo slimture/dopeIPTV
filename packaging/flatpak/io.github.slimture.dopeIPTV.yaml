@@ -1,28 +1,38 @@
 # Flatpak manifest for dopeIPTV.
 #
-# NOTE: this is a first pass and will very likely need a couple of CI
-# iterations - building libmpv inside Flatpak (libass/libplacebo/ffmpeg) is
-# the fiddly part. The AppImage/.deb/pip artifacts do not depend on this.
+# Strategy: build libmpv (+ libplacebo + libass) from source on the
+# freedesktop runtime, then pip-install the PyQt6 app itself. The app module
+# is allowed network access at build time (build-args: --share=network) so we
+# don't have to vendor every wheel - this is fine because we ship our own
+# .flatpak bundle from CI and do not submit to Flathub (which forbids it).
+#
+# The libmpv/libplacebo/libass module recipe mirrors Celluloid's known-good
+# Flathub manifest, so the fiddly media stack builds reliably.
 app-id: io.github.slimture.dopeIPTV
 runtime: org.freedesktop.Platform
-runtime-version: '23.08'
+runtime-version: '24.08'
 sdk: org.freedesktop.Sdk
 command: dopeiptv
+
 finish-args:
   - --share=ipc
   - --share=network
   - --socket=fallback-x11
   - --socket=wayland
   - --socket=pulseaudio
-  - --device=dri
+  - --device=all
+  - --filesystem=home
   - --talk-name=org.freedesktop.ScreenSaver
-  - --talk-name=org.freedesktop.Flatpak
+  - --talk-name=org.freedesktop.login1
+  - --system-talk-name=org.freedesktop.login1
+  - --env=LC_NUMERIC=C
 
-# ffmpeg (recording + mpv demux/decode) from the runtime extension.
+# Full ffmpeg from the runtime extension (mpv links the SDK's ffmpeg at build
+# time; this provides the complete codec set at runtime).
 add-extensions:
   org.freedesktop.Platform.ffmpeg-full:
     directory: lib/ffmpeg
-    version: '23.08'
+    version: '24.08'
     add-ld-path: .
     autodelete: false
 
@@ -32,45 +42,68 @@ cleanup-commands:
 modules:
   # --- libass (subtitle rendering for mpv) ---
   - name: libass
-    config-opts: [--disable-static]
+    cleanup:
+      - /include
+      - /lib/*.la
+      - /lib/pkgconfig
+    config-opts:
+      - --disable-static
     sources:
       - type: archive
-        url: https://github.com/libass/libass/releases/download/0.17.1/libass-0.17.1.tar.xz
-        sha256: f0da0bbfba476c16ae3e1cfd862256d30915911f7abaa1b16ce62ee653192784
+        url: https://github.com/libass/libass/releases/download/0.17.5/libass-0.17.5.tar.xz
+        sha256: 2dca25c0e0c837ddf00b52011b3f82cac1e4ddd3ad018227806b0c2288864acc
+
+  # --- libplacebo (required by mpv's GPU/GL render path) ---
+  - name: libplacebo
+    buildsystem: meson
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+    sources:
+      - type: git
+        url: https://github.com/haasn/libplacebo.git
+        tag: v7.360.1
+        commit: cee9b076f2c63104ccfd497fa79c39a867293ec4
 
   # --- libmpv ---
-  # libplacebo may also be required for the OpenGL render path; add it here if
-  # CI reports it missing.
   - name: mpv
-    buildsystem: simple
-    build-commands:
-      - python3 waf configure --prefix=/app --enable-libmpv-shared
-        --disable-cplayer --disable-manpage-build --disable-javascript
-      - python3 waf build
-      - python3 waf install
+    buildsystem: meson
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+      - /share/man
+      - /share/bash-completion
+      - /share/zsh
+      - /share/doc
+      - /share/applications
+      - /share/icons
+    config-opts:
+      - -Dlibmpv=true
+      - -Dcplayer=false
+      - -Dbuild-date=false
+      - -Dalsa=disabled
+      - -Dlua=disabled
+      - -Djavascript=disabled
     sources:
       - type: archive
-        url: https://github.com/mpv-player/mpv/archive/refs/tags/v0.37.0.tar.gz
-        sha256: 1d2d4adbaf048a2fa6ee134575032c4b2dad9a7efafd5b3e69b88db935afe097
-      - type: file
-        url: https://waf.io/waf-2.0.25
-        sha256: 21199cd220ccf60434133e1fd2ab8c8e5217c3799199c82722543970dc8e38d5
-        dest-filename: waf
+        url: https://github.com/mpv-player/mpv/archive/v0.41.0.tar.gz
+        sha256: ee21092a5ee427353392360929dc64645c54479aefdb5babc5cfbb5fad626209
 
-  # --- the Python app + its wheels (PyQt6 bundles its own Qt) ---
+  # --- the dopeIPTV app + its Python deps (PyQt6 bundles its own Qt) ---
   - name: dopeiptv
     buildsystem: simple
+    build-options:
+      build-args:
+        - --share=network
     build-commands:
-      - pip3 install --no-index --find-links=deps --prefix=/app
+      - pip3 install --prefix=/app --no-cache-dir
         PyQt6 requests python-mpv pychromecast .
-      - install -Dm755 dopeiptv.py /app/bin/dopeiptv
       - install -Dm644 packaging/io.github.slimture.dopeIPTV.desktop
         /app/share/applications/io.github.slimture.dopeIPTV.desktop
       - install -Dm644 packaging/io.github.slimture.dopeIPTV.metainfo.xml
         /app/share/metainfo/io.github.slimture.dopeIPTV.metainfo.xml
+      - install -Dm644 packaging/io.github.slimture.dopeIPTV.png
+        /app/share/icons/hicolor/256x256/apps/io.github.slimture.dopeIPTV.png
     sources:
       - type: dir
         path: ../..
-    # `deps` should be populated by flatpak-pip-generator (see the workflow),
-    # or replace the --no-index/--find-links line with plain `pip3 install`
-    # if the build sandbox is allowed network access.
