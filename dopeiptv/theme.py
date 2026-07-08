@@ -124,8 +124,9 @@ QPushButton#NavBtn:checked {{ background: {ACCENT}; color: white; font-weight: 6
 
 QListWidget {{
     background: transparent; border: none; outline: none; font-size: 13px;
+    color: {p['text2']};
 }}
-QListWidget::item {{ border-radius: 8px; padding: 7px 10px; margin: 1px 6px; color: {p['text2']}; }}
+QListWidget::item {{ border-radius: 8px; padding: 7px 10px; margin: 1px 6px; }}
 QListWidget::item:hover    {{ background: {p['hover']}; }}
 QListWidget::item:selected {{ background: {p['sel']}; color: {p['text']}; }}
 
