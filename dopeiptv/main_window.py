@@ -10,10 +10,11 @@ import time
 from datetime import datetime
 
 from PyQt6.QtCore import (
-    QDateTime, QSettings, QSize, Qt, QThreadPool, QTimer, pyqtSignal,
+    QDateTime, QSettings, QSize, Qt, QThreadPool, QTimer, QUrl, pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QColor, QKeySequence, QPainter, QPainterPath, QPixmap, QShortcut,
+    QColor, QDesktopServices, QKeySequence, QPainter, QPainterPath, QPixmap,
+    QShortcut,
 )
 from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDateTimeEdit, QDialog,
@@ -83,6 +84,10 @@ class MainWindow(QMainWindow):
         self.rec.recording_stopped.connect(self._on_recording_stopped)
         self.wake = WakeLock()
         self.tmdb: PosterResolver | None = None
+        self._tmdb_pool: QThreadPool | None = None
+        self._poster_refresh_timer = QTimer(self)
+        self._poster_refresh_timer.setSingleShot(True)
+        self._poster_refresh_timer.timeout.connect(self._flush_poster_refresh)
         self._init_metadata_provider()
         self.trakt = TraktClient(settings)
         self._trakt_active: dict | None = None
@@ -340,6 +345,17 @@ class MainWindow(QMainWindow):
         self.d_meta.setWordWrap(True)
         dl.addWidget(self.d_meta)
 
+        play_row = QHBoxLayout()
+        play_row.setSpacing(8)
+        self.play_mpv = QPushButton("▶  Play", objectName="Primary")
+        self.play_mpv.setToolTip("Play in mpv")
+        self.play_mpv.setSizePolicy(QSizePolicy.Policy.Fixed,
+                                    QSizePolicy.Policy.Fixed)
+        self.play_mpv.clicked.connect(lambda: self.play("mpv"))
+        play_row.addWidget(self.play_mpv)
+        play_row.addStretch(1)
+        dl.addLayout(play_row)
+
         self.now_card = QFrame(objectName="Card")
         nc = QVBoxLayout(self.now_card)
         nc.setContentsMargins(14, 12, 14, 12)
@@ -372,17 +388,6 @@ class MainWindow(QMainWindow):
         self.epg_lay.addStretch()
         self.epg_scroll.setWidget(self.epg_holder)
         dl.addWidget(self.epg_scroll, 1)
-
-        row = QHBoxLayout()
-        row.setSpacing(8)
-        self.play_mpv = QPushButton("▶  Play", objectName="Primary")
-        self.play_mpv.setToolTip("Play in mpv")
-        self.play_mpv.setSizePolicy(QSizePolicy.Policy.Fixed,
-                                    QSizePolicy.Policy.Fixed)
-        self.play_mpv.clicked.connect(lambda: self.play("mpv"))
-        row.addWidget(self.play_mpv)
-        row.addStretch(1)
-        dl.addLayout(row)
 
         root.addWidget(side)
         root.addWidget(mid)
@@ -848,7 +853,16 @@ class MainWindow(QMainWindow):
         key = self.settings.value("tmdb_api_key", "") or ""
         if not key:
             return
-        self.tmdb = PosterResolver(self.pool, self.settings, TmdbClient(key))
+        # Dedicated, small thread pool: TMDB lookups must never compete
+        # with the shared pool used for channel/EPG loading, or a burst
+        # of poster searches can starve real work and look like a freeze.
+        pool = QThreadPool()
+        pool.setMaxThreadCount(2)
+        self._tmdb_pool = pool
+        self.tmdb = PosterResolver(pool, self.settings, TmdbClient(key))
+
+    def _flush_poster_refresh(self) -> None:
+        self.list_model.refresh_all()
 
     def poster_for(self, it, kind: str) -> str | None:
         if not self.tmdb or kind not in ("vod", "series"):
@@ -856,8 +870,9 @@ class MainWindow(QMainWindow):
         title = it.get("name") or it.get("title") or ""
         if not title:
             return None
-        return self.tmdb.get(title, kind,
-                             lambda _url: self.list_model.refresh_all())
+        return self.tmdb.get(
+            title, kind,
+            lambda _url: self._poster_refresh_timer.start(150))
 
     # -- trakt scrobbling -------------------------------------------------------------
 
@@ -2703,7 +2718,7 @@ class MainWindow(QMainWindow):
     def open_settings(self) -> None:
         d = QDialog(self)
         d.setWindowTitle("Settings")
-        d.setMinimumSize(620, 580)
+        d.setMinimumSize(820, 600)
         outer = QVBoxLayout(d)
         outer.setContentsMargins(18, 18, 18, 18)
         tabs = QTabWidget()
@@ -2935,29 +2950,90 @@ class MainWindow(QMainWindow):
             [("playlist", "Playlist (provider artwork)"),
              ("tmdb", "TMDB (fetch posters by title)")],
             self.settings.value("metadata_source", "playlist"))
+        tmdb_key_row = QHBoxLayout()
         tmdb_key_edit = QLineEdit(self.settings.value("tmdb_api_key", ""))
         tmdb_key_edit.setPlaceholderText("TMDB API key (v3 auth)")
+        tmdb_test_btn = QPushButton("Test")
+        tmdb_key_row.addWidget(tmdb_key_edit, 1)
+        tmdb_key_row.addWidget(tmdb_test_btn)
         mf.addRow("Artwork source", meta_source_box)
-        mf.addRow("TMDB API key", tmdb_key_edit)
+        key_row_idx = mf.rowCount()
+        mf.addRow("TMDB API key", tmdb_key_row)
+        tmdb_status = QLabel()
+        tmdb_status.setWordWrap(True)
+        status_row_idx = mf.rowCount()
+        mf.addRow("", tmdb_status)
         meta_hint = QLabel(
             "Get a free key at themoviedb.org -> Settings -> API. "
             "Posters are matched by title and cached, so lookups "
-            "only happen once per movie/series.")
+            "only happen once per movie/series. Not used for live TV.")
         meta_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         meta_hint.setWordWrap(True)
         mf.addRow(meta_hint)
         tabs.addTab(meta_tab, "Metadata")
 
+        def update_meta_visibility() -> None:
+            show_tmdb = meta_source_box.currentData() == "tmdb"
+            mf.setRowVisible(key_row_idx, show_tmdb)
+            mf.setRowVisible(status_row_idx, show_tmdb)
+
+        def test_tmdb_key() -> None:
+            key = tmdb_key_edit.text().strip()
+            if not key:
+                tmdb_status.setText("Enter an API key first.")
+                tmdb_status.setStyleSheet(
+                    f"color:{P['error']}; font-size:11px;")
+                return
+            tmdb_status.setText("Checking...")
+            tmdb_status.setStyleSheet(
+                f"color:{P['muted2']}; font-size:11px;")
+
+            def check():
+                TmdbClient(key).poster_url("Inception", "vod")
+                return True
+
+            def ok(_r):
+                tmdb_status.setText("Key works.")
+                tmdb_status.setStyleSheet(
+                    f"color:{P['accent']}; font-size:11px; font-weight:600;")
+
+            def fail(msg):
+                tmdb_status.setText(f"Key check failed: {msg}")
+                tmdb_status.setStyleSheet(
+                    f"color:{P['error']}; font-size:11px;")
+
+            run_async(self.pool, check, ok, fail)
+
+        meta_source_box.currentIndexChanged.connect(
+            lambda _i: update_meta_visibility())
+        tmdb_test_btn.clicked.connect(test_tmdb_key)
+        update_meta_visibility()
+
         # Trakt tab
         trakt_tab = QWidget()
         tf = QVBoxLayout(trakt_tab)
         tf.setSpacing(10)
+        trakt_setup_lbl = QLabel(
+            "One-time setup (about 2 minutes): Trakt requires every app "
+            "to have its own free API app for sign-in. Click below, "
+            "create one (any name, redirect URI doesn't matter), then "
+            "paste the Client ID and Secret it shows you. You only do "
+            "this once - after that, Connect just shows you a short "
+            "code to enter at trakt.tv, no password typing.")
+        trakt_setup_lbl.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        trakt_setup_lbl.setWordWrap(True)
+        tf.addWidget(trakt_setup_lbl)
+        create_app_btn = QPushButton("Create a free Trakt app...")
+        create_app_btn.clicked.connect(
+            lambda: QDesktopServices.openUrl(
+                QUrl("https://trakt.tv/oauth/applications/new")))
+        tf.addWidget(create_app_btn)
         tform = QFormLayout()
         tform.setSpacing(10)
         trakt_id_edit = QLineEdit(self.trakt.client_id)
-        trakt_id_edit.setPlaceholderText("Trakt Client ID")
+        trakt_id_edit.setPlaceholderText("Client ID (from the app you created)")
         trakt_secret_edit = QLineEdit(self.trakt.client_secret)
-        trakt_secret_edit.setPlaceholderText("Trakt Client Secret")
+        trakt_secret_edit.setPlaceholderText("Client Secret")
         trakt_secret_edit.setEchoMode(QLineEdit.EchoMode.Password)
         tform.addRow("Client ID", trakt_id_edit)
         tform.addRow("Client Secret", trakt_secret_edit)
@@ -2966,7 +3042,7 @@ class MainWindow(QMainWindow):
         trakt_status.setWordWrap(True)
         tf.addWidget(trakt_status)
         trakt_btns = QHBoxLayout()
-        trakt_connect_btn = QPushButton("Connect to Trakt...")
+        trakt_connect_btn = QPushButton("Connect to Trakt...", objectName="Primary")
         trakt_disconnect_btn = QPushButton("Disconnect")
         trakt_watchlist_btn = QPushButton("Watchlist / History...")
         trakt_btns.addWidget(trakt_connect_btn)
@@ -2975,10 +3051,8 @@ class MainWindow(QMainWindow):
         trakt_btns.addStretch()
         tf.addLayout(trakt_btns)
         trakt_hint = QLabel(
-            "Create a free API app at trakt.tv/oauth/applications "
-            "to get a Client ID and Secret (redirect URI doesn't "
-            "matter - device login is used). While connected, "
-            "movies/episodes you play are scrobbled to Trakt.")
+            "While connected, movies and episodes you play are "
+            "scrobbled to Trakt. Live TV and recordings are not.")
         trakt_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         trakt_hint.setWordWrap(True)
         tf.addWidget(trakt_hint)

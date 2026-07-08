@@ -233,8 +233,8 @@ QTabWidget::pane {{
     top: -1px;
 }}
 QTabBar::tab {{
-    background: transparent; color: {p['text2']}; padding: 7px 18px;
-    border-radius: 7px; margin: 2px; font-size: 12px; min-width: 60px;
+    background: transparent; color: {p['text2']}; padding: 7px 12px;
+    border-radius: 7px; margin: 1px; font-size: 12px; min-width: 46px;
 }}
 QTabBar::tab:selected {{ background: {p['btn']}; color: {p['text']}; }}
 QTabBar::tab:hover:!selected {{ background: {p['hover']}; }}
