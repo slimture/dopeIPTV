@@ -689,7 +689,8 @@ class MainWindow(QMainWindow):
             self.setGeometry(geo)
             for delay in (0, 30, 120):
                 QTimer.singleShot(
-                    delay, lambda g=geo: self.setGeometry(g))
+                    delay, lambda g=geo: self._pip_win is not None
+                    and not self.isFullScreen() and self.setGeometry(g))
         else:
             self._pip_fs_geo = self.geometry()
             self.setWindowFlags(Qt.WindowType.Window)
@@ -749,8 +750,8 @@ class MainWindow(QMainWindow):
         # changing window flags recreates the native window on X11 and the WM
         # may otherwise re-place or lower it.
         for delay in (0, 40, 150):
-            QTimer.singleShot(delay, lambda g=geo: (
-                self.setGeometry(g), self.raise_()))
+            QTimer.singleShot(delay, lambda g=geo: self._pip_win is not None
+                              and (self.setGeometry(g), self.raise_()))
         if "wayland" in QApplication.instance().platformName().lower() \
                 and not getattr(self, "_pip_wayland_warned", False):
             self._pip_wayland_warned = True
