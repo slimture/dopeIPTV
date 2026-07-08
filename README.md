@@ -10,14 +10,15 @@ player (with optional external mpv/VLC playback).
 
 ## Features
 
-- TV, Movies, and Series with favorites, history, and fast search
-- Embedded in-app video via libmpv OpenGL — works on any compositor (GNOME, KDE, Hyprland, ...)
-- Full EPG with progress bars, guide dialog, and persistent disk cache
-- Recording with timers, size caps, and folder management (uses ffmpeg)
-- Timeshift / catch-up for archived channels
-- TMDB artwork/metadata and Trakt scrobbling (optional, configured in Settings)
-- Themes (5 palettes + 7 accent colors), parental control, Chromecast
-- Multiple playlists, content manager, editable channel lists
+- **Embedded video** via libmpv's OpenGL render API — plays right inside the app on any compositor (GNOME, KDE, Hyprland, ...), with fullscreen, Picture-in-Picture, a hover scrubber and arrow-key seeking
+- **TV, Movies & Series** with seasons/episodes, favorites, history, and instant search across thousands of channels
+- **8 languages** — English, Svenska, Español, Deutsch, Français, 中文, Русский, ไทย — switchable live in Settings
+- **Resume playback** — movies/series/recordings remember where you stopped and offer to continue
+- **Full EPG** with now/next progress bars, a searchable guide, and a persistent disk cache that shows instantly on startup
+- **TMDB metadata** — posters, ratings (linked to IMDb), and a clickable cast list that finds an actor's other titles in your playlist
+- **Recording & Timeshift** — record on a timer/schedule (single-connection friendly) and watch catch-up archives from the EPG
+- **Chromecast**, **Trakt** scrobbling, **multiple playlists**, parental control, content manager and editable channel lists
+- **Themes** — 5 palettes + 7 accent colors, applied live
 
 See [FEATURES.md](FEATURES.md) for the full feature list.
 
@@ -110,7 +111,9 @@ the first time the app starts.
 | Action | How |
 |---|---|
 | Play | Double-click, or the **▶ Play** button in the detail panel |
-| Pause / skip / volume | ⏸, −10s / +30s, and the volume slider + mute in the player bar |
+| Pause / stop / volume | The player bar buttons + the volume slider & mute |
+| Seek (movies/series/catch-up) | Hover the video for the scrubber, or click the video and use ← / → (tap = ±10s, hold = continuous) |
+| Resume where you left off | Prompted automatically when you replay a movie/episode |
 | Audio track / subtitles / aspect / buffer | The ⚙ button in the player bar (also in fullscreen) |
 | Stats for nerds | ⚙ → Stats for nerds (live overlay on the video) |
 | Fullscreen | Double-click the video, or press `F` — `Esc` to leave |
