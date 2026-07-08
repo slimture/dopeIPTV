@@ -189,7 +189,11 @@ class _MpvGLWidget(QOpenGLWidget):
         opts = {"vo": "libmpv", "user_agent": "dopeIPTV/1.0",
                 "keep_open": "yes", "input_default_bindings": False,
                 "input_vo_keyboard": False, "osc": False,
-                "terminal": False}
+                "terminal": False,
+                # Never let mpv open its own window, and keep its OSD silent -
+                # otherwise it draws the media title centred on black while a
+                # stream buffers, which can surface as a stray frame.
+                "force-window": "no", "osd-level": 0}
         if sys.platform == "darwin":
             from .platform_macos import extra_mpv_opts
             opts.update(extra_mpv_opts())
