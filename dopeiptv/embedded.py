@@ -248,22 +248,33 @@ class _MpvGLWidget(QOpenGLWidget):
         print("[dopeIPTV] Render context ready", file=sys.stderr)
 
     def paintGL(self) -> None:
-        if not self._ctx:
-            return
-        if self._blank:
+        # Blank branch first so a repaint that arrives mid-stop (when mpv has
+        # already been told to stop but our _ctx is still around) doesn't try
+        # to render an mpv frame with a half-torn-down context - which
+        # crashes on Wayland. Also guard the render path against a null ctx,
+        # a null current GL context, or an exception bubbling out of libmpv,
+        # so any transient race becomes a black frame instead of a segfault.
+        if self._blank or self._ctx is None:
             glctx = QOpenGLContext.currentContext()
             if glctx is not None:
-                f = glctx.functions()
-                f.glClearColor(0.0, 0.0, 0.0, 1.0)
-                f.glClear(0x00004000)  # GL_COLOR_BUFFER_BIT
+                try:
+                    f = glctx.functions()
+                    f.glClearColor(0.0, 0.0, 0.0, 1.0)
+                    f.glClear(0x00004000)  # GL_COLOR_BUFFER_BIT
+                except Exception:
+                    pass
             return
-        ratio = (self.devicePixelRatioF()
-                 if hasattr(self, "devicePixelRatioF") else 1)
-        self._ctx.render(flip_y=True, opengl_fbo={
-            "w": int(self.width() * ratio),
-            "h": int(self.height() * ratio),
-            "fbo": self.defaultFramebufferObject(),
-        })
+        try:
+            ratio = (self.devicePixelRatioF()
+                     if hasattr(self, "devicePixelRatioF") else 1)
+            self._ctx.render(flip_y=True, opengl_fbo={
+                "w": int(self.width() * ratio),
+                "h": int(self.height() * ratio),
+                "fbo": self.defaultFramebufferObject(),
+            })
+        except Exception as e:
+            print(f"[dopeIPTV] paintGL render failed: {e}", file=sys.stderr)
+            self._blank = True
 
     def shutdown(self) -> None:
         if self._ctx:
@@ -1511,6 +1522,12 @@ class EmbeddedPlayer(QWidget):
         # Tell the main window first (while position/duration are still valid)
         # so it can remember this item as last-active and save its resume point.
         self.stopped.emit()
+        # Flip the video pane to blank BEFORE telling mpv to stop. On Wayland
+        # mpv's update_cb can fire once more after command("stop") is issued;
+        # if we hadn't blanked yet, that callback would repaint with an mpv
+        # context that libmpv has already begun tearing down and segfault the
+        # whole app. Blanking first makes any late repaint a harmless clear.
+        self.video.set_blank(True)
         self.stop_stream_record()
         self.current_url = None
         if self.video.mpv:
@@ -1525,8 +1542,6 @@ class EmbeddedPlayer(QWidget):
         self._stats_timer.stop()
         self._sync_pause_label(True)
         self._mac_show_cursor()
-        # Paint the pane solid black instead of freezing on the last frame.
-        self.video.set_blank(True)
 
     def shutdown(self) -> None:
         self.stop_stream_record()
