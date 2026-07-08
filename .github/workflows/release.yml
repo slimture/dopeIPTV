@@ -116,6 +116,70 @@ jobs:
             *.AppImage
             *.deb
 
+  # -------------------------------------------------- macOS .app + .dmg ---
+  # Runs on Apple Silicon (macos-14 is arm64; GitHub gives it free for public
+  # repos). Produces an unsigned .dmg - users need to right-click -> Open
+  # once to get past Gatekeeper. Signing/notarising can be added later by
+  # putting DEVELOPER_ID / APPLE_ID secrets in the repo and calling
+  # codesign / notarytool.
+  macos-dmg:
+    name: macOS .dmg
+    runs-on: macos-14
+    continue-on-error: true   # matches Flatpak - failure here shouldn't block the other formats
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: System deps (mpv, ffmpeg, create-dmg)
+        run: |
+          brew update
+          brew install mpv ffmpeg create-dmg
+      - name: Python build deps
+        run: |
+          python -m pip install --upgrade pip pyinstaller pyobjc-core
+          python -m pip install -r requirements.txt
+      - name: Version
+        id: v
+        run: echo "version=$(python -c 'import dopeiptv,sys;print(dopeiptv.VERSION)')" >> "$GITHUB_OUTPUT"
+      - name: Build .icns
+        run: |
+          QT_QPA_PLATFORM=offscreen python packaging/gen_iconset.py build
+          iconutil -c icns build/dopeiptv.iconset -o build/dopeiptv.icns
+      - name: PyInstaller bundle (.app)
+        env:
+          DOPEIPTV_VERSION: ${{ steps.v.outputs.version }}
+          DOPEIPTV_ICNS: ${{ github.workspace }}/build/dopeiptv.icns
+        run: pyinstaller --noconfirm dopeiptv-mac.spec   # -> dist/dopeIPTV.app
+      - name: Pack .dmg
+        run: |
+          V=${{ steps.v.outputs.version }}
+          # Use create-dmg for the pretty side-by-side install window (app
+          # icon on the left, /Applications alias on the right). --skip-jenkins
+          # avoids CI-specific quirks; --no-internet-enable stops macOS from
+          # tagging the DMG as internet-quarantined at mount time.
+          create-dmg \
+            --volname "dopeIPTV ${V}" \
+            --window-pos 200 120 \
+            --window-size 600 380 \
+            --icon-size 100 \
+            --icon "dopeIPTV.app" 150 190 \
+            --app-drop-link 450 190 \
+            --hide-extension "dopeIPTV.app" \
+            --no-internet-enable \
+            --skip-jenkins \
+            "dopeIPTV-${V}-macOS-arm64.dmg" \
+            "dist/dopeIPTV.app"
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: '*.dmg'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: '*.dmg'
+
   # --------------------------------------------------------------- Flatpak ---
   # Most likely to need iteration (building libmpv in Flatpak). Kept from
   # blocking the release with continue-on-error.
