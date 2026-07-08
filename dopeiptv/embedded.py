@@ -558,8 +558,17 @@ class EmbeddedPlayer(QWidget):
         else:
             bar_h = self.bar.sizeHint().height() if self.bar.isVisible() else 0
             spacing = self.layout().spacing()
-            h = max(self.VIDEO_BOX_HEIGHT, self.height() - bar_h - spacing)
-            self.video.setFixedHeight(h)
+            available = self.height() - bar_h - spacing
+            # The VIDEO_BOX_HEIGHT floor exists so the embedded player
+            # doesn't shrink to nothing while docked in the main window's
+            # detail panel. In PiP mode the window is deliberately small
+            # (as little as ~270px tall) - enforcing that same floor there
+            # forces the video taller than the window actually has room
+            # for, which is exactly the fixed-height mismatch that shows
+            # up as unadjustable black bars after the PiP<->fullscreen
+            # round trip. PiP should just fill whatever space it has.
+            floor = 0 if self._pip_mode else self.VIDEO_BOX_HEIGHT
+            self.video.setFixedHeight(max(floor, available))
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)

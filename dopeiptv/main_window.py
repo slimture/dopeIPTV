@@ -38,7 +38,7 @@ from .players import (
     MpvIpcPlayer, MpvWindowPlayer, _libmpv, embedded_playback_reason,
     embedded_playback_supported, launch_player,
 )
-from .recording import RecordingManager, safe_filename
+from .recording import RecordingManager, format_size, safe_filename
 from .stores import (
     CategoryOverrides, ChannelOverrides, FavoriteStore, HistoryStore,
     ParentalControl, PlaylistStore,
@@ -65,8 +65,13 @@ class MainWindow(QMainWindow):
         self.logos = LogoLoader(self.pool)
         # Separate, higher-res cache for posters/cast photos - reusing
         # `logos` (capped at 96px for small list icons) would blur badly
-        # once scaled up to the much larger detail-panel sizes.
-        self.poster_art = LogoLoader(self.pool, max_size=320)
+        # once scaled up to the much larger detail-panel sizes. Also its
+        # own thread pool: a poster plus up to 8 cast photos is up to 9
+        # concurrent downloads per selection, which would otherwise
+        # compete with (and delay) channel/EPG loading on the shared pool.
+        self._art_pool = QThreadPool()
+        self._art_pool.setMaxThreadCount(4)
+        self.poster_art = LogoLoader(self._art_pool, max_size=320)
         self.epg_progress.connect(self._on_epg_progress)
         pid = (active_pl or {}).get("id")
         self.xmltv = XmltvGuide(
@@ -2308,18 +2313,63 @@ class MainWindow(QMainWindow):
                            lambda: self._schedule_recording(it))
         cap_menu = rec_menu.addMenu("Size limit (this session)")
         current = self.rec.session_cap
-        for label, cap in (("From Settings", None), ("No limit", 0),
-                           ("250 MB", 250 * 10**6),
-                           ("500 MB", 500 * 10**6),
-                           ("1 GB", 10**9), ("2 GB", 2 * 10**9),
-                           ("5 GB", 5 * 10**9),
-                           ("10 GB", 10 * 10**9)):
+        presets = (("From Settings", None), ("No limit", 0),
+                   ("250 MB", 250 * 10**6),
+                   ("500 MB", 500 * 10**6),
+                   ("1 GB", 10**9), ("2 GB", 2 * 10**9),
+                   ("5 GB", 5 * 10**9),
+                   ("10 GB", 10 * 10**9),
+                   ("50 GB", 50 * 10**9),
+                   ("100 GB", 100 * 10**9))
+        for label, cap in presets:
             act = cap_menu.addAction(label)
             act.setCheckable(True)
             act.setChecked(cap == current)
             act.triggered.connect(
                 lambda _c, cap=cap: setattr(
                     self.rec, "session_cap", cap))
+        cap_menu.addSeparator()
+        known_caps = {cap for _label, cap in presets}
+        custom_label = "Custom size..."
+        if current and current not in known_caps:
+            custom_label = f"Custom size... (currently {format_size(current)})"
+        custom_act = cap_menu.addAction(custom_label)
+        custom_act.setCheckable(True)
+        custom_act.setChecked(bool(current) and current not in known_caps)
+        custom_act.triggered.connect(self._set_custom_rec_cap)
+
+    def _set_custom_rec_cap(self) -> None:
+        d = QDialog(self)
+        d.setWindowTitle("Custom size limit")
+        d.setMinimumWidth(320)
+        f = QFormLayout(d)
+        f.setSpacing(10)
+        row = QHBoxLayout()
+        val_edit = QLineEdit()
+        val_edit.setPlaceholderText("e.g. 75")
+        unit_box = self._combo(
+            [("MB", "MB"), ("GB", "GB"), ("TB", "TB")], "GB")
+        row.addWidget(val_edit)
+        row.addWidget(unit_box)
+        f.addRow("Stop recording at", row)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel)
+        for b in buttons.buttons():
+            b.setIcon(QIcon())
+        buttons.accepted.connect(d.accept)
+        buttons.rejected.connect(d.reject)
+        f.addRow(buttons)
+        if not d.exec():
+            return
+        try:
+            val = float(val_edit.text().strip().replace(",", "."))
+        except ValueError:
+            return
+        if val <= 0:
+            return
+        mult = {"MB": 10**6, "GB": 10**9, "TB": 10**12}[unit_box.currentData()]
+        self.rec.session_cap = int(val * mult)
 
     def _record_now(self, it, minutes) -> None:
         if it.get("stream_id") is None:
