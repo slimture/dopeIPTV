@@ -143,11 +143,6 @@ class _MpvGLWidget(QOpenGLWidget):
         if sys.platform == "darwin":
             from .platform_macos import apply_widget_surface_format
             apply_widget_surface_format(self)
-        # Create the native surface eagerly as a child of the player, so the
-        # first playback doesn't briefly flash the GL surface as a separate
-        # top-level window while its context is realised.
-        self.setAttribute(Qt.WidgetAttribute.WA_NativeWindow, True)
-        self.setAttribute(Qt.WidgetAttribute.WA_DontCreateNativeAncestors, True)
         self.setMinimumHeight(190)
         self.setSizePolicy(QSizePolicy.Policy.Expanding,
                            QSizePolicy.Policy.Expanding)
@@ -383,7 +378,7 @@ class EmbeddedPlayer(QWidget):
         bl.addWidget(self.stop_btn)
         bl.addWidget(self.next_btn)
         bl.addWidget(self.pause_btn)
-        bl.addWidget(self.title_lbl, 1)
+        bl.addStretch(1)
         bl.addWidget(self.ts_btn)
         bl.addWidget(self.rec_btn)
         bl.addWidget(self.opts_btn)

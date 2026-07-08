@@ -2249,9 +2249,6 @@ class MainWindow(QMainWindow):
         self._set_status(tr("status_playing", title=title))
         self._show_toast(tr("status_playing", title=title))
         mode = self.playback_mode()
-        print(f"[dopeIPTV] Playing via mode={mode} "
-              f"(embedded pane: {'yes' if self.player else 'no'})",
-              file=sys.stderr)
         if mode == "embedded" and self.player:
             self.rec.finish_all_inplayer("channel changed")
             self.player.show()
