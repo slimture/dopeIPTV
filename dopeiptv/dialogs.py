@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
+from .i18n import tr
 from .theme import P
 
 
@@ -149,7 +150,7 @@ class EpgGuideDialog(QDialog):
         super().__init__(window)
         self.window = window
         self.channels = channels
-        title = "EPG Guide"
+        title = tr("btn_epg_guide")
         if category_name:
             title += f" — {category_name}"
         self.setWindowTitle(title)
@@ -158,7 +159,7 @@ class EpgGuideDialog(QDialog):
         lay.setContentsMargins(14, 14, 14, 14)
         lay.setSpacing(8)
 
-        self.search = QLineEdit(placeholderText="Filter channels...")
+        self.search = QLineEdit(placeholderText=tr("epg_filter_channels"))
         self.search.textChanged.connect(self._populate)
         lay.addWidget(self.search)
 
@@ -180,7 +181,7 @@ class EpgGuideDialog(QDialog):
         rl = QVBoxLayout(right)
         rl.setContentsMargins(0, 0, 0, 0)
         rl.setSpacing(6)
-        self.ch_title = QLabel("Select a channel")
+        self.ch_title = QLabel(tr("epg_select_channel"))
         self.ch_title.setStyleSheet("font-size:14px; font-weight:700;")
         rl.addWidget(self.ch_title)
         self.now_lbl = QLabel("")
@@ -198,13 +199,11 @@ class EpgGuideDialog(QDialog):
         self.schedule_list.itemDoubleClicked.connect(
             lambda _it: self._play_current())
         rl.addWidget(self.schedule_list, 1)
-        rec_hint = QLabel(
-            "Right-click an upcoming or currently-airing programme to "
-            "record it (multi-select works too).")
+        rec_hint = QLabel(tr("epg_record_hint"))
         rec_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         rec_hint.setWordWrap(True)
         rl.addWidget(rec_hint)
-        self.play_btn = QPushButton("Play channel", objectName="Primary")
+        self.play_btn = QPushButton(tr("epg_play_channel"), objectName="Primary")
         self.play_btn.clicked.connect(self._play_current)
         self.play_btn.setEnabled(False)
         rl.addWidget(self.play_btn)
@@ -212,9 +211,17 @@ class EpgGuideDialog(QDialog):
 
         splitter.addWidget(left)
         splitter.addWidget(right)
-        splitter.setSizes([280, 500])
+        # Size the channel pane to actually fit the channel names, with a
+        # floor and a cap so a stray very long title doesn't make it dominate.
+        fm = self.list.fontMetrics()
+        widest = 0
+        for it in self.channels[:800]:
+            widest = max(widest, fm.horizontalAdvance(it.get("name") or "?"))
+        left_w = max(240, min(widest + 52, 400))
+        splitter.setSizes([left_w, 540])
         splitter.setStretchFactor(1, 1)
         lay.addWidget(splitter, 1)
+        self.resize(left_w + 580, 620)
 
         self._populate()
 
@@ -232,18 +239,19 @@ class EpgGuideDialog(QDialog):
             now = self.window.xmltv.now_for(it)
             suffix = f" — {now[0]}" if now else ""
             item = QListWidgetItem(name + suffix)
+            item.setToolTip(name + suffix)
             item.setData(Qt.ItemDataRole.UserRole, it)
             self.list.addItem(item)
-        note = f"{shown} channels"
+        note = tr("epg_channels_count", n=shown)
         if shown > self.MAX_ROWS:
-            note += f" (first {self.MAX_ROWS})"
+            note += " " + tr("epg_channels_first", n=self.MAX_ROWS)
         self.info_lbl.setText(note)
 
     def _channel_selected(self, cur, _prev=None) -> None:
         self.schedule_list.clear()
         self._current_channel = None
         if not cur:
-            self.ch_title.setText("Select a channel")
+            self.ch_title.setText(tr("epg_select_channel"))
             self.now_lbl.setText("")
             self.play_btn.setEnabled(False)
             return
@@ -258,10 +266,10 @@ class EpgGuideDialog(QDialog):
             start = datetime.fromtimestamp(now_prog["start_timestamp"])
             stop = datetime.fromtimestamp(now_prog["stop_timestamp"])
             self.now_lbl.setText(
-                f"Now: {now_prog['title']}  "
+                f"{tr('epg_now_prefix')}: {now_prog['title']}  "
                 f"({start.strftime('%H:%M')}–{stop.strftime('%H:%M')})")
         else:
-            self.now_lbl.setText("No current programme data")
+            self.now_lbl.setText(tr("epg_no_programme"))
 
         now_ts = datetime.now().astimezone().timestamp()
         entries = self.window.xmltv._entries_for(it)

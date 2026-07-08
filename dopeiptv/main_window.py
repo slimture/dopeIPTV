@@ -191,6 +191,14 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(self._base_title)
         self.resize(1240, 780)
         self._build_ui()
+        # Restore the window size from last session (falls back to the default
+        # above on first run). The panel dividers are restored once more after
+        # the window is shown at its real size - see _restore_splitter_state -
+        # so their proportions don't drift when the geometry is applied.
+        geo = self.settings.value("window_geometry")
+        if geo:
+            self.restoreGeometry(geo)
+        QTimer.singleShot(0, self._restore_splitter_state)
         self.loading_bar.show()
         self._set_status(tr("status_loading_channels"))
         QTimer.singleShot(100, self._load_categories)
@@ -231,11 +239,9 @@ class MainWindow(QMainWindow):
         sl.setContentsMargins(12, 16, 12, 12)
         sl.setSpacing(4)
 
-        title = QLabel("dopeIPTV", objectName="AppTitle")
-        sub = QLabel("for Linux", objectName="AppSub")
-        sl.addWidget(title)
-        sl.addWidget(sub)
-        sl.addSpacing(14)
+        # (The app name already shows in the window title / menu bar, so the
+        # sidebar doesn't repeat it - it just starts with the nav buttons.)
+        sl.addSpacing(4)
 
         self.nav_btns: dict[str, QPushButton] = {}
         for key, text in (("live", tr("nav_tv")), ("vod", tr("nav_movies")),
@@ -405,6 +411,8 @@ class MainWindow(QMainWindow):
             self.player.pip_requested.connect(self._toggle_pip)
             self.player.pip_context_menu.connect(self._pip_context_menu)
             self.player.stop_btn.clicked.connect(self._exit_pip_if_active)
+            self.player.stopped.connect(self._on_player_stopped)
+            self.player.resume_requested.connect(self._resume_last)
             # Keep the player pane visible on stop - mpv clears to black -
             # instead of hiding it, so the window just goes black.
             dl.addWidget(self.player, 1)
@@ -416,7 +424,7 @@ class MainWindow(QMainWindow):
         self.stream_error.hide()
         dl.addWidget(self.stream_error)
 
-        self._detail_name = "Select something from the list"
+        self._detail_name = tr("detail_select_something")
 
         header_row = QHBoxLayout()
         header_row.setSpacing(14)
@@ -444,8 +452,8 @@ class MainWindow(QMainWindow):
         self.media_rating_lbl.hide()
         left_col.addWidget(self.media_rating_lbl, 0, Qt.AlignmentFlag.AlignLeft)
 
-        self.play_mpv = QPushButton("▶  Play", objectName="Primary")
-        self.play_mpv.setToolTip("Play in mpv")
+        self.play_mpv = QPushButton("▶  " + tr("btn_play"), objectName="Primary")
+        self.play_mpv.setToolTip(tr("tooltip_play_in_mpv"))
         self.play_mpv.setSizePolicy(QSizePolicy.Policy.Fixed,
                                     QSizePolicy.Policy.Fixed)
         self.play_mpv.clicked.connect(lambda: self.play("mpv"))
@@ -555,10 +563,6 @@ class MainWindow(QMainWindow):
         det.setMinimumWidth(280)
         self._side, self._mid, self._det = side, mid, det
         self._root = root
-        # Restore the panel divider positions from last session.
-        st = self.settings.value("splitter_state")
-        if st:
-            root.restoreState(st)
         self._toast = _Toast(root)
 
         self.tick = QTimer(self)
@@ -760,10 +764,6 @@ class MainWindow(QMainWindow):
         for delay in (0, 40, 150):
             QTimer.singleShot(delay, lambda g=geo: self._pip_win is not None
                               and (self.setGeometry(g), self.raise_()))
-        if "wayland" in QApplication.instance().platformName().lower() \
-                and not getattr(self, "_pip_wayland_warned", False):
-            self._pip_wayland_warned = True
-            self._show_toast(tr("pip_wayland_hint"), 6000)
 
     def _saved_pip_geometry(self) -> "QRect | None":
         raw = self.settings.value("pip_geometry", "")
@@ -1378,7 +1378,7 @@ class MainWindow(QMainWindow):
         self._current_epg = None
         self._tmdb_details = None
         if not it:
-            self._detail_name = "Select something from the list"
+            self._detail_name = tr("detail_select_something")
             self.d_logo.setFixedSize(*self.POSTER_SIZE_LIVE)
             self.d_logo.setPixmap(QPixmap())
             self.d_logo.setText("")
@@ -2228,6 +2228,28 @@ class MainWindow(QMainWindow):
         m, s = divmod(rem, 60)
         return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
+    def _on_player_stopped(self) -> None:
+        """The Stop button was pressed. Save the resume point while the player
+        still knows the position, then clear the now-playing highlight/title.
+        _last_playback is kept so Play can bring this title back."""
+        self._save_resume_position()
+        self._playing_key = None
+        self._playing_group = None
+        self._playing_item = None
+        self._sync_player_buttons()
+        self.listw.viewport().update()
+        self.setWindowTitle(self._base_title)
+
+    def _resume_last(self) -> None:
+        """Replay the last-played title after a Stop (the mini-player Play
+        button routes here when the player is empty)."""
+        last = getattr(self, "_last_playback", None)
+        if not last:
+            return
+        self._start_playback(last["url"], last["title"], last["icon_url"],
+                             last["key"], last["kind"], record=False,
+                             item=last["item"])
+
     def _start_playback(self, url: str, title: str, icon_url,
                         key, kind: str, record: bool = True,
                         item=None) -> None:
@@ -2244,6 +2266,11 @@ class MainWindow(QMainWindow):
             self._trakt_start_for_item(kind, item)
         self.stream_error.hide()
         self._playing_item = item if kind == "live" else None
+        # Remember the full context so a Stop -> Play round-trip can replay
+        # exactly this title (and resume where it left off) instead of falling
+        # back to the first channel in the list.
+        self._last_playback = {"url": url, "title": title, "icon_url": icon_url,
+                               "key": key, "kind": kind, "item": item}
         self._sync_player_buttons()
         self._playing_key = key
         self._playing_group = {"live": "live", "movie": "vod",
@@ -3405,11 +3432,12 @@ class MainWindow(QMainWindow):
             self.listw.setFlow(QListView.Flow.LeftToRight)
             self.listw.setWrapping(True)
             self.listw.setResizeMode(QListView.ResizeMode.Adjust)
-            self.listw.setGridSize(self.delegate.grid_size())
+            self.listw.set_grid_cell(self.delegate.grid_size())
         else:
             self.listw.setViewMode(QListView.ViewMode.ListMode)
             self.listw.setFlow(QListView.Flow.TopToBottom)
             self.listw.setWrapping(False)
+            self.listw.set_grid_cell(None)
             self.listw.setGridSize(QSize())
         self.listw.setVerticalScrollMode(
             QAbstractItemView.ScrollMode.ScrollPerPixel)
@@ -3478,6 +3506,8 @@ class MainWindow(QMainWindow):
         self.search.setPlaceholderText(tr("search_placeholder"))
         self._size_label.setText(tr("label_size"))
         self._sort_label.setText(tr("label_sort"))
+        self.play_mpv.setText("▶  " + tr("btn_play"))
+        self.play_mpv.setToolTip(tr("tooltip_play_in_mpv"))
         # Player control tooltips (embedded bar + fullscreen overlay).
         if self.player:
             self.player.retranslate_ui()
@@ -4228,6 +4258,14 @@ class MainWindow(QMainWindow):
                 return
         super().keyPressEvent(event)
 
+    def _restore_splitter_state(self) -> None:
+        """Restore the panel divider positions from last session. Runs after
+        the window is shown at its restored size so the saved proportions land
+        exactly instead of being rescaled from the default geometry."""
+        st = self.settings.value("splitter_state")
+        if st:
+            self._root.restoreState(st)
+
     def closeEvent(self, event) -> None:
         # Close the non-modal cast panel first: as a separate top-level
         # window it would otherwise keep the app alive (quitOnLastWindowClosed
@@ -4241,6 +4279,7 @@ class MainWindow(QMainWindow):
         if (self._pip_win is None and not self.isFullScreen()
                 and not self._player_fs):
             self.settings.setValue("splitter_state", self._root.saveState())
+            self.settings.setValue("window_geometry", self.saveGeometry())
         self._save_resume_position()
         self.wake.release()
         if self.tmdb:

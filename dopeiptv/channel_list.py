@@ -12,13 +12,39 @@ from .theme import ACCENT, P
 
 
 class ChannelListView(QListView):
-    """Right-click never moves the selection (avoids switching the preview)."""
+    """Right-click never moves the selection (avoids switching the preview).
+    In grid mode the columns are stretched to fill the viewport width so the
+    last column sits against the right edge instead of leaving a ragged gap."""
+
+    def __init__(self, *a, **kw) -> None:
+        super().__init__(*a, **kw)
+        self._grid_cell: QSize | None = None
 
     def mousePressEvent(self, e) -> None:
         if e.button() == Qt.MouseButton.RightButton:
             e.accept()
             return
         super().mousePressEvent(e)
+
+    def set_grid_cell(self, cell: "QSize | None") -> None:
+        """Remember the delegate's base grid cell (or None for list mode) and
+        re-justify. Called whenever the view mode / density changes."""
+        self._grid_cell = cell
+        self._justify_grid()
+
+    def resizeEvent(self, e) -> None:
+        super().resizeEvent(e)
+        self._justify_grid()
+
+    def _justify_grid(self) -> None:
+        cell = self._grid_cell
+        if cell is None or cell.width() <= 0:
+            return
+        vw = self.viewport().width()
+        if vw <= 0:
+            return
+        cols = max(1, vw // cell.width())
+        self.setGridSize(QSize(vw // cols, cell.height()))
 
 
 class ChannelListModel(QAbstractListModel):

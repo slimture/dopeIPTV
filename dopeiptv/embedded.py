@@ -152,7 +152,14 @@ class _MpvGLWidget(QOpenGLWidget):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.mpv = None
         self._ctx = None
+        self._blank = False
         self.frame_ready.connect(self.update)
+
+    def set_blank(self, blank: bool) -> None:
+        """When blanked, paint solid black instead of mpv's last frame. Used on
+        stop so the pane clears instead of freezing on the final image."""
+        self._blank = blank
+        self.update()
 
     _SEEK_KEYS = (Qt.Key.Key_Left, Qt.Key.Key_Right)
 
@@ -240,6 +247,13 @@ class _MpvGLWidget(QOpenGLWidget):
     def paintGL(self) -> None:
         if not self._ctx:
             return
+        if self._blank:
+            glctx = QOpenGLContext.currentContext()
+            if glctx is not None:
+                f = glctx.functions()
+                f.glClearColor(0.0, 0.0, 0.0, 1.0)
+                f.glClear(0x00004000)  # GL_COLOR_BUFFER_BIT
+            return
         ratio = (self.devicePixelRatioF()
                  if hasattr(self, "devicePixelRatioF") else 1)
         self._ctx.render(flip_y=True, opengl_fbo={
@@ -312,6 +326,8 @@ class EmbeddedPlayer(QWidget):
     record_menu = pyqtSignal(object)
     pip_requested = pyqtSignal()
     pip_context_menu = pyqtSignal(object)
+    stopped = pyqtSignal()
+    resume_requested = pyqtSignal()
 
     OVERLAY_HIDE_MS = 3000
     VIDEO_BOX_HEIGHT = 260
@@ -985,6 +1001,7 @@ class EmbeddedPlayer(QWidget):
 
     def play(self, url: str, title: str, start: float = 0.0) -> bool:
         try:
+            self.video.set_blank(False)
             self.title_lbl.setText(title or "")
             self._hide_seek_ui()
             if self.video.mpv is None:
@@ -1061,6 +1078,12 @@ class EmbeddedPlayer(QWidget):
             pass
 
     def toggle_pause(self) -> None:
+        # Pressing play after a Stop replays the last item (the main window
+        # remembers what it was and resumes where it left off) rather than
+        # doing nothing on an empty player.
+        if self.current_url is None:
+            self.resume_requested.emit()
+            return
         m = self.video.mpv
         if m is None:
             return
@@ -1312,10 +1335,16 @@ class EmbeddedPlayer(QWidget):
     # -- volume ----------------------------------------------------------------
 
     def _set_volume(self, value: int) -> None:
+        # Dragging the slider up while muted implicitly unmutes, so the slider
+        # never lies about what you'll hear.
+        if value > 0 and getattr(self, "_muted", False):
+            self._muted = False
+            self._apply_mute_icon()
         m = self.video.mpv
         if m is not None:
             try:
                 m["volume"] = float(value)
+                m["mute"] = getattr(self, "_muted", False)
             except Exception:
                 pass
         for s in (self.vol, self.fs_vol):
@@ -1350,6 +1379,19 @@ class EmbeddedPlayer(QWidget):
 
     def toggle_mute(self) -> None:
         self._muted = not self._muted
+        # Make the volume sliders follow the mute state: drop to 0 while muted,
+        # spring back to the previous level when unmuted. We move them without
+        # emitting valueChanged so the real (pre-mute) volume isn't overwritten
+        # in settings.
+        if self._muted:
+            self._vol_before_mute = self.vol.value()
+            shown = 0
+        else:
+            shown = getattr(self, "_vol_before_mute", self.vol.value()) or 0
+        for s in (self.vol, self.fs_vol):
+            s.blockSignals(True)
+            s.setValue(shown)
+            s.blockSignals(False)
         m = self.video.mpv
         if m is not None:
             try:
@@ -1381,6 +1423,9 @@ class EmbeddedPlayer(QWidget):
             pass
 
     def stop(self) -> None:
+        # Tell the main window first (while position/duration are still valid)
+        # so it can remember this item as last-active and save its resume point.
+        self.stopped.emit()
         self.stop_stream_record()
         self.current_url = None
         if self.video.mpv:
@@ -1393,9 +1438,9 @@ class EmbeddedPlayer(QWidget):
         self._hide_seek_ui()
         self._stats_overlay.hide()
         self._stats_timer.stop()
-        # Repaint the (now empty) mpv surface so the pane goes black instead
-        # of freezing on the last frame.
-        self.video.update()
+        self._sync_pause_label(True)
+        # Paint the pane solid black instead of freezing on the last frame.
+        self.video.set_blank(True)
 
     def shutdown(self) -> None:
         self.stop_stream_record()

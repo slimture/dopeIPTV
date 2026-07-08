@@ -614,6 +614,62 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Программа передач",
         "th": "คู่มือ EPG",
     },
+    "epg_filter_channels": {
+        "en": "Filter channels...", "sv": "Filtrera kanaler...",
+        "es": "Filtrar canales...", "de": "Kanäle filtern...",
+        "fr": "Filtrer les chaînes...", "zh": "筛选频道...",
+        "ru": "Фильтр каналов...", "th": "กรองช่อง...",
+    },
+    "epg_select_channel": {
+        "en": "Select a channel", "sv": "Välj en kanal",
+        "es": "Selecciona un canal", "de": "Kanal auswählen",
+        "fr": "Sélectionnez une chaîne", "zh": "选择一个频道",
+        "ru": "Выберите канал", "th": "เลือกช่อง",
+    },
+    "epg_play_channel": {
+        "en": "Play channel", "sv": "Spela kanal",
+        "es": "Reproducir canal", "de": "Kanal abspielen",
+        "fr": "Lire la chaîne", "zh": "播放频道",
+        "ru": "Воспроизвести канал", "th": "เล่นช่อง",
+    },
+    "epg_no_programme": {
+        "en": "No current programme data", "sv": "Ingen aktuell programdata",
+        "es": "Sin datos de programa actual",
+        "de": "Keine aktuellen Programmdaten",
+        "fr": "Aucune donnée de programme actuelle", "zh": "无当前节目数据",
+        "ru": "Нет данных о текущей программе", "th": "ไม่มีข้อมูลรายการปัจจุบัน",
+    },
+    "epg_now_prefix": {
+        "en": "Now", "sv": "Nu", "es": "Ahora", "de": "Jetzt",
+        "fr": "En cours", "zh": "正在播放", "ru": "Сейчас", "th": "ตอนนี้",
+    },
+    "epg_record_hint": {
+        "en": "Right-click an upcoming or currently-airing programme to "
+              "record it (multi-select works too).",
+        "sv": "Högerklicka på ett kommande eller pågående program för att "
+              "spela in det (flerval fungerar också).",
+        "es": "Haz clic derecho en un programa próximo o en emisión para "
+              "grabarlo (también funciona la selección múltiple).",
+        "de": "Rechtsklick auf eine kommende oder laufende Sendung, um sie "
+              "aufzunehmen (Mehrfachauswahl möglich).",
+        "fr": "Clic droit sur un programme à venir ou en cours pour "
+              "l'enregistrer (sélection multiple possible).",
+        "zh": "右键点击即将播出或正在播出的节目即可录制（也支持多选）。",
+        "ru": "Щёлкните правой кнопкой по будущей или текущей передаче, чтобы "
+              "записать её (работает и множественный выбор).",
+        "th": "คลิกขวาที่รายการที่กำลังจะออกอากาศหรือกำลังออกอากาศเพื่อบันทึก "
+              "(เลือกหลายรายการได้)",
+    },
+    "epg_channels_count": {
+        "en": "{n} channels", "sv": "{n} kanaler", "es": "{n} canales",
+        "de": "{n} Kanäle", "fr": "{n} chaînes", "zh": "{n} 个频道",
+        "ru": "{n} каналов", "th": "{n} ช่อง",
+    },
+    "epg_channels_first": {
+        "en": "(first {n})", "sv": "(första {n})", "es": "(primeros {n})",
+        "de": "(erste {n})", "fr": "({n} premières)", "zh": "（前 {n} 个）",
+        "ru": "(первые {n})", "th": "({n} แรก)",
+    },
     "btn_add": {
         "en": "Add...",
         "sv": "Lägg till...",
@@ -2745,6 +2801,28 @@ _STRINGS: dict[str, dict[str, str]] = {
     "theme_nord": {
         "en": "Nord", "sv": "Nord", "es": "Nord", "de": "Nord",
         "fr": "Nord", "zh": "Nord", "ru": "Nord", "th": "Nord",
+    },
+    "theme_dracula": {
+        "en": "Dracula", "sv": "Dracula", "es": "Dracula", "de": "Dracula",
+        "fr": "Dracula", "zh": "Dracula", "ru": "Dracula", "th": "Dracula",
+    },
+    "theme_gruvbox": {
+        "en": "Gruvbox (dark)", "sv": "Gruvbox (mörk)",
+        "es": "Gruvbox (oscuro)", "de": "Gruvbox (dunkel)",
+        "fr": "Gruvbox (sombre)", "zh": "Gruvbox（深色）",
+        "ru": "Gruvbox (тёмная)", "th": "Gruvbox (มืด)",
+    },
+    "theme_solarized": {
+        "en": "Solarized (dark)", "sv": "Solarized (mörk)",
+        "es": "Solarized (oscuro)", "de": "Solarized (dunkel)",
+        "fr": "Solarized (sombre)", "zh": "Solarized（深色）",
+        "ru": "Solarized (тёмная)", "th": "Solarized (มืด)",
+    },
+    "theme_catppuccin": {
+        "en": "Catppuccin (mocha)", "sv": "Catppuccin (mocha)",
+        "es": "Catppuccin (mocha)", "de": "Catppuccin (mocha)",
+        "fr": "Catppuccin (mocha)", "zh": "Catppuccin（mocha）",
+        "ru": "Catppuccin (mocha)", "th": "Catppuccin (mocha)",
     },
     "theme_light": {
         "en": "Light", "sv": "Ljust", "es": "Claro", "de": "Hell",
