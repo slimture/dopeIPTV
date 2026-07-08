@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QComboBox, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout,
     QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-    QMessageBox, QPushButton, QVBoxLayout,
+    QMessageBox, QPushButton, QScrollArea, QSplitter, QVBoxLayout,
+    QWidget,
 )
 
 from .theme import P
@@ -136,37 +139,72 @@ class PlaylistDialog(QDialog):
 
 
 class EpgGuideDialog(QDialog):
-    """Channel schedule overview from the EPG."""
+    """Channel schedule with timeline: past, current, and upcoming."""
 
     MAX_ROWS = 2000
 
-    def __init__(self, window, channels) -> None:
+    def __init__(self, window, channels, category_name=None) -> None:
         super().__init__(window)
         self.window = window
         self.channels = channels
-        self.setWindowTitle("EPG Guide")
-        self.resize(560, 640)
+        title = "EPG Guide"
+        if category_name:
+            title += f" — {category_name}"
+        self.setWindowTitle(title)
+        self.resize(780, 600)
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(18, 18, 18, 18)
-        lay.setSpacing(10)
+        lay.setContentsMargins(14, 14, 14, 14)
+        lay.setSpacing(8)
 
         self.search = QLineEdit(placeholderText="Filter channels...")
         self.search.textChanged.connect(self._populate)
         lay.addWidget(self.search)
 
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        left = QWidget()
+        ll = QVBoxLayout(left)
+        ll.setContentsMargins(0, 0, 0, 0)
+        ll.setSpacing(4)
         self.info_lbl = QLabel("")
         self.info_lbl.setStyleSheet(
             f"color:{P['muted2']}; font-size:11px;")
-        lay.addWidget(self.info_lbl)
-
+        ll.addWidget(self.info_lbl)
         self.list = QListWidget()
+        self.list.currentItemChanged.connect(self._channel_selected)
         self.list.itemDoubleClicked.connect(self._play_selected)
-        lay.addWidget(self.list, 1)
+        ll.addWidget(self.list, 1)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        buttons.rejected.connect(self.reject)
-        buttons.accepted.connect(self.accept)
-        lay.addWidget(buttons)
+        right = QWidget()
+        rl = QVBoxLayout(right)
+        rl.setContentsMargins(0, 0, 0, 0)
+        rl.setSpacing(6)
+        self.ch_title = QLabel("Select a channel")
+        self.ch_title.setStyleSheet("font-size:14px; font-weight:700;")
+        rl.addWidget(self.ch_title)
+        self.now_lbl = QLabel("")
+        self.now_lbl.setStyleSheet(
+            f"color:{P['accent']}; font-size:12px; font-weight:600;")
+        self.now_lbl.setWordWrap(True)
+        rl.addWidget(self.now_lbl)
+        self.schedule_scroll = QScrollArea()
+        self.schedule_scroll.setWidgetResizable(True)
+        self.schedule_holder = QWidget()
+        self.schedule_lay = QVBoxLayout(self.schedule_holder)
+        self.schedule_lay.setContentsMargins(0, 0, 0, 0)
+        self.schedule_lay.setSpacing(2)
+        self.schedule_lay.addStretch()
+        self.schedule_scroll.setWidget(self.schedule_holder)
+        rl.addWidget(self.schedule_scroll, 1)
+        self.play_btn = QPushButton("Play channel", objectName="Primary")
+        self.play_btn.clicked.connect(self._play_current)
+        self.play_btn.setEnabled(False)
+        rl.addWidget(self.play_btn)
+
+        splitter.addWidget(left)
+        splitter.addWidget(right)
+        splitter.setSizes([280, 500])
+        splitter.setStretchFactor(1, 1)
+        lay.addWidget(splitter, 1)
 
         self._populate()
 
@@ -182,23 +220,86 @@ class EpgGuideDialog(QDialog):
             if shown > self.MAX_ROWS:
                 break
             now = self.window.xmltv.now_for(it)
-            if now:
-                label = f"{name}\nNow: {now[0]}  ({int(now[1])}%)"
-            else:
-                label = f"{name}\nNo programme data"
-            item = QListWidgetItem(label)
+            suffix = f" — {now[0]}" if now else ""
+            item = QListWidgetItem(name + suffix)
             item.setData(Qt.ItemDataRole.UserRole, it)
             self.list.addItem(item)
         note = f"{shown} channels"
         if shown > self.MAX_ROWS:
-            note += (f" (showing first {self.MAX_ROWS}"
-                     " - narrow your search)")
+            note += f" (first {self.MAX_ROWS})"
         self.info_lbl.setText(note)
+
+    def _channel_selected(self, cur, _prev=None) -> None:
+        while self.schedule_lay.count() > 1:
+            w = self.schedule_lay.takeAt(0).widget()
+            if w:
+                w.deleteLater()
+        if not cur:
+            self.ch_title.setText("Select a channel")
+            self.now_lbl.setText("")
+            self.play_btn.setEnabled(False)
+            return
+        it = cur.data(Qt.ItemDataRole.UserRole)
+        name = it.get("name") or "?"
+        self.ch_title.setText(name)
+        self.play_btn.setEnabled(True)
+
+        now_prog = self.window.xmltv.current_programme(it)
+        if now_prog:
+            start = datetime.fromtimestamp(now_prog["start_timestamp"])
+            stop = datetime.fromtimestamp(now_prog["stop_timestamp"])
+            self.now_lbl.setText(
+                f"Now: {now_prog['title']}  "
+                f"({start.strftime('%H:%M')}–{stop.strftime('%H:%M')})")
+        else:
+            self.now_lbl.setText("No current programme data")
+
+        now_ts = datetime.now().astimezone().timestamp()
+        entries = self.window.xmltv._entries_for(it)
+        past = [p for p in entries
+                if p["stop_timestamp"] <= now_ts
+                and p["start_timestamp"] >= now_ts - 86400]
+        past.reverse()
+        upcoming = [p for p in entries if p["start_timestamp"] > now_ts][:20]
+
+        if upcoming:
+            self._add_section("Upcoming")
+            for p in upcoming:
+                self._add_programme(p, upcoming=True)
+        if past:
+            self._add_section("Earlier today")
+            for p in past[:20]:
+                self._add_programme(p, upcoming=False)
+
+    def _add_section(self, text: str) -> None:
+        lbl = QLabel(text)
+        lbl.setStyleSheet(
+            f"color:{P['muted2']}; font-size:10px; font-weight:700;"
+            "letter-spacing:1px; padding:6px 0 2px 0;")
+        idx = self.schedule_lay.count() - 1
+        self.schedule_lay.insertWidget(idx, lbl)
+
+    def _add_programme(self, prog: dict, upcoming: bool) -> None:
+        start = datetime.fromtimestamp(prog["start_timestamp"])
+        stop = datetime.fromtimestamp(prog["stop_timestamp"])
+        time_str = f"{start.strftime('%H:%M')}–{stop.strftime('%H:%M')}"
+        title = prog.get("title") or "?"
+        row = QLabel(f"<b>{time_str}</b>  {title}")
+        row.setWordWrap(True)
+        color = P["text2"] if upcoming else P["muted"]
+        row.setStyleSheet(f"color:{color}; font-size:12px; padding:2px 0;")
+        idx = self.schedule_lay.count() - 1
+        self.schedule_lay.insertWidget(idx, row)
 
     def _play_selected(self, item) -> None:
         it = item.data(Qt.ItemDataRole.UserRole)
         self.window.play_live_channel(it)
         self.accept()
+
+    def _play_current(self) -> None:
+        cur = self.list.currentItem()
+        if cur:
+            self._play_selected(cur)
 
 
 class ContentManagerDialog(QDialog):

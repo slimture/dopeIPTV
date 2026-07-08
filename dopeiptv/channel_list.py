@@ -253,9 +253,13 @@ class ChannelDelegate(QStyledItemDelegate):
                     lambda _pm: self.window.listw.viewport().update())
 
         num_w = 0
+        is_fav = (kind in ("live", "vod", "series")
+                  and self.window.favs.is_favorite(it.get("stream_id")))
         if kind in ("live", "fav") and it.get("num"):
             has_archive = self.window._timeshift_days(it) > 0
             num_w = 52 if has_archive else 34
+            if is_fav:
+                num_w += 18
             painter.setPen(QColor(P["muted3"]))
             fnum = QFont()
             fnum.setPointSize(10)
@@ -263,11 +267,37 @@ class ChannelDelegate(QStyledItemDelegate):
             num_rect = QRect(
                 rect.right() - 12 - num_w, rect.top(),
                 num_w, rect.height())
+            suffix = str(it["num"])
+            if has_archive:
+                suffix = "⏪ " + suffix
             painter.drawText(
                 num_rect,
                 Qt.AlignmentFlag.AlignVCenter
-                | Qt.AlignmentFlag.AlignRight,
-                ("⏪ " if has_archive else "") + str(it["num"]))
+                | Qt.AlignmentFlag.AlignRight, suffix)
+            if is_fav:
+                painter.setPen(QColor("#FFD700"))
+                fstar = QFont()
+                fstar.setPointSize(12)
+                painter.setFont(fstar)
+                star_rect = QRect(
+                    num_rect.left() - 16, rect.top(), 16, rect.height())
+                painter.drawText(
+                    star_rect,
+                    Qt.AlignmentFlag.AlignVCenter
+                    | Qt.AlignmentFlag.AlignRight, "★")
+        elif is_fav:
+            num_w = 22
+            painter.setPen(QColor("#FFD700"))
+            fnum = QFont()
+            fnum.setPointSize(12)
+            painter.setFont(fnum)
+            num_rect = QRect(
+                rect.right() - 12 - num_w, rect.top(),
+                num_w, rect.height())
+            painter.drawText(
+                num_rect,
+                Qt.AlignmentFlag.AlignVCenter
+                | Qt.AlignmentFlag.AlignRight, "★")
 
         text_x = logo_rect.right() + 12
         text_w = max(0, rect.right() - 12 - num_w - text_x)

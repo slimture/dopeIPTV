@@ -8,7 +8,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import QSettings, Qt
 from PyQt6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPixmap
-from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6.QtWidgets import QApplication, QLabel, QMessageBox
 
 from . import APP_NAME, ORG
 from .client import XtreamClient
@@ -85,9 +85,12 @@ def main() -> int:
     if _libmpv is not None:
         os.environ.setdefault("LC_NUMERIC", "C")
 
-    if _libmpv is not None and sys.platform == "darwin":
-        from .platform_macos import setup_opengl
-        setup_opengl()
+    if sys.platform == "darwin":
+        from .platform_macos import fix_app_name
+        fix_app_name(APP_NAME)
+        if _libmpv is not None:
+            from .platform_macos import setup_opengl
+            setup_opengl()
 
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
@@ -125,13 +128,39 @@ def main() -> int:
 
         candidate = XtreamClient(pl["server"], pl["username"], pl["password"])
         offline = False
-        try:
-            candidate.authenticate()
+        splash = QLabel(f"  Connecting to {pl.get('name', 'server')}...",
+                        None, Qt.WindowType.SplashScreen)
+        splash.setStyleSheet(
+            "background:#17171C; color:#C9C9D2; font-size:14px;"
+            "padding:18px 28px; border-radius:10px;")
+        splash.adjustSize()
+        splash.show()
+        app.processEvents()
+
+        import threading
+        auth_err = [None]
+
+        def _do_auth():
+            try:
+                candidate.authenticate()
+            except Exception as exc:
+                auth_err[0] = exc
+
+        t = threading.Thread(target=_do_auth, daemon=True)
+        t.start()
+        while t.is_alive():
+            app.processEvents()
+            t.join(0.05)
+
+        if auth_err[0] is None:
             client = candidate
             settings.setValue("server", pl["server"])
             settings.setValue("username", pl["username"])
             settings.setValue("password", pl["password"])
-        except Exception as e:
+            splash.close()
+        else:
+            e = auth_err[0]
+            splash.close()
             box = QMessageBox(QMessageBox.Icon.Warning, "Connection failed",
                               f"{pl['name']}: {e}\n\n"
                               "You can start anyway - content will load once "
@@ -162,4 +191,6 @@ def main() -> int:
     if offline:
         w.setWindowTitle(w.windowTitle() + "  (offline)")
     w.show()
+    for _ in range(5):
+        app.processEvents()
     return app.exec()

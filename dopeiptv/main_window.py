@@ -98,6 +98,7 @@ class MainWindow(QMainWindow):
         self._playing_key = None
         self._playing_group: str | None = None
         self._playing_item = None
+        self._pip_win = None
         self._last_player = None
         self._last_playlist_refresh = time.time()
         self._load_gen = 0
@@ -106,7 +107,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(self._base_title)
         self.resize(1240, 780)
         self._build_ui()
-        self._load_categories()
+        self.loading_bar.show()
+        self._set_status("Loading channels...")
+        QTimer.singleShot(100, self._load_categories)
 
         self._auto_refresh_timer = QTimer(self)
         self._auto_refresh_timer.timeout.connect(self._maybe_auto_refresh)
@@ -128,6 +131,7 @@ class MainWindow(QMainWindow):
         quit_action.triggered.connect(self.close)
 
         root = QSplitter(Qt.Orientation.Horizontal)
+        root.setHandleWidth(6)
         self.setCentralWidget(root)
 
         # Sidebar
@@ -257,6 +261,12 @@ class MainWindow(QMainWindow):
         self.listw.customContextMenuRequested.connect(self._context_menu)
         ml.addWidget(self.listw, 1)
 
+        self._loading_hint = QLabel("Loading channels...")
+        self._loading_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._loading_hint.setStyleSheet(
+            f"color:{P['muted2']}; font-size:13px; padding:40px 0;")
+        ml.addWidget(self._loading_hint)
+
         self.count_lbl = QLabel("")
         self.count_lbl.setStyleSheet(f"color:{P['muted3']}; font-size:11px;")
         status_row = QHBoxLayout()
@@ -294,6 +304,8 @@ class MainWindow(QMainWindow):
                 lambda: self.wake.release())
             self.player.playback_error.connect(self._playback_error)
             self.player.zap.connect(self._zap)
+            self.player.pip_requested.connect(self._toggle_pip)
+            self.player.stop_btn.clicked.connect(self._exit_pip_if_active)
             self.player.stop_btn.clicked.connect(self.player.hide)
             dl.addWidget(self.player, 2)
 
@@ -392,8 +404,14 @@ class MainWindow(QMainWindow):
                   activated=self._toggle_fullscreen_shortcut)
         QShortcut(QKeySequence(Qt.Key.Key_Delete), self,
                   activated=self._delete_pressed)
+        QShortcut(QKeySequence(Qt.Key.Key_Space), self,
+                  activated=self._toggle_pause_shortcut)
 
         self._apply_view_settings()
+
+    def _toggle_pause_shortcut(self) -> None:
+        if self.player and self.player.isVisible():
+            self.player.toggle_pause()
 
     # -- fullscreen ----------------------------------------------------------------
 
@@ -410,6 +428,9 @@ class MainWindow(QMainWindow):
         if now - getattr(self, "_fs_toggled_at", 0.0) < 0.4:
             return
         self._fs_toggled_at = now
+        if self._pip_win is not None:
+            self._toggle_pip_fullscreen()
+            return
         if self._player_fs:
             self._exit_player_fullscreen()
             return
@@ -464,6 +485,115 @@ class MainWindow(QMainWindow):
         elif scroll is not None:
             QTimer.singleShot(0, lambda: (
                 self.listw.verticalScrollBar().setValue(scroll)))
+
+    def _toggle_pip_fullscreen(self) -> None:
+        if self.isFullScreen():
+            self.player.set_fullscreen_ui(False)
+            self.setWindowFlags(
+                self.windowFlags()
+                | Qt.WindowType.FramelessWindowHint
+                | Qt.WindowType.WindowStaysOnTopHint)
+            self.showNormal()
+            geo = getattr(self, "_pip_fs_geo", None)
+            if geo:
+                self.setGeometry(geo)
+            else:
+                self.resize(480, 270)
+                screen_geo = self.screen().availableGeometry()
+                self.move(screen_geo.right() - 500,
+                          screen_geo.bottom() - 290)
+        else:
+            self._pip_fs_geo = self.geometry()
+            self.setWindowFlags(
+                (self.windowFlags()
+                 & ~Qt.WindowType.FramelessWindowHint
+                 & ~Qt.WindowType.WindowStaysOnTopHint))
+            self.player.set_fullscreen_ui(True)
+            self.showFullScreen()
+
+    # -- picture-in-picture (mini mode — no reparenting) ----------------------------
+
+    def _toggle_pip(self) -> None:
+        if not self.player:
+            return
+        if self._pip_win is not None:
+            self._exit_pip()
+            return
+        if self._player_fs:
+            self._exit_player_fullscreen()
+
+        self._pip_win = True
+        self._pip_geo = self.geometry()
+        self._pip_state = self.windowState()
+
+        self._side.hide()
+        self._mid.hide()
+        self._pip_det_hidden: list[QWidget] = []
+        for w in self._det.children():
+            if (isinstance(w, QWidget) and w is not self.player
+                    and w.isVisible()):
+                self._pip_det_hidden.append(w)
+                w.hide()
+        det_lay = self._det.layout()
+        self._pip_margins = det_lay.contentsMargins()
+        det_lay.setContentsMargins(0, 0, 0, 0)
+        self._det.setStyleSheet(
+            "#DetailPane { background:#000000; border:none; }")
+        self.menuBar().hide()
+        self.player.pip_btn.setToolTip("Exit Picture-in-Picture")
+        self.player.fs_btn.hide()
+        self.player.video.setMinimumHeight(0)
+        self.player.set_pip_mode(True)
+
+        if self.isFullScreen() or self.isMaximized():
+            self.showNormal()
+        self.setMinimumSize(240, 135)
+        self.setWindowFlags(
+            self.windowFlags()
+            | Qt.WindowType.WindowStaysOnTopHint
+            | Qt.WindowType.FramelessWindowHint)
+        self.show()
+        self.resize(480, 270)
+        screen_geo = self.screen().availableGeometry()
+        self.move(screen_geo.right() - 500, screen_geo.bottom() - 290)
+
+    def _exit_pip(self) -> None:
+        if self._pip_win is None:
+            return
+        self._pip_win = None
+
+        self.player.set_pip_mode(False)
+        self.player.video.setMinimumHeight(190)
+        self.setMinimumSize(0, 0)
+        self._side.show()
+        self._mid.show()
+        for w in getattr(self, "_pip_det_hidden", []):
+            w.show()
+        self._pip_det_hidden = []
+        m = getattr(self, "_pip_margins", None)
+        if m is not None:
+            self._det.layout().setContentsMargins(
+                m.left(), m.top(), m.right(), m.bottom())
+        self._det.setStyleSheet("")
+        self.menuBar().show()
+        self.player.pip_btn.setToolTip("Picture-in-Picture")
+        self.player.fs_btn.show()
+
+        self.setWindowFlags(
+            (self.windowFlags()
+             & ~Qt.WindowType.WindowStaysOnTopHint
+             & ~Qt.WindowType.FramelessWindowHint))
+        self.show()
+        geo = getattr(self, "_pip_geo", None)
+        state = getattr(self, "_pip_state", None)
+        if geo:
+            self.setGeometry(geo)
+        if state and state != Qt.WindowState.WindowNoState:
+            self.setWindowState(state)
+
+    def _exit_pip_if_active(self) -> None:
+        if self._pip_win is not None:
+            self._exit_pip()
 
     # -- playlists -----------------------------------------------------------------
 
@@ -598,8 +728,15 @@ class MainWindow(QMainWindow):
                 if (self.overrides.is_locked(self.mode, cid)
                         and not self.parental.session_unlocked):
                     name += "  [locked]"
+                ovr = self.overrides.get(self.mode, cid)
+                icon = ovr.get("icon", "")
+                if icon:
+                    name = f"{icon}  {name}"
                 it = QListWidgetItem(name)
                 it.setData(Qt.ItemDataRole.UserRole, cid)
+                color = ovr.get("color", "")
+                if color:
+                    it.setForeground(QColor(color))
                 self.cat_list.addItem(it)
             self.cat_list.blockSignals(False)
             self.cat_list.setCurrentRow(0)
@@ -750,6 +887,8 @@ class MainWindow(QMainWindow):
             filtered = items
         filtered = self._sorted(filtered)
         self.list_model.set_items(filtered, kind)
+        if self._loading_hint.isVisible():
+            self._loading_hint.hide()
         self._set_status(f"{len(filtered)} {self.LABELS[kind]}")
         if kind == "fav" and not self.all_items:
             self._set_status(
@@ -1365,7 +1504,7 @@ class MainWindow(QMainWindow):
                     m.addMenu("Timeshift / catch-up"), it)
             m.addSeparator()
             self._build_record_menu(m.addMenu("Record"), it)
-        if (self.mode in ("live", "fav")
+        if (self.mode in ("live", "fav", "vod", "series")
                 and it.get("stream_id") is not None):
             m.addSeparator()
             fav_menu = m.addMenu("Add to favorites group")
@@ -1376,7 +1515,8 @@ class MainWindow(QMainWindow):
                 fav_menu.addSeparator()
             fav_menu.addAction("New group...",
                                lambda: self._add_fav(None, it))
-            if self.mode == "fav":
+            if (self.mode == "fav"
+                    or self.favs.is_favorite(it.get("stream_id"))):
                 m.addAction("Remove from favorites",
                             lambda: self._remove_fav(it))
         if (self.mode in ("live", "vod", "series")
@@ -1459,10 +1599,14 @@ class MainWindow(QMainWindow):
             self._load_categories()
 
     def _remove_fav(self, item) -> None:
-        cur = self.cat_list.currentItem()
-        group = cur.data(Qt.ItemDataRole.UserRole) if cur else None
-        self.favs.remove(item.get("stream_id"), group)
-        self._load_categories()
+        if self.mode == "fav":
+            cur = self.cat_list.currentItem()
+            group = cur.data(Qt.ItemDataRole.UserRole) if cur else None
+            self.favs.remove(item.get("stream_id"), group)
+            self._load_categories()
+        else:
+            self.favs.remove(item.get("stream_id"))
+            self.list_model.refresh_all()
 
     # -- parental control ----------------------------------------------------------
 
@@ -1525,6 +1669,19 @@ class MainWindow(QMainWindow):
             cid = data
             m.addAction("Rename category...",
                         lambda: self._rename_category(cid))
+            m.addAction("Set icon...",
+                        lambda: self._set_category_icon(cid))
+            color_menu = m.addMenu("Set color")
+            for label, hex_val in (("Default", ""), ("Blue", "#4C8DFF"),
+                                   ("Green", "#2FBF71"), ("Orange", "#FF9F43"),
+                                   ("Red", "#FF5C5C"), ("Purple", "#8E6BFF"),
+                                   ("Teal", "#2AC3C3"), ("Pink", "#FF5C8A")):
+                act = color_menu.addAction(label)
+                act.triggered.connect(
+                    lambda _, c=hex_val: (
+                        self.overrides.update(self.mode, cid, color=c),
+                        self._load_categories()))
+            m.addSeparator()
             m.addAction("Hide category",
                         lambda: self._set_category_flag(cid, hidden=True))
             if self.overrides.is_locked(self.mode, cid):
@@ -1555,6 +1712,16 @@ class MainWindow(QMainWindow):
             self, "Rename category", "New name:", text=current)
         if ok:
             self.overrides.update(self.mode, cid, name=name.strip())
+            self._load_categories()
+
+    def _set_category_icon(self, cid) -> None:
+        current = self.overrides.get(self.mode, cid).get("icon", "")
+        icon, ok = QInputDialog.getText(
+            self, "Set category icon",
+            "Enter an emoji or short text (leave blank to remove):",
+            text=current)
+        if ok:
+            self.overrides.update(self.mode, cid, icon=icon.strip())
             self._load_categories()
 
     def _set_category_flag(self, cid, **fields) -> None:
@@ -1619,9 +1786,11 @@ class MainWindow(QMainWindow):
             f"● REC ({n})" if n > 1 else "● REC")
         self.rec_indicator.setVisible(n > 0)
         if self.player:
-            label = "●" if n else "REC"
-            self.player.rec_btn.setText(label)
-            self.player.fs_rec_btn.setText(label)
+            for b in (self.player.rec_btn, self.player.fs_rec_btn):
+                b.setToolTip(f"Recording ({n})" if n else "Record")
+                b.setStyleSheet(
+                    "color:#FF5C5C; font-weight:700;" if n
+                    else "color:#FF5C5C;")
         if self.mode == "rec":
             cur = self.cat_list.currentItem()
             self._load_items(
@@ -2045,6 +2214,8 @@ class MainWindow(QMainWindow):
 
     def _build_timeshift_menu(self, ts_menu, it) -> None:
         days = self._timeshift_days(it)
+        ts_menu.addAction("Go Live", lambda: self.play_live_channel(it))
+        ts_menu.addSeparator()
         prog = self.xmltv.current_programme(it)
         if prog:
             ts_menu.addAction(
@@ -2224,6 +2395,12 @@ class MainWindow(QMainWindow):
     # -- EPG guide -----------------------------------------------------------------
 
     def _open_epg_guide(self) -> None:
+        self._ensure_xmltv_loaded()
+        if self.mode == "live" and self.all_items:
+            cat = self.cat_list.currentItem()
+            cat_name = cat.text() if cat else "All"
+            EpgGuideDialog(self, list(self.all_items), cat_name).exec()
+            return
         dlg = QDialog(self)
         dlg.setWindowTitle("EPG Guide")
         lay = QVBoxLayout(dlg)
@@ -2233,7 +2410,6 @@ class MainWindow(QMainWindow):
 
         def done(channels):
             dlg.close()
-            self._ensure_xmltv_loaded()
             EpgGuideDialog(self, channels or []).exec()
 
         run_async(self.pool, lambda: self.client.live_streams(None),
@@ -2444,6 +2620,15 @@ class MainWindow(QMainWindow):
         for b in (add_btn, edit_btn, remove_btn, refresh_pl_btn, use_btn):
             pl_btns.addWidget(b)
         pv.addLayout(pl_btns)
+        io_btns = QHBoxLayout()
+        export_btn = QPushButton("Export...")
+        export_btn.setToolTip("Export all playlists to a JSON file")
+        import_btn = QPushButton("Import...")
+        import_btn.setToolTip("Import playlists from a JSON file")
+        io_btns.addWidget(export_btn)
+        io_btns.addWidget(import_btn)
+        io_btns.addStretch()
+        pv.addLayout(io_btns)
         tabs.addTab(pl_tab, "Playlists")
 
         # Parental tab
@@ -2627,14 +2812,87 @@ class MainWindow(QMainWindow):
                 self.switch_playlist(pid)
                 reload_pl_list()
 
+        def export_playlists():
+            if not store or not store.playlists():
+                QMessageBox.information(
+                    d, "Export", "No playlists to export.")
+                return
+            path, _ = QFileDialog.getSaveFileName(
+                d, "Export playlists", "playlists.json",
+                "JSON files (*.json)",
+                options=QFileDialog.Option.DontUseNativeDialog)
+            if not path:
+                return
+            import json
+            data = []
+            for p in store.playlists():
+                data.append({
+                    "name": p.get("name", ""),
+                    "server": p.get("server", ""),
+                    "username": p.get("username", ""),
+                    "password": p.get("password", ""),
+                    "epg_url": p.get("epg_url", ""),
+                    "refresh": p.get("refresh", "never"),
+                })
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            QMessageBox.information(
+                d, "Export",
+                f"Exported {len(data)} playlist(s) to:\n{path}")
+
+        def import_playlists():
+            if not store:
+                return
+            path, _ = QFileDialog.getOpenFileName(
+                d, "Import playlists", "",
+                "JSON files (*.json);;All files (*)",
+                options=QFileDialog.Option.DontUseNativeDialog)
+            if not path:
+                return
+            import json
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception as exc:
+                QMessageBox.warning(
+                    d, "Import", f"Could not read file:\n{exc}")
+                return
+            if not isinstance(data, list):
+                QMessageBox.warning(
+                    d, "Import", "Invalid format — expected a JSON list.")
+                return
+            added = 0
+            for entry in data:
+                if not isinstance(entry, dict):
+                    continue
+                server = entry.get("server", "").strip()
+                user = entry.get("username", "").strip()
+                pw = entry.get("password", "").strip()
+                if not (server and user and pw):
+                    continue
+                store.add({
+                    "name": entry.get("name", "").strip()
+                            or server.split("//")[-1].split("/")[0],
+                    "server": server, "username": user,
+                    "password": pw,
+                    "epg_url": entry.get("epg_url", "").strip(),
+                    "refresh": entry.get("refresh", "never"),
+                })
+                added += 1
+            reload_pl_list()
+            QMessageBox.information(
+                d, "Import", f"Imported {added} playlist(s).")
+
         add_btn.clicked.connect(add_playlist)
         edit_btn.clicked.connect(edit_playlist)
         remove_btn.clicked.connect(remove_playlist)
         refresh_pl_btn.clicked.connect(self.refresh_playlist)
         use_btn.clicked.connect(use_playlist)
+        export_btn.clicked.connect(export_playlists)
+        import_btn.clicked.connect(import_playlists)
         if not store:
             for b in (add_btn, edit_btn, remove_btn,
-                      refresh_pl_btn, use_btn):
+                      refresh_pl_btn, use_btn, export_btn, import_btn):
                 b.setEnabled(False)
         reload_pl_list()
 
@@ -2694,6 +2952,8 @@ class MainWindow(QMainWindow):
 
     def _on_epg_progress(self, value: int) -> None:
         self.loading_bar.show()
+        if value >= 0:
+            self._set_status(f"Loading programme guide... {value}%")
         if value < 0:
             self.loading_bar.setRange(0, 0)
         else:

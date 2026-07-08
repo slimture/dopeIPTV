@@ -83,6 +83,18 @@ def extra_player_candidates(player: str) -> list[str]:
     return ["/Applications/VLC.app/Contents/MacOS/VLC"]
 
 
+def fix_app_name(name: str) -> None:
+    """Set the macOS menu bar app name (overrides 'python' default)."""
+    try:
+        import objc  # noqa: F401
+        bundle = objc.lookUpClass("NSBundle").mainBundle()
+        info = bundle.localizedInfoDictionary() or bundle.infoDictionary()
+        if info is not None:
+            info["CFBundleName"] = name
+    except Exception:
+        pass
+
+
 def libmpv_install_hint() -> str:
     """Installation hint shown when libmpv is missing on macOS."""
     return "\n  Install with: brew install mpv && pip install python-mpv"

@@ -27,6 +27,10 @@ class _MpvGLWidget(QOpenGLWidget):
 
     frame_ready = pyqtSignal()
     playback_error = pyqtSignal(str)
+    video_mouse_press = pyqtSignal(object)
+    video_mouse_move = pyqtSignal(object)
+    video_mouse_release = pyqtSignal(object)
+    video_dbl_click = pyqtSignal()
 
     EXTRA_OPTS: dict = {}
 
@@ -41,6 +45,18 @@ class _MpvGLWidget(QOpenGLWidget):
         self.mpv = None
         self._ctx = None
         self.frame_ready.connect(self.update)
+
+    def mousePressEvent(self, event) -> None:
+        self.video_mouse_press.emit(event)
+
+    def mouseMoveEvent(self, event) -> None:
+        self.video_mouse_move.emit(event)
+
+    def mouseReleaseEvent(self, event) -> None:
+        self.video_mouse_release.emit(event)
+
+    def mouseDoubleClickEvent(self, event) -> None:
+        self.video_dbl_click.emit()
 
     def _get_proc_address(self, _, name: bytes) -> int:
         glctx = QOpenGLContext.currentContext()
@@ -161,6 +177,7 @@ class EmbeddedPlayer(QWidget):
     exit_fullscreen = pyqtSignal()
     timeshift_menu = pyqtSignal(object)
     record_menu = pyqtSignal(object)
+    pip_requested = pyqtSignal()
 
     OVERLAY_HIDE_MS = 3000
     VIDEO_BOX_HEIGHT = 260
@@ -177,22 +194,26 @@ class EmbeddedPlayer(QWidget):
         self.video.installEventFilter(self)
         self.video.setMouseTracking(True)
         self.video.playback_error.connect(self.playback_error)
+        self.video.video_dbl_click.connect(self._on_video_dbl_click)
+        self.video.video_mouse_press.connect(self._on_video_press)
+        self.video.video_mouse_move.connect(self._on_video_move)
+        self.video.video_mouse_release.connect(self._on_video_release)
         lay.addWidget(self.video, 1)
 
         self.bar = QWidget()
         bl = QHBoxLayout(self.bar)
-        bl.setContentsMargins(0, 0, 0, 0)
-        bl.setSpacing(4)
+        bl.setContentsMargins(4, 2, 4, 2)
+        bl.setSpacing(3)
         self.prev_btn = QPushButton("◀", objectName="MiniBtn")
         self.prev_btn.setToolTip("Previous channel (Ctrl+Left)")
         self.prev_btn.clicked.connect(lambda: self.zap.emit(-1))
         self.next_btn = QPushButton("▶", objectName="MiniBtn")
         self.next_btn.setToolTip("Next channel (Ctrl+Right)")
         self.next_btn.clicked.connect(lambda: self.zap.emit(1))
-        self.pause_btn = QPushButton("⏸", objectName="MiniBtn")
+        self.pause_btn = QPushButton("‖", objectName="MiniBtn")
         self.pause_btn.setToolTip("Pause / resume")
         self.pause_btn.clicked.connect(self.toggle_pause)
-        self.back_btn = QPushButton("-10", objectName="MiniBtn")
+        self.back_btn = QPushButton("−10", objectName="MiniBtn")
         self.back_btn.setToolTip("Back 10 seconds")
         self.back_btn.clicked.connect(lambda: self._relative_seek(-10))
         self.back_btn.hide()
@@ -208,12 +229,12 @@ class EmbeddedPlayer(QWidget):
         self.seek.hide()
         self.time_lbl = QLabel("", objectName="DetailMeta")
         self.time_lbl.hide()
-        self.mute_btn = QPushButton("\U0001f50a", objectName="MiniBtn")
+        self.mute_btn = QPushButton("🔊", objectName="MiniBtn")
         self.mute_btn.setToolTip("Mute / unmute")
         self.mute_btn.clicked.connect(self.toggle_mute)
         self.vol = QSlider(Qt.Orientation.Horizontal)
         self.vol.setRange(0, 100)
-        self.vol.setFixedWidth(50)
+        self.vol.setFixedWidth(40)
         self.vol.setToolTip("Volume")
         self.vol.valueChanged.connect(self._set_volume)
         self.ts_btn = QPushButton("⏪", objectName="MiniBtn")
@@ -221,8 +242,9 @@ class EmbeddedPlayer(QWidget):
         self.ts_btn.clicked.connect(
             lambda: self.timeshift_menu.emit(self.ts_btn))
         self.ts_btn.hide()
-        self.rec_btn = QPushButton("REC", objectName="MiniBtn")
-        self.rec_btn.setToolTip("Record this channel")
+        self.rec_btn = QPushButton("●", objectName="MiniBtn")
+        self.rec_btn.setToolTip("Record")
+        self.rec_btn.setStyleSheet("color:#FF5C5C;")
         self.rec_btn.clicked.connect(
             lambda: self.record_menu.emit(self.rec_btn))
         self.rec_btn.hide()
@@ -233,6 +255,9 @@ class EmbeddedPlayer(QWidget):
         self.stop_btn = QPushButton("■", objectName="MiniBtn")
         self.stop_btn.setToolTip("Stop playback")
         self.stop_btn.clicked.connect(self.stop)
+        self.pip_btn = QPushButton("PiP", objectName="MiniBtn")
+        self.pip_btn.setToolTip("Picture-in-Picture")
+        self.pip_btn.clicked.connect(self.pip_requested)
         self.fs_btn = QPushButton("⛶", objectName="MiniBtn")
         self.fs_btn.setToolTip("Fullscreen")
         bl.addWidget(self.prev_btn)
@@ -244,13 +269,18 @@ class EmbeddedPlayer(QWidget):
         bl.addWidget(self.seek, 2)
         bl.addWidget(self.time_lbl)
         bl.addWidget(self.mute_btn)
+        bl.addSpacing(2)
         bl.addWidget(self.vol)
+        bl.addSpacing(4)
         bl.addWidget(self.ts_btn)
         bl.addWidget(self.rec_btn)
         bl.addWidget(self.opts_btn)
+        bl.addWidget(self.pip_btn)
         bl.addWidget(self.stop_btn)
         bl.addWidget(self.fs_btn)
         lay.addWidget(self.bar)
+        self.bar.setMouseTracking(True)
+        self.bar.installEventFilter(self)
 
         self.overlay = QLabel("", self)
         self.overlay.setStyleSheet(
@@ -271,7 +301,7 @@ class EmbeddedPlayer(QWidget):
         self.fs_next_btn = QPushButton("▶", objectName="MiniBtn")
         self.fs_next_btn.setToolTip("Next channel (Right)")
         self.fs_next_btn.clicked.connect(lambda: self.zap.emit(1))
-        self.fs_pause_btn = QPushButton("⏸", objectName="MiniBtn")
+        self.fs_pause_btn = QPushButton("‖", objectName="MiniBtn")
         self.fs_pause_btn.setToolTip("Pause / resume")
         self.fs_pause_btn.clicked.connect(self.toggle_pause)
         self.fs_back_btn = QPushButton("-10", objectName="MiniBtn")
@@ -298,8 +328,9 @@ class EmbeddedPlayer(QWidget):
         self.fs_ts_btn.clicked.connect(
             lambda: self.timeshift_menu.emit(self.fs_ts_btn))
         self.fs_ts_btn.hide()
-        self.fs_rec_btn = QPushButton("REC", objectName="MiniBtn")
-        self.fs_rec_btn.setToolTip("Record this channel")
+        self.fs_rec_btn = QPushButton("●", objectName="MiniBtn")
+        self.fs_rec_btn.setToolTip("Record")
+        self.fs_rec_btn.setStyleSheet("color:#FF5C5C;")
         self.fs_rec_btn.clicked.connect(
             lambda: self.record_menu.emit(self.fs_rec_btn))
         self.fs_rec_btn.hide()
@@ -355,6 +386,14 @@ class EmbeddedPlayer(QWidget):
         self._overlay_timer.setInterval(self.OVERLAY_HIDE_MS)
         self._overlay_timer.timeout.connect(self._hide_fs_ui)
 
+        self._drag_start = None
+        self._drag_win_pos = None
+        self._drag_active = False
+        self._pip_mode = False
+        self._pip_bar_timer = QTimer(self)
+        self._pip_bar_timer.setSingleShot(True)
+        self._pip_bar_timer.timeout.connect(self._hide_pip_bar)
+
         self._stats_overlay = QLabel("", self.video)
         self._stats_overlay.setStyleSheet(
             "background: rgba(0,0,0,180); color: #ECECF1;"
@@ -365,19 +404,71 @@ class EmbeddedPlayer(QWidget):
         self._stats_timer.setInterval(1000)
         self._stats_timer.timeout.connect(self._update_stats_text)
 
-    # -- event filter ----------------------------------------------------------
+    # -- event filter (fullscreen overlay + pip bar on control hover) ---------
 
     def eventFilter(self, obj, event):
         if obj is self.video:
-            if event.type() == event.Type.MouseButtonDblClick:
-                self.double_clicked.emit()
-                return True
-            if event.type() == event.Type.MouseMove and self._fs_ui:
-                self._show_overlay()
+            if event.type() == event.Type.MouseMove:
+                if self._fs_ui:
+                    self._show_overlay()
+        elif obj is self.bar and self._pip_mode:
+            if event.type() in (event.Type.Enter, event.Type.MouseMove):
+                self._pip_bar_timer.start(self.PIP_BAR_HIDE_MS)
         elif self._fs_ui and event.type() in (event.Type.Enter,
                                               event.Type.MouseMove):
             self._overlay_timer.start()
         return super().eventFilter(obj, event)
+
+    # -- video mouse handlers (signals from _MpvGLWidget) ------------------
+
+    def _on_video_dbl_click(self) -> None:
+        if not self._drag_active:
+            self.double_clicked.emit()
+
+    def _on_video_press(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton and self._pip_mode:
+            self._drag_start = event.globalPosition().toPoint()
+            self._drag_win_pos = self.window().pos()
+            self._drag_active = False
+
+    def _on_video_move(self, event) -> None:
+        if self._pip_mode:
+            self._show_pip_bar()
+        if (self._drag_start is not None
+                and event.buttons() & Qt.MouseButton.LeftButton):
+            delta = event.globalPosition().toPoint() - self._drag_start
+            if not self._drag_active:
+                if abs(delta.x()) > 4 or abs(delta.y()) > 4:
+                    self._drag_active = True
+                else:
+                    return
+            self.window().move(self._drag_win_pos + delta)
+
+    def _on_video_release(self, event) -> None:
+        if (event.button() == Qt.MouseButton.LeftButton
+                and self._drag_start is not None):
+            self._drag_start = None
+            self._drag_active = False
+
+    # -- pip bar auto-hide -----------------------------------------------------
+
+    PIP_BAR_HIDE_MS = 2500
+
+    def set_pip_mode(self, enabled: bool) -> None:
+        self._pip_mode = enabled
+        if enabled:
+            self._show_pip_bar()
+        else:
+            self._pip_bar_timer.stop()
+            self.bar.show()
+
+    def _show_pip_bar(self) -> None:
+        self.bar.show()
+        self._pip_bar_timer.start(self.PIP_BAR_HIDE_MS)
+
+    def _hide_pip_bar(self) -> None:
+        if self._pip_mode:
+            self.bar.hide()
 
     # -- overlay ---------------------------------------------------------------
 
@@ -564,7 +655,7 @@ class EmbeddedPlayer(QWidget):
             pass
 
     def _sync_pause_label(self, paused: bool) -> None:
-        label = "▶" if paused else "⏸"
+        label = "▶" if paused else "‖"
         self.pause_btn.setText(label)
         self.fs_pause_btn.setText(label)
 
@@ -703,15 +794,28 @@ class EmbeddedPlayer(QWidget):
                 pass
             return "—"
 
+        hwdec = prop("hwdec-current")
+        if not hwdec or hwdec == "—":
+            hwdec = prop("hwdec")
+        if not hwdec or hwdec in ("—", "no"):
+            hwdec = "software"
+        dropped = prop("frame-drop-count", lambda v: str(int(v)))
+        vo_drops = prop("vo-drop-frame-count", lambda v: str(int(v)))
+        if dropped != "—" and vo_drops != "—":
+            dropped = f"{dropped} / {vo_drops} vo"
+
         lines = [
             f"Video: {track_info('video')}",
             f"Audio: {track_info('audio')}",
-            f"HW dec: {prop('hwdec-current')}",
+            f"HW dec: {hwdec}",
             f"A/V sync: {prop('avsync', lambda v: f'{v:.3f} s')}",
-            f"Dropped: {prop('frame-drop-count')}",
+            f"Dropped: {dropped}",
+            f"FPS: {prop('estimated-vf-fps', lambda v: f'{v:.1f}')}",
+            f"Bitrate: {prop('video-bitrate', lambda v: f'{v / 1000:.0f} kbps' if v else '—')}",
             f"Cache: {prop('demuxer-cache-duration', lambda v: f'{v:.1f} s')}",
-            f"Net: {prop('cache-speed', lambda v: f'{v / 1024:.0f} KB/s' if v else '—')}",
+            f"Net: {prop('cache-speed', lambda v: f'{v / 1024:.0f} KB/s' if v else '0 KB/s')}",
             f"Format: {prop('file-format')}",
+            f"Protocol: {prop('stream-path', lambda v: v.split('://')[0] if '://' in str(v) else str(v))}",
         ]
         self._stats_overlay.setText("\n".join(lines))
         self._place_stats()

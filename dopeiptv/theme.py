@@ -124,8 +124,9 @@ QPushButton#NavBtn:checked {{ background: {ACCENT}; color: white; font-weight: 6
 
 QListWidget {{
     background: transparent; border: none; outline: none; font-size: 13px;
+    color: {p['text2']};
 }}
-QListWidget::item {{ border-radius: 8px; padding: 7px 10px; margin: 1px 6px; color: {p['text2']}; }}
+QListWidget::item {{ border-radius: 8px; padding: 7px 10px; margin: 1px 6px; }}
 QListWidget::item:hover    {{ background: {p['hover']}; }}
 QListWidget::item:selected {{ background: {p['sel']}; color: {p['text']}; }}
 
@@ -184,7 +185,13 @@ QPushButton {{
 QPushButton:hover  {{ background: {p['btn_hover']}; }}
 QPushButton#Primary {{ background: {ACCENT}; border: none; color: white; }}
 QPushButton#Primary:hover {{ background: {p['accent_hi']}; }}
-QPushButton#MiniBtn {{ padding: 3px 6px; font-size: 11px; border-radius: 6px; }}
+QPushButton#MiniBtn {{
+    padding: 2px 4px; font-size: 10px; border-radius: 5px;
+    min-width: 18px; min-height: 18px; max-height: 18px; text-align: center;
+}}
+
+QSplitter::handle {{ background: transparent; width: 6px; }}
+QSplitter::handle:hover {{ background: {p['border_in']}; }}
 
 QScrollArea {{ background: transparent; border: none; }}
 QScrollArea > QWidget > QWidget {{ background: transparent; }}
@@ -226,8 +233,8 @@ QTabWidget::pane {{
     top: -1px;
 }}
 QTabBar::tab {{
-    background: transparent; color: {p['text2']}; padding: 7px 16px;
-    border-radius: 7px; margin: 2px; font-size: 12px;
+    background: transparent; color: {p['text2']}; padding: 7px 18px;
+    border-radius: 7px; margin: 2px; font-size: 12px; min-width: 60px;
 }}
 QTabBar::tab:selected {{ background: {p['btn']}; color: {p['text']}; }}
 QTabBar::tab:hover:!selected {{ background: {p['hover']}; }}
