@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import time
 import uuid
 from datetime import datetime
@@ -14,6 +15,24 @@ from typing import Any, Callable
 from PyQt6.QtCore import QObject, QSettings, QTimer, pyqtSignal
 
 from .client import find_player_executable
+
+
+def _bundled_ffmpeg() -> str | None:
+    """Path to an ffmpeg shipped inside a frozen (PyInstaller/AppImage) build.
+
+    The spec bundles the ffmpeg binary next to the executable so recording
+    works without a system install; it is not on PATH, so look for it here
+    before falling back to shutil.which().
+    """
+    if not getattr(sys, "frozen", False):
+        return None
+    exe = "ffmpeg.exe" if sys.platform == "win32" else "ffmpeg"
+    base = getattr(sys, "_MEIPASS", None) or os.path.dirname(sys.executable)
+    for cand in (os.path.join(base, exe),
+                 os.path.join(os.path.dirname(sys.executable), exe)):
+        if os.path.isfile(cand) and os.access(cand, os.X_OK):
+            return cand
+    return None
 
 
 def safe_filename(name: str | None) -> str:
@@ -111,7 +130,7 @@ class RecordingManager(QObject):
     @staticmethod
     def recorder() -> tuple[str | None, str | None]:
         """(kind, executable) of the available recorder, or (None, None)."""
-        ff = shutil.which("ffmpeg")
+        ff = _bundled_ffmpeg() or shutil.which("ffmpeg")
         if ff:
             return "ffmpeg", ff
         mpv = find_player_executable("mpv")

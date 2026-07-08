@@ -407,7 +407,7 @@ class MainWindow(QMainWindow):
         for w in (self.now_time, self.now_title, self.now_bar, self.now_desc):
             nc.addWidget(w)
         self.now_card.hide()
-        header_row.addWidget(self.now_card, 1)
+        header_row.addWidget(self.now_card, 1, Qt.AlignmentFlag.AlignTop)
 
         # Movie/series synopsis + metadata, shown to the *right* of the
         # poster (only one of now_card / media_info is ever visible, since
@@ -443,7 +443,12 @@ class MainWindow(QMainWindow):
         mi.addStretch(1)
         self.media_info.setWidget(mi_holder)
         self.media_info.hide()
-        header_row.addWidget(self.media_info, 1)
+        # Pin the info card's top to the poster's top. Without AlignTop the
+        # card (shorter than the poster column once the Play button and its
+        # stretch are added) gets vertically centered in the row and sits
+        # visibly lower than the poster.
+        header_row.addWidget(self.media_info, 1, Qt.AlignmentFlag.AlignTop)
+        header_row.setAlignment(Qt.AlignmentFlag.AlignTop)
         dl.addLayout(header_row)
 
         self.cast_scroll = QScrollArea()

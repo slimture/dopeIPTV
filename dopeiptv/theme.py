@@ -186,8 +186,7 @@ QPushButton:hover  {{ background: {p['btn_hover']}; }}
 QPushButton#Primary {{ background: {ACCENT}; border: none; color: white; }}
 QPushButton#Primary:hover {{ background: {p['accent_hi']}; }}
 QPushButton#MiniBtn {{
-    padding: 2px 4px; font-size: 10px; border-radius: 5px;
-    min-width: 18px; min-height: 18px; max-height: 18px; text-align: center;
+    padding: 0; font-size: 13px; border-radius: 6px; text-align: center;
 }}
 
 QSplitter::handle {{ background: transparent; width: 6px; }}

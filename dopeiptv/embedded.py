@@ -181,6 +181,7 @@ class EmbeddedPlayer(QWidget):
 
     OVERLAY_HIDE_MS = 3000
     VIDEO_BOX_HEIGHT = 260
+    MINIBTN = 28
 
     def __init__(self, parent: QWidget | None = None,
                  settings=None) -> None:
@@ -363,6 +364,25 @@ class EmbeddedPlayer(QWidget):
                     self.fs_exit_btn):
             wdg.setMouseTracking(True)
             wdg.installEventFilter(self)
+
+        # Give every control-bar button the exact same square size so the
+        # glyphs line up on one baseline instead of each button sizing to
+        # its own glyph (which left them at slightly different heights and
+        # off the shared line). The one text button (PiP) keeps its width
+        # but shares the height; the volume sliders match the height too.
+        m = self.MINIBTN
+        for b in (self.prev_btn, self.next_btn, self.pause_btn, self.back_btn,
+                  self.fwd_btn, self.ts_btn, self.rec_btn, self.opts_btn,
+                  self.stop_btn, self.fs_btn, self.mute_btn,
+                  self.fs_prev_btn, self.fs_next_btn, self.fs_pause_btn,
+                  self.fs_back_btn, self.fs_fwd_btn, self.fs_ts_btn,
+                  self.fs_rec_btn, self.fs_opts_btn, self.fs_exit_btn,
+                  self.fs_mute_btn):
+            b.setFixedSize(m, m)
+        self.pip_btn.setFixedHeight(m)
+        self.pip_btn.setMinimumWidth(m)
+        for s in (self.vol, self.fs_vol):
+            s.setFixedHeight(m)
 
         self._pos_timer = QTimer(self)
         self._pos_timer.setInterval(500)
