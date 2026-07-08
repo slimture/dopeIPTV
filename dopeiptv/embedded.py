@@ -434,7 +434,11 @@ class EmbeddedPlayer(QWidget):
         self.video = _MpvGLWidget(self)
         self.video.installEventFilter(self)
         self.video.setMouseTracking(True)
-        self.video.playback_error.connect(self.playback_error)
+        # Route mpv errors through a filter so a user-initiated stop doesn't
+        # surface the "aborted / loading failed" mpv fires while it winds
+        # the stream down as a "Stream error" toast.
+        self._stopping = False
+        self.video.playback_error.connect(self._on_playback_error)
         self.video.video_dbl_click.connect(self._on_video_dbl_click)
         self.video.video_mouse_press.connect(self._on_video_press)
         self.video.video_mouse_move.connect(self._on_video_move)
@@ -701,6 +705,20 @@ class EmbeddedPlayer(QWidget):
         self._pip_bar_timer.setSingleShot(True)
         self._pip_bar_timer.timeout.connect(self._hide_pip_bar)
 
+        # Black cover widget that sits over the mpv render surface when we
+        # want the pane to be visibly black. Painted with a plain QPalette
+        # background so it works even if GL cleaning is unreliable on the
+        # user's compositor (Wayland's KDE/Hyprland stack sometimes still
+        # shows the last mpv frame or tearing artefacts through paintGL's
+        # glClear). setAutoFillBackground guarantees Qt fills it every paint.
+        self._blackout = QWidget(self.video)
+        self._blackout.setAutoFillBackground(True)
+        pal = self._blackout.palette()
+        pal.setColor(self._blackout.backgroundRole(), QColor(0, 0, 0))
+        self._blackout.setPalette(pal)
+        self._blackout.hide()
+        self._blackout.installEventFilter(self)  # forward mouse to controls
+
         self._stats_overlay = QLabel("", self.video)
         self._stats_overlay.setStyleSheet(
             "background: rgba(0,0,0,180); color: #ECECF1;"
@@ -794,6 +812,14 @@ class EmbeddedPlayer(QWidget):
 
     def _on_video_dbl_click(self) -> None:
         self.double_clicked.emit()
+
+    def _on_playback_error(self, msg: str) -> None:
+        # Suppress the aborted-playback / "loading failed" mpv fires while a
+        # user-initiated stop unwinds the current stream. Any error after
+        # play() has cleared the flag is a real one and gets forwarded.
+        if self._stopping:
+            return
+        self.playback_error.emit(msg)
 
     def _resize_edges_for_window(self, local_pos, source_widget):
         """Map a local mouse position to window-level edge flags for PiP resize."""
@@ -1036,6 +1062,8 @@ class EmbeddedPlayer(QWidget):
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         self._lock_video_box()
+        if self._blackout.isVisible():
+            self._blackout.setGeometry(self.video.rect())
         if self.overlay.isVisible() or self.fs_controls.isVisible():
             self._place_overlay()
         if self.seek_overlay.isVisible():
@@ -1097,6 +1125,10 @@ class EmbeddedPlayer(QWidget):
 
     def play(self, url: str, title: str, start: float = 0.0) -> bool:
         try:
+            # Fresh play cycle - drop the stop-in-progress flag so any real
+            # error from this new stream (auth failed, 404, ...) is surfaced.
+            self._stopping = False
+            self._blackout.hide()
             self.video.set_blank(False)
             self.title_lbl.setText(title or "")
             self._hide_seek_ui()
@@ -1536,6 +1568,11 @@ class EmbeddedPlayer(QWidget):
         # context that libmpv has already begun tearing down and segfault the
         # whole app. Blanking first makes any late repaint a harmless clear.
         self.video.set_blank(True)
+        # Flag "we are stopping" so the playback-error handler ignores the
+        # aborted-playback messages libmpv fires while it winds the current
+        # stream down - without this, a user-initiated stop shows a scary
+        # "Stream error: loading failed" toast.
+        self._stopping = True
         m = self.video.mpv
         if m is not None:
             # Disable mpv's video output too, so nothing at all renders back
@@ -1545,13 +1582,11 @@ class EmbeddedPlayer(QWidget):
                 m["vid"] = "no"
             except Exception:
                 pass
-            # Clear the playlist BEFORE issuing stop so mpv releases the
-            # current file cleanly (with just "stop" mpv may keep the last
-            # decoded frame in its render pipeline). loadfile with a null
-            # source then guarantees the render context is fed an empty
-            # frame instead of the previous one.
-            for cmd in (("playlist-clear",), ("stop",),
-                        ("loadfile", "null:", "replace")):
+            # Clear the playlist and issue stop. (Feeding mpv a null: source
+            # to force a black frame turned out to be wrong: mpv rejects it
+            # and fires a "loading failed" error that the UI showed to the
+            # user on every manual stop.)
+            for cmd in (("playlist-clear",), ("stop",)):
                 try:
                     m.command(*cmd)
                 except Exception:
@@ -1571,6 +1606,12 @@ class EmbeddedPlayer(QWidget):
         QTimer.singleShot(0, self.video.update)
         QTimer.singleShot(80, self.video.update)
         QTimer.singleShot(240, self.video.update)
+        # Show the raster-painted black cover on top of the GL surface. This
+        # is what actually makes the pane genuinely black on compositors
+        # where paintGL's glClear alone isn't enough.
+        self._blackout.setGeometry(self.video.rect())
+        self._blackout.show()
+        self._blackout.raise_()
 
     def shutdown(self) -> None:
         self.stop_stream_record()
