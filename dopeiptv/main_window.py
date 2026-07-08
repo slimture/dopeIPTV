@@ -32,6 +32,7 @@ from .dialogs import (
 )
 from .embedded import EmbeddedPlayer
 from .epg import XmltvGuide, epg_cache_path
+from .metadata import PosterResolver, TmdbClient
 from .players import (
     MpvIpcPlayer, MpvWindowPlayer, _libmpv, embedded_playback_reason,
     embedded_playback_supported, launch_player,
@@ -42,6 +43,7 @@ from .stores import (
     ParentalControl, PlaylistStore,
 )
 from .theme import ACCENT, ACCENTS, P, THEMES, apply_theme, build_style
+from .trakt import TraktAuthError, TraktClient
 from .wakelock import WakeLock
 from .workers import LogoLoader, run_async
 
@@ -80,6 +82,10 @@ class MainWindow(QMainWindow):
         self.rec.jobs_changed.connect(self._recordings_changed)
         self.rec.recording_stopped.connect(self._on_recording_stopped)
         self.wake = WakeLock()
+        self.tmdb: PosterResolver | None = None
+        self._init_metadata_provider()
+        self.trakt = TraktClient(settings)
+        self._trakt_active: dict | None = None
         self._raw_categories: list = []
         self.mpv = MpvIpcPlayer()
         self.mpv_window = MpvWindowPlayer() if _libmpv is not None else None
@@ -302,6 +308,7 @@ class MainWindow(QMainWindow):
                 lambda: self.rec.finish_all_inplayer("playback stopped"))
             self.player.stop_btn.clicked.connect(
                 lambda: self.wake.release())
+            self.player.stop_btn.clicked.connect(self._trakt_stop_current)
             self.player.playback_error.connect(self._playback_error)
             self.player.zap.connect(self._zap)
             self.player.pip_requested.connect(self._toggle_pip)
@@ -831,6 +838,206 @@ class MainWindow(QMainWindow):
             return
         run_async(self.pool, self.xmltv.ensure_loaded,
                   lambda ok: self.list_model.refresh_all() if ok else None)
+
+    # -- metadata (TMDB artwork) -----------------------------------------------------
+
+    def _init_metadata_provider(self) -> None:
+        self.tmdb = None
+        if self.settings.value("metadata_source", "playlist") != "tmdb":
+            return
+        key = self.settings.value("tmdb_api_key", "") or ""
+        if not key:
+            return
+        self.tmdb = PosterResolver(self.pool, self.settings, TmdbClient(key))
+
+    def poster_for(self, it, kind: str) -> str | None:
+        if not self.tmdb or kind not in ("vod", "series"):
+            return None
+        title = it.get("name") or it.get("title") or ""
+        if not title:
+            return None
+        return self.tmdb.get(title, kind,
+                             lambda _url: self.list_model.refresh_all())
+
+    # -- trakt scrobbling -------------------------------------------------------------
+
+    def _trakt_start_for_item(self, kind: str, item) -> None:
+        if not item or not self.trakt.is_connected():
+            return
+        if kind == "movie":
+            title = item.get("name") or item.get("title") or ""
+            if not title:
+                return
+
+            def job(title=title):
+                movie = self.trakt.find_movie(title)
+                if not movie:
+                    return None
+                payload = {"movie": movie}
+                self.trakt.scrobble_start(payload, 0.0)
+                return payload
+
+        elif kind == "episode":
+            show_title = ((self.series_ctx or {}).get("name")
+                          or (self.series_ctx or {}).get("title") or "")
+            try:
+                season = int(item.get("season"))
+                episode = int(item.get("episode_num"))
+            except (TypeError, ValueError):
+                return
+            if not show_title:
+                return
+
+            def job(show_title=show_title, season=season, episode=episode):
+                ep = self.trakt.find_episode(show_title, season, episode)
+                if not ep:
+                    return None
+                payload = {"episode": ep}
+                self.trakt.scrobble_start(payload, 0.0)
+                return payload
+        else:
+            return
+
+        def done(payload):
+            if payload:
+                self._trakt_active = {"payload": payload}
+
+        run_async(self.pool, job, done, lambda _e: None)
+
+    def _trakt_stop_current(self) -> None:
+        if not self._trakt_active:
+            return
+        active = self._trakt_active
+        self._trakt_active = None
+        progress = self.player.progress_percent() if self.player else 0.0
+
+        def job(active=active, progress=progress):
+            self.trakt.scrobble_stop(active["payload"], progress)
+
+        run_async(self.pool, job, lambda _r: None, lambda _e: None)
+
+    def _trakt_device_auth_dialog(self, parent) -> None:
+        d = QDialog(parent)
+        d.setWindowTitle("Connect to Trakt")
+        d.setMinimumWidth(380)
+        lay = QVBoxLayout(d)
+        info = QLabel("Requesting a device code...")
+        info.setWordWrap(True)
+        info.setStyleSheet("font-size:13px;")
+        lay.addWidget(info)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel)
+        buttons.rejected.connect(d.reject)
+        lay.addWidget(buttons)
+
+        state = {"cancelled": False, "device_code": None,
+                 "interval": 5, "expires_at": 0.0}
+
+        def poll() -> None:
+            if state["cancelled"] or not state["device_code"]:
+                return
+            if time.time() > state["expires_at"]:
+                info.setText("Code expired - try again.")
+                return
+            run_async(self.pool,
+                      lambda: self.trakt.poll_device_token(
+                          state["device_code"]),
+                      poll_done, poll_failed)
+
+        def poll_done(data) -> None:
+            if state["cancelled"]:
+                return
+            if data is None:
+                QTimer.singleShot(state["interval"] * 1000, poll)
+                return
+            info.setText("Connected to Trakt!")
+            QTimer.singleShot(700, d.accept)
+
+        def poll_failed(msg) -> None:
+            if not state["cancelled"]:
+                info.setText(f"Trakt login failed: {msg}")
+
+        def started(data) -> None:
+            if state["cancelled"]:
+                return
+            state["device_code"] = data["device_code"]
+            state["interval"] = data.get("interval", 5)
+            state["expires_at"] = time.time() + data.get("expires_in", 600)
+            info.setText(
+                f"Go to <b>{data.get('verification_url')}</b> and enter "
+                f"this code:<br><br><span style='font-size:20px; "
+                f"font-weight:700;'>{data['user_code']}</span>")
+            QTimer.singleShot(state["interval"] * 1000, poll)
+
+        def start_failed(msg) -> None:
+            if not state["cancelled"]:
+                info.setText(f"Could not start Trakt login: {msg}")
+
+        buttons.rejected.connect(lambda: state.__setitem__("cancelled", True))
+        run_async(self.pool, self.trakt.start_device_auth,
+                  started, start_failed)
+        d.exec()
+
+    def _open_trakt_dialog(self, parent) -> None:
+        if not self.trakt.is_connected():
+            QMessageBox.information(
+                parent, "Trakt", "Connect to Trakt first.")
+            return
+        d = QDialog(parent)
+        d.setWindowTitle("Trakt Watchlist & History")
+        d.setMinimumSize(480, 500)
+        lay = QVBoxLayout(d)
+        tw = QTabWidget()
+        lay.addWidget(tw)
+        wl_list = QListWidget()
+        hist_list = QListWidget()
+        tw.addTab(wl_list, "Watchlist")
+        tw.addTab(hist_list, "History")
+        status = QLabel("Loading...")
+        status.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        lay.addWidget(status)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(d.reject)
+        buttons.accepted.connect(d.accept)
+        lay.addWidget(buttons)
+
+        def fmt_watchlist(e) -> str:
+            for kind in ("movie", "show"):
+                if e.get(kind):
+                    x = e[kind]
+                    return f"{x.get('title')} ({x.get('year') or '?'})"
+            return "?"
+
+        def fmt_history(e) -> str:
+            watched = (e.get("watched_at") or "")[:10]
+            if e.get("movie"):
+                m = e["movie"]
+                return f"{watched}  {m.get('title')} ({m.get('year') or '?'})"
+            if e.get("episode") and e.get("show"):
+                ep, s = e["episode"], e["show"]
+                return (f"{watched}  {s.get('title')} "
+                        f"S{ep.get('season')}E{ep.get('number')} - "
+                        f"{ep.get('title') or ''}")
+            return watched or "?"
+
+        def load_failed(msg) -> None:
+            status.setText(f"Could not load Trakt data: {msg}")
+
+        def load_history(items) -> None:
+            hist_list.clear()
+            for e in items:
+                hist_list.addItem(fmt_history(e))
+            status.setText("")
+
+        def load_watchlist(items) -> None:
+            wl_list.clear()
+            for e in items:
+                wl_list.addItem(fmt_watchlist(e))
+            run_async(self.pool, lambda: self.trakt.history(50),
+                      load_history, load_failed)
+
+        run_async(self.pool, self.trakt.watchlist,
+                  load_watchlist, load_failed)
+        d.exec()
 
     # -- list and filtering --------------------------------------------------------
 
@@ -1392,8 +1599,11 @@ class MainWindow(QMainWindow):
                         item=None) -> None:
         if not self._guard_stream_switch(url, title):
             return
+        self._trakt_stop_current()
         if record and kind:
             self.history.add(url, title, icon_url, key, kind)
+        if kind in ("movie", "episode"):
+            self._trakt_start_for_item(kind, item)
         self.stream_error.hide()
         self._playing_item = item if kind == "live" else None
         self._sync_player_buttons()
@@ -1447,6 +1657,7 @@ class MainWindow(QMainWindow):
     def _playback_error(self, msg: str) -> None:
         self.rec.finish_all_inplayer("stream error")
         self.wake.release()
+        self._trakt_active = None
         if self.player:
             self.player.current_url = None
         self._set_status(f"Stream error: {msg}", error=True)
@@ -2716,6 +2927,93 @@ class MainWindow(QMainWindow):
         recv.addStretch()
         tabs.addTab(rec_tab, "Recording")
 
+        # Metadata tab (TMDB artwork)
+        meta_tab = QWidget()
+        mf = QFormLayout(meta_tab)
+        mf.setSpacing(10)
+        meta_source_box = self._combo(
+            [("playlist", "Playlist (provider artwork)"),
+             ("tmdb", "TMDB (fetch posters by title)")],
+            self.settings.value("metadata_source", "playlist"))
+        tmdb_key_edit = QLineEdit(self.settings.value("tmdb_api_key", ""))
+        tmdb_key_edit.setPlaceholderText("TMDB API key (v3 auth)")
+        mf.addRow("Artwork source", meta_source_box)
+        mf.addRow("TMDB API key", tmdb_key_edit)
+        meta_hint = QLabel(
+            "Get a free key at themoviedb.org -> Settings -> API. "
+            "Posters are matched by title and cached, so lookups "
+            "only happen once per movie/series.")
+        meta_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        meta_hint.setWordWrap(True)
+        mf.addRow(meta_hint)
+        tabs.addTab(meta_tab, "Metadata")
+
+        # Trakt tab
+        trakt_tab = QWidget()
+        tf = QVBoxLayout(trakt_tab)
+        tf.setSpacing(10)
+        tform = QFormLayout()
+        tform.setSpacing(10)
+        trakt_id_edit = QLineEdit(self.trakt.client_id)
+        trakt_id_edit.setPlaceholderText("Trakt Client ID")
+        trakt_secret_edit = QLineEdit(self.trakt.client_secret)
+        trakt_secret_edit.setPlaceholderText("Trakt Client Secret")
+        trakt_secret_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        tform.addRow("Client ID", trakt_id_edit)
+        tform.addRow("Client Secret", trakt_secret_edit)
+        tf.addLayout(tform)
+        trakt_status = QLabel()
+        trakt_status.setWordWrap(True)
+        tf.addWidget(trakt_status)
+        trakt_btns = QHBoxLayout()
+        trakt_connect_btn = QPushButton("Connect to Trakt...")
+        trakt_disconnect_btn = QPushButton("Disconnect")
+        trakt_watchlist_btn = QPushButton("Watchlist / History...")
+        trakt_btns.addWidget(trakt_connect_btn)
+        trakt_btns.addWidget(trakt_disconnect_btn)
+        trakt_btns.addWidget(trakt_watchlist_btn)
+        trakt_btns.addStretch()
+        tf.addLayout(trakt_btns)
+        trakt_hint = QLabel(
+            "Create a free API app at trakt.tv/oauth/applications "
+            "to get a Client ID and Secret (redirect URI doesn't "
+            "matter - device login is used). While connected, "
+            "movies/episodes you play are scrobbled to Trakt.")
+        trakt_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        trakt_hint.setWordWrap(True)
+        tf.addWidget(trakt_hint)
+        tf.addStretch()
+
+        def refresh_trakt_status():
+            if self.trakt.is_connected():
+                trakt_status.setText("Connected to Trakt.")
+            else:
+                trakt_status.setText("Not connected.")
+            trakt_disconnect_btn.setEnabled(self.trakt.is_connected())
+
+        def do_trakt_connect():
+            self.settings.setValue(
+                "trakt_client_id", trakt_id_edit.text().strip())
+            self.settings.setValue(
+                "trakt_client_secret", trakt_secret_edit.text().strip())
+            if not self.trakt.client_id or not self.trakt.client_secret:
+                QMessageBox.warning(
+                    d, "Trakt", "Enter a Client ID and Client Secret first.")
+                return
+            self._trakt_device_auth_dialog(d)
+            refresh_trakt_status()
+
+        def do_trakt_disconnect():
+            self.trakt.disconnect()
+            refresh_trakt_status()
+
+        trakt_connect_btn.clicked.connect(do_trakt_connect)
+        trakt_disconnect_btn.clicked.connect(do_trakt_disconnect)
+        trakt_watchlist_btn.clicked.connect(
+            lambda: self._open_trakt_dialog(d))
+        refresh_trakt_status()
+        tabs.addTab(trakt_tab, "Trakt")
+
         def refresh_pin_status():
             if self.parental.has_pin():
                 state = ("unlocked for this session"
@@ -2938,9 +3236,19 @@ class MainWindow(QMainWindow):
                 "rec_max_value", val if val > 0 else "")
             self.settings.setValue(
                 "rec_max_unit", rec_max_unit.currentData())
+            self.settings.setValue(
+                "metadata_source", meta_source_box.currentData())
+            self.settings.setValue(
+                "tmdb_api_key", tmdb_key_edit.text().strip())
+            self._init_metadata_provider()
+            self.settings.setValue(
+                "trakt_client_id", trakt_id_edit.text().strip())
+            self.settings.setValue(
+                "trakt_client_secret", trakt_secret_edit.text().strip())
             if self.player:
                 self.player.apply_default_options()
             self._apply_view_settings()
+            self.list_model.refresh_all()
 
     def show_about(self) -> None:
         QMessageBox.about(
@@ -3003,6 +3311,13 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:
         self.wake.release()
+        if self._trakt_active:
+            active = self._trakt_active
+            progress = self.player.progress_percent() if self.player else 0.0
+            threading.Thread(
+                target=lambda: self.trakt.scrobble_stop(
+                    active["payload"], progress),
+                daemon=True).start()
         self.rec.shutdown()
         if self.player:
             self.player.shutdown()

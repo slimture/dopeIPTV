@@ -897,6 +897,19 @@ class EmbeddedPlayer(QWidget):
         for btn in (self.fs_back_btn, self.fs_fwd_btn):
             btn.setVisible(True)
 
+    def progress_percent(self) -> float:
+        m = self.video.mpv
+        if m is None:
+            return 0.0
+        try:
+            dur = m.duration
+            pos = m.playback_time
+        except Exception:
+            return 0.0
+        if not dur:
+            return 0.0
+        return max(0.0, min(100.0, 100.0 * (pos or 0) / dur))
+
     # -- volume ----------------------------------------------------------------
 
     def _set_volume(self, value: int) -> None:
