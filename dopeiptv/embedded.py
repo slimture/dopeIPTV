@@ -201,6 +201,11 @@ class EmbeddedPlayer(QWidget):
     def __init__(self, parent: QWidget | None = None,
                  settings=None) -> None:
         super().__init__(parent)
+        # Initialised up front because eventFilter() reads them, and events
+        # can be delivered to the filtered widgets (e.g. font/style changes
+        # on the control bar) while the rest of __init__ is still running.
+        self._fs_ui = False
+        self._pip_mode = False
         self._settings = settings
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
