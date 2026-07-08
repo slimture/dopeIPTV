@@ -424,6 +424,9 @@ class MainWindow(QMainWindow):
     def _toggle_player_fullscreen(self) -> None:
         if not self.player or not self.player.isVisible():
             return
+        if self._pip_win is not None:
+            self._exit_pip()
+            return
         now = time.time()
         if now - getattr(self, "_fs_toggled_at", 0.0) < 0.4:
             return
@@ -514,9 +517,11 @@ class MainWindow(QMainWindow):
         self.menuBar().hide()
         self.player.pip_btn.setToolTip("Exit Picture-in-Picture")
         self.player.fs_btn.hide()
+        self.player.video.setMinimumHeight(0)
 
         if self.isFullScreen() or self.isMaximized():
             self.showNormal()
+        self.setMinimumSize(240, 135)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         self.show()
         self.resize(480, 270)
@@ -528,6 +533,8 @@ class MainWindow(QMainWindow):
             return
         self._pip_win = None
 
+        self.player.video.setMinimumHeight(190)
+        self.setMinimumSize(0, 0)
         self._side.show()
         self._mid.show()
         for w in getattr(self, "_pip_det_hidden", []):
