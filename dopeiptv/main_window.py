@@ -61,6 +61,44 @@ class _ClickableWidget(QWidget):
         super().mousePressEvent(event)
 
 
+class _Toast(QLabel):
+    """Non-intrusive overlay notification that fades away after a few seconds."""
+
+    DURATION_MS = 3500
+
+    def __init__(self, parent: QWidget) -> None:
+        super().__init__(parent)
+        self.setWordWrap(True)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setStyleSheet(
+            f"background: rgba(30,30,36,220); color: #ECECF1;"
+            f"border-radius: 10px; padding: 10px 18px;"
+            f"font-size: 12px; font-weight: 500;")
+        self.hide()
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self._dismiss)
+
+    def show_message(self, text: str, duration_ms: int = 0) -> None:
+        self.setText(text)
+        self.adjustSize()
+        self.setFixedWidth(min(320, max(180, self.sizeHint().width() + 20)))
+        self.adjustSize()
+        self._place()
+        self.show()
+        self.raise_()
+        self._timer.start(duration_ms or self.DURATION_MS)
+
+    def _place(self) -> None:
+        p = self.parent()
+        if p:
+            self.move((p.width() - self.width()) // 2,
+                      p.height() - self.height() - 30)
+
+    def _dismiss(self) -> None:
+        self.hide()
+
+
 class MainWindow(QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
@@ -418,10 +456,6 @@ class MainWindow(QMainWindow):
         self.media_info.setWidgetResizable(True)
         self.media_info.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.media_info.setMaximumHeight(self.POSTER_SIZE_MEDIA[1])
-        # A QScrollArea doesn't match the QFrame#Card theme rule, so give
-        # it the same card background/border explicitly for consistency
-        # with the live "now playing" card.
         self.media_info.setStyleSheet(
             f"QScrollArea {{ background:{P['input']}; "
             f"border:1px solid {P['border_in']}; border-radius:12px; }}")
@@ -490,6 +524,7 @@ class MainWindow(QMainWindow):
         root.setStretchFactor(2, 0)
         det.setMinimumWidth(280)
         self._side, self._mid, self._det = side, mid, det
+        self._toast = _Toast(root)
 
         self.tick = QTimer(self)
         self.tick.timeout.connect(self._refresh_progress)
@@ -730,6 +765,7 @@ class MainWindow(QMainWindow):
             progress_cb=self.epg_progress.emit)
         self._info_cache.clear()
         self._set_status("Refreshing playlist...")
+        self._show_toast("Refreshing playlist...")
         self._load_categories()
         run_async(
             self.pool, lambda: self.xmltv.ensure_loaded(force=True),
@@ -743,6 +779,7 @@ class MainWindow(QMainWindow):
             return
         self.loading_bar.show()
         self._set_status(f"Connecting to {pl['name']}...")
+        self._show_toast(f"Connecting to {pl['name']}...")
         candidate = XtreamClient(pl["server"], pl["username"], pl["password"])
 
         def done(_auth):
@@ -1259,6 +1296,7 @@ class MainWindow(QMainWindow):
         self._clear_cast_row()
         self._clear_epg_rows()
         self._current_epg = None
+        self._tmdb_details = None
         if not it:
             self._detail_name = "Select something from the list"
             self.d_logo.setFixedSize(*self.POSTER_SIZE_LIVE)
@@ -1354,6 +1392,7 @@ class MainWindow(QMainWindow):
             self.poster_art.get(fallback_url, self._set_detail_logo)
 
     def _apply_media_card(self, details: dict) -> None:
+        self._tmdb_details = details
         rating = details.get("rating")
         imdb_id = details.get("imdb_id")
         cast = details.get("cast") or []
@@ -1381,6 +1420,9 @@ class MainWindow(QMainWindow):
             self.cast_scroll.show()
         else:
             self.cast_scroll.hide()
+        if (details.get("overview") or details.get("genres")) \
+                and not self.media_info.isVisible():
+            self._show_media_info({}, self._current_key)
 
     CAST_PHOTO_SIZE = 56
 
@@ -1548,10 +1590,43 @@ class MainWindow(QMainWindow):
         dialog.accept()
         if kind == "vod":
             self.switch_mode("vod")
-            self.play_item(it, "mpv")
+            self._navigate_to_item(it, "vod")
         else:
             self.switch_mode("series")
-            self._enter_series(it)
+            self._navigate_to_item(it, "series")
+
+    def _navigate_to_item(self, target, mode: str) -> None:
+        """Switch to the right category and scroll/select a specific item."""
+        cat_id = str(target.get("category_id") or "")
+        for i in range(self.cat_list.count()):
+            ci = self.cat_list.item(i)
+            if ci and str(ci.data(Qt.ItemDataRole.UserRole) or "") == cat_id:
+                self.cat_list.setCurrentRow(i)
+                break
+        else:
+            self.cat_list.setCurrentRow(0)
+
+        target_key = self._item_key(target)
+
+        def after_load(target_key=target_key, target=target):
+            for row in range(self.list_model.rowCount()):
+                it = self.list_model.item_at(row)
+                if it and self._item_key(it) == target_key:
+                    idx = self.list_model.index(row)
+                    self.listw.setCurrentIndex(idx)
+                    self.listw.scrollTo(
+                        idx, QAbstractItemView.ScrollHint.PositionAtCenter)
+                    if mode == "series":
+                        self._enter_series(it)
+                    else:
+                        self.play_item(it, "mpv")
+                    return
+            if mode == "series":
+                self._enter_series(target)
+            else:
+                self.play_item(target, "mpv")
+
+        QTimer.singleShot(300, after_load)
 
     def _clear_epg_rows(self) -> None:
         while self.epg_lay.count() > 1:
@@ -1622,17 +1697,20 @@ class MainWindow(QMainWindow):
         if key != self._current_key:
             return
         self._clear_epg_rows()
+        td = self._tmdb_details or {}
         plot = str(
-            info.get("plot") or info.get("description") or "").strip()
+            info.get("plot") or info.get("description")
+            or td.get("overview") or "").strip()
         self.media_plot.setText(plot)
         self.media_plot.setVisible(bool(plot))
 
         parts: list[str] = []
         simple = (
-            ("Genre", info.get("genre")),
+            ("Genre", info.get("genre") or td.get("genres")),
             ("Director", info.get("director")),
             ("Released",
-             info.get("releasedate") or info.get("releaseDate")),
+             info.get("releasedate") or info.get("releaseDate")
+             or td.get("release_date")),
             ("Duration", info.get("duration")),
             ("Rating", info.get("rating")),
         )
@@ -1644,9 +1722,6 @@ class MainWindow(QMainWindow):
         if cast:
             names = [n.strip() for n in cast.split(",") if n.strip()]
             if self.tmdb:
-                # Each provider cast name becomes a clickable link that
-                # resolves the actor on TMDB and lists their other titles
-                # from this playlist - the same action as the photo chips.
                 rendered = [
                     f'<a href="cast:{html.escape(n)}" '
                     f'style="color:{ACCENT}; text-decoration:none;">'
@@ -1654,6 +1729,15 @@ class MainWindow(QMainWindow):
             else:
                 rendered = [html.escape(n) for n in names]
             parts.append("<b>Cast:</b> " + ", ".join(rendered))
+        elif self.tmdb and td.get("cast"):
+            names = [c.get("name") for c in td["cast"]
+                     if c.get("name")]
+            rendered = [
+                f'<a href="cast:{html.escape(n)}" '
+                f'style="color:{ACCENT}; text-decoration:none;">'
+                f'{html.escape(n)}</a>' for n in names]
+            if rendered:
+                parts.append("<b>Cast:</b> " + ", ".join(rendered))
         self.media_meta.setText("<br>".join(parts))
         self.media_meta.setVisible(bool(parts))
 
@@ -1936,6 +2020,7 @@ class MainWindow(QMainWindow):
         self.listw.viewport().update()
         self.setWindowTitle(title or self._base_title)
         self._set_status(f"Playing: {title}")
+        self._show_toast(f"Playing: {title}")
         mode = self.playback_mode()
         print(f"[dopeIPTV] Playing via mode={mode} "
               f"(embedded pane: {'yes' if self.player else 'no'})",
@@ -1967,6 +2052,9 @@ class MainWindow(QMainWindow):
         QMessageBox.warning(
             self, "Player not found",
             f"{name} was not found. Install it and try again.")
+
+    def _show_toast(self, text: str, duration_ms: int = 0) -> None:
+        self._toast.show_message(text, duration_ms)
 
     def _set_status(self, text: str, error: bool = False) -> None:
         self.count_lbl.setStyleSheet(
@@ -3814,6 +3902,8 @@ class MainWindow(QMainWindow):
         self.loading_bar.show()
         if value >= 0:
             self._set_status(f"Loading programme guide... {value}%")
+        if value == 0:
+            self._show_toast("Loading programme guide...")
         if value < 0:
             self.loading_bar.setRange(0, 0)
         else:

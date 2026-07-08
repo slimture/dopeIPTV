@@ -66,11 +66,17 @@ class TmdbClient:
             })
             if len(cast) == 8:
                 break
+        genres = ", ".join(g.get("name", "") for g in d.get("genres") or []
+                          if g.get("name"))
+        release = (d.get("release_date") or d.get("first_air_date") or "")
         return {
             "poster_url": f"{self.IMG_BASE}{poster_path}" if poster_path else None,
             "rating": d.get("vote_average") or None,
             "imdb_id": (d.get("external_ids") or {}).get("imdb_id"),
             "cast": cast,
+            "overview": d.get("overview") or "",
+            "genres": genres,
+            "release_date": release,
         }
 
     def person_credits(self, person_id: int) -> list[str]:

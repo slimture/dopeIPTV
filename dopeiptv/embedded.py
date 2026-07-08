@@ -205,6 +205,7 @@ class EmbeddedPlayer(QWidget):
         bl = QHBoxLayout(self.bar)
         bl.setContentsMargins(4, 2, 4, 2)
         bl.setSpacing(8)
+        bl.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         self.prev_btn = QPushButton("◀", objectName="MiniBtn")
         self.prev_btn.setToolTip("Previous channel (Ctrl+Left)")
         self.prev_btn.clicked.connect(lambda: self.zap.emit(-1))
@@ -431,6 +432,25 @@ class EmbeddedPlayer(QWidget):
         elif obj is self.bar and self._pip_mode:
             if event.type() in (event.Type.Enter, event.Type.MouseMove):
                 self._pip_bar_timer.start(self.PIP_BAR_HIDE_MS)
+                if event.type() == event.Type.MouseMove:
+                    try:
+                        pos = event.position().toPoint()
+                    except Exception:
+                        pos = event.pos()
+                    edges = self._resize_edges_for_window(pos, self.bar)
+                    cursor = self._EDGE_CURSORS.get(edges)
+                    self.bar.setCursor(
+                        cursor if cursor else Qt.CursorShape.ArrowCursor)
+            elif event.type() == event.Type.MouseButtonPress:
+                try:
+                    pos = event.position().toPoint()
+                except Exception:
+                    pos = event.pos()
+                edges = self._resize_edges_for_window(pos, self.bar)
+                win = self.window().windowHandle()
+                if edges and win:
+                    win.startSystemResize(edges)
+                    return True
         elif self._fs_ui and event.type() in (event.Type.Enter,
                                               event.Type.MouseMove):
             self._overlay_timer.start()
@@ -443,15 +463,18 @@ class EmbeddedPlayer(QWidget):
     def _on_video_dbl_click(self) -> None:
         self.double_clicked.emit()
 
-    def _resize_edges(self, pos, size):
+    def _resize_edges_for_window(self, local_pos, source_widget):
+        """Map a local mouse position to window-level edge flags for PiP resize."""
+        global_pos = source_widget.mapTo(self.window(), local_pos)
+        win_size = self.window().size()
         edges = Qt.Edge(0)
-        if pos.x() <= self.RESIZE_MARGIN:
+        if global_pos.x() <= self.RESIZE_MARGIN:
             edges |= Qt.Edge.LeftEdge
-        elif pos.x() >= size.width() - self.RESIZE_MARGIN:
+        elif global_pos.x() >= win_size.width() - self.RESIZE_MARGIN:
             edges |= Qt.Edge.RightEdge
-        if pos.y() <= self.RESIZE_MARGIN:
+        if global_pos.y() <= self.RESIZE_MARGIN:
             edges |= Qt.Edge.TopEdge
-        elif pos.y() >= size.height() - self.RESIZE_MARGIN:
+        elif global_pos.y() >= win_size.height() - self.RESIZE_MARGIN:
             edges |= Qt.Edge.BottomEdge
         return edges
 
@@ -461,33 +484,35 @@ class EmbeddedPlayer(QWidget):
         win = self.window().windowHandle()
         if win is None:
             return
-        edges = self._resize_edges(event.position().toPoint(),
-                                    self.video.size())
+        edges = self._resize_edges_for_window(
+            event.position().toPoint(), self.video)
         if edges:
             win.startSystemResize(edges)
         else:
             win.startSystemMove()
 
+    _EDGE_CURSORS = {
+        Qt.Edge.LeftEdge: Qt.CursorShape.SizeHorCursor,
+        Qt.Edge.RightEdge: Qt.CursorShape.SizeHorCursor,
+        Qt.Edge.TopEdge: Qt.CursorShape.SizeVerCursor,
+        Qt.Edge.BottomEdge: Qt.CursorShape.SizeVerCursor,
+        Qt.Edge.LeftEdge | Qt.Edge.TopEdge:
+            Qt.CursorShape.SizeFDiagCursor,
+        Qt.Edge.RightEdge | Qt.Edge.BottomEdge:
+            Qt.CursorShape.SizeFDiagCursor,
+        Qt.Edge.RightEdge | Qt.Edge.TopEdge:
+            Qt.CursorShape.SizeBDiagCursor,
+        Qt.Edge.LeftEdge | Qt.Edge.BottomEdge:
+            Qt.CursorShape.SizeBDiagCursor,
+    }
+
     def _on_video_move(self, event) -> None:
         if self._pip_mode and not self._fs_ui:
             self._show_pip_bar()
             if not (event.buttons() & Qt.MouseButton.LeftButton):
-                edges = self._resize_edges(event.position().toPoint(),
-                                            self.video.size())
-                cursor = {
-                    Qt.Edge.LeftEdge: Qt.CursorShape.SizeHorCursor,
-                    Qt.Edge.RightEdge: Qt.CursorShape.SizeHorCursor,
-                    Qt.Edge.TopEdge: Qt.CursorShape.SizeVerCursor,
-                    Qt.Edge.BottomEdge: Qt.CursorShape.SizeVerCursor,
-                    Qt.Edge.LeftEdge | Qt.Edge.TopEdge:
-                        Qt.CursorShape.SizeFDiagCursor,
-                    Qt.Edge.RightEdge | Qt.Edge.BottomEdge:
-                        Qt.CursorShape.SizeFDiagCursor,
-                    Qt.Edge.RightEdge | Qt.Edge.TopEdge:
-                        Qt.CursorShape.SizeBDiagCursor,
-                    Qt.Edge.LeftEdge | Qt.Edge.BottomEdge:
-                        Qt.CursorShape.SizeBDiagCursor,
-                }.get(edges)
+                edges = self._resize_edges_for_window(
+                    event.position().toPoint(), self.video)
+                cursor = self._EDGE_CURSORS.get(edges)
                 self.video.setCursor(cursor if cursor else Qt.CursorShape.ArrowCursor)
 
     def _on_video_release(self, event) -> None:
