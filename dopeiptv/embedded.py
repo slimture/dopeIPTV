@@ -182,8 +182,8 @@ class EmbeddedPlayer(QWidget):
 
         self.bar = QWidget()
         bl = QHBoxLayout(self.bar)
-        bl.setContentsMargins(2, 1, 2, 1)
-        bl.setSpacing(1)
+        bl.setContentsMargins(4, 2, 4, 2)
+        bl.setSpacing(3)
         self.prev_btn = QPushButton("◀", objectName="MiniBtn")
         self.prev_btn.setToolTip("Previous channel (Ctrl+Left)")
         self.prev_btn.clicked.connect(lambda: self.zap.emit(-1))
