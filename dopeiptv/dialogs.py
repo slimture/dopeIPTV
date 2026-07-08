@@ -352,10 +352,12 @@ class EpgGuideDialog(QDialog):
             m.exec(self.schedule_list.viewport().mapToGlobal(pos))
 
     def _record_entries(self, entries: list[dict]) -> None:
+        scheduled, skipped = 0, 0
         for e in entries:
             channel_it, prog, live = e["channel"], e["prog"], e["live"]
             sid = channel_it.get("stream_id")
             if sid is None:
+                skipped += 1
                 continue
             url = self.window.client.live_url(sid, "ts")
             title = (f"{self.window.channel_display_name(channel_it)} - "
@@ -363,7 +365,17 @@ class EpgGuideDialog(QDialog):
             start_ts = time.time() if live else prog["start_timestamp"]
             self.window.rec.add_job(url, title, start_ts,
                                     prog["stop_timestamp"])
+            scheduled += 1
         self._refresh_schedule_marks()
+        if scheduled:
+            self.window._set_status(
+                f"Scheduled {scheduled} recording"
+                f"{'s' if scheduled > 1 else ''} - see Recordings → Upcoming")
+        if skipped:
+            QMessageBox.warning(
+                self, "Record",
+                f"{skipped} programme{'s' if skipped > 1 else ''} could "
+                "not be scheduled: missing channel stream id.")
 
     def _cancel_entries(self, entries: list[dict]) -> None:
         for e in entries:
