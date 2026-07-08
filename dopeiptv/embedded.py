@@ -214,7 +214,7 @@ class EmbeddedPlayer(QWidget):
         self.mute_btn.clicked.connect(self.toggle_mute)
         self.vol = QSlider(Qt.Orientation.Horizontal)
         self.vol.setRange(0, 100)
-        self.vol.setFixedWidth(44)
+        self.vol.setFixedWidth(40)
         self.vol.setToolTip("Volume")
         self.vol.valueChanged.connect(self._set_volume)
         self.ts_btn = QPushButton("⏪", objectName="MiniBtn")
@@ -249,7 +249,9 @@ class EmbeddedPlayer(QWidget):
         bl.addWidget(self.seek, 2)
         bl.addWidget(self.time_lbl)
         bl.addWidget(self.mute_btn)
+        bl.addSpacing(2)
         bl.addWidget(self.vol)
+        bl.addSpacing(4)
         bl.addWidget(self.ts_btn)
         bl.addWidget(self.rec_btn)
         bl.addWidget(self.opts_btn)
@@ -362,6 +364,10 @@ class EmbeddedPlayer(QWidget):
         self._overlay_timer.setInterval(self.OVERLAY_HIDE_MS)
         self._overlay_timer.timeout.connect(self._hide_fs_ui)
 
+        self._drag_start = None
+        self._drag_win_pos = None
+        self._drag_active = False
+
         self._stats_overlay = QLabel("", self.video)
         self._stats_overlay.setStyleSheet(
             "background: rgba(0,0,0,180); color: #ECECF1;"
@@ -379,12 +385,41 @@ class EmbeddedPlayer(QWidget):
             if event.type() == event.Type.MouseButtonDblClick:
                 self.double_clicked.emit()
                 return True
-            if event.type() == event.Type.MouseMove and self._fs_ui:
-                self._show_overlay()
+            if event.type() == event.Type.MouseButtonPress:
+                if (event.button() == Qt.MouseButton.LeftButton
+                        and self._pip_drag_enabled()):
+                    self._drag_start = event.globalPosition().toPoint()
+                    self._drag_win_pos = self.window().pos()
+                    self._drag_active = False
+            if event.type() == event.Type.MouseMove:
+                if self._fs_ui:
+                    self._show_overlay()
+                if (self._drag_start is not None
+                        and event.buttons() & Qt.MouseButton.LeftButton):
+                    delta = event.globalPosition().toPoint() - self._drag_start
+                    if not self._drag_active:
+                        if (abs(delta.x()) > 4 or abs(delta.y()) > 4):
+                            self._drag_active = True
+                        else:
+                            return False
+                    self.window().move(self._drag_win_pos + delta)
+                    return True
+            if event.type() == event.Type.MouseButtonRelease:
+                if (event.button() == Qt.MouseButton.LeftButton
+                        and self._drag_start is not None):
+                    was_drag = self._drag_active
+                    self._drag_start = None
+                    self._drag_active = False
+                    if was_drag:
+                        return True
         elif self._fs_ui and event.type() in (event.Type.Enter,
                                               event.Type.MouseMove):
             self._overlay_timer.start()
         return super().eventFilter(obj, event)
+
+    def _pip_drag_enabled(self) -> bool:
+        w = self.window()
+        return hasattr(w, '_pip_win') and w._pip_win is not None
 
     # -- overlay ---------------------------------------------------------------
 

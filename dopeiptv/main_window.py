@@ -109,7 +109,7 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self.loading_bar.show()
         self._set_status("Loading channels...")
-        self._load_categories()
+        QTimer.singleShot(100, self._load_categories)
 
         self._auto_refresh_timer = QTimer(self)
         self._auto_refresh_timer.timeout.connect(self._maybe_auto_refresh)
@@ -1471,7 +1471,7 @@ class MainWindow(QMainWindow):
                     m.addMenu("Timeshift / catch-up"), it)
             m.addSeparator()
             self._build_record_menu(m.addMenu("Record"), it)
-        if (self.mode in ("live", "fav")
+        if (self.mode in ("live", "fav", "vod", "series")
                 and it.get("stream_id") is not None):
             m.addSeparator()
             fav_menu = m.addMenu("Add to favorites group")
@@ -1482,7 +1482,8 @@ class MainWindow(QMainWindow):
                 fav_menu.addSeparator()
             fav_menu.addAction("New group...",
                                lambda: self._add_fav(None, it))
-            if self.mode == "fav":
+            if (self.mode == "fav"
+                    or self.favs.is_favorite(it.get("stream_id"))):
                 m.addAction("Remove from favorites",
                             lambda: self._remove_fav(it))
         if (self.mode in ("live", "vod", "series")
@@ -1565,10 +1566,14 @@ class MainWindow(QMainWindow):
             self._load_categories()
 
     def _remove_fav(self, item) -> None:
-        cur = self.cat_list.currentItem()
-        group = cur.data(Qt.ItemDataRole.UserRole) if cur else None
-        self.favs.remove(item.get("stream_id"), group)
-        self._load_categories()
+        if self.mode == "fav":
+            cur = self.cat_list.currentItem()
+            group = cur.data(Qt.ItemDataRole.UserRole) if cur else None
+            self.favs.remove(item.get("stream_id"), group)
+            self._load_categories()
+        else:
+            self.favs.remove(item.get("stream_id"))
+            self.list_model.refresh_all()
 
     # -- parental control ----------------------------------------------------------
 

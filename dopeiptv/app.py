@@ -191,5 +191,6 @@ def main() -> int:
     if offline:
         w.setWindowTitle(w.windowTitle() + "  (offline)")
     w.show()
-    app.processEvents()
+    for _ in range(5):
+        app.processEvents()
     return app.exec()
