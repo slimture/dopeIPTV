@@ -19,6 +19,12 @@ class ChannelListView(QListView):
     def __init__(self, *a, **kw) -> None:
         super().__init__(*a, **kw)
         self._grid_cell: QSize | None = None
+        # Kill IconMode's default 4-6 px padding around every item and any
+        # frame inset - our justified slots already fill the viewport, so any
+        # extra spacing just adds a visible gap on the right.
+        self.setSpacing(0)
+        self.setContentsMargins(0, 0, 0, 0)
+        self.setViewportMargins(0, 0, 0, 0)
 
     def mousePressEvent(self, e) -> None:
         if e.button() == Qt.MouseButton.RightButton:
@@ -43,8 +49,13 @@ class ChannelListView(QListView):
         vw = self.viewport().width()
         if vw <= 0:
             return
+        # Fit as many natural-width columns as possible, then stretch each
+        # slot to divide the viewport evenly - the last column then hugs the
+        # right edge. Any leftover pixel (from integer division) sits at the
+        # very right and is imperceptible.
         cols = max(1, vw // cell.width())
-        self.setGridSize(QSize(vw // cols, cell.height()))
+        slot_w = vw // cols
+        self.setGridSize(QSize(slot_w, cell.height()))
 
 
 class ChannelListModel(QAbstractListModel):

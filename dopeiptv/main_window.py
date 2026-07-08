@@ -18,7 +18,7 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtGui import (
     QAction, QColor, QDesktopServices, QIcon, QKeySequence, QPainter,
-    QPainterPath, QPixmap, QShortcut,
+    QPainterPath, QPen, QPixmap, QShortcut,
 )
 from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDateTimeEdit, QDialog,
@@ -104,46 +104,55 @@ class _Toast(QLabel):
 
 
 class _SidebarLogo(QWidget):
-    """Small themed dopeIPTV wordmark at the top of the sidebar: an accent
-    play-tile next to the name, centred. Painted from the live palette so it
-    recolours when the theme/accent changes (call update() then). Identical on
-    Linux and macOS."""
+    """Small themed mark at the top of the sidebar. A pair of concentric
+    signal arcs (broadcast metaphor) leaning right, sitting inside a rounded
+    accent tile with a play notch cut from the arcs. Recolours live from
+    ``P['accent']`` when the theme or accent changes (call ``update()`` after
+    ``apply_theme``). Identical on Linux and macOS - no OS-specific paths."""
+
+    LOGO_PX = 40  # tile edge in device-independent pixels
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setFixedHeight(42)
+        self.setFixedHeight(self.LOGO_PX + 8)
+        self.setToolTip(APP_NAME)
 
     def paintEvent(self, _event) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        tile = 26.0
-        font = self.font()
-        font.setPointSizeF(15.0)
-        font.setBold(True)
-        painter.setFont(font)
-        text = "dopeIPTV"
-        text_w = painter.fontMetrics().horizontalAdvance(text)
-        gap = 9.0
-        total = tile + gap + text_w
-        x0 = (self.width() - total) / 2.0
-        y0 = (self.height() - tile) / 2.0
-        # Accent tile with a white play triangle (mirrors the app icon). Read
-        # the accent from the live palette dict (not the module-level ACCENT,
-        # which is bound by value and would go stale after an accent change).
-        path = QPainterPath()
-        path.addRoundedRect(x0, y0, tile, tile, tile * 0.30, tile * 0.30)
-        painter.fillPath(path, QColor(P.get("accent", "#4C8DFF")))
+        s = float(self.LOGO_PX)
+        x0 = (self.width() - s) / 2.0
+        y0 = (self.height() - s) / 2.0
+        accent = QColor(P.get("accent", "#4C8DFF"))
+        # Rounded accent tile as the base.
+        tile = QPainterPath()
+        tile.addRoundedRect(x0, y0, s, s, s * 0.28, s * 0.28)
+        painter.fillPath(tile, accent)
+        # A single crisp play triangle centred on the tile; the negative
+        # space around it does the work, so we keep it simple and iconic.
+        # Slight left-inset so the triangle looks optically centred (the
+        # apex draws the eye to the right).
+        cx = x0 + s * 0.54
+        cy = y0 + s * 0.50
+        h = s * 0.44
+        w = s * 0.40
         tri = QPainterPath()
-        tri.moveTo(x0 + tile * 0.38, y0 + tile * 0.27)
-        tri.lineTo(x0 + tile * 0.38, y0 + tile * 0.73)
-        tri.lineTo(x0 + tile * 0.75, y0 + tile * 0.50)
+        tri.moveTo(cx - w * 0.55, cy - h * 0.5)
+        tri.lineTo(cx - w * 0.55, cy + h * 0.5)
+        tri.lineTo(cx + w * 0.55, cy)
         tri.closeSubpath()
         painter.fillPath(tri, QColor("white"))
-        # Wordmark in the theme's primary text colour.
-        painter.setPen(QColor(P.get("text", "#ECECF1")))
-        painter.drawText(
-            QRectF(x0 + tile + gap, 0, text_w + 4, self.height()),
-            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, text)
+        # Two thin signal arcs leaning off the top-right corner: gives the
+        # mark a broadcast/IPTV feel without adding text.
+        pen = QPen(QColor("white"))
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        for i, thickness in enumerate((1.6, 1.6)):
+            pen.setWidthF(thickness)
+            painter.setPen(pen)
+            r = s * (0.14 + i * 0.09)
+            painter.drawArc(
+                QRectF(x0 + s * 0.80 - r, y0 + s * 0.20 - r, r * 2, r * 2),
+                200 * 16, 100 * 16)
         painter.end()
 
 
@@ -239,8 +248,9 @@ class MainWindow(QMainWindow):
         # above on first run). The panel dividers are restored once more after
         # the window is shown at its real size - see _restore_splitter_state -
         # so their proportions don't drift when the geometry is applied.
+        from PyQt6.QtCore import QByteArray
         geo = self.settings.value("window_geometry")
-        if geo:
+        if isinstance(geo, QByteArray) and geo.size() > 0:
             self.restoreGeometry(geo)
         QTimer.singleShot(0, self._restore_splitter_state)
         self.loading_bar.show()
@@ -333,7 +343,10 @@ class MainWindow(QMainWindow):
         # Middle column
         mid = QWidget(objectName="MiddlePane")
         ml = QVBoxLayout(mid)
-        ml.setContentsMargins(14, 14, 14, 10)
+        # Tighter horizontal margins so the grid-view icons sit close to
+        # the panel edges (the icons themselves are already centred inside
+        # their justified cells, but any middle-pane inset compounds on top).
+        ml.setContentsMargins(8, 14, 6, 10)
         ml.setSpacing(10)
 
         self.loading_bar = QProgressBar(objectName="LoadBar")
@@ -612,6 +625,10 @@ class MainWindow(QMainWindow):
         root.setStretchFactor(0, 0)
         root.setStretchFactor(1, 1)
         root.setStretchFactor(2, 0)
+        # Save the panel layout every time the user drags a divider, so it
+        # persists even if closeEvent doesn't run (Ctrl+C, force quit, sudden
+        # kill). The window geometry is saved via moveEvent/resizeEvent below.
+        root.splitterMoved.connect(self._schedule_save_layout)
         det.setMinimumWidth(280)
         self._side, self._mid, self._det = side, mid, det
         self._root = root
@@ -4317,9 +4334,42 @@ class MainWindow(QMainWindow):
         """Restore the panel divider positions from last session. Runs after
         the window is shown at its restored size so the saved proportions land
         exactly instead of being rescaled from the default geometry."""
+        from PyQt6.QtCore import QByteArray
         st = self.settings.value("splitter_state")
-        if st:
+        if isinstance(st, QByteArray) and st.size() > 0:
             self._root.restoreState(st)
+
+    def _schedule_save_layout(self, *_args) -> None:
+        """Called on splitter drag / window move / window resize. Coalesces
+        rapid updates into a single save 300 ms after the last event."""
+        t = getattr(self, "_save_layout_timer", None)
+        if t is None:
+            t = QTimer(self)
+            t.setSingleShot(True)
+            t.setInterval(300)
+            t.timeout.connect(self._save_layout)
+            self._save_layout_timer = t
+        t.start()
+
+    def _save_layout(self) -> None:
+        """Write the current window geometry + splitter state to disk. Skipped
+        while in PiP or fullscreen (those sizes are transient)."""
+        if not hasattr(self, "_root"):
+            return
+        if (self._pip_win is not None or self.isFullScreen()
+                or self._player_fs):
+            return
+        self.settings.setValue("splitter_state", self._root.saveState())
+        self.settings.setValue("window_geometry", self.saveGeometry())
+        self.settings.sync()
+
+    def moveEvent(self, event) -> None:
+        super().moveEvent(event)
+        self._schedule_save_layout()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._schedule_save_layout()
 
     def closeEvent(self, event) -> None:
         # Close the non-modal cast panel first: as a separate top-level
@@ -4329,12 +4379,9 @@ class MainWindow(QMainWindow):
         d = getattr(self, "_cast_dialog", None)
         if d is not None:
             d.close()
-        # Remember the panel divider layout - but not while in PiP or
-        # fullscreen, whose splitter/window sizes are transient.
-        if (self._pip_win is None and not self.isFullScreen()
-                and not self._player_fs):
-            self.settings.setValue("splitter_state", self._root.saveState())
-            self.settings.setValue("window_geometry", self.saveGeometry())
+        # Remember the panel divider layout and window size (also saved
+        # incrementally on move/resize/splitter-drag, this is the final flush).
+        self._save_layout()
         self._save_resume_position()
         self.wake.release()
         if self.tmdb:

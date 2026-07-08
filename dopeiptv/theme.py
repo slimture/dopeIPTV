@@ -239,10 +239,31 @@ QSplitter::handle:hover {{ background: {p['border_in']}; }}
 QScrollArea {{ background: transparent; border: none; }}
 QScrollArea > QWidget > QWidget {{ background: transparent; }}
 
-QScrollBar:vertical {{ background: transparent; width: 8px; margin: 2px; }}
-QScrollBar::handle:vertical {{ background: {p['scroll']}; border-radius: 4px; min-height: 30px; }}
-QScrollBar::handle:vertical:hover {{ background: {p['scroll_hover']}; }}
-QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; }}
+/* Thin themed scrollbars in both orientations. Without an explicit
+   horizontal style Qt falls back to the platform theme (a fat white bar on
+   macOS / GTK+), which reads as ugly against the dark UI. */
+QScrollBar:vertical {{
+    background: transparent; width: 8px; margin: 2px;
+    border: none;
+}}
+QScrollBar:horizontal {{
+    background: transparent; height: 8px; margin: 2px;
+    border: none;
+}}
+QScrollBar::handle:vertical {{
+    background: {p['scroll']}; border-radius: 4px; min-height: 30px;
+}}
+QScrollBar::handle:horizontal {{
+    background: {p['scroll']}; border-radius: 4px; min-width: 30px;
+}}
+QScrollBar::handle:vertical:hover,
+QScrollBar::handle:horizontal:hover {{ background: {p['scroll_hover']}; }}
+QScrollBar::add-line, QScrollBar::sub-line {{
+    width: 0; height: 0; background: none; border: none;
+}}
+QScrollBar::add-page, QScrollBar::sub-page {{
+    background: transparent;
+}}
 
 QMenuBar {{
     background: {p['side']}; color: {p['text2']}; border-bottom: 1px solid {p['border']};
