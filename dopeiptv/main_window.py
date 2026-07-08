@@ -405,7 +405,8 @@ class MainWindow(QMainWindow):
             self.player.pip_requested.connect(self._toggle_pip)
             self.player.pip_context_menu.connect(self._pip_context_menu)
             self.player.stop_btn.clicked.connect(self._exit_pip_if_active)
-            self.player.stop_btn.clicked.connect(self.player.hide)
+            # Keep the player pane visible on stop - mpv clears to black -
+            # instead of hiding it, so the window just goes black.
             dl.addWidget(self.player, 1)
 
         self.stream_error = QLabel("")

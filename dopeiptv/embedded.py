@@ -374,6 +374,7 @@ class EmbeddedPlayer(QWidget):
         self.fs_btn = QPushButton("⛶", objectName="MiniBtn")
         self.fs_btn.setToolTip(tr("tooltip_fullscreen"))
         bl.addWidget(self.prev_btn)
+        bl.addWidget(self.stop_btn)
         bl.addWidget(self.next_btn)
         bl.addWidget(self.pause_btn)
         bl.addWidget(self.back_btn)
@@ -385,7 +386,6 @@ class EmbeddedPlayer(QWidget):
         bl.addWidget(self.rec_btn)
         bl.addWidget(self.opts_btn)
         bl.addWidget(self.pip_btn)
-        bl.addWidget(self.stop_btn)
         bl.addWidget(self.fs_btn)
         bl.addSpacing(6)
         bl.addWidget(self.mute_btn)
@@ -1266,9 +1266,13 @@ class EmbeddedPlayer(QWidget):
             except Exception:
                 pass
         self.title_lbl.setText("")
+        self._pos_timer.stop()
         self._hide_seek_ui()
         self._stats_overlay.hide()
         self._stats_timer.stop()
+        # Repaint the (now empty) mpv surface so the pane goes black instead
+        # of freezing on the last frame.
+        self.video.update()
 
     def shutdown(self) -> None:
         self.stop_stream_record()
