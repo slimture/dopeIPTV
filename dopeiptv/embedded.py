@@ -448,6 +448,37 @@ class EmbeddedPlayer(QWidget):
         self._stats_timer.setInterval(1000)
         self._stats_timer.timeout.connect(self._update_stats_text)
 
+        self.retranslate_ui()
+
+    def retranslate_ui(self) -> None:
+        """(Re)apply every control tooltip from the active language. Called
+        once at construction and again live when the language changes."""
+        self.prev_btn.setToolTip(tr("tooltip_previous_channel") + " (Ctrl+Left)")
+        self.next_btn.setToolTip(tr("tooltip_next_channel") + " (Ctrl+Right)")
+        self.pause_btn.setToolTip(tr("tooltip_pause_resume"))
+        self.back_btn.setToolTip(tr("tooltip_back_10s"))
+        self.fwd_btn.setToolTip(tr("tooltip_forward_30s"))
+        self.mute_btn.setToolTip(tr("tooltip_mute_unmute"))
+        self.vol.setToolTip(tr("tooltip_volume"))
+        self.ts_btn.setToolTip(tr("tooltip_timeshift"))
+        self.rec_btn.setToolTip(tr("tooltip_record"))
+        self.opts_btn.setToolTip(tr("tooltip_audio_subs_aspect"))
+        self.stop_btn.setToolTip(tr("tooltip_stop_playback"))
+        self.pip_btn.setToolTip(
+            tr("tooltip_exit_pip") if self._pip_mode else tr("tooltip_pip"))
+        self.fs_btn.setToolTip(tr("tooltip_fullscreen"))
+        self.fs_prev_btn.setToolTip(tr("tooltip_previous_channel") + " (Left)")
+        self.fs_next_btn.setToolTip(tr("tooltip_next_channel") + " (Right)")
+        self.fs_pause_btn.setToolTip(tr("tooltip_pause_resume"))
+        self.fs_back_btn.setToolTip(tr("tooltip_back_10s"))
+        self.fs_fwd_btn.setToolTip(tr("tooltip_forward_30s"))
+        self.fs_mute_btn.setToolTip(tr("tooltip_mute_unmute"))
+        self.fs_vol.setToolTip(tr("tooltip_volume"))
+        self.fs_ts_btn.setToolTip(tr("tooltip_timeshift"))
+        self.fs_rec_btn.setToolTip(tr("tooltip_record"))
+        self.fs_opts_btn.setToolTip(tr("tooltip_audio_subs_aspect"))
+        self.fs_exit_btn.setToolTip(tr("tooltip_exit_fullscreen") + " (Esc)")
+
     # -- event filter (fullscreen overlay + pip bar on control hover) ---------
 
     def eventFilter(self, obj, event):

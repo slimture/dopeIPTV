@@ -202,6 +202,13 @@ class MainWindow(QMainWindow):
         about_action.triggered.connect(self.show_about)
         quit_action = app_menu.addAction(tr("menu_quit"))
         quit_action.triggered.connect(self.close)
+        # Kept for live language switching (see retranslate_ui).
+        self._i18n_actions = {
+            settings_action: lambda: tr("btn_settings") + "...",
+            refresh_action: lambda: tr("menu_refresh_playlist"),
+            about_action: lambda: tr("menu_about"),
+            quit_action: lambda: tr("menu_quit"),
+        }
 
         root = QSplitter(Qt.Orientation.Horizontal)
         root.setHandleWidth(6)
@@ -232,23 +239,25 @@ class MainWindow(QMainWindow):
             self.nav_btns[key] = b
         self.nav_btns["live"].setChecked(True)
 
-        sl.addWidget(QLabel(tr("sidebar_categories"), objectName="SectionLabel"))
+        self._cat_section_label = QLabel(
+            tr("sidebar_categories"), objectName="SectionLabel")
+        sl.addWidget(self._cat_section_label)
         self.cat_list = QListWidget()
         self.cat_list.currentItemChanged.connect(self._category_changed)
         self.cat_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.cat_list.customContextMenuRequested.connect(self._cat_menu)
         sl.addWidget(self.cat_list, 1)
 
-        guide_btn = QPushButton(tr("btn_epg_guide"))
+        self._guide_btn = guide_btn = QPushButton(tr("btn_epg_guide"))
         guide_btn.clicked.connect(self._open_epg_guide)
         sl.addWidget(guide_btn)
 
-        refresh_btn = QPushButton(tr("btn_refresh"))
+        self._refresh_btn = refresh_btn = QPushButton(tr("btn_refresh"))
         refresh_btn.setToolTip(tr("tooltip_reload_channels_epg"))
         refresh_btn.clicked.connect(self.refresh_playlist)
         sl.addWidget(refresh_btn)
 
-        settings_btn = QPushButton(tr("btn_settings"))
+        self._settings_btn = settings_btn = QPushButton(tr("btn_settings"))
         settings_btn.clicked.connect(self.open_settings)
         sl.addWidget(settings_btn)
 
@@ -296,9 +305,11 @@ class MainWindow(QMainWindow):
         self.grid_btn.setChecked(
             self.settings.value("view_grid", "false") == "true")
         self.grid_btn.toggled.connect(self._inline_view_changed)
-        ctl.addWidget(QLabel(tr("label_size")))
+        self._size_label = QLabel(tr("label_size"))
+        self._sort_label = QLabel(tr("label_sort"))
+        ctl.addWidget(self._size_label)
         ctl.addWidget(self.size_box)
-        ctl.addWidget(QLabel(tr("label_sort")))
+        ctl.addWidget(self._sort_label)
         ctl.addWidget(self.sort_box)
         ctl.addStretch()
         ctl.addWidget(self.grid_btn)
@@ -458,6 +469,11 @@ class MainWindow(QMainWindow):
         self.media_info.setWidgetResizable(True)
         self.media_info.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # Expand to fill the row so the box bottom lines up with the poster
+        # column instead of collapsing to its content's height (which left
+        # it short and forced early scrolling).
+        self.media_info.setSizePolicy(QSizePolicy.Policy.Preferred,
+                                      QSizePolicy.Policy.Expanding)
         self.media_info.setStyleSheet(
             f"QScrollArea {{ background:{P['input']}; "
             f"border:1px solid {P['border_in']}; border-radius:12px; }}")
@@ -479,12 +495,10 @@ class MainWindow(QMainWindow):
         mi.addStretch(1)
         self.media_info.setWidget(mi_holder)
         self.media_info.hide()
-        # Pin the info card's top to the poster's top. Without AlignTop the
-        # card (shorter than the poster column once the Play button and its
-        # stretch are added) gets vertically centered in the row and sits
-        # visibly lower than the poster.
-        header_row.addWidget(self.media_info, 1, Qt.AlignmentFlag.AlignTop)
-        header_row.setAlignment(Qt.AlignmentFlag.AlignTop)
+        # The info box fills the row height (Expanding policy above) so its
+        # bottom lines up with the poster column. now_card (live TV) keeps
+        # its own AlignTop flag below, so this only affects VOD/series.
+        header_row.addWidget(self.media_info, 1)
         dl.addLayout(header_row)
 
         self.cast_scroll = QScrollArea()
@@ -640,29 +654,34 @@ class MainWindow(QMainWindow):
     def _toggle_pip_fullscreen(self) -> None:
         if self.isFullScreen():
             self.setWindowFlags(
-                self.windowFlags()
+                Qt.WindowType.Tool
                 | Qt.WindowType.FramelessWindowHint
                 | Qt.WindowType.WindowStaysOnTopHint)
             self.showNormal()
             geo = getattr(self, "_pip_fs_geo", None)
-            if geo:
-                self.setGeometry(geo)
-            else:
+            if not geo:
                 self.resize(480, 270)
                 screen_geo = self.screen().availableGeometry()
                 self.move(screen_geo.right() - 500,
                           screen_geo.bottom() - 290)
+                geo = self.geometry()
             # Restore the small PiP geometry *before* unlocking the video's
             # fixed height, so _lock_video_box() sizes it to the final PiP
             # dimensions instead of the still-fullscreen ones.
             self.player.set_fullscreen_ui(False)
             self.player.set_pip_mode(True)
+            # Changing window flags recreates the native window on X11, and
+            # the WM re-places the fresh frameless window (usually centered)
+            # asynchronously. Setting the geometry once here races with that,
+            # so also re-assert it on the next event-loop turns until it
+            # sticks at the remembered PiP position.
+            self.setGeometry(geo)
+            for delay in (0, 30, 120):
+                QTimer.singleShot(
+                    delay, lambda g=geo: self.setGeometry(g))
         else:
             self._pip_fs_geo = self.geometry()
-            self.setWindowFlags(
-                (self.windowFlags()
-                 & ~Qt.WindowType.FramelessWindowHint
-                 & ~Qt.WindowType.WindowStaysOnTopHint))
+            self.setWindowFlags(Qt.WindowType.Window)
             self.player.set_fullscreen_ui(True)
             self.showFullScreen()
 
@@ -1527,30 +1546,65 @@ class MainWindow(QMainWindow):
 
         self._ensure_full_catalog(with_catalog)
 
-    def _on_cast_clicked(self, name: str, person_id) -> None:
-        if not self.tmdb:
-            return
+    def _ensure_cast_dialog(self) -> QDialog:
+        """Create (once) a reusable, non-modal, always-on-top panel that
+        lists a cast member's other titles. Non-modal so the cast strip on
+        the right stays clickable - clicking another cast member just
+        refreshes this same panel instead of stacking new dialogs."""
+        d = getattr(self, "_cast_dialog", None)
+        if d is not None:
+            return d
         d = QDialog(self)
-        d.setWindowTitle(f"{name} — other titles in your playlist")
-        d.setMinimumSize(420, 480)
+        # Tool + stay-on-top keeps it above the main window without blocking
+        # it, so you can pick another cast member while it is open.
+        d.setWindowFlags(Qt.WindowType.Tool
+                         | Qt.WindowType.WindowStaysOnTopHint)
+        d.setModal(False)
+        d.setMinimumSize(440, 520)
         lay = QVBoxLayout(d)
-        status = QLabel("Looking up filmography...")
-        status.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
-        status.setWordWrap(True)
-        lay.addWidget(status)
-        result_list = QListWidget()
-        lay.addWidget(result_list, 1)
+        self._cast_status = QLabel("")
+        self._cast_status.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        self._cast_status.setWordWrap(True)
+        lay.addWidget(self._cast_status)
+        self._cast_result_list = QListWidget()
+        # Room for a poster thumbnail beside each title.
+        self._cast_result_list.setIconSize(QSize(46, 69))
+        self._cast_result_list.setStyleSheet(
+            "QListWidget::item { padding: 4px; }")
+        self._cast_result_list.itemDoubleClicked.connect(
+            lambda item: self._play_cast_match(item, d))
+        lay.addWidget(self._cast_result_list, 1)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        buttons.rejected.connect(d.reject)
-        buttons.accepted.connect(d.accept)
+        buttons.rejected.connect(d.hide)
+        buttons.accepted.connect(d.hide)
         for b in buttons.buttons():
             b.setIcon(QIcon())
         lay.addWidget(buttons)
+        self._cast_dialog = d
+        return d
+
+    def _on_cast_clicked(self, name: str, person_id) -> None:
+        if not self.tmdb:
+            return
+        d = self._ensure_cast_dialog()
+        d.setWindowTitle(f"{name} — other titles in your playlist")
+        status = self._cast_status
+        result_list = self._cast_result_list
+        result_list.clear()
+        status.setText("Looking up filmography...")
+        # Each click starts a new lookup; stamp a token so stale async
+        # callbacks from a previously clicked cast member are ignored.
+        token = getattr(self, "_cast_token", 0) + 1
+        self._cast_token = token
 
         def show_matches(titles: list[str]) -> None:
+            if self._cast_token != token:
+                return
             status.setText("Searching your playlist...")
 
             def with_matches(matches) -> None:
+                if self._cast_token != token:
+                    return
                 result_list.clear()
                 if not matches:
                     status.setText(
@@ -1565,16 +1619,15 @@ class MainWindow(QMainWindow):
                     item = QListWidgetItem(label)
                     item.setData(Qt.ItemDataRole.UserRole, (it, kind))
                     result_list.addItem(item)
+                    self._load_cast_match_poster(it, kind, item)
 
             self._find_playlist_matches(titles, with_matches)
 
-        result_list.itemDoubleClicked.connect(
-            lambda item: self._play_cast_match(item, d))
-
         def with_person_id(pid) -> None:
+            if self._cast_token != token:
+                return
             if not pid:
-                status.setText(
-                    f"Couldn't find {name} on TMDB.")
+                status.setText(f"Couldn't find {name} on TMDB.")
                 return
             credits = self.tmdb.get_person_credits(pid, show_matches)
             if credits is not None:
@@ -1589,11 +1642,39 @@ class MainWindow(QMainWindow):
             pid = self.tmdb.resolve_person_id(name, with_person_id)
             if pid is not None:
                 with_person_id(pid)
-        d.exec()
+        d.show()
+        d.raise_()
+        d.activateWindow()
+
+    def _load_cast_match_poster(self, it, kind, item) -> None:
+        """Fetch a poster thumbnail for a cast-filmography match and set it
+        as the list item's icon (provider artwork first, then TMDB)."""
+        def apply(pm) -> None:
+            try:
+                icon_pm = pm.scaled(
+                    46, 69, Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation)
+                item.setIcon(QIcon(icon_pm))
+            except RuntimeError:
+                pass  # the list item was cleared before the art arrived
+
+        url = it.get("stream_icon") or it.get("cover")
+        if url:
+            self.poster_art.get(url, apply)
+            return
+        if self.tmdb:
+            title = it.get("name") or it.get("title") or ""
+            tmdb_kind = "vod" if kind == "vod" else "series"
+            details = self.tmdb.get_full(
+                title, tmdb_kind,
+                lambda d: (d.get("poster_url")
+                           and self.poster_art.get(d["poster_url"], apply)))
+            if details and details.get("poster_url"):
+                self.poster_art.get(details["poster_url"], apply)
 
     def _play_cast_match(self, item, dialog) -> None:
         it, kind = item.data(Qt.ItemDataRole.UserRole)
-        dialog.accept()
+        dialog.hide()
         if kind == "vod":
             self.switch_mode("vod")
             self._navigate_to_item(it, "vod")
@@ -3205,19 +3286,34 @@ class MainWindow(QMainWindow):
             return
         self.settings.setValue("language", code)
         set_language(code)
-        # Retranslate the chrome we hold references to so the change is
-        # visible immediately; the rest (settings tabs already open,
-        # context menus) picks up the new language as it is next rebuilt,
-        # and a full relaunch translates everything.
-        labels = {"live": "nav_tv", "vod": "nav_movies", "series": "nav_series",
-                  "fav": "nav_favorites", "rec": "nav_recordings",
-                  "history": "nav_history"}
+        self.retranslate_ui()
+
+    def retranslate_ui(self) -> None:
+        """Re-apply every translatable string on the persistent chrome so
+        the language switches live. The settings dialog and context menus
+        are rebuilt each time they open, so they pick up the language on
+        their own and don't need touching here."""
+        for action, getter in getattr(self, "_i18n_actions", {}).items():
+            action.setText(getter())
+        nav_labels = {
+            "live": "nav_tv", "vod": "nav_movies", "series": "nav_series",
+            "fav": "nav_favorites", "rec": "nav_recordings",
+            "history": "nav_history",
+        }
         for key, btn in self.nav_btns.items():
-            if key in labels:
-                btn.setText(tr(labels[key]))
+            if key in nav_labels:
+                btn.setText(tr(nav_labels[key]))
+        self._cat_section_label.setText(tr("sidebar_categories"))
+        self._guide_btn.setText(tr("btn_epg_guide"))
+        self._refresh_btn.setText(tr("btn_refresh"))
+        self._refresh_btn.setToolTip(tr("tooltip_reload_channels_epg"))
+        self._settings_btn.setText(tr("btn_settings"))
         self.search.setPlaceholderText(tr("search_placeholder"))
-        QMessageBox.information(
-            self, tr("setting_language"), tr("misc_language_restart"))
+        self._size_label.setText(tr("label_size"))
+        self._sort_label.setText(tr("label_sort"))
+        # Player control tooltips (embedded bar + fullscreen overlay).
+        if self.player:
+            self.player.retranslate_ui()
 
     def _inline_view_changed(self, *_) -> None:
         self.settings.setValue(
