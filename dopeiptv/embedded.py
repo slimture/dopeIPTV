@@ -567,6 +567,18 @@ class EmbeddedPlayer(QWidget):
             self.video.setMinimumHeight(190)
             self.video.setMaximumHeight(16777215)
         else:
+            # Clear any fixed height *before* measuring self.height(). A
+            # fixed-height child inflates this widget's own minimum size,
+            # so if the previous call locked in a wrong (too-tall) value -
+            # e.g. read right after leaving fullscreen, before the window
+            # had actually resized - that wrong height keeps reinforcing
+            # itself forever: every later resizeEvent recomputes from the
+            # same stuck self.height() instead of the real available
+            # space, which is exactly the letterboxing that survived a
+            # manual resize and needed an app restart to clear.
+            self.video.setMinimumHeight(0)
+            self.video.setMaximumHeight(16777215)
+            self.layout().activate()
             bar_h = self.bar.sizeHint().height() if self.bar.isVisible() else 0
             spacing = self.layout().spacing()
             available = self.height() - bar_h - spacing

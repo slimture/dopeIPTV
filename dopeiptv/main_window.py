@@ -403,7 +403,6 @@ class MainWindow(QMainWindow):
             nc.addWidget(w)
         self.now_card.hide()
         header_row.addWidget(self.now_card, 1)
-        header_row.addStretch(1)
         dl.addLayout(header_row)
 
         self.cast_scroll = QScrollArea()
