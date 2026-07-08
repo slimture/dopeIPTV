@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import pickle
 import sys
 import threading
 import time
@@ -15,6 +16,10 @@ import requests
 from PyQt6.QtCore import QStandardPaths
 
 from .client import XtreamClient
+
+
+# Bump to invalidate all pickled indexes on disk after a schema change.
+_INDEX_VERSION = 1
 
 
 def normalize_name(s: str | None) -> str:
@@ -148,7 +153,16 @@ class XmltvGuide:
                 self._failed = True
                 return False
             try:
-                self._parse(data)
+                # Prefer the pickled parse-index next to the XML: a 280 MB
+                # XMLTV dump takes 10-15 s to iterparse but loads from
+                # pickle in ~1 s. Fall back to re-parsing (and re-writing
+                # the pickle) if it's missing, older than the XML, or
+                # from an older schema version.
+                if source == "cache" and self._load_index():
+                    pass
+                else:
+                    self._parse(data)
+                    self._write_index()
                 self._loaded = True
                 self._failed = False
                 print(f"[dopeIPTV] EPG loaded from {source} "
@@ -156,6 +170,43 @@ class XmltvGuide:
             except Exception:
                 self._failed = self._loaded is False
             return self._loaded
+
+    # -- pickle index --------------------------------------------------------
+
+    def _index_path(self) -> Path | None:
+        if not self.cache_path:
+            return None
+        return self.cache_path.with_suffix(self.cache_path.suffix + ".pkl")
+
+    def _load_index(self) -> bool:
+        p = self._index_path()
+        if not p or not p.exists() or not self.cache_path:
+            return False
+        try:
+            if p.stat().st_mtime < self.cache_path.stat().st_mtime:
+                return False
+            with p.open("rb") as f:
+                blob = pickle.load(f)
+        except (OSError, pickle.PickleError, EOFError, ValueError):
+            return False
+        if not isinstance(blob, dict) or blob.get("v") != _INDEX_VERSION:
+            return False
+        self._by_id = blob.get("by_id", {})
+        self._by_name = blob.get("by_name", {})
+        return True
+
+    def _write_index(self) -> None:
+        p = self._index_path()
+        if not p:
+            return
+        try:
+            with p.open("wb") as f:
+                pickle.dump({"v": _INDEX_VERSION,
+                             "by_id": self._by_id,
+                             "by_name": self._by_name},
+                            f, protocol=pickle.HIGHEST_PROTOCOL)
+        except OSError:
+            pass
 
     def _entries_for(self, item: dict) -> list[dict]:
         cid = (item.get("epg_channel_id") or "").strip().lower()

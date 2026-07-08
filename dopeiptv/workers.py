@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from typing import Any, Callable
 
 import requests
@@ -68,17 +69,28 @@ class LogoLoader(QObject):
     once scaled back up.
     """
 
-    def __init__(self, pool: QThreadPool, max_size: int = 96) -> None:
+    def __init__(self, pool: QThreadPool, max_size: int = 96,
+                 max_entries: int = 800) -> None:
         super().__init__()
         self.pool = pool
         self.max_size = max_size
-        self.cache: dict[str, QPixmap] = {}
+        self.max_entries = max_entries
+        # Bounded LRU: older entries drop out as we scroll through big
+        # provider dumps so the process doesn't grow unbounded.
+        self.cache: OrderedDict[str, QPixmap] = OrderedDict()
         self.waiting: dict[str, list[Callable]] = {}
+
+    def _store(self, url: str, pm: QPixmap) -> None:
+        self.cache[url] = pm
+        self.cache.move_to_end(url)
+        while len(self.cache) > self.max_entries:
+            self.cache.popitem(last=False)
 
     def get(self, url: str | None, callback: Callable[[QPixmap], None]) -> None:
         if not url:
             return
         if url in self.cache:
+            self.cache.move_to_end(url)
             callback(self.cache[url])
             return
         if url in self.waiting:
@@ -99,7 +111,7 @@ class LogoLoader(QObject):
                 pm = pm.scaled(self.max_size, self.max_size,
                                Qt.AspectRatioMode.KeepAspectRatio,
                                Qt.TransformationMode.SmoothTransformation)
-                self.cache[u] = pm
+                self._store(u, pm)
                 for cb in callbacks:
                     try:
                         cb(pm)
