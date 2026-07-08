@@ -8,7 +8,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import QSettings, Qt
 from PyQt6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPixmap
-from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6.QtWidgets import QApplication, QLabel, QMessageBox
 
 from . import APP_NAME, ORG
 from .client import XtreamClient
@@ -128,13 +128,23 @@ def main() -> int:
 
         candidate = XtreamClient(pl["server"], pl["username"], pl["password"])
         offline = False
+        splash = QLabel(f"  Connecting to {pl.get('name', 'server')}...",
+                        None, Qt.WindowType.SplashScreen)
+        splash.setStyleSheet(
+            "background:#17171C; color:#C9C9D2; font-size:14px;"
+            "padding:18px 28px; border-radius:10px;")
+        splash.adjustSize()
+        splash.show()
+        app.processEvents()
         try:
             candidate.authenticate()
             client = candidate
             settings.setValue("server", pl["server"])
             settings.setValue("username", pl["username"])
             settings.setValue("password", pl["password"])
+            splash.close()
         except Exception as e:
+            splash.close()
             box = QMessageBox(QMessageBox.Icon.Warning, "Connection failed",
                               f"{pl['name']}: {e}\n\n"
                               "You can start anyway - content will load once "
@@ -165,4 +175,5 @@ def main() -> int:
     if offline:
         w.setWindowTitle(w.windowTitle() + "  (offline)")
     w.show()
+    app.processEvents()
     return app.exec()

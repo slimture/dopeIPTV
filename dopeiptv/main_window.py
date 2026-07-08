@@ -107,6 +107,8 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(self._base_title)
         self.resize(1240, 780)
         self._build_ui()
+        self.loading_bar.show()
+        self._set_status("Loading channels...")
         self._load_categories()
 
         self._auto_refresh_timer = QTimer(self)
@@ -258,6 +260,12 @@ class MainWindow(QMainWindow):
             Qt.ContextMenuPolicy.CustomContextMenu)
         self.listw.customContextMenuRequested.connect(self._context_menu)
         ml.addWidget(self.listw, 1)
+
+        self._loading_hint = QLabel("Loading channels...")
+        self._loading_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._loading_hint.setStyleSheet(
+            f"color:{P['muted2']}; font-size:13px; padding:40px 0;")
+        ml.addWidget(self._loading_hint)
 
         self.count_lbl = QLabel("")
         self.count_lbl.setStyleSheet(f"color:{P['muted3']}; font-size:11px;")
@@ -839,6 +847,8 @@ class MainWindow(QMainWindow):
             filtered = items
         filtered = self._sorted(filtered)
         self.list_model.set_items(filtered, kind)
+        if self._loading_hint.isVisible():
+            self._loading_hint.hide()
         self._set_status(f"{len(filtered)} {self.LABELS[kind]}")
         if kind == "fav" and not self.all_items:
             self._set_status(
@@ -1731,9 +1741,11 @@ class MainWindow(QMainWindow):
             f"● REC ({n})" if n > 1 else "● REC")
         self.rec_indicator.setVisible(n > 0)
         if self.player:
-            label = "●" if n else "REC"
-            self.player.rec_btn.setText(label)
-            self.player.fs_rec_btn.setText(label)
+            for b in (self.player.rec_btn, self.player.fs_rec_btn):
+                b.setToolTip(f"Recording ({n})" if n else "Record")
+                b.setStyleSheet(
+                    "color:#FF5C5C; font-weight:700;" if n
+                    else "color:#FF5C5C;")
         if self.mode == "rec":
             cur = self.cat_list.currentItem()
             self._load_items(
@@ -2813,6 +2825,8 @@ class MainWindow(QMainWindow):
 
     def _on_epg_progress(self, value: int) -> None:
         self.loading_bar.show()
+        if value >= 0:
+            self._set_status(f"Loading programme guide... {value}%")
         if value < 0:
             self.loading_bar.setRange(0, 0)
         else:
