@@ -424,13 +424,13 @@ class MainWindow(QMainWindow):
     def _toggle_player_fullscreen(self) -> None:
         if not self.player or not self.player.isVisible():
             return
-        if self._pip_win is not None:
-            self._exit_pip()
-            return
         now = time.time()
         if now - getattr(self, "_fs_toggled_at", 0.0) < 0.4:
             return
         self._fs_toggled_at = now
+        if self._pip_win is not None:
+            self._toggle_pip_fullscreen()
+            return
         if self._player_fs:
             self._exit_player_fullscreen()
             return
@@ -485,6 +485,31 @@ class MainWindow(QMainWindow):
         elif scroll is not None:
             QTimer.singleShot(0, lambda: (
                 self.listw.verticalScrollBar().setValue(scroll)))
+
+    def _toggle_pip_fullscreen(self) -> None:
+        if self.isFullScreen():
+            self.player.set_fullscreen_ui(False)
+            self.setWindowFlags(
+                self.windowFlags()
+                | Qt.WindowType.FramelessWindowHint
+                | Qt.WindowType.WindowStaysOnTopHint)
+            self.showNormal()
+            geo = getattr(self, "_pip_fs_geo", None)
+            if geo:
+                self.setGeometry(geo)
+            else:
+                self.resize(480, 270)
+                screen_geo = self.screen().availableGeometry()
+                self.move(screen_geo.right() - 500,
+                          screen_geo.bottom() - 290)
+        else:
+            self._pip_fs_geo = self.geometry()
+            self.setWindowFlags(
+                (self.windowFlags()
+                 & ~Qt.WindowType.FramelessWindowHint
+                 & ~Qt.WindowType.WindowStaysOnTopHint))
+            self.player.set_fullscreen_ui(True)
+            self.showFullScreen()
 
     # -- picture-in-picture (mini mode — no reparenting) ----------------------------
 

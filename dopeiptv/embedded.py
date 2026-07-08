@@ -27,6 +27,10 @@ class _MpvGLWidget(QOpenGLWidget):
 
     frame_ready = pyqtSignal()
     playback_error = pyqtSignal(str)
+    video_mouse_press = pyqtSignal(object)
+    video_mouse_move = pyqtSignal(object)
+    video_mouse_release = pyqtSignal(object)
+    video_dbl_click = pyqtSignal()
 
     EXTRA_OPTS: dict = {}
 
@@ -41,6 +45,18 @@ class _MpvGLWidget(QOpenGLWidget):
         self.mpv = None
         self._ctx = None
         self.frame_ready.connect(self.update)
+
+    def mousePressEvent(self, event) -> None:
+        self.video_mouse_press.emit(event)
+
+    def mouseMoveEvent(self, event) -> None:
+        self.video_mouse_move.emit(event)
+
+    def mouseReleaseEvent(self, event) -> None:
+        self.video_mouse_release.emit(event)
+
+    def mouseDoubleClickEvent(self, event) -> None:
+        self.video_dbl_click.emit()
 
     def _get_proc_address(self, _, name: bytes) -> int:
         glctx = QOpenGLContext.currentContext()
@@ -178,6 +194,10 @@ class EmbeddedPlayer(QWidget):
         self.video.installEventFilter(self)
         self.video.setMouseTracking(True)
         self.video.playback_error.connect(self.playback_error)
+        self.video.video_dbl_click.connect(self._on_video_dbl_click)
+        self.video.video_mouse_press.connect(self._on_video_press)
+        self.video.video_mouse_move.connect(self._on_video_move)
+        self.video.video_mouse_release.connect(self._on_video_release)
         lay.addWidget(self.video, 1)
 
         self.bar = QWidget()
@@ -384,44 +404,13 @@ class EmbeddedPlayer(QWidget):
         self._stats_timer.setInterval(1000)
         self._stats_timer.timeout.connect(self._update_stats_text)
 
-    # -- event filter ----------------------------------------------------------
+    # -- event filter (fullscreen overlay + pip bar on control hover) ---------
 
     def eventFilter(self, obj, event):
         if obj is self.video:
-            if event.type() == event.Type.MouseButtonDblClick:
-                if not self._drag_active:
-                    self.double_clicked.emit()
-                    return True
-            if event.type() == event.Type.MouseButtonPress:
-                if (event.button() == Qt.MouseButton.LeftButton
-                        and self._pip_drag_enabled()):
-                    self._drag_start = event.globalPosition().toPoint()
-                    self._drag_win_pos = self.window().pos()
-                    self._drag_active = False
-                    return True
             if event.type() == event.Type.MouseMove:
                 if self._fs_ui:
                     self._show_overlay()
-                if self._pip_mode:
-                    self._show_pip_bar()
-                if (self._drag_start is not None
-                        and event.buttons() & Qt.MouseButton.LeftButton):
-                    delta = event.globalPosition().toPoint() - self._drag_start
-                    if not self._drag_active:
-                        if (abs(delta.x()) > 4 or abs(delta.y()) > 4):
-                            self._drag_active = True
-                        else:
-                            return True
-                    self.window().move(self._drag_win_pos + delta)
-                    return True
-            if event.type() == event.Type.MouseButtonRelease:
-                if (event.button() == Qt.MouseButton.LeftButton
-                        and self._drag_start is not None):
-                    was_drag = self._drag_active
-                    self._drag_start = None
-                    self._drag_active = False
-                    if was_drag:
-                        return True
         elif obj is self.bar and self._pip_mode:
             if event.type() in (event.Type.Enter, event.Type.MouseMove):
                 self._pip_bar_timer.start(self.PIP_BAR_HIDE_MS)
@@ -430,8 +419,36 @@ class EmbeddedPlayer(QWidget):
             self._overlay_timer.start()
         return super().eventFilter(obj, event)
 
-    def _pip_drag_enabled(self) -> bool:
-        return self._pip_mode
+    # -- video mouse handlers (signals from _MpvGLWidget) ------------------
+
+    def _on_video_dbl_click(self) -> None:
+        if not self._drag_active:
+            self.double_clicked.emit()
+
+    def _on_video_press(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton and self._pip_mode:
+            self._drag_start = event.globalPosition().toPoint()
+            self._drag_win_pos = self.window().pos()
+            self._drag_active = False
+
+    def _on_video_move(self, event) -> None:
+        if self._pip_mode:
+            self._show_pip_bar()
+        if (self._drag_start is not None
+                and event.buttons() & Qt.MouseButton.LeftButton):
+            delta = event.globalPosition().toPoint() - self._drag_start
+            if not self._drag_active:
+                if abs(delta.x()) > 4 or abs(delta.y()) > 4:
+                    self._drag_active = True
+                else:
+                    return
+            self.window().move(self._drag_win_pos + delta)
+
+    def _on_video_release(self, event) -> None:
+        if (event.button() == Qt.MouseButton.LeftButton
+                and self._drag_start is not None):
+            self._drag_start = None
+            self._drag_active = False
 
     # -- pip bar auto-hide -----------------------------------------------------
 
