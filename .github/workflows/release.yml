@@ -27,8 +27,15 @@ jobs:
       - name: Smoke test - install wheel in a fresh venv
         run: |
           # Verify the wheel actually installs into a clean environment and
-          # every import path is intact. python-mpv is the risky one - if it
-          # can't find libmpv at import time the app is dead on arrival.
+          # every import path is intact. PyQt6 loads libEGL/libGL at import
+          # time, so the runner needs those system libraries even for a
+          # headless import check - this mirrors what a real pipx user has
+          # to install alongside the wheel (see the .deb depends list).
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libxcb-cursor0 libpulse0 libdbus-1-3 \
+            libxkbcommon0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xkb1
           python -m venv /tmp/smoke
           /tmp/smoke/bin/pip install --upgrade pip
           /tmp/smoke/bin/pip install dist/*.whl
