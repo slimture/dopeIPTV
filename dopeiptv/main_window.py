@@ -13,12 +13,12 @@ import time
 from datetime import datetime, timedelta
 
 from PyQt6.QtCore import (
-    QDateTime, QRect, QSettings, QSize, Qt, QThreadPool, QTimer, QUrl,
+    QDateTime, QRect, QRectF, QSettings, QSize, Qt, QThreadPool, QTimer, QUrl,
     pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QColor, QDesktopServices, QIcon, QKeySequence, QPainter, QPainterPath,
-    QPixmap, QShortcut,
+    QAction, QColor, QDesktopServices, QIcon, QKeySequence, QPainter,
+    QPainterPath, QPixmap, QShortcut,
 )
 from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDateTimeEdit, QDialog,
@@ -101,6 +101,50 @@ class _Toast(QLabel):
 
     def _dismiss(self) -> None:
         self.hide()
+
+
+class _SidebarLogo(QWidget):
+    """Small themed dopeIPTV wordmark at the top of the sidebar: an accent
+    play-tile next to the name, centred. Painted from the live palette so it
+    recolours when the theme/accent changes (call update() then). Identical on
+    Linux and macOS."""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setFixedHeight(42)
+
+    def paintEvent(self, _event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        tile = 26.0
+        font = self.font()
+        font.setPointSizeF(15.0)
+        font.setBold(True)
+        painter.setFont(font)
+        text = "dopeIPTV"
+        text_w = painter.fontMetrics().horizontalAdvance(text)
+        gap = 9.0
+        total = tile + gap + text_w
+        x0 = (self.width() - total) / 2.0
+        y0 = (self.height() - tile) / 2.0
+        # Accent tile with a white play triangle (mirrors the app icon). Read
+        # the accent from the live palette dict (not the module-level ACCENT,
+        # which is bound by value and would go stale after an accent change).
+        path = QPainterPath()
+        path.addRoundedRect(x0, y0, tile, tile, tile * 0.30, tile * 0.30)
+        painter.fillPath(path, QColor(P.get("accent", "#4C8DFF")))
+        tri = QPainterPath()
+        tri.moveTo(x0 + tile * 0.38, y0 + tile * 0.27)
+        tri.lineTo(x0 + tile * 0.38, y0 + tile * 0.73)
+        tri.lineTo(x0 + tile * 0.75, y0 + tile * 0.50)
+        tri.closeSubpath()
+        painter.fillPath(tri, QColor("white"))
+        # Wordmark in the theme's primary text colour.
+        painter.setPen(QColor(P.get("text", "#ECECF1")))
+        painter.drawText(
+            QRectF(x0 + tile + gap, 0, text_w + 4, self.height()),
+            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, text)
+        painter.end()
 
 
 class MainWindow(QMainWindow):
@@ -221,6 +265,13 @@ class MainWindow(QMainWindow):
         about_action.triggered.connect(self.show_about)
         quit_action = app_menu.addAction(tr("menu_quit"))
         quit_action.triggered.connect(self.close)
+        # On macOS these roles move the items into the standard application
+        # menu (the bold "dopeIPTV" menu next to the Apple logo), which is
+        # where a Mac user expects About / Settings / Quit. The role is a
+        # no-op on Linux/Windows, so the GNOME menu is unchanged.
+        about_action.setMenuRole(QAction.MenuRole.AboutRole)
+        settings_action.setMenuRole(QAction.MenuRole.PreferencesRole)
+        quit_action.setMenuRole(QAction.MenuRole.QuitRole)
         # Kept for live language switching (see retranslate_ui).
         self._i18n_actions = {
             settings_action: lambda: tr("btn_settings") + "...",
@@ -239,9 +290,10 @@ class MainWindow(QMainWindow):
         sl.setContentsMargins(12, 16, 12, 12)
         sl.setSpacing(4)
 
-        # (The app name already shows in the window title / menu bar, so the
-        # sidebar doesn't repeat it - it just starts with the nav buttons.)
-        sl.addSpacing(4)
+        # Small themed logo at the top of the sidebar (recolours with theme).
+        self._sidebar_logo = _SidebarLogo()
+        sl.addWidget(self._sidebar_logo)
+        sl.addSpacing(6)
 
         self.nav_btns: dict[str, QPushButton] = {}
         for key, text in (("live", tr("nav_tv")), ("vod", tr("nav_movies")),
@@ -3459,6 +3511,7 @@ class MainWindow(QMainWindow):
         self.settings.setValue("accent", accent)
         apply_theme(self.settings)
         QApplication.instance().setStyleSheet(build_style())
+        self._sidebar_logo.update()
         self.listw.viewport().update()
         self.count_lbl.setStyleSheet(
             f"color:{P['muted3']}; font-size:11px;")
@@ -3526,6 +3579,14 @@ class MainWindow(QMainWindow):
         idx = box.findData(current)
         if idx >= 0:
             box.setCurrentIndex(idx)
+        if sys.platform == "darwin":
+            # On macOS the styled combo doesn't grow to fit its text, so the
+            # closed box clips ("Playba…", "Sven…"). Size it to the widest
+            # entry (plus a little for the arrow). Linux is left as-is.
+            box.setSizeAdjustPolicy(
+                QComboBox.SizeAdjustPolicy.AdjustToContents)
+            longest = max((len(lbl) for _v, lbl in items), default=0)
+            box.setMinimumContentsLength(longest + 2)
         return box
 
     def open_settings(self) -> None:

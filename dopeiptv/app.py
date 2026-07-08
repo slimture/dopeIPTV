@@ -8,7 +8,22 @@ from pathlib import Path
 
 from PyQt6.QtCore import QSettings, Qt
 from PyQt6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPixmap
-from PyQt6.QtWidgets import QApplication, QLabel, QMessageBox
+from PyQt6.QtWidgets import (
+    QApplication, QLabel, QMessageBox, QProxyStyle, QStyle,
+)
+
+
+class _NoButtonIconsStyle(QProxyStyle):
+    """Strip the platform theme icons Qt puts on OK / Cancel / Save dialog
+    buttons (a green tick, a red cross, ...). We want clean text-only buttons
+    everywhere - most visibly in Settings on Linux themes that ship those
+    icons. Only this one style hint is overridden; everything else defers to
+    the real platform style, so nothing else changes on any OS."""
+
+    def styleHint(self, hint, option=None, widget=None, returnData=None):
+        if hint == QStyle.StyleHint.SH_DialogButtonBox_ButtonsHaveIcons:
+            return 0
+        return super().styleHint(hint, option, widget, returnData)
 
 from . import APP_NAME, ORG
 from .client import XtreamClient
@@ -93,6 +108,7 @@ def main() -> int:
             setup_opengl()
 
     app = QApplication(sys.argv)
+    app.setStyle(_NoButtonIconsStyle(app.style()))
     app.setApplicationName(APP_NAME)
     app.setOrganizationName(ORG)
     app.setApplicationDisplayName(APP_NAME)

@@ -71,6 +71,29 @@ def gl_get_proc_address_fallback(name: bytes) -> int:
         return 0
 
 
+_cursor_hidden = False
+
+
+def set_cursor_hidden(hidden: bool) -> None:
+    """Hide/show the mouse cursor on macOS via an application override cursor.
+
+    Per-widget ``setCursor(BlankCursor)`` does not reliably hide the pointer
+    over a QOpenGLWidget on macOS (the native view keeps its own cursor rect),
+    so the fullscreen/mini-player idle-hide has no effect there. An override
+    cursor is honoured by Cocoa. Kept balanced via the module flag so the
+    push/pop stack never drifts. macOS only - Linux uses the widget cursor."""
+    global _cursor_hidden
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtGui import QCursor
+    from PyQt6.QtWidgets import QApplication
+    if hidden and not _cursor_hidden:
+        QApplication.setOverrideCursor(QCursor(Qt.CursorShape.BlankCursor))
+        _cursor_hidden = True
+    elif not hidden and _cursor_hidden:
+        QApplication.restoreOverrideCursor()
+        _cursor_hidden = False
+
+
 def extra_mpv_opts() -> dict:
     """Extra mpv options for macOS (hardware decoding)."""
     return {"hwdec": "videotoolbox-copy"}
@@ -84,13 +107,23 @@ def extra_player_candidates(player: str) -> list[str]:
 
 
 def fix_app_name(name: str) -> None:
-    """Set the macOS menu bar app name (overrides 'python' default)."""
+    """Set the macOS application-menu name so it reads 'dopeIPTV' instead of
+    'python' when the app is run from source. Needs pyobjc; if it isn't
+    installed this is a no-op and the menu keeps the process name (a proper
+    .app bundle with CFBundleName in Info.plist fixes it for good - see the
+    packaging docs). Must run before QApplication is created."""
     try:
         import objc  # noqa: F401
         bundle = objc.lookUpClass("NSBundle").mainBundle()
         info = bundle.localizedInfoDictionary() or bundle.infoDictionary()
         if info is not None:
             info["CFBundleName"] = name
+            info["CFBundleDisplayName"] = name
+        try:
+            objc.lookUpClass("NSProcessInfo").processInfo().setProcessName_(
+                name)
+        except Exception:
+            pass
     except Exception:
         pass
 
@@ -113,9 +146,17 @@ class WakeLockMacOS:
     def acquire(self, reason: str = "Playing video") -> None:
         if self.held:
             return
+        # -d prevents display sleep, -i prevents idle system sleep; tying it to
+        # our own PID (-w) makes the OS release the assertion if we crash. Use
+        # the absolute path so it resolves even under a Finder-launched app's
+        # minimal PATH.
+        exe = "/usr/bin/caffeinate"
+        if not os.path.exists(exe):
+            exe = "caffeinate"
         try:
             self._proc = subprocess.Popen(
-                ["caffeinate", "-di"], stdin=subprocess.DEVNULL,
+                [exe, "-d", "-i", "-w", str(os.getpid())],
+                stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception:
             pass

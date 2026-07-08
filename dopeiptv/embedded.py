@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import sys
 
-from PyQt6.QtCore import QByteArray, QPointF, QRectF, QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import (
+    QByteArray, QEvent, QObject, QPointF, QRect, QRectF, QSize, Qt, QTimer,
+    pyqtSignal,
+)
 from PyQt6.QtGui import (
-    QColor, QIcon, QOpenGLContext, QPainter, QPen, QPixmap, QPolygonF,
+    QColor, QCursor, QIcon, QOpenGLContext, QPainter, QPen, QPixmap, QPolygonF,
 )
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 from PyQt6.QtWidgets import (
-    QApplication, QHBoxLayout, QLabel, QMenu, QSizePolicy, QSlider,
+    QApplication, QHBoxLayout, QLabel, QLineEdit, QMenu, QSizePolicy, QSlider,
     QVBoxLayout, QWidget, QPushButton,
 )
 
@@ -313,6 +316,75 @@ class _SeekSlider(QSlider):
             event.accept()
             return
         super().mouseReleaseEvent(event)
+
+
+class _MacInputFilter(QObject):
+    """macOS-only application-level input filter for the embedded player.
+
+    On macOS a QOpenGLWidget does not reliably get keyboard focus or drive its
+    own cursor rect, so two things that work through plain widget events on
+    Linux don't on macOS:
+      * plain Left/Right seek - the keys fall through to the channel list (mini
+        player) or the window (fullscreen) and change channel instead of
+        seeking ±10 s;
+      * the idle cursor-hide over the video surface.
+    Filtering at the application level sidesteps the focus problem. It is
+    installed only on darwin, so Linux keeps its existing widget-based paths
+    completely untouched.
+    """
+
+    def __init__(self, player: "EmbeddedPlayer") -> None:
+        super().__init__(player)
+        self._player = player
+        self._cursor_timer = QTimer(self)
+        self._cursor_timer.setSingleShot(True)
+        self._cursor_timer.setInterval(2000)
+        self._cursor_timer.timeout.connect(self._maybe_hide_cursor)
+        QApplication.instance().installEventFilter(self)
+
+    def _over_video(self) -> bool:
+        p = self._player
+        if p.current_url is None or p.video.mpv is None or not p.video.isVisible():
+            return False
+        top_left = p.video.mapToGlobal(p.video.rect().topLeft())
+        return QRect(top_left, p.video.size()).contains(QCursor.pos())
+
+    def _maybe_hide_cursor(self) -> None:
+        from .platform_macos import set_cursor_hidden
+        if self._over_video():
+            set_cursor_hidden(True)
+
+    def eventFilter(self, obj, event):
+        et = event.type()
+        if et == QEvent.Type.MouseMove:
+            from .platform_macos import set_cursor_hidden
+            set_cursor_hidden(False)
+            if self._over_video():
+                self._cursor_timer.start()
+            else:
+                self._cursor_timer.stop()
+        elif et in (QEvent.Type.KeyPress, QEvent.Type.KeyRelease):
+            if self._handle_seek_key(event, et == QEvent.Type.KeyPress):
+                return True
+        return False
+
+    def _handle_seek_key(self, event, pressed: bool) -> bool:
+        if event.key() not in (Qt.Key.Key_Left, Qt.Key.Key_Right):
+            return False
+        # Ctrl+arrows stay a channel zap; only claim the bare presses.
+        if event.modifiers() != Qt.KeyboardModifier.NoModifier:
+            return False
+        p = self._player
+        if p.current_url is None or not p._is_seekable():
+            return False
+        # Never steal arrows from a text field (search box, PIN entry, ...).
+        if isinstance(QApplication.focusWidget(), QLineEdit):
+            return False
+        if pressed:
+            p._on_seek_key_press(event)
+        else:
+            p._on_seek_key_release(event)
+        return True
 
 
 class EmbeddedPlayer(QWidget):
@@ -628,6 +700,11 @@ class EmbeddedPlayer(QWidget):
         self._stats_timer.setInterval(1000)
         self._stats_timer.timeout.connect(self._update_stats_text)
 
+        # macOS: route arrow-seek + cursor-hide through an app-level filter,
+        # because a QOpenGLWidget can't drive them itself there. No-op on Linux.
+        self._mac_input_filter = (
+            _MacInputFilter(self) if sys.platform == "darwin" else None)
+
         self.retranslate_ui()
 
     def retranslate_ui(self) -> None:
@@ -777,6 +854,13 @@ class EmbeddedPlayer(QWidget):
         except Exception:
             return False
 
+    def _mac_show_cursor(self) -> None:
+        """Un-hide the macOS override cursor (safety for when playback ends
+        while it was hidden and no mouse move follows). No-op off macOS."""
+        if sys.platform == "darwin":
+            from .platform_macos import set_cursor_hidden
+            set_cursor_hidden(False)
+
     def _on_seek_key_press(self, event) -> None:
         if not self._is_seekable():
             return
@@ -861,6 +945,7 @@ class EmbeddedPlayer(QWidget):
             self._overlay_timer.stop()
             self.unsetCursor()
             self.video.unsetCursor()
+            self._mac_show_cursor()
             # The docked height is now a constant, not derived from
             # self.height(), so restoring it doesn't depend on the window
             # having finished its async resize back from fullscreen - it
@@ -1439,6 +1524,7 @@ class EmbeddedPlayer(QWidget):
         self._stats_overlay.hide()
         self._stats_timer.stop()
         self._sync_pause_label(True)
+        self._mac_show_cursor()
         # Paint the pane solid black instead of freezing on the last frame.
         self.video.set_blank(True)
 
