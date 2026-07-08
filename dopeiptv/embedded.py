@@ -411,10 +411,13 @@ class EmbeddedPlayer(QWidget):
         self.pip_btn.clicked.connect(self.pip_requested)
         self.fs_btn = QPushButton("⛶", objectName="MiniBtn")
         self.fs_btn.setToolTip(tr("tooltip_fullscreen"))
+        # Standard transport order: prev / play-pause / next, with Stop set
+        # slightly apart so it isn't hit by accident in the play-pause spot.
         bl.addWidget(self.prev_btn)
-        bl.addWidget(self.stop_btn)
-        bl.addWidget(self.next_btn)
         bl.addWidget(self.pause_btn)
+        bl.addWidget(self.next_btn)
+        bl.addSpacing(6)
+        bl.addWidget(self.stop_btn)
         bl.addStretch(1)
         bl.addWidget(self.ts_btn)
         bl.addWidget(self.rec_btn)
