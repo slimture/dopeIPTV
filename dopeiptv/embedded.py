@@ -843,7 +843,21 @@ class EmbeddedPlayer(QWidget):
             set_opt("video-aspect-override",
                     aspect if aspect != "auto" else "-1")
 
-    def play(self, url: str, title: str) -> bool:
+    def playback_position(self) -> float:
+        m = self.video.mpv
+        try:
+            return float(m.playback_time or 0.0)
+        except Exception:
+            return 0.0
+
+    def playback_duration(self) -> float:
+        m = self.video.mpv
+        try:
+            return float(m.duration or 0.0)
+        except Exception:
+            return 0.0
+
+    def play(self, url: str, title: str, start: float = 0.0) -> bool:
         try:
             self.title_lbl.setText(title or "")
             self._hide_seek_ui()
@@ -871,6 +885,12 @@ class EmbeddedPlayer(QWidget):
             self._sync_pause_label(False)
             try:
                 m.pause = False
+            except Exception:
+                pass
+            # Resume playback at a saved offset (in seconds) via mpv's start
+            # option; reset it otherwise so it doesn't leak to the next file.
+            try:
+                m["start"] = str(float(start)) if start and start > 1 else "none"
             except Exception:
                 pass
             m.play(url)

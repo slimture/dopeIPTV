@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import json
 import os
 import shutil
 import sys
@@ -11,7 +12,8 @@ import time
 from datetime import datetime, timedelta
 
 from PyQt6.QtCore import (
-    QDateTime, QSettings, QSize, Qt, QThreadPool, QTimer, QUrl, pyqtSignal,
+    QDateTime, QRect, QSettings, QSize, Qt, QThreadPool, QTimer, QUrl,
+    pyqtSignal,
 )
 from PyQt6.QtGui import (
     QColor, QDesktopServices, QIcon, QKeySequence, QPainter, QPainterPath,
@@ -134,6 +136,14 @@ class MainWindow(QMainWindow):
             settings, f"favorites_{pid}" if pid else "favorites")
         self.history = HistoryStore(
             settings, f"history_{pid}" if pid else "history")
+        self._resume_key = f"resume_positions_{pid}" if pid else "resume_positions"
+        try:
+            self._resume: dict = json.loads(
+                settings.value(self._resume_key, "") or "{}")
+        except Exception:
+            self._resume = {}
+        if not isinstance(self._resume, dict):
+            self._resume = {}
         self.overrides = CategoryOverrides(
             settings, f"category_overrides_{pid}" if pid else "category_overrides")
         self.channel_ov = ChannelOverrides(
@@ -546,6 +556,12 @@ class MainWindow(QMainWindow):
         self.tick = QTimer(self)
         self.tick.timeout.connect(self._refresh_progress)
         self.tick.start(60_000)
+
+        # Periodically remember the playback position of movies/episodes so
+        # they can be resumed later even if the app is closed abruptly.
+        self._resume_timer = QTimer(self)
+        self._resume_timer.timeout.connect(self._save_resume_position)
+        self._resume_timer.start(12_000)
         self._current_epg = None
         self._player_fs = False
 
@@ -722,13 +738,41 @@ class MainWindow(QMainWindow):
             | Qt.WindowType.WindowStaysOnTopHint
             | Qt.WindowType.FramelessWindowHint)
         self.show()
-        self.resize(480, 270)
-        screen_geo = self.screen().availableGeometry()
-        self.move(screen_geo.right() - 500, screen_geo.bottom() - 290)
+        # Restore the last PiP position/size, else default to bottom-right.
+        geo = self._saved_pip_geometry()
+        if geo is None:
+            screen_geo = self.screen().availableGeometry()
+            geo = QRect(screen_geo.right() - 500, screen_geo.bottom() - 290,
+                        480, 270)
+        self.setGeometry(geo)
+        # Re-assert geometry + stacking across the next event-loop turns:
+        # changing window flags recreates the native window on X11 and the WM
+        # may otherwise re-place or lower it.
+        for delay in (0, 40, 150):
+            QTimer.singleShot(delay, lambda g=geo: (
+                self.setGeometry(g), self.raise_()))
+        if "wayland" in QApplication.instance().platformName().lower() \
+                and not getattr(self, "_pip_wayland_warned", False):
+            self._pip_wayland_warned = True
+            self._show_toast(tr("pip_wayland_hint"), 6000)
+
+    def _saved_pip_geometry(self) -> "QRect | None":
+        raw = self.settings.value("pip_geometry", "")
+        try:
+            x, y, w, h = (int(v) for v in str(raw).split(","))
+        except (ValueError, TypeError):
+            return None
+        if w < 200 or h < 120:
+            return None
+        return QRect(x, y, w, h)
 
     def _exit_pip(self) -> None:
         if self._pip_win is None:
             return
+        # Remember the PiP window's position/size for next time.
+        g = self.geometry()
+        self.settings.setValue(
+            "pip_geometry", f"{g.x()},{g.y()},{g.width()},{g.height()}")
         self._pip_win = None
 
         self.player.set_pip_mode(False)
@@ -2098,11 +2142,58 @@ class MainWindow(QMainWindow):
             mode = "window"
         return mode
 
+    # Content kinds whose playback position is worth remembering/resuming.
+    _RESUMABLE = ("movie", "episode", "recording")
+
+    def _save_resume_position(self) -> None:
+        """Remember how far into the current title the user got, so it can be
+        resumed later. Positions near the very start or end are dropped."""
+        if not (self.player and self.player.current_url and self._playing_key
+                and self._playing_group in ("vod", "episode", "rec")):
+            return
+        pos = self.player.playback_position()
+        dur = self.player.playback_duration()
+        rkey = f"{self._playing_group}:{self._playing_key}"
+        if dur > 0 and 60 < pos < dur * 0.95:
+            self._resume[rkey] = {"pos": round(pos), "dur": round(dur)}
+        else:
+            self._resume.pop(rkey, None)
+        self.settings.setValue(self._resume_key, json.dumps(self._resume))
+
+    def _resume_offset(self, key, kind: str) -> float:
+        """Ask whether to resume a partly-watched title; return the start
+        offset in seconds (0 to start from the beginning)."""
+        group = {"movie": "vod", "episode": "episode",
+                 "recording": "rec"}.get(kind)
+        saved = self._resume.get(f"{group}:{key}") if group else None
+        if not saved:
+            return 0.0
+        pos = float(saved.get("pos") or 0)
+        if pos <= 60:
+            return 0.0
+        idx = self._choice_dialog(
+            tr("resume_title"),
+            tr("resume_prompt", time=self._fmt_hms(pos)),
+            [(tr("resume_continue", time=self._fmt_hms(pos)), "primary"),
+             (tr("resume_restart"), "normal")])
+        return pos if idx == 0 else 0.0
+
+    @staticmethod
+    def _fmt_hms(seconds: float) -> str:
+        seconds = max(0, int(seconds))
+        h, rem = divmod(seconds, 3600)
+        m, s = divmod(rem, 60)
+        return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+
     def _start_playback(self, url: str, title: str, icon_url,
                         key, kind: str, record: bool = True,
                         item=None) -> None:
         if not self._guard_stream_switch(url, title):
             return
+        # Remember where we were in whatever was playing before switching.
+        self._save_resume_position()
+        resume_at = (self._resume_offset(key, kind)
+                     if kind in self._RESUMABLE else 0.0)
         self._trakt_stop_current()
         if record and kind:
             self.history.add(url, title, icon_url, key, kind)
@@ -2127,7 +2218,7 @@ class MainWindow(QMainWindow):
             self.rec.finish_all_inplayer("channel changed")
             self.player.show()
             self.player.set_overlay_info(title)
-            if self.player.play(url, title):
+            if self.player.play(url, title, start=resume_at):
                 self.wake.acquire(f"Playing {title}")
             else:
                 self.player.hide()
@@ -2526,6 +2617,40 @@ class MainWindow(QMainWindow):
             self.player.set_overlay_info(
                 f"Recording stopped: {title} ({reason})")
 
+    def _choice_dialog(self, title: str, message: str,
+                       options: list[tuple[str, str]]) -> int | None:
+        """A compact, themed confirmation dialog. *options* is a list of
+        (label, kind) where kind is "primary"/"normal"/"danger"; returns the
+        index of the clicked option, or None if dismissed. Replaces the
+        oversized multi-button QMessageBox with clean stacked buttons."""
+        d = QDialog(self)
+        d.setWindowTitle(title)
+        d.setModal(True)
+        d.setMinimumWidth(420)
+        lay = QVBoxLayout(d)
+        lay.setContentsMargins(22, 20, 22, 18)
+        lay.setSpacing(16)
+        lbl = QLabel(message)
+        lbl.setWordWrap(True)
+        lbl.setStyleSheet(f"font-size:13px; color:{P['text2']};")
+        lay.addWidget(lbl)
+        btns = QVBoxLayout()
+        btns.setSpacing(8)
+        chosen: dict[str, int | None] = {"idx": None}
+        for i, (label, kind) in enumerate(options):
+            b = QPushButton(label)
+            if kind == "primary":
+                b.setObjectName("Primary")
+            elif kind == "danger":
+                b.setStyleSheet(
+                    f"color:{P['rec']}; font-weight:600;")
+            b.clicked.connect(
+                lambda _c=False, i=i: (chosen.update(idx=i), d.accept()))
+            btns.addWidget(b)
+        lay.addLayout(btns)
+        d.exec()
+        return chosen["idx"]
+
     def _guard_stream_switch(self, url: str, title: str) -> bool:
         if not url or not str(url).startswith("http"):
             return True
@@ -2539,28 +2664,23 @@ class MainWindow(QMainWindow):
             if self.player and url == self.player.current_url:
                 return True
             j = inplayer[0]
-            box = QMessageBox(self)
-            box.setWindowTitle("Recording in progress")
-            box.setText(
-                f"'{j['title']}' is being recorded from the stream "
-                f"you're watching.\n\nSwitching to '{title}' will "
-                "STOP that recording - unless you continue it over "
-                "a second connection (needs a multi-stream account).")
-            stop_btn = box.addButton(
-                "Stop recording & switch",
-                QMessageBox.ButtonRole.AcceptRole)
-            cont_btn = (box.addButton(
-                "Switch & keep recording (new connection)",
-                QMessageBox.ButtonRole.ActionRole)
-                if j.get("url") else None)
-            box.addButton("Keep watching (recording continues)",
-                          QMessageBox.ButtonRole.RejectRole)
-            box.exec()
-            clicked = box.clickedButton()
-            if clicked is stop_btn:
+            can_cont = bool(j.get("url"))
+            options = [("Stop recording and switch", "danger")]
+            if can_cont:
+                options.append(
+                    ("Switch, keep recording on a new connection", "normal"))
+            options.append(("Keep watching (recording continues)", "primary"))
+            idx = self._choice_dialog(
+                "Recording in progress",
+                f"“{j['title']}” is being recorded from the stream you're "
+                f"watching. Switching to “{title}” will stop that recording, "
+                "unless you continue it over a second connection (needs a "
+                "multi-stream account).",
+                options)
+            if idx == 0:
                 self.rec.finish_all_inplayer("stopped")
                 return True
-            if cont_btn is not None and clicked is cont_btn:
+            if can_cont and idx == 1:
                 self.rec.finish_all_inplayer(
                     "continued over a new connection")
                 self.rec.add_job(j["url"], f"{j['title']} (cont.)",
@@ -2569,25 +2689,18 @@ class MainWindow(QMainWindow):
                 return True
             return False
         j = active[0]
-        box = QMessageBox(self)
-        box.setWindowTitle("Recording in progress")
-        box.setText(
-            f"'{j['title']}' is being recorded over its own "
-            f"connection.\n\nIf your account only allows one stream "
-            f"at a time, starting '{title}' can kill that recording.")
-        watch_btn = box.addButton(
-            "Watch the recorded channel (no new stream)",
-            QMessageBox.ButtonRole.AcceptRole)
-        anyway_btn = box.addButton(
-            "Play anyway (I have multiple streams)",
-            QMessageBox.ButtonRole.ActionRole)
-        box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
-        box.exec()
-        clicked = box.clickedButton()
-        if clicked is watch_btn:
+        idx = self._choice_dialog(
+            "Recording in progress",
+            f"“{j['title']}” is being recorded over its own connection. If "
+            f"your account only allows one stream at a time, starting "
+            f"“{title}” can kill that recording.",
+            [("Watch the recorded channel", "primary"),
+             ("Play anyway (I have multiple streams)", "normal"),
+             ("Cancel", "normal")])
+        if idx == 0:
             self._watch_recording_file(j)
             return False
-        if clicked is anyway_btn:
+        if idx == 1:
             self._multi_stream_ok = True
             return True
         return False
@@ -4083,6 +4196,7 @@ class MainWindow(QMainWindow):
         d = getattr(self, "_cast_dialog", None)
         if d is not None:
             d.close()
+        self._save_resume_position()
         self.wake.release()
         if self.tmdb:
             self.tmdb.flush()
