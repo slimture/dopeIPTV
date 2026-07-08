@@ -2249,10 +2249,19 @@ class MainWindow(QMainWindow):
         self._playing_key = self._item_key(it)
         self._playing_group = "live"
         self._playing_item = it
+        # Also remember what's playing here (not just in _start_playback) so
+        # a Stop -> Play round-trip after an auto-preview brings this channel
+        # back instead of resuming nothing. Without this the Play button
+        # after Stop prints '_resume_last: no _last_playback stored' because
+        # auto-preview never went through _start_playback.
+        self._last_playback = {"url": url, "title": title,
+                               "icon_url": it.get("stream_icon"),
+                               "key": self._item_key(it),
+                               "kind": "live", "item": it}
         self._sync_player_buttons()
         self.listw.viewport().update()
         self.setWindowTitle(title or self._base_title)
-        self._set_status(f"Playing: {title}")
+        self._set_status(tr("status_playing", title=title))
         self.rec.finish_all_inplayer("channel changed")
         self.player.show()
         self.player.set_overlay_info(title)

@@ -1545,10 +1545,17 @@ class EmbeddedPlayer(QWidget):
                 m["vid"] = "no"
             except Exception:
                 pass
-            try:
-                m.command("stop")
-            except Exception:
-                pass
+            # Clear the playlist BEFORE issuing stop so mpv releases the
+            # current file cleanly (with just "stop" mpv may keep the last
+            # decoded frame in its render pipeline). loadfile with a null
+            # source then guarantees the render context is fed an empty
+            # frame instead of the previous one.
+            for cmd in (("playlist-clear",), ("stop",),
+                        ("loadfile", "null:", "replace")):
+                try:
+                    m.command(*cmd)
+                except Exception:
+                    pass
         self.stop_stream_record()
         self.current_url = None
         self.title_lbl.setText("")
