@@ -28,7 +28,7 @@ class _NoButtonIconsStyle(QProxyStyle):
 from . import APP_NAME, ORG, VERSION
 from .client import XtreamClient
 from .dialogs import LoginDialog, PlaylistDialog
-from .main_window import MainWindow
+from .ui.main_window import MainWindow
 from .players import _libmpv, _libmpv_error, embedded_playback_reason
 
 _SUPPRESSED_QT_WARNINGS = (

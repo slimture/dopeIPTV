@@ -7,11 +7,11 @@ from __future__ import annotations
 
 import html
 import re
-from .client import b64, epg_times
-from .i18n import tr
-from .theme import ACCENT, P
+from ..client import b64, epg_times
+from ..i18n import tr
+from ..theme import ACCENT, P
 from .widgets import _ClickableWidget
-from .workers import run_async, tmdb_url_from_provider
+from ..workers import run_async, tmdb_url_from_provider
 from PyQt6.QtCore import QSize, QTimer, Qt
 from PyQt6.QtGui import QIcon, QPainter, QPainterPath, QPixmap
 from PyQt6.QtWidgets import QAbstractItemView, QDialog, QDialogButtonBox, QFrame, QLabel, QListWidget, QListWidgetItem, QVBoxLayout, QWidget

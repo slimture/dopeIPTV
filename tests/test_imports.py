@@ -23,7 +23,7 @@ MODULES_NEED_DISPLAY = [
     "dopeiptv.chromecast",
     "dopeiptv.dialogs",
     "dopeiptv.embedded",
-    "dopeiptv.main_window",
+    "dopeiptv.ui.main_window",
     "dopeiptv.players",
 ]
 
