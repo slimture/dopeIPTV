@@ -134,53 +134,14 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
-def _drop_host_graphics(binaries):
-    """Strip the OpenGL/Mesa/DRM/Wayland stack from the bundle so it comes
-    from the machine running the app, not the build host.
-
-    PyInstaller's Qt hooks pull libGL/libEGL/libglapi/libgbm/libdrm and the
-    Mesa GLX + LLVM loader into the bundle. Shipping them is what kills the
-    embedded player on other distros: our bundled libGL loads the *host's*
-    DRI driver (/usr/lib/dri/*_dri.so), the two disagree on libglapi's symbol
-    table, and GL init dies with "did not find extension DRI_Mesa / failed to
-    bind extensions". The build host (Arch) happens to match its own bundle so
-    it works there, while an Ubuntu box shows a black, dead player. These
-    libraries must always come from the host - which by definition matches its
-    own DRI drivers and compositor - so drop them here. Every Linux desktop
-    ships them, exactly as the upstream AppImage excludelist assumes."""
-    host_libs = (
-        # The GLX + Mesa loader stack that actually triggers "did not find
-        # extension DRI_Mesa / failed to bind extensions": our bundled libGL
-        # loads the host's DRI driver, and the two disagree on libglapi's
-        # symbol table. These are present on every GL-capable Linux desktop,
-        # so taking them from the host is safe and fixes the clash. We
-        # deliberately do NOT strip libEGL, libgbm, libdrm or the Wayland/xcb
-        # libs: libmpv can be hard-linked (DT_NEEDED) against them, and a
-        # minimal host might not have them installed, which would stop libmpv
-        # from loading at all.
-        "libGL.so", "libGLX.so", "libGLX_mesa.so", "libGLdispatch.so",
-        "libOpenGL.so", "libglapi.so", "libgallium", "libLLVM",
-        # Fontconfig - a bundled (older) libfontconfig can't parse a newer
-        # host /etc/fonts and spews "invalid attribute 'xsi:nil'" warnings on
-        # every launch. Use the host's so it reads its own config cleanly.
-        "libfontconfig.so",
-    )
-    kept, dropped = [], []
-    for entry in binaries:
-        base = os.path.basename(entry[0])
-        if any(base.startswith(p) for p in host_libs):
-            dropped.append(base)
-        else:
-            kept.append(entry)
-    if dropped:
-        print("Excluding host graphics libs from bundle: "
-              + ", ".join(sorted(set(dropped))))
-    return kept
-
-
-if sys.platform.startswith("linux"):
-    a.binaries = _drop_host_graphics(a.binaries)
-
+# NOTE: we deliberately ship PyInstaller's full bundled OpenGL/Mesa stack
+# (libGL/libEGL/libglapi/libgallium/libLLVM, i.e. the self-contained llvmpipe
+# software renderer). An earlier version stripped it to use the host's GL, but
+# that mixed a host libGL with our bundled libEGL and stopped the embedded
+# player's window from coming up on some systems (e.g. an Ubuntu Wayland VM).
+# The bundled stack is self-contained and is what works across machines,
+# including software-only GL in VMs; the "did not find extension DRI_Mesa"
+# lines it prints when it probes for a hardware driver are harmless noise.
 pyz = PYZ(a.pure)
 
 exe = EXE(
