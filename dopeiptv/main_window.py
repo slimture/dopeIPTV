@@ -47,7 +47,7 @@ from .players import (
 from .recording import RecordingManager, format_size, safe_filename
 from .stores import (
     CategoryOverrides, ChannelOverrides, FavoriteStore, HistoryStore,
-    ParentalControl, PlaylistStore, WatchedStore,
+    ParentalControl, PlaylistStore, WatchedStore, WatchlistStore,
 )
 from .theme import ACCENT, ACCENTS, P, THEMES, apply_theme, build_style
 from .trakt import TraktAuthError, TraktClient
@@ -196,10 +196,21 @@ class MainWindow(QMainWindow):
         # category / channel / EPG API calls - that starvation is what
         # made "Loading categories" hang when a Movies category loaded
         # hundreds of poster fetches at once.
+        # The two loaders share the same on-disk cache directory: they
+        # cache the raw response bytes (not the scaled pixmap), so a
+        # cover the detail panel already fetched is instantly usable
+        # by the list delegate without another network round-trip.
+        # That also matters for the dead-URL fallback: if `poster_art`
+        # ever succeeded on a URL, the disk file exists, so `logos`
+        # can serve it without hitting the network - which is what
+        # went wrong when the two dirs were separate and a transient
+        # 500 on one loader made the delegate fall back to an empty
+        # `stream_icon` even though the detail panel had the artwork.
+        shared_image_dir = default_image_cache_dir("images")
         self._logo_pool = QThreadPool()
         self._logo_pool.setMaxThreadCount(4)
         self.logos = LogoLoader(self._logo_pool, max_size=320,
-                                cache_dir=default_image_cache_dir("logos"))
+                                cache_dir=shared_image_dir)
         # A poster plus up to 8 cast photos is up to 9 concurrent
         # downloads per selection, hence the separate pool + higher-res
         # cache (reusing `logos` blurs on the big detail-panel sizes).
@@ -207,7 +218,12 @@ class MainWindow(QMainWindow):
         self._art_pool.setMaxThreadCount(4)
         self.poster_art = LogoLoader(
             self._art_pool, max_size=320,
-            cache_dir=default_image_cache_dir("posters"))
+            cache_dir=shared_image_dir)
+        # A URL that fails on one loader may succeed on the other (or
+        # the reverse); share the dead-URL blacklist so the delegate's
+        # fallback logic isn't inconsistent between list and detail
+        # panel for the same movie.
+        self.poster_art.dead = self.logos.dead
         self.epg_progress.connect(self._on_epg_progress)
         pid = (active_pl or {}).get("id")
         self.xmltv = XmltvGuide(
@@ -247,6 +263,7 @@ class MainWindow(QMainWindow):
         self.trakt = TraktClient(settings)
         self._trakt_active: dict | None = None
         self.watched = WatchedStore(settings)
+        self.watchlist = WatchlistStore(settings)
         self._watched_sync_running = False
         self._raw_categories: list = []
         self.mpv = MpvIpcPlayer()
@@ -1285,6 +1302,8 @@ class MainWindow(QMainWindow):
             try:
                 movies = self.trakt.watched_movies()
                 shows = self.trakt.watched_shows()
+                wl_movies = self.trakt.watchlist_movies()
+                wl_shows = self.trakt.watchlist_shows()
             except Exception:
                 # Marshal back to the main thread just to flip the
                 # running flag; QTimer.singleShot from a non-Qt thread
@@ -1292,6 +1311,7 @@ class MainWindow(QMainWindow):
                 QTimer.singleShot(0, self._on_watched_sync_failed)
                 return
             self.watched.replace(movies, shows)
+            self.watchlist.replace(wl_movies, wl_shows)
             QTimer.singleShot(0, self._on_watched_sync_done)
 
         threading.Thread(target=worker, daemon=True).start()
@@ -1348,6 +1368,146 @@ class MainWindow(QMainWindow):
             if hk == "series":
                 return self.show_watched_count(item) > 0
         return False
+
+    def _tmdb_id_for_item(self, item: dict, kind: str) -> int | None:
+        if not self.tmdb or not item:
+            return None
+        title = item.get("name") or item.get("title") or ""
+        return self.tmdb.tmdb_id_for(title, kind)
+
+    def _show_tmdb_id_for_episode(self) -> int | None:
+        if not self.tmdb or not self.series_ctx:
+            return None
+        show_title = (self.series_ctx.get("name")
+                      or self.series_ctx.get("title") or "")
+        return self.tmdb.tmdb_id_for(show_title, "series")
+
+    # -- mark-as-watched (local toggle + optional Trakt push) -----------------
+
+    def _mark_movie_watched(self, item: dict,
+                            push_to_trakt: bool) -> None:
+        tid = self._tmdb_id_for_item(item, "vod")
+        if tid is None:
+            self._error(tr("mark_needs_tmdb"))
+            return
+        self.watched.mark_movie_local(tid)
+        if push_to_trakt and self.trakt.is_connected():
+            def job(tid=tid):
+                try:
+                    self.trakt.add_movie_history(tid)
+                except Exception:
+                    pass
+            threading.Thread(target=job, daemon=True).start()
+        self.list_model.refresh_all()
+
+    def _unmark_movie_watched(self, item: dict,
+                              push_to_trakt: bool) -> None:
+        tid = self._tmdb_id_for_item(item, "vod")
+        if tid is None:
+            return
+        self.watched.unmark_movie(tid)
+        if push_to_trakt and self.trakt.is_connected():
+            def job(tid=tid):
+                try:
+                    self.trakt.remove_movie_history(tid)
+                except Exception:
+                    pass
+            threading.Thread(target=job, daemon=True).start()
+        self.list_model.refresh_all()
+
+    def _mark_episode_watched(self, item: dict,
+                              push_to_trakt: bool) -> None:
+        sid = self._show_tmdb_id_for_episode()
+        if sid is None:
+            self._error(tr("mark_needs_tmdb"))
+            return
+        try:
+            season = int(item.get("season"))
+            episode = int(item.get("episode_num"))
+        except (TypeError, ValueError):
+            return
+        self.watched.mark_episode_local(sid, season, episode)
+        if push_to_trakt and self.trakt.is_connected():
+            def job(sid=sid, s=season, e=episode):
+                try:
+                    self.trakt.add_episode_history(sid, s, e)
+                except Exception:
+                    pass
+            threading.Thread(target=job, daemon=True).start()
+        self.list_model.refresh_all()
+
+    def _unmark_episode_watched(self, item: dict,
+                                push_to_trakt: bool) -> None:
+        sid = self._show_tmdb_id_for_episode()
+        if sid is None:
+            return
+        try:
+            season = int(item.get("season"))
+            episode = int(item.get("episode_num"))
+        except (TypeError, ValueError):
+            return
+        self.watched.unmark_episode(sid, season, episode)
+        if push_to_trakt and self.trakt.is_connected():
+            def job(sid=sid, s=season, e=episode):
+                try:
+                    self.trakt.remove_episode_history(sid, s, e)
+                except Exception:
+                    pass
+            threading.Thread(target=job, daemon=True).start()
+        self.list_model.refresh_all()
+
+    # -- Watch Later (local toggle + optional Trakt push) --------------------
+
+    def is_on_watchlist(self, item: dict, kind: str) -> bool:
+        tid = self._tmdb_id_for_item(item, kind)
+        if kind == "vod":
+            return self.watchlist.has_movie(tid)
+        if kind == "series":
+            return self.watchlist.has_show(tid)
+        return False
+
+    def _add_watchlist(self, item: dict, kind: str,
+                       push_to_trakt: bool) -> None:
+        tid = self._tmdb_id_for_item(item, kind)
+        if tid is None:
+            self._error(tr("mark_needs_tmdb"))
+            return
+        if kind == "vod":
+            self.watchlist.add_movie_local(tid)
+            trakt_fn = self.trakt.add_movie_watchlist
+        else:
+            self.watchlist.add_show_local(tid)
+            trakt_fn = self.trakt.add_show_watchlist
+        if push_to_trakt and self.trakt.is_connected():
+            def job(tid=tid, fn=trakt_fn):
+                try:
+                    fn(tid)
+                except Exception:
+                    pass
+            threading.Thread(target=job, daemon=True).start()
+
+    def _remove_watchlist(self, item: dict, kind: str,
+                          push_to_trakt: bool) -> None:
+        tid = self._tmdb_id_for_item(item, kind)
+        if tid is None:
+            return
+        if kind == "vod":
+            self.watchlist.remove_movie(tid)
+            trakt_fn = self.trakt.remove_movie_watchlist
+        else:
+            self.watchlist.remove_show(tid)
+            trakt_fn = self.trakt.remove_show_watchlist
+        if push_to_trakt and self.trakt.is_connected():
+            def job(tid=tid, fn=trakt_fn):
+                try:
+                    fn(tid)
+                except Exception:
+                    pass
+            threading.Thread(target=job, daemon=True).start()
+        # If we're currently viewing the watchlist pseudo-category,
+        # dropping this item should remove it from the visible list.
+        if self.mode in ("vod", "series") and self._current_cat_id == "_watchlist":
+            self._load_items("_watchlist")
 
     def _trakt_device_auth_dialog(self, parent) -> None:
         d = QDialog(parent)
@@ -2601,6 +2761,71 @@ class MainWindow(QMainWindow):
             m.addAction(tr("ctx_match_tmdb"),
                         lambda: self._open_tmdb_match_dialog(
                             it, "vod" if self.mode == "vod" else "series"))
+        # Mark-as-watched and Watch-Later live behind the same TMDB
+        # match. Both surface a 'local only' variant (no Trakt push)
+        # and, when Trakt is connected, a 'and on Trakt' variant that
+        # also POSTs the change so any other device sees it.
+        if self.tmdb and (
+                (self.mode == "vod")
+                or (self.mode == "series" and not self.series_ctx)
+                or self.series_ctx):
+            m.addSeparator()
+            trakt_ok = self.trakt.is_connected()
+            if self.series_ctx:
+                mark = self._mark_episode_watched
+                unmark = self._unmark_episode_watched
+                watched = self.is_episode_watched(it)
+            elif self.mode == "vod":
+                mark = self._mark_movie_watched
+                unmark = self._unmark_movie_watched
+                watched = self.is_movie_watched(it)
+            else:
+                # Series list item: shortcut to marking S1E1 - but for
+                # the show-level toggle we treat 'any episode watched'
+                # as watched and unmark clears every episode. Wire
+                # only the unmark path so the user can toggle the
+                # whole show off; marking a whole show is done from
+                # the episode list.
+                mark = None
+                unmark = None
+                watched = self.show_watched_count(it) > 0
+            if mark is not None:
+                if watched:
+                    m.addAction(tr("ctx_unmark_watched"),
+                                lambda it=it: unmark(it, False))
+                    if trakt_ok:
+                        m.addAction(tr("ctx_unmark_watched_trakt"),
+                                    lambda it=it: unmark(it, True))
+                else:
+                    m.addAction(tr("ctx_mark_watched"),
+                                lambda it=it: mark(it, False))
+                    if trakt_ok:
+                        m.addAction(tr("ctx_mark_watched_trakt"),
+                                    lambda it=it: mark(it, True))
+        # Watch Later toggle only for movies and shows (not episodes).
+        if (self.tmdb and not self.series_ctx
+                and self.mode in ("vod", "series")):
+            wl_kind = self.mode
+            on_list = self.is_on_watchlist(it, wl_kind)
+            trakt_ok = self.trakt.is_connected()
+            if on_list:
+                m.addAction(
+                    tr("ctx_watchlist_remove"),
+                    lambda it=it: self._remove_watchlist(it, wl_kind, False))
+                if trakt_ok:
+                    m.addAction(
+                        tr("ctx_watchlist_remove_trakt"),
+                        lambda it=it: self._remove_watchlist(
+                            it, wl_kind, True))
+            else:
+                m.addAction(
+                    tr("ctx_watchlist_add"),
+                    lambda it=it: self._add_watchlist(it, wl_kind, False))
+                if trakt_ok:
+                    m.addAction(
+                        tr("ctx_watchlist_add_trakt"),
+                        lambda it=it: self._add_watchlist(
+                            it, wl_kind, True))
         if (self.mode in ("live", "vod", "series")
                 and not self.series_ctx):
             ov_mode = self.mode

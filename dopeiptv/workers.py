@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import time
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Callable
@@ -122,10 +123,12 @@ class LogoLoader(QObject):
         # provider dumps so the process doesn't grow unbounded.
         self.cache: OrderedDict[str, QPixmap] = OrderedDict()
         self.waiting: dict[str, list[Callable]] = {}
-        # URLs that returned 404 / other error last time we tried, so
-        # the caller can fall back to a provider-supplied cover URL
-        # instead of asking us to keep retrying a dead endpoint.
-        self.dead: set[str] = set()
+        # URLs that returned 404 / other error last time we tried,
+        # timestamped so a purely transient network hiccup doesn't
+        # blacklist a good URL for the rest of the session. On expiry
+        # we fall back into the normal fetch path and try again.
+        self.dead: dict[str, float] = {}
+        self.dead_ttl: float = 60.0
         # Disk cache: raw response bytes, keyed by URL hash. Lets
         # evicted RAM entries reload in a few ms from local SSD instead
         # of re-hitting the network.
@@ -133,7 +136,15 @@ class LogoLoader(QObject):
             Path(cache_dir) if cache_dir is not None else None)
 
     def is_dead(self, url: str | None) -> bool:
-        return bool(url) and url in self.dead
+        if not url:
+            return False
+        t = self.dead.get(url)
+        if t is None:
+            return False
+        if time.monotonic() - t > self.dead_ttl:
+            self.dead.pop(url, None)
+            return False
+        return True
 
     def _disk_path(self, url: str) -> Path | None:
         if self.disk_dir is None:
@@ -144,6 +155,8 @@ class LogoLoader(QObject):
     def _store(self, url: str, pm: QPixmap) -> None:
         self.cache[url] = pm
         self.cache.move_to_end(url)
+        # A URL that once failed but now decoded fine is alive again.
+        self.dead.pop(url, None)
         while len(self.cache) > self.max_entries:
             self.cache.popitem(last=False)
 
@@ -181,6 +194,14 @@ class LogoLoader(QObject):
                     except OSError:
                         pass
             r = requests.get(u, timeout=10)
+            # Blacklist ONLY legitimately-dead endpoints (404 / 410 /
+            # 451) - a 500, connection reset or DNS blip is transient
+            # and must not stick, otherwise a single flaky moment
+            # nukes every cover in the session. Transient failures
+            # fall through raise_for_status -> on_fail, which no
+            # longer touches the dead map.
+            if r.status_code in (404, 410, 451):
+                self.dead[u] = time.monotonic()
             r.raise_for_status()
             data = r.content
             if dp is not None:
@@ -213,11 +234,15 @@ class LogoLoader(QObject):
                     pass
 
         def on_fail(_msg: str) -> None:
+            # Only clean up the waiting entry. The dead-URL blacklist
+            # is set exclusively inside fetch() for confirmed 404s -
+            # a generic error here (timeout, connection reset,
+            # something a scroll retry might well recover from) is not
+            # a reason to blacklist. Fire each pending callback with
+            # an empty pixmap so the delegate repaints; if the URL is
+            # in `dead`, the delegate will swap in the provider fallback,
+            # otherwise it just repaints and tries the URL again.
             callbacks = self.waiting.pop(url, [])
-            self.dead.add(url)
-            # Fire each pending callback with an empty pixmap so the
-            # delegate can repaint - the next paint checks is_dead()
-            # and swaps in the provider fallback URL.
             for cb in callbacks:
                 try:
                     cb(QPixmap())

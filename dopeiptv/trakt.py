@@ -176,6 +176,101 @@ class TraktClient:
                 out.append(tid)
         return out
 
+    # -- add/remove history (mark-as-watched from the app) -------------------
+
+    @staticmethod
+    def _movie_payload(tmdb_id: int) -> dict:
+        return {"movies": [{"ids": {"tmdb": int(tmdb_id)}}]}
+
+    @staticmethod
+    def _episode_payload(show_tmdb_id: int, season: int,
+                         episode: int) -> dict:
+        return {"shows": [{
+            "ids": {"tmdb": int(show_tmdb_id)},
+            "seasons": [{
+                "number": int(season),
+                "episodes": [{"number": int(episode)}],
+            }],
+        }]}
+
+    def add_movie_history(self, tmdb_id: int) -> None:
+        r = requests.post(f"{API}/sync/history",
+                          json=self._movie_payload(tmdb_id),
+                          headers=self._headers(), timeout=15)
+        r.raise_for_status()
+
+    def remove_movie_history(self, tmdb_id: int) -> None:
+        r = requests.post(f"{API}/sync/history/remove",
+                          json=self._movie_payload(tmdb_id),
+                          headers=self._headers(), timeout=15)
+        r.raise_for_status()
+
+    def add_episode_history(self, show_tmdb_id: int, season: int,
+                            episode: int) -> None:
+        r = requests.post(
+            f"{API}/sync/history",
+            json=self._episode_payload(show_tmdb_id, season, episode),
+            headers=self._headers(), timeout=15)
+        r.raise_for_status()
+
+    def remove_episode_history(self, show_tmdb_id: int, season: int,
+                               episode: int) -> None:
+        r = requests.post(
+            f"{API}/sync/history/remove",
+            json=self._episode_payload(show_tmdb_id, season, episode),
+            headers=self._headers(), timeout=15)
+        r.raise_for_status()
+
+    # -- watchlist (add-to-watch-later) --------------------------------------
+
+    def add_movie_watchlist(self, tmdb_id: int) -> None:
+        r = requests.post(f"{API}/sync/watchlist",
+                          json=self._movie_payload(tmdb_id),
+                          headers=self._headers(), timeout=15)
+        r.raise_for_status()
+
+    def remove_movie_watchlist(self, tmdb_id: int) -> None:
+        r = requests.post(f"{API}/sync/watchlist/remove",
+                          json=self._movie_payload(tmdb_id),
+                          headers=self._headers(), timeout=15)
+        r.raise_for_status()
+
+    def add_show_watchlist(self, tmdb_id: int) -> None:
+        r = requests.post(f"{API}/sync/watchlist",
+                          json={"shows": [{"ids": {"tmdb": int(tmdb_id)}}]},
+                          headers=self._headers(), timeout=15)
+        r.raise_for_status()
+
+    def remove_show_watchlist(self, tmdb_id: int) -> None:
+        r = requests.post(f"{API}/sync/watchlist/remove",
+                          json={"shows": [{"ids": {"tmdb": int(tmdb_id)}}]},
+                          headers=self._headers(), timeout=15)
+        r.raise_for_status()
+
+    def watchlist_movies(self) -> list[int]:
+        """TMDB ids of every movie on the user's Trakt watchlist."""
+        r = requests.get(f"{API}/sync/watchlist/movies",
+                         headers=self._headers(), timeout=30)
+        r.raise_for_status()
+        out: list[int] = []
+        for entry in r.json() or []:
+            tid = ((entry.get("movie") or {}).get("ids") or {}).get("tmdb")
+            if isinstance(tid, int):
+                out.append(tid)
+        return out
+
+    def watchlist_shows(self) -> list[int]:
+        """TMDB ids of every show on the user's Trakt watchlist."""
+        r = requests.get(f"{API}/sync/watchlist/shows",
+                         headers=self._headers(), timeout=30)
+        r.raise_for_status()
+        out: list[int] = []
+        for entry in r.json() or []:
+            tid = ((entry.get("show") or {}).get("ids") or {}).get("tmdb")
+            if isinstance(tid, int):
+                out.append(tid)
+        return out
+
     def watched_shows(self) -> dict[int, list[list[int]]]:
         """Every episode the user has marked watched on any device.
         Returns a mapping show_tmdb_id -> [[season, episode], ...] with each

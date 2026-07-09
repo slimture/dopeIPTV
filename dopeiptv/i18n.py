@@ -3315,6 +3315,86 @@ _STRINGS: dict[str, dict[str, str]] = {
         "th": "โปสเตอร์และโลโก้ช่องที่แคชไว้บนดิสก์ "
               "รายการที่ถูกล้างจะโหลดใหม่จากเครือข่ายเมื่อเลื่อนครั้งถัดไป",
     },
+    "ctx_mark_watched": {
+        "en": "Mark as watched (local)",
+        "sv": "Markera som sedd (lokalt)",
+        "es": "Marcar como visto (local)",
+        "de": "Als gesehen markieren (lokal)",
+        "fr": "Marquer comme vu (local)",
+        "zh": "标记为已观看（本地）",
+        "ru": "Отметить как просмотрено (локально)",
+        "th": "ทำเครื่องหมายว่าดูแล้ว (ในเครื่อง)",
+    },
+    "ctx_mark_watched_trakt": {
+        "en": "Mark as watched + Trakt",
+        "sv": "Markera som sedd + Trakt",
+        "es": "Marcar como visto + Trakt",
+        "de": "Als gesehen markieren + Trakt",
+        "fr": "Marquer comme vu + Trakt",
+        "zh": "标记为已观看 + Trakt",
+        "ru": "Отметить как просмотрено + Trakt",
+        "th": "ทำเครื่องหมายว่าดูแล้ว + Trakt",
+    },
+    "ctx_unmark_watched": {
+        "en": "Unmark as watched (local)",
+        "sv": "Ta bort som sedd (lokalt)",
+        "es": "Desmarcar como visto (local)",
+        "de": "Als ungesehen markieren (lokal)",
+        "fr": "Retirer comme vu (local)",
+        "zh": "取消已观看标记（本地）",
+        "ru": "Снять отметку о просмотре (локально)",
+        "th": "ยกเลิกการทำเครื่องหมายว่าดูแล้ว (ในเครื่อง)",
+    },
+    "ctx_unmark_watched_trakt": {
+        "en": "Unmark as watched + Trakt",
+        "sv": "Ta bort som sedd + Trakt",
+        "es": "Desmarcar como visto + Trakt",
+        "de": "Als ungesehen markieren + Trakt",
+        "fr": "Retirer comme vu + Trakt",
+        "zh": "取消已观看标记 + Trakt",
+        "ru": "Снять отметку о просмотре + Trakt",
+        "th": "ยกเลิกการทำเครื่องหมายว่าดูแล้ว + Trakt",
+    },
+    "ctx_watchlist_add": {
+        "en": "Add to Watch Later (local)",
+        "sv": "Lägg till i Titta senare (lokalt)",
+        "es": "Añadir a Ver más tarde (local)",
+        "de": "Zu 'Später ansehen' hinzufügen (lokal)",
+        "fr": "Ajouter à Regarder plus tard (local)",
+        "zh": "添加到稍后观看（本地）",
+        "ru": "Добавить в «Посмотреть позже» (локально)",
+        "th": "เพิ่มไปที่ดูภายหลัง (ในเครื่อง)",
+    },
+    "ctx_watchlist_add_trakt": {
+        "en": "Add to Watch Later + Trakt",
+        "sv": "Lägg till i Titta senare + Trakt",
+        "es": "Añadir a Ver más tarde + Trakt",
+        "de": "Zu 'Später ansehen' hinzufügen + Trakt",
+        "fr": "Ajouter à Regarder plus tard + Trakt",
+        "zh": "添加到稍后观看 + Trakt",
+        "ru": "Добавить в «Посмотреть позже» + Trakt",
+        "th": "เพิ่มไปที่ดูภายหลัง + Trakt",
+    },
+    "ctx_watchlist_remove": {
+        "en": "Remove from Watch Later (local)",
+        "sv": "Ta bort från Titta senare (lokalt)",
+        "es": "Quitar de Ver más tarde (local)",
+        "de": "Aus 'Später ansehen' entfernen (lokal)",
+        "fr": "Retirer de Regarder plus tard (local)",
+        "zh": "从稍后观看移除（本地）",
+        "ru": "Убрать из «Посмотреть позже» (локально)",
+        "th": "ลบจากดูภายหลัง (ในเครื่อง)",
+    },
+    "ctx_watchlist_remove_trakt": {
+        "en": "Remove from Watch Later + Trakt",
+        "sv": "Ta bort från Titta senare + Trakt",
+        "es": "Quitar de Ver más tarde + Trakt",
+        "de": "Aus 'Später ansehen' entfernen + Trakt",
+        "fr": "Retirer de Regarder plus tard + Trakt",
+        "zh": "从稍后观看移除 + Trakt",
+        "ru": "Убрать из «Посмотреть позже» + Trakt",
+        "th": "ลบจากดูภายหลัง + Trakt",
+    },
     "ctx_match_tmdb": {
         "en": "Match on TMDB…",
         "sv": "Matcha mot TMDB…",
@@ -4199,6 +4279,31 @@ _STRINGS: dict[str, dict[str, str]] = {
         "es": "Lista / Historial…", "de": "Merkliste / Verlauf…",
         "fr": "Liste de suivi / Historique…", "zh": "待看列表 / 历史……",
         "ru": "Список / История…", "th": "รายการที่ติดตาม / ประวัติ…",
+    },
+    "mark_needs_tmdb": {
+        "en": "TMDB metadata hasn't resolved for this title yet — try "
+              "again in a few seconds, or use 'Match on TMDB…' to pick "
+              "one manually.",
+        "sv": "TMDB har inte matchat den här titeln än — försök igen "
+              "om några sekunder, eller använd 'Matcha mot TMDB…' för "
+              "att välja manuellt.",
+        "es": "Los metadatos de TMDB aún no se han resuelto para este "
+              "título — inténtalo de nuevo en unos segundos o usa "
+              "'Emparejar con TMDB…' para elegir manualmente.",
+        "de": "TMDB-Metadaten für diesen Titel wurden noch nicht "
+              "aufgelöst — versuche es in ein paar Sekunden erneut oder "
+              "nutze 'Mit TMDB abgleichen…'.",
+        "fr": "Les métadonnées TMDB n'ont pas encore été résolues pour "
+              "ce titre — réessaye dans quelques secondes ou utilise "
+              "'Associer à TMDB…' pour choisir manuellement.",
+        "zh": "TMDB 元数据尚未解析此标题——请几秒后再试，或使用"
+              "'在 TMDB 上匹配…'手动选择。",
+        "ru": "Метаданные TMDB для этого названия ещё не получены — "
+              "попробуйте через несколько секунд или используйте "
+              "«Сопоставить с TMDB…».",
+        "th": "TMDB ยังไม่ได้จับคู่ชื่อเรื่องนี้ — "
+              "ลองใหม่ในอีกไม่กี่วินาที หรือใช้ 'จับคู่กับ TMDB…' "
+              "เพื่อเลือกด้วยตนเอง",
     },
     "trakt_sync_now": {
         "en": "Sync now", "sv": "Synka nu", "es": "Sincronizar ahora",
