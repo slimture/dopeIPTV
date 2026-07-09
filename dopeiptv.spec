@@ -137,20 +137,31 @@ def _libmpv_dep_binaries(libmpv_path):
         print(f"WARNING: ldd on libmpv failed ({e}); not bundling its deps. "
               "The embedded player may fail on machines missing ffmpeg/libass.")
         return []
+    stage_dir = tempfile.mkdtemp(prefix="dopeiptv-mpvdeps-")
     deps = []
+    seen = set()
     for line in out.splitlines():
         if "=>" not in line:
             continue
         path = line.split("=>", 1)[1].strip().split(" ", 1)[0]
         if not path or not os.path.exists(path):
             continue
-        base = os.path.basename(path)
-        if any(base.startswith(p) for p in deny):
+        base = os.path.basename(path)          # the soname, e.g. libavcodec.so.58
+        if base in seen or any(base.startswith(p) for p in deny):
             continue
-        deps.append((os.path.realpath(path), "."))
+        seen.add(base)
+        # Bundle under the SONAME libmpv actually references (DT_NEEDED), not
+        # the fully-versioned real filename. ldd resolves "libavcodec.so.58" to
+        # the file "libavcodec.so.58.134.100"; if we bundle it under the latter
+        # name, libmpv's runtime lookup for "libavcodec.so.58" misses it and
+        # libmpv fails to load ("Failed to load dynlib"). Stage a copy named
+        # after the soname so the lookup resolves.
+        staged = os.path.join(stage_dir, base)
+        shutil.copy2(os.path.realpath(path), staged)
+        deps.append((staged, "."))
     if deps:
-        names = sorted({os.path.basename(p) for p, _ in deps})
-        print(f"Bundling {len(deps)} libmpv dependencies: {', '.join(names)}")
+        print(f"Bundling {len(deps)} libmpv dependencies: "
+              + ", ".join(sorted(os.path.basename(s) for s, _ in deps)))
     return deps
 
 
