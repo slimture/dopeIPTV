@@ -82,11 +82,14 @@ class Worker(QRunnable):
         # SystemExit / KeyboardInterrupt / anything raised while
         # signal-emit is dispatching - and forward the message
         # through .fail so run_async's on_fail path still runs.
+        # A traceback here would spam stderr on every routine
+        # network miss (DNS unreachable, dead provider host, 5xx)
+        # since those all raise inside fetch; on_fail already gets
+        # the message string, and any genuinely-uncaught crash is
+        # caught by the installed sys.excepthook.
         try:
             result = self.fn(*self.args, **self.kwargs)
         except BaseException as e:
-            import traceback
-            traceback.print_exc()
             try:
                 self.signals.fail.emit(str(e))
             except BaseException:
@@ -95,8 +98,7 @@ class Worker(QRunnable):
             try:
                 self.signals.done.emit(result)
             except BaseException:
-                import traceback
-                traceback.print_exc()
+                pass
         finally:
             try:
                 self.signals.finished.emit()
