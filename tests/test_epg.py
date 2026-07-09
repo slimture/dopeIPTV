@@ -1,6 +1,8 @@
-"""Unit tests for dopeiptv.epg utilities."""
+"""Unit tests for dopeiptv.epg utilities and the guide index."""
 
-from dopeiptv.epg import normalize_name, parse_xmltv_time
+from datetime import datetime, timedelta, timezone
+
+from dopeiptv.epg import XmltvGuide, normalize_name, parse_xmltv_time
 
 
 def test_normalize_name():
@@ -28,3 +30,93 @@ def test_parse_xmltv_time_invalid():
     assert parse_xmltv_time("not-a-date") is None
     assert parse_xmltv_time("") is None
     assert parse_xmltv_time(None) is None
+
+
+# -- guide index (compact column storage) -----------------------------------
+
+def _xml_ts(dt: datetime) -> str:
+    return dt.strftime("%Y%m%d%H%M%S +0000")
+
+
+def _make_guide(cache_path=None) -> XmltvGuide:
+    """A guide around 'now': one finished, one airing, two upcoming."""
+    now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+    h = timedelta(hours=1)
+    xml = ['<tv><channel id="c1"><display-name>Alpha TV</display-name>'
+           '</channel>']
+    slots = [(now - 2 * h, now - h, "Earlier Show", "was on before"),
+             (now - h, now + h, "Airing Now", "currently on"),
+             (now + h, now + 2 * h, "Up Next", "coming up"),
+             (now + 2 * h, now + 3 * h, "Later On", "after that")]
+    for start, stop, title, desc in slots:
+        xml.append(f'<programme channel="C1" start="{_xml_ts(start)}" '
+                   f'stop="{_xml_ts(stop)}"><title>{title}</title>'
+                   f'<desc>{desc}</desc></programme>')
+    xml.append("</tv>")
+    g = XmltvGuide(client=None,
+                   cache_path=str(cache_path) if cache_path else None)
+    g._parse("".join(xml).encode())
+    g._loaded = True
+    return g
+
+
+def test_guide_entries_shape():
+    g = _make_guide()
+    item = {"epg_channel_id": "c1"}
+    entries = g._entries_for(item)
+    assert [e["title"] for e in entries] == [
+        "Earlier Show", "Airing Now", "Up Next", "Later On"]
+    e = entries[1]
+    assert e["_plain"] is True
+    assert e["description"] == "currently on"
+    assert isinstance(e["start_timestamp"], int)
+    assert e["start_timestamp"] < e["stop_timestamp"]
+
+
+def test_guide_queries():
+    g = _make_guide()
+    item = {"epg_channel_id": "c1"}
+    cur = g.current_programme(item)
+    assert cur and cur["title"] == "Airing Now"
+    title, pct = g.now_for(item)
+    assert title == "Airing Now" and 0 <= pct <= 100
+    listings = g.listings_for(item)
+    assert [e["title"] for e in listings] == [
+        "Airing Now", "Up Next", "Later On"]
+    past = g.past_programmes(item, days=1)
+    assert [e["title"] for e in past] == ["Earlier Show"]
+
+
+def test_guide_name_fallback():
+    """No epg_channel_id: resolve through the normalized display name."""
+    g = _make_guide()
+    cur = g.current_programme({"name": " ALPHA tv "})
+    assert cur and cur["title"] == "Airing Now"
+
+
+def test_guide_index_roundtrip(tmp_path):
+    """The pickled index reloads into an identical, queryable guide."""
+    cache = tmp_path / "epg_test.xml"
+    cache.write_bytes(b"<tv/>")  # only mtime matters for the check
+    g = _make_guide(cache_path=cache)
+    g._write_index()
+    g2 = XmltvGuide(client=None, cache_path=str(cache))
+    assert g2._load_index() is True
+    g2._loaded = True
+    item = {"epg_channel_id": "c1"}
+    assert g2._entries_for(item) == g._entries_for(item)
+    assert g2.current_programme(item) == g.current_programme(item)
+
+
+def test_guide_index_rejects_old_version(tmp_path):
+    """A v1 (pre-compact-storage) pickle must be rejected, not half-loaded."""
+    import pickle
+    cache = tmp_path / "epg_test.xml"
+    cache.write_bytes(b"<tv/>")
+    pkl = tmp_path / "epg_test.xml.pkl"
+    with pkl.open("wb") as f:
+        pickle.dump({"v": 1, "by_id": {"c1": [{"title": "old"}]},
+                     "by_name": {}}, f)
+    g = XmltvGuide(client=None, cache_path=str(cache))
+    assert g._load_index() is False
+    assert g._by_id == {}

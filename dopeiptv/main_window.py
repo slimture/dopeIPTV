@@ -210,7 +210,8 @@ class MainWindow(QMainWindow):
         self._logo_pool = QThreadPool()
         self._logo_pool.setMaxThreadCount(4)
         self.logos = LogoLoader(self._logo_pool, max_size=320,
-                                cache_dir=shared_image_dir)
+                                cache_dir=shared_image_dir,
+                                max_bytes=48 * 1024 * 1024)
         # A poster plus up to 8 cast photos is up to 9 concurrent
         # downloads per selection, hence the separate pool + higher-res
         # cache (reusing `logos` blurs on the big detail-panel sizes).
@@ -218,7 +219,8 @@ class MainWindow(QMainWindow):
         self._art_pool.setMaxThreadCount(4)
         self.poster_art = LogoLoader(
             self._art_pool, max_size=320,
-            cache_dir=shared_image_dir)
+            cache_dir=shared_image_dir,
+            max_bytes=96 * 1024 * 1024)
         # A URL that fails on one loader may succeed on the other (or
         # the reverse); share the dead-URL blacklist so the delegate's
         # fallback logic isn't inconsistent between list and detail

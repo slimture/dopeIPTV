@@ -8,6 +8,8 @@ import sys
 import threading
 import time
 import xml.etree.ElementTree as ET
+from array import array
+from bisect import bisect_left, bisect_right
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
@@ -19,7 +21,9 @@ from .client import XtreamClient
 
 
 # Bump to invalidate all pickled indexes on disk after a schema change.
-_INDEX_VERSION = 1
+# v2: compact column storage (arrays + deduped strings) instead of one
+# dict per programme - a ~260 MB guide used to cost ~1 GB of RAM.
+_INDEX_VERSION = 2
 
 
 def normalize_name(s: str | None) -> str:
@@ -73,7 +77,14 @@ class XmltvGuide:
         self._lock = threading.Lock()
         self._loaded = False
         self._failed = False
-        self._by_id: dict[str, list[dict]] = {}
+        # Column storage per channel: (starts, stops, titles, descriptions),
+        # sorted by start time. Two int64 arrays plus two string tuples cost
+        # a fraction of a dict per programme (a guide easily holds 1-2
+        # million programmes), and the sorted starts let lookups bisect
+        # instead of scanning. Query methods materialise the small
+        # {"_plain": True, ...} dicts on demand, so callers see the exact
+        # same entries as before.
+        self._by_id: dict[str, tuple[array, array, tuple, tuple]] = {}
         self._by_name: dict[str, str] = {}
         self.delay_minutes = 0
 
@@ -208,20 +219,53 @@ class XmltvGuide:
         except OSError:
             pass
 
-    def _entries_for(self, item: dict) -> list[dict]:
+    def _sched_for(self, item: dict) -> tuple[array, array, tuple, tuple] | None:
         cid = (item.get("epg_channel_id") or "").strip().lower()
-        entries = self._by_id.get(cid)
-        if entries is None:
+        sched = self._by_id.get(cid)
+        if sched is None:
             cid = self._by_name.get(normalize_name(item.get("name")))
-            entries = self._by_id.get(cid, [])
-        return entries
+            sched = self._by_id.get(cid)
+        return sched
+
+    @staticmethod
+    def _entry(sched: tuple, i: int) -> dict:
+        starts, stops, titles, descs = sched
+        return {"_plain": True,
+                "title": titles[i],
+                "description": descs[i],
+                "start_timestamp": starts[i],
+                "stop_timestamp": stops[i]}
+
+    def _entries_for(self, item: dict) -> list[dict]:
+        sched = self._sched_for(item)
+        if not sched:
+            return []
+        return [self._entry(sched, i) for i in range(len(sched[0]))]
+
+    # No broadcast programme runs longer than a day; bounding the backward
+    # scan by this keeps lookups O(one day of entries) instead of O(all).
+    _MAX_PROG_SECS = 86400
 
     def listings_for(self, item: dict, limit: int = 8) -> list[dict]:
         if not self.ensure_loaded():
             return []
+        sched = self._sched_for(item)
+        if not sched:
+            return []
         now = self._now()
-        return [p for p in self._entries_for(item)
-                if p["stop_timestamp"] > now][:limit]
+        starts, stops = sched[0], sched[1]
+        n = len(starts)
+        lo = bisect_right(starts, now)
+        # Everything from lo on starts in the future (so ends there too);
+        # additionally, anything that started within the last day may still
+        # be airing. Collect in start order, exactly like the old full scan.
+        out: list[dict] = []
+        j = bisect_left(starts, now - self._MAX_PROG_SECS)
+        while j < n and len(out) < limit:
+            if stops[j] > now:
+                out.append(self._entry(sched, j))
+            j += 1
+        return out
 
     def now_for(self, item: dict) -> tuple[str, float] | None:
         """(title, percent) for the currently airing programme, or None."""
@@ -237,30 +281,53 @@ class XmltvGuide:
         """The full entry for the currently airing programme, or None."""
         if not self._loaded:
             return None
+        sched = self._sched_for(item)
+        if not sched:
+            return None
         now = self._now()
-        for p in self._entries_for(item):
-            if p["start_timestamp"] <= now < p["stop_timestamp"]:
-                return p
+        starts, stops = sched[0], sched[1]
+        # The airing programme started within the last day (see
+        # _MAX_PROG_SECS); return the earliest such entry covering now,
+        # matching the old first-match-in-start-order scan.
+        lo = bisect_left(starts, now - self._MAX_PROG_SECS)
+        hi = bisect_right(starts, now)
+        for j in range(lo, hi):
+            if starts[j] <= now < stops[j]:
+                return self._entry(sched, j)
         return None
 
     def past_programmes(self, item: dict, days: int) -> list[dict]:
         """Past programmes (newest first), at most *days* back."""
         if not self.ensure_loaded():
             return []
+        sched = self._sched_for(item)
+        if not sched:
+            return []
         now = self._now()
         cutoff = now - days * 86400
-        out = [p for p in self._entries_for(item)
-               if p["stop_timestamp"] <= now
-               and p["start_timestamp"] >= cutoff]
+        starts, stops = sched[0], sched[1]
+        lo = bisect_left(starts, cutoff)
+        out = [self._entry(sched, i)
+               for i in range(lo, len(starts))
+               if stops[i] <= now and starts[i] >= cutoff]
         out.reverse()
         return out
 
     def _parse(self, data: bytes) -> None:
         cutoff = (datetime.now().astimezone().timestamp()
                   - self.KEEP_PAST_DAYS * 86400)
-        by_id: dict[str, list[dict]] = {}
+        rows: dict[str, list[tuple]] = {}
         by_name: dict[str, str] = {}
         seen: set[tuple] = set()
+        # Guides repeat the same titles and descriptions endlessly (reruns,
+        # daily shows, episode blurbs); keeping one str object per unique
+        # text instead of one per programme cuts the string heap by well
+        # over half - and shrinks the pickle index the same way.
+        text_pool: dict[str, str] = {}
+
+        def pooled(s: str) -> str:
+            return text_pool.setdefault(s, s)
+
         for _, el in ET.iterparse(io.BytesIO(data)):
             if el.tag == "channel":
                 cid = (el.get("id") or "").strip().lower()
@@ -279,14 +346,19 @@ class XmltvGuide:
                     dedup_key = (cid, int(start.timestamp()), title.lower())
                     if dedup_key not in seen:
                         seen.add(dedup_key)
-                        by_id.setdefault(cid, []).append({
-                            "_plain": True,
-                            "title": title,
-                            "description": (el.findtext("desc") or "").strip(),
-                            "start_timestamp": int(start.timestamp()),
-                            "stop_timestamp": int(stop.timestamp()),
-                        })
+                        rows.setdefault(cid, []).append((
+                            int(start.timestamp()),
+                            int(stop.timestamp()),
+                            pooled(title),
+                            pooled((el.findtext("desc") or "").strip()),
+                        ))
                 el.clear()
-        for lst in by_id.values():
-            lst.sort(key=lambda p: p["start_timestamp"])
+        del seen, text_pool
+        by_id: dict[str, tuple[array, array, tuple, tuple]] = {}
+        for cid, lst in rows.items():
+            lst.sort(key=lambda r: r[0])
+            by_id[cid] = (array("q", (r[0] for r in lst)),
+                          array("q", (r[1] for r in lst)),
+                          tuple(r[2] for r in lst),
+                          tuple(r[3] for r in lst))
         self._by_id, self._by_name = by_id, by_name

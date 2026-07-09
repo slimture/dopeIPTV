@@ -233,13 +233,20 @@ class LogoLoader(QObject):
 
     def __init__(self, pool: QThreadPool, max_size: int = 96,
                  max_entries: int = 2000,
-                 cache_dir: Path | str | None = None) -> None:
+                 cache_dir: Path | str | None = None,
+                 max_bytes: int = 64 * 1024 * 1024) -> None:
         super().__init__()
         self.pool = pool
         self.max_size = max_size
         self.max_entries = max_entries
         # Bounded LRU: older entries drop out as we scroll through big
-        # provider dumps so the process doesn't grow unbounded.
+        # provider dumps so the process doesn't grow unbounded. The bound
+        # is in BYTES, not entries - 2000 pixmaps sounds harmless but at
+        # 320 px it is close to a gigabyte of decoded RGBA sitting in RAM
+        # after a long browse. Evicted entries reload from the disk cache
+        # in a few ms, so a tight budget costs nothing visible.
+        self.max_bytes = max_bytes
+        self._cache_bytes = 0
         self.cache: OrderedDict[str, QPixmap] = OrderedDict()
         self.waiting: dict[str, list[Callable]] = {}
         # Failed URLs get a per-URL expiry timestamp. 404/410/451 get
@@ -318,15 +325,26 @@ class LogoLoader(QObject):
         h = hashlib.sha1(url.encode("utf-8")).hexdigest()
         return self.disk_dir / h[:2] / h[2:]
 
+    @staticmethod
+    def _pm_bytes(pm: QPixmap) -> int:
+        # Decoded pixmap cost: width x height x 4 (RGBA). Never zero, so
+        # even null pixmaps count as an entry.
+        return max(1024, pm.width() * pm.height() * 4)
+
     def _store(self, url: str, pm: QPixmap) -> None:
+        old = self.cache.pop(url, None)
+        if old is not None:
+            self._cache_bytes -= self._pm_bytes(old)
         self.cache[url] = pm
-        self.cache.move_to_end(url)
+        self._cache_bytes += self._pm_bytes(pm)
         # A URL that once failed but now decoded fine is alive again -
         # and so is its host.
         self.dead.pop(url, None)
         self._clear_host(url)
-        while len(self.cache) > self.max_entries:
-            self.cache.popitem(last=False)
+        while self.cache and (len(self.cache) > self.max_entries
+                              or self._cache_bytes > self.max_bytes):
+            _, evicted = self.cache.popitem(last=False)
+            self._cache_bytes -= self._pm_bytes(evicted)
 
     def get(self, url: str | None, callback: Callable[[QPixmap], None]) -> None:
         if not url:

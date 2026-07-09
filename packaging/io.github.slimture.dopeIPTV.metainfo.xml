@@ -37,6 +37,12 @@
           <li>Never crash if the graphics stack can't create the video
               surface - the app stays up and offers external playback</li>
           <li>CI now verifies the player loads inside a clean container</li>
+          <li>Far lower memory use: the EPG index is stored compactly
+              (roughly a quarter of before on big guides) and image caches
+              are capped by size, so idle RAM drops by around a gigabyte
+              with large providers</li>
+          <li>Faster EPG lookups (binary search instead of scanning),
+              snappier lists on huge channel line-ups</li>
         </ul>
       </description>
     </release>
