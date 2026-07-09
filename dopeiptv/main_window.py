@@ -274,6 +274,12 @@ class MainWindow(QMainWindow):
         self._watched_refresh_timer = QTimer(self)
         self._watched_refresh_timer.setSingleShot(True)
         self._watched_refresh_timer.timeout.connect(self._reload_watched)
+        # Favourites -> Trakt list: fetched ids + a debounce to rebuild
+        # rows as their tmdb-id lookups resolve.
+        self._fav_trakt_ids: tuple[list[int], list[int]] = ([], [])
+        self._fav_refresh_timer = QTimer(self)
+        self._fav_refresh_timer.setSingleShot(True)
+        self._fav_refresh_timer.timeout.connect(self._rebuild_fav_trakt)
         self._init_metadata_provider()
         self.trakt = TraktClient(settings)
         self._trakt_active: dict | None = None
@@ -1100,6 +1106,10 @@ class MainWindow(QMainWindow):
             series = QListWidgetItem(tr("fav_series"))
             series.setData(Qt.ItemDataRole.UserRole, ("series", None))
             self.cat_list.addItem(series)
+            if self.trakt.is_connected():
+                trakt_row = QListWidgetItem(tr("watched_trakt"))
+                trakt_row.setData(Qt.ItemDataRole.UserRole, ("trakt", None))
+                self.cat_list.addItem(trakt_row)
             self.cat_list.blockSignals(False)
             self.cat_list.setCurrentRow(0)
             return
@@ -1233,6 +1243,14 @@ class MainWindow(QMainWindow):
                 self.all_items = self.movie_favs.items()
             elif section == "series":
                 self.all_items = self.series_favs.items()
+            elif section == "trakt":
+                # Favourites pulled from the Trakt 'dopeIPTV Favorites'
+                # list - fetched over the network, so show an empty list
+                # now and fill it in asynchronously.
+                self.all_items = []
+                self._apply_filter()
+                self._load_trakt_favorites()
+                return
             else:
                 exclude = (() if self.parental.session_unlocked
                            else self.favs.locked_groups())
@@ -1637,6 +1655,45 @@ class MainWindow(QMainWindow):
                     if self.tmdb else None)
             items.append(self._trakt_watched_item(show_tid, "series", meta))
         return items
+
+    def _load_trakt_favorites(self) -> None:
+        """Fetch the 'dopeIPTV Favorites' list ids from Trakt off the GUI
+        thread, then build the rows (resolving names/posters by id)."""
+        if not self.trakt.is_connected():
+            return
+        gen = self._load_gen
+
+        def job():
+            return (self.trakt.favorite_movies(), self.trakt.favorite_shows())
+
+        def done(res):
+            if (gen != self._load_gen or self.mode != "fav"
+                    or self._fav_section != "trakt"):
+                return
+            self._fav_trakt_ids = (res[0] or [], res[1] or [])
+            self._rebuild_fav_trakt()
+
+        run_async(self.pool, job, done, lambda _e: None)
+
+    def _rebuild_fav_trakt(self) -> None:
+        if self.mode != "fav" or self._fav_section != "trakt":
+            return
+        movies, shows = self._fav_trakt_ids
+
+        def on_resolved(_meta):
+            self._fav_refresh_timer.start(250)
+
+        items: list[dict] = []
+        for tid in movies:
+            meta = (self.tmdb.resolve_by_id(tid, "vod", on_resolved)
+                    if self.tmdb else None)
+            items.append(self._trakt_watched_item(tid, "vod", meta))
+        for tid in shows:
+            meta = (self.tmdb.resolve_by_id(tid, "series", on_resolved)
+                    if self.tmdb else None)
+            items.append(self._trakt_watched_item(tid, "series", meta))
+        self.all_items = items
+        self._apply_filter()
 
     @staticmethod
     def _merge_watched(local: list[dict],
@@ -2336,7 +2393,8 @@ class MainWindow(QMainWindow):
         # ("movie"/"episode"/"live") - normalise it to the vod/series
         # the detail panel and TMDB lookup speak.
         snap_kind = (it.get("_kind")
-                     if self.mode in ("history", "watchlist", "watched")
+                     if (self.mode in ("history", "watchlist", "watched")
+                         or (self.mode == "fav" and it.get("_kind")))
                      else None)
         snap_kind = {"movie": "vod", "episode": "series"}.get(
             snap_kind, snap_kind)
@@ -3060,7 +3118,8 @@ class MainWindow(QMainWindow):
         if self.mode in ("watchlist", "watched"):
             eff_mode = it.get("_kind") or "vod"
         elif self.mode == "fav":
-            eff_mode = "vod" if self._fav_section == "movie" else "series"
+            eff_mode = it.get("_kind") or (
+                "vod" if self._fav_section == "movie" else "series")
         if eff_mode == "vod":
             return self.client.vod_url(
                 it.get("stream_id"), it.get("container_extension")), title
