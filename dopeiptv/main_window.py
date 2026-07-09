@@ -1677,6 +1677,42 @@ class MainWindow(QMainWindow):
                 return self.show_watched_count(item) > 0
         return False
 
+    def watched_source(self, item: dict, kind: str) -> str | None:
+        """'trakt' if this row is watched according to Trakt, 'local' if
+        it's only a local in-app mark, else None. Lets the delegate
+        colour the badge differently so a Trakt-synced 'seen' reads
+        distinctly from a local-only one."""
+        if kind == "history":
+            hk = item.get("_kind")
+            kind = {"movie": "vod", "series": "series"}.get(hk, hk)
+        if kind == "vod":
+            if not self.is_movie_watched(item):
+                return None
+            tid = self._tmdb_id_for_item(item, "vod")
+            if isinstance(tid, int) and tid in self.watched.trakt_movies:
+                return "trakt"
+            return "local"
+        if kind == "series":
+            tid = self._tmdb_id_for_item(item, "series")
+            if isinstance(tid, int) and self.watched.trakt_episodes.get(tid):
+                return "trakt"
+            if self.show_watched_count(item) > 0:
+                return "local"
+            return None
+        if kind == "episode":
+            if not self.is_episode_watched(item):
+                return None
+            tid = self._show_tmdb_id_for_episode()
+            try:
+                pair = (int(item.get("season")), int(item.get("episode_num")))
+            except (TypeError, ValueError):
+                pair = None
+            if (isinstance(tid, int) and pair is not None
+                    and pair in (self.watched.trakt_episodes.get(tid) or set())):
+                return "trakt"
+            return "local"
+        return None
+
     def is_item_on_watchlist(self, item: dict, kind: str) -> bool:
         """Unified predicate the delegate calls once per paint - answers
         whether the given item is on the Watch Later list (its clock
@@ -1716,6 +1752,36 @@ class MainWindow(QMainWindow):
 
     # -- mark-as-watched (local toggle + optional Trakt push) -----------------
 
+    @staticmethod
+    def _trakt_push(fn) -> None:
+        """Fire a Trakt mutation on a daemon thread (killed instantly on
+        quit, so a mid-flight request never crashes teardown)."""
+        def job():
+            try:
+                fn()
+            except Exception:
+                pass
+        threading.Thread(target=job, daemon=True).start()
+
+    def _resolve_tmdb_id_async(self, item: dict, kind: str,
+                               on_id) -> None:
+        """Look a provider title up on TMDB (search -> id) off the GUI
+        thread and hand the resolved id (or None) back on the main
+        thread. Used by the '+Trakt' mark path when the poster hasn't
+        resolved yet so choosing 'seen (Trakt)' still reaches Trakt."""
+        title = item.get("name") or item.get("title") or ""
+        if not title or not self.tmdb:
+            on_id(None)
+            return
+
+        def job():
+            cleaned, year = PosterResolver.clean_title(title)
+            details = self.tmdb.client.fetch_details(
+                cleaned or title, kind, year)
+            return details.get("tmdb_id") if details else None
+
+        run_async(self.pool, job, on_id, lambda _e: on_id(None))
+
     def _mark_movie_watched(self, item: dict,
                             push_to_trakt: bool) -> None:
         tid = self._tmdb_id_for_item(item, "vod")
@@ -1723,24 +1789,33 @@ class MainWindow(QMainWindow):
             self.watched.mark_movie_local(tid)
         else:
             # Local mark works even before TMDB resolves - key on the
-            # provider stream_id so the badge is immediate. Trakt push
-            # still needs the TMDB id, so only skip it in that case.
+            # provider stream_id so the badge is immediate.
             sid = item.get("stream_id")
             try:
                 self.watched.mark_movie_local_by_stream(int(sid))
             except (TypeError, ValueError):
                 return
-            if push_to_trakt:
-                self._error(tr("mark_needs_tmdb"))
-                push_to_trakt = False
         self.watched.add_local_item(item, "vod", tid)
-        if push_to_trakt and tid is not None and self.trakt.is_connected():
-            def job(tid=tid):
-                try:
-                    self.trakt.add_movie_history(tid)
-                except Exception:
-                    pass
-            threading.Thread(target=job, daemon=True).start()
+        if push_to_trakt and self.trakt.is_connected():
+            if tid is not None:
+                self._trakt_push(lambda: self.trakt.add_movie_history(tid))
+            elif self.tmdb is not None:
+                # Not resolved yet - look the id up on demand, then
+                # upgrade the local mark to tmdb-keyed and push.
+                self._resolve_tmdb_id_async(
+                    item, "vod",
+                    lambda tid: self._on_movie_id_for_trakt(item, tid))
+            else:
+                self._error(tr("mark_needs_tmdb"))
+        self.list_model.refresh_all()
+
+    def _on_movie_id_for_trakt(self, item: dict, tid: int | None) -> None:
+        if not isinstance(tid, int):
+            self._error(tr("mark_needs_tmdb"))
+            return
+        self.watched.mark_movie_local(tid)
+        self.watched.add_local_item(item, "vod", tid)
+        self._trakt_push(lambda: self.trakt.add_movie_history(tid))
         self.list_model.refresh_all()
 
     def _unmark_movie_watched(self, item: dict,
@@ -1779,21 +1854,33 @@ class MainWindow(QMainWindow):
                 self.watched.mark_episode_local_by_stream(int(eid))
             except (TypeError, ValueError):
                 return
-            if push_to_trakt:
-                self._error(tr("mark_needs_tmdb"))
-                push_to_trakt = False
         # Watching an episode means the show belongs in the local
         # watched list - snapshot the series (one row per show).
         if self.series_ctx:
             self.watched.add_local_item(self.series_ctx, "series", sid)
-        if (push_to_trakt and sid is not None and season is not None
+        if (push_to_trakt and season is not None
                 and self.trakt.is_connected()):
-            def job(sid=sid, s=season, e=episode):
-                try:
-                    self.trakt.add_episode_history(sid, s, e)
-                except Exception:
-                    pass
-            threading.Thread(target=job, daemon=True).start()
+            if sid is not None:
+                self._trakt_push(
+                    lambda: self.trakt.add_episode_history(sid, season, episode))
+            elif self.tmdb is not None and self.series_ctx is not None:
+                self._resolve_tmdb_id_async(
+                    self.series_ctx, "series",
+                    lambda tid, s=season, e=episode: self._on_show_id_for_trakt(
+                        self.series_ctx, tid, s, e))
+            else:
+                self._error(tr("mark_needs_tmdb"))
+        self.list_model.refresh_all()
+
+    def _on_show_id_for_trakt(self, series_item: dict, tid: int | None,
+                              season: int, episode: int) -> None:
+        if not isinstance(tid, int):
+            self._error(tr("mark_needs_tmdb"))
+            return
+        self.watched.mark_episode_local(tid, season, episode)
+        self.watched.add_local_item(series_item, "series", tid)
+        self._trakt_push(
+            lambda: self.trakt.add_episode_history(tid, season, episode))
         self.list_model.refresh_all()
 
     def _unmark_episode_watched(self, item: dict,

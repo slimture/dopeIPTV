@@ -184,18 +184,20 @@ class ChannelDelegate(QStyledItemDelegate):
             self._paint_list(painter, option, index)
 
     def _paint_watched_badge(self, painter, anchor: QRect,
-                             size: int) -> None:
-        """Small green circle with a white check in the top-right corner
-        of *anchor* - the 'you've already seen this' marker synced from
-        Trakt. Painted after the logo/poster so it's not clipped by the
-        rounded-rect path used for the artwork."""
+                             size: int, source: str = "local") -> None:
+        """Small circle with a white check in the top-right corner of
+        *anchor* - the 'you've already seen this' marker. Coloured by
+        source: the accent colour for a local-only mark, Trakt red when
+        the mark is known to Trakt, so the two read distinctly. Painted
+        after the logo/poster so it's not clipped by the rounded-rect
+        path used for the artwork."""
         pad = 3
         x = anchor.right() - size - pad
         y = anchor.top() + pad
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor(ACCENT))
+        painter.setBrush(QColor("#ed1c24" if source == "trakt" else ACCENT))
         painter.drawEllipse(x, y, size, size)
         # Check mark: two short strokes inside the circle.
         pen = QPen(QColor("#ffffff"))
@@ -324,9 +326,10 @@ class ChannelDelegate(QStyledItemDelegate):
                     url,
                     lambda _pm: self.window.listw.viewport().update())
 
-        if self.window.is_item_watched(it, kind):
+        wsrc = self.window.watched_source(it, kind)
+        if wsrc:
             self._paint_watched_badge(
-                painter, logo_rect, max(18, logo_sz // 5))
+                painter, logo_rect, max(18, logo_sz // 5), wsrc)
         if self.window.is_item_on_watchlist(it, kind):
             self._paint_watchlist_badge(
                 painter, logo_rect, max(18, logo_sz // 5))
@@ -413,9 +416,10 @@ class ChannelDelegate(QStyledItemDelegate):
                     url,
                     lambda _pm: self.window.listw.viewport().update())
 
-        if self.window.is_item_watched(it, kind):
+        wsrc = self.window.watched_source(it, kind)
+        if wsrc:
             self._paint_watched_badge(
-                painter, logo_rect, max(16, logo_sz // 4))
+                painter, logo_rect, max(16, logo_sz // 4), wsrc)
         if self.window.is_item_on_watchlist(it, kind):
             self._paint_watchlist_badge(
                 painter, logo_rect, max(16, logo_sz // 4))

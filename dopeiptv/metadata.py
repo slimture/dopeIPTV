@@ -132,6 +132,7 @@ class TmdbClient:
                           if g.get("name"))
         release = (d.get("release_date") or d.get("first_air_date") or "")
         return {
+            "tmdb_id": tid,
             "title": d.get("title") or d.get("name") or "",
             "poster_url": f"{self.IMG_BASE}{poster_path}" if poster_path else None,
             "rating": d.get("vote_average") or None,
@@ -212,6 +213,7 @@ class TmdbClient:
                           if g.get("name"))
         release = (d.get("release_date") or d.get("first_air_date") or "")
         return {
+            "tmdb_id": int(tmdb_id),
             "title": d.get("title") or d.get("name") or "",
             "poster_url": f"{self.IMG_BASE}{poster_path}" if poster_path else None,
             "rating": d.get("vote_average") or None,
