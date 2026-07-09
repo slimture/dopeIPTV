@@ -216,27 +216,35 @@ jobs:
           # through. Remove it so the packaged libmpv is the only one.
           sudo apt-get remove -y mpv libmpv-dev libmpv2 libmpv1 || true
           sudo ldconfig
-          # The embedded player must be ENABLED from the bundled libmpv alone.
-          # "Embedded playback: enabled" only needs libmpv to load (not a GPU),
-          # so it is a valid assertion even under headless CI.
-          assert_embedded_enabled() {
-            local name="$1"
-            if grep -q "Embedded playback disabled" /tmp/$name.log \
-               || ! grep -q "Embedded playback: enabled" /tmp/$name.log; then
-              echo "::error::$name: embedded player is not enabled from the bundled libmpv (would be dead on a machine without a system mpv):"
-              grep -iE "Embedded playback|libmpv|Cannot find libmpv" /tmp/$name.log | head
-              return 1
+          # Authoritative libmpv check: run the bundle's built-in --self-check,
+          # which loads the bundled libmpv WITHOUT creating a QApplication.
+          # A full GUI launch aborts under headless CI (no GPU) long before
+          # the app can report libmpv's status, so we verify it GUI-lessly.
+          # Exit 0 = bundled libmpv loaded; exit 1 = embedded player dead
+          # (exactly the "only works where mpv is preinstalled" bug).
+          self_check() {
+            local exe="$1" name="$2"
+            echo "::group::Self-check (bundled libmpv): $name"
+            if "$exe" --self-check >/tmp/$name-selfcheck.log 2>&1; then
+              cat /tmp/$name-selfcheck.log
+              echo "$name: embedded player enabled from bundled libmpv - PASS"
+              echo "::endgroup::"
+              return 0
             fi
-            echo "$name: embedded player enabled from bundled libmpv - PASS"
+            echo "::error::$name: embedded player NOT enabled from the bundled libmpv (would be dead on a machine without a system mpv):"
+            cat /tmp/$name-selfcheck.log
+            echo "::endgroup::"
+            return 1
           }
           # AppImage: no install needed, just chmod+run.
           chmod +x dopeIPTV-*.AppImage
-          launch_and_check "$PWD/$(ls dopeIPTV-*.AppImage | head -1)" appimage
-          assert_embedded_enabled appimage
+          APPIMAGE="$PWD/$(ls dopeIPTV-*.AppImage | head -1)"
+          self_check "$APPIMAGE" appimage
+          launch_and_check "$APPIMAGE" appimage
           # .deb: install then run via the /usr/bin/dopeiptv wrapper.
           sudo apt-get install -y ./dopeiptv_*.deb
+          self_check "$(command -v dopeiptv)" deb
           launch_and_check "$(command -v dopeiptv)" deb
-          assert_embedded_enabled deb
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2

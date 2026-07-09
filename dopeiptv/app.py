@@ -158,6 +158,26 @@ def main() -> int:
     # One unconditional startup line so packaging smoke tests can prove
     # Python + our package imported cleanly before any GL/Qt init runs.
     print(f"[dopeIPTV] {VERSION} starting", file=sys.stderr, flush=True)
+
+    if "--self-check" in sys.argv:
+        # GUI-less packaging check: did the *bundled* libmpv load? This runs
+        # the frozen bundle without creating a QApplication, which aborts
+        # under headless CI (no GPU) long before the app would otherwise
+        # report whether libmpv is present. It lets CI prove the embedded
+        # player is wired up on a machine with no system mpv - the exact case
+        # that used to slip through because the build host had mpv installed.
+        if _libmpv is None:
+            reason = _libmpv_error
+        else:
+            reason = embedded_playback_reason()
+        if reason:
+            print(f"[dopeIPTV] self-check: embedded playback DISABLED: "
+                  f"{reason}", file=sys.stderr)
+            return 1
+        print("[dopeIPTV] self-check: embedded playback OK "
+              "(bundled libmpv loaded)", file=sys.stderr)
+        return 0
+
     _install_crash_hooks()
     global _original_msg_handler
     from PyQt6.QtCore import qInstallMessageHandler
