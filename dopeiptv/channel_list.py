@@ -259,12 +259,14 @@ class ChannelDelegate(QStyledItemDelegate):
         url = self.window.poster_for(it, kind)
         if url and self.window.logos.is_dead(url):
             url = None
-        # Only fall back to the provider cover once TMDB has actually
-        # answered (with or without a match). Loading the provider
-        # cover while TMDB is still in flight causes a visible
-        # 'double load' - provider cover briefly appears, then gets
-        # replaced by the TMDB poster when the fetch resolves.
-        if not url and self.window.tmdb_resolved(it, kind):
+        # Always fall back to the provider cover when TMDB doesn't
+        # have (or hasn't yet returned) one. The alternative - waiting
+        # for TMDB before falling back - meant every row that TMDB
+        # couldn't answer for stayed on the placeholder letter, and
+        # for a user on 'IPTV provider' metadata mode that's every
+        # row. Any brief poster swap when TMDB later delivers a
+        # better URL is a much smaller cost than no cover at all.
+        if not url:
             url = it.get("stream_icon") or it.get("cover")
         pm = self.window.logos.cache.get(url) if url else None
         if pm:
@@ -346,12 +348,14 @@ class ChannelDelegate(QStyledItemDelegate):
         url = self.window.poster_for(it, kind)
         if url and self.window.logos.is_dead(url):
             url = None
-        # Only fall back to the provider cover once TMDB has actually
-        # answered (with or without a match). Loading the provider
-        # cover while TMDB is still in flight causes a visible
-        # 'double load' - provider cover briefly appears, then gets
-        # replaced by the TMDB poster when the fetch resolves.
-        if not url and self.window.tmdb_resolved(it, kind):
+        # Always fall back to the provider cover when TMDB doesn't
+        # have (or hasn't yet returned) one. The alternative - waiting
+        # for TMDB before falling back - meant every row that TMDB
+        # couldn't answer for stayed on the placeholder letter, and
+        # for a user on 'IPTV provider' metadata mode that's every
+        # row. Any brief poster swap when TMDB later delivers a
+        # better URL is a much smaller cost than no cover at all.
+        if not url:
             url = it.get("stream_icon") or it.get("cover")
         pm = self.window.logos.cache.get(url) if url else None
         if pm:

@@ -340,7 +340,7 @@ class FakeDelegate:
         url = w.poster_for(it, kind)
         if url and w.logos.is_dead(url):
             url = None
-        if not url and w.tmdb_resolved(it, kind):
+        if not url:
             url = it.get("stream_icon") or it.get("cover")
         return url
 
@@ -421,15 +421,15 @@ def test_delegate_falls_back_when_tmdb_errored(qapp, settings):
     assert d.pick_url(it, "vod") == "https://provider/y.jpg"
 
 
-def test_delegate_shows_nothing_while_tmdb_pending(qapp, settings):
-    """During the fetch window we deliberately paint the placeholder
-    and NOT the provider fallback - loading the provider URL now
-    only to swap it 150 ms later is what created the 'double load'
-    flicker the user saw."""
+def test_delegate_uses_provider_url_while_tmdb_pending(qapp, settings):
+    """While TMDB is still fetching we prefer the provider stream_icon
+    over an empty placeholder. Yes, a fast TMDB response may swap
+    the poster once - that's a brief cosmetic flicker; the previous
+    'wait for TMDB' behaviour left users with no covers at all for
+    every row TMDB couldn't answer for, which was much worse."""
     from dopeiptv.metadata import PosterResolver
     client = MagicMock()
-    # A no-op fetch that never returns during the assertion window;
-    # simulated by leaving side_effect unset AND not draining.
+    # Leave fetch unresolved by not draining the pool.
     client.fetch_details.return_value = {"tmdb_id": 1, "poster_url": "u"}
     tmdb = PosterResolver(_pool(), settings, client)
 
@@ -437,8 +437,18 @@ def test_delegate_shows_nothing_while_tmdb_pending(qapp, settings):
     d = FakeDelegate(win)
     it = {"name": "Pending Movie", "stream_icon": "https://provider/x.jpg"}
     url = d.pick_url(it, "vod")
-    # Fetch is in flight - we should NOT have fallen back yet.
-    assert url is None
+    assert url == "https://provider/x.jpg"
+
+
+def test_delegate_uses_provider_url_when_tmdb_disabled(qapp, settings):
+    """User selected 'IPTV provider' metadata mode: self.tmdb is None
+    and every VOD/series row should paint the provider stream_icon.
+    This is what the user hit when covers stopped loading after
+    switching away from TMDB."""
+    win = FakeWindow(tmdb=None, logos=_StubLogos())
+    d = FakeDelegate(win)
+    it = {"name": "Any Movie", "stream_icon": "https://provider/x.jpg"}
+    assert d.pick_url(it, "vod") == "https://provider/x.jpg"
 
 
 def test_delegate_uses_provider_url_for_live_kind(qapp, settings):
