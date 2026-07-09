@@ -726,6 +726,55 @@ def test_logo_loader_sends_browser_user_agent(qapp, tmp_path, monkeypatch):
     assert seen["timeout"][0] < 5
 
 
+# -- Auto-match result selection (the 'manual finds it, auto doesn't') fix -
+
+
+def test_pick_result_prefers_poster_over_blind_first():
+    """results[0] with no poster loses to a lower-ranked result that
+    has one - exactly the case the user hit: auto 'matched' but showed
+    no cover while the manual dialog showed the right poster."""
+    from dopeiptv.metadata import TmdbClient
+    results = [
+        {"id": 1, "poster_path": None, "release_date": "1990-01-01"},
+        {"id": 2, "poster_path": "/good.jpg", "release_date": "1991-01-01"},
+    ]
+    assert TmdbClient._pick_result(results, None)["id"] == 2
+
+
+def test_pick_result_prefers_year_match_with_poster():
+    from dopeiptv.metadata import TmdbClient
+    results = [
+        {"id": 1, "poster_path": "/a.jpg", "release_date": "2005-01-01"},
+        {"id": 2, "poster_path": "/b.jpg", "release_date": "2021-06-01"},
+    ]
+    # Year 2021 should win even though it's ranked second.
+    assert TmdbClient._pick_result(results, 2021)["id"] == 2
+
+
+def test_pick_result_falls_back_to_first_when_no_posters():
+    from dopeiptv.metadata import TmdbClient
+    results = [{"id": 9, "poster_path": None}, {"id": 8, "poster_path": None}]
+    assert TmdbClient._pick_result(results, None)["id"] == 9
+    assert TmdbClient._pick_result([], None) is None
+
+
+def test_auto_fetch_passes_year_to_client(qapp, settings):
+    """The auto-matcher must forward the year clean_title extracted -
+    without it, a same-title different-year film can rank first and
+    steal the cover (why manual, which sends the year, found it)."""
+    from dopeiptv.metadata import PosterResolver
+    client = MagicMock()
+    client.fetch_details.return_value = {
+        "tmdb_id": 1, "poster_url": "https://tmdb/x.jpg"}
+    r = PosterResolver(_pool(), settings, client)
+    r.get_full("Total Recall (1990) 1080p", "vod", lambda d: None)
+    _drain_pool(r.pool, qapp)
+    args, _ = client.fetch_details.call_args
+    assert args[0] == "Total Recall"   # cleaned title
+    assert args[1] == "vod"
+    assert args[2] == 1990             # year forwarded
+
+
 # -- Embedded TMDB path extraction from provider URLs ----------------------
 
 

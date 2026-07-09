@@ -41,20 +41,69 @@ class TmdbClient:
     def poster_url(self, title: str, kind: str) -> str | None:
         return (self.fetch_details(title, kind) or {}).get("poster_url")
 
-    def fetch_details(self, title: str, kind: str) -> dict | None:
-        """Search by title, then fetch poster/rating/IMDb id/cast in one
-        combined request (append_to_response) for the top match."""
-        endpoint = "movie" if kind == "vod" else "tv"
-        r = requests.get(
-            f"{self.BASE}/search/{endpoint}",
-            params={"api_key": self.api_key, "query": title,
-                    "include_adult": "false"},
-            timeout=10)
-        r.raise_for_status()
-        results = r.json().get("results") or []
+    @staticmethod
+    def _result_year(r: dict) -> int | None:
+        d = r.get("release_date") or r.get("first_air_date") or ""
+        try:
+            return int(d[:4])
+        except (ValueError, TypeError):
+            return None
+
+    @classmethod
+    def _pick_result(cls, results: list[dict],
+                     year: int | None) -> dict | None:
+        """Choose the best search hit the way the manual dialog's user
+        does - prefer a result that actually HAS a poster (and, when we
+        know the year, one that matches it) over a blind results[0].
+        A bare results[0] with no poster_path is exactly the case where
+        auto-match 'found something' but showed no cover while the user
+        could see the right poster one row down in the dialog."""
         if not results:
             return None
-        tid = results[0].get("id")
+        if year is not None:
+            same_year = [r for r in results
+                         if cls._result_year(r) == year and r.get("poster_path")]
+            if same_year:
+                return same_year[0]
+            near_year = [r for r in results
+                         if cls._result_year(r) in (year - 1, year, year + 1)
+                         and r.get("poster_path")]
+            if near_year:
+                return near_year[0]
+        with_poster = [r for r in results if r.get("poster_path")]
+        if with_poster:
+            return with_poster[0]
+        return results[0]
+
+    def fetch_details(self, title: str, kind: str,
+                      year: int | None = None) -> dict | None:
+        """Search by title (optionally narrowed by year), then fetch
+        poster/rating/IMDb id/cast in one combined request
+        (append_to_response) for the best match."""
+        endpoint = "movie" if kind == "vod" else "tv"
+        params = {"api_key": self.api_key, "query": title,
+                  "include_adult": "false"}
+        if year is not None:
+            params["year" if endpoint == "movie"
+                   else "first_air_date_year"] = year
+        r = requests.get(
+            f"{self.BASE}/search/{endpoint}", params=params, timeout=10)
+        r.raise_for_status()
+        results = r.json().get("results") or []
+        # If a year filter returned nothing, retry without it - the
+        # provider's year can be wrong/missing and a title-only hit
+        # still beats no cover.
+        if not results and year is not None:
+            params.pop("year", None)
+            params.pop("first_air_date_year", None)
+            r = requests.get(
+                f"{self.BASE}/search/{endpoint}", params=params, timeout=10)
+            r.raise_for_status()
+            results = r.json().get("results") or []
+        best = self._pick_result(results, year)
+        if not best:
+            return None
+        tid = best.get("id")
         if tid is None:
             return None
         r2 = requests.get(
@@ -64,7 +113,7 @@ class TmdbClient:
             timeout=10)
         r2.raise_for_status()
         d = r2.json()
-        poster_path = d.get("poster_path") or results[0].get("poster_path")
+        poster_path = d.get("poster_path") or best.get("poster_path")
         cast = []
         for c in (d.get("credits") or {}).get("cast") or []:
             name = c.get("name")
@@ -313,8 +362,8 @@ class PosterResolver(QObject):
         cleaned, year = self.clean_title(title)
         search_query = cleaned or title
 
-        def fetch(t=search_query, k=kind):
-            return self.client.fetch_details(t, k)
+        def fetch(t=search_query, k=kind, y=year):
+            return self.client.fetch_details(t, k, y)
 
         def done(details, key=key, raw=title, q=search_query):
             # Never overwrite a manual pick with an auto-search result. This
