@@ -246,7 +246,7 @@ class PosterResolver(QObject):
     # pick, ...) so previously-cached 'no match / no poster' results are
     # dropped once and re-searched with the better logic. Entries that
     # already have a poster, and manual picks, are always kept.
-    CACHE_MATCHER_VER = 2
+    CACHE_MATCHER_VER = 3
     PERSON_CACHE_KEY = "tmdb_person_cache"
     PERSON_ID_CACHE_KEY = "tmdb_person_id_cache"
 
@@ -357,9 +357,14 @@ class PosterResolver(QObject):
                 year = None
         # Leading 'EN|', 'SV - ', 'FR:' language tag
         t = re.sub(r"^\s*[A-Za-z]{2,3}\s*[|\-:]\s*", "", t)
-        # Bracketed suffixes: '[IMDB]', '[MULTI]', '[SUB]', '[HDR]',
-        # trailing '[ ]' or '( )' or '(2023)'
-        t = re.sub(r"\s*[\[(][^\])]*[\])]\s*$", "", t)
+        # Remove EVERY bracketed segment anywhere in the title, not just
+        # a single trailing one: '[AR-ENG]', '[MULTI]', '(1080p)',
+        # '{x}'. Provider libraries often stack several, sometimes with
+        # a dangling unclosed bracket ('... [AR-ENG] [').
+        t = re.sub(r"[\[({][^\])}]*[\])}]", " ", t)
+        # Drop any leftover stray/unclosed bracket characters so a title
+        # ending '... [' doesn't defeat the TMDB search.
+        t = re.sub(r"[\[\](){}]", " ", t)
         # Codec / audio / language noise tail
         t = re.sub(
             r"\b(1080p|720p|2160p|4K|UHD|HDR|WEB[-.]?DL|WEB[-.]?RIP|"
@@ -371,7 +376,7 @@ class PosterResolver(QObject):
         # doesn't confuse the TMDB search string.
         t = re.sub(r"\s*\(?\b(19|20)\d{2}\b\)?\s*", " ", t)
         # Trim leftover punctuation / whitespace
-        t = t.strip(" -_.|:;/\t\n")
+        t = t.strip(" -_.|:;/[](){}\t\n")
         t = re.sub(r"\s+", " ", t)
         return t, year
 

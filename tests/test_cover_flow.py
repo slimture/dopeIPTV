@@ -931,9 +931,23 @@ def test_clean_title_strips_bracketed_suffixes():
         ("Dune (2021) [MULTI]", "Dune"),
         ("Interstellar [HDR]", "Interstellar"),
         ("Oppenheimer [SUB]", "Oppenheimer"),
+        # multiple stacked tags + a dangling unclosed bracket
+        ("One Hundred and One Dalmatians [AR-ENG] [",
+         "One Hundred and One Dalmatians"),
+        ("Dune [AR] [ENG] [", "Dune"),
+        ("EN | The Matrix (1999) [MULTI] [1080p]", "The Matrix"),
     ]:
         cleaned, _ = PosterResolver.clean_title(raw)
         assert cleaned == expected, f"{raw!r} -> {cleaned!r}"
+
+
+def test_clean_title_keeps_legit_punctuation():
+    from dopeiptv.metadata import PosterResolver
+    # A colon/hyphen in a real title must survive - only bracket junk
+    # is noise.
+    assert PosterResolver.clean_title(
+        "Léon: The Professional")[0] == "Léon: The Professional"
+    assert PosterResolver.clean_title("Spider-Man [SUB]")[0] == "Spider-Man"
 
 
 def test_clean_title_strips_language_prefix_and_codec_tail():
