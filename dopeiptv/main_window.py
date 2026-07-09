@@ -4289,12 +4289,57 @@ class MainWindow(QMainWindow):
                     "the stream you're watching (no extra connection)")
                 return
 
+        # Not the channel currently on screen. If the embedded player is
+        # busy with something else, recording this one opens a SECOND
+        # connection to the provider (many accounts allow only one), so
+        # ask - offer to switch to it and record instead, mirroring the
+        # switch-while-recording prompt.
+        busy = (self.player is not None and self.player.isVisible()
+                and self.playback_mode() == "embedded"
+                and self._playing_key is not None)
+        if busy:
+            playing = (self._last_playback or {}).get("title") or ""
+            idx = self._choice_dialog(
+                tr("rec_switch_title"),
+                tr("rec_switch_body", playing=playing, target=title),
+                [(tr("rec_switch_and_record"), "primary"),
+                 (tr("rec_record_background"), "normal"),
+                 (tr("common_cancel"), "normal")])
+            if idx == 0:
+                self._switch_and_record(it, stop_ts, length)
+                return
+            if idx != 1:
+                return  # cancel / dismissed
+
         if not self._recorder_ready():
             return
         url = self.client.live_url(it["stream_id"], "ts")
         self.rec.add_job(url, title, now, stop_ts)
         self._set_status(
             f"● Recording {title} {length} → {self.rec.directory()}")
+
+    def _switch_and_record(self, it, stop_ts, length: str) -> None:
+        """Switch the embedded player to this channel and record the
+        stream we're now watching - one connection, no conflict."""
+        title = self.channel_display_name(it)
+        try:
+            path = self.rec.build_path(title)
+        except OSError as e:
+            QMessageBox.warning(self, tr("rec_status_recording"), str(e))
+            return
+        self.play_live_channel(it)
+        if self.player and self.player.start_stream_record(path):
+            self.rec.add_inplayer_job(
+                title, path, stop_ts,
+                url=self.client.live_url(it["stream_id"], "ts"))
+            self._set_status(
+                f"● Recording {title} {length} - capturing "
+                "the stream you're watching (no extra connection)")
+        elif self._recorder_ready():
+            url = self.client.live_url(it["stream_id"], "ts")
+            self.rec.add_job(url, title, time.time(), stop_ts)
+            self._set_status(
+                f"● Recording {title} {length} → {self.rec.directory()}")
 
     def _schedule_recording(self, it) -> None:
         if not self._recorder_ready() or it.get("stream_id") is None:

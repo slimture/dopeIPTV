@@ -3119,6 +3119,60 @@ _STRINGS: dict[str, dict[str, str]] = {
         "de": "Wird geladen…", "fr": "Chargement…", "zh": "加载中……",
         "ru": "Загрузка…", "th": "กำลังโหลด…",
     },
+    "rec_switch_title": {
+        "en": "Record another channel?",
+        "sv": "Spela in en annan kanal?",
+        "es": "¿Grabar otro canal?",
+        "de": "Anderen Kanal aufnehmen?",
+        "fr": "Enregistrer une autre chaîne ?",
+        "zh": "录制另一个频道？",
+        "ru": "Записать другой канал?",
+        "th": "บันทึกอีกช่องหรือไม่?",
+    },
+    "rec_switch_body": {
+        "en": "“{playing}” is playing. Recording “{target}” instead needs a "
+              "second connection to your provider - many accounts allow only "
+              "one at a time.",
+        "sv": "“{playing}” spelas. Att spela in “{target}” kräver en andra "
+              "anslutning till din leverantör - många konton tillåter bara "
+              "en åt gången.",
+        "es": "“{playing}” se está reproduciendo. Grabar “{target}” necesita "
+              "una segunda conexión con tu proveedor; muchas cuentas solo "
+              "permiten una a la vez.",
+        "de": "“{playing}” läuft. Für die Aufnahme von “{target}” ist eine "
+              "zweite Verbindung zum Anbieter nötig - viele Konten erlauben "
+              "nur eine gleichzeitig.",
+        "fr": "“{playing}” est en lecture. Enregistrer “{target}” nécessite "
+              "une deuxième connexion à votre fournisseur - beaucoup de "
+              "comptes n'en autorisent qu'une à la fois.",
+        "zh": "正在播放“{playing}”。录制“{target}”需要与提供商建立第二个连接——"
+              "许多账户一次只允许一个。",
+        "ru": "Воспроизводится «{playing}». Для записи «{target}» нужно второе "
+              "подключение к провайдеру - многие аккаунты допускают только "
+              "одно одновременно.",
+        "th": "กำลังเล่น “{playing}” การบันทึก “{target}” ต้องใช้การเชื่อมต่อที่สองกับ"
+              "ผู้ให้บริการ - หลายบัญชีอนุญาตเพียงหนึ่งเดียวในแต่ละครั้ง",
+    },
+    "rec_switch_and_record": {
+        "en": "Switch to it and record",
+        "sv": "Byt till den och spela in",
+        "es": "Cambiar a él y grabar",
+        "de": "Dorthin wechseln und aufnehmen",
+        "fr": "Passer dessus et enregistrer",
+        "zh": "切换到它并录制",
+        "ru": "Переключиться и записать",
+        "th": "สลับไปและบันทึก",
+    },
+    "rec_record_background": {
+        "en": "Record in the background (needs a second connection)",
+        "sv": "Spela in i bakgrunden (kräver en andra anslutning)",
+        "es": "Grabar en segundo plano (necesita una segunda conexión)",
+        "de": "Im Hintergrund aufnehmen (braucht eine zweite Verbindung)",
+        "fr": "Enregistrer en arrière-plan (nécessite une 2e connexion)",
+        "zh": "在后台录制（需要第二个连接）",
+        "ru": "Записать в фоне (нужно второе подключение)",
+        "th": "บันทึกในพื้นหลัง (ต้องใช้การเชื่อมต่อที่สอง)",
+    },
 
     # ── Chromecast dialog ─────────────────────────────────────────────────
     "cast_title": {
