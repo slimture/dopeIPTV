@@ -99,6 +99,16 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Избранное",
         "th": "รายการโปรด",
     },
+    "nav_watchlist": {
+        "en": "Watch Later",
+        "sv": "Titta senare",
+        "es": "Ver más tarde",
+        "de": "Später ansehen",
+        "fr": "Regarder plus tard",
+        "zh": "稍后观看",
+        "ru": "Посмотреть позже",
+        "th": "ดูภายหลัง",
+    },
     "nav_recordings": {
         "en": "Recordings",
         "sv": "Inspelningar",

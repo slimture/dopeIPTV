@@ -561,17 +561,22 @@ class WatchedStore:
 
 
 class WatchlistStore:
-    """'Watch later' list, same two-layer design as WatchedStore. The
-    Trakt layer mirrors /sync/watchlist for the account; the local
-    layer is the user's private list that never touches the network.
-    A single tmdb id in either layer means 'on the watchlist'."""
+    """'Watch later' list. Each entry is a full provider item dict so
+    the sidebar's Watch Later category can render straight from the
+    store without another vod_streams / series_list round-trip. Trakt
+    ids come along for the ride so a Trakt-side add/remove has
+    something to POST."""
 
     def __init__(self, settings: QSettings) -> None:
         self.settings = settings
+        # kind ("movie" | "show") -> list of item dicts (newest first).
+        self.movies: list[dict] = []
+        self.shows: list[dict] = []
+        # Sets of tmdb-ids known to Trakt (populated by replace()),
+        # used to answer 'is on Trakt watchlist' for the badge in the
+        # right-click menu.
         self.trakt_movies: set[int] = set()
-        self.local_movies: set[int] = set()
         self.trakt_shows: set[int] = set()
-        self.local_shows: set[int] = set()
         self.last_sync_at: int = 0
         self._load()
 
@@ -583,65 +588,118 @@ class WatchlistStore:
             data = json.loads(raw)
         except (ValueError, TypeError):
             return
-        def load_set(key):
-            return {int(x) for x in data.get(key, []) if isinstance(x, int)}
-        self.trakt_movies = load_set("trakt_movies")
-        self.local_movies = load_set("local_movies")
-        self.trakt_shows = load_set("trakt_shows")
-        self.local_shows = load_set("local_shows")
+        self.movies = [x for x in (data.get("movies") or [])
+                       if isinstance(x, dict)]
+        self.shows = [x for x in (data.get("shows") or [])
+                      if isinstance(x, dict)]
+        self.trakt_movies = {int(x) for x in data.get("trakt_movies", [])
+                             if isinstance(x, int)}
+        self.trakt_shows = {int(x) for x in data.get("trakt_shows", [])
+                            if isinstance(x, int)}
         self.last_sync_at = int(data.get("last_sync_at") or 0)
 
     def _save(self) -> None:
         payload = {
+            "movies": self.movies,
+            "shows": self.shows,
             "trakt_movies": sorted(self.trakt_movies),
-            "local_movies": sorted(self.local_movies),
             "trakt_shows": sorted(self.trakt_shows),
-            "local_shows": sorted(self.local_shows),
             "last_sync_at": self.last_sync_at,
         }
         self.settings.setValue("trakt_watchlist_cache",
                                json.dumps(payload, separators=(",", ":")))
 
+    # -- Trakt-sync layer ---------------------------------------------------
+
     def replace(self, movies: list[int], shows: list[int]) -> None:
+        """Rebuild the known-on-Trakt sets. Doesn't touch the item
+        snapshots the user added locally - that's a separate concern."""
         self.trakt_movies = set(movies)
         self.trakt_shows = set(shows)
         self.last_sync_at = int(datetime.now().timestamp())
         self._save()
 
-    def has_movie(self, tmdb_id: int | None) -> bool:
-        if not isinstance(tmdb_id, int):
-            return False
-        return tmdb_id in self.trakt_movies or tmdb_id in self.local_movies
+    # -- lookups ------------------------------------------------------------
 
-    def has_show(self, tmdb_id: int | None) -> bool:
-        if not isinstance(tmdb_id, int):
-            return False
-        return tmdb_id in self.trakt_shows or tmdb_id in self.local_shows
+    @staticmethod
+    def _match(item: dict, tmdb_id: int | None,
+               stream_id: int | None) -> bool:
+        if isinstance(tmdb_id, int) and item.get("_tmdb_id") == tmdb_id:
+            return True
+        if isinstance(stream_id, int):
+            for key in ("stream_id", "series_id"):
+                if item.get(key) == stream_id:
+                    return True
+        return False
 
-    def add_movie_local(self, tmdb_id: int) -> None:
-        self.local_movies.add(int(tmdb_id))
+    def has_movie(self, tmdb_id: int | None,
+                  stream_id: int | None = None) -> bool:
+        if isinstance(tmdb_id, int) and tmdb_id in self.trakt_movies:
+            return True
+        return any(self._match(m, tmdb_id, stream_id) for m in self.movies)
+
+    def has_show(self, tmdb_id: int | None,
+                 stream_id: int | None = None) -> bool:
+        if isinstance(tmdb_id, int) and tmdb_id in self.trakt_shows:
+            return True
+        return any(self._match(s, tmdb_id, stream_id) for s in self.shows)
+
+    # -- add / remove ------------------------------------------------------
+
+    @staticmethod
+    def _make_entry(item: dict, tmdb_id: int | None) -> dict:
+        """Store a shallow snapshot of just the fields the delegate
+        and playback code touch, so a bulky provider payload doesn't
+        blow up QSettings JSON."""
+        snap = {
+            "name": item.get("name") or item.get("title"),
+            "title": item.get("title") or item.get("name"),
+            "stream_id": item.get("stream_id"),
+            "series_id": item.get("series_id"),
+            "container_extension": item.get("container_extension"),
+            "stream_icon": item.get("stream_icon"),
+            "cover": item.get("cover"),
+            "category_id": item.get("category_id"),
+            "_tmdb_id": tmdb_id,
+        }
+        return {k: v for k, v in snap.items() if v is not None}
+
+    def _dedup_key(self, item: dict, tmdb_id: int | None,
+                   stream_id: int | None) -> None:
+        pass
+
+    def add_movie_local(self, item: dict, tmdb_id: int | None) -> None:
+        if self.has_movie(tmdb_id, item.get("stream_id")):
+            return
+        self.movies.insert(0, self._make_entry(item, tmdb_id))
         self._save()
 
-    def remove_movie(self, tmdb_id: int) -> None:
-        tid = int(tmdb_id)
-        self.trakt_movies.discard(tid)
-        self.local_movies.discard(tid)
+    def add_show_local(self, item: dict, tmdb_id: int | None) -> None:
+        if self.has_show(tmdb_id, item.get("series_id")):
+            return
+        self.shows.insert(0, self._make_entry(item, tmdb_id))
         self._save()
 
-    def add_show_local(self, tmdb_id: int) -> None:
-        self.local_shows.add(int(tmdb_id))
+    def remove_movie(self, tmdb_id: int | None,
+                     stream_id: int | None = None) -> None:
+        if isinstance(tmdb_id, int):
+            self.trakt_movies.discard(tmdb_id)
+        self.movies = [m for m in self.movies
+                       if not self._match(m, tmdb_id, stream_id)]
         self._save()
 
-    def remove_show(self, tmdb_id: int) -> None:
-        tid = int(tmdb_id)
-        self.trakt_shows.discard(tid)
-        self.local_shows.discard(tid)
+    def remove_show(self, tmdb_id: int | None,
+                    stream_id: int | None = None) -> None:
+        if isinstance(tmdb_id, int):
+            self.trakt_shows.discard(tmdb_id)
+        self.shows = [s for s in self.shows
+                      if not self._match(s, tmdb_id, stream_id)]
         self._save()
 
     def clear(self) -> None:
+        self.movies = []
+        self.shows = []
         self.trakt_movies = set()
-        self.local_movies = set()
         self.trakt_shows = set()
-        self.local_shows = set()
         self.last_sync_at = 0
         self.settings.remove("trakt_watchlist_cache")

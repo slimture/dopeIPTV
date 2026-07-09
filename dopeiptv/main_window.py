@@ -360,6 +360,7 @@ class MainWindow(QMainWindow):
         self.nav_btns: dict[str, QPushButton] = {}
         for key, text in (("live", tr("nav_tv")), ("vod", tr("nav_movies")),
                           ("series", tr("nav_series")), ("fav", tr("nav_favorites")),
+                          ("watchlist", tr("nav_watchlist")),
                           ("rec", tr("nav_recordings")), ("history", tr("nav_history"))):
             b = QPushButton(text, objectName="NavBtn")
             b.setCheckable(True)
@@ -1055,6 +1056,21 @@ class MainWindow(QMainWindow):
             self.cat_list.blockSignals(False)
             self.cat_list.setCurrentRow(0)
             return
+        if self.mode == "watchlist":
+            # Watch Later has two sub-categories - Movies and Series -
+            # mirroring the two Trakt watchlist endpoints. 'All' up
+            # top shows both stacked, movies first.
+            self.cat_list.blockSignals(True)
+            for label, data in [
+                    (tr("cat_all"), None),
+                    (tr("nav_movies"), "movies"),
+                    (tr("nav_series"), "series")]:
+                it = QListWidgetItem(label)
+                it.setData(Qt.ItemDataRole.UserRole, data)
+                self.cat_list.addItem(it)
+            self.cat_list.blockSignals(False)
+            self.cat_list.setCurrentRow(0)
+            return
         self.loading_bar.show()
         self._set_status(tr("status_loading_categories"))
         fn = {"live": self.client.live_categories,
@@ -1147,6 +1163,20 @@ class MainWindow(QMainWindow):
             return
         if self.mode == "history":
             self.all_items = self.history.items()
+            self._apply_filter()
+            return
+        if self.mode == "watchlist":
+            self._watchlist_subcat = category_id
+            movies = [
+                {**m, "_kind": "vod"} for m in self.watchlist.movies]
+            shows = [
+                {**s, "_kind": "series"} for s in self.watchlist.shows]
+            if category_id == "movies":
+                self.all_items = movies
+            elif category_id == "series":
+                self.all_items = shows
+            else:
+                self.all_items = movies + shows
             self._apply_filter()
             return
         self.loading_bar.show()
@@ -1545,54 +1575,63 @@ class MainWindow(QMainWindow):
 
     def is_on_watchlist(self, item: dict, kind: str) -> bool:
         tid = self._tmdb_id_for_item(item, kind)
+        sid = (item.get("stream_id") if kind == "vod"
+               else item.get("series_id"))
+        try:
+            sid_int = int(sid) if sid is not None else None
+        except (TypeError, ValueError):
+            sid_int = None
         if kind == "vod":
-            return self.watchlist.has_movie(tid)
+            return self.watchlist.has_movie(tid, sid_int)
         if kind == "series":
-            return self.watchlist.has_show(tid)
+            return self.watchlist.has_show(tid, sid_int)
         return False
 
     def _add_watchlist(self, item: dict, kind: str,
                        push_to_trakt: bool) -> None:
         tid = self._tmdb_id_for_item(item, kind)
-        if tid is None:
-            self._error(tr("mark_needs_tmdb"))
-            return
         if kind == "vod":
-            self.watchlist.add_movie_local(tid)
+            self.watchlist.add_movie_local(item, tid)
             trakt_fn = self.trakt.add_movie_watchlist
         else:
-            self.watchlist.add_show_local(tid)
+            self.watchlist.add_show_local(item, tid)
             trakt_fn = self.trakt.add_show_watchlist
-        if push_to_trakt and self.trakt.is_connected():
-            def job(tid=tid, fn=trakt_fn):
-                try:
-                    fn(tid)
-                except Exception:
-                    pass
-            threading.Thread(target=job, daemon=True).start()
+        if push_to_trakt:
+            if tid is None:
+                self._error(tr("mark_needs_tmdb"))
+            elif self.trakt.is_connected():
+                def job(tid=tid, fn=trakt_fn):
+                    try:
+                        fn(tid)
+                    except Exception:
+                        pass
+                threading.Thread(target=job, daemon=True).start()
 
     def _remove_watchlist(self, item: dict, kind: str,
                           push_to_trakt: bool) -> None:
         tid = self._tmdb_id_for_item(item, kind)
-        if tid is None:
-            return
+        sid = (item.get("stream_id") if kind == "vod"
+               else item.get("series_id"))
+        try:
+            sid_int = int(sid) if sid is not None else None
+        except (TypeError, ValueError):
+            sid_int = None
         if kind == "vod":
-            self.watchlist.remove_movie(tid)
+            self.watchlist.remove_movie(tid, sid_int)
             trakt_fn = self.trakt.remove_movie_watchlist
         else:
-            self.watchlist.remove_show(tid)
+            self.watchlist.remove_show(tid, sid_int)
             trakt_fn = self.trakt.remove_show_watchlist
-        if push_to_trakt and self.trakt.is_connected():
+        if push_to_trakt and tid is not None and self.trakt.is_connected():
             def job(tid=tid, fn=trakt_fn):
                 try:
                     fn(tid)
                 except Exception:
                     pass
             threading.Thread(target=job, daemon=True).start()
-        # If we're currently viewing the watchlist pseudo-category,
-        # dropping this item should remove it from the visible list.
-        if self.mode in ("vod", "series") and self._current_cat_id == "_watchlist":
-            self._load_items("_watchlist")
+        # If we're currently in the Watch Later view, drop the row.
+        if self.mode == "watchlist":
+            self._load_items(getattr(self, "_watchlist_subcat", None))
 
     def _trakt_device_auth_dialog(self, parent) -> None:
         d = QDialog(parent)
@@ -2514,7 +2553,13 @@ class MainWindow(QMainWindow):
         if self.mode in ("live", "fav"):
             fmt = self.settings.value("stream_format", "ts")
             return self.client.live_url(it.get("stream_id"), fmt), title
-        if self.mode == "vod":
+        # Watch Later snapshots carry `_kind` set to "vod" or "series"
+        # so the same movie playback code path works from that view
+        # even though self.mode is 'watchlist'.
+        eff_mode = self.mode
+        if self.mode == "watchlist":
+            eff_mode = it.get("_kind") or "vod"
+        if eff_mode == "vod":
             return self.client.vod_url(
                 it.get("stream_id"), it.get("container_extension")), title
         return None, title
@@ -2534,6 +2579,12 @@ class MainWindow(QMainWindow):
         if not it:
             return
         if self.mode == "series" and not self.series_ctx:
+            self._enter_series(it)
+            return
+        # Series row from Watch Later: same 'drill in' behaviour as
+        # from the Series view - open the episode list instead of
+        # trying to play a series URL directly.
+        if self.mode == "watchlist" and it.get("_kind") == "series":
             self._enter_series(it)
             return
         if self.mode == "rec":
@@ -4056,8 +4107,8 @@ class MainWindow(QMainWindow):
             action.setText(getter())
         nav_labels = {
             "live": "nav_tv", "vod": "nav_movies", "series": "nav_series",
-            "fav": "nav_favorites", "rec": "nav_recordings",
-            "history": "nav_history",
+            "fav": "nav_favorites", "watchlist": "nav_watchlist",
+            "rec": "nav_recordings", "history": "nav_history",
         }
         for key, btn in self.nav_btns.items():
             if key in nav_labels:
@@ -5003,24 +5054,29 @@ class MainWindow(QMainWindow):
             self.mpv_window.shutdown()
         self.mpv.stop()
         threading.Thread(target=self.cast.shutdown, daemon=True).start()
-        # Cancel every queued background download and give running
-        # workers a very short grace period, but do not block on them.
-        # requests.get can hang for its full 10 s timeout, way beyond
-        # anything a user waiting for the window to close will accept.
+        # Cancel every queued background download. Wait a moderate
+        # amount of time for in-flight workers to finish so libmpv,
+        # Wayland handles and file descriptors have a chance to
+        # release cleanly - a hard exit while any of those are mid-
+        # teardown leaves stale state that can crash the NEXT startup.
         for pool in (self.pool, self._logo_pool, self._art_pool):
             try:
                 pool.clear()
-                pool.waitForDone(150)
+                pool.waitForDone(1500)
             except Exception:
                 pass
         super().closeEvent(event)
-        # Skip Python's atexit/module-teardown path entirely: image
-        # workers still executing requests.get would otherwise finish
-        # into a torn-down interpreter and Qt would emit signals into
-        # dead C++ objects, both of which surface as
-        # 'Aborted (core dumped)'. Everything we care about
-        # persistence-wise has already landed; disk writes in flight
-        # go through '.part' + rename so any interrupted write leaves
-        # no visible file behind. os._exit sends SIGKILL semantics to
-        # the process, joining every thread instantly.
-        os._exit(0)
+        # Only fall back to os._exit if workers are still active - at
+        # that point the interpreter would segfault emitting Qt
+        # signals during teardown, so the abrupt exit is the lesser
+        # evil. If workers drained normally, use a clean quit so
+        # atexit / QApplication destructors run and every OS-level
+        # resource (mpv sound device, Wayland surfaces) gets released
+        # instead of being orphaned until the compositor times them
+        # out.
+        active_workers = any(
+            p.activeThreadCount() > 0
+            for p in (self.pool, self._logo_pool, self._art_pool))
+        if active_workers:
+            os._exit(0)
+        QApplication.instance().quit()
