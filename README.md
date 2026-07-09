@@ -20,7 +20,7 @@ player (with optional external mpv/VLC playback).
 - **Chromecast**, **Trakt** scrobbling, **multiple playlists**, parental control, content manager and editable channel lists
 - **Themes** — 5 palettes + 7 accent colors, applied live
 
-See [FEATURES.md](FEATURES.md) for the full feature list.
+See [FEATURES.md](docs/FEATURES.md) for the full feature list.
 
 ## Dependencies
 
@@ -165,7 +165,7 @@ v3 or later (GPL-3.0-or-later)** — see [`LICENSE`](LICENSE).
 
 It builds on GPL/LGPL components including **mpv/libmpv**, **FFmpeg**,
 **PyQt6** and optionally **VLC**. GPLv3 is the licence that is compatible
-with all of them; see [`THIRD-PARTY-LICENSES.md`](THIRD-PARTY-LICENSES.md)
+with all of them; see [`THIRD-PARTY-LICENSES.md`](docs/THIRD-PARTY-LICENSES.md)
 for the full rationale and the licence of every dependency.
 
 This product uses the TMDB API but is not endorsed or certified by TMDB.

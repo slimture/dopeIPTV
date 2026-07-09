@@ -7,8 +7,8 @@ enough to fit in a 14-16B model's context window.
 ## Module responsibilities
 
 Modules are grouped into layered subpackages (`providers/`, `core/`,
-`media/`, `ui/`).  See `ARCHITECTURE.md` for the full map and the
-one-way import rule.
+`media/`, `services/`, `ui/`).  See `docs/ARCHITECTURE.md` for the full
+map and the one-way import rule.
 
 | Module | What it owns |
 |--------|--------------|
