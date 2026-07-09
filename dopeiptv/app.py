@@ -26,10 +26,10 @@ class _NoButtonIconsStyle(QProxyStyle):
         return super().styleHint(hint, option, widget, returnData)
 
 from . import APP_NAME, ORG, VERSION
-from .client import XtreamClient
-from .dialogs import LoginDialog, PlaylistDialog
+from .providers.client import XtreamClient
+from .ui.dialogs import LoginDialog, PlaylistDialog
 from .ui.main_window import MainWindow
-from .players import _libmpv, _libmpv_error, embedded_playback_reason
+from .media.players import _libmpv, _libmpv_error, embedded_playback_reason
 
 _SUPPRESSED_QT_WARNINGS = (
     b"Failed to register with host portal",
@@ -47,8 +47,8 @@ def _qt_message_filter(msg_type, context, message):
         _original_msg_handler(msg_type, context, message)
 
 
-from .stores import PlaylistStore
-from .theme import ACCENT, apply_theme, build_style
+from .core.stores import PlaylistStore
+from .ui.theme import ACCENT, apply_theme, build_style
 
 
 def make_app_icon() -> QIcon:
@@ -191,10 +191,10 @@ def main() -> int:
         os.environ.setdefault("LC_NUMERIC", "C")
 
     if sys.platform == "darwin":
-        from .platform_macos import fix_app_name
+        from .core.platform_macos import fix_app_name
         fix_app_name(APP_NAME)
         if _libmpv is not None:
-            from .platform_macos import setup_opengl
+            from .core.platform_macos import setup_opengl
             setup_opengl()
 
     app = QApplication(sys.argv)

@@ -1,6 +1,6 @@
-"""Unit tests for dopeiptv.recording utilities."""
+"""Unit tests for dopeiptv.core.recording utilities."""
 
-from dopeiptv.recording import format_size, safe_filename
+from dopeiptv.core.recording import format_size, safe_filename
 
 
 def test_safe_filename_strips_unsafe():

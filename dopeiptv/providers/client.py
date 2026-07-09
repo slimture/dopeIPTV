@@ -148,7 +148,7 @@ def find_player_executable(player: str) -> str | None:
     else:
         candidates = ["vlc", "cvlc"]
     if sys.platform == "darwin":
-        from .platform_macos import extra_player_candidates
+        from ..core.platform_macos import extra_player_candidates
         candidates += extra_player_candidates(player)
     for c in candidates:
         if os.path.isabs(c):

@@ -7,7 +7,7 @@ from PyQt6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import QLabel, QWidget
 
 from .. import APP_NAME
-from ..theme import P
+from .theme import P
 
 
 class _ClickableWidget(QWidget):

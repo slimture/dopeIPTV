@@ -77,7 +77,7 @@ def settings(tmp_path):
 def test_get_full_returns_none_while_pending(qapp, settings):
     """A first call for an unresolved title kicks the fetch and returns
     None; the callback runs once the fetch delivers."""
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     client = MagicMock()
     client.fetch_details.return_value = {
         "tmdb_id": 1, "poster_url": "https://tmdb/poster.jpg"}
@@ -93,7 +93,7 @@ def test_get_full_returns_none_while_pending(qapp, settings):
 
 
 def test_get_full_returns_cached_dict_second_call(qapp, settings):
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     client = MagicMock()
     client.fetch_details.return_value = {"tmdb_id": 42}
     r = PosterResolver(_pool(), settings, client)
@@ -110,7 +110,7 @@ def test_get_full_no_match_still_resolves(qapp, settings):
     """A title with no TMDB match caches an empty dict and calls
     the pending callbacks with it. Without this, delegate stays on
     the placeholder forever."""
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     client = MagicMock()
     client.fetch_details.return_value = None  # no match
     r = PosterResolver(_pool(), settings, client)
@@ -128,7 +128,7 @@ def test_get_full_client_error_fires_callback(qapp, settings):
     raised was clearing self._waiting without notifying anyone, so
     the delegate never learned to fall back to the provider cover.
     Fixed in 5bafc16 - stays fixed here."""
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     client = MagicMock()
     client.fetch_details.side_effect = RuntimeError("upstream 503")
     r = PosterResolver(_pool(), settings, client)
@@ -144,7 +144,7 @@ def test_get_full_client_error_fires_callback(qapp, settings):
 def test_multiple_callers_all_notified(qapp, settings):
     """Two independent callers subscribe to the same title while the
     fetch is in flight; both fire once the fetch resolves."""
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     client = MagicMock()
     client.fetch_details.return_value = {"tmdb_id": 7}
     r = PosterResolver(_pool(), settings, client)
@@ -161,7 +161,7 @@ def test_multiple_callers_all_notified(qapp, settings):
 def test_get_returns_url_and_callback_wrapper(qapp, settings):
     """PosterResolver.get() is the delegate's entry point - it wraps
     the full-details callback so the delegate only sees the URL."""
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     client = MagicMock()
     client.fetch_details.return_value = {
         "tmdb_id": 1, "poster_url": "https://tmdb/x.jpg"}
@@ -181,7 +181,7 @@ def test_get_returns_url_and_callback_wrapper(qapp, settings):
 
 
 def test_tmdb_id_for_and_is_resolved_reflect_cache(qapp, settings):
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     client = MagicMock()
     client.fetch_details.return_value = {
         "tmdb_id": 999, "poster_url": "https://x/y.jpg"}
@@ -196,7 +196,7 @@ def test_tmdb_id_for_and_is_resolved_reflect_cache(qapp, settings):
 
 
 def test_is_resolved_true_after_error(qapp, settings):
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     client = MagicMock()
     client.fetch_details.side_effect = RuntimeError("nope")
     r = PosterResolver(_pool(), settings, client)
@@ -216,7 +216,7 @@ def test_logo_loader_disk_cache_roundtrip(qapp, tmp_path, monkeypatch):
     """A URL fetched once is written to disk, evicted from RAM, then
     served straight from disk on the next request - no second network
     call."""
-    from dopeiptv.workers import LogoLoader
+    from dopeiptv.core.workers import LogoLoader
     from PyQt6.QtCore import QThreadPool
 
     red_png = _valid_png_bytes()
@@ -232,7 +232,7 @@ def test_logo_loader_disk_cache_roundtrip(qapp, tmp_path, monkeypatch):
         calls["n"] += 1
         return FakeResp()
 
-    monkeypatch.setattr("dopeiptv.workers.requests.get", fake_get)
+    monkeypatch.setattr("dopeiptv.core.workers.requests.get", fake_get)
 
     pool = _pool()
     loader = LogoLoader(pool, max_size=16, cache_dir=tmp_path)
@@ -255,7 +255,7 @@ def test_logo_loader_corrupt_disk_file_recovers(qapp, tmp_path, monkeypatch):
     """A truncated cache file (previous crash mid-write) gets
     unlinked and refetched from the network instead of poisoning
     the loader with a broken pixmap forever."""
-    from dopeiptv.workers import LogoLoader
+    from dopeiptv.core.workers import LogoLoader
     import hashlib
 
     red_png = _valid_png_bytes()
@@ -266,7 +266,7 @@ def test_logo_loader_corrupt_disk_file_recovers(qapp, tmp_path, monkeypatch):
         def raise_for_status(self): pass
 
     monkeypatch.setattr(
-        "dopeiptv.workers.requests.get", lambda u, headers=None, timeout=None: FakeResp())
+        "dopeiptv.core.workers.requests.get", lambda u, headers=None, timeout=None: FakeResp())
 
     pool = _pool()
     loader = LogoLoader(pool, max_size=16, cache_dir=tmp_path)
@@ -287,7 +287,7 @@ def test_logo_loader_corrupt_disk_file_recovers(qapp, tmp_path, monkeypatch):
 
 
 def test_logo_loader_marks_404_dead_long_ttl(qapp, tmp_path, monkeypatch):
-    from dopeiptv.workers import LogoLoader
+    from dopeiptv.core.workers import LogoLoader
 
     class Resp404:
         status_code = 404
@@ -296,7 +296,7 @@ def test_logo_loader_marks_404_dead_long_ttl(qapp, tmp_path, monkeypatch):
             raise RuntimeError("404")
 
     monkeypatch.setattr(
-        "dopeiptv.workers.requests.get", lambda u, headers=None, timeout=None: Resp404())
+        "dopeiptv.core.workers.requests.get", lambda u, headers=None, timeout=None: Resp404())
 
     pool = _pool()
     loader = LogoLoader(pool, max_size=16, cache_dir=tmp_path)
@@ -306,10 +306,10 @@ def test_logo_loader_marks_404_dead_long_ttl(qapp, tmp_path, monkeypatch):
 
 
 def test_logo_loader_transient_error_short_ttl(qapp, tmp_path, monkeypatch):
-    from dopeiptv.workers import LogoLoader
+    from dopeiptv.core.workers import LogoLoader
 
     monkeypatch.setattr(
-        "dopeiptv.workers.requests.get",
+        "dopeiptv.core.workers.requests.get",
         lambda u, headers=None, timeout=None: (_ for _ in ()).throw(RuntimeError("timeout")))
 
     pool = _pool()
@@ -373,7 +373,7 @@ class FakeWindow:
     def cover_url(self, it, kind):
         # Call the exact same pure function MainWindow.cover_url uses,
         # so this fake can't drift from production behaviour.
-        from dopeiptv.workers import choose_cover_url
+        from dopeiptv.core.workers import choose_cover_url
         raw = it.get("stream_icon") or it.get("cover") or None
         return choose_cover_url(
             self.poster_for(it, kind), raw, kind, self.logos.is_dead)
@@ -401,7 +401,7 @@ def test_delegate_prefers_tmdb_when_resolved(qapp, settings):
     same artwork the detail panel shows so the columns agree, and
     on providers whose image hosts are down it's the only URL that
     actually loads."""
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     client = MagicMock()
     client.fetch_details.return_value = {
         "tmdb_id": 1, "poster_url": "https://tmdb/great.jpg"}
@@ -416,7 +416,7 @@ def test_delegate_prefers_tmdb_when_resolved(qapp, settings):
 
 
 def test_delegate_uses_tmdb_when_provider_icon_missing(qapp, settings):
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     client = MagicMock()
     client.fetch_details.return_value = {
         "tmdb_id": 1, "poster_url": "https://tmdb/great.jpg"}
@@ -432,7 +432,7 @@ def test_delegate_uses_tmdb_when_provider_icon_missing(qapp, settings):
 
 def test_delegate_uses_tmdb_when_provider_icon_dead(qapp, settings):
     """Provider icon 404s -> the TMDB poster steps in."""
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     client = MagicMock()
     client.fetch_details.return_value = {
         "tmdb_id": 1, "poster_url": "https://tmdb/great.jpg"}
@@ -451,7 +451,7 @@ def test_delegate_uses_tmdb_when_provider_icon_dead(qapp, settings):
 
 
 def test_delegate_falls_back_when_tmdb_has_no_match(qapp, settings):
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     client = MagicMock()
     client.fetch_details.return_value = None
     tmdb = PosterResolver(_pool(), settings, client)
@@ -465,7 +465,7 @@ def test_delegate_falls_back_when_tmdb_has_no_match(qapp, settings):
 
 
 def test_delegate_falls_back_when_tmdb_errored(qapp, settings):
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     client = MagicMock()
     client.fetch_details.side_effect = RuntimeError("upstream 500")
     tmdb = PosterResolver(_pool(), settings, client)
@@ -487,7 +487,7 @@ def test_delegate_uses_provider_url_while_tmdb_pending(qapp, settings):
     the poster once - that's a brief cosmetic flicker; the previous
     'wait for TMDB' behaviour left users with no covers at all for
     every row TMDB couldn't answer for, which was much worse."""
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     client = MagicMock()
     # Leave fetch unresolved by not draining the pool.
     client.fetch_details.return_value = {"tmdb_id": 1, "poster_url": "u"}
@@ -505,7 +505,7 @@ def test_delegate_defers_provider_fetch_while_tmdb_pending(qapp, settings):
     already cached) but must not be FETCHED - queueing it just burns
     a request on art that gets replaced seconds later, and on flaky
     panel hosts the burst gets us rate-limited."""
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     client = MagicMock()
     client.fetch_details.return_value = {
         "tmdb_id": 1, "poster_url": "https://tmdb/x.jpg"}
@@ -525,7 +525,7 @@ def test_delegate_defers_provider_fetch_while_tmdb_pending(qapp, settings):
 
 
 def test_delegate_fetches_provider_after_nomatch(qapp, settings):
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     client = MagicMock()
     client.fetch_details.return_value = None  # no TMDB match
     tmdb = PosterResolver(_pool(), settings, client)
@@ -554,7 +554,7 @@ def test_delegate_uses_provider_url_for_live_kind(qapp, settings):
     stream_icon is the canonical logo. tmdb_resolved returns True
     for kinds other than vod/series so the fallback fires
     immediately."""
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     client = MagicMock()
     tmdb = PosterResolver(_pool(), settings, client)
     win = FakeWindow(tmdb, _StubLogos())
@@ -568,10 +568,10 @@ def test_logo_loader_host_circuit_breaker(qapp, tmp_path, monkeypatch):
     host on cooldown, so the hundreds of remaining URLs on a dead
     provider panel short-circuit instantly instead of each burning a
     worker for a connect timeout."""
-    from dopeiptv.workers import LogoLoader
+    from dopeiptv.core.workers import LogoLoader
 
     monkeypatch.setattr(
-        "dopeiptv.workers.requests.get",
+        "dopeiptv.core.workers.requests.get",
         lambda u, headers=None, timeout=None: (_ for _ in ()).throw(
             RuntimeError("Connection reset by peer")))
 
@@ -589,7 +589,7 @@ def test_logo_loader_host_circuit_breaker(qapp, tmp_path, monkeypatch):
 
 def test_logo_loader_host_breaker_resets_on_success(
         qapp, tmp_path, monkeypatch):
-    from dopeiptv.workers import LogoLoader
+    from dopeiptv.core.workers import LogoLoader
 
     png = _valid_png_bytes()
     fail = {"on": True}
@@ -604,7 +604,7 @@ def test_logo_loader_host_breaker_resets_on_success(
             raise RuntimeError("reset")
         return OkResp()
 
-    monkeypatch.setattr("dopeiptv.workers.requests.get", fake_get)
+    monkeypatch.setattr("dopeiptv.core.workers.requests.get", fake_get)
     pool = _pool()
     loader = LogoLoader(pool, max_size=16, cache_dir=tmp_path)
     loader.host_cooldown = 0.0  # let the breaker expire immediately
@@ -625,7 +625,7 @@ def test_host_breaker_ignores_http_errors(qapp, tmp_path, monkeypatch):
     is alive, only those specific files are missing. Tripping the
     breaker on them blocks the covers on that host that DO exist
     (the ptv.is regression from the user's second debug log)."""
-    from dopeiptv.workers import LogoLoader
+    from dopeiptv.core.workers import LogoLoader
     import requests as _requests
 
     class Resp404:
@@ -636,7 +636,7 @@ def test_host_breaker_ignores_http_errors(qapp, tmp_path, monkeypatch):
                 "404 Client Error: Not Found for url: x")
 
     monkeypatch.setattr(
-        "dopeiptv.workers.requests.get",
+        "dopeiptv.core.workers.requests.get",
         lambda u, headers=None, timeout=None: Resp404())
 
     pool = _pool()
@@ -656,7 +656,7 @@ def test_host_breaker_ignores_http_errors(qapp, tmp_path, monkeypatch):
 def test_http_response_resets_host_strikes(qapp, tmp_path, monkeypatch):
     """Two connection failures followed by an HTTP response (even an
     error one) must reset the strike counter - the host answered."""
-    from dopeiptv.workers import LogoLoader
+    from dopeiptv.core.workers import LogoLoader
     import requests as _requests
 
     mode = {"fail": True}
@@ -673,7 +673,7 @@ def test_http_response_resets_host_strikes(qapp, tmp_path, monkeypatch):
             raise RuntimeError("Connection reset by peer")
         return Resp404()
 
-    monkeypatch.setattr("dopeiptv.workers.requests.get", fake_get)
+    monkeypatch.setattr("dopeiptv.core.workers.requests.get", fake_get)
     pool = _pool()
     loader = LogoLoader(pool, max_size=16, cache_dir=tmp_path)
     loader.host_strike_limit = 3  # isolate the reset logic from the default
@@ -697,7 +697,7 @@ def test_queued_job_skips_network_when_host_died(qapp, tmp_path, monkeypatch):
     NOT hit the network when the worker finally runs it - that's what
     stops hundreds of already-queued jobs each burning a connect
     timeout on a host we already know is down."""
-    from dopeiptv.workers import LogoLoader
+    from dopeiptv.core.workers import LogoLoader
     import time
 
     calls = {"n": 0}
@@ -706,7 +706,7 @@ def test_queued_job_skips_network_when_host_died(qapp, tmp_path, monkeypatch):
         calls["n"] += 1
         raise RuntimeError("Connection reset by peer")
 
-    monkeypatch.setattr("dopeiptv.workers.requests.get", fake_get)
+    monkeypatch.setattr("dopeiptv.core.workers.requests.get", fake_get)
     pool = _pool()
     loader = LogoLoader(pool, max_size=16, cache_dir=tmp_path)
     # Pre-mark the host dead (as if earlier strikes already tripped it).
@@ -725,7 +725,7 @@ def test_logo_loader_sends_browser_user_agent(qapp, tmp_path, monkeypatch):
     """Several image hosts (Wikipedia's 403, some Xtream panels'
     TCP resets) reject python-requests' default UA. Every image
     fetch must carry the browser-style header."""
-    from dopeiptv.workers import LogoLoader
+    from dopeiptv.core.workers import LogoLoader
 
     seen = {}
     png = _valid_png_bytes()
@@ -740,7 +740,7 @@ def test_logo_loader_sends_browser_user_agent(qapp, tmp_path, monkeypatch):
         seen["timeout"] = timeout
         return OkResp()
 
-    monkeypatch.setattr("dopeiptv.workers.requests.get", fake_get)
+    monkeypatch.setattr("dopeiptv.core.workers.requests.get", fake_get)
     pool = _pool()
     loader = LogoLoader(pool, max_size=16, cache_dir=tmp_path)
     loader.get("https://cdn/ua.jpg", lambda pm: None)
@@ -757,7 +757,7 @@ def test_pick_result_prefers_poster_over_blind_first():
     """results[0] with no poster loses to a lower-ranked result that
     has one - exactly the case the user hit: auto 'matched' but showed
     no cover while the manual dialog showed the right poster."""
-    from dopeiptv.metadata import TmdbClient
+    from dopeiptv.providers.metadata import TmdbClient
     results = [
         {"id": 1, "poster_path": None, "release_date": "1990-01-01"},
         {"id": 2, "poster_path": "/good.jpg", "release_date": "1991-01-01"},
@@ -766,7 +766,7 @@ def test_pick_result_prefers_poster_over_blind_first():
 
 
 def test_pick_result_prefers_year_match_with_poster():
-    from dopeiptv.metadata import TmdbClient
+    from dopeiptv.providers.metadata import TmdbClient
     results = [
         {"id": 1, "poster_path": "/a.jpg", "release_date": "2005-01-01"},
         {"id": 2, "poster_path": "/b.jpg", "release_date": "2021-06-01"},
@@ -776,7 +776,7 @@ def test_pick_result_prefers_year_match_with_poster():
 
 
 def test_pick_result_falls_back_to_first_when_no_posters():
-    from dopeiptv.metadata import TmdbClient
+    from dopeiptv.providers.metadata import TmdbClient
     results = [{"id": 9, "poster_path": None}, {"id": 8, "poster_path": None}]
     assert TmdbClient._pick_result(results, None)["id"] == 9
     assert TmdbClient._pick_result([], None) is None
@@ -786,7 +786,7 @@ def test_auto_fetch_passes_year_to_client(qapp, settings):
     """The auto-matcher must forward the year clean_title extracted -
     without it, a same-title different-year film can rank first and
     steal the cover (why manual, which sends the year, found it)."""
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     client = MagicMock()
     client.fetch_details.return_value = {
         "tmdb_id": 1, "poster_url": "https://tmdb/x.jpg"}
@@ -804,7 +804,7 @@ def test_cache_prunes_no_poster_entries_on_matcher_upgrade(qapp, tmp_path):
     dropped so the improved matcher re-runs; entries with a poster and
     manual picks survive."""
     from PyQt6.QtCore import QSettings
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     import json
     s = QSettings(str(tmp_path / "p.ini"), QSettings.Format.IniFormat)
     s.setValue(PosterResolver.CACHE_KEY, json.dumps({
@@ -826,7 +826,7 @@ def test_cache_prunes_no_poster_entries_on_matcher_upgrade(qapp, tmp_path):
 
 def test_cache_prune_runs_once(qapp, tmp_path):
     from PyQt6.QtCore import QSettings
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     import json
     s = QSettings(str(tmp_path / "q.ini"), QSettings.Format.IniFormat)
     s.setValue(PosterResolver.CACHE_MATCHER_VER_KEY,
@@ -851,7 +851,7 @@ def test_no_tmdb_uses_embedded_provider_poster():
     (title_tmdb=None), but a provider URL that embeds a TMDB path is
     still rewritten to image.tmdb.org - which serves images with no
     API key. So these covers work for everyone."""
-    from dopeiptv.workers import choose_cover_url
+    from dopeiptv.core.workers import choose_cover_url
     raw = "http://Ptv.is:2095/images/movies/kv2Qk9MKFFQo4WQPaYta599HkJP.jpg"
     assert choose_cover_url(None, raw, "vod", _never_dead) == (
         "https://image.tmdb.org/t/p/w500/kv2Qk9MKFFQo4WQPaYta599HkJP.jpg")
@@ -859,31 +859,31 @@ def test_no_tmdb_uses_embedded_provider_poster():
 
 def test_no_tmdb_uses_raw_provider_cover():
     """No TMDB key, provider cover isn't a TMDB proxy - it's used as-is."""
-    from dopeiptv.workers import choose_cover_url
+    from dopeiptv.core.workers import choose_cover_url
     raw = "https://cdn.provider.com/posters/movie-42.jpg"
     assert choose_cover_url(None, raw, "vod", _never_dead) == raw
 
 
 def test_no_tmdb_live_channel_uses_provider_logo():
-    from dopeiptv.workers import choose_cover_url
+    from dopeiptv.core.workers import choose_cover_url
     raw = "https://provider/logos/svt1.png"
     assert choose_cover_url(None, raw, "live", _never_dead) == raw
 
 
 def test_no_tmdb_no_cover_returns_none():
-    from dopeiptv.workers import choose_cover_url
+    from dopeiptv.core.workers import choose_cover_url
     assert choose_cover_url(None, None, "vod", _never_dead) is None
 
 
 def test_cover_url_tmdb_wins_when_present():
-    from dopeiptv.workers import choose_cover_url
+    from dopeiptv.core.workers import choose_cover_url
     raw = "https://cdn.provider.com/x.jpg"
     assert choose_cover_url("https://tmdb/poster.jpg", raw, "vod",
                             _never_dead) == "https://tmdb/poster.jpg"
 
 
 def test_cover_url_dead_tmdb_falls_to_provider():
-    from dopeiptv.workers import choose_cover_url
+    from dopeiptv.core.workers import choose_cover_url
     dead = {"https://tmdb/poster.jpg"}
     raw = "https://cdn.provider.com/x.jpg"
     assert choose_cover_url("https://tmdb/poster.jpg", raw, "vod",
@@ -897,7 +897,7 @@ def test_tmdb_url_from_provider_extracts_embedded_path():
     """Provider URLs that proxy a TMDB poster get rewritten to the
     direct image.tmdb.org URL. Exact URLs pulled from the user's
     debug log."""
-    from dopeiptv.workers import tmdb_url_from_provider
+    from dopeiptv.core.workers import tmdb_url_from_provider
     cases = [
         ("http://Ptv.is:2095/images/movies/kv2Qk9MKFFQo4WQPaYta599HkJP.jpg",
          "https://image.tmdb.org/t/p/w500/kv2Qk9MKFFQo4WQPaYta599HkJP.jpg"),
@@ -917,7 +917,7 @@ def test_tmdb_url_from_provider_extracts_embedded_path():
 def test_tmdb_url_from_provider_ignores_non_tmdb():
     """Provider-native ids and real CDN URLs must NOT be rewritten -
     rewriting a working cover to a bogus TMDB path would break it."""
-    from dopeiptv.workers import tmdb_url_from_provider
+    from dopeiptv.core.workers import tmdb_url_from_provider
     non_tmdb = [
         # MD5 upload id (32 lowercase hex, no uppercase)
         "http://Ptv.is:2095/images/220af56e2aa03da34ce44a560b0b333d.jpg",
@@ -942,7 +942,7 @@ def test_delegate_uses_embedded_tmdb_when_title_search_fails(qapp, settings):
     can't match, but whose provider stream_icon embeds a TMDB path,
     now shows the poster straight from image.tmdb.org instead of
     404ing on the panel's broken proxy."""
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     client = MagicMock()
     client.fetch_details.return_value = None  # title search: no match
     tmdb = PosterResolver(_pool(), settings, client)
@@ -965,7 +965,7 @@ def test_delegate_embedded_dead_skips_redundant_raw_proxy(qapp, settings):
     the raw provider URL is the panel's proxy of the SAME token and
     will fail identically - so we skip it and show the placeholder
     rather than waste a request on a genuinely-missing image."""
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     import time
     client = MagicMock()
     client.fetch_details.return_value = None
@@ -984,7 +984,7 @@ def test_delegate_keeps_raw_when_not_a_tmdb_proxy(qapp, settings):
     """A raw provider URL that is NOT a TMDB proxy (e.g. an amazon
     image) is still used as the fallback - it's a genuinely different
     image, not a redundant proxy of a dead token."""
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     client = MagicMock()
     client.fetch_details.return_value = None
     tmdb = PosterResolver(_pool(), settings, client)
@@ -999,7 +999,7 @@ def test_delegate_keeps_raw_when_not_a_tmdb_proxy(qapp, settings):
 
 
 def test_clean_title_strips_bracketed_suffixes():
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     for raw, expected in [
         ("The Matrix [IMDB]", "The Matrix"),
         ("Barbie [ ]", "Barbie"),
@@ -1017,7 +1017,7 @@ def test_clean_title_strips_bracketed_suffixes():
 
 
 def test_clean_title_keeps_legit_punctuation():
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     # A colon/hyphen in a real title must survive - only bracket junk
     # is noise.
     assert PosterResolver.clean_title(
@@ -1026,7 +1026,7 @@ def test_clean_title_keeps_legit_punctuation():
 
 
 def test_clean_title_strips_language_prefix_and_codec_tail():
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     for raw, expected in [
         ("EN | Sicario", "Sicario"),
         ("SV - Snatch (2000)", "Snatch"),
@@ -1038,7 +1038,7 @@ def test_clean_title_strips_language_prefix_and_codec_tail():
 
 
 def test_clean_title_extracts_year():
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     assert PosterResolver.clean_title("Dune (2021)")[1] == 2021
     assert PosterResolver.clean_title("Dune 2021")[1] == 2021
     assert PosterResolver.clean_title("Dune")[1] is None
@@ -1049,7 +1049,7 @@ def test_auto_fetch_cleans_title_before_calling_client(qapp, settings):
     to TmdbClient.fetch_details; TMDB then failed to find a match
     because the title had bracketed noise. Now clean_title runs
     first so the search query is the naked title."""
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     client = MagicMock()
     client.fetch_details.return_value = {
         "tmdb_id": 1, "poster_url": "https://tmdb/x.jpg"}
@@ -1072,7 +1072,7 @@ def test_set_manual_match_caches_preview_immediately(qapp, settings):
     manual pick must cache that URL right away so the delegate can
     show it on the very next paint, without having to wait for
     fetch_details_by_id."""
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     client = MagicMock()
     client.fetch_details_by_id.return_value = {
         "tmdb_id": 42, "poster_url": "https://tmdb/x.jpg",
@@ -1106,7 +1106,7 @@ def test_set_manual_match_survives_details_error(qapp, settings):
     preview poster URL must still be cached so the row picks up the
     user's choice on the next paint. Previously the failure was
     silent and the cover never appeared."""
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     client = MagicMock()
     client.fetch_details_by_id.side_effect = RuntimeError("upstream 500")
     r = PosterResolver(_pool(), settings, client)
@@ -1127,7 +1127,7 @@ def test_set_manual_match_survives_details_error(qapp, settings):
 def test_delegate_falls_back_when_tmdb_url_is_dead(qapp, settings):
     """TMDB returned a poster URL but the CDN 404s. Delegate should
     reach for the provider stream_icon."""
-    from dopeiptv.metadata import PosterResolver
+    from dopeiptv.providers.metadata import PosterResolver
     client = MagicMock()
     client.fetch_details.return_value = {
         "tmdb_id": 1, "poster_url": "https://dead-tmdb-cdn/x.jpg"}

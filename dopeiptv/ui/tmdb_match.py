@@ -14,10 +14,10 @@ from PyQt6.QtWidgets import (
     QListWidgetItem, QPushButton, QVBoxLayout, QWidget,
 )
 
-from .i18n import tr
-from .metadata import PosterResolver
+from ..i18n import tr
+from ..providers.metadata import PosterResolver
 from .theme import P
-from .workers import run_async
+from ..core.workers import run_async
 
 
 class TmdbMatchDialog(QDialog):

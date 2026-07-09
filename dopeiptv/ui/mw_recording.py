@@ -8,11 +8,11 @@ from __future__ import annotations
 import os
 import shutil
 import time
-from ..client import b64, epg_times
+from ..providers.client import b64, epg_times
 from ..i18n import tr
-from ..recording import format_size, safe_filename
-from ..theme import P
-from ..workers import run_async
+from ..core.recording import format_size, safe_filename
+from .theme import P
+from ..core.workers import run_async
 from PyQt6.QtCore import QDateTime, Qt
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QComboBox, QDateTimeEdit, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu, QMessageBox, QPushButton, QVBoxLayout

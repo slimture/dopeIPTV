@@ -20,11 +20,11 @@ from PyQt6.QtWidgets import (
 
 from .. import APP_NAME, VERSION
 from ..i18n import tr
-from ..dialogs import EpgGuideDialog, PlaylistDialog
-from ..metadata import TmdbClient, bundled_tmdb_key
-from ..players import embedded_playback_reason
-from ..theme import ACCENTS, P, THEMES, apply_theme, build_style
-from ..workers import (
+from .dialogs import EpgGuideDialog, PlaylistDialog
+from ..providers.metadata import TmdbClient, bundled_tmdb_key
+from ..media.players import embedded_playback_reason
+from .theme import ACCENTS, P, THEMES, apply_theme, build_style
+from ..core.workers import (
     clear_directory, default_image_cache_dir, dir_size_bytes, run_async)
 
 

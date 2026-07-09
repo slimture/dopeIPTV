@@ -1,6 +1,6 @@
-"""Unit tests for dopeiptv.client utilities."""
+"""Unit tests for dopeiptv.providers.client utilities."""
 
-from dopeiptv.client import b64
+from dopeiptv.providers.client import b64
 
 
 def test_b64_decodes_valid():

@@ -1,8 +1,8 @@
-"""Unit tests for dopeiptv.epg utilities and the guide index."""
+"""Unit tests for dopeiptv.providers.epg utilities and the guide index."""
 
 from datetime import datetime, timedelta, timezone
 
-from dopeiptv.epg import XmltvGuide, normalize_name, parse_xmltv_time
+from dopeiptv.providers.epg import XmltvGuide, normalize_name, parse_xmltv_time
 
 
 def test_normalize_name():

@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
-from .i18n import tr
+from ..i18n import tr
 from .theme import P
 
 

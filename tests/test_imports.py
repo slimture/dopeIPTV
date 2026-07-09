@@ -12,25 +12,25 @@ import dopeiptv
 
 MODULES = [
     "dopeiptv",
-    "dopeiptv.client",
-    "dopeiptv.epg",
-    "dopeiptv.stores",
-    "dopeiptv.workers",
-    "dopeiptv.recording",
-    "dopeiptv.theme",
-    "dopeiptv.wakelock",
-    "dopeiptv.metadata",
-    "dopeiptv.trakt",
+    "dopeiptv.providers.client",
+    "dopeiptv.providers.epg",
+    "dopeiptv.core.stores",
+    "dopeiptv.core.workers",
+    "dopeiptv.core.recording",
+    "dopeiptv.ui.theme",
+    "dopeiptv.core.wakelock",
+    "dopeiptv.providers.metadata",
+    "dopeiptv.providers.trakt",
 ]
 
 MODULES_NEED_DISPLAY = [
     "dopeiptv.app",
-    "dopeiptv.channel_list",
-    "dopeiptv.chromecast",
-    "dopeiptv.dialogs",
-    "dopeiptv.embedded",
+    "dopeiptv.ui.channel_list",
+    "dopeiptv.providers.chromecast",
+    "dopeiptv.ui.dialogs",
+    "dopeiptv.media.embedded",
     "dopeiptv.ui.main_window",
-    "dopeiptv.players",
+    "dopeiptv.media.players",
 ]
 
 

@@ -1,6 +1,6 @@
-"""Unit tests for dopeiptv.theme."""
+"""Unit tests for dopeiptv.ui.theme."""
 
-from dopeiptv.theme import ACCENTS, P, THEMES, build_style
+from dopeiptv.ui.theme import ACCENTS, P, THEMES, build_style
 
 
 def test_themes_not_empty():

@@ -1,8 +1,8 @@
-"""Unit tests for dopeiptv.stores."""
+"""Unit tests for dopeiptv.core.stores."""
 
 from unittest.mock import MagicMock
 
-from dopeiptv.stores import (FavoriteStore, HistoryStore, WatchedStore,
+from dopeiptv.core.stores import (FavoriteStore, HistoryStore, WatchedStore,
                              WatchlistStore)
 
 

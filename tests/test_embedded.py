@@ -26,7 +26,7 @@ def qapp():
 
 def test_embedded_player_constructs(qapp):
     try:
-        from dopeiptv.embedded import EmbeddedPlayer
+        from dopeiptv.media.embedded import EmbeddedPlayer
     except Exception:
         pytest.skip("Qt/OpenGL not available")
     player = EmbeddedPlayer()

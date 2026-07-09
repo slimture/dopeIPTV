@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 
-from . import APP_NAME
+from .. import APP_NAME
 
 
 class WakeLock:

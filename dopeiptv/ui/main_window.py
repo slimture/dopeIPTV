@@ -23,30 +23,30 @@ from PyQt6.QtWidgets import (
 
 from .. import APP_NAME
 from ..i18n import tr
-from ..channel_list import ChannelDelegate, ChannelListModel, ChannelListView
-from ..chromecast import CastDialog, ChromecastManager
-from ..client import XtreamClient
-from ..embedded import EmbeddedPlayer
-from ..epg import XmltvGuide, epg_cache_path
-from ..metadata import PosterResolver, TmdbClient, bundled_tmdb_key
-from ..players import (
+from .channel_list import ChannelDelegate, ChannelListModel, ChannelListView
+from ..providers.chromecast import CastDialog, ChromecastManager
+from ..providers.client import XtreamClient
+from ..media.embedded import EmbeddedPlayer
+from ..providers.epg import XmltvGuide, epg_cache_path
+from ..providers.metadata import PosterResolver, TmdbClient, bundled_tmdb_key
+from ..media.players import (
     MpvIpcPlayer, MpvWindowPlayer, _libmpv, embedded_playback_supported, launch_player,
 )
-from ..recording import RecordingManager
-from ..stores import (
+from ..core.recording import RecordingManager
+from ..core.stores import (
     CategoryOverrides, ChannelOverrides, FavoriteStore, HistoryStore,
     ParentalControl, PlaylistStore, WatchedStore, WatchlistStore,
 )
-from ..theme import P
-from ..trakt import TraktClient
-from ..wakelock import WakeLock
+from .theme import P
+from ..providers.trakt import TraktClient
+from ..core.wakelock import WakeLock
 from .widgets import _SidebarLogo, _Toast
 from .mw_settings import _SettingsMixin
 from .mw_trakt import _TraktMixin
 from .mw_recording import _RecordingMixin
 from .mw_context import _ContextMenuMixin
 from .mw_detail import _DetailMixin
-from ..workers import (
+from ..core.workers import (
     LogoLoader, choose_cover_url, default_image_cache_dir,
     run_async)
 

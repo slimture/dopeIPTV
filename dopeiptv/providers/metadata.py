@@ -13,7 +13,7 @@ import requests
 from PyQt6.QtCore import QObject, QSettings, QThreadPool, QTimer
 
 
-from .workers import run_async
+from ..core.workers import run_async
 
 # Same env switch as the image loader: DOPEIPTV_IMG_DEBUG=1 traces
 # every TMDB title resolution (query used, match / no-match / error)
@@ -41,7 +41,7 @@ def bundled_tmdb_key() -> str:
     if key:
         return key
     try:
-        from ._tmdb_key import TMDB_API_KEY  # type: ignore
+        from .._tmdb_key import TMDB_API_KEY  # type: ignore
         return (TMDB_API_KEY or "").strip()
     except Exception:
         return ""

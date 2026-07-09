@@ -17,9 +17,9 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QWidget, QPushButton,
 )
 
-from .i18n import tr
+from ..i18n import tr
 from .players import _libmpv, _register_error_callback
-from .theme import P
+from ..ui.theme import P
 
 
 def _control_icon(name: str, color: str, px: int = 28) -> QIcon:
@@ -146,7 +146,7 @@ class _MpvGLWidget(QOpenGLWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         if sys.platform == "darwin":
-            from .platform_macos import apply_widget_surface_format
+            from ..core.platform_macos import apply_widget_surface_format
             apply_widget_surface_format(self)
         self.setMinimumHeight(190)
         self.setSizePolicy(QSizePolicy.Policy.Expanding,
@@ -207,7 +207,7 @@ class _MpvGLWidget(QOpenGLWidget):
                 if v:
                     return v
         if sys.platform == "darwin":
-            from .platform_macos import gl_get_proc_address_fallback
+            from ..core.platform_macos import gl_get_proc_address_fallback
             return gl_get_proc_address_fallback(name)
         return 0
 
@@ -263,7 +263,7 @@ class _MpvGLWidget(QOpenGLWidget):
                 # stream buffers, which can surface as a stray frame.
                 "force-window": "no", "osd-level": 0}
         if sys.platform == "darwin":
-            from .platform_macos import extra_mpv_opts
+            from ..core.platform_macos import extra_mpv_opts
             soft.update(extra_mpv_opts())
         soft.update(self.EXTRA_OPTS)
         for key, val in soft.items():
@@ -397,14 +397,14 @@ class _MacInputFilter(QObject):
         return QRect(top_left, p.video.size()).contains(QCursor.pos())
 
     def _maybe_hide_cursor(self) -> None:
-        from .platform_macos import set_cursor_hidden
+        from ..core.platform_macos import set_cursor_hidden
         if self._over_video():
             set_cursor_hidden(True)
 
     def eventFilter(self, obj, event):
         et = event.type()
         if et == QEvent.Type.MouseMove:
-            from .platform_macos import set_cursor_hidden
+            from ..core.platform_macos import set_cursor_hidden
             set_cursor_hidden(False)
             if self._over_video():
                 self._cursor_timer.start()
@@ -933,7 +933,7 @@ class EmbeddedPlayer(QWidget):
         """Un-hide the macOS override cursor (safety for when playback ends
         while it was hidden and no mouse move follows). No-op off macOS."""
         if sys.platform == "darwin":
-            from .platform_macos import set_cursor_hidden
+            from ..core.platform_macos import set_cursor_hidden
             set_cursor_hidden(False)
 
     def _on_seek_key_press(self, event) -> None:

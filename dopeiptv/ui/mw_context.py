@@ -5,9 +5,9 @@ Verbatim move - self.* access and behaviour unchanged.
 
 from __future__ import annotations
 
-from ..dialogs import ContentManagerDialog
+from .dialogs import ContentManagerDialog
 from ..i18n import tr
-from ..tmdb_match import TmdbMatchDialog
+from .tmdb_match import TmdbMatchDialog
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QInputDialog, QLineEdit, QMenu, QMessageBox
 

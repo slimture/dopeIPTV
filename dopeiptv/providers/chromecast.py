@@ -8,8 +8,8 @@ from PyQt6.QtWidgets import (
     QDialog, QHBoxLayout, QLabel, QListWidget, QPushButton, QVBoxLayout,
 )
 
-from .i18n import tr
-from .workers import run_async
+from ..i18n import tr
+from ..core.workers import run_async
 
 try:
     import pychromecast as _pychromecast

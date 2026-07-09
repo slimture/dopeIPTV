@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtWidgets import QMessageBox
 
-from .client import find_player_executable
+from ..providers.client import find_player_executable
 
 _libmpv_error: str | None = None
 
@@ -53,7 +53,7 @@ def _prepare_bundled_libmpv() -> None:
 
 
 if sys.platform == "darwin":
-    from .platform_macos import find_libmpv
+    from ..core.platform_macos import find_libmpv
     find_libmpv()
 
 _prepare_bundled_libmpv()
@@ -70,7 +70,7 @@ def embedded_playback_reason() -> str | None:
     if _libmpv is None:
         hint = ""
         if sys.platform == "darwin":
-            from .platform_macos import libmpv_install_hint
+            from ..core.platform_macos import libmpv_install_hint
             hint = libmpv_install_hint()
         return (f"python-mpv/libmpv failed to load ({_libmpv_error})"
                 + hint)

@@ -1,9 +1,10 @@
 # Architecture
 
 dopeIPTV is a desktop IPTV client built with PyQt6 that connects to
-Xtream Codes providers.  The codebase is split into focused modules
-inside the `dopeiptv/` package, each under ~500 lines (except the
-main window which is inherently larger as a single QMainWindow class).
+Xtream Codes providers.  The codebase is grouped into layered
+subpackages inside the `dopeiptv/` package - `providers/` (data
+sources), `core/` (storage, background work, OS glue), `media/`
+(playback) and `ui/` (everything the user sees).
 
 ## Module map
 
@@ -13,21 +14,46 @@ dopeiptv.py            Thin launcher (calls dopeiptv.app.main)
 dopeiptv/
   __init__.py          Package metadata (APP_NAME, ORG, VERSION)
   app.py               QApplication bootstrap, login flow, icon generation
-  main_window.py       MainWindow(QMainWindow) - all UI and business logic
-  channel_list.py      Virtualized list: model, view, custom-painted delegate
-  dialogs.py           Login, playlist editor, EPG guide, content manager
-  embedded.py          _MpvGLWidget(QOpenGLWidget), EmbeddedPlayer, seek bar
-  players.py           External player launch (mpv IPC / VLC), libmpv detection
-  recording.py         RecordingManager - ffmpeg/mpv stream-copy, timers
-  client.py            XtreamClient - Xtream Codes HTTP API wrapper
-  epg.py               XmltvGuide - XMLTV parser with disk cache
-  stores.py            JSON data stores (playlists, favorites, history, etc.)
-  workers.py           QThreadPool helpers, LogoLoader
-  chromecast.py        ChromecastManager, CastDialog
-  theme.py             5 themes x 7 accents, palette dict P, QSS generator
-  wakelock.py          Screensaver/suspend inhibitor (DBus + macOS caffeinate)
-  platform_macos.py    macOS-specific helpers (OpenGL, libmpv, wakelock, paths)
+  i18n.py              Translation tables + set_language / tr()
+
+  providers/           Data sources (the network / provider edge)
+    client.py          XtreamClient - Xtream Codes HTTP API wrapper
+    epg.py             XmltvGuide - XMLTV parser with disk cache + index
+    metadata.py        TMDB client, PosterResolver (cover art)
+    trakt.py           Trakt.tv sync (watched, watchlist)
+    chromecast.py      ChromecastManager, CastDialog
+
+  core/                Storage, background work, OS integration
+    stores.py          JSON data stores (playlists, favorites, history, ...)
+    workers.py         QThreadPool helpers, LogoLoader, byte-bounded caches
+    recording.py       RecordingManager - ffmpeg/mpv stream-copy, timers
+    wakelock.py        Screensaver/suspend inhibitor (DBus + caffeinate)
+    platform_macos.py  macOS-specific helpers (OpenGL, libmpv, paths)
+
+  media/               Playback
+    embedded.py        _MpvGLWidget(QOpenGLWidget), EmbeddedPlayer, seek bar
+    players.py         External player launch (mpv IPC / VLC), libmpv detect
+
+  ui/                  Everything the user sees
+    __init__.py        Lazy MainWindow export (PEP 562)
+    main_window.py     MainWindow composition root (QMainWindow + mixins)
+    mw_settings.py     Settings dialog mixin
+    mw_trakt.py        Trakt / watched / watchlist mixin
+    mw_recording.py    Recording / timeshift mixin
+    mw_context.py      Right-click context-menu mixin
+    mw_detail.py       EPG / detail-panel mixin
+    widgets.py         Small standalone widgets
+    channel_list.py    Virtualized list: model, view, painted delegate
+    dialogs.py         Login, playlist editor, EPG guide, content manager
+    tmdb_match.py      Manual TMDB match dialog
+    theme.py           5 themes x 7 accents, palette dict P, QSS generator
 ```
+
+Import direction is one-way: `ui` may use `media`, `core` and
+`providers`; `media` and `providers` may use `core`; `core` depends on
+nothing above it.  (The one cross-edge is `media.embedded` -> `ui.theme`
+for player-overlay colours, which is why `ui/__init__` exposes
+`MainWindow` lazily so touching `ui.theme` never drags in the window.)
 
 ## Data flow
 

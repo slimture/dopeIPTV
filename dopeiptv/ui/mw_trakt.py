@@ -8,9 +8,9 @@ from __future__ import annotations
 import threading
 import time
 from ..i18n import tr
-from ..metadata import PosterResolver
-from ..theme import P
-from ..workers import run_async
+from ..providers.metadata import PosterResolver
+from .theme import P
+from ..core.workers import run_async
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QListWidget, QMessageBox, QTabWidget, QVBoxLayout
 from datetime import datetime
