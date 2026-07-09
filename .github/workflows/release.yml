@@ -162,7 +162,7 @@ jobs:
           set -e
           for img in ubuntu:22.04 ubuntu:24.04 debian:12; do
             echo "::group::self-containment on $img"
-            docker run --rm -v "$PWD:/work" -w /work "$img" bash -c '
+            docker run --rm -v "$PWD:/work:ro" "$img" bash -c '
               set -e
               export DEBIAN_FRONTEND=noninteractive
               apt-get update -qq
@@ -177,11 +177,14 @@ jobs:
                 >/dev/null 2>&1 \
                 || apt-get install -y -qq --no-install-recommends libasound2 \
                 >/dev/null
-              rm -rf squashfs-root
-              ap=$(ls dopeIPTV-*.AppImage | head -1)
-              chmod +x "$ap"
-              ./"$ap" --appimage-extract >/dev/null
-              INT=squashfs-root/usr/dopeiptv/_internal
+              # Extract into a throwaway dir INSIDE the (ephemeral) container,
+              # not the shared /work mount, so distro runs do not collide.
+              ap=$(ls /work/dopeIPTV-*.AppImage | head -1)
+              cp "$ap" /tmp/app.AppImage
+              chmod +x /tmp/app.AppImage
+              cd /tmp
+              ./app.AppImage --appimage-extract >/dev/null
+              INT=/tmp/squashfs-root/usr/dopeiptv/_internal
               echo "--- libmpv unresolved deps (ldd) ---"
               if LD_LIBRARY_PATH="$INT" ldd "$INT/libmpv.so.2" 2>&1 \
                    | grep -i "not found"; then
@@ -190,11 +193,10 @@ jobs:
               fi
               echo "(none missing per ldd)"
               echo "--- self-check ---"
-              ./squashfs-root/usr/dopeiptv/dopeiptv --self-check
+              /tmp/squashfs-root/usr/dopeiptv/dopeiptv --self-check
             '
             echo "::endgroup::"
           done
-          rm -rf squashfs-root
       - name: Smoke test - launch AppImage and .deb
         run: |
           # Headless CI has no hardware GL, so QOpenGLWidget's GL init step
