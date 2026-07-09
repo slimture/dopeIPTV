@@ -110,12 +110,27 @@ def _install_crash_hooks() -> None:
     except OSError:
         log_fh = None
 
-    def _write(text: str) -> None:
-        try:
-            sys.stderr.write(text)
-            sys.stderr.flush()
-        except Exception:
-            pass
+    # Any exception whose full class path matches one of these is a
+    # routine network / DNS / TLS failure - the app already handles
+    # them and there's no signal-value to spamming the terminal with
+    # them. They still land in the on-disk log so we can pull them
+    # up if we're diagnosing something.
+    _QUIET_EXC_NAMES = {
+        "requests.exceptions.ConnectionError",
+        "requests.exceptions.ConnectTimeout",
+        "requests.exceptions.ReadTimeout",
+        "requests.exceptions.SSLError",
+        "urllib3.exceptions.MaxRetryError",
+        "urllib3.exceptions.NewConnectionError",
+        "urllib3.exceptions.NameResolutionError",
+        "urllib3.exceptions.ConnectTimeoutError",
+        "socket.gaierror",
+        "socket.timeout",
+        "OSError",
+        "ConnectionResetError",
+    }
+
+    def _log(text: str) -> None:
         if log_fh is not None:
             try:
                 log_fh.write(text)
@@ -123,17 +138,40 @@ def _install_crash_hooks() -> None:
             except Exception:
                 pass
 
+    def _stderr(text: str) -> None:
+        try:
+            sys.stderr.write(text)
+            sys.stderr.flush()
+        except Exception:
+            pass
+
+    def _is_quiet(exc_type) -> bool:
+        try:
+            name = f"{exc_type.__module__}.{exc_type.__name__}"
+        except Exception:
+            return False
+        return name in _QUIET_EXC_NAMES
+
     def _hook(exc_type, exc_value, exc_tb):
         buf = io.StringIO()
         buf.write("\n[dopeIPTV] CRASH: uncaught exception\n")
         traceback.print_exception(exc_type, exc_value, exc_tb, file=buf)
-        _write(buf.getvalue())
+        text = buf.getvalue()
+        _log(text)
+        if not _is_quiet(exc_type):
+            _stderr(text)
 
     def _thread_hook(args):
         _hook(args.exc_type, args.exc_value, args.exc_traceback)
 
+    def _unraisable_hook(args):
+        # PyQt on newer Python routes exceptions from queued slot
+        # delivery through sys.unraisablehook. Same filter applies.
+        _hook(args.exc_type, args.exc_value, args.exc_traceback)
+
     sys.excepthook = _hook
     threading.excepthook = _thread_hook
+    sys.unraisablehook = _unraisable_hook
     # C-level crashes (segfault before qFatal, mpv, GL) - dump a
     # native backtrace to both stderr and the log file.
     try:

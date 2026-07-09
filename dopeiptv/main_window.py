@@ -1762,6 +1762,7 @@ class MainWindow(QMainWindow):
         "live": "channels", "vod": "movies", "series": "series",
         "episode": "episodes", "fav": "favorites",
         "history": "history items", "rec": "recordings",
+        "watchlist": "on your list",
     }
 
     @staticmethod
@@ -1865,14 +1866,16 @@ class MainWindow(QMainWindow):
             return
         name = self.channel_display_name(it)
         self._detail_name = name
-        # History rows carry the original content kind in "_kind"; a VOD or
-        # series watched from History should still show its poster + TMDB
-        # metadata, resolved by title (history has no provider stream_id).
-        hist_kind = it.get("_kind") if self.mode == "history" else None
+        # History and Watch Later rows carry the original content kind
+        # in "_kind"; a VOD or series shown from either view should still
+        # resolve TMDB metadata + cover the same way the main Movies /
+        # Series view does.
+        snap_kind = (it.get("_kind")
+                     if self.mode in ("history", "watchlist") else None)
         media_kind = (
             "vod" if self.mode == "vod"
             else "series" if self.mode == "series"
-            else hist_kind if hist_kind in ("vod", "series")
+            else snap_kind if snap_kind in ("vod", "series")
             else None)
         is_media = media_kind is not None
         poster_size = (self.POSTER_SIZE_MEDIA if is_media
@@ -1908,11 +1911,15 @@ class MainWindow(QMainWindow):
                 if (self.player and self._autoplay_preview()
                         and self.playback_mode() == "embedded"):
                     self._preview_timer.start(350)
-        elif self.mode == "vod":
+        # In Watch Later, defer to the snapshot's kind so a movie row
+        # fetches movie info and a series row fetches series info.
+        elif (self.mode == "vod"
+              or (self.mode == "watchlist" and snap_kind == "vod")):
             if it.get("stream_id") is not None:
                 self._request_media_info(
                     "vod", it["stream_id"], self._current_key)
-        else:
+        elif (self.mode == "series"
+              or (self.mode == "watchlist" and snap_kind == "series")):
             if it.get("series_id") is not None:
                 self._request_media_info(
                     "series", it["series_id"], self._current_key)
@@ -2901,9 +2908,15 @@ class MainWindow(QMainWindow):
         # match. Both surface a 'local only' variant (no Trakt push)
         # and, when Trakt is connected, a 'and on Trakt' variant that
         # also POSTs the change so any other device sees it.
+        # For rows in the Watch Later view, _kind on the snapshot
+        # tells us whether the entry is a movie or a series so the
+        # same code path works there.
+        eff_mode = self.mode
+        if self.mode == "watchlist":
+            eff_mode = it.get("_kind") or "vod"
         if self.tmdb and (
-                (self.mode == "vod")
-                or (self.mode == "series" and not self.series_ctx)
+                (eff_mode == "vod")
+                or (eff_mode == "series" and not self.series_ctx)
                 or self.series_ctx):
             m.addSeparator()
             trakt_ok = self.trakt.is_connected()
@@ -2911,7 +2924,7 @@ class MainWindow(QMainWindow):
                 mark = self._mark_episode_watched
                 unmark = self._unmark_episode_watched
                 watched = self.is_episode_watched(it)
-            elif self.mode == "vod":
+            elif eff_mode == "vod":
                 mark = self._mark_movie_watched
                 unmark = self._unmark_movie_watched
                 watched = self.is_movie_watched(it)
@@ -2936,29 +2949,36 @@ class MainWindow(QMainWindow):
                         m.addAction(tr("ctx_mark_watched_trakt"),
                                     lambda it=it: mark(it, True))
         # Watch Later toggle only for movies and shows (not episodes).
-        if (self.tmdb and not self.series_ctx
-                and self.mode in ("vod", "series")):
-            wl_kind = self.mode
+        # Also works from within the Watch Later view - the row's
+        # _kind maps it back to vod/series so the same store call
+        # runs. That's what makes 'remove from Watch Later' reachable.
+        wl_kind = None
+        if self.tmdb and not self.series_ctx:
+            if self.mode in ("vod", "series"):
+                wl_kind = self.mode
+            elif self.mode == "watchlist":
+                wl_kind = it.get("_kind")
+        if wl_kind in ("vod", "series"):
             on_list = self.is_on_watchlist(it, wl_kind)
             trakt_ok = self.trakt.is_connected()
             if on_list:
                 m.addAction(
                     tr("ctx_watchlist_remove"),
-                    lambda it=it: self._remove_watchlist(it, wl_kind, False))
+                    lambda it=it, k=wl_kind: self._remove_watchlist(it, k, False))
                 if trakt_ok:
                     m.addAction(
                         tr("ctx_watchlist_remove_trakt"),
-                        lambda it=it: self._remove_watchlist(
-                            it, wl_kind, True))
+                        lambda it=it, k=wl_kind: self._remove_watchlist(
+                            it, k, True))
             else:
                 m.addAction(
                     tr("ctx_watchlist_add"),
-                    lambda it=it: self._add_watchlist(it, wl_kind, False))
+                    lambda it=it, k=wl_kind: self._add_watchlist(it, k, False))
                 if trakt_ok:
                     m.addAction(
                         tr("ctx_watchlist_add_trakt"),
-                        lambda it=it: self._add_watchlist(
-                            it, wl_kind, True))
+                        lambda it=it, k=wl_kind: self._add_watchlist(
+                            it, k, True))
         if (self.mode in ("live", "vod", "series")
                 and not self.series_ctx):
             ov_mode = self.mode
