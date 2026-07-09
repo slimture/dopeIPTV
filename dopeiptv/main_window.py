@@ -4898,8 +4898,10 @@ class MainWindow(QMainWindow):
         d = getattr(self, "_cast_dialog", None)
         if d is not None:
             d.close()
-        # Remember the panel divider layout and window size (also saved
-        # incrementally on move/resize/splitter-drag, this is the final flush).
+        # All persistence must land BEFORE we skip the interpreter
+        # teardown below. Layout, resume position, TMDB cache flush,
+        # recording state, mpv teardown, cast disconnect - each of
+        # these is itself flush-and-return, no pending threads.
         self._save_layout()
         self._save_resume_position()
         self.wake.release()
@@ -4919,16 +4921,24 @@ class MainWindow(QMainWindow):
             self.mpv_window.shutdown()
         self.mpv.stop()
         threading.Thread(target=self.cast.shutdown, daemon=True).start()
-        # Drop queued background downloads so thread-pool teardown doesn't
-        # stall the exit, then give in-flight workers up to 500 ms to wind
-        # down naturally - otherwise a mid-flight disk write or requests
-        # call finishes into an interpreter that's already tearing modules
-        # down and crashes the process with SIGSEGV during exit.
+        # Cancel every queued background download and give running
+        # workers a very short grace period, but do not block on them.
+        # requests.get can hang for its full 10 s timeout, way beyond
+        # anything a user waiting for the window to close will accept.
         for pool in (self.pool, self._logo_pool, self._art_pool):
             try:
                 pool.clear()
-                pool.waitForDone(500)
+                pool.waitForDone(150)
             except Exception:
                 pass
         super().closeEvent(event)
-        QApplication.instance().quit()
+        # Skip Python's atexit/module-teardown path entirely: image
+        # workers still executing requests.get would otherwise finish
+        # into a torn-down interpreter and Qt would emit signals into
+        # dead C++ objects, both of which surface as
+        # 'Aborted (core dumped)'. Everything we care about
+        # persistence-wise has already landed; disk writes in flight
+        # go through '.part' + rename so any interrupted write leaves
+        # no visible file behind. os._exit sends SIGKILL semantics to
+        # the process, joining every thread instantly.
+        os._exit(0)
