@@ -112,7 +112,7 @@ class LogoLoader(QObject):
     """
 
     def __init__(self, pool: QThreadPool, max_size: int = 96,
-                 max_entries: int = 800,
+                 max_entries: int = 2000,
                  cache_dir: Path | str | None = None) -> None:
         super().__init__()
         self.pool = pool
