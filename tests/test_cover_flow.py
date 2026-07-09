@@ -371,18 +371,12 @@ class FakeWindow:
         return self.tmdb.is_resolved(title, kind)
 
     def cover_url(self, it, kind):
-        from dopeiptv.workers import tmdb_url_from_provider
-        title_tmdb = self.poster_for(it, kind)
+        # Call the exact same pure function MainWindow.cover_url uses,
+        # so this fake can't drift from production behaviour.
+        from dopeiptv.workers import choose_cover_url
         raw = it.get("stream_icon") or it.get("cover") or None
-        embed_tmdb = (tmdb_url_from_provider(raw)
-                      if kind in ("vod", "series") else None)
-        if title_tmdb and not self.logos.is_dead(title_tmdb):
-            return title_tmdb
-        if embed_tmdb:
-            return None if self.logos.is_dead(embed_tmdb) else embed_tmdb
-        if raw and not self.logos.is_dead(raw):
-            return raw
-        return None
+        return choose_cover_url(
+            self.poster_for(it, kind), raw, kind, self.logos.is_dead)
 
     def cover_should_fetch(self, url, it, kind):
         if (not url or url in self.logos.waiting
@@ -813,6 +807,57 @@ def test_cache_prune_runs_once(qapp, tmp_path):
     r = PosterResolver(_pool(), s, MagicMock())
     # Already on the current version -> no prune, the entry stays.
     assert "vod:no match" in r._cache
+
+
+# -- Covers WITHOUT a TMDB account (title_tmdb is always None) --------------
+
+
+def _never_dead(url):
+    return False
+
+
+def test_no_tmdb_uses_embedded_provider_poster():
+    """A user with no TMDB key: the title search never runs
+    (title_tmdb=None), but a provider URL that embeds a TMDB path is
+    still rewritten to image.tmdb.org - which serves images with no
+    API key. So these covers work for everyone."""
+    from dopeiptv.workers import choose_cover_url
+    raw = "http://Ptv.is:2095/images/movies/kv2Qk9MKFFQo4WQPaYta599HkJP.jpg"
+    assert choose_cover_url(None, raw, "vod", _never_dead) == (
+        "https://image.tmdb.org/t/p/w500/kv2Qk9MKFFQo4WQPaYta599HkJP.jpg")
+
+
+def test_no_tmdb_uses_raw_provider_cover():
+    """No TMDB key, provider cover isn't a TMDB proxy - it's used as-is."""
+    from dopeiptv.workers import choose_cover_url
+    raw = "https://cdn.provider.com/posters/movie-42.jpg"
+    assert choose_cover_url(None, raw, "vod", _never_dead) == raw
+
+
+def test_no_tmdb_live_channel_uses_provider_logo():
+    from dopeiptv.workers import choose_cover_url
+    raw = "https://provider/logos/svt1.png"
+    assert choose_cover_url(None, raw, "live", _never_dead) == raw
+
+
+def test_no_tmdb_no_cover_returns_none():
+    from dopeiptv.workers import choose_cover_url
+    assert choose_cover_url(None, None, "vod", _never_dead) is None
+
+
+def test_cover_url_tmdb_wins_when_present():
+    from dopeiptv.workers import choose_cover_url
+    raw = "https://cdn.provider.com/x.jpg"
+    assert choose_cover_url("https://tmdb/poster.jpg", raw, "vod",
+                            _never_dead) == "https://tmdb/poster.jpg"
+
+
+def test_cover_url_dead_tmdb_falls_to_provider():
+    from dopeiptv.workers import choose_cover_url
+    dead = {"https://tmdb/poster.jpg"}
+    raw = "https://cdn.provider.com/x.jpg"
+    assert choose_cover_url("https://tmdb/poster.jpg", raw, "vod",
+                            lambda u: u in dead) == raw
 
 
 # -- Embedded TMDB path extraction from provider URLs ----------------------

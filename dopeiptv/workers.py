@@ -69,6 +69,35 @@ def tmdb_url_from_provider(url: str | None) -> str | None:
         return None
     return f"https://image.tmdb.org/t/p/w500/{token}.{ext}"
 
+
+def choose_cover_url(title_tmdb, raw_provider, kind, is_dead):
+    """Pick the cover URL for a list row, in priority order:
+
+      1. the TMDB title-search poster (None when there's no TMDB key
+         configured, or the lookup is still pending / found nothing)
+      2. a TMDB poster path embedded in the provider's own image URL -
+         rewritten to image.tmdb.org, which needs NO API key, so this
+         works even for users who never connect a TMDB account
+      3. the raw provider cover URL
+
+    Returns the first candidate that isn't blacklisted (``is_dead(url)``
+    covers both the single-URL cooldown and the per-host circuit
+    breaker). When an embedded-TMDB URL is dead, the raw provider URL
+    is skipped too - it's the panel's proxy of the same dead token.
+
+    Pure function shared by MainWindow.cover_url and the tests so the
+    two can't drift; the no-TMDB path is exercised directly by passing
+    title_tmdb=None."""
+    embed = (tmdb_url_from_provider(raw_provider)
+             if kind in ("vod", "series") else None)
+    if title_tmdb and not is_dead(title_tmdb):
+        return title_tmdb
+    if embed:
+        return None if is_dead(embed) else embed
+    if raw_provider and not is_dead(raw_provider):
+        return raw_provider
+    return None
+
 import requests
 from PyQt6.QtCore import (
     QObject, QRunnable, QStandardPaths, QThreadPool, Qt, pyqtSignal, pyqtSlot,

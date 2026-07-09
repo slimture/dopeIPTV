@@ -53,8 +53,8 @@ from .theme import ACCENT, ACCENTS, P, THEMES, apply_theme, build_style
 from .trakt import TraktAuthError, TraktClient
 from .wakelock import WakeLock
 from .workers import (
-    LogoLoader, clear_directory, default_image_cache_dir, dir_size_bytes,
-    run_async, tmdb_url_from_provider)
+    LogoLoader, choose_cover_url, clear_directory, default_image_cache_dir,
+    dir_size_bytes, run_async, tmdb_url_from_provider)
 
 
 class _ClickableWidget(QWidget):
@@ -1287,24 +1287,9 @@ class MainWindow(QMainWindow):
 
         poster_for() is always called so the background TMDB lookup
         that feeds the watched-badge + detail panel still fires."""
-        title_tmdb = self.poster_for(it, kind)
-        raw = self._provider_cover(it)
-        embed_tmdb = (tmdb_url_from_provider(raw)
-                      if kind in ("vod", "series") else None)
-        if title_tmdb and not self.logos.is_dead(title_tmdb):
-            return title_tmdb
-        if embed_tmdb:
-            # raw is the panel's proxy of this exact TMDB token. If the
-            # direct image.tmdb.org URL is dead (TMDB deleted the
-            # poster), the proxy will 404/fail the same way - so raw is
-            # never a useful fallback here. Returning None instead of
-            # raw saves a wasted request that also drags down flaky
-            # panel hosts (which then trip the circuit breaker for the
-            # covers that DO exist on them).
-            return None if self.logos.is_dead(embed_tmdb) else embed_tmdb
-        if raw and not self.logos.is_dead(raw):
-            return raw
-        return None
+        return choose_cover_url(
+            self.poster_for(it, kind), self._provider_cover(it),
+            kind, self.logos.is_dead)
 
     def cover_should_fetch(self, url, it, kind: str) -> bool:
         """Whether the delegate should queue a network fetch for *url*
