@@ -2,14 +2,26 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections import OrderedDict
+from pathlib import Path
 from typing import Any, Callable
 
 import requests
 from PyQt6.QtCore import (
-    QObject, QRunnable, QThreadPool, Qt, pyqtSignal, pyqtSlot,
+    QObject, QRunnable, QStandardPaths, QThreadPool, Qt, pyqtSignal, pyqtSlot,
 )
 from PyQt6.QtGui import QPixmap
+
+
+def default_image_cache_dir(sub: str = "images") -> Path:
+    """Location for on-disk image bytes: reuse Qt's per-app cache dir so
+    a user-triggered 'clear cache' picks it up automatically."""
+    base = QStandardPaths.writableLocation(
+        QStandardPaths.StandardLocation.CacheLocation)
+    if not base:
+        base = str(Path.home() / ".cache" / "dopeiptv")
+    return Path(base) / sub
 
 
 class WorkerSignals(QObject):
@@ -70,7 +82,8 @@ class LogoLoader(QObject):
     """
 
     def __init__(self, pool: QThreadPool, max_size: int = 96,
-                 max_entries: int = 800) -> None:
+                 max_entries: int = 800,
+                 cache_dir: Path | str | None = None) -> None:
         super().__init__()
         self.pool = pool
         self.max_size = max_size
@@ -79,6 +92,17 @@ class LogoLoader(QObject):
         # provider dumps so the process doesn't grow unbounded.
         self.cache: OrderedDict[str, QPixmap] = OrderedDict()
         self.waiting: dict[str, list[Callable]] = {}
+        # Disk cache: raw response bytes, keyed by URL hash. Lets
+        # evicted RAM entries reload in a few ms from local SSD instead
+        # of re-hitting the network.
+        self.disk_dir: Path | None = (
+            Path(cache_dir) if cache_dir is not None else None)
+
+    def _disk_path(self, url: str) -> Path | None:
+        if self.disk_dir is None:
+            return None
+        h = hashlib.sha1(url.encode("utf-8")).hexdigest()
+        return self.disk_dir / h[:2] / h[2:]
 
     def _store(self, url: str, pm: QPixmap) -> None:
         self.cache[url] = pm
@@ -97,11 +121,26 @@ class LogoLoader(QObject):
             self.waiting[url].append(callback)
             return
         self.waiting[url] = [callback]
+        disk_path = self._disk_path(url)
 
-        def fetch(u: str = url) -> tuple[str, bytes]:
+        def fetch(u: str = url, dp: Path | None = disk_path) -> tuple[str, bytes]:
+            if dp is not None and dp.exists():
+                try:
+                    data = dp.read_bytes()
+                    if data:
+                        return u, data
+                except OSError:
+                    pass
             r = requests.get(u, timeout=10)
             r.raise_for_status()
-            return u, r.content
+            data = r.content
+            if dp is not None:
+                try:
+                    dp.parent.mkdir(parents=True, exist_ok=True)
+                    dp.write_bytes(data)
+                except OSError:
+                    pass
+            return u, data
 
         def done(result: tuple[str, bytes]) -> None:
             u, data = result

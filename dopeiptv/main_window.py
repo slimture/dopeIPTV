@@ -52,7 +52,7 @@ from .stores import (
 from .theme import ACCENT, ACCENTS, P, THEMES, apply_theme, build_style
 from .trakt import TraktAuthError, TraktClient
 from .wakelock import WakeLock
-from .workers import LogoLoader, run_async
+from .workers import LogoLoader, default_image_cache_dir, run_async
 
 
 class _ClickableWidget(QWidget):
@@ -189,7 +189,8 @@ class MainWindow(QMainWindow):
         # logos stay crisp even when the user picks large/xlarge grid. The
         # default 96 was fine when only compact/medium existed but blurred
         # noticeably on 4K displays.
-        self.logos = LogoLoader(self.pool, max_size=320)
+        self.logos = LogoLoader(self.pool, max_size=320,
+                                cache_dir=default_image_cache_dir("logos"))
         # Separate, higher-res cache for posters/cast photos - reusing
         # `logos` (capped at 96px for small list icons) would blur badly
         # once scaled up to the much larger detail-panel sizes. Also its
@@ -198,7 +199,9 @@ class MainWindow(QMainWindow):
         # compete with (and delay) channel/EPG loading on the shared pool.
         self._art_pool = QThreadPool()
         self._art_pool.setMaxThreadCount(4)
-        self.poster_art = LogoLoader(self._art_pool, max_size=320)
+        self.poster_art = LogoLoader(
+            self._art_pool, max_size=320,
+            cache_dir=default_image_cache_dir("posters"))
         self.epg_progress.connect(self._on_epg_progress)
         pid = (active_pl or {}).get("id")
         self.xmltv = XmltvGuide(
