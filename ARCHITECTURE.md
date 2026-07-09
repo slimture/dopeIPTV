@@ -37,6 +37,8 @@ dopeiptv/
   services/            Window-agnostic application services
     coverart.py        CoverArtService - TMDB resolver lifecycle + the
                        ordered list/detail cover-candidate logic
+    resume.py          ResumeStore - per-playlist resume positions
+                       (persistence + keep/drop rule)
 
   ui/                  Everything the user sees
     __init__.py        Lazy MainWindow export (PEP 562)

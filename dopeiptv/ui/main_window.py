@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import threading
 import time
@@ -29,6 +28,7 @@ from ..providers.client import XtreamClient
 from ..media.embedded import EmbeddedPlayer
 from ..providers.epg import XmltvGuide, epg_cache_path
 from ..services.coverart import CoverArtService
+from ..services.resume import ResumeStore
 from ..media.players import (
     MpvIpcPlayer, MpvWindowPlayer, _libmpv, embedded_playback_supported, launch_player,
 )
@@ -124,14 +124,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             id_key="series_id")
         self.history = HistoryStore(
             settings, f"history_{pid}" if pid else "history")
-        self._resume_key = f"resume_positions_{pid}" if pid else "resume_positions"
-        try:
-            self._resume: dict = json.loads(
-                settings.value(self._resume_key, "") or "{}")
-        except Exception:
-            self._resume = {}
-        if not isinstance(self._resume, dict):
-            self._resume = {}
+        self.resume = ResumeStore(settings, pid)
         self.overrides = CategoryOverrides(
             settings, f"category_overrides_{pid}" if pid else "category_overrides")
         self.channel_ov = ChannelOverrides(
@@ -1549,25 +1542,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not (self.player and self.player.current_url and self._playing_key
                 and self._playing_group in ("vod", "episode", "rec")):
             return
-        pos = self.player.playback_position()
-        dur = self.player.playback_duration()
-        rkey = f"{self._playing_group}:{self._playing_key}"
-        if dur > 0 and 60 < pos < dur * 0.95:
-            self._resume[rkey] = {"pos": round(pos), "dur": round(dur)}
-        else:
-            self._resume.pop(rkey, None)
-        self.settings.setValue(self._resume_key, json.dumps(self._resume))
+        self.resume.record(self._playing_group, self._playing_key,
+                           self.player.playback_position(),
+                           self.player.playback_duration())
 
     def _resume_offset(self, key, kind: str) -> float:
         """Ask whether to resume a partly-watched title; return the start
         offset in seconds (0 to start from the beginning)."""
-        group = {"movie": "vod", "episode": "episode",
-                 "recording": "rec"}.get(kind)
-        saved = self._resume.get(f"{group}:{key}") if group else None
-        if not saved:
-            return 0.0
-        pos = float(saved.get("pos") or 0)
-        if pos <= 60:
+        pos = self.resume.saved_position(key, kind)
+        if pos <= 0:
             return 0.0
         idx = self._choice_dialog(
             tr("resume_title"),
