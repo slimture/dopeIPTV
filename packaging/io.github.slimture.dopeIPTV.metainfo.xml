@@ -26,6 +26,22 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.5.0" date="2026-07-09">
+      <description>
+        <p>A large internal reorganisation - no user-visible change, but a
+           much cleaner and safer codebase to build on.</p>
+        <ul>
+          <li>The code is grouped into clear layers (providers, core,
+              media, services, ui) with a one-way import rule, so a module
+              can be changed without breaking the layers beneath it</li>
+          <li>Business logic that did not belong in the window (cover-art
+              resolution, resume positions) is now separate, tested
+              service objects</li>
+          <li>The Python wheel now ships every subpackage, and the tree
+              passes a clean lint with no dead imports</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.4.4" date="2026-07-09">
       <description>
         <p>Lower memory use, ARM64 Linux builds, and an internal cleanup.</p>
