@@ -31,9 +31,9 @@ class _Toast(QLabel):
         self.setWordWrap(True)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setStyleSheet(
-            f"background: rgba(30,30,36,220); color: #ECECF1;"
-            f"border-radius: 10px; padding: 10px 18px;"
-            f"font-size: 12px; font-weight: 500;")
+            "background: rgba(30,30,36,220); color: #ECECF1;"
+            "border-radius: 10px; padding: 10px 18px;"
+            "font-size: 12px; font-weight: 500;")
         self.hide()
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)

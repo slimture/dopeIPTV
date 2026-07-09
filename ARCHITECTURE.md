@@ -29,6 +29,7 @@ dopeiptv/
     recording.py       RecordingManager - ffmpeg/mpv stream-copy, timers
     wakelock.py        Screensaver/suspend inhibitor (DBus + caffeinate)
     platform_macos.py  macOS-specific helpers (OpenGL, libmpv, paths)
+    player_exec.py     Locate the external mpv / VLC binary on the host
 
   media/               Playback
     embedded.py        _MpvGLWidget(QOpenGLWidget), EmbeddedPlayer, seek bar

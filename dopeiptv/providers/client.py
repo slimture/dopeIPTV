@@ -4,9 +4,6 @@ from __future__ import annotations
 
 import base64
 import html
-import os
-import shutil
-import sys
 from datetime import datetime, timezone
 from typing import Any
 
@@ -139,23 +136,3 @@ def epg_times(entry: dict) -> tuple[datetime | None, datetime | None]:
                     continue
         return None
     return parse("start_timestamp", "start"), parse("stop_timestamp", "end")
-
-
-def find_player_executable(player: str) -> str | None:
-    """Locate the mpv or vlc binary."""
-    if player == "mpv":
-        candidates = ["mpv"]
-    else:
-        candidates = ["vlc", "cvlc"]
-    if sys.platform == "darwin":
-        from ..core.platform_macos import extra_player_candidates
-        candidates += extra_player_candidates(player)
-    for c in candidates:
-        if os.path.isabs(c):
-            if os.path.isfile(c) and os.access(c, os.X_OK):
-                return c
-        else:
-            found = shutil.which(c)
-            if found:
-                return found
-    return None

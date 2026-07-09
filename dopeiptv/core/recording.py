@@ -14,7 +14,7 @@ from typing import Any, Callable
 
 from PyQt6.QtCore import QObject, QSettings, QTimer, pyqtSignal
 
-from ..providers.client import find_player_executable
+from .player_exec import find_player_executable
 
 
 def _bundled_ffmpeg() -> str | None:

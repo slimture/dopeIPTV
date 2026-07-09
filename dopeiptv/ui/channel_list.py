@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QAbstractListModel, QModelIndex, QRect, QRectF, QSize, Qt
-from PyQt6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QPixmap
+from PyQt6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import (
-    QListView, QSizePolicy, QStyle, QStyledItemDelegate,
+    QListView, QStyle, QStyledItemDelegate,
 )
 
 from .theme import ACCENT, P

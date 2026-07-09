@@ -30,7 +30,7 @@ def _pool():
 def _valid_png_bytes() -> bytes:
     """A minimal but genuinely-decodeable 4x4 red PNG built through Qt
     itself so QImage.loadFromData accepts it in the tests."""
-    from PyQt6.QtCore import QBuffer, QByteArray, QIODevice
+    from PyQt6.QtCore import QBuffer, QIODevice
     from PyQt6.QtGui import QImage
     img = QImage(4, 4, QImage.Format.Format_RGB32)
     img.fill(0xff0000)
@@ -217,7 +217,6 @@ def test_logo_loader_disk_cache_roundtrip(qapp, tmp_path, monkeypatch):
     served straight from disk on the next request - no second network
     call."""
     from dopeiptv.core.workers import LogoLoader
-    from PyQt6.QtCore import QThreadPool
 
     red_png = _valid_png_bytes()
 

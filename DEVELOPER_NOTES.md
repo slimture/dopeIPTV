@@ -19,6 +19,20 @@ The application was refactored from a single 6000-line `dopeiptv.py`
 monolith into a proper Python package (`dopeiptv/`).  The top-level
 `dopeiptv.py` is now a thin launcher that calls `dopeiptv.app.main()`.
 
+The package is organised into layered subpackages with a one-way import
+rule (see `ARCHITECTURE.md` for the full module map):
+
+- `providers/` — data sources (Xtream client, EPG, TMDB, Trakt, cast)
+- `core/`      — storage, background workers, OS integration
+- `media/`     — playback (embedded libmpv widget, external launchers)
+- `services/`  — window-agnostic application services (cover art, resume)
+- `ui/`        — the main window, its mixins and all widgets/dialogs
+
+`ui` may import from any layer below it; `services` builds on
+`providers`/`core` but never imports `ui`; `core` depends on nothing
+above it. Keeping this direction one-way is what lets you change a
+module without breaking the layers beneath it.
+
 ## Xtream Codes API
 
 The app connects to Xtream Codes providers via their HTTP API

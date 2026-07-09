@@ -9,12 +9,11 @@ import subprocess
 import sys
 import tempfile
 import time
-from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtWidgets import QMessageBox
 
-from ..providers.client import find_player_executable
+from ..core.player_exec import find_player_executable
 
 _libmpv_error: str | None = None
 

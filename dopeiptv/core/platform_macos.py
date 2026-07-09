@@ -6,7 +6,6 @@ import ctypes
 import ctypes.util
 import os
 import subprocess
-import sys
 
 
 def find_libmpv() -> None:

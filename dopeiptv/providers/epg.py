@@ -12,7 +12,7 @@ from array import array
 from bisect import bisect_left, bisect_right
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Callable
 
 import requests
 from PyQt6.QtCore import QStandardPaths
@@ -255,10 +255,8 @@ class XmltvGuide:
         now = self._now()
         starts, stops = sched[0], sched[1]
         n = len(starts)
-        lo = bisect_right(starts, now)
-        # Everything from lo on starts in the future (so ends there too);
-        # additionally, anything that started within the last day may still
-        # be airing. Collect in start order, exactly like the old full scan.
+        # Anything that started within the last day may still be airing;
+        # collect in start order, exactly like the old full scan.
         out: list[dict] = []
         j = bisect_left(starts, now - self._MAX_PROG_SECS)
         while j < n and len(out) < limit:
@@ -353,7 +351,8 @@ class XmltvGuide:
                             pooled((el.findtext("desc") or "").strip()),
                         ))
                 el.clear()
-        del seen, text_pool
+        seen.clear()
+        text_pool.clear()
         by_id: dict[str, tuple[array, array, tuple, tuple]] = {}
         for cid, lst in rows.items():
             lst.sort(key=lambda r: r[0])
