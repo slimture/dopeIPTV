@@ -122,11 +122,18 @@ class LogoLoader(QObject):
         # provider dumps so the process doesn't grow unbounded.
         self.cache: OrderedDict[str, QPixmap] = OrderedDict()
         self.waiting: dict[str, list[Callable]] = {}
+        # URLs that returned 404 / other error last time we tried, so
+        # the caller can fall back to a provider-supplied cover URL
+        # instead of asking us to keep retrying a dead endpoint.
+        self.dead: set[str] = set()
         # Disk cache: raw response bytes, keyed by URL hash. Lets
         # evicted RAM entries reload in a few ms from local SSD instead
         # of re-hitting the network.
         self.disk_dir: Path | None = (
             Path(cache_dir) if cache_dir is not None else None)
+
+    def is_dead(self, url: str | None) -> bool:
+        return bool(url) and url in self.dead
 
     def _disk_path(self, url: str) -> Path | None:
         if self.disk_dir is None:
@@ -154,20 +161,37 @@ class LogoLoader(QObject):
         disk_path = self._disk_path(url)
 
         def fetch(u: str = url, dp: Path | None = disk_path) -> tuple[str, bytes]:
+            # Disk cache read: validate by attempting to decode. If a
+            # previous session was killed mid-write (e.g. crash on
+            # shutdown) the file is truncated and QPixmap.loadFromData
+            # will fail - in that case unlink the bad file and fall
+            # through to a fresh network fetch so the cover isn't
+            # stuck as a placeholder forever.
             if dp is not None and dp.exists():
                 try:
                     data = dp.read_bytes()
                     if data:
-                        return u, data
+                        probe = QPixmap()
+                        if probe.loadFromData(data):
+                            return u, data
+                        dp.unlink(missing_ok=True)
                 except OSError:
-                    pass
+                    try:
+                        dp.unlink(missing_ok=True)
+                    except OSError:
+                        pass
             r = requests.get(u, timeout=10)
             r.raise_for_status()
             data = r.content
             if dp is not None:
                 try:
                     dp.parent.mkdir(parents=True, exist_ok=True)
-                    dp.write_bytes(data)
+                    # Write to a sibling temp path and rename so a crash
+                    # mid-write can never leave a truncated file behind
+                    # for the next session to trip over.
+                    tmp = dp.with_name(dp.name + ".part")
+                    tmp.write_bytes(data)
+                    tmp.replace(dp)
                 except OSError:
                     pass
             return u, data
@@ -176,15 +200,28 @@ class LogoLoader(QObject):
             u, data = result
             callbacks = self.waiting.pop(u, [])
             pm = QPixmap()
-            if pm.loadFromData(data):
-                pm = pm.scaled(self.max_size, self.max_size,
-                               Qt.AspectRatioMode.KeepAspectRatio,
-                               Qt.TransformationMode.SmoothTransformation)
-                self._store(u, pm)
-                for cb in callbacks:
-                    try:
-                        cb(pm)
-                    except RuntimeError:
-                        pass
+            if not pm.loadFromData(data):
+                return
+            pm = pm.scaled(self.max_size, self.max_size,
+                           Qt.AspectRatioMode.KeepAspectRatio,
+                           Qt.TransformationMode.SmoothTransformation)
+            self._store(u, pm)
+            for cb in callbacks:
+                try:
+                    cb(pm)
+                except RuntimeError:
+                    pass
 
-        run_async(self.pool, fetch, done, lambda _: self.waiting.pop(url, None))
+        def on_fail(_msg: str) -> None:
+            callbacks = self.waiting.pop(url, [])
+            self.dead.add(url)
+            # Fire each pending callback with an empty pixmap so the
+            # delegate can repaint - the next paint checks is_dead()
+            # and swaps in the provider fallback URL.
+            for cb in callbacks:
+                try:
+                    cb(QPixmap())
+                except RuntimeError:
+                    pass
+
+        run_async(self.pool, fetch, done, on_fail)

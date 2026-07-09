@@ -1275,22 +1275,35 @@ class MainWindow(QMainWindow):
                 return
         self._watched_sync_running = True
 
-        def job():
-            return (self.trakt.watched_movies(),
-                    self.trakt.watched_shows())
-
-        def done(result):
-            self._watched_sync_running = False
-            movies, shows = result
+        # Runs on a daemon thread rather than the QThreadPool: the two
+        # Trakt endpoints are 30-45 s worst case, and if the user closes
+        # the app while the request is in flight a pool worker touching
+        # emit signals during Python teardown segfaults the process on
+        # exit. Daemon threads are killed instantly on process end so
+        # no callback ever fires into a torn-down interpreter.
+        def worker() -> None:
+            try:
+                movies = self.trakt.watched_movies()
+                shows = self.trakt.watched_shows()
+            except Exception:
+                # Marshal back to the main thread just to flip the
+                # running flag; QTimer.singleShot from a non-Qt thread
+                # is safe as long as the target QObject lives there.
+                QTimer.singleShot(0, self._on_watched_sync_failed)
+                return
             self.watched.replace(movies, shows)
-            # Nudge the visible list so the newly-known "seen" markers
-            # paint without a category switch.
-            self.list_model.refresh_all()
+            QTimer.singleShot(0, self._on_watched_sync_done)
 
-        def fail(_msg):
-            self._watched_sync_running = False
+        threading.Thread(target=worker, daemon=True).start()
 
-        run_async(self.pool, job, done, fail)
+    def _on_watched_sync_done(self) -> None:
+        self._watched_sync_running = False
+        # Nudge the visible list so the newly-known 'seen' markers
+        # paint without needing a category switch.
+        self.list_model.refresh_all()
+
+    def _on_watched_sync_failed(self) -> None:
+        self._watched_sync_running = False
 
     def is_movie_watched(self, item: dict) -> bool:
         if not self.tmdb or not item:

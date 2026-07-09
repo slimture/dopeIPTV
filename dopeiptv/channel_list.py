@@ -257,6 +257,8 @@ class ChannelDelegate(QStyledItemDelegate):
         logo_rect = QRect(logo_x, logo_y, logo_sz, logo_sz)
         radius = max(8, logo_sz // 5)
         url = self.window.poster_for(it, kind)
+        if url and self.window.logos.is_dead(url):
+            url = None
         if not url:
             url = it.get("stream_icon") or it.get("cover")
         pm = self.window.logos.cache.get(url) if url else None
@@ -336,6 +338,8 @@ class ChannelDelegate(QStyledItemDelegate):
             logo_sz, logo_sz)
         radius = max(6, logo_sz // 4)
         url = self.window.poster_for(it, kind)
+        if url and self.window.logos.is_dead(url):
+            url = None
         if not url:
             url = it.get("stream_icon") or it.get("cover")
         pm = self.window.logos.cache.get(url) if url else None
