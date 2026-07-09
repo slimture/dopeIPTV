@@ -155,6 +155,7 @@ class _MpvGLWidget(QOpenGLWidget):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.mpv = None
         self._ctx = None
+        self._gl_init_error: str | None = None
         self._blank = False
         self.frame_ready.connect(self.update)
 
@@ -221,6 +222,29 @@ class _MpvGLWidget(QOpenGLWidget):
         else:
             print("[dopeIPTV] WARNING: no GL context in initializeGL",
                   file=sys.stderr)
+        # Building the mpv render context can fail hard on a weak or
+        # software-only GL stack (typically a VM with no GPU acceleration).
+        # This runs inside a Qt virtual override (initializeGL), and if the
+        # exception were allowed to propagate out of it PyQt aborts the whole
+        # process with "Fatal Python error: Aborted" - the app never opens.
+        # Catch it: leave the video surface blank, keep the app alive, and
+        # surface a clear reason instead of a crash. The real machines this
+        # targets (with a GPU) never hit this path.
+        try:
+            self._build_mpv_render()
+            print("[dopeIPTV] Render context ready", file=sys.stderr)
+        except Exception as e:
+            self._ctx = None
+            self.mpv = None
+            self._gl_init_error = f"{type(e).__name__}: {e}"
+            print(f"[dopeIPTV] embedded GL init failed, in-app video "
+                  f"disabled: {self._gl_init_error}", file=sys.stderr)
+            # Defer the toast so it fires after the window is up, not from
+            # inside the GL callback.
+            QTimer.singleShot(1500, lambda: self.playback_error.emit(
+                tr("embedded_gl_failed")))
+
+    def _build_mpv_render(self) -> None:
         # vo=libmpv is mandatory for the render API and exists in every
         # libmpv build - create the instance with just that (plus a quiet
         # terminal), then apply the rest tolerantly below.
@@ -258,7 +282,6 @@ class _MpvGLWidget(QOpenGLWidget):
                 "get_proc_address": self._proc_address_fn})
         self._ctx.update_cb = lambda: self.frame_ready.emit()
         _register_error_callback(self.mpv, self.playback_error)
-        print("[dopeIPTV] Render context ready", file=sys.stderr)
 
     def paintGL(self) -> None:
         # Blank branch first so a repaint that arrives mid-stop (when mpv has

@@ -1266,6 +1266,33 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "{name} не найден. Установите и попробуйте снова.",
         "th": "ไม่พบ {name} กรุณาติดตั้งแล้วลองอีกครั้ง",
     },
+    "embedded_gl_failed": {
+        "en": "In-app video isn't available on this system's graphics "
+              "(often a virtual machine without GPU acceleration). "
+              "You can still open channels in an external player.",
+        "sv": "Inbäddad video stöds inte av den här datorns grafik "
+              "(ofta en virtuell maskin utan GPU-acceleration). "
+              "Du kan fortfarande öppna kanaler i en extern spelare.",
+        "es": "El vídeo integrado no está disponible con los gráficos de "
+              "este sistema (a menudo una máquina virtual sin aceleración "
+              "por GPU). Aún puedes abrir canales en un reproductor externo.",
+        "de": "In-App-Video wird von der Grafik dieses Systems nicht "
+              "unterstützt (oft eine virtuelle Maschine ohne "
+              "GPU-Beschleunigung). Du kannst Kanäle weiterhin in einem "
+              "externen Player öffnen.",
+        "fr": "La vidéo intégrée n'est pas disponible avec les graphismes de "
+              "ce système (souvent une machine virtuelle sans accélération "
+              "GPU). Vous pouvez toujours ouvrir les chaînes dans un lecteur "
+              "externe.",
+        "zh": "此系统的显卡不支持应用内视频（通常是没有 GPU 加速的虚拟机）。"
+              "你仍可以在外部播放器中打开频道。",
+        "ru": "Встроенное видео недоступно на графике этой системы "
+              "(часто это виртуальная машина без ускорения GPU). "
+              "Вы всё ещё можете открывать каналы во внешнем плеере.",
+        "th": "วิดีโอในแอปใช้งานไม่ได้กับกราฟิกของระบบนี้ "
+              "(มักเป็นเครื่องเสมือนที่ไม่มีการเร่ง GPU) "
+              "คุณยังเปิดช่องในเครื่องเล่นภายนอกได้",
+    },
 
     # ── Search ────────────────────────────────────────────────────────────
 
