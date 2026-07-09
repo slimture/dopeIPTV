@@ -271,6 +271,85 @@ class TraktClient:
                 out.append(tid)
         return out
 
+    # -- favorites (mirrored to a personal Trakt list) -----------------------
+
+    FAV_LIST_NAME = "dopeIPTV Favorites"
+
+    def _ensure_fav_list(self) -> str | None:
+        """Return the slug of the personal 'dopeIPTV Favorites' list,
+        creating it (and caching the slug) on first use."""
+        slug = self.settings.value("trakt_fav_list_slug", "") or ""
+        if slug:
+            return slug
+        try:
+            r = requests.get(f"{API}/users/me/lists",
+                             headers=self._headers(), timeout=15)
+            r.raise_for_status()
+            for lst in r.json() or []:
+                if lst.get("name") == self.FAV_LIST_NAME:
+                    slug = (lst.get("ids") or {}).get("slug") or ""
+                    if slug:
+                        self.settings.setValue("trakt_fav_list_slug", slug)
+                        return slug
+            r = requests.post(
+                f"{API}/users/me/lists",
+                json={"name": self.FAV_LIST_NAME,
+                      "description": "Favorites from dopeIPTV.",
+                      "privacy": "private"},
+                headers=self._headers(), timeout=15)
+            r.raise_for_status()
+            slug = (r.json().get("ids") or {}).get("slug") or ""
+            if slug:
+                self.settings.setValue("trakt_fav_list_slug", slug)
+            return slug or None
+        except Exception:
+            return None
+
+    def _fav_items(self, tmdb_id: int, kind: str) -> dict:
+        key = "movies" if kind == "vod" else "shows"
+        return {key: [{"ids": {"tmdb": int(tmdb_id)}}]}
+
+    def add_favorite(self, tmdb_id: int, kind: str) -> None:
+        slug = self._ensure_fav_list()
+        if not slug:
+            return
+        r = requests.post(f"{API}/users/me/lists/{slug}/items",
+                          json=self._fav_items(tmdb_id, kind),
+                          headers=self._headers(), timeout=15)
+        r.raise_for_status()
+
+    def remove_favorite(self, tmdb_id: int, kind: str) -> None:
+        slug = self._ensure_fav_list()
+        if not slug:
+            return
+        r = requests.post(f"{API}/users/me/lists/{slug}/items/remove",
+                          json=self._fav_items(tmdb_id, kind),
+                          headers=self._headers(), timeout=15)
+        r.raise_for_status()
+
+    def _fav_list_ids(self, kind: str) -> list[int]:
+        slug = self._ensure_fav_list()
+        if not slug:
+            return []
+        endpoint = "movies" if kind == "vod" else "shows"
+        node = "movie" if kind == "vod" else "show"
+        r = requests.get(f"{API}/users/me/lists/{slug}/items/{endpoint}",
+                         headers=self._headers(), timeout=30)
+        if r.status_code != 200:
+            return []
+        out: list[int] = []
+        for entry in r.json() or []:
+            tid = ((entry.get(node) or {}).get("ids") or {}).get("tmdb")
+            if isinstance(tid, int):
+                out.append(tid)
+        return out
+
+    def favorite_movies(self) -> list[int]:
+        return self._fav_list_ids("vod")
+
+    def favorite_shows(self) -> list[int]:
+        return self._fav_list_ids("series")
+
     def watched_shows(self) -> dict[int, list[list[int]]]:
         """Every episode the user has marked watched on any device.
         Returns a mapping show_tmdb_id -> [[season, episode], ...] with each

@@ -1552,6 +1552,27 @@ class MainWindow(QMainWindow):
             except Exception:
                 continue
             self.watchlist.mark_show_synced(tid)
+        self._push_local_favorites_to_trakt()
+
+    def _push_local_favorites_to_trakt(self) -> None:
+        """Runs on the sync worker thread. Upload any movie/series
+        favourite that carries a resolved tmdb id but isn't on the Trakt
+        'dopeIPTV Favorites' list yet, so favourites are remembered
+        across devices. Adds are idempotent, so re-runs are harmless."""
+        try:
+            on_trakt = {"vod": set(self.trakt.favorite_movies()),
+                        "series": set(self.trakt.favorite_shows())}
+        except Exception:
+            return
+        for store, kind in ((self.movie_favs, "vod"),
+                            (self.series_favs, "series")):
+            for it in store.items():
+                tid = it.get("_tmdb_id")
+                if isinstance(tid, int) and tid not in on_trakt[kind]:
+                    try:
+                        self.trakt.add_favorite(tid, kind)
+                    except Exception:
+                        pass
 
     def _on_watched_sync_done(self) -> None:
         self._watched_sync_running = False
@@ -3587,10 +3608,29 @@ class MainWindow(QMainWindow):
         the affected row."""
         store = self.movie_favs if section == "movie" else self.series_favs
         ident = item.get(store.id_key)
+        kind = "vod" if section == "movie" else "series"
+        tid = self._tmdb_id_for_item(item, kind)
         if add:
-            store.add("all", item)
+            # Stamp the resolved tmdb id onto the stored snapshot so a
+            # later Trakt push/remove doesn't need to re-resolve it.
+            snap = dict(item)
+            if isinstance(tid, int):
+                snap["_tmdb_id"] = tid
+            store.add("all", snap)
         else:
             store.remove(ident)
+        # Mirror to the Trakt 'dopeIPTV Favorites' list when connected.
+        if self.trakt.is_connected():
+            if isinstance(tid, int):
+                self._trakt_push(
+                    (lambda: self.trakt.add_favorite(tid, kind)) if add
+                    else (lambda: self.trakt.remove_favorite(tid, kind)))
+            elif add and self.tmdb is not None:
+                self._resolve_tmdb_id_async(
+                    item, kind,
+                    lambda rid, k=kind: self._trakt_push(
+                        lambda: self.trakt.add_favorite(rid, k))
+                    if isinstance(rid, int) else None)
         if (self.mode == "fav"
                 and self._fav_section == section
                 and not add):
