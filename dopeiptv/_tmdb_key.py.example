@@ -1,0 +1,17 @@
+"""Built-in TMDB API key (optional).
+
+TMDB posters work out of the box when a key is available here or in the
+DOPEIPTV_TMDB_KEY environment variable. To ship a key with the app:
+
+  1. Copy this file to  dopeiptv/_tmdb_key.py  (git-ignored), or
+  2. export DOPEIPTV_TMDB_KEY=<your key>  before running, or
+  3. for release builds, set a DOPEIPTV_TMDB_KEY GitHub Actions secret so
+     it's baked into the packaged artifacts without ever touching git.
+
+Use a TMDB "API Key (v3 auth)" - the short key, not the long v4 Read
+Access Token. A user's own key entered in Settings always overrides this.
+
+The real key is deliberately never committed to the public repository.
+"""
+
+TMDB_API_KEY = ""

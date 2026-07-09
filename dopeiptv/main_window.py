@@ -39,7 +39,7 @@ from .dialogs import (
 from .embedded import EmbeddedPlayer
 from .tmdb_match import TmdbMatchDialog
 from .epg import XmltvGuide, epg_cache_path
-from .metadata import PosterResolver, TmdbClient
+from .metadata import PosterResolver, TmdbClient, bundled_tmdb_key
 from .players import (
     MpvIpcPlayer, MpvWindowPlayer, _libmpv, embedded_playback_reason,
     embedded_playback_supported, launch_player,
@@ -1320,9 +1320,16 @@ class MainWindow(QMainWindow):
         # user who prefers the provider's own artwork. The
         # metadata_source setting only decides whether the *list cover*
         # prefers the TMDB title-search poster or the provider's image.
-        self._prefer_tmdb_covers = (
-            self.settings.value("metadata_source", "playlist") == "tmdb")
-        key = self.settings.value("tmdb_api_key", "") or ""
+        # A built-in key ships with release builds so TMDB works with no
+        # setup. When one is present TMDB is the default artwork source;
+        # otherwise we fall back to the provider's own images. A user who
+        # explicitly picks a source in Settings overrides the default.
+        bundled = bundled_tmdb_key()
+        source = self.settings.value("metadata_source", "") or ""
+        if not source:
+            source = "tmdb" if bundled else "playlist"
+        self._prefer_tmdb_covers = (source == "tmdb")
+        key = (self.settings.value("tmdb_api_key", "") or "").strip() or bundled
         if not key:
             return
         # Dedicated thread pool: TMDB lookups must never compete with
@@ -5025,10 +5032,14 @@ class MainWindow(QMainWindow):
         meta_tab = QWidget()
         mf = QFormLayout(meta_tab)
         mf.setSpacing(10)
+        _bundled = bool(bundled_tmdb_key())
+        _tmdb_label = ("TMDB (built-in, recommended)" if _bundled
+                       else "TMDB (needs your own key below)")
         meta_source_box = self._combo(
-            [("playlist", "Playlist (provider artwork)"),
-             ("tmdb", "TMDB (fetch posters by title)")],
-            self.settings.value("metadata_source", "playlist"))
+            [("tmdb", _tmdb_label),
+             ("playlist", "Provider artwork")],
+            self.settings.value(
+                "metadata_source", "tmdb" if _bundled else "playlist"))
         tmdb_key_row = QHBoxLayout()
         tmdb_key_edit = QLineEdit(self.settings.value("tmdb_api_key", ""))
         tmdb_key_edit.setPlaceholderText(tr("tmdb_key_placeholder"))
@@ -5043,9 +5054,18 @@ class MainWindow(QMainWindow):
         status_row_idx = mf.rowCount()
         mf.addRow("", tmdb_status)
         meta_hint = QLabel(
-            "Get a free key at themoviedb.org -> Settings -> API. "
-            "Posters are matched by title and cached, so lookups "
-            "only happen once per movie/series. Not used for live TV.")
+            ("TMDB works out of the box - no account needed. Posters are "
+             "matched by title and cached, so lookups happen once per "
+             "movie/series (not used for live TV). You can optionally "
+             "enter your own free key from themoviedb.org -> Settings -> "
+             "API to use your own quota. This product uses the TMDB API "
+             "but is not endorsed or certified by TMDB.")
+            if _bundled else
+            ("Get a free key at themoviedb.org -> Settings -> API. "
+             "Posters are matched by title and cached, so lookups "
+             "only happen once per movie/series. Not used for live TV. "
+             "This product uses the TMDB API but is not endorsed or "
+             "certified by TMDB."))
         meta_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         meta_hint.setWordWrap(True)
         mf.addRow(meta_hint)

@@ -20,3 +20,7 @@ venv/
 !dopeiptv.desktop
 recordings/
 .aider*
+# Built-in TMDB key - never commit the real key to the public repo.
+# Provide it via the DOPEIPTV_TMDB_KEY env var (CI secret for releases)
+# or a local copy of this module made from _tmdb_key.py.example.
+dopeiptv/_tmdb_key.py

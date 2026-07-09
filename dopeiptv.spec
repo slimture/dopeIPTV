@@ -62,6 +62,13 @@ hiddenimports += [
     "PyQt6.QtNetwork",
 ]
 
+# Optional built-in TMDB key module (git-ignored, written by CI from a
+# secret). It's imported dynamically inside a try/except, so name it here
+# so PyInstaller bundles it when the release build has baked one.
+import os as _os
+if _os.path.exists(_os.path.join("dopeiptv", "_tmdb_key.py")):
+    hiddenimports += ["dopeiptv._tmdb_key"]
+
 
 a = Analysis(
     ['dopeiptv.py'],

@@ -26,6 +26,27 @@ def _tmdb_dbg(msg: str) -> None:
         print(f"[dopeIPTV:tmdb] {msg}", file=sys.stderr, flush=True)
 
 
+def bundled_tmdb_key() -> str:
+    """The built-in TMDB key that makes posters work out of the box, so a
+    user never has to create their own account.
+
+    Read from the DOPEIPTV_TMDB_KEY environment variable (set for local
+    dev and baked into release builds from a CI secret) or, failing that,
+    an optional git-ignored ``dopeiptv/_tmdb_key.py`` exposing
+    ``TMDB_API_KEY``. Deliberately NOT committed to the public repo, so
+    the source tree carries no scrapeable secret while released binaries
+    still ship a working key. A user's own key (Settings) always wins
+    over this."""
+    key = (os.environ.get("DOPEIPTV_TMDB_KEY") or "").strip()
+    if key:
+        return key
+    try:
+        from ._tmdb_key import TMDB_API_KEY  # type: ignore
+        return (TMDB_API_KEY or "").strip()
+    except Exception:
+        return ""
+
+
 class TmdbClient:
     """Thin wrapper around the TMDB v3 search/details endpoints."""
 
