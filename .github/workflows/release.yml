@@ -156,9 +156,19 @@ jobs:
           # differs from the 22.04 we build against, so if libmpv's deps
           # weren't bundled this fails - which is exactly the "only works where
           # mpv is installed" bug. --self-check needs no GPU or display.
+          # Install only the GUI base every Ubuntu desktop already has
+          # (libGL, glib, fontconfig, xcb, ...) - PyQt needs libGL.so.1 just to
+          # import. Deliberately do NOT install the media stack (mpv, ffmpeg,
+          # libass): those must come from our bundle, which is what this test
+          # proves.
           APPIMAGE="$(ls dopeIPTV-*.AppImage | head -1)"
           docker run --rm -v "$PWD:/work" -w /work ubuntu:24.04 bash -c "
             set -e
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update -qq
+            apt-get install -y -qq --no-install-recommends \
+              libgl1 libegl1 libglib2.0-0 libfontconfig1 libfreetype6 \
+              libdbus-1-3 libxkbcommon0 libxcb-cursor0 >/dev/null
             chmod +x '$APPIMAGE'
             ./'$APPIMAGE' --appimage-extract-and-run --self-check
           "
