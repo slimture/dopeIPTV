@@ -22,7 +22,13 @@ jobs:
       - name: Bake built-in TMDB key
         env:
           DOPEIPTV_TMDB_KEY: ${{ secrets.DOPEIPTV_TMDB_KEY }}
-        run: printf 'TMDB_API_KEY = "%s"\n' "${DOPEIPTV_TMDB_KEY}" > dopeiptv/_tmdb_key.py
+        run: |
+          printf 'TMDB_API_KEY = "%s"\n' "${DOPEIPTV_TMDB_KEY}" > dopeiptv/_tmdb_key.py
+          if [ -n "${DOPEIPTV_TMDB_KEY}" ]; then
+            echo "Built-in TMDB key baked in (${#DOPEIPTV_TMDB_KEY} chars)."
+          else
+            echo "::warning::DOPEIPTV_TMDB_KEY secret is empty - the built-in TMDB option will NOT appear in this build."
+          fi
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -63,7 +69,13 @@ jobs:
       - name: Bake built-in TMDB key
         env:
           DOPEIPTV_TMDB_KEY: ${{ secrets.DOPEIPTV_TMDB_KEY }}
-        run: printf 'TMDB_API_KEY = "%s"\n' "${DOPEIPTV_TMDB_KEY}" > dopeiptv/_tmdb_key.py
+        run: |
+          printf 'TMDB_API_KEY = "%s"\n' "${DOPEIPTV_TMDB_KEY}" > dopeiptv/_tmdb_key.py
+          if [ -n "${DOPEIPTV_TMDB_KEY}" ]; then
+            echo "Built-in TMDB key baked in (${#DOPEIPTV_TMDB_KEY} chars)."
+          else
+            echo "::warning::DOPEIPTV_TMDB_KEY secret is empty - the built-in TMDB option will NOT appear in this build."
+          fi
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -208,7 +220,13 @@ jobs:
       - name: Bake built-in TMDB key
         env:
           DOPEIPTV_TMDB_KEY: ${{ secrets.DOPEIPTV_TMDB_KEY }}
-        run: printf 'TMDB_API_KEY = "%s"\n' "${DOPEIPTV_TMDB_KEY}" > dopeiptv/_tmdb_key.py
+        run: |
+          printf 'TMDB_API_KEY = "%s"\n' "${DOPEIPTV_TMDB_KEY}" > dopeiptv/_tmdb_key.py
+          if [ -n "${DOPEIPTV_TMDB_KEY}" ]; then
+            echo "Built-in TMDB key baked in (${#DOPEIPTV_TMDB_KEY} chars)."
+          else
+            echo "::warning::DOPEIPTV_TMDB_KEY secret is empty - the built-in TMDB option will NOT appear in this build."
+          fi
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -320,7 +338,13 @@ jobs:
       - name: Bake built-in TMDB key
         env:
           DOPEIPTV_TMDB_KEY: ${{ secrets.DOPEIPTV_TMDB_KEY }}
-        run: printf 'TMDB_API_KEY = "%s"\n' "${DOPEIPTV_TMDB_KEY}" > dopeiptv/_tmdb_key.py
+        run: |
+          printf 'TMDB_API_KEY = "%s"\n' "${DOPEIPTV_TMDB_KEY}" > dopeiptv/_tmdb_key.py
+          if [ -n "${DOPEIPTV_TMDB_KEY}" ]; then
+            echo "Built-in TMDB key baked in (${#DOPEIPTV_TMDB_KEY} chars)."
+          else
+            echo "::warning::DOPEIPTV_TMDB_KEY secret is empty - the built-in TMDB option will NOT appear in this build."
+          fi
       - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
           bundle: dopeIPTV.flatpak
