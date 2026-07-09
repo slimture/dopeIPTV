@@ -189,14 +189,18 @@ class MainWindow(QMainWindow):
         # logos stay crisp even when the user picks large/xlarge grid. The
         # default 96 was fine when only compact/medium existed but blurred
         # noticeably on 4K displays.
-        self.logos = LogoLoader(self.pool, max_size=320,
+        # Dedicated thread pools per image kind so scrolling through a
+        # big grid never starves the shared pool that also runs the
+        # category / channel / EPG API calls - that starvation is what
+        # made "Loading categories" hang when a Movies category loaded
+        # hundreds of poster fetches at once.
+        self._logo_pool = QThreadPool()
+        self._logo_pool.setMaxThreadCount(4)
+        self.logos = LogoLoader(self._logo_pool, max_size=320,
                                 cache_dir=default_image_cache_dir("logos"))
-        # Separate, higher-res cache for posters/cast photos - reusing
-        # `logos` (capped at 96px for small list icons) would blur badly
-        # once scaled up to the much larger detail-panel sizes. Also its
-        # own thread pool: a poster plus up to 8 cast photos is up to 9
-        # concurrent downloads per selection, which would otherwise
-        # compete with (and delay) channel/EPG loading on the shared pool.
+        # A poster plus up to 8 cast photos is up to 9 concurrent
+        # downloads per selection, hence the separate pool + higher-res
+        # cache (reusing `logos` blurs on the big detail-panel sizes).
         self._art_pool = QThreadPool()
         self._art_pool.setMaxThreadCount(4)
         self.poster_art = LogoLoader(
@@ -289,7 +293,7 @@ class MainWindow(QMainWindow):
     def _build_ui(self) -> None:
         menubar = self.menuBar()
         app_menu = menubar.addMenu(APP_NAME)
-        settings_action = app_menu.addAction(tr("btn_settings") + "...")
+        settings_action = app_menu.addAction(tr("btn_settings") + "…")
         settings_action.triggered.connect(self.open_settings)
         refresh_action = app_menu.addAction(tr("menu_refresh_playlist"))
         refresh_action.triggered.connect(self.refresh_playlist)
@@ -307,7 +311,7 @@ class MainWindow(QMainWindow):
         quit_action.setMenuRole(QAction.MenuRole.QuitRole)
         # Kept for live language switching (see retranslate_ui).
         self._i18n_actions = {
-            settings_action: lambda: tr("btn_settings") + "...",
+            settings_action: lambda: tr("btn_settings") + "…",
             refresh_action: lambda: tr("menu_refresh_playlist"),
             about_action: lambda: tr("menu_about"),
             quit_action: lambda: tr("menu_quit"),
@@ -1925,7 +1929,7 @@ class MainWindow(QMainWindow):
             return
         key = self._item_key(it)
         self._clear_epg_rows()
-        self._epg_note("Loading programme guide...")
+        self._epg_note("Loading programme guide…")
 
         def fetch():
             listings = self.client.short_epg(sid, 8)
@@ -1953,7 +1957,7 @@ class MainWindow(QMainWindow):
         if cached is not None:
             self._show_media_info(cached, key)
             return
-        self._epg_note("Loading information...")
+        self._epg_note("Loading information…")
         if kind == "vod":
             fetch = lambda: (
                 self.client.vod_info(mid) or {}).get("info") or {}

@@ -149,7 +149,7 @@ def main() -> int:
 
         candidate = XtreamClient(pl["server"], pl["username"], pl["password"])
         offline = False
-        splash = QLabel(f"  Connecting to {pl.get('name', 'server')}...",
+        splash = QLabel(f"  Connecting to {pl.get('name', 'server')}…",
                         None, Qt.WindowType.SplashScreen)
         splash.setStyleSheet(
             "background:#17171C; color:#C9C9D2; font-size:14px;"
@@ -191,7 +191,7 @@ def main() -> int:
                               parent=None)
             start_btn = box.addButton("Start anyway",
                                       QMessageBox.ButtonRole.AcceptRole)
-            edit_btn = box.addButton("Edit playlist...",
+            edit_btn = box.addButton("Edit playlist…",
                                      QMessageBox.ButtonRole.ActionRole)
             quit_btn = box.addButton("Quit",
                                      QMessageBox.ButtonRole.RejectRole)
