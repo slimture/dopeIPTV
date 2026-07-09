@@ -11,6 +11,8 @@ import ctypes.util
 import glob
 import os
 import shutil
+import sys
+import tempfile
 
 from PyInstaller.utils.hooks import collect_all
 
@@ -25,22 +27,71 @@ def _find_ffmpeg():
 
 
 def _find_libmpv():
-    """Return [(src, '.')] for the libmpv shared library, or [] if not found."""
-    candidates = []
-    name = ctypes.util.find_library("mpv")
-    if name and os.path.isabs(name):
-        candidates.append(name)
-    # find_library often returns just a soname; probe the usual lib dirs too.
-    for d in ("/usr/lib", "/usr/lib64", "/usr/local/lib",
-              "/usr/lib/x86_64-linux-gnu", "/lib/x86_64-linux-gnu"):
-        candidates += glob.glob(os.path.join(d, "libmpv.so*"))
-        candidates += glob.glob(os.path.join(d, "libmpv.*.dylib"))
-    for path in candidates:
-        if path and os.path.exists(path):
-            return [(path, ".")]
-    print("WARNING: libmpv not found; the embedded player will not work in "
-          "this build. Install mpv/libmpv before running PyInstaller.")
-    return []
+    """Bundle libmpv under the exact soname python-mpv dlopen()s.
+
+    python-mpv loads the library by a versioned soname (libmpv.so.2 on
+    Linux, libmpv.2.dylib on macOS). Two things have to be right or the
+    embedded player is dead in the packaged app:
+
+      * we must actually find it - on Apple Silicon Homebrew installs to
+        /opt/homebrew/lib, which the old probe missed, so the .dmg
+        shipped with no libmpv at all;
+      * we must bundle it under that versioned soname, not the bare
+        libmpv.so dev symlink - PyInstaller names the bundled file after
+        the source basename, and a bundle with only "libmpv.so" fails a
+        CDLL("libmpv.so.2") lookup at runtime.
+
+    So we locate the library, resolve any symlink to the real file, and
+    stage a copy named after the primary soname before handing it to
+    PyInstaller (which then also pulls in its transitive deps)."""
+    if sys.platform == "darwin":
+        primary = "libmpv.2.dylib"
+        prefer = ("libmpv.2.dylib", "libmpv.dylib")
+        patterns = [
+            "/opt/homebrew/lib/libmpv*.dylib",
+            "/usr/local/lib/libmpv*.dylib",
+            "/opt/homebrew/Cellar/mpv/*/lib/libmpv*.dylib",
+            "/usr/local/Cellar/mpv/*/lib/libmpv*.dylib",
+            "/opt/local/lib/libmpv*.dylib",
+        ]
+    else:
+        primary = "libmpv.so.2"
+        prefer = ("libmpv.so.2", "libmpv.so.1", "libmpv.so")
+        patterns = [
+            "/usr/lib/x86_64-linux-gnu/libmpv.so*",
+            "/lib/x86_64-linux-gnu/libmpv.so*",
+            "/usr/lib/aarch64-linux-gnu/libmpv.so*",
+            "/usr/lib/libmpv.so*",
+            "/usr/lib64/libmpv.so*",
+            "/usr/local/lib/libmpv.so*",
+        ]
+    matches: list[str] = []
+    for pat in patterns:
+        matches += glob.glob(pat)
+    chosen = None
+    for name in prefer:                       # prefer the versioned soname
+        for m in matches:
+            if os.path.basename(m) == name:
+                chosen = m
+                break
+        if chosen:
+            break
+    if not chosen and matches:
+        chosen = matches[0]
+    if not chosen:                            # last resort: the linker
+        name = ctypes.util.find_library("mpv")
+        if name and os.path.exists(name):
+            chosen = name
+    if not chosen:
+        print("WARNING: libmpv not found; the embedded player will not work "
+              "in this build. Install mpv/libmpv before running PyInstaller.")
+        return []
+    real = os.path.realpath(chosen)
+    staged = os.path.join(
+        tempfile.mkdtemp(prefix="dopeiptv-libmpv-"), primary)
+    shutil.copy2(real, staged)
+    print(f"Bundling libmpv: {real} -> {primary}")
+    return [(staged, ".")]
 
 
 binaries = _find_libmpv() + _find_ffmpeg()

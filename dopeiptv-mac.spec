@@ -12,6 +12,7 @@ import ctypes.util
 import glob
 import os
 import shutil
+import tempfile
 
 from PyInstaller.utils.hooks import collect_all
 
@@ -27,18 +28,44 @@ def _find_ffmpeg():
 
 
 def _find_libmpv():
-    """libmpv on macOS lives under Homebrew's lib dir; probe both prefixes."""
-    candidates = []
-    name = ctypes.util.find_library("mpv")
-    if name and os.path.isabs(name):
-        candidates.append(name)
-    for d in ("/opt/homebrew/lib", "/usr/local/lib"):
-        candidates += glob.glob(os.path.join(d, "libmpv*.dylib"))
-    for path in candidates:
-        if path and os.path.exists(path):
-            return [(path, ".")]
-    print("WARNING: libmpv not found; embedded playback will be dead.")
-    return []
+    """Bundle libmpv under the exact soname python-mpv dlopen()s
+    (libmpv.2.dylib), resolving the Homebrew symlink to the real file so
+    the name is right regardless of the on-disk versioned name."""
+    primary = "libmpv.2.dylib"
+    prefer = ("libmpv.2.dylib", "libmpv.dylib")
+    patterns = [
+        "/opt/homebrew/lib/libmpv*.dylib",
+        "/usr/local/lib/libmpv*.dylib",
+        "/opt/homebrew/Cellar/mpv/*/lib/libmpv*.dylib",
+        "/usr/local/Cellar/mpv/*/lib/libmpv*.dylib",
+        "/opt/local/lib/libmpv*.dylib",
+    ]
+    matches = []
+    for pat in patterns:
+        matches += glob.glob(pat)
+    chosen = None
+    for name in prefer:
+        for m in matches:
+            if os.path.basename(m) == name:
+                chosen = m
+                break
+        if chosen:
+            break
+    if not chosen and matches:
+        chosen = matches[0]
+    if not chosen:
+        name = ctypes.util.find_library("mpv")
+        if name and os.path.exists(name):
+            chosen = name
+    if not chosen:
+        print("WARNING: libmpv not found; embedded playback will be dead.")
+        return []
+    real = os.path.realpath(chosen)
+    staged = os.path.join(
+        tempfile.mkdtemp(prefix="dopeiptv-libmpv-"), primary)
+    shutil.copy2(real, staged)
+    print(f"Bundling libmpv: {real} -> {primary}")
+    return [(staged, ".")]
 
 
 binaries = _find_libmpv() + _find_ffmpeg()

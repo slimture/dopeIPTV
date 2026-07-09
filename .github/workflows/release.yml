@@ -157,6 +157,20 @@ jobs:
               "$exe" >/tmp/$name.log 2>&1 &
             local pid=$!
             sleep 6
+            # The app degrades gracefully when libmpv can't be loaded
+            # (it just disables the embedded player and keeps running),
+            # so a missing/mis-named bundled libmpv would otherwise sail
+            # through as a PASS. "Failed to load dynlib" is PyInstaller's
+            # error for a bundled shared library it can't find - treat it
+            # as a hard packaging failure.
+            if grep -qE "Failed to load dynlib" /tmp/$name.log; then
+              echo "::error::$name: a bundled library failed to load (libmpv?) - the embedded player would be dead:"
+              grep -iE "Failed to load dynlib|libmpv|Embedded playback disabled" /tmp/$name.log | head
+              kill "$pid" 2>/dev/null || true
+              wait "$pid" 2>/dev/null || true
+              echo "::endgroup::"
+              return 1
+            fi
             if kill -0 "$pid" 2>/dev/null; then
               echo "$name: process $pid alive after 6s - PASS"
               kill "$pid" 2>/dev/null || true
@@ -289,8 +303,21 @@ jobs:
           VER=$(defaults read "${APP}/Contents/Info" CFBundleShortVersionString)
           echo "CFBundleName=$NAME  CFBundleShortVersionString=$VER"
           test "$NAME" = "dopeIPTV" || { echo "::error::wrong CFBundleName ($NAME)"; hdiutil detach "$MOUNT" || true; exit 1; }
-          # libmpv must be bundled and linked via a resolvable path.
-          find "$APP/Contents" -name 'libmpv*' -print
+          # libmpv must be bundled under the exact soname python-mpv loads,
+          # or the embedded player is dead on the user's Mac.
+          MPV=$(find "$APP/Contents" -name 'libmpv.2.dylib' -print | head -1)
+          if [ -z "$MPV" ]; then
+            echo "::error::libmpv.2.dylib is not bundled in the .app - embedded player would be dead"
+            find "$APP/Contents" -name 'libmpv*' -print
+            hdiutil detach "$MOUNT" || true; exit 1
+          fi
+          echo "bundled libmpv: $MPV"
+          # And its own dependencies must be bundled too, not left pointing
+          # at Homebrew/Cellar paths that won't exist on a clean Mac.
+          if otool -L "$MPV" | grep -E '/opt/homebrew|/usr/local/(lib|Cellar)|/opt/local'; then
+            echo "::error::bundled libmpv still links against Homebrew paths - its deps aren't bundled; embedded player will fail on a machine without Homebrew"
+            hdiutil detach "$MOUNT" || true; exit 1
+          fi
           otool -L "$BIN" | head -20 || true
           # Check the icon actually made it in.
           test -f "$APP/Contents/Resources/dopeiptv.icns" \
