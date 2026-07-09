@@ -26,6 +26,20 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.4.2" date="2026-07-09">
+      <description>
+        <p>Packaging fixes so the app "just works" on more systems.</p>
+        <ul>
+          <li>Embedded video now works across distributions - the Linux
+              builds no longer ship their own OpenGL/Mesa stack, which had
+              clashed with the host driver and left a black player on Ubuntu</li>
+          <li>AppImage runs with no libfuse2 install needed (static runtime)</li>
+          <li>External mpv/VLC launches correctly from the packaged builds</li>
+          <li>Flatpak no longer crashes on libmpv builds missing an option</li>
+          <li>Silenced the fontconfig warning spam on launch</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.4.1" date="2026-07-09">
       <description>
         <p>Bugfix: the embedded player is now included in the packaged
