@@ -34,6 +34,10 @@ dopeiptv/
     embedded.py        _MpvGLWidget(QOpenGLWidget), EmbeddedPlayer, seek bar
     players.py         External player launch (mpv IPC / VLC), libmpv detect
 
+  services/            Window-agnostic application services
+    coverart.py        CoverArtService - TMDB resolver lifecycle + the
+                       ordered list/detail cover-candidate logic
+
   ui/                  Everything the user sees
     __init__.py        Lazy MainWindow export (PEP 562)
     main_window.py     MainWindow composition root (QMainWindow + mixins)
@@ -49,8 +53,9 @@ dopeiptv/
     theme.py           5 themes x 7 accents, palette dict P, QSS generator
 ```
 
-Import direction is one-way: `ui` may use `media`, `core` and
-`providers`; `media` and `providers` may use `core`; `core` depends on
+Import direction is one-way: `ui` may use `services`, `media`, `core`
+and `providers`; `services` builds on `providers`/`core` but never
+imports `ui`; `media` and `providers` may use `core`; `core` depends on
 nothing above it.  (The one cross-edge is `media.embedded` -> `ui.theme`
 for player-overlay colours, which is why `ui/__init__` exposes
 `MainWindow` lazily so touching `ui.theme` never drags in the window.)

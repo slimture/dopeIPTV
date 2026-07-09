@@ -314,7 +314,7 @@ class ChannelDelegate(QStyledItemDelegate):
         # provider URL - first that isn't blacklisted. is_dead()
         # covers both the single-URL blacklist and the per-host
         # circuit breaker.
-        url = self.window.cover_url(it, kind)
+        url = self.window.cover.cover_url(it, kind)
         pm = self.window.logos.cache.get(url) if url else None
         if pm:
             path = QPainterPath()
@@ -343,7 +343,7 @@ class ChannelDelegate(QStyledItemDelegate):
             # the raw provider URL waits until the title lookup has
             # answered so pending rows don't burn requests on art
             # that's about to be replaced.
-            if self.window.cover_should_fetch(url, it, kind):
+            if self.window.cover.should_fetch(url, it, kind):
                 self.window.logos.get(
                     url,
                     lambda _pm: self.window.listw.viewport().update())
@@ -406,7 +406,7 @@ class ChannelDelegate(QStyledItemDelegate):
         # provider URL - first that isn't blacklisted. is_dead()
         # covers both the single-URL blacklist and the per-host
         # circuit breaker.
-        url = self.window.cover_url(it, kind)
+        url = self.window.cover.cover_url(it, kind)
         pm = self.window.logos.cache.get(url) if url else None
         if pm:
             path = QPainterPath()
@@ -435,7 +435,7 @@ class ChannelDelegate(QStyledItemDelegate):
             # the raw provider URL waits until the title lookup has
             # answered so pending rows don't burn requests on art
             # that's about to be replaced.
-            if self.window.cover_should_fetch(url, it, kind):
+            if self.window.cover.should_fetch(url, it, kind):
                 self.window.logos.get(
                     url,
                     lambda _pm: self.window.listw.viewport().update())

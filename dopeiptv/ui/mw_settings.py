@@ -1024,7 +1024,7 @@ class _SettingsMixin:
                 "metadata_source", meta_source_box.currentData())
             self.settings.setValue(
                 "tmdb_api_key", tmdb_key_edit.text().strip())
-            self._init_metadata_provider()
+            self.cover.reload()
             self.settings.setValue(
                 "trakt_client_id", trakt_id_edit.text().strip())
             self.settings.setValue(

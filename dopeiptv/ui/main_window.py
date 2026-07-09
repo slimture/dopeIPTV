@@ -28,7 +28,7 @@ from ..providers.chromecast import CastDialog, ChromecastManager
 from ..providers.client import XtreamClient
 from ..media.embedded import EmbeddedPlayer
 from ..providers.epg import XmltvGuide, epg_cache_path
-from ..providers.metadata import PosterResolver, TmdbClient, bundled_tmdb_key
+from ..services.coverart import CoverArtService
 from ..media.players import (
     MpvIpcPlayer, MpvWindowPlayer, _libmpv, embedded_playback_supported, launch_player,
 )
@@ -47,8 +47,7 @@ from .mw_recording import _RecordingMixin
 from .mw_context import _ContextMenuMixin
 from .mw_detail import _DetailMixin
 from ..core.workers import (
-    LogoLoader, choose_cover_url, default_image_cache_dir,
-    run_async)
+    LogoLoader, default_image_cache_dir, run_async)
 
 
 class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
@@ -144,9 +143,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.rec.recording_stopped.connect(self._on_recording_stopped)
         self.wake = WakeLock()
         self._full_catalog: list | None = None
-        self.tmdb: PosterResolver | None = None
-        self._prefer_tmdb_covers = False
-        self._tmdb_pool: QThreadPool | None = None
         self._poster_refresh_timer = QTimer(self)
         self._poster_refresh_timer.setSingleShot(True)
         self._poster_refresh_timer.timeout.connect(self._flush_poster_refresh)
@@ -161,7 +157,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._fav_refresh_timer = QTimer(self)
         self._fav_refresh_timer.setSingleShot(True)
         self._fav_refresh_timer.timeout.connect(self._rebuild_fav_trakt)
-        self._init_metadata_provider()
+        self.cover = CoverArtService(
+            settings, self.logos,
+            lambda: self._poster_refresh_timer.start(150))
         self.trakt = TraktClient(settings)
         self._trakt_active: dict | None = None
         self.watched = WatchedStore(settings)
@@ -1229,145 +1227,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     # -- metadata (TMDB artwork) -----------------------------------------------------
 
-    def _init_metadata_provider(self) -> None:
-        if self.tmdb:
-            self.tmdb.flush()
-        self.tmdb = None
-        # The TMDB resolver is created whenever an API key is present -
-        # NOT only when TMDB is the chosen cover source. It also powers
-        # Trakt id resolution (Trakt's API is tmdb-keyed) and the
-        # watched/watchlist badges, which must keep working even for a
-        # user who prefers the provider's own artwork. The
-        # metadata_source setting only decides whether the *list cover*
-        # prefers the TMDB title-search poster or the provider's image.
-        # A built-in key ships with release builds so TMDB works with no
-        # setup. When one is present TMDB is the default artwork source;
-        # otherwise we fall back to the provider's own images. A user who
-        # explicitly picks a source in Settings overrides the default.
-        bundled = bundled_tmdb_key()
-        user_key = (self.settings.value("tmdb_api_key", "") or "").strip()
-        # Three explicit sources:
-        #   "tmdb"     - the built-in key (default when one ships)
-        #   "custom"   - the user's own key
-        #   "playlist" - the provider's own artwork
-        source = self.settings.value("metadata_source", "") or ""
-        if not source:
-            source = "tmdb" if bundled else ("custom" if user_key
-                                             else "playlist")
-        self._prefer_tmdb_covers = source in ("tmdb", "custom")
-        if source == "custom":
-            key = user_key
-        elif source == "tmdb":
-            # Prefer the built-in key; fall back to a user key so an
-            # older "tmdb" setting keeps working before this split.
-            key = bundled or user_key
-        else:  # provider artwork - still resolve ids for Trakt/badges
-            key = user_key or bundled
-        if not key:
-            return
-        # Dedicated thread pool: TMDB lookups must never compete with
-        # the shared pool used for channel/EPG loading, or a burst of
-        # poster searches can starve real work and look like a freeze.
-        # 6 workers is well under TMDB's 50 req/s limit but keeps a
-        # newly-opened category with dozens of unseen titles from
-        # taking half a minute to fill in the posters - each row
-        # takes two sequential HTTP calls (search + details), so
-        # fewer workers turn a 50-row scroll into visible latency.
-        pool = QThreadPool()
-        pool.setMaxThreadCount(6)
-        self._tmdb_pool = pool
-        self.tmdb = PosterResolver(pool, self.settings, TmdbClient(key))
+    @property
+    def tmdb(self):
+        """The active TMDB poster resolver (or None). Owned by the
+        CoverArtService; exposed here because the detail panel, context
+        menu and Trakt sync all reach the TMDB client through it."""
+        return self.cover.resolver
 
     def _flush_poster_refresh(self) -> None:
         self.list_model.refresh_all()
-
-    def poster_for(self, it, kind: str) -> str | None:
-        if not self.tmdb or kind not in ("vod", "series"):
-            return None
-        title = it.get("name") or it.get("title") or ""
-        if not title:
-            return None
-        return self.tmdb.get(
-            title, kind,
-            lambda _url: self._poster_refresh_timer.start(150))
-
-    def tmdb_resolved(self, it, kind: str) -> bool:
-        """True when we've either already got TMDB metadata for this
-        row or TMDB isn't going to answer for it (live TV, no TMDB
-        provider configured, empty title). The list delegate uses
-        this to decide when it's safe to load the provider fallback
-        cover: while TMDB is mid-fetch, painting the fallback would
-        just be a wasted network round-trip that gets replaced 150 ms
-        later when TMDB resolves."""
-        if not self.tmdb or kind not in ("vod", "series"):
-            return True
-        title = it.get("name") or it.get("title") or ""
-        if not title:
-            return True
-        return self.tmdb.is_resolved(title, kind)
-
-    def _provider_cover(self, it) -> str | None:
-        raw = it.get("stream_icon") or it.get("cover")
-        return raw or None
-
-    def _cover_kind(self, it, kind: str) -> str:
-        """The kind to use for artwork lookup. Watch Later / Watched /
-        Favourites / History rows are snapshots that carry the real
-        content kind in "_kind"; map that to vod/series so their posters
-        resolve from TMDB just like the Movies/Series lists, instead of
-        being treated as a container kind that never gets a poster."""
-        if kind in ("watchlist", "watched", "fav", "history"):
-            hk = it.get("_kind")
-            return {"movie": "vod", "vod": "vod", "series": "series",
-                    "episode": "series"}.get(hk, kind)
-        return kind
-
-    def cover_url(self, it, kind: str) -> str | None:
-        """The URL the list delegate should paint for this row, chosen
-        from an ordered candidate list (first that isn't blacklisted):
-
-          1. TMDB poster from the title search (matches the detail
-             panel, so the two columns agree once it resolves)
-          2. TMDB poster extracted from the provider's own image URL
-             (many panels proxy TMDB art under a broken host - going
-             to image.tmdb.org gets the real file with no title-search
-             dependency and no wait)
-          3. the raw provider URL
-
-        poster_for() is always called so the background TMDB lookup
-        that feeds the watched-badge + detail panel still fires, even
-        when the user prefers the provider's own artwork for the list -
-        in that case we just drop the title-search poster as the *cover*
-        candidate and let the provider image (or its embedded-TMDB
-        rewrite) win."""
-        eff = self._cover_kind(it, kind)
-        # A Trakt-only row already carries a real TMDB poster URL as its
-        # stream_icon, so skip the title search (it would be a wasted
-        # round-trip that could even mismatch) and use that directly.
-        title_tmdb = None if it.get("_trakt_only") else self.poster_for(it, eff)
-        if not self._prefer_tmdb_covers:
-            title_tmdb = None
-        return choose_cover_url(
-            title_tmdb, self._provider_cover(it),
-            eff, self.logos.is_dead)
-
-    def cover_should_fetch(self, url, it, kind: str) -> bool:
-        """Whether the delegate should queue a network fetch for *url*
-        now. TMDB URLs (title-search or embedded) fetch immediately;
-        the raw provider URL waits until the TMDB lookup has answered
-        so a pending row doesn't burn a request on art that's about to
-        be replaced (and hammer flaky panel hosts into rate-limiting)."""
-        if (not url or url in self.logos.waiting
-                or self.logos.is_dead(url)):
-            return False
-        if "image.tmdb.org" in url:
-            return True
-        # When the user prefers the provider's own artwork, there's no
-        # pending title-search poster that could replace this URL, so
-        # fetch it straight away instead of waiting on TMDB.
-        if not self._prefer_tmdb_covers:
-            return True
-        return self.tmdb_resolved(it, self._cover_kind(it, kind))
 
     # -- trakt scrobbling -------------------------------------------------------------
 
@@ -1954,8 +1822,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._save_layout()
         self._save_resume_position()
         self.wake.release()
-        if self.tmdb:
-            self.tmdb.flush()
+        self.cover.flush()
         if self._trakt_active:
             active = self._trakt_active
             progress = self.player.progress_percent() if self.player else 0.0
