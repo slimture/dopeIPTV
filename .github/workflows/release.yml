@@ -264,6 +264,24 @@ jobs:
           DOPEIPTV_VERSION: ${{ steps.v.outputs.version }}
           DOPEIPTV_ICNS: ${{ github.workspace }}/build/dopeiptv.icns
         run: pyinstaller --noconfirm dopeiptv-mac.spec   # -> dist/dopeIPTV.app
+      - name: Ad-hoc codesign the .app
+        run: |
+          # We bundle/stage extra dylibs (libmpv, ffmpeg) after PyInstaller's
+          # own signing, which invalidates the bundle signature - on Apple
+          # Silicon an app with a broken/missing signature is killed on launch
+          # ("bounces once and dies") with no Gatekeeper prompt. Re-sign the
+          # whole thing ad-hoc (identity "-"), inside-out, so it has a VALID
+          # signature. That won't get past notarisation, but it does give a
+          # downloaded app the normal "unidentified developer" prompt, so a
+          # user can allow it from System Settings -> Privacy & Security ->
+          # "Open Anyway" without touching the Terminal.
+          APP="dist/dopeIPTV.app"
+          find "$APP/Contents" \( -name '*.dylib' -o -name '*.so' \) -print0 \
+            | xargs -0 -I{} codesign --force --timestamp=none --sign - {} || true
+          codesign --force --deep --timestamp=none --sign - "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP" \
+            && echo "ad-hoc signature valid" \
+            || echo "::warning::ad-hoc signature verification reported issues"
       - name: Pack .dmg
         run: |
           V=${{ steps.v.outputs.version }}
