@@ -563,6 +563,77 @@ def test_logo_loader_host_breaker_resets_on_success(
     assert not loader.is_dead("http://flaky:2095/9.jpg")
 
 
+def test_host_breaker_ignores_http_errors(qapp, tmp_path, monkeypatch):
+    """404s must NOT trip the host breaker - a server answering 404
+    is alive, only those specific files are missing. Tripping the
+    breaker on them blocks the covers on that host that DO exist
+    (the ptv.is regression from the user's second debug log)."""
+    from dopeiptv.workers import LogoLoader
+    import requests as _requests
+
+    class Resp404:
+        status_code = 404
+        content = b""
+        def raise_for_status(self):
+            raise _requests.exceptions.HTTPError(
+                "404 Client Error: Not Found for url: x")
+
+    monkeypatch.setattr(
+        "dopeiptv.workers.requests.get",
+        lambda u, headers=None, timeout=None: Resp404())
+
+    pool = _pool()
+    loader = LogoLoader(pool, max_size=16, cache_dir=tmp_path)
+    for i in range(5):
+        loader.get(f"http://alivepanel:2095/missing{i}.jpg",
+                   lambda pm: None)
+        _drain_pool(pool, qapp)
+
+    # The individual URLs are dead (they really are 404)...
+    assert loader.is_dead("http://alivepanel:2095/missing0.jpg")
+    # ...but the host stays open for the covers that exist.
+    assert "alivepanel:2095" not in loader.dead_hosts
+    assert not loader.is_dead("http://alivepanel:2095/exists.jpg")
+
+
+def test_http_response_resets_host_strikes(qapp, tmp_path, monkeypatch):
+    """Two connection failures followed by an HTTP response (even an
+    error one) must reset the strike counter - the host answered."""
+    from dopeiptv.workers import LogoLoader
+    import requests as _requests
+
+    mode = {"fail": True}
+
+    class Resp404:
+        status_code = 404
+        content = b""
+        def raise_for_status(self):
+            raise _requests.exceptions.HTTPError(
+                "404 Client Error: Not Found for url: x")
+
+    def fake_get(u, headers=None, timeout=None):
+        if mode["fail"]:
+            raise RuntimeError("Connection reset by peer")
+        return Resp404()
+
+    monkeypatch.setattr("dopeiptv.workers.requests.get", fake_get)
+    pool = _pool()
+    loader = LogoLoader(pool, max_size=16, cache_dir=tmp_path)
+    # Two connection strikes (limit is 3)...
+    for i in range(2):
+        loader.get(f"http://wobbly:2095/{i}.jpg", lambda pm: None)
+        _drain_pool(pool, qapp)
+    # ...then the host answers (404): strikes reset.
+    mode["fail"] = False
+    loader.get("http://wobbly:2095/answers.jpg", lambda pm: None)
+    _drain_pool(pool, qapp)
+    # A third connection failure is now strike 1, not strike 3.
+    mode["fail"] = True
+    loader.get("http://wobbly:2095/again.jpg", lambda pm: None)
+    _drain_pool(pool, qapp)
+    assert "wobbly:2095" not in loader.dead_hosts
+
+
 def test_logo_loader_sends_browser_user_agent(qapp, tmp_path, monkeypatch):
     """Several image hosts (Wikipedia's 403, some Xtream panels'
     TCP resets) reject python-requests' default UA. Every image

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import sys
 import time
 from collections import OrderedDict
@@ -219,7 +220,8 @@ class LogoLoader(QObject):
         host = self._host_of(url)
         n = self._host_strikes.get(host, 0) + 1
         self._host_strikes[host] = n
-        if n >= self.host_strike_limit:
+        if (n >= self.host_strike_limit
+                and host not in self.dead_hosts):
             _img_dbg(f"host DEAD({self.host_cooldown:.0f}s) {host}")
             self.dead_hosts[host] = time.monotonic() + self.host_cooldown
 
@@ -309,10 +311,17 @@ class LogoLoader(QObject):
             # of URLs on one dead provider host that difference is
             # what keeps the queue from starving the working hosts.
             r = requests.get(u, headers=_IMG_HEADERS, timeout=(3.05, 15))
-            # Long TTL for legitimately-dead endpoints, short TTL for
-            # everything else so a temporary 500 or connection reset
-            # gets a brief cooldown instead of a session-long ban.
-            if r.status_code in (404, 410, 451):
+            # ANY HTTP response - even a 404 - proves the host itself
+            # is alive, so reset its circuit-breaker strikes. Only
+            # connection-level failures (reset, timeout, DNS) should
+            # ever take a whole host down; a panel with some missing
+            # image files must not have its working covers blocked.
+            self._clear_host(u)
+            # Long TTL for legitimately-dead endpoints (and 400s -
+            # a malformed URL from provider data never starts
+            # working), short TTL for everything else so a temporary
+            # 500 gets a brief cooldown instead of a session-long ban.
+            if r.status_code in (400, 404, 410, 451):
                 _img_dbg(f"net {r.status_code} DEAD(1h) {u}")
                 self._mark_dead(u, self.dead_ttl_permanent)
             r.raise_for_status()
@@ -358,11 +367,15 @@ class LogoLoader(QObject):
             if url not in self.dead:
                 _img_dbg(f"net FAIL cooldown(20s) {_msg[:80]} {url}")
                 self._mark_dead(url, self.dead_ttl_transient)
-            # Connection-level failures count toward the host circuit
-            # breaker - a couple of these on the same panel host means
-            # the host is down / rejecting us, so every remaining URL
-            # on it should short-circuit to the fallback URL.
-            self._strike_host(url)
+            # Only CONNECTION-level failures count toward the host
+            # circuit breaker. An HTTP error response ("404 Client
+            # Error: ...", "500 Server Error: ...") proves the host
+            # answered - a panel with missing image files must not
+            # get its working covers blocked. requests formats status
+            # failures with the code first, so that prefix is the
+            # discriminator.
+            if not re.match(r"\s*\d{3} (Client|Server) Error", _msg):
+                self._strike_host(url)
             callbacks = self.waiting.pop(url, [])
             for cb in callbacks:
                 try:
