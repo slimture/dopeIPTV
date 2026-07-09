@@ -67,10 +67,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # x86_64: build on the oldest supported glibc (2.35) so it runs
+          # everywhere from Ubuntu 22.04 up. PyQt6's x86_64 wheel is
+          # manylinux_2_34, which 22.04 (glibc 2.35) satisfies.
           - arch: x86_64
             runs_on: ubuntu-22.04
+            test_distros: "ubuntu:22.04 ubuntu:24.04 debian:12"
+          # aarch64: PyQt6's arm64 wheel is manylinux_2_39, so we MUST build
+          # on glibc >= 2.39 (Ubuntu 24.04). That makes 24.04 the floor for
+          # the ARM build, so only test it on distros that new.
           - arch: aarch64
-            runs_on: ubuntu-22.04-arm
+            runs_on: ubuntu-24.04-arm
+            test_distros: "ubuntu:24.04"
     runs-on: ${{ matrix.runs_on }}
     steps:
       - uses: actions/checkout@v4
@@ -168,7 +176,7 @@ jobs:
           # from our bundle, which is what this proves. --self-check needs no
           # GPU or display.
           set -e
-          for img in ubuntu:22.04 ubuntu:24.04 debian:12; do
+          for img in ${{ matrix.test_distros }}; do
             echo "::group::self-containment on $img"
             docker run --rm -v "$PWD:/work:ro" "$img" bash -c '
               set -e
