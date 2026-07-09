@@ -255,6 +255,7 @@ class MainWindow(QMainWindow):
         self.wake = WakeLock()
         self._full_catalog: list | None = None
         self.tmdb: PosterResolver | None = None
+        self._prefer_tmdb_covers = False
         self._tmdb_pool: QThreadPool | None = None
         self._poster_refresh_timer = QTimer(self)
         self._poster_refresh_timer.setSingleShot(True)
@@ -1223,8 +1224,15 @@ class MainWindow(QMainWindow):
         if self.tmdb:
             self.tmdb.flush()
         self.tmdb = None
-        if self.settings.value("metadata_source", "playlist") != "tmdb":
-            return
+        # The TMDB resolver is created whenever an API key is present -
+        # NOT only when TMDB is the chosen cover source. It also powers
+        # Trakt id resolution (Trakt's API is tmdb-keyed) and the
+        # watched/watchlist badges, which must keep working even for a
+        # user who prefers the provider's own artwork. The
+        # metadata_source setting only decides whether the *list cover*
+        # prefers the TMDB title-search poster or the provider's image.
+        self._prefer_tmdb_covers = (
+            self.settings.value("metadata_source", "playlist") == "tmdb")
         key = self.settings.value("tmdb_api_key", "") or ""
         if not key:
             return
@@ -1286,9 +1294,16 @@ class MainWindow(QMainWindow):
           3. the raw provider URL
 
         poster_for() is always called so the background TMDB lookup
-        that feeds the watched-badge + detail panel still fires."""
+        that feeds the watched-badge + detail panel still fires, even
+        when the user prefers the provider's own artwork for the list -
+        in that case we just drop the title-search poster as the *cover*
+        candidate and let the provider image (or its embedded-TMDB
+        rewrite) win."""
+        title_tmdb = self.poster_for(it, kind)
+        if not self._prefer_tmdb_covers:
+            title_tmdb = None
         return choose_cover_url(
-            self.poster_for(it, kind), self._provider_cover(it),
+            title_tmdb, self._provider_cover(it),
             kind, self.logos.is_dead)
 
     def cover_should_fetch(self, url, it, kind: str) -> bool:
@@ -1301,6 +1316,11 @@ class MainWindow(QMainWindow):
                 or self.logos.is_dead(url)):
             return False
         if "image.tmdb.org" in url:
+            return True
+        # When the user prefers the provider's own artwork, there's no
+        # pending title-search poster that could replace this URL, so
+        # fetch it straight away instead of waiting on TMDB.
+        if not self._prefer_tmdb_covers:
             return True
         return self.tmdb_resolved(it, kind)
 
