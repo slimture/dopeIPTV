@@ -205,6 +205,23 @@ class TraktClient:
                           headers=self._headers(), timeout=15)
         r.raise_for_status()
 
+    def add_show_history(self, show_tmdb_id: int) -> None:
+        """Mark an entire show watched. A show payload with no seasons
+        tells Trakt to add every aired episode to the history - the
+        closest thing to a 'seen the whole series' primitive."""
+        r = requests.post(
+            f"{API}/sync/history",
+            json={"shows": [{"ids": {"tmdb": int(show_tmdb_id)}}]},
+            headers=self._headers(), timeout=15)
+        r.raise_for_status()
+
+    def remove_show_history(self, show_tmdb_id: int) -> None:
+        r = requests.post(
+            f"{API}/sync/history/remove",
+            json={"shows": [{"ids": {"tmdb": int(show_tmdb_id)}}]},
+            headers=self._headers(), timeout=15)
+        r.raise_for_status()
+
     def add_episode_history(self, show_tmdb_id: int, season: int,
                             episode: int) -> None:
         r = requests.post(

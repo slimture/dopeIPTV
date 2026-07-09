@@ -419,6 +419,13 @@ class MainWindow(QMainWindow):
         # fresh data without digging into Settings.
         self._sync_now_btn = QPushButton(tr("btn_sync_now"))
         self._sync_now_btn.clicked.connect(self._sidebar_sync_now)
+        # Deliberately loud (red, bold) so it's obvious when it appears -
+        # it only shows in the Trakt-backed lists, so it shouldn't blend
+        # in with the neutral sidebar buttons.
+        self._sync_now_btn.setStyleSheet(
+            "QPushButton{background:#e5354b; color:#ffffff; font-weight:700;"
+            " border:none; border-radius:6px; padding:8px;}"
+            "QPushButton:hover{background:#c8283b;}")
         self._sync_now_btn.hide()
         sl.addWidget(self._sync_now_btn)
 
@@ -1600,6 +1607,12 @@ class MainWindow(QMainWindow):
             except Exception:
                 continue
             self.watched.mark_episode_synced(show_id, season, episode)
+        for show_id in self.watched.pending_show_pushes():
+            try:
+                self.trakt.add_show_history(show_id)
+            except Exception:
+                continue
+            self.watched.mark_show_synced(show_id)
         wl_movies, wl_shows = self.watchlist.pending_trakt_pushes()
         for tid in wl_movies:
             try:
@@ -1843,7 +1856,9 @@ class MainWindow(QMainWindow):
             return "local"
         if kind == "series":
             tid = self._tmdb_id_for_item(item, "series")
-            if isinstance(tid, int) and self.watched.trakt_episodes.get(tid):
+            if isinstance(tid, int) and (
+                    self.watched.trakt_episodes.get(tid)
+                    or tid in self.watched.synced_shows):
                 return "trakt"
             if self.show_watched_count(item) > 0:
                 return "local"
@@ -2086,9 +2101,9 @@ class MainWindow(QMainWindow):
 
     def _mark_series_watched(self, item: dict,
                              push_to_trakt: bool) -> None:
-        """Local-only 'seen the whole show' toggle. Trakt has no
-        'watched entire show' primitive so the +Trakt variant is
-        deliberately unavailable at the series-list level."""
+        """'Seen the whole show' toggle. Locally it's a stream-keyed
+        flag; the +Trakt variant marks the entire show watched on Trakt
+        (a show payload adds every aired episode)."""
         sid = item.get("series_id") or item.get("stream_id")
         try:
             self.watched.mark_series_local_by_stream(int(sid))
@@ -2096,6 +2111,30 @@ class MainWindow(QMainWindow):
             return
         tid = self._tmdb_id_for_item(item, "series")
         self.watched.add_local_item(item, "series", tid)
+        # Record the whole-show mark (tmdb-keyed) so a later sync can
+        # push it even if we don't push right now.
+        if isinstance(tid, int):
+            self.watched.mark_show_local(tid)
+        if push_to_trakt and self.trakt.is_connected():
+            if isinstance(tid, int):
+                self._trakt_push(lambda: self.trakt.add_show_history(tid))
+                self.watched.mark_show_synced(tid)
+            elif self.tmdb is not None:
+                self._resolve_tmdb_id_async(
+                    item, "series",
+                    lambda rid: self._on_series_id_for_trakt(item, rid))
+            else:
+                self._error(tr("mark_needs_tmdb"))
+        self.list_model.refresh_all()
+
+    def _on_series_id_for_trakt(self, item: dict, tid: int | None) -> None:
+        if not isinstance(tid, int):
+            self._error(tr("mark_needs_tmdb"))
+            return
+        self.watched.mark_show_local(tid)
+        self.watched.mark_show_synced(tid)
+        self.watched.add_local_item(item, "series", tid)
+        self._trakt_push(lambda: self.trakt.add_show_history(tid))
         self.list_model.refresh_all()
 
     def _unmark_series_watched(self, item: dict,
@@ -2105,19 +2144,20 @@ class MainWindow(QMainWindow):
             self.watched.unmark_series_by_stream(int(sid))
         except (TypeError, ValueError):
             pass
-        # Also clear any TMDB-keyed per-episode marks for this show so
-        # the badge disappears immediately.
-        tid = None
-        if self.tmdb:
-            title = item.get("name") or item.get("title") or ""
-            tid = self.tmdb.tmdb_id_for(title, "series")
-            if isinstance(tid, int):
-                for ep_set in (self.watched.trakt_episodes,
-                               self.watched.local_episodes):
-                    ep_set.pop(tid, None)
-                self.watched._save()
+        # Also clear any TMDB-keyed per-episode marks + whole-show mark
+        # for this show so the badge disappears immediately.
+        tid = self._tmdb_id_for_item(item, "series")
+        if isinstance(tid, int):
+            for ep_set in (self.watched.trakt_episodes,
+                           self.watched.local_episodes):
+                ep_set.pop(tid, None)
+            self.watched.unmark_show(tid)
+            self.watched._save()
         self.watched.remove_local_item(
             "series", tid, item.get("series_id") or item.get("stream_id"))
+        if (push_to_trakt and isinstance(tid, int)
+                and self.trakt.is_connected()):
+            self._trakt_push(lambda: self.trakt.remove_show_history(tid))
         self.list_model.refresh_all()
 
     # -- Watch Later (local toggle + optional Trakt push) --------------------
@@ -3594,13 +3634,13 @@ class MainWindow(QMainWindow):
                 if watched:
                     m.addAction(tr("ctx_unmark_watched"),
                                 lambda it=it: unmark(it, False))
-                    if trakt_ok and mark is not self._mark_series_watched:
+                    if trakt_ok:
                         m.addAction(tr("ctx_unmark_watched_trakt"),
                                     lambda it=it: unmark(it, True))
                 else:
                     m.addAction(tr("ctx_mark_watched"),
                                 lambda it=it: mark(it, False))
-                    if trakt_ok and mark is not self._mark_series_watched:
+                    if trakt_ok:
                         m.addAction(tr("ctx_mark_watched_trakt"),
                                     lambda it=it: mark(it, True))
         # Watch Later toggle only for movies and shows (not episodes).

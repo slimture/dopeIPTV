@@ -373,6 +373,11 @@ class WatchedStore:
         self.local_series_streams: set[int] = set()
         # Provider episode-id set for the same reason.
         self.local_episode_streams: set[int] = set()
+        # Whole-show 'seen the series' marks keyed on the show's TMDB id,
+        # plus the subset already pushed to Trakt so we never re-POST
+        # (which would add duplicate watched entries for every episode).
+        self.local_shows: set[int] = set()
+        self.synced_shows: set[int] = set()
         # Item snapshots for everything marked watched locally in-app, so
         # the 'Watched -> Local' list can render straight from the store
         # (one entry per movie / per series). Newest first.
@@ -438,6 +443,10 @@ class WatchedStore:
         self.local_episode_streams = {
             int(x) for x in data.get("local_episode_streams", [])
             if isinstance(x, int)}
+        self.local_shows = {int(x) for x in data.get("local_shows", [])
+                            if isinstance(x, int)}
+        self.synced_shows = {int(x) for x in data.get("synced_shows", [])
+                             if isinstance(x, int)}
         self.local_items = [x for x in (data.get("local_items") or [])
                             if isinstance(x, dict)]
         self.last_sync_at = int(data.get("last_sync_at") or 0)
@@ -453,6 +462,8 @@ class WatchedStore:
             "local_movie_streams": sorted(self.local_movie_streams),
             "local_series_streams": sorted(self.local_series_streams),
             "local_episode_streams": sorted(self.local_episode_streams),
+            "local_shows": sorted(self.local_shows),
+            "synced_shows": sorted(self.synced_shows),
             "local_items": self.local_items,
             "last_sync_at": self.last_sync_at,
         }
@@ -579,6 +590,28 @@ class WatchedStore:
 
     def mark_series_local_by_stream(self, series_id: int) -> None:
         self.local_series_streams.add(int(series_id))
+        self._save()
+
+    # -- whole-show 'seen the series' marks (tmdb-keyed, push to Trakt) --------
+
+    def mark_show_local(self, show_tmdb_id: int) -> None:
+        self.local_shows.add(int(show_tmdb_id))
+        self._save()
+
+    def unmark_show(self, show_tmdb_id: int) -> None:
+        tid = int(show_tmdb_id)
+        self.local_shows.discard(tid)
+        self.synced_shows.discard(tid)
+        self._save()
+
+    def pending_show_pushes(self) -> list[int]:
+        """Whole-show local marks not yet pushed to Trakt."""
+        return sorted(self.local_shows - self.synced_shows)
+
+    def mark_show_synced(self, show_tmdb_id: int) -> None:
+        tid = int(show_tmdb_id)
+        self.local_shows.add(tid)
+        self.synced_shows.add(tid)
         self._save()
 
     def unmark_series_by_stream(self, series_id: int) -> None:

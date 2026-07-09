@@ -94,6 +94,20 @@ def test_watched_store_snapshots_persist():
     assert w2.local_watched_items()[0]["name"] == "Dune"
 
 
+def test_watched_store_whole_show_push():
+    s = _mock_settings()
+    w = WatchedStore(s)
+    w.mark_show_local(500)
+    assert w.pending_show_pushes() == [500]
+    w.mark_show_synced(500)
+    assert w.pending_show_pushes() == []
+    # A fresh store keeps the synced state (no re-push after restart).
+    w2 = WatchedStore(s)
+    assert w2.pending_show_pushes() == []
+    w2.unmark_show(500)
+    assert 500 not in w2.local_shows and 500 not in w2.synced_shows
+
+
 def test_watched_store_stream_marks_not_pushed():
     """Stream-id-only marks have no TMDB id, so nothing to push."""
     s = _mock_settings()
