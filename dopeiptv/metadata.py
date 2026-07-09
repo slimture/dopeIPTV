@@ -264,9 +264,15 @@ class PosterResolver(QObject):
             self._on_resolved(key)
 
         def fail(_msg, key=key):
+            # A TMDB request that timed out / hit a 5xx counts as
+            # resolved-with-no-match: the delegate can safely fall
+            # back to the provider cover from now on and stop
+            # painting the placeholder letter. Notify waiting
+            # callbacks the same way done() does so the row actually
+            # gets a repaint instead of freezing on the placeholder.
             self._cache[key] = {}
             self._pending.discard(key)
-            self._waiting.pop(key, None)
+            self._on_resolved(key)
 
         run_async(self.pool, fetch, done, fail)
 
