@@ -1325,11 +1325,24 @@ class MainWindow(QMainWindow):
         # otherwise we fall back to the provider's own images. A user who
         # explicitly picks a source in Settings overrides the default.
         bundled = bundled_tmdb_key()
+        user_key = (self.settings.value("tmdb_api_key", "") or "").strip()
+        # Three explicit sources:
+        #   "tmdb"     - the built-in key (default when one ships)
+        #   "custom"   - the user's own key
+        #   "playlist" - the provider's own artwork
         source = self.settings.value("metadata_source", "") or ""
         if not source:
-            source = "tmdb" if bundled else "playlist"
-        self._prefer_tmdb_covers = (source == "tmdb")
-        key = (self.settings.value("tmdb_api_key", "") or "").strip() or bundled
+            source = "tmdb" if bundled else ("custom" if user_key
+                                             else "playlist")
+        self._prefer_tmdb_covers = source in ("tmdb", "custom")
+        if source == "custom":
+            key = user_key
+        elif source == "tmdb":
+            # Prefer the built-in key; fall back to a user key so an
+            # older "tmdb" setting keeps working before this split.
+            key = bundled or user_key
+        else:  # provider artwork - still resolve ids for Trakt/badges
+            key = user_key or bundled
         if not key:
             return
         # Dedicated thread pool: TMDB lookups must never compete with
@@ -5073,27 +5086,30 @@ class MainWindow(QMainWindow):
         mf = QFormLayout(meta_tab)
         mf.setSpacing(10)
         _bundled = bool(bundled_tmdb_key())
-        _tmdb_label = ("TMDB (built-in, recommended)" if _bundled
-                       else "TMDB (needs your own key below)")
-        meta_source_box = self._combo(
-            [("tmdb", _tmdb_label),
-             ("playlist", "Provider artwork")],
-            self.settings.value(
-                "metadata_source", "tmdb" if _bundled else "playlist"))
+        # Source options: the built-in key (only offered when one ships),
+        # the user's own key, or the provider's own artwork. The key
+        # field appears only for the "own key" choice, so there's no
+        # stray field hanging under the built-in option.
+        _options = []
+        if _bundled:
+            _options.append(("tmdb", tr("meta_src_builtin")))
+        _options.append(("custom", tr("meta_src_own")))
+        _options.append(("playlist", tr("meta_src_provider")))
+        _default_src = self.settings.value(
+            "metadata_source",
+            "tmdb" if _bundled else
+            ("custom" if self.settings.value("tmdb_api_key", "")
+             else "playlist"))
+        meta_source_box = self._combo(_options, _default_src)
         tmdb_key_row = QHBoxLayout()
         tmdb_key_edit = QLineEdit(self.settings.value("tmdb_api_key", ""))
-        tmdb_key_edit.setPlaceholderText(
-            tr("tmdb_key_optional_ph") if _bundled
-            else tr("tmdb_key_placeholder"))
+        tmdb_key_edit.setPlaceholderText(tr("tmdb_key_placeholder"))
         tmdb_test_btn = QPushButton(tr("btn_test"))
         tmdb_key_row.addWidget(tmdb_key_edit, 1)
         tmdb_key_row.addWidget(tmdb_test_btn)
         mf.addRow(tr("setting_artwork_source"), meta_source_box)
         key_row_idx = mf.rowCount()
-        # When a built-in key ships with the app the field is only for
-        # overriding it with your own, so mark it optional.
-        mf.addRow(tr("setting_tmdb_key_optional") if _bundled
-                  else tr("setting_tmdb_key"), tmdb_key_row)
+        mf.addRow(tr("setting_tmdb_key"), tmdb_key_row)
         tmdb_status = QLabel()
         tmdb_status.setWordWrap(True)
         status_row_idx = mf.rowCount()
@@ -5117,9 +5133,9 @@ class MainWindow(QMainWindow):
         tabs.addTab(meta_tab, tr("tab_metadata"))
 
         def update_meta_visibility() -> None:
-            show_tmdb = meta_source_box.currentData() == "tmdb"
-            mf.setRowVisible(key_row_idx, show_tmdb)
-            mf.setRowVisible(status_row_idx, show_tmdb)
+            show_key = meta_source_box.currentData() == "custom"
+            mf.setRowVisible(key_row_idx, show_key)
+            mf.setRowVisible(status_row_idx, show_key)
 
         def test_tmdb_key() -> None:
             key = tmdb_key_edit.text().strip()
