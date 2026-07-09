@@ -90,6 +90,13 @@ jobs:
           wget -q -O /usr/local/bin/appimagetool \
             https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x /usr/local/bin/appimagetool
+          # Statically-linked AppImage runtime. The default runtime needs the
+          # host to have libfuse2 installed - which newer Ubuntu drops, so the
+          # AppImage refuses to start with a cryptic FUSE error until the user
+          # runs "apt install libfuse2". This static runtime carries its own
+          # FUSE, so the AppImage "just runs" on a stock system.
+          wget -q -O /usr/local/bin/appimage-runtime \
+            https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64
       - name: Python build deps
         run: |
           python -m pip install --upgrade pip pyinstaller
@@ -114,7 +121,9 @@ jobs:
           exec "$HERE/usr/dopeiptv/dopeiptv" "$@"
           EOF
           chmod +x AppDir/AppRun
-          ARCH=x86_64 appimagetool --no-appstream AppDir "dopeIPTV-${V}-x86_64.AppImage"
+          ARCH=x86_64 appimagetool --no-appstream \
+            --runtime-file /usr/local/bin/appimage-runtime \
+            AppDir "dopeIPTV-${V}-x86_64.AppImage"
       - name: Build .deb
         run: |
           V=${{ steps.v.outputs.version }}
