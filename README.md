@@ -56,8 +56,21 @@ chmod +x dopeIPTV-*.AppImage
 ```
 
 The AppImage bundles Python, PyQt6, libmpv, and ffmpeg — nothing else to
-install. (To integrate it into your application menu, use a tool like
+install, and the **embedded** player works out of the box. (To integrate it
+into your application menu, use a tool like
 [Gear Lever](https://flathub.org/apps/it.mijorus.gearlever) or AppImageLauncher.)
+
+> **Note — "Open externally" needs a system player.** The built-in embedded
+> player is fully self-contained. But the right-click **Open externally**
+> option (and the separate-window mpv mode) launches a *standalone* `mpv` or
+> `vlc` from your system, so those features only work if you have `mpv`
+> and/or `vlc` installed via your distro:
+>
+> ```bash
+> sudo apt install mpv vlc      # Debian/Ubuntu
+> sudo dnf install mpv vlc      # Fedora
+> sudo pacman -S mpv vlc        # Arch
+> ```
 
 ### Option B — install from source with pipx
 
@@ -131,7 +144,8 @@ the first time the app starts.
 
 ## Troubleshooting
 
-- **Embedded playback disabled** — install `mpv`/`libmpv` and `python-mpv` (see Dependencies).
+- **Embedded playback disabled** — install `mpv`/`libmpv` and `python-mpv` (see Dependencies). Not needed for the packaged AppImage/.deb/Flatpak, which bundle the embedded player.
+- **"Open externally" does nothing** — the external-player options launch a standalone `mpv` or `vlc` from your system; install one (`sudo apt install mpv vlc`). The embedded player does not need them.
 - **Recording does nothing** — install `ffmpeg`; it is the recording backend.
 - **Live stream won't start** — try switching the live format to `m3u8` in Settings.
 - **No categories** — check the server URL (include the port, e.g. `:8080`).
