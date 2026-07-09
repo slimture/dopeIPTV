@@ -62,6 +62,38 @@ def test_watched_store_local_then_trakt_push():
     assert w.is_episode_watched(700, 1, 3)
 
 
+def test_watched_store_local_snapshots():
+    s = _mock_settings()
+    w = WatchedStore(s)
+    w.add_local_item({"stream_id": "10", "name": "Dune"}, "vod", 111)
+    w.add_local_item({"series_id": "20", "name": "Severance"}, "series", 222)
+    items = w.local_watched_items()
+    assert len(items) == 2
+    # Series first (newest), then the movie.
+    assert items[0]["_kind"] == "series"
+    assert items[1]["_kind"] == "vod"
+    # Re-adding the same movie must not duplicate it.
+    w.add_local_item({"stream_id": "10", "name": "Dune"}, "vod", 111)
+    assert len(w.local_watched_items()) == 2
+    # Remove by tmdb id.
+    w.remove_local_item("vod", 111, "10")
+    kinds = [x["_kind"] for x in w.local_watched_items()]
+    assert kinds == ["series"]
+
+
+def test_watched_store_snapshots_persist():
+    store = {}
+    s = MagicMock()
+    s.value = lambda k, d="": store.get(k, d)
+    s.setValue = lambda k, v: store.__setitem__(k, v)
+    w = WatchedStore(s)
+    w.add_local_item({"stream_id": "10", "name": "Dune"}, "vod", 111)
+    # A fresh store reading the same settings sees the snapshot.
+    w2 = WatchedStore(s)
+    assert len(w2.local_watched_items()) == 1
+    assert w2.local_watched_items()[0]["name"] == "Dune"
+
+
 def test_watched_store_stream_marks_not_pushed():
     """Stream-id-only marks have no TMDB id, so nothing to push."""
     s = _mock_settings()

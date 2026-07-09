@@ -373,6 +373,10 @@ class WatchedStore:
         self.local_series_streams: set[int] = set()
         # Provider episode-id set for the same reason.
         self.local_episode_streams: set[int] = set()
+        # Item snapshots for everything marked watched locally in-app, so
+        # the 'Watched -> Local' list can render straight from the store
+        # (one entry per movie / per series). Newest first.
+        self.local_items: list[dict] = []
         self.last_sync_at: int = 0
         self._load()
 
@@ -434,6 +438,8 @@ class WatchedStore:
         self.local_episode_streams = {
             int(x) for x in data.get("local_episode_streams", [])
             if isinstance(x, int)}
+        self.local_items = [x for x in (data.get("local_items") or [])
+                            if isinstance(x, dict)]
         self.last_sync_at = int(data.get("last_sync_at") or 0)
 
     def _save(self) -> None:
@@ -447,6 +453,7 @@ class WatchedStore:
             "local_movie_streams": sorted(self.local_movie_streams),
             "local_series_streams": sorted(self.local_series_streams),
             "local_episode_streams": sorted(self.local_episode_streams),
+            "local_items": self.local_items,
             "last_sync_at": self.last_sync_at,
         }
         self.settings.setValue("trakt_watched_cache",
@@ -594,6 +601,56 @@ class WatchedStore:
         return (isinstance(episode_id, int)
                 and episode_id in self.local_episode_streams)
 
+    # -- local watched snapshots (the 'Watched -> Local' list) ---------------
+
+    @staticmethod
+    def _snapshot(item: dict, kind: str, tmdb_id: int | None) -> dict:
+        snap = {
+            "name": item.get("name") or item.get("title"),
+            "title": item.get("title") or item.get("name"),
+            "stream_id": item.get("stream_id"),
+            "series_id": item.get("series_id"),
+            "container_extension": item.get("container_extension"),
+            "stream_icon": item.get("stream_icon"),
+            "cover": item.get("cover"),
+            "category_id": item.get("category_id"),
+            "_kind": kind,
+            "_tmdb_id": tmdb_id,
+        }
+        return {k: v for k, v in snap.items() if v is not None}
+
+    @staticmethod
+    def _same_item(a: dict, kind: str, tmdb_id: int | None,
+                   ident) -> bool:
+        if a.get("_kind") != kind:
+            return False
+        if isinstance(tmdb_id, int) and a.get("_tmdb_id") == tmdb_id:
+            return True
+        id_field = "stream_id" if kind == "vod" else "series_id"
+        return ident is not None and a.get(id_field) == ident
+
+    def add_local_item(self, item: dict, kind: str,
+                       tmdb_id: int | None) -> None:
+        """Record (or refresh) a locally-watched movie/series snapshot -
+        one row per title. kind is 'vod' or 'series'."""
+        ident = (item.get("stream_id") if kind == "vod"
+                 else item.get("series_id"))
+        self.local_items = [
+            x for x in self.local_items
+            if not self._same_item(x, kind, tmdb_id, ident)]
+        self.local_items.insert(0, self._snapshot(item, kind, tmdb_id))
+        self._save()
+
+    def remove_local_item(self, kind: str, tmdb_id: int | None,
+                          ident) -> None:
+        self.local_items = [
+            x for x in self.local_items
+            if not self._same_item(x, kind, tmdb_id, ident)]
+        self._save()
+
+    def local_watched_items(self) -> list[dict]:
+        return list(self.local_items)
+
     def clear(self) -> None:
         self.trakt_movies = set()
         self.local_movies = set()
@@ -602,6 +659,7 @@ class WatchedStore:
         self.local_movie_streams = set()
         self.local_series_streams = set()
         self.local_episode_streams = set()
+        self.local_items = []
         self.last_sync_at = 0
         self.settings.remove("trakt_watched_cache")
 

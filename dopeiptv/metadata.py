@@ -132,6 +132,7 @@ class TmdbClient:
                           if g.get("name"))
         release = (d.get("release_date") or d.get("first_air_date") or "")
         return {
+            "title": d.get("title") or d.get("name") or "",
             "poster_url": f"{self.IMG_BASE}{poster_path}" if poster_path else None,
             "rating": d.get("vote_average") or None,
             "imdb_id": (d.get("external_ids") or {}).get("imdb_id"),
@@ -211,6 +212,7 @@ class TmdbClient:
                           if g.get("name"))
         release = (d.get("release_date") or d.get("first_air_date") or "")
         return {
+            "title": d.get("title") or d.get("name") or "",
             "poster_url": f"{self.IMG_BASE}{poster_path}" if poster_path else None,
             "rating": d.get("vote_average") or None,
             "imdb_id": (d.get("external_ids") or {}).get("imdb_id"),
@@ -241,6 +243,9 @@ class PosterResolver(QObject):
     """
 
     CACHE_KEY = "tmdb_poster_cache_v3"
+    # Separate cache for direct tmdb-id -> {name, poster} lookups, used
+    # to render the Trakt watched history (which only gives us ids).
+    BYID_CACHE_KEY = "tmdb_byid_cache_v1"
     CACHE_MATCHER_VER_KEY = "tmdb_matcher_version"
     # Bump when the auto-matcher gets smarter (year filter, best-poster
     # pick, ...) so previously-cached 'no match / no poster' results are
@@ -289,6 +294,17 @@ class PosterResolver(QObject):
         self._pending: set[str] = set()
         self._waiting: dict[str, list[Callable]] = {}
         self._dirty = False
+        # tmdb-id lookup cache ("vod:123"/"series:456" -> {name, poster}).
+        try:
+            self._byid_cache: dict[str, dict] = json.loads(
+                settings.value(self.BYID_CACHE_KEY, "") or "{}")
+        except Exception:
+            self._byid_cache = {}
+        if not isinstance(self._byid_cache, dict):
+            self._byid_cache = {}
+        self._byid_pending: set[str] = set()
+        self._byid_waiting: dict[str, list[Callable]] = {}
+        self._byid_dirty = False
         try:
             self._person_cache: dict[str, list[str]] = json.loads(
                 settings.value(self.PERSON_CACHE_KEY, "") or "{}")
@@ -320,11 +336,72 @@ class PosterResolver(QObject):
         if self._dirty:
             self._dirty = False
             self.settings.setValue(self.CACHE_KEY, json.dumps(self._cache))
+        if self._byid_dirty:
+            self._byid_dirty = False
+            self.settings.setValue(self.BYID_CACHE_KEY,
+                                   json.dumps(self._byid_cache))
+
+    def _save_byid(self) -> None:
+        self._byid_dirty = True
+        self._save_timer.start(2000)
 
     def flush(self) -> None:
         """Force any pending cache write out immediately (e.g. on quit)."""
         self._save_timer.stop()
         self._flush_save()
+
+    @staticmethod
+    def _byid_key(tmdb_id: int, kind: str) -> str:
+        return f"{kind}:{int(tmdb_id)}"
+
+    def resolve_by_id(self, tmdb_id: int, kind: str,
+                      callback: Callable[[dict], None]) -> dict | None:
+        """Resolve a bare TMDB id to {name, poster_url} for the Trakt
+        watched list. Returns the cached value immediately (or None) and,
+        if unresolved, kicks off a background details fetch that invokes
+        *callback* once done. kind is 'vod' (movie) or 'series' (tv)."""
+        try:
+            tid = int(tmdb_id)
+        except (TypeError, ValueError):
+            return None
+        key = self._byid_key(tid, kind)
+        cached = self._byid_cache.get(key)
+        if cached is not None:
+            return cached or None
+        self._byid_waiting.setdefault(key, []).append(callback)
+        if key in self._byid_pending:
+            return None
+        self._byid_pending.add(key)
+
+        def fetch(tid=tid, k=kind):
+            return self.client.fetch_details_by_id(tid, k)
+
+        def done(details, key=key):
+            meta = {}
+            if details:
+                meta = {"name": details.get("title") or "",
+                        "poster_url": details.get("poster_url")}
+            self._byid_cache[key] = meta
+            self._save_byid()
+            self._byid_pending.discard(key)
+            for cb in self._byid_waiting.pop(key, []):
+                try:
+                    cb(meta)
+                except RuntimeError:
+                    pass
+
+        def fail(_msg, key=key):
+            # Leave uncached so a later visit retries; just drop the
+            # pending flag and notify so the row stops waiting.
+            self._byid_pending.discard(key)
+            for cb in self._byid_waiting.pop(key, []):
+                try:
+                    cb({})
+                except RuntimeError:
+                    pass
+
+        run_async(self.pool, fetch, done, fail)
+        return None
 
     @staticmethod
     def _key(title: str, kind: str) -> str:

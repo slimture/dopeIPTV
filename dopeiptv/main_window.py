@@ -269,6 +269,11 @@ class MainWindow(QMainWindow):
         self._poster_refresh_timer = QTimer(self)
         self._poster_refresh_timer.setSingleShot(True)
         self._poster_refresh_timer.timeout.connect(self._flush_poster_refresh)
+        # Rebuilds the Watched -> Trakt list as tmdb-id lookups resolve.
+        self._watched_subcat = None
+        self._watched_refresh_timer = QTimer(self)
+        self._watched_refresh_timer.setSingleShot(True)
+        self._watched_refresh_timer.timeout.connect(self._reload_watched)
         self._init_metadata_provider()
         self.trakt = TraktClient(settings)
         self._trakt_active: dict | None = None
@@ -375,6 +380,7 @@ class MainWindow(QMainWindow):
         for key, text in (("live", tr("nav_tv")), ("vod", tr("nav_movies")),
                           ("series", tr("nav_series")), ("fav", tr("nav_favorites")),
                           ("watchlist", tr("nav_watchlist")),
+                          ("watched", tr("nav_watched")),
                           ("rec", tr("nav_recordings")), ("history", tr("nav_history"))):
             b = QPushButton(text, objectName="NavBtn")
             b.setCheckable(True)
@@ -1038,6 +1044,10 @@ class MainWindow(QMainWindow):
             else QAbstractItemView.SelectionMode.SingleSelection)
         self.search.clear()
         self._load_categories()
+        # Opening Watched is a good moment to pull the latest Trakt
+        # history (respects the 1 h TTL, so it's a no-op if just synced).
+        if mode == "watched":
+            self._maybe_sync_watched()
 
     def _load_categories(self) -> None:
         self._load_gen += 1
@@ -1102,6 +1112,25 @@ class MainWindow(QMainWindow):
                     (tr("cat_all"), None),
                     (tr("nav_movies"), "movies"),
                     (tr("nav_series"), "series")]:
+                it = QListWidgetItem(label)
+                it.setData(Qt.ItemDataRole.UserRole, data)
+                self.cat_list.addItem(it)
+            self.cat_list.blockSignals(False)
+            self.cat_list.setCurrentRow(0)
+            return
+        if self.mode == "watched":
+            # Split into Local and Trakt. The Trakt row (and the
+            # combined 'All') only appear when connected - a user with
+            # no Trakt account just sees their local list.
+            self.cat_list.blockSignals(True)
+            connected = self.trakt.is_connected()
+            rows = []
+            if connected:
+                rows.append((tr("cat_all"), None))
+            rows.append((tr("watched_local"), "local"))
+            if connected:
+                rows.append((tr("watched_trakt"), "trakt"))
+            for label, data in rows:
                 it = QListWidgetItem(label)
                 it.setData(Qt.ItemDataRole.UserRole, data)
                 self.cat_list.addItem(it)
@@ -1226,6 +1255,18 @@ class MainWindow(QMainWindow):
                 self.all_items = shows
             else:
                 self.all_items = movies + shows
+            self._apply_filter()
+            return
+        if self.mode == "watched":
+            self._watched_subcat = category_id
+            local = self.watched.local_watched_items()
+            if category_id == "local":
+                self.all_items = local
+            elif category_id == "trakt":
+                self.all_items = self._trakt_watched_items()
+            else:
+                self.all_items = self._merge_watched(
+                    local, self._trakt_watched_items())
             self._apply_filter()
             return
         self.loading_bar.show()
@@ -1510,18 +1551,72 @@ class MainWindow(QMainWindow):
         # Nudge the visible list so the newly-known 'seen' markers
         # paint without needing a category switch.
         self.list_model.refresh_all()
+        # The Watched list is built from the Trakt sets, so a fresh sync
+        # means it needs rebuilding, not just repainting.
+        if self.mode == "watched":
+            self._load_items(self._watched_subcat)
 
     def _on_watched_sync_failed(self) -> None:
         self._watched_sync_running = False
 
+    # -- Watched (Sedda) list ------------------------------------------------
+
+    def _reload_watched(self) -> None:
+        if self.mode == "watched":
+            self._load_items(self._watched_subcat)
+
+    def _trakt_watched_item(self, tmdb_id: int, kind: str,
+                            meta: dict | None) -> dict:
+        """Build a list row for a Trakt-watched title. meta is the
+        resolved {name, poster_url} or None while the tmdb-id lookup is
+        still in flight (shows a placeholder that fills in on repaint)."""
+        name = (meta or {}).get("name") or "…"
+        poster = (meta or {}).get("poster_url")
+        item = {"name": name, "_kind": kind, "_tmdb_id": tmdb_id,
+                "_trakt_only": True}
+        if poster:
+            item["stream_icon"] = poster
+        return item
+
+    def _trakt_watched_items(self) -> list[dict]:
+        """The whole Trakt watched history as list rows - movies plus one
+        row per series. tmdb-ids are resolved to name + poster lazily via
+        the resolver's by-id cache; unresolved rows trigger a background
+        fetch and a debounced rebuild so they fill in as answers arrive."""
+        def on_resolved(_meta):
+            self._watched_refresh_timer.start(250)
+
+        items: list[dict] = []
+        for tid in sorted(self.watched.trakt_movies):
+            meta = (self.tmdb.resolve_by_id(tid, "vod", on_resolved)
+                    if self.tmdb else None)
+            items.append(self._trakt_watched_item(tid, "vod", meta))
+        for show_tid in sorted(self.watched.trakt_episodes):
+            meta = (self.tmdb.resolve_by_id(show_tid, "series", on_resolved)
+                    if self.tmdb else None)
+            items.append(self._trakt_watched_item(show_tid, "series", meta))
+        return items
+
+    @staticmethod
+    def _merge_watched(local: list[dict],
+                       trakt: list[dict]) -> list[dict]:
+        """Local snapshots first (they carry provider ids so they're
+        playable), then Trakt-only rows whose tmdb-id isn't already
+        covered by a local entry."""
+        seen = {(x.get("_kind"), x.get("_tmdb_id"))
+                for x in local if x.get("_tmdb_id") is not None}
+        merged = list(local)
+        for t in trakt:
+            if (t.get("_kind"), t.get("_tmdb_id")) in seen:
+                continue
+            merged.append(t)
+        return merged
+
     def is_movie_watched(self, item: dict) -> bool:
         if not item:
             return False
-        if self.tmdb:
-            title = item.get("name") or item.get("title") or ""
-            if self.watched.is_movie_watched(
-                    self.tmdb.tmdb_id_for(title, "vod")):
-                return True
+        if self.watched.is_movie_watched(self._tmdb_id_for_item(item, "vod")):
+            return True
         sid = item.get("stream_id")
         try:
             return self.watched.is_movie_watched_by_stream(int(sid))
@@ -1531,11 +1626,8 @@ class MainWindow(QMainWindow):
     def show_watched_count(self, item: dict) -> int:
         if not item:
             return 0
-        count = 0
-        if self.tmdb:
-            title = item.get("name") or item.get("title") or ""
-            count = self.watched.show_watched_count(
-                self.tmdb.tmdb_id_for(title, "series"))
+        count = self.watched.show_watched_count(
+            self._tmdb_id_for_item(item, "series"))
         if count > 0:
             return count
         # Fall back to the stream-id local mark so a series marked
@@ -1602,7 +1694,15 @@ class MainWindow(QMainWindow):
         return False
 
     def _tmdb_id_for_item(self, item: dict, kind: str) -> int | None:
-        if not self.tmdb or not item:
+        if not item:
+            return None
+        # Snapshots (Watch Later / Watched / Trakt rows) already carry a
+        # resolved tmdb id - trust it directly so mark/unmark and the
+        # badges work even without a title-search cache hit.
+        tid = item.get("_tmdb_id")
+        if isinstance(tid, int):
+            return tid
+        if not self.tmdb:
             return None
         title = item.get("name") or item.get("title") or ""
         return self.tmdb.tmdb_id_for(title, kind)
@@ -1633,6 +1733,7 @@ class MainWindow(QMainWindow):
             if push_to_trakt:
                 self._error(tr("mark_needs_tmdb"))
                 push_to_trakt = False
+        self.watched.add_local_item(item, "vod", tid)
         if push_to_trakt and tid is not None and self.trakt.is_connected():
             def job(tid=tid):
                 try:
@@ -1652,6 +1753,7 @@ class MainWindow(QMainWindow):
             self.watched.unmark_movie_by_stream(int(sid))
         except (TypeError, ValueError):
             pass
+        self.watched.remove_local_item("vod", tid, item.get("stream_id"))
         if push_to_trakt and tid is not None and self.trakt.is_connected():
             def job(tid=tid):
                 try:
@@ -1680,6 +1782,10 @@ class MainWindow(QMainWindow):
             if push_to_trakt:
                 self._error(tr("mark_needs_tmdb"))
                 push_to_trakt = False
+        # Watching an episode means the show belongs in the local
+        # watched list - snapshot the series (one row per show).
+        if self.series_ctx:
+            self.watched.add_local_item(self.series_ctx, "series", sid)
         if (push_to_trakt and sid is not None and season is not None
                 and self.trakt.is_connected()):
             def job(sid=sid, s=season, e=episode):
@@ -1705,6 +1811,17 @@ class MainWindow(QMainWindow):
             self.watched.unmark_episode_by_stream(int(eid))
         except (TypeError, ValueError):
             pass
+        # Drop the series from the local watched list only once no
+        # episodes remain watched and it isn't marked as a whole-show.
+        if self.series_ctx:
+            series_sid = (self.series_ctx.get("series_id")
+                          or self.series_ctx.get("stream_id"))
+            still_watched = (
+                (isinstance(sid, int) and self.watched.show_watched_count(sid))
+                or self.watched.is_series_watched_by_stream(
+                    self._as_int(series_sid)))
+            if not still_watched:
+                self.watched.remove_local_item("series", sid, series_sid)
         if (push_to_trakt and sid is not None and season is not None
                 and self.trakt.is_connected()):
             def job(sid=sid, s=season, e=episode):
@@ -1725,6 +1842,8 @@ class MainWindow(QMainWindow):
             self.watched.mark_series_local_by_stream(int(sid))
         except (TypeError, ValueError):
             return
+        tid = self._tmdb_id_for_item(item, "series")
+        self.watched.add_local_item(item, "series", tid)
         self.list_model.refresh_all()
 
     def _unmark_series_watched(self, item: dict,
@@ -1736,6 +1855,7 @@ class MainWindow(QMainWindow):
             pass
         # Also clear any TMDB-keyed per-episode marks for this show so
         # the badge disappears immediately.
+        tid = None
         if self.tmdb:
             title = item.get("name") or item.get("title") or ""
             tid = self.tmdb.tmdb_id_for(title, "series")
@@ -1744,6 +1864,8 @@ class MainWindow(QMainWindow):
                                self.watched.local_episodes):
                     ep_set.pop(tid, None)
                 self.watched._save()
+        self.watched.remove_local_item(
+            "series", tid, item.get("series_id") or item.get("stream_id"))
         self.list_model.refresh_all()
 
     # -- Watch Later (local toggle + optional Trakt push) --------------------
@@ -1937,7 +2059,7 @@ class MainWindow(QMainWindow):
         "live": "channels", "vod": "movies", "series": "series",
         "episode": "episodes", "fav": "favorites",
         "history": "history items", "rec": "recordings",
-        "watchlist": "on your list",
+        "watchlist": "on your list", "watched": "watched",
     }
 
     @staticmethod
@@ -2017,6 +2139,13 @@ class MainWindow(QMainWindow):
     # -- item identity -------------------------------------------------------------
 
     @staticmethod
+    def _as_int(v):
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
     def _item_key(it):
         if not it:
             return None
@@ -2063,7 +2192,8 @@ class MainWindow(QMainWindow):
         # ("movie"/"episode"/"live") - normalise it to the vod/series
         # the detail panel and TMDB lookup speak.
         snap_kind = (it.get("_kind")
-                     if self.mode in ("history", "watchlist") else None)
+                     if self.mode in ("history", "watchlist", "watched")
+                     else None)
         snap_kind = {"movie": "vod", "episode": "series"}.get(
             snap_kind, snap_kind)
         # In the Favorites view the content kind follows the selected
@@ -2119,7 +2249,7 @@ class MainWindow(QMainWindow):
         # makes the plot/genre/cast panel fill in for history items
         # even with no TMDB account.
         elif (ckind == "vod"
-              or (self.mode in ("watchlist", "history")
+              or (self.mode in ("watchlist", "history", "watched")
                   and snap_kind == "vod")):
             sid = it.get("stream_id")
             if sid is None and self.mode == "history":
@@ -2127,7 +2257,7 @@ class MainWindow(QMainWindow):
             if sid is not None:
                 self._request_media_info("vod", sid, self._current_key)
         elif (ckind == "series"
-              or (self.mode in ("watchlist", "history")
+              or (self.mode in ("watchlist", "history", "watched")
                   and snap_kind == "series")):
             sid = it.get("series_id")
             if sid is None and self.mode == "history":
@@ -2783,7 +2913,7 @@ class MainWindow(QMainWindow):
         # so the same movie playback code path works from that view
         # even though self.mode is 'watchlist'.
         eff_mode = self.mode
-        if self.mode == "watchlist":
+        if self.mode in ("watchlist", "watched"):
             eff_mode = it.get("_kind") or "vod"
         elif self.mode == "fav":
             eff_mode = "vod" if self._fav_section == "movie" else "series"
@@ -2812,7 +2942,15 @@ class MainWindow(QMainWindow):
         # Series row from Watch Later or the Favorites 'Series' section:
         # same 'drill in' behaviour as from the Series view - open the
         # episode list instead of trying to play a series URL directly.
-        if self.mode == "watchlist" and it.get("_kind") == "series":
+        # A Trakt-only watched row (seen on another device, not in this
+        # provider) has no stream to play or drill into - it's a record,
+        # not content. Check this before the series-drill below.
+        if (it.get("_trakt_only") and not it.get("stream_id")
+                and not it.get("series_id")):
+            self._error(tr("watched_trakt_only_note"))
+            return
+        if (self.mode in ("watchlist", "watched")
+                and it.get("_kind") == "series"):
             self._enter_series(it)
             return
         if (self.mode == "fav" and self._fav_section == "series"
@@ -3158,7 +3296,7 @@ class MainWindow(QMainWindow):
         # tells us whether the entry is a movie or a series so the
         # same code path works there.
         eff_mode = self.mode
-        if self.mode == "watchlist":
+        if self.mode in ("watchlist", "watched"):
             eff_mode = it.get("_kind") or "vod"
         elif self.mode == "history":
             # History stores 'movie'/'episode'/'live'; only movies get
@@ -4410,6 +4548,7 @@ class MainWindow(QMainWindow):
         nav_labels = {
             "live": "nav_tv", "vod": "nav_movies", "series": "nav_series",
             "fav": "nav_favorites", "watchlist": "nav_watchlist",
+            "watched": "nav_watched",
             "rec": "nav_recordings", "history": "nav_history",
         }
         for key, btn in self.nav_btns.items():
