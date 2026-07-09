@@ -87,34 +87,19 @@ def install_icon(icon: QIcon) -> None:
         pass
 
 
-_CRASH_LOG_PATH = "/tmp/dopeiptv-crash.log"
-
-
 def _install_crash_hooks() -> None:
-    """Capture every Python exception - main thread, worker threads,
-    Qt slot errors - to /tmp/dopeiptv-crash.log AND stderr with an
+    """Print genuinely-uncaught Python exceptions to stderr with an
     explicit flush. Newer PyQt6 turns unhandled slot exceptions into
     qFatal -> SIGABRT before Python's default excepthook manages to
     flush its buffered stderr traceback, so we lose the diagnostic
-    just when we most need it."""
-    import atexit
+    just when we most need it. Routine network / DNS failures are
+    filtered out - the app handles them and there's no signal in
+    printing them."""
     import faulthandler
     import io
     import threading
     import traceback
 
-    log_fh = None
-    try:
-        log_fh = open(_CRASH_LOG_PATH, "a", buffering=1)
-        atexit.register(log_fh.close)
-    except OSError:
-        log_fh = None
-
-    # Any exception whose full class path matches one of these is a
-    # routine network / DNS / TLS failure - the app already handles
-    # them and there's no signal-value to spamming the terminal with
-    # them. They still land in the on-disk log so we can pull them
-    # up if we're diagnosing something.
     _QUIET_EXC_NAMES = {
         "requests.exceptions.ConnectionError",
         "requests.exceptions.ConnectTimeout",
@@ -130,21 +115,6 @@ def _install_crash_hooks() -> None:
         "ConnectionResetError",
     }
 
-    def _log(text: str) -> None:
-        if log_fh is not None:
-            try:
-                log_fh.write(text)
-                log_fh.flush()
-            except Exception:
-                pass
-
-    def _stderr(text: str) -> None:
-        try:
-            sys.stderr.write(text)
-            sys.stderr.flush()
-        except Exception:
-            pass
-
     def _is_quiet(exc_type) -> bool:
         try:
             name = f"{exc_type.__module__}.{exc_type.__name__}"
@@ -153,13 +123,16 @@ def _install_crash_hooks() -> None:
         return name in _QUIET_EXC_NAMES
 
     def _hook(exc_type, exc_value, exc_tb):
+        if _is_quiet(exc_type):
+            return
         buf = io.StringIO()
         buf.write("\n[dopeIPTV] CRASH: uncaught exception\n")
         traceback.print_exception(exc_type, exc_value, exc_tb, file=buf)
-        text = buf.getvalue()
-        _log(text)
-        if not _is_quiet(exc_type):
-            _stderr(text)
+        try:
+            sys.stderr.write(buf.getvalue())
+            sys.stderr.flush()
+        except Exception:
+            pass
 
     def _thread_hook(args):
         _hook(args.exc_type, args.exc_value, args.exc_traceback)
@@ -173,11 +146,9 @@ def _install_crash_hooks() -> None:
     threading.excepthook = _thread_hook
     sys.unraisablehook = _unraisable_hook
     # C-level crashes (segfault before qFatal, mpv, GL) - dump a
-    # native backtrace to both stderr and the log file.
+    # native backtrace to stderr.
     try:
         faulthandler.enable(file=sys.stderr, all_threads=True)
-        if log_fh is not None:
-            faulthandler.enable(file=log_fh, all_threads=True)
     except Exception:
         pass
 

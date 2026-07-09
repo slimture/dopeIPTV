@@ -1895,10 +1895,11 @@ class MainWindow(QMainWindow):
         if self.mode == "rec":
             return
 
-        if self.mode == "history":
-            # _load_detail_poster -> _apply_media_card fills in the TMDB
-            # rating/cast/synopsis for media titles; nothing more to do for
-            # live/recording history rows.
+        if self.mode == "history" and snap_kind not in ("vod", "series"):
+            # For live/recording history rows the artwork + TMDB card
+            # is all we have; only fall through for movie/series
+            # history rows so they also get provider-side info
+            # (plot, year, episode list).
             return
 
         if self.series_ctx:
@@ -1911,15 +1912,18 @@ class MainWindow(QMainWindow):
                 if (self.player and self._autoplay_preview()
                         and self.playback_mode() == "embedded"):
                     self._preview_timer.start(350)
-        # In Watch Later, defer to the snapshot's kind so a movie row
-        # fetches movie info and a series row fetches series info.
+        # In History / Watch Later, defer to the snapshot's _kind so
+        # a movie row fetches movie info and a series row fetches
+        # series info - same as the main Movies / Series views.
         elif (self.mode == "vod"
-              or (self.mode == "watchlist" and snap_kind == "vod")):
+              or (self.mode in ("watchlist", "history")
+                  and snap_kind == "vod")):
             if it.get("stream_id") is not None:
                 self._request_media_info(
                     "vod", it["stream_id"], self._current_key)
         elif (self.mode == "series"
-              or (self.mode == "watchlist" and snap_kind == "series")):
+              or (self.mode in ("watchlist", "history")
+                  and snap_kind == "series")):
             if it.get("series_id") is not None:
                 self._request_media_info(
                     "series", it["series_id"], self._current_key)
