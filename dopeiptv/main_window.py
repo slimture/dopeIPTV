@@ -1228,11 +1228,16 @@ class MainWindow(QMainWindow):
         key = self.settings.value("tmdb_api_key", "") or ""
         if not key:
             return
-        # Dedicated, small thread pool: TMDB lookups must never compete
-        # with the shared pool used for channel/EPG loading, or a burst
-        # of poster searches can starve real work and look like a freeze.
+        # Dedicated thread pool: TMDB lookups must never compete with
+        # the shared pool used for channel/EPG loading, or a burst of
+        # poster searches can starve real work and look like a freeze.
+        # 6 workers is well under TMDB's 50 req/s limit but keeps a
+        # newly-opened category with dozens of unseen titles from
+        # taking half a minute to fill in the posters - each row
+        # takes two sequential HTTP calls (search + details), so
+        # fewer workers turn a 50-row scroll into visible latency.
         pool = QThreadPool()
-        pool.setMaxThreadCount(2)
+        pool.setMaxThreadCount(6)
         self._tmdb_pool = pool
         self.tmdb = PosterResolver(pool, self.settings, TmdbClient(key))
 
