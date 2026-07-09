@@ -5082,13 +5082,18 @@ class MainWindow(QMainWindow):
                 "metadata_source", "tmdb" if _bundled else "playlist"))
         tmdb_key_row = QHBoxLayout()
         tmdb_key_edit = QLineEdit(self.settings.value("tmdb_api_key", ""))
-        tmdb_key_edit.setPlaceholderText(tr("tmdb_key_placeholder"))
+        tmdb_key_edit.setPlaceholderText(
+            tr("tmdb_key_optional_ph") if _bundled
+            else tr("tmdb_key_placeholder"))
         tmdb_test_btn = QPushButton(tr("btn_test"))
         tmdb_key_row.addWidget(tmdb_key_edit, 1)
         tmdb_key_row.addWidget(tmdb_test_btn)
         mf.addRow(tr("setting_artwork_source"), meta_source_box)
         key_row_idx = mf.rowCount()
-        mf.addRow(tr("setting_tmdb_key"), tmdb_key_row)
+        # When a built-in key ships with the app the field is only for
+        # overriding it with your own, so mark it optional.
+        mf.addRow(tr("setting_tmdb_key_optional") if _bundled
+                  else tr("setting_tmdb_key"), tmdb_key_row)
         tmdb_status = QLabel()
         tmdb_status.setWordWrap(True)
         status_row_idx = mf.rowCount()
