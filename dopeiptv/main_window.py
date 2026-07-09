@@ -4375,7 +4375,12 @@ class MainWindow(QMainWindow):
 
         # Disk-cache controls: covers/logos accumulate under
         # QStandardPaths.CacheLocation and don't clean themselves.
-        cache_dirs = [default_image_cache_dir("logos"),
+        # The live cache is the shared "images" dir; the two legacy
+        # dirs predate the loaders sharing one directory - keep them
+        # in the sweep so files from old sessions still get counted
+        # and cleared.
+        cache_dirs = [default_image_cache_dir("images"),
+                      default_image_cache_dir("logos"),
                       default_image_cache_dir("posters")]
         cache_lbl = QLabel()
         clear_cache_btn = QPushButton(tr("settings_image_cache_clear"))

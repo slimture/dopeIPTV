@@ -256,18 +256,21 @@ class ChannelDelegate(QStyledItemDelegate):
         logo_y = rect.top() + 8
         logo_rect = QRect(logo_x, logo_y, logo_sz, logo_sz)
         radius = max(8, logo_sz // 5)
-        url = self.window.poster_for(it, kind)
+        # Provider cover FIRST. Xtream providers curate stream_icon /
+        # cover per item (usually already a TMDB-hosted poster), so it
+        # matches 1:1 what other IPTV apps show and never depends on
+        # our title-based TMDB search succeeding. The TMDB URL is the
+        # fallback for items the provider left bare - and calling
+        # poster_for still kicks the background TMDB resolution that
+        # the watched-badges and detail panel rely on.
+        tmdb_url = self.window.poster_for(it, kind)
+        url = it.get("stream_icon") or it.get("cover")
         if url and self.window.logos.is_dead(url):
             url = None
-        # Always fall back to the provider cover when TMDB doesn't
-        # have (or hasn't yet returned) one. The alternative - waiting
-        # for TMDB before falling back - meant every row that TMDB
-        # couldn't answer for stayed on the placeholder letter, and
-        # for a user on 'IPTV provider' metadata mode that's every
-        # row. Any brief poster swap when TMDB later delivers a
-        # better URL is a much smaller cost than no cover at all.
         if not url:
-            url = it.get("stream_icon") or it.get("cover")
+            url = tmdb_url
+        if url and self.window.logos.is_dead(url):
+            url = None
         pm = self.window.logos.cache.get(url) if url else None
         if pm:
             path = QPainterPath()
@@ -345,18 +348,21 @@ class ChannelDelegate(QStyledItemDelegate):
             rect.top() + (rect.height() - logo_sz) // 2,
             logo_sz, logo_sz)
         radius = max(6, logo_sz // 4)
-        url = self.window.poster_for(it, kind)
+        # Provider cover FIRST. Xtream providers curate stream_icon /
+        # cover per item (usually already a TMDB-hosted poster), so it
+        # matches 1:1 what other IPTV apps show and never depends on
+        # our title-based TMDB search succeeding. The TMDB URL is the
+        # fallback for items the provider left bare - and calling
+        # poster_for still kicks the background TMDB resolution that
+        # the watched-badges and detail panel rely on.
+        tmdb_url = self.window.poster_for(it, kind)
+        url = it.get("stream_icon") or it.get("cover")
         if url and self.window.logos.is_dead(url):
             url = None
-        # Always fall back to the provider cover when TMDB doesn't
-        # have (or hasn't yet returned) one. The alternative - waiting
-        # for TMDB before falling back - meant every row that TMDB
-        # couldn't answer for stayed on the placeholder letter, and
-        # for a user on 'IPTV provider' metadata mode that's every
-        # row. Any brief poster swap when TMDB later delivers a
-        # better URL is a much smaller cost than no cover at all.
         if not url:
-            url = it.get("stream_icon") or it.get("cover")
+            url = tmdb_url
+        if url and self.window.logos.is_dead(url):
+            url = None
         pm = self.window.logos.cache.get(url) if url else None
         if pm:
             path = QPainterPath()

@@ -3,10 +3,22 @@
 from __future__ import annotations
 
 import hashlib
+import os
+import sys
 import time
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Callable
+
+# DOPEIPTV_IMG_DEBUG=1 traces every image decision (RAM/disk/network
+# hit, HTTP status, decode failure, dead-marking) to stderr - the
+# support tool for "covers aren't loading" reports.
+_IMG_DEBUG = bool(os.environ.get("DOPEIPTV_IMG_DEBUG"))
+
+
+def _img_dbg(msg: str) -> None:
+    if _IMG_DEBUG:
+        print(f"[dopeIPTV:img] {msg}", file=sys.stderr, flush=True)
 
 import requests
 from PyQt6.QtCore import (
@@ -228,7 +240,9 @@ class LogoLoader(QObject):
                         # runs on the main thread.
                         probe = QImage()
                         if probe.loadFromData(data):
+                            _img_dbg(f"disk hit {u}")
                             return u, data
+                        _img_dbg(f"disk CORRUPT, refetching {u}")
                         dp.unlink(missing_ok=True)
                 except OSError:
                     try:
@@ -240,9 +254,11 @@ class LogoLoader(QObject):
             # everything else so a temporary 500 or connection reset
             # gets a brief cooldown instead of a session-long ban.
             if r.status_code in (404, 410, 451):
+                _img_dbg(f"net {r.status_code} DEAD(1h) {u}")
                 self._mark_dead(u, self.dead_ttl_permanent)
             r.raise_for_status()
             data = r.content
+            _img_dbg(f"net {r.status_code} ok {len(data)}B {u}")
             if dp is not None:
                 try:
                     dp.parent.mkdir(parents=True, exist_ok=True)
@@ -252,8 +268,8 @@ class LogoLoader(QObject):
                     tmp = dp.with_name(dp.name + ".part")
                     tmp.write_bytes(data)
                     tmp.replace(dp)
-                except OSError:
-                    pass
+                except OSError as e:
+                    _img_dbg(f"disk WRITE FAILED {e} {u}")
             return u, data
 
         def done(result: tuple[str, bytes]) -> None:
@@ -261,6 +277,7 @@ class LogoLoader(QObject):
             callbacks = self.waiting.pop(u, [])
             pm = QPixmap()
             if not pm.loadFromData(data):
+                _img_dbg(f"DECODE FAILED {len(data)}B {u}")
                 return
             pm = pm.scaled(self.max_size, self.max_size,
                            Qt.AspectRatioMode.KeepAspectRatio,
@@ -280,6 +297,7 @@ class LogoLoader(QObject):
             # cover. If fetch() already marked it dead with the
             # permanent TTL (real 404), keep that longer timeout.
             if url not in self.dead:
+                _img_dbg(f"net FAIL cooldown(20s) {_msg[:80]} {url}")
                 self._mark_dead(url, self.dead_ttl_transient)
             callbacks = self.waiting.pop(url, [])
             for cb in callbacks:

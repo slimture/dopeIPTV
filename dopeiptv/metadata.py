@@ -4,7 +4,9 @@ cast by title, with a persistent cache so each title is only searched once."""
 from __future__ import annotations
 
 import json
+import os
 import re
+import sys
 from typing import Callable
 
 import requests
@@ -12,6 +14,16 @@ from PyQt6.QtCore import QObject, QSettings, QThreadPool, QTimer
 
 
 from .workers import run_async
+
+# Same env switch as the image loader: DOPEIPTV_IMG_DEBUG=1 traces
+# every TMDB title resolution (query used, match / no-match / error)
+# to stderr so cover problems can be diagnosed from a user log.
+_TMDB_DEBUG = bool(os.environ.get("DOPEIPTV_IMG_DEBUG"))
+
+
+def _tmdb_dbg(msg: str) -> None:
+    if _TMDB_DEBUG:
+        print(f"[dopeIPTV:tmdb] {msg}", file=sys.stderr, flush=True)
 
 
 class TmdbClient:
@@ -304,7 +316,7 @@ class PosterResolver(QObject):
         def fetch(t=search_query, k=kind):
             return self.client.fetch_details(t, k)
 
-        def done(details, key=key):
+        def done(details, key=key, raw=title, q=search_query):
             # Never overwrite a manual pick with an auto-search result. This
             # can happen if the cache entry gets evicted and re-fetched.
             existing = self._cache.get(key) or {}
@@ -312,18 +324,24 @@ class PosterResolver(QObject):
                 self._pending.discard(key)
                 self._on_resolved(key)
                 return
+            if details:
+                _tmdb_dbg(f"MATCH  q={q!r} raw={raw!r} "
+                          f"poster={bool(details.get('poster_url'))}")
+            else:
+                _tmdb_dbg(f"NOMATCH q={q!r} raw={raw!r}")
             self._cache[key] = details or {}
             self._save()
             self._pending.discard(key)
             self._on_resolved(key)
 
-        def fail(_msg, key=key):
+        def fail(msg, key=key, raw=title, q=search_query):
             # A TMDB request that timed out / hit a 5xx counts as
             # resolved-with-no-match: the delegate can safely fall
             # back to the provider cover from now on and stop
             # painting the placeholder letter. Notify waiting
             # callbacks the same way done() does so the row actually
             # gets a repaint instead of freezing on the placeholder.
+            _tmdb_dbg(f"ERROR  q={q!r} raw={raw!r} {str(msg)[:80]}")
             self._cache[key] = {}
             self._pending.discard(key)
             self._on_resolved(key)

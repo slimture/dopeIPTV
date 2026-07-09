@@ -337,11 +337,14 @@ class FakeDelegate:
 
     def pick_url(self, it, kind):
         w = self.window
-        url = w.poster_for(it, kind)
+        tmdb_url = w.poster_for(it, kind)
+        url = it.get("stream_icon") or it.get("cover")
         if url and w.logos.is_dead(url):
             url = None
         if not url:
-            url = it.get("stream_icon") or it.get("cover")
+            url = tmdb_url
+        if url and w.logos.is_dead(url):
+            url = None
         return url
 
 
@@ -375,7 +378,10 @@ class _StubLogos:
         return url in self.dead
 
 
-def test_delegate_uses_tmdb_url_when_available(qapp, settings):
+def test_delegate_prefers_provider_cover_over_tmdb(qapp, settings):
+    """Provider-first: the curated stream_icon always wins when it
+    exists - that's what SwipTV and other IPTV apps show, and it
+    never depends on our title-based TMDB search succeeding."""
     from dopeiptv.metadata import PosterResolver
     client = MagicMock()
     client.fetch_details.return_value = {
@@ -387,6 +393,41 @@ def test_delegate_uses_tmdb_url_when_available(qapp, settings):
     win = FakeWindow(tmdb, _StubLogos())
     d = FakeDelegate(win)
     it = {"name": "Great Movie", "stream_icon": "https://provider/x.jpg"}
+    assert d.pick_url(it, "vod") == "https://provider/x.jpg"
+
+
+def test_delegate_uses_tmdb_when_provider_icon_missing(qapp, settings):
+    from dopeiptv.metadata import PosterResolver
+    client = MagicMock()
+    client.fetch_details.return_value = {
+        "tmdb_id": 1, "poster_url": "https://tmdb/great.jpg"}
+    tmdb = PosterResolver(_pool(), settings, client)
+    tmdb.get_full("Great Movie", "vod", lambda d: None)
+    _drain_pool(tmdb.pool, qapp)
+
+    win = FakeWindow(tmdb, _StubLogos())
+    d = FakeDelegate(win)
+    it = {"name": "Great Movie"}  # provider gave no stream_icon
+    assert d.pick_url(it, "vod") == "https://tmdb/great.jpg"
+
+
+def test_delegate_uses_tmdb_when_provider_icon_dead(qapp, settings):
+    """Provider icon 404s -> the TMDB poster steps in."""
+    from dopeiptv.metadata import PosterResolver
+    client = MagicMock()
+    client.fetch_details.return_value = {
+        "tmdb_id": 1, "poster_url": "https://tmdb/great.jpg"}
+    tmdb = PosterResolver(_pool(), settings, client)
+    tmdb.get_full("Great Movie", "vod", lambda d: None)
+    _drain_pool(tmdb.pool, qapp)
+
+    import time
+    logos = _StubLogos()
+    logos.dead["https://provider/broken.jpg"] = time.monotonic() + 3600
+    win = FakeWindow(tmdb, logos)
+    d = FakeDelegate(win)
+    it = {"name": "Great Movie",
+          "stream_icon": "https://provider/broken.jpg"}
     assert d.pick_url(it, "vod") == "https://tmdb/great.jpg"
 
 
