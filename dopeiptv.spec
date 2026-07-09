@@ -91,7 +91,67 @@ def _find_libmpv():
         tempfile.mkdtemp(prefix="dopeiptv-libmpv-"), primary)
     shutil.copy2(real, staged)
     print(f"Bundling libmpv: {real} -> {primary}")
-    return [(staged, ".")]
+    result = [(staged, ".")]
+    if sys.platform != "darwin":
+        result += _libmpv_dep_binaries(real)
+    return result
+
+
+def _libmpv_dep_binaries(libmpv_path):
+    """Bundle the shared libraries libmpv itself needs (Linux).
+
+    python-mpv dlopen()s libmpv at runtime, so PyInstaller never analyses it
+    and never pulls in libmpv's own dependencies - ffmpeg's libav*, libass,
+    libplacebo and a long tail of codec libraries. They happen to be present
+    on the build host and on a full desktop, so it "works on my machine", but
+    a leaner box - or simply a newer Ubuntu whose ffmpeg soname differs from
+    the one our libmpv was built against (24.04's libav*.so.60 vs 22.04's
+    libav*.so.58) - can't load libmpv at all ("Failed to load dynlib") and the
+    embedded player is dead. Walk ldd and bundle everything that isn't a core
+    system / GL / X / Wayland / audio library (those must come from the host
+    to match its kernel, driver, display server and sound server), so the
+    player is genuinely self-contained on any machine."""
+    import subprocess
+    deny = (
+        # C runtime + loader - must be the host's
+        "linux-vdso", "ld-linux", "libc.so", "libm.so", "libdl.so",
+        "libpthread.so", "librt.so", "libresolv.so", "libutil.so",
+        "libgcc_s.so", "libstdc++.so", "libmvec.so", "libanl.so",
+        # GL / Mesa / DRM / Vulkan - host's, matches its GPU driver
+        "libGL", "libGLX", "libEGL", "libGLdispatch", "libOpenGL",
+        "libglapi", "libgbm", "libdrm", "libgallium", "libLLVM", "libvulkan",
+        # X / Wayland / input - host's, matches its display server
+        "libX11", "libxcb", "libXext", "libXfixes", "libXrandr", "libXi",
+        "libXrender", "libXau", "libXdmcp", "libxkbcommon", "libwayland",
+        "libxshmfence",
+        # audio - host's, matches its sound server
+        "libpulse", "libasound", "libpipewire", "libjack",
+        # font stack + ubiquitous base libs present on every desktop
+        "libfontconfig", "libfreetype", "libz.so", "libzstd", "liblzma",
+        "libbz2", "libudev", "libsystemd", "libdbus", "libcap", "libffi",
+        "libpcre", "libselinux", "libmount", "libblkid",
+    )
+    try:
+        out = subprocess.check_output(["ldd", libmpv_path], text=True)
+    except Exception as e:
+        print(f"WARNING: ldd on libmpv failed ({e}); not bundling its deps. "
+              "The embedded player may fail on machines missing ffmpeg/libass.")
+        return []
+    deps = []
+    for line in out.splitlines():
+        if "=>" not in line:
+            continue
+        path = line.split("=>", 1)[1].strip().split(" ", 1)[0]
+        if not path or not os.path.exists(path):
+            continue
+        base = os.path.basename(path)
+        if any(base.startswith(p) for p in deny):
+            continue
+        deps.append((os.path.realpath(path), "."))
+    if deps:
+        names = sorted({os.path.basename(p) for p, _ in deps})
+        print(f"Bundling {len(deps)} libmpv dependencies: {', '.join(names)}")
+    return deps
 
 
 binaries = _find_libmpv() + _find_ffmpeg()

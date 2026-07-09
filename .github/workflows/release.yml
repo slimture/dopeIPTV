@@ -147,6 +147,21 @@ jobs:
             --depends libgl1 --depends libegl1 --depends libxcb-cursor0 \
             --depends libpulse0 \
             -C "$root" .
+      - name: Self-containment test in a clean ubuntu:24.04 container
+        run: |
+          # The strongest proof that the embedded player works on ANY machine,
+          # not just where ffmpeg/libmpv happen to be installed: run the
+          # AppImage's GUI-less --self-check inside a pristine ubuntu:24.04
+          # container with NOTHING extra installed. 24.04's ffmpeg soname
+          # differs from the 22.04 we build against, so if libmpv's deps
+          # weren't bundled this fails - which is exactly the "only works where
+          # mpv is installed" bug. --self-check needs no GPU or display.
+          APPIMAGE="$(ls dopeIPTV-*.AppImage | head -1)"
+          docker run --rm -v "$PWD:/work" -w /work ubuntu:24.04 bash -c "
+            set -e
+            chmod +x '$APPIMAGE'
+            ./'$APPIMAGE' --appimage-extract-and-run --self-check
+          "
       - name: Smoke test - launch AppImage and .deb
         run: |
           # Headless CI has no hardware GL, so QOpenGLWidget's GL init step
