@@ -221,20 +221,33 @@ class _MpvGLWidget(QOpenGLWidget):
         else:
             print("[dopeIPTV] WARNING: no GL context in initializeGL",
                   file=sys.stderr)
-        opts = {"vo": "libmpv", "user_agent": "dopeIPTV/1.0",
-                "keep_open": "yes", "input_default_bindings": False,
-                "input_vo_keyboard": False, "osc": False,
-                "terminal": False,
+        # vo=libmpv is mandatory for the render API and exists in every
+        # libmpv build - create the instance with just that (plus a quiet
+        # terminal), then apply the rest tolerantly below.
+        print("[dopeIPTV] Creating mpv instance...", file=sys.stderr)
+        self.mpv = _libmpv.MPV(vo="libmpv", terminal=False)
+        # Best-effort options. Some minimal libmpv builds (notably the one
+        # compiled inside our Flatpak) don't implement every option - e.g.
+        # 'osc'. Passing them all to the constructor makes ONE unknown
+        # option abort the whole player ("mpv option does not exist"), so
+        # set them one at a time and skip any this build rejects.
+        soft = {"user_agent": "dopeIPTV/1.0", "keep_open": "yes",
+                "input_default_bindings": False, "input_vo_keyboard": False,
+                "osc": False,
                 # Never let mpv open its own window, and keep its OSD silent -
                 # otherwise it draws the media title centred on black while a
                 # stream buffers, which can surface as a stray frame.
                 "force-window": "no", "osd-level": 0}
         if sys.platform == "darwin":
             from .platform_macos import extra_mpv_opts
-            opts.update(extra_mpv_opts())
-        opts.update(self.EXTRA_OPTS)
-        print("[dopeIPTV] Creating mpv instance...", file=sys.stderr)
-        self.mpv = _libmpv.MPV(**opts)
+            soft.update(extra_mpv_opts())
+        soft.update(self.EXTRA_OPTS)
+        for key, val in soft.items():
+            try:
+                self.mpv[key.replace("_", "-")] = val
+            except Exception as e:
+                print(f"[dopeIPTV] mpv option {key!r} skipped: {e}",
+                      file=sys.stderr)
         print("[dopeIPTV] mpv created, creating render context...",
               file=sys.stderr)
         self._proc_address_fn = _libmpv.MpvGlGetProcAddressFn(
