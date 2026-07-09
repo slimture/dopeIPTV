@@ -16,11 +16,19 @@ from PyQt6.QtCore import QSettings
 
 
 class FavoriteStore:
-    """Favorite channels in user-defined groups, persisted via QSettings."""
+    """Favorites in user-defined groups, persisted via QSettings.
 
-    def __init__(self, settings: QSettings, key: str = "favorites") -> None:
+    Used three times over: channels (keyed on ``stream_id``, with the
+    full group + parental-lock UI), and two flat single-group stores for
+    favorite movies (``stream_id``) and series (``series_id``). The
+    ``id_key`` selects which provider field identifies an item so the
+    same code drives all three."""
+
+    def __init__(self, settings: QSettings, key: str = "favorites",
+                 id_key: str = "stream_id") -> None:
         self.settings = settings
         self.key = key
+        self.id_key = id_key
         try:
             self.groups: dict[str, list[dict]] = json.loads(
                 settings.value(key, "") or "{}")
@@ -37,26 +45,26 @@ class FavoriteStore:
 
     def add(self, group: str, item: dict) -> None:
         items = self.groups.setdefault(group, [])
-        stream_id = item.get("stream_id")
-        if not any(x.get("stream_id") == stream_id for x in items):
+        ident = item.get(self.id_key)
+        if not any(x.get(self.id_key) == ident for x in items):
             items.append(item)
         self._save()
 
-    def remove(self, stream_id: Any, group: str | None = None) -> None:
+    def remove(self, ident: Any, group: str | None = None) -> None:
         for g in ([group] if group else list(self.groups)):
             self.groups[g] = [x for x in self.groups.get(g, [])
-                              if x.get("stream_id") != stream_id]
+                              if x.get(self.id_key) != ident]
         self._save()
 
-    def is_favorite(self, stream_id) -> bool:
+    def is_favorite(self, ident) -> bool:
         for items in self.groups.values():
-            if any(x.get("stream_id") == stream_id for x in items):
+            if any(x.get(self.id_key) == ident for x in items):
                 return True
         return False
 
-    def groups_for(self, stream_id) -> list[str]:
+    def groups_for(self, ident) -> list[str]:
         return [g for g, items in self.groups.items()
-                if any(x.get("stream_id") == stream_id for x in items)]
+                if any(x.get(self.id_key) == ident for x in items)]
 
     def remove_group(self, group: str) -> None:
         self.groups.pop(group, None)
@@ -91,9 +99,9 @@ class FavoriteStore:
             if g in exclude_groups:
                 continue
             for it in self.groups[g]:
-                stream_id = it.get("stream_id")
-                if stream_id not in seen:
-                    seen.add(stream_id)
+                ident = it.get(self.id_key)
+                if ident not in seen:
+                    seen.add(ident)
                     result.append(it)
         return result
 

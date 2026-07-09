@@ -233,6 +233,15 @@ class MainWindow(QMainWindow):
         self.xmltv.delay_minutes = self._epg_delay_minutes()
         self.favs = FavoriteStore(
             settings, f"favorites_{pid}" if pid else "favorites")
+        # Flat, single-group favourites for movies and series - the
+        # split Favorites column shows these under 'Movies' and 'Series'
+        # alongside the grouped channel favourites.
+        self.movie_favs = FavoriteStore(
+            settings, f"movie_favorites_{pid}" if pid else "movie_favorites",
+            id_key="stream_id")
+        self.series_favs = FavoriteStore(
+            settings, f"series_favorites_{pid}" if pid else "series_favorites",
+            id_key="series_id")
         self.history = HistoryStore(
             settings, f"history_{pid}" if pid else "history")
         self._resume_key = f"resume_positions_{pid}" if pid else "resume_positions"
@@ -278,6 +287,10 @@ class MainWindow(QMainWindow):
             settings.setValue("playback_mode_v2", "1")
         self.mode: str = "live"
         self.all_items: list = []
+        # Which Favorites section is showing: "chan", "movie" or
+        # "series". Drives the content kind (poster vs live, play as
+        # movie vs drill into episodes) while self.mode stays "fav".
+        self._fav_section: str = "chan"
         self.series_ctx = None
         self._info_cache: dict = {}
         self._current_key = None
@@ -992,6 +1005,10 @@ class MainWindow(QMainWindow):
             self.playlist_store.set_active(pid)
             self.client = candidate
             self.favs = FavoriteStore(self.settings, f"favorites_{pid}")
+            self.movie_favs = FavoriteStore(
+                self.settings, f"movie_favorites_{pid}", id_key="stream_id")
+            self.series_favs = FavoriteStore(
+                self.settings, f"series_favorites_{pid}", id_key="series_id")
             self.history = HistoryStore(self.settings, f"history_{pid}")
             self._base_title = pl["name"]
             self.setWindowTitle(self._base_title)
@@ -1042,18 +1059,37 @@ class MainWindow(QMainWindow):
             self.cat_list.blockSignals(False)
             self.cat_list.setCurrentRow(0)
             return
-        if self.mode in ("fav", "history"):
+        if self.mode == "history":
             self.cat_list.blockSignals(True)
             all_item = QListWidgetItem(tr("cat_all"))
             all_item.setData(Qt.ItemDataRole.UserRole, None)
             self.cat_list.addItem(all_item)
-            if self.mode == "fav":
-                for g in self.favs.group_names():
-                    locked = (self.favs.is_locked(g)
-                              and not self.parental.session_unlocked)
-                    it = QListWidgetItem(f"{g}  [locked]" if locked else g)
-                    it.setData(Qt.ItemDataRole.UserRole, g)
-                    self.cat_list.addItem(it)
+            self.cat_list.blockSignals(False)
+            self.cat_list.setCurrentRow(0)
+            return
+        if self.mode == "fav":
+            # Split column: a Channels section (with its user-defined
+            # groups + parental lock nested underneath), then flat
+            # Movies and Series sections. The row data is a
+            # (section, group) tuple - group is only meaningful for
+            # channels.
+            self.cat_list.blockSignals(True)
+            chan = QListWidgetItem(tr("fav_channels"))
+            chan.setData(Qt.ItemDataRole.UserRole, ("chan", None))
+            self.cat_list.addItem(chan)
+            for g in self.favs.group_names():
+                locked = (self.favs.is_locked(g)
+                          and not self.parental.session_unlocked)
+                label = f"    {g}  [locked]" if locked else f"    {g}"
+                it = QListWidgetItem(label)
+                it.setData(Qt.ItemDataRole.UserRole, ("chan", g))
+                self.cat_list.addItem(it)
+            movies = QListWidgetItem(tr("fav_movies"))
+            movies.setData(Qt.ItemDataRole.UserRole, ("movie", None))
+            self.cat_list.addItem(movies)
+            series = QListWidgetItem(tr("fav_series"))
+            series.setData(Qt.ItemDataRole.UserRole, ("series", None))
+            self.cat_list.addItem(series)
             self.cat_list.blockSignals(False)
             self.cat_list.setCurrentRow(0)
             return
@@ -1126,7 +1162,11 @@ class MainWindow(QMainWindow):
         locked = False
         if cat is not None:
             if self.mode == "fav":
-                locked = self.favs.is_locked(cat)
+                # cat is a (section, group) tuple; only a named channel
+                # group can be parental-locked.
+                section, group = cat
+                locked = (section == "chan" and group is not None
+                          and self.favs.is_locked(group))
             elif self.mode in ("live", "vod", "series"):
                 locked = self.overrides.is_locked(self.mode, cat)
         if locked and not self.parental.session_unlocked:
@@ -1156,10 +1196,18 @@ class MainWindow(QMainWindow):
             self._apply_filter()
             return
         if self.mode == "fav":
-            exclude = (() if self.parental.session_unlocked
-                       else self.favs.locked_groups())
-            self.all_items = self.favs.items(
-                category_id, exclude_groups=exclude)
+            # category_id is a (section, group) tuple (or None as a
+            # fallback, meaning all channels).
+            section, group = category_id if category_id else ("chan", None)
+            self._fav_section = section
+            if section == "movie":
+                self.all_items = self.movie_favs.items()
+            elif section == "series":
+                self.all_items = self.series_favs.items()
+            else:
+                exclude = (() if self.parental.session_unlocked
+                           else self.favs.locked_groups())
+                self.all_items = self.favs.items(group, exclude_groups=exclude)
             self._apply_filter()
             return
         if self.mode == "history":
@@ -1930,9 +1978,21 @@ class MainWindow(QMainWindow):
         ov_mode = "live" if kind == "fav" else kind
         return self.channel_ov.is_hidden(ov_mode, key)
 
+    def _content_kind(self) -> str:
+        """The kind of content the middle list is currently showing.
+        Same as self.mode except inside the Favorites view, where the
+        selected section decides whether the rows are channels ('fav',
+        painted like live), movies ('vod') or series ('series')."""
+        if self.series_ctx:
+            return "episode"
+        if self.mode == "fav":
+            return {"movie": "vod", "series": "series"}.get(
+                self._fav_section, "fav")
+        return self.mode
+
     def _apply_filter(self) -> None:
         text = self.search.text().lower().strip()
-        kind = "episode" if self.series_ctx else self.mode
+        kind = self._content_kind()
         items = [it for it in self.all_items
                  if not self._channel_hidden(it, kind)]
         if text:
@@ -1945,9 +2005,12 @@ class MainWindow(QMainWindow):
         if self._loading_hint.isVisible():
             self._loading_hint.hide()
         self._set_status(f"{len(filtered)} {self.LABELS[kind]}")
-        if kind == "fav" and not self.all_items:
+        if self.mode == "fav" and not self.series_ctx and not self.all_items:
+            where = {"movie": "a movie in Movies",
+                     "series": "a series in Series"}.get(
+                         self._fav_section, "a channel in TV")
             self._set_status(
-                "No favorites yet - right-click a channel in TV to add one.")
+                f"No favorites yet - right-click {where} to add one.")
         elif kind == "history" and not self.all_items:
             self._set_status("No watch history yet.")
 
@@ -1964,7 +2027,7 @@ class MainWindow(QMainWindow):
         if self.series_ctx:
             return "episode"
         return {"live": "live", "fav": "live", "vod": "movie"}.get(
-            self.mode, "other")
+            self._content_kind(), "other")
 
     # -- selection, EPG and detail panel -------------------------------------------
 
@@ -2003,9 +2066,14 @@ class MainWindow(QMainWindow):
                      if self.mode in ("history", "watchlist") else None)
         snap_kind = {"movie": "vod", "episode": "series"}.get(
             snap_kind, snap_kind)
+        # In the Favorites view the content kind follows the selected
+        # section, so a favourite movie/series gets the poster + info
+        # panel just like it would in the Movies / Series views.
+        ckind = self._content_kind()
         media_kind = (
-            "vod" if self.mode == "vod"
-            else "series" if self.mode == "series"
+            "series" if self.series_ctx
+            else "vod" if ckind == "vod"
+            else "series" if ckind == "series"
             else snap_kind if snap_kind in ("vod", "series")
             else None)
         is_media = media_kind is not None
@@ -2037,7 +2105,7 @@ class MainWindow(QMainWindow):
             info = (it.get("info")
                     if isinstance(it.get("info"), dict) else {})
             self._show_media_info(info, self._current_key)
-        elif self.mode in ("live", "fav"):
+        elif ckind in ("live", "fav"):
             if it.get("stream_id") is not None:
                 self._request_epg()
                 if (self.player and self._autoplay_preview()
@@ -2050,7 +2118,7 @@ class MainWindow(QMainWindow):
         # stream_id/series_id), so fall back to that - this is what
         # makes the plot/genre/cast panel fill in for history items
         # even with no TMDB account.
-        elif (self.mode == "vod"
+        elif (ckind == "vod"
               or (self.mode in ("watchlist", "history")
                   and snap_kind == "vod")):
             sid = it.get("stream_id")
@@ -2058,7 +2126,7 @@ class MainWindow(QMainWindow):
                 sid = it.get("_key")
             if sid is not None:
                 self._request_media_info("vod", sid, self._current_key)
-        elif (self.mode == "series"
+        elif (ckind == "series"
               or (self.mode in ("watchlist", "history")
                   and snap_kind == "series")):
             sid = it.get("series_id")
@@ -2458,7 +2526,8 @@ class MainWindow(QMainWindow):
 
     def _request_epg(self) -> None:
         it = self.list_model.item_at(self.listw.currentIndex().row())
-        if not it or self.mode not in ("live", "fav") or self.series_ctx:
+        if (not it or self._content_kind() not in ("live", "fav")
+                or self.series_ctx):
             return
         sid = it.get("stream_id")
         if sid is None:
@@ -2704,7 +2773,10 @@ class MainWindow(QMainWindow):
         if self.series_ctx:
             return self.client.episode_url(
                 it.get("id"), it.get("container_extension")), title
-        if self.mode in ("live", "fav"):
+        # Favorite movies/series route by the selected section, not by
+        # 'fav' meaning live - only the Channels section plays live.
+        if self.mode == "live" or (
+                self.mode == "fav" and self._fav_section == "chan"):
             fmt = self.settings.value("stream_format", "ts")
             return self.client.live_url(it.get("stream_id"), fmt), title
         # Watch Later snapshots carry `_kind` set to "vod" or "series"
@@ -2713,6 +2785,8 @@ class MainWindow(QMainWindow):
         eff_mode = self.mode
         if self.mode == "watchlist":
             eff_mode = it.get("_kind") or "vod"
+        elif self.mode == "fav":
+            eff_mode = "vod" if self._fav_section == "movie" else "series"
         if eff_mode == "vod":
             return self.client.vod_url(
                 it.get("stream_id"), it.get("container_extension")), title
@@ -2735,10 +2809,14 @@ class MainWindow(QMainWindow):
         if self.mode == "series" and not self.series_ctx:
             self._enter_series(it)
             return
-        # Series row from Watch Later: same 'drill in' behaviour as
-        # from the Series view - open the episode list instead of
-        # trying to play a series URL directly.
+        # Series row from Watch Later or the Favorites 'Series' section:
+        # same 'drill in' behaviour as from the Series view - open the
+        # episode list instead of trying to play a series URL directly.
         if self.mode == "watchlist" and it.get("_kind") == "series":
+            self._enter_series(it)
+            return
+        if (self.mode == "fav" and self._fav_section == "series"
+                and not self.series_ctx):
             self._enter_series(it)
             return
         if self.mode == "rec":
@@ -2783,7 +2861,7 @@ class MainWindow(QMainWindow):
             url, title = it.get("_url"), it.get("name") or "dopeIPTV"
         else:
             url, title = self._stream_for(it)
-            if (self.mode in ("live", "fav")
+            if (self._content_kind() in ("live", "fav")
                     and it.get("stream_id") is not None):
                 url = self.client.live_url(it["stream_id"], "m3u8")
         if not url:
@@ -2795,8 +2873,8 @@ class MainWindow(QMainWindow):
 
     def _play_preview(self) -> None:
         it = self.list_model.item_at(self.listw.currentIndex().row())
-        if (not it or self.mode not in ("live", "fav") or self.series_ctx
-                or not self.player
+        if (not it or self._content_kind() not in ("live", "fav")
+                or self.series_ctx or not self.player
                 or self.playback_mode() != "embedded"):
             return
         url, title = self._stream_for(it)
@@ -3022,7 +3100,8 @@ class MainWindow(QMainWindow):
         if not (self.mode == "series" and not self.series_ctx):
             m.addAction(tr("ctx_cast_to_chromecast"),
                         lambda: self._open_cast_dialog(it))
-        if (self.mode in ("live", "fav")
+        content_kind = self._content_kind()
+        if (content_kind in ("live", "fav")
                 and it.get("stream_id") is not None):
             if self._timeshift_days(it):
                 m.addSeparator()
@@ -3030,8 +3109,10 @@ class MainWindow(QMainWindow):
                     m.addMenu(tr("tooltip_timeshift")), it)
             m.addSeparator()
             self._build_record_menu(m.addMenu(tr("rec_record")), it)
-        if (self.mode in ("live", "fav", "vod", "series")
+        if (content_kind in ("live", "fav")
                 and it.get("stream_id") is not None):
+            # Channel favourites keep the full user-defined group +
+            # parental-lock system.
             m.addSeparator()
             fav_menu = m.addMenu(tr("ctx_add_to_favorites"))
             for g in self.favs.group_names():
@@ -3041,10 +3122,28 @@ class MainWindow(QMainWindow):
                 fav_menu.addSeparator()
             fav_menu.addAction(tr("ctx_new_group"),
                                lambda: self._add_fav(None, it))
-            if (self.mode == "fav"
+            if (content_kind == "fav"
                     or self.favs.is_favorite(it.get("stream_id"))):
                 m.addAction(tr("ctx_remove_from_favorites"),
                             lambda: self._remove_fav(it))
+        elif content_kind == "vod" and it.get("stream_id") is not None:
+            # Movie favourites are a flat list - a single toggle.
+            m.addSeparator()
+            if self.movie_favs.is_favorite(it.get("stream_id")):
+                m.addAction(tr("ctx_remove_from_favorites"),
+                            lambda: self._toggle_media_fav(it, "movie", False))
+            else:
+                m.addAction(tr("ctx_add_to_favorites"),
+                            lambda: self._toggle_media_fav(it, "movie", True))
+        elif content_kind == "series" and it.get("series_id") is not None:
+            # Series favourites are a flat list - a single toggle.
+            m.addSeparator()
+            if self.series_favs.is_favorite(it.get("series_id")):
+                m.addAction(tr("ctx_remove_from_favorites"),
+                            lambda: self._toggle_media_fav(it, "series", False))
+            else:
+                m.addAction(tr("ctx_add_to_favorites"),
+                            lambda: self._toggle_media_fav(it, "series", True))
         if (self.mode in ("vod", "series") and not self.series_ctx
                 and self.tmdb):
             m.addSeparator()
@@ -3239,11 +3338,34 @@ class MainWindow(QMainWindow):
     def _remove_fav(self, item) -> None:
         if self.mode == "fav":
             cur = self.cat_list.currentItem()
-            group = cur.data(Qt.ItemDataRole.UserRole) if cur else None
+            data = cur.data(Qt.ItemDataRole.UserRole) if cur else None
+            # fav category data is a (section, group) tuple; only the
+            # channel section carries a group to scope the removal to.
+            group = data[1] if isinstance(data, tuple) else None
             self.favs.remove(item.get("stream_id"), group)
             self._load_categories()
         else:
             self.favs.remove(item.get("stream_id"))
+            self.list_model.refresh_all()
+
+    def _toggle_media_fav(self, item, section: str, add: bool) -> None:
+        """Flat add/remove for movie ('movie') and series ('series')
+        favourites - no groups, no lock. Refreshes the list, and when
+        we're inside the Favorites view of that section, drops/reloads
+        the affected row."""
+        store = self.movie_favs if section == "movie" else self.series_favs
+        ident = item.get(store.id_key)
+        if add:
+            store.add("all", item)
+        else:
+            store.remove(ident)
+        if (self.mode == "fav"
+                and self._fav_section == section
+                and not add):
+            cur = self.cat_list.currentItem()
+            self._load_items(cur.data(Qt.ItemDataRole.UserRole) if cur
+                             else (section, None))
+        else:
             self.list_model.refresh_all()
 
     # -- parental control ----------------------------------------------------------
