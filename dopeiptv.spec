@@ -160,6 +160,10 @@ def _drop_host_graphics(binaries):
         # Wayland client stack - must match the running compositor.
         "libwayland-client.so", "libwayland-egl.so", "libwayland-cursor.so",
         "libwayland-server.so",
+        # Fontconfig - a bundled (older) libfontconfig can't parse a newer
+        # host /etc/fonts and spews "invalid attribute 'xsi:nil'" warnings on
+        # every launch. Use the host's so it reads its own config cleanly.
+        "libfontconfig.so",
     )
     kept, dropped = [], []
     for entry in binaries:
