@@ -26,6 +26,23 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.4.4" date="2026-07-09">
+      <description>
+        <p>Lower memory use, ARM64 Linux builds, and an internal cleanup.</p>
+        <ul>
+          <li>Far lower memory use: the EPG index is stored compactly
+              (roughly a quarter of before on big guides) and image caches
+              are capped by size, so idle RAM drops by around a gigabyte
+              with large providers</li>
+          <li>Faster EPG lookups (binary search instead of scanning),
+              snappier lists on huge channel line-ups</li>
+          <li>ARM64 Linux builds: an aarch64 AppImage and .deb, for ARM
+              machines (e.g. an ARM Ubuntu VM on Apple Silicon)</li>
+          <li>Internal restructuring of the main window into focused modules
+              - no user-visible change, but a safer base for new features</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.4.3" date="2026-07-09">
       <description>
         <p>The embedded player is now fully self-contained.</p>
@@ -37,12 +54,6 @@
           <li>Never crash if the graphics stack can't create the video
               surface - the app stays up and offers external playback</li>
           <li>CI now verifies the player loads inside a clean container</li>
-          <li>Far lower memory use: the EPG index is stored compactly
-              (roughly a quarter of before on big guides) and image caches
-              are capped by size, so idle RAM drops by around a gigabyte
-              with large providers</li>
-          <li>Faster EPG lookups (binary search instead of scanning),
-              snappier lists on huge channel line-ups</li>
         </ul>
       </description>
     </release>
