@@ -147,42 +147,54 @@ jobs:
             --depends libgl1 --depends libegl1 --depends libxcb-cursor0 \
             --depends libpulse0 \
             -C "$root" .
-      - name: Self-containment test in a clean ubuntu:24.04 container
+      - name: Self-containment test across clean distros
         run: |
-          # The strongest proof that the embedded player works on ANY machine,
-          # not just where ffmpeg/libmpv happen to be installed: run the
-          # AppImage's GUI-less --self-check inside a pristine ubuntu:24.04
-          # container with NOTHING extra installed. 24.04's ffmpeg soname
-          # differs from the 22.04 we build against, so if libmpv's deps
-          # weren't bundled this fails - which is exactly the "only works where
-          # mpv is installed" bug. --self-check needs no GPU or display.
-          # Install only the GUI base every Ubuntu desktop already has
-          # (libGL, glib, fontconfig, xcb, ...) - PyQt needs libGL.so.1 just to
-          # import. Deliberately do NOT install the media stack (mpv, ffmpeg,
-          # libass): those must come from our bundle, which is what this test
-          # proves.
-          docker run --rm -v "$PWD:/work" -w /work ubuntu:24.04 bash -c '
-            set -e
-            export DEBIAN_FRONTEND=noninteractive
-            apt-get update -qq
-            # The GUI + media host libraries that every Ubuntu desktop already
-            # ships (and that libmpv/Qt legitimately load from the host). NOT
-            # the ffmpeg/libass media stack - that must come from our bundle.
-            apt-get install -y -qq --no-install-recommends \
-              libgl1 libegl1 libglib2.0-0 libfontconfig1 libfreetype6 \
-              libdbus-1-3 libxkbcommon0 libxcb-cursor0 libx11-6 libxext6 \
-              libxrandr2 libxv1 libxss1 libwayland-client0 libwayland-egl1 \
-              libdrm2 libgbm1 libasound2t64 libpulse0 >/dev/null
-            ap=$(ls dopeIPTV-*.AppImage | head -1)
-            chmod +x "$ap"
-            ./"$ap" --appimage-extract >/dev/null
-            INT=squashfs-root/usr/dopeiptv/_internal
-            echo "--- libmpv unresolved deps (ldd) ---"
-            LD_LIBRARY_PATH="$INT" ldd "$INT/libmpv.so.2" 2>&1 \
-              | grep -i "not found" || echo "(none missing per ldd)"
-            echo "--- self-check ---"
-            ./squashfs-root/usr/dopeiptv/dopeiptv --self-check
-          '
+          # Prove the embedded player works on a real user's machine - not
+          # just where ffmpeg/libmpv happen to be installed - by running the
+          # AppImage's GUI-less --self-check inside SEVERAL pristine distro
+          # containers with no media stack installed. Each distro ships a
+          # different ffmpeg soname, so if libmpv's deps weren't fully bundled
+          # this fails - exactly the "only works where mpv is installed" bug.
+          # We install only the GUI/host base every desktop already has
+          # (libGL/X/Wayland/audio); the ffmpeg/libass media stack must come
+          # from our bundle, which is what this proves. --self-check needs no
+          # GPU or display.
+          set -e
+          for img in ubuntu:22.04 ubuntu:24.04 debian:12; do
+            echo "::group::self-containment on $img"
+            docker run --rm -v "$PWD:/work" -w /work "$img" bash -c '
+              set -e
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update -qq
+              apt-get install -y -qq --no-install-recommends \
+                libgl1 libegl1 libglib2.0-0 libfontconfig1 libfreetype6 \
+                libdbus-1-3 libxkbcommon0 libxcb-cursor0 libx11-6 libxext6 \
+                libxrandr2 libxv1 libxss1 libwayland-client0 libwayland-egl1 \
+                libdrm2 libgbm1 libpulse0 >/dev/null
+              # libasound has different package names across releases (t64
+              # transition), so try both.
+              apt-get install -y -qq --no-install-recommends libasound2t64 \
+                >/dev/null 2>&1 \
+                || apt-get install -y -qq --no-install-recommends libasound2 \
+                >/dev/null
+              rm -rf squashfs-root
+              ap=$(ls dopeIPTV-*.AppImage | head -1)
+              chmod +x "$ap"
+              ./"$ap" --appimage-extract >/dev/null
+              INT=squashfs-root/usr/dopeiptv/_internal
+              echo "--- libmpv unresolved deps (ldd) ---"
+              if LD_LIBRARY_PATH="$INT" ldd "$INT/libmpv.so.2" 2>&1 \
+                   | grep -i "not found"; then
+                echo "::error::libmpv has unresolved deps on '"$img"'"
+                exit 1
+              fi
+              echo "(none missing per ldd)"
+              echo "--- self-check ---"
+              ./squashfs-root/usr/dopeiptv/dopeiptv --self-check
+            '
+            echo "::endgroup::"
+          done
+          rm -rf squashfs-root
       - name: Smoke test - launch AppImage and .deb
         run: |
           # Headless CI has no hardware GL, so QOpenGLWidget's GL init step
