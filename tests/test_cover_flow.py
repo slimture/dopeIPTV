@@ -775,6 +775,46 @@ def test_auto_fetch_passes_year_to_client(qapp, settings):
     assert args[2] == 1990             # year forwarded
 
 
+def test_cache_prunes_no_poster_entries_on_matcher_upgrade(qapp, tmp_path):
+    """After a matcher upgrade, previously-cached no-poster failures are
+    dropped so the improved matcher re-runs; entries with a poster and
+    manual picks survive."""
+    from PyQt6.QtCore import QSettings
+    from dopeiptv.metadata import PosterResolver
+    import json
+    s = QSettings(str(tmp_path / "p.ini"), QSettings.Format.IniFormat)
+    s.setValue(PosterResolver.CACHE_KEY, json.dumps({
+        "vod:has poster": {"poster_url": "https://tmdb/x.jpg"},
+        "vod:no match": {},
+        "vod:no poster": {"poster_url": None, "rating": 5},
+        "vod:manual pick": {"manual": True, "poster_url": None},
+    }))
+    # No stored matcher version -> prune runs.
+    r = PosterResolver(_pool(), s, MagicMock())
+    assert "vod:has poster" in r._cache
+    assert "vod:manual pick" in r._cache      # manual survives
+    assert "vod:no match" not in r._cache      # re-search
+    assert "vod:no poster" not in r._cache     # re-search
+    # Version stamped so it doesn't prune again next launch.
+    assert int(s.value(PosterResolver.CACHE_MATCHER_VER_KEY)) == \
+        PosterResolver.CACHE_MATCHER_VER
+
+
+def test_cache_prune_runs_once(qapp, tmp_path):
+    from PyQt6.QtCore import QSettings
+    from dopeiptv.metadata import PosterResolver
+    import json
+    s = QSettings(str(tmp_path / "q.ini"), QSettings.Format.IniFormat)
+    s.setValue(PosterResolver.CACHE_MATCHER_VER_KEY,
+               PosterResolver.CACHE_MATCHER_VER)
+    s.setValue(PosterResolver.CACHE_KEY, json.dumps({
+        "vod:no match": {},  # a fresh no-match from the current matcher
+    }))
+    r = PosterResolver(_pool(), s, MagicMock())
+    # Already on the current version -> no prune, the entry stays.
+    assert "vod:no match" in r._cache
+
+
 # -- Embedded TMDB path extraction from provider URLs ----------------------
 
 

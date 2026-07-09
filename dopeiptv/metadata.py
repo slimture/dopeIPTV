@@ -241,6 +241,12 @@ class PosterResolver(QObject):
     """
 
     CACHE_KEY = "tmdb_poster_cache_v3"
+    CACHE_MATCHER_VER_KEY = "tmdb_matcher_version"
+    # Bump when the auto-matcher gets smarter (year filter, best-poster
+    # pick, ...) so previously-cached 'no match / no poster' results are
+    # dropped once and re-searched with the better logic. Entries that
+    # already have a poster, and manual picks, are always kept.
+    CACHE_MATCHER_VER = 2
     PERSON_CACHE_KEY = "tmdb_person_cache"
     PERSON_ID_CACHE_KEY = "tmdb_person_id_cache"
 
@@ -260,6 +266,26 @@ class PosterResolver(QObject):
             k: (v if isinstance(v, dict) else {"poster_url": v or None})
             for k, v in raw.items()
         }
+        # One-time prune after a matcher upgrade: drop entries that
+        # resolved without a poster so the improved matcher re-runs for
+        # them. Titles that already have a poster (and manual overrides)
+        # are untouched, so this costs re-searches only for the previous
+        # failures, once.
+        try:
+            stored_ver = int(
+                settings.value(self.CACHE_MATCHER_VER_KEY, 0) or 0)
+        except (ValueError, TypeError):
+            stored_ver = 0
+        if stored_ver < self.CACHE_MATCHER_VER:
+            before = len(self._cache)
+            self._cache = {
+                k: v for k, v in self._cache.items()
+                if v.get("manual") or v.get("poster_url")}
+            settings.setValue(self.CACHE_MATCHER_VER_KEY,
+                              self.CACHE_MATCHER_VER)
+            settings.setValue(self.CACHE_KEY, json.dumps(self._cache))
+            _tmdb_dbg(f"cache prune: dropped {before - len(self._cache)} "
+                      f"no-poster entries for re-match")
         self._pending: set[str] = set()
         self._waiting: dict[str, list[Callable]] = {}
         self._dirty = False
