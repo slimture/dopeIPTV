@@ -4,6 +4,7 @@ cast by title, with a persistent cache so each title is only searched once."""
 from __future__ import annotations
 
 import json
+import re
 from typing import Callable
 
 import requests
@@ -242,12 +243,65 @@ class PosterResolver(QObject):
     def _key(title: str, kind: str) -> str:
         return f"{kind}:{title.strip().lower()}"
 
+    @staticmethod
+    def clean_title(raw: str) -> tuple[str, int | None]:
+        """Strip the noise providers wrap around real movie titles so
+        the initial TMDB search stands a chance of matching. Handles
+        leading language tags (EN|, SV -), quality/codec/audio tags
+        (1080p, x265, WEB-DL, MULTI), and the bracketed suffixes
+        Xtream operators add for indexing purposes ([IMDB], [MULTI],
+        [SUB], plus empty [] or (something) that follow). Returns
+        the cleaned title and the year if one appears in the raw
+        string, so callers can pre-fill both a search box and a year
+        filter. Shared between the auto-matcher (so covers show up
+        for provider titles that TMDB would otherwise reject) and
+        the manual-match dialog (so the search box lands on a sane
+        starting query)."""
+        t = raw or ""
+        # Extract the year first, from the raw string, so a bracketed
+        # or parenthesised year isn't collateral-damage of the
+        # bracket-suffix strip a couple of lines down.
+        year: int | None = None
+        year_m = re.search(r"\b(19|20)\d{2}\b", t)
+        if year_m:
+            try:
+                year = int(year_m.group(0))
+            except ValueError:
+                year = None
+        # Leading 'EN|', 'SV - ', 'FR:' language tag
+        t = re.sub(r"^\s*[A-Za-z]{2,3}\s*[|\-:]\s*", "", t)
+        # Bracketed suffixes: '[IMDB]', '[MULTI]', '[SUB]', '[HDR]',
+        # trailing '[ ]' or '( )' or '(2023)'
+        t = re.sub(r"\s*[\[(][^\])]*[\])]\s*$", "", t)
+        # Codec / audio / language noise tail
+        t = re.sub(
+            r"\b(1080p|720p|2160p|4K|UHD|HDR|WEB[-.]?DL|WEB[-.]?RIP|"
+            r"BR[-.]?RIP|BluRay|BDR[iI][pP]|x265|x264|HEVC|H\.?264|"
+            r"H\.?265|AAC|DTS|AC3|MULTI|VOSTFR|VOST|VF|SUB|DUAL|"
+            r"REMUX|EXTENDED|UNRATED|DIRECTORS?[ .]CUT)\b.*$", "",
+            t, flags=re.IGNORECASE)
+        # Strip any leftover bare year, optionally in parens, so it
+        # doesn't confuse the TMDB search string.
+        t = re.sub(r"\s*\(?\b(19|20)\d{2}\b\)?\s*", " ", t)
+        # Trim leftover punctuation / whitespace
+        t = t.strip(" -_.|:;/\t\n")
+        t = re.sub(r"\s+", " ", t)
+        return t, year
+
     def _ensure_fetch(self, title: str, kind: str, key: str) -> None:
         if key in self._pending:
             return
         self._pending.add(key)
+        # Provider titles carry marketing noise (language prefix,
+        # quality tags, '[IMDB]' / '[MULTI]' bracket suffixes, year
+        # in parens) that TMDB's search endpoint scores against the
+        # real title and rejects. Clean before searching so the
+        # auto-match hits the same titles the manual dialog already
+        # succeeds on.
+        cleaned, year = self.clean_title(title)
+        search_query = cleaned or title
 
-        def fetch(t=title, k=kind):
+        def fetch(t=search_query, k=kind):
             return self.client.fetch_details(t, k)
 
         def done(details, key=key):
@@ -277,35 +331,65 @@ class PosterResolver(QObject):
         run_async(self.pool, fetch, done, fail)
 
     def set_manual_match(self, title: str, kind: str, tmdb_id: int,
-                         callback: Callable[[dict], None]) -> None:
-        """User picked a specific TMDB entry for this title. Fetch its full
-        details, cache them with a manual=True flag so they survive future
-        auto-searches, and notify the caller (usually the detail panel) so
-        the poster + metadata refresh live."""
+                         callback: Callable[[dict], None],
+                         preview: dict | None = None) -> None:
+        """User picked a specific TMDB entry for this title. Cache the
+        pick immediately with whatever fields the caller already had
+        from search (poster_url, title, year, overview) so the list
+        poster + detail panel update on the next paint even if the
+        follow-up fetch_details_by_id call fails; then fire that fetch
+        in the background to merge in the richer fields (rating,
+        cast, imdb id) and re-notify. The manual=True flag survives
+        future auto-searches either way."""
         key = self._key(title, kind)
+
+        seed = {"manual": True, "tmdb_id": tmdb_id}
+        if preview:
+            for k in ("poster_url", "title", "year",
+                      "overview", "release_date"):
+                v = preview.get(k)
+                if v is not None:
+                    seed[k] = v
+        self._cache[key] = seed
+        self._save()
+        # Notify the delegate / detail panel right away so the cover
+        # can appear before the details-endpoint round-trip returns.
+        for cb in self._waiting.pop(key, []):
+            try:
+                cb(seed)
+            except RuntimeError:
+                pass
+        try:
+            callback(seed)
+        except RuntimeError:
+            pass
 
         def fetch(tid=tmdb_id, k=kind):
             return self.client.fetch_details_by_id(tid, k)
 
         def done(details, key=key):
-            d = dict(details or {})
+            # Merge the richer TMDB fields on top of the seed. Keep
+            # any seed field the details endpoint didn't return
+            # (poster_url in particular - the search result's poster
+            # is authoritative for the user's pick).
+            d = dict(self._cache.get(key) or seed)
+            for k, v in (details or {}).items():
+                if v is None and d.get(k) is not None:
+                    continue
+                d[k] = v
             d["manual"] = True
             d["tmdb_id"] = tmdb_id
             self._cache[key] = d
             self._save()
-            # Notify anyone waiting on the auto-search too so we don't
-            # leave callbacks pending indefinitely.
-            for cb in self._waiting.pop(key, []):
-                try:
-                    cb(d)
-                except RuntimeError:
-                    pass
             try:
                 callback(d)
             except RuntimeError:
                 pass
 
-        def fail(_msg):
+        def fail(_msg, key=key):
+            # Seed is already in the cache; keep the poster visible
+            # and don't retry. The delegate + detail panel already
+            # got their notification above.
             pass
 
         run_async(self.pool, fetch, done, fail)

@@ -5,7 +5,6 @@ ambiguous names (multiple films sharing a title)."""
 
 from __future__ import annotations
 
-import re
 from typing import Callable
 
 from PyQt6.QtCore import Qt, QSize
@@ -16,34 +15,9 @@ from PyQt6.QtWidgets import (
 )
 
 from .i18n import tr
+from .metadata import PosterResolver
 from .theme import P
 from .workers import run_async
-
-
-# Strip provider noise from a title before the initial search: leading
-# language prefixes ("EN|", "SV -"), the year in parens, and quality tags
-# (1080p, x265, WEB-DL, MULTI, ...). Same regexes the cast-filmography
-# matcher uses.
-_PREFIX = re.compile(r"^\s*[A-Z]{2,3}\s*[|\-:]\s*")
-_YEAR = re.compile(r"\s*\(?\b(19|20)\d{2}\b\)?\s*")
-_NOISE = re.compile(
-    r"\b(1080p|720p|2160p|4K|UHD|HDR|WEB[-.]?DL|WEB[-.]?RIP|BR[-.]?RIP|"
-    r"BluRay|BDR[iI][pP]|x265|x264|HEVC|H\.?264|H\.?265|AAC|DTS|AC3|"
-    r"MULTI|VOSTFR|VOST|VF|SUB|DUAL)\b.*$",
-    re.IGNORECASE)
-
-
-def _clean_title(raw: str) -> str:
-    """Best-effort cleanup so the initial search on the dirty provider title
-    stands a chance of matching. Leaves the year in a separate return so the
-    caller can pre-fill the year field too."""
-    t = raw or ""
-    t = _PREFIX.sub("", t)
-    t = _NOISE.sub("", t)
-    year_m = _YEAR.search(t)
-    year = int(year_m.group(0).strip("() ")) if year_m else None
-    t = _YEAR.sub(" ", t).strip(" -_.|")
-    return t, year
 
 
 class TmdbMatchDialog(QDialog):
@@ -65,7 +39,7 @@ class TmdbMatchDialog(QDialog):
         outer.setContentsMargins(18, 18, 18, 14)
         outer.setSpacing(10)
 
-        clean, year = _clean_title(title)
+        clean, year = PosterResolver.clean_title(title)
         info = QLabel(tr("tmdb_match_hint"))
         info.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         info.setWordWrap(True)
@@ -199,9 +173,14 @@ class TmdbMatchDialog(QDialog):
             return
         # Delegate to the resolver so the manual pick is written to the
         # persistent cache and any listeners on the detail panel refresh.
+        # Pass the search-result fields as a preview so the poster
+        # appears immediately even if the follow-up details call
+        # fails - the user already saw this poster in the dialog and
+        # it should just work.
         self.window.tmdb.set_manual_match(
             self._original_title, self._kind, picked["tmdb_id"],
-            lambda d: self._on_pick(d))
+            lambda d: self._on_pick(d),
+            preview=picked)
         self.accept()
 
     def _clear(self) -> None:

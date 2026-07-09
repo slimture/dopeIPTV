@@ -455,6 +455,121 @@ def test_delegate_uses_provider_url_for_live_kind(qapp, settings):
     assert d.pick_url(it, "live") == "https://provider/svt1.png"
 
 
+# -- Provider-title cleaning: the [IMDB] / [MULTI] / codec noise -----------
+
+
+def test_clean_title_strips_bracketed_suffixes():
+    from dopeiptv.metadata import PosterResolver
+    for raw, expected in [
+        ("The Matrix [IMDB]", "The Matrix"),
+        ("Barbie [ ]", "Barbie"),
+        ("Dune (2021) [MULTI]", "Dune"),
+        ("Interstellar [HDR]", "Interstellar"),
+        ("Oppenheimer [SUB]", "Oppenheimer"),
+    ]:
+        cleaned, _ = PosterResolver.clean_title(raw)
+        assert cleaned == expected, f"{raw!r} -> {cleaned!r}"
+
+
+def test_clean_title_strips_language_prefix_and_codec_tail():
+    from dopeiptv.metadata import PosterResolver
+    for raw, expected in [
+        ("EN | Sicario", "Sicario"),
+        ("SV - Snatch (2000)", "Snatch"),
+        ("The Matrix 1999 1080p WEB-DL x265", "The Matrix"),
+        ("Dune 2021 BluRay x264 AC3", "Dune"),
+    ]:
+        cleaned, _ = PosterResolver.clean_title(raw)
+        assert cleaned == expected, f"{raw!r} -> {cleaned!r}"
+
+
+def test_clean_title_extracts_year():
+    from dopeiptv.metadata import PosterResolver
+    assert PosterResolver.clean_title("Dune (2021)")[1] == 2021
+    assert PosterResolver.clean_title("Dune 2021")[1] == 2021
+    assert PosterResolver.clean_title("Dune")[1] is None
+
+
+def test_auto_fetch_cleans_title_before_calling_client(qapp, settings):
+    """The auto-matcher used to hand the raw provider title straight
+    to TmdbClient.fetch_details; TMDB then failed to find a match
+    because the title had bracketed noise. Now clean_title runs
+    first so the search query is the naked title."""
+    from dopeiptv.metadata import PosterResolver
+    client = MagicMock()
+    client.fetch_details.return_value = {
+        "tmdb_id": 1, "poster_url": "https://tmdb/x.jpg"}
+    r = PosterResolver(_pool(), settings, client)
+    r.get_full("The Matrix (1999) 1080p WEB-DL [IMDB]", "vod",
+               lambda d: None)
+    _drain_pool(r.pool, qapp)
+    # First positional arg passed to fetch_details is the cleaned
+    # search query, not the raw provider title.
+    call_args, _ = client.fetch_details.call_args
+    assert call_args[0] == "The Matrix", call_args
+    assert call_args[1] == "vod"
+
+
+# -- Manual TMDB match with preview seed ------------------------------------
+
+
+def test_set_manual_match_caches_preview_immediately(qapp, settings):
+    """The dialog already knew a poster URL from the search step - the
+    manual pick must cache that URL right away so the delegate can
+    show it on the very next paint, without having to wait for
+    fetch_details_by_id."""
+    from dopeiptv.metadata import PosterResolver
+    client = MagicMock()
+    client.fetch_details_by_id.return_value = {
+        "tmdb_id": 42, "poster_url": "https://tmdb/x.jpg",
+        "rating": 8.1, "cast": []}
+    r = PosterResolver(_pool(), settings, client)
+
+    got = []
+    r.set_manual_match(
+        "Some Movie [IMDB]", "vod", 42,
+        callback=lambda d: got.append(d),
+        preview={"poster_url": "https://tmdb/preview.jpg",
+                 "title": "Some Movie", "year": 2020})
+
+    # Immediate seed: cache and first callback fired synchronously.
+    assert r.is_resolved("Some Movie [IMDB]", "vod") is True
+    assert r.tmdb_id_for("Some Movie [IMDB]", "vod") == 42
+    assert len(got) >= 1
+    assert got[0]["poster_url"] == "https://tmdb/preview.jpg"
+    assert got[0]["manual"] is True
+
+    # After the details call resolves, a richer dict overwrites the
+    # seed (but poster_url from search wins over any None from details).
+    _drain_pool(r.pool, qapp)
+    final = r._cache[r._key("Some Movie [IMDB]", "vod")]
+    assert final["rating"] == 8.1
+    assert final["manual"] is True
+
+
+def test_set_manual_match_survives_details_error(qapp, settings):
+    """If fetch_details_by_id blows up (network flake, TMDB 500) the
+    preview poster URL must still be cached so the row picks up the
+    user's choice on the next paint. Previously the failure was
+    silent and the cover never appeared."""
+    from dopeiptv.metadata import PosterResolver
+    client = MagicMock()
+    client.fetch_details_by_id.side_effect = RuntimeError("upstream 500")
+    r = PosterResolver(_pool(), settings, client)
+
+    got = []
+    r.set_manual_match(
+        "Movie", "vod", 99,
+        callback=lambda d: got.append(d),
+        preview={"poster_url": "https://tmdb/y.jpg"})
+    _drain_pool(r.pool, qapp)
+
+    cached = r._cache[r._key("Movie", "vod")]
+    assert cached["poster_url"] == "https://tmdb/y.jpg", (
+        "preview URL must survive when details call fails")
+    assert cached["manual"] is True
+
+
 def test_delegate_falls_back_when_tmdb_url_is_dead(qapp, settings):
     """TMDB returned a poster URL but the CDN 404s. Delegate should
     reach for the provider stream_icon."""
