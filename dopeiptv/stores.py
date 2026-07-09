@@ -479,6 +479,44 @@ class WatchedStore:
         eps.add((int(season), int(episode)))
         self._save()
 
+    # -- local -> Trakt push (cross-device sync of local-only marks) ----------
+
+    def pending_trakt_pushes(self) -> tuple[list[int],
+                                            list[tuple[int, int, int]]]:
+        """Local marks that carry a TMDB id but Trakt doesn't know about
+        yet - the set the periodic sync should POST up so a title first
+        marked 'seen (local)' also lands on the user's Trakt account.
+        Stream-id-only marks (no TMDB match) are intentionally excluded:
+        Trakt's API is tmdb-keyed and has nothing to receive them."""
+        movies = sorted(self.local_movies - self.trakt_movies)
+        episodes: list[tuple[int, int, int]] = []
+        for show_id, pairs in self.local_episodes.items():
+            already = self.trakt_episodes.get(show_id) or set()
+            for season, episode in sorted(pairs - already):
+                episodes.append((show_id, season, episode))
+        return movies, episodes
+
+    def mark_movie_synced(self, tmdb_id: int) -> None:
+        """A local movie mark has been accepted by Trakt: promote it to
+        the Trakt layer so the next sync's pull keeps it and we never
+        POST it a second time (which would add a duplicate watch)."""
+        tid = int(tmdb_id)
+        self.local_movies.discard(tid)
+        self.trakt_movies.add(tid)
+        self._save()
+
+    def mark_episode_synced(self, show_tmdb_id: int,
+                            season: int, episode: int) -> None:
+        sid = int(show_tmdb_id)
+        key = (int(season), int(episode))
+        eps = self.local_episodes.get(sid)
+        if eps:
+            eps.discard(key)
+            if not eps:
+                del self.local_episodes[sid]
+        self.trakt_episodes.setdefault(sid, set()).add(key)
+        self._save()
+
     def unmark_episode(self, show_tmdb_id: int,
                        season: int, episode: int) -> None:
         sid = int(show_tmdb_id)
@@ -678,6 +716,29 @@ class WatchlistStore:
         if self.has_show(tmdb_id, item.get("series_id")):
             return
         self.shows.insert(0, self._make_entry(item, tmdb_id))
+        self._save()
+
+    # -- local -> Trakt push -------------------------------------------------
+
+    def pending_trakt_pushes(self) -> tuple[list[int], list[int]]:
+        """TMDB ids of locally-added Watch Later entries that Trakt
+        doesn't know about yet, so the periodic sync can POST them up."""
+        movies = sorted({
+            m["_tmdb_id"] for m in self.movies
+            if isinstance(m.get("_tmdb_id"), int)
+            and m["_tmdb_id"] not in self.trakt_movies})
+        shows = sorted({
+            s["_tmdb_id"] for s in self.shows
+            if isinstance(s.get("_tmdb_id"), int)
+            and s["_tmdb_id"] not in self.trakt_shows})
+        return movies, shows
+
+    def mark_movie_synced(self, tmdb_id: int) -> None:
+        self.trakt_movies.add(int(tmdb_id))
+        self._save()
+
+    def mark_show_synced(self, tmdb_id: int) -> None:
+        self.trakt_shows.add(int(tmdb_id))
         self._save()
 
     def remove_movie(self, tmdb_id: int | None,

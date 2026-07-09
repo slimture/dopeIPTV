@@ -1417,9 +1417,45 @@ class MainWindow(QMainWindow):
                 return
             self.watched.replace(movies, shows)
             self.watchlist.replace(wl_movies, wl_shows)
+            # Cross-device: anything the user marked 'seen (local)' that
+            # has since resolved to a TMDB id but isn't on Trakt yet gets
+            # pushed up now, then promoted into the Trakt layer so it's
+            # never POSTed twice (which would add duplicate watches).
+            self._push_local_watched_to_trakt()
             QTimer.singleShot(0, self._on_watched_sync_done)
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _push_local_watched_to_trakt(self) -> None:
+        """Runs on the sync worker thread. Best-effort POST of local-only
+        watched marks to Trakt; each accepted item is promoted to the
+        Trakt layer so the next sync keeps it and we never double-post."""
+        movies, episodes = self.watched.pending_trakt_pushes()
+        for tid in movies:
+            try:
+                self.trakt.add_movie_history(tid)
+            except Exception:
+                continue
+            self.watched.mark_movie_synced(tid)
+        for show_id, season, episode in episodes:
+            try:
+                self.trakt.add_episode_history(show_id, season, episode)
+            except Exception:
+                continue
+            self.watched.mark_episode_synced(show_id, season, episode)
+        wl_movies, wl_shows = self.watchlist.pending_trakt_pushes()
+        for tid in wl_movies:
+            try:
+                self.trakt.add_movie_watchlist(tid)
+            except Exception:
+                continue
+            self.watchlist.mark_movie_synced(tid)
+        for tid in wl_shows:
+            try:
+                self.trakt.add_show_watchlist(tid)
+            except Exception:
+                continue
+            self.watchlist.mark_show_synced(tid)
 
     def _on_watched_sync_done(self) -> None:
         self._watched_sync_running = False
