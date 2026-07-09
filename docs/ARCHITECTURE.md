@@ -17,7 +17,7 @@ dopeiptv/
   i18n.py              Translation tables + set_language / tr()
 
   providers/           Data sources (the network / provider edge)
-    client.py          XtreamClient - Xtream Codes HTTP API wrapper
+    client.py          XtreamClient + OfflineClient (empty first-run stand-in)
     epg.py             XmltvGuide - XMLTV parser with disk cache + index
     metadata.py        TMDB client, PosterResolver (cover art)
     trakt.py           Trakt.tv sync (watched, watchlist)
@@ -50,6 +50,7 @@ dopeiptv/
     mw_context.py      Right-click context-menu mixin
     mw_detail.py       EPG / detail-panel mixin
     widgets.py         Small standalone widgets
+    welcome.py         First-run welcome overlay (connect / explore)
     channel_list.py    Virtualized list: model, view, painted delegate
     dialogs.py         Login, playlist editor, EPG guide, content manager
     tmdb_match.py      Manual TMDB match dialog

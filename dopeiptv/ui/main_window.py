@@ -41,6 +41,7 @@ from .theme import P
 from ..providers.trakt import TraktClient
 from ..core.wakelock import WakeLock
 from .widgets import _SidebarLogo, _Toast
+from .welcome import WelcomeOverlay
 from .mw_settings import _SettingsMixin
 from .mw_trakt import _TraktMixin
 from .mw_recording import _RecordingMixin
@@ -59,6 +60,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def __init__(self, client: XtreamClient, settings: QSettings,
                  playlists: PlaylistStore | None = None) -> None:
         super().__init__()
+        self._welcome = None  # first-run overlay; created on demand
         self.client = client
         self.settings = settings
         self.playlist_store = playlists
@@ -1789,6 +1791,37 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         self._schedule_save_layout()
+        if self._welcome is not None and self._welcome.isVisible():
+            self._welcome.cover()
+
+    # -- first-run welcome ---------------------------------------------------
+
+    def show_welcome(self) -> None:
+        """Show the first-run welcome overlay (no provider configured yet)."""
+        if self._welcome is None:
+            self._welcome = WelcomeOverlay(
+                self, self._welcome_connect, self._welcome_explore)
+        self._welcome.cover()
+
+    def _welcome_explore(self) -> None:
+        if self._welcome is not None:
+            self._welcome.hide()
+        self._set_status(tr("welcome_add_hint"))
+
+    def _welcome_connect(self) -> None:
+        from .dialogs import LoginDialog
+        dlg = LoginDialog(self.settings, self)
+        if not dlg.exec():
+            return
+        server, user, pw = dlg.values()
+        name = server.split("//")[-1].split("/")[0] or "My playlist"
+        pl = self.playlist_store.add(
+            {"name": name, "server": server, "username": user,
+             "password": pw, "epg_url": "", "refresh": "never"})
+        self.playlist_store.set_active(pl["id"])
+        if self._welcome is not None:
+            self._welcome.hide()
+        self.switch_playlist(pl["id"])
 
     def closeEvent(self, event) -> None:
         # Close the non-modal cast panel first: as a separate top-level

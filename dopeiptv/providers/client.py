@@ -108,6 +108,73 @@ class XtreamClient:
                 f"{int(duration_min)}/{stamp}/{stream_id}.ts")
 
 
+class OfflineClient:
+    """A do-nothing stand-in for :class:`XtreamClient`, used when the app is
+    opened without a provider (first-run "explore" mode).
+
+    It exposes the exact same interface but every data call returns empty, so
+    the whole UI works with no server configured - lists are simply empty and
+    nothing hits the network. It is a Null Object: the window never has to
+    special-case a missing client, and swapping in a real client later
+    (``MainWindow.switch_playlist``) needs no teardown.
+    """
+
+    def __init__(self) -> None:
+        self.server = ""
+        self.username = ""
+        self.password = ""
+        self.session = requests.Session()
+
+    def authenticate(self) -> dict:
+        return {}
+
+    def live_categories(self) -> list[dict]:
+        return []
+
+    def live_streams(self, category_id: str | None = None) -> list[dict]:
+        return []
+
+    def vod_categories(self) -> list[dict]:
+        return []
+
+    def vod_streams(self, category_id: str | None = None) -> list[dict]:
+        return []
+
+    def series_categories(self) -> list[dict]:
+        return []
+
+    def series_list(self, category_id: str | None = None) -> list[dict]:
+        return []
+
+    def series_info(self, series_id: int | str) -> dict:
+        return {}
+
+    def vod_info(self, vod_id: int | str) -> dict:
+        return {}
+
+    def short_epg(self, stream_id: int | str, limit: int = 8) -> list[dict]:
+        return []
+
+    def epg_table(self, stream_id: int | str) -> list[dict]:
+        return []
+
+    def xmltv(self) -> bytes:
+        return b""
+
+    def live_url(self, stream_id: int | str, fmt: str = "ts") -> str:
+        return ""
+
+    def vod_url(self, stream_id: int | str, ext: str | None = None) -> str:
+        return ""
+
+    def episode_url(self, episode_id: int | str, ext: str | None = None) -> str:
+        return ""
+
+    def timeshift_url(self, stream_id: int | str, start_dt: datetime,
+                      duration_min: int) -> str:
+        return ""
+
+
 def b64(text: str | None) -> str:
     """Decode Xtream's base64-encoded EPG text fields."""
     if not text:

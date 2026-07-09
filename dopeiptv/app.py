@@ -26,8 +26,8 @@ class _NoButtonIconsStyle(QProxyStyle):
         return super().styleHint(hint, option, widget, returnData)
 
 from . import APP_NAME, ORG, VERSION
-from .providers.client import XtreamClient
-from .ui.dialogs import LoginDialog, PlaylistDialog
+from .providers.client import OfflineClient, XtreamClient
+from .ui.dialogs import PlaylistDialog
 from .ui.main_window import MainWindow
 from .media.players import _libmpv, _libmpv_error, embedded_playback_reason
 
@@ -222,17 +222,18 @@ def main() -> int:
     store = PlaylistStore(settings)
 
     client = None
+    welcome = False
+    offline = False
     while client is None:
         pl = store.active()
         if pl is None:
-            dlg = LoginDialog(settings)
-            if not dlg.exec():
-                return 0
-            server, user, pw = dlg.values()
-            name = server.split("//")[-1].split("/")[0] or "My playlist"
-            pl = store.add({"name": name, "server": server, "username": user,
-                            "password": pw, "epg_url": "", "refresh": "never"})
-            store.set_active(pl["id"])
+            # No provider configured yet (first run). Don't gate the app
+            # behind a modal login - open the window in "explore" mode with a
+            # do-nothing client and let the in-window welcome screen offer to
+            # connect a provider or just look around.
+            client = OfflineClient()
+            welcome = True
+            break
 
         candidate = XtreamClient(pl["server"], pl["username"], pl["password"])
         offline = False
@@ -299,6 +300,8 @@ def main() -> int:
     if offline:
         w.setWindowTitle(w.windowTitle() + "  (offline)")
     w.show()
+    if welcome:
+        w.show_welcome()
     for _ in range(5):
         app.processEvents()
     return app.exec()

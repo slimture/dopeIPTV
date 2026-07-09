@@ -890,6 +890,66 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Подключить",
         "th": "เชื่อมต่อ",
     },
+    "welcome_title": {
+        "en": "Welcome to dopeIPTV",
+        "sv": "Välkommen till dopeIPTV",
+        "es": "Bienvenido a dopeIPTV",
+        "de": "Willkommen bei dopeIPTV",
+        "fr": "Bienvenue dans dopeIPTV",
+        "zh": "欢迎使用 dopeIPTV",
+        "ru": "Добро пожаловать в dopeIPTV",
+        "th": "ยินดีต้อนรับสู่ dopeIPTV",
+    },
+    "welcome_subtitle": {
+        "en": "Connect your IPTV provider to load your channels, movies and "
+              "series — or just look around first.",
+        "sv": "Anslut din IPTV-leverantör för att ladda dina kanaler, filmer "
+              "och serier – eller kika runt först.",
+        "es": "Conecta tu proveedor de IPTV para cargar tus canales, películas "
+              "y series, o simplemente echa un vistazo primero.",
+        "de": "Verbinde deinen IPTV-Anbieter, um deine Sender, Filme und "
+              "Serien zu laden – oder sieh dich erst einmal um.",
+        "fr": "Connectez votre fournisseur IPTV pour charger vos chaînes, "
+              "films et séries — ou jetez d'abord un coup d'œil.",
+        "zh": "连接您的 IPTV 提供商以加载频道、电影和剧集，或先四处看看。",
+        "ru": "Подключите IPTV-провайдера, чтобы загрузить каналы, фильмы и "
+              "сериалы — или просто осмотритесь.",
+        "th": "เชื่อมต่อผู้ให้บริการ IPTV เพื่อโหลดช่อง ภาพยนตร์ และซีรีส์ "
+              "— หรือลองดูรอบ ๆ ก่อนก็ได้",
+    },
+    "welcome_connect": {
+        "en": "Connect your provider",
+        "sv": "Anslut din leverantör",
+        "es": "Conecta tu proveedor",
+        "de": "Anbieter verbinden",
+        "fr": "Connecter votre fournisseur",
+        "zh": "连接您的提供商",
+        "ru": "Подключить провайдера",
+        "th": "เชื่อมต่อผู้ให้บริการ",
+    },
+    "welcome_explore": {
+        "en": "Explore without an account",
+        "sv": "Utforska utan konto",
+        "es": "Explorar sin cuenta",
+        "de": "Ohne Konto erkunden",
+        "fr": "Explorer sans compte",
+        "zh": "无账户浏览",
+        "ru": "Осмотреться без аккаунта",
+        "th": "สำรวจโดยไม่มีบัญชี",
+    },
+    "welcome_add_hint": {
+        "en": "No provider yet — add one any time in Settings.",
+        "sv": "Ingen leverantör än – lägg till en när som helst i Inställningar.",
+        "es": "Aún no hay proveedor: añade uno cuando quieras en Ajustes.",
+        "de": "Noch kein Anbieter – füge jederzeit einen in den Einstellungen "
+              "hinzu.",
+        "fr": "Aucun fournisseur pour l'instant — ajoutez-en un à tout moment "
+              "dans les Réglages.",
+        "zh": "尚无提供商 — 可随时在设置中添加。",
+        "ru": "Провайдер ещё не добавлен — добавьте его в любой момент в "
+              "настройках.",
+        "th": "ยังไม่มีผู้ให้บริการ — เพิ่มได้ทุกเมื่อในการตั้งค่า",
+    },
     "btn_use": {
         "en": "Use",
         "sv": "Använd",
