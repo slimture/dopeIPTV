@@ -2986,12 +2986,15 @@ class MainWindow(QMainWindow):
             # the mark-as-watched actions here (episodes lack the
             # season/episode data those need).
             eff_mode = "vod" if it.get("_kind") == "movie" else None
-        if self.tmdb and (
-                (eff_mode == "vod")
+        # Mark-as-watched does NOT need TMDB: the local flag keys on the
+        # provider stream_id when no TMDB account is configured. Only
+        # the '+ Trakt' variants need TMDB (Trakt's API is tmdb-keyed),
+        # so those are gated on trakt-connected AND a TMDB resolver.
+        if ((eff_mode == "vod")
                 or (eff_mode == "series" and not self.series_ctx)
                 or self.series_ctx):
             m.addSeparator()
-            trakt_ok = self.trakt.is_connected()
+            trakt_ok = self.trakt.is_connected() and self.tmdb is not None
             if self.series_ctx:
                 mark = self._mark_episode_watched
                 unmark = self._unmark_episode_watched
@@ -3024,8 +3027,11 @@ class MainWindow(QMainWindow):
         # Also works from within the Watch Later view - the row's
         # _kind maps it back to vod/series so the same store call
         # runs. That's what makes 'remove from Watch Later' reachable.
+        # Watch Later also works without TMDB - the list stores a
+        # snapshot keyed on the provider stream_id. TMDB only gates the
+        # '+ Trakt' variants (Trakt watchlist is tmdb-keyed).
         wl_kind = None
-        if self.tmdb and not self.series_ctx:
+        if not self.series_ctx:
             if self.mode in ("vod", "series"):
                 wl_kind = self.mode
             elif self.mode == "watchlist":
@@ -3034,7 +3040,7 @@ class MainWindow(QMainWindow):
                 wl_kind = "vod" if it.get("_kind") == "movie" else None
         if wl_kind in ("vod", "series"):
             on_list = self.is_on_watchlist(it, wl_kind)
-            trakt_ok = self.trakt.is_connected()
+            trakt_ok = self.trakt.is_connected() and self.tmdb is not None
             if on_list:
                 m.addAction(
                     tr("ctx_watchlist_remove"),
