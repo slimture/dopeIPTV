@@ -1249,6 +1249,21 @@ class MainWindow(QMainWindow):
             title, kind,
             lambda _url: self._poster_refresh_timer.start(150))
 
+    def tmdb_resolved(self, it, kind: str) -> bool:
+        """True when we've either already got TMDB metadata for this
+        row or TMDB isn't going to answer for it (live TV, no TMDB
+        provider configured, empty title). The list delegate uses
+        this to decide when it's safe to load the provider fallback
+        cover: while TMDB is mid-fetch, painting the fallback would
+        just be a wasted network round-trip that gets replaced 150 ms
+        later when TMDB resolves."""
+        if not self.tmdb or kind not in ("vod", "series"):
+            return True
+        title = it.get("name") or it.get("title") or ""
+        if not title:
+            return True
+        return self.tmdb.is_resolved(title, kind)
+
     # -- trakt scrobbling -------------------------------------------------------------
 
     def _trakt_start_for_item(self, kind: str, item) -> None:

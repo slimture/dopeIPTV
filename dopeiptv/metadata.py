@@ -339,6 +339,18 @@ class PosterResolver(QObject):
         tid = cached.get("tmdb_id")
         return int(tid) if isinstance(tid, int) else None
 
+    def is_resolved(self, title: str, kind: str) -> bool:
+        """True if the TMDB fetch for this title has completed (with or
+        without a match); False while the request is still in flight or
+        hasn't been kicked yet. Used by the list delegate to decide
+        whether to show a provider fallback cover while TMDB fetches,
+        or wait for TMDB to answer - the fallback loads a wrong URL
+        that immediately gets replaced when TMDB resolves, and that
+        flicker reads as a 'double load' during the first pass."""
+        if not title:
+            return True
+        return self._key(title, kind) in self._cache
+
     def get_full(self, title: str, kind: str,
                  callback: Callable[[dict], None]) -> dict | None:
         """Full metadata dict (poster_url/rating/imdb_id/cast), or None

@@ -259,7 +259,12 @@ class ChannelDelegate(QStyledItemDelegate):
         url = self.window.poster_for(it, kind)
         if url and self.window.logos.is_dead(url):
             url = None
-        if not url:
+        # Only fall back to the provider cover once TMDB has actually
+        # answered (with or without a match). Loading the provider
+        # cover while TMDB is still in flight causes a visible
+        # 'double load' - provider cover briefly appears, then gets
+        # replaced by the TMDB poster when the fetch resolves.
+        if not url and self.window.tmdb_resolved(it, kind):
             url = it.get("stream_icon") or it.get("cover")
         pm = self.window.logos.cache.get(url) if url else None
         if pm:
@@ -341,7 +346,12 @@ class ChannelDelegate(QStyledItemDelegate):
         url = self.window.poster_for(it, kind)
         if url and self.window.logos.is_dead(url):
             url = None
-        if not url:
+        # Only fall back to the provider cover once TMDB has actually
+        # answered (with or without a match). Loading the provider
+        # cover while TMDB is still in flight causes a visible
+        # 'double load' - provider cover briefly appears, then gets
+        # replaced by the TMDB poster when the fetch resolves.
+        if not url and self.window.tmdb_resolved(it, kind):
             url = it.get("stream_icon") or it.get("cover")
         pm = self.window.logos.cache.get(url) if url else None
         if pm:
