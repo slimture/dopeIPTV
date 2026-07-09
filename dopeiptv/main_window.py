@@ -2,65 +2,53 @@
 
 from __future__ import annotations
 
-import html
 import json
 import os
-import re
-import shutil
-import sys
 import threading
 import time
-from datetime import datetime, timedelta
 
 from PyQt6.QtCore import (
-    QDateTime, QPointF, QRect, QRectF, QSettings, QSize, Qt, QThreadPool,
-    QTimer, QUrl, pyqtSignal,
+    QRect, QSettings, Qt, QThreadPool,
+    QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QAction, QColor, QDesktopServices, QIcon, QKeySequence, QPainter,
-    QPainterPath, QPen, QPixmap, QShortcut,
+    QAction, QColor, QKeySequence, QShortcut,
 )
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QApplication, QComboBox, QDateTimeEdit, QDialog,
-    QDialogButtonBox, QFileDialog, QFormLayout, QFrame, QHBoxLayout,
-    QInputDialog, QLabel, QLineEdit, QListView, QListWidget, QListWidgetItem,
+    QAbstractItemView, QApplication, QFrame, QHBoxLayout,
+    QLabel, QLineEdit, QListWidget, QListWidgetItem,
     QMainWindow, QMenu, QMessageBox, QProgressBar, QPushButton, QScrollArea,
-    QSizePolicy, QSpinBox, QSplitter, QTabWidget, QVBoxLayout, QWidget,
+    QSizePolicy, QSplitter, QVBoxLayout, QWidget,
 )
 
-from . import APP_NAME, ORG, VERSION
+from . import APP_NAME
 from .i18n import tr
 from .channel_list import ChannelDelegate, ChannelListModel, ChannelListView
 from .chromecast import CastDialog, ChromecastManager
-from .client import XtreamClient, b64, epg_times
-from .dialogs import (
-    ContentManagerDialog, EpgGuideDialog, LoginDialog, PlaylistDialog,
-)
+from .client import XtreamClient
 from .embedded import EmbeddedPlayer
-from .tmdb_match import TmdbMatchDialog
 from .epg import XmltvGuide, epg_cache_path
 from .metadata import PosterResolver, TmdbClient, bundled_tmdb_key
 from .players import (
-    MpvIpcPlayer, MpvWindowPlayer, _libmpv, embedded_playback_reason,
-    embedded_playback_supported, launch_player,
+    MpvIpcPlayer, MpvWindowPlayer, _libmpv, embedded_playback_supported, launch_player,
 )
-from .recording import RecordingManager, format_size, safe_filename
+from .recording import RecordingManager
 from .stores import (
     CategoryOverrides, ChannelOverrides, FavoriteStore, HistoryStore,
     ParentalControl, PlaylistStore, WatchedStore, WatchlistStore,
 )
-from .theme import ACCENT, ACCENTS, P, THEMES, apply_theme, build_style
-from .trakt import TraktAuthError, TraktClient
+from .theme import P
+from .trakt import TraktClient
 from .wakelock import WakeLock
-from .widgets import _ClickableWidget, _SidebarLogo, _Toast
+from .widgets import _SidebarLogo, _Toast
 from .mw_settings import _SettingsMixin
 from .mw_trakt import _TraktMixin
 from .mw_recording import _RecordingMixin
 from .mw_context import _ContextMenuMixin
 from .mw_detail import _DetailMixin
 from .workers import (
-    LogoLoader, choose_cover_url, clear_directory, default_image_cache_dir,
-    dir_size_bytes, run_async, tmdb_url_from_provider)
+    LogoLoader, choose_cover_url, default_image_cache_dir,
+    run_async)
 
 
 class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
