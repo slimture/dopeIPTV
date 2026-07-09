@@ -12,7 +12,7 @@ import requests
 from PyQt6.QtCore import (
     QObject, QRunnable, QStandardPaths, QThreadPool, Qt, pyqtSignal, pyqtSlot,
 )
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QImage, QPixmap
 
 
 def default_image_cache_dir(sub: str = "images") -> Path:
@@ -76,14 +76,32 @@ class Worker(QRunnable):
 
     @pyqtSlot()
     def run(self) -> None:
+        # Any exception that escapes this method surfaces via PyQt as
+        # qFatal on newer Qt/PyQt versions and terminates the process
+        # via SIGABRT. Trap absolutely everything - including
+        # SystemExit / KeyboardInterrupt / anything raised while
+        # signal-emit is dispatching - and forward the message
+        # through .fail so run_async's on_fail path still runs.
         try:
             result = self.fn(*self.args, **self.kwargs)
-        except Exception as e:
-            self.signals.fail.emit(str(e))
+        except BaseException as e:
+            import traceback
+            traceback.print_exc()
+            try:
+                self.signals.fail.emit(str(e))
+            except BaseException:
+                pass
         else:
-            self.signals.done.emit(result)
+            try:
+                self.signals.done.emit(result)
+            except BaseException:
+                import traceback
+                traceback.print_exc()
         finally:
-            self.signals.finished.emit()
+            try:
+                self.signals.finished.emit()
+            except BaseException:
+                pass
 
 
 _ACTIVE_WORKERS: set[Worker] = set()
@@ -190,7 +208,14 @@ class LogoLoader(QObject):
                 try:
                     data = dp.read_bytes()
                     if data:
-                        probe = QPixmap()
+                        # QImage is thread-safe; QPixmap is GUI-thread
+                        # only in Qt6 and touching it here aborts the
+                        # whole process on newer PyQt6 (qFatal fires
+                        # from pyqt6_err_print). We only need to
+                        # validate that the bytes decode - the actual
+                        # QPixmap conversion happens in done() which
+                        # runs on the main thread.
+                        probe = QImage()
                         if probe.loadFromData(data):
                             return u, data
                         dp.unlink(missing_ok=True)
