@@ -2981,6 +2981,11 @@ class MainWindow(QMainWindow):
         eff_mode = self.mode
         if self.mode == "watchlist":
             eff_mode = it.get("_kind") or "vod"
+        elif self.mode == "history":
+            # History stores 'movie'/'episode'/'live'; only movies get
+            # the mark-as-watched actions here (episodes lack the
+            # season/episode data those need).
+            eff_mode = "vod" if it.get("_kind") == "movie" else None
         if self.tmdb and (
                 (eff_mode == "vod")
                 or (eff_mode == "series" and not self.series_ctx)
@@ -3025,6 +3030,8 @@ class MainWindow(QMainWindow):
                 wl_kind = self.mode
             elif self.mode == "watchlist":
                 wl_kind = it.get("_kind")
+            elif self.mode == "history":
+                wl_kind = "vod" if it.get("_kind") == "movie" else None
         if wl_kind in ("vod", "series"):
             on_list = self.is_on_watchlist(it, wl_kind)
             trakt_ok = self.trakt.is_connected()
