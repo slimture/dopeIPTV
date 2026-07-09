@@ -149,17 +149,17 @@ def _drop_host_graphics(binaries):
     own DRI drivers and compositor - so drop them here. Every Linux desktop
     ships them, exactly as the upstream AppImage excludelist assumes."""
     host_libs = (
-        # OpenGL / Mesa / DRM - the DRI_Mesa offenders.
+        # The GLX + Mesa loader stack that actually triggers "did not find
+        # extension DRI_Mesa / failed to bind extensions": our bundled libGL
+        # loads the host's DRI driver, and the two disagree on libglapi's
+        # symbol table. These are present on every GL-capable Linux desktop,
+        # so taking them from the host is safe and fixes the clash. We
+        # deliberately do NOT strip libEGL, libgbm, libdrm or the Wayland/xcb
+        # libs: libmpv can be hard-linked (DT_NEEDED) against them, and a
+        # minimal host might not have them installed, which would stop libmpv
+        # from loading at all.
         "libGL.so", "libGLX.so", "libGLX_mesa.so", "libGLdispatch.so",
-        "libOpenGL.so", "libEGL.so", "libEGL_mesa.so", "libGLESv2.so",
-        "libGLESv1_CM.so", "libglapi.so", "libgbm.so", "libgallium",
-        "libdrm.so", "libdrm_amdgpu.so", "libdrm_nouveau.so",
-        "libdrm_radeon.so", "libdrm_intel.so", "libLLVM", "libvulkan.so",
-        "libxcb-glx.so", "libxcb-dri2.so", "libxcb-dri3.so",
-        "libxcb-present.so",
-        # Wayland client stack - must match the running compositor.
-        "libwayland-client.so", "libwayland-egl.so", "libwayland-cursor.so",
-        "libwayland-server.so",
+        "libOpenGL.so", "libglapi.so", "libgallium", "libLLVM",
         # Fontconfig - a bundled (older) libfontconfig can't parse a newer
         # host /etc/fonts and spews "invalid attribute 'xsi:nil'" warnings on
         # every launch. Use the host's so it reads its own config cleanly.

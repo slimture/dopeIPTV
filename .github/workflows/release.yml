@@ -208,12 +208,35 @@ jobs:
             echo "::endgroup::"
             return 1
           }
+          # Reproduce a real user's machine: NO system mpv/libmpv installed.
+          # The build host has libmpv (we built against it), so python-mpv's
+          # find_library('mpv') would locate the *system* copy and the bundled
+          # one would never be exercised - which is exactly how shipping a
+          # bundle that only works where mpv is already installed slipped
+          # through. Remove it so the packaged libmpv is the only one.
+          sudo apt-get remove -y mpv libmpv-dev libmpv2 libmpv1 || true
+          sudo ldconfig
+          # The embedded player must be ENABLED from the bundled libmpv alone.
+          # "Embedded playback: enabled" only needs libmpv to load (not a GPU),
+          # so it is a valid assertion even under headless CI.
+          assert_embedded_enabled() {
+            local name="$1"
+            if grep -q "Embedded playback disabled" /tmp/$name.log \
+               || ! grep -q "Embedded playback: enabled" /tmp/$name.log; then
+              echo "::error::$name: embedded player is not enabled from the bundled libmpv (would be dead on a machine without a system mpv):"
+              grep -iE "Embedded playback|libmpv|Cannot find libmpv" /tmp/$name.log | head
+              return 1
+            fi
+            echo "$name: embedded player enabled from bundled libmpv - PASS"
+          }
           # AppImage: no install needed, just chmod+run.
           chmod +x dopeIPTV-*.AppImage
           launch_and_check "$PWD/$(ls dopeIPTV-*.AppImage | head -1)" appimage
+          assert_embedded_enabled appimage
           # .deb: install then run via the /usr/bin/dopeiptv wrapper.
           sudo apt-get install -y ./dopeiptv_*.deb
           launch_and_check "$(command -v dopeiptv)" deb
+          assert_embedded_enabled deb
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2

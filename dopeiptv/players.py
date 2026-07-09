@@ -18,9 +18,45 @@ from .client import find_player_executable
 
 _libmpv_error: str | None = None
 
+
+def _prepare_bundled_libmpv() -> None:
+    """Point python-mpv at the libmpv we ship inside the frozen bundle.
+
+    python-mpv finds libmpv with ctypes.util.find_library('mpv'), which only
+    searches the *system* library path - never our PyInstaller bundle. So on a
+    machine with no system mpv installed (exactly the machine bundling libmpv
+    is meant to serve) it raised "Cannot find libmpv in the usual places" and
+    the embedded player was silently disabled. It only ever worked where the
+    user happened to have mpv installed system-wide - Arch, Homebrew, the CI
+    runner - which is why "it works on my machine" but nowhere else. When
+    frozen, monkeypatch find_library so 'mpv' resolves to the shipped file.
+    A plain source run isn't frozen, so this is a no-op there and the normal
+    system lookup applies."""
+    if not getattr(sys, "frozen", False):
+        return
+    import ctypes.util
+    soname = "libmpv.2.dylib" if sys.platform == "darwin" else "libmpv.so.2"
+    candidates = [getattr(sys, "_MEIPASS", None),
+                  os.path.dirname(sys.executable)]
+    bundled = next((os.path.join(d, soname) for d in candidates
+                    if d and os.path.exists(os.path.join(d, soname))), None)
+    if not bundled:
+        return
+    _orig = ctypes.util.find_library
+
+    def _find(name):
+        if name == "mpv":
+            return bundled
+        return _orig(name)
+
+    ctypes.util.find_library = _find
+
+
 if sys.platform == "darwin":
     from .platform_macos import find_libmpv
     find_libmpv()
+
+_prepare_bundled_libmpv()
 
 try:
     import mpv as _libmpv
