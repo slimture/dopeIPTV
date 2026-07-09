@@ -159,7 +159,7 @@ class _SettingsMixin:
         QApplication.instance().quit()
 
     def _set_language(self, code: str) -> None:
-        from .i18n import set_language, current_language
+        from ..i18n import set_language, current_language
         if code == current_language():
             return
         self.settings.setValue("language", code)
@@ -381,7 +381,7 @@ class _SettingsMixin:
         accent_box.currentIndexChanged.connect(
             lambda _i: self._set_theme(
                 theme_box.currentData(), accent_box.currentData()))
-        from .i18n import LANGUAGES, current_language
+        from ..i18n import LANGUAGES, current_language
         lang_box = self._combo(
             [(code, name) for code, name in LANGUAGES.items()],
             current_language())
