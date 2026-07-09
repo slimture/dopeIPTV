@@ -183,6 +183,34 @@ class ChannelDelegate(QStyledItemDelegate):
         else:
             self._paint_list(painter, option, index)
 
+    def _paint_watched_badge(self, painter, anchor: QRect,
+                             size: int) -> None:
+        """Small green circle with a white check in the top-right corner
+        of *anchor* - the 'you've already seen this' marker synced from
+        Trakt. Painted after the logo/poster so it's not clipped by the
+        rounded-rect path used for the artwork."""
+        pad = 3
+        x = anchor.right() - size - pad
+        y = anchor.top() + pad
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(ACCENT))
+        painter.drawEllipse(x, y, size, size)
+        # Check mark: two short strokes inside the circle.
+        pen = QPen(QColor("#ffffff"))
+        pen.setWidth(max(2, size // 6))
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        painter.setPen(pen)
+        cx, cy = x + size / 2, y + size / 2
+        path = QPainterPath()
+        path.moveTo(cx - size * 0.22, cy + size * 0.02)
+        path.lineTo(cx - size * 0.05, cy + size * 0.20)
+        path.lineTo(cx + size * 0.24, cy - size * 0.18)
+        painter.drawPath(path)
+        painter.restore()
+
     def _is_playing(self, it, kind: str) -> bool:
         group = {"live": "live", "fav": "live", "vod": "vod",
                  "episode": "episode", "history": "history",
@@ -260,6 +288,10 @@ class ChannelDelegate(QStyledItemDelegate):
                     url,
                     lambda _pm: self.window.listw.viewport().update())
 
+        if self.window.is_item_watched(it, kind):
+            self._paint_watched_badge(
+                painter, logo_rect, max(18, logo_sz // 5))
+
         painter.setPen(
             QColor(ACCENT) if playing else QColor(P["text"]))
         fname = QFont()
@@ -334,6 +366,10 @@ class ChannelDelegate(QStyledItemDelegate):
                 self.window.logos.get(
                     url,
                     lambda _pm: self.window.listw.viewport().update())
+
+        if self.window.is_item_watched(it, kind):
+            self._paint_watched_badge(
+                painter, logo_rect, max(16, logo_sz // 4))
 
         num_w = 0
         is_fav = (kind in ("live", "vod", "series")

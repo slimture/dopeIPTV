@@ -326,6 +326,19 @@ class PosterResolver(QObject):
         details = self.get_full(title, kind, lambda d: callback(d.get("poster_url")))
         return details.get("poster_url") if details else None
 
+    def tmdb_id_for(self, title: str, kind: str) -> int | None:
+        """Synchronous TMDB-id lookup used by watched-history badges: only
+        returns a value when we already have this title resolved (no
+        network side effect), otherwise None. The list delegate calls
+        this every paint, so a fetch here would swamp the pool."""
+        if not title:
+            return None
+        cached = self._cache.get(self._key(title, kind))
+        if not cached:
+            return None
+        tid = cached.get("tmdb_id")
+        return int(tid) if isinstance(tid, int) else None
+
     def get_full(self, title: str, kind: str,
                  callback: Callable[[dict], None]) -> dict | None:
         """Full metadata dict (poster_url/rating/imdb_id/cast), or None

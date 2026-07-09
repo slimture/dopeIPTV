@@ -4200,6 +4200,75 @@ _STRINGS: dict[str, dict[str, str]] = {
         "fr": "Liste de suivi / Historique…", "zh": "待看列表 / 历史……",
         "ru": "Список / История…", "th": "รายการที่ติดตาม / ประวัติ…",
     },
+    "trakt_sync_now": {
+        "en": "Sync now", "sv": "Synka nu", "es": "Sincronizar ahora",
+        "de": "Jetzt synchronisieren", "fr": "Synchroniser",
+        "zh": "立即同步", "ru": "Синхронизировать", "th": "ซิงค์ตอนนี้",
+    },
+    "trakt_syncing": {
+        "en": "Syncing watched history…",
+        "sv": "Synkar tittarhistorik…",
+        "es": "Sincronizando historial…",
+        "de": "Verlauf wird synchronisiert…",
+        "fr": "Synchronisation de l'historique…",
+        "zh": "正在同步观看历史…",
+        "ru": "Синхронизация истории просмотров…",
+        "th": "กำลังซิงค์ประวัติการดู…",
+    },
+    "trakt_sync_never": {
+        "en": "Watched history: not synced yet.",
+        "sv": "Tittarhistorik: inte synkad än.",
+        "es": "Historial de visualización: aún no sincronizado.",
+        "de": "Verlauf: noch nicht synchronisiert.",
+        "fr": "Historique de visionnage : pas encore synchronisé.",
+        "zh": "观看历史：尚未同步。",
+        "ru": "История просмотров: ещё не синхронизирована.",
+        "th": "ประวัติการดู: ยังไม่ได้ซิงค์",
+    },
+    "trakt_sync_status": {
+        "en": "Synced {when} — {movies} movies, {episodes} episodes.",
+        "sv": "Synkad {when} — {movies} filmer, {episodes} avsnitt.",
+        "es": "Sincronizado {when} — {movies} películas, "
+              "{episodes} episodios.",
+        "de": "Synchronisiert {when} — {movies} Filme, "
+              "{episodes} Episoden.",
+        "fr": "Synchronisé {when} — {movies} films, "
+              "{episodes} épisodes.",
+        "zh": "已同步于 {when} — {movies} 部电影, {episodes} 集。",
+        "ru": "Синхронизировано {when} — фильмов: {movies}, "
+              "эпизодов: {episodes}.",
+        "th": "ซิงค์เมื่อ {when} — {movies} หนัง, {episodes} ตอน",
+    },
+    "trakt_sync_hint": {
+        "en": "Marks movies and episodes you've watched on any device "
+              "(mobile, browser, other players) with a check-badge in "
+              "the list. Auto-syncs on startup at most once an hour.",
+        "sv": "Markerar filmer och avsnitt du sett på andra enheter "
+              "(mobil, webb, andra spelare) med en bock-badge i listan. "
+              "Autosynkar vid uppstart högst en gång per timme.",
+        "es": "Marca las películas y episodios que has visto en "
+              "cualquier dispositivo (móvil, navegador, otros "
+              "reproductores) con una marca en la lista. Se sincroniza "
+              "automáticamente al iniciar, como máximo una vez por hora.",
+        "de": "Markiert Filme und Episoden, die du auf irgendeinem "
+              "Gerät angesehen hast (Handy, Browser, andere Player), "
+              "mit einer Häkchen-Plakette in der Liste. Autosync beim "
+              "Start höchstens einmal pro Stunde.",
+        "fr": "Marque les films et épisodes que tu as regardés sur "
+              "n'importe quel appareil (mobile, navigateur, autres "
+              "lecteurs) avec un badge dans la liste. Synchronisation "
+              "automatique au démarrage, une fois par heure au maximum.",
+        "zh": "在列表中标记您在任何设备（移动设备、浏览器、其他播放器）上"
+              "观看过的电影和剧集。启动时最多每小时自动同步一次。",
+        "ru": "Помечает фильмы и эпизоды, которые вы посмотрели на "
+              "любом устройстве (телефон, браузер, другие плееры), "
+              "значком в списке. Автосинхронизация при запуске не чаще "
+              "раза в час.",
+        "th": "ทำเครื่องหมายภาพยนตร์และตอนที่คุณดูบนอุปกรณ์ใดก็ได้ "
+              "(มือถือ เบราว์เซอร์ โปรแกรมเล่นอื่น) "
+              "ด้วยเครื่องหมายถูกในรายการ "
+              "ซิงค์อัตโนมัติเมื่อเปิดโปรแกรมไม่เกินหนึ่งครั้งต่อชั่วโมง",
+    },
     "trakt_connected": {
         "en": "Connected to Trakt.", "sv": "Ansluten till Trakt.",
         "es": "Conectado a Trakt.", "de": "Mit Trakt verbunden.",

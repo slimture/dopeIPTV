@@ -47,7 +47,7 @@ from .players import (
 from .recording import RecordingManager, format_size, safe_filename
 from .stores import (
     CategoryOverrides, ChannelOverrides, FavoriteStore, HistoryStore,
-    ParentalControl, PlaylistStore,
+    ParentalControl, PlaylistStore, WatchedStore,
 )
 from .theme import ACCENT, ACCENTS, P, THEMES, apply_theme, build_style
 from .trakt import TraktAuthError, TraktClient
@@ -246,6 +246,8 @@ class MainWindow(QMainWindow):
         self._init_metadata_provider()
         self.trakt = TraktClient(settings)
         self._trakt_active: dict | None = None
+        self.watched = WatchedStore(settings)
+        self._watched_sync_running = False
         self._raw_categories: list = []
         self.mpv = MpvIpcPlayer()
         self.mpv_window = MpvWindowPlayer() if _libmpv is not None else None
@@ -285,6 +287,10 @@ class MainWindow(QMainWindow):
         self.loading_bar.show()
         self._set_status(tr("status_loading_channels"))
         QTimer.singleShot(100, self._load_categories)
+        # Cross-device sync of watched movies/episodes from Trakt. Deferred
+        # so the initial category/EPG traffic goes first - the sync runs
+        # for the full account which can take a couple of seconds.
+        QTimer.singleShot(2500, self._maybe_sync_watched)
 
         self._auto_refresh_timer = QTimer(self)
         self._auto_refresh_timer.timeout.connect(self._maybe_auto_refresh)
@@ -1252,6 +1258,83 @@ class MainWindow(QMainWindow):
             self.trakt.scrobble_stop(active["payload"], progress)
 
         run_async(self.pool, job, lambda _r: None, lambda _e: None)
+
+    # -- trakt watched-history sync --------------------------------------------
+
+    # Skip the auto-sync if we synced this recently (an hour) - avoids
+    # hammering Trakt on every restart while still catching the "watched a
+    # movie on the couch, opened dopeIPTV the same evening" case.
+    _WATCHED_SYNC_TTL: int = 3600
+
+    def _maybe_sync_watched(self, force: bool = False) -> None:
+        if not self.trakt.is_connected() or self._watched_sync_running:
+            return
+        if not force:
+            age = int(datetime.now().timestamp()) - self.watched.last_sync_at
+            if age < self._WATCHED_SYNC_TTL:
+                return
+        self._watched_sync_running = True
+
+        def job():
+            return (self.trakt.watched_movies(),
+                    self.trakt.watched_shows())
+
+        def done(result):
+            self._watched_sync_running = False
+            movies, shows = result
+            self.watched.replace(movies, shows)
+            # Nudge the visible list so the newly-known "seen" markers
+            # paint without a category switch.
+            self.list_model.refresh_all()
+
+        def fail(_msg):
+            self._watched_sync_running = False
+
+        run_async(self.pool, job, done, fail)
+
+    def is_movie_watched(self, item: dict) -> bool:
+        if not self.tmdb or not item:
+            return False
+        title = item.get("name") or item.get("title") or ""
+        return self.watched.is_movie_watched(
+            self.tmdb.tmdb_id_for(title, "vod"))
+
+    def show_watched_count(self, item: dict) -> int:
+        if not self.tmdb or not item:
+            return 0
+        title = item.get("name") or item.get("title") or ""
+        return self.watched.show_watched_count(
+            self.tmdb.tmdb_id_for(title, "series"))
+
+    def is_episode_watched(self, item: dict) -> bool:
+        if not self.tmdb or not item or not self.series_ctx:
+            return False
+        show_title = (self.series_ctx.get("name")
+                      or self.series_ctx.get("title") or "")
+        show_id = self.tmdb.tmdb_id_for(show_title, "series")
+        try:
+            season = int(item.get("season"))
+            episode = int(item.get("episode_num"))
+        except (TypeError, ValueError):
+            return False
+        return self.watched.is_episode_watched(show_id, season, episode)
+
+    def is_item_watched(self, item: dict, kind: str) -> bool:
+        """Unified predicate the delegate calls once per paint - answers
+        whether the given item should show the 'already seen' badge."""
+        if kind == "vod":
+            return self.is_movie_watched(item)
+        if kind == "series":
+            return self.show_watched_count(item) > 0
+        if kind == "episode":
+            return self.is_episode_watched(item)
+        if kind == "history":
+            hk = item.get("_kind")
+            if hk == "movie":
+                return self.is_movie_watched(item)
+            if hk == "series":
+                return self.show_watched_count(item) > 0
+        return False
 
     def _trakt_device_auth_dialog(self, parent) -> None:
         d = QDialog(parent)
@@ -4152,7 +4235,53 @@ class MainWindow(QMainWindow):
         trakt_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         trakt_hint.setWordWrap(True)
         tf.addWidget(trakt_hint)
+
+        # Watched-history sync controls.
+        sync_row = QHBoxLayout()
+        sync_status = QLabel()
+        sync_status.setWordWrap(True)
+        sync_now_btn = QPushButton(tr("trakt_sync_now"))
+        sync_row.addWidget(sync_status, 1)
+        sync_row.addWidget(sync_now_btn)
+        tf.addLayout(sync_row)
+        sync_hint = QLabel(tr("trakt_sync_hint"))
+        sync_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        sync_hint.setWordWrap(True)
+        tf.addWidget(sync_hint)
+
         tf.addStretch()
+
+        def refresh_sync_status():
+            n_m, n_e = (len(self.watched.movies),
+                        sum(len(v) for v in self.watched.episodes.values()))
+            if self.watched.last_sync_at:
+                when = datetime.fromtimestamp(
+                    self.watched.last_sync_at).strftime("%Y-%m-%d %H:%M")
+                sync_status.setText(
+                    tr("trakt_sync_status", when=when,
+                       movies=n_m, episodes=n_e))
+            else:
+                sync_status.setText(tr("trakt_sync_never"))
+            sync_now_btn.setEnabled(
+                self.trakt.is_connected()
+                and not self._watched_sync_running)
+
+        def do_sync_now():
+            sync_now_btn.setEnabled(False)
+            sync_status.setText(tr("trakt_syncing"))
+            # Kick a forced sync and re-poll status every second while it
+            # runs so the label flips to "synced" without needing the
+            # user to close and reopen the dialog.
+            self._maybe_sync_watched(force=True)
+            poll = QTimer(d)
+            def tick():
+                if not self._watched_sync_running:
+                    poll.stop()
+                    refresh_sync_status()
+            poll.timeout.connect(tick)
+            poll.start(400)
+
+        sync_now_btn.clicked.connect(do_sync_now)
 
         def refresh_trakt_status():
             if self.trakt.is_connected():
@@ -4160,6 +4289,7 @@ class MainWindow(QMainWindow):
             else:
                 trakt_status.setText(tr("trakt_not_connected"))
             trakt_disconnect_btn.setEnabled(self.trakt.is_connected())
+            refresh_sync_status()
 
         def do_trakt_connect():
             self.settings.setValue(

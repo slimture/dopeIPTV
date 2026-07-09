@@ -337,3 +337,86 @@ class PlaylistStore:
         if self.get(pid):
             self.active_id = pid
             self._save()
+
+
+class WatchedStore:
+    """Cross-device watched-history cache pulled from Trakt.
+
+    Keyed on TMDB ids so the same lookup works whether the local match
+    came from the auto-matcher or a manual TMDB pick. Persisted as one
+    JSON blob in QSettings so a normal shutdown never leaves it half-
+    written and startup is a single settings read."""
+
+    def __init__(self, settings: QSettings) -> None:
+        self.settings = settings
+        self.movies: set[int] = set()
+        # show_tmdb_id -> set of (season, episode) tuples
+        self.episodes: dict[int, set[tuple[int, int]]] = {}
+        self.last_sync_at: int = 0
+        self._load()
+
+    def _load(self) -> None:
+        raw = self.settings.value("trakt_watched_cache", "") or ""
+        if not raw:
+            return
+        try:
+            data = json.loads(raw)
+        except (ValueError, TypeError):
+            return
+        self.movies = {int(x) for x in data.get("movies", [])
+                       if isinstance(x, int)}
+        eps: dict[int, set[tuple[int, int]]] = {}
+        for sid, pairs in (data.get("episodes") or {}).items():
+            try:
+                key = int(sid)
+            except (ValueError, TypeError):
+                continue
+            eps[key] = {(int(s), int(e)) for s, e in pairs
+                        if isinstance(s, int) and isinstance(e, int)}
+        self.episodes = eps
+        self.last_sync_at = int(data.get("last_sync_at") or 0)
+
+    def _save(self) -> None:
+        payload = {
+            "movies": sorted(self.movies),
+            "episodes": {str(k): sorted(list(v))
+                         for k, v in self.episodes.items()},
+            "last_sync_at": self.last_sync_at,
+        }
+        self.settings.setValue("trakt_watched_cache",
+                               json.dumps(payload, separators=(",", ":")))
+
+    def replace(self, movies: list[int],
+                shows: dict[int, list[list[int]]]) -> None:
+        """Rebuild the cache from a fresh Trakt sync payload."""
+        self.movies = set(movies)
+        self.episodes = {
+            sid: {(s, e) for s, e in pairs}
+            for sid, pairs in shows.items()
+        }
+        self.last_sync_at = int(datetime.now().timestamp())
+        self._save()
+
+    def is_movie_watched(self, tmdb_id: int | None) -> bool:
+        return isinstance(tmdb_id, int) and tmdb_id in self.movies
+
+    def is_episode_watched(self, show_tmdb_id: int | None,
+                           season: int | None,
+                           episode: int | None) -> bool:
+        if not isinstance(show_tmdb_id, int):
+            return False
+        if not isinstance(season, int) or not isinstance(episode, int):
+            return False
+        eps = self.episodes.get(show_tmdb_id)
+        return eps is not None and (season, episode) in eps
+
+    def show_watched_count(self, show_tmdb_id: int | None) -> int:
+        if not isinstance(show_tmdb_id, int):
+            return 0
+        return len(self.episodes.get(show_tmdb_id) or ())
+
+    def clear(self) -> None:
+        self.movies = set()
+        self.episodes = {}
+        self.last_sync_at = 0
+        self.settings.remove("trakt_watched_cache")

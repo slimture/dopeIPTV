@@ -159,3 +159,44 @@ class TraktClient:
                          headers=self._headers(), timeout=15)
         r.raise_for_status()
         return r.json() or []
+
+    # -- watched (for cross-device sync into the "already seen" indicator) ----
+
+    def watched_movies(self) -> list[int]:
+        """Every movie the user has marked watched on any device.
+        Returns the list of TMDB ids - dopeIPTV keys its local titles on
+        TMDB via the poster-resolver, so imdb ids aren't needed."""
+        r = requests.get(f"{API}/sync/watched/movies",
+                         headers=self._headers(), timeout=30)
+        r.raise_for_status()
+        out: list[int] = []
+        for entry in r.json() or []:
+            tid = ((entry.get("movie") or {}).get("ids") or {}).get("tmdb")
+            if isinstance(tid, int):
+                out.append(tid)
+        return out
+
+    def watched_shows(self) -> dict[int, list[list[int]]]:
+        """Every episode the user has marked watched on any device.
+        Returns a mapping show_tmdb_id -> [[season, episode], ...] with each
+        watched episode listed once. Trakt returns the full nested seasons
+        structure by default; we flatten it so the local WatchedStore can
+        answer 'is S03E05 seen?' with a single set lookup."""
+        r = requests.get(f"{API}/sync/watched/shows",
+                         headers=self._headers(), timeout=45)
+        r.raise_for_status()
+        out: dict[int, list[list[int]]] = {}
+        for entry in r.json() or []:
+            tid = ((entry.get("show") or {}).get("ids") or {}).get("tmdb")
+            if not isinstance(tid, int):
+                continue
+            eps: list[list[int]] = []
+            for season in entry.get("seasons") or []:
+                snum = season.get("number")
+                for ep in season.get("episodes") or []:
+                    enum = ep.get("number")
+                    if isinstance(snum, int) and isinstance(enum, int):
+                        eps.append([snum, enum])
+            if eps:
+                out[tid] = eps
+        return out
