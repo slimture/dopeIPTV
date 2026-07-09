@@ -1714,7 +1714,13 @@ class MainWindow(QMainWindow):
             meta = (self.tmdb.resolve_by_id(tid, "vod", on_resolved)
                     if self.tmdb else None)
             items.append(self._trakt_watched_item(tid, "vod", meta))
-        for show_tid in sorted(self.watched.trakt_episodes):
+        # Shows Trakt has returned episodes for, PLUS whole-show marks we
+        # pushed this session - the latter may not be reflected in the
+        # /sync/watched pull yet (Trakt indexes with a short delay), so
+        # include them so a just-synced series shows up immediately.
+        show_ids = set(self.watched.trakt_episodes) | set(
+            self.watched.synced_shows)
+        for show_tid in sorted(show_ids):
             meta = (self.tmdb.resolve_by_id(show_tid, "series", on_resolved)
                     if self.tmdb else None)
             items.append(self._trakt_watched_item(show_tid, "series", meta))
@@ -2111,30 +2117,39 @@ class MainWindow(QMainWindow):
             return
         tid = self._tmdb_id_for_item(item, "series")
         self.watched.add_local_item(item, "series", tid)
-        # Record the whole-show mark (tmdb-keyed) so a later sync can
-        # push it even if we don't push right now.
         if isinstance(tid, int):
+            # Record the whole-show mark (tmdb-keyed) so the periodic sync
+            # can push it to Trakt even if the user chose the local-only
+            # variant; the +Trakt variant also pushes right away.
             self.watched.mark_show_local(tid)
-        if push_to_trakt and self.trakt.is_connected():
-            if isinstance(tid, int):
+            if push_to_trakt and self.trakt.is_connected():
                 self._trakt_push(lambda: self.trakt.add_show_history(tid))
                 self.watched.mark_show_synced(tid)
-            elif self.tmdb is not None:
-                self._resolve_tmdb_id_async(
-                    item, "series",
-                    lambda rid: self._on_series_id_for_trakt(item, rid))
-            else:
-                self._error(tr("mark_needs_tmdb"))
+        elif self.tmdb is not None:
+            # No cached id yet - resolve it in the background so the show
+            # can still reach Trakt (now if +Trakt, otherwise on the next
+            # sync). Without a resolved id there's nothing Trakt can key
+            # on, hence the mark_needs_tmdb notice only for the +Trakt
+            # variant when we have no resolver at all.
+            self._resolve_tmdb_id_async(
+                item, "series",
+                lambda rid: self._on_series_id_resolved(item, rid,
+                                                        push_to_trakt))
+        elif push_to_trakt:
+            self._error(tr("mark_needs_tmdb"))
         self.list_model.refresh_all()
 
-    def _on_series_id_for_trakt(self, item: dict, tid: int | None) -> None:
+    def _on_series_id_resolved(self, item: dict, tid: int | None,
+                               push_to_trakt: bool) -> None:
         if not isinstance(tid, int):
-            self._error(tr("mark_needs_tmdb"))
+            if push_to_trakt:
+                self._error(tr("mark_needs_tmdb"))
             return
         self.watched.mark_show_local(tid)
-        self.watched.mark_show_synced(tid)
         self.watched.add_local_item(item, "series", tid)
-        self._trakt_push(lambda: self.trakt.add_show_history(tid))
+        if push_to_trakt and self.trakt.is_connected():
+            self.watched.mark_show_synced(tid)
+            self._trakt_push(lambda: self.trakt.add_show_history(tid))
         self.list_model.refresh_all()
 
     def _unmark_series_watched(self, item: dict,
