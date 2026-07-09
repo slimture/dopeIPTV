@@ -1291,9 +1291,19 @@ class MainWindow(QMainWindow):
         raw = self._provider_cover(it)
         embed_tmdb = (tmdb_url_from_provider(raw)
                       if kind in ("vod", "series") else None)
-        for cand in (title_tmdb, embed_tmdb, raw):
-            if cand and not self.logos.is_dead(cand):
-                return cand
+        if title_tmdb and not self.logos.is_dead(title_tmdb):
+            return title_tmdb
+        if embed_tmdb:
+            # raw is the panel's proxy of this exact TMDB token. If the
+            # direct image.tmdb.org URL is dead (TMDB deleted the
+            # poster), the proxy will 404/fail the same way - so raw is
+            # never a useful fallback here. Returning None instead of
+            # raw saves a wasted request that also drags down flaky
+            # panel hosts (which then trip the circuit breaker for the
+            # covers that DO exist on them).
+            return None if self.logos.is_dead(embed_tmdb) else embed_tmdb
+        if raw and not self.logos.is_dead(raw):
+            return raw
         return None
 
     def cover_should_fetch(self, url, it, kind: str) -> bool:
