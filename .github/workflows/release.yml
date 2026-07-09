@@ -161,17 +161,28 @@ jobs:
           # import. Deliberately do NOT install the media stack (mpv, ffmpeg,
           # libass): those must come from our bundle, which is what this test
           # proves.
-          APPIMAGE="$(ls dopeIPTV-*.AppImage | head -1)"
-          docker run --rm -v "$PWD:/work" -w /work ubuntu:24.04 bash -c "
+          docker run --rm -v "$PWD:/work" -w /work ubuntu:24.04 bash -c '
             set -e
             export DEBIAN_FRONTEND=noninteractive
             apt-get update -qq
+            # The GUI + media host libraries that every Ubuntu desktop already
+            # ships (and that libmpv/Qt legitimately load from the host). NOT
+            # the ffmpeg/libass media stack - that must come from our bundle.
             apt-get install -y -qq --no-install-recommends \
               libgl1 libegl1 libglib2.0-0 libfontconfig1 libfreetype6 \
-              libdbus-1-3 libxkbcommon0 libxcb-cursor0 >/dev/null
-            chmod +x '$APPIMAGE'
-            ./'$APPIMAGE' --appimage-extract-and-run --self-check
-          "
+              libdbus-1-3 libxkbcommon0 libxcb-cursor0 libx11-6 libxext6 \
+              libxrandr2 libxv1 libxss1 libwayland-client0 libwayland-egl1 \
+              libdrm2 libgbm1 libasound2t64 libpulse0 >/dev/null
+            ap=$(ls dopeIPTV-*.AppImage | head -1)
+            chmod +x "$ap"
+            ./"$ap" --appimage-extract >/dev/null
+            INT=squashfs-root/usr/dopeiptv/_internal
+            echo "--- libmpv unresolved deps (ldd) ---"
+            LD_LIBRARY_PATH="$INT" ldd "$INT/libmpv.so.2" 2>&1 \
+              | grep -i "not found" || echo "(none missing per ldd)"
+            echo "--- self-check ---"
+            ./squashfs-root/usr/dopeiptv/dopeiptv --self-check
+          '
       - name: Smoke test - launch AppImage and .deb
         run: |
           # Headless CI has no hardware GL, so QOpenGLWidget's GL init step
