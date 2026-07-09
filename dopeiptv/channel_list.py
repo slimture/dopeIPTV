@@ -242,6 +242,28 @@ class ChannelDelegate(QStyledItemDelegate):
         painter.drawPath(path)
         painter.restore()
 
+    def _paint_fav_star(self, painter, anchor: QRect, size: int) -> None:
+        """Gold star in the bottom-right corner of *anchor* - the same
+        favourite marker channels use, now on movie/series posters too.
+        Bottom-right so it clears the watched (top-right) and Watch Later
+        (top-left) badges. A dark disc behind it keeps it readable on
+        light posters."""
+        pad = 3
+        x = anchor.right() - size - pad
+        y = anchor.bottom() - size - pad
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(0, 0, 0, 130))
+        painter.drawEllipse(x, y, size, size)
+        painter.setPen(QColor("#FFD700"))
+        f = QFont()
+        f.setPointSize(max(9, int(size * 0.62)))
+        painter.setFont(f)
+        painter.drawText(QRect(x, y, size, size),
+                         Qt.AlignmentFlag.AlignCenter, "★")
+        painter.restore()
+
     def _is_playing(self, it, kind: str) -> bool:
         group = {"live": "live", "fav": "live", "vod": "vod",
                  "episode": "episode", "history": "history",
@@ -333,6 +355,8 @@ class ChannelDelegate(QStyledItemDelegate):
         if self.window.is_item_on_watchlist(it, kind):
             self._paint_watchlist_badge(
                 painter, logo_rect, max(18, logo_sz // 5))
+        if self.window.is_favorite_item(it, kind):
+            self._paint_fav_star(painter, logo_rect, max(18, logo_sz // 5))
 
         painter.setPen(
             QColor(ACCENT) if playing else QColor(P["text"]))
@@ -425,8 +449,7 @@ class ChannelDelegate(QStyledItemDelegate):
                 painter, logo_rect, max(16, logo_sz // 4))
 
         num_w = 0
-        is_fav = (kind in ("live", "vod", "series")
-                  and self.window.favs.is_favorite(it.get("stream_id")))
+        is_fav = self.window.is_favorite_item(it, kind)
         if kind in ("live", "fav") and it.get("num"):
             has_archive = self.window._timeshift_days(it) > 0
             num_w = 52 if has_archive else 34

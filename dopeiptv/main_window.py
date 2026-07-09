@@ -1754,6 +1754,22 @@ class MainWindow(QMainWindow):
             return "local"
         return None
 
+    def is_favorite_item(self, item: dict, kind: str) -> bool:
+        """Whether the row is a favourite (its gold star) - routed to the
+        right store: channels, movies (stream_id) or series (series_id)."""
+        if not item:
+            return False
+        if kind == "history":
+            hk = item.get("_kind")
+            kind = {"movie": "vod", "series": "series"}.get(hk, hk)
+        if kind in ("live", "fav"):
+            return self.favs.is_favorite(item.get("stream_id"))
+        if kind == "vod":
+            return self.movie_favs.is_favorite(item.get("stream_id"))
+        if kind == "series":
+            return self.series_favs.is_favorite(item.get("series_id"))
+        return False
+
     def is_item_on_watchlist(self, item: dict, kind: str) -> bool:
         """Unified predicate the delegate calls once per paint - answers
         whether the given item is on the Watch Later list (its clock
@@ -3353,6 +3369,11 @@ class MainWindow(QMainWindow):
         it = self.list_model.item_at(idx.row())
         if not it:
             return
+        # Select (highlight) the right-clicked row so it's clear which
+        # item the menu acts on. This only moves the selection + detail
+        # panel; playback is on double-click, so nothing starts playing
+        # and no channel switch happens.
+        self.listw.setCurrentIndex(idx)
         if self.mode == "rec":
             self._rec_context_menu(pos, it)
             return
