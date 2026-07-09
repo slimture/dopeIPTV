@@ -1537,6 +1537,22 @@ class MainWindow(QMainWindow):
                 return self.show_watched_count(item) > 0
         return False
 
+    def is_item_on_watchlist(self, item: dict, kind: str) -> bool:
+        """Unified predicate the delegate calls once per paint - answers
+        whether the given item is on the Watch Later list (its clock
+        marker). Only movie/series rows can be on the list."""
+        if kind == "vod":
+            return self.is_on_watchlist(item, "vod")
+        if kind == "series":
+            return self.is_on_watchlist(item, "series")
+        if kind == "history":
+            hk = item.get("_kind")
+            if hk == "movie":
+                return self.is_on_watchlist(item, "vod")
+            if hk == "series":
+                return self.is_on_watchlist(item, "series")
+        return False
+
     def _tmdb_id_for_item(self, item: dict, kind: str) -> int | None:
         if not self.tmdb or not item:
             return None

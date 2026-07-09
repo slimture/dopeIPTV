@@ -211,6 +211,35 @@ class ChannelDelegate(QStyledItemDelegate):
         painter.drawPath(path)
         painter.restore()
 
+    def _paint_watchlist_badge(self, painter, anchor: QRect,
+                               size: int) -> None:
+        """Small clock badge in the top-LEFT corner of *anchor* - the
+        'on your Watch Later list' marker. Left corner so it never
+        collides with the top-right watched check, and a blue disc so
+        the two markers read as distinct at a glance."""
+        pad = 3
+        x = anchor.left() + pad
+        y = anchor.top() + pad
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("#2f80ed"))
+        painter.drawEllipse(x, y, size, size)
+        pen = QPen(QColor("#ffffff"))
+        pen.setWidth(max(2, size // 7))
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        painter.setPen(pen)
+        cx, cy = x + size / 2.0, y + size / 2.0
+        # Clock hands: one up (12 o'clock), one to the right (~4 o'clock).
+        path = QPainterPath()
+        path.moveTo(cx, cy)
+        path.lineTo(cx, cy - size * 0.26)
+        path.moveTo(cx, cy)
+        path.lineTo(cx + size * 0.20, cy + size * 0.12)
+        painter.drawPath(path)
+        painter.restore()
+
     def _is_playing(self, it, kind: str) -> bool:
         group = {"live": "live", "fav": "live", "vod": "vod",
                  "episode": "episode", "history": "history",
@@ -298,6 +327,9 @@ class ChannelDelegate(QStyledItemDelegate):
         if self.window.is_item_watched(it, kind):
             self._paint_watched_badge(
                 painter, logo_rect, max(18, logo_sz // 5))
+        if self.window.is_item_on_watchlist(it, kind):
+            self._paint_watchlist_badge(
+                painter, logo_rect, max(18, logo_sz // 5))
 
         painter.setPen(
             QColor(ACCENT) if playing else QColor(P["text"]))
@@ -383,6 +415,9 @@ class ChannelDelegate(QStyledItemDelegate):
 
         if self.window.is_item_watched(it, kind):
             self._paint_watched_badge(
+                painter, logo_rect, max(16, logo_sz // 4))
+        if self.window.is_item_on_watchlist(it, kind):
+            self._paint_watchlist_badge(
                 painter, logo_rect, max(16, logo_sz // 4))
 
         num_w = 0
