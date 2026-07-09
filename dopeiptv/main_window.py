@@ -4552,10 +4552,14 @@ class MainWindow(QMainWindow):
         self.mpv.stop()
         threading.Thread(target=self.cast.shutdown, daemon=True).start()
         # Drop queued background downloads so thread-pool teardown doesn't
-        # stall the exit, then make sure the event loop actually returns.
-        for pool in (self.pool, self._art_pool):
+        # stall the exit, then give in-flight workers up to 500 ms to wind
+        # down naturally - otherwise a mid-flight disk write or requests
+        # call finishes into an interpreter that's already tearing modules
+        # down and crashes the process with SIGSEGV during exit.
+        for pool in (self.pool, self._logo_pool, self._art_pool):
             try:
                 pool.clear()
+                pool.waitForDone(500)
             except Exception:
                 pass
         super().closeEvent(event)
