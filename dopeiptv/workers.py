@@ -110,13 +110,22 @@ _ACTIVE_WORKERS: set[Worker] = set()
 def run_async(pool: QThreadPool, fn: Callable, on_done: Callable,
               on_fail: Callable | None = None, *args: Any,
               **kwargs: Any) -> Worker:
-    """Schedule *fn* on *pool* and connect done/fail callbacks."""
+    """Schedule *fn* on *pool* and connect done/fail callbacks.
+
+    Callbacks are wired with an explicit QueuedConnection so they run
+    on the receiving QObject's thread regardless of PyQt's heuristics
+    for plain-callable targets - which on some builds default to
+    DirectConnection and dispatch on the worker thread, so a
+    QPixmap/QWidget touched in on_done/on_fail then trips a
+    thread-affinity qFatal and aborts the process."""
     w = Worker(fn, *args, **kwargs)
-    w.signals.done.connect(on_done)
+    ct = Qt.ConnectionType.QueuedConnection
+    w.signals.done.connect(on_done, ct)
     if on_fail:
-        w.signals.fail.connect(on_fail)
+        w.signals.fail.connect(on_fail, ct)
     _ACTIVE_WORKERS.add(w)
-    w.signals.finished.connect(lambda: _ACTIVE_WORKERS.discard(w))
+    w.signals.finished.connect(
+        lambda: _ACTIVE_WORKERS.discard(w), ct)
     pool.start(w)
     return w
 
