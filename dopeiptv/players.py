@@ -47,6 +47,29 @@ def embedded_playback_supported() -> bool:
     return embedded_playback_reason() is None
 
 
+def _system_env() -> dict:
+    """Environment for spawning a SYSTEM binary (mpv/VLC) from inside a
+    frozen bundle. PyInstaller/AppImage prepend our bundled libraries to
+    the loader/plugin paths; a system player that inherits those loads
+    OUR Qt/libmpv/ffmpeg instead of its own and fails to start - which is
+    why external mpv "doesn't work" from the AppImage/.deb. Restore the
+    pre-launch values PyInstaller stashes as *_ORIG, or drop the vars
+    entirely, so the child runs against the real system libraries. On a
+    plain source run none of these are set, so this is a no-op there."""
+    env = dict(os.environ)
+    for var in ("LD_LIBRARY_PATH", "LD_PRELOAD", "QT_PLUGIN_PATH",
+                "QT_QPA_PLATFORM_PLUGIN_PATH", "QML2_IMPORT_PATH",
+                "GST_PLUGIN_SYSTEM_PATH", "GST_PLUGIN_PATH", "GTK_PATH",
+                "GDK_PIXBUF_MODULE_FILE", "FONTCONFIG_FILE",
+                "FONTCONFIG_PATH", "PYTHONHOME", "PYTHONPATH"):
+        orig = env.get(var + "_ORIG")
+        if orig:
+            env[var] = orig
+        else:
+            env.pop(var, None)
+    return env
+
+
 def launch_player(player: str, url: str, title: str | None = None,
                   parent: object = None) -> None:
     """Spawn an external mpv or VLC process."""
@@ -66,7 +89,7 @@ def launch_player(player: str, url: str, title: str | None = None,
                             f"  sudo apt install {name.lower()}")
         return
     subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                     start_new_session=True)
+                     start_new_session=True, env=_system_env())
 
 
 def _register_error_callback(mpv_instance: object, signal: pyqtSignal) -> None:
@@ -110,7 +133,7 @@ class MpvIpcPlayer:
                "--user-agent=dopeIPTV/1.0"]
         self.proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
                                      stderr=subprocess.DEVNULL,
-                                     start_new_session=True)
+                                     start_new_session=True, env=_system_env())
         for _ in range(60):
             if os.path.exists(self.socket_path):
                 return True
