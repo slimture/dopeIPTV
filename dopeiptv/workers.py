@@ -159,14 +159,14 @@ class LogoLoader(QObject):
         self.dead: dict[str, float] = {}
         self.dead_ttl_permanent: float = 3600.0
         self.dead_ttl_transient: float = 20.0
-
-    def _mark_dead(self, url: str, ttl: float) -> None:
-        self.dead[url] = time.monotonic() + ttl
         # Disk cache: raw response bytes, keyed by URL hash. Lets
         # evicted RAM entries reload in a few ms from local SSD instead
         # of re-hitting the network.
         self.disk_dir: Path | None = (
             Path(cache_dir) if cache_dir is not None else None)
+
+    def _mark_dead(self, url: str, ttl: float) -> None:
+        self.dead[url] = time.monotonic() + ttl
 
     def is_dead(self, url: str | None) -> bool:
         if not url:
