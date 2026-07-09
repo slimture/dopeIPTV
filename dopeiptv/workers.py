@@ -15,6 +15,19 @@ from typing import Any, Callable
 # support tool for "covers aren't loading" reports.
 _IMG_DEBUG = bool(os.environ.get("DOPEIPTV_IMG_DEBUG"))
 
+# A browser-style User-Agent for image fetches. python-requests'
+# default UA gets rejected outright by several image hosts the IPTV
+# world leans on: Wikipedia returns 403 for it, and some Xtream
+# panels (ptv.is et al) TCP-reset the connection - which looked like
+# the provider being down when other IPTV apps loaded the same URLs
+# fine. They send a real UA; so do we.
+_IMG_HEADERS = {
+    "User-Agent": ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                   "(KHTML, like Gecko) Chrome/126.0 Safari/537.36 "
+                   "dopeIPTV"),
+    "Accept": "image/*,*/*;q=0.8",
+}
+
 
 def _img_dbg(msg: str) -> None:
     if _IMG_DEBUG:
@@ -173,22 +186,62 @@ class LogoLoader(QObject):
         self.dead: dict[str, float] = {}
         self.dead_ttl_permanent: float = 3600.0
         self.dead_ttl_transient: float = 20.0
+        # Host-level circuit breaker. A provider whose image server is
+        # down (or resetting connections) has hundreds of URLs in one
+        # category; without this, each dead URL burns a worker for up
+        # to its full connect timeout and the queue starves out the
+        # hosts that DO work (TMDB). Three straight failures on a host
+        # put the whole host on a cooldown so every remaining URL on
+        # it short-circuits to the fallback instantly; one success
+        # resets the counter.
+        self.dead_hosts: dict[str, float] = {}
+        self._host_strikes: dict[str, int] = {}
+        self.host_strike_limit: int = 3
+        self.host_cooldown: float = 60.0
         # Disk cache: raw response bytes, keyed by URL hash. Lets
         # evicted RAM entries reload in a few ms from local SSD instead
         # of re-hitting the network.
         self.disk_dir: Path | None = (
             Path(cache_dir) if cache_dir is not None else None)
 
+    @staticmethod
+    def _host_of(url: str) -> str:
+        # scheme://HOST[:port]/... - cheap split, no urlparse import.
+        try:
+            return url.split("/", 3)[2].lower()
+        except IndexError:
+            return url
+
     def _mark_dead(self, url: str, ttl: float) -> None:
         self.dead[url] = time.monotonic() + ttl
+
+    def _strike_host(self, url: str) -> None:
+        host = self._host_of(url)
+        n = self._host_strikes.get(host, 0) + 1
+        self._host_strikes[host] = n
+        if n >= self.host_strike_limit:
+            _img_dbg(f"host DEAD({self.host_cooldown:.0f}s) {host}")
+            self.dead_hosts[host] = time.monotonic() + self.host_cooldown
+
+    def _clear_host(self, url: str) -> None:
+        host = self._host_of(url)
+        self._host_strikes.pop(host, None)
+        self.dead_hosts.pop(host, None)
 
     def is_dead(self, url: str | None) -> bool:
         if not url:
             return False
+        now = time.monotonic()
+        host_expiry = self.dead_hosts.get(self._host_of(url))
+        if host_expiry is not None:
+            if now < host_expiry:
+                return True
+            self.dead_hosts.pop(self._host_of(url), None)
+            self._host_strikes.pop(self._host_of(url), None)
         expiry = self.dead.get(url)
         if expiry is None:
             return False
-        if time.monotonic() >= expiry:
+        if now >= expiry:
             self.dead.pop(url, None)
             return False
         return True
@@ -202,8 +255,10 @@ class LogoLoader(QObject):
     def _store(self, url: str, pm: QPixmap) -> None:
         self.cache[url] = pm
         self.cache.move_to_end(url)
-        # A URL that once failed but now decoded fine is alive again.
+        # A URL that once failed but now decoded fine is alive again -
+        # and so is its host.
         self.dead.pop(url, None)
+        self._clear_host(url)
         while len(self.cache) > self.max_entries:
             self.cache.popitem(last=False)
 
@@ -249,7 +304,11 @@ class LogoLoader(QObject):
                         dp.unlink(missing_ok=True)
                     except OSError:
                         pass
-            r = requests.get(u, timeout=10)
+            # Short connect timeout: a host that's down should cost a
+            # worker ~3 s, not the full read timeout - with hundreds
+            # of URLs on one dead provider host that difference is
+            # what keeps the queue from starving the working hosts.
+            r = requests.get(u, headers=_IMG_HEADERS, timeout=(3.05, 15))
             # Long TTL for legitimately-dead endpoints, short TTL for
             # everything else so a temporary 500 or connection reset
             # gets a brief cooldown instead of a session-long ban.
@@ -299,6 +358,11 @@ class LogoLoader(QObject):
             if url not in self.dead:
                 _img_dbg(f"net FAIL cooldown(20s) {_msg[:80]} {url}")
                 self._mark_dead(url, self.dead_ttl_transient)
+            # Connection-level failures count toward the host circuit
+            # breaker - a couple of these on the same panel host means
+            # the host is down / rejecting us, so every remaining URL
+            # on it should short-circuit to the fallback URL.
+            self._strike_host(url)
             callbacks = self.waiting.pop(url, [])
             for cb in callbacks:
                 try:

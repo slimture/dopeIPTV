@@ -228,7 +228,7 @@ def test_logo_loader_disk_cache_roundtrip(qapp, tmp_path, monkeypatch):
         content = red_png
         def raise_for_status(self): pass
 
-    def fake_get(url, timeout=None):
+    def fake_get(url, headers=None, timeout=None):
         calls["n"] += 1
         return FakeResp()
 
@@ -266,7 +266,7 @@ def test_logo_loader_corrupt_disk_file_recovers(qapp, tmp_path, monkeypatch):
         def raise_for_status(self): pass
 
     monkeypatch.setattr(
-        "dopeiptv.workers.requests.get", lambda u, timeout=None: FakeResp())
+        "dopeiptv.workers.requests.get", lambda u, headers=None, timeout=None: FakeResp())
 
     pool = _pool()
     loader = LogoLoader(pool, max_size=16, cache_dir=tmp_path)
@@ -296,7 +296,7 @@ def test_logo_loader_marks_404_dead_long_ttl(qapp, tmp_path, monkeypatch):
             raise RuntimeError("404")
 
     monkeypatch.setattr(
-        "dopeiptv.workers.requests.get", lambda u, timeout=None: Resp404())
+        "dopeiptv.workers.requests.get", lambda u, headers=None, timeout=None: Resp404())
 
     pool = _pool()
     loader = LogoLoader(pool, max_size=16, cache_dir=tmp_path)
@@ -310,7 +310,7 @@ def test_logo_loader_transient_error_short_ttl(qapp, tmp_path, monkeypatch):
 
     monkeypatch.setattr(
         "dopeiptv.workers.requests.get",
-        lambda u, timeout=None: (_ for _ in ()).throw(RuntimeError("timeout")))
+        lambda u, headers=None, timeout=None: (_ for _ in ()).throw(RuntimeError("timeout")))
 
     pool = _pool()
     loader = LogoLoader(pool, max_size=16, cache_dir=tmp_path)
@@ -338,11 +338,10 @@ class FakeDelegate:
     def pick_url(self, it, kind):
         w = self.window
         tmdb_url = w.poster_for(it, kind)
-        url = it.get("stream_icon") or it.get("cover")
-        if url and w.logos.is_dead(url):
-            url = None
-        if not url:
-            url = tmdb_url
+        if tmdb_url and w.logos.is_dead(tmdb_url):
+            tmdb_url = None
+        url = (tmdb_url or it.get("stream_icon")
+               or it.get("cover"))
         if url and w.logos.is_dead(url):
             url = None
         return url
@@ -378,10 +377,11 @@ class _StubLogos:
         return url in self.dead
 
 
-def test_delegate_prefers_provider_cover_over_tmdb(qapp, settings):
-    """Provider-first: the curated stream_icon always wins when it
-    exists - that's what SwipTV and other IPTV apps show, and it
-    never depends on our title-based TMDB search succeeding."""
+def test_delegate_prefers_tmdb_when_resolved(qapp, settings):
+    """A resolved TMDB match wins over the provider icon - it's the
+    same artwork the detail panel shows so the columns agree, and
+    on providers whose image hosts are down it's the only URL that
+    actually loads."""
     from dopeiptv.metadata import PosterResolver
     client = MagicMock()
     client.fetch_details.return_value = {
@@ -393,7 +393,7 @@ def test_delegate_prefers_provider_cover_over_tmdb(qapp, settings):
     win = FakeWindow(tmdb, _StubLogos())
     d = FakeDelegate(win)
     it = {"name": "Great Movie", "stream_icon": "https://provider/x.jpg"}
-    assert d.pick_url(it, "vod") == "https://provider/x.jpg"
+    assert d.pick_url(it, "vod") == "https://tmdb/great.jpg"
 
 
 def test_delegate_uses_tmdb_when_provider_icon_missing(qapp, settings):
@@ -504,6 +504,92 @@ def test_delegate_uses_provider_url_for_live_kind(qapp, settings):
     d = FakeDelegate(win)
     it = {"name": "SVT1", "stream_icon": "https://provider/svt1.png"}
     assert d.pick_url(it, "live") == "https://provider/svt1.png"
+
+
+def test_logo_loader_host_circuit_breaker(qapp, tmp_path, monkeypatch):
+    """Three straight connection failures on one host put the whole
+    host on cooldown, so the hundreds of remaining URLs on a dead
+    provider panel short-circuit instantly instead of each burning a
+    worker for a connect timeout."""
+    from dopeiptv.workers import LogoLoader
+
+    monkeypatch.setattr(
+        "dopeiptv.workers.requests.get",
+        lambda u, headers=None, timeout=None: (_ for _ in ()).throw(
+            RuntimeError("Connection reset by peer")))
+
+    pool = _pool()
+    loader = LogoLoader(pool, max_size=16, cache_dir=tmp_path)
+    for i in range(3):
+        loader.get(f"http://deadpanel:2095/images/{i}.jpg", lambda pm: None)
+        _drain_pool(pool, qapp)
+
+    # A NEVER-fetched URL on the same host is now considered dead...
+    assert loader.is_dead("http://deadpanel:2095/images/other.jpg")
+    # ...but other hosts are unaffected.
+    assert not loader.is_dead("https://image.tmdb.org/t/p/w500/x.jpg")
+
+
+def test_logo_loader_host_breaker_resets_on_success(
+        qapp, tmp_path, monkeypatch):
+    from dopeiptv.workers import LogoLoader
+
+    png = _valid_png_bytes()
+    fail = {"on": True}
+
+    class OkResp:
+        status_code = 200
+        content = png
+        def raise_for_status(self): pass
+
+    def fake_get(u, headers=None, timeout=None):
+        if fail["on"]:
+            raise RuntimeError("reset")
+        return OkResp()
+
+    monkeypatch.setattr("dopeiptv.workers.requests.get", fake_get)
+    pool = _pool()
+    loader = LogoLoader(pool, max_size=16, cache_dir=tmp_path)
+    loader.host_cooldown = 0.0  # let the breaker expire immediately
+    for i in range(3):
+        loader.get(f"http://flaky:2095/{i}.jpg", lambda pm: None)
+        _drain_pool(pool, qapp)
+    # Breaker tripped but with zero cooldown it expires on next check.
+    fail["on"] = False
+    got = []
+    loader.get("http://flaky:2095/new.jpg", lambda pm: got.append(pm))
+    _drain_pool(pool, qapp)
+    assert len(got) == 1 and not got[0].isNull()
+    assert not loader.is_dead("http://flaky:2095/9.jpg")
+
+
+def test_logo_loader_sends_browser_user_agent(qapp, tmp_path, monkeypatch):
+    """Several image hosts (Wikipedia's 403, some Xtream panels'
+    TCP resets) reject python-requests' default UA. Every image
+    fetch must carry the browser-style header."""
+    from dopeiptv.workers import LogoLoader
+
+    seen = {}
+    png = _valid_png_bytes()
+
+    class OkResp:
+        status_code = 200
+        content = png
+        def raise_for_status(self): pass
+
+    def fake_get(u, headers=None, timeout=None):
+        seen["headers"] = headers or {}
+        seen["timeout"] = timeout
+        return OkResp()
+
+    monkeypatch.setattr("dopeiptv.workers.requests.get", fake_get)
+    pool = _pool()
+    loader = LogoLoader(pool, max_size=16, cache_dir=tmp_path)
+    loader.get("https://cdn/ua.jpg", lambda pm: None)
+    _drain_pool(pool, qapp)
+    assert "Mozilla/5.0" in seen["headers"].get("User-Agent", "")
+    # Connect timeout is the short one so dead hosts fail fast.
+    assert seen["timeout"][0] < 5
 
 
 # -- Provider-title cleaning: the [IMDB] / [MULTI] / codec noise -----------

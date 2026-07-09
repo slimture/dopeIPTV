@@ -256,19 +256,19 @@ class ChannelDelegate(QStyledItemDelegate):
         logo_y = rect.top() + 8
         logo_rect = QRect(logo_x, logo_y, logo_sz, logo_sz)
         radius = max(8, logo_sz // 5)
-        # Provider cover FIRST. Xtream providers curate stream_icon /
-        # cover per item (usually already a TMDB-hosted poster), so it
-        # matches 1:1 what other IPTV apps show and never depends on
-        # our title-based TMDB search succeeding. The TMDB URL is the
-        # fallback for items the provider left bare - and calling
-        # poster_for still kicks the background TMDB resolution that
-        # the watched-badges and detail panel rely on.
+        # TMDB poster when the title resolved with a match (it's the
+        # same artwork the detail panel shows, so the two columns
+        # always agree), provider stream_icon otherwise - including
+        # while TMDB is still resolving, so rows are never blank when
+        # the provider has art. is_dead() covers both the single-URL
+        # blacklist and the per-host circuit breaker, so a provider
+        # whose image server is down (or resets python UAs) stops
+        # costing a connect-timeout per row after a few strikes.
         tmdb_url = self.window.poster_for(it, kind)
-        url = it.get("stream_icon") or it.get("cover")
-        if url and self.window.logos.is_dead(url):
-            url = None
-        if not url:
-            url = tmdb_url
+        if tmdb_url and self.window.logos.is_dead(tmdb_url):
+            tmdb_url = None
+        url = (tmdb_url or it.get("stream_icon")
+               or it.get("cover"))
         if url and self.window.logos.is_dead(url):
             url = None
         pm = self.window.logos.cache.get(url) if url else None
@@ -348,19 +348,19 @@ class ChannelDelegate(QStyledItemDelegate):
             rect.top() + (rect.height() - logo_sz) // 2,
             logo_sz, logo_sz)
         radius = max(6, logo_sz // 4)
-        # Provider cover FIRST. Xtream providers curate stream_icon /
-        # cover per item (usually already a TMDB-hosted poster), so it
-        # matches 1:1 what other IPTV apps show and never depends on
-        # our title-based TMDB search succeeding. The TMDB URL is the
-        # fallback for items the provider left bare - and calling
-        # poster_for still kicks the background TMDB resolution that
-        # the watched-badges and detail panel rely on.
+        # TMDB poster when the title resolved with a match (it's the
+        # same artwork the detail panel shows, so the two columns
+        # always agree), provider stream_icon otherwise - including
+        # while TMDB is still resolving, so rows are never blank when
+        # the provider has art. is_dead() covers both the single-URL
+        # blacklist and the per-host circuit breaker, so a provider
+        # whose image server is down (or resets python UAs) stops
+        # costing a connect-timeout per row after a few strikes.
         tmdb_url = self.window.poster_for(it, kind)
-        url = it.get("stream_icon") or it.get("cover")
-        if url and self.window.logos.is_dead(url):
-            url = None
-        if not url:
-            url = tmdb_url
+        if tmdb_url and self.window.logos.is_dead(tmdb_url):
+            tmdb_url = None
+        url = (tmdb_url or it.get("stream_icon")
+               or it.get("cover"))
         if url and self.window.logos.is_dead(url):
             url = None
         pm = self.window.logos.cache.get(url) if url else None
