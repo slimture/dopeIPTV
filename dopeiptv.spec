@@ -134,6 +134,49 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
+def _drop_host_graphics(binaries):
+    """Strip the OpenGL/Mesa/DRM/Wayland stack from the bundle so it comes
+    from the machine running the app, not the build host.
+
+    PyInstaller's Qt hooks pull libGL/libEGL/libglapi/libgbm/libdrm and the
+    Mesa GLX + LLVM loader into the bundle. Shipping them is what kills the
+    embedded player on other distros: our bundled libGL loads the *host's*
+    DRI driver (/usr/lib/dri/*_dri.so), the two disagree on libglapi's symbol
+    table, and GL init dies with "did not find extension DRI_Mesa / failed to
+    bind extensions". The build host (Arch) happens to match its own bundle so
+    it works there, while an Ubuntu box shows a black, dead player. These
+    libraries must always come from the host - which by definition matches its
+    own DRI drivers and compositor - so drop them here. Every Linux desktop
+    ships them, exactly as the upstream AppImage excludelist assumes."""
+    host_libs = (
+        # OpenGL / Mesa / DRM - the DRI_Mesa offenders.
+        "libGL.so", "libGLX.so", "libGLX_mesa.so", "libGLdispatch.so",
+        "libOpenGL.so", "libEGL.so", "libEGL_mesa.so", "libGLESv2.so",
+        "libGLESv1_CM.so", "libglapi.so", "libgbm.so", "libgallium",
+        "libdrm.so", "libdrm_amdgpu.so", "libdrm_nouveau.so",
+        "libdrm_radeon.so", "libdrm_intel.so", "libLLVM", "libvulkan.so",
+        "libxcb-glx.so", "libxcb-dri2.so", "libxcb-dri3.so",
+        "libxcb-present.so",
+        # Wayland client stack - must match the running compositor.
+        "libwayland-client.so", "libwayland-egl.so", "libwayland-cursor.so",
+        "libwayland-server.so",
+    )
+    kept, dropped = [], []
+    for entry in binaries:
+        base = os.path.basename(entry[0])
+        if any(base.startswith(p) for p in host_libs):
+            dropped.append(base)
+        else:
+            kept.append(entry)
+    if dropped:
+        print("Excluding host graphics libs from bundle: "
+              + ", ".join(sorted(set(dropped))))
+    return kept
+
+
+if sys.platform.startswith("linux"):
+    a.binaries = _drop_host_graphics(a.binaries)
+
 pyz = PYZ(a.pure)
 
 exe = EXE(
