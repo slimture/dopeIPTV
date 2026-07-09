@@ -120,9 +120,14 @@ def _libmpv_dep_binaries(libmpv_path):
         # GL / Mesa / DRM / Vulkan - host's, matches its GPU driver
         "libGL", "libGLX", "libEGL", "libGLdispatch", "libOpenGL",
         "libglapi", "libgbm", "libdrm", "libgallium", "libLLVM", "libvulkan",
-        # X / Wayland / input - host's, matches its display server
+        # X / input - host's, matches its display server. NOTE: we do NOT
+        # exclude libwayland-* here: libmpv's helper libs (libdecor, SDL2)
+        # pull in libwayland-cursor/server, which aren't present on every
+        # system (e.g. X11-only or a lean box), so bundle them or libmpv
+        # fails to load. libwayland has a stable ABI and vo=libmpv never
+        # opens its own Wayland connection, so a bundled copy is safe.
         "libX11", "libxcb", "libXext", "libXfixes", "libXrandr", "libXi",
-        "libXrender", "libXau", "libXdmcp", "libxkbcommon", "libwayland",
+        "libXrender", "libXau", "libXdmcp", "libxkbcommon",
         "libxshmfence",
         # audio - host's, matches its sound server
         "libpulse", "libasound", "libpipewire", "libjack",
