@@ -256,21 +256,12 @@ class ChannelDelegate(QStyledItemDelegate):
         logo_y = rect.top() + 8
         logo_rect = QRect(logo_x, logo_y, logo_sz, logo_sz)
         radius = max(8, logo_sz // 5)
-        # TMDB poster when the title resolved with a match (it's the
-        # same artwork the detail panel shows, so the two columns
-        # always agree), provider stream_icon otherwise - including
-        # while TMDB is still resolving, so rows are never blank when
-        # the provider has art. is_dead() covers both the single-URL
-        # blacklist and the per-host circuit breaker, so a provider
-        # whose image server is down (or resets python UAs) stops
-        # costing a connect-timeout per row after a few strikes.
-        tmdb_url = self.window.poster_for(it, kind)
-        if tmdb_url and self.window.logos.is_dead(tmdb_url):
-            tmdb_url = None
-        url = (tmdb_url or it.get("stream_icon")
-               or it.get("cover"))
-        if url and self.window.logos.is_dead(url):
-            url = None
+        # cover_url picks TMDB (title search), then a TMDB path
+        # extracted from the provider's own icon URL, then the raw
+        # provider URL - first that isn't blacklisted. is_dead()
+        # covers both the single-URL blacklist and the per-host
+        # circuit breaker.
+        url = self.window.cover_url(it, kind)
         pm = self.window.logos.cache.get(url) if url else None
         if pm:
             path = QPainterPath()
@@ -295,18 +286,11 @@ class ChannelDelegate(QStyledItemDelegate):
             painter.setFont(f)
             painter.drawText(logo_rect, Qt.AlignmentFlag.AlignCenter,
                              name.strip()[:1].upper())
-            # Only spend network on a provider fallback URL once TMDB
-            # has actually answered for this title. While the lookup
-            # is pending, the fallback would be fetched just to get
-            # replaced by the TMDB poster a second later - wasted
-            # traffic that also hammers flaky panel hosts into
-            # rate-limiting us (already-cached provider art still
-            # paints above regardless). The TMDB URL itself is by
-            # definition resolved, so it always passes.
-            if (url and url not in self.window.logos.waiting
-                    and not self.window.logos.is_dead(url)
-                    and (url == tmdb_url
-                         or self.window.tmdb_resolved(it, kind))):
+            # Fetch decision lives on the window: TMDB URLs go now,
+            # the raw provider URL waits until the title lookup has
+            # answered so pending rows don't burn requests on art
+            # that's about to be replaced.
+            if self.window.cover_should_fetch(url, it, kind):
                 self.window.logos.get(
                     url,
                     lambda _pm: self.window.listw.viewport().update())
@@ -358,21 +342,12 @@ class ChannelDelegate(QStyledItemDelegate):
             rect.top() + (rect.height() - logo_sz) // 2,
             logo_sz, logo_sz)
         radius = max(6, logo_sz // 4)
-        # TMDB poster when the title resolved with a match (it's the
-        # same artwork the detail panel shows, so the two columns
-        # always agree), provider stream_icon otherwise - including
-        # while TMDB is still resolving, so rows are never blank when
-        # the provider has art. is_dead() covers both the single-URL
-        # blacklist and the per-host circuit breaker, so a provider
-        # whose image server is down (or resets python UAs) stops
-        # costing a connect-timeout per row after a few strikes.
-        tmdb_url = self.window.poster_for(it, kind)
-        if tmdb_url and self.window.logos.is_dead(tmdb_url):
-            tmdb_url = None
-        url = (tmdb_url or it.get("stream_icon")
-               or it.get("cover"))
-        if url and self.window.logos.is_dead(url):
-            url = None
+        # cover_url picks TMDB (title search), then a TMDB path
+        # extracted from the provider's own icon URL, then the raw
+        # provider URL - first that isn't blacklisted. is_dead()
+        # covers both the single-URL blacklist and the per-host
+        # circuit breaker.
+        url = self.window.cover_url(it, kind)
         pm = self.window.logos.cache.get(url) if url else None
         if pm:
             path = QPainterPath()
@@ -397,18 +372,11 @@ class ChannelDelegate(QStyledItemDelegate):
             painter.setFont(f)
             painter.drawText(logo_rect, Qt.AlignmentFlag.AlignCenter,
                              name.strip()[:1].upper())
-            # Only spend network on a provider fallback URL once TMDB
-            # has actually answered for this title. While the lookup
-            # is pending, the fallback would be fetched just to get
-            # replaced by the TMDB poster a second later - wasted
-            # traffic that also hammers flaky panel hosts into
-            # rate-limiting us (already-cached provider art still
-            # paints above regardless). The TMDB URL itself is by
-            # definition resolved, so it always passes.
-            if (url and url not in self.window.logos.waiting
-                    and not self.window.logos.is_dead(url)
-                    and (url == tmdb_url
-                         or self.window.tmdb_resolved(it, kind))):
+            # Fetch decision lives on the window: TMDB URLs go now,
+            # the raw provider URL waits until the title lookup has
+            # answered so pending rows don't burn requests on art
+            # that's about to be replaced.
+            if self.window.cover_should_fetch(url, it, kind):
                 self.window.logos.get(
                     url,
                     lambda _pm: self.window.listw.viewport().update())

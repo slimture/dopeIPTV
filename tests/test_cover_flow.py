@@ -328,40 +328,28 @@ def test_logo_loader_transient_error_short_ttl(qapp, tmp_path, monkeypatch):
 
 
 class FakeDelegate:
-    """Replicates the branching in ChannelDelegate.paint that picks
-    which URL to hand to LogoLoader. Kept in the tests so a refactor
-    in the real delegate is deliberate, not accidental."""
+    """The real ChannelDelegate.paint just calls window.cover_url and
+    window.cover_should_fetch, so the fake is a thin passthrough - the
+    interesting logic is tested on FakeWindow (which mirrors the real
+    MainWindow methods) below."""
 
     def __init__(self, window):
         self.window = window
 
     def pick_url(self, it, kind):
-        w = self.window
-        tmdb_url = w.poster_for(it, kind)
-        if tmdb_url and w.logos.is_dead(tmdb_url):
-            tmdb_url = None
-        url = (tmdb_url or it.get("stream_icon")
-               or it.get("cover"))
-        if url and w.logos.is_dead(url):
-            url = None
-        return url
+        return self.window.cover_url(it, kind)
 
     def should_fetch(self, it, kind):
-        """Mirrors the delegate's queue-a-network-fetch condition: the
-        provider fallback is only fetched once TMDB has answered, so
-        pending rows don't waste traffic on art that's about to be
-        replaced."""
-        w = self.window
-        tmdb_url = w.poster_for(it, kind)
-        if tmdb_url and w.logos.is_dead(tmdb_url):
-            tmdb_url = None
-        url = self.pick_url(it, kind)
-        if not url or w.logos.is_dead(url):
-            return False
-        return url == tmdb_url or w.tmdb_resolved(it, kind)
+        return self.window.cover_should_fetch(
+            self.window.cover_url(it, kind), it, kind)
 
 
 class FakeWindow:
+    """Mirrors MainWindow.cover_url / cover_should_fetch / poster_for /
+    tmdb_resolved so the cover-selection logic is exercised without a
+    full window. Kept byte-for-byte behaviourally aligned with the
+    real methods."""
+
     def __init__(self, tmdb, logos):
         self.tmdb = tmdb
         self.logos = logos
@@ -382,11 +370,31 @@ class FakeWindow:
             return True
         return self.tmdb.is_resolved(title, kind)
 
+    def cover_url(self, it, kind):
+        from dopeiptv.workers import tmdb_url_from_provider
+        title_tmdb = self.poster_for(it, kind)
+        raw = it.get("stream_icon") or it.get("cover") or None
+        embed_tmdb = (tmdb_url_from_provider(raw)
+                      if kind in ("vod", "series") else None)
+        for cand in (title_tmdb, embed_tmdb, raw):
+            if cand and not self.logos.is_dead(cand):
+                return cand
+        return None
+
+    def cover_should_fetch(self, url, it, kind):
+        if (not url or url in self.logos.waiting
+                or self.logos.is_dead(url)):
+            return False
+        if "image.tmdb.org" in url:
+            return True
+        return self.tmdb_resolved(it, kind)
+
 
 class _StubLogos:
     """LogoLoader stand-in exposing only what the delegate touches."""
     def __init__(self):
         self.dead = {}
+        self.waiting = {}
     def is_dead(self, url):
         return url in self.dead
 
@@ -713,6 +721,94 @@ def test_logo_loader_sends_browser_user_agent(qapp, tmp_path, monkeypatch):
     assert "Mozilla/5.0" in seen["headers"].get("User-Agent", "")
     # Connect timeout is the short one so dead hosts fail fast.
     assert seen["timeout"][0] < 5
+
+
+# -- Embedded TMDB path extraction from provider URLs ----------------------
+
+
+def test_tmdb_url_from_provider_extracts_embedded_path():
+    """Provider URLs that proxy a TMDB poster get rewritten to the
+    direct image.tmdb.org URL. Exact URLs pulled from the user's
+    debug log."""
+    from dopeiptv.workers import tmdb_url_from_provider
+    cases = [
+        ("http://Ptv.is:2095/images/movies/kv2Qk9MKFFQo4WQPaYta599HkJP.jpg",
+         "https://image.tmdb.org/t/p/w500/kv2Qk9MKFFQo4WQPaYta599HkJP.jpg"),
+        # double slash the panels sometimes emit
+        ("http://Ptv.is:2095/images/movies//gLhHHZUzeseRXShoDyC4VqLgsNv.jpg",
+         "https://image.tmdb.org/t/p/w500/gLhHHZUzeseRXShoDyC4VqLgsNv.jpg"),
+        # _small size suffix (nordic1.tv style)
+        ("http://nordic1.tv:2095/images/5w5HpAXMRty6YBxx6GjPAk0CuMN_small.jpg",
+         "https://image.tmdb.org/t/p/w500/5w5HpAXMRty6YBxx6GjPAk0CuMN.jpg"),
+        ("http://31.220.3.239:2095/images/movies/3jcbDmRFiQ83drXNOvRDeKHxS0C.jpg",
+         "https://image.tmdb.org/t/p/w500/3jcbDmRFiQ83drXNOvRDeKHxS0C.jpg"),
+    ]
+    for src, expected in cases:
+        assert tmdb_url_from_provider(src) == expected, src
+
+
+def test_tmdb_url_from_provider_ignores_non_tmdb():
+    """Provider-native ids and real CDN URLs must NOT be rewritten -
+    rewriting a working cover to a bogus TMDB path would break it."""
+    from dopeiptv.workers import tmdb_url_from_provider
+    non_tmdb = [
+        # MD5 upload id (32 lowercase hex, no uppercase)
+        "http://Ptv.is:2095/images/220af56e2aa03da34ce44a560b0b333d.jpg",
+        "http://31.220.3.239:2095/images/faa1eedd39e5f08a5f22dfdf60c4ad15.jpg",
+        # already a TMDB URL - leave it
+        "https://image.tmdb.org/t/p/w500/abcDEF123.jpg",
+        # real CDNs with their own filename schemes
+        "https://cdn.countryflags.com/thumbs/sweden/flag-round-250.png",
+        "https://musicart.xboxlive.com/7/48df5000-0000-0000-0000-0/504/image.jpg",
+        ("https://m.media-amazon.com/images/M/"
+         "MV5BOWFkODE4ZWUtYzg2NC00ZGJkLTljYjYtMmJjY2E2ODc0N2UzXkEyXkFqcGd"
+         "eQXVyNTU5ODQ0MA@@._V1_QL75_UY266_CR147,0,180,266_.jpg"),
+        "",
+        None,
+    ]
+    for u in non_tmdb:
+        assert tmdb_url_from_provider(u) is None, u
+
+
+def test_delegate_uses_embedded_tmdb_when_title_search_fails(qapp, settings):
+    """The real fix for the user's report: a movie whose title TMDB
+    can't match, but whose provider stream_icon embeds a TMDB path,
+    now shows the poster straight from image.tmdb.org instead of
+    404ing on the panel's broken proxy."""
+    from dopeiptv.metadata import PosterResolver
+    client = MagicMock()
+    client.fetch_details.return_value = None  # title search: no match
+    tmdb = PosterResolver(_pool(), settings, client)
+    win = FakeWindow(tmdb, _StubLogos())
+    d = FakeDelegate(win)
+    it = {"name": "Weird Provider Title 2019",
+          "stream_icon":
+          "http://Ptv.is:2095/images/movies/kv2Qk9MKFFQo4WQPaYta599HkJP.jpg"}
+    # Even before the title search resolves, the embedded TMDB URL is
+    # used - it doesn't depend on the search.
+    picked = d.pick_url(it, "vod")
+    assert picked == (
+        "https://image.tmdb.org/t/p/w500/kv2Qk9MKFFQo4WQPaYta599HkJP.jpg")
+    # And it fetches immediately - it's an image.tmdb.org URL.
+    assert d.should_fetch(it, "vod") is True
+
+
+def test_delegate_embedded_dead_falls_to_raw_provider(qapp, settings):
+    """If even the embedded-TMDB URL is blacklisted, the raw provider
+    URL is the last resort."""
+    from dopeiptv.metadata import PosterResolver
+    import time
+    client = MagicMock()
+    client.fetch_details.return_value = None
+    tmdb = PosterResolver(_pool(), settings, client)
+    logos = _StubLogos()
+    embed = "https://image.tmdb.org/t/p/w500/kv2Qk9MKFFQo4WQPaYta599HkJP.jpg"
+    logos.dead[embed] = time.monotonic() + 3600
+    win = FakeWindow(tmdb, logos)
+    d = FakeDelegate(win)
+    raw = "http://Ptv.is:2095/images/movies/kv2Qk9MKFFQo4WQPaYta599HkJP.jpg"
+    it = {"name": "X", "stream_icon": raw}
+    assert d.pick_url(it, "vod") == raw
 
 
 # -- Provider-title cleaning: the [IMDB] / [MULTI] / codec noise -----------

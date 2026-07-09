@@ -34,6 +34,41 @@ def _img_dbg(msg: str) -> None:
     if _IMG_DEBUG:
         print(f"[dopeIPTV:img] {msg}", file=sys.stderr, flush=True)
 
+
+# A TMDB poster/backdrop path embedded in a provider image URL. Many
+# Xtream panels proxy TMDB art under their own host, e.g.
+#   http://panel:2095/images/movies/<tmdb_token>.jpg
+#   http://panel:2095/images/<tmdb_token>_small.jpg
+# but the proxy frequently 404s (or the host is down) while
+# image.tmdb.org serves the real file. Detect the token and go to the
+# source. TMDB tokens are ~27-char base62 strings; the guards below
+# keep provider-native ids from being mis-rewritten:
+#   * MD5 upload ids are 32 lowercase-hex chars (no uppercase)
+#   * amazon/IMDB 'MV5B...' segments carry ',', '@@' and '_V1_' which
+#     break the contiguous token
+# The regex therefore requires the token to sit right before the
+# extension (with an optional _size suffix), and tmdb_url_from_provider
+# additionally requires mixed case.
+_TMDB_EMBED_RE = re.compile(
+    r"/([A-Za-z0-9]{26,32})(?:_[A-Za-z]+)?\.(jpe?g|png)(?:$|\?)", re.I)
+
+
+def tmdb_url_from_provider(url: str | None) -> str | None:
+    """If *url* is a provider image URL that embeds a TMDB poster path,
+    return the direct image.tmdb.org URL for it; otherwise None."""
+    if not url or "image.tmdb.org" in url:
+        return None
+    m = _TMDB_EMBED_RE.search(url)
+    if not m:
+        return None
+    token, ext = m.group(1), m.group(2).lower()
+    # Real TMDB tokens mix upper and lower case. All-lowercase (MD5
+    # hex) or all-uppercase are provider-native ids, not TMDB paths.
+    if not (any(c.isupper() for c in token)
+            and any(c.islower() for c in token)):
+        return None
+    return f"https://image.tmdb.org/t/p/w500/{token}.{ext}"
+
 import requests
 from PyQt6.QtCore import (
     QObject, QRunnable, QStandardPaths, QThreadPool, Qt, pyqtSignal, pyqtSlot,

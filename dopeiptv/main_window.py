@@ -54,7 +54,7 @@ from .trakt import TraktAuthError, TraktClient
 from .wakelock import WakeLock
 from .workers import (
     LogoLoader, clear_directory, default_image_cache_dir, dir_size_bytes,
-    run_async)
+    run_async, tmdb_url_from_provider)
 
 
 class _ClickableWidget(QWidget):
@@ -1269,6 +1269,46 @@ class MainWindow(QMainWindow):
             return True
         return self.tmdb.is_resolved(title, kind)
 
+    def _provider_cover(self, it) -> str | None:
+        raw = it.get("stream_icon") or it.get("cover")
+        return raw or None
+
+    def cover_url(self, it, kind: str) -> str | None:
+        """The URL the list delegate should paint for this row, chosen
+        from an ordered candidate list (first that isn't blacklisted):
+
+          1. TMDB poster from the title search (matches the detail
+             panel, so the two columns agree once it resolves)
+          2. TMDB poster extracted from the provider's own image URL
+             (many panels proxy TMDB art under a broken host - going
+             to image.tmdb.org gets the real file with no title-search
+             dependency and no wait)
+          3. the raw provider URL
+
+        poster_for() is always called so the background TMDB lookup
+        that feeds the watched-badge + detail panel still fires."""
+        title_tmdb = self.poster_for(it, kind)
+        raw = self._provider_cover(it)
+        embed_tmdb = (tmdb_url_from_provider(raw)
+                      if kind in ("vod", "series") else None)
+        for cand in (title_tmdb, embed_tmdb, raw):
+            if cand and not self.logos.is_dead(cand):
+                return cand
+        return None
+
+    def cover_should_fetch(self, url, it, kind: str) -> bool:
+        """Whether the delegate should queue a network fetch for *url*
+        now. TMDB URLs (title-search or embedded) fetch immediately;
+        the raw provider URL waits until the TMDB lookup has answered
+        so a pending row doesn't burn a request on art that's about to
+        be replaced (and hammer flaky panel hosts into rate-limiting)."""
+        if (not url or url in self.logos.waiting
+                or self.logos.is_dead(url)):
+            return False
+        if "image.tmdb.org" in url:
+            return True
+        return self.tmdb_resolved(it, kind)
+
     # -- trakt scrobbling -------------------------------------------------------------
 
     def _trakt_start_for_item(self, kind: str, item) -> None:
@@ -1975,7 +2015,11 @@ class MainWindow(QMainWindow):
 
     def _load_detail_poster(self, it, is_media: bool,
                             kind: str | None = None) -> None:
-        fallback_url = it.get("stream_icon") or it.get("cover")
+        raw_cover = it.get("stream_icon") or it.get("cover")
+        # If the provider icon embeds a TMDB path, prefer the direct
+        # image.tmdb.org URL - the panel's own proxy is often the one
+        # that's 404ing/down. Same rewrite the list delegate uses.
+        fallback_url = tmdb_url_from_provider(raw_cover) or raw_cover
         if not (is_media and self.tmdb):
             if fallback_url:
                 self.poster_art.get(fallback_url, self._set_detail_logo)
