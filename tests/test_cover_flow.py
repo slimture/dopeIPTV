@@ -346,6 +346,20 @@ class FakeDelegate:
             url = None
         return url
 
+    def should_fetch(self, it, kind):
+        """Mirrors the delegate's queue-a-network-fetch condition: the
+        provider fallback is only fetched once TMDB has answered, so
+        pending rows don't waste traffic on art that's about to be
+        replaced."""
+        w = self.window
+        tmdb_url = w.poster_for(it, kind)
+        if tmdb_url and w.logos.is_dead(tmdb_url):
+            tmdb_url = None
+        url = self.pick_url(it, kind)
+        if not url or w.logos.is_dead(url):
+            return False
+        return url == tmdb_url or w.tmdb_resolved(it, kind)
+
 
 class FakeWindow:
     def __init__(self, tmdb, logos):
@@ -479,6 +493,44 @@ def test_delegate_uses_provider_url_while_tmdb_pending(qapp, settings):
     it = {"name": "Pending Movie", "stream_icon": "https://provider/x.jpg"}
     url = d.pick_url(it, "vod")
     assert url == "https://provider/x.jpg"
+
+
+def test_delegate_defers_provider_fetch_while_tmdb_pending(qapp, settings):
+    """While TMDB is mid-lookup the provider URL may PAINT (if it's
+    already cached) but must not be FETCHED - queueing it just burns
+    a request on art that gets replaced seconds later, and on flaky
+    panel hosts the burst gets us rate-limited."""
+    from dopeiptv.metadata import PosterResolver
+    client = MagicMock()
+    client.fetch_details.return_value = {
+        "tmdb_id": 1, "poster_url": "https://tmdb/x.jpg"}
+    tmdb = PosterResolver(_pool(), settings, client)
+
+    win = FakeWindow(tmdb, _StubLogos())
+    d = FakeDelegate(win)
+    it = {"name": "Pending Movie", "stream_icon": "https://provider/x.jpg"}
+    # Kicked but not drained: the lookup is in flight.
+    assert d.pick_url(it, "vod") == "https://provider/x.jpg"
+    assert d.should_fetch(it, "vod") is False
+
+    _drain_pool(tmdb.pool, qapp)
+    # Resolved with a match: now it's the TMDB URL and it fetches.
+    assert d.pick_url(it, "vod") == "https://tmdb/x.jpg"
+    assert d.should_fetch(it, "vod") is True
+
+
+def test_delegate_fetches_provider_after_nomatch(qapp, settings):
+    from dopeiptv.metadata import PosterResolver
+    client = MagicMock()
+    client.fetch_details.return_value = None  # no TMDB match
+    tmdb = PosterResolver(_pool(), settings, client)
+    win = FakeWindow(tmdb, _StubLogos())
+    d = FakeDelegate(win)
+    it = {"name": "Sport Rerun", "stream_icon": "https://provider/x.jpg"}
+    d.pick_url(it, "vod")  # kicks the lookup
+    _drain_pool(tmdb.pool, qapp)
+    assert d.pick_url(it, "vod") == "https://provider/x.jpg"
+    assert d.should_fetch(it, "vod") is True
 
 
 def test_delegate_uses_provider_url_when_tmdb_disabled(qapp, settings):

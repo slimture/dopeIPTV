@@ -295,8 +295,18 @@ class ChannelDelegate(QStyledItemDelegate):
             painter.setFont(f)
             painter.drawText(logo_rect, Qt.AlignmentFlag.AlignCenter,
                              name.strip()[:1].upper())
+            # Only spend network on a provider fallback URL once TMDB
+            # has actually answered for this title. While the lookup
+            # is pending, the fallback would be fetched just to get
+            # replaced by the TMDB poster a second later - wasted
+            # traffic that also hammers flaky panel hosts into
+            # rate-limiting us (already-cached provider art still
+            # paints above regardless). The TMDB URL itself is by
+            # definition resolved, so it always passes.
             if (url and url not in self.window.logos.waiting
-                    and not self.window.logos.is_dead(url)):
+                    and not self.window.logos.is_dead(url)
+                    and (url == tmdb_url
+                         or self.window.tmdb_resolved(it, kind))):
                 self.window.logos.get(
                     url,
                     lambda _pm: self.window.listw.viewport().update())
@@ -387,8 +397,18 @@ class ChannelDelegate(QStyledItemDelegate):
             painter.setFont(f)
             painter.drawText(logo_rect, Qt.AlignmentFlag.AlignCenter,
                              name.strip()[:1].upper())
+            # Only spend network on a provider fallback URL once TMDB
+            # has actually answered for this title. While the lookup
+            # is pending, the fallback would be fetched just to get
+            # replaced by the TMDB poster a second later - wasted
+            # traffic that also hammers flaky panel hosts into
+            # rate-limiting us (already-cached provider art still
+            # paints above regardless). The TMDB URL itself is by
+            # definition resolved, so it always passes.
             if (url and url not in self.window.logos.waiting
-                    and not self.window.logos.is_dead(url)):
+                    and not self.window.logos.is_dead(url)
+                    and (url == tmdb_url
+                         or self.window.tmdb_resolved(it, kind))):
                 self.window.logos.get(
                     url,
                     lambda _pm: self.window.listw.viewport().update())
