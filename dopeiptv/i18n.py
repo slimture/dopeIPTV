@@ -4430,6 +4430,16 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Синхронизация истории просмотров…",
         "th": "กำลังซิงค์ประวัติการดู…",
     },
+    "btn_sync_now": {
+        "en": "Sync now (Trakt)",
+        "sv": "Synka nu (Trakt)",
+        "es": "Sincronizar ahora (Trakt)",
+        "de": "Jetzt synchronisieren (Trakt)",
+        "fr": "Synchroniser (Trakt)",
+        "zh": "立即同步 (Trakt)",
+        "ru": "Синхронизировать (Trakt)",
+        "th": "ซิงค์เดี๋ยวนี้ (Trakt)",
+    },
     "trakt_sync_never": {
         "en": "Watched history: not synced yet.",
         "sv": "Tittarhistorik: inte synkad än.",

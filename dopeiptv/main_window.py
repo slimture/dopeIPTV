@@ -302,6 +302,10 @@ class MainWindow(QMainWindow):
         # "series". Drives the content kind (poster vs live, play as
         # movie vs drill into episodes) while self.mode stays "fav".
         self._fav_section: str = "chan"
+        # True only while a right-click is moving the selection, so the
+        # live-channel autoplay preview doesn't fire (right-click should
+        # highlight a row, never start playing it).
+        self._rmb_selecting: bool = False
         self.series_ctx = None
         self._info_cache: dict = {}
         self._current_key = None
@@ -409,6 +413,14 @@ class MainWindow(QMainWindow):
         self._guide_btn = guide_btn = QPushButton(tr("btn_epg_guide"))
         guide_btn.clicked.connect(self._open_epg_guide)
         sl.addWidget(guide_btn)
+
+        # Contextual "Sync now" - only shown in the Trakt-backed lists
+        # (Watched, Watch Later, Favorites -> Trakt) so the user can pull
+        # fresh data without digging into Settings.
+        self._sync_now_btn = QPushButton(tr("btn_sync_now"))
+        self._sync_now_btn.clicked.connect(self._sidebar_sync_now)
+        self._sync_now_btn.hide()
+        sl.addWidget(self._sync_now_btn)
 
         self._refresh_btn = refresh_btn = QPushButton(tr("btn_refresh"))
         refresh_btn.setToolTip(tr("tooltip_reload_channels_epg"))
@@ -1050,6 +1062,7 @@ class MainWindow(QMainWindow):
             else QAbstractItemView.SelectionMode.SingleSelection)
         self.search.clear()
         self._load_categories()
+        self._update_sync_btn()
         # Opening Watched is a good moment to pull the latest Trakt
         # history (respects the 1 h TTL, so it's a no-op if just synced).
         if mode == "watched":
@@ -1219,6 +1232,7 @@ class MainWindow(QMainWindow):
             return
         self.series_ctx = None
         self.back_btn.hide()
+        self._update_sync_btn()
         self._load_items(cat)
 
     def _load_items(self, category_id) -> None:
@@ -1408,6 +1422,18 @@ class MainWindow(QMainWindow):
         raw = it.get("stream_icon") or it.get("cover")
         return raw or None
 
+    def _cover_kind(self, it, kind: str) -> str:
+        """The kind to use for artwork lookup. Watch Later / Watched /
+        Favourites / History rows are snapshots that carry the real
+        content kind in "_kind"; map that to vod/series so their posters
+        resolve from TMDB just like the Movies/Series lists, instead of
+        being treated as a container kind that never gets a poster."""
+        if kind in ("watchlist", "watched", "fav", "history"):
+            hk = it.get("_kind")
+            return {"movie": "vod", "vod": "vod", "series": "series",
+                    "episode": "series"}.get(hk, kind)
+        return kind
+
     def cover_url(self, it, kind: str) -> str | None:
         """The URL the list delegate should paint for this row, chosen
         from an ordered candidate list (first that isn't blacklisted):
@@ -1426,12 +1452,16 @@ class MainWindow(QMainWindow):
         in that case we just drop the title-search poster as the *cover*
         candidate and let the provider image (or its embedded-TMDB
         rewrite) win."""
-        title_tmdb = self.poster_for(it, kind)
+        eff = self._cover_kind(it, kind)
+        # A Trakt-only row already carries a real TMDB poster URL as its
+        # stream_icon, so skip the title search (it would be a wasted
+        # round-trip that could even mismatch) and use that directly.
+        title_tmdb = None if it.get("_trakt_only") else self.poster_for(it, eff)
         if not self._prefer_tmdb_covers:
             title_tmdb = None
         return choose_cover_url(
             title_tmdb, self._provider_cover(it),
-            kind, self.logos.is_dead)
+            eff, self.logos.is_dead)
 
     def cover_should_fetch(self, url, it, kind: str) -> bool:
         """Whether the delegate should queue a network fetch for *url*
@@ -1449,7 +1479,7 @@ class MainWindow(QMainWindow):
         # fetch it straight away instead of waiting on TMDB.
         if not self._prefer_tmdb_covers:
             return True
-        return self.tmdb_resolved(it, kind)
+        return self.tmdb_resolved(it, self._cover_kind(it, kind))
 
     # -- trakt scrobbling -------------------------------------------------------------
 
@@ -1623,6 +1653,27 @@ class MainWindow(QMainWindow):
     def _reload_watched(self) -> None:
         if self.mode == "watched":
             self._load_items(self._watched_subcat)
+
+    def _update_sync_btn(self) -> None:
+        """Show the sidebar 'Sync now' button only in the Trakt-backed
+        lists, and only when a Trakt account is connected."""
+        cur = self.cat_list.currentItem()
+        data = cur.data(Qt.ItemDataRole.UserRole) if cur else None
+        show = self.trakt.is_connected() and (
+            self.mode == "watched"
+            or (self.mode == "fav" and isinstance(data, tuple)
+                and data[0] == "trakt"))
+        self._sync_now_btn.setVisible(bool(show))
+
+    def _sidebar_sync_now(self) -> None:
+        # Force a Trakt pull (watched history + watchlist) and push any
+        # local marks/favourites up; the Watched list rebuilds itself on
+        # completion. In the Favorites -> Trakt view, also refetch that
+        # list right away.
+        self._maybe_sync_watched(force=True)
+        if self.mode == "fav" and self._fav_section == "trakt":
+            self._load_trakt_favorites()
+        self._set_status(tr("trakt_syncing"))
 
     def _trakt_watched_item(self, tmdb_id: int, kind: str,
                             meta: dict | None) -> dict:
@@ -2441,7 +2492,8 @@ class MainWindow(QMainWindow):
             if it.get("stream_id") is not None:
                 self._request_epg()
                 if (self.player and self._autoplay_preview()
-                        and self.playback_mode() == "embedded"):
+                        and self.playback_mode() == "embedded"
+                        and not self._rmb_selecting):
                     self._preview_timer.start(350)
         # In History / Watch Later, defer to the snapshot's _kind so
         # a movie row fetches movie info and a series row fetches
@@ -3429,10 +3481,13 @@ class MainWindow(QMainWindow):
         if not it:
             return
         # Select (highlight) the right-clicked row so it's clear which
-        # item the menu acts on. This only moves the selection + detail
-        # panel; playback is on double-click, so nothing starts playing
-        # and no channel switch happens.
+        # item the menu acts on. The _rmb_selecting guard stops the
+        # live-channel autoplay preview from firing, so right-clicking a
+        # channel highlights it without starting playback or interrupting
+        # whatever is already playing.
+        self._rmb_selecting = True
         self.listw.setCurrentIndex(idx)
+        self._rmb_selecting = False
         if self.mode == "rec":
             self._rec_context_menu(pos, it)
             return
