@@ -3276,6 +3276,45 @@ _STRINGS: dict[str, dict[str, str]] = {
         "zh": "恢复默认频道…", "ru": "Восстановить каналы по умолчанию…",
         "th": "คืนค่าช่องเริ่มต้น…",
     },
+    "settings_image_cache_label": {
+        "en": "Image cache on disk: {size}",
+        "sv": "Bildcache på disk: {size}",
+        "es": "Caché de imágenes en disco: {size}",
+        "de": "Bildcache auf Datenträger: {size}",
+        "fr": "Cache d'images sur disque : {size}",
+        "zh": "磁盘上的图像缓存: {size}",
+        "ru": "Кэш изображений на диске: {size}",
+        "th": "แคชรูปภาพบนดิสก์: {size}",
+    },
+    "settings_image_cache_clear": {
+        "en": "Clear image cache",
+        "sv": "Rensa bildcache",
+        "es": "Vaciar caché de imágenes",
+        "de": "Bildcache leeren",
+        "fr": "Vider le cache d'images",
+        "zh": "清除图像缓存",
+        "ru": "Очистить кэш изображений",
+        "th": "ล้างแคชรูปภาพ",
+    },
+    "settings_image_cache_hint": {
+        "en": "Cached posters and channel logos on disk. Cleared covers "
+              "reload from the network on next scroll.",
+        "sv": "Cachade affischer och kanallogotyper på disk. Rensade "
+              "covers laddas om från nätverket vid nästa scroll.",
+        "es": "Pósteres y logotipos de canales en caché en disco. Los "
+              "elementos borrados se recargan desde la red al desplazarse.",
+        "de": "Zwischengespeicherte Poster und Kanallogos auf dem "
+              "Datenträger. Gelöschte Cover werden beim nächsten Scrollen "
+              "aus dem Netzwerk nachgeladen.",
+        "fr": "Affiches et logos de chaînes en cache sur disque. Les "
+              "éléments effacés se rechargent depuis le réseau au "
+              "prochain défilement.",
+        "zh": "磁盘上缓存的海报和频道徽标。清除后下次滚动时将从网络重新加载。",
+        "ru": "Кэшированные постеры и логотипы каналов на диске. "
+              "Очищенные заново загрузятся из сети при следующей прокрутке.",
+        "th": "โปสเตอร์และโลโก้ช่องที่แคชไว้บนดิสก์ "
+              "รายการที่ถูกล้างจะโหลดใหม่จากเครือข่ายเมื่อเลื่อนครั้งถัดไป",
+    },
     "ctx_match_tmdb": {
         "en": "Match on TMDB…",
         "sv": "Matcha mot TMDB…",

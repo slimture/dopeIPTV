@@ -24,6 +24,36 @@ def default_image_cache_dir(sub: str = "images") -> Path:
     return Path(base) / sub
 
 
+def dir_size_bytes(path: Path) -> int:
+    """Total on-disk size of *path*, best-effort (missing/unreadable files
+    are silently skipped) so a broken symlink can't crash the Settings dialog."""
+    if not path.exists():
+        return 0
+    total = 0
+    for p in path.rglob("*"):
+        try:
+            if p.is_file():
+                total += p.stat().st_size
+        except OSError:
+            pass
+    return total
+
+
+def clear_directory(path: Path) -> None:
+    """Delete every file under *path* but keep the directory itself so
+    the LogoLoader can write into it again without needing a mkdir race."""
+    if not path.exists():
+        return
+    for p in sorted(path.rglob("*"), key=lambda x: -len(x.parts)):
+        try:
+            if p.is_file() or p.is_symlink():
+                p.unlink()
+            elif p.is_dir():
+                p.rmdir()
+        except OSError:
+            pass
+
+
 class WorkerSignals(QObject):
     """Signals emitted by Worker when the background task completes."""
     done = pyqtSignal(object)

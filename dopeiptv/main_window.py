@@ -52,7 +52,9 @@ from .stores import (
 from .theme import ACCENT, ACCENTS, P, THEMES, apply_theme, build_style
 from .trakt import TraktAuthError, TraktClient
 from .wakelock import WakeLock
-from .workers import LogoLoader, default_image_cache_dir, run_async
+from .workers import (
+    LogoLoader, clear_directory, default_image_cache_dir, dir_size_bytes,
+    run_async)
 
 
 class _ClickableWidget(QWidget):
@@ -3872,6 +3874,47 @@ class MainWindow(QMainWindow):
             f"color:{P['muted2']}; font-size:11px;")
         theme_hint.setWordWrap(True)
         uf.addRow(theme_hint)
+
+        # Disk-cache controls: covers/logos accumulate under
+        # QStandardPaths.CacheLocation and don't clean themselves.
+        cache_dirs = [default_image_cache_dir("logos"),
+                      default_image_cache_dir("posters")]
+        cache_lbl = QLabel()
+        clear_cache_btn = QPushButton(tr("settings_image_cache_clear"))
+
+        def _fmt_size(n: int) -> str:
+            for unit in ("B", "KB", "MB", "GB"):
+                if n < 1024 or unit == "GB":
+                    return f"{n:.1f} {unit}" if unit != "B" else f"{n} B"
+                n /= 1024
+            return f"{n:.1f} GB"
+
+        def refresh_cache_label() -> None:
+            total = sum(dir_size_bytes(d) for d in cache_dirs)
+            cache_lbl.setText(
+                tr("settings_image_cache_label", size=_fmt_size(total)))
+            clear_cache_btn.setEnabled(total > 0)
+
+        def clear_cache() -> None:
+            for d in cache_dirs:
+                clear_directory(d)
+            # Also drop the in-memory LRUs so a re-scroll doesn't just
+            # rewrite the same pixmaps back to disk from RAM.
+            self.logos.cache.clear()
+            self.poster_art.cache.clear()
+            refresh_cache_label()
+
+        clear_cache_btn.clicked.connect(clear_cache)
+        cache_row = QHBoxLayout()
+        cache_row.addWidget(cache_lbl, 1)
+        cache_row.addWidget(clear_cache_btn)
+        uf.addRow(cache_row)
+        cache_hint = QLabel(tr("settings_image_cache_hint"))
+        cache_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        cache_hint.setWordWrap(True)
+        uf.addRow(cache_hint)
+        refresh_cache_label()
+
         tabs.addTab(ui_tab, tr("tab_interface"))
 
         # Playlists tab
@@ -3881,8 +3924,8 @@ class MainWindow(QMainWindow):
         pl_list = QListWidget()
         pv.addWidget(pl_list, 1)
         pl_btns = QHBoxLayout()
-        add_btn = QPushButton(tr("btn_add") + "...")
-        edit_btn = QPushButton(tr("btn_edit") + "...")
+        add_btn = QPushButton(tr("btn_add"))
+        edit_btn = QPushButton(tr("btn_edit"))
         remove_btn = QPushButton(tr("btn_remove"))
         refresh_pl_btn = QPushButton(tr("btn_refresh"))
         refresh_pl_btn.setToolTip(tr("tooltip_reload_channels_epg"))
@@ -3891,9 +3934,9 @@ class MainWindow(QMainWindow):
             pl_btns.addWidget(b)
         pv.addLayout(pl_btns)
         io_btns = QHBoxLayout()
-        export_btn = QPushButton(tr("btn_export") + "...")
+        export_btn = QPushButton(tr("btn_export"))
         export_btn.setToolTip(tr("settings_export_tip"))
-        import_btn = QPushButton(tr("btn_import") + "...")
+        import_btn = QPushButton(tr("btn_import"))
         import_btn.setToolTip(tr("settings_import_tip"))
         io_btns.addWidget(export_btn)
         io_btns.addWidget(import_btn)
