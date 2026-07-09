@@ -87,11 +87,69 @@ def install_icon(icon: QIcon) -> None:
         pass
 
 
+_CRASH_LOG_PATH = "/tmp/dopeiptv-crash.log"
+
+
+def _install_crash_hooks() -> None:
+    """Capture every Python exception - main thread, worker threads,
+    Qt slot errors - to /tmp/dopeiptv-crash.log AND stderr with an
+    explicit flush. Newer PyQt6 turns unhandled slot exceptions into
+    qFatal -> SIGABRT before Python's default excepthook manages to
+    flush its buffered stderr traceback, so we lose the diagnostic
+    just when we most need it."""
+    import atexit
+    import faulthandler
+    import io
+    import threading
+    import traceback
+
+    log_fh = None
+    try:
+        log_fh = open(_CRASH_LOG_PATH, "a", buffering=1)
+        atexit.register(log_fh.close)
+    except OSError:
+        log_fh = None
+
+    def _write(text: str) -> None:
+        try:
+            sys.stderr.write(text)
+            sys.stderr.flush()
+        except Exception:
+            pass
+        if log_fh is not None:
+            try:
+                log_fh.write(text)
+                log_fh.flush()
+            except Exception:
+                pass
+
+    def _hook(exc_type, exc_value, exc_tb):
+        buf = io.StringIO()
+        buf.write("\n[dopeIPTV] CRASH: uncaught exception\n")
+        traceback.print_exception(exc_type, exc_value, exc_tb, file=buf)
+        _write(buf.getvalue())
+
+    def _thread_hook(args):
+        _hook(args.exc_type, args.exc_value, args.exc_traceback)
+
+    sys.excepthook = _hook
+    threading.excepthook = _thread_hook
+    # C-level crashes (segfault before qFatal, mpv, GL) - dump a
+    # native backtrace to both stderr and the log file.
+    try:
+        faulthandler.enable(file=sys.stderr, all_threads=True)
+        if log_fh is not None:
+            faulthandler.enable(file=log_fh, all_threads=True)
+    except Exception:
+        pass
+
+
 def main() -> int:
     """Launch the application."""
     # One unconditional startup line so packaging smoke tests can prove
     # Python + our package imported cleanly before any GL/Qt init runs.
     print(f"[dopeIPTV] {VERSION} starting", file=sys.stderr, flush=True)
+    _install_crash_hooks()
     global _original_msg_handler
     from PyQt6.QtCore import qInstallMessageHandler
     _original_msg_handler = qInstallMessageHandler(_qt_message_filter)
