@@ -1924,9 +1924,13 @@ class MainWindow(QMainWindow):
         # History and Watch Later rows carry the original content kind
         # in "_kind"; a VOD or series shown from either view should still
         # resolve TMDB metadata + cover the same way the main Movies /
-        # Series view does.
+        # Series view does. History uses its own vocabulary
+        # ("movie"/"episode"/"live") - normalise it to the vod/series
+        # the detail panel and TMDB lookup speak.
         snap_kind = (it.get("_kind")
                      if self.mode in ("history", "watchlist") else None)
+        snap_kind = {"movie": "vod", "episode": "series"}.get(
+            snap_kind, snap_kind)
         media_kind = (
             "vod" if self.mode == "vod"
             else "series" if self.mode == "series"
