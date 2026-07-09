@@ -357,6 +357,14 @@ class WatchedStore:
         # show_tmdb_id -> set of (season, episode) tuples
         self.trakt_episodes: dict[int, set[tuple[int, int]]] = {}
         self.local_episodes: dict[int, set[tuple[int, int]]] = {}
+        # Local marks keyed on the provider's stream_id / series_id
+        # instead of TMDB id, for when TMDB hasn't resolved (or has no
+        # match at all - e.g. a sport rerun filed under Movies). Trakt
+        # push is not available for these but the local badge is.
+        self.local_movie_streams: set[int] = set()
+        self.local_series_streams: set[int] = set()
+        # Provider episode-id set for the same reason.
+        self.local_episode_streams: set[int] = set()
         self.last_sync_at: int = 0
         self._load()
 
@@ -409,6 +417,15 @@ class WatchedStore:
         self.trakt_episodes = self._load_eps(
             data.get("trakt_episodes") or data.get("episodes"))
         self.local_episodes = self._load_eps(data.get("local_episodes"))
+        self.local_movie_streams = {
+            int(x) for x in data.get("local_movie_streams", [])
+            if isinstance(x, int)}
+        self.local_series_streams = {
+            int(x) for x in data.get("local_series_streams", [])
+            if isinstance(x, int)}
+        self.local_episode_streams = {
+            int(x) for x in data.get("local_episode_streams", [])
+            if isinstance(x, int)}
         self.last_sync_at = int(data.get("last_sync_at") or 0)
 
     def _save(self) -> None:
@@ -419,6 +436,9 @@ class WatchedStore:
             "local_movies": sorted(self.local_movies),
             "trakt_episodes": dump_eps(self.trakt_episodes),
             "local_episodes": dump_eps(self.local_episodes),
+            "local_movie_streams": sorted(self.local_movie_streams),
+            "local_series_streams": sorted(self.local_series_streams),
+            "local_episode_streams": sorted(self.local_episode_streams),
             "last_sync_at": self.last_sync_at,
         }
         self.settings.setValue("trakt_watched_cache",
@@ -490,11 +510,52 @@ class WatchedStore:
             return 0
         return len(self.episodes_for(show_tmdb_id))
 
+    # -- stream-id-based local marks (used when TMDB hasn't resolved) ---------
+
+    def mark_movie_local_by_stream(self, stream_id: int) -> None:
+        self.local_movie_streams.add(int(stream_id))
+        self._save()
+
+    def unmark_movie_by_stream(self, stream_id: int) -> None:
+        self.local_movie_streams.discard(int(stream_id))
+        self._save()
+
+    def is_movie_watched_by_stream(self, stream_id: int | None) -> bool:
+        return (isinstance(stream_id, int)
+                and stream_id in self.local_movie_streams)
+
+    def mark_series_local_by_stream(self, series_id: int) -> None:
+        self.local_series_streams.add(int(series_id))
+        self._save()
+
+    def unmark_series_by_stream(self, series_id: int) -> None:
+        self.local_series_streams.discard(int(series_id))
+        self._save()
+
+    def is_series_watched_by_stream(self, series_id: int | None) -> bool:
+        return (isinstance(series_id, int)
+                and series_id in self.local_series_streams)
+
+    def mark_episode_local_by_stream(self, episode_id: int) -> None:
+        self.local_episode_streams.add(int(episode_id))
+        self._save()
+
+    def unmark_episode_by_stream(self, episode_id: int) -> None:
+        self.local_episode_streams.discard(int(episode_id))
+        self._save()
+
+    def is_episode_watched_by_stream(self, episode_id: int | None) -> bool:
+        return (isinstance(episode_id, int)
+                and episode_id in self.local_episode_streams)
+
     def clear(self) -> None:
         self.trakt_movies = set()
         self.local_movies = set()
         self.trakt_episodes = {}
         self.local_episodes = {}
+        self.local_movie_streams = set()
+        self.local_series_streams = set()
+        self.local_episode_streams = set()
         self.last_sync_at = 0
         self.settings.remove("trakt_watched_cache")
 

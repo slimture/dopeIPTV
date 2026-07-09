@@ -123,12 +123,18 @@ class LogoLoader(QObject):
         # provider dumps so the process doesn't grow unbounded.
         self.cache: OrderedDict[str, QPixmap] = OrderedDict()
         self.waiting: dict[str, list[Callable]] = {}
-        # URLs that returned 404 / other error last time we tried,
-        # timestamped so a purely transient network hiccup doesn't
-        # blacklist a good URL for the rest of the session. On expiry
-        # we fall back into the normal fetch path and try again.
+        # Failed URLs get a per-URL expiry timestamp. 404/410/451 get
+        # a long TTL because the endpoint is genuinely gone; any other
+        # failure (timeout, 500, connection reset) gets a much shorter
+        # cooldown so the delegate doesn't re-queue the same URL on
+        # every paint and drown the pool in retrying jobs while still
+        # being able to retry once the hiccup is over.
         self.dead: dict[str, float] = {}
-        self.dead_ttl: float = 60.0
+        self.dead_ttl_permanent: float = 3600.0
+        self.dead_ttl_transient: float = 20.0
+
+    def _mark_dead(self, url: str, ttl: float) -> None:
+        self.dead[url] = time.monotonic() + ttl
         # Disk cache: raw response bytes, keyed by URL hash. Lets
         # evicted RAM entries reload in a few ms from local SSD instead
         # of re-hitting the network.
@@ -138,10 +144,10 @@ class LogoLoader(QObject):
     def is_dead(self, url: str | None) -> bool:
         if not url:
             return False
-        t = self.dead.get(url)
-        if t is None:
+        expiry = self.dead.get(url)
+        if expiry is None:
             return False
-        if time.monotonic() - t > self.dead_ttl:
+        if time.monotonic() >= expiry:
             self.dead.pop(url, None)
             return False
         return True
@@ -194,14 +200,11 @@ class LogoLoader(QObject):
                     except OSError:
                         pass
             r = requests.get(u, timeout=10)
-            # Blacklist ONLY legitimately-dead endpoints (404 / 410 /
-            # 451) - a 500, connection reset or DNS blip is transient
-            # and must not stick, otherwise a single flaky moment
-            # nukes every cover in the session. Transient failures
-            # fall through raise_for_status -> on_fail, which no
-            # longer touches the dead map.
+            # Long TTL for legitimately-dead endpoints, short TTL for
+            # everything else so a temporary 500 or connection reset
+            # gets a brief cooldown instead of a session-long ban.
             if r.status_code in (404, 410, 451):
-                self.dead[u] = time.monotonic()
+                self._mark_dead(u, self.dead_ttl_permanent)
             r.raise_for_status()
             data = r.content
             if dp is not None:
@@ -234,14 +237,14 @@ class LogoLoader(QObject):
                     pass
 
         def on_fail(_msg: str) -> None:
-            # Only clean up the waiting entry. The dead-URL blacklist
-            # is set exclusively inside fetch() for confirmed 404s -
-            # a generic error here (timeout, connection reset,
-            # something a scroll retry might well recover from) is not
-            # a reason to blacklist. Fire each pending callback with
-            # an empty pixmap so the delegate repaints; if the URL is
-            # in `dead`, the delegate will swap in the provider fallback,
-            # otherwise it just repaints and tries the URL again.
+            # Cool the URL down briefly so the delegate doesn't re-fire
+            # a fetch for it on every subsequent paint - that's what
+            # let a single flaky endpoint saturate the pool with
+            # repeat attempts and eventually starve every other
+            # cover. If fetch() already marked it dead with the
+            # permanent TTL (real 404), keep that longer timeout.
+            if url not in self.dead:
+                self._mark_dead(url, self.dead_ttl_transient)
             callbacks = self.waiting.pop(url, [])
             for cb in callbacks:
                 try:

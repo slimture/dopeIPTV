@@ -285,7 +285,8 @@ class ChannelDelegate(QStyledItemDelegate):
             painter.setFont(f)
             painter.drawText(logo_rect, Qt.AlignmentFlag.AlignCenter,
                              name.strip()[:1].upper())
-            if url and url not in self.window.logos.waiting:
+            if (url and url not in self.window.logos.waiting
+                    and not self.window.logos.is_dead(url)):
                 self.window.logos.get(
                     url,
                     lambda _pm: self.window.listw.viewport().update())
@@ -366,7 +367,8 @@ class ChannelDelegate(QStyledItemDelegate):
             painter.setFont(f)
             painter.drawText(logo_rect, Qt.AlignmentFlag.AlignCenter,
                              name.strip()[:1].upper())
-            if url and url not in self.window.logos.waiting:
+            if (url and url not in self.window.logos.waiting
+                    and not self.window.logos.is_dead(url)):
                 self.window.logos.get(
                     url,
                     lambda _pm: self.window.listw.viewport().update())

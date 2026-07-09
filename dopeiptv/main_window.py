@@ -1326,31 +1326,58 @@ class MainWindow(QMainWindow):
         self._watched_sync_running = False
 
     def is_movie_watched(self, item: dict) -> bool:
-        if not self.tmdb or not item:
+        if not item:
             return False
-        title = item.get("name") or item.get("title") or ""
-        return self.watched.is_movie_watched(
-            self.tmdb.tmdb_id_for(title, "vod"))
-
-    def show_watched_count(self, item: dict) -> int:
-        if not self.tmdb or not item:
-            return 0
-        title = item.get("name") or item.get("title") or ""
-        return self.watched.show_watched_count(
-            self.tmdb.tmdb_id_for(title, "series"))
-
-    def is_episode_watched(self, item: dict) -> bool:
-        if not self.tmdb or not item or not self.series_ctx:
-            return False
-        show_title = (self.series_ctx.get("name")
-                      or self.series_ctx.get("title") or "")
-        show_id = self.tmdb.tmdb_id_for(show_title, "series")
+        if self.tmdb:
+            title = item.get("name") or item.get("title") or ""
+            if self.watched.is_movie_watched(
+                    self.tmdb.tmdb_id_for(title, "vod")):
+                return True
+        sid = item.get("stream_id")
         try:
-            season = int(item.get("season"))
-            episode = int(item.get("episode_num"))
+            return self.watched.is_movie_watched_by_stream(int(sid))
         except (TypeError, ValueError):
             return False
-        return self.watched.is_episode_watched(show_id, season, episode)
+
+    def show_watched_count(self, item: dict) -> int:
+        if not item:
+            return 0
+        count = 0
+        if self.tmdb:
+            title = item.get("name") or item.get("title") or ""
+            count = self.watched.show_watched_count(
+                self.tmdb.tmdb_id_for(title, "series"))
+        if count > 0:
+            return count
+        # Fall back to the stream-id local mark so a series marked
+        # watched before TMDB resolved still shows a badge (count 1).
+        sid = item.get("series_id") or item.get("stream_id")
+        try:
+            if self.watched.is_series_watched_by_stream(int(sid)):
+                return 1
+        except (TypeError, ValueError):
+            pass
+        return 0
+
+    def is_episode_watched(self, item: dict) -> bool:
+        if not item or not self.series_ctx:
+            return False
+        if self.tmdb:
+            show_title = (self.series_ctx.get("name")
+                          or self.series_ctx.get("title") or "")
+            show_id = self.tmdb.tmdb_id_for(show_title, "series")
+            try:
+                season = int(item.get("season"))
+                episode = int(item.get("episode_num"))
+                if self.watched.is_episode_watched(show_id, season, episode):
+                    return True
+            except (TypeError, ValueError):
+                pass
+        eid = item.get("id")
+        try:
+            return self.watched.is_episode_watched_by_stream(int(eid))
+        except (TypeError, ValueError):
+            return False
 
     def is_item_watched(self, item: dict, kind: str) -> bool:
         """Unified predicate the delegate calls once per paint - answers
@@ -1387,11 +1414,21 @@ class MainWindow(QMainWindow):
     def _mark_movie_watched(self, item: dict,
                             push_to_trakt: bool) -> None:
         tid = self._tmdb_id_for_item(item, "vod")
-        if tid is None:
-            self._error(tr("mark_needs_tmdb"))
-            return
-        self.watched.mark_movie_local(tid)
-        if push_to_trakt and self.trakt.is_connected():
+        if tid is not None:
+            self.watched.mark_movie_local(tid)
+        else:
+            # Local mark works even before TMDB resolves - key on the
+            # provider stream_id so the badge is immediate. Trakt push
+            # still needs the TMDB id, so only skip it in that case.
+            sid = item.get("stream_id")
+            try:
+                self.watched.mark_movie_local_by_stream(int(sid))
+            except (TypeError, ValueError):
+                return
+            if push_to_trakt:
+                self._error(tr("mark_needs_tmdb"))
+                push_to_trakt = False
+        if push_to_trakt and tid is not None and self.trakt.is_connected():
             def job(tid=tid):
                 try:
                     self.trakt.add_movie_history(tid)
@@ -1403,10 +1440,14 @@ class MainWindow(QMainWindow):
     def _unmark_movie_watched(self, item: dict,
                               push_to_trakt: bool) -> None:
         tid = self._tmdb_id_for_item(item, "vod")
-        if tid is None:
-            return
-        self.watched.unmark_movie(tid)
-        if push_to_trakt and self.trakt.is_connected():
+        if tid is not None:
+            self.watched.unmark_movie(tid)
+        sid = item.get("stream_id")
+        try:
+            self.watched.unmark_movie_by_stream(int(sid))
+        except (TypeError, ValueError):
+            pass
+        if push_to_trakt and tid is not None and self.trakt.is_connected():
             def job(tid=tid):
                 try:
                     self.trakt.remove_movie_history(tid)
@@ -1418,16 +1459,24 @@ class MainWindow(QMainWindow):
     def _mark_episode_watched(self, item: dict,
                               push_to_trakt: bool) -> None:
         sid = self._show_tmdb_id_for_episode()
-        if sid is None:
-            self._error(tr("mark_needs_tmdb"))
-            return
         try:
             season = int(item.get("season"))
             episode = int(item.get("episode_num"))
         except (TypeError, ValueError):
-            return
-        self.watched.mark_episode_local(sid, season, episode)
-        if push_to_trakt and self.trakt.is_connected():
+            season = episode = None
+        if sid is not None and season is not None:
+            self.watched.mark_episode_local(sid, season, episode)
+        else:
+            eid = item.get("id")
+            try:
+                self.watched.mark_episode_local_by_stream(int(eid))
+            except (TypeError, ValueError):
+                return
+            if push_to_trakt:
+                self._error(tr("mark_needs_tmdb"))
+                push_to_trakt = False
+        if (push_to_trakt and sid is not None and season is not None
+                and self.trakt.is_connected()):
             def job(sid=sid, s=season, e=episode):
                 try:
                     self.trakt.add_episode_history(sid, s, e)
@@ -1439,21 +1488,57 @@ class MainWindow(QMainWindow):
     def _unmark_episode_watched(self, item: dict,
                                 push_to_trakt: bool) -> None:
         sid = self._show_tmdb_id_for_episode()
-        if sid is None:
-            return
         try:
             season = int(item.get("season"))
             episode = int(item.get("episode_num"))
         except (TypeError, ValueError):
-            return
-        self.watched.unmark_episode(sid, season, episode)
-        if push_to_trakt and self.trakt.is_connected():
+            season = episode = None
+        if sid is not None and season is not None:
+            self.watched.unmark_episode(sid, season, episode)
+        eid = item.get("id")
+        try:
+            self.watched.unmark_episode_by_stream(int(eid))
+        except (TypeError, ValueError):
+            pass
+        if (push_to_trakt and sid is not None and season is not None
+                and self.trakt.is_connected()):
             def job(sid=sid, s=season, e=episode):
                 try:
                     self.trakt.remove_episode_history(sid, s, e)
                 except Exception:
                     pass
             threading.Thread(target=job, daemon=True).start()
+        self.list_model.refresh_all()
+
+    def _mark_series_watched(self, item: dict,
+                             push_to_trakt: bool) -> None:
+        """Local-only 'seen the whole show' toggle. Trakt has no
+        'watched entire show' primitive so the +Trakt variant is
+        deliberately unavailable at the series-list level."""
+        sid = item.get("series_id") or item.get("stream_id")
+        try:
+            self.watched.mark_series_local_by_stream(int(sid))
+        except (TypeError, ValueError):
+            return
+        self.list_model.refresh_all()
+
+    def _unmark_series_watched(self, item: dict,
+                               push_to_trakt: bool) -> None:
+        sid = item.get("series_id") or item.get("stream_id")
+        try:
+            self.watched.unmark_series_by_stream(int(sid))
+        except (TypeError, ValueError):
+            pass
+        # Also clear any TMDB-keyed per-episode marks for this show so
+        # the badge disappears immediately.
+        if self.tmdb:
+            title = item.get("name") or item.get("title") or ""
+            tid = self.tmdb.tmdb_id_for(title, "series")
+            if isinstance(tid, int):
+                for ep_set in (self.watched.trakt_episodes,
+                               self.watched.local_episodes):
+                    ep_set.pop(tid, None)
+                self.watched._save()
         self.list_model.refresh_all()
 
     # -- Watch Later (local toggle + optional Trakt push) --------------------
@@ -2780,26 +2865,23 @@ class MainWindow(QMainWindow):
                 unmark = self._unmark_movie_watched
                 watched = self.is_movie_watched(it)
             else:
-                # Series list item: shortcut to marking S1E1 - but for
-                # the show-level toggle we treat 'any episode watched'
-                # as watched and unmark clears every episode. Wire
-                # only the unmark path so the user can toggle the
-                # whole show off; marking a whole show is done from
-                # the episode list.
-                mark = None
-                unmark = None
+                # Series list item: local-only 'seen the whole show'.
+                # Trakt has no whole-show watched primitive, only
+                # per-episode, so we skip the +Trakt variant here.
+                mark = self._mark_series_watched
+                unmark = self._unmark_series_watched
                 watched = self.show_watched_count(it) > 0
             if mark is not None:
                 if watched:
                     m.addAction(tr("ctx_unmark_watched"),
                                 lambda it=it: unmark(it, False))
-                    if trakt_ok:
+                    if trakt_ok and mark is not self._mark_series_watched:
                         m.addAction(tr("ctx_unmark_watched_trakt"),
                                     lambda it=it: unmark(it, True))
                 else:
                     m.addAction(tr("ctx_mark_watched"),
                                 lambda it=it: mark(it, False))
-                    if trakt_ok:
+                    if trakt_ok and mark is not self._mark_series_watched:
                         m.addAction(tr("ctx_mark_watched_trakt"),
                                     lambda it=it: mark(it, True))
         # Watch Later toggle only for movies and shows (not episodes).
