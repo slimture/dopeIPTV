@@ -261,7 +261,7 @@ class LogoLoader(QObject):
         # resets the counter.
         self.dead_hosts: dict[str, float] = {}
         self._host_strikes: dict[str, int] = {}
-        self.host_strike_limit: int = 3
+        self.host_strike_limit: int = 2
         self.host_cooldown: float = 60.0
         # Disk cache: raw response bytes, keyed by URL hash. Lets
         # evicted RAM entries reload in a few ms from local SSD instead
@@ -370,6 +370,17 @@ class LogoLoader(QObject):
                         dp.unlink(missing_ok=True)
                     except OSError:
                         pass
+            # A host that tripped the circuit breaker WHILE this job sat
+            # in the queue: skip the network entirely. Scrolling a big
+            # category queues hundreds of jobs for one host before the
+            # first couple fail and mark it dead; without this re-check,
+            # every already-queued job still spends its full connect
+            # timeout on a host we already know is down. Returning empty
+            # bytes makes done() paint nothing (placeholder) without a
+            # network round-trip or another strike.
+            if self.is_dead(u):
+                _img_dbg(f"host cooldown skip {u}")
+                return u, b""
             # Short connect timeout: a host that's down should cost a
             # worker ~3 s, not the full read timeout - with hundreds
             # of URLs on one dead provider host that difference is
@@ -407,6 +418,11 @@ class LogoLoader(QObject):
         def done(result: tuple[str, bytes]) -> None:
             u, data = result
             callbacks = self.waiting.pop(u, [])
+            if not data:
+                # Empty = skipped (host on cooldown) or nothing served.
+                # Just drop the pending entry; the delegate keeps the
+                # placeholder and will re-try once the cooldown expires.
+                return
             pm = QPixmap()
             if not pm.loadFromData(data):
                 _img_dbg(f"DECODE FAILED {len(data)}B {u}")

@@ -676,7 +676,8 @@ def test_http_response_resets_host_strikes(qapp, tmp_path, monkeypatch):
     monkeypatch.setattr("dopeiptv.workers.requests.get", fake_get)
     pool = _pool()
     loader = LogoLoader(pool, max_size=16, cache_dir=tmp_path)
-    # Two connection strikes (limit is 3)...
+    loader.host_strike_limit = 3  # isolate the reset logic from the default
+    # Two connection strikes (under the limit)...
     for i in range(2):
         loader.get(f"http://wobbly:2095/{i}.jpg", lambda pm: None)
         _drain_pool(pool, qapp)
@@ -689,6 +690,35 @@ def test_http_response_resets_host_strikes(qapp, tmp_path, monkeypatch):
     loader.get("http://wobbly:2095/again.jpg", lambda pm: None)
     _drain_pool(pool, qapp)
     assert "wobbly:2095" not in loader.dead_hosts
+
+
+def test_queued_job_skips_network_when_host_died(qapp, tmp_path, monkeypatch):
+    """A fetch that was queued before its host tripped the breaker must
+    NOT hit the network when the worker finally runs it - that's what
+    stops hundreds of already-queued jobs each burning a connect
+    timeout on a host we already know is down."""
+    from dopeiptv.workers import LogoLoader
+    import time
+
+    calls = {"n": 0}
+
+    def fake_get(u, headers=None, timeout=None):
+        calls["n"] += 1
+        raise RuntimeError("Connection reset by peer")
+
+    monkeypatch.setattr("dopeiptv.workers.requests.get", fake_get)
+    pool = _pool()
+    loader = LogoLoader(pool, max_size=16, cache_dir=tmp_path)
+    # Pre-mark the host dead (as if earlier strikes already tripped it).
+    loader.dead_hosts["downhost:2095"] = time.monotonic() + 60
+    got = []
+    loader.get("http://downhost:2095/movies/x.jpg",
+               lambda pm: got.append(pm))
+    _drain_pool(pool, qapp)
+    # No network call was made; the worker short-circuited.
+    assert calls["n"] == 0
+    # No cover painted (empty result), no crash.
+    assert got == []
 
 
 def test_logo_loader_sends_browser_user_agent(qapp, tmp_path, monkeypatch):
