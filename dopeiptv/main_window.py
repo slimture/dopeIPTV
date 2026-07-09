@@ -1974,18 +1974,26 @@ class MainWindow(QMainWindow):
         # In History / Watch Later, defer to the snapshot's _kind so
         # a movie row fetches movie info and a series row fetches
         # series info - same as the main Movies / Series views.
+        # History rows carry the provider id under "_key" (not
+        # stream_id/series_id), so fall back to that - this is what
+        # makes the plot/genre/cast panel fill in for history items
+        # even with no TMDB account.
         elif (self.mode == "vod"
               or (self.mode in ("watchlist", "history")
                   and snap_kind == "vod")):
-            if it.get("stream_id") is not None:
-                self._request_media_info(
-                    "vod", it["stream_id"], self._current_key)
+            sid = it.get("stream_id")
+            if sid is None and self.mode == "history":
+                sid = it.get("_key")
+            if sid is not None:
+                self._request_media_info("vod", sid, self._current_key)
         elif (self.mode == "series"
               or (self.mode in ("watchlist", "history")
                   and snap_kind == "series")):
-            if it.get("series_id") is not None:
-                self._request_media_info(
-                    "series", it["series_id"], self._current_key)
+            sid = it.get("series_id")
+            if sid is None and self.mode == "history":
+                sid = it.get("_key")
+            if sid is not None:
+                self._request_media_info("series", sid, self._current_key)
 
     @property
     def PLACEHOLDER_LOGO_STYLE(self) -> str:
