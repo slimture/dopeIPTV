@@ -992,6 +992,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._player_fs = True
         self._fs_return_index = self.listw.currentIndex()
         self._fs_return_scroll = self.listw.verticalScrollBar().value()
+        # Remember the panel widths: hiding the side/middle panes lets the
+        # detail pane take the whole window, and without this the splitter
+        # wouldn't get its proportions back on the way out of fullscreen.
+        self._fs_splitter_sizes = self._root.sizes()
         self._side.hide()
         self._mid.hide()
         self._det_hidden: list[QWidget] = []
@@ -1045,6 +1049,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # sized bakes in a wrong height that a later resize doesn't
         # reliably clear (the same class of bug as the PiP letterboxing).
         self.player.set_fullscreen_ui(False)
+        # Put the panel widths back (deferred so it lands after the window has
+        # returned to its normal geometry, otherwise the still-fullscreen-sized
+        # window bakes in the wrong proportions).
+        saved = getattr(self, "_fs_splitter_sizes", None)
+        if saved:
+            QTimer.singleShot(0, lambda s=saved: self._root.setSizes(s))
         idx = getattr(self, "_fs_return_index", None)
         scroll = getattr(self, "_fs_return_scroll", None)
         if idx is not None and idx.isValid():
@@ -1106,6 +1116,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._pip_win = True
         self._pip_geo = self.geometry()
         self._pip_state = self.windowState()
+        self._pip_splitter_sizes = self._root.sizes()
 
         self._side.hide()
         self._mid.hide()
@@ -1198,6 +1209,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.setGeometry(geo)
         if state and state != Qt.WindowState.WindowNoState:
             self.setWindowState(state)
+        # Put the panel widths back (deferred, after the window geometry has
+        # been restored) so the detail pane doesn't keep its PiP-wide size.
+        saved = getattr(self, "_pip_splitter_sizes", None)
+        if saved:
+            QTimer.singleShot(0, lambda s=saved: self._root.setSizes(s))
 
     def _pip_context_menu(self, global_pos) -> None:
         if self._pip_win is None:
