@@ -22,6 +22,7 @@ from .. import APP_NAME, VERSION
 from ..i18n import tr
 from .dialogs import EpgGuideDialog, PlaylistDialog
 from ..providers.metadata import TmdbClient, bundled_tmdb_key
+from ..providers.trakt import REDIRECT_URI
 from ..media.players import embedded_playback_reason
 from .theme import ACCENTS, P, THEMES, apply_theme, build_style
 from ..core.workers import (
@@ -656,12 +657,12 @@ class _SettingsMixin:
         tf = QVBoxLayout(trakt_tab)
         tf.setSpacing(10)
         trakt_setup_lbl = QLabel(
-            "One-time setup (about 2 minutes): Trakt requires every app "
-            "to have its own free API app for sign-in. Click below, "
-            "create one (any name, redirect URI doesn't matter), then "
-            "paste the Client ID and Secret it shows you. You only do "
-            "this once - after that, Connect just shows you a short "
-            "code to enter at trakt.tv, no password typing.")
+            "One-time setup (about 2 minutes): Trakt requires every app to "
+            "have its own free API app for sign-in. Click below, create one "
+            "(any name), and set its Redirect URI to exactly "
+            f"{REDIRECT_URI} - then paste the Client ID and Secret it shows "
+            "you here. You only do this once. After that, Connect just opens "
+            "your browser and you click 'Yes' - no code, no password typing.")
         trakt_setup_lbl.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         trakt_setup_lbl.setWordWrap(True)
         tf.addWidget(trakt_setup_lbl)
@@ -767,7 +768,7 @@ class _SettingsMixin:
                 QMessageBox.warning(
                     d, "Trakt", tr("msg_trakt_enter_creds"))
                 return
-            self._trakt_device_auth_dialog(d)
+            self._trakt_browser_auth_dialog(d)
             refresh_trakt_status()
 
         def do_trakt_disconnect():

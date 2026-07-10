@@ -4616,6 +4616,81 @@ _STRINGS: dict[str, dict[str, str]] = {
         "fr": "Se connecter à Trakt", "zh": "连接到 Trakt",
         "ru": "Подключиться к Trakt", "th": "เชื่อมต่อ Trakt",
     },
+    "trakt_browser_opening": {
+        "en": "Opening your browser… approve dopeIPTV on the Trakt page that "
+              "appears, then come back here. Already signed in to Trakt on "
+              "the web? Just click 'Yes'.",
+        "sv": "Öppnar webbläsaren… godkänn dopeIPTV på Trakt-sidan som visas "
+              "och kom sedan tillbaka hit. Redan inloggad på Trakt på webben? "
+              "Klicka bara 'Yes'.",
+        "es": "Abriendo tu navegador… aprueba dopeIPTV en la página de Trakt "
+              "y vuelve aquí. ¿Ya tienes sesión en Trakt? Solo pulsa 'Yes'.",
+        "de": "Browser wird geöffnet… bestätige dopeIPTV auf der Trakt-Seite "
+              "und komm dann zurück. Schon bei Trakt angemeldet? Einfach "
+              "'Yes' klicken.",
+        "fr": "Ouverture du navigateur… autorisez dopeIPTV sur la page Trakt, "
+              "puis revenez ici. Déjà connecté à Trakt ? Cliquez sur 'Yes'.",
+        "zh": "正在打开浏览器……在出现的 Trakt 页面上批准 dopeIPTV，然后返回这里。"
+              "已在网页登录 Trakt？点击 'Yes' 即可。",
+        "ru": "Открываем браузер… подтвердите dopeIPTV на странице Trakt и "
+              "вернитесь сюда. Уже вошли в Trakt? Просто нажмите 'Yes'.",
+        "th": "กำลังเปิดเบราว์เซอร์… อนุมัติ dopeIPTV บนหน้า Trakt แล้วกลับมาที่นี่ "
+              "หากล็อกอิน Trakt บนเว็บอยู่แล้ว แค่คลิก 'Yes'",
+    },
+    "trakt_finishing": {
+        "en": "Approved - finishing sign-in…",
+        "sv": "Godkänt - slutför inloggningen…",
+        "es": "Aprobado: finalizando el inicio de sesión…",
+        "de": "Bestätigt - Anmeldung wird abgeschlossen…",
+        "fr": "Autorisé - finalisation de la connexion…",
+        "zh": "已批准——正在完成登录……",
+        "ru": "Подтверждено - завершаем вход…",
+        "th": "อนุมัติแล้ว - กำลังเข้าสู่ระบบให้เสร็จ…",
+    },
+    "trakt_timed_out": {
+        "en": "Timed out waiting for approval. Close and try again.",
+        "sv": "Tidsgränsen gick ut i väntan på godkännande. Stäng och försök "
+              "igen.",
+        "es": "Se agotó el tiempo de espera. Cierra e inténtalo de nuevo.",
+        "de": "Zeitüberschreitung beim Warten auf die Bestätigung. Schließen "
+              "und erneut versuchen.",
+        "fr": "Délai dépassé en attendant l'autorisation. Fermez et réessayez.",
+        "zh": "等待批准超时。请关闭后重试。",
+        "ru": "Истекло время ожидания подтверждения. Закройте и повторите.",
+        "th": "หมดเวลารอการอนุมัติ ปิดแล้วลองใหม่",
+    },
+    "trakt_denied": {
+        "en": "Sign-in was declined in the browser.",
+        "sv": "Inloggningen nekades i webbläsaren.",
+        "es": "El inicio de sesión se rechazó en el navegador.",
+        "de": "Die Anmeldung wurde im Browser abgelehnt.",
+        "fr": "La connexion a été refusée dans le navigateur.",
+        "zh": "在浏览器中拒绝了登录。",
+        "ru": "Вход был отклонён в браузере.",
+        "th": "การเข้าสู่ระบบถูกปฏิเสธในเบราว์เซอร์",
+    },
+    "trakt_port_busy": {
+        "en": "Couldn't open the local sign-in port ({port}). Close whatever "
+              "is using it and try again.",
+        "sv": "Kunde inte öppna den lokala inloggningsporten ({port}). Stäng "
+              "det som använder den och försök igen.",
+        "es": "No se pudo abrir el puerto local de inicio de sesión ({port}). "
+              "Cierra lo que lo use e inténtalo de nuevo.",
+        "de": "Der lokale Anmelde-Port ({port}) konnte nicht geöffnet werden. "
+              "Schließe, was ihn belegt, und versuch es erneut.",
+        "fr": "Impossible d'ouvrir le port de connexion local ({port}). "
+              "Fermez ce qui l'utilise et réessayez.",
+        "zh": "无法打开本地登录端口（{port}）。请关闭占用它的程序后重试。",
+        "ru": "Не удалось открыть локальный порт для входа ({port}). Закройте "
+              "занимающую его программу и повторите.",
+        "th": "เปิดพอร์ตล็อกอินในเครื่องไม่ได้ ({port}) ปิดสิ่งที่ใช้งานอยู่แล้วลองใหม่",
+    },
+    "trakt_use_code_instead": {
+        "en": "Use a code instead", "sv": "Använd en kod istället",
+        "es": "Usar un código", "de": "Stattdessen Code verwenden",
+        "fr": "Utiliser un code", "zh": "改用代码",
+        "ru": "Ввести код вместо этого", "th": "ใช้รหัสแทน",
+    },
     "trakt_requesting_code": {
         "en": "Requesting a device code…",
         "sv": "Begär en enhetskod…", "es": "Solicitando un código…",

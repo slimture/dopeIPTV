@@ -2112,7 +2112,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self, settings=self.settings,
                 on_connect=self._wizard_connect,
                 on_explore=self._wizard_explore,
-                on_connect_trakt=lambda: self._open_trakt_dialog(self),
+                on_connect_trakt=lambda: self._trakt_browser_auth_dialog(self),
                 on_language_change=self._wizard_language)
         else:
             self._welcome.reset()

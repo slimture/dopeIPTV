@@ -5,14 +5,20 @@ Verbatim move - self.* access and behaviour unchanged.
 
 from __future__ import annotations
 
+import secrets
 import threading
 import time
 from ..i18n import tr
 from ..providers.metadata import PosterResolver
+from ..providers.oauth_loopback import capture_oauth_redirect
+from ..providers.trakt import OAUTH_PORT, REDIRECT_URI
 from .theme import P
 from ..core.workers import run_async
-from PyQt6.QtCore import QTimer, Qt
-from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QListWidget, QMessageBox, QTabWidget, QVBoxLayout
+from PyQt6.QtCore import QTimer, Qt, QUrl
+from PyQt6.QtGui import QDesktopServices
+from PyQt6.QtWidgets import (
+    QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QListWidget, QMessageBox,
+    QPushButton, QTabWidget, QVBoxLayout)
 from datetime import datetime
 
 
@@ -768,6 +774,96 @@ class _TraktMixin:
         # If we're currently in the Watch Later view, drop the row.
         if self.mode == "watchlist":
             self._load_items(getattr(self, "_watchlist_subcat", None))
+
+    def _trakt_browser_auth_dialog(self, parent) -> None:
+        """Sign in to Trakt through the browser (OAuth authorization-code with
+        a loopback redirect). Opens trakt.tv's approve page; because the
+        browser already carries the user's Trakt session they just click
+        'Yes' - no code, no password. A one-shot local server on OAUTH_PORT
+        catches the redirect and we swap the code for tokens. Falls back to
+        the device-code dialog for anyone who'd rather type a code."""
+        if not (self.trakt.client_id and self.trakt.client_secret):
+            QMessageBox.information(parent, "Trakt", tr("msg_trakt_enter_creds"))
+            return
+
+        d = QDialog(parent)
+        d.setWindowTitle(tr("trakt_connect_title"))
+        d.setMinimumWidth(400)
+        lay = QVBoxLayout(d)
+        info = QLabel(tr("trakt_browser_opening"))
+        info.setWordWrap(True)
+        info.setStyleSheet("font-size:13px;")
+        lay.addWidget(info)
+
+        row = QHBoxLayout()
+        code_btn = QPushButton(tr("trakt_use_code_instead"))
+        row.addWidget(code_btn)
+        row.addStretch(1)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel)
+        row.addWidget(buttons)
+        lay.addLayout(row)
+
+        state = {"cancelled": False, "token": secrets.token_urlsafe(16)}
+
+        def cancel() -> None:
+            state["cancelled"] = True
+            d.reject()
+
+        buttons.rejected.connect(cancel)
+
+        def use_code() -> None:
+            state["cancelled"] = True
+            d.reject()
+            self._trakt_device_auth_dialog(parent)
+
+        code_btn.clicked.connect(use_code)
+
+        def captured(params) -> None:
+            if state["cancelled"]:
+                return
+            if not params:
+                info.setText(tr("trakt_timed_out"))
+                return
+            if params.get("error"):
+                info.setText(tr("trakt_denied"))
+                return
+            if params.get("state") != state["token"]:
+                # Mismatched state: never trust the code (CSRF guard).
+                info.setText(tr("trakt_login_failed", msg="state mismatch"))
+                return
+            info.setText(tr("trakt_finishing"))
+            run_async(
+                self.pool,
+                lambda code=params.get("code", ""): self.trakt.exchange_code(
+                    code),
+                exchanged, exchange_failed)
+
+        def capture_failed(msg) -> None:
+            if not state["cancelled"]:
+                info.setText(tr("trakt_port_busy", port=OAUTH_PORT))
+
+        def exchanged(_data) -> None:
+            if state["cancelled"]:
+                return
+            info.setText(tr("trakt_connected_excl"))
+            self._maybe_sync_watched(force=True)
+            QTimer.singleShot(700, d.accept)
+
+        def exchange_failed(msg) -> None:
+            if not state["cancelled"]:
+                info.setText(tr("trakt_login_failed", msg=msg))
+
+        # Start the loopback listener first, then open the browser so the
+        # server is already waiting when Trakt redirects back.
+        run_async(
+            self.pool,
+            lambda: capture_oauth_redirect(
+                OAUTH_PORT, timeout=180.0,
+                should_cancel=lambda: state["cancelled"]),
+            captured, capture_failed)
+        QDesktopServices.openUrl(
+            QUrl(self.trakt.authorize_url(state["token"], REDIRECT_URI)))
+        d.exec()
 
     def _trakt_device_auth_dialog(self, parent) -> None:
         d = QDialog(parent)

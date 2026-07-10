@@ -8,7 +8,14 @@ import requests
 from PyQt6.QtCore import QSettings
 
 API = "https://api.trakt.tv"
+SITE = "https://trakt.tv"
 API_VERSION = "2"
+
+# Loopback redirect for the browser (authorization-code) sign-in. The port is
+# fixed so it can be registered as the Trakt app's redirect URI; the callback
+# is served by a one-shot local HTTP server (see providers/oauth_loopback.py).
+OAUTH_PORT = 41794
+REDIRECT_URI = f"http://127.0.0.1:{OAUTH_PORT}/callback"
 
 
 class TraktAuthError(Exception):
@@ -89,6 +96,40 @@ class TraktClient:
             }[r.status_code])
         r.raise_for_status()
         return None
+
+    # -- browser (authorization-code) OAuth flow -----------------------------
+
+    def authorize_url(self, state: str,
+                      redirect_uri: str = REDIRECT_URI) -> str:
+        """The trakt.tv page to open in the browser. If the user is already
+        signed in on the web they only click 'Yes' (or are bounced straight
+        through if they've authorised the app before) - no password typing."""
+        from urllib.parse import urlencode
+        q = urlencode({
+            "response_type": "code",
+            "client_id": self.client_id,
+            "redirect_uri": redirect_uri,
+            "state": state,
+        })
+        return f"{SITE}/oauth/authorize?{q}"
+
+    def exchange_code(self, code: str,
+                      redirect_uri: str = REDIRECT_URI) -> dict:
+        """Trade the authorization code from the redirect for access/refresh
+        tokens and store them. Raises TraktAuthError on failure."""
+        r = requests.post(
+            f"{API}/oauth/token",
+            json={"code": code, "client_id": self.client_id,
+                  "client_secret": self.client_secret,
+                  "redirect_uri": redirect_uri,
+                  "grant_type": "authorization_code"},
+            timeout=15)
+        if r.status_code in (200, 201):
+            data = r.json()
+            self._store_tokens(data)
+            return data
+        raise TraktAuthError(
+            f"Trakt rejected the sign-in (HTTP {r.status_code}).")
 
     # -- headers --------------------------------------------------------------
 
