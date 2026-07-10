@@ -318,8 +318,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cat_list.customContextMenuRequested.connect(self._cat_menu)
         sl.addWidget(self.cat_list, 1)
 
-        self._guide_btn = guide_btn = QPushButton(tr("btn_epg_guide"))
+        self._guide_btn = guide_btn = QPushButton(
+            tr("btn_epg_guide"), objectName="SideAction")
         guide_btn.setToolTip(tr("btn_epg_guide"))
+        guide_btn.setSizePolicy(QSizePolicy.Policy.Expanding,
+                                QSizePolicy.Policy.Fixed)
         guide_btn.clicked.connect(self._open_epg_guide)
         sl.addWidget(guide_btn)
 
@@ -341,8 +344,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # (Reload lives in the menu bar's "Refresh playlist" and the
         # per-playlist auto-refresh setting; a sidebar button here was just
         # an easy mis-click.)
-        self._settings_btn = settings_btn = QPushButton(tr("btn_settings"))
+        self._settings_btn = settings_btn = QPushButton(
+            tr("btn_settings"), objectName="SideAction")
         settings_btn.setToolTip(tr("btn_settings"))
+        settings_btn.setSizePolicy(QSizePolicy.Policy.Expanding,
+                                   QSizePolicy.Policy.Fixed)
         settings_btn.clicked.connect(self.open_settings)
         sl.addWidget(settings_btn)
 
@@ -695,7 +701,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if hasattr(self, "_side") and not self._player_fs:
             self._apply_sidebar_collapsed()
 
-    RAIL_W = 58
+    RAIL_W = 60
 
     def _apply_sidebar_collapsed(self) -> None:
         collapsed = getattr(self, "_sidebar_collapsed", False)
@@ -707,27 +713,43 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         for key, b in self.nav_btns.items():
             b.setText(self._rail_glyphs.get(key, "•") if collapsed
                       else self._nav_texts[key])
-            b.setProperty("rail", collapsed)
-            b.style().unpolish(b)
-            b.style().polish(b)
+            self._set_rail(b, collapsed)
         # Everything that only makes sense expanded: logo, the whole
-        # category area, and full-text buttons become icons or hide.
+        # category area, and full-text buttons become short labels or hide.
         self._sidebar_logo.setVisible(not collapsed)
         self._cat_section_label.setVisible(not collapsed)
         self.cat_solo_btn.setVisible(not collapsed)
         self.cat_list.setVisible(not collapsed)
+        # Short letter labels in the rail so it's obvious what each is
+        # (an emoji alone read as an anonymous box for some users).
+        self._guide_btn.setText("EPG" if collapsed else tr("btn_epg_guide"))
+        self._settings_btn.setText("⚙" if collapsed else tr("btn_settings"))
+        self._set_rail(self._guide_btn, collapsed)
+        self._set_rail(self._settings_btn, collapsed)
+        # Pin the pane to exactly the rail width and hand the freed space to
+        # the middle column right away - otherwise the splitter keeps the old
+        # (now empty) sidebar footprint until you happen to click it. Operate
+        # on the live size list so the detail pane (and the floating toast,
+        # which the splitter also counts) keep their widths.
         if collapsed:
-            self._guide_btn.setText("📅")
-            self._settings_btn.setText("⚙")
+            self._side.setMinimumWidth(self.RAIL_W)
             self._side.setMaximumWidth(self.RAIL_W)
+            target = self.RAIL_W
         else:
-            self._guide_btn.setText(tr("btn_epg_guide"))
-            self._settings_btn.setText(tr("btn_settings"))
+            self._side.setMinimumWidth(0)
             self._side.setMaximumWidth(16777215)
-            w = getattr(self, "_sidebar_expanded_w", 220)
-            total = self._root.width()
-            det = self._root.sizes()[2] if len(self._root.sizes()) == 3 else 320
-            self._root.setSizes([w, max(200, total - w - det), det])
+            target = getattr(self, "_sidebar_expanded_w", 220)
+        sizes = self._root.sizes()
+        if len(sizes) >= 2:
+            sizes[1] = max(200, sizes[1] + (sizes[0] - target))
+            sizes[0] = target
+            self._root.setSizes(sizes)
+
+    @staticmethod
+    def _set_rail(btn, on: bool) -> None:
+        btn.setProperty("rail", on)
+        btn.style().unpolish(btn)
+        btn.style().polish(btn)
 
     def _on_cat_solo_toggle(self, checked: bool) -> None:
         """Collapse the category list to just the active category (hide all
