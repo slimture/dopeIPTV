@@ -766,14 +766,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         btn.style().polish(btn)
 
     def _on_splitter_moved(self, *_a) -> None:
-        """Dragging the divider outward while collapsed re-expands the sidebar
-        - the natural gesture to bring the full column back."""
-        if not getattr(self, "_sidebar_collapsed", False):
+        """Symmetric drag behaviour for the sidebar: drag the divider outward
+        to bring the full column back, drag it inward to collapse to the icon
+        rail. The snap-to targets (rail width / >=180) sit outside the
+        threshold band, so it settles instead of flickering."""
+        if not hasattr(self, "_side") or not hasattr(self, "side_btn"):
             return
-        if self._side.width() > self.RAIL_W + 24:
-            self._sidebar_expanded_w = max(self._side.width(), 180)
-            # Flip the toggle; its handler runs the expand path.
-            self.side_btn.setChecked(True)
+        w = self._side.width()
+        if getattr(self, "_sidebar_collapsed", False):
+            if w > self.RAIL_W + 40:
+                self._sidebar_expanded_w = max(w, 180)
+                self.side_btn.setChecked(True)   # -> expand
+        elif w < 130:
+            self.side_btn.setChecked(False)      # -> collapse to the rail
 
     def _on_cat_solo_toggle(self, checked: bool) -> None:
         """Collapse the category list to just the active category (hide all
