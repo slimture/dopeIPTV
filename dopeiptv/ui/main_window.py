@@ -205,6 +205,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._fav_view_tint = ("", "")
         self._pending_cat_select = _UNSET
         self._pending_jump_key = None
+        self._stream_retries = 0
+        self._last_stream_error_ts = 0.0
         self._pip_win = None
         self._last_player = None
         self._last_playlist_refresh = time.time()
@@ -2474,10 +2476,33 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             else f"color:{P['muted3']}; font-size:11px;")
         self.count_lbl.setText(text)
 
+    MAX_STREAM_RETRIES = 2
+
     def _playback_error(self, msg: str) -> None:
         self.rec.finish_all_inplayer("stream error")
         self.wake.release()
         self._trakt_active = None
+        # Live streams drop briefly all the time (single-connection accounts,
+        # HLS segment hiccups, the window being dragged). Reconnect silently a
+        # couple of times before surfacing the error. Reset the counter when
+        # the stream had been stable for a while, so a later drop retries too.
+        now = time.time()
+        if now - getattr(self, "_last_stream_error_ts", 0.0) > 20:
+            self._stream_retries = 0
+        self._last_stream_error_ts = now
+        lp = getattr(self, "_last_playback", None)
+        if (lp and lp.get("kind") == "live" and self.player
+                and getattr(self, "_stream_retries", 0) < self.MAX_STREAM_RETRIES):
+            self._stream_retries = getattr(self, "_stream_retries", 0) + 1
+            self.player.current_url = None
+            if not self._player_fs:
+                self.stream_error.hide()
+            self._set_status(tr("status_reconnecting"))
+            if self._player_fs and self.player:
+                self.player.set_overlay_info(tr("status_reconnecting"))
+            QTimer.singleShot(1500, self._retry_last_stream)
+            return
+        self._stream_retries = 0
         if self.player:
             self.player.current_url = None
         self._set_status(f"Stream error: {msg}", error=True)
@@ -2488,6 +2513,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.stream_error.show()
         if self.player:
             self.player.title_lbl.setText("")
+
+    def _retry_last_stream(self) -> None:
+        lp = getattr(self, "_last_playback", None)
+        if not lp or lp.get("kind") != "live":
+            return
+        it = lp.get("item")
+        if it is not None:
+            self.play_live_channel(it)   # re-derives a fresh live URL
+        else:
+            self._start_playback(lp["url"], lp["title"], lp.get("icon_url"),
+                                 lp.get("key"), "live")
 
     def _zap(self, direction: int) -> None:
         if self.mode not in ("live", "fav", "vod", "series",

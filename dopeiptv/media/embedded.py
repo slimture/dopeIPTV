@@ -222,6 +222,17 @@ class _MpvGLWidget(QOpenGLWidget):
         else:
             print("[dopeIPTV] WARNING: no GL context in initializeGL",
                   file=sys.stderr)
+        # If mpv already exists, this is a *repeat* initializeGL - the window's
+        # GL context was recreated (e.g. the compositor reparented the window
+        # while dragging it, or it moved to another monitor). Do NOT rebuild:
+        # a fresh mpv instance would tear down the stream that's playing (which
+        # surfaced as "Stream error: loading failed" on a simple window move).
+        # Keep the existing instance; paintGL already tolerates a stale context
+        # by drawing a black frame until it settles.
+        if self.mpv is not None:
+            print("[dopeIPTV] initializeGL re-entered; keeping existing mpv",
+                  file=sys.stderr)
+            return
         # Building the mpv render context can fail hard on a weak or
         # software-only GL stack (typically a VM with no GPU acceleration).
         # This runs inside a Qt virtual override (initializeGL), and if the

@@ -1678,6 +1678,12 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "История просмотров пуста.",
         "th": "ยังไม่มีประวัติการรับชม",
     },
+    "status_reconnecting": {
+        "en": "Reconnecting…", "sv": "Återansluter…",
+        "es": "Reconectando…", "de": "Neu verbinden…",
+        "fr": "Reconnexion…", "zh": "正在重新连接…",
+        "ru": "Переподключение…", "th": "กำลังเชื่อมต่อใหม่…",
+    },
     "status_stream_error": {
         "en": "Stream error: {msg}",
         "sv": "Strömfel: {msg}",
