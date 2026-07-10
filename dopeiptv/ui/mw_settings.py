@@ -1042,9 +1042,26 @@ class _SettingsMixin:
     def show_about(self) -> None:
         d = QDialog(self)
         d.setWindowTitle(f"{tr('menu_about')} {APP_NAME}")
-        d.setMinimumWidth(480)
+        d.setMinimumWidth(440)
         lay = QVBoxLayout(d)
-        lay.setSpacing(10)
+        lay.setContentsMargins(22, 20, 22, 18)
+        lay.setSpacing(12)
+
+        # Small, flat text-link buttons so the dialog reads as info, not a
+        # wall of chunky buttons.
+        link_css = (
+            "QPushButton { border:none; background:transparent; padding:2px 0;"
+            " font-size:12px; text-align:left; color:%s; }"
+            "QPushButton:hover { color:%s; text-decoration:underline; }"
+        ) % (P["muted"], P["text"])
+
+        def link(text, url):
+            b = QPushButton(text)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setStyleSheet(link_css)
+            b.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(url)))
+            return b
+
         title = QLabel(
             f"<b style='font-size:18px'>{APP_NAME}</b>"
             f"&nbsp;&nbsp;<span style='color:{P['muted2']}'>{VERSION}</span>")
@@ -1053,47 +1070,61 @@ class _SettingsMixin:
         desc.setWordWrap(True)
         lay.addWidget(desc)
 
-        links = QHBoxLayout()
-        gh_btn = QPushButton(tr("about_github"))
-        gh_btn.clicked.connect(lambda: QDesktopServices.openUrl(
-            QUrl(f"https://github.com/{GITHUB_REPO}")))
-        rel_btn = QPushButton(tr("about_all_releases"))
-        rel_btn.clicked.connect(lambda: QDesktopServices.openUrl(
-            QUrl(f"https://github.com/{GITHUB_REPO}/releases")))
-        links.addWidget(gh_btn)
-        links.addWidget(rel_btn)
-        links.addStretch(1)
-        lay.addLayout(links)
-
+        # -- update section: one clear status line, with an inline re-check --
         status = QLabel(tr("about_checking"))
         status.setWordWrap(True)
-        status.setStyleSheet(f"color:{P['muted2']}; font-size:12px;")
+        status.setStyleSheet(f"color:{P['muted']}; font-size:12px;")
         lay.addWidget(status)
         notes = QTextBrowser()
         notes.setOpenExternalLinks(True)
-        notes.setMaximumHeight(240)
+        notes.setMaximumHeight(220)
         notes.hide()
         lay.addWidget(notes)
-        dl_btn = QPushButton(tr("about_download"))
-        dl_btn.setObjectName("Primary")
-        dl_btn.hide()
-        lay.addWidget(dl_btn)
 
-        row = QHBoxLayout()
-        row.addStretch(1)
-        recheck = QPushButton(tr("about_check_again"))
-        close = QPushButton(tr("common_close"))
-        close.clicked.connect(d.accept)
-        row.addWidget(recheck)
-        row.addWidget(close)
-        lay.addLayout(row)
+        act_row = QHBoxLayout()
+        act_row.setSpacing(8)
+        dl_btn = QPushButton(tr("about_download"))
+        dl_btn.setStyleSheet(
+            "QPushButton { padding:4px 12px; font-size:12px; }")
+        dl_btn.hide()
+        recheck = QPushButton(tr("about_check_updates"))
+        recheck.setStyleSheet(link_css)
+        recheck.setCursor(Qt.CursorShape.PointingHandCursor)
+        act_row.addWidget(dl_btn)
+        act_row.addWidget(recheck)
+        act_row.addStretch(1)
+        lay.addLayout(act_row)
+
+        # -- links + attribution ------------------------------------------
+        links = QHBoxLayout()
+        links.setSpacing(16)
+        links.addWidget(link(tr("about_github"),
+                             f"https://github.com/{GITHUB_REPO}"))
+        links.addWidget(link(tr("about_all_releases"),
+                             f"https://github.com/{GITHUB_REPO}/releases"))
+        links.addStretch(1)
+        lay.addLayout(links)
+
+        credit = QLabel(tr("about_tmdb_credit"))
+        credit.setWordWrap(True)
+        credit.setOpenExternalLinks(True)
+        credit.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        lay.addWidget(credit)
+
+        btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        btns.rejected.connect(d.accept)
+        btns.accepted.connect(d.accept)
+        lay.addWidget(btns)
 
         def done(rel) -> None:
+            recheck.setEnabled(True)
             if not rel or not rel.get("tag"):
                 status.setText(tr("about_check_failed"))
                 return
             if is_newer(rel["tag"], VERSION):
                 status.setText(tr("about_update_available", version=rel["tag"]))
+                status.setStyleSheet(
+                    f"color:{P['text']}; font-size:12px; font-weight:600;")
                 if rel.get("body"):
                     notes.setMarkdown(rel["body"])
                     notes.show()
@@ -1106,15 +1137,18 @@ class _SettingsMixin:
                         lambda: QDesktopServices.openUrl(QUrl(rel["url"])))
                     dl_btn.show()
             else:
-                status.setText(tr("about_up_to_date"))
+                status.setText("✓ " + tr("about_up_to_date"))
                 notes.hide()
                 dl_btn.hide()
 
         def fail(_e) -> None:
+            recheck.setEnabled(True)
             status.setText(tr("about_check_failed"))
 
         def check() -> None:
+            recheck.setEnabled(False)
             status.setText(tr("about_checking"))
+            status.setStyleSheet(f"color:{P['muted']}; font-size:12px;")
             run_async(self.pool,
                       lambda: fetch_latest_release(GITHUB_REPO), done, fail)
 

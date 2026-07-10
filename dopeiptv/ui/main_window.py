@@ -886,8 +886,38 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self._pip_win is None:
             return
         m = QMenu(self)
+        # Right-click "Always on top" only where the client can actually set
+        # its stacking (X11/XWayland/Windows/macOS). On native Wayland the
+        # compositor ignores it, so there the title-bar menu is the only route
+        # and adding a dead toggle here would just mislead.
+        if "wayland" not in QApplication.platformName().lower():
+            act = m.addAction(tr("pip_always_on_top"))
+            act.setCheckable(True)
+            act.setChecked(bool(self.windowFlags()
+                                & Qt.WindowType.WindowStaysOnTopHint))
+            act.toggled.connect(self._set_pip_on_top)
+        else:
+            # Native Wayland can't pin from the client - point the user at the
+            # compositor's own title-bar menu (a disabled, informational row).
+            hint = m.addAction(tr("pip_wayland_hint"))
+            hint.setEnabled(False)
+        m.addSeparator()
         m.addAction(tr("tooltip_exit_pip"), self._exit_pip)
         m.exec(global_pos)
+
+    def _set_pip_on_top(self, on: bool) -> None:
+        if self._pip_win is None:
+            return
+        flags = self.windowFlags()
+        if on:
+            flags |= Qt.WindowType.WindowStaysOnTopHint
+        else:
+            flags &= ~Qt.WindowType.WindowStaysOnTopHint
+        geo = self.geometry()
+        self.setWindowFlags(flags)
+        self.setGeometry(geo)      # setWindowFlags can drop the geometry
+        self.show()
+        self.raise_()
 
     def _exit_pip_if_active(self) -> None:
         if self._pip_win is not None:

@@ -2089,6 +2089,36 @@ _STRINGS: dict[str, dict[str, str]] = {
         "de": "Erneut suchen", "fr": "Revérifier", "zh": "重新检查",
         "ru": "Проверить снова", "th": "ตรวจอีกครั้ง",
     },
+    "about_check_updates": {
+        "en": "Check for updates", "sv": "Sök efter uppdateringar",
+        "es": "Buscar actualizaciones", "de": "Nach Updates suchen",
+        "fr": "Rechercher des mises à jour", "zh": "检查更新",
+        "ru": "Проверить обновления", "th": "ตรวจหาการอัปเดต",
+    },
+    "about_tmdb_credit": {
+        "en": "Movie and TV metadata and artwork provided by TMDB. This "
+              "product uses the TMDB API but is not endorsed or certified by "
+              "TMDB.",
+        "sv": "Metadata och bilder för filmer och serier tillhandahålls av "
+              "TMDB. Denna produkt använder TMDB:s API men är inte godkänd "
+              "eller certifierad av TMDB.",
+        "es": "Metadatos e imágenes de películas y series proporcionados por "
+              "TMDB. Este producto usa la API de TMDB pero no está avalado ni "
+              "certificado por TMDB.",
+        "de": "Film- und Serien-Metadaten und -Bilder von TMDB. Dieses "
+              "Produkt nutzt die TMDB-API, ist aber nicht von TMDB unterstützt "
+              "oder zertifiziert.",
+        "fr": "Métadonnées et visuels de films et séries fournis par TMDB. Ce "
+              "produit utilise l'API de TMDB mais n'est ni approuvé ni "
+              "certifié par TMDB.",
+        "zh": "影视元数据和图片由 TMDB 提供。本产品使用 TMDB API，但未获得 "
+              "TMDB 的认可或认证。",
+        "ru": "Метаданные и изображения фильмов и сериалов предоставлены TMDB. "
+              "Этот продукт использует API TMDB, но не одобрен и не "
+              "сертифицирован TMDB.",
+        "th": "ข้อมูลและภาพของหนังและซีรีส์จัดหาโดย TMDB "
+              "ผลิตภัณฑ์นี้ใช้ TMDB API แต่ไม่ได้รับการรับรองจาก TMDB",
+    },
     "menu_about": {
         "en": "About dopeIPTV",
         "sv": "Om dopeIPTV",
@@ -3379,14 +3409,15 @@ _STRINGS: dict[str, dict[str, str]] = {
         "zh": "置顶", "ru": "Поверх всех окон", "th": "ปักหมุดบนสุด",
     },
     "pip_wayland_hint": {
-        "en": "Always-on-top needs X11 (Wayland limitation).",
-        "sv": "Alltid överst kräver X11 (Wayland-begränsning).",
-        "es": "Siempre visible requiere X11 (limitación de Wayland).",
-        "de": "Immer im Vordergrund braucht X11 (Wayland-Beschränkung).",
-        "fr": "Toujours au premier plan nécessite X11 (limite Wayland).",
-        "zh": "置顶需要 X11（Wayland 限制）。",
-        "ru": "Поверх всех окон требует X11 (ограничение Wayland).",
-        "th": "ปักหมุดบนสุดต้องใช้ X11 (ข้อจำกัดของ Wayland)",
+        "en": "Always on top: right-click the title bar (Wayland)",
+        "sv": "Alltid överst: högerklicka på titelraden (Wayland)",
+        "es": "Siempre visible: clic derecho en la barra de título (Wayland)",
+        "de": "Immer im Vordergrund: Titelleiste rechtsklicken (Wayland)",
+        "fr": "Toujours au premier plan : clic droit sur la barre de titre "
+              "(Wayland)",
+        "zh": "始终置顶：右键点击标题栏（Wayland）",
+        "ru": "Поверх всех окон: ПКМ по заголовку окна (Wayland)",
+        "th": "อยู่บนสุดเสมอ: คลิกขวาที่แถบชื่อหน้าต่าง (Wayland)",
     },
     "resume_title": {
         "en": "Resume playback", "sv": "Återuppta uppspelning",
