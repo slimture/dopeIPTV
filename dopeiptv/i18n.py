@@ -1846,10 +1846,14 @@ _STRINGS: dict[str, dict[str, str]] = {
               "จากผู้ให้บริการ ซึ่งหลายบัญชีไม่อนุญาต หยุดมินิเพลเยอร์ก่อนไหม?",
     },
     "ext_play_stop_open": {
-        "en": "Stop & open externally", "sv": "Stoppa & öppna externt",
-        "es": "Detener y abrir externo", "de": "Stoppen & extern öffnen",
-        "fr": "Arrêter et ouvrir", "zh": "停止并外部打开",
-        "ru": "Остановить и открыть", "th": "หยุดแล้วเปิดภายนอก",
+        "en": "Stop and open externally",
+        "sv": "Stoppa och öppna externt",
+        "es": "Detener y abrir externo",
+        "de": "Stoppen und extern öffnen",
+        "fr": "Arrêter et ouvrir",
+        "zh": "停止并外部打开",
+        "ru": "Остановить и открыть",
+        "th": "หยุดแล้วเปิดภายนอก",
     },
     "ext_play_keep_open": {
         "en": "Open anyway (2nd connection)",
