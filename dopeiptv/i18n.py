@@ -2009,6 +2009,86 @@ _STRINGS: dict[str, dict[str, str]] = {
 
     # ── About / menu ──────────────────────────────────────────────────────
 
+    "about_desc": {
+        "en": "An elegant IPTV client for Xtream Codes and M3U playlists - "
+              "with EPG, embedded mpv/VLC playback, favorites, recordings and "
+              "Trakt sync.",
+        "sv": "En elegant IPTV-klient för Xtream Codes och M3U-spellistor - "
+              "med EPG, inbäddad mpv/VLC-uppspelning, favoriter, inspelningar "
+              "och Trakt-synk.",
+        "es": "Un elegante cliente IPTV para Xtream Codes y listas M3U, con "
+              "EPG, reproducción integrada mpv/VLC, favoritos, grabaciones y "
+              "sincronización con Trakt.",
+        "de": "Ein eleganter IPTV-Client für Xtream Codes und M3U-Playlists - "
+              "mit EPG, eingebetteter mpv/VLC-Wiedergabe, Favoriten, "
+              "Aufnahmen und Trakt-Sync.",
+        "fr": "Un client IPTV élégant pour Xtream Codes et playlists M3U - "
+              "avec EPG, lecture intégrée mpv/VLC, favoris, enregistrements "
+              "et synchronisation Trakt.",
+        "zh": "一款优雅的 IPTV 客户端，支持 Xtream Codes 和 M3U 播放列表——"
+              "含 EPG、内嵌 mpv/VLC 播放、收藏、录制和 Trakt 同步。",
+        "ru": "Элегантный IPTV-клиент для Xtream Codes и M3U-плейлистов - с "
+              "EPG, встроенным воспроизведением mpv/VLC, избранным, записью и "
+              "синхронизацией с Trakt.",
+        "th": "แอป IPTV ที่สวยงามสำหรับ Xtream Codes และเพลย์ลิสต์ M3U - พร้อม "
+              "EPG, การเล่นในตัว mpv/VLC, รายการโปรด, การบันทึก และซิงก์ Trakt",
+    },
+    "about_github": {
+        "en": "GitHub", "sv": "GitHub", "es": "GitHub", "de": "GitHub",
+        "fr": "GitHub", "zh": "GitHub", "ru": "GitHub", "th": "GitHub",
+    },
+    "about_all_releases": {
+        "en": "All releases", "sv": "Alla versioner", "es": "Versiones",
+        "de": "Alle Versionen", "fr": "Versions", "zh": "所有版本",
+        "ru": "Все выпуски", "th": "ทุกเวอร์ชัน",
+    },
+    "about_checking": {
+        "en": "Checking for updates…", "sv": "Söker efter uppdateringar…",
+        "es": "Buscando actualizaciones…", "de": "Suche nach Updates…",
+        "fr": "Recherche de mises à jour…", "zh": "正在检查更新……",
+        "ru": "Проверка обновлений…", "th": "กำลังตรวจหาการอัปเดต…",
+    },
+    "about_up_to_date": {
+        "en": "You're on the latest version.",
+        "sv": "Du har den senaste versionen.",
+        "es": "Tienes la última versión.",
+        "de": "Du hast die neueste Version.",
+        "fr": "Vous avez la dernière version.",
+        "zh": "你已是最新版本。",
+        "ru": "У вас последняя версия.",
+        "th": "คุณใช้เวอร์ชันล่าสุดแล้ว",
+    },
+    "about_update_available": {
+        "en": "A new version is available: {version}",
+        "sv": "En ny version finns: {version}",
+        "es": "Hay una nueva versión disponible: {version}",
+        "de": "Eine neue Version ist verfügbar: {version}",
+        "fr": "Une nouvelle version est disponible : {version}",
+        "zh": "有新版本可用：{version}",
+        "ru": "Доступна новая версия: {version}",
+        "th": "มีเวอร์ชันใหม่: {version}",
+    },
+    "about_check_failed": {
+        "en": "Couldn't check for updates right now.",
+        "sv": "Kunde inte söka efter uppdateringar just nu.",
+        "es": "No se pudo buscar actualizaciones ahora.",
+        "de": "Konnte gerade nicht nach Updates suchen.",
+        "fr": "Impossible de vérifier les mises à jour pour l'instant.",
+        "zh": "暂时无法检查更新。",
+        "ru": "Сейчас не удалось проверить обновления.",
+        "th": "ตรวจหาการอัปเดตไม่ได้ในขณะนี้",
+    },
+    "about_download": {
+        "en": "Download the update", "sv": "Ladda ner uppdateringen",
+        "es": "Descargar la actualización", "de": "Update herunterladen",
+        "fr": "Télécharger la mise à jour", "zh": "下载更新",
+        "ru": "Скачать обновление", "th": "ดาวน์โหลดการอัปเดต",
+    },
+    "about_check_again": {
+        "en": "Check again", "sv": "Sök igen", "es": "Buscar de nuevo",
+        "de": "Erneut suchen", "fr": "Revérifier", "zh": "重新检查",
+        "ru": "Проверить снова", "th": "ตรวจอีกครั้ง",
+    },
     "menu_about": {
         "en": "About dopeIPTV",
         "sv": "Om dopeIPTV",

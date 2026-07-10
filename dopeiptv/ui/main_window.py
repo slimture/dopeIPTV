@@ -2094,8 +2094,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if screen is None:
             return
         avail = screen.availableGeometry()
-        w = min(max(1240, int(avail.width() * 0.88)), avail.width(), 2600)
-        h = min(max(780, int(avail.height() * 0.90)), avail.height(), 1600)
+        # Aim for ~90% of the display, capped on huge monitors. The floor is
+        # itself clamped to the screen, so a small laptop never gets a window
+        # bigger than it can show - it just fills what's there.
+        w = min(int(avail.width() * 0.90), 2600)
+        h = min(int(avail.height() * 0.90), 1600)
+        w = min(max(w, min(1100, avail.width())), avail.width())
+        h = min(max(h, min(720, avail.height())), avail.height())
         self.resize(w, h)
         self.move(avail.x() + (avail.width() - w) // 2,
                   avail.y() + (avail.height() - h) // 2)

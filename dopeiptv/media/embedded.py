@@ -1067,8 +1067,13 @@ class EmbeddedPlayer(QWidget):
         self.fs_controls.move(
             self.width() - self.fs_controls.width() - margin,
             self.height() - self.fs_controls.height() - margin)
-        self.overlay.setFixedWidth(
-            max(120, min(self.width() - 2 * margin, 640)))
+        # Hug the text instead of always reserving a wide box: measure the
+        # widest line and only wrap (up to the cap) when it's genuinely long.
+        fm = self.overlay.fontMetrics()
+        lines = (self.overlay.text() or "").split("\n")
+        text_w = max((fm.horizontalAdvance(ln) for ln in lines), default=0)
+        cap = min(self.width() - 2 * margin, 640)
+        self.overlay.setFixedWidth(max(120, min(text_w + 34, cap)))
         self.overlay.adjustSize()
         self.overlay.move(
             margin,

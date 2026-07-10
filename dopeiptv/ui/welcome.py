@@ -19,6 +19,7 @@ from __future__ import annotations
 from typing import Callable
 
 from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QComboBox, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QSizePolicy, QStackedWidget, QVBoxLayout, QWidget,
@@ -90,6 +91,12 @@ class WelcomeOverlay(QWidget):
         # Let the card hug whichever page is showing.
         self._stack.currentChanged.connect(self._fit_card)
         self._fit_card(0)
+
+        # Esc dismisses the wizard from anywhere inside it (a plain
+        # keyPressEvent never fires while a field/button holds focus).
+        esc = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
+        esc.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        esc.activated.connect(self._explore)
 
         self._greet_idx = 0
         self._flash = QTimer(self)

@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDialog, QDialogButtonBox,
     QFileDialog, QFormLayout, QHBoxLayout, QInputDialog, QLabel,
     QLineEdit, QListWidget, QListWidgetItem, QMessageBox,
-    QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget,
+    QPushButton, QSpinBox, QTabWidget, QTextBrowser, QVBoxLayout, QWidget,
 )
 
 from .. import APP_NAME, VERSION
@@ -25,6 +25,7 @@ from ..providers.metadata import TmdbClient, bundled_tmdb_key
 from ..providers.trakt import REDIRECT_URI
 from ..media.players import embedded_playback_reason
 from .theme import ACCENTS, P, THEMES, apply_theme, build_style
+from ..core.updates import GITHUB_REPO, fetch_latest_release, is_newer
 from ..core.workers import (
     clear_directory, default_image_cache_dir, dir_size_bytes, run_async)
 
@@ -1041,11 +1042,86 @@ class _SettingsMixin:
             self.list_model.refresh_all()
 
     def show_about(self) -> None:
-        QMessageBox.about(
-            self, f"About {APP_NAME}",
-            f"<b>{APP_NAME}</b> {VERSION}<br><br>"
-            "An elegant IPTV client for Xtream Codes with EPG,<br>"
-            "embedded playback, favorites and history.<br><br>"
-            "Playback via mpv (embedded/window) or VLC.")
+        d = QDialog(self)
+        d.setWindowTitle(f"{tr('menu_about')} {APP_NAME}")
+        d.setMinimumWidth(480)
+        lay = QVBoxLayout(d)
+        lay.setSpacing(10)
+        title = QLabel(
+            f"<b style='font-size:18px'>{APP_NAME}</b>"
+            f"&nbsp;&nbsp;<span style='color:{P['muted2']}'>{VERSION}</span>")
+        lay.addWidget(title)
+        desc = QLabel(tr("about_desc"))
+        desc.setWordWrap(True)
+        lay.addWidget(desc)
+
+        links = QHBoxLayout()
+        gh_btn = QPushButton(tr("about_github"))
+        gh_btn.clicked.connect(lambda: QDesktopServices.openUrl(
+            QUrl(f"https://github.com/{GITHUB_REPO}")))
+        rel_btn = QPushButton(tr("about_all_releases"))
+        rel_btn.clicked.connect(lambda: QDesktopServices.openUrl(
+            QUrl(f"https://github.com/{GITHUB_REPO}/releases")))
+        links.addWidget(gh_btn)
+        links.addWidget(rel_btn)
+        links.addStretch(1)
+        lay.addLayout(links)
+
+        status = QLabel(tr("about_checking"))
+        status.setWordWrap(True)
+        status.setStyleSheet(f"color:{P['muted2']}; font-size:12px;")
+        lay.addWidget(status)
+        notes = QTextBrowser()
+        notes.setOpenExternalLinks(True)
+        notes.setMaximumHeight(240)
+        notes.hide()
+        lay.addWidget(notes)
+        dl_btn = QPushButton(tr("about_download"))
+        dl_btn.setObjectName("Primary")
+        dl_btn.hide()
+        lay.addWidget(dl_btn)
+
+        row = QHBoxLayout()
+        row.addStretch(1)
+        recheck = QPushButton(tr("about_check_again"))
+        close = QPushButton(tr("common_close"))
+        close.clicked.connect(d.accept)
+        row.addWidget(recheck)
+        row.addWidget(close)
+        lay.addLayout(row)
+
+        def done(rel) -> None:
+            if not rel or not rel.get("tag"):
+                status.setText(tr("about_check_failed"))
+                return
+            if is_newer(rel["tag"], VERSION):
+                status.setText(tr("about_update_available", version=rel["tag"]))
+                if rel.get("body"):
+                    notes.setMarkdown(rel["body"])
+                    notes.show()
+                if rel.get("url"):
+                    try:
+                        dl_btn.clicked.disconnect()
+                    except TypeError:
+                        pass
+                    dl_btn.clicked.connect(
+                        lambda: QDesktopServices.openUrl(QUrl(rel["url"])))
+                    dl_btn.show()
+            else:
+                status.setText(tr("about_up_to_date"))
+                notes.hide()
+                dl_btn.hide()
+
+        def fail(_e) -> None:
+            status.setText(tr("about_check_failed"))
+
+        def check() -> None:
+            status.setText(tr("about_checking"))
+            run_async(self.pool,
+                      lambda: fetch_latest_release(GITHUB_REPO), done, fail)
+
+        recheck.clicked.connect(check)
+        check()               # auto-check on open
+        d.exec()
 
     # -- EPG refresh with progress -------------------------------------------------
