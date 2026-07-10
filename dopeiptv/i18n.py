@@ -947,6 +947,36 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "🎬 Попробовать демоканалы",
         "th": "🎬 ลองช่องเดโม",
     },
+    "demo_notice": {
+        "en": "Demo mode: a few free public test streams so you can try the "
+              "app. They're third-party services, so playback isn't "
+              "guaranteed. Add your own provider any time for the full "
+              "experience.",
+        "sv": "Demoläge: några gratis publika teststreams så du kan testa "
+              "appen. De är tredjepartstjänster, så uppspelning kan inte "
+              "garanteras. Lägg till din egen leverantör när du vill för hela "
+              "upplevelsen.",
+        "es": "Modo demo: algunas transmisiones de prueba públicas y gratuitas "
+              "para probar la app. Son servicios de terceros, así que la "
+              "reproducción no está garantizada. Añade tu proveedor cuando "
+              "quieras.",
+        "de": "Demo-Modus: ein paar kostenlose öffentliche Teststreams zum "
+              "Ausprobieren. Es sind Drittanbieter-Dienste, die Wiedergabe "
+              "ist daher nicht garantiert. Füge jederzeit deinen eigenen "
+              "Anbieter hinzu.",
+        "fr": "Mode démo : quelques flux de test publics et gratuits pour "
+              "essayer l'appli. Ce sont des services tiers, la lecture n'est "
+              "donc pas garantie. Ajoutez votre fournisseur quand vous voulez.",
+        "zh": "演示模式：一些免费的公共测试流，供你试用本应用。它们是第三方服务，"
+              "因此无法保证播放。随时可以添加你自己的服务商。",
+        "ru": "Демо-режим: несколько бесплатных публичных тестовых потоков, "
+              "чтобы попробовать приложение. Это сторонние сервисы, поэтому "
+              "воспроизведение не гарантируется. В любой момент добавьте "
+              "своего провайдера.",
+        "th": "โหมดเดโม: สตรีมทดสอบสาธารณะฟรีสองสามรายการเพื่อให้ลองใช้แอป "
+              "เป็นบริการของบุคคลที่สาม จึงไม่รับประกันการเล่น "
+              "เพิ่มผู้ให้บริการของคุณเองได้ทุกเมื่อ",
+    },
     "demo_title": {
         "en": "dopeIPTV — Demo channels",
         "sv": "dopeIPTV — Demo-kanaler",

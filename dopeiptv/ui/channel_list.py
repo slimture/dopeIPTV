@@ -211,11 +211,12 @@ class ChannelDelegate(QStyledItemDelegate):
         f.setPointSize(self.name_pt + 3)   # scales with the density
         painter.setFont(f)
         painter.setPen(QColor(P["text"]))
-        # Vertically centred in the (tight) band so sections sit close
-        # together instead of leaving a big gap around each label.
-        r = option.rect.adjusted(14, 0, -12, 0)
+        # Bottom-align so the label hugs the item right below it - that reads
+        # as "this header belongs to the section under it" and keeps the first
+        # poster/row close to its heading, with the breathing room above.
+        r = option.rect.adjusted(14, 0, -12, -2)
         painter.drawText(
-            r, int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft),
+            r, int(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft),
             (text or "").upper())
         painter.restore()
 

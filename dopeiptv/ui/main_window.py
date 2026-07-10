@@ -205,6 +205,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         geo = self.settings.value("window_geometry")
         if isinstance(geo, QByteArray) and geo.size() > 0:
             self.restoreGeometry(geo)
+        else:
+            self._size_to_screen()   # first run: fit the actual display
         QTimer.singleShot(0, self._restore_splitter_state)
         self.loading_bar.show()
         self._set_status(tr("status_loading_channels"))
@@ -687,6 +689,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             "#DetailPane { background:#000000; border:none; }")
         self.menuBar().hide()
         self.player.set_fullscreen_ui(True)
+        self._update_provider_hint()   # tuck the '+ Add provider' hint away
         self._was_fullscreen = self.isFullScreen()
         self.showFullScreen()
 
@@ -725,6 +728,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         elif scroll is not None:
             QTimer.singleShot(0, lambda: (
                 self.listw.verticalScrollBar().setValue(scroll)))
+        self._update_provider_hint()   # bring the hint back if in explore mode
 
     def _toggle_pip_fullscreen(self) -> None:
         if self.isFullScreen():
@@ -920,6 +924,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                                 progress_cb=self.epg_progress.emit)
         self.switch_mode("live")
         self._update_provider_hint()   # hides the '+ Add provider' hint
+        self._show_toast(tr("demo_notice"), 8000)
 
     def switch_playlist(self, pid: str) -> None:
         pl = self.playlist_store.get(pid) if self.playlist_store else None
@@ -2077,6 +2082,22 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 return
         super().keyPressEvent(event)
 
+    def _size_to_screen(self) -> None:
+        """First run only: open at a comfortable fraction of the actual
+        display instead of a fixed 1240x780, and centre it. Capped so it
+        stays sane on very large / multi-monitor desktops. Runs once - after
+        this the saved geometry takes over, so nothing resizes 'by itself'."""
+        from PyQt6.QtWidgets import QApplication
+        screen = QApplication.primaryScreen()
+        if screen is None:
+            return
+        avail = screen.availableGeometry()
+        w = min(max(1240, int(avail.width() * 0.82)), avail.width(), 2400)
+        h = min(max(780, int(avail.height() * 0.85)), avail.height(), 1500)
+        self.resize(w, h)
+        self.move(avail.x() + (avail.width() - w) // 2,
+                  avail.y() + (avail.height() - h) // 2)
+
     def _restore_splitter_state(self) -> None:
         """Restore the panel divider positions from last session. Runs after
         the window is shown at its restored size so the saved proportions land
@@ -2085,6 +2106,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         st = self.settings.value("splitter_state")
         if isinstance(st, QByteArray) and st.size() > 0:
             self._root.restoreState(st)
+            return
+        # First run: give the video (right) column a share of the real width
+        # so it's usefully large on a wide screen, instead of a fixed 380 px.
+        total = self._root.width()
+        if total > 900:
+            side = 240
+            det = min(max(380, int(total * 0.30)), 720)
+            self._root.setSizes([side, total - side - det, det])
 
     def _schedule_save_layout(self, *_args) -> None:
         """Called on splitter drag / window move / window resize. Coalesces
@@ -2168,9 +2197,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         whenever the app is running without a real provider and the wizard is
         closed. It brings the wizard back and disappears the moment a provider
         is added."""
-        offline = isinstance(self.client, OfflineClient)
+        # Only the plain explore-mode client shows the hint. DemoClient is a
+        # subclass of OfflineClient but IS a provider, so exclude it by exact
+        # type; and never float the button over a maximized/fullscreen video.
+        offline = type(self.client) is OfflineClient
         overlay_up = self._welcome is not None and self._welcome.isVisible()
-        if offline and not overlay_up:
+        if offline and not overlay_up and not self._player_fs:
             if self._add_provider_btn is None:
                 self._build_provider_hint()
             self._add_provider_btn.setText(tr("onb_add_provider"))

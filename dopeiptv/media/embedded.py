@@ -463,6 +463,14 @@ class EmbeddedPlayer(QWidget):
         self._pip_mode = False
         self.seek_overlay = None
         self._settings = settings
+        # Docked video-box height scales with the display so the mini player
+        # is usefully large on a 27"/4K screen and modest on a laptop -
+        # computed once here, then constant (nothing resizes on its own).
+        from PyQt6.QtWidgets import QApplication
+        scr = QApplication.primaryScreen()
+        if scr is not None:
+            self.VIDEO_BOX_HEIGHT = min(
+                max(260, int(scr.availableGeometry().height() * 0.24)), 520)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(2)

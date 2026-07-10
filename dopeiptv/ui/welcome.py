@@ -51,6 +51,9 @@ class WelcomeOverlay(QWidget):
         self._on_demo = on_demo
 
         self.setObjectName("WelcomeOverlay")
+        # Accept keyboard focus so Esc reaches keyPressEvent even before the
+        # user clicks a field.
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setStyleSheet(
             f"#WelcomeOverlay {{ background: {P['bg']}; }}"
             f"#WelcomeCard {{ background: {P['pane']};"
@@ -248,6 +251,14 @@ class WelcomeOverlay(QWidget):
         self._on_connect(server, user, pw)
         self._stack.setCurrentIndex(2)   # continue to the optional Trakt step
 
+    def keyPressEvent(self, event) -> None:
+        # Esc dismisses the wizard the same as "Continue without account".
+        if event.key() == Qt.Key.Key_Escape:
+            self._explore()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
     def _demo(self) -> None:
         self._flash.stop()
         self.hide()
@@ -314,3 +325,4 @@ class WelcomeOverlay(QWidget):
         self.setGeometry(central.geometry() if central else parent.rect())
         self.raise_()
         self.show()
+        self.setFocus()   # so Esc works without clicking first
