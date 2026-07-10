@@ -603,6 +603,9 @@ class _ContextMenuMixin:
     def _open_content_manager(self) -> None:
         if self.mode not in ("live", "vod", "series"):
             return
+        cur = self.cat_list.currentItem()
+        self._pending_cat_select = (cur.data(Qt.ItemDataRole.UserRole)
+                                    if cur else self._pending_cat_select)
         ContentManagerDialog(
             self, self.mode, self._raw_categories, self.overrides).exec()
         self._load_categories()

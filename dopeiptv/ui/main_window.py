@@ -56,6 +56,11 @@ from ..core.workers import (
     LogoLoader, default_image_cache_dir, run_async)
 
 
+# Sentinel for "no pending category to reselect" - distinct from None, which
+# is a real category id (the "All" row).
+_UNSET = object()
+
+
 class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _ContextMenuMixin, _DetailMixin, QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
@@ -198,6 +203,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._playing_item = None
         self._focus_mode = False
         self._fav_view_tint = ("", "")
+        self._pending_cat_select = _UNSET
         self._pip_win = None
         self._last_player = None
         self._last_playlist_refresh = time.time()
@@ -1479,8 +1485,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     it.setBackground(QColor(bgcolor))
                 self.cat_list.addItem(it)
             self.cat_list.blockSignals(False)
-            self.cat_list.setCurrentRow(
-                1 if self.cat_list.count() > 1 else 0)
+            # Normally land on the first real category, but if a reload was
+            # asked to keep the current one (e.g. after Manage categories),
+            # reselect that category so the list doesn't jump to the top.
+            keep = self._pending_cat_select
+            self._pending_cat_select = _UNSET
+            row = 1 if self.cat_list.count() > 1 else 0
+            if keep is not _UNSET:
+                for i in range(self.cat_list.count()):
+                    if self.cat_list.item(i).data(
+                            Qt.ItemDataRole.UserRole) == keep:
+                        row = i
+                        break
+            self.cat_list.setCurrentRow(row)
 
         def fail(msg):
             if gen != self._load_gen:
