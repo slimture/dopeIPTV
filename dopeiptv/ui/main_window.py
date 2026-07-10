@@ -1121,11 +1121,24 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._update_sync_btn()
         self._load_items(cat)
 
+    def _is_grouped_view(self, category_id) -> bool:
+        """The combined, header-grouped views that are always rendered as a
+        headed list (never the poster grid)."""
+        if self.mode == "fav":
+            return category_id == ("all", None)
+        if self.mode == "watchlist":
+            return category_id is None
+        if self.mode == "watched":
+            return True
+        if self.mode == "history":
+            return category_id is None
+        return False
+
     def _load_items(self, category_id) -> None:
-        # The grouped "All favorites" overview is always a headed list, even
-        # when the user's global view is the poster grid; every other view
-        # honours the user's setting, so restore it when leaving that view.
-        if not (self.mode == "fav" and category_id == ("all", None)):
+        # Grouped overviews are always a headed list, even when the user's
+        # global view is the poster grid; every other view honours the user's
+        # setting, so restore it when leaving a grouped view.
+        if not self._is_grouped_view(category_id):
             self._restore_view_mode()
         if self.mode == "rec":
             if category_id == "__jobs__":
@@ -1171,29 +1184,42 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         if self.mode == "watchlist":
             self._watchlist_subcat = category_id
-            movies = [
-                {**m, "_kind": "vod"} for m in self.watchlist.movies]
-            shows = [
-                {**s, "_kind": "series"} for s in self.watchlist.shows]
+            movies = [{**m, "_kind": "vod"} for m in self.watchlist.movies]
+            shows = [{**s, "_kind": "series"} for s in self.watchlist.shows]
             if category_id == "movies":
                 self.all_items = movies
-            elif category_id == "series":
+                self._apply_filter()
+                return
+            if category_id == "series":
                 self.all_items = shows
-            else:
-                self.all_items = movies + shows
-            self._apply_filter()
+                self._apply_filter()
+                return
+            # 'All' - Movies and Series stacked under headers.
+            self._show_grouped(
+                [("fav_movies", "vod", "vod", self._search_filter(movies)),
+                 ("fav_series", "series", "series", self._search_filter(shows))],
+                "watchlist")
             return
         if self.mode == "watched":
             self._watched_subcat = category_id
             local = self.watched.local_watched_items()
             if category_id == "local":
-                self.all_items = local
+                items = local
             elif category_id == "trakt":
-                self.all_items = self._trakt_watched_items()
+                items = self._trakt_watched_items()
             else:
-                self.all_items = self._merge_watched(
+                items = self._merge_watched(
                     local, self._trakt_watched_items())
-            self._apply_filter()
+            movies = self._search_filter(
+                [it for it in items
+                 if it.get("_kind") not in ("series", "episode")])
+            series = self._search_filter(
+                [it for it in items
+                 if it.get("_kind") in ("series", "episode")])
+            self._show_grouped(
+                [("fav_movies", "vod", "vod", movies),
+                 ("fav_series", "series", "series", series)],
+                "watched")
             return
         self.loading_bar.show()
         self._set_status(tr("status_loading_content"))
@@ -1227,48 +1253,61 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
         run_async(self.pool, lambda: fn(category_id), done, fail)
 
-    # -- grouped "All favorites" view ----------------------------------------
+    # -- grouped, headed "All / combined" views ------------------------------
 
-    def _load_favorites_all(self) -> None:
-        """Show every favorite at once - channels, movies and series - as a
-        single list grouped under section headers, so opening Favorites shows
-        all three kinds immediately instead of just Channels."""
-        self._force_list_view()
+    def _search_filter(self, items: list) -> list:
+        """Filter items by the current search text on their display name."""
         text = self.search.text().lower().strip()
+        if not text:
+            return items
+        return [it for it in items
+                if text in self.channel_display_name(it).lower()]
 
-        def keep(it):
-            return not text or text in self.channel_display_name(it).lower()
+    def _grouped(self, sections: list) -> list:
+        """Build a headed list from ordered (header_key, ekind, kind, items)
+        sections, tagging each row with _ekind (delegate art/badges) and _kind
+        (playback routing). Empty sections are skipped. Shared by the combined
+        Favorites / Watch Later / Watched / History views."""
+        out: list[dict] = []
+        for header_key, ekind, kind, items in sections:
+            if items:
+                out.append({"_header": tr(header_key)})
+                out += [{**it, "_ekind": ekind, "_kind": kind}
+                        for it in items]
+        return out
 
-        exclude = (() if self.parental.session_unlocked
-                   else self.favs.locked_groups())
-        chans = [it for it in self.favs.items(None, exclude_groups=exclude)
-                 if keep(it)]
-        movies = [it for it in self.movie_favs.items() if keep(it)]
-        series = [it for it in self.series_favs.items() if keep(it)]
-
-        grouped: list[dict] = []
-        # Tag each row with its own kind: _ekind drives the delegate's cover
-        # art / badges, _kind drives playback routing (see _stream_for).
-        if chans:
-            grouped.append({"_header": tr("fav_channels")})
-            grouped += [{**c, "_ekind": "fav", "_kind": "live"} for c in chans]
-        if movies:
-            grouped.append({"_header": tr("fav_movies")})
-            grouped += [{**m, "_ekind": "vod", "_kind": "vod"} for m in movies]
-        if series:
-            grouped.append({"_header": tr("fav_series")})
-            grouped += [{**s, "_ekind": "series", "_kind": "series"}
-                        for s in series]
-
+    def _show_grouped(self, sections: list, model_kind: str,
+                      empty_msg: str | None = None) -> None:
+        """Render a grouped view: force the headed list layout, populate the
+        model and set a count/empty status."""
+        self._force_list_view()
+        grouped = self._grouped(sections)
         self.all_items = grouped
-        self.list_model.set_items(grouped, "fav")
+        self.list_model.set_items(grouped, model_kind)
         if self._loading_hint.isVisible():
             self._loading_hint.hide()
-        total = len(chans) + len(movies) + len(series)
+        total = sum(len(s[3]) for s in sections)
+        label = self.LABELS.get(model_kind, "")
         if total:
-            self._set_status(f"{total} {self.LABELS['fav']}")
+            self._set_status(f"{total} {label}".strip())
         else:
-            self._set_status(tr("fav_empty_all"))
+            self._set_status(empty_msg or f"0 {label}".strip())
+
+    def _load_favorites_all(self) -> None:
+        """Show every favorite at once - channels, movies and series - grouped
+        under section headers, so opening Favorites shows all three kinds
+        immediately instead of just Channels."""
+        exclude = (() if self.parental.session_unlocked
+                   else self.favs.locked_groups())
+        chans = self._search_filter(
+            self.favs.items(None, exclude_groups=exclude))
+        movies = self._search_filter(self.movie_favs.items())
+        series = self._search_filter(self.series_favs.items())
+        self._show_grouped(
+            [("fav_channels", "fav", "live", chans),
+             ("fav_movies", "vod", "vod", movies),
+             ("fav_series", "series", "series", series)],
+            "fav", tr("fav_empty_all"))
 
     def _force_list_view(self) -> None:
         from PyQt6.QtWidgets import QListView
