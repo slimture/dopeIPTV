@@ -164,9 +164,11 @@ class WelcomeOverlay(QWidget):
 
         lay.addWidget(self._c_title)
         lay.addLayout(form)
-        lay.addWidget(self._c_err)
+        # Connect sits directly under the Password field; the (initially
+        # empty) error line lives just below the button.
         lay.addWidget(self._c_connect)
-        lay.addSpacing(2)
+        lay.addWidget(self._c_err)
+        lay.addSpacing(10)
         # Keep the "What's inside" heading tight against its bullet list.
         feats_box = QVBoxLayout()
         feats_box.setSpacing(1)

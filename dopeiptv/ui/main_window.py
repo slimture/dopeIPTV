@@ -1317,17 +1317,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _render_rows(self, rows: list, model_kind: str,
                      empty_msg: str | None = None) -> None:
-        """Populate the model from a headed row list. Headers are kept in both
-        modes: a full-width row in list mode, and in grid mode their row is
-        padded with invisible fillers so the header sits alone above the
-        posters (Qt's icon grid can't make a single item span the row)."""
+        """Populate the model from a headed row list.
+
+        In list mode the section headers are kept as full-width rows. In grid
+        mode they are dropped: Qt's icon grid gives every cell a uniform size,
+        so a header can't cleanly span a row without either wrecking the poster
+        column alignment or leaving a tall, ragged gap. Grid mode is therefore
+        a clean, uniform poster wall (sections stay grouped in order, just
+        without the labels); the section labels live in list mode."""
         n = sum(1 for r in rows if not r.get("_header"))
-        # Remember the unpadded rows so a resize can re-pad for the new column
-        # count without reloading from the source (avoids re-fetching Trakt).
-        self._combined_rows = rows
-        self._combined_kind = model_kind
         if self._grid_on():
-            rows = self._pad_headers_for_grid(rows)
+            rows = [r for r in rows if not r.get("_header")]
         self.all_items = rows
         self.list_model.set_items(rows, model_kind)
         if self._loading_hint.isVisible():
@@ -1335,30 +1335,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         label = self.LABELS.get(model_kind, "")
         self._set_status(f"{n} {label}".strip() if n
                          else (empty_msg or f"0 {label}".strip()))
-
-    def _pad_headers_for_grid(self, rows: list) -> list:
-        """Put every header alone on its own grid row above its posters: finish
-        the previous section's part-row with fillers, then fill the rest of the
-        header's row, so the posters wrap to the next line beneath it."""
-        vw = self.listw.viewport().width()
-        cell_w = max(1, self.delegate.cell_w)
-        cols = (vw // cell_w) if vw > 0 else 0
-        if cols <= 1:
-            return rows              # 1 column: headers already start a row
-        filler = {"_filler": True}
-        out: list[dict] = []
-        col = 0
-        for r in rows:
-            if r.get("_header"):
-                if col:              # finish the current row first
-                    out += [filler] * (cols - col)
-                out.append(r)
-                out += [filler] * (cols - 1)   # rest of the header's own row
-                col = 0
-            else:
-                out.append(r)
-                col = (col + 1) % cols
-        return out
 
     def _show_grouped(self, sections: list, model_kind: str,
                       empty_msg: str | None = None) -> None:
@@ -1415,29 +1391,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             "fav", tr("fav_empty_all"))
 
     def _apply_list_layout(self, _force_list: bool = False) -> None:
-        """Set the middle pane layout from the user's grid/list choice.
-
-        Three cases: a plain list; a *combined* view in grid mode (posters
-        that keep their section headers - laid out from each item's own size
-        hint so a header can span the full row); or a normal poster grid with
-        uniform, justified cells."""
+        """Set the middle pane layout from the user's grid/list choice: a plain
+        top-to-bottom list, or a uniform, justified poster grid. Combined views
+        (favorites, watched, history, ...) use the very same grid - they just
+        drop their section headers there (see _render_rows)."""
         from PyQt6.QtWidgets import QListView
         grid = self._grid_on()
-        combined = self._is_combined_view(getattr(self, "_current_cat", None))
         self.delegate.set_grid(grid)
         if not grid:
             self.listw.setViewMode(QListView.ViewMode.ListMode)
             self.listw.setFlow(QListView.Flow.TopToBottom)
             self.listw.setWrapping(False)
-            self.listw.set_grid_cell(None)
-            self.listw.setGridSize(QSize())
-        elif combined:
-            # Self-sizing icon flow: posters use the delegate's cell hint,
-            # header rows report the full viewport width and so span a row.
-            self.listw.setViewMode(QListView.ViewMode.IconMode)
-            self.listw.setFlow(QListView.Flow.LeftToRight)
-            self.listw.setWrapping(True)
-            self.listw.setResizeMode(QListView.ResizeMode.Adjust)
             self.listw.set_grid_cell(None)
             self.listw.setGridSize(QSize())
         else:
@@ -2086,30 +2050,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self._welcome is not None and self._welcome.isVisible():
             self._welcome.cover()
         self._position_provider_hint()
-        # The number of grid columns changed, so re-pad the header rows.
-        if (self._grid_on()
-                and self._is_combined_view(getattr(self, "_current_cat", None))):
-            self._schedule_regrid()
-
-    def _schedule_regrid(self) -> None:
-        t = getattr(self, "_regrid_timer", None)
-        if t is None:
-            t = QTimer(self)
-            t.setSingleShot(True)
-            t.setInterval(120)
-            t.timeout.connect(self._regrid)
-            self._regrid_timer = t
-        t.start()
-
-    def _regrid(self) -> None:
-        rows = getattr(self, "_combined_rows", None)
-        if rows is None or not self._grid_on():
-            return
-        if not self._is_combined_view(getattr(self, "_current_cat", None)):
-            return
-        padded = self._pad_headers_for_grid(rows)
-        self.all_items = padded
-        self.list_model.set_items(padded, self._combined_kind)
+        # The justified poster grid re-flows its columns from ChannelListView's
+        # own resizeEvent, so nothing else to do here.
 
     # -- first-run onboarding ------------------------------------------------
 
