@@ -21,7 +21,7 @@ from typing import Callable
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QComboBox, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QStackedWidget, QVBoxLayout, QWidget,
+    QPushButton, QSizePolicy, QStackedWidget, QVBoxLayout, QWidget,
 )
 
 from ..i18n import LANGUAGES, tr
@@ -60,10 +60,15 @@ class WelcomeOverlay(QWidget):
             f"#OnbFeat {{ font-size: 12px; color: {P['muted']}; }}"
             f"#OnbErr {{ font-size: 12px; color: {P['error']}; }}")
 
+        # Stretches above and below keep the card at its natural (content)
+        # height, centred - without them the card stretches to fill the whole
+        # overlay, so no amount of inner compression would shrink it.
         outer = QVBoxLayout(self)
-        outer.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        outer.addStretch(1)
         self._card = QFrame(objectName="WelcomeCard")
         self._card.setFixedWidth(430)
+        self._card.setSizePolicy(QSizePolicy.Policy.Fixed,
+                                 QSizePolicy.Policy.Maximum)
         card_l = QVBoxLayout(self._card)
         card_l.setContentsMargins(26, 16, 26, 16)
         card_l.setSpacing(6)
@@ -73,7 +78,13 @@ class WelcomeOverlay(QWidget):
         self._stack.addWidget(self._build_connect_page())   # 1
         self._stack.addWidget(self._build_trakt_page())     # 2
         card_l.addWidget(self._stack)
-        outer.addWidget(self._card)
+        outer.addWidget(self._card, 0, Qt.AlignmentFlag.AlignHCenter)
+        outer.addStretch(1)
+        # A QStackedWidget otherwise reserves the height of its tallest page,
+        # so the short welcome page would look as tall as the connect form.
+        # Let the card hug whichever page is showing.
+        self._stack.currentChanged.connect(self._fit_card)
+        self._fit_card(0)
 
         self._greet_idx = 0
         self._flash = QTimer(self)
@@ -250,6 +261,17 @@ class WelcomeOverlay(QWidget):
         self._t_finish.setText(tr("onb_finish"))
 
     # -- geometry ------------------------------------------------------------
+
+    def _fit_card(self, idx: int) -> None:
+        # A QStackedWidget always reserves the height of its tallest page.
+        # Pin it to the current page's height so the short welcome page isn't
+        # padded out to the size of the connect form.
+        cur = self._stack.widget(idx)
+        cur.adjustSize()
+        self._stack.setFixedHeight(cur.sizeHint().height())
+        self._card.adjustSize()
+        if self.isVisible():
+            self.cover()
 
     def reset(self) -> None:
         """Return to the first page and resume the greeting flash (used when
