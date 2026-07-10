@@ -7,7 +7,7 @@ import threading
 import time
 
 from PyQt6.QtCore import (
-    QRect, QSettings, Qt, QThreadPool,
+    QRect, QSettings, QSize, Qt, QThreadPool,
     QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import (
@@ -986,6 +986,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # (section, group) tuple - group is only meaningful for
             # channels.
             self.cat_list.blockSignals(True)
+            all_row = QListWidgetItem(tr("cat_all"))
+            all_row.setData(Qt.ItemDataRole.UserRole, ("all", None))
+            self.cat_list.addItem(all_row)
             chan = QListWidgetItem(tr("fav_channels"))
             chan.setData(Qt.ItemDataRole.UserRole, ("chan", None))
             self.cat_list.addItem(chan)
@@ -1119,6 +1122,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._load_items(cat)
 
     def _load_items(self, category_id) -> None:
+        # The grouped "All favorites" overview is always a headed list, even
+        # when the user's global view is the poster grid; every other view
+        # honours the user's setting, so restore it when leaving that view.
+        if not (self.mode == "fav" and category_id == ("all", None)):
+            self._restore_view_mode()
         if self.mode == "rec":
             if category_id == "__jobs__":
                 self.all_items = [self._job_item(j)
@@ -1136,6 +1144,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # fallback, meaning all channels).
             section, group = category_id if category_id else ("chan", None)
             self._fav_section = section
+            if section == "all":
+                self._load_favorites_all()
+                return
             if section == "movie":
                 self.all_items = self.movie_favs.items()
             elif section == "series":
@@ -1215,6 +1226,64 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._error(msg)
 
         run_async(self.pool, lambda: fn(category_id), done, fail)
+
+    # -- grouped "All favorites" view ----------------------------------------
+
+    def _load_favorites_all(self) -> None:
+        """Show every favorite at once - channels, movies and series - as a
+        single list grouped under section headers, so opening Favorites shows
+        all three kinds immediately instead of just Channels."""
+        self._force_list_view()
+        text = self.search.text().lower().strip()
+
+        def keep(it):
+            return not text or text in self.channel_display_name(it).lower()
+
+        exclude = (() if self.parental.session_unlocked
+                   else self.favs.locked_groups())
+        chans = [it for it in self.favs.items(None, exclude_groups=exclude)
+                 if keep(it)]
+        movies = [it for it in self.movie_favs.items() if keep(it)]
+        series = [it for it in self.series_favs.items() if keep(it)]
+
+        grouped: list[dict] = []
+        # Tag each row with its own kind: _ekind drives the delegate's cover
+        # art / badges, _kind drives playback routing (see _stream_for).
+        if chans:
+            grouped.append({"_header": tr("fav_channels")})
+            grouped += [{**c, "_ekind": "fav", "_kind": "live"} for c in chans]
+        if movies:
+            grouped.append({"_header": tr("fav_movies")})
+            grouped += [{**m, "_ekind": "vod", "_kind": "vod"} for m in movies]
+        if series:
+            grouped.append({"_header": tr("fav_series")})
+            grouped += [{**s, "_ekind": "series", "_kind": "series"}
+                        for s in series]
+
+        self.all_items = grouped
+        self.list_model.set_items(grouped, "fav")
+        if self._loading_hint.isVisible():
+            self._loading_hint.hide()
+        total = len(chans) + len(movies) + len(series)
+        if total:
+            self._set_status(f"{total} {self.LABELS['fav']}")
+        else:
+            self._set_status(tr("fav_empty_all"))
+
+    def _force_list_view(self) -> None:
+        from PyQt6.QtWidgets import QListView
+        self._view_forced = True
+        self.delegate.set_grid(False)
+        self.listw.setViewMode(QListView.ViewMode.ListMode)
+        self.listw.setFlow(QListView.Flow.TopToBottom)
+        self.listw.setWrapping(False)
+        self.listw.set_grid_cell(None)
+        self.listw.setGridSize(QSize())
+
+    def _restore_view_mode(self) -> None:
+        if getattr(self, "_view_forced", False):
+            self._view_forced = False
+            self._apply_view_settings()
 
     def _ensure_xmltv_loaded(self) -> None:
         if self.xmltv._loaded or self.xmltv._failed:
@@ -1388,9 +1457,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return self.client.episode_url(
                 it.get("id"), it.get("container_extension")), title
         # Favorite movies/series route by the selected section, not by
-        # 'fav' meaning live - only the Channels section plays live.
-        if self.mode == "live" or (
-                self.mode == "fav" and self._fav_section == "chan"):
+        # 'fav' meaning live - only the Channels section plays live. In the
+        # grouped "All favorites" view each row carries its own _kind, so a
+        # channel row (_kind == "live") plays live regardless of section.
+        if (self.mode == "live" or it.get("_kind") == "live" or (
+                self.mode == "fav" and self._fav_section == "chan")):
             fmt = self.settings.value("stream_format", "ts")
             return self.client.live_url(it.get("stream_id"), fmt), title
         # Watch Later snapshots carry `_kind` set to "vod" or "series"
@@ -1419,7 +1490,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.play_item(it, player, external)
 
     def play_item(self, it, player=None, external: bool = False) -> None:
-        if not it:
+        if not it or it.get("_header"):
             return
         if self.mode == "series" and not self.series_ctx:
             self._enter_series(it)
@@ -1438,8 +1509,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 and it.get("_kind") == "series"):
             self._enter_series(it)
             return
-        if (self.mode == "fav" and self._fav_section == "series"
-                and not self.series_ctx):
+        if (self.mode == "fav" and not self.series_ctx
+                and (self._fav_section == "series"
+                     or it.get("_kind") == "series")):
             self._enter_series(it)
             return
         if self.mode == "rec":
@@ -1686,6 +1758,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         row = self.listw.currentIndex().row()
         new_row = (row + direction) % count if row >= 0 else 0
+        # Skip section-header rows in the grouped "All favorites" view.
+        for _ in range(count):
+            it = self.list_model.item_at(new_row)
+            if not (it and it.get("_header")):
+                break
+            new_row = (new_row + direction) % count
         idx = self.list_model.index(new_row)
         self.listw.setCurrentIndex(idx)
         self.listw.scrollTo(idx)

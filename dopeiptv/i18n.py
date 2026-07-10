@@ -1071,6 +1071,23 @@ _STRINGS: dict[str, dict[str, str]] = {
         "th": "คุณกำลังสำรวจโดยไม่มีผู้ให้บริการ แอปจึงถูกจำกัด "
               "เพิ่มได้ทุกเมื่อด้วยปุ่ม “+ เพิ่มผู้ให้บริการ” ตรงกลาง",
     },
+    "fav_empty_all": {
+        "en": "No favorites yet — right-click any channel, movie or series "
+              "to add one.",
+        "sv": "Inga favoriter än – högerklicka en kanal, film eller serie för "
+              "att lägga till.",
+        "es": "Aún no hay favoritos: haz clic derecho en un canal, película o "
+              "serie para añadir uno.",
+        "de": "Noch keine Favoriten — Rechtsklick auf einen Sender, Film oder "
+              "eine Serie zum Hinzufügen.",
+        "fr": "Aucun favori pour l'instant — clic droit sur une chaîne, un "
+              "film ou une série pour en ajouter.",
+        "zh": "还没有收藏 — 右键点击任意频道、电影或剧集即可添加。",
+        "ru": "Пока нет избранного — щёлкните правой кнопкой по каналу, фильму "
+              "или сериалу, чтобы добавить.",
+        "th": "ยังไม่มีรายการโปรด — คลิกขวาที่ช่อง ภาพยนตร์ หรือซีรีส์ "
+              "เพื่อเพิ่ม",
+    },
     "onb_fill_all": {
         "en": "Please fill in server, username and password.",
         "sv": "Fyll i server, användarnamn och lösenord.",

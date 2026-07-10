@@ -130,6 +130,14 @@ class ChannelListModel(QAbstractListModel):
             return self._items[row]
         return None
 
+    def flags(self, index):
+        # Section-header rows (used by the grouped "All favorites" view) are
+        # labels, not content: not selectable and not clickable.
+        it = self.item_at(index.row())
+        if it and it.get("_header"):
+            return Qt.ItemFlag.NoItemFlags
+        return super().flags(index)
+
     def refresh_all(self) -> None:
         if self._items:
             self.dataChanged.emit(
@@ -173,15 +181,34 @@ class ChannelDelegate(QStyledItemDelegate):
         return QSize(self.cell_w, self.cell_h)
 
     def sizeHint(self, option, index) -> QSize:
+        it = index.data(Qt.ItemDataRole.UserRole)
+        if it and it.get("_header"):
+            return QSize(0, 32)
         if self.grid:
             return QSize(self.cell_w, self.cell_h)
         return QSize(0, self.row_h)
 
     def paint(self, painter, option, index) -> None:
-        if self.grid:
+        it = index.data(Qt.ItemDataRole.UserRole)
+        if it and it.get("_header"):
+            self._paint_header(painter, option, it["_header"])
+        elif self.grid:
             self._paint_grid(painter, option, index)
         else:
             self._paint_list(painter, option, index)
+
+    def _paint_header(self, painter, option, text: str) -> None:
+        painter.save()
+        f = QFont()
+        f.setBold(True)
+        f.setPointSize(9)
+        painter.setFont(f)
+        painter.setPen(QColor(P["muted"]))
+        r = option.rect.adjusted(14, 6, -12, 0)
+        painter.drawText(
+            r, int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft),
+            (text or "").upper())
+        painter.restore()
 
     def _paint_watched_badge(self, painter, anchor: QRect,
                              size: int, source: str = "local") -> None:
@@ -281,7 +308,7 @@ class ChannelDelegate(QStyledItemDelegate):
 
     def _paint_grid(self, painter, option, index) -> None:
         it = index.data(Qt.ItemDataRole.UserRole) or {}
-        kind = index.model().kind
+        kind = it.get("_ekind") or index.model().kind
         rect = option.rect
         logo_sz = self.grid_logo
         painter.save()
@@ -378,7 +405,7 @@ class ChannelDelegate(QStyledItemDelegate):
 
     def _paint_list(self, painter, option, index) -> None:
         it = index.data(Qt.ItemDataRole.UserRole) or {}
-        kind = index.model().kind
+        kind = it.get("_ekind") or index.model().kind
         rect = option.rect
         logo_sz = self.logo_sz
         painter.save()
