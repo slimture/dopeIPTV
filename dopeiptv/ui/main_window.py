@@ -812,10 +812,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self.isFullScreen() or self.isMaximized():
             self.showNormal()
         self.setMinimumSize(240, 135)
-        self.setWindowFlags(
-            Qt.WindowType.Tool
-            | Qt.WindowType.WindowStaysOnTopHint
-            | Qt.WindowType.FramelessWindowHint)
+        # Wayland (GNOME/Mutter) ignores WindowStaysOnTopHint - a client can't
+        # pin its own stacking there. So on Wayland we KEEP the title bar, and
+        # the user right-clicks it for the compositor's own "Always on Top"
+        # (exactly how Firefox PiP does it). On X11 the hint works, so we use
+        # the clean frameless floating window.
+        flags = Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint
+        if "wayland" not in QApplication.platformName().lower():
+            flags |= Qt.WindowType.FramelessWindowHint
+        self.setWindowFlags(flags)
         self.show()
         # Restore the last PiP position/size, else default to bottom-right.
         geo = self._saved_pip_geometry()
