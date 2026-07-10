@@ -331,6 +331,15 @@ class XmltvGuide:
         return out
 
     def _parse(self, data: bytes) -> None:
+        # Many EPG URLs serve gzipped XMLTV (.xml.gz); requests doesn't
+        # transparently decompress a gzip *body* (only transfer-encoding), so
+        # detect the gzip magic and inflate it ourselves.
+        if data[:2] == b"\x1f\x8b":
+            import gzip
+            try:
+                data = gzip.decompress(data)
+            except OSError:
+                pass
         cutoff = (datetime.now().astimezone().timestamp()
                   - self.KEEP_PAST_DAYS * 86400)
         rows: dict[str, list[tuple]] = {}
