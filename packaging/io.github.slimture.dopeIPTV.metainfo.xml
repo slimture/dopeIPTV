@@ -49,6 +49,18 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.6.2" date="2026-07-10">
+      <description>
+        <p>A polish release: a collapsible sidebar, custom colours, and fixes.</p>
+        <ul>
+          <li>Collapsible sidebar - fold it to a slim icon rail (drag or Ctrl+B), plus a focus mode that hides the list for a player-only layout</li>
+          <li>Custom colours for the left-column entries, categories, individual items, and favourite folders (a folder's colour applies to all its favourites)</li>
+          <li>M3U playlists now auto-detect their EPG guide (url-tvg), and gzipped XMLTV guides are read transparently</li>
+          <li>The EPG grid marks channels with catch-up, flags the channel you're watching, and offers "Play this programme"; click the sidebar logo to jump to what's playing</li>
+          <li>Fixes: Picture-in-Picture close no longer quits the app, the mini player keeps its size after fullscreen, and the colour picker no longer freezes on some Linux setups</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.6.1" date="2026-07-10">
       <description>
         <p>A polish release: a collapsible sidebar, custom colours, and fixes.</p>
