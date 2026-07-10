@@ -9,12 +9,12 @@ from __future__ import annotations
 import sys
 from datetime import datetime
 
-from PyQt6.QtCore import QSize, Qt, QTimer, QUrl
+from PyQt6.QtCore import Qt, QTimer, QUrl
 from PyQt6.QtGui import QDesktopServices, QIcon
 from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDialog, QDialogButtonBox,
     QFileDialog, QFormLayout, QHBoxLayout, QInputDialog, QLabel,
-    QLineEdit, QListView, QListWidget, QListWidgetItem, QMessageBox,
+    QLineEdit, QListWidget, QListWidgetItem, QMessageBox,
     QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget,
 )
 
@@ -81,21 +81,13 @@ class _SettingsMixin:
 
     def _apply_view_settings(self) -> None:
         density = self.settings.value("view_density", "medium")
-        grid = self.settings.value("view_grid", "false") == "true"
+        user_grid = self.settings.value("view_grid", "false") == "true"
+        # The current view decides whether the grid is even allowed: grouped,
+        # header views are always a list (headers can't span the poster grid).
+        force_list = self._is_grouped_view(getattr(self, "_current_cat", None))
+        grid = user_grid and not force_list
         self.delegate.set_density(density)
-        self.delegate.set_grid(grid)
-        if grid:
-            self.listw.setViewMode(QListView.ViewMode.IconMode)
-            self.listw.setFlow(QListView.Flow.LeftToRight)
-            self.listw.setWrapping(True)
-            self.listw.setResizeMode(QListView.ResizeMode.Adjust)
-            self.listw.set_grid_cell(self.delegate.grid_size())
-        else:
-            self.listw.setViewMode(QListView.ViewMode.ListMode)
-            self.listw.setFlow(QListView.Flow.TopToBottom)
-            self.listw.setWrapping(False)
-            self.listw.set_grid_cell(None)
-            self.listw.setGridSize(QSize())
+        self._apply_list_layout(force_list)
         self.listw.setVerticalScrollMode(
             QAbstractItemView.ScrollMode.ScrollPerPixel)
         step = (self.delegate.grid_size().height() // 2 if grid
@@ -104,8 +96,7 @@ class _SettingsMixin:
         if hasattr(self, "size_box"):
             for box, key in (
                 (self.size_box, density),
-                (self.sort_box,
-                 self.settings.value("sort_order", "default")),
+                (self.sort_box, self._current_sort_order()),
             ):
                 box.blockSignals(True)
                 i = box.findData(key)
@@ -113,9 +104,13 @@ class _SettingsMixin:
                     box.setCurrentIndex(i)
                 box.blockSignals(False)
             self.grid_btn.blockSignals(True)
-            self.grid_btn.setChecked(grid)
+            self.grid_btn.setChecked(user_grid)
             self.grid_btn.blockSignals(False)
-        self._apply_filter()
+        # Grouped views must rebuild (their header rows); others just re-filter.
+        if force_list:
+            self._load_items(getattr(self, "_current_cat", None))
+        else:
+            self._apply_filter()
 
     def _set_theme(self, theme: str, accent: str) -> None:
         self.settings.setValue("theme", theme)
@@ -204,10 +199,12 @@ class _SettingsMixin:
             self.player.retranslate_ui()
 
     def _inline_view_changed(self, *_) -> None:
+        # Density and grid are global; the sort dropdown applies only to the
+        # current category, so different categories can keep different orders.
         self.settings.setValue(
             "view_density", self.size_box.currentData())
         self.settings.setValue(
-            "sort_order", self.sort_box.currentData())
+            self._sort_setting_key(), self.sort_box.currentData())
         self.settings.setValue(
             "view_grid",
             "true" if self.grid_btn.isChecked() else "false")

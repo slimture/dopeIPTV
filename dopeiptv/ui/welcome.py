@@ -53,20 +53,20 @@ class WelcomeOverlay(QWidget):
             f"#WelcomeOverlay {{ background: {P['bg']}; }}"
             f"#WelcomeCard {{ background: {P['pane']};"
             f" border: 1px solid {P['border']}; border-radius: 16px; }}"
-            f"#Hero {{ font-size: 30px; font-weight: 800; color: {P['text']}; }}"
-            f"#OnbTitle {{ font-size: 18px; font-weight: 700;"
+            f"#Hero {{ font-size: 23px; font-weight: 800; color: {P['text']}; }}"
+            f"#OnbTitle {{ font-size: 15px; font-weight: 700;"
             f" color: {P['text']}; }}"
-            f"#OnbSub {{ font-size: 13px; color: {P['muted']}; }}"
-            f"#OnbFeat {{ font-size: 13px; color: {P['muted']}; }}"
+            f"#OnbSub {{ font-size: 12px; color: {P['muted']}; }}"
+            f"#OnbFeat {{ font-size: 12px; color: {P['muted']}; }}"
             f"#OnbErr {{ font-size: 12px; color: {P['error']}; }}")
 
         outer = QVBoxLayout(self)
         outer.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._card = QFrame(objectName="WelcomeCard")
-        self._card.setFixedWidth(460)
+        self._card.setFixedWidth(430)
         card_l = QVBoxLayout(self._card)
-        card_l.setContentsMargins(34, 26, 34, 24)
-        card_l.setSpacing(12)
+        card_l.setContentsMargins(26, 16, 26, 16)
+        card_l.setSpacing(6)
 
         self._stack = QStackedWidget()
         self._stack.addWidget(self._build_welcome_page())   # 0
@@ -85,7 +85,7 @@ class WelcomeOverlay(QWidget):
     def _build_welcome_page(self) -> QWidget:
         page = QWidget()
         lay = QVBoxLayout(page)
-        lay.setSpacing(12)
+        lay.setSpacing(7)
         self._hero = QLabel(self._GREETINGS[0], objectName="Hero")
         self._hero.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._w_sub = QLabel(tr("welcome_subtitle"), objectName="OnbSub")
@@ -103,17 +103,17 @@ class WelcomeOverlay(QWidget):
         self._lang_combo.currentIndexChanged.connect(self._language_picked)
 
         self._w_next = QPushButton(tr("onb_next"), objectName="Primary")
-        self._w_next.setMinimumHeight(38)
+        self._w_next.setMinimumHeight(34)
         self._w_next.clicked.connect(lambda: self._stack.setCurrentIndex(1))
         self._w_skip = QPushButton(tr("welcome_explore"))
         self._w_skip.clicked.connect(self._explore)
 
         lay.addWidget(self._hero)
         lay.addWidget(self._w_sub)
-        lay.addSpacing(4)
+        lay.addSpacing(2)
         lay.addWidget(self._lang_label)
         lay.addWidget(self._lang_combo)
-        lay.addSpacing(4)
+        lay.addSpacing(2)
         lay.addWidget(self._w_next)
         lay.addWidget(self._w_skip)
         return page
@@ -121,7 +121,7 @@ class WelcomeOverlay(QWidget):
     def _build_connect_page(self) -> QWidget:
         page = QWidget()
         lay = QVBoxLayout(page)
-        lay.setSpacing(10)
+        lay.setSpacing(6)
         self._c_title = QLabel(tr("login_subtitle"), objectName="OnbTitle")
         self._c_title.setWordWrap(True)
 
@@ -142,7 +142,7 @@ class WelcomeOverlay(QWidget):
         self._c_err = QLabel("", objectName="OnbErr")
         self._c_err.setWordWrap(True)
         self._c_connect = QPushButton(tr("btn_connect"), objectName="Primary")
-        self._c_connect.setMinimumHeight(38)
+        self._c_connect.setMinimumHeight(34)
         self._c_connect.clicked.connect(self._do_connect)
 
         # Short tour of what the app does, right under the login form.
@@ -155,12 +155,12 @@ class WelcomeOverlay(QWidget):
         lay.addLayout(form)
         lay.addWidget(self._c_err)
         lay.addWidget(self._c_connect)
-        lay.addSpacing(6)
+        lay.addSpacing(2)
         lay.addWidget(self._f_title)
         for f in self._feats:
             f.setWordWrap(True)
             lay.addWidget(f)
-        lay.addSpacing(4)
+        lay.addSpacing(2)
         row = QHBoxLayout()
         self._c_back = QPushButton(tr("onb_back"))
         self._c_back.clicked.connect(lambda: self._stack.setCurrentIndex(0))
@@ -175,23 +175,23 @@ class WelcomeOverlay(QWidget):
     def _build_trakt_page(self) -> QWidget:
         page = QWidget()
         lay = QVBoxLayout(page)
-        lay.setSpacing(12)
+        lay.setSpacing(7)
         self._t_title = QLabel(tr("onb_trakt_title"), objectName="OnbTitle")
         self._t_title.setWordWrap(True)
         self._t_desc = QLabel(tr("onb_trakt_desc"), objectName="OnbSub")
         self._t_desc.setWordWrap(True)
         self._t_connect = QPushButton(tr("onb_trakt_connect"))
-        self._t_connect.setMinimumHeight(34)
+        self._t_connect.setMinimumHeight(30)
         self._t_connect.clicked.connect(self._on_connect_trakt)
         self._t_finish = QPushButton(tr("onb_finish"), objectName="Primary")
-        self._t_finish.setMinimumHeight(38)
+        self._t_finish.setMinimumHeight(34)
         self._t_finish.clicked.connect(self._finish)
 
         lay.addWidget(self._t_title)
         lay.addWidget(self._t_desc)
-        lay.addSpacing(6)
+        lay.addSpacing(2)
         lay.addWidget(self._t_connect)
-        lay.addSpacing(4)
+        lay.addSpacing(2)
         lay.addWidget(self._t_finish)
         return page
 

@@ -180,10 +180,15 @@ class ChannelDelegate(QStyledItemDelegate):
     def grid_size(self) -> QSize:
         return QSize(self.cell_w, self.cell_h)
 
+    def _header_h(self) -> int:
+        # Scale the section header with the density so it stays visible even
+        # next to Extra-Large rows, but keep the gap below it tight.
+        return min(max(30, self.name_pt * 3), 52)
+
     def sizeHint(self, option, index) -> QSize:
         it = index.data(Qt.ItemDataRole.UserRole)
         if it and it.get("_header"):
-            return QSize(0, 32)
+            return QSize(0, self._header_h())
         if self.grid:
             return QSize(self.cell_w, self.cell_h)
         return QSize(0, self.row_h)
@@ -201,12 +206,14 @@ class ChannelDelegate(QStyledItemDelegate):
         painter.save()
         f = QFont()
         f.setBold(True)
-        f.setPointSize(9)
+        f.setPointSize(self.name_pt + 3)   # scales with the density
         painter.setFont(f)
-        painter.setPen(QColor(P["muted"]))
-        r = option.rect.adjusted(14, 6, -12, 0)
+        painter.setPen(QColor(P["text"]))
+        # Bottom-align the text so the gap sits above the header, keeping it
+        # visually attached to the rows that follow.
+        r = option.rect.adjusted(14, 0, -12, -4)
         painter.drawText(
-            r, int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft),
+            r, int(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft),
             (text or "").upper())
         painter.restore()
 

@@ -1129,7 +1129,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         """The combined, header-grouped views that are always rendered as a
         headed list (never the poster grid)."""
         if self.mode == "fav":
-            return category_id == ("all", None)
+            return category_id in (("all", None), ("trakt", None))
         if self.mode == "watchlist":
             return category_id is None
         if self.mode == "watched":
@@ -1141,11 +1141,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         return False
 
     def _load_items(self, category_id) -> None:
-        # Grouped overviews are always a headed list, even when the user's
-        # global view is the poster grid; every other view honours the user's
-        # setting, so restore it when leaving a grouped view.
-        if not self._is_grouped_view(category_id):
-            self._restore_view_mode()
+        # Apply the right layout up front and deterministically: grouped
+        # overviews are always a headed list, every other view honours the
+        # user's grid/list choice. Doing it here (not via a sticky flag) fixes
+        # the grid setting being "forgotten" when hopping between categories.
+        self._current_cat = category_id
+        self._apply_list_layout(self._is_grouped_view(category_id))
         if self.mode == "rec":
             if category_id == "__jobs__":
                 self.all_items = [self._job_item(j)
@@ -1210,8 +1211,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 if rows:
                     grouped.append({"_header": tr(hk)})
                     grouped += [{**r, "_ekind": ek} for r in rows]
-            self._force_list_view()
-            self.all_items = grouped
+                self.all_items = grouped
             self.list_model.set_items(grouped, "history")
             if self._loading_hint.isVisible():
                 self._loading_hint.hide()
@@ -1316,7 +1316,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                       empty_msg: str | None = None) -> None:
         """Render a grouped view: force the headed list layout, populate the
         model and set a count/empty status."""
-        self._force_list_view()
         grouped = self._grouped(sections)
         self.all_items = grouped
         self.list_model.set_items(grouped, model_kind)
@@ -1359,7 +1358,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if buckets[key]:
                 grouped.append({"_header": tr(hk)})
                 grouped += buckets[key]
-        self._force_list_view()
         self.all_items = grouped
         self.list_model.set_items(grouped, "rec")
         if self._loading_hint.isVisible():
@@ -1382,20 +1380,26 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
              ("fav_series", "series", "series", series)],
             "fav", tr("fav_empty_all"))
 
-    def _force_list_view(self) -> None:
+    def _apply_list_layout(self, force_list: bool) -> None:
+        """Set the middle pane to grid or list. *force_list* wins over the
+        user's grid setting (used by the grouped, header views, which must be
+        a list). Layout only - no re-render, no settings-panel sync."""
         from PyQt6.QtWidgets import QListView
-        self._view_forced = True
-        self.delegate.set_grid(False)
-        self.listw.setViewMode(QListView.ViewMode.ListMode)
-        self.listw.setFlow(QListView.Flow.TopToBottom)
-        self.listw.setWrapping(False)
-        self.listw.set_grid_cell(None)
-        self.listw.setGridSize(QSize())
-
-    def _restore_view_mode(self) -> None:
-        if getattr(self, "_view_forced", False):
-            self._view_forced = False
-            self._apply_view_settings()
+        user_grid = self.settings.value("view_grid", "false") == "true"
+        grid = user_grid and not force_list
+        self.delegate.set_grid(grid)
+        if grid:
+            self.listw.setViewMode(QListView.ViewMode.IconMode)
+            self.listw.setFlow(QListView.Flow.LeftToRight)
+            self.listw.setWrapping(True)
+            self.listw.setResizeMode(QListView.ResizeMode.Adjust)
+            self.listw.set_grid_cell(self.delegate.grid_size())
+        else:
+            self.listw.setViewMode(QListView.ViewMode.ListMode)
+            self.listw.setFlow(QListView.Flow.TopToBottom)
+            self.listw.setWrapping(False)
+            self.listw.set_grid_cell(None)
+            self.listw.setGridSize(QSize())
 
     def _ensure_xmltv_loaded(self) -> None:
         if self.xmltv._loaded or self.xmltv._failed:
@@ -1439,8 +1443,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _sort_key_name(it):
         return (it.get("name") or it.get("title") or "").lower()
 
+    def _sort_setting_key(self) -> str:
+        """Per-category sort key, so each category can keep its own order."""
+        return f"sort::{self.mode}::{getattr(self, '_current_cat', None)!r}"
+
+    def _current_sort_order(self) -> str:
+        """The sort order for the current category: its own override if set,
+        otherwise the global default from Settings."""
+        return self.settings.value(
+            self._sort_setting_key(),
+            self.settings.value("sort_order", "default"))
+
     def _sorted(self, items: list) -> list:
-        order = self.settings.value("sort_order", "default")
+        order = self._current_sort_order()
         if order == "alpha_asc":
             return sorted(items, key=MainWindow._sort_key_name)
         if order == "alpha_desc":
@@ -2056,17 +2071,23 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _build_provider_hint(self) -> None:
         from PyQt6.QtCore import QPropertyAnimation
         from PyQt6.QtWidgets import QGraphicsOpacityEffect
-        btn = QPushButton(tr("onb_add_provider"), self, objectName="Primary")
+        btn = QPushButton(tr("onb_add_provider"), self)
         btn.setMinimumHeight(46)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        # Always red, independent of the app theme, so it clearly reads as
+        # a call to action.
+        btn.setStyleSheet(
+            "QPushButton { background:#e5354b; color:#ffffff; font-weight:700;"
+            " font-size:14px; border:none; border-radius:10px; padding:0 22px; }"
+            "QPushButton:hover { background:#c8283b; }")
         btn.clicked.connect(self.show_welcome)
         # Slow opacity pulse to draw the eye without being noisy.
         eff = QGraphicsOpacityEffect(btn)
         btn.setGraphicsEffect(eff)
         anim = QPropertyAnimation(eff, b"opacity", self)
-        anim.setDuration(1600)
+        anim.setDuration(1500)
         anim.setStartValue(1.0)
-        anim.setKeyValueAt(0.5, 0.5)
+        anim.setKeyValueAt(0.5, 0.45)
         anim.setEndValue(1.0)
         anim.setLoopCount(-1)
         self._add_provider_btn = btn
@@ -2076,13 +2097,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         btn = self._add_provider_btn
         if btn is None or not btn.isVisible():
             return
-        # Centre it in the middle list pane, mapped into window coordinates.
+        # Lower third of the middle list pane, mapped into window coordinates.
         btn.adjustSize()
         w = max(240, btn.width() + 40)
         h = 46
         tl = self.listw.mapTo(self, self.listw.rect().topLeft())
         x = tl.x() + (self.listw.width() - w) // 2
-        y = tl.y() + (self.listw.height() - h) // 2
+        y = tl.y() + int(self.listw.height() * 0.72) - h // 2
         btn.setGeometry(x, y, w, h)
 
     def closeEvent(self, event) -> None:

@@ -280,17 +280,22 @@ class _TraktMixin:
         def on_resolved(_meta):
             self._fav_refresh_timer.start(250)
 
-        items: list[dict] = []
+        movie_items = []
         for tid in movies:
             meta = (self.tmdb.resolve_by_id(tid, "vod", on_resolved)
                     if self.tmdb else None)
-            items.append(self._trakt_watched_item(tid, "vod", meta))
+            movie_items.append(self._trakt_watched_item(tid, "vod", meta))
+        series_items = []
         for tid in shows:
             meta = (self.tmdb.resolve_by_id(tid, "series", on_resolved)
                     if self.tmdb else None)
-            items.append(self._trakt_watched_item(tid, "series", meta))
-        self.all_items = items
-        self._apply_filter()
+            series_items.append(self._trakt_watched_item(tid, "series", meta))
+        # Split into Movies and Series under headers, like the other views.
+        self._show_grouped(
+            [("fav_movies", "vod", "vod", self._search_filter(movie_items)),
+             ("fav_series", "series", "series",
+              self._search_filter(series_items))],
+            "fav")
 
     @staticmethod
     def _merge_watched(local: list[dict],
