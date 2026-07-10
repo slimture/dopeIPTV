@@ -52,8 +52,8 @@ class EpgGridDialog(QDialog):
     HEADER_H = 30
     CH_COL_W = 200
     PX_PER_MIN = 6            # 360 px per hour
-    PAST_MIN = 30            # a little history to the left of "now"
-    WINDOW_HOURS = 12
+    FUTURE_HOURS = 12       # how far ahead the board reaches
+    MAX_PAST_HOURS = 48     # cap on how far back timeshift opens the board
     MAX_CHANNELS = 300       # a grid past this is unreadable anyway
 
     # Distinct, muted row accents that read on both light and dark themes.
@@ -74,8 +74,19 @@ class EpgGridDialog(QDialog):
         self.setWindowTitle(title)
 
         now = time.time()
-        self._start = (now // 1800) * 1800 - self.PAST_MIN * 60
-        self._stop = self._start + self.WINDOW_HOURS * 3600
+        now_floor = (now // 1800) * 1800
+        # Open the board further back for timeshift channels so their past
+        # (catch-up-able) programmes are scrollable into view.
+        max_ts_days = 0
+        for ch in self.channels:
+            try:
+                max_ts_days = max(max_ts_days,
+                                  self.window._timeshift_days(ch))
+            except Exception:
+                pass
+        past_h = min(max(0.5, max_ts_days * 24), self.MAX_PAST_HOURS)
+        self._start = now_floor - past_h * 3600
+        self._stop = now_floor + self.FUTURE_HOURS * 3600
         self._grid_w = int((self._stop - self._start) / 60 * self.PX_PER_MIN)
 
         outer = QVBoxLayout(self)
@@ -92,6 +103,17 @@ class EpgGridDialog(QDialog):
         self.view.setAlignment(
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         self.view.setBackgroundBrush(QColor(P["bg"]))
+        # Chunkier scrollbars - the thin default is fiddly to grab, and the
+        # horizontal one matters here since the board is wide.
+        self.view.setStyleSheet(
+            "QScrollBar:horizontal{height:16px;margin:0;}"
+            "QScrollBar:vertical{width:16px;margin:0;}"
+            "QScrollBar::handle{background:%s;border-radius:6px;}"
+            "QScrollBar::handle:horizontal{min-width:60px;}"
+            "QScrollBar::handle:vertical{min-height:60px;}"
+            "QScrollBar::handle:hover{background:%s;}"
+            "QScrollBar::add-line,QScrollBar::sub-line{width:0;height:0;}"
+            % (P["muted3"], P["muted"]))
         self.view.horizontalScrollBar().valueChanged.connect(self._pin)
         self.view.verticalScrollBar().valueChanged.connect(self._pin)
         outer.addWidget(self.view, 1)
@@ -257,37 +279,50 @@ class EpgGridDialog(QDialog):
         data = self._block_at(scene_pos)
         if not data:
             return
-        self._selected = data["channel"]
+        self._selected = data
         p = data["prog"]
         start = datetime.fromtimestamp(p["start_timestamp"]).strftime("%H:%M")
         stop = datetime.fromtimestamp(p["stop_timestamp"]).strftime("%H:%M")
+        catchup = (p["stop_timestamp"] < time.time()
+                   and self.window._timeshift_days(data["channel"]))
+        tag = "  ⟲" if catchup else ""
         self.info.setText(
             f"{data['channel'].get('name') or '?'} · "
-            f"{start}–{stop}  {p.get('title') or ''}")
+            f"{start}–{stop}  {p.get('title') or ''}{tag}")
         self.play_btn.setEnabled(True)
 
     def _play_at(self, scene_pos) -> None:
         data = self._block_at(scene_pos)
         if data:
-            self._selected = data["channel"]
+            self._selected = data
             self._play_selected()
 
     def _play_selected(self) -> None:
-        if self._selected is not None:
-            self.window.play_live_channel(self._selected)
-            self.accept()
+        if not self._selected:
+            return
+        ch, p = self._selected["channel"], self._selected["prog"]
+        # A finished programme on a timeshift channel plays as catch-up;
+        # everything else tunes the channel live.
+        if p["stop_timestamp"] < time.time() and self.window._timeshift_days(ch):
+            self.window._play_timeshift(ch, prog=p)
+        else:
+            self.window.play_live_channel(ch)
+        self.accept()
 
     def _context_at(self, scene_pos, global_pos) -> None:
         data = self._block_at(scene_pos)
         if not data:
             return
         ch, p = data["channel"], data["prog"]
-        self._selected = ch
+        self._selected = data
         self.play_btn.setEnabled(True)
         m = QMenu(self)
-        m.addAction(tr("epg_play_channel"), self._play_selected)
-        if (ch.get("stream_id") is not None
-                and p["stop_timestamp"] > time.time()):
+        past = p["stop_timestamp"] < time.time()
+        if past and self.window._timeshift_days(ch):
+            m.addAction(tr("ts_play_from_start"), self._play_selected)
+        m.addAction(tr("ts_go_live") if past else tr("epg_play_channel"),
+                    lambda: (self.window.play_live_channel(ch), self.accept()))
+        if ch.get("stream_id") is not None and p["stop_timestamp"] > time.time():
             m.addAction(tr("rec_record_programme"), lambda: self._record(ch, p))
         m.exec(global_pos)
 

@@ -313,11 +313,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._sync_now_btn.hide()
         sl.addWidget(self._sync_now_btn)
 
-        self._refresh_btn = refresh_btn = QPushButton(tr("btn_refresh"))
-        refresh_btn.setToolTip(tr("tooltip_reload_channels_epg"))
-        refresh_btn.clicked.connect(self.refresh_playlist)
-        sl.addWidget(refresh_btn)
-
+        # (Reload lives in the menu bar's "Refresh playlist" and the
+        # per-playlist auto-refresh setting; a sidebar button here was just
+        # an easy mis-click.)
         self._settings_btn = settings_btn = QPushButton(tr("btn_settings"))
         settings_btn.clicked.connect(self.open_settings)
         sl.addWidget(settings_btn)
@@ -1793,6 +1791,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
 
         if external or player == "vlc":
+            if not self._confirm_external_while_playing():
+                return
             launch_player(player or "mpv", url, title, self)
             if self.mode != "history":
                 self.history.add(url, title, icon, key, kind)
@@ -1800,6 +1800,25 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
         self._start_playback(url, title, icon, key, kind,
                              record=self.mode != "history", item=it)
+
+    def _confirm_external_while_playing(self) -> bool:
+        """Opening an external player pulls a SECOND stream from the provider
+        (many accounts allow only one). If the mini player is busy, ask first:
+        stop it, open anyway, or cancel. Returns False to abort."""
+        busy = (self.player is not None and self.player.isVisible()
+                and self.playback_mode() == "embedded"
+                and self._playing_key is not None)
+        if not busy:
+            return True
+        idx = self._choice_dialog(
+            tr("ext_play_title"), tr("ext_play_body"),
+            [(tr("ext_play_stop_open"), "primary"),
+             (tr("ext_play_keep_open"), "normal"),
+             (tr("common_cancel"), "normal")])
+        if idx == 0:
+            self.player.stop()          # free the connection first
+            return True
+        return idx == 1                 # 1 = open anyway; else cancel
 
     def _open_cast_dialog(self, it) -> None:
         if not ChromecastManager.available():

@@ -197,6 +197,19 @@ def main() -> int:
             from .core.platform_macos import setup_opengl
             setup_opengl()
 
+    # Opt-in X11/XWayland backend (Settings > "Run via X11"). Must be set
+    # before QApplication. Guarded so it can never wedge startup: Linux only,
+    # never overrides a user-set QT_QPA_PLATFORM, and `--no-x11` bypasses it
+    # if XWayland is ever unavailable and the app won't open.
+    if (sys.platform.startswith("linux")
+            and "--no-x11" not in sys.argv
+            and not os.environ.get("QT_QPA_PLATFORM")):
+        try:
+            if QSettings(ORG, ORG).value("force_x11", "false") == "true":
+                os.environ["QT_QPA_PLATFORM"] = "xcb"
+        except Exception:
+            pass
+
     app = QApplication(sys.argv)
     app.setStyle(_NoButtonIconsStyle(app.style()))
     app.setApplicationName(APP_NAME)

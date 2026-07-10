@@ -12,9 +12,9 @@ from datetime import datetime
 from PyQt6.QtCore import Qt, QTimer, QUrl
 from PyQt6.QtGui import QDesktopServices, QIcon
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QApplication, QComboBox, QDialog, QDialogButtonBox,
-    QFileDialog, QFormLayout, QHBoxLayout, QInputDialog, QLabel,
-    QLineEdit, QListWidget, QListWidgetItem, QMessageBox,
+    QAbstractItemView, QApplication, QCheckBox, QComboBox, QDialog,
+    QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout, QInputDialog,
+    QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox,
     QPushButton, QSpinBox, QTabWidget, QTextBrowser, QVBoxLayout, QWidget,
 )
 
@@ -209,8 +209,6 @@ class _SettingsMixin:
                 btn.setText(tr(nav_labels[key]))
         self._cat_section_label.setText(tr("sidebar_categories"))
         self._guide_btn.setText(tr("btn_epg_guide"))
-        self._refresh_btn.setText(tr("btn_refresh"))
-        self._refresh_btn.setToolTip(tr("tooltip_reload_channels_epg"))
         self._settings_btn.setText(tr("btn_settings"))
         self.search.setPlaceholderText(tr("search_placeholder"))
         self._size_label.setText(tr("label_size"))
@@ -356,6 +354,17 @@ class _SettingsMixin:
         pf.addRow(tr("setting_network_buffer"), buf_box)
         pf.addRow(tr("setting_replay_delay"), replay_delay_row)
         pf.addRow(tr("setting_epg_delay"), epg_delay_row)
+        x11_box = None
+        if sys.platform.startswith("linux"):
+            x11_box = QCheckBox(tr("setting_force_x11"))
+            x11_box.setChecked(
+                self.settings.value("force_x11", "false") == "true")
+            x11_box.setToolTip(tr("setting_force_x11_hint"))
+            pf.addRow("", x11_box)
+            x11_hint = QLabel(tr("setting_force_x11_hint"))
+            x11_hint.setWordWrap(True)
+            x11_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+            pf.addRow("", x11_hint)
         delay_hint = QLabel(
             "Replay delay shifts where catch-up/timeshift starts "
             "playback, for providers whose stream lags behind their "
@@ -1021,6 +1030,9 @@ class _SettingsMixin:
                 "stream_format", fmt_box.currentData())
             self.settings.setValue(
                 "autoplay_preview", autoplay_box.currentData())
+            if x11_box is not None:
+                self.settings.setValue(
+                    "force_x11", "true" if x11_box.isChecked() else "false")
             if mode_box.currentData():
                 self.settings.setValue(
                     "playback_mode", mode_box.currentData())

@@ -1773,6 +1773,90 @@ _STRINGS: dict[str, dict[str, str]] = {
 
     # ── Recording ─────────────────────────────────────────────────────────
 
+    "setting_force_x11": {
+        "en": "Run via X11 backend (needs restart)",
+        "sv": "Kör via X11-backend (kräver omstart)",
+        "es": "Ejecutar con backend X11 (requiere reinicio)",
+        "de": "Über X11-Backend ausführen (Neustart nötig)",
+        "fr": "Utiliser le backend X11 (redémarrage requis)",
+        "zh": "通过 X11 后端运行（需重启）",
+        "ru": "Запускать через X11 (нужен перезапуск)",
+        "th": "รันผ่านแบ็กเอนด์ X11 (ต้องรีสตาร์ต)",
+    },
+    "setting_force_x11_hint": {
+        "en": "Wayland only: run under XWayland so the Picture-in-Picture "
+              "window can float frameless and always-on-top. May look slightly "
+              "softer on fractional HiDPI scaling.",
+        "sv": "Endast Wayland: kör under XWayland så att bild-i-bild-fönstret "
+              "kan flyta ramlöst och alltid överst. Kan se något mjukare ut "
+              "vid fraktionell HiDPI-skalning.",
+        "es": "Solo Wayland: ejecuta bajo XWayland para que la ventana PiP "
+              "flote sin marco y siempre visible. Puede verse algo borroso con "
+              "escala HiDPI fraccionada.",
+        "de": "Nur Wayland: läuft unter XWayland, damit das Bild-im-Bild-"
+              "Fenster rahmenlos und immer im Vordergrund schweben kann. Kann "
+              "bei fraktionaler HiDPI-Skalierung etwas weicher wirken.",
+        "fr": "Wayland uniquement : exécute sous XWayland pour que la fenêtre "
+              "PiP flotte sans cadre et toujours au premier plan. Peut paraître "
+              "légèrement flou en mise à l'échelle HiDPI fractionnaire.",
+        "zh": "仅 Wayland：在 XWayland 下运行，使画中画窗口可无边框浮动并置顶。"
+              "在分数 HiDPI 缩放下可能略微模糊。",
+        "ru": "Только Wayland: запуск под XWayland, чтобы окно «картинка в "
+              "картинке» было безрамочным и поверх всех окон. При дробном "
+              "HiDPI-масштабе может выглядеть чуть мягче.",
+        "th": "เฉพาะ Wayland: รันภายใต้ XWayland เพื่อให้หน้าต่าง PiP "
+              "ลอยแบบไร้ขอบและอยู่บนสุดได้ อาจดูนุ่มขึ้นเล็กน้อยเมื่อสเกล HiDPI แบบเศษส่วน",
+    },
+    "ext_play_title": {
+        "en": "Open external player?",
+        "sv": "Öppna extern spelare?",
+        "es": "¿Abrir reproductor externo?",
+        "de": "Externen Player öffnen?",
+        "fr": "Ouvrir le lecteur externe ?",
+        "zh": "打开外部播放器？",
+        "ru": "Открыть внешний плеер?",
+        "th": "เปิดโปรแกรมเล่นภายนอกไหม?",
+    },
+    "ext_play_body": {
+        "en": "Something is playing in the mini player. Opening an external "
+              "player pulls a second stream from the provider, which many "
+              "accounts don't allow. Stop the mini player first?",
+        "sv": "Något spelas i minispelaren. Att öppna en extern spelare hämtar "
+              "en andra stream från leverantören, vilket många konton inte "
+              "tillåter. Stoppa minispelaren först?",
+        "es": "Algo se reproduce en el mini reproductor. Abrir uno externo "
+              "abre una segunda conexión con el proveedor, que muchas cuentas "
+              "no permiten. ¿Detener el mini reproductor primero?",
+        "de": "Im Mini-Player läuft etwas. Ein externer Player öffnet eine "
+              "zweite Verbindung zum Anbieter, was viele Konten nicht "
+              "erlauben. Mini-Player zuerst stoppen?",
+        "fr": "Quelque chose est en lecture dans le mini-lecteur. Ouvrir un "
+              "lecteur externe crée une seconde connexion au fournisseur, que "
+              "beaucoup de comptes interdisent. Arrêter le mini-lecteur ?",
+        "zh": "迷你播放器正在播放。打开外部播放器会向服务商建立第二条连接，"
+              "许多账户不允许这样。要先停止迷你播放器吗？",
+        "ru": "В мини-плеере что-то воспроизводится. Внешний плеер откроет "
+              "второе соединение с провайдером, что многие аккаунты запрещают. "
+              "Остановить мини-плеер сначала?",
+        "th": "มีบางอย่างกำลังเล่นในมินิเพลเยอร์ การเปิดโปรแกรมเล่นภายนอกจะดึงสตรีมที่สอง "
+              "จากผู้ให้บริการ ซึ่งหลายบัญชีไม่อนุญาต หยุดมินิเพลเยอร์ก่อนไหม?",
+    },
+    "ext_play_stop_open": {
+        "en": "Stop & open externally", "sv": "Stoppa & öppna externt",
+        "es": "Detener y abrir externo", "de": "Stoppen & extern öffnen",
+        "fr": "Arrêter et ouvrir", "zh": "停止并外部打开",
+        "ru": "Остановить и открыть", "th": "หยุดแล้วเปิดภายนอก",
+    },
+    "ext_play_keep_open": {
+        "en": "Open anyway (2nd connection)",
+        "sv": "Öppna ändå (2:a anslutning)",
+        "es": "Abrir igualmente (2.ª conexión)",
+        "de": "Trotzdem öffnen (2. Verbindung)",
+        "fr": "Ouvrir quand même (2e connexion)",
+        "zh": "仍然打开（第二条连接）",
+        "ru": "Всё равно открыть (2-е соединение)",
+        "th": "เปิดต่อไป (การเชื่อมต่อที่ 2)",
+    },
     "rec_record_programme": {
         "en": "Record this programme",
         "sv": "Spela in det här programmet",
@@ -2953,6 +3037,16 @@ _STRINGS: dict[str, dict[str, str]] = {
 
     # ── Timeshift / catch-up ──────────────────────────────────────────────
 
+    "ts_play_from_start": {
+        "en": "Play from start (catch-up)",
+        "sv": "Spela från början (catch-up)",
+        "es": "Reproducir desde el inicio (recuperar)",
+        "de": "Von Anfang an ansehen (Catch-up)",
+        "fr": "Lire depuis le début (rattrapage)",
+        "zh": "从头播放（回看）",
+        "ru": "Смотреть сначала (архив)",
+        "th": "เล่นตั้งแต่ต้น (ดูย้อนหลัง)",
+    },
     "ts_go_live": {
         "en": "Go Live",
         "sv": "Gå live",
