@@ -25,7 +25,9 @@ from .. import APP_NAME
 from ..i18n import tr
 from .channel_list import ChannelDelegate, ChannelListModel, ChannelListView
 from ..providers.chromecast import CastDialog, ChromecastManager
-from ..providers.client import OfflineClient, XtreamClient, make_client
+from ..providers.client import (
+    DemoClient, OfflineClient, XtreamClient, make_client,
+)
 from ..media.embedded import EmbeddedPlayer
 from ..providers.epg import XmltvGuide, epg_cache_path
 from ..services.coverart import CoverArtService
@@ -2092,8 +2094,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if screen is None:
             return
         avail = screen.availableGeometry()
-        w = min(max(1240, int(avail.width() * 0.82)), avail.width(), 2400)
-        h = min(max(780, int(avail.height() * 0.85)), avail.height(), 1500)
+        w = min(max(1240, int(avail.width() * 0.88)), avail.width(), 2600)
+        h = min(max(780, int(avail.height() * 0.90)), avail.height(), 1600)
         self.resize(w, h)
         self.move(avail.x() + (avail.width() - w) // 2,
                   avail.y() + (avail.height() - h) // 2)
@@ -2112,7 +2114,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         total = self._root.width()
         if total > 900:
             side = 240
-            det = min(max(380, int(total * 0.30)), 720)
+            det = min(max(420, int(total * 0.36)), 1000)
             self._root.setSizes([side, total - side - det, det])
 
     def _schedule_save_layout(self, *_args) -> None:
@@ -2197,12 +2199,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         whenever the app is running without a real provider and the wizard is
         closed. It brings the wizard back and disappears the moment a provider
         is added."""
-        # Only the plain explore-mode client shows the hint. DemoClient is a
-        # subclass of OfflineClient but IS a provider, so exclude it by exact
-        # type; and never float the button over a maximized/fullscreen video.
-        offline = type(self.client) is OfflineClient
+        # Show the hint until a REAL provider is added: explore mode
+        # (OfflineClient) and the demo (DemoClient) both still want it, so the
+        # user can graduate from trying channels to entering their own. A real
+        # Xtream/M3U client removes it for good. M3UClient also subclasses
+        # OfflineClient, so key on the exact types. Never float it over a
+        # maximized/fullscreen video.
+        no_provider = type(self.client) in (OfflineClient, DemoClient)
         overlay_up = self._welcome is not None and self._welcome.isVisible()
-        if offline and not overlay_up and not self._player_fs:
+        if no_provider and not overlay_up and not self._player_fs:
             if self._add_provider_btn is None:
                 self._build_provider_hint()
             self._add_provider_btn.setText(tr("onb_add_provider"))

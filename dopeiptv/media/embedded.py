@@ -470,7 +470,7 @@ class EmbeddedPlayer(QWidget):
         scr = QApplication.primaryScreen()
         if scr is not None:
             self.VIDEO_BOX_HEIGHT = min(
-                max(260, int(scr.availableGeometry().height() * 0.24)), 520)
+                max(260, int(scr.availableGeometry().height() * 0.30)), 680)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(2)
