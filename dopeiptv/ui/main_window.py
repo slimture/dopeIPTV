@@ -905,6 +905,22 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                         self.list_model.refresh_all() if ok else None),
             lambda _: self._epg_progress_finished())
 
+    def start_demo(self) -> None:
+        """Switch to the built-in demo provider (a few free public test
+        streams) so the app can be tried without any credentials. Reuses the
+        normal live path - the demo client just answers with a fixed channel
+        list."""
+        from ..providers.client import DemoClient
+        self.client = DemoClient()
+        self._base_title = tr("demo_title")
+        self.setWindowTitle(self._base_title)
+        # Rebuild the (empty) guide against the demo client, then load the
+        # Live channels through the usual mode switch.
+        self.xmltv = XmltvGuide(self.client, None, cache_path=None,
+                                progress_cb=self.epg_progress.emit)
+        self.switch_mode("live")
+        self._update_provider_hint()   # hides the '+ Add provider' hint
+
     def switch_playlist(self, pid: str) -> None:
         pl = self.playlist_store.get(pid) if self.playlist_store else None
         if not pl:
@@ -2117,7 +2133,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 on_connect=self._wizard_connect,
                 on_explore=self._wizard_explore,
                 on_connect_trakt=lambda: self._trakt_browser_auth_dialog(self),
-                on_language_change=self._wizard_language)
+                on_language_change=self._wizard_language,
+                on_demo=self.start_demo)
         else:
             self._welcome.reset()
         self._welcome.cover()

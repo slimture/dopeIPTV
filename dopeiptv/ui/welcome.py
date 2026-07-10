@@ -40,13 +40,15 @@ class WelcomeOverlay(QWidget):
                  on_connect: Callable[[str, str, str], None],
                  on_explore: Callable[[], None],
                  on_connect_trakt: Callable[[], None],
-                 on_language_change: Callable[[str], None]) -> None:
+                 on_language_change: Callable[[str], None],
+                 on_demo: Callable[[], None]) -> None:
         super().__init__(parent)
         self._settings = settings
         self._on_connect = on_connect
         self._on_explore = on_explore
         self._on_connect_trakt = on_connect_trakt
         self._on_language_change = on_language_change
+        self._on_demo = on_demo
 
         self.setObjectName("WelcomeOverlay")
         self.setStyleSheet(
@@ -116,6 +118,8 @@ class WelcomeOverlay(QWidget):
         self._w_next = QPushButton(tr("onb_next"), objectName="Primary")
         self._w_next.setMinimumHeight(34)
         self._w_next.clicked.connect(lambda: self._stack.setCurrentIndex(1))
+        self._w_demo = QPushButton(tr("onb_try_demo"))
+        self._w_demo.clicked.connect(self._demo)
         self._w_skip = QPushButton(tr("welcome_explore"))
         self._w_skip.clicked.connect(self._explore)
 
@@ -126,6 +130,7 @@ class WelcomeOverlay(QWidget):
         lay.addWidget(self._lang_combo)
         lay.addSpacing(2)
         lay.addWidget(self._w_next)
+        lay.addWidget(self._w_demo)
         lay.addWidget(self._w_skip)
         return page
 
@@ -243,6 +248,11 @@ class WelcomeOverlay(QWidget):
         self._on_connect(server, user, pw)
         self._stack.setCurrentIndex(2)   # continue to the optional Trakt step
 
+    def _demo(self) -> None:
+        self._flash.stop()
+        self.hide()
+        self._on_demo()
+
     def _explore(self) -> None:
         self._flash.stop()
         self.hide()
@@ -256,6 +266,7 @@ class WelcomeOverlay(QWidget):
         self._w_sub.setText(tr("welcome_subtitle"))
         self._lang_label.setText(tr("onb_choose_language"))
         self._w_next.setText(tr("onb_next"))
+        self._w_demo.setText(tr("onb_try_demo"))
         self._w_skip.setText(tr("welcome_explore"))
         self._c_title.setText(tr("login_subtitle"))
         self._lbl_server.setText(tr("login_server"))

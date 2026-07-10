@@ -3,7 +3,7 @@ for XtreamClient: same interface, every data call empty, nothing hits the net.""
 
 import inspect
 
-from dopeiptv.providers.client import OfflineClient, XtreamClient
+from dopeiptv.providers.client import DemoClient, OfflineClient, XtreamClient
 
 
 def test_same_public_interface_as_xtream():
@@ -43,3 +43,28 @@ def test_carries_the_attributes_the_epg_and_ui_read():
     assert c.server == "" and c.username == "" and c.password == ""
     assert c.session is not None          # epg download reads client.session
     assert c.authenticate() == {}          # no-op, never raises
+
+
+def test_demo_client_same_interface_as_xtream():
+    def public_methods(cls):
+        return {n for n, _ in inspect.getmembers(cls, inspect.isfunction)
+                if not n.startswith("_")}
+    missing = public_methods(XtreamClient) - public_methods(DemoClient)
+    assert not missing, f"DemoClient missing: {sorted(missing)}"
+
+
+def test_demo_client_serves_live_channels_only():
+    c = DemoClient()
+    cats = c.live_categories()
+    assert len(cats) == 1
+    streams = c.live_streams(cats[0]["category_id"])
+    assert len(streams) == len(DemoClient.STREAMS) >= 4
+    # Each channel resolves to its real public HLS url; ids are 1-based.
+    for i, s in enumerate(streams, start=1):
+        assert s["stream_id"] == i
+        url = c.live_url(s["stream_id"])
+        assert url.startswith("https://") and url == DemoClient.STREAMS[i - 1][1]
+    # No movies/series/EPG - inherited empty from OfflineClient.
+    assert c.vod_categories() == [] and c.series_categories() == []
+    assert c.xmltv() == b""
+    assert c.live_url("nope") == ""

@@ -175,6 +175,52 @@ class OfflineClient:
         return ""
 
 
+class DemoClient(OfflineClient):
+    """A no-account 'try it out' provider: one Live category of official,
+    free, public HLS test streams so the app can be exercised end to end
+    without any real credentials. Everything else (movies, series, EPG) is
+    empty, inherited from OfflineClient. These are well-known test assets
+    (Mux, Apple, Bitmovin) - not a third-party IPTV service."""
+
+    # (name, HLS url). Kept deliberately small and to stable public streams.
+    STREAMS: list[tuple[str, str]] = [
+        ("Big Buck Bunny",
+         "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8"),
+        ("Apple BipBop",
+         "https://devstreaming-cdn.apple.com/videos/streaming/examples/"
+         "bipbop_4x3/bipbop_4x3_variant.m3u8"),
+        ("Sintel",
+         "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8"),
+        ("Art of Motion",
+         "https://bitdash-a.akamaihd.net/content/MI201109210084_1/m3u8s/"
+         "f08e80da-bf1d-4e3d-8899-f0f6155f6efa.m3u8"),
+        ("Tears of Steel",
+         "https://test-streams.mux.dev/tos_ismc/main.m3u8"),
+    ]
+    CATEGORY_ID = "demo"
+
+    def __init__(self) -> None:
+        super().__init__()
+        # stream_id -> url, with 1-based ids matching the list order.
+        self._urls = {i + 1: url for i, (_n, url) in enumerate(self.STREAMS)}
+
+    def live_categories(self) -> list[dict]:
+        return [{"category_id": self.CATEGORY_ID,
+                 "category_name": "Demo channels"}]
+
+    def live_streams(self, category_id: str | None = None) -> list[dict]:
+        return [{"stream_id": i + 1, "num": i + 1, "name": name,
+                 "stream_icon": "", "category_id": self.CATEGORY_ID,
+                 "epg_channel_id": ""}
+                for i, (name, _url) in enumerate(self.STREAMS)]
+
+    def live_url(self, stream_id: int | str, fmt: str = "ts") -> str:
+        try:
+            return self._urls.get(int(stream_id), "")
+        except (TypeError, ValueError):
+            return ""
+
+
 def b64(text: str | None) -> str:
     """Decode Xtream's base64-encoded EPG text fields."""
     if not text:
