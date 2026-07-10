@@ -120,3 +120,28 @@ def test_guide_index_rejects_old_version(tmp_path):
     g = XmltvGuide(client=None, cache_path=str(cache))
     assert g._load_index() is False
     assert g._by_id == {}
+
+
+def test_effective_url_prefers_custom_then_m3u_header():
+    from dopeiptv.providers.client import M3UClient
+    # explicit per-playlist URL always wins
+    m = M3UClient("http://x")
+    m.epg_url = "http://from-header/epg.xml"
+    g = XmltvGuide(m, custom_url="http://explicit/epg.xml")
+    assert g._effective_url() == "http://explicit/epg.xml"
+    # no explicit URL -> ensure the M3U parses and its header URL is used
+    m2 = M3UClient("http://x")
+    m2._fetch = lambda: ('#EXTM3U url-tvg="http://hdr/epg.xml.gz"\n'
+                         '#EXTINF:-1,Ch\nhttp://s/ch\n')
+    g2 = XmltvGuide(m2, custom_url=None)
+    assert g2._effective_url() == "http://hdr/epg.xml.gz"
+
+
+def test_download_no_epg_source_raises_for_m3u():
+    import pytest
+    from dopeiptv.providers.client import M3UClient
+    m = M3UClient("http://x")
+    m._fetch = lambda: "#EXTM3U\n#EXTINF:-1,Ch\nhttp://s/ch\n"  # no url-tvg
+    g = XmltvGuide(m, custom_url=None)
+    with pytest.raises(RuntimeError):
+        g._download()

@@ -191,6 +191,9 @@ class M3UClient(OfflineClient):
         self.server = (url or "").strip()
         self._channels: list[dict] = []
         self._loaded = False
+        # EPG URL advertised by the playlist's #EXTM3U header
+        # (url-tvg / x-tvg-url), auto-detected while parsing.
+        self.epg_url = ""
 
     # -- fetch + parse --------------------------------------------------------
 
@@ -228,6 +231,15 @@ class M3UClient(OfflineClient):
                     "category_name": attrs.get("group-title", "").strip()
                     or "Uncategorized",
                 }
+            elif line.startswith("#EXTM3U"):
+                # Header line: many playlists advertise their XMLTV guide here
+                # as url-tvg="..." (or x-tvg-url="..."). Grab it as an EPG hint.
+                hdr = dict(self._ATTR.findall(line))
+                url = (hdr.get("url-tvg") or hdr.get("x-tvg-url") or "").strip()
+                if url:
+                    # A playlist may list several comma-separated guides; the
+                    # first reachable one is the sensible default.
+                    self.epg_url = url.split(",")[0].strip()
             elif line.startswith("#"):
                 continue                       # other directives: ignore
             elif pending is not None:

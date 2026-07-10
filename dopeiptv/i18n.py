@@ -1178,6 +1178,16 @@ _STRINGS: dict[str, dict[str, str]] = {
               "чтобы следовать общей настройке.",
         "th": "การเรียงสำหรับหมวดนี้ เลือก “ค่าเริ่มต้นรวม” เพื่อใช้ค่าตั้งรวมของแอป",
     },
+    "tooltip_toggle_sidebar": {
+        "en": "Show/hide the category list (Ctrl+B)",
+        "sv": "Visa/dölj kategorilistan (Ctrl+B)",
+        "es": "Mostrar/ocultar la lista de categorías (Ctrl+B)",
+        "de": "Kategorieliste ein-/ausblenden (Strg+B)",
+        "fr": "Afficher/masquer la liste des catégories (Ctrl+B)",
+        "zh": "显示/隐藏分类列表 (Ctrl+B)",
+        "ru": "Показать/скрыть список категорий (Ctrl+B)",
+        "th": "แสดง/ซ่อนรายการหมวดหมู่ (Ctrl+B)",
+    },
     "rec_today": {
         "en": "Today", "sv": "Idag", "es": "Hoy", "de": "Heute",
         "fr": "Aujourd'hui", "zh": "今天", "ru": "Сегодня", "th": "วันนี้",

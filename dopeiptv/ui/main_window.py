@@ -373,6 +373,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.grid_btn.toggled.connect(self._inline_view_changed)
         self._size_label = QLabel(tr("label_size"))
         self._sort_label = QLabel(tr("label_sort"))
+        # Toggle for the left category column - handy for clean screenshots
+        # (hide category names) or just more room for the list.
+        self.side_btn = QPushButton("☰", objectName="InlineToggle")
+        self.side_btn.setCheckable(True)
+        self.side_btn.setChecked(True)
+        self.side_btn.setToolTip(tr("tooltip_toggle_sidebar"))
+        self.side_btn.setFixedWidth(34)
+        self.side_btn.toggled.connect(self._on_side_toggle)
+        ctl.addWidget(self.side_btn)
         ctl.addWidget(self._size_label)
         ctl.addWidget(self.size_box)
         ctl.addWidget(self._sort_label)
@@ -647,8 +656,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                   activated=self._delete_pressed)
         QShortcut(QKeySequence(Qt.Key.Key_Space), self,
                   activated=self._toggle_pause_shortcut)
+        QShortcut(QKeySequence("Ctrl+B"), self,
+                  activated=lambda: self.side_btn.toggle())
 
         self._apply_view_settings()
+
+    def _on_side_toggle(self, checked: bool) -> None:
+        """Show/hide the left category column. Remembered so leaving
+        fullscreen doesn't force it back on against the user's choice."""
+        self._sidebar_user_hidden = not checked
+        if hasattr(self, "_side") and not self._player_fs:
+            self._side.setVisible(checked)
 
     def _toggle_pause_shortcut(self) -> None:
         if self.player and self.player.isVisible():
@@ -711,7 +729,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self.showNormal()
             return
         self._player_fs = False
-        self._side.show()
+        self._side.setVisible(not getattr(self, "_sidebar_user_hidden", False))
         self._mid.show()
         for w in getattr(self, "_det_hidden", []):
             w.show()

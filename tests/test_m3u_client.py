@@ -82,6 +82,27 @@ def test_authenticate_parses_and_empty_raises():
         pass
 
 
+def test_url_tvg_header_detected_as_epg_url():
+    hdr = ('#EXTM3U url-tvg="http://guide/epg.xml.gz"\n'
+           '#EXTINF:-1,Ch\nhttp://s/ch\n')
+    c = M3UClient("http://x")
+    c._parse(hdr)
+    assert c.epg_url == "http://guide/epg.xml.gz"
+
+
+def test_x_tvg_url_alias_and_first_of_many():
+    hdr = ('#EXTM3U x-tvg-url="http://a/1.xml,http://b/2.xml"\n'
+           '#EXTINF:-1,Ch\nhttp://s/ch\n')
+    c = M3UClient("http://x")
+    c._parse(hdr)
+    assert c.epg_url == "http://a/1.xml"
+
+
+def test_no_tvg_header_leaves_epg_url_empty():
+    c = _parsed()
+    assert c.epg_url == ""
+
+
 def test_make_client_factory():
     assert isinstance(
         make_client({"kind": "m3u", "server": "http://x"}), M3UClient)

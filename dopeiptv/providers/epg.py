@@ -112,9 +112,31 @@ class XmltvGuide:
         except OSError:
             pass
 
-    def _download(self) -> bytes:
+    def _effective_url(self) -> str:
+        """The XMLTV URL to fetch: an explicit per-playlist URL wins, else the
+        one an M3U playlist advertises in its #EXTM3U header (url-tvg). The M3U
+        client only knows that after it has parsed, so ensure it is loaded and
+        read the hint lazily here rather than at construction time."""
         if self.custom_url:
-            r = requests.get(self.custom_url, stream=True, timeout=(20, 300))
+            return self.custom_url
+        if hasattr(self.client, "epg_url"):
+            ensure = getattr(self.client, "_ensure", None)
+            if callable(ensure):
+                try:
+                    ensure()
+                except Exception:
+                    pass
+            return getattr(self.client, "epg_url", "") or ""
+        return ""
+
+    def _download(self) -> bytes:
+        url = self._effective_url()
+        if url:
+            r = requests.get(url, stream=True, timeout=(20, 300))
+        elif hasattr(self.client, "epg_url"):
+            # An M3U/offline client with no guide URL: there is no Xtream
+            # xmltv.php endpoint to fall back to, so report "no EPG" cleanly.
+            raise RuntimeError("no EPG source for this playlist")
         else:
             r = self.client.session.get(
                 f"{self.client.server}/xmltv.php",
