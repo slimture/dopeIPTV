@@ -460,6 +460,8 @@ class _ContextMenuMixin:
                             lambda: self._lock_category(cid))
             m.addSeparator()
         m.addAction(tr("ctx_manage_categories"), self._open_content_manager)
+        m.addSeparator()
+        m.addAction(tr("menu_refresh_playlist"), self.refresh_playlist)
         m.exec(self.cat_list.mapToGlobal(pos))
 
     def _new_fav_folder(self, store) -> None:

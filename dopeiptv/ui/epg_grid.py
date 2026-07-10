@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..i18n import tr
-from .theme import P
+from .theme import ACCENT, P
 
 
 class _GridView(QGraphicsView):
@@ -103,22 +103,28 @@ class EpgGridDialog(QDialog):
         self.view.setAlignment(
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         self.view.setBackgroundBrush(QColor(P["bg"]))
-        # Chunkier scrollbars - the thin default is fiddly to grab, and the
-        # horizontal one matters here since the board is wide.
+        # Chunky, accent-coloured scrollbars: the thin grey default blended
+        # into the background and was easy to miss, and the horizontal one
+        # matters here since the board is wide.
         self.view.setStyleSheet(
-            "QScrollBar:horizontal{height:16px;margin:0;}"
-            "QScrollBar:vertical{width:16px;margin:0;}"
-            "QScrollBar::handle{background:%s;border-radius:6px;}"
-            "QScrollBar::handle:horizontal{min-width:60px;}"
-            "QScrollBar::handle:vertical{min-height:60px;}"
+            "QScrollBar:horizontal{height:18px;margin:0;"
+            "background:rgba(128,128,128,40);}"
+            "QScrollBar:vertical{width:18px;margin:0;"
+            "background:rgba(128,128,128,40);}"
+            "QScrollBar::handle{background:%s;border-radius:7px;}"
+            "QScrollBar::handle:horizontal{min-width:70px;}"
+            "QScrollBar::handle:vertical{min-height:70px;}"
             "QScrollBar::handle:hover{background:%s;}"
             "QScrollBar::add-line,QScrollBar::sub-line{width:0;height:0;}"
-            % (P["muted3"], P["muted"]))
+            % (ACCENT, P["text"]))
         self.view.horizontalScrollBar().valueChanged.connect(self._pin)
         self.view.verticalScrollBar().valueChanged.connect(self._pin)
         outer.addWidget(self.view, 1)
 
         bar = QHBoxLayout()
+        self.now_btn = QPushButton("⟳ " + tr("epg_jump_now"))
+        self.now_btn.clicked.connect(self._scroll_to_now)
+        bar.addWidget(self.now_btn)
         self.info = QLabel(tr("epg_select_channel"))
         self.info.setStyleSheet(f"color:{P['muted']}; font-size:12px;")
         self.info.setWordWrap(True)
@@ -145,6 +151,12 @@ class EpgGridDialog(QDialog):
 
     def _x(self, ts: float) -> float:
         return self.CH_COL_W + (ts - self._start) / 60 * self.PX_PER_MIN
+
+    def _scroll_to_now(self) -> None:
+        """Bring the current time back into view (after scrolling far back)."""
+        now_x = self._x(time.time())
+        self.view.horizontalScrollBar().setValue(
+            max(0, int(now_x - self.CH_COL_W - 40)))
 
     # -- build ---------------------------------------------------------------
 

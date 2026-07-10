@@ -736,6 +736,10 @@ _STRINGS: dict[str, dict[str, str]] = {
         "fr": "Sélectionnez une chaîne", "zh": "选择一个频道",
         "ru": "Выберите канал", "th": "เลือกช่อง",
     },
+    "epg_jump_now": {
+        "en": "Now", "sv": "Nu", "es": "Ahora", "de": "Jetzt",
+        "fr": "Maintenant", "zh": "现在", "ru": "Сейчас", "th": "ตอนนี้",
+    },
     "epg_play_channel": {
         "en": "Play channel", "sv": "Spela kanal",
         "es": "Reproducir canal", "de": "Kanal abspielen",
