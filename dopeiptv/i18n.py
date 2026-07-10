@@ -977,6 +977,36 @@ _STRINGS: dict[str, dict[str, str]] = {
               "เป็นบริการของบุคคลที่สาม จึงไม่รับประกันการเล่น "
               "เพิ่มผู้ให้บริการของคุณเองได้ทุกเมื่อ",
     },
+    "trakt_wizard_intro": {
+        "en": "One-time setup: create a free Trakt API app, set its Redirect "
+              "URI to exactly {url}, and paste its Client ID and Secret below. "
+              "After that, Connect just opens your browser and you click Yes.",
+        "sv": "Engångsinställning: skapa en gratis Trakt-API-app, sätt dess "
+              "Redirect URI till exakt {url} och klistra in dess Client ID och "
+              "Secret nedan. Sedan öppnar Connect bara webbläsaren och du "
+              "klickar Yes.",
+        "es": "Configuración única: crea una app API gratuita de Trakt, pon su "
+              "Redirect URI exactamente en {url} y pega su Client ID y Secret "
+              "abajo. Después, Conectar solo abre el navegador y pulsas Sí.",
+        "de": "Einmalige Einrichtung: erstelle eine kostenlose Trakt-API-App, "
+              "setze ihre Redirect-URI exakt auf {url} und füge Client ID und "
+              "Secret unten ein. Danach öffnet Connect nur den Browser und du "
+              "klickst Ja.",
+        "fr": "Configuration unique : créez une app API Trakt gratuite, "
+              "définissez son Redirect URI exactement sur {url}, puis collez "
+              "son Client ID et Secret ci-dessous. Ensuite, Connecter ouvre "
+              "le navigateur et vous cliquez sur Oui.",
+        "zh": "一次性设置：创建一个免费的 Trakt API 应用，将其 Redirect URI "
+              "设置为 {url}，然后在下面粘贴 Client ID 和 Secret。之后，"
+              "连接只会打开浏览器，你点击 Yes 即可。",
+        "ru": "Разовая настройка: создайте бесплатное Trakt API-приложение, "
+              "укажите его Redirect URI точно как {url} и вставьте Client ID и "
+              "Secret ниже. После этого «Подключить» просто откроет браузер, и "
+              "вы нажмёте Yes.",
+        "th": "ตั้งค่าครั้งเดียว: สร้างแอป Trakt API ฟรี ตั้ง Redirect URI ให้เป็น {url} "
+              "พอดี แล้ววาง Client ID และ Secret ด้านล่าง จากนั้น Connect "
+              "จะเปิดเบราว์เซอร์ให้คุณคลิก Yes",
+    },
     "demo_title": {
         "en": "dopeIPTV — Demo channels",
         "sv": "dopeIPTV — Demo-kanaler",

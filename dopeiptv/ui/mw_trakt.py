@@ -17,8 +17,8 @@ from ..core.workers import run_async
 from PyQt6.QtCore import QTimer, Qt, QUrl
 from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (
-    QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QListWidget, QMessageBox,
-    QPushButton, QTabWidget, QVBoxLayout)
+    QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
+    QListWidget, QMessageBox, QPushButton, QTabWidget, QVBoxLayout)
 from datetime import datetime
 
 
@@ -774,6 +774,69 @@ class _TraktMixin:
         # If we're currently in the Watch Later view, drop the row.
         if self.mode == "watchlist":
             self._load_items(getattr(self, "_watchlist_subcat", None))
+
+    def _trakt_connect_flow(self, parent) -> None:
+        """Entry point for the wizard's 'Connect Trakt' button. If the app
+        credentials are already set, go straight to the one-click browser
+        sign-in; otherwise collect them first (they're a one-time thing) and
+        then continue to the browser."""
+        if self.trakt.client_id and self.trakt.client_secret:
+            self._trakt_browser_auth_dialog(parent)
+            return
+        if self._trakt_creds_dialog(parent):
+            self._trakt_browser_auth_dialog(parent)
+
+    def _trakt_creds_dialog(self, parent) -> bool:
+        """One-time collection of the free Trakt API app's Client ID + Secret.
+        Returns True once both are filled and saved."""
+        d = QDialog(parent)
+        d.setWindowTitle(tr("trakt_connect_title"))
+        d.setMinimumWidth(430)
+        lay = QVBoxLayout(d)
+        intro = QLabel(tr("trakt_wizard_intro", url=REDIRECT_URI))
+        intro.setWordWrap(True)
+        intro.setStyleSheet("font-size:12px;")
+        lay.addWidget(intro)
+        create = QPushButton(tr("trakt_create_app"))
+        create.clicked.connect(lambda: QDesktopServices.openUrl(
+            QUrl("https://trakt.tv/oauth/applications/new")))
+        crow = QHBoxLayout()
+        crow.addWidget(create)
+        crow.addStretch(1)
+        lay.addLayout(crow)
+        form = QFormLayout()
+        id_edit = QLineEdit(self.trakt.client_id)
+        id_edit.setPlaceholderText(tr("trakt_client_id_ph"))
+        sec_edit = QLineEdit(self.trakt.client_secret)
+        sec_edit.setPlaceholderText(tr("trakt_client_secret_ph"))
+        sec_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        form.addRow(tr("field_client_id"), id_edit)
+        form.addRow(tr("field_client_secret"), sec_edit)
+        lay.addLayout(form)
+        err = QLabel("")
+        err.setStyleSheet(f"color:{P['error']}; font-size:12px;")
+        err.setWordWrap(True)
+        lay.addWidget(err)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel)
+        buttons.button(QDialogButtonBox.StandardButton.Ok).setText(
+            tr("onb_next"))
+        lay.addWidget(buttons)
+
+        def accept() -> None:
+            cid = id_edit.text().strip()
+            sec = sec_edit.text().strip()
+            if not (cid and sec):
+                err.setText(tr("msg_trakt_enter_creds"))
+                return
+            self.settings.setValue("trakt_client_id", cid)
+            self.settings.setValue("trakt_client_secret", sec)
+            d.accept()
+
+        buttons.accepted.connect(accept)
+        buttons.rejected.connect(d.reject)
+        return d.exec() == QDialog.DialogCode.Accepted
 
     def _trakt_browser_auth_dialog(self, parent) -> None:
         """Sign in to Trakt through the browser (OAuth authorization-code with
