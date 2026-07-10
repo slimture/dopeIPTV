@@ -19,7 +19,6 @@ from __future__ import annotations
 from typing import Callable
 
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QComboBox, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QSizePolicy, QStackedWidget, QVBoxLayout, QWidget,
@@ -92,11 +91,9 @@ class WelcomeOverlay(QWidget):
         self._stack.currentChanged.connect(self._fit_card)
         self._fit_card(0)
 
-        # Esc dismisses the wizard from anywhere inside it (a plain
-        # keyPressEvent never fires while a field/button holds focus).
-        esc = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
-        esc.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
-        esc.activated.connect(self._explore)
+        # Esc is handled by the main window's single Escape shortcut (it calls
+        # dismiss() when this overlay is up) - a second shortcut here would
+        # just make Escape ambiguous and fire neither.
 
         self._greet_idx = 0
         self._flash = QTimer(self)
@@ -280,13 +277,10 @@ class WelcomeOverlay(QWidget):
         self._on_connect(server, user, pw, kind)
         self._stack.setCurrentIndex(2)   # continue to the optional Trakt step
 
-    def keyPressEvent(self, event) -> None:
-        # Esc dismisses the wizard the same as "Continue without account".
-        if event.key() == Qt.Key.Key_Escape:
-            self._explore()
-            event.accept()
-            return
-        super().keyPressEvent(event)
+    def dismiss(self) -> None:
+        """Close the wizard the same as 'Continue without account' - called by
+        the main window's Escape shortcut."""
+        self._explore()
 
     def _demo(self) -> None:
         self._flash.stop()

@@ -638,7 +638,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         QShortcut(QKeySequence("Ctrl+Left"), self,
                   activated=lambda: self._zap(-1))
         QShortcut(QKeySequence(Qt.Key.Key_Escape), self,
-                  activated=self._exit_player_fullscreen)
+                  activated=self._on_escape)
         QShortcut(QKeySequence(Qt.Key.Key_F), self,
                   activated=self._toggle_fullscreen_shortcut)
         QShortcut(QKeySequence(Qt.Key.Key_Delete), self,
@@ -694,6 +694,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._update_provider_hint()   # tuck the '+ Add provider' hint away
         self._was_fullscreen = self.isFullScreen()
         self.showFullScreen()
+
+    def _on_escape(self) -> None:
+        """Single Escape handler so the key is never ambiguous: dismiss the
+        onboarding wizard if it's up, otherwise leave fullscreen."""
+        if self._welcome is not None and self._welcome.isVisible():
+            self._welcome.dismiss()
+            return
+        self._exit_player_fullscreen()
 
     def _exit_player_fullscreen(self) -> None:
         if not self._player_fs:
