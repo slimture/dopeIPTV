@@ -1773,6 +1773,16 @@ _STRINGS: dict[str, dict[str, str]] = {
 
     # ── Recording ─────────────────────────────────────────────────────────
 
+    "rec_record_programme": {
+        "en": "Record this programme",
+        "sv": "Spela in det här programmet",
+        "es": "Grabar este programa",
+        "de": "Diese Sendung aufnehmen",
+        "fr": "Enregistrer cette émission",
+        "zh": "录制此节目",
+        "ru": "Записать эту передачу",
+        "th": "บันทึกรายการนี้",
+    },
     "rec_record": {
         "en": "Record",
         "sv": "Spela in",

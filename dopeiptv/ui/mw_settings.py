@@ -20,7 +20,8 @@ from PyQt6.QtWidgets import (
 
 from .. import APP_NAME, VERSION
 from ..i18n import tr
-from .dialogs import EpgGuideDialog, PlaylistDialog
+from .dialogs import PlaylistDialog
+from .epg_grid import EpgGridDialog
 from ..providers.metadata import TmdbClient, bundled_tmdb_key
 from ..providers.trakt import REDIRECT_URI
 from ..media.players import embedded_playback_reason
@@ -63,7 +64,17 @@ class _SettingsMixin:
         if self.mode == "live" and self.all_items:
             cat = self.cat_list.currentItem()
             cat_name = cat.text() if cat else "All"
-            EpgGuideDialog(self, list(self.all_items), cat_name).exec()
+            EpgGridDialog(self, list(self.all_items), cat_name).exec()
+            return
+        # In Favorites, scope the guide to the favorite CHANNELS shown (a
+        # folder, or all of them) - movies/series have no EPG. Other Trakt/
+        # media sections simply have no live channels to guide.
+        if self.mode == "fav":
+            chans = self._favorite_channels_for_guide()
+            cat = self.cat_list.currentItem()
+            EpgGridDialog(self, chans,
+                          cat.text().strip() if cat else tr("nav_favorites")
+                          ).exec()
             return
         dlg = QDialog(self)
         dlg.setWindowTitle(tr("btn_epg_guide"))
@@ -74,10 +85,23 @@ class _SettingsMixin:
 
         def done(channels):
             dlg.close()
-            EpgGuideDialog(self, channels or []).exec()
+            EpgGridDialog(self, channels or []).exec()
 
         run_async(self.pool, lambda: self.client.live_streams(None),
                   done, lambda _: dlg.close())
+
+    def _favorite_channels_for_guide(self) -> list:
+        """The favorite live channels the EPG guide should cover, honoring the
+        currently selected Favorites sub-category (a channel folder, or all)."""
+        cat = self.cat_list.currentItem()
+        data = cat.data(Qt.ItemDataRole.UserRole) if cat else None
+        section, group = data if isinstance(data, tuple) else ("all", None)
+        if section not in ("chan", "all"):
+            return []          # Movies / Series / Trakt: no live EPG
+        exclude = (() if self.parental.session_unlocked
+                   else self.favs.locked_groups())
+        return self.favs.items(group if section == "chan" else None,
+                               exclude_groups=exclude)
 
     # -- view settings -------------------------------------------------------------
 

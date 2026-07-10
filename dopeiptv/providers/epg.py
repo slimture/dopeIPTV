@@ -294,6 +294,25 @@ class XmltvGuide:
                 return self._entry(sched, j)
         return None
 
+    def programmes_in(self, item: dict, win_start: float,
+                      win_stop: float) -> list[dict]:
+        """Every programme overlapping the window [win_start, win_stop],
+        in air order - for the timeline grid."""
+        if not self._loaded:
+            return []
+        sched = self._sched_for(item)
+        if not sched:
+            return []
+        starts, stops = sched[0], sched[1]
+        n = len(starts)
+        out: list[dict] = []
+        j = bisect_left(starts, win_start - self._MAX_PROG_SECS)
+        while j < n and starts[j] < win_stop:
+            if stops[j] > win_start:
+                out.append(self._entry(sched, j))
+            j += 1
+        return out
+
     def past_programmes(self, item: dict, days: int) -> list[dict]:
         """Past programmes (newest first), at most *days* back."""
         if not self.ensure_loaded():
