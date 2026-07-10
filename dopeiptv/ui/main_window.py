@@ -204,6 +204,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._focus_mode = False
         self._fav_view_tint = ("", "")
         self._pending_cat_select = _UNSET
+        self._pending_jump_key = None
         self._pip_win = None
         self._last_player = None
         self._last_playlist_refresh = time.time()
@@ -1509,6 +1510,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             keep = self._pending_cat_select
             self._pending_cat_select = _UNSET
             row = 1 if self.cat_list.count() > 1 else 0
+            # A pending "jump to now playing" wants every item visible, so land
+            # on the "All" row (0) rather than the first category.
+            if getattr(self, "_pending_jump_key", None) is not None:
+                row = 0
             if keep is not _UNSET:
                 for i in range(self.cat_list.count()):
                     if self.cat_list.item(i).data(
@@ -1971,33 +1976,46 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return iov.get("color", "") or "", iov.get("bgcolor", "") or ""
         return "", ""
 
+    def _try_select_playing(self) -> bool:
+        """Select + scroll to the playing item if it's in the current list."""
+        key = self._playing_key
+        if key is None:
+            return False
+        for row in range(self.list_model.rowCount()):
+            item = self.list_model.item_at(row)
+            if (item and not item.get("_header")
+                    and self._item_key(item) == key):
+                idx = self.list_model.index(row)
+                self.listw.setCurrentIndex(idx)
+                self.listw.scrollTo(
+                    idx, QAbstractItemView.ScrollHint.PositionAtCenter)
+                return True
+        return False
+
     def _jump_to_now_playing(self) -> None:
-        """Clicking the sidebar logo jumps to whatever's playing: select and
-        scroll to its row, switching to its section first if needed."""
-        if self._playing_key is None or getattr(self, "_playing_item", None) is None:
+        """Clicking the sidebar logo jumps the middle column to whatever's
+        playing: select and scroll to its row, switching to its section and
+        opening the 'All' category first so the row is actually in the list."""
+        if (self._playing_key is None
+                or getattr(self, "_playing_item", None) is None):
             self._show_toast(tr("toast_nothing_playing"))
             return
-        key = self._playing_key
-
-        def select() -> bool:
-            for row in range(self.list_model.rowCount()):
-                item = self.list_model.item_at(row)
-                if item and not item.get("_header") \
-                        and self._item_key(item) == key:
-                    idx = self.list_model.index(row)
-                    self.listw.setCurrentIndex(idx)
-                    self.listw.scrollTo(
-                        idx, QAbstractItemView.ScrollHint.PositionAtCenter)
-                    return True
-            return False
-
-        if select():
+        if self._try_select_playing():
             return
-        target = {"live": "live", "vod": "vod"}.get(self._playing_group)
-        if target and self.mode != target:
-            self.switch_mode(target)
-            # The list loads asynchronously; try to select once it's populated.
-            QTimer.singleShot(400, select)
+        # Not in the current (possibly category-filtered) list: remember the
+        # target and navigate to a view that contains it, then select once it
+        # has loaded (see _load_categories / _apply_filter).
+        self._pending_jump_key = self._playing_key
+        QTimer.singleShot(2500, self._clear_pending_jump)   # safety net
+        target = {"live": "live", "vod": "vod",
+                  "episode": "series"}.get(self._playing_group, self.mode)
+        if self.mode != target:
+            self.switch_mode(target)     # done() picks "All" while a jump pends
+        elif self.cat_list.count():
+            self.cat_list.setCurrentRow(0)   # "All" -> shows every item
+
+    def _clear_pending_jump(self) -> None:
+        self._pending_jump_key = None
 
     def _channel_hidden(self, it, kind: str) -> bool:
         if kind not in ("live", "vod", "series", "fav"):
@@ -2032,6 +2050,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             filtered = items
         filtered = self._sorted(filtered)
         self.list_model.set_items(filtered, kind)
+        if getattr(self, "_pending_jump_key", None) is not None:
+            if self._try_select_playing():
+                self._pending_jump_key = None
         if self._loading_hint.isVisible():
             self._loading_hint.hide()
         self._set_status(f"{len(filtered)} {self.LABELS[kind]}")
