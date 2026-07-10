@@ -131,10 +131,10 @@ class ChannelListModel(QAbstractListModel):
         return None
 
     def flags(self, index):
-        # Section-header rows (used by the grouped "All favorites" view) are
-        # labels, not content: not selectable and not clickable.
+        # Section headers (and the invisible fillers that pad out a header's
+        # row in grid mode) are not content: not selectable, not clickable.
         it = self.item_at(index.row())
-        if it and it.get("_header"):
+        if it and (it.get("_header") or it.get("_filler")):
             return Qt.ItemFlag.NoItemFlags
         return super().flags(index)
 
@@ -188,18 +188,20 @@ class ChannelDelegate(QStyledItemDelegate):
     def sizeHint(self, option, index) -> QSize:
         it = index.data(Qt.ItemDataRole.UserRole)
         if it and it.get("_header"):
-            if self.grid:
-                # Report the full viewport width so the icon flow puts the
-                # header alone on its own row (spanning above the posters).
-                vw = self.window.listw.viewport().width()
-                return QSize(max(vw, 200), self._header_h())
-            return QSize(0, self._header_h())
+            # A header is one grid cell tall in grid mode (the fillers after it
+            # complete its row so it sits alone above the posters); a full
+            # row in list mode.
+            return QSize(self.cell_w if self.grid else 0, self._header_h())
+        if it and it.get("_filler"):
+            return QSize(self.cell_w, self._header_h())
         if self.grid:
             return QSize(self.cell_w, self.cell_h)
         return QSize(0, self.row_h)
 
     def paint(self, painter, option, index) -> None:
         it = index.data(Qt.ItemDataRole.UserRole)
+        if it and it.get("_filler"):
+            return                       # invisible spacer
         if it and it.get("_header"):
             self._paint_header(painter, option, it["_header"])
         elif self.grid:

@@ -167,10 +167,15 @@ class WelcomeOverlay(QWidget):
         lay.addWidget(self._c_err)
         lay.addWidget(self._c_connect)
         lay.addSpacing(2)
-        lay.addWidget(self._f_title)
+        # Keep the "What's inside" heading tight against its bullet list.
+        feats_box = QVBoxLayout()
+        feats_box.setSpacing(1)
+        feats_box.setContentsMargins(0, 0, 0, 0)
+        feats_box.addWidget(self._f_title)
         for f in self._feats:
             f.setWordWrap(True)
-            lay.addWidget(f)
+            feats_box.addWidget(f)
+        lay.addLayout(feats_box)
         lay.addSpacing(2)
         row = QHBoxLayout()
         self._c_back = QPushButton(tr("onb_back"))

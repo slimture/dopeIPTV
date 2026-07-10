@@ -1150,6 +1150,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # user's grid/list choice. Doing it here (not via a sticky flag) fixes
         # the grid setting being "forgotten" when hopping between categories.
         self._current_cat = category_id
+        self._sync_sort_box()            # show THIS category's sort order
         self._apply_list_layout(False)   # honour the user's grid/list choice
         if self.mode == "rec":
             if category_id == "__jobs__":
@@ -1316,17 +1317,48 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _render_rows(self, rows: list, model_kind: str,
                      empty_msg: str | None = None) -> None:
-        """Populate the model from a headed row list. Section headers are kept
-        in both list and grid mode (in grid they span the full row), so the
-        grouping survives either way."""
+        """Populate the model from a headed row list. Headers are kept in both
+        modes: a full-width row in list mode, and in grid mode their row is
+        padded with invisible fillers so the header sits alone above the
+        posters (Qt's icon grid can't make a single item span the row)."""
+        n = sum(1 for r in rows if not r.get("_header"))
+        # Remember the unpadded rows so a resize can re-pad for the new column
+        # count without reloading from the source (avoids re-fetching Trakt).
+        self._combined_rows = rows
+        self._combined_kind = model_kind
+        if self._grid_on():
+            rows = self._pad_headers_for_grid(rows)
         self.all_items = rows
         self.list_model.set_items(rows, model_kind)
         if self._loading_hint.isVisible():
             self._loading_hint.hide()
-        n = sum(1 for r in rows if not r.get("_header"))
         label = self.LABELS.get(model_kind, "")
         self._set_status(f"{n} {label}".strip() if n
                          else (empty_msg or f"0 {label}".strip()))
+
+    def _pad_headers_for_grid(self, rows: list) -> list:
+        """Put every header alone on its own grid row above its posters: finish
+        the previous section's part-row with fillers, then fill the rest of the
+        header's row, so the posters wrap to the next line beneath it."""
+        vw = self.listw.viewport().width()
+        cell_w = max(1, self.delegate.cell_w)
+        cols = (vw // cell_w) if vw > 0 else 0
+        if cols <= 1:
+            return rows              # 1 column: headers already start a row
+        filler = {"_filler": True}
+        out: list[dict] = []
+        col = 0
+        for r in rows:
+            if r.get("_header"):
+                if col:              # finish the current row first
+                    out += [filler] * (cols - col)
+                out.append(r)
+                out += [filler] * (cols - 1)   # rest of the header's own row
+                col = 0
+            else:
+                out.append(r)
+                col = (col + 1) % cols
+        return out
 
     def _show_grouped(self, sections: list, model_kind: str,
                       empty_msg: str | None = None) -> None:
@@ -1465,6 +1497,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         """The current category's own choice: 'global' (follow the app-wide
         default) unless it has been overridden."""
         return self.settings.value(self._sort_setting_key(), "global")
+
+    def _sync_sort_box(self) -> None:
+        """Point the toolbar sort dropdown at the current category's order, so
+        it never carries a stale value into _inline_view_changed (which would
+        write that order onto whatever category is showing now)."""
+        if not hasattr(self, "sort_box"):
+            return
+        self.sort_box.blockSignals(True)
+        i = self.sort_box.findData(self._current_sort_raw())
+        if i >= 0:
+            self.sort_box.setCurrentIndex(i)
+        self.sort_box.blockSignals(False)
 
     def _current_sort_order(self) -> str:
         """The effective sort order for the current category - its own
@@ -1658,7 +1702,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.play_item(it, player, external)
 
     def play_item(self, it, player=None, external: bool = False) -> None:
-        if not it or it.get("_header"):
+        if not it or it.get("_header") or it.get("_filler"):
             return
         if self.mode == "series" and not self.series_ctx:
             self._enter_series(it)
@@ -1926,10 +1970,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         row = self.listw.currentIndex().row()
         new_row = (row + direction) % count if row >= 0 else 0
-        # Skip section-header rows in the grouped "All favorites" view.
+        # Skip section-header and filler rows in the grouped views.
         for _ in range(count):
             it = self.list_model.item_at(new_row)
-            if not (it and it.get("_header")):
+            if not (it and (it.get("_header") or it.get("_filler"))):
                 break
             new_row = (new_row + direction) % count
         idx = self.list_model.index(new_row)
@@ -2042,6 +2086,30 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self._welcome is not None and self._welcome.isVisible():
             self._welcome.cover()
         self._position_provider_hint()
+        # The number of grid columns changed, so re-pad the header rows.
+        if (self._grid_on()
+                and self._is_combined_view(getattr(self, "_current_cat", None))):
+            self._schedule_regrid()
+
+    def _schedule_regrid(self) -> None:
+        t = getattr(self, "_regrid_timer", None)
+        if t is None:
+            t = QTimer(self)
+            t.setSingleShot(True)
+            t.setInterval(120)
+            t.timeout.connect(self._regrid)
+            self._regrid_timer = t
+        t.start()
+
+    def _regrid(self) -> None:
+        rows = getattr(self, "_combined_rows", None)
+        if rows is None or not self._grid_on():
+            return
+        if not self._is_combined_view(getattr(self, "_current_cat", None)):
+            return
+        padded = self._pad_headers_for_grid(rows)
+        self.all_items = padded
+        self.list_model.set_items(padded, self._combined_kind)
 
     # -- first-run onboarding ------------------------------------------------
 
