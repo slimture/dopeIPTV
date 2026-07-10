@@ -565,6 +565,12 @@ class _DetailMixin:
             if not isinstance(info, dict):
                 info = {}
             self._info_cache[(kind, mid)] = info
+            # Keep the metadata cache bounded so a long browse doesn't hold
+            # every title's info in RAM. A miss just refetches (a few ms), so
+            # dropping the oldest entries has no visible effect. dicts preserve
+            # insertion order, so the first key is the oldest.
+            while len(self._info_cache) > 250:
+                self._info_cache.pop(next(iter(self._info_cache)))
             self._show_media_info(info, key)
 
         run_async(self.pool, fetch, done, lambda _: None)

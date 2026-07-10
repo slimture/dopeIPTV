@@ -101,10 +101,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # cache (reusing `logos` blurs on the big detail-panel sizes).
         self._art_pool = QThreadPool()
         self._art_pool.setMaxThreadCount(4)
+        # The detail panel shows one title's poster + cast at a time, so a
+        # huge RAM budget here just holds artwork nobody's looking at; 64 MB
+        # is still hundreds of posters and evicted ones reload from disk in a
+        # few ms.
         self.poster_art = LogoLoader(
             self._art_pool, max_size=320,
             cache_dir=shared_image_dir,
-            max_bytes=96 * 1024 * 1024)
+            max_bytes=64 * 1024 * 1024)
         # A URL that fails on one loader may succeed on the other (or
         # the reverse); share the dead-URL blacklist so the delegate's
         # fallback logic isn't inconsistent between list and detail
