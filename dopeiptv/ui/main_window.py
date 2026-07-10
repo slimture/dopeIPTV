@@ -621,6 +621,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._resume_timer = QTimer(self)
         self._resume_timer.timeout.connect(self._save_resume_position)
         self._resume_timer.start(12_000)
+        # High-water playback progress (percent) of the current title. Kept
+        # up to date by the resume timer because mpv stops reporting a
+        # position once the file has ended - without this, a title watched
+        # to the very end would read as 0% at auto-mark time.
+        self._playback_max_pct = 0.0
         self._current_epg = None
         self._player_fs = False
 
@@ -1797,6 +1802,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.resume.record(self._playing_group, self._playing_key,
                            self.player.playback_position(),
                            self.player.playback_duration())
+        self._playback_max_pct = max(self._playback_max_pct,
+                                     self.player.progress_percent())
 
     def _resume_offset(self, key, kind: str) -> float:
         """Ask whether to resume a partly-watched title; return the start
@@ -1818,11 +1825,49 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         m, s = divmod(rem, 60)
         return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
+    # Watching past this point counts as "seen the whole thing" - credits
+    # are routinely skipped, so demanding 100% would miss most real views.
+    _AUTO_WATCHED_PCT = 90.0
+
+    def _maybe_auto_mark_watched(self) -> None:
+        """Automatically mark the movie/episode that just finished playing as
+        watched (local layer) when it was played past _AUTO_WATCHED_PCT.
+        Called at every point a playback session ends: Stop, switching to
+        another title, and app close. Reuses the same helpers as the
+        right-click 'Mark as watched' so the badge appears identically;
+        Trakt learns of the mark through the regular local->Trakt sync
+        (the live scrobble usually beats it there anyway). Embedded player
+        only - external players never report their position."""
+        last = getattr(self, "_last_playback", None)
+        if not last or last.get("kind") not in ("movie", "episode"):
+            return
+        if last.get("_auto_marked"):
+            return                     # once per playback session
+        pct = max(self._playback_max_pct,
+                  self.player.progress_percent() if self.player else 0.0)
+        if pct < self._AUTO_WATCHED_PCT:
+            return
+        last["_auto_marked"] = True
+        item = last.get("item") or {}
+        if last["kind"] == "movie":
+            self._mark_movie_watched(item, push_to_trakt=False)
+            return
+        # Episode marks attribute the episode to the *current* series
+        # context; restore the snapshot from when playback started in case
+        # the user browsed elsewhere while the episode played.
+        saved_ctx = self.series_ctx
+        self.series_ctx = last.get("series_ctx") or saved_ctx
+        try:
+            self._mark_episode_watched(item, push_to_trakt=False)
+        finally:
+            self.series_ctx = saved_ctx
+
     def _on_player_stopped(self) -> None:
         """The Stop button was pressed. Save the resume point while the player
         still knows the position, then clear the now-playing highlight/title.
         _last_playback is kept so Play can bring this title back."""
         self._save_resume_position()
+        self._maybe_auto_mark_watched()
         self._playing_key = None
         self._playing_group = None
         self._playing_item = None
@@ -1845,8 +1890,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                         item=None) -> None:
         if not self._guard_stream_switch(url, title):
             return
-        # Remember where we were in whatever was playing before switching.
+        # Remember where we were in whatever was playing before switching,
+        # and give the outgoing title its watched mark if it earned one.
         self._save_resume_position()
+        self._maybe_auto_mark_watched()
         resume_at = (self._resume_offset(key, kind)
                      if kind in self._RESUMABLE else 0.0)
         self._trakt_stop_current()
@@ -1860,7 +1907,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # exactly this title (and resume where it left off) instead of falling
         # back to the first channel in the list.
         self._last_playback = {"url": url, "title": title, "icon_url": icon_url,
-                               "key": key, "kind": kind, "item": item}
+                               "key": key, "kind": kind, "item": item,
+                               "series_ctx": (self.series_ctx
+                                              if kind == "episode" else None)}
+        self._playback_max_pct = 0.0
         self._sync_player_buttons()
         self._playing_key = key
         self._playing_group = {"live": "live", "movie": "vod",
@@ -2163,6 +2213,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # these is itself flush-and-return, no pending threads.
         self._save_layout()
         self._save_resume_position()
+        self._maybe_auto_mark_watched()
         self.wake.release()
         self.cover.flush()
         if self._trakt_active:
