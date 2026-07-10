@@ -270,6 +270,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         sl.addWidget(self._sidebar_logo)
         sl.addSpacing(6)
 
+        # Glyphs used when the sidebar is collapsed to an icon rail.
+        self._rail_glyphs = {
+            "live": "📺", "vod": "🎬", "series": "🎞", "fav": "★",
+            "watchlist": "🕒", "watched": "✓", "rec": "⏺", "history": "🕘",
+        }
+        self._nav_texts: dict[str, str] = {}
         self.nav_btns: dict[str, QPushButton] = {}
         for key, text in (("live", tr("nav_tv")), ("vod", tr("nav_movies")),
                           ("series", tr("nav_series")), ("fav", tr("nav_favorites")),
@@ -279,10 +285,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             b = QPushButton(text, objectName="NavBtn")
             b.setCheckable(True)
             b.setFlat(True)
+            b.setToolTip(text)
             b.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             b.clicked.connect(lambda _, k=key: self.switch_mode(k))
             sl.addWidget(b)
             self.nav_btns[key] = b
+            self._nav_texts[key] = text
         self.nav_btns["live"].setChecked(True)
 
         # "Categories" header with a small "solo" toggle on the right that
@@ -311,6 +319,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         sl.addWidget(self.cat_list, 1)
 
         self._guide_btn = guide_btn = QPushButton(tr("btn_epg_guide"))
+        guide_btn.setToolTip(tr("btn_epg_guide"))
         guide_btn.clicked.connect(self._open_epg_guide)
         sl.addWidget(guide_btn)
 
@@ -333,6 +342,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # per-playlist auto-refresh setting; a sidebar button here was just
         # an easy mis-click.)
         self._settings_btn = settings_btn = QPushButton(tr("btn_settings"))
+        settings_btn.setToolTip(tr("btn_settings"))
         settings_btn.clicked.connect(self.open_settings)
         sl.addWidget(settings_btn)
 
@@ -678,12 +688,46 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._apply_view_settings()
 
     def _on_side_toggle(self, checked: bool) -> None:
-        """Show/hide the whole left column (nav + categories). Remembered so
-        leaving fullscreen doesn't force it back on against the user's
-        choice."""
-        self._sidebar_user_hidden = not checked
+        """Collapse the left column to a narrow icon rail (or expand it back).
+        The rail keeps the TV/Movies/Series nav as icons, so you reclaim the
+        width without losing navigation. Remembered across fullscreen."""
+        self._sidebar_collapsed = not checked
         if hasattr(self, "_side") and not self._player_fs:
-            self._side.setVisible(checked)
+            self._apply_sidebar_collapsed()
+
+    RAIL_W = 58
+
+    def _apply_sidebar_collapsed(self) -> None:
+        collapsed = getattr(self, "_sidebar_collapsed", False)
+        if not hasattr(self, "nav_btns"):
+            return
+        # Remember the expanded width so we can hand it back on expand.
+        if collapsed and self._side.maximumWidth() > self.RAIL_W:
+            self._sidebar_expanded_w = max(self._side.width(), 180)
+        for key, b in self.nav_btns.items():
+            b.setText(self._rail_glyphs.get(key, "•") if collapsed
+                      else self._nav_texts[key])
+            b.setProperty("rail", collapsed)
+            b.style().unpolish(b)
+            b.style().polish(b)
+        # Everything that only makes sense expanded: logo, the whole
+        # category area, and full-text buttons become icons or hide.
+        self._sidebar_logo.setVisible(not collapsed)
+        self._cat_section_label.setVisible(not collapsed)
+        self.cat_solo_btn.setVisible(not collapsed)
+        self.cat_list.setVisible(not collapsed)
+        if collapsed:
+            self._guide_btn.setText("📅")
+            self._settings_btn.setText("⚙")
+            self._side.setMaximumWidth(self.RAIL_W)
+        else:
+            self._guide_btn.setText(tr("btn_epg_guide"))
+            self._settings_btn.setText(tr("btn_settings"))
+            self._side.setMaximumWidth(16777215)
+            w = getattr(self, "_sidebar_expanded_w", 220)
+            total = self._root.width()
+            det = self._root.sizes()[2] if len(self._root.sizes()) == 3 else 320
+            self._root.setSizes([w, max(200, total - w - det), det])
 
     def _on_cat_solo_toggle(self, checked: bool) -> None:
         """Collapse the category list to just the active category (hide all
@@ -763,7 +807,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self.showNormal()
             return
         self._player_fs = False
-        self._side.setVisible(not getattr(self, "_sidebar_user_hidden", False))
+        self._side.show()
+        self._apply_sidebar_collapsed()   # keep the rail/expanded choice
         self._mid.show()
         for w in getattr(self, "_det_hidden", []):
             w.show()

@@ -160,6 +160,7 @@ QPushButton#NavBtn {{
 }}
 QPushButton#NavBtn:hover  {{ background: {p['hover']}; }}
 QPushButton#NavBtn:checked {{ background: {ACCENT}; color: white; font-weight: 600; }}
+QPushButton#NavBtn[rail="true"] {{ text-align: center; padding: 8px 0; font-size: 19px; }}
 
 #SectionLabel {{
     color: {p['muted2']}; font-size: 10px; font-weight: 700;
