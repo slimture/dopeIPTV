@@ -469,8 +469,14 @@ class EmbeddedPlayer(QWidget):
         from PyQt6.QtWidgets import QApplication
         scr = QApplication.primaryScreen()
         if scr is not None:
+            # Scale the docked box with the screen WIDTH, not its height: the
+            # right column's width is what a 16:9 video has to fit into, so a
+            # width-based height stays roughly 16:9 for the typical column and
+            # avoids tall letterbox bars on narrow laptop screens - while
+            # still growing on a wide 27"/4K display. Computed once, so it
+            # never drifts when the splitter is dragged.
             self.VIDEO_BOX_HEIGHT = min(
-                max(260, int(scr.availableGeometry().height() * 0.30)), 680)
+                max(230, int(scr.availableGeometry().width() * 0.17)), 620)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(2)

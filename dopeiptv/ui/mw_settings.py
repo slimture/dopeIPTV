@@ -660,10 +660,9 @@ class _SettingsMixin:
         trakt_setup_lbl = QLabel(
             "Just click Connect: your browser opens Trakt, you click 'Yes', "
             "and you're signed in - no codes, no passwords. The Client ID / "
-            "Secret below are optional and only for advanced users who'd "
-            "rather use their own Trakt API app (set its Redirect URI to "
-            f"exactly {REDIRECT_URI}); leave them blank to use the built-in "
-            "app.")
+            "Secret below are dopeIPTV's built-in app and work as-is. Advanced "
+            "users can replace them with their own Trakt API app (set its "
+            f"Redirect URI to exactly {REDIRECT_URI}).")
         trakt_setup_lbl.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         trakt_setup_lbl.setWordWrap(True)
         tf.addWidget(trakt_setup_lbl)
@@ -677,13 +676,12 @@ class _SettingsMixin:
         tf.addLayout(create_app_row)
         tform = QFormLayout()
         tform.setSpacing(10)
-        # Show only a user-set override here, not the built-in default, so
-        # the fields read as "blank = use the bundled app".
-        trakt_id_edit = QLineEdit(
-            self.settings.value("trakt_client_id", "") or "")
+        # Show the effective keys (the built-in app's, unless the user set
+        # their own) so the fields aren't confusingly blank after a
+        # successful sign-in.
+        trakt_id_edit = QLineEdit(self.trakt.client_id)
         trakt_id_edit.setPlaceholderText(tr("trakt_client_id_ph"))
-        trakt_secret_edit = QLineEdit(
-            self.settings.value("trakt_client_secret", "") or "")
+        trakt_secret_edit = QLineEdit(self.trakt.client_secret)
         trakt_secret_edit.setPlaceholderText(tr("trakt_client_secret_ph"))
         trakt_secret_edit.setEchoMode(QLineEdit.EchoMode.Password)
         tform.addRow(tr("field_client_id"), trakt_id_edit)
