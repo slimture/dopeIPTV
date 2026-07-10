@@ -490,18 +490,19 @@ class _ContextMenuMixin:
                         (tr("accent_pink"), "#FF5C8A"))
             color_menu = m.addMenu(tr("ctx_set_color"))
             for label, hex_val in _palette:
-                act = color_menu.addAction(label)
-                act.triggered.connect(
-                    lambda _, c=hex_val: (
-                        self.overrides.update(self.mode, cid, color=c),
-                        self._load_categories()))
+                color_menu.addAction(
+                    label,
+                    lambda c=hex_val: self._set_category_color(cid, color=c))
             bg_menu = m.addMenu(tr("ctx_set_bg_color"))
             for label, hex_val in _palette:
-                act = bg_menu.addAction(label)
-                act.triggered.connect(
-                    lambda _, c=hex_val: (
-                        self.overrides.update(self.mode, cid, bgcolor=c),
-                        self._load_categories()))
+                bg_menu.addAction(
+                    label,
+                    lambda c=hex_val: self._set_category_color(cid, bgcolor=c))
+            cov = self.overrides.get(self.mode, cid)
+            if cov.get("color") or cov.get("bgcolor"):
+                m.addAction(
+                    tr("ctx_reset_color"),
+                    lambda: self._set_category_color(cid, color="", bgcolor=""))
             m.addSeparator()
             m.addAction(tr("ctx_hide_category"),
                         lambda: self._set_category_flag(cid, hidden=True))
@@ -575,6 +576,23 @@ class _ContextMenuMixin:
     def _set_category_flag(self, cid, **fields) -> None:
         self.overrides.update(self.mode, cid, **fields)
         self._load_categories()
+
+    def _set_category_color(self, cid, **fields) -> None:
+        """Colour a category row without reloading the list, so the selection
+        and scroll position stay put (a full reload jumps back to the top)."""
+        from PyQt6.QtGui import QColor
+        self.overrides.update(self.mode, cid, **fields)
+        ovr = self.overrides.get(self.mode, cid)
+        col, bg = ovr.get("color", ""), ovr.get("bgcolor", "")
+        for i in range(self.cat_list.count()):
+            item = self.cat_list.item(i)
+            if item is not None and item.data(Qt.ItemDataRole.UserRole) == cid:
+                item.setData(Qt.ItemDataRole.ForegroundRole,
+                             QColor(col) if col else None)
+                item.setData(Qt.ItemDataRole.BackgroundRole,
+                             QColor(bg) if bg else None)
+                break
+        self.cat_list.viewport().update()
 
     def _lock_category(self, cid) -> None:
         if not self._ensure_pin_configured():

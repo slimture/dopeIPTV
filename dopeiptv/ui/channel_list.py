@@ -11,6 +11,21 @@ from PyQt6.QtWidgets import (
 from .theme import ACCENT, P
 
 
+class CategoryColorDelegate(QStyledItemDelegate):
+    """Paints a category/folder row's custom background. The list's stylesheet
+    makes a plain QListWidgetItem.setBackground invisible, so fill it here
+    (under the normal text painting) for non-selected rows."""
+
+    def paint(self, painter, option, index) -> None:
+        bg = index.data(Qt.ItemDataRole.BackgroundRole)
+        if (bg is not None
+                and not (option.state & QStyle.StateFlag.State_Selected)):
+            painter.save()
+            painter.fillRect(option.rect, bg)
+            painter.restore()
+        super().paint(painter, option, index)
+
+
 class ChannelListView(QListView):
     """Right-click never moves the selection (avoids switching the preview).
     In grid mode the columns are stretched to fill the viewport width so the

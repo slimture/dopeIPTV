@@ -4128,6 +4128,12 @@ _STRINGS: dict[str, dict[str, str]] = {
     },
 
     # ── Channel / category context menus (extras) ────────────────────────
+    "ctx_reset_color": {
+        "en": "Reset color", "sv": "Återställ färg",
+        "es": "Restablecer color", "de": "Farbe zurücksetzen",
+        "fr": "Réinitialiser la couleur", "zh": "重置颜色",
+        "ru": "Сбросить цвет", "th": "รีเซ็ตสี",
+    },
     "ctx_reset_channel": {
         "en": "Reset this channel's customizations",
         "sv": "Återställ kanalens anpassningar",

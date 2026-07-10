@@ -23,7 +23,9 @@ from PyQt6.QtWidgets import (
 
 from .. import APP_NAME
 from ..i18n import tr
-from .channel_list import ChannelDelegate, ChannelListModel, ChannelListView
+from .channel_list import (
+    CategoryColorDelegate, ChannelDelegate, ChannelListModel, ChannelListView,
+)
 from ..providers.chromecast import CastDialog, ChromecastManager
 from ..providers.client import (
     DemoClient, OfflineClient, XtreamClient, make_client,
@@ -334,6 +336,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         cat_hdr.addWidget(self.cat_solo_btn)
         sl.addLayout(cat_hdr)
         self.cat_list = QListWidget()
+        self.cat_list.setItemDelegate(CategoryColorDelegate(self.cat_list))
         self.cat_list.setMinimumWidth(0)
         self.cat_list.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -1916,29 +1919,22 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         return base
 
     def item_tint(self, it, kind: str):
-        """(text, background) hex colours for a list item, inherited from its
-        category's custom colours - so a colour set on a category cascades to
-        every item in it. Empty strings when none. Per-item overrides win."""
+        """(text, background) hex colours for a list item. A colour set on a
+        category is NOT inherited by its items - that only tints the category
+        row itself. Items are tinted only by their own per-item colour, and in
+        a favourites folder by the folder's colour."""
         if not it:
             return "", ""
         if self.mode == "fav":
-            # In a favourites folder every item inherits the folder's colour.
             return getattr(self, "_fav_view_tint", ("", ""))
         mode = {"live": "live", "vod": "vod", "series": "series"}.get(kind)
         if mode is None:
             return "", ""
-        # A per-item colour (set from the item's own right-click) takes
-        # precedence over the inherited category colour.
         key = self._item_key(it)
         if key is not None:
             iov = self.channel_ov.get(mode, key)
-            fg, bg = iov.get("color", ""), iov.get("bgcolor", "")
-            if fg or bg:
-                cov = self.overrides.get(mode, it.get("category_id"))
-                return (fg or cov.get("color", ""),
-                        bg or cov.get("bgcolor", ""))
-        cov = self.overrides.get(mode, it.get("category_id"))
-        return cov.get("color", "") or "", cov.get("bgcolor", "") or ""
+            return iov.get("color", "") or "", iov.get("bgcolor", "") or ""
+        return "", ""
 
     def _channel_hidden(self, it, kind: str) -> bool:
         if kind not in ("live", "vod", "series", "fav"):
