@@ -70,10 +70,20 @@ class _SidebarLogo(QWidget):
     LOGO_W = 92
     LOGO_H = 40
 
+    clicked = pyqtSignal()
+
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setFixedHeight(self.LOGO_H + 10)
         self.setToolTip(APP_NAME)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def mousePressEvent(self, e) -> None:
+        if e.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+            e.accept()
+            return
+        super().mousePressEvent(e)
 
     def paintEvent(self, _event) -> None:
         painter = QPainter(self)

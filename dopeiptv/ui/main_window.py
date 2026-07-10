@@ -280,6 +280,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._sidebar_logo.setMinimumWidth(0)
         self._sidebar_logo.setSizePolicy(QSizePolicy.Policy.Ignored,
                                          QSizePolicy.Policy.Fixed)
+        self._sidebar_logo.setToolTip(tr("tooltip_jump_playing"))
+        self._sidebar_logo.clicked.connect(self._jump_to_now_playing)
         sl.addWidget(self._sidebar_logo)
         sl.addSpacing(6)
 
@@ -1968,6 +1970,34 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             iov = self.channel_ov.get(mode, key)
             return iov.get("color", "") or "", iov.get("bgcolor", "") or ""
         return "", ""
+
+    def _jump_to_now_playing(self) -> None:
+        """Clicking the sidebar logo jumps to whatever's playing: select and
+        scroll to its row, switching to its section first if needed."""
+        if self._playing_key is None or getattr(self, "_playing_item", None) is None:
+            self._show_toast(tr("toast_nothing_playing"))
+            return
+        key = self._playing_key
+
+        def select() -> bool:
+            for row in range(self.list_model.rowCount()):
+                item = self.list_model.item_at(row)
+                if item and not item.get("_header") \
+                        and self._item_key(item) == key:
+                    idx = self.list_model.index(row)
+                    self.listw.setCurrentIndex(idx)
+                    self.listw.scrollTo(
+                        idx, QAbstractItemView.ScrollHint.PositionAtCenter)
+                    return True
+            return False
+
+        if select():
+            return
+        target = {"live": "live", "vod": "vod"}.get(self._playing_group)
+        if target and self.mode != target:
+            self.switch_mode(target)
+            # The list loads asynchronously; try to select once it's populated.
+            QTimer.singleShot(400, select)
 
     def _channel_hidden(self, it, kind: str) -> bool:
         if kind not in ("live", "vod", "series", "fav"):
