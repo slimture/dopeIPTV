@@ -26,7 +26,7 @@ class _NoButtonIconsStyle(QProxyStyle):
         return super().styleHint(hint, option, widget, returnData)
 
 from . import APP_NAME, ORG, VERSION
-from .providers.client import OfflineClient, XtreamClient
+from .providers.client import OfflineClient, make_client
 from .ui.dialogs import PlaylistDialog
 from .ui.main_window import MainWindow
 from .media.players import _libmpv, _libmpv_error, embedded_playback_reason
@@ -235,7 +235,7 @@ def main() -> int:
             welcome = True
             break
 
-        candidate = XtreamClient(pl["server"], pl["username"], pl["password"])
+        candidate = make_client(pl)
         offline = False
         splash = QLabel(f"  Connecting to {pl.get('name', 'server')}…",
                         None, Qt.WindowType.SplashScreen)

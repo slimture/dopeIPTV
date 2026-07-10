@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import html
+import re
 from datetime import datetime, timezone
 from typing import Any
 
@@ -173,6 +174,122 @@ class OfflineClient:
     def timeshift_url(self, stream_id: int | str, start_dt: datetime,
                       duration_min: int) -> str:
         return ""
+
+
+class M3UClient(OfflineClient):
+    """Backed by a plain M3U/M3U8 playlist (a URL or local file) instead of an
+    Xtream API. Exposes the same interface as XtreamClient but Live-only -
+    M3U lists have no movies/series/EPG API, so those stay empty (the guide
+    can still come from the playlist's separate EPG URL). Channels are grouped
+    by their ``group-title`` into categories."""
+
+    _EXTINF = re.compile(r'#EXTINF:-?\d*\s*(?P<attrs>[^,]*),(?P<name>.*)')
+    _ATTR = re.compile(r'([\w-]+)="([^"]*)"')
+
+    def __init__(self, url: str) -> None:
+        super().__init__()
+        self.server = (url or "").strip()
+        self._channels: list[dict] = []
+        self._loaded = False
+
+    # -- fetch + parse --------------------------------------------------------
+
+    def _fetch(self) -> str:
+        url = self.server
+        if url.startswith(("http://", "https://")):
+            r = self.session.get(url, timeout=(20, 180))
+            r.raise_for_status()
+            return r.text
+        if url.startswith("file://"):
+            url = url[7:]
+        with open(url, "r", encoding="utf-8", errors="replace") as fh:
+            return fh.read()
+
+    def _parse(self, text: str) -> None:
+        channels: list[dict] = []
+        pending: dict | None = None
+        sid = 0
+        for raw in text.splitlines():
+            line = raw.strip()
+            if not line:
+                continue
+            if line.startswith("#EXTINF"):
+                m = self._EXTINF.match(line)
+                if not m:
+                    pending = None
+                    continue
+                attrs = dict(self._ATTR.findall(m.group("attrs")))
+                name = (m.group("name").strip()
+                        or attrs.get("tvg-name", "")).strip() or "?"
+                pending = {
+                    "name": name,
+                    "stream_icon": attrs.get("tvg-logo", ""),
+                    "epg_channel_id": attrs.get("tvg-id", ""),
+                    "category_name": attrs.get("group-title", "").strip()
+                    or "Uncategorized",
+                }
+            elif line.startswith("#"):
+                continue                       # other directives: ignore
+            elif pending is not None:
+                sid += 1
+                pending["stream_id"] = sid
+                pending["num"] = sid
+                pending["category_id"] = pending["category_name"]
+                pending["_url"] = line
+                channels.append(pending)
+                pending = None
+        self._channels = channels
+
+    def authenticate(self) -> dict:
+        # Fetching + parsing the list is this provider's "auth": it proves the
+        # URL is reachable and yields at least one channel.
+        self._parse(self._fetch())
+        self._loaded = True
+        if not self._channels:
+            raise RuntimeError("No channels found in the M3U playlist.")
+        return {"user_info": {"auth": 1}}
+
+    def _ensure(self) -> None:
+        if not self._loaded:
+            try:
+                self.authenticate()
+            except Exception:
+                self._loaded = True            # don't retry-storm on failure
+
+    # -- interface ------------------------------------------------------------
+
+    def live_categories(self) -> list[dict]:
+        self._ensure()
+        seen: list[str] = []
+        for c in self._channels:
+            if c["category_id"] not in seen:
+                seen.append(c["category_id"])
+        return [{"category_id": g, "category_name": g} for g in seen]
+
+    def live_streams(self, category_id: str | None = None) -> list[dict]:
+        self._ensure()
+        return [c for c in self._channels
+                if category_id is None or c["category_id"] == category_id]
+
+    def live_url(self, stream_id: int | str, fmt: str = "ts") -> str:
+        self._ensure()
+        try:
+            sid = int(stream_id)
+        except (TypeError, ValueError):
+            return ""
+        for c in self._channels:
+            if c["stream_id"] == sid:
+                return c["_url"]
+        return ""
+
+
+def make_client(playlist: dict):
+    """Build the right provider client for a stored playlist: an M3U-backed
+    client when kind == 'm3u', otherwise the Xtream API client."""
+    if (playlist or {}).get("kind") == "m3u":
+        return M3UClient(playlist.get("server", ""))
+    return XtreamClient(playlist["server"], playlist["username"],
+                        playlist["password"])
 
 
 class DemoClient(OfflineClient):

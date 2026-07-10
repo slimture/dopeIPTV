@@ -25,7 +25,7 @@ from .. import APP_NAME
 from ..i18n import tr
 from .channel_list import ChannelDelegate, ChannelListModel, ChannelListView
 from ..providers.chromecast import CastDialog, ChromecastManager
-from ..providers.client import OfflineClient, XtreamClient
+from ..providers.client import OfflineClient, XtreamClient, make_client
 from ..media.embedded import EmbeddedPlayer
 from ..providers.epg import XmltvGuide, epg_cache_path
 from ..services.coverart import CoverArtService
@@ -933,7 +933,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.loading_bar.show()
         self._set_status(tr("status_connecting", name=pl['name']))
         self._show_toast(tr("status_connecting", name=pl['name']))
-        candidate = XtreamClient(pl["server"], pl["username"], pl["password"])
+        candidate = make_client(pl)
 
         def done(_auth):
             self.loading_bar.hide()

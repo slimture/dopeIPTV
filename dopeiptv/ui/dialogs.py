@@ -93,8 +93,13 @@ class PlaylistDialog(QDialog):
         form.setSpacing(10)
         self.name = QLineEdit(playlist.get("name", ""))
         self.name.setPlaceholderText(tr("playlist_name_placeholder"))
+        self.kind = QComboBox()
+        self.kind.addItem(tr("playlist_kind_xtream"), "xtream")
+        self.kind.addItem(tr("playlist_kind_m3u"), "m3u")
+        kidx = self.kind.findData(playlist.get("kind", "xtream"))
+        if kidx >= 0:
+            self.kind.setCurrentIndex(kidx)
         self.server = QLineEdit(playlist.get("server", ""))
-        self.server.setPlaceholderText("http://server:port")
         self.user = QLineEdit(playlist.get("username", ""))
         self.pw = QLineEdit(playlist.get("password", ""))
         self.pw.setEchoMode(QLineEdit.EchoMode.Password)
@@ -106,10 +111,15 @@ class PlaylistDialog(QDialog):
         idx = self.refresh.findData(playlist.get("refresh", "never"))
         if idx >= 0:
             self.refresh.setCurrentIndex(idx)
+        # Explicit labels so the login rows can be hidden for M3U playlists.
+        self._server_lbl = QLabel()
+        self._user_lbl = QLabel(tr("login_username"))
+        self._pw_lbl = QLabel(tr("login_password"))
         form.addRow(tr("playlist_name"), self.name)
-        form.addRow(tr("login_server"), self.server)
-        form.addRow(tr("login_username"), self.user)
-        form.addRow(tr("login_password"), self.pw)
+        form.addRow(tr("playlist_kind"), self.kind)
+        form.addRow(self._server_lbl, self.server)
+        form.addRow(self._user_lbl, self.user)
+        form.addRow(self._pw_lbl, self.pw)
         form.addRow(tr("playlist_custom_epg_url"), self.epg_url)
         form.addRow(tr("playlist_auto_refresh"), self.refresh)
         lay.addLayout(form)
@@ -120,10 +130,27 @@ class PlaylistDialog(QDialog):
         buttons.accepted.connect(self._validate)
         buttons.rejected.connect(self.reject)
         lay.addWidget(buttons)
+        self.kind.currentIndexChanged.connect(self._update_kind)
+        self._update_kind()
+
+    def _update_kind(self) -> None:
+        m3u = self.kind.currentData() == "m3u"
+        # M3U needs only a URL - hide the username/password rows and relabel
+        # the address field.
+        self._server_lbl.setText(
+            tr("playlist_m3u_url") if m3u else tr("login_server"))
+        self.server.setPlaceholderText(
+            "https://example.com/playlist.m3u" if m3u else "http://server:port")
+        for w in (self._user_lbl, self.user, self._pw_lbl, self.pw):
+            w.setVisible(not m3u)
 
     def _validate(self) -> None:
-        if not (self.server.text().strip() and self.user.text().strip()
-                and self.pw.text().strip()):
+        if self.kind.currentData() == "m3u":
+            ok = bool(self.server.text().strip())
+        else:
+            ok = bool(self.server.text().strip() and self.user.text().strip()
+                      and self.pw.text().strip())
+        if not ok:
             QMessageBox.warning(self, tr("playlist_msg_title"),
                                 tr("playlist_required_fields"))
             return
@@ -135,6 +162,7 @@ class PlaylistDialog(QDialog):
             name = self.server.text().strip().split("//")[-1].split("/")[0]
         return {
             "name": name,
+            "kind": self.kind.currentData(),
             "server": self.server.text().strip(),
             "username": self.user.text().strip(),
             "password": self.pw.text().strip(),
