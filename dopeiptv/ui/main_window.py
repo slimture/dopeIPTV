@@ -268,6 +268,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
         # Small themed logo at the top of the sidebar (recolours with theme).
         self._sidebar_logo = _SidebarLogo()
+        self._sidebar_logo.setMinimumWidth(0)
+        self._sidebar_logo.setSizePolicy(QSizePolicy.Policy.Ignored,
+                                         QSizePolicy.Policy.Fixed)
         sl.addWidget(self._sidebar_logo)
         sl.addSpacing(6)
 
@@ -287,11 +290,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             b.setCheckable(True)
             b.setFlat(True)
             b.setToolTip(text)
-            b.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-            # Let the button shrink below its text width so the sidebar can be
-            # dragged narrow enough to cross the auto-collapse threshold (the
-            # text-based minimum used to block the drag before it got there).
-            b.setMinimumWidth(0)
+            # "Ignored" horizontal policy: the button fills the width when
+            # there's room but imposes no text-based minimum, so the sidebar
+            # can be dragged narrow enough to cross the auto-collapse threshold
+            # (a plain minimumWidth(0) doesn't lower the minimumSizeHint the
+            # splitter actually honours).
+            b.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
             b.clicked.connect(lambda _, k=key: self.switch_mode(k))
             # Right-click to give this entry a custom colour.
             b.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -329,6 +333,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         cat_hdr.addWidget(self.cat_solo_btn)
         sl.addLayout(cat_hdr)
         self.cat_list = QListWidget()
+        self.cat_list.setMinimumWidth(0)
+        self.cat_list.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.cat_list.currentItemChanged.connect(self._category_changed)
         self.cat_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.cat_list.customContextMenuRequested.connect(self._cat_menu)
@@ -337,9 +344,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._guide_btn = guide_btn = QPushButton(
             tr("btn_epg_guide"), objectName="SideAction")
         guide_btn.setToolTip(tr("btn_epg_guide"))
-        guide_btn.setSizePolicy(QSizePolicy.Policy.Expanding,
+        guide_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
                                 QSizePolicy.Policy.Fixed)
-        guide_btn.setMinimumWidth(0)
         guide_btn.clicked.connect(self._open_epg_guide)
         sl.addWidget(guide_btn)
 
@@ -364,9 +370,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._settings_btn = settings_btn = QPushButton(
             tr("btn_settings"), objectName="SideAction")
         settings_btn.setToolTip(tr("btn_settings"))
-        settings_btn.setSizePolicy(QSizePolicy.Policy.Expanding,
+        settings_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
                                    QSizePolicy.Policy.Fixed)
-        settings_btn.setMinimumWidth(0)
         settings_btn.clicked.connect(self.open_settings)
         sl.addWidget(settings_btn)
 
@@ -807,15 +812,20 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         btn.style().polish(btn)
 
     def _maybe_collapse_on_drag(self, *_a) -> None:
-        """Dragging the side divider inward past the threshold collapses to the
-        icon rail. Collapsing pins the rail's max width, which the splitter
-        honours immediately, so it sticks mid-drag. (Expanding again is the
-        ☰ button / Ctrl+B - a frozen-width rail can't be dragged back out.)"""
+        """Dragging the side divider inward collapses to the icon rail.
+        Collapse when the drag reaches the sidebar's own minimum (i.e. pulled
+        as far left as it goes) or below a comfortable width - keyed off the
+        widget's real minimum so it works whatever the font/DPI makes that.
+        Collapsing pins the rail's max width, which the splitter honours
+        immediately, so it sticks mid-drag. (Re-expand with ☰ / Ctrl+B - a
+        frozen-width rail can't be dragged back out.)"""
         if not hasattr(self, "_side") or not hasattr(self, "side_btn"):
             return
         if getattr(self, "_sidebar_collapsed", False):
             return
-        if self._side.width() < 150:
+        w = self._side.width()
+        floor = self._side.minimumSizeHint().width()
+        if w < 150 or w <= floor + 12:
             self.side_btn.setChecked(False)      # -> collapse to the rail
 
     def _set_focus_mode(self, on: bool) -> None:
@@ -2600,6 +2610,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         btn.setGeometry(x, y, w, h)
 
     def closeEvent(self, event) -> None:
+        # In PiP the main window itself is the little floating player, so its
+        # own close button would otherwise quit the app. Treat it as "leave
+        # PiP" and drop back to the normal mini-player window instead.
+        if self._pip_win is not None:
+            event.ignore()
+            self._exit_pip()
+            return
         # Close the non-modal cast panel first: as a separate top-level
         # window it would otherwise keep the app alive (quitOnLastWindowClosed
         # never fires) and leave the process hanging after the main window
