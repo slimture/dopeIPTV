@@ -1001,22 +1001,26 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             all_row = QListWidgetItem(tr("cat_all"))
             all_row.setData(Qt.ItemDataRole.UserRole, ("all", None))
             self.cat_list.addItem(all_row)
-            chan = QListWidgetItem(tr("fav_channels"))
-            chan.setData(Qt.ItemDataRole.UserRole, ("chan", None))
-            self.cat_list.addItem(chan)
-            for g in self.favs.group_names():
-                locked = (self.favs.is_locked(g)
-                          and not self.parental.session_unlocked)
-                label = f"    {g}  [locked]" if locked else f"    {g}"
-                it = QListWidgetItem(label)
-                it.setData(Qt.ItemDataRole.UserRole, ("chan", g))
-                self.cat_list.addItem(it)
-            movies = QListWidgetItem(tr("fav_movies"))
-            movies.setData(Qt.ItemDataRole.UserRole, ("movie", None))
-            self.cat_list.addItem(movies)
-            series = QListWidgetItem(tr("fav_series"))
-            series.setData(Qt.ItemDataRole.UserRole, ("series", None))
-            self.cat_list.addItem(series)
+
+            def add_fav_section(section: str, label: str, store) -> None:
+                # A section header row (shows everything in the section) with
+                # the user's folders nested underneath. Locks are a
+                # channels-only feature; folders in movies/series just carry a
+                # name.
+                head = QListWidgetItem(label)
+                head.setData(Qt.ItemDataRole.UserRole, (section, None))
+                self.cat_list.addItem(head)
+                for g in store.custom_groups():
+                    locked = (section == "chan" and store.is_locked(g)
+                              and not self.parental.session_unlocked)
+                    text = f"    {g}  [locked]" if locked else f"    {g}"
+                    it = QListWidgetItem(text)
+                    it.setData(Qt.ItemDataRole.UserRole, (section, g))
+                    self.cat_list.addItem(it)
+
+            add_fav_section("chan", tr("fav_channels"), self.favs)
+            add_fav_section("movie", tr("fav_movies"), self.movie_favs)
+            add_fav_section("series", tr("fav_series"), self.series_favs)
             if self.trakt.is_connected():
                 trakt_row = QListWidgetItem(tr("watched_trakt"))
                 trakt_row.setData(Qt.ItemDataRole.UserRole, ("trakt", None))
@@ -1180,9 +1184,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self._load_favorites_all()
                 return
             if section == "movie":
-                self.all_items = self.movie_favs.items()
+                self.all_items = self.movie_favs.items(group)
             elif section == "series":
-                self.all_items = self.series_favs.items()
+                self.all_items = self.series_favs.items(group)
             elif section == "trakt":
                 # Favourites pulled from the Trakt 'dopeIPTV Favorites'
                 # list - fetched over the network, so show an empty list
@@ -2196,7 +2200,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         h = 46
         tl = self.listw.mapTo(self, self.listw.rect().topLeft())
         x = tl.x() + (self.listw.width() - w) // 2
-        y = tl.y() + int(self.listw.height() * 0.82) - h // 2
+        y = tl.y() + int(self.listw.height() * 0.90) - h // 2
         btn.setGeometry(x, y, w, h)
 
     def closeEvent(self, event) -> None:

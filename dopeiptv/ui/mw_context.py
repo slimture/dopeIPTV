@@ -6,6 +6,7 @@ Verbatim move - self.* access and behaviour unchanged.
 from __future__ import annotations
 
 from .dialogs import ContentManagerDialog
+from ..core.stores import FAV_DEFAULT_GROUP
 from ..i18n import tr
 from .tmdb_match import TmdbMatchDialog
 from PyQt6.QtCore import Qt
@@ -52,23 +53,21 @@ class _ContextMenuMixin:
             self._build_record_menu(m.addMenu(tr("rec_record")), it)
         if (content_kind in ("live", "fav")
                 and it.get("stream_id") is not None):
-            # Channel favourites keep the full user-defined group +
-            # parental-lock system.
+            # Every category works the same: a one-click "Add to favorites"
+            # (into the default bucket), an "Add to folder" submenu for any
+            # user-made folders, and Remove when it's already a favorite.
             m.addSeparator()
-            fav_menu = m.addMenu(tr("ctx_add_to_favorites"))
-            for g in self.favs.group_names():
-                fav_menu.addAction(
-                    g, lambda g=g: self._add_fav(g, it))
-            if self.favs.group_names():
-                fav_menu.addSeparator()
-            fav_menu.addAction(tr("ctx_new_group"),
-                               lambda: self._add_fav(None, it))
             if (content_kind == "fav"
                     or self.favs.is_favorite(it.get("stream_id"))):
                 m.addAction(tr("ctx_remove_from_favorites"),
                             lambda: self._remove_fav(it))
+            else:
+                m.addAction(tr("ctx_add_to_favorites"),
+                            lambda: self._add_fav(FAV_DEFAULT_GROUP, it))
+            self._add_fav_folder_menu(
+                m, lambda g: self._add_fav(g, it),
+                lambda: self._add_fav(None, it), self.favs)
         elif content_kind == "vod" and it.get("stream_id") is not None:
-            # Movie favourites are a flat list - a single toggle.
             m.addSeparator()
             if self.movie_favs.is_favorite(it.get("stream_id")):
                 m.addAction(tr("ctx_remove_from_favorites"),
@@ -76,8 +75,12 @@ class _ContextMenuMixin:
             else:
                 m.addAction(tr("ctx_add_to_favorites"),
                             lambda: self._toggle_media_fav(it, "movie", True))
+            self._add_fav_folder_menu(
+                m,
+                lambda g: self._toggle_media_fav(it, "movie", True, group=g),
+                lambda: self._new_media_fav_folder(it, "movie"),
+                self.movie_favs)
         elif content_kind == "series" and it.get("series_id") is not None:
-            # Series favourites are a flat list - a single toggle.
             m.addSeparator()
             if self.series_favs.is_favorite(it.get("series_id")):
                 m.addAction(tr("ctx_remove_from_favorites"),
@@ -85,6 +88,11 @@ class _ContextMenuMixin:
             else:
                 m.addAction(tr("ctx_add_to_favorites"),
                             lambda: self._toggle_media_fav(it, "series", True))
+            self._add_fav_folder_menu(
+                m,
+                lambda g: self._toggle_media_fav(it, "series", True, group=g),
+                lambda: self._new_media_fav_folder(it, "series"),
+                self.series_favs)
         if (self.mode in ("vod", "series") and not self.series_ctx
                 and self.tmdb):
             m.addSeparator()
@@ -265,10 +273,29 @@ class _ContextMenuMixin:
 
     # -- favorites -----------------------------------------------------------------
 
+    def _add_fav_folder_menu(self, menu, add_to_group, new_folder,
+                             store) -> None:
+        """Shared 'Add to folder ▸ [folders…] / New folder…' submenu for all
+        three categories. *add_to_group* files the item into a named folder;
+        *new_folder* prompts for a new one."""
+        folder = menu.addMenu(tr("ctx_add_to_folder"))
+        for g in store.custom_groups():
+            folder.addAction(g, lambda g=g: add_to_group(g))
+        if store.custom_groups():
+            folder.addSeparator()
+        folder.addAction(tr("ctx_new_folder"), lambda: new_folder())
+
+    def _new_media_fav_folder(self, item, section: str) -> None:
+        name, ok = QInputDialog.getText(
+            self, tr("ctx_new_folder"), tr("prompt_folder_name"))
+        name = (name or "").strip()
+        if ok and name and name != FAV_DEFAULT_GROUP:
+            self._toggle_media_fav(item, section, True, group=name)
+
     def _add_fav(self, group, item) -> None:
         if group is None:
             group, ok = QInputDialog.getText(
-                self, "New favorites group", "Group name:")
+                self, tr("ctx_new_folder"), tr("prompt_folder_name"))
             group = (group or "").strip()
             if not ok or not group:
                 return
@@ -289,11 +316,12 @@ class _ContextMenuMixin:
             self.favs.remove(item.get("stream_id"))
             self.list_model.refresh_all()
 
-    def _toggle_media_fav(self, item, section: str, add: bool) -> None:
-        """Flat add/remove for movie ('movie') and series ('series')
-        favourites - no groups, no lock. Refreshes the list, and when
-        we're inside the Favorites view of that section, drops/reloads
-        the affected row."""
+    def _toggle_media_fav(self, item, section: str, add: bool,
+                          group: str | None = None) -> None:
+        """Add/remove a movie ('movie') or series ('series') favorite. *add*
+        with no *group* files it into the default bucket; pass a folder name
+        to file it there instead. Remove drops it from every folder. Mirrors
+        to Trakt when connected and refreshes the affected view."""
         store = self.movie_favs if section == "movie" else self.series_favs
         ident = item.get(store.id_key)
         kind = "vod" if section == "movie" else "series"
@@ -304,7 +332,7 @@ class _ContextMenuMixin:
             snap = dict(item)
             if isinstance(tid, int):
                 snap["_tmdb_id"] = tid
-            store.add("all", snap)
+            store.add(group or FAV_DEFAULT_GROUP, snap)
         else:
             store.remove(ident)
         # Mirror to the Trakt 'dopeIPTV Favorites' list when connected.
@@ -370,17 +398,31 @@ class _ContextMenuMixin:
         if self.mode == "fav":
             if not data:
                 return
-            group = data
-            m.addAction(
-                tr("ctx_remove_group", group=group),
-                lambda: (self.favs.remove_group(group),
-                         self._load_categories()))
-            if self.favs.is_locked(group):
-                m.addAction(tr("ctx_unlock_group"),
-                            lambda: self._set_fav_lock(group, False))
+            section, group = data
+            store = {"chan": self.favs, "movie": self.movie_favs,
+                     "series": self.series_favs}.get(section)
+            if store is None:      # the 'All' / Trakt rows manage nothing
+                return
+            if group and group != FAV_DEFAULT_GROUP:
+                # A folder row: rename / remove (+ parental lock for channels).
+                m.addAction(
+                    tr("ctx_rename_folder"),
+                    lambda: self._rename_fav_folder(store, group))
+                m.addAction(
+                    tr("ctx_remove_folder", group=group),
+                    lambda: (store.remove_group(group),
+                             self._load_categories()))
+                if section == "chan":
+                    if store.is_locked(group):
+                        m.addAction(tr("ctx_unlock_group"),
+                                    lambda: self._set_fav_lock(group, False))
+                    else:
+                        m.addAction(tr("ctx_lock_group"),
+                                    lambda: self._set_fav_lock(group, True))
             else:
-                m.addAction(tr("ctx_lock_group"),
-                            lambda: self._set_fav_lock(group, True))
+                # A section header row: make a new folder under it.
+                m.addAction(tr("ctx_new_folder"),
+                            lambda: self._new_fav_folder(store))
             m.exec(self.cat_list.mapToGlobal(pos))
             return
 
@@ -419,6 +461,23 @@ class _ContextMenuMixin:
             m.addSeparator()
         m.addAction(tr("ctx_manage_categories"), self._open_content_manager)
         m.exec(self.cat_list.mapToGlobal(pos))
+
+    def _new_fav_folder(self, store) -> None:
+        name, ok = QInputDialog.getText(
+            self, tr("ctx_new_folder"), tr("prompt_folder_name"))
+        name = (name or "").strip()
+        if ok and name and name != FAV_DEFAULT_GROUP:
+            store.ensure_group(name)
+            self._load_categories()
+
+    def _rename_fav_folder(self, store, group: str) -> None:
+        name, ok = QInputDialog.getText(
+            self, tr("ctx_rename_folder"), tr("prompt_folder_name"),
+            text=group)
+        name = (name or "").strip()
+        if ok and name and name != group and name != FAV_DEFAULT_GROUP:
+            store.rename_group(group, name)
+            self._load_categories()
 
     def _set_fav_lock(self, group: str, locked: bool) -> None:
         if locked and not self._ensure_pin_configured():

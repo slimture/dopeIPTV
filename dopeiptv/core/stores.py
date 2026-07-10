@@ -15,14 +15,20 @@ from typing import Any
 from PyQt6.QtCore import QSettings
 
 
+# The implicit "just add it here" bucket every category has. Items land
+# here on a plain "Add to favorites"; user-made folders are any other group.
+# Hidden from the folder list in the sidebar (it's the section's default).
+FAV_DEFAULT_GROUP = "all"
+
+
 class FavoriteStore:
     """Favorites in user-defined groups, persisted via QSettings.
 
-    Used three times over: channels (keyed on ``stream_id``, with the
-    full group + parental-lock UI), and two flat single-group stores for
-    favorite movies (``stream_id``) and series (``series_id``). The
-    ``id_key`` selects which provider field identifies an item so the
-    same code drives all three."""
+    Used three times over - channels (keyed on ``stream_id``), movies
+    (``stream_id``) and series (``series_id``) - each with the same default
+    bucket + optional user folders + parental-lock support. The ``id_key``
+    selects which provider field identifies an item so the same code drives
+    all three."""
 
     def __init__(self, settings: QSettings, key: str = "favorites",
                  id_key: str = "stream_id") -> None:
@@ -71,6 +77,28 @@ class FavoriteStore:
         if group in self.locked_groups():
             self.set_group_locked(group, False)
         self._save()
+
+    def ensure_group(self, group: str) -> None:
+        """Create an empty folder so it shows in the sidebar before anything
+        is filed into it."""
+        self.groups.setdefault(group, [])
+        self._save()
+
+    def rename_group(self, old: str, new: str) -> None:
+        """Rename a folder, carrying its items and any parental lock over."""
+        new = (new or "").strip()
+        if old not in self.groups or not new or new == old:
+            return
+        self.groups.setdefault(new, []).extend(self.groups.pop(old))
+        if self.is_locked(old):
+            self.set_group_locked(old, False)
+            self.set_group_locked(new, True)
+        self._save()
+
+    def custom_groups(self) -> list[str]:
+        """Folder names the user made - every group except the default
+        bucket, which the sidebar represents with the section row itself."""
+        return [g for g in self.group_names() if g != FAV_DEFAULT_GROUP]
 
     def locked_groups(self) -> set[str]:
         try:

@@ -180,9 +180,10 @@ class ChannelDelegate(QStyledItemDelegate):
         return QSize(self.cell_w, self.cell_h)
 
     def _header_h(self) -> int:
-        # Scale the section header with the density so it stays visible even
-        # next to Extra-Large rows, but keep the gap below it tight.
-        return min(max(30, self.name_pt * 3), 52)
+        # Scale the section header with the density so it stays legible next
+        # to Extra-Large rows, but keep the band tight - it used to reserve a
+        # lot of empty space above/below the text between sections.
+        return min(max(22, self.name_pt * 2), 34)
 
     def sizeHint(self, option, index) -> QSize:
         it = index.data(Qt.ItemDataRole.UserRole)
@@ -210,11 +211,11 @@ class ChannelDelegate(QStyledItemDelegate):
         f.setPointSize(self.name_pt + 3)   # scales with the density
         painter.setFont(f)
         painter.setPen(QColor(P["text"]))
-        # Bottom-align the text so the gap sits above the header, keeping it
-        # visually attached to the rows that follow.
-        r = option.rect.adjusted(14, 0, -12, -4)
+        # Vertically centred in the (tight) band so sections sit close
+        # together instead of leaving a big gap around each label.
+        r = option.rect.adjusted(14, 0, -12, 0)
         painter.drawText(
-            r, int(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft),
+            r, int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft),
             (text or "").upper())
         painter.restore()
 
