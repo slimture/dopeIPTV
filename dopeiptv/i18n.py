@@ -1071,6 +1071,28 @@ _STRINGS: dict[str, dict[str, str]] = {
         "th": "คุณกำลังสำรวจโดยไม่มีผู้ให้บริการ แอปจึงถูกจำกัด "
               "เพิ่มได้ทุกเมื่อด้วยปุ่ม “+ เพิ่มผู้ให้บริการ” ตรงกลาง",
     },
+    "sort_global": {
+        "en": "Global default", "sv": "Global standard",
+        "es": "Predet. global", "de": "Globaler Standard",
+        "fr": "Défaut global", "zh": "全局默认",
+        "ru": "Общий по умолч.", "th": "ค่าเริ่มต้นรวม",
+    },
+    "sort_scope_hint": {
+        "en": "Sort order for this category. Pick “Global default” to follow "
+              "the app-wide setting.",
+        "sv": "Sortering för den här kategorin. Välj ”Global standard” för att "
+              "följa appens globala inställning.",
+        "es": "Orden para esta categoría. Elige “Predet. global” para seguir "
+              "el ajuste general.",
+        "de": "Sortierung für diese Kategorie. „Globaler Standard“ folgt der "
+              "app-weiten Einstellung.",
+        "fr": "Tri pour cette catégorie. Choisissez « Défaut global » pour "
+              "suivre le réglage général.",
+        "zh": "此分类的排序。选择“全局默认”以跟随全局设置。",
+        "ru": "Сортировка для этой категории. Выберите «Общий по умолч.», "
+              "чтобы следовать общей настройке.",
+        "th": "การเรียงสำหรับหมวดนี้ เลือก “ค่าเริ่มต้นรวม” เพื่อใช้ค่าตั้งรวมของแอป",
+    },
     "rec_today": {
         "en": "Today", "sv": "Idag", "es": "Hoy", "de": "Heute",
         "fr": "Aujourd'hui", "zh": "今天", "ru": "Сегодня", "th": "วันนี้",

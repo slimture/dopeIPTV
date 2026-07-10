@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import threading
 import time
+from datetime import datetime
 
 from PyQt6.QtCore import (
     QRect, QSettings, QSize, Qt, QThreadPool,
@@ -352,10 +353,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.size_box.setObjectName("InlineCombo")
         self.size_box.currentIndexChanged.connect(self._inline_view_changed)
         self.sort_box = self._combo(
-            [("default", tr("label_default")), ("alpha_asc", "A→Z"),
-             ("alpha_desc", "Z→A"), ("recent", tr("label_recent"))],
-            self.settings.value("sort_order", "default"))
+            [("global", tr("sort_global")), ("default", tr("label_default")),
+             ("alpha_asc", "A→Z"), ("alpha_desc", "Z→A"),
+             ("recent", tr("label_recent"))],
+            "global")
         self.sort_box.setObjectName("InlineCombo")
+        self.sort_box.setToolTip(tr("sort_scope_hint"))
         self.sort_box.currentIndexChanged.connect(self._inline_view_changed)
         self.grid_btn = QPushButton(tr("btn_grid"), objectName="InlineToggle")
         self.grid_btn.setCheckable(True)
@@ -1202,8 +1205,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # right artwork (logo vs poster) per row.
             def sect(cat):
                 ks = self._HISTORY_KINDS[cat]
-                return self._search_filter(
-                    [it for it in items if it.get("_kind") in ks])
+                return self._sorted(self._search_filter(
+                    [it for it in items if it.get("_kind") in ks]))
             grouped: list[dict] = []
             for hk, ek, rows in (
                     ("fav_channels", "fav", sect("live")),
@@ -1305,7 +1308,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if items:
                 out.append({"_header": tr(header_key)})
                 out += [{**it, "_ekind": ekind, "_kind": kind}
-                        for it in items]
+                        for it in self._sorted(items)]
         return out
 
     def _grid_on(self) -> bool:
@@ -1313,11 +1316,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _render_rows(self, rows: list, model_kind: str,
                      empty_msg: str | None = None) -> None:
-        """Populate the model from a headed row list. In grid mode the section
-        headers are dropped (they can't span a poster grid) so the view is a
-        flat wall of posters; in list mode the headers stay."""
-        if self._grid_on():
-            rows = [r for r in rows if not r.get("_header")]
+        """Populate the model from a headed row list. Section headers are kept
+        in both list and grid mode (in grid they span the full row), so the
+        grouping survives either way."""
         self.all_items = rows
         self.list_model.set_items(rows, model_kind)
         if self._loading_hint.isVisible():
@@ -1381,26 +1382,38 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
              ("fav_series", "series", "series", series)],
             "fav", tr("fav_empty_all"))
 
-    def _apply_list_layout(self, force_list: bool) -> None:
-        """Set the middle pane to grid or list. *force_list* wins over the
-        user's grid setting (used by the grouped, header views, which must be
-        a list). Layout only - no re-render, no settings-panel sync."""
+    def _apply_list_layout(self, _force_list: bool = False) -> None:
+        """Set the middle pane layout from the user's grid/list choice.
+
+        Three cases: a plain list; a *combined* view in grid mode (posters
+        that keep their section headers - laid out from each item's own size
+        hint so a header can span the full row); or a normal poster grid with
+        uniform, justified cells."""
         from PyQt6.QtWidgets import QListView
-        user_grid = self.settings.value("view_grid", "false") == "true"
-        grid = user_grid and not force_list
+        grid = self._grid_on()
+        combined = self._is_combined_view(getattr(self, "_current_cat", None))
         self.delegate.set_grid(grid)
-        if grid:
-            self.listw.setViewMode(QListView.ViewMode.IconMode)
-            self.listw.setFlow(QListView.Flow.LeftToRight)
-            self.listw.setWrapping(True)
-            self.listw.setResizeMode(QListView.ResizeMode.Adjust)
-            self.listw.set_grid_cell(self.delegate.grid_size())
-        else:
+        if not grid:
             self.listw.setViewMode(QListView.ViewMode.ListMode)
             self.listw.setFlow(QListView.Flow.TopToBottom)
             self.listw.setWrapping(False)
             self.listw.set_grid_cell(None)
             self.listw.setGridSize(QSize())
+        elif combined:
+            # Self-sizing icon flow: posters use the delegate's cell hint,
+            # header rows report the full viewport width and so span a row.
+            self.listw.setViewMode(QListView.ViewMode.IconMode)
+            self.listw.setFlow(QListView.Flow.LeftToRight)
+            self.listw.setWrapping(True)
+            self.listw.setResizeMode(QListView.ResizeMode.Adjust)
+            self.listw.set_grid_cell(None)
+            self.listw.setGridSize(QSize())
+        else:
+            self.listw.setViewMode(QListView.ViewMode.IconMode)
+            self.listw.setFlow(QListView.Flow.LeftToRight)
+            self.listw.setWrapping(True)
+            self.listw.setResizeMode(QListView.ResizeMode.Adjust)
+            self.listw.set_grid_cell(self.delegate.grid_size())
 
     def _ensure_xmltv_loaded(self) -> None:
         if self.xmltv._loaded or self.xmltv._failed:
@@ -1448,12 +1461,36 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         """Per-category sort key, so each category can keep its own order."""
         return f"sort::{self.mode}::{getattr(self, '_current_cat', None)!r}"
 
+    def _current_sort_raw(self) -> str:
+        """The current category's own choice: 'global' (follow the app-wide
+        default) unless it has been overridden."""
+        return self.settings.value(self._sort_setting_key(), "global")
+
     def _current_sort_order(self) -> str:
-        """The sort order for the current category: its own override if set,
-        otherwise the global default from Settings."""
-        return self.settings.value(
-            self._sort_setting_key(),
-            self.settings.value("sort_order", "default"))
+        """The effective sort order for the current category - its own
+        override, or the global default when it is set to follow global."""
+        raw = self._current_sort_raw()
+        if raw == "global":
+            return self.settings.value("sort_order", "default")
+        return raw
+
+    @staticmethod
+    def _recency_key(it) -> int:
+        # Newest-first key that works across views: provider "added", else the
+        # history "_watched_at" ISO timestamp.
+        a = it.get("added")
+        if a:
+            try:
+                return int(a)
+            except (TypeError, ValueError):
+                pass
+        wa = it.get("_watched_at")
+        if wa:
+            try:
+                return int(datetime.fromisoformat(wa).timestamp())
+            except (TypeError, ValueError):
+                pass
+        return 0
 
     def _sorted(self, items: list) -> list:
         order = self._current_sort_order()
@@ -1462,12 +1499,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if order == "alpha_desc":
             return sorted(items, key=MainWindow._sort_key_name, reverse=True)
         if order == "recent":
-            def added(it):
-                try:
-                    return int(it.get("added") or 0)
-                except (TypeError, ValueError):
-                    return 0
-            return sorted(items, key=added, reverse=True)
+            return sorted(items, key=MainWindow._recency_key, reverse=True)
         return items
 
     def channel_display_name(self, it) -> str:

@@ -92,7 +92,7 @@ class _SettingsMixin:
         if hasattr(self, "size_box"):
             for box, key in (
                 (self.size_box, density),
-                (self.sort_box, self._current_sort_order()),
+                (self.sort_box, self._current_sort_raw()),
             ):
                 box.blockSignals(True)
                 i = box.findData(key)

@@ -188,6 +188,11 @@ class ChannelDelegate(QStyledItemDelegate):
     def sizeHint(self, option, index) -> QSize:
         it = index.data(Qt.ItemDataRole.UserRole)
         if it and it.get("_header"):
+            if self.grid:
+                # Report the full viewport width so the icon flow puts the
+                # header alone on its own row (spanning above the posters).
+                vw = self.window.listw.viewport().width()
+                return QSize(max(vw, 200), self._header_h())
             return QSize(0, self._header_h())
         if self.grid:
             return QSize(self.cell_w, self.cell_h)
