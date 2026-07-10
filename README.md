@@ -19,8 +19,8 @@ supporting the **Xtream Codes API** and **M3U playlists**, **EPG**, and an
 |---|---|
 | ![Live TV with the EPG](docs/screenshots/live.png) | ![EPG timeline grid](docs/screenshots/epg-grid.png) |
 | *Live TV with the programme guide* | *EPG timeline grid* |
-| ![Movies and series](docs/screenshots/movies.png) | ![Favorites and the player](docs/screenshots/player.png) |
-| *Movies & series with TMDB artwork* | *Favorites and the embedded player* |
+| ![Themes and accent colors](docs/screenshots/themes.png) | ![Favorites and the player](docs/screenshots/player.png) |
+| *Themes — 5 palettes + 7 accents* | *Favorites and the embedded player* |
 
 ## Features
 
