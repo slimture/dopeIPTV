@@ -81,13 +81,9 @@ class _SettingsMixin:
 
     def _apply_view_settings(self) -> None:
         density = self.settings.value("view_density", "medium")
-        user_grid = self.settings.value("view_grid", "false") == "true"
-        # The current view decides whether the grid is even allowed: grouped,
-        # header views are always a list (headers can't span the poster grid).
-        force_list = self._is_grouped_view(getattr(self, "_current_cat", None))
-        grid = user_grid and not force_list
+        grid = self.settings.value("view_grid", "false") == "true"
         self.delegate.set_density(density)
-        self._apply_list_layout(force_list)
+        self._apply_list_layout(False)   # honour the user's grid/list choice
         self.listw.setVerticalScrollMode(
             QAbstractItemView.ScrollMode.ScrollPerPixel)
         step = (self.delegate.grid_size().height() // 2 if grid
@@ -104,10 +100,11 @@ class _SettingsMixin:
                     box.setCurrentIndex(i)
                 box.blockSignals(False)
             self.grid_btn.blockSignals(True)
-            self.grid_btn.setChecked(user_grid)
+            self.grid_btn.setChecked(grid)
             self.grid_btn.blockSignals(False)
-        # Grouped views must rebuild (their header rows); others just re-filter.
-        if force_list:
+        # Combined views must rebuild (grid drops their headers, list keeps
+        # them); every other view just re-filters the current items.
+        if self._is_combined_view(getattr(self, "_current_cat", None)):
             self._load_items(getattr(self, "_current_cat", None))
         else:
             self._apply_filter()

@@ -1125,9 +1125,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._update_sync_btn()
         self._load_items(cat)
 
-    def _is_grouped_view(self, category_id) -> bool:
-        """The combined, header-grouped views that are always rendered as a
-        headed list (never the poster grid)."""
+    def _is_combined_view(self, category_id) -> bool:
+        """The combined views that stack several kinds together: grouped under
+        headers in list mode, or a flat poster wall in grid mode. They must be
+        rebuilt (not just re-filtered) when the grid setting changes."""
         if self.mode == "fav":
             return category_id in (("all", None), ("trakt", None))
         if self.mode == "watchlist":
@@ -1146,7 +1147,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # user's grid/list choice. Doing it here (not via a sticky flag) fixes
         # the grid setting being "forgotten" when hopping between categories.
         self._current_cat = category_id
-        self._apply_list_layout(self._is_grouped_view(category_id))
+        self._apply_list_layout(False)   # honour the user's grid/list choice
         if self.mode == "rec":
             if category_id == "__jobs__":
                 self.all_items = [self._job_item(j)
@@ -1211,12 +1212,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 if rows:
                     grouped.append({"_header": tr(hk)})
                     grouped += [{**r, "_ekind": ek} for r in rows]
-                self.all_items = grouped
-            self.list_model.set_items(grouped, "history")
-            if self._loading_hint.isVisible():
-                self._loading_hint.hide()
-            total = sum(1 for it in grouped if not it.get("_header"))
-            self._set_status(f"{total} {self.LABELS['history']}".strip())
+            self._render_rows(grouped, "history")
             return
         if self.mode == "watchlist":
             self._watchlist_subcat = category_id
@@ -1312,21 +1308,30 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                         for it in items]
         return out
 
-    def _show_grouped(self, sections: list, model_kind: str,
-                      empty_msg: str | None = None) -> None:
-        """Render a grouped view: force the headed list layout, populate the
-        model and set a count/empty status."""
-        grouped = self._grouped(sections)
-        self.all_items = grouped
-        self.list_model.set_items(grouped, model_kind)
+    def _grid_on(self) -> bool:
+        return self.settings.value("view_grid", "false") == "true"
+
+    def _render_rows(self, rows: list, model_kind: str,
+                     empty_msg: str | None = None) -> None:
+        """Populate the model from a headed row list. In grid mode the section
+        headers are dropped (they can't span a poster grid) so the view is a
+        flat wall of posters; in list mode the headers stay."""
+        if self._grid_on():
+            rows = [r for r in rows if not r.get("_header")]
+        self.all_items = rows
+        self.list_model.set_items(rows, model_kind)
         if self._loading_hint.isVisible():
             self._loading_hint.hide()
-        total = sum(len(s[3]) for s in sections)
+        n = sum(1 for r in rows if not r.get("_header"))
         label = self.LABELS.get(model_kind, "")
-        if total:
-            self._set_status(f"{total} {label}".strip())
-        else:
-            self._set_status(empty_msg or f"0 {label}".strip())
+        self._set_status(f"{n} {label}".strip() if n
+                         else (empty_msg or f"0 {label}".strip()))
+
+    def _show_grouped(self, sections: list, model_kind: str,
+                      empty_msg: str | None = None) -> None:
+        """Render a combined view from ordered sections - grouped under
+        headers in list mode, a flat poster wall in grid mode."""
+        self._render_rows(self._grouped(sections), model_kind, empty_msg)
 
     def _load_recordings_grouped(self, files: list) -> None:
         """Recordings grouped by when they were made: Today / Yesterday /
@@ -1358,11 +1363,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if buckets[key]:
                 grouped.append({"_header": tr(hk)})
                 grouped += buckets[key]
-        self.all_items = grouped
-        self.list_model.set_items(grouped, "rec")
-        if self._loading_hint.isVisible():
-            self._loading_hint.hide()
-        self._set_status(f"{len(files)} {self.LABELS['rec']}")
+        self._render_rows(grouped, "rec")
 
     def _load_favorites_all(self) -> None:
         """Show every favorite at once - channels, movies and series - grouped
@@ -2103,7 +2104,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         h = 46
         tl = self.listw.mapTo(self, self.listw.rect().topLeft())
         x = tl.x() + (self.listw.width() - w) // 2
-        y = tl.y() + int(self.listw.height() * 0.72) - h // 2
+        y = tl.y() + int(self.listw.height() * 0.82) - h // 2
         btn.setGeometry(x, y, w, h)
 
     def closeEvent(self, event) -> None:
