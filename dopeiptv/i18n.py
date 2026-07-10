@@ -937,6 +937,160 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Осмотреться без аккаунта",
         "th": "สำรวจโดยไม่มีบัญชี",
     },
+    "onb_choose_language": {
+        "en": "Choose your language",
+        "sv": "Välj språk",
+        "es": "Elige tu idioma",
+        "de": "Sprache wählen",
+        "fr": "Choisissez votre langue",
+        "zh": "选择语言",
+        "ru": "Выберите язык",
+        "th": "เลือกภาษาของคุณ",
+    },
+    "onb_next": {
+        "en": "Next", "sv": "Nästa", "es": "Siguiente", "de": "Weiter",
+        "fr": "Suivant", "zh": "下一步", "ru": "Далее", "th": "ถัดไป",
+    },
+    "onb_back": {
+        "en": "Back", "sv": "Tillbaka", "es": "Atrás", "de": "Zurück",
+        "fr": "Retour", "zh": "上一步", "ru": "Назад", "th": "ย้อนกลับ",
+    },
+    "onb_skip": {
+        "en": "Skip for now", "sv": "Hoppa över", "es": "Omitir por ahora",
+        "de": "Vorerst überspringen", "fr": "Ignorer pour l'instant",
+        "zh": "暂时跳过", "ru": "Пропустить", "th": "ข้ามไปก่อน",
+    },
+    "onb_finish": {
+        "en": "Finish", "sv": "Klar", "es": "Finalizar", "de": "Fertig",
+        "fr": "Terminer", "zh": "完成", "ru": "Готово", "th": "เสร็จสิ้น",
+    },
+    "onb_features_title": {
+        "en": "What's inside dopeIPTV",
+        "sv": "Det här finns i dopeIPTV",
+        "es": "Qué incluye dopeIPTV",
+        "de": "Das steckt in dopeIPTV",
+        "fr": "Ce que contient dopeIPTV",
+        "zh": "dopeIPTV 有什么",
+        "ru": "Что внутри dopeIPTV",
+        "th": "สิ่งที่มีใน dopeIPTV",
+    },
+    "onb_feat_1": {
+        "en": "Live TV, Movies & Series — fast and searchable",
+        "sv": "Live-TV, filmer och serier – snabbt och sökbart",
+        "es": "TV en directo, películas y series — rápido y con búsqueda",
+        "de": "Live-TV, Filme & Serien — schnell und durchsuchbar",
+        "fr": "TV en direct, films et séries — rapide et cherchable",
+        "zh": "直播电视、电影和剧集 — 快速且可搜索",
+        "ru": "Live-ТВ, фильмы и сериалы — быстро и с поиском",
+        "th": "ทีวีสด ภาพยนตร์ และซีรีส์ — รวดเร็วและค้นหาได้",
+    },
+    "onb_feat_2": {
+        "en": "Full EPG guide with now/next and catch-up",
+        "sv": "Full EPG-guide med nu/nästa och catch-up",
+        "es": "Guía EPG completa con ahora/después y catch-up",
+        "de": "Voller EPG-Guide mit Jetzt/Nächstes und Catch-up",
+        "fr": "Guide EPG complet avec en cours/à suivre et rattrapage",
+        "zh": "完整的 EPG 节目指南，含正在播出/稍后及回看",
+        "ru": "Полный EPG с «сейчас/далее» и архивом",
+        "th": "คู่มือ EPG เต็มรูปแบบพร้อมกำลังฉาย/ถัดไป และดูย้อนหลัง",
+    },
+    "onb_feat_3": {
+        "en": "Built-in video player — no external app needed",
+        "sv": "Inbyggd videospelare – ingen extern app behövs",
+        "es": "Reproductor de vídeo integrado — sin apps externas",
+        "de": "Eingebauter Player — keine externe App nötig",
+        "fr": "Lecteur vidéo intégré — aucune app externe requise",
+        "zh": "内置视频播放器 — 无需外部应用",
+        "ru": "Встроенный плеер — без сторонних приложений",
+        "th": "เครื่องเล่นวิดีโอในตัว — ไม่ต้องใช้แอปภายนอก",
+    },
+    "onb_feat_4": {
+        "en": "Recording, Chromecast, Trakt sync, themes & more",
+        "sv": "Inspelning, Chromecast, Trakt-synk, teman m.m.",
+        "es": "Grabación, Chromecast, sync con Trakt, temas y más",
+        "de": "Aufnahme, Chromecast, Trakt-Sync, Themes & mehr",
+        "fr": "Enregistrement, Chromecast, sync Trakt, thèmes et plus",
+        "zh": "录制、Chromecast、Trakt 同步、主题等",
+        "ru": "Запись, Chromecast, синхронизация Trakt, темы и не только",
+        "th": "การบันทึก, Chromecast, ซิงก์ Trakt, ธีม และอื่น ๆ",
+    },
+    "onb_trakt_title": {
+        "en": "Connect Trakt (optional)",
+        "sv": "Anslut Trakt (valfritt)",
+        "es": "Conectar Trakt (opcional)",
+        "de": "Trakt verbinden (optional)",
+        "fr": "Connecter Trakt (facultatif)",
+        "zh": "连接 Trakt（可选）",
+        "ru": "Подключить Trakt (необязательно)",
+        "th": "เชื่อมต่อ Trakt (ไม่บังคับ)",
+    },
+    "onb_trakt_desc": {
+        "en": "Sync your watched history and watchlist with Trakt.tv. This is "
+              "completely optional — you can also do it later in Settings.",
+        "sv": "Synka din sedda-historik och bevakningslista med Trakt.tv. Helt "
+              "valfritt – du kan även göra det senare i Inställningar.",
+        "es": "Sincroniza tu historial y tu lista con Trakt.tv. Es totalmente "
+              "opcional; también puedes hacerlo luego en Ajustes.",
+        "de": "Synchronisiere deinen Verlauf und deine Merkliste mit Trakt.tv. "
+              "Völlig optional — geht auch später in den Einstellungen.",
+        "fr": "Synchronisez votre historique et votre liste avec Trakt.tv. "
+              "C'est facultatif — vous pourrez le faire plus tard dans les "
+              "Réglages.",
+        "zh": "将观看记录和待看列表与 Trakt.tv 同步。完全可选 — 也可稍后在设置中完成。",
+        "ru": "Синхронизируйте историю просмотров и список с Trakt.tv. Это "
+              "необязательно — можно сделать позже в настройках.",
+        "th": "ซิงก์ประวัติการดูและรายการที่อยากดูกับ Trakt.tv ทั้งหมดนี้ไม่บังคับ "
+              "— ทำภายหลังในการตั้งค่าก็ได้",
+    },
+    "onb_trakt_connect": {
+        "en": "Connect Trakt", "sv": "Anslut Trakt", "es": "Conectar Trakt",
+        "de": "Trakt verbinden", "fr": "Connecter Trakt", "zh": "连接 Trakt",
+        "ru": "Подключить Trakt", "th": "เชื่อมต่อ Trakt",
+    },
+    "onb_limited_notice": {
+        "en": "You're exploring without a provider, so the app is limited. "
+              "Add one any time with the “+ Add provider” button in the "
+              "middle.",
+        "sv": "Du utforskar utan en leverantör, så appen är begränsad. Lägg "
+              "till en när som helst med “+ Lägg till leverantör”-knappen i "
+              "mitten.",
+        "es": "Estás explorando sin proveedor, así que la app está limitada. "
+              "Añade uno cuando quieras con el botón “+ Añadir proveedor” del "
+              "centro.",
+        "de": "Du erkundest ohne Anbieter, daher ist die App eingeschränkt. "
+              "Füge jederzeit einen über die Schaltfläche „+ Anbieter "
+              "hinzufügen“ in der Mitte hinzu.",
+        "fr": "Vous explorez sans fournisseur, l'app est donc limitée. "
+              "Ajoutez-en un à tout moment avec le bouton « + Ajouter un "
+              "fournisseur » au centre.",
+        "zh": "你正在没有提供商的情况下浏览，因此应用功能受限。可随时用中间的"
+              "“+ 添加提供商”按钮添加。",
+        "ru": "Вы просматриваете без провайдера, поэтому приложение "
+              "ограничено. Добавьте его в любой момент кнопкой «+ Добавить "
+              "провайдера» в центре.",
+        "th": "คุณกำลังสำรวจโดยไม่มีผู้ให้บริการ แอปจึงถูกจำกัด "
+              "เพิ่มได้ทุกเมื่อด้วยปุ่ม “+ เพิ่มผู้ให้บริการ” ตรงกลาง",
+    },
+    "onb_fill_all": {
+        "en": "Please fill in server, username and password.",
+        "sv": "Fyll i server, användarnamn och lösenord.",
+        "es": "Completa el servidor, el usuario y la contraseña.",
+        "de": "Bitte Server, Benutzername und Passwort ausfüllen.",
+        "fr": "Veuillez remplir le serveur, l'identifiant et le mot de passe.",
+        "zh": "请填写服务器、用户名和密码。",
+        "ru": "Заполните сервер, имя пользователя и пароль.",
+        "th": "กรุณากรอกเซิร์ฟเวอร์ ชื่อผู้ใช้ และรหัสผ่าน",
+    },
+    "onb_add_provider": {
+        "en": "+ Add provider",
+        "sv": "+ Lägg till leverantör",
+        "es": "+ Añadir proveedor",
+        "de": "+ Anbieter hinzufügen",
+        "fr": "+ Ajouter un fournisseur",
+        "zh": "+ 添加提供商",
+        "ru": "+ Добавить провайдера",
+        "th": "+ เพิ่มผู้ให้บริการ",
+    },
     "welcome_add_hint": {
         "en": "No provider yet — add one any time in Settings.",
         "sv": "Ingen leverantör än – lägg till en när som helst i Inställningar.",

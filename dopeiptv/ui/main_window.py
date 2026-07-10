@@ -24,7 +24,7 @@ from .. import APP_NAME
 from ..i18n import tr
 from .channel_list import ChannelDelegate, ChannelListModel, ChannelListView
 from ..providers.chromecast import CastDialog, ChromecastManager
-from ..providers.client import XtreamClient
+from ..providers.client import OfflineClient, XtreamClient
 from ..media.embedded import EmbeddedPlayer
 from ..providers.epg import XmltvGuide, epg_cache_path
 from ..services.coverart import CoverArtService
@@ -60,7 +60,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def __init__(self, client: XtreamClient, settings: QSettings,
                  playlists: PlaylistStore | None = None) -> None:
         super().__init__()
-        self._welcome = None  # first-run overlay; created on demand
+        self._welcome = None  # first-run onboarding overlay; created on demand
+        self._add_provider_btn = None  # "+ Add provider" hint when offline
         self.client = client
         self.settings = settings
         self.playlist_store = playlists
@@ -917,6 +918,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.history = HistoryStore(self.settings, f"history_{pid}")
             self._base_title = pl["name"]
             self.setWindowTitle(self._base_title)
+            self._update_provider_hint()
             self.refresh_playlist()
 
         def fail(msg):
@@ -1793,35 +1795,78 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._schedule_save_layout()
         if self._welcome is not None and self._welcome.isVisible():
             self._welcome.cover()
+        self._position_provider_hint()
 
-    # -- first-run welcome ---------------------------------------------------
+    # -- first-run onboarding ------------------------------------------------
 
     def show_welcome(self) -> None:
-        """Show the first-run welcome overlay (no provider configured yet)."""
+        """Show the first-run onboarding wizard (no provider configured)."""
         if self._welcome is None:
             self._welcome = WelcomeOverlay(
-                self, self._welcome_connect, self._welcome_explore)
+                self, settings=self.settings,
+                on_connect=self._wizard_connect,
+                on_explore=self._wizard_explore,
+                on_connect_trakt=lambda: self._open_trakt_dialog(self),
+                on_language_change=self._wizard_language)
+        else:
+            self._welcome.reset()
         self._welcome.cover()
+        self._update_provider_hint()
 
-    def _welcome_explore(self) -> None:
-        if self._welcome is not None:
-            self._welcome.hide()
-        self._set_status(tr("welcome_add_hint"))
+    def _wizard_language(self, code: str) -> None:
+        from ..i18n import set_language
+        set_language(code)
+        self.settings.setValue("language", code)
+        self.retranslate_ui()
 
-    def _welcome_connect(self) -> None:
-        from .dialogs import LoginDialog
-        dlg = LoginDialog(self.settings, self)
-        if not dlg.exec():
-            return
-        server, user, pw = dlg.values()
+    def _wizard_connect(self, server: str, user: str, pw: str) -> None:
         name = server.split("//")[-1].split("/")[0] or "My playlist"
         pl = self.playlist_store.add(
             {"name": name, "server": server, "username": user,
              "password": pw, "epg_url": "", "refresh": "never"})
         self.playlist_store.set_active(pl["id"])
-        if self._welcome is not None:
-            self._welcome.hide()
         self.switch_playlist(pl["id"])
+        # The wizard stays open for the optional Trakt step and hides itself
+        # on Finish; the provider hint should not appear now.
+        self._update_provider_hint()
+
+    def _wizard_explore(self) -> None:
+        self._set_status(tr("welcome_add_hint"))
+        QMessageBox.information(self, APP_NAME, tr("onb_limited_notice"))
+        self._update_provider_hint()
+
+    # -- "no provider yet" affordance ----------------------------------------
+
+    def _update_provider_hint(self) -> None:
+        """Show a big centred '+ Add provider' button whenever the app is
+        running without a real provider and the wizard is closed. It brings
+        the wizard back and disappears the moment a provider is added."""
+        offline = isinstance(self.client, OfflineClient)
+        overlay_up = self._welcome is not None and self._welcome.isVisible()
+        if offline and not overlay_up:
+            if self._add_provider_btn is None:
+                btn = QPushButton(tr("onb_add_provider"), self,
+                                  objectName="Primary")
+                btn.setMinimumHeight(40)
+                btn.clicked.connect(self.show_welcome)
+                self._add_provider_btn = btn
+            self._add_provider_btn.setText(tr("onb_add_provider"))
+            self._position_provider_hint()
+            self._add_provider_btn.show()
+            self._add_provider_btn.raise_()
+        elif self._add_provider_btn is not None:
+            self._add_provider_btn.hide()
+
+    def _position_provider_hint(self) -> None:
+        btn = self._add_provider_btn
+        if btn is None or not btn.isVisible():
+            return
+        c = self.centralWidget().geometry()
+        btn.adjustSize()
+        w = max(220, btn.width() + 32)
+        h = 44
+        btn.setGeometry(c.x() + (c.width() - w) // 2,
+                        c.y() + (c.height() - h) // 2, w, h)
 
     def closeEvent(self, event) -> None:
         # Close the non-modal cast panel first: as a separate top-level
