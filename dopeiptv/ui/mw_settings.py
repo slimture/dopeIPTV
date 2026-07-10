@@ -40,12 +40,19 @@ class _SettingsMixin:
                 self._load_categories()
 
     def _clear_history(self) -> None:
+        # Delete only the currently selected history category (channels /
+        # movies / series), or everything when 'All' is selected.
+        sub = getattr(self, "_history_subcat", None)
+        kinds = self._HISTORY_KINDS.get(sub)
         if QMessageBox.question(
                 self, tr("msg_clear_history_title"),
                 tr("msg_clear_history_body")) \
                 == QMessageBox.StandardButton.Yes:
-            self.history.clear()
-            self._load_items(None)
+            if kinds:
+                self.history.clear_kind(kinds)
+            else:
+                self.history.clear()
+            self._load_items(sub)
 
     # -- EPG guide -----------------------------------------------------------------
 

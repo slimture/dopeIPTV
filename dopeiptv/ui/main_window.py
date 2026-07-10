@@ -973,9 +973,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         if self.mode == "history":
             self.cat_list.blockSignals(True)
-            all_item = QListWidgetItem(tr("cat_all"))
-            all_item.setData(Qt.ItemDataRole.UserRole, None)
-            self.cat_list.addItem(all_item)
+            for label, data in [(tr("cat_all"), None),
+                                (tr("fav_channels"), "live"),
+                                (tr("nav_movies"), "movie"),
+                                (tr("nav_series"), "series")]:
+                it = QListWidgetItem(label)
+                it.setData(Qt.ItemDataRole.UserRole, data)
+                self.cat_list.addItem(it)
             self.cat_list.blockSignals(False)
             self.cat_list.setCurrentRow(0)
             return
@@ -1132,6 +1136,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return True
         if self.mode == "history":
             return category_id is None
+        if self.mode == "rec":
+            return category_id not in ("__jobs__", "__upcoming__")
         return False
 
     def _load_items(self, category_id) -> None:
@@ -1144,13 +1150,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if category_id == "__jobs__":
                 self.all_items = [self._job_item(j)
                                   for j in reversed(self.rec.jobs)]
-            elif category_id == "__upcoming__":
+                self._apply_filter()
+                return
+            if category_id == "__upcoming__":
                 self.all_items = [
                     self._job_item(j) for j in reversed(self.rec.jobs)
                     if j["status"] == "scheduled"]
-            else:
-                self.all_items = self.rec.files(category_id)
-            self._apply_filter()
+                self._apply_filter()
+                return
+            self._load_recordings_grouped(self.rec.files(category_id))
             return
         if self.mode == "fav":
             # category_id is a (section, group) tuple (or None as a
@@ -1179,8 +1187,36 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._apply_filter()
             return
         if self.mode == "history":
-            self.all_items = self.history.items()
-            self._apply_filter()
+            self._history_subcat = category_id  # None / live / movie / series
+            items = self.history.items()
+            if category_id is not None:
+                kinds = self._HISTORY_KINDS.get(category_id, set())
+                self.all_items = [it for it in items
+                                  if it.get("_kind") in kinds]
+                self._apply_filter()
+                return
+            # 'All' - grouped by kind. Keep each row's original _kind for
+            # playback/scrobble; only tag _ekind so the delegate paints the
+            # right artwork (logo vs poster) per row.
+            def sect(cat):
+                ks = self._HISTORY_KINDS[cat]
+                return self._search_filter(
+                    [it for it in items if it.get("_kind") in ks])
+            grouped: list[dict] = []
+            for hk, ek, rows in (
+                    ("fav_channels", "fav", sect("live")),
+                    ("fav_movies", "vod", sect("movie")),
+                    ("fav_series", "series", sect("series"))):
+                if rows:
+                    grouped.append({"_header": tr(hk)})
+                    grouped += [{**r, "_ekind": ek} for r in rows]
+            self._force_list_view()
+            self.all_items = grouped
+            self.list_model.set_items(grouped, "history")
+            if self._loading_hint.isVisible():
+                self._loading_hint.hide()
+            total = sum(1 for it in grouped if not it.get("_header"))
+            self._set_status(f"{total} {self.LABELS['history']}".strip())
             return
         if self.mode == "watchlist":
             self._watchlist_subcat = category_id
@@ -1293,6 +1329,43 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         else:
             self._set_status(empty_msg or f"0 {label}".strip())
 
+    def _load_recordings_grouped(self, files: list) -> None:
+        """Recordings grouped by when they were made: Today / Yesterday /
+        This week / Earlier, newest first. Rows keep their recording nature
+        (no _ekind/_kind retag) so they still play via the rec path."""
+        import datetime
+        files = sorted(self._search_filter(files),
+                       key=lambda f: int(f.get("added") or 0), reverse=True)
+        today = datetime.date.today()
+        buckets = {"today": [], "yesterday": [], "week": [], "earlier": []}
+        for f in files:
+            try:
+                ts = int(f.get("added") or 0)
+            except (TypeError, ValueError):
+                ts = 0
+            d = datetime.date.fromtimestamp(ts) if ts else today
+            delta = (today - d).days
+            if delta <= 0:
+                buckets["today"].append(f)
+            elif delta == 1:
+                buckets["yesterday"].append(f)
+            elif delta < 7:
+                buckets["week"].append(f)
+            else:
+                buckets["earlier"].append(f)
+        grouped: list[dict] = []
+        for key, hk in (("today", "rec_today"), ("yesterday", "rec_yesterday"),
+                        ("week", "rec_this_week"), ("earlier", "rec_earlier")):
+            if buckets[key]:
+                grouped.append({"_header": tr(hk)})
+                grouped += buckets[key]
+        self._force_list_view()
+        self.all_items = grouped
+        self.list_model.set_items(grouped, "rec")
+        if self._loading_hint.isVisible():
+            self._loading_hint.hide()
+        self._set_status(f"{len(files)} {self.LABELS['rec']}")
+
     def _load_favorites_all(self) -> None:
         """Show every favorite at once - channels, movies and series - grouped
         under section headers, so opening Favorites shows all three kinds
@@ -1352,6 +1425,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         "episode": "episodes", "fav": "favorites",
         "history": "history items", "rec": "recordings",
         "watchlist": "on your list", "watched": "watched",
+    }
+
+    # History left-category -> the stored _kind values it covers, for the
+    # grouped view and the per-category delete.
+    _HISTORY_KINDS = {
+        "live": {"live"},
+        "movie": {"movie", "vod"},
+        "series": {"series", "episode"},
     }
 
     @staticmethod

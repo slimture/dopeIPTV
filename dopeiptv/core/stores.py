@@ -149,6 +149,13 @@ class HistoryStore:
         self.entries = []
         self._save()
 
+    def clear_kind(self, kinds) -> None:
+        """Remove only entries whose _kind is in *kinds* (e.g. just channels,
+        leaving movies and series). Used by the per-category history delete."""
+        ks = set(kinds)
+        self.entries = [e for e in self.entries if e.get("_kind") not in ks]
+        self._save()
+
     def items(self) -> list[dict]:
         return list(self.entries)
 

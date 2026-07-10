@@ -1071,6 +1071,23 @@ _STRINGS: dict[str, dict[str, str]] = {
         "th": "คุณกำลังสำรวจโดยไม่มีผู้ให้บริการ แอปจึงถูกจำกัด "
               "เพิ่มได้ทุกเมื่อด้วยปุ่ม “+ เพิ่มผู้ให้บริการ” ตรงกลาง",
     },
+    "rec_today": {
+        "en": "Today", "sv": "Idag", "es": "Hoy", "de": "Heute",
+        "fr": "Aujourd'hui", "zh": "今天", "ru": "Сегодня", "th": "วันนี้",
+    },
+    "rec_yesterday": {
+        "en": "Yesterday", "sv": "Igår", "es": "Ayer", "de": "Gestern",
+        "fr": "Hier", "zh": "昨天", "ru": "Вчера", "th": "เมื่อวาน",
+    },
+    "rec_this_week": {
+        "en": "This week", "sv": "Denna vecka", "es": "Esta semana",
+        "de": "Diese Woche", "fr": "Cette semaine", "zh": "本周",
+        "ru": "На этой неделе", "th": "สัปดาห์นี้",
+    },
+    "rec_earlier": {
+        "en": "Earlier", "sv": "Tidigare", "es": "Anteriores", "de": "Früher",
+        "fr": "Plus tôt", "zh": "更早", "ru": "Ранее", "th": "ก่อนหน้านี้",
+    },
     "fav_empty_all": {
         "en": "No favorites yet — right-click any channel, movie or series "
               "to add one.",
