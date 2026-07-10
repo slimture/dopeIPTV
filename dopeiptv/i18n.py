@@ -1198,6 +1198,18 @@ _STRINGS: dict[str, dict[str, str]] = {
         "de": "Farbe wählen…", "fr": "Choisir la couleur…",
         "zh": "设置颜色…", "ru": "Выбрать цвет…", "th": "ตั้งสี…",
     },
+    "nav_set_text_color": {
+        "en": "Set text color…", "sv": "Välj textfärg…",
+        "es": "Color del texto…", "de": "Textfarbe wählen…",
+        "fr": "Couleur du texte…", "zh": "设置文字颜色…",
+        "ru": "Цвет текста…", "th": "ตั้งสีข้อความ…",
+    },
+    "nav_set_bg_color": {
+        "en": "Set background color…", "sv": "Välj bakgrundsfärg…",
+        "es": "Color de fondo…", "de": "Hintergrundfarbe wählen…",
+        "fr": "Couleur de fond…", "zh": "设置背景颜色…",
+        "ru": "Цвет фона…", "th": "ตั้งสีพื้นหลัง…",
+    },
     "nav_reset_color": {
         "en": "Reset color", "sv": "Återställ färg", "es": "Restablecer color",
         "de": "Farbe zurücksetzen", "fr": "Réinitialiser la couleur",
@@ -4434,6 +4446,12 @@ _STRINGS: dict[str, dict[str, str]] = {
         "en": "Set color", "sv": "Ange färg", "es": "Establecer color",
         "de": "Farbe festlegen", "fr": "Définir la couleur", "zh": "设置颜色",
         "ru": "Задать цвет", "th": "ตั้งสี",
+    },
+    "ctx_set_bg_color": {
+        "en": "Set background", "sv": "Ange bakgrund",
+        "es": "Establecer fondo", "de": "Hintergrund festlegen",
+        "fr": "Définir le fond", "zh": "设置背景", "ru": "Задать фон",
+        "th": "ตั้งพื้นหลัง",
     },
     "color_default": {
         "en": "Default", "sv": "Standard", "es": "Predeterminado",

@@ -434,19 +434,27 @@ class _ContextMenuMixin:
                         lambda: self._rename_category(cid))
             m.addAction(tr("ctx_set_icon"),
                         lambda: self._set_category_icon(cid))
+            _palette = ((tr("color_default"), ""),
+                        (tr("accent_blue"), "#4C8DFF"),
+                        (tr("accent_green"), "#2FBF71"),
+                        (tr("accent_orange"), "#FF9F43"),
+                        (tr("accent_red"), "#FF5C5C"),
+                        (tr("accent_purple"), "#8E6BFF"),
+                        (tr("accent_teal"), "#2AC3C3"),
+                        (tr("accent_pink"), "#FF5C8A"))
             color_menu = m.addMenu(tr("ctx_set_color"))
-            for label, hex_val in ((tr("color_default"), ""),
-                                   (tr("accent_blue"), "#4C8DFF"),
-                                   (tr("accent_green"), "#2FBF71"),
-                                   (tr("accent_orange"), "#FF9F43"),
-                                   (tr("accent_red"), "#FF5C5C"),
-                                   (tr("accent_purple"), "#8E6BFF"),
-                                   (tr("accent_teal"), "#2AC3C3"),
-                                   (tr("accent_pink"), "#FF5C8A")):
+            for label, hex_val in _palette:
                 act = color_menu.addAction(label)
                 act.triggered.connect(
                     lambda _, c=hex_val: (
                         self.overrides.update(self.mode, cid, color=c),
+                        self._load_categories()))
+            bg_menu = m.addMenu(tr("ctx_set_bg_color"))
+            for label, hex_val in _palette:
+                act = bg_menu.addAction(label)
+                act.triggered.connect(
+                    lambda _, c=hex_val: (
+                        self.overrides.update(self.mode, cid, bgcolor=c),
                         self._load_categories()))
             m.addSeparator()
             m.addAction(tr("ctx_hide_category"),

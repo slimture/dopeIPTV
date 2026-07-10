@@ -8,7 +8,7 @@ import time
 from datetime import datetime
 
 from PyQt6.QtCore import (
-    QRect, QSettings, QSize, Qt, QThreadPool,
+    QEvent, QRect, QSettings, QSize, Qt, QThreadPool,
     QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import (
@@ -693,7 +693,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # persists even if closeEvent doesn't run (Ctrl+C, force quit, sudden
         # kill). The window geometry is saved via moveEvent/resizeEvent below.
         root.splitterMoved.connect(self._schedule_save_layout)
-        root.splitterMoved.connect(self._on_splitter_moved)
+        # Watch the side|middle divider's own handle for mouse-release so we
+        # can snap the sidebar to/from the icon rail *after* the drag ends -
+        # calling setSizes() mid-drag (from splitterMoved) doesn't stick.
+        self._side_handle = root.handle(1)
+        if self._side_handle is not None:
+            self._side_handle.installEventFilter(self)
         det.setMinimumWidth(280)
         # Keep the content list from being squeezed away: dragging the sidebar
         # divider far right used to swallow the whole middle column (leaving
@@ -781,7 +786,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if collapsed:
             # Floor at the rail width, but leave the max open so the divider
             # can still be dragged outward - that re-expands (see
-            # _on_splitter_moved).
+            # _reconcile_sidebar_from_drag).
             self._side.setMinimumWidth(self.RAIL_W)
             self._side.setMaximumWidth(16777215)
             target = self.RAIL_W
@@ -801,11 +806,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         btn.style().unpolish(btn)
         btn.style().polish(btn)
 
-    def _on_splitter_moved(self, *_a) -> None:
-        """Symmetric drag behaviour for the sidebar: drag the divider outward
-        to bring the full column back, drag it inward to collapse to the icon
-        rail. The snap-to targets (rail width / >=180) sit outside the
-        threshold band, so it settles instead of flickering."""
+    def eventFilter(self, obj, event):
+        if (obj is getattr(self, "_side_handle", None)
+                and event.type() == QEvent.Type.MouseButtonRelease):
+            # Defer so the splitter finishes handling the release first.
+            QTimer.singleShot(0, self._reconcile_sidebar_from_drag)
+        return super().eventFilter(obj, event)
+
+    def _reconcile_sidebar_from_drag(self) -> None:
+        """After the user drags the side divider: snap to the icon rail if it
+        was pulled narrow, or expand if it was pulled out from the rail. The
+        snap targets (rail width / >=180) sit outside the threshold band so it
+        settles instead of flickering."""
         if not hasattr(self, "_side") or not hasattr(self, "side_btn"):
             return
         w = self._side.width()
@@ -838,19 +850,28 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     # -- custom nav colours --------------------------------------------------
 
     def _apply_nav_color(self, key: str) -> None:
-        """Tint one nav entry with the user's chosen colour (text when idle,
-        background when selected). Empty setting -> back to the theme default."""
+        """Tint one nav entry with the user's chosen text and/or background
+        colours. Empty settings -> back to the theme default."""
         b = self.nav_btns.get(key)
         if b is None:
             return
-        c = self.settings.value(f"nav_color_{key}", "") or ""
-        if c:
-            b.setStyleSheet(
-                "QPushButton#NavBtn{color:%s;}"
-                "QPushButton#NavBtn:checked{background:%s;color:#ffffff;}"
-                % (c, c))
-        else:
+        fg = self.settings.value(f"nav_color_{key}", "") or ""
+        bg = self.settings.value(f"nav_bg_{key}", "") or ""
+        if not fg and not bg:
             b.setStyleSheet("")
+            return
+        idle = []
+        if fg:
+            idle.append(f"color:{fg};")
+        if bg:
+            idle.append(f"background:{bg};")
+        # When selected, a custom background wins as the fill; otherwise keep
+        # the accent selection with the custom text colour.
+        checked = (f"background:{bg};color:{fg or '#ffffff'};" if bg
+                   else f"color:{fg};")
+        b.setStyleSheet(
+            "QPushButton#NavBtn{%s}QPushButton#NavBtn:checked{%s}"
+            % ("".join(idle), checked))
 
     def _nav_color_menu(self, key: str, global_pos) -> None:
         m = QMenu(self)
@@ -858,24 +879,31 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if key in ("live", "vod", "series"):
             m.addAction(tr("menu_refresh_playlist"), self.refresh_playlist)
             m.addSeparator()
-        m.addAction(tr("nav_set_color"), lambda: self._pick_nav_color(key))
-        if self.settings.value(f"nav_color_{key}", ""):
+        m.addAction(tr("nav_set_text_color"),
+                    lambda: self._pick_nav_color(key, "text"))
+        m.addAction(tr("nav_set_bg_color"),
+                    lambda: self._pick_nav_color(key, "bg"))
+        if (self.settings.value(f"nav_color_{key}", "")
+                or self.settings.value(f"nav_bg_{key}", "")):
             m.addAction(tr("nav_reset_color"),
                         lambda: self._reset_nav_color(key))
         m.exec(global_pos)
 
-    def _pick_nav_color(self, key: str) -> None:
+    def _pick_nav_color(self, key: str, which: str) -> None:
         from PyQt6.QtWidgets import QColorDialog
-        cur = self.settings.value(f"nav_color_{key}", "") or ""
+        skey = f"nav_bg_{key}" if which == "bg" else f"nav_color_{key}"
+        cur = self.settings.value(skey, "") or ""
         col = QColorDialog.getColor(
             QColor(cur) if cur else QColor("#3b5ba5"), self,
-            tr("nav_set_color"))
+            tr("nav_set_bg_color") if which == "bg"
+            else tr("nav_set_text_color"))
         if col.isValid():
-            self.settings.setValue(f"nav_color_{key}", col.name())
+            self.settings.setValue(skey, col.name())
             self._apply_nav_color(key)
 
     def _reset_nav_color(self, key: str) -> None:
         self.settings.remove(f"nav_color_{key}")
+        self.settings.remove(f"nav_bg_{key}")
         self._apply_nav_color(key)
 
     def _on_cat_solo_toggle(self, checked: bool) -> None:
@@ -1413,6 +1441,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 color = ovr.get("color", "")
                 if color:
                     it.setForeground(QColor(color))
+                bgcolor = ovr.get("bgcolor", "")
+                if bgcolor:
+                    it.setBackground(QColor(bgcolor))
                 self.cat_list.addItem(it)
             self.cat_list.blockSignals(False)
             self.cat_list.setCurrentRow(
