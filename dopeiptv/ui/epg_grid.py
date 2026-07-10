@@ -218,14 +218,35 @@ class EpgGridDialog(QDialog):
             self._header_group.addToGroup(lbl)
             t += 3600
 
+    def _is_playing(self, ch: dict) -> bool:
+        """True if this channel is the one currently playing live, so the row
+        can be flagged in the guide."""
+        w = self.window
+        if getattr(w, "_playing_group", None) != "live":
+            return False
+        player = getattr(w, "player", None)
+        if not player or not player.isVisible():
+            return False
+        try:
+            key = w._item_key(ch)
+        except Exception:
+            return False
+        return key is not None and key == getattr(w, "_playing_key", None)
+
     def _draw_channel_row(self, row: int, ch: dict) -> None:
         y = self.HEADER_H + row * self.ROW_H
         base = QColor(self.ROW_COLORS[row % len(self.ROW_COLORS)])
+        playing = self._is_playing(ch)
         cell = QGraphicsRectItem(0, y, self.CH_COL_W, self.ROW_H)
-        cell.setBrush(QBrush(base.darker(120)))
-        cell.setPen(QPen(QColor(P["bg"]), 1))
+        if playing:
+            cell.setBrush(QBrush(QColor(ACCENT)))
+            cell.setPen(QPen(QColor("#ffffff"), 2))
+        else:
+            cell.setBrush(QBrush(base.darker(120)))
+            cell.setPen(QPen(QColor(P["bg"]), 1))
         self._chan_group.addToGroup(cell)
-        name = QGraphicsSimpleTextItem(ch.get("name") or "?")
+        label_text = ("▶  " if playing else "") + (ch.get("name") or "?")
+        name = QGraphicsSimpleTextItem(label_text)
         f = QFont()
         f.setBold(True)
         f.setPointSize(10)
@@ -234,6 +255,19 @@ class EpgGridDialog(QDialog):
         self._elide(name, self.CH_COL_W - 16)
         name.setPos(8, y + (self.ROW_H - name.boundingRect().height()) / 2)
         self._chan_group.addToGroup(name)
+        if playing:
+            # Tint the whole row across the timeline so the playing channel
+            # is obvious even when the programme area is what you're looking
+            # at. Sits above the blocks but carries no data(0), so it never
+            # intercepts a click (hit-testing reads the block beneath it).
+            band = QGraphicsRectItem(self.CH_COL_W, y, self._grid_w, self.ROW_H)
+            glow = QColor(ACCENT)
+            glow.setAlpha(48)
+            band.setBrush(QBrush(glow))
+            band.setPen(QPen(Qt.PenStyle.NoPen))
+            band.setZValue(6)
+            band.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+            self.scene.addItem(band)
 
         for i, p in enumerate(
                 self.window.xmltv.programmes_in(ch, self._start, self._stop)):
