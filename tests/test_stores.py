@@ -35,6 +35,19 @@ def test_favorite_store_groups():
     assert not any(x["stream_id"] == "200" for x in fav.items("news"))
 
 
+def test_favorite_store_group_colors():
+    s = _mock_settings()
+    fav = FavoriteStore(s)
+    assert fav.group_color("sports") == {}
+    fav.set_group_color("sports", color="#ff0000")
+    fav.set_group_color("sports", bgcolor="#001122")
+    assert fav.group_color("sports") == {"color": "#ff0000",
+                                         "bgcolor": "#001122"}
+    # Clearing both empties the entry.
+    fav.set_group_color("sports", color="", bgcolor="")
+    assert fav.group_color("sports") == {}
+
+
 def test_favorite_store_series_id_key():
     """A series favourites store keys on series_id, not stream_id."""
     s = _mock_settings()

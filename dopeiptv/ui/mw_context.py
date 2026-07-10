@@ -199,6 +199,24 @@ class _ContextMenuMixin:
             m.addAction(
                 tr("ctx_hide_channel") if ov_mode == "live" else tr("ctx_hide"),
                 lambda: self._hide_channel(ov_mode, key))
+            _palette = ((tr("color_default"), ""),
+                        (tr("accent_blue"), "#4C8DFF"),
+                        (tr("accent_green"), "#2FBF71"),
+                        (tr("accent_orange"), "#FF9F43"),
+                        (tr("accent_red"), "#FF5C5C"),
+                        (tr("accent_purple"), "#8E6BFF"),
+                        (tr("accent_teal"), "#2AC3C3"),
+                        (tr("accent_pink"), "#FF5C8A"))
+            color_menu = m.addMenu(tr("ctx_set_color"))
+            for label, hexv in _palette:
+                color_menu.addAction(
+                    label,
+                    lambda c=hexv: self._set_item_color(ov_mode, key, color=c))
+            bg_menu = m.addMenu(tr("ctx_set_bg_color"))
+            for label, hexv in _palette:
+                bg_menu.addAction(
+                    label,
+                    lambda c=hexv: self._set_item_color(ov_mode, key, bgcolor=c))
             if self.channel_ov.get(ov_mode, key):
                 m.addAction(
                     tr("ctx_reset_channel"),
@@ -241,8 +259,16 @@ class _ContextMenuMixin:
         self._apply_filter()
 
     def _reset_channel(self, mode: str, key) -> None:
-        self.channel_ov.update(mode, key, name="", hidden=False)
+        self.channel_ov.update(mode, key, name="", hidden=False,
+                               color="", bgcolor="")
         self._apply_filter()
+
+    def _set_item_color(self, mode: str, key, **fields) -> None:
+        if key is None:
+            return
+        self.channel_ov.update(mode, key, **fields)
+        self.list_model.refresh_all()
+        self.listw.viewport().update()
 
     def _open_tmdb_match_dialog(self, it: dict, kind: str) -> None:
         """Open the manual TMDB-match dialog for a movie/series and refresh
@@ -419,6 +445,26 @@ class _ContextMenuMixin:
                     else:
                         m.addAction(tr("ctx_lock_group"),
                                     lambda: self._set_fav_lock(group, True))
+                _pal = ((tr("color_default"), ""),
+                        (tr("accent_blue"), "#4C8DFF"),
+                        (tr("accent_green"), "#2FBF71"),
+                        (tr("accent_orange"), "#FF9F43"),
+                        (tr("accent_red"), "#FF5C5C"),
+                        (tr("accent_purple"), "#8E6BFF"),
+                        (tr("accent_teal"), "#2AC3C3"),
+                        (tr("accent_pink"), "#FF5C8A"))
+                cmenu = m.addMenu(tr("ctx_set_color"))
+                for label, hexv in _pal:
+                    cmenu.addAction(
+                        label,
+                        lambda c=hexv, st=store, gr=group:
+                        self._set_folder_color(st, gr, color=c))
+                bmenu = m.addMenu(tr("ctx_set_bg_color"))
+                for label, hexv in _pal:
+                    bmenu.addAction(
+                        label,
+                        lambda c=hexv, st=store, gr=group:
+                        self._set_folder_color(st, gr, bgcolor=c))
             else:
                 # A section header row: make a new folder under it.
                 m.addAction(tr("ctx_new_folder"),
@@ -471,6 +517,14 @@ class _ContextMenuMixin:
         m.addSeparator()
         m.addAction(tr("menu_refresh_playlist"), self.refresh_playlist)
         m.exec(self.cat_list.mapToGlobal(pos))
+
+    def _set_folder_color(self, store, group: str, **fields) -> None:
+        store.set_group_color(group, **fields)
+        # Reload the list so the folder's items repaint with the new colour.
+        if self.mode == "fav":
+            self._load_items(self.cat_list.currentItem().data(
+                Qt.ItemDataRole.UserRole)
+                if self.cat_list.currentItem() else None)
 
     def _new_fav_folder(self, store) -> None:
         name, ok = QInputDialog.getText(

@@ -195,6 +195,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._playing_group: str | None = None
         self._playing_item = None
         self._focus_mode = False
+        self._fav_view_tint = ("", "")
         self._pip_win = None
         self._last_player = None
         self._last_playlist_refresh = time.time()
@@ -1558,6 +1559,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # fallback, meaning all channels).
             section, group = category_id if category_id else ("chan", None)
             self._fav_section = section
+            # A folder's colour cascades to all its favourites: resolve it once
+            # here (all items in a selected folder share it) for item_tint.
+            fstore = {"chan": self.favs, "movie": self.movie_favs,
+                      "series": self.series_favs}.get(section)
+            gc = fstore.group_color(group) if (fstore and group) else {}
+            self._fav_view_tint = (gc.get("color", "") or "",
+                                   gc.get("bgcolor", "") or "")
             if section == "all":
                 self._load_favorites_all()
                 return
@@ -1913,6 +1921,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         every item in it. Empty strings when none. Per-item overrides win."""
         if not it:
             return "", ""
+        if self.mode == "fav":
+            # In a favourites folder every item inherits the folder's colour.
+            return getattr(self, "_fav_view_tint", ("", ""))
         mode = {"live": "live", "vod": "vod", "series": "series"}.get(kind)
         if mode is None:
             return "", ""

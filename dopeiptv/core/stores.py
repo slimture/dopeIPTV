@@ -117,6 +117,30 @@ class FavoriteStore:
     def is_locked(self, group: str) -> bool:
         return group in self.locked_groups()
 
+    def group_color(self, group: str) -> dict:
+        """Per-folder {'color':..,'bgcolor':..} - applied to every favourite
+        in the folder. Stored beside the favourites, keyed by folder name."""
+        try:
+            data = json.loads(
+                self.settings.value(f"{self.key}_colors", "") or "{}")
+        except Exception:
+            data = {}
+        return data.get(group, {}) if isinstance(data, dict) else {}
+
+    def set_group_color(self, group: str, **fields: Any) -> None:
+        try:
+            data = json.loads(
+                self.settings.value(f"{self.key}_colors", "") or "{}")
+        except Exception:
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        entry = data.setdefault(group, {})
+        entry.update(fields)
+        if not any(entry.values()):
+            data.pop(group, None)
+        self.settings.setValue(f"{self.key}_colors", json.dumps(data))
+
     def items(self, group: str | None = None,
               exclude_groups: tuple[str, ...] = ()) -> list[dict]:
         if group:
