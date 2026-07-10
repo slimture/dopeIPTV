@@ -1,41 +1,40 @@
-## dopeIPTV 0.6.0
+## dopeIPTV 0.6.1
 
-A big feature release focused on getting started, Trakt, and the EPG.
+A polish release: a collapsible sidebar, custom colours across the app, a
+smarter M3U/EPG setup, and some important fixes (Picture-in-Picture no longer
+quits the app, the colour picker no longer freezes).
 
-**Highlights:** one-click **Sign in with Trakt** · auto-mark **watched** · **demo channels** + **M3U** playlists · unified **favorite folders** · a new horizontal **EPG timeline grid** with catch-up · adaptive window sizing · in-app **update check**.
+**Highlights:** collapsible **icon-rail sidebar** · **focus mode** · custom **colours** for nav, categories, items & favourite folders · **M3U auto-EPG** · EPG grid flags the **playing** channel · PiP-close & colour-picker fixes.
 
 <details>
 <summary><b>Full release notes</b> — click to expand</summary>
 
-### Getting started
-- **Try it without a provider** — a "🎬 Demo channels" button loads a few free public test streams so you can exercise the whole app before entering any credentials.
-- **M3U playlists** — alongside Xtream Codes you can add any free/legal `.m3u` playlist URL (e.g. iptv-org). Choose the type in the playlist dialog or the onboarding wizard.
-- **Onboarding wizard** — full in-window welcome with language pick, a short feature tour, and Esc to dismiss.
+### Sidebar & layout
+- **Collapsible sidebar** — fold it down to a slim icon rail with the **☰** button or **Ctrl+B**, or just drag its divider: inward collapses to the rail, outward expands it again. You keep the TV/Movies/Series navigation as icons and reclaim the width for the content — handy on small screens.
+- **Solo category** — a small disclosure arrow next to "Categories" collapses the list to only the active category (tidy for screenshots), without touching the navigation.
+- **Focus mode** — the **⤢** button (or **Ctrl+Shift+M**) hides the whole content list for a rail-plus-player layout. A slim arrow strip on the player's edge brings the list straight back, so it can never get lost.
+- The content list now has a minimum width, so dragging a divider can't accidentally hide it.
 
-### Trakt — one click, zero setup
-- **Sign in with Trakt** opens your browser, you click "Yes", and you're connected — no codes, no manual API keys (power users can still bring their own in Settings).
+### Colours
+- **Left-column entries** (TV … History) can each be given their own **text and background colour** — right-click an entry.
+- **Categories** can be coloured too; a category's colour tints **its own row** in the left column.
+- **Individual channels, movies and series** can be given a personal text/background colour from their right-click menu.
+- **Favourite folders** can be coloured, and that colour applies to **every favourite in the folder** — a quick way to colour-code a whole group.
+- Every colour choice has a **Reset**, and colours persist between sessions.
 
-### Watched
-- Movies and episodes are **auto-marked watched** once you've seen ~90%, locally — the badge appears without Trakt and syncs up when connected.
+### M3U & EPG
+- **Automatic EPG for M3U playlists** — dopeIPTV now reads the `url-tvg` / `x-tvg-url` guide URL from a playlist's `#EXTM3U` header, so a plain M3U URL brings its programme guide with nothing extra to configure (an explicit per-playlist EPG URL still wins).
+- **Gzipped XMLTV** guides (`.xml.gz`) are now decompressed transparently.
+- The EPG timeline grid **flags the channel you're currently watching**, and a **"Playing"** button jumps the board back to it after you've scrolled down a long line-up.
 
-### Favorites
-- **Unified folders** across Channels, Movies and Series: a plain "Add to favorites", an "Add to folder" submenu, and create/rename/remove folders from the sidebar's right-click menu.
+### Convenience
+- **Refresh playlist** is now one right-click away on the **TV / Movies / Series** entries in the left column.
 
-### EPG
-- **New horizontal timeline grid**: colour-coded channel rows, programmes as blocks, a live "now" line, and a pinned time header + channel column. Click to select, double-click to play, right-click to record a programme.
-- Timeshift channels open the board up to 48h **into the past** with **catch-up playback**; a "Now" button jumps back to the present.
-- From Favorites the guide is scoped to your favorite channels.
-
-### Player & windows
-- **Adaptive first-run window sizing** to your display, and a larger, letterbox-free mini player.
-- **Picture-in-Picture always-on-top** on Wayland (title-bar menu), plus an opt-in "Run via X11 backend" for a frameless, always-on-top PiP.
-- Opening an **external player** now asks first if the mini player is busy, so it won't trip single-connection accounts.
-
-### Other
-- **About** dialog: version, an automatic update check with the latest release's notes and a download link, and TMDB attribution.
-- **Recordings**: a total recordings-folder size cap.
-- Tighter section headers, clearer EPG scrollbars, and lower memory use.
+### Fixes
+- **Picture-in-Picture** — pressing the window's close button while in PiP now drops back to the normal mini player instead of quitting the whole app.
+- **Colour picker** — no longer freezes the app on some Linux setups (it now always uses the in-app dialog).
+- **Keep your place** — opening *Manage categories*, or recolouring a category, no longer snaps the category list back to the top; your selection and scroll position stay put.
 
 </details>
 
-**Full changelog:** https://github.com/slimture/dopeIPTV/compare/v0.5.0...v0.6.0
+**Full changelog:** https://github.com/slimture/dopeIPTV/compare/v0.6.0...v0.6.1
