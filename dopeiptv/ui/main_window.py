@@ -662,11 +662,20 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._apply_view_settings()
 
     def _on_side_toggle(self, checked: bool) -> None:
-        """Show/hide the left category column. Remembered so leaving
-        fullscreen doesn't force it back on against the user's choice."""
-        self._sidebar_user_hidden = not checked
-        if hasattr(self, "_side") and not self._player_fs:
-            self._side.setVisible(checked)
+        """Show/hide just the category list (the nav buttons stay), so the
+        provider's category names can be tucked away - handy for clean
+        screenshots - without losing TV/Movies/Series navigation. Remembered
+        so leaving fullscreen doesn't force it back on."""
+        self._cat_list_hidden = not checked
+        if not self._player_fs:
+            self._apply_cat_list_visibility()
+
+    def _apply_cat_list_visibility(self) -> None:
+        show = not getattr(self, "_cat_list_hidden", False)
+        if hasattr(self, "cat_list"):
+            self.cat_list.setVisible(show)
+        if hasattr(self, "_cat_section_label"):
+            self._cat_section_label.setVisible(show)
 
     def _toggle_pause_shortcut(self) -> None:
         if self.player and self.player.isVisible():
@@ -729,7 +738,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self.showNormal()
             return
         self._player_fs = False
-        self._side.setVisible(not getattr(self, "_sidebar_user_hidden", False))
+        self._side.show()
+        self._apply_cat_list_visibility()   # keep the user's category-list choice
         self._mid.show()
         for w in getattr(self, "_det_hidden", []):
             w.show()
