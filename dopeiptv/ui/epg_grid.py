@@ -125,6 +125,12 @@ class EpgGridDialog(QDialog):
         self.now_btn = QPushButton("⟳ " + tr("epg_jump_now"))
         self.now_btn.clicked.connect(self._scroll_to_now)
         bar.addWidget(self.now_btn)
+        # Jumps the board back up to the channel you're watching (handy after
+        # scrolling far down a long line-up). Only shown when one is playing.
+        self.playing_btn = QPushButton("▶ " + tr("epg_jump_playing"))
+        self.playing_btn.clicked.connect(self._scroll_to_playing)
+        self.playing_btn.hide()
+        bar.addWidget(self.playing_btn)
         self.info = QLabel(tr("epg_select_channel"))
         self.info.setStyleSheet(f"color:{P['muted']}; font-size:12px;")
         self.info.setWordWrap(True)
@@ -158,11 +164,21 @@ class EpgGridDialog(QDialog):
         self.view.horizontalScrollBar().setValue(
             max(0, int(now_x - self.CH_COL_W - 40)))
 
+    def _scroll_to_playing(self) -> None:
+        """Scroll vertically back to the row of the channel you're watching."""
+        row = getattr(self, "_playing_row", None)
+        if row is None:
+            return
+        y = self.HEADER_H + row * self.ROW_H
+        self.view.verticalScrollBar().setValue(
+            max(0, int(y - self.HEADER_H - self.ROW_H)))
+
     # -- build ---------------------------------------------------------------
 
     def _build(self) -> None:
         self.scene.clear()
         self._selected = None
+        self._playing_row = None
         self.play_btn.setEnabled(False)
         text = self.filter.text().lower().strip()
         chans = [c for c in self.channels
@@ -191,6 +207,8 @@ class EpgGridDialog(QDialog):
             QPen(QColor(P["border"])), QBrush(head_bg))
         self._corner.setZValue(30)
         self._pin()
+        if hasattr(self, "playing_btn"):
+            self.playing_btn.setVisible(self._playing_row is not None)
 
     def _draw_grid_lines(self, grid_h: int) -> None:
         t = self._start
@@ -237,6 +255,8 @@ class EpgGridDialog(QDialog):
         y = self.HEADER_H + row * self.ROW_H
         base = QColor(self.ROW_COLORS[row % len(self.ROW_COLORS)])
         playing = self._is_playing(ch)
+        if playing:
+            self._playing_row = row
         cell = QGraphicsRectItem(0, y, self.CH_COL_W, self.ROW_H)
         if playing:
             cell.setBrush(QBrush(QColor(ACCENT)))

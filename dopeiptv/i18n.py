@@ -740,6 +740,11 @@ _STRINGS: dict[str, dict[str, str]] = {
         "en": "Now", "sv": "Nu", "es": "Ahora", "de": "Jetzt",
         "fr": "Maintenant", "zh": "现在", "ru": "Сейчас", "th": "ตอนนี้",
     },
+    "epg_jump_playing": {
+        "en": "Playing", "sv": "Spelas nu", "es": "En reproducción",
+        "de": "Läuft", "fr": "En cours", "zh": "正在播放",
+        "ru": "Сейчас идёт", "th": "กำลังเล่น",
+    },
     "epg_play_channel": {
         "en": "Play channel", "sv": "Spela kanal",
         "es": "Reproducir canal", "de": "Kanal abspielen",

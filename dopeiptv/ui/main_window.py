@@ -854,6 +854,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _nav_color_menu(self, key: str, global_pos) -> None:
         m = QMenu(self)
+        # Provider-backed lists can be reloaded straight from their entry.
+        if key in ("live", "vod", "series"):
+            m.addAction(tr("menu_refresh_playlist"), self.refresh_playlist)
+            m.addSeparator()
         m.addAction(tr("nav_set_color"), lambda: self._pick_nav_color(key))
         if self.settings.value(f"nav_color_{key}", ""):
             m.addAction(tr("nav_reset_color"),
