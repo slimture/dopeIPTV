@@ -8,7 +8,7 @@ import time
 from datetime import datetime
 
 from PyQt6.QtCore import (
-    QRect, QSettings, QSize, Qt, QThreadPool,
+    QEvent, QRect, QSettings, QSize, Qt, QThreadPool,
     QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import (
@@ -703,6 +703,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # _apply_sidebar_collapsed) is what makes this stick mid-drag - a hard
         # width constraint the splitter honours, unlike a setSizes() call.
         root.splitterMoved.connect(self._maybe_collapse_on_drag)
+        # When collapsed the rail's width is pinned (so it can't stretch), which
+        # freezes its divider handle - so watch the handle for a rightward drag
+        # to re-expand it without reaching for the ☰ button.
+        self._side_handle = root.handle(1)
+        if self._side_handle is not None:
+            self._side_handle.installEventFilter(self)
         det.setMinimumWidth(280)
         # Keep the content list from being squeezed away: dragging the sidebar
         # divider far right used to swallow the whole middle column (leaving
@@ -821,12 +827,35 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         frozen-width rail can't be dragged back out.)"""
         if not hasattr(self, "_side") or not hasattr(self, "side_btn"):
             return
-        if getattr(self, "_sidebar_collapsed", False):
-            return
         w = self._side.width()
+        if getattr(self, "_sidebar_collapsed", False):
+            # Only while actively dragging the rail's handle out (the press
+            # temporarily unpinned it): grow it past a bit of slack -> expand.
+            if getattr(self, "_rail_drag", False) and w > self.RAIL_W + 60:
+                self.side_btn.setChecked(True)      # -> expand
+            return
+        if getattr(self, "_rail_drag", False):
+            return                                   # mid rail-drag-out
         floor = self._side.minimumSizeHint().width()
         if w < 150 or w <= floor + 12:
-            self.side_btn.setChecked(False)      # -> collapse to the rail
+            self.side_btn.setChecked(False)          # -> collapse to the rail
+
+    def eventFilter(self, obj, event):
+        # The collapsed rail pins its width (so it can't stretch), which also
+        # freezes its handle. Pressing the handle temporarily unpins it so the
+        # user can drag the rail back out; if they don't, we re-pin on release.
+        if obj is getattr(self, "_side_handle", None):
+            t = event.type()
+            if (t == QEvent.Type.MouseButtonPress
+                    and getattr(self, "_sidebar_collapsed", False)):
+                self._rail_drag = True
+                self._side.setMaximumWidth(16777215)
+            elif (t == QEvent.Type.MouseButtonRelease
+                    and getattr(self, "_rail_drag", False)):
+                self._rail_drag = False
+                if getattr(self, "_sidebar_collapsed", False):
+                    self._side.setMaximumWidth(self.RAIL_W)   # re-pin
+        return super().eventFilter(obj, event)
 
     def _set_focus_mode(self, on: bool) -> None:
         """Focus mode hides the whole content list so the player pane gets the
