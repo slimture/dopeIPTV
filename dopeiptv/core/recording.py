@@ -334,6 +334,27 @@ class RecordingManager(QObject):
             self.settings.value("rec_max_unit", "GB"), 10**9)
         return int(val * mult) if val > 0 else 0
 
+    def total_cap_bytes(self) -> int:
+        """User's total size limit for the whole recordings folder
+        (0 = unlimited)."""
+        try:
+            val = float(self.settings.value("rec_total_value", 0) or 0)
+        except (TypeError, ValueError):
+            return 0
+        mult = {"MB": 10**6, "GB": 10**9, "TB": 10**12}.get(
+            self.settings.value("rec_total_unit", "GB"), 10**9)
+        return int(val * mult) if val > 0 else 0
+
+    def folder_used_bytes(self) -> int:
+        """Bytes currently occupied by recordings in the folder."""
+        return sum(int(f.get("_size") or 0) for f in self.files(None))
+
+    def total_cap_exceeded(self) -> bool:
+        """True when a total cap is set and the folder already meets/exceeds
+        it - a new recording should be refused."""
+        cap = self.total_cap_bytes()
+        return cap > 0 and self.folder_used_bytes() >= cap
+
     def _over_size_cap(self, j: dict, cap: int) -> bool:
         try:
             return (cap > 0 and bool(j.get("path"))

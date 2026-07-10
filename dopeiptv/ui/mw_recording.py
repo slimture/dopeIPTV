@@ -210,6 +210,22 @@ class _RecordingMixin:
             tr("msg_rec_needs_ffmpeg"))
         return False
 
+    @staticmethod
+    def _fmt_gb(n: int) -> str:
+        return f"{n / 10**9:.1f} GB"
+
+    def _within_storage_cap(self) -> bool:
+        """False (and warns) when the recordings folder has hit the user's
+        total size limit, so no new recording is started."""
+        if not self.rec.total_cap_exceeded():
+            return True
+        QMessageBox.warning(
+            self, tr("rec_cap_title"),
+            tr("rec_cap_reached",
+               used=self._fmt_gb(self.rec.folder_used_bytes()),
+               cap=self._fmt_gb(self.rec.total_cap_bytes())))
+        return False
+
     def _build_record_menu(self, rec_menu, it) -> None:
         active = [j for j in self.rec.jobs if j["status"] == "recording"]
         for j in active:
@@ -290,6 +306,8 @@ class _RecordingMixin:
 
     def _record_now(self, it, minutes) -> None:
         if it.get("stream_id") is None:
+            return
+        if not self._within_storage_cap():
             return
         title = self.channel_display_name(it)
         now = time.time()
@@ -372,6 +390,8 @@ class _RecordingMixin:
 
     def _schedule_recording(self, it) -> None:
         if not self._recorder_ready() or it.get("stream_id") is None:
+            return
+        if not self._within_storage_cap():
             return
         d = QDialog(self)
         d.setWindowTitle(tr("rec_schedule_recording").rstrip("."))

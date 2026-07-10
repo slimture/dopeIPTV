@@ -5260,6 +5260,49 @@ _STRINGS: dict[str, dict[str, str]] = {
         "de": "kein Limit", "fr": "aucune limite", "zh": "无限制",
         "ru": "без лимита", "th": "ไม่จำกัด",
     },
+    "rec_total_label": {
+        "en": "Total recordings folder limit",
+        "sv": "Total gräns för inspelningsmappen",
+        "es": "Límite total de la carpeta de grabaciones",
+        "de": "Gesamtlimit des Aufnahmeordners",
+        "fr": "Limite totale du dossier d'enregistrements",
+        "zh": "录制文件夹总容量上限",
+        "ru": "Общий лимит папки записей",
+        "th": "ขีดจำกัดรวมของโฟลเดอร์การบันทึก",
+    },
+    "rec_cap_title": {
+        "en": "Storage limit reached",
+        "sv": "Lagringsgräns nådd",
+        "es": "Límite de almacenamiento alcanzado",
+        "de": "Speicherlimit erreicht",
+        "fr": "Limite de stockage atteinte",
+        "zh": "已达存储上限",
+        "ru": "Достигнут лимит хранилища",
+        "th": "ถึงขีดจำกัดพื้นที่จัดเก็บแล้ว",
+    },
+    "rec_cap_reached": {
+        "en": "Can't start a new recording: the recordings folder is at your "
+              "limit ({used} of {cap}). Delete some recordings or raise the "
+              "limit in Settings.",
+        "sv": "Kan inte starta en ny inspelning: inspelningsmappen har nått "
+              "din gräns ({used} av {cap}). Radera några inspelningar eller "
+              "höj gränsen i Inställningar.",
+        "es": "No se puede iniciar una grabación: la carpeta está en tu "
+              "límite ({used} de {cap}). Borra grabaciones o sube el límite "
+              "en Ajustes.",
+        "de": "Neue Aufnahme nicht möglich: der Ordner hat dein Limit erreicht "
+              "({used} von {cap}). Lösche Aufnahmen oder erhöhe das Limit in "
+              "den Einstellungen.",
+        "fr": "Impossible de démarrer un enregistrement : le dossier a atteint "
+              "votre limite ({used} sur {cap}). Supprimez des enregistrements "
+              "ou augmentez la limite dans les Réglages.",
+        "zh": "无法开始新录制：录制文件夹已达上限（{used} / {cap}）。"
+              "请删除部分录制或在设置中提高上限。",
+        "ru": "Нельзя начать запись: папка достигла лимита ({used} из {cap}). "
+              "Удалите записи или увеличьте лимит в настройках.",
+        "th": "เริ่มบันทึกใหม่ไม่ได้: โฟลเดอร์ถึงขีดจำกัดแล้ว ({used} จาก {cap}) "
+              "ลบการบันทึกบางส่วนหรือเพิ่มขีดจำกัดในการตั้งค่า",
+    },
 
     # ── Settings: reset-to-defaults ───────────────────────────────────────
     "settings_reset_all": {

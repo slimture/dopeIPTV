@@ -35,3 +35,38 @@ def test_format_size_mb():
 def test_format_size_gb():
     result = format_size(1024 ** 3)
     assert "GB" in result
+
+
+def test_total_recordings_cap(tmp_path):
+    """The folder-wide size cap counts only recordings and trips at the
+    limit so a new recording can be refused."""
+    from PyQt6.QtCore import QSettings
+    from dopeiptv.core.recording import RecordingManager
+
+    for name, size in (("a.mp4", 1_000_000_000),
+                       ("b.mp4", 2_000_000_000),
+                       ("note.txt", 5_000_000_000)):
+        p = tmp_path / name
+        with open(p, "wb") as f:
+            f.seek(size - 1)
+            f.write(b"\0")
+
+    s = QSettings("dopeIPTV-test", "reccap")
+    s.clear()
+    s.setValue("recordings_dir", str(tmp_path))
+    rm = RecordingManager(s)
+
+    # Only the two .mp4 files count (~3 GB), not the .txt.
+    assert 2.9e9 < rm.folder_used_bytes() < 3.1e9
+    assert rm.total_cap_bytes() == 0 and not rm.total_cap_exceeded()
+
+    s.setValue("rec_total_value", "5")
+    s.setValue("rec_total_unit", "GB")
+    assert not rm.total_cap_exceeded()          # 3 GB < 5 GB
+
+    s.setValue("rec_total_value", "2")
+    assert rm.total_cap_exceeded()              # 3 GB >= 2 GB
+
+    s.setValue("rec_total_value", "1")
+    s.setValue("rec_total_unit", "TB")
+    assert rm.total_cap_bytes() == 10**12 and not rm.total_cap_exceeded()

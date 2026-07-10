@@ -544,6 +544,19 @@ class _SettingsMixin:
         size_row.addWidget(rec_max_unit)
         size_row.addStretch()
         recv.addLayout(size_row)
+        total_row = QHBoxLayout()
+        total_row.addWidget(QLabel(tr("rec_total_label")))
+        rec_total_edit = QLineEdit(
+            str(self.settings.value("rec_total_value", "")))
+        rec_total_edit.setPlaceholderText(tr("ph_no_limit"))
+        rec_total_edit.setMaximumWidth(90)
+        rec_total_unit = self._combo(
+            [("GB", "GB"), ("TB", "TB")],
+            self.settings.value("rec_total_unit", "GB"))
+        total_row.addWidget(rec_total_edit)
+        total_row.addWidget(rec_total_unit)
+        total_row.addStretch()
+        recv.addLayout(total_row)
         rk, rexe = self.rec.recorder()
         rec_hint = QLabel(
             f"Recorder: {rk} ({rexe})" if rexe else
@@ -1025,6 +1038,14 @@ class _SettingsMixin:
                 "rec_max_value", val if val > 0 else "")
             self.settings.setValue(
                 "rec_max_unit", rec_max_unit.currentData())
+            try:
+                tval = float(rec_total_edit.text().replace(",", ".") or 0)
+            except ValueError:
+                tval = 0
+            self.settings.setValue(
+                "rec_total_value", tval if tval > 0 else "")
+            self.settings.setValue(
+                "rec_total_unit", rec_total_unit.currentData())
             self.settings.setValue(
                 "metadata_source", meta_source_box.currentData())
             self.settings.setValue(
