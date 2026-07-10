@@ -650,6 +650,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         root.addWidget(det)
         root.setSizes([220, 560, 380])
         root.setCollapsible(0, False)
+        root.setCollapsible(1, False)
         root.setCollapsible(2, False)
         root.setStretchFactor(0, 0)
         root.setStretchFactor(1, 1)
@@ -660,6 +661,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         root.splitterMoved.connect(self._schedule_save_layout)
         root.splitterMoved.connect(self._on_splitter_moved)
         det.setMinimumWidth(280)
+        # Keep the content list from being squeezed away: dragging the sidebar
+        # divider far right used to swallow the whole middle column (leaving
+        # sidebar + player and no list, which just looks broken). A floor plus
+        # non-collapsible keeps it always present.
+        mid.setMinimumWidth(240)
         self._side, self._mid, self._det = side, mid, det
         self._root = root
         self._toast = _Toast(root)
@@ -749,7 +755,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             target = getattr(self, "_sidebar_expanded_w", 220)
         sizes = self._root.sizes()
         if len(sizes) >= 2:
-            sizes[1] = max(200, sizes[1] + (sizes[0] - target))
+            sizes[1] = max(240, sizes[1] + (sizes[0] - target))
             sizes[0] = target
             self._root.setSizes(sizes)
 
