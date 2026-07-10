@@ -285,9 +285,25 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.nav_btns[key] = b
         self.nav_btns["live"].setChecked(True)
 
+        # "Categories" header with a small "solo" toggle on the right that
+        # collapses the list to just the active category. Kept in a zero-margin
+        # row so it takes exactly the label's height - the nav-button spacing
+        # above stays untouched.
+        cat_hdr = QHBoxLayout()
+        cat_hdr.setContentsMargins(0, 0, 0, 0)
+        cat_hdr.setSpacing(4)
         self._cat_section_label = QLabel(
             tr("sidebar_categories"), objectName="SectionLabel")
-        sl.addWidget(self._cat_section_label)
+        cat_hdr.addWidget(self._cat_section_label)
+        cat_hdr.addStretch()
+        self.cat_solo_btn = QPushButton("◉", objectName="SectionToggle")
+        self.cat_solo_btn.setCheckable(True)
+        self.cat_solo_btn.setFlat(True)
+        self.cat_solo_btn.setFixedSize(20, 18)
+        self.cat_solo_btn.setToolTip(tr("tooltip_solo_category"))
+        self.cat_solo_btn.toggled.connect(self._on_cat_solo_toggle)
+        cat_hdr.addWidget(self.cat_solo_btn)
+        sl.addLayout(cat_hdr)
         self.cat_list = QListWidget()
         self.cat_list.currentItemChanged.connect(self._category_changed)
         self.cat_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -662,20 +678,29 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._apply_view_settings()
 
     def _on_side_toggle(self, checked: bool) -> None:
-        """Show/hide just the category list (the nav buttons stay), so the
-        provider's category names can be tucked away - handy for clean
-        screenshots - without losing TV/Movies/Series navigation. Remembered
-        so leaving fullscreen doesn't force it back on."""
-        self._cat_list_hidden = not checked
-        if not self._player_fs:
-            self._apply_cat_list_visibility()
+        """Show/hide the whole left column (nav + categories). Remembered so
+        leaving fullscreen doesn't force it back on against the user's
+        choice."""
+        self._sidebar_user_hidden = not checked
+        if hasattr(self, "_side") and not self._player_fs:
+            self._side.setVisible(checked)
 
-    def _apply_cat_list_visibility(self) -> None:
-        show = not getattr(self, "_cat_list_hidden", False)
-        if hasattr(self, "cat_list"):
-            self.cat_list.setVisible(show)
-        if hasattr(self, "_cat_section_label"):
-            self._cat_section_label.setVisible(show)
+    def _on_cat_solo_toggle(self, checked: bool) -> None:
+        """Collapse the category list to just the active category (hide all
+        the other rows), so the provider's category names can be tucked away
+        for clean screenshots while the list still shows where you are."""
+        self._cat_solo = checked
+        self._apply_cat_solo()
+
+    def _apply_cat_solo(self) -> None:
+        if not hasattr(self, "cat_list"):
+            return
+        solo = getattr(self, "_cat_solo", False)
+        current = self.cat_list.currentRow()
+        for i in range(self.cat_list.count()):
+            it = self.cat_list.item(i)
+            if it is not None:
+                it.setHidden(solo and i != current)
 
     def _toggle_pause_shortcut(self) -> None:
         if self.player and self.player.isVisible():
@@ -738,8 +763,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self.showNormal()
             return
         self._player_fs = False
-        self._side.show()
-        self._apply_cat_list_visibility()   # keep the user's category-list choice
+        self._side.setVisible(not getattr(self, "_sidebar_user_hidden", False))
         self._mid.show()
         for w in getattr(self, "_det_hidden", []):
             w.show()
@@ -1232,6 +1256,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.back_btn.hide()
         self._update_sync_btn()
         self._load_items(cat)
+        # In "solo" mode keep only the now-active category visible in the list.
+        self._apply_cat_solo()
 
     def _is_combined_view(self, category_id) -> bool:
         """The combined views that stack several kinds together: grouped under
