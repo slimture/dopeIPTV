@@ -288,10 +288,20 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             b.setFlat(True)
             b.setToolTip(text)
             b.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            # Let the button shrink below its text width so the sidebar can be
+            # dragged narrow enough to cross the auto-collapse threshold (the
+            # text-based minimum used to block the drag before it got there).
+            b.setMinimumWidth(0)
             b.clicked.connect(lambda _, k=key: self.switch_mode(k))
+            # Right-click to give this entry a custom colour.
+            b.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            b.customContextMenuRequested.connect(
+                lambda pos, k=key, bt=b: self._nav_color_menu(
+                    k, bt.mapToGlobal(pos)))
             sl.addWidget(b)
             self.nav_btns[key] = b
             self._nav_texts[key] = text
+            self._apply_nav_color(key)
         self.nav_btns["live"].setChecked(True)
 
         # "Categories" header with a small "solo" toggle on the right that
@@ -303,6 +313,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         cat_hdr.setSpacing(4)
         self._cat_section_label = QLabel(
             tr("sidebar_categories"), objectName="SectionLabel")
+        self._cat_section_label.setMinimumWidth(0)
         cat_hdr.addWidget(self._cat_section_label)
         cat_hdr.addStretch()
         # A disclosure-style toggle: a Qt-drawn arrow (not a font glyph, so it
@@ -328,6 +339,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         guide_btn.setToolTip(tr("btn_epg_guide"))
         guide_btn.setSizePolicy(QSizePolicy.Policy.Expanding,
                                 QSizePolicy.Policy.Fixed)
+        guide_btn.setMinimumWidth(0)
         guide_btn.clicked.connect(self._open_epg_guide)
         sl.addWidget(guide_btn)
 
@@ -354,6 +366,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         settings_btn.setToolTip(tr("btn_settings"))
         settings_btn.setSizePolicy(QSizePolicy.Policy.Expanding,
                                    QSizePolicy.Policy.Fixed)
+        settings_btn.setMinimumWidth(0)
         settings_btn.clicked.connect(self.open_settings)
         sl.addWidget(settings_btn)
 
@@ -800,7 +813,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if w > self.RAIL_W + 40:
                 self._sidebar_expanded_w = max(w, 180)
                 self.side_btn.setChecked(True)   # -> expand
-        elif w < 130:
+        elif w < 150:
+            # Threshold sits comfortably above the expanded column's own
+            # minimum width (the logo floor ~127) so a drag inward can always
+            # reach it and collapse to the rail.
             self.side_btn.setChecked(False)      # -> collapse to the rail
 
     def _set_focus_mode(self, on: bool) -> None:
@@ -818,6 +834,45 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not hasattr(self, "_reopen_btn"):
             return
         self._reopen_btn.setGeometry(0, 0, 20, self._det.height())
+
+    # -- custom nav colours --------------------------------------------------
+
+    def _apply_nav_color(self, key: str) -> None:
+        """Tint one nav entry with the user's chosen colour (text when idle,
+        background when selected). Empty setting -> back to the theme default."""
+        b = self.nav_btns.get(key)
+        if b is None:
+            return
+        c = self.settings.value(f"nav_color_{key}", "") or ""
+        if c:
+            b.setStyleSheet(
+                "QPushButton#NavBtn{color:%s;}"
+                "QPushButton#NavBtn:checked{background:%s;color:#ffffff;}"
+                % (c, c))
+        else:
+            b.setStyleSheet("")
+
+    def _nav_color_menu(self, key: str, global_pos) -> None:
+        m = QMenu(self)
+        m.addAction(tr("nav_set_color"), lambda: self._pick_nav_color(key))
+        if self.settings.value(f"nav_color_{key}", ""):
+            m.addAction(tr("nav_reset_color"),
+                        lambda: self._reset_nav_color(key))
+        m.exec(global_pos)
+
+    def _pick_nav_color(self, key: str) -> None:
+        from PyQt6.QtWidgets import QColorDialog
+        cur = self.settings.value(f"nav_color_{key}", "") or ""
+        col = QColorDialog.getColor(
+            QColor(cur) if cur else QColor("#3b5ba5"), self,
+            tr("nav_set_color"))
+        if col.isValid():
+            self.settings.setValue(f"nav_color_{key}", col.name())
+            self._apply_nav_color(key)
+
+    def _reset_nav_color(self, key: str) -> None:
+        self.settings.remove(f"nav_color_{key}")
+        self._apply_nav_color(key)
 
     def _on_cat_solo_toggle(self, checked: bool) -> None:
         """Collapse the category list to just the active category (hide all

@@ -1188,6 +1188,16 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Свернуть боковую панель в значки (Ctrl+B)",
         "th": "ย่อแถบด้านข้างเป็นไอคอน (Ctrl+B)",
     },
+    "nav_set_color": {
+        "en": "Set color…", "sv": "Välj färg…", "es": "Elegir color…",
+        "de": "Farbe wählen…", "fr": "Choisir la couleur…",
+        "zh": "设置颜色…", "ru": "Выбрать цвет…", "th": "ตั้งสี…",
+    },
+    "nav_reset_color": {
+        "en": "Reset color", "sv": "Återställ färg", "es": "Restablecer color",
+        "de": "Farbe zurücksetzen", "fr": "Réinitialiser la couleur",
+        "zh": "重置颜色", "ru": "Сбросить цвет", "th": "รีเซ็ตสี",
+    },
     "tooltip_hide_list": {
         "en": "Hide the list — focus the player (Ctrl+Shift+M)",
         "sv": "Dölj listan — fokusera spelaren (Ctrl+Shift+M)",
