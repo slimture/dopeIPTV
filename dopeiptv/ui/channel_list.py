@@ -325,7 +325,12 @@ class ChannelDelegate(QStyledItemDelegate):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         playing = self._is_playing(it, kind)
+        tint_fg, tint_bg = self.window.item_tint(it, kind)
         inner = rect.adjusted(3, 3, -3, -3)
+        if tint_bg:
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(tint_bg))
+            painter.drawRoundedRect(inner, 12, 12)
         if option.state & QStyle.StateFlag.State_Selected:
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(QColor(P["sel"]))
@@ -396,7 +401,8 @@ class ChannelDelegate(QStyledItemDelegate):
             self._paint_fav_star(painter, logo_rect, max(18, logo_sz // 5))
 
         painter.setPen(
-            QColor(ACCENT) if playing else QColor(P["text"]))
+            QColor(ACCENT) if playing
+            else QColor(tint_fg) if tint_fg else QColor(P["text"]))
         fname = QFont()
         fname.setPointSize(self.grid_name_pt)
         fname.setBold(True)
@@ -422,7 +428,10 @@ class ChannelDelegate(QStyledItemDelegate):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         playing = self._is_playing(it, kind)
+        tint_fg, tint_bg = self.window.item_tint(it, kind)
 
+        if tint_bg:
+            painter.fillRect(rect, QColor(tint_bg))
         if option.state & QStyle.StateFlag.State_Selected:
             painter.fillRect(rect, QColor(P["sel"]))
         elif option.state & QStyle.StateFlag.State_MouseOver:
@@ -543,7 +552,8 @@ class ChannelDelegate(QStyledItemDelegate):
         y = rect.top() + (rect.height() - block_h) // 2
 
         painter.setPen(
-            QColor(ACCENT) if playing else QColor(P["text"]))
+            QColor(ACCENT) if playing
+            else QColor(tint_fg) if tint_fg else QColor(P["text"]))
         fname = QFont()
         fname.setPointSize(self.name_pt)
         fname.setBold(True)

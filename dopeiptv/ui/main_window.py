@@ -890,10 +890,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         from PyQt6.QtWidgets import QColorDialog
         skey = f"nav_bg_{key}" if which == "bg" else f"nav_color_{key}"
         cur = self.settings.value(skey, "") or ""
+        # Force Qt's own dialog: the native colour picker can open behind the
+        # window or hang on some Linux setups (same as the file dialog).
         col = QColorDialog.getColor(
             QColor(cur) if cur else QColor("#3b5ba5"), self,
             tr("nav_set_bg_color") if which == "bg"
-            else tr("nav_set_text_color"))
+            else tr("nav_set_text_color"),
+            QColorDialog.ColorDialogOption.DontUseNativeDialog)
         if col.isValid():
             self.settings.setValue(skey, col.name())
             self._apply_nav_color(key)
@@ -1874,6 +1877,28 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 ov_mode = "live" if mode == "fav" else mode
                 return self.channel_ov.display_name(ov_mode, key, base)
         return base
+
+    def item_tint(self, it, kind: str):
+        """(text, background) hex colours for a list item, inherited from its
+        category's custom colours - so a colour set on a category cascades to
+        every item in it. Empty strings when none. Per-item overrides win."""
+        if not it:
+            return "", ""
+        mode = {"live": "live", "vod": "vod", "series": "series"}.get(kind)
+        if mode is None:
+            return "", ""
+        # A per-item colour (set from the item's own right-click) takes
+        # precedence over the inherited category colour.
+        key = self._item_key(it)
+        if key is not None:
+            iov = self.channel_ov.get(mode, key)
+            fg, bg = iov.get("color", ""), iov.get("bgcolor", "")
+            if fg or bg:
+                cov = self.overrides.get(mode, it.get("category_id"))
+                return (fg or cov.get("color", ""),
+                        bg or cov.get("bgcolor", ""))
+        cov = self.overrides.get(mode, it.get("category_id"))
+        return cov.get("color", "") or "", cov.get("bgcolor", "") or ""
 
     def _channel_hidden(self, it, kind: str) -> bool:
         if kind not in ("live", "vod", "series", "fav"):
