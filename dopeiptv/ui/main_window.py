@@ -658,6 +658,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # persists even if closeEvent doesn't run (Ctrl+C, force quit, sudden
         # kill). The window geometry is saved via moveEvent/resizeEvent below.
         root.splitterMoved.connect(self._schedule_save_layout)
+        root.splitterMoved.connect(self._on_splitter_moved)
         det.setMinimumWidth(280)
         self._side, self._mid, self._det = side, mid, det
         self._root = root
@@ -736,8 +737,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # on the live size list so the detail pane (and the floating toast,
         # which the splitter also counts) keep their widths.
         if collapsed:
+            # Floor at the rail width, but leave the max open so the divider
+            # can still be dragged outward - that re-expands (see
+            # _on_splitter_moved).
             self._side.setMinimumWidth(self.RAIL_W)
-            self._side.setMaximumWidth(self.RAIL_W)
+            self._side.setMaximumWidth(16777215)
             target = self.RAIL_W
         else:
             self._side.setMinimumWidth(0)
@@ -754,6 +758,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         btn.setProperty("rail", on)
         btn.style().unpolish(btn)
         btn.style().polish(btn)
+
+    def _on_splitter_moved(self, *_a) -> None:
+        """Dragging the divider outward while collapsed re-expands the sidebar
+        - the natural gesture to bring the full column back."""
+        if not getattr(self, "_sidebar_collapsed", False):
+            return
+        if self._side.width() > self.RAIL_W + 24:
+            self._sidebar_expanded_w = max(self._side.width(), 180)
+            # Flip the toggle; its handler runs the expand path.
+            self.side_btn.setChecked(True)
 
     def _on_cat_solo_toggle(self, checked: bool) -> None:
         """Collapse the category list to just the active category (hide all
