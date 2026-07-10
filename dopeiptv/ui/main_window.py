@@ -1910,41 +1910,60 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _wizard_explore(self) -> None:
         self._set_status(tr("welcome_add_hint"))
-        QMessageBox.information(self, APP_NAME, tr("onb_limited_notice"))
         self._update_provider_hint()
 
     # -- "no provider yet" affordance ----------------------------------------
 
     def _update_provider_hint(self) -> None:
-        """Show a big centred '+ Add provider' button whenever the app is
-        running without a real provider and the wizard is closed. It brings
-        the wizard back and disappears the moment a provider is added."""
+        """Show a big pulsing '+ Add provider' button in the middle pane
+        whenever the app is running without a real provider and the wizard is
+        closed. It brings the wizard back and disappears the moment a provider
+        is added."""
         offline = isinstance(self.client, OfflineClient)
         overlay_up = self._welcome is not None and self._welcome.isVisible()
         if offline and not overlay_up:
             if self._add_provider_btn is None:
-                btn = QPushButton(tr("onb_add_provider"), self,
-                                  objectName="Primary")
-                btn.setMinimumHeight(40)
-                btn.clicked.connect(self.show_welcome)
-                self._add_provider_btn = btn
+                self._build_provider_hint()
             self._add_provider_btn.setText(tr("onb_add_provider"))
-            self._position_provider_hint()
             self._add_provider_btn.show()
             self._add_provider_btn.raise_()
+            self._position_provider_hint()
+            self._add_provider_anim.start()
         elif self._add_provider_btn is not None:
+            self._add_provider_anim.stop()
             self._add_provider_btn.hide()
+
+    def _build_provider_hint(self) -> None:
+        from PyQt6.QtCore import QPropertyAnimation
+        from PyQt6.QtWidgets import QGraphicsOpacityEffect
+        btn = QPushButton(tr("onb_add_provider"), self, objectName="Primary")
+        btn.setMinimumHeight(46)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.clicked.connect(self.show_welcome)
+        # Slow opacity pulse to draw the eye without being noisy.
+        eff = QGraphicsOpacityEffect(btn)
+        btn.setGraphicsEffect(eff)
+        anim = QPropertyAnimation(eff, b"opacity", self)
+        anim.setDuration(1600)
+        anim.setStartValue(1.0)
+        anim.setKeyValueAt(0.5, 0.5)
+        anim.setEndValue(1.0)
+        anim.setLoopCount(-1)
+        self._add_provider_btn = btn
+        self._add_provider_anim = anim
 
     def _position_provider_hint(self) -> None:
         btn = self._add_provider_btn
         if btn is None or not btn.isVisible():
             return
-        c = self.centralWidget().geometry()
+        # Centre it in the middle list pane, mapped into window coordinates.
         btn.adjustSize()
-        w = max(220, btn.width() + 32)
-        h = 44
-        btn.setGeometry(c.x() + (c.width() - w) // 2,
-                        c.y() + (c.height() - h) // 2, w, h)
+        w = max(240, btn.width() + 40)
+        h = 46
+        tl = self.listw.mapTo(self, self.listw.rect().topLeft())
+        x = tl.x() + (self.listw.width() - w) // 2
+        y = tl.y() + (self.listw.height() - h) // 2
+        btn.setGeometry(x, y, w, h)
 
     def closeEvent(self, event) -> None:
         # Close the non-modal cast panel first: as a separate top-level

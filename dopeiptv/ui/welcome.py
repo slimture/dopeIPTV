@@ -1,17 +1,17 @@
 """First-run onboarding, shown when the app opens without a provider.
 
-A multi-step overlay drawn on top of the main content (a plain child
-widget, not a modal dialog, so it feels part of the app):
+A compact multi-step overlay drawn on top of the main content (a plain
+child widget, not a modal dialog, so it feels part of the app):
 
-  1. Welcome  - a multilingual greeting that flashes through languages,
-                plus a language picker for the whole app.
-  2. Features - a short tour of what the app does.
-  3. Connect  - Xtream Codes server / username / password.
-  4. Trakt    - optional Trakt.tv sync.
+  1. Welcome - a greeting that flashes through languages, plus a language
+               picker for the whole app.
+  2. Connect - Xtream Codes server / username / password, with a short
+               tour of what the app does right below it.
+  3. Trakt   - optional Trakt.tv sync.
 
 At any point the user can "Skip for now" and explore the empty app; a
-persistent "+ Add provider" button in the main window brings the wizard
-back until a provider is configured.
+pulsing "+ Add provider" button in the middle pane brings the wizard back
+until a provider is configured.
 """
 
 from __future__ import annotations
@@ -29,8 +29,7 @@ from .theme import P
 
 
 class WelcomeOverlay(QWidget):
-    # Decorative greetings that flash on the first page (not tied to the
-    # app's translated languages - just a friendly hello in many tongues).
+    # Decorative greetings that flash on the first page.
     _GREETINGS = (
         "Welcome", "Bienvenue", "Bienvenido", "Willkommen", "Benvenuto",
         "Bem-vindo", "Välkommen", "Witaj", "欢迎", "ようこそ",
@@ -54,11 +53,11 @@ class WelcomeOverlay(QWidget):
             f"#WelcomeOverlay {{ background: {P['bg']}; }}"
             f"#WelcomeCard {{ background: {P['pane']};"
             f" border: 1px solid {P['border']}; border-radius: 16px; }}"
-            f"#Hero {{ font-size: 34px; font-weight: 800; color: {P['text']}; }}"
-            f"#OnbTitle {{ font-size: 20px; font-weight: 700;"
+            f"#Hero {{ font-size: 30px; font-weight: 800; color: {P['text']}; }}"
+            f"#OnbTitle {{ font-size: 18px; font-weight: 700;"
             f" color: {P['text']}; }}"
             f"#OnbSub {{ font-size: 13px; color: {P['muted']}; }}"
-            f"#OnbFeat {{ font-size: 14px; color: {P['text']}; }}"
+            f"#OnbFeat {{ font-size: 13px; color: {P['muted']}; }}"
             f"#OnbErr {{ font-size: 12px; color: {P['error']}; }}")
 
         outer = QVBoxLayout(self)
@@ -66,18 +65,16 @@ class WelcomeOverlay(QWidget):
         self._card = QFrame(objectName="WelcomeCard")
         self._card.setFixedWidth(460)
         card_l = QVBoxLayout(self._card)
-        card_l.setContentsMargins(36, 30, 36, 28)
-        card_l.setSpacing(16)
+        card_l.setContentsMargins(34, 26, 34, 24)
+        card_l.setSpacing(12)
 
         self._stack = QStackedWidget()
-        self._stack.addWidget(self._build_welcome_page())
-        self._stack.addWidget(self._build_features_page())
-        self._stack.addWidget(self._build_connect_page())
-        self._stack.addWidget(self._build_trakt_page())
+        self._stack.addWidget(self._build_welcome_page())   # 0
+        self._stack.addWidget(self._build_connect_page())   # 1
+        self._stack.addWidget(self._build_trakt_page())     # 2
         card_l.addWidget(self._stack)
         outer.addWidget(self._card)
 
-        # Flash the greeting through languages while the first page shows.
         self._greet_idx = 0
         self._flash = QTimer(self)
         self._flash.timeout.connect(self._next_greeting)
@@ -88,7 +85,7 @@ class WelcomeOverlay(QWidget):
     def _build_welcome_page(self) -> QWidget:
         page = QWidget()
         lay = QVBoxLayout(page)
-        lay.setSpacing(14)
+        lay.setSpacing(12)
         self._hero = QLabel(self._GREETINGS[0], objectName="Hero")
         self._hero.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._w_sub = QLabel(tr("welcome_subtitle"), objectName="OnbSub")
@@ -111,41 +108,20 @@ class WelcomeOverlay(QWidget):
         self._w_skip = QPushButton(tr("welcome_explore"))
         self._w_skip.clicked.connect(self._explore)
 
-        lay.addStretch(1)
         lay.addWidget(self._hero)
         lay.addWidget(self._w_sub)
-        lay.addSpacing(8)
+        lay.addSpacing(4)
         lay.addWidget(self._lang_label)
         lay.addWidget(self._lang_combo)
-        lay.addSpacing(6)
+        lay.addSpacing(4)
         lay.addWidget(self._w_next)
         lay.addWidget(self._w_skip)
-        lay.addStretch(1)
-        return page
-
-    def _build_features_page(self) -> QWidget:
-        page = QWidget()
-        lay = QVBoxLayout(page)
-        lay.setSpacing(12)
-        self._f_title = QLabel(tr("onb_features_title"), objectName="OnbTitle")
-        self._f_title.setWordWrap(True)
-        self._feats = [QLabel(tr(k), objectName="OnbFeat")
-                       for k in ("onb_feat_1", "onb_feat_2",
-                                 "onb_feat_3", "onb_feat_4")]
-        lay.addWidget(self._f_title)
-        lay.addSpacing(4)
-        for f in self._feats:
-            f.setWordWrap(True)
-            lay.addWidget(f)
-        lay.addStretch(1)
-        lay.addLayout(self._nav_row(
-            back_to=0, next_to=2, next_key="onb_next"))
         return page
 
     def _build_connect_page(self) -> QWidget:
         page = QWidget()
         lay = QVBoxLayout(page)
-        lay.setSpacing(12)
+        lay.setSpacing(10)
         self._c_title = QLabel(tr("login_subtitle"), objectName="OnbTitle")
         self._c_title.setWordWrap(True)
 
@@ -165,20 +141,29 @@ class WelcomeOverlay(QWidget):
 
         self._c_err = QLabel("", objectName="OnbErr")
         self._c_err.setWordWrap(True)
-
         self._c_connect = QPushButton(tr("btn_connect"), objectName="Primary")
         self._c_connect.setMinimumHeight(38)
         self._c_connect.clicked.connect(self._do_connect)
+
+        # Short tour of what the app does, right under the login form.
+        self._f_title = QLabel(tr("onb_features_title"), objectName="OnbSub")
+        self._feats = [QLabel("•  " + tr(k), objectName="OnbFeat")
+                       for k in ("onb_feat_1", "onb_feat_2",
+                                 "onb_feat_3", "onb_feat_4")]
 
         lay.addWidget(self._c_title)
         lay.addLayout(form)
         lay.addWidget(self._c_err)
         lay.addWidget(self._c_connect)
-        lay.addStretch(1)
-        # Back to features, or skip the provider entirely (explore).
+        lay.addSpacing(6)
+        lay.addWidget(self._f_title)
+        for f in self._feats:
+            f.setWordWrap(True)
+            lay.addWidget(f)
+        lay.addSpacing(4)
         row = QHBoxLayout()
         self._c_back = QPushButton(tr("onb_back"))
-        self._c_back.clicked.connect(lambda: self._stack.setCurrentIndex(1))
+        self._c_back.clicked.connect(lambda: self._stack.setCurrentIndex(0))
         self._c_skip = QPushButton(tr("onb_skip"))
         self._c_skip.clicked.connect(self._explore)
         row.addWidget(self._c_back)
@@ -206,23 +191,9 @@ class WelcomeOverlay(QWidget):
         lay.addWidget(self._t_desc)
         lay.addSpacing(6)
         lay.addWidget(self._t_connect)
-        lay.addStretch(1)
+        lay.addSpacing(4)
         lay.addWidget(self._t_finish)
         return page
-
-    def _nav_row(self, *, back_to: int, next_to: int, next_key: str):
-        row = QHBoxLayout()
-        back = QPushButton(tr("onb_back"))
-        back.clicked.connect(lambda: self._stack.setCurrentIndex(back_to))
-        nxt = QPushButton(tr(next_key), objectName="Primary")
-        nxt.setMinimumHeight(36)
-        nxt.clicked.connect(lambda: self._stack.setCurrentIndex(next_to))
-        row.addWidget(back)
-        row.addStretch(1)
-        row.addWidget(nxt)
-        # keep references so a language switch can retranslate them
-        self._feat_back, self._feat_next = back, nxt
-        return row
 
     # -- actions -------------------------------------------------------------
 
@@ -234,7 +205,7 @@ class WelcomeOverlay(QWidget):
         code = self._lang_combo.currentData()
         if not code:
             return
-        self._on_language_change(code)   # window: set_language + save + retranslate
+        self._on_language_change(code)
         self._retranslate()
 
     def _do_connect(self) -> None:
@@ -246,7 +217,7 @@ class WelcomeOverlay(QWidget):
             return
         self._c_err.setText("")
         self._on_connect(server, user, pw)
-        self._stack.setCurrentIndex(3)   # continue to the optional Trakt step
+        self._stack.setCurrentIndex(2)   # continue to the optional Trakt step
 
     def _explore(self) -> None:
         self._flash.stop()
@@ -262,17 +233,15 @@ class WelcomeOverlay(QWidget):
         self._lang_label.setText(tr("onb_choose_language"))
         self._w_next.setText(tr("onb_next"))
         self._w_skip.setText(tr("welcome_explore"))
-        self._f_title.setText(tr("onb_features_title"))
-        for lbl, key in zip(self._feats, ("onb_feat_1", "onb_feat_2",
-                                          "onb_feat_3", "onb_feat_4")):
-            lbl.setText(tr(key))
-        self._feat_back.setText(tr("onb_back"))
-        self._feat_next.setText(tr("onb_next"))
         self._c_title.setText(tr("login_subtitle"))
         self._lbl_server.setText(tr("login_server"))
         self._lbl_user.setText(tr("login_username"))
         self._lbl_pw.setText(tr("login_password"))
         self._c_connect.setText(tr("btn_connect"))
+        self._f_title.setText(tr("onb_features_title"))
+        for lbl, key in zip(self._feats, ("onb_feat_1", "onb_feat_2",
+                                          "onb_feat_3", "onb_feat_4")):
+            lbl.setText("•  " + tr(key))
         self._c_back.setText(tr("onb_back"))
         self._c_skip.setText(tr("onb_skip"))
         self._t_title.setText(tr("onb_trakt_title"))
