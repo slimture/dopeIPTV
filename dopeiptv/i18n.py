@@ -1123,9 +1123,10 @@ _STRINGS: dict[str, dict[str, str]] = {
               "— ทำภายหลังในการตั้งค่าก็ได้",
     },
     "onb_trakt_connect": {
-        "en": "Connect Trakt", "sv": "Anslut Trakt", "es": "Conectar Trakt",
-        "de": "Trakt verbinden", "fr": "Connecter Trakt", "zh": "连接 Trakt",
-        "ru": "Подключить Trakt", "th": "เชื่อมต่อ Trakt",
+        "en": "Sign in with Trakt", "sv": "Logga in med Trakt",
+        "es": "Iniciar sesión con Trakt", "de": "Mit Trakt anmelden",
+        "fr": "Se connecter avec Trakt", "zh": "使用 Trakt 登录",
+        "ru": "Войти через Trakt", "th": "เข้าสู่ระบบด้วย Trakt",
     },
     "onb_limited_notice": {
         "en": "You're exploring without a provider, so the app is limited. "

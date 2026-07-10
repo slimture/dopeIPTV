@@ -2177,10 +2177,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.settings.setValue("language", code)
         self.retranslate_ui()
 
-    def _wizard_connect(self, server: str, user: str, pw: str) -> None:
+    def _wizard_connect(self, server: str, user: str, pw: str,
+                        kind: str = "xtream") -> None:
         name = server.split("//")[-1].split("/")[0] or "My playlist"
         pl = self.playlist_store.add(
-            {"name": name, "server": server, "username": user,
+            {"name": name, "kind": kind, "server": server, "username": user,
              "password": pw, "epg_url": "", "refresh": "never"})
         self.playlist_store.set_active(pl["id"])
         self.switch_playlist(pl["id"])

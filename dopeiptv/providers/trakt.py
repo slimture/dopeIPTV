@@ -17,6 +17,16 @@ API_VERSION = "2"
 OAUTH_PORT = 41794
 REDIRECT_URI = f"http://127.0.0.1:{OAUTH_PORT}/callback"
 
+# dopeIPTV's own registered Trakt application, bundled so users get a true
+# one-click "Sign in with Trakt" with zero setup. A user who prefers their own
+# API app can still override these in Settings (they take precedence). As with
+# any distributed native app, an embedded secret is technically extractable;
+# that's an accepted trade-off for the frictionless flow.
+DEFAULT_CLIENT_ID = (
+    "0f954e24983e4dbd2ee5d1bd006a6fe99bbe3ada9a95e47396e5238a9b746ded")
+DEFAULT_CLIENT_SECRET = (
+    "1bc6756ea9674759f4eb38a50b71d1ee02fb5897af71a961fc9344a52bde4090")
+
 
 class TraktAuthError(Exception):
     pass
@@ -32,11 +42,13 @@ class TraktClient:
 
     @property
     def client_id(self) -> str:
-        return self.settings.value("trakt_client_id", "") or ""
+        # A user-supplied app id wins; otherwise fall back to the bundled one.
+        return self.settings.value("trakt_client_id", "") or DEFAULT_CLIENT_ID
 
     @property
     def client_secret(self) -> str:
-        return self.settings.value("trakt_client_secret", "") or ""
+        return (self.settings.value("trakt_client_secret", "")
+                or DEFAULT_CLIENT_SECRET)
 
     @property
     def access_token(self) -> str:

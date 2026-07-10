@@ -37,7 +37,7 @@ class WelcomeOverlay(QWidget):
     )
 
     def __init__(self, parent: QWidget, *, settings,
-                 on_connect: Callable[[str, str, str], None],
+                 on_connect: Callable[[str, str, str, str], None],
                  on_explore: Callable[[], None],
                  on_connect_trakt: Callable[[], None],
                  on_language_change: Callable[[str], None],
@@ -146,14 +146,20 @@ class WelcomeOverlay(QWidget):
 
         form = QFormLayout()
         s = self._settings
+        self._conn_kind = QComboBox()
+        self._conn_kind.addItem(tr("playlist_kind_xtream"), "xtream")
+        self._conn_kind.addItem(tr("playlist_kind_m3u"), "m3u")
+        self._conn_kind.currentIndexChanged.connect(self._update_conn_kind)
         self._server = QLineEdit(s.value("server", "") if s else "")
         self._server.setPlaceholderText("http://server:port")
         self._user = QLineEdit(s.value("username", "") if s else "")
         self._pw = QLineEdit(s.value("password", "") if s else "")
         self._pw.setEchoMode(QLineEdit.EchoMode.Password)
+        self._lbl_kind = QLabel(tr("playlist_kind"))
         self._lbl_server = QLabel(tr("login_server"))
         self._lbl_user = QLabel(tr("login_username"))
         self._lbl_pw = QLabel(tr("login_password"))
+        form.addRow(self._lbl_kind, self._conn_kind)
         form.addRow(self._lbl_server, self._server)
         form.addRow(self._lbl_user, self._user)
         form.addRow(self._lbl_pw, self._pw)
@@ -237,18 +243,34 @@ class WelcomeOverlay(QWidget):
         self._on_language_change(code)
         self._retranslate()
 
+    def _update_conn_kind(self) -> None:
+        m3u = self._conn_kind.currentData() == "m3u"
+        self._lbl_server.setText(
+            tr("playlist_m3u_url") if m3u else tr("login_server"))
+        self._server.setPlaceholderText(
+            "https://example.com/playlist.m3u" if m3u else "http://server:port")
+        for w in (self._lbl_user, self._user, self._lbl_pw, self._pw):
+            w.setVisible(not m3u)
+        self._fit_card(self._stack.currentIndex())
+
     def _do_connect(self) -> None:
+        kind = self._conn_kind.currentData()
         server = self._server.text().strip()
-        user = self._user.text().strip()
-        pw = self._pw.text().strip()
-        if not (server and user and pw):
+        if kind == "m3u":
+            ok = bool(server)
+            user = pw = ""
+        else:
+            user = self._user.text().strip()
+            pw = self._pw.text().strip()
+            ok = bool(server and user and pw)
+        if not ok:
             self._c_err.setText(tr("onb_fill_all"))
             self._c_err.setVisible(True)
             self._fit_card(self._stack.currentIndex())
             return
         self._c_err.setText("")
         self._c_err.setVisible(False)
-        self._on_connect(server, user, pw)
+        self._on_connect(server, user, pw, kind)
         self._stack.setCurrentIndex(2)   # continue to the optional Trakt step
 
     def keyPressEvent(self, event) -> None:
@@ -280,9 +302,10 @@ class WelcomeOverlay(QWidget):
         self._w_demo.setText(tr("onb_try_demo"))
         self._w_skip.setText(tr("welcome_explore"))
         self._c_title.setText(tr("login_subtitle"))
-        self._lbl_server.setText(tr("login_server"))
+        self._lbl_kind.setText(tr("playlist_kind"))
         self._lbl_user.setText(tr("login_username"))
         self._lbl_pw.setText(tr("login_password"))
+        self._update_conn_kind()   # re-labels the server row for the mode
         self._c_connect.setText(tr("btn_connect"))
         self._f_title.setText(tr("onb_features_title"))
         for lbl, key in zip(self._feats, ("onb_feat_1", "onb_feat_2",
