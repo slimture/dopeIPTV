@@ -8,7 +8,7 @@ import time
 from datetime import datetime
 
 from PyQt6.QtCore import (
-    QEvent, QRect, QSettings, QSize, Qt, QThreadPool,
+    QRect, QSettings, QSize, Qt, QThreadPool,
     QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import (
@@ -693,12 +693,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # persists even if closeEvent doesn't run (Ctrl+C, force quit, sudden
         # kill). The window geometry is saved via moveEvent/resizeEvent below.
         root.splitterMoved.connect(self._schedule_save_layout)
-        # Watch the side|middle divider's own handle for mouse-release so we
-        # can snap the sidebar to/from the icon rail *after* the drag ends -
-        # calling setSizes() mid-drag (from splitterMoved) doesn't stick.
-        self._side_handle = root.handle(1)
-        if self._side_handle is not None:
-            self._side_handle.installEventFilter(self)
+        # Dragging the side divider inward past a threshold collapses the
+        # sidebar to the icon rail. Pinning the rail's max width (in
+        # _apply_sidebar_collapsed) is what makes this stick mid-drag - a hard
+        # width constraint the splitter honours, unlike a setSizes() call.
+        root.splitterMoved.connect(self._maybe_collapse_on_drag)
         det.setMinimumWidth(280)
         # Keep the content list from being squeezed away: dragging the sidebar
         # divider far right used to swallow the whole middle column (leaving
@@ -784,11 +783,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # on the live size list so the detail pane (and the floating toast,
         # which the splitter also counts) keep their widths.
         if collapsed:
-            # Floor at the rail width, but leave the max open so the divider
-            # can still be dragged outward - that re-expands (see
-            # _reconcile_sidebar_from_drag).
+            # Pin to exactly the rail width: a hard constraint the splitter
+            # honours immediately (so a drag-in snaps cleanly) and which keeps
+            # the rail from stretching when the middle column is hidden in
+            # focus mode.
             self._side.setMinimumWidth(self.RAIL_W)
-            self._side.setMaximumWidth(16777215)
+            self._side.setMaximumWidth(self.RAIL_W)
             target = self.RAIL_W
         else:
             self._side.setMinimumWidth(0)
@@ -806,29 +806,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         btn.style().unpolish(btn)
         btn.style().polish(btn)
 
-    def eventFilter(self, obj, event):
-        if (obj is getattr(self, "_side_handle", None)
-                and event.type() == QEvent.Type.MouseButtonRelease):
-            # Defer so the splitter finishes handling the release first.
-            QTimer.singleShot(0, self._reconcile_sidebar_from_drag)
-        return super().eventFilter(obj, event)
-
-    def _reconcile_sidebar_from_drag(self) -> None:
-        """After the user drags the side divider: snap to the icon rail if it
-        was pulled narrow, or expand if it was pulled out from the rail. The
-        snap targets (rail width / >=180) sit outside the threshold band so it
-        settles instead of flickering."""
+    def _maybe_collapse_on_drag(self, *_a) -> None:
+        """Dragging the side divider inward past the threshold collapses to the
+        icon rail. Collapsing pins the rail's max width, which the splitter
+        honours immediately, so it sticks mid-drag. (Expanding again is the
+        ☰ button / Ctrl+B - a frozen-width rail can't be dragged back out.)"""
         if not hasattr(self, "_side") or not hasattr(self, "side_btn"):
             return
-        w = self._side.width()
         if getattr(self, "_sidebar_collapsed", False):
-            if w > self.RAIL_W + 40:
-                self._sidebar_expanded_w = max(w, 180)
-                self.side_btn.setChecked(True)   # -> expand
-        elif w < 150:
-            # Threshold sits comfortably above the expanded column's own
-            # minimum width (the logo floor ~127) so a drag inward can always
-            # reach it and collapse to the rail.
+            return
+        if self._side.width() < 150:
             self.side_btn.setChecked(False)      # -> collapse to the rail
 
     def _set_focus_mode(self, on: bool) -> None:
