@@ -152,6 +152,9 @@ class WelcomeOverlay(QWidget):
 
         self._c_err = QLabel("", objectName="OnbErr")
         self._c_err.setWordWrap(True)
+        # Hidden until there is an error, so the empty line doesn't push a
+        # gap between the Connect button and the feature tour below.
+        self._c_err.setVisible(False)
         self._c_connect = QPushButton(tr("btn_connect"), objectName="Primary")
         self._c_connect.setMinimumHeight(34)
         self._c_connect.clicked.connect(self._do_connect)
@@ -164,11 +167,11 @@ class WelcomeOverlay(QWidget):
 
         lay.addWidget(self._c_title)
         lay.addLayout(form)
-        # Connect sits directly under the Password field; the (initially
-        # empty) error line lives just below the button.
+        # Connect sits directly under the Password field; the error line
+        # (hidden until needed) lives just below the button.
         lay.addWidget(self._c_connect)
         lay.addWidget(self._c_err)
-        lay.addSpacing(10)
+        lay.addSpacing(8)
         # Keep the "What's inside" heading tight against its bullet list.
         feats_box = QVBoxLayout()
         feats_box.setSpacing(1)
@@ -232,8 +235,11 @@ class WelcomeOverlay(QWidget):
         pw = self._pw.text().strip()
         if not (server and user and pw):
             self._c_err.setText(tr("onb_fill_all"))
+            self._c_err.setVisible(True)
+            self._fit_card(self._stack.currentIndex())
             return
         self._c_err.setText("")
+        self._c_err.setVisible(False)
         self._on_connect(server, user, pw)
         self._stack.setCurrentIndex(2)   # continue to the optional Trakt step
 
@@ -285,6 +291,7 @@ class WelcomeOverlay(QWidget):
         the wizard is reopened from the '+ Add provider' button)."""
         self._stack.setCurrentIndex(0)
         self._c_err.setText("")
+        self._c_err.setVisible(False)
         if not self._flash.isActive():
             self._flash.start(1300)
 

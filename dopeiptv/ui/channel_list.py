@@ -131,10 +131,9 @@ class ChannelListModel(QAbstractListModel):
         return None
 
     def flags(self, index):
-        # Section headers (and the invisible fillers that pad out a header's
-        # row in grid mode) are not content: not selectable, not clickable.
+        # Section headers are not content: not selectable, not clickable.
         it = self.item_at(index.row())
-        if it and (it.get("_header") or it.get("_filler")):
+        if it and it.get("_header"):
             return Qt.ItemFlag.NoItemFlags
         return super().flags(index)
 
@@ -188,20 +187,15 @@ class ChannelDelegate(QStyledItemDelegate):
     def sizeHint(self, option, index) -> QSize:
         it = index.data(Qt.ItemDataRole.UserRole)
         if it and it.get("_header"):
-            # A header is one grid cell tall in grid mode (the fillers after it
-            # complete its row so it sits alone above the posters); a full
-            # row in list mode.
-            return QSize(self.cell_w if self.grid else 0, self._header_h())
-        if it and it.get("_filler"):
-            return QSize(self.cell_w, self._header_h())
+            # Headers only appear in list mode (combined views force it),
+            # where they are a full-width row.
+            return QSize(0, self._header_h())
         if self.grid:
             return QSize(self.cell_w, self.cell_h)
         return QSize(0, self.row_h)
 
     def paint(self, painter, option, index) -> None:
         it = index.data(Qt.ItemDataRole.UserRole)
-        if it and it.get("_filler"):
-            return                       # invisible spacer
         if it and it.get("_header"):
             self._paint_header(painter, option, it["_header"])
         elif self.grid:

@@ -1671,7 +1671,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.play_item(it, player, external)
 
     def play_item(self, it, player=None, external: bool = False) -> None:
-        if not it or it.get("_header") or it.get("_filler"):
+        if not it or it.get("_header"):
             return
         if self.mode == "series" and not self.series_ctx:
             self._enter_series(it)
@@ -1984,10 +1984,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         row = self.listw.currentIndex().row()
         new_row = (row + direction) % count if row >= 0 else 0
-        # Skip section-header and filler rows in the grouped views.
+        # Skip section-header rows in the grouped views.
         for _ in range(count):
             it = self.list_model.item_at(new_row)
-            if not (it and (it.get("_header") or it.get("_filler"))):
+            if not (it and it.get("_header")):
                 break
             new_row = (new_row + direction) % count
         idx = self.list_model.index(new_row)
