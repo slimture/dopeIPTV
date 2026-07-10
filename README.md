@@ -5,8 +5,22 @@ coded dopeIPTV based on what I think is a good IPTV-player. I think you will
 like it.
 
 It's primarily for Linux (works okay on macOS) with a modern dark interface,
-supporting the **Xtream Codes API**, **EPG**, and an **embedded mpv** video
-player (with optional external mpv/VLC playback).
+supporting the **Xtream Codes API** and **M3U playlists**, **EPG**, and an
+**embedded mpv** video player (with optional external mpv/VLC playback).
+
+> **dopeIPTV is a player, not a content source.** You connect it to a service
+> you already subscribe to (an Xtream Codes account or an M3U playlist) — it
+> doesn't provide any channels itself. The built-in **demo channels** are free,
+> public test streams so you can try the app with nothing to configure.
+
+## Screenshots
+
+|  |  |
+|---|---|
+| ![Live TV with the EPG](docs/screenshots/live.png) | ![EPG timeline grid](docs/screenshots/epg-grid.png) |
+| *Live TV with the programme guide* | *EPG timeline grid* |
+| ![Movies and series](docs/screenshots/movies.png) | ![Favorites and the player](docs/screenshots/player.png) |
+| *Movies & series with TMDB artwork* | *Favorites and the embedded player* |
 
 ## Features
 

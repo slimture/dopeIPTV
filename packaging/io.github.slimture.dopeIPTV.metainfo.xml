@@ -7,13 +7,36 @@
   <summary>Modern IPTV player for Xtream Codes with EPG</summary>
   <description>
     <p>
-      dopeIPTV is a clean, modern IPTV client for Xtream Codes providers. It
-      offers an embedded mpv player, an electronic programme guide, movies and
-      series with TMDB metadata, recording and timeshift, Chromecast support,
-      multiple playlists, themes and translations.
+      dopeIPTV is a clean, modern player for your own Xtream Codes or M3U
+      subscription. It offers an embedded mpv player, an electronic programme
+      guide with a timeline grid, movies and series with TMDB metadata,
+      recording and timeshift catch-up, optional Trakt sync, Chromecast
+      support, multiple playlists, themes and translations.
+    </p>
+    <p>
+      dopeIPTV is a player only: it does not provide any channels or content -
+      you connect it to a service you already subscribe to.
     </p>
   </description>
   <launchable type="desktop-id">io.github.slimture.dopeIPTV.desktop</launchable>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Live TV with the electronic programme guide</caption>
+      <image>https://raw.githubusercontent.com/slimture/dopeIPTV/main/docs/screenshots/live.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Movies and series with TMDB artwork and details</caption>
+      <image>https://raw.githubusercontent.com/slimture/dopeIPTV/main/docs/screenshots/movies.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>The EPG timeline grid: what's on now and next</caption>
+      <image>https://raw.githubusercontent.com/slimture/dopeIPTV/main/docs/screenshots/epg-grid.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Favorites and the embedded player</caption>
+      <image>https://raw.githubusercontent.com/slimture/dopeIPTV/main/docs/screenshots/player.png</image>
+    </screenshot>
+  </screenshots>
   <categories>
     <category>AudioVideo</category>
     <category>Video</category>
@@ -26,6 +49,19 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.6.0" date="2026-07-10">
+      <description>
+        <p>A big feature release focused on getting started, Trakt and the EPG.</p>
+        <ul>
+          <li>One-click "Sign in with Trakt" via the browser - no codes or API keys</li>
+          <li>Try it with built-in demo channels, or add any free M3U playlist</li>
+          <li>Movies and episodes auto-mark as watched once you've seen them</li>
+          <li>A new horizontal EPG timeline grid with timeshift catch-up</li>
+          <li>Unified favorite folders across channels, movies and series</li>
+          <li>Adaptive window sizing, an in-app update check, and a recordings size cap</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.5.0" date="2026-07-09">
       <description>
         <p>A large internal reorganisation - no user-visible change, but a
