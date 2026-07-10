@@ -178,6 +178,7 @@ class EpgGridDialog(QDialog):
     def _build(self) -> None:
         self.scene.clear()
         self._selected = None
+        self._sel_outline = None   # dropped by scene.clear(); recreated on pick
         self._playing_row = None
         self.play_btn.setEnabled(False)
         text = self.filter.text().lower().strip()
@@ -257,6 +258,10 @@ class EpgGridDialog(QDialog):
         playing = self._is_playing(ch)
         if playing:
             self._playing_row = row
+        try:
+            has_ts = self.window._timeshift_days(ch) > 0
+        except Exception:
+            has_ts = False
         cell = QGraphicsRectItem(0, y, self.CH_COL_W, self.ROW_H)
         if playing:
             cell.setBrush(QBrush(QColor(ACCENT)))
@@ -265,7 +270,10 @@ class EpgGridDialog(QDialog):
             cell.setBrush(QBrush(base.darker(120)))
             cell.setPen(QPen(QColor(P["bg"]), 1))
         self._chan_group.addToGroup(cell)
-        label_text = ("▶  " if playing else "") + (ch.get("name") or "?")
+        # ⏪ marks a channel with catch-up (timeshift), matching the main list.
+        label_text = (("▶  " if playing else "")
+                      + ("⏪ " if has_ts else "")
+                      + (ch.get("name") or "?"))
         name = QGraphicsSimpleTextItem(label_text)
         f = QFont()
         f.setBold(True)
@@ -341,11 +349,35 @@ class EpgGridDialog(QDialog):
                 return data
         return None
 
+    def _highlight_block(self, scene_pos) -> None:
+        """Outline the picked programme block so it's clear which one is
+        selected (and which one 'Play this programme' will act on)."""
+        block = None
+        for it in self.scene.items(scene_pos):
+            d = it.data(0)
+            if (isinstance(d, dict) and "channel" in d
+                    and isinstance(it, QGraphicsRectItem)):
+                block = it
+                break
+        if block is None:
+            return
+        if getattr(self, "_sel_outline", None) is None \
+                or self._sel_outline.scene() is None:
+            self._sel_outline = self.scene.addRect(
+                block.rect(), QPen(QColor("#ffffff"), 2),
+                QBrush(Qt.BrushStyle.NoBrush))
+            self._sel_outline.setZValue(17)
+            self._sel_outline.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+        else:
+            self._sel_outline.setRect(block.rect())
+        self._sel_outline.show()
+
     def _select_at(self, scene_pos) -> None:
         data = self._block_at(scene_pos)
         if not data:
             return
         self._selected = data
+        self._highlight_block(scene_pos)
         p = data["prog"]
         start = datetime.fromtimestamp(p["start_timestamp"]).strftime("%H:%M")
         stop = datetime.fromtimestamp(p["stop_timestamp"]).strftime("%H:%M")
@@ -385,7 +417,7 @@ class EpgGridDialog(QDialog):
         m = QMenu(self)
         past = p["stop_timestamp"] < time.time()
         if past and self.window._timeshift_days(ch):
-            m.addAction(tr("ts_play_from_start"), self._play_selected)
+            m.addAction(tr("epg_play_this_programme"), self._play_selected)
         m.addAction(tr("ts_go_live") if past else tr("epg_play_channel"),
                     lambda: (self.window.play_live_channel(ch), self.accept()))
         if ch.get("stream_id") is not None and p["stop_timestamp"] > time.time():

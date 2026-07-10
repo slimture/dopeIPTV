@@ -3132,6 +3132,16 @@ _STRINGS: dict[str, dict[str, str]] = {
 
     # ── Timeshift / catch-up ──────────────────────────────────────────────
 
+    "epg_play_this_programme": {
+        "en": "Play this programme (catch-up)",
+        "sv": "Spela det här programmet (catch-up)",
+        "es": "Reproducir este programa (recuperar)",
+        "de": "Diese Sendung ansehen (Catch-up)",
+        "fr": "Lire cette émission (rattrapage)",
+        "zh": "播放此节目（回看）",
+        "ru": "Смотреть эту передачу (архив)",
+        "th": "เล่นรายการนี้ (ดูย้อนหลัง)",
+    },
     "ts_play_from_start": {
         "en": "Play from start (catch-up)",
         "sv": "Spela från början (catch-up)",
