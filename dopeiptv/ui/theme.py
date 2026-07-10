@@ -237,6 +237,12 @@ QPushButton#MiniBtn {{
     padding: 0; font-size: 13px; border-radius: 6px; text-align: center;
 }}
 
+QToolButton#SectionToggle {{
+    background: transparent; border: none; border-radius: 6px;
+}}
+QToolButton#SectionToggle:hover {{ background: {p['hover']}; }}
+QToolButton#SectionToggle:checked {{ background: {p['hover']}; }}
+
 QSplitter::handle {{ background: transparent; width: 6px; }}
 QSplitter::handle:hover {{ background: {p['border_in']}; }}
 

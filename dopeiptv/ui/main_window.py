@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QFrame, QHBoxLayout,
     QLabel, QLineEdit, QListWidget, QListWidgetItem,
     QMainWindow, QMenu, QMessageBox, QProgressBar, QPushButton, QScrollArea,
-    QSizePolicy, QSplitter, QVBoxLayout, QWidget,
+    QSizePolicy, QSplitter, QToolButton, QVBoxLayout, QWidget,
 )
 
 from .. import APP_NAME
@@ -304,11 +304,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             tr("sidebar_categories"), objectName="SectionLabel")
         cat_hdr.addWidget(self._cat_section_label)
         cat_hdr.addStretch()
-        # A disclosure-style toggle: ▾ = list expanded, ▸ = collapsed to just
-        # the active category. Reads like a collapsible section header.
-        self.cat_solo_btn = QPushButton("▾", objectName="SectionToggle")
+        # A disclosure-style toggle: a Qt-drawn arrow (not a font glyph, so it
+        # can't render as a box/ring) - down = list expanded, right = collapsed
+        # to just the active category. Reads like a collapsible section header.
+        self.cat_solo_btn = QToolButton(objectName="SectionToggle")
         self.cat_solo_btn.setCheckable(True)
-        self.cat_solo_btn.setFlat(True)
+        self.cat_solo_btn.setArrowType(Qt.ArrowType.DownArrow)
+        self.cat_solo_btn.setAutoRaise(True)
         self.cat_solo_btn.setFixedSize(22, 18)
         self.cat_solo_btn.setToolTip(tr("tooltip_solo_category"))
         self.cat_solo_btn.toggled.connect(self._on_cat_solo_toggle)
@@ -758,7 +760,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         the other rows), so the provider's category names can be tucked away
         for clean screenshots while the list still shows where you are."""
         self._cat_solo = checked
-        self.cat_solo_btn.setText("▸" if checked else "▾")
+        self.cat_solo_btn.setArrowType(
+            Qt.ArrowType.RightArrow if checked else Qt.ArrowType.DownArrow)
         self._apply_cat_solo()
 
     def _apply_cat_solo(self) -> None:
