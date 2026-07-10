@@ -243,6 +243,12 @@ QToolButton#SectionToggle {{
 QToolButton#SectionToggle:hover {{ background: {p['hover']}; }}
 QToolButton#SectionToggle:checked {{ background: {p['hover']}; }}
 
+QToolButton#ReopenStrip {{
+    background: {p['hover']}; border: none;
+    border-top-right-radius: 6px; border-bottom-right-radius: 6px;
+}}
+QToolButton#ReopenStrip:hover {{ background: {ACCENT}; }}
+
 QSplitter::handle {{ background: transparent; width: 6px; }}
 QSplitter::handle:hover {{ background: {p['border_in']}; }}
 

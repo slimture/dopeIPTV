@@ -194,6 +194,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._playing_key = None
         self._playing_group: str | None = None
         self._playing_item = None
+        self._focus_mode = False
         self._pip_win = None
         self._last_player = None
         self._last_playlist_refresh = time.time()
@@ -417,7 +418,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.side_btn.setToolTip(tr("tooltip_toggle_sidebar"))
         self.side_btn.setFixedWidth(34)
         self.side_btn.toggled.connect(self._on_side_toggle)
+        # Focus mode: hide this whole list column to give the player the room,
+        # reopened via the arrow strip on the detail pane's edge.
+        self.focus_btn = QPushButton("⤢", objectName="InlineToggle")
+        self.focus_btn.setToolTip(tr("tooltip_hide_list"))
+        self.focus_btn.setFixedWidth(34)
+        self.focus_btn.clicked.connect(lambda: self._set_focus_mode(True))
         ctl.addWidget(self.side_btn)
+        ctl.addWidget(self.focus_btn)
         ctl.addWidget(self._size_label)
         ctl.addWidget(self.size_box)
         ctl.addWidget(self._sort_label)
@@ -484,6 +492,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         dl = QVBoxLayout(det)
         dl.setContentsMargins(20, 22, 20, 18)
         dl.setSpacing(12)
+
+        # "Focus mode" reopen strip: a slim full-height arrow pinned to the
+        # detail pane's left edge, shown only when the list is hidden, so
+        # there's always an obvious way to bring the middle column back.
+        # It floats over the pane (not in the layout) at x=0, so it tracks the
+        # pane's left edge as the splitter moves; only its height needs a
+        # refresh on window resize (see _position_reopen).
+        self._reopen_btn = QToolButton(det, objectName="ReopenStrip")
+        self._reopen_btn.setArrowType(Qt.ArrowType.RightArrow)
+        self._reopen_btn.setToolTip(tr("tooltip_show_list"))
+        self._reopen_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._reopen_btn.clicked.connect(lambda: self._set_focus_mode(False))
+        self._reopen_btn.hide()
 
         self.player: EmbeddedPlayer | None = None
         if embedded_playback_supported():
@@ -701,6 +722,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                   activated=self._toggle_pause_shortcut)
         QShortcut(QKeySequence("Ctrl+B"), self,
                   activated=lambda: self.side_btn.toggle())
+        QShortcut(QKeySequence("Ctrl+Shift+M"), self,
+                  activated=lambda: self._set_focus_mode(not self._focus_mode))
 
         self._apply_view_settings()
 
@@ -779,6 +802,22 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self.side_btn.setChecked(True)   # -> expand
         elif w < 130:
             self.side_btn.setChecked(False)      # -> collapse to the rail
+
+    def _set_focus_mode(self, on: bool) -> None:
+        """Focus mode hides the whole content list so the player pane gets the
+        room. The reopen arrow strip on the detail pane's left edge is the way
+        back, so the list can never be lost."""
+        self._focus_mode = on
+        self._mid.setVisible(not on)
+        self._reopen_btn.setVisible(on and not self._player_fs)
+        if on:
+            self._position_reopen()
+            self._reopen_btn.raise_()
+
+    def _position_reopen(self) -> None:
+        if not hasattr(self, "_reopen_btn"):
+            return
+        self._reopen_btn.setGeometry(0, 0, 20, self._det.height())
 
     def _on_cat_solo_toggle(self, checked: bool) -> None:
         """Collapse the category list to just the active category (hide all
@@ -2374,6 +2413,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self._welcome is not None and self._welcome.isVisible():
             self._welcome.cover()
         self._position_provider_hint()
+        if getattr(self, "_focus_mode", False):
+            self._position_reopen()
         # The justified poster grid re-flows its columns from ChannelListView's
         # own resizeEvent, so nothing else to do here.
 
