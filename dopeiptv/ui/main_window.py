@@ -410,18 +410,23 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         settings_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
                                    QSizePolicy.Policy.Fixed)
         settings_btn.clicked.connect(self.open_settings)
+        # Discreet "update available" pill just above Settings, shown only when
+        # the startup check finds a newer release. Click opens About (which has
+        # the changelog + download); nothing shows when you're up to date.
+        self._update_pill = QPushButton("", objectName="UpdatePill")
+        self._update_pill.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._update_pill.setSizePolicy(QSizePolicy.Policy.Ignored,
+                                        QSizePolicy.Policy.Fixed)
+        self._update_pill.setStyleSheet(
+            "QPushButton#UpdatePill {"
+            f" background:{P.get('accent', '#3DDC84')}; color:#0B0B0F;"
+            " border:none; border-radius:7px; padding:6px 10px; margin:2px 0;"
+            " font-size:12px; font-weight:600; }"
+            "QPushButton#UpdatePill:hover { text-decoration:underline; }")
+        self._update_pill.clicked.connect(self.show_about)
+        self._update_pill.hide()
+        sl.addWidget(self._update_pill)
         sl.addWidget(settings_btn)
-        # A discreet "update available" badge in the button's top-right corner.
-        # Hidden until the startup check finds a newer release; works whether
-        # the button shows the "Settings" text or the collapsed gear glyph.
-        self._update_dot = QLabel(settings_btn)
-        self._update_dot.setFixedSize(9, 9)
-        self._update_dot.setAttribute(
-            Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self._update_dot.setStyleSheet(
-            "background:#3DDC84; border-radius:4px;")
-        self._update_dot.hide()
-        settings_btn.installEventFilter(self)
 
         # Middle column
         mid = QWidget(objectName="MiddlePane")
@@ -874,6 +879,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._settings_btn.setText("⚙" if collapsed else tr("btn_settings"))
         self._set_rail(self._guide_btn, collapsed)
         self._set_rail(self._settings_btn, collapsed)
+        self._refresh_update_pill()
 
     def _apply_sidebar_collapsed(self) -> None:
         collapsed = getattr(self, "_sidebar_collapsed", False)
@@ -959,11 +965,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self._set_sidebar_collapsed(False)
 
     def eventFilter(self, obj, event):
-        # Keep the update badge pinned to the settings button's top-right
-        # corner as the sidebar collapses/expands (the button's width changes).
-        if (obj is getattr(self, "_settings_btn", None)
-                and event.type() in (QEvent.Type.Resize, QEvent.Type.Show)):
-            self._position_update_dot()
         # Track the whole drag gesture on the side divider. On press we free the
         # pane (unpin min/max) so it can move both ways for as long as the button
         # is held; on release we commit the final pinned width. This lets a
@@ -984,9 +985,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self._apply_sidebar_collapsed()
         return super().eventFilter(obj, event)
 
-    def _position_update_dot(self) -> None:
-        b = self._settings_btn
-        self._update_dot.move(b.width() - self._update_dot.width() - 8, 6)
+    def _refresh_update_pill(self) -> None:
+        """Show/hide the 'update available' pill and adapt its label to the
+        sidebar's collapsed/expanded state."""
+        if not hasattr(self, "_update_pill"):
+            return
+        if not getattr(self, "_update_available", False):
+            self._update_pill.hide()
+            return
+        collapsed = getattr(self, "_sidebar_collapsed", False)
+        self._update_pill.setText("⬆" if collapsed else tr("update_pill"))
+        self._update_pill.setToolTip(
+            tr("about_update_available", version=self._update_latest))
+        self._update_pill.show()
 
     def _maybe_check_updates(self) -> None:
         """Once-a-day background check for a newer release; on a hit, light the
@@ -1020,13 +1031,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _apply_update_state(self, latest_tag: str) -> None:
         newer = bool(latest_tag) and is_newer(latest_tag, VERSION)
-        self._update_dot.setVisible(newer)
-        if newer:
-            self._position_update_dot()
-            self._settings_btn.setToolTip(
-                tr("about_update_available", version=latest_tag))
-        else:
-            self._settings_btn.setToolTip(tr("btn_settings"))
+        self._update_available = newer
+        self._update_latest = latest_tag if newer else ""
+        self._refresh_update_pill()
 
     def _set_focus_mode(self, on: bool) -> None:
         """Focus mode hides the whole content list so the player pane gets the

@@ -2017,6 +2017,12 @@ _STRINGS: dict[str, dict[str, str]] = {
 
     # ── Recording ─────────────────────────────────────────────────────────
 
+    "update_pill": {
+        "en": "⬆ Update available", "sv": "⬆ Uppdatering finns",
+        "es": "⬆ Actualización disponible", "de": "⬆ Update verfügbar",
+        "fr": "⬆ Mise à jour dispo", "zh": "⬆ 有可用更新",
+        "ru": "⬆ Доступно обновление", "th": "⬆ มีอัปเดต",
+    },
     "setting_check_updates": {
         "en": "Check for updates on startup",
         "sv": "Sök efter uppdateringar vid start",
