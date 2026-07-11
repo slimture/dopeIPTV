@@ -818,7 +818,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._set_rail(self._guide_btn, collapsed)
         self._set_rail(self._settings_btn, collapsed)
 
-    def _apply_sidebar_collapsed(self, move_sizes: bool = True) -> None:
+    def _apply_sidebar_collapsed(self) -> None:
         collapsed = getattr(self, "_sidebar_collapsed", False)
         if not hasattr(self, "nav_btns"):
             return
@@ -834,9 +834,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # freezing it. The final width is pinned on mouse release.
         if getattr(self, "_side_dragging", False):
             return
-        # Pin the pane to exactly the rail width and hand the freed space to
-        # the middle column right away - otherwise the splitter keeps the old
-        # (now empty) sidebar footprint until you happen to click it.
+        # Pin the pane and reflow the sizes so the panel snaps to its final
+        # width immediately. Crucially this runs on the drag-release too: after
+        # a collapse the rail must snap to RAIL_W right away, otherwise the pane
+        # keeps its wider footprint and leaves an empty gap beside the icons
+        # until the next click. When expanding, the target is the current
+        # (dragged) width, so setSizes is a no-op reflow that keeps it put.
         if collapsed:
             # Pin to exactly the rail width: a hard constraint the splitter
             # honours immediately (so a drag-in snaps cleanly) and which keeps
@@ -849,14 +852,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._side.setMinimumWidth(0)
             self._side.setMaximumWidth(16777215)
             target = getattr(self, "_sidebar_expanded_w", 220)
-        # On a drag release the splitter already sits where the mouse left it,
-        # so only nudge the sizes for a button/keyboard toggle (move_sizes).
-        if move_sizes:
-            sizes = self._root.sizes()
-            if len(sizes) >= 2:
-                sizes[1] = max(240, sizes[1] + (sizes[0] - target))
-                sizes[0] = target
-                self._root.setSizes(sizes)
+        sizes = self._root.sizes()
+        if len(sizes) >= 2:
+            sizes[1] = max(240, sizes[1] + (sizes[0] - target))
+            sizes[0] = target
+            self._root.setSizes(sizes)
 
     @staticmethod
     def _set_rail(btn, on: bool) -> None:
@@ -916,9 +916,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             elif (t == QEvent.Type.MouseButtonRelease
                     and getattr(self, "_side_dragging", False)):
                 self._side_dragging = False
-                # Commit geometry for whatever state we ended in; the splitter
-                # already sits at the dragged width, so don't move the sizes.
-                self._apply_sidebar_collapsed(move_sizes=False)
+                # Commit geometry for whatever state we ended in. On a collapse
+                # this snaps the rail to RAIL_W right away (no leftover gap); on
+                # an expand the target is the current width, so it stays put.
+                self._apply_sidebar_collapsed()
         return super().eventFilter(obj, event)
 
     def _set_focus_mode(self, on: bool) -> None:
