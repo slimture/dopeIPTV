@@ -123,6 +123,23 @@ class XmltvGuide:
         except OSError:
             pass
 
+    def clear_cache(self) -> None:
+        """Delete the on-disk EPG cache (compressed guide + parsed index) and
+        forget the loaded guide, so the next load re-fetches from the provider.
+        Backs Settings' 'Clear EPG cache' - useful when a guide went stale or
+        a provider changed its XMLTV."""
+        for p in (self.cache_path, self._index_path()):
+            try:
+                if p is not None and p.exists():
+                    p.unlink()
+            except OSError:
+                pass
+        with self._lock:
+            self._by_id = {}
+            self._by_name = {}
+            self._loaded = False
+            self._failed = False
+
     def _effective_url(self) -> str:
         """The XMLTV URL to fetch: an explicit per-playlist URL wins, else the
         one an M3U playlist advertises in its #EXTM3U header (url-tvg). The M3U

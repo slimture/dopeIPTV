@@ -464,6 +464,34 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Задержка EPG",
         "th": "ดีเลย์ EPG",
     },
+    "setting_epg_cache": {
+        "en": "EPG cache", "sv": "EPG-cache",
+        "es": "Caché de EPG", "de": "EPG-Cache",
+        "fr": "Cache EPG", "zh": "EPG 缓存",
+        "ru": "Кэш EPG", "th": "แคช EPG",
+    },
+    "btn_refresh_epg": {
+        "en": "Refresh guide now", "sv": "Uppdatera guide nu",
+        "es": "Actualizar guía", "de": "Guide jetzt aktualisieren",
+        "fr": "Actualiser le guide", "zh": "立即刷新指南",
+        "ru": "Обновить программу", "th": "รีเฟรชผังรายการ",
+    },
+    "btn_clear_epg": {
+        "en": "Clear EPG cache", "sv": "Rensa EPG-cache",
+        "es": "Borrar caché EPG", "de": "EPG-Cache leeren",
+        "fr": "Vider le cache EPG", "zh": "清除 EPG 缓存",
+        "ru": "Очистить кэш EPG", "th": "ล้างแคช EPG",
+    },
+    "epg_cache_cleared": {
+        "en": "EPG cache cleared — reloading…",
+        "sv": "EPG-cache rensad — laddar om…",
+        "es": "Caché EPG borrada — recargando…",
+        "de": "EPG-Cache geleert — wird neu geladen…",
+        "fr": "Cache EPG vidé — rechargement…",
+        "zh": "EPG 缓存已清除 — 正在重新加载…",
+        "ru": "Кэш EPG очищен — перезагрузка…",
+        "th": "ล้างแคช EPG แล้ว — กำลังโหลดใหม่…",
+    },
 
     # ── Settings labels (Interface) ───────────────────────────────────────
 
@@ -1782,6 +1810,18 @@ _STRINGS: dict[str, dict[str, str]] = {
         "es": "Reconectando…", "de": "Neu verbinden…",
         "fr": "Reconnexion…", "zh": "正在重新连接…",
         "ru": "Переподключение…", "th": "กำลังเชื่อมต่อใหม่…",
+    },
+    "status_stream_in_use": {
+        "en": "Stream in use on another device (max {maxc} connection)",
+        "sv": "Streamen används på en annan enhet (max {maxc} anslutning)",
+        "es": "Transmisión en uso en otro dispositivo (máx. {maxc} conexión)",
+        "de": "Stream wird auf einem anderen Gerät verwendet "
+              "(max. {maxc} Verbindung)",
+        "fr": "Flux utilisé sur un autre appareil (max {maxc} connexion)",
+        "zh": "流正在另一台设备上使用（最多 {maxc} 个连接）",
+        "ru": "Поток используется на другом устройстве "
+              "(макс. {maxc} подключение)",
+        "th": "สตรีมกำลังใช้งานบนอุปกรณ์อื่น (สูงสุด {maxc} การเชื่อมต่อ)",
     },
     "status_stream_error": {
         "en": "Stream error: {msg}",

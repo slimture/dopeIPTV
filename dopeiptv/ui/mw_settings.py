@@ -387,6 +387,15 @@ class _SettingsMixin:
         pf.addRow(tr("setting_network_buffer"), buf_box)
         pf.addRow(tr("setting_replay_delay"), replay_delay_row)
         pf.addRow(tr("setting_epg_delay"), epg_delay_row)
+        epg_cache_row = QHBoxLayout()
+        refresh_epg_btn = QPushButton(tr("btn_refresh_epg"))
+        clear_epg_btn = QPushButton(tr("btn_clear_epg"))
+        refresh_epg_btn.clicked.connect(self._refresh_epg_now)
+        clear_epg_btn.clicked.connect(self._clear_epg_cache)
+        epg_cache_row.addWidget(refresh_epg_btn)
+        epg_cache_row.addWidget(clear_epg_btn)
+        epg_cache_row.addStretch()
+        pf.addRow(tr("setting_epg_cache"), epg_cache_row)
         x11_box = None
         if sys.platform.startswith("linux"):
             x11_box = QCheckBox(tr("setting_force_x11"))
