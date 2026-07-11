@@ -707,15 +707,28 @@ class _SettingsMixin:
         trakt_tab = QWidget()
         tf = QVBoxLayout(trakt_tab)
         tf.setSpacing(10)
-        trakt_setup_lbl = QLabel(
-            "Just click Connect: your browser opens Trakt, you click 'Yes', "
-            "and you're signed in - no codes, no passwords. The Client ID / "
-            "Secret below are dopeIPTV's built-in app and work as-is. Advanced "
-            "users can replace them with their own Trakt API app (set its "
-            f"Redirect URI to exactly {REDIRECT_URI}).")
-        trakt_setup_lbl.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
-        trakt_setup_lbl.setWordWrap(True)
-        tf.addWidget(trakt_setup_lbl)
+        trakt_status = QLabel()
+        trakt_status.setWordWrap(True)
+        tf.addWidget(trakt_status)
+
+        # -- Easy path: one-click browser sign-in with the built-in app -------
+        trakt_browser_btn = QPushButton(tr("trakt_connect_browser"),
+                                        objectName="Primary")
+        browser_row = QHBoxLayout()
+        browser_row.addWidget(trakt_browser_btn)
+        browser_row.addStretch(1)
+        tf.addLayout(browser_row)
+        browser_hint = QLabel(tr("trakt_connect_browser_hint"))
+        browser_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        browser_hint.setWordWrap(True)
+        tf.addWidget(browser_hint)
+
+        # -- Advanced path: bring your own Trakt API app ----------------------
+        creds_hint = QLabel(tr("trakt_creds_hint")
+                            + f"\nRedirect URI: {REDIRECT_URI}")
+        creds_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        creds_hint.setWordWrap(True)
+        tf.addWidget(creds_hint)
         create_app_btn = QPushButton(tr("trakt_create_app"))
         create_app_btn.clicked.connect(
             lambda: QDesktopServices.openUrl(
@@ -737,15 +750,16 @@ class _SettingsMixin:
         tform.addRow(tr("field_client_id"), trakt_id_edit)
         tform.addRow(tr("field_client_secret"), trakt_secret_edit)
         tf.addLayout(tform)
-        trakt_status = QLabel()
-        trakt_status.setWordWrap(True)
-        tf.addWidget(trakt_status)
+        creds_row = QHBoxLayout()
+        trakt_creds_btn = QPushButton(tr("trakt_connect_creds"))
+        creds_row.addWidget(trakt_creds_btn)
+        creds_row.addStretch(1)
+        tf.addLayout(creds_row)
+
+        # -- Session actions --------------------------------------------------
         trakt_btns = QHBoxLayout()
-        trakt_connect_btn = QPushButton(tr("trakt_connect_btn"),
-                                        objectName="Primary")
         trakt_disconnect_btn = QPushButton(tr("trakt_disconnect"))
         trakt_watchlist_btn = QPushButton(tr("trakt_watchlist_btn"))
-        trakt_btns.addWidget(trakt_connect_btn)
         trakt_btns.addWidget(trakt_disconnect_btn)
         trakt_btns.addWidget(trakt_watchlist_btn)
         trakt_btns.addStretch()
@@ -812,15 +826,24 @@ class _SettingsMixin:
             trakt_disconnect_btn.setEnabled(self.trakt.is_connected())
             refresh_sync_status()
 
-        def do_trakt_connect():
-            self.settings.setValue(
-                "trakt_client_id", trakt_id_edit.text().strip())
-            self.settings.setValue(
-                "trakt_client_secret", trakt_secret_edit.text().strip())
-            if not self.trakt.client_id or not self.trakt.client_secret:
+        def do_connect_browser():
+            # Easy path: sign in through the browser with whatever Trakt app is
+            # active (the built-in one unless the user saved their own). Doesn't
+            # touch the credential fields.
+            self._trakt_browser_auth_dialog(d)
+            refresh_trakt_status()
+
+        def do_connect_creds():
+            # Advanced path: save the entered Client ID / Secret first, then run
+            # the same browser sign-in against that app.
+            cid = trakt_id_edit.text().strip()
+            secret = trakt_secret_edit.text().strip()
+            if not cid or not secret:
                 QMessageBox.warning(
                     d, "Trakt", tr("msg_trakt_enter_creds"))
                 return
+            self.settings.setValue("trakt_client_id", cid)
+            self.settings.setValue("trakt_client_secret", secret)
             self._trakt_browser_auth_dialog(d)
             refresh_trakt_status()
 
@@ -828,7 +851,8 @@ class _SettingsMixin:
             self.trakt.disconnect()
             refresh_trakt_status()
 
-        trakt_connect_btn.clicked.connect(do_trakt_connect)
+        trakt_browser_btn.clicked.connect(do_connect_browser)
+        trakt_creds_btn.clicked.connect(do_connect_creds)
         trakt_disconnect_btn.clicked.connect(do_trakt_disconnect)
         trakt_watchlist_btn.clicked.connect(
             lambda: self._open_trakt_dialog(d))

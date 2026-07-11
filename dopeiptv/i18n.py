@@ -5312,6 +5312,63 @@ _STRINGS: dict[str, dict[str, str]] = {
         "fr": "Se connecter à Trakt…", "zh": "连接到 Trakt……",
         "ru": "Подключиться к Trakt…", "th": "เชื่อมต่อ Trakt…",
     },
+    "trakt_connect_browser": {
+        "en": "Connect via browser", "sv": "Anslut via webbläsare",
+        "es": "Conectar con el navegador", "de": "Über Browser verbinden",
+        "fr": "Se connecter via le navigateur", "zh": "通过浏览器连接",
+        "ru": "Подключиться через браузер", "th": "เชื่อมต่อผ่านเบราว์เซอร์",
+    },
+    "trakt_connect_creds": {
+        "en": "Connect with Client ID & Secret",
+        "sv": "Anslut med Client ID & Secret",
+        "es": "Conectar con Client ID y Secret",
+        "de": "Mit Client-ID & Secret verbinden",
+        "fr": "Se connecter avec Client ID et Secret",
+        "zh": "使用 Client ID 和 Secret 连接",
+        "ru": "Подключиться с Client ID и Secret",
+        "th": "เชื่อมต่อด้วย Client ID และ Secret",
+    },
+    "trakt_connect_browser_hint": {
+        "en": "The easy way: uses dopeIPTV's built-in Trakt app. Your browser "
+              "opens Trakt, you click 'Yes', and you're signed in - no codes.",
+        "sv": "Det enkla sättet: använder dopeIPTV:s inbyggda Trakt-app. Din "
+              "webbläsare öppnar Trakt, du klickar 'Ja', och du är inloggad - "
+              "inga koder.",
+        "es": "La forma fácil: usa la app de Trakt integrada en dopeIPTV. Tu "
+              "navegador abre Trakt, pulsas 'Sí' y ya estás dentro - sin códigos.",
+        "de": "Der einfache Weg: nutzt die eingebaute Trakt-App von dopeIPTV. "
+              "Dein Browser öffnet Trakt, du klickst 'Ja' und bist angemeldet - "
+              "ohne Codes.",
+        "fr": "La méthode simple : utilise l'app Trakt intégrée de dopeIPTV. "
+              "Votre navigateur ouvre Trakt, vous cliquez sur 'Oui' et vous "
+              "êtes connecté - sans codes.",
+        "zh": "简单方式：使用 dopeIPTV 内置的 Trakt 应用。浏览器打开 Trakt，"
+              "点击“是”即可登录——无需代码。",
+        "ru": "Простой способ: использует встроенное приложение Trakt в "
+              "dopeIPTV. Браузер откроет Trakt, вы нажмёте «Да» и войдёте - "
+              "без кодов.",
+        "th": "วิธีง่าย ๆ: ใช้แอป Trakt ในตัวของ dopeIPTV เบราว์เซอร์จะเปิด "
+              "Trakt คุณคลิก 'ใช่' แล้วเข้าสู่ระบบ - ไม่ต้องใช้รหัส",
+    },
+    "trakt_creds_hint": {
+        "en": "Advanced: use your own Trakt API app. Paste its Client ID and "
+              "Secret above, then connect (browser opens the same way).",
+        "sv": "Avancerat: använd din egen Trakt-API-app. Klistra in dess "
+              "Client ID och Secret ovan och anslut (webbläsaren öppnas likadant).",
+        "es": "Avanzado: usa tu propia app de la API de Trakt. Pega su Client "
+              "ID y Secret arriba y conecta (el navegador se abre igual).",
+        "de": "Erweitert: nutze deine eigene Trakt-API-App. Füge oben ihre "
+              "Client-ID und Secret ein und verbinde (Browser öffnet sich gleich).",
+        "fr": "Avancé : utilisez votre propre app API Trakt. Collez son Client "
+              "ID et Secret ci-dessus, puis connectez-vous (le navigateur "
+              "s'ouvre de la même façon).",
+        "zh": "高级：使用你自己的 Trakt API 应用。在上方粘贴其 Client ID 和 "
+              "Secret，然后连接（浏览器以相同方式打开）。",
+        "ru": "Дополнительно: используйте своё приложение Trakt API. Вставьте "
+              "его Client ID и Secret выше и подключитесь (браузер откроется так же).",
+        "th": "ขั้นสูง: ใช้แอป Trakt API ของคุณเอง วาง Client ID และ Secret "
+              "ด้านบน แล้วเชื่อมต่อ (เบราว์เซอร์จะเปิดแบบเดียวกัน)",
+    },
     "trakt_disconnect": {
         "en": "Disconnect", "sv": "Koppla från", "es": "Desconectar",
         "de": "Trennen", "fr": "Déconnecter", "zh": "断开连接",
