@@ -81,7 +81,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Reclaim EPG guides left behind by playlists that no longer exist -
         # each is hundreds of MB and they were never cleaned up.
         try:
-            keep = [p.get("id") for p in playlists.all()] if playlists else []
+            keep = [p.get("id") for p in playlists.items] if playlists else []
             n = prune_epg_caches(keep)
             print(f"[dopeIPTV] EPG cache prune: kept {len(keep)} playlist(s) "
                   f"{keep}, removed {n} orphaned file(s)", file=sys.stderr)
@@ -1428,7 +1428,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         left by playlists that no longer exist, then re-fetch fresh."""
         self.xmltv.clear_cache()
         try:
-            prune_epg_caches(p.get("id") for p in self.playlist_store.all()) \
+            prune_epg_caches(p.get("id") for p in self.playlist_store.items) \
                 if self.playlist_store else None
         except Exception:
             pass
