@@ -809,6 +809,11 @@ class EmbeddedPlayer(QWidget):
         self._overlay_timer.setInterval(self.OVERLAY_HIDE_MS)
         self._overlay_timer.timeout.connect(self._hide_fs_ui)
 
+        # Sleep timer: stop playback after a chosen number of minutes.
+        self._sleep_timer = QTimer(self)
+        self._sleep_timer.setSingleShot(True)
+        self._sleep_timer.timeout.connect(self._on_sleep_elapsed)
+
         self._pip_mode = False
         self._pip_bar_timer = QTimer(self)
         self._pip_bar_timer.setSingleShot(True)
@@ -1443,11 +1448,35 @@ class EmbeddedPlayer(QWidget):
             act.triggered.connect(
                 lambda _c, s=secs: self._set_cache_secs(s))
 
+        sleep = menu.addMenu(tr("opt_sleep_timer"))
+        off_s = sleep.addAction(tr("opt_off"))
+        off_s.setCheckable(True)
+        off_s.setChecked(not self._sleep_timer.isActive())
+        off_s.triggered.connect(lambda _c: self._start_sleep_timer(0))
+        for mins in (15, 30, 45, 60, 90):
+            act = sleep.addAction(tr("opt_minutes", n=mins))
+            act.triggered.connect(
+                lambda _c, mn=mins: self._start_sleep_timer(mn))
+
         menu.addSeparator()
         stats_act = menu.addAction(tr("opt_stats_for_nerds"))
         stats_act.triggered.connect(self._show_stats)
 
         menu.exec(anchor.mapToGlobal(anchor.rect().bottomLeft()))
+
+    def _start_sleep_timer(self, minutes: int) -> None:
+        """Stop playback after *minutes* (0 cancels a running timer)."""
+        if minutes <= 0:
+            if self._sleep_timer.isActive():
+                self._sleep_timer.stop()
+                self.set_overlay_info(tr("sleep_cancelled"))
+            return
+        self._sleep_timer.start(minutes * 60 * 1000)
+        self.set_overlay_info(tr("sleep_set", n=minutes))
+
+    def _on_sleep_elapsed(self) -> None:
+        self.set_overlay_info(tr("sleep_stopping"))
+        self.stop()
 
     def _show_stats(self) -> None:
         if self._stats_overlay.isVisible():

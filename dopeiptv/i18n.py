@@ -3194,6 +3194,38 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Сетевой буфер",
         "th": "บัฟเฟอร์เครือข่าย",
     },
+    "opt_sleep_timer": {
+        "en": "Sleep timer", "sv": "Insomningstimer",
+        "es": "Temporizador de apagado", "de": "Sleep-Timer",
+        "fr": "Minuterie de veille", "zh": "睡眠定时器",
+        "ru": "Таймер сна", "th": "ตั้งเวลาปิด",
+    },
+    "opt_minutes": {
+        "en": "{n} min", "sv": "{n} min", "es": "{n} min", "de": "{n} Min",
+        "fr": "{n} min", "zh": "{n} 分钟", "ru": "{n} мин", "th": "{n} นาที",
+    },
+    "sleep_set": {
+        "en": "Sleep timer: stopping in {n} min",
+        "sv": "Insomningstimer: stänger av om {n} min",
+        "es": "Temporizador: se apagará en {n} min",
+        "de": "Sleep-Timer: stoppt in {n} Min",
+        "fr": "Minuterie : arrêt dans {n} min",
+        "zh": "睡眠定时器：{n} 分钟后停止",
+        "ru": "Таймер сна: остановка через {n} мин",
+        "th": "ตั้งเวลาปิด: จะหยุดใน {n} นาที",
+    },
+    "sleep_cancelled": {
+        "en": "Sleep timer cancelled", "sv": "Insomningstimer avbruten",
+        "es": "Temporizador cancelado", "de": "Sleep-Timer abgebrochen",
+        "fr": "Minuterie annulée", "zh": "睡眠定时器已取消",
+        "ru": "Таймер сна отменён", "th": "ยกเลิกตั้งเวลาปิดแล้ว",
+    },
+    "sleep_stopping": {
+        "en": "Sleep timer: stopping playback", "sv": "Insomningstimer: stänger av",
+        "es": "Temporizador: deteniendo", "de": "Sleep-Timer: stoppt",
+        "fr": "Minuterie : arrêt", "zh": "睡眠定时器：正在停止",
+        "ru": "Таймер сна: остановка", "th": "ตั้งเวลาปิด: กำลังหยุด",
+    },
     "opt_stats_for_nerds": {
         "en": "Stats for nerds",
         "sv": "Statistik för nördar",
