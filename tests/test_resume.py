@@ -63,3 +63,36 @@ def test_corrupt_stored_json_is_ignored():
     s = FakeSettings({"resume_positions_p": "{not json"})
     r = ResumeStore(s, "p")           # must not raise
     assert r.saved_position(1, "movie") == 0.0
+
+
+def test_continue_watching_lists_movies_with_progress():
+    r = ResumeStore(FakeSettings(), "p")
+    r.record("vod", 42, pos=1800, dur=3600,
+             item={"name": "Dune", "stream_id": 42,
+                   "container_extension": "mp4"})
+    r.record("vod", 7, pos=300, dur=6000,
+             item={"name": "Old", "stream_id": 7})
+    cw = r.continue_watching()
+    assert [x["name"] for x in cw] == ["Old", "Dune"] or \
+           {x["name"] for x in cw} == {"Dune", "Old"}
+    by_name = {x["name"]: x for x in cw}
+    assert by_name["Dune"]["_progress_pct"] == 50
+    assert by_name["Dune"]["_kind"] == "vod"
+    assert by_name["Dune"]["_resume_pos"] == 1800
+
+
+def test_continue_watching_excludes_episodes_and_near_start():
+    r = ResumeStore(FakeSettings(), "p")
+    r.record("episode", 5, pos=600, dur=1800,
+             item={"name": "Ep", "stream_id": 5})   # episodes not listed
+    r.record("vod", 9, pos=30, dur=3600,
+             item={"name": "Barely", "stream_id": 9})  # < 60s dropped
+    assert r.continue_watching() == []
+
+
+def test_continue_watching_clear_removes_row():
+    r = ResumeStore(FakeSettings(), "p")
+    r.record("vod", 42, pos=1800, dur=3600, item={"name": "Dune"})
+    assert len(r.continue_watching()) == 1
+    r.clear("vod", 42)
+    assert r.continue_watching() == []

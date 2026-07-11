@@ -1561,6 +1561,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             all_item = QListWidgetItem(tr("cat_all"))
             all_item.setData(Qt.ItemDataRole.UserRole, None)
             self.cat_list.addItem(all_item)
+            # A synthetic "Continue watching" category for Movies, shown only
+            # when there are partly-watched titles to resume.
+            if self.mode == "vod" and self.resume.continue_watching():
+                cw = QListWidgetItem("▶  " + tr("cat_continue"))
+                cw.setData(Qt.ItemDataRole.UserRole, "__continue__")
+                self.cat_list.addItem(cw)
             for c in cats:
                 cid = c.get("category_id")
                 if self.overrides.is_hidden(self.mode, cid):
@@ -1774,6 +1780,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 [("fav_movies", "vod", "vod", movies),
                  ("fav_series", "series", "series", series)],
                 "watched")
+            return
+        if self.mode == "vod" and category_id == "__continue__":
+            # Synthetic category: partly-watched movies, straight from the
+            # resume store (no network fetch).
+            self.all_items = self.resume.continue_watching()
+            self._apply_filter()
             return
         self._show_busy()
         self._set_status(tr("status_loading_content"))
@@ -2397,9 +2409,23 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         self.resume.record(self._playing_group, self._playing_key,
                            self.player.playback_position(),
-                           self.player.playback_duration())
+                           self.player.playback_duration(),
+                           item=(self._last_playback or {}).get("item"))
         self._playback_max_pct = max(self._playback_max_pct,
                                      self.player.progress_percent())
+
+    def _remove_continue(self, it) -> None:
+        """Forget a movie's resume point (from the Continue-watching menu),
+        then refresh the list - the category disappears once it's empty."""
+        self.resume.clear("vod", self._item_key(it))
+        cur = self.cat_list.currentItem()
+        cur_cat = cur.data(Qt.ItemDataRole.UserRole) if cur else None
+        if self.mode == "vod" and cur_cat == "__continue__":
+            if self.resume.continue_watching():
+                self.all_items = self.resume.continue_watching()
+                self._apply_filter()
+            else:
+                self._load_categories()
 
     def _resume_offset(self, key, kind: str) -> float:
         """Ask whether to resume a partly-watched title; return the start

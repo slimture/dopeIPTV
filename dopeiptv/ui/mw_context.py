@@ -34,6 +34,10 @@ class _ContextMenuMixin:
             return
         m = QMenu(self)
         m.addAction(tr("ctx_play_in_mpv"), lambda: self.play_item(it, "mpv"))
+        # Continue-watching rows carry a resume point; offer to forget it.
+        if it.get("_resume_pos") is not None:
+            m.addAction(tr("ctx_continue_remove"),
+                        lambda it=it: self._remove_continue(it))
         ext = m.addMenu(tr("ctx_open_externally"))
         ext.addAction("mpv",
                       lambda: self.play_item(it, "mpv", external=True))

@@ -560,9 +560,10 @@ class ChannelDelegate(QStyledItemDelegate):
         now = (self.window.xmltv.now_for(it)
                if kind in ("live", "fav") else None)
 
+        resume_pct = it.get("_progress_pct")
         name_h = self.name_pt + 8
         sub_h = (self.sub_pt + 6) if now else 0
-        bar_h = 6 if now else 0
+        bar_h = 6 if (now or resume_pct is not None) else 0
         block_h = name_h + sub_h + bar_h
         y = rect.top() + (rect.height() - block_h) // 2
 
@@ -599,6 +600,18 @@ class ChannelDelegate(QStyledItemDelegate):
             painter.drawRoundedRect(bar_rect, 2, 2)
             fill_w = int(
                 bar_rect.width() * max(0, min(100, pct)) / 100)
+            if fill_w > 0:
+                painter.setBrush(QColor(ACCENT))
+                painter.drawRoundedRect(
+                    QRect(bar_rect.x(), bar_rect.y(),
+                          fill_w, bar_rect.height()), 2, 2)
+        elif resume_pct is not None:
+            # Continue-watching resume progress (movies have no EPG 'now').
+            bar_rect = QRect(text_x, y + name_h, text_w, 4)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor("#2A2A32"))
+            painter.drawRoundedRect(bar_rect, 2, 2)
+            fill_w = int(bar_rect.width() * max(0, min(100, resume_pct)) / 100)
             if fill_w > 0:
                 painter.setBrush(QColor(ACCENT))
                 painter.drawRoundedRect(

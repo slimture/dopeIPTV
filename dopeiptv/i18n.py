@@ -4603,6 +4603,22 @@ _STRINGS: dict[str, dict[str, str]] = {
         "en": "All", "sv": "Alla", "es": "Todo", "de": "Alle", "fr": "Tout",
         "zh": "全部", "ru": "Все", "th": "ทั้งหมด",
     },
+    "cat_continue": {
+        "en": "Continue watching", "sv": "Fortsätt titta",
+        "es": "Continuar viendo", "de": "Weiterschauen",
+        "fr": "Reprendre", "zh": "继续观看",
+        "ru": "Продолжить просмотр", "th": "ดูต่อ",
+    },
+    "ctx_continue_remove": {
+        "en": "Remove from Continue watching",
+        "sv": "Ta bort från Fortsätt titta",
+        "es": "Quitar de Continuar viendo",
+        "de": "Aus Weiterschauen entfernen",
+        "fr": "Retirer de Reprendre",
+        "zh": "从继续观看中移除",
+        "ru": "Убрать из «Продолжить просмотр»",
+        "th": "ลบออกจากดูต่อ",
+    },
 
     # ── Durations (reused by record + timeshift menus) ────────────────────
     "dur_30min": {"en": "30 min", "sv": "30 min", "es": "30 min",
