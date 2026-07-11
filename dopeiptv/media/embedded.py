@@ -1326,8 +1326,16 @@ class EmbeddedPlayer(QWidget):
             m = self.video.mpv
             # Re-enable mpv's video output in case a previous stop() set it
             # to "no" - without this the stream would play with audio only.
+            # Also reset the audio track to auto: picking a specific track
+            # earlier pins aid to that track *index*, and that index leaks into
+            # the next stream. Switching e.g. a movie -> a TV channel that has
+            # fewer/other audio tracks then selects a non-existent track and
+            # plays silent until a manual reload. Auto lets each new stream pick
+            # its own default (apply_default_options re-applies any language
+            # preference right after).
             try:
                 m["vid"] = "auto"
+                m["aid"] = "auto"
             except Exception:
                 pass
             try:

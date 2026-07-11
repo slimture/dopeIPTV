@@ -170,13 +170,20 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._fav_refresh_timer = QTimer(self)
         self._fav_refresh_timer.setSingleShot(True)
         self._fav_refresh_timer.timeout.connect(self._rebuild_fav_trakt)
+        # The TMDB poster/person caches and the Trakt watched/watchlist caches
+        # are multi-MB blobs. Kept in the shared settings they made every write
+        # to that file (a volume nudge, a resume tick) rewrite all of it on
+        # sync - a main-thread stall that hitched video. Route every large,
+        # frequently-rewritten cache through a dedicated cache file so the
+        # shared settings stays small and any write to it syncs in ~1ms.
+        self._cache_settings = self._open_cache_settings(settings)
         self.cover = CoverArtService(
-            settings, self.logos,
+            self._cache_settings, self.logos,
             lambda: self._poster_refresh_timer.start(150))
         self.trakt = TraktClient(settings)
         self._trakt_active: dict | None = None
-        self.watched = WatchedStore(settings)
-        self.watchlist = WatchlistStore(settings)
+        self.watched = WatchedStore(self._cache_settings)
+        self.watchlist = WatchlistStore(self._cache_settings)
         self._watched_sync_running = False
         self._raw_categories: list = []
         self.mpv = MpvIpcPlayer()
@@ -2479,6 +2486,42 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     # Content kinds whose playback position is worth remembering/resuming.
     _RESUMABLE = ("movie", "episode", "recording")
+
+    # Cache keys that are large and/or frequently rewritten - moved out of the
+    # shared settings so writing them never rewrites the small settings file
+    # (and, conversely, so a small settings write never has to rewrite them).
+    _CACHE_KEYS = (
+        "tmdb_poster_cache_v3", "tmdb_byid_cache_v1", "tmdb_matcher_version",
+        "tmdb_person_cache", "tmdb_person_id_cache",
+        "trakt_watched_cache", "trakt_watchlist_cache",
+    )
+
+    def _open_cache_settings(self, shared: QSettings) -> QSettings:
+        """Dedicated file for the big TMDB/Trakt caches. Keeping multi-MB blobs
+        in the shared settings meant QSettings' auto-sync rewrote all of them
+        whenever any small value (volume, resume, window state) changed - a
+        100-400ms main-thread stall that hitched video. Moving them here keeps
+        the shared file tiny so those frequent writes sync in ~1ms, and the
+        caches (rewritten on their own worker threads) no longer bloat it.
+        Migrate any existing cache keys out of the shared file once."""
+        cs = QSettings(QSettings.Format.IniFormat, QSettings.Scope.UserScope,
+                       ORG, "cache")
+        try:
+            if cs.value("_migrated") != "1":
+                moved = False
+                for k in self._CACHE_KEYS:
+                    if shared.contains(k):
+                        cs.setValue(k, shared.value(k))
+                        shared.remove(k)
+                        moved = True
+                cs.setValue("_migrated", "1")
+                cs.sync()
+                if moved:
+                    shared.sync()
+        except Exception as e:
+            print(f"[dopeIPTV] cache settings migration skipped: {e}",
+                  file=sys.stderr)
+        return cs
 
     def _open_resume_settings(self, shared: QSettings) -> QSettings:
         """Resume positions get their own small settings file. They are written
