@@ -153,32 +153,6 @@ def _install_crash_hooks() -> None:
         pass
 
 
-def _install_gc_debug() -> None:
-    """Log every cyclic-GC collection and its wall-time to stderr (opt-in via
-    DOPEIPTV_GC_DEBUG=1). Used to confirm whether the periodic video micro-
-    freeze lines up with a full (gen2) collection pause - if a gen2 line prints
-    tens of milliseconds every several seconds, the GC is the stall source."""
-    import gc
-    import time
-    state = {"t0": 0.0}
-
-    def _cb(phase, info):
-        if phase == "start":
-            state["t0"] = time.perf_counter()
-            return
-        dt = (time.perf_counter() - state["t0"]) * 1000.0
-        gen = info.get("generation", 0)
-        # Only the full (gen2) sweeps are expensive enough to drop a frame;
-        # also surface any collection that happens to run long.
-        if gen >= 2 or dt >= 3.0:
-            print(f"[dopeIPTV][gc] gen{gen} {dt:.1f}ms "
-                  f"collected={info.get('collected')} "
-                  f"uncollectable={info.get('uncollectable')}",
-                  file=sys.stderr)
-
-    gc.callbacks.append(_cb)
-
-
 def _install_stall_debug(app) -> None:
     """Detect main-thread (event-loop) stalls and log them (opt-in via
     DOPEIPTV_STALL_DEBUG=1). A short-interval timer that fires late means the
@@ -263,24 +237,6 @@ def main() -> int:
                 os.environ["QT_QPA_PLATFORM"] = "xcb"
         except Exception:
             pass
-
-    # Vsync-lock the default GL surface (non-macOS; macOS sets its own Core
-    # profile format in setup_opengl). Without an explicit swap interval the
-    # buffer swap isn't paced to the display refresh, so mpv's report_swap()
-    # feeds its frame timer bogus intervals and 4K / high-fps video judders and
-    # drops frames even with hardware decoding. Requesting swapInterval(1) plus
-    # a defined GL version turns the context from "NoProfile" into a proper
-    # vsync'd surface, which is what standalone mpv (vo=gpu) gets for free.
-    if _libmpv is not None and sys.platform != "darwin":
-        try:
-            from PyQt6.QtGui import QSurfaceFormat
-            fmt = QSurfaceFormat.defaultFormat()
-            fmt.setSwapInterval(1)
-            fmt.setSwapBehavior(QSurfaceFormat.SwapBehavior.DoubleBuffer)
-            QSurfaceFormat.setDefaultFormat(fmt)
-        except Exception as e:
-            print(f"[dopeIPTV] default surface format skipped: {e}",
-                  file=sys.stderr)
 
     app = QApplication(sys.argv)
     app.setStyle(_NoButtonIconsStyle(app.style()))
@@ -390,27 +346,7 @@ def main() -> int:
     for _ in range(5):
         app.processEvents()
 
-    # Keep Python's cyclic garbage collector from micro-freezing video. Every
-    # full (gen2) collection scans *every* tracked object - the tens of
-    # thousands of Qt/mpv wrapper objects built during startup - which is a
-    # ~10-30ms pause that drops a video frame. Under the small per-frame
-    # allocation churn of playback that recurs roughly every several seconds,
-    # showing up as a regular micro-stutter that standalone mpv (C, no GC)
-    # never has. gc.freeze() moves all long-lived startup objects into a
-    # permanent generation that is never scanned again, so later collections
-    # only walk the small short-lived per-frame garbage and stay cheap; the
-    # raised thresholds also make full collections run far less often. Do a
-    # collect() first so only real survivors get frozen.
-    import gc
-    if os.environ.get("DOPEIPTV_GC_DEBUG") == "1":
-        _install_gc_debug()
     if os.environ.get("DOPEIPTV_STALL_DEBUG") == "1":
         _install_stall_debug(app)
-    try:
-        gc.collect()
-        gc.freeze()
-        gc.set_threshold(10_000, 50, 50)
-    except Exception as e:
-        print(f"[dopeIPTV] GC tuning skipped: {e}", file=sys.stderr)
 
     return app.exec()

@@ -298,17 +298,6 @@ class _MpvGLWidget(QOpenGLWidget):
                 # Enthusiasts can force zero-copy with DOPEIPTV_HWDEC=nvdec etc.
                 "hwdec": (os.environ.get("DOPEIPTV_HWDEC")
                           or "auto-copy-safe"),
-                # Resample each frame's presentation time to the display's
-                # measured refresh instead of only honouring the file's
-                # timestamps. Paired with the vsync'd surface + report_swap(),
-                # this is what keeps 24/30/60fps and 4K content smooth on a
-                # 60/120/144Hz screen - the same cadence standalone mpv uses.
-                # It needs an accurate display-fps estimate, which report_swap
-                # now provides; if a minimal libmpv build lacks it the per-key
-                # loop below just skips it. Overridable (DOPEIPTV_VIDEO_SYNC=
-                # audio reverts to mpv's default, timing-tolerant sync).
-                "video-sync": (os.environ.get("DOPEIPTV_VIDEO_SYNC")
-                               or "display-resample"),
                 # (No 'osc' option: the on-screen controller is a feature of
                 # the standalone mpv GUI and doesn't exist in the libmpv/render
                 # build we use - setting it only logged a harmless skip.)
@@ -341,14 +330,14 @@ class _MpvGLWidget(QOpenGLWidget):
             soft["demuxer-max-bytes"] = _dmax
         if _dback:
             soft["demuxer-max-back-bytes"] = _dback
-        # mpv's late-frame dropping. Default 'vo' drops a frame it judges would
-        # display late; if our present timing is periodically off that shows up
-        # as a batch of dropped frames. DOPEIPTV_FRAMEDROP=no shows every frame
-        # instead (any lateness self-corrects) to test whether the drop logic
-        # is what's visible as the periodic hitch.
-        _fd = os.environ.get("DOPEIPTV_FRAMEDROP")
-        if _fd:
-            soft["framedrop"] = _fd
+        # Video timing. Default is mpv's own (audio) sync - the most tested,
+        # timing-tolerant mode, which suits our QOpenGLWidget surface (Qt
+        # composites the frame, so we can't guarantee the exact display timing
+        # that video-sync=display-resample needs). Enthusiasts can opt into a
+        # display-sync mode with DOPEIPTV_VIDEO_SYNC=display-resample.
+        _vsync = os.environ.get("DOPEIPTV_VIDEO_SYNC")
+        if _vsync:
+            soft["video-sync"] = _vsync
         soft.update(self.EXTRA_OPTS)
         for key, val in soft.items():
             try:
