@@ -81,13 +81,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Reclaim EPG guides left behind by playlists that no longer exist -
         # each is hundreds of MB and they were never cleaned up.
         try:
-            n = prune_epg_caches(p.get("id") for p in playlists.all()) \
-                if playlists else 0
-            if n:
-                print(f"[dopeIPTV] pruned {n} orphaned EPG cache file(s)",
-                      file=sys.stderr)
-        except Exception:
-            pass
+            keep = [p.get("id") for p in playlists.all()] if playlists else []
+            n = prune_epg_caches(keep)
+            print(f"[dopeIPTV] EPG cache prune: kept {len(keep)} playlist(s) "
+                  f"{keep}, removed {n} orphaned file(s)", file=sys.stderr)
+        except Exception as e:
+            print(f"[dopeIPTV] EPG cache prune failed: {e}", file=sys.stderr)
         self.pool = QThreadPool.globalInstance()
         # 320 px covers the biggest cell we render (xlarge grid uses a 200 px
         # logo, and a HiDPI screen doubles the pixel budget), so channel
