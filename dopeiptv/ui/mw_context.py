@@ -122,7 +122,13 @@ class _ContextMenuMixin:
                 or (eff_mode == "series" and not self.series_ctx)
                 or self.series_ctx):
             m.addSeparator()
-            trakt_ok = self.trakt.is_connected() and self.tmdb is not None
+            # The '+Trakt' push needs a tmdb id (Trakt's API is tmdb-keyed):
+            # available either from a TMDB resolver or from an id the row
+            # already carries (Watch Later / Watched snapshots). Without a
+            # TMDB key AND without a carried id there's no way to reach Trakt.
+            trakt_ok = self.trakt.is_connected() and (
+                self.tmdb is not None
+                or isinstance(it.get("_tmdb_id"), int))
             if self.series_ctx:
                 mark = self._mark_episode_watched
                 unmark = self._unmark_episode_watched
