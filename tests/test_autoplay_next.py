@@ -105,11 +105,20 @@ def test_queue_override_carried_forward():
     assert f._ep_index_override == 1
 
 
-@pytest.mark.parametrize("last", [None, {}, {"kind": "live"}])
+@pytest.mark.parametrize("last", [None, {}, {"kind": "rec"}])
 def test_no_op_when_nothing_playable(last):
     f = _make(last=last)
     MainWindow._on_player_finished(f)
     assert f.played == []
+
+
+def test_live_finish_reconnects_instead_of_autoplaying():
+    # A live stream reaching EOF means the connection dropped, not that a
+    # title ended - it must reconnect, not autoplay an episode.
+    f = _make(last={"kind": "live", "key": 5})
+    f._reconnect_live = lambda reason: f.played.append(("__reconnect__", reason))
+    MainWindow._on_player_finished(f)
+    assert f.played == [("__reconnect__", "eof")]
 
 
 def test_manual_next_button_skips_without_waiting():

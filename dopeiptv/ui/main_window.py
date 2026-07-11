@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import threading
 import time
 from datetime import datetime
@@ -2728,9 +2729,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.series_ctx = saved
 
     def _on_player_finished(self) -> None:
-        """An episode played to its natural end. Mark it watched and, if
-        enabled, autoplay the next episode in the same series."""
+        """End-of-file from the player. For a live stream that means the
+        connection dropped (a live channel never really "ends"), so reconnect
+        instead of leaving it frozen on the last frame. For an episode, mark it
+        watched and optionally autoplay the next one."""
         last = getattr(self, "_last_playback", None)
+        if last and last.get("kind") == "live":
+            self._reconnect_live("eof")
+            return
         if not last or last.get("kind") != "episode":
             return
         # Give the just-finished episode its watched mark (it reached the end).
@@ -2898,8 +2904,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.title_lbl.setText("")
 
     def _on_player_stalled(self) -> None:
-        """The player reported the live stream frozen (buffer-starved). Reconnect
-        silently, respecting the same retry budget as a hard error."""
+        """The player reported the live stream frozen (buffer-starved)."""
+        self._reconnect_live("stall")
+
+    def _reconnect_live(self, reason: str) -> None:
+        """Silently reconnect the current live stream after it froze
+        (buffer-starved) or hit EOF (the server dropped the connection or a
+        segment gap ended the stream - with keep-open mpv then pauses on the
+        last frame instead of stopping, which looks like the app killed it).
+        Respects a small retry budget so a genuinely dead channel doesn't loop
+        forever; the budget resets after 20s of healthy playback."""
         lp = getattr(self, "_last_playback", None)
         if not (self.player and self.player.isVisible()):
             return
@@ -2912,6 +2926,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return   # tried hard already; leave it for the user to zap
         self._last_stream_error_ts = now
         self._stream_retries = getattr(self, "_stream_retries", 0) + 1
+        print(f"[dopeIPTV] live reconnect ({reason}) "
+              f"try {self._stream_retries}/{self.MAX_STREAM_RETRIES}",
+              file=sys.stderr)
         self.player.current_url = None
         self._set_status(tr("status_reconnecting"))
         QTimer.singleShot(300, self._retry_last_stream)
@@ -2921,9 +2938,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not lp or lp.get("kind") != "live":
             return
         it = lp.get("item")
-        if it is not None:
-            self.play_live_channel(it)   # re-derives a fresh live URL
-        else:
+        # Re-derive a fresh URL from the channel when we know its id (handles a
+        # token/timestamp that expired). Replayed from History we only have the
+        # stored URL (no stream_id), so fall back to that - it's the same URL a
+        # manual re-open uses, so it reconnects the same way.
+        if it is not None and it.get("stream_id") is not None:
+            self.play_live_channel(it)
+        elif lp.get("url"):
             self._start_playback(lp["url"], lp["title"], lp.get("icon_url"),
                                  lp.get("key"), "live")
 
