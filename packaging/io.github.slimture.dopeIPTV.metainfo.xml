@@ -49,6 +49,17 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.6.3" date="2026-07-11">
+      <description>
+        <p>Keyboard shortcuts, a calmer progress indicator, and playback stability.</p>
+        <ul>
+          <li>Keyboard shortcuts throughout - Ctrl+G for the EPG guide, M/P/R/I for mute/PiP/record/stats, arrow keys to zap and nudge volume, and N/Enter in the guide (all documented in the README)</li>
+          <li>A steadier progress indicator that no longer sticks at "100%" or lingers on screen, with a watchdog to clear it</li>
+          <li>Playback stability - live streams auto-reconnect after a network hiccup, a stall watchdog recovers a frozen picture, and moving the window no longer drops the stream</li>
+          <li>Packaging - a fully offline Flathub manifest so the app can ship on Flathub</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.6.2" date="2026-07-10">
       <description>
         <p>A polish release: a collapsible sidebar, custom colours, and fixes.</p>
