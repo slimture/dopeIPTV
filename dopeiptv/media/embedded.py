@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 import time
 
@@ -282,6 +283,13 @@ class _MpvGLWidget(QOpenGLWidget):
         # set them one at a time and skip any this build rejects.
         soft = {"user_agent": "dopeIPTV/1.0", "keep_open": "yes",
                 "input_default_bindings": False, "input_vo_keyboard": False,
+                # Hardware decoding - without this mpv software-decodes, which
+                # stutters on 4K (esp. 10-bit HEVC/HDR) even on fast CPUs. This
+                # matches what standalone mpv does by default. 'auto-safe' only
+                # picks methods known to cooperate with the render API and
+                # falls back to software if none are available, so it never
+                # makes playback worse. Override via DOPEIPTV_HWDEC.
+                "hwdec": (os.environ.get("DOPEIPTV_HWDEC") or "auto-safe"),
                 # (No 'osc' option: the on-screen controller is a feature of
                 # the standalone mpv GUI and doesn't exist in the libmpv/render
                 # build we use - setting it only logged a harmless skip.)
