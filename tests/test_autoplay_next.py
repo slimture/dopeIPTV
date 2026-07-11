@@ -45,7 +45,9 @@ def _make(autoplay="true", mode="embedded", last=None):
         f.played.append((title, key, kind))
 
     f._start_playback = start
-    f._autoplay_next_episode = MainWindow._autoplay_next_episode.__get__(f)
+    for name in ("_autoplay_next_episode", "_next_episode_item",
+                 "_has_next_episode", "_advance_to_next_episode"):
+        setattr(f, name, getattr(MainWindow, name).__get__(f))
     return f
 
 
@@ -108,3 +110,25 @@ def test_no_op_when_nothing_playable(last):
     f = _make(last=last)
     MainWindow._on_player_finished(f)
     assert f.played == []
+
+
+def test_manual_next_button_skips_without_waiting():
+    # The player's 'next episode' button advances even mid-episode, and does
+    # NOT force a watched mark (that's left to _start_playback's threshold).
+    f = _make(last=_last(0))
+    MainWindow._play_next_episode(f)
+    assert f.played == [("S1 E2", 2, "episode")]
+    assert f.marked == []
+
+
+def test_manual_next_on_last_episode_is_noop():
+    f = _make(last=_last(2))
+    MainWindow._play_next_episode(f)
+    assert f.played == []
+
+
+def test_has_next_episode_reflects_position():
+    f = _make(last=_last(0))
+    assert f._has_next_episode() is True
+    f = _make(last=_last(2))
+    assert f._has_next_episode() is False

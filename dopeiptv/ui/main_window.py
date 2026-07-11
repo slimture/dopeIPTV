@@ -563,6 +563,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.resume_requested.connect(self._resume_last)
             self.player.stalled.connect(self._on_player_stalled)
             self.player.finished.connect(self._on_player_finished)
+            self.player.next_episode.connect(self._play_next_episode)
             # Keep the player pane visible on stop - mpv clears to black -
             # instead of hiding it, so the window just goes black.
             dl.addWidget(self.player, 1)
@@ -2472,40 +2473,62 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _autoplay_next_episode(self) -> bool:
         return self.settings.value("autoplay_next_episode", "true") == "true"
 
+    def _next_episode_item(self):
+        """The next episode after the one currently/last playing, as
+        (item, queue, next_index, series_ctx) - or None if there isn't one."""
+        last = getattr(self, "_last_playback", None)
+        if not last or last.get("kind") != "episode":
+            return None
+        queue = last.get("ep_queue") or []
+        idx = last.get("ep_index", -1)
+        if idx < 0 or idx + 1 >= len(queue):
+            return None
+        return queue[idx + 1], queue, idx + 1, last.get("series_ctx")
+
+    def _has_next_episode(self) -> bool:
+        return self._next_episode_item() is not None
+
+    def _advance_to_next_episode(self) -> bool:
+        """Play the next episode in the current series, carrying the episode
+        queue forward so it keeps advancing. Returns False if there's no next
+        episode or we're not on the embedded player."""
+        nxt = self._next_episode_item()
+        if not nxt or self.playback_mode() != "embedded":
+            return False
+        item, queue, index, ctx = nxt
+        saved = self.series_ctx
+        self.series_ctx = ctx or saved
+        try:
+            url = self.client.episode_url(
+                item.get("id"), item.get("container_extension"))
+            if not url:
+                return False
+            title = item.get("name") or item.get("title") or "dopeIPTV"
+            self._ep_queue_override = queue
+            self._ep_index_override = index
+            self._start_playback(
+                url, title, item.get("stream_icon") or item.get("cover"),
+                self._item_key(item), "episode", record=True, item=item)
+            return True
+        finally:
+            self.series_ctx = saved
+
     def _on_player_finished(self) -> None:
         """An episode played to its natural end. Mark it watched and, if
-        enabled, autoplay the next episode in the same series - carrying the
-        episode queue forward so it keeps going through a whole season."""
+        enabled, autoplay the next episode in the same series."""
         last = getattr(self, "_last_playback", None)
         if not last or last.get("kind") != "episode":
             return
         # Give the just-finished episode its watched mark (it reached the end).
         self._save_resume_position()
         self._maybe_auto_mark_watched()
-        if not self._autoplay_next_episode() or self.playback_mode() != "embedded":
-            return
-        queue = last.get("ep_queue") or []
-        idx = last.get("ep_index", -1)
-        if idx < 0 or idx + 1 >= len(queue):
-            return                              # last episode - nothing to queue
-        nxt = queue[idx + 1]
-        ctx = last.get("series_ctx")
-        saved = self.series_ctx
-        self.series_ctx = ctx or saved
-        try:
-            url = self.client.episode_url(
-                nxt.get("id"), nxt.get("container_extension"))
-            if not url:
-                return
-            title = nxt.get("name") or nxt.get("title") or "dopeIPTV"
-            # Carry the queue forward so the next finish can advance again.
-            self._ep_queue_override = queue
-            self._ep_index_override = idx + 1
-            self._start_playback(
-                url, title, nxt.get("stream_icon") or nxt.get("cover"),
-                self._item_key(nxt), "episode", record=True, item=nxt)
-        finally:
-            self.series_ctx = saved
+        if self._autoplay_next_episode():
+            self._advance_to_next_episode()
+
+    def _play_next_episode(self) -> None:
+        """The player's 'next episode' button - skip straight to the next one
+        without waiting for the current episode to end."""
+        self._advance_to_next_episode()
 
     def _resume_last(self) -> None:
         """Replay the last-played title after a Stop (the mini-player Play
@@ -2558,6 +2581,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                             if e is item or self._item_key(e) == key), -1)
             self._last_playback["ep_queue"] = queue or []
             self._last_playback["ep_index"] = idx
+        # Offer the in-player 'next episode' button only when one is queued.
+        if self.player is not None:
+            self.player.set_next_available(
+                kind == "episode" and self._has_next_episode())
         self._playback_max_pct = 0.0
         self._sync_player_buttons()
         self._playing_key = key

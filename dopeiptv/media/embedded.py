@@ -272,7 +272,9 @@ class _MpvGLWidget(QOpenGLWidget):
         # set them one at a time and skip any this build rejects.
         soft = {"user_agent": "dopeIPTV/1.0", "keep_open": "yes",
                 "input_default_bindings": False, "input_vo_keyboard": False,
-                "osc": False,
+                # (No 'osc' option: the on-screen controller is a feature of
+                # the standalone mpv GUI and doesn't exist in the libmpv/render
+                # build we use - setting it only logged a harmless skip.)
                 # Network resilience for live streams: abort a dead connection
                 # instead of hanging forever (that then surfaces as an error we
                 # auto-reconnect from), and let ffmpeg transparently reconnect
@@ -473,6 +475,7 @@ class EmbeddedPlayer(QWidget):
     resume_requested = pyqtSignal()
     stalled = pyqtSignal()
     finished = pyqtSignal()
+    next_episode = pyqtSignal()
 
     OVERLAY_HIDE_MS = 3000
     VIDEO_BOX_HEIGHT = 260
@@ -588,6 +591,12 @@ class EmbeddedPlayer(QWidget):
         self.stop_btn = QPushButton("■", objectName="MiniBtn")
         self.stop_btn.setToolTip(tr("tooltip_stop_playback"))
         self.stop_btn.clicked.connect(self.stop)
+        # Skip to the next episode (series only). Hidden unless the app tells us
+        # a next episode is queued (set_next_available).
+        self.nextep_btn = QPushButton("⏭", objectName="MiniBtn")
+        self.nextep_btn.setToolTip(tr("tooltip_next_episode"))
+        self.nextep_btn.clicked.connect(self.next_episode)
+        self.nextep_btn.hide()
         self.pip_btn = QPushButton("PiP", objectName="MiniBtn")
         self.pip_btn.setToolTip(tr("tooltip_pip"))
         self.pip_btn.clicked.connect(self.pip_requested)
@@ -602,6 +611,7 @@ class EmbeddedPlayer(QWidget):
         bl.addSpacing(10)
         bl.addWidget(self.pause_btn)
         bl.addWidget(self.stop_btn)
+        bl.addWidget(self.nextep_btn)
         bl.addStretch(1)
         bl.addWidget(self.ts_btn)
         bl.addWidget(self.rec_btn)
@@ -660,6 +670,10 @@ class EmbeddedPlayer(QWidget):
         self.fs_pause_btn = QPushButton("‖", objectName="MiniBtn")
         self.fs_pause_btn.setToolTip(tr("tooltip_pause_resume"))
         self.fs_pause_btn.clicked.connect(self.toggle_pause)
+        self.fs_nextep_btn = QPushButton("⏭", objectName="MiniBtn")
+        self.fs_nextep_btn.setToolTip(tr("tooltip_next_episode"))
+        self.fs_nextep_btn.clicked.connect(self.next_episode)
+        self.fs_nextep_btn.hide()
         self.fs_back_btn = QPushButton("-10", objectName="MiniBtn")
         self.fs_back_btn.clicked.connect(lambda: self._relative_seek(-10))
         self.fs_back_btn.hide()
@@ -700,6 +714,7 @@ class EmbeddedPlayer(QWidget):
         fc.addWidget(self.fs_prev_btn)
         fc.addWidget(self.fs_next_btn)
         fc.addWidget(self.fs_pause_btn)
+        fc.addWidget(self.fs_nextep_btn)
         fc.addWidget(self.fs_back_btn)
         fc.addWidget(self.fs_fwd_btn)
         fc.addWidget(self.fs_seek, 1)
@@ -1061,6 +1076,15 @@ class EmbeddedPlayer(QWidget):
         if self._fs_ui and self.overlay.isVisible():
             self.overlay.setText(self._overlay_text)
             self._place_overlay()
+
+    def set_next_available(self, available: bool) -> None:
+        """Show/hide the 'next episode' button in both control bars. The app
+        calls this when it starts a stream, based on whether a next episode is
+        queued in the current series."""
+        for b in (getattr(self, "nextep_btn", None),
+                  getattr(self, "fs_nextep_btn", None)):
+            if b is not None:
+                b.setVisible(available)
 
     def set_fullscreen_ui(self, fullscreen: bool) -> None:
         self._fs_ui = fullscreen

@@ -1425,6 +1425,16 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Следующий канал",
         "th": "ช่องถัดไป",
     },
+    "tooltip_next_episode": {
+        "en": "Next episode",
+        "sv": "Nästa avsnitt",
+        "es": "Episodio siguiente",
+        "de": "Nächste Folge",
+        "fr": "Épisode suivant",
+        "zh": "下一集",
+        "ru": "Следующий эпизод",
+        "th": "ตอนถัดไป",
+    },
     "tooltip_fullscreen": {
         "en": "Fullscreen",
         "sv": "Helskärm",
