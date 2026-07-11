@@ -43,13 +43,46 @@ def parse_xmltv_time(s: str | None) -> datetime | None:
         return None
 
 
-def epg_cache_path(playlist_id: str | None) -> str:
-    """Per-playlist file path for the cached XMLTV guide."""
+def _epg_cache_dir() -> "Path":
     base = QStandardPaths.writableLocation(
         QStandardPaths.StandardLocation.CacheLocation)
     if not base:
         base = str(Path.home() / ".cache" / "dopeiptv")
-    return str(Path(base) / f"epg_{playlist_id or 'default'}.xml")
+    return Path(base)
+
+
+def epg_cache_path(playlist_id: str | None) -> str:
+    """Per-playlist file path for the cached XMLTV guide."""
+    return str(_epg_cache_dir() / f"epg_{playlist_id or 'default'}.xml")
+
+
+def prune_epg_caches(keep_ids) -> int:
+    """Delete cached EPG guides (compressed XMLTV + parsed .pkl index) for
+    playlists that no longer exist. Each playlist caches its whole guide -
+    often hundreds of MB - under epg_<id>.xml, and removing a playlist never
+    deleted its cache, so over time they pile up into gigabytes. Keeps the
+    guides for *keep_ids* (plus the 'default' no-playlist cache); returns how
+    many files were removed. Safe to call at startup."""
+    d = _epg_cache_dir()
+    if not d.exists():
+        return 0
+    keep = {str(i) for i in keep_ids if i} | {"default"}
+    removed = 0
+    for f in d.glob("epg_*.xml*"):
+        name = f.name[4:]  # drop the "epg_" prefix
+        for suffix in (".xml.pkl", ".xml"):
+            if name.endswith(suffix):
+                pid = name[:-len(suffix)]
+                break
+        else:
+            continue
+        if pid not in keep:
+            try:
+                f.unlink()
+                removed += 1
+            except OSError:
+                pass
+    return removed
 
 
 class XmltvGuide:

@@ -1811,18 +1811,6 @@ _STRINGS: dict[str, dict[str, str]] = {
         "fr": "Reconnexion…", "zh": "正在重新连接…",
         "ru": "Переподключение…", "th": "กำลังเชื่อมต่อใหม่…",
     },
-    "status_stream_in_use": {
-        "en": "Stream in use on another device (max {maxc} connection)",
-        "sv": "Streamen används på en annan enhet (max {maxc} anslutning)",
-        "es": "Transmisión en uso en otro dispositivo (máx. {maxc} conexión)",
-        "de": "Stream wird auf einem anderen Gerät verwendet "
-              "(max. {maxc} Verbindung)",
-        "fr": "Flux utilisé sur un autre appareil (max {maxc} connexion)",
-        "zh": "流正在另一台设备上使用（最多 {maxc} 个连接）",
-        "ru": "Поток используется на другом устройстве "
-              "(макс. {maxc} подключение)",
-        "th": "สตรีมกำลังใช้งานบนอุปกรณ์อื่น (สูงสุด {maxc} การเชื่อมต่อ)",
-    },
     "status_stream_error": {
         "en": "Stream error: {msg}",
         "sv": "Strömfel: {msg}",

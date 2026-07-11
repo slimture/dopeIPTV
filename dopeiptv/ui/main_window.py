@@ -32,7 +32,7 @@ from ..providers.client import (
     DemoClient, OfflineClient, XtreamClient, make_client,
 )
 from ..media.embedded import EmbeddedPlayer
-from ..providers.epg import XmltvGuide, epg_cache_path
+from ..providers.epg import XmltvGuide, epg_cache_path, prune_epg_caches
 from ..services.coverart import CoverArtService
 from ..services.resume import ResumeStore
 from ..services.reminders import ReminderStore
@@ -78,6 +78,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.settings = settings
         self.playlist_store = playlists
         active_pl = playlists.active() if playlists else None
+        # Reclaim EPG guides left behind by playlists that no longer exist -
+        # each is hundreds of MB and they were never cleaned up.
+        try:
+            n = prune_epg_caches(p.get("id") for p in playlists.all()) \
+                if playlists else 0
+            if n:
+                print(f"[dopeIPTV] pruned {n} orphaned EPG cache file(s)",
+                      file=sys.stderr)
+        except Exception:
+            pass
         self.pool = QThreadPool.globalInstance()
         # 320 px covers the biggest cell we render (xlarge grid uses a 200 px
         # logo, and a HiDPI screen doubles the pixel budget), so channel
@@ -2928,60 +2938,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._reconnect_live("stall")
 
     def _reconnect_live(self, reason: str) -> None:
-        """Recover the current live stream after it froze (buffer-starved) or
-        hit EOF (the server dropped the connection or a segment gap ended it -
-        with keep-open mpv pauses on the last frame instead of stopping, which
-        looks like the app killed it).
-
-        First check, off the UI thread, whether another device already holds
-        our only connection slot: if the account is at its concurrent-connection
-        limit, reconnecting would just kick the other device off (and it would
-        kick us straight back), so tell the user instead. Only when we're not
-        at the limit - the common transient-drop case - do we silently
-        reconnect. No/failed account info (e.g. plain M3U) falls back to a
-        normal reconnect."""
-        lp = getattr(self, "_last_playback", None)
-        if not (self.player and self.player.isVisible()):
-            return
-        if not lp or lp.get("kind") != "live":
-            return
-
-        def check():
-            return getattr(self.client, "account_info", lambda: {})() or {}
-
-        def decide(info):
-            ui = (info or {}).get("user_info") or {}
-            raw_active = ui.get("active_cons")
-            raw_max = ui.get("max_connections")
-            print(f"[dopeIPTV] account connections: active_cons={raw_active!r} "
-                  f"max_connections={raw_max!r}", file=sys.stderr)
-            try:
-                active = int(raw_active)
-                maxc = int(raw_max)
-            except (TypeError, ValueError):
-                active = maxc = None
-            if maxc and maxc > 0 and active is not None and active >= maxc:
-                print(f"[dopeIPTV] live not reconnected: at connection limit "
-                      f"({active}/{maxc}) - stream in use elsewhere",
-                      file=sys.stderr)
-                msg = tr("status_stream_in_use", maxc=maxc)
-                self._set_status(msg)
-                if self.player and self.player.isVisible():
-                    self.player.set_overlay_info(msg)
-                return
-            self._do_live_reconnect(reason)
-
-        def check_failed(e):
-            print(f"[dopeIPTV] account_info check failed ({e}); "
-                  f"reconnecting anyway", file=sys.stderr)
-            self._do_live_reconnect(reason)
-
-        run_async(self.pool, check, decide, check_failed)
-
-    def _do_live_reconnect(self, reason: str) -> None:
-        """Silent live reconnect, guarded by a small retry budget so a genuinely
-        dead channel doesn't loop forever; the budget resets after 20s of
-        healthy playback."""
+        """Silently recover the current live stream after it froze
+        (buffer-starved) or hit EOF (the server dropped the connection or a
+        segment gap ended it - with keep-open mpv pauses on the last frame
+        instead of stopping, which looks like the app killed it). Guarded by a
+        small retry budget so a genuinely dead channel doesn't loop forever; the
+        budget resets after 20s of healthy playback."""
         lp = getattr(self, "_last_playback", None)
         if not (self.player and self.player.isVisible()):
             return
