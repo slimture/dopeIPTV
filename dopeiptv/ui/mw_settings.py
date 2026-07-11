@@ -751,7 +751,7 @@ class _SettingsMixin:
         tform.addRow(tr("field_client_secret"), trakt_secret_edit)
         tf.addLayout(tform)
         creds_row = QHBoxLayout()
-        trakt_creds_btn = QPushButton(tr("trakt_connect_creds"))
+        trakt_creds_btn = QPushButton(tr("trakt_save_creds"))
         creds_row.addWidget(trakt_creds_btn)
         creds_row.addStretch(1)
         tf.addLayout(creds_row)
@@ -833,9 +833,10 @@ class _SettingsMixin:
             self._trakt_browser_auth_dialog(d)
             refresh_trakt_status()
 
-        def do_connect_creds():
-            # Advanced path: save the entered Client ID / Secret first, then run
-            # the same browser sign-in against that app.
+        def do_save_creds():
+            # Advanced path: only store the entered Client ID / Secret. The
+            # actual sign-in always goes through 'Connect via browser' (Trakt
+            # user auth can't be done from credentials alone).
             cid = trakt_id_edit.text().strip()
             secret = trakt_secret_edit.text().strip()
             if not cid or not secret:
@@ -844,15 +845,14 @@ class _SettingsMixin:
                 return
             self.settings.setValue("trakt_client_id", cid)
             self.settings.setValue("trakt_client_secret", secret)
-            self._trakt_browser_auth_dialog(d)
-            refresh_trakt_status()
+            trakt_status.setText(tr("trakt_creds_saved"))
 
         def do_trakt_disconnect():
             self.trakt.disconnect()
             refresh_trakt_status()
 
         trakt_browser_btn.clicked.connect(do_connect_browser)
-        trakt_creds_btn.clicked.connect(do_connect_creds)
+        trakt_creds_btn.clicked.connect(do_save_creds)
         trakt_disconnect_btn.clicked.connect(do_trakt_disconnect)
         trakt_watchlist_btn.clicked.connect(
             lambda: self._open_trakt_dialog(d))

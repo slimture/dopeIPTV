@@ -5318,15 +5318,29 @@ _STRINGS: dict[str, dict[str, str]] = {
         "fr": "Se connecter via le navigateur", "zh": "通过浏览器连接",
         "ru": "Подключиться через браузер", "th": "เชื่อมต่อผ่านเบราว์เซอร์",
     },
-    "trakt_connect_creds": {
-        "en": "Connect with Client ID & Secret",
-        "sv": "Anslut med Client ID & Secret",
-        "es": "Conectar con Client ID y Secret",
-        "de": "Mit Client-ID & Secret verbinden",
-        "fr": "Se connecter avec Client ID et Secret",
-        "zh": "使用 Client ID 和 Secret 连接",
-        "ru": "Подключиться с Client ID и Secret",
-        "th": "เชื่อมต่อด้วย Client ID และ Secret",
+    "trakt_save_creds": {
+        "en": "Save Client ID & Secret",
+        "sv": "Spara Client ID & Secret",
+        "es": "Guardar Client ID y Secret",
+        "de": "Client-ID & Secret speichern",
+        "fr": "Enregistrer Client ID et Secret",
+        "zh": "保存 Client ID 和 Secret",
+        "ru": "Сохранить Client ID и Secret",
+        "th": "บันทึก Client ID และ Secret",
+    },
+    "trakt_creds_saved": {
+        "en": "Saved. Now click 'Connect via browser' above to sign in.",
+        "sv": "Sparat. Klicka nu på 'Anslut via webbläsare' ovan för att logga in.",
+        "es": "Guardado. Ahora pulsa 'Conectar con el navegador' arriba para "
+              "iniciar sesión.",
+        "de": "Gespeichert. Klicke jetzt oben auf 'Über Browser verbinden', "
+              "um dich anzumelden.",
+        "fr": "Enregistré. Cliquez maintenant sur 'Se connecter via le "
+              "navigateur' ci-dessus pour vous connecter.",
+        "zh": "已保存。现在点击上方的“通过浏览器连接”以登录。",
+        "ru": "Сохранено. Теперь нажмите «Подключиться через браузер» выше, "
+              "чтобы войти.",
+        "th": "บันทึกแล้ว คลิก 'เชื่อมต่อผ่านเบราว์เซอร์' ด้านบนเพื่อเข้าสู่ระบบ",
     },
     "trakt_connect_browser_hint": {
         "en": "The easy way: uses dopeIPTV's built-in Trakt app. Your browser "
@@ -5352,22 +5366,29 @@ _STRINGS: dict[str, dict[str, str]] = {
     },
     "trakt_creds_hint": {
         "en": "Advanced: use your own Trakt API app. Paste its Client ID and "
-              "Secret above, then connect (browser opens the same way).",
+              "Secret, Save them, then use 'Connect via browser' above (Trakt "
+              "always confirms sign-in in the browser).",
         "sv": "Avancerat: använd din egen Trakt-API-app. Klistra in dess "
-              "Client ID och Secret ovan och anslut (webbläsaren öppnas likadant).",
+              "Client ID och Secret, Spara, och använd sedan 'Anslut via "
+              "webbläsare' ovan (Trakt bekräftar alltid inloggning i webbläsaren).",
         "es": "Avanzado: usa tu propia app de la API de Trakt. Pega su Client "
-              "ID y Secret arriba y conecta (el navegador se abre igual).",
-        "de": "Erweitert: nutze deine eigene Trakt-API-App. Füge oben ihre "
-              "Client-ID und Secret ein und verbinde (Browser öffnet sich gleich).",
+              "ID y Secret, guárdalos y usa 'Conectar con el navegador' arriba "
+              "(Trakt siempre confirma el inicio de sesión en el navegador).",
+        "de": "Erweitert: nutze deine eigene Trakt-API-App. Füge ihre Client-ID "
+              "und Secret ein, speichere sie und nutze dann oben 'Über Browser "
+              "verbinden' (Trakt bestätigt die Anmeldung immer im Browser).",
         "fr": "Avancé : utilisez votre propre app API Trakt. Collez son Client "
-              "ID et Secret ci-dessus, puis connectez-vous (le navigateur "
-              "s'ouvre de la même façon).",
-        "zh": "高级：使用你自己的 Trakt API 应用。在上方粘贴其 Client ID 和 "
-              "Secret，然后连接（浏览器以相同方式打开）。",
+              "ID et Secret, enregistrez-les, puis utilisez 'Se connecter via le "
+              "navigateur' ci-dessus (Trakt confirme toujours la connexion dans "
+              "le navigateur).",
+        "zh": "高级：使用你自己的 Trakt API 应用。粘贴其 Client ID 和 Secret，"
+              "保存后使用上方的“通过浏览器连接”（Trakt 始终在浏览器中确认登录）。",
         "ru": "Дополнительно: используйте своё приложение Trakt API. Вставьте "
-              "его Client ID и Secret выше и подключитесь (браузер откроется так же).",
+              "его Client ID и Secret, сохраните, затем нажмите «Подключиться "
+              "через браузер» выше (Trakt всегда подтверждает вход в браузере).",
         "th": "ขั้นสูง: ใช้แอป Trakt API ของคุณเอง วาง Client ID และ Secret "
-              "ด้านบน แล้วเชื่อมต่อ (เบราว์เซอร์จะเปิดแบบเดียวกัน)",
+              "บันทึก แล้วใช้ 'เชื่อมต่อผ่านเบราว์เซอร์' ด้านบน (Trakt จะยืนยัน"
+              "การเข้าสู่ระบบในเบราว์เซอร์เสมอ)",
     },
     "trakt_disconnect": {
         "en": "Disconnect", "sv": "Koppla från", "es": "Desconectar",
