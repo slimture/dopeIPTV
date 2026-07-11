@@ -34,6 +34,7 @@ from ..media.embedded import EmbeddedPlayer
 from ..providers.epg import XmltvGuide, epg_cache_path
 from ..services.coverart import CoverArtService
 from ..services.resume import ResumeStore
+from ..services.reminders import ReminderStore
 from ..media.players import (
     MpvIpcPlayer, MpvWindowPlayer, _libmpv, embedded_playback_supported, launch_player,
 )
@@ -142,6 +143,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.history = HistoryStore(
             settings, f"history_{pid}" if pid else "history")
         self.resume = ResumeStore(settings, pid)
+        self.reminders = ReminderStore(settings, pid)
         self.overrides = CategoryOverrides(
             settings, f"category_overrides_{pid}" if pid else "category_overrides")
         self.channel_ov = ChannelOverrides(
@@ -740,6 +742,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.tick = QTimer(self)
         self.tick.timeout.connect(self._refresh_progress)
         self.tick.start(60_000)
+
+        # Poll EPG reminders so one fires close to its programme's start.
+        self._reminder_timer = QTimer(self)
+        self._reminder_timer.timeout.connect(self._check_reminders)
+        self._reminder_timer.start(30_000)
 
         # Periodically remember the playback position of movies/episodes so
         # they can be resumed later even if the app is closed abruptly.
@@ -1416,6 +1423,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.series_favs = FavoriteStore(
                 self.settings, f"series_favorites_{pid}", id_key="series_id")
             self.history = HistoryStore(self.settings, f"history_{pid}")
+            self.resume = ResumeStore(self.settings, pid)
+            self.reminders = ReminderStore(self.settings, pid)
             self._base_title = pl["name"]
             self.setWindowTitle(self._base_title)
             self._update_provider_hint()
@@ -2824,6 +2833,30 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         else:
             self._start_playback(lp["url"], lp["title"], lp.get("icon_url"),
                                  lp.get("key"), "live")
+
+    def _add_reminder(self, ch: dict, p: dict) -> None:
+        """Set an EPG reminder for a future programme."""
+        self.reminders.add(ch, p.get("title"), p.get("start_timestamp"))
+        self._show_toast(
+            tr("reminder_set", title=p.get("title") or ch.get("name") or ""),
+            4000)
+
+    def _check_reminders(self) -> None:
+        for r in self.reminders.due(int(time.time())):
+            self._fire_reminder(r)
+
+    def _fire_reminder(self, r: dict) -> None:
+        ch = r.get("ch") or {}
+        title = r.get("title") or ch.get("name") or ""
+        idx = self._choice_dialog(
+            tr("reminder_now_title"),
+            tr("reminder_now_body", title=title,
+               channel=ch.get("name") or ""),
+            [(tr("reminder_watch_now"), "primary"),
+             (tr("common_dismiss"), "normal")])
+        if idx == 0 and ch.get("stream_id") is not None:
+            self.switch_mode("live")
+            self.play_live_channel(ch)
 
     def _last_channel(self) -> None:
         """Jump back to the previously watched live channel (TV 'last' key)."""

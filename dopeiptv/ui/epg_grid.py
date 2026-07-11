@@ -441,6 +441,19 @@ class EpgGridDialog(QDialog):
                     lambda: (self.window.play_live_channel(ch), self.accept()))
         if ch.get("stream_id") is not None and p["stop_timestamp"] > time.time():
             m.addAction(tr("rec_record_programme"), lambda: self._record(ch, p))
+        # Remind me when a future programme starts.
+        if (ch.get("stream_id") is not None
+                and p["start_timestamp"] > time.time()
+                and getattr(self.window, "reminders", None) is not None):
+            sid, start = ch.get("stream_id"), p["start_timestamp"]
+            if self.window.reminders.has(sid, start):
+                m.addAction(
+                    tr("reminder_remove"),
+                    lambda: self.window.reminders.remove(sid, start))
+            else:
+                m.addAction(
+                    tr("reminder_add"),
+                    lambda: self.window._add_reminder(ch, p))
         m.exec(global_pos)
 
     def _record(self, ch: dict, p: dict) -> None:
