@@ -2951,9 +2951,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
         def decide(info):
             ui = (info or {}).get("user_info") or {}
+            raw_active = ui.get("active_cons")
+            raw_max = ui.get("max_connections")
+            print(f"[dopeIPTV] account connections: active_cons={raw_active!r} "
+                  f"max_connections={raw_max!r}", file=sys.stderr)
             try:
-                active = int(ui.get("active_cons"))
-                maxc = int(ui.get("max_connections"))
+                active = int(raw_active)
+                maxc = int(raw_max)
             except (TypeError, ValueError):
                 active = maxc = None
             if maxc and maxc > 0 and active is not None and active >= maxc:
@@ -2967,8 +2971,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 return
             self._do_live_reconnect(reason)
 
-        run_async(self.pool, check, decide,
-                  lambda _e: self._do_live_reconnect(reason))
+        def check_failed(e):
+            print(f"[dopeIPTV] account_info check failed ({e}); "
+                  f"reconnecting anyway", file=sys.stderr)
+            self._do_live_reconnect(reason)
+
+        run_async(self.pool, check, decide, check_failed)
 
     def _do_live_reconnect(self, reason: str) -> None:
         """Silent live reconnect, guarded by a small retry budget so a genuinely
