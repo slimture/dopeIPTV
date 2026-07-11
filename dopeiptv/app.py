@@ -210,6 +210,24 @@ def main() -> int:
         except Exception:
             pass
 
+    # Vsync-lock the default GL surface (non-macOS; macOS sets its own Core
+    # profile format in setup_opengl). Without an explicit swap interval the
+    # buffer swap isn't paced to the display refresh, so mpv's report_swap()
+    # feeds its frame timer bogus intervals and 4K / high-fps video judders and
+    # drops frames even with hardware decoding. Requesting swapInterval(1) plus
+    # a defined GL version turns the context from "NoProfile" into a proper
+    # vsync'd surface, which is what standalone mpv (vo=gpu) gets for free.
+    if _libmpv is not None and sys.platform != "darwin":
+        try:
+            from PyQt6.QtGui import QSurfaceFormat
+            fmt = QSurfaceFormat.defaultFormat()
+            fmt.setSwapInterval(1)
+            fmt.setSwapBehavior(QSurfaceFormat.SwapBehavior.DoubleBuffer)
+            QSurfaceFormat.setDefaultFormat(fmt)
+        except Exception as e:
+            print(f"[dopeIPTV] default surface format skipped: {e}",
+                  file=sys.stderr)
+
     app = QApplication(sys.argv)
     app.setStyle(_NoButtonIconsStyle(app.style()))
     app.setApplicationName(APP_NAME)
