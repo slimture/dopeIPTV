@@ -227,7 +227,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         else:
             self._size_to_screen()   # first run: fit the actual display
         QTimer.singleShot(0, self._restore_splitter_state)
-        self.loading_bar.show()
+        self._show_busy()
         self._set_status(tr("status_loading_channels"))
         QTimer.singleShot(100, self._load_categories)
         # Cross-device sync of watched movies/episodes from Trakt. Deferred
@@ -404,7 +404,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.loading_bar = QProgressBar(objectName="LoadBar")
         self.loading_bar.setRange(0, 0)
         self.loading_bar.setTextVisible(False)
-        self.loading_bar.hide()
+        self._hide_busy()
         ml.addWidget(self.loading_bar)
 
         self.search = QLineEdit(objectName="Search")
@@ -767,6 +767,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                   activated=lambda: self.side_btn.toggle())
         QShortcut(QKeySequence("Ctrl+Shift+M"), self,
                   activated=lambda: self._set_focus_mode(not self._focus_mode))
+        # Player controls (single letters, mpv-style). Guarded so they never
+        # fire while typing in a text field, and only act with the player up.
+        QShortcut(QKeySequence(Qt.Key.Key_M), self,
+                  activated=self._shortcut_mute)
+        QShortcut(QKeySequence(Qt.Key.Key_P), self,
+                  activated=self._shortcut_pip)
+        QShortcut(QKeySequence(Qt.Key.Key_R), self,
+                  activated=self._shortcut_record)
+        QShortcut(QKeySequence(Qt.Key.Key_I), self,
+                  activated=self._shortcut_stats)
+        QShortcut(QKeySequence("Ctrl+G"), self,
+                  activated=self._shortcut_epg_guide)
 
         self._apply_view_settings()
 
@@ -972,6 +984,34 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _toggle_pause_shortcut(self) -> None:
         if self.player and self.player.isVisible():
             self.player.toggle_pause()
+
+    def _typing(self) -> bool:
+        """True when a text field has focus, so single-letter player shortcuts
+        don't steal the keystroke from the search box etc."""
+        return isinstance(self.focusWidget(), QLineEdit)
+
+    def _player_up(self) -> bool:
+        return bool(self.player and self.player.isVisible())
+
+    def _shortcut_mute(self) -> None:
+        if not self._typing() and self._player_up():
+            self.player.toggle_mute()
+
+    def _shortcut_pip(self) -> None:
+        if not self._typing() and self._player_up():
+            self._toggle_pip()
+
+    def _shortcut_record(self) -> None:
+        if not self._typing() and self._player_up():
+            self.player.record_menu.emit(self.player.rec_btn)
+
+    def _shortcut_stats(self) -> None:
+        if not self._typing() and self._player_up():
+            self.player._show_stats()
+
+    def _shortcut_epg_guide(self) -> None:
+        if not self._typing():
+            self._open_epg_guide()
 
     # -- fullscreen ----------------------------------------------------------------
 
@@ -1313,13 +1353,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         pl = self.playlist_store.get(pid) if self.playlist_store else None
         if not pl:
             return
-        self.loading_bar.show()
+        self._show_busy()
         self._set_status(tr("status_connecting", name=pl['name']))
         self._show_toast(tr("status_connecting", name=pl['name']))
         candidate = make_client(pl)
 
         def done(_auth):
-            self.loading_bar.hide()
+            self._hide_busy()
             self.playlist_store.set_active(pid)
             self.client = candidate
             self.favs = FavoriteStore(self.settings, f"favorites_{pid}")
@@ -1334,7 +1374,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.refresh_playlist()
 
         def fail(msg):
-            self.loading_bar.hide()
+            self._hide_busy()
             self._set_status("")
             QMessageBox.warning(
                 self, tr("playlist_msg_title"),
@@ -1466,7 +1506,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.cat_list.blockSignals(False)
             self.cat_list.setCurrentRow(0)
             return
-        self.loading_bar.show()
+        self._show_busy()
         self._set_status(tr("status_loading_categories"))
         fn = {"live": self.client.live_categories,
               "vod": self.client.vod_categories,
@@ -1476,7 +1516,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         def done(cats):
             if gen != self._load_gen or self.mode != request_mode:
                 return
-            self.loading_bar.hide()
+            self._hide_busy()
             self._raw_categories = cats or []
             self.cat_list.blockSignals(True)
             self.cat_list.clear()
@@ -1697,7 +1737,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  ("fav_series", "series", "series", series)],
                 "watched")
             return
-        self.loading_bar.show()
+        self._show_busy()
         self._set_status(tr("status_loading_content"))
         fn = {"live": self.client.live_streams,
               "vod": self.client.vod_streams,
@@ -1708,7 +1748,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         def done(items):
             if gen != self._load_gen or self.mode != mode:
                 return
-            self.loading_bar.hide()
+            self._hide_busy()
             items = items or []
             if category_id is None:
                 excluded = self.overrides.excluded_ids(
@@ -2098,11 +2138,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         sid = series.get("series_id")
         if sid is None:
             return
-        self.loading_bar.show()
+        self._show_busy()
         self._set_status(tr("status_loading_episodes"))
 
         def done(info):
-            self.loading_bar.hide()
+            self._hide_busy()
             episodes = []
             for season, eps in (info.get("episodes") or {}).items():
                 for ep in eps:
@@ -2576,25 +2616,42 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     # -- recordings ----------------------------------------------------------------
 
 
+    def _show_busy(self) -> None:
+        """Show the top 'busy' strip. Always indeterminate (no jumpy 0-100 %),
+        and armed with a watchdog so it can never get stuck on screen: every
+        call restarts a timer that force-hides it if nothing refreshes it."""
+        bar = self.loading_bar
+        bar.setRange(0, 0)
+        bar.setVisible(True)
+        wd = getattr(self, "_busy_watchdog", None)
+        if wd is None:
+            wd = QTimer(self)
+            wd.setSingleShot(True)
+            wd.setInterval(25000)
+            wd.timeout.connect(self._hide_busy)
+            self._busy_watchdog = wd
+        wd.start()
+
+    def _hide_busy(self) -> None:
+        wd = getattr(self, "_busy_watchdog", None)
+        if wd is not None:
+            wd.stop()
+        self.loading_bar.setVisible(False)
+
     def _on_epg_progress(self, value: int) -> None:
-        self.loading_bar.show()
-        if value >= 0:
-            self._set_status(
-                tr("status_loading_programme_guide_pct", pct=value))
-        if value == 0:
-            self._show_toast(tr("status_loading_programme_guide"))
-        if value < 0:
-            self.loading_bar.setRange(0, 0)
-        else:
-            self.loading_bar.setRange(0, 100)
-            self.loading_bar.setValue(value)
+        # The guide download reports progress erratically - often no total, and
+        # nothing at all during the several-second parse after it hits 100 % -
+        # so a percentage looked jumpy and got stuck. Drive a calm indeterminate
+        # strip + a one-off status line instead.
+        self._show_busy()
+        if value <= 0:
+            self._set_status(tr("status_loading_programme_guide"))
 
     def _epg_progress_finished(self) -> None:
-        self.loading_bar.setRange(0, 0)
-        self.loading_bar.hide()
+        self._hide_busy()
 
     def _error(self, msg: str) -> None:
-        self.loading_bar.hide()
+        self._hide_busy()
         self._set_status("Error: " + msg, error=True)
 
     # -- keyboard and close --------------------------------------------------------

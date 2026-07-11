@@ -153,6 +153,21 @@ class EpgGridDialog(QDialog):
         self.view.horizontalScrollBar().setValue(max(0, int(now_x
                                                              - self.CH_COL_W - 40)))
 
+    def keyPressEvent(self, event) -> None:
+        # In-guide shortcuts: N jumps to now, P to the playing channel, Enter
+        # plays the selected programme. Esc closes (QDialog default).
+        k = event.key()
+        if k == Qt.Key.Key_N:
+            self._scroll_to_now()
+            return
+        if k == Qt.Key.Key_P and getattr(self, "_playing_row", None) is not None:
+            self._scroll_to_playing()
+            return
+        if k in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and self._selected:
+            self._play_selected()
+            return
+        super().keyPressEvent(event)
+
     # -- geometry ------------------------------------------------------------
 
     def _x(self, ts: float) -> float:

@@ -156,6 +156,45 @@ the first time the app starts.
 | Search | Type in the search field at the top |
 | Switch account | Settings → "Switch account / server" |
 
+## Keyboard shortcuts
+
+**Anywhere in the app**
+
+| Key | Action |
+|---|---|
+| `Space` | Play / pause |
+| `F` | Fullscreen (`Esc` to leave) |
+| `Ctrl`+`←` / `Ctrl`+`→` | Previous / next channel (zap) |
+| `Ctrl`+`B` | Collapse / expand the sidebar (icon rail) |
+| `Ctrl`+`Shift`+`M` | Focus mode (hide the list) |
+| `Ctrl`+`G` | Open the EPG guide |
+| `M` | Mute |
+| `P` | Picture-in-Picture |
+| `R` | Record |
+| `I` | Stats for nerds |
+| `Delete` | Remove the selected item (recordings / history) |
+| `Esc` | Leave fullscreen / close a dialog |
+
+Single-letter keys (`M`, `P`, `R`, `I`) act on the player and are ignored
+while you're typing in the search box.
+
+**With the video focused** (click the video first)
+
+| Key | Action |
+|---|---|
+| `←` / `→` | Seek −/+10 s (hold to scrub continuously) |
+| `↑` / `↓` | Volume down / up |
+| Double-click | Fullscreen |
+
+**In the EPG guide**
+
+| Key | Action |
+|---|---|
+| `N` | Jump to *now* |
+| `P` | Jump to the channel that's playing |
+| `Enter` | Play the selected programme |
+| `Esc` | Close the guide |
+
 ## Troubleshooting
 
 - **Embedded playback disabled** — install `mpv`/`libmpv` and `python-mpv` (see Dependencies). Not needed for the packaged AppImage/.deb/Flatpak, which bundle the embedded player.

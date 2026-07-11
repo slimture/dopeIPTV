@@ -166,11 +166,14 @@ class _MpvGLWidget(QOpenGLWidget):
         self.update()
 
     _SEEK_KEYS = (Qt.Key.Key_Left, Qt.Key.Key_Right)
+    _PLAYER_KEYS = (Qt.Key.Key_Left, Qt.Key.Key_Right,
+                    Qt.Key.Key_Up, Qt.Key.Key_Down)
 
     def keyPressEvent(self, event) -> None:
-        # Plain (unmodified) Left/Right seek; Ctrl+Left/Right stays a channel
-        # zap shortcut, so only claim the unmodified presses.
-        if (event.key() in self._SEEK_KEYS
+        # Plain (unmodified) Left/Right seek and Up/Down volume when the video
+        # has focus (mpv-style). Ctrl+Left/Right stays a channel zap, so only
+        # claim the unmodified presses.
+        if (event.key() in self._PLAYER_KEYS
                 and event.modifiers() == Qt.KeyboardModifier.NoModifier):
             self.video_key_press.emit(event)
             event.accept()
@@ -962,6 +965,11 @@ class EmbeddedPlayer(QWidget):
             set_cursor_hidden(False)
 
     def _on_seek_key_press(self, event) -> None:
+        # Up/Down = volume, and it works on live too (no seeking needed).
+        # Auto-repeat is fine here - holding the key ramps the volume.
+        if event.key() in (Qt.Key.Key_Up, Qt.Key.Key_Down):
+            self._nudge_volume(5 if event.key() == Qt.Key.Key_Up else -5)
+            return
         if not self._is_seekable():
             return
         step = -10 if event.key() == Qt.Key.Key_Left else 10
@@ -974,6 +982,11 @@ class EmbeddedPlayer(QWidget):
     def _on_seek_key_release(self, event) -> None:
         if not event.isAutoRepeat():
             self._seek_hold_timer.stop()
+
+    def _nudge_volume(self, delta: int) -> None:
+        """Bump the volume by *delta* (the slider's valueChanged applies it to
+        mpv and unmutes if needed)."""
+        self.vol.setValue(max(0, min(100, self.vol.value() + delta)))
 
     # -- pip bar auto-hide -----------------------------------------------------
 
