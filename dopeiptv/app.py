@@ -153,34 +153,6 @@ def _install_crash_hooks() -> None:
         pass
 
 
-def _install_stall_debug(app) -> None:
-    """Detect main-thread (event-loop) stalls and log them (opt-in via
-    DOPEIPTV_STALL_DEBUG=1). A short-interval timer that fires late means the
-    loop was blocked in between - which is exactly what would back up mpv's
-    render callback and drop a batch of video frames. If the periodic ~10s
-    hitch prints a matching '[stall] Nms' line the freeze is on our thread; if
-    nothing prints while the video still hitches, the stall is inside mpv's own
-    threads (decode/demux) and not something our code is blocking."""
-    from PyQt6.QtCore import QTimer
-    import time
-    period_ms = 50
-    state = {"last": time.perf_counter()}
-
-    def _tick():
-        now = time.perf_counter()
-        drift = (now - state["last"]) * 1000.0 - period_ms
-        state["last"] = now
-        if drift >= 30.0:
-            print(f"[dopeIPTV][stall] main thread blocked ~{drift:.0f}ms",
-                  file=sys.stderr)
-
-    t = QTimer(app)
-    t.setTimerType(Qt.TimerType.PreciseTimer)
-    t.timeout.connect(_tick)
-    t.start(period_ms)
-    app._stall_timer = t  # keep a reference alive
-
-
 def main() -> int:
     """Launch the application."""
     # One unconditional startup line so packaging smoke tests can prove
@@ -345,8 +317,5 @@ def main() -> int:
         w.show_welcome()
     for _ in range(5):
         app.processEvents()
-
-    if os.environ.get("DOPEIPTV_STALL_DEBUG") == "1":
-        _install_stall_debug(app)
 
     return app.exec()
