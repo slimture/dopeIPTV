@@ -250,6 +250,35 @@ class _SettingsMixin:
             box.setMinimumContentsLength(longest + 2)
         return box
 
+    def _format_account(self, info: dict) -> str:
+        """Turn Xtream user_info into a one-line account summary (status,
+        expiry + days left, active/max connections)."""
+        ui = (info or {}).get("user_info") or {}
+        if not ui:
+            return tr("account_unavailable")
+        status = str(ui.get("status") or "").strip().capitalize()
+        if str(ui.get("is_trial")) in ("1", "true", "True"):
+            status = f"{status} · {tr('account_trial')}".strip(" ·")
+        exp = ui.get("exp_date")
+        if exp in (None, "", "null", "0", 0):
+            exp_txt = tr("account_unlimited")
+        else:
+            try:
+                dt = datetime.fromtimestamp(int(exp))
+                days = (dt - datetime.now()).days
+                exp_txt = dt.strftime("%Y-%m-%d")
+                exp_txt += (f" ({tr('account_days_left', days=days)})"
+                            if days >= 0 else f" ({tr('account_expired')})")
+            except (TypeError, ValueError, OSError):
+                exp_txt = str(exp)
+        active = ui.get("active_cons", "?")
+        maxc = ui.get("max_connections", "?")
+        return "     ·     ".join([
+            f"{tr('account_status')}: {status or '—'}",
+            f"{tr('account_expiry')}: {exp_txt}",
+            f"{tr('account_connections')}: {active} / {maxc}",
+        ])
+
     def open_settings(self) -> None:
         d = QDialog(self)
         d.setWindowTitle(tr("settings_title"))
@@ -488,6 +517,20 @@ class _SettingsMixin:
         pl_tab = QWidget()
         pv = QVBoxLayout(pl_tab)
         pv.setSpacing(10)
+        # Account status for the active Xtream provider (expiry, connections).
+        account_lbl = QLabel(tr("account_loading"))
+        account_lbl.setWordWrap(True)
+        account_lbl.setObjectName("DetailMeta")
+        pv.addWidget(account_lbl)
+
+        def _fill_account(info):
+            account_lbl.setText(self._format_account(info))
+
+        run_async(
+            self.pool,
+            lambda: getattr(self.client, "account_info", lambda: {})(),
+            _fill_account,
+            lambda _e: account_lbl.setText(tr("account_unavailable")))
         pl_list = QListWidget()
         pv.addWidget(pl_list, 1)
         pl_btns = QHBoxLayout()

@@ -252,6 +252,55 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Плейлисты",
         "th": "เพลย์ลิสต์",
     },
+    "account_loading": {
+        "en": "Loading account…", "sv": "Laddar konto…",
+        "es": "Cargando cuenta…", "de": "Konto wird geladen…",
+        "fr": "Chargement du compte…", "zh": "正在加载账户……",
+        "ru": "Загрузка аккаунта…", "th": "กำลังโหลดบัญชี…",
+    },
+    "account_unavailable": {
+        "en": "Account info not available for this playlist.",
+        "sv": "Kontoinfo ej tillgänglig för den här spellistan.",
+        "es": "Información de cuenta no disponible para esta lista.",
+        "de": "Kontoinformationen für diese Wiedergabeliste nicht verfügbar.",
+        "fr": "Infos de compte indisponibles pour cette liste.",
+        "zh": "此播放列表无账户信息。",
+        "ru": "Данные аккаунта недоступны для этого плейлиста.",
+        "th": "ไม่มีข้อมูลบัญชีสำหรับเพลย์ลิสต์นี้",
+    },
+    "account_status": {
+        "en": "Status", "sv": "Status", "es": "Estado", "de": "Status",
+        "fr": "Statut", "zh": "状态", "ru": "Статус", "th": "สถานะ",
+    },
+    "account_expiry": {
+        "en": "Expires", "sv": "Går ut", "es": "Caduca", "de": "Läuft ab",
+        "fr": "Expire", "zh": "到期", "ru": "Истекает", "th": "หมดอายุ",
+    },
+    "account_connections": {
+        "en": "Connections", "sv": "Anslutningar", "es": "Conexiones",
+        "de": "Verbindungen", "fr": "Connexions", "zh": "连接数",
+        "ru": "Подключения", "th": "การเชื่อมต่อ",
+    },
+    "account_days_left": {
+        "en": "{days} days left", "sv": "{days} dagar kvar",
+        "es": "{days} días restantes", "de": "noch {days} Tage",
+        "fr": "{days} jours restants", "zh": "剩余 {days} 天",
+        "ru": "осталось {days} дн.", "th": "เหลือ {days} วัน",
+    },
+    "account_expired": {
+        "en": "expired", "sv": "utgången", "es": "caducada",
+        "de": "abgelaufen", "fr": "expiré", "zh": "已过期",
+        "ru": "истёк", "th": "หมดอายุแล้ว",
+    },
+    "account_unlimited": {
+        "en": "Unlimited", "sv": "Obegränsat", "es": "Ilimitado",
+        "de": "Unbegrenzt", "fr": "Illimité", "zh": "无限期",
+        "ru": "Бессрочно", "th": "ไม่จำกัด",
+    },
+    "account_trial": {
+        "en": "Trial", "sv": "Prova-på", "es": "Prueba", "de": "Test",
+        "fr": "Essai", "zh": "试用", "ru": "Пробный", "th": "ทดลอง",
+    },
     "tab_parental": {
         "en": "Parental",
         "sv": "Föräldrakontroll",

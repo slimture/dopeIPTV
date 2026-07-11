@@ -39,6 +39,19 @@ class XtreamClient:
             raise RuntimeError("Wrong username or password.")
         return data
 
+    def account_info(self) -> dict:
+        """The Xtream account status: user_info (expiry, active/max
+        connections, trial, status) plus server_info. Used by the Account
+        panel. Returns {} on any error rather than raising."""
+        try:
+            data = self._api()
+        except Exception:
+            return {}
+        if not isinstance(data, dict):
+            return {}
+        return {"user_info": data.get("user_info") or {},
+                "server_info": data.get("server_info") or {}}
+
     def live_categories(self) -> list[dict]:
         return self._api(action="get_live_categories") or []
 
@@ -127,6 +140,10 @@ class OfflineClient:
         self.session = requests.Session()
 
     def authenticate(self) -> dict:
+        return {}
+
+    def account_info(self) -> dict:
+        # M3U / demo / offline providers have no account to report.
         return {}
 
     def live_categories(self) -> list[dict]:
