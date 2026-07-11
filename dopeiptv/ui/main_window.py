@@ -793,13 +793,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     RAIL_W = 60
 
-    def _apply_sidebar_collapsed(self) -> None:
-        collapsed = getattr(self, "_sidebar_collapsed", False)
+    def _apply_sidebar_chrome(self, collapsed: bool) -> None:
+        """Visual-only rail state: nav glyphs vs labels, and which of the
+        expanded-only bits (logo, category area) show. Safe to call mid-drag -
+        it touches no width constraints and never calls setSizes()."""
         if not hasattr(self, "nav_btns"):
             return
-        # Remember the expanded width so we can hand it back on expand.
-        if collapsed and self._side.maximumWidth() > self.RAIL_W:
-            self._sidebar_expanded_w = max(self._side.width(), 180)
         for key, b in self.nav_btns.items():
             b.setText(self._rail_glyphs.get(key, "•") if collapsed
                       else self._nav_texts[key])
@@ -816,11 +815,26 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._settings_btn.setText("⚙" if collapsed else tr("btn_settings"))
         self._set_rail(self._guide_btn, collapsed)
         self._set_rail(self._settings_btn, collapsed)
+
+    def _apply_sidebar_collapsed(self, move_sizes: bool = True) -> None:
+        collapsed = getattr(self, "_sidebar_collapsed", False)
+        if not hasattr(self, "nav_btns"):
+            return
+        # Remember the expanded width so we can hand it back on expand.
+        if not collapsed and self._side.width() > self.RAIL_W:
+            self._sidebar_expanded_w = max(self._side.width(), 180)
+        elif collapsed and self._side.maximumWidth() > self.RAIL_W:
+            self._sidebar_expanded_w = max(self._side.width(), 180)
+        self._apply_sidebar_chrome(collapsed)
+        # While the user is actively dragging the divider (see eventFilter) we
+        # leave the pane UNPINNED and skip all geometry, so a single continuous
+        # drag can collapse, re-expand and collapse again without a pinned width
+        # freezing it. The final width is pinned on mouse release.
+        if getattr(self, "_side_dragging", False):
+            return
         # Pin the pane to exactly the rail width and hand the freed space to
         # the middle column right away - otherwise the splitter keeps the old
-        # (now empty) sidebar footprint until you happen to click it. Operate
-        # on the live size list so the detail pane (and the floating toast,
-        # which the splitter also counts) keep their widths.
+        # (now empty) sidebar footprint until you happen to click it.
         if collapsed:
             # Pin to exactly the rail width: a hard constraint the splitter
             # honours immediately (so a drag-in snaps cleanly) and which keeps
@@ -833,11 +847,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._side.setMinimumWidth(0)
             self._side.setMaximumWidth(16777215)
             target = getattr(self, "_sidebar_expanded_w", 220)
-        sizes = self._root.sizes()
-        if len(sizes) >= 2:
-            sizes[1] = max(240, sizes[1] + (sizes[0] - target))
-            sizes[0] = target
-            self._root.setSizes(sizes)
+        # On a drag release the splitter already sits where the mouse left it,
+        # so only nudge the sizes for a button/keyboard toggle (move_sizes).
+        if move_sizes:
+            sizes = self._root.sizes()
+            if len(sizes) >= 2:
+                sizes[1] = max(240, sizes[1] + (sizes[0] - target))
+                sizes[0] = target
+                self._root.setSizes(sizes)
 
     @staticmethod
     def _set_rail(btn, on: bool) -> None:
@@ -845,44 +862,61 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         btn.style().unpolish(btn)
         btn.style().polish(btn)
 
+    def _set_sidebar_collapsed(self, collapsed: bool) -> None:
+        """Flip collapsed state and keep the ☰ button in sync, without letting
+        its toggle re-run the geometry (we drive that from here / on release)."""
+        if getattr(self, "_sidebar_collapsed", False) == collapsed:
+            return
+        self._sidebar_collapsed = collapsed
+        self.side_btn.blockSignals(True)
+        self.side_btn.setChecked(not collapsed)   # checked == expanded
+        self.side_btn.blockSignals(False)
+        self._apply_sidebar_collapsed()
+
     def _maybe_collapse_on_drag(self, *_a) -> None:
-        """Dragging the side divider inward collapses to the icon rail.
-        Collapse when the drag reaches the sidebar's own minimum (i.e. pulled
-        as far left as it goes) or below a comfortable width - keyed off the
-        widget's real minimum so it works whatever the font/DPI makes that.
-        Collapsing pins the rail's max width, which the splitter honours
-        immediately, so it sticks mid-drag. (Re-expand with ☰ / Ctrl+B - a
-        frozen-width rail can't be dragged back out.)"""
+        """Dragging the side divider flips the sidebar between full and the icon
+        rail. While the handle is held (see eventFilter) the pane is left
+        unpinned, so one continuous drag can collapse, re-expand and collapse
+        again - the final width is pinned on release. Two thresholds give a
+        hysteresis band so it doesn't flicker right at the boundary."""
         if not hasattr(self, "_side") or not hasattr(self, "side_btn"):
             return
-        w = self._side.width()
-        if getattr(self, "_sidebar_collapsed", False):
-            # Only while actively dragging the rail's handle out (the press
-            # temporarily unpinned it): grow it past a bit of slack -> expand.
-            if getattr(self, "_rail_drag", False) and w > self.RAIL_W + 60:
-                self.side_btn.setChecked(True)      # -> expand
+        if getattr(self, "_player_fs", False):
             return
-        if getattr(self, "_rail_drag", False):
-            return                                   # mid rail-drag-out
-        floor = self._side.minimumSizeHint().width()
-        if w < 150 or w <= floor + 12:
-            self.side_btn.setChecked(False)          # -> collapse to the rail
+        w = self._side.width()
+        if not getattr(self, "_sidebar_collapsed", False):
+            # Collapse once pulled to (near) the sidebar's own minimum - keyed
+            # off the real minimumSizeHint so it works at any font/DPI.
+            floor = self._side.minimumSizeHint().width()
+            if w < 150 or w <= floor + 12:
+                self._collapse_w = w
+                self._set_sidebar_collapsed(True)
+        else:
+            # Re-expand by dragging back out. Only while the handle is held (a
+            # rail pinned at rest can't move) and past a hysteresis gap above
+            # where it collapsed, so it won't flip-flop at the threshold.
+            if (getattr(self, "_side_dragging", False)
+                    and w >= getattr(self, "_collapse_w", 150) + 40):
+                self._set_sidebar_collapsed(False)
 
     def eventFilter(self, obj, event):
-        # The collapsed rail pins its width (so it can't stretch), which also
-        # freezes its handle. Pressing the handle temporarily unpins it so the
-        # user can drag the rail back out; if they don't, we re-pin on release.
+        # Track the whole drag gesture on the side divider. On press we free the
+        # pane (unpin min/max) so it can move both ways for as long as the button
+        # is held; on release we commit the final pinned width. This lets a
+        # single continuous drag collapse and re-expand the rail repeatedly
+        # without ever letting go.
         if obj is getattr(self, "_side_handle", None):
             t = event.type()
-            if (t == QEvent.Type.MouseButtonPress
-                    and getattr(self, "_sidebar_collapsed", False)):
-                self._rail_drag = True
+            if t == QEvent.Type.MouseButtonPress:
+                self._side_dragging = True
+                self._side.setMinimumWidth(0)
                 self._side.setMaximumWidth(16777215)
             elif (t == QEvent.Type.MouseButtonRelease
-                    and getattr(self, "_rail_drag", False)):
-                self._rail_drag = False
-                if getattr(self, "_sidebar_collapsed", False):
-                    self._side.setMaximumWidth(self.RAIL_W)   # re-pin
+                    and getattr(self, "_side_dragging", False)):
+                self._side_dragging = False
+                # Commit geometry for whatever state we ended in; the splitter
+                # already sits at the dragged width, so don't move the sizes.
+                self._apply_sidebar_collapsed(move_sizes=False)
         return super().eventFilter(obj, event)
 
     def _set_focus_mode(self, on: bool) -> None:
