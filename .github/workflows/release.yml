@@ -523,9 +523,17 @@ jobs:
           flatpak info io.github.slimture.dopeIPTV
           flatpak info --show-runtime io.github.slimture.dopeIPTV
           echo "::endgroup::"
+      - name: Name the bundle with the version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          # Match the other assets (dopeIPTV-0.6.4-...): strip the tag's leading
+          # 'v' so the flatpak carries the version instead of a bare name.
+          V="${GITHUB_REF_NAME#v}"
+          mv dopeIPTV.flatpak "dopeIPTV-${V}.flatpak"
+          echo "BUNDLE=dopeIPTV-${V}.flatpak" >> "$GITHUB_ENV"
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: dopeIPTV.flatpak
+          files: ${{ env.BUNDLE }}
           body_path: RELEASE_NOTES.md
