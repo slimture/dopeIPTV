@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (
     QSizePolicy, QSplitter, QToolButton, QVBoxLayout, QWidget,
 )
 
-from .. import APP_NAME
+from .. import APP_NAME, ORG
 from ..i18n import tr
 from .channel_list import (
     CategoryColorDelegate, ChannelDelegate, ChannelListModel, ChannelListView,
@@ -142,7 +142,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             id_key="series_id")
         self.history = HistoryStore(
             settings, f"history_{pid}" if pid else "history")
-        self.resume = ResumeStore(settings, pid)
+        self._resume_settings = self._open_resume_settings(settings)
+        self.resume = ResumeStore(self._resume_settings, pid)
         self.reminders = ReminderStore(settings, pid)
         self.overrides = CategoryOverrides(
             settings, f"category_overrides_{pid}" if pid else "category_overrides")
@@ -1433,7 +1434,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.series_favs = FavoriteStore(
                 self.settings, f"series_favorites_{pid}", id_key="series_id")
             self.history = HistoryStore(self.settings, f"history_{pid}")
-            self.resume = ResumeStore(self.settings, pid)
+            self.resume = ResumeStore(self._resume_settings, pid)
             self.reminders = ReminderStore(self.settings, pid)
             self._base_title = pl["name"]
             self.setWindowTitle(self._base_title)
@@ -2481,6 +2482,35 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     # Content kinds whose playback position is worth remembering/resuming.
     _RESUMABLE = ("movie", "episode", "recording")
+
+    def _open_resume_settings(self, shared: QSettings) -> QSettings:
+        """Resume positions get their own small settings file. They are written
+        every ~12s during playback; keeping them in the shared app settings -
+        which also holds the multi-MB TMDB/Trakt caches - meant each write
+        dirtied that file, so QSettings' periodic auto-sync rewrote the whole
+        thing: a 100-400ms main-thread stall that backed up mpv's render loop
+        and dropped a batch of frames every ~12s. A dedicated file syncs in
+        ~1ms and never dirties the big one. Migrate any existing
+        resume_positions* keys out of the shared file once, so the user's
+        continue-watching survives the move."""
+        rs = QSettings(QSettings.Format.IniFormat, QSettings.Scope.UserScope,
+                       ORG, "resume")
+        try:
+            if rs.value("_migrated") != "1":
+                moved = False
+                for k in shared.allKeys():
+                    if k.startswith("resume_positions"):
+                        rs.setValue(k, shared.value(k))
+                        shared.remove(k)
+                        moved = True
+                rs.setValue("_migrated", "1")
+                rs.sync()
+                if moved:
+                    shared.sync()
+        except Exception as e:
+            print(f"[dopeIPTV] resume settings migration skipped: {e}",
+                  file=sys.stderr)
+        return rs
 
     def _save_resume_position(self) -> None:
         """Remember how far into the current title the user got, so it can be
