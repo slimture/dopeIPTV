@@ -3215,6 +3215,21 @@ _STRINGS: dict[str, dict[str, str]] = {
         "en": "{n} min", "sv": "{n} min", "es": "{n} min", "de": "{n} Min",
         "fr": "{n} min", "zh": "{n} 分钟", "ru": "{n} мин", "th": "{n} นาที",
     },
+    "opt_sleep_custom": {
+        "en": "Custom…", "sv": "Egen tid…", "es": "Personalizado…",
+        "de": "Eigene Zeit…", "fr": "Personnalisé…", "zh": "自定义……",
+        "ru": "Свой…", "th": "กำหนดเอง…",
+    },
+    "sleep_prompt": {
+        "en": "Stop playback after (minutes):",
+        "sv": "Stäng av uppspelning efter (minuter):",
+        "es": "Detener la reproducción tras (minutos):",
+        "de": "Wiedergabe stoppen nach (Minuten):",
+        "fr": "Arrêter la lecture après (minutes) :",
+        "zh": "在多少分钟后停止播放：",
+        "ru": "Остановить воспроизведение через (минут):",
+        "th": "หยุดเล่นหลังจาก (นาที):",
+    },
     "sleep_set": {
         "en": "Sleep timer: stopping in {n} min",
         "sv": "Insomningstimer: stänger av om {n} min",

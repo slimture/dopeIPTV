@@ -1457,6 +1457,9 @@ class EmbeddedPlayer(QWidget):
             act = sleep.addAction(tr("opt_minutes", n=mins))
             act.triggered.connect(
                 lambda _c, mn=mins: self._start_sleep_timer(mn))
+        sleep.addSeparator()
+        custom = sleep.addAction(tr("opt_sleep_custom"))
+        custom.triggered.connect(self._ask_sleep_minutes)
 
         menu.addSeparator()
         stats_act = menu.addAction(tr("opt_stats_for_nerds"))
@@ -1473,6 +1476,14 @@ class EmbeddedPlayer(QWidget):
             return
         self._sleep_timer.start(minutes * 60 * 1000)
         self.set_overlay_info(tr("sleep_set", n=minutes))
+
+    def _ask_sleep_minutes(self) -> None:
+        from PyQt6.QtWidgets import QInputDialog
+        mins, ok = QInputDialog.getInt(
+            self, tr("opt_sleep_timer"), tr("sleep_prompt"),
+            60, 1, 1440, 5)
+        if ok:
+            self._start_sleep_timer(int(mins))
 
     def _on_sleep_elapsed(self) -> None:
         self.set_overlay_info(tr("sleep_stopping"))
@@ -1497,8 +1508,12 @@ class EmbeddedPlayer(QWidget):
             return
 
         def prop(name, fmt=str):
+            # Read via attribute access (m.some_property) - the same form the
+            # rest of the player uses successfully. Some libmpv builds don't
+            # resolve the subscript getter for these hyphenated names, which
+            # made every stat below Video/Audio read as "—".
             try:
-                v = m[name]
+                v = getattr(m, name.replace("-", "_"))
                 return fmt(v) if v is not None else "—"
             except Exception:
                 return "—"
