@@ -229,8 +229,12 @@ class XmltvGuide:
         try:
             if p.stat().st_mtime < self.cache_path.stat().st_mtime:
                 return False
-            with p.open("rb") as f:
-                blob = pickle.load(f)
+            data = p.read_bytes()
+            # New index files are gzip-compressed; a plain pickle from an older
+            # build (pickle proto starts \x80, never the gzip magic) still loads.
+            if data[:2] == b"\x1f\x8b":
+                data = gzip.decompress(data)
+            blob = pickle.loads(data)
         except (OSError, pickle.PickleError, EOFError, ValueError):
             return False
         if not isinstance(blob, dict) or blob.get("v") != _INDEX_VERSION:
@@ -244,11 +248,11 @@ class XmltvGuide:
         if not p:
             return
         try:
-            with p.open("wb") as f:
-                pickle.dump({"v": _INDEX_VERSION,
-                             "by_id": self._by_id,
-                             "by_name": self._by_name},
-                            f, protocol=pickle.HIGHEST_PROTOCOL)
+            blob = pickle.dumps({"v": _INDEX_VERSION,
+                                 "by_id": self._by_id,
+                                 "by_name": self._by_name},
+                                protocol=pickle.HIGHEST_PROTOCOL)
+            p.write_bytes(gzip.compress(blob, compresslevel=5))
         except OSError:
             pass
 
