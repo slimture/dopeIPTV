@@ -284,12 +284,20 @@ class _MpvGLWidget(QOpenGLWidget):
         soft = {"user_agent": "dopeIPTV/1.0", "keep_open": "yes",
                 "input_default_bindings": False, "input_vo_keyboard": False,
                 # Hardware decoding - without this mpv software-decodes, which
-                # stutters on 4K (esp. 10-bit HEVC/HDR) even on fast CPUs. This
-                # matches what standalone mpv does by default. 'auto-safe' only
-                # picks methods known to cooperate with the render API and
-                # falls back to software if none are available, so it never
-                # makes playback worse. Override via DOPEIPTV_HWDEC.
-                "hwdec": (os.environ.get("DOPEIPTV_HWDEC") or "auto-safe"),
+                # stutters on 4K (esp. 10-bit HEVC/HDR) even on fast CPUs.
+                # 'auto-copy-safe' decodes on the GPU's dedicated engine and
+                # copies the frame back to RAM for upload as a normal texture.
+                # We deliberately prefer the *copy* path over zero-copy interop:
+                # our OpenGL render-API + QOpenGLWidget context can't always
+                # negotiate direct GL interop (vaapi-egl / cuda-gl), and when
+                # that fails you get a black frame or a software fallback. The
+                # copy path works with any GL context and any GPU that has a
+                # decoder (AMD vaapi-copy, Intel vaapi-copy, NVIDIA nvdec /
+                # vulkan-copy) - the heavy decode still runs on hardware. It
+                # also uses noticeably less RAM here than the interop path.
+                # Enthusiasts can force zero-copy with DOPEIPTV_HWDEC=nvdec etc.
+                "hwdec": (os.environ.get("DOPEIPTV_HWDEC")
+                          or "auto-copy-safe"),
                 # (No 'osc' option: the on-screen controller is a feature of
                 # the standalone mpv GUI and doesn't exist in the libmpv/render
                 # build we use - setting it only logged a harmless skip.)
