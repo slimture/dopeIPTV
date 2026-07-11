@@ -23,6 +23,7 @@ from ..i18n import tr
 from .dialogs import PlaylistDialog
 from .epg_grid import EpgGridDialog
 from ..providers.metadata import TmdbClient, bundled_tmdb_key
+from ..providers.client import make_client
 from ..media.players import embedded_playback_reason
 from .theme import ACCENTS, P, THEMES, apply_theme, build_style
 from ..core.updates import GITHUB_REPO, fetch_latest_release, is_newer
@@ -517,20 +518,13 @@ class _SettingsMixin:
         pl_tab = QWidget()
         pv = QVBoxLayout(pl_tab)
         pv.setSpacing(10)
-        # Account status for the active Xtream provider (expiry, connections).
+        # Account status for the selected Xtream provider (expiry,
+        # connections). Follows the list selection so you can check any
+        # provider without switching to it.
         account_lbl = QLabel(tr("account_loading"))
         account_lbl.setWordWrap(True)
         account_lbl.setObjectName("DetailMeta")
         pv.addWidget(account_lbl)
-
-        def _fill_account(info):
-            account_lbl.setText(self._format_account(info))
-
-        run_async(
-            self.pool,
-            lambda: getattr(self.client, "account_info", lambda: {})(),
-            _fill_account,
-            lambda _e: account_lbl.setText(tr("account_unavailable")))
         pl_list = QListWidget()
         pv.addWidget(pl_list, 1)
         pl_btns = QHBoxLayout()
@@ -915,6 +909,31 @@ class _SettingsMixin:
             return (item.data(Qt.ItemDataRole.UserRole)
                     if item else None)
 
+        def refresh_account(pid):
+            pl = store.get(pid) if (store and pid) else None
+            if not pl:
+                account_lbl.setText(tr("account_unavailable"))
+                return
+            account_lbl.setText(tr("account_loading"))
+
+            def fetch(pl=pl):
+                try:
+                    return make_client(pl).account_info()
+                except Exception:
+                    return {}
+
+            def done(info, pid=pid):
+                # Ignore a stale answer if the selection moved on meanwhile.
+                if selected_pid() == pid:
+                    account_lbl.setText(self._format_account(info))
+
+            run_async(
+                self.pool, fetch, done,
+                lambda _e: account_lbl.setText(tr("account_unavailable")))
+
+        pl_list.currentItemChanged.connect(
+            lambda *_: refresh_account(selected_pid()))
+
         def add_playlist():
             dlg = PlaylistDialog(d)
             if dlg.exec():
@@ -1033,6 +1052,17 @@ class _SettingsMixin:
                       refresh_pl_btn, use_btn, export_btn, import_btn):
                 b.setEnabled(False)
         reload_pl_list()
+        # Start on the active provider so its account status shows first
+        # (selecting a row drives refresh_account via currentItemChanged).
+        if store:
+            active_row = next(
+                (i for i in range(pl_list.count())
+                 if pl_list.item(i).data(Qt.ItemDataRole.UserRole)
+                 == store.active_id), 0)
+            if pl_list.count():
+                pl_list.setCurrentRow(active_row)
+            else:
+                account_lbl.setText(tr("account_unavailable"))
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
