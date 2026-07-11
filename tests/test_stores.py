@@ -107,6 +107,39 @@ def test_watched_store_snapshots_persist():
     assert w2.local_watched_items()[0]["name"] == "Dune"
 
 
+def test_watched_store_trakt_titles_carry_and_persist():
+    store = {}
+    s = MagicMock()
+    s.value = lambda k, d="": store.get(k, d)
+    s.setValue = lambda k, v: store.__setitem__(k, v)
+    w = WatchedStore(s)
+    w.replace([111, 222], {333: [[1, 1]]},
+              {111: "Dune (2021)", 222: "Sicario"},
+              {333: "Severance (2022)"})
+    assert w.trakt_title(111, "vod") == "Dune (2021)"
+    assert w.trakt_title(222, "vod") == "Sicario"
+    assert w.trakt_title(333, "series") == "Severance (2022)"
+    # A movie id has no show title and vice-versa.
+    assert w.trakt_title(111, "series") is None
+    assert w.trakt_title(999, "vod") is None
+    # replace() runs on the sync worker thread and deliberately doesn't write
+    # QSettings; a main-thread save (any local mark) flushes the whole blob.
+    # After that, a fresh store reads the titles back.
+    w._save()
+    w2 = WatchedStore(s)
+    assert w2.trakt_title(111, "vod") == "Dune (2021)"
+    assert w2.trakt_title(333, "series") == "Severance (2022)"
+
+
+def test_watched_store_replace_without_titles_keeps_ids():
+    s = _mock_settings()
+    w = WatchedStore(s)
+    w.replace([1, 2], {})
+    assert w.trakt_movies == {1, 2}
+    # No titles passed -> lookups just return None, no crash.
+    assert w.trakt_title(1, "vod") is None
+
+
 def test_watched_store_whole_show_push():
     s = _mock_settings()
     w = WatchedStore(s)

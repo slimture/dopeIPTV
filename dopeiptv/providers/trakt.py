@@ -214,18 +214,25 @@ class TraktClient:
 
     # -- watched (for cross-device sync into the "already seen" indicator) ----
 
-    def watched_movies(self) -> list[int]:
+    def watched_movies(self, titles: dict[int, str] | None = None) -> list[int]:
         """Every movie the user has marked watched on any device.
         Returns the list of TMDB ids - dopeIPTV keys its local titles on
-        TMDB via the poster-resolver, so imdb ids aren't needed."""
+        TMDB via the poster-resolver, so imdb ids aren't needed. If a
+        *titles* dict is passed it's filled with tmdb id -> 'Title (year)',
+        so the Watched list can name rows even without a TMDB key."""
         r = requests.get(f"{API}/sync/watched/movies",
                          headers=self._headers(), timeout=30)
         r.raise_for_status()
         out: list[int] = []
         for entry in r.json() or []:
-            tid = ((entry.get("movie") or {}).get("ids") or {}).get("tmdb")
+            movie = entry.get("movie") or {}
+            tid = (movie.get("ids") or {}).get("tmdb")
             if isinstance(tid, int):
                 out.append(tid)
+                if titles is not None:
+                    name, year = movie.get("title"), movie.get("year")
+                    if name:
+                        titles[tid] = f"{name} ({year})" if year else name
         return out
 
     # -- add/remove history (mark-as-watched from the app) -------------------
@@ -419,20 +426,27 @@ class TraktClient:
     def favorite_shows(self) -> list[int]:
         return self._fav_list_ids("series")
 
-    def watched_shows(self) -> dict[int, list[list[int]]]:
+    def watched_shows(self, titles: dict[int, str] | None = None
+                      ) -> dict[int, list[list[int]]]:
         """Every episode the user has marked watched on any device.
         Returns a mapping show_tmdb_id -> [[season, episode], ...] with each
         watched episode listed once. Trakt returns the full nested seasons
         structure by default; we flatten it so the local WatchedStore can
-        answer 'is S03E05 seen?' with a single set lookup."""
+        answer 'is S03E05 seen?' with a single set lookup. If a *titles* dict
+        is passed it's filled with show tmdb id -> 'Title (year)'."""
         r = requests.get(f"{API}/sync/watched/shows",
                          headers=self._headers(), timeout=45)
         r.raise_for_status()
         out: dict[int, list[list[int]]] = {}
         for entry in r.json() or []:
-            tid = ((entry.get("show") or {}).get("ids") or {}).get("tmdb")
+            show = entry.get("show") or {}
+            tid = (show.get("ids") or {}).get("tmdb")
             if not isinstance(tid, int):
                 continue
+            if titles is not None:
+                name, year = show.get("title"), show.get("year")
+                if name:
+                    titles[tid] = f"{name} ({year})" if year else name
             eps: list[list[int]] = []
             for season in entry.get("seasons") or []:
                 snum = season.get("number")

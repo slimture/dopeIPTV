@@ -101,9 +101,11 @@ class _TraktMixin:
         # exit. Daemon threads are killed instantly on process end so
         # no callback ever fires into a torn-down interpreter.
         def worker() -> None:
+            movie_titles: dict[int, str] = {}
+            show_titles: dict[int, str] = {}
             try:
-                movies = self.trakt.watched_movies()
-                shows = self.trakt.watched_shows()
+                movies = self.trakt.watched_movies(movie_titles)
+                shows = self.trakt.watched_shows(show_titles)
                 wl_movies = self.trakt.watchlist_movies()
                 wl_shows = self.trakt.watchlist_shows()
             except Exception:
@@ -112,7 +114,7 @@ class _TraktMixin:
                 # is safe as long as the target QObject lives there.
                 QTimer.singleShot(0, self._on_watched_sync_failed)
                 return
-            self.watched.replace(movies, shows)
+            self.watched.replace(movies, shows, movie_titles, show_titles)
             self.watchlist.replace(wl_movies, wl_shows)
             # Cross-device: anything the user marked 'seen (local)' that
             # has since resolved to a TMDB id but isn't on Trakt yet gets
@@ -226,7 +228,10 @@ class _TraktMixin:
         """Build a list row for a Trakt-watched title. meta is the
         resolved {name, poster_url} or None while the tmdb-id lookup is
         still in flight (shows a placeholder that fills in on repaint)."""
-        name = (meta or {}).get("name") or "…"
+        # Prefer the resolved TMDB name; fall back to the title Trakt gave us
+        # (so rows are named even with no TMDB key), then a placeholder.
+        name = ((meta or {}).get("name")
+                or self.watched.trakt_title(tmdb_id, kind) or "…")
         poster = (meta or {}).get("poster_url")
         item = {"name": name, "_kind": kind, "_tmdb_id": tmdb_id,
                 "_trakt_only": True}

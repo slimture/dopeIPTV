@@ -441,6 +441,12 @@ class WatchedStore:
         # the 'Watched -> Local' list can render straight from the store
         # (one entry per movie / per series). Newest first.
         self.local_items: list[dict] = []
+        # tmdb id -> display title from Trakt, so the Watched list can name a
+        # row even when there's no TMDB key to resolve a poster (Trakt's API is
+        # tmdb-keyed but also returns the title/year, which we'd otherwise drop
+        # and render an anonymous placeholder for).
+        self.trakt_movie_titles: dict[int, str] = {}
+        self.trakt_show_titles: dict[int, str] = {}
         self.last_sync_at: int = 0
         self._load()
 
@@ -508,6 +514,12 @@ class WatchedStore:
                              if isinstance(x, int)}
         self.local_items = [x for x in (data.get("local_items") or [])
                             if isinstance(x, dict)]
+        self.trakt_movie_titles = {
+            int(k): str(v) for k, v in
+            (data.get("trakt_movie_titles") or {}).items()}
+        self.trakt_show_titles = {
+            int(k): str(v) for k, v in
+            (data.get("trakt_show_titles") or {}).items()}
         self.last_sync_at = int(data.get("last_sync_at") or 0)
 
     def _save(self) -> None:
@@ -524,6 +536,10 @@ class WatchedStore:
             "local_shows": sorted(self.local_shows),
             "synced_shows": sorted(self.synced_shows),
             "local_items": self.local_items,
+            "trakt_movie_titles": {str(k): v
+                                   for k, v in self.trakt_movie_titles.items()},
+            "trakt_show_titles": {str(k): v
+                                  for k, v in self.trakt_show_titles.items()},
             "last_sync_at": self.last_sync_at,
         }
         self.settings.setValue("trakt_watched_cache",
@@ -532,15 +548,28 @@ class WatchedStore:
     # -- Trakt-sync layer ----------------------------------------------------
 
     def replace(self, movies: list[int],
-                shows: dict[int, list[list[int]]]) -> None:
+                shows: dict[int, list[list[int]]],
+                movie_titles: dict[int, str] | None = None,
+                show_titles: dict[int, str] | None = None) -> None:
         """Rebuild the Trakt layer from a fresh sync payload. Leaves the
-        local layer untouched."""
+        local layer untouched. The optional title maps (tmdb id -> title)
+        let the Watched list name a row without a TMDB lookup."""
         self.trakt_movies = set(movies)
         self.trakt_episodes = {
             sid: {(s, e) for s, e in pairs}
             for sid, pairs in shows.items()
         }
+        if movie_titles is not None:
+            self.trakt_movie_titles = dict(movie_titles)
+        if show_titles is not None:
+            self.trakt_show_titles = dict(show_titles)
         self.last_sync_at = int(datetime.now().timestamp())
+
+    def trakt_title(self, tmdb_id: int, kind: str) -> str | None:
+        """The Trakt-provided title for a watched tmdb id, if we have it."""
+        src = (self.trakt_show_titles if kind == "series"
+               else self.trakt_movie_titles)
+        return src.get(int(tmdb_id))
         self._save()
 
     # -- local layer (right-click 'Mark as watched (local)') -----------------
@@ -752,6 +781,8 @@ class WatchedStore:
         self.local_series_streams = set()
         self.local_episode_streams = set()
         self.local_items = []
+        self.trakt_movie_titles = {}
+        self.trakt_show_titles = {}
         self.last_sync_at = 0
         self.settings.remove("trakt_watched_cache")
 
