@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import io
 import pickle
 import sys
@@ -99,16 +100,26 @@ class XmltvGuide:
             if (max_age is not None
                     and time.time() - self.cache_path.stat().st_mtime > max_age):
                 return None
-            return self.cache_path.read_bytes()
+            data = self.cache_path.read_bytes()
         except OSError:
             return None
+        # Transparently gunzip. New caches are gzip-compressed (a raw XMLTV
+        # guide shrinks ~10x - hundreds of MB down to tens), so the on-disk
+        # cache and the startup read stay small. A plain-XML cache written by
+        # an older build (no gzip magic) is returned unchanged.
+        if data[:2] == b"\x1f\x8b":
+            try:
+                return gzip.decompress(data)
+            except (OSError, EOFError):
+                return None
+        return data
 
     def _write_cache(self, data: bytes) -> None:
         if not self.cache_path:
             return
         try:
             self.cache_path.parent.mkdir(parents=True, exist_ok=True)
-            self.cache_path.write_bytes(data)
+            self.cache_path.write_bytes(gzip.compress(data, compresslevel=5))
         except OSError:
             pass
 

@@ -278,6 +278,24 @@ class PosterResolver(QObject):
     PERSON_CACHE_KEY = "tmdb_person_cache"
     PERSON_ID_CACHE_KEY = "tmdb_person_id_cache"
 
+    # Hard caps so months of browsing can't grow these caches without bound
+    # (an ever-larger cache file slows every save and the startup load, which
+    # is how an app "starts to lag after a while"). Generous enough to cover a
+    # huge library; when full, the oldest entries are dropped and simply
+    # re-resolve once if that title is revisited. dicts preserve insertion
+    # order, so "oldest" == the front of the dict.
+    MAX_POSTER = 12000
+    MAX_BYID = 12000
+    MAX_PERSON = 3000
+    MAX_PERSON_ID = 6000
+
+    @staticmethod
+    def _capped(d: dict, limit: int) -> dict:
+        """Trim *d* to its newest *limit* entries (keeping the tail)."""
+        if len(d) <= limit:
+            return d
+        return dict(list(d.items())[-limit:])
+
     def __init__(self, pool: QThreadPool, settings: QSettings,
                  client: TmdbClient) -> None:
         super().__init__()
@@ -340,6 +358,13 @@ class PosterResolver(QObject):
                 settings.value(self.PERSON_ID_CACHE_KEY, "") or "{}")
         except Exception:
             self._person_id_cache = {}
+        # Enforce the caps on already-persisted caches too, so an existing
+        # oversized cache file shrinks on the next launch instead of lingering.
+        self._cache = self._capped(self._cache, self.MAX_POSTER)
+        self._byid_cache = self._capped(self._byid_cache, self.MAX_BYID)
+        self._person_cache = self._capped(self._person_cache, self.MAX_PERSON)
+        self._person_id_cache = self._capped(
+            self._person_id_cache, self.MAX_PERSON_ID)
         self._person_id_pending: set[str] = set()
         self._person_id_waiting: dict[str, list[Callable]] = {}
         # A resolved entry writes the whole (growing) cache back to
@@ -358,9 +383,11 @@ class PosterResolver(QObject):
     def _flush_save(self) -> None:
         if self._dirty:
             self._dirty = False
+            self._cache = self._capped(self._cache, self.MAX_POSTER)
             self.settings.setValue(self.CACHE_KEY, json.dumps(self._cache))
         if self._byid_dirty:
             self._byid_dirty = False
+            self._byid_cache = self._capped(self._byid_cache, self.MAX_BYID)
             self.settings.setValue(self.BYID_CACHE_KEY,
                                    json.dumps(self._byid_cache))
 
@@ -671,6 +698,8 @@ class PosterResolver(QObject):
 
         def done(titles, key=key):
             self._person_cache[key] = titles or []
+            self._person_cache = self._capped(
+                self._person_cache, self.MAX_PERSON)
             self.settings.setValue(
                 self.PERSON_CACHE_KEY, json.dumps(self._person_cache))
             self._person_pending.discard(key)
@@ -708,6 +737,8 @@ class PosterResolver(QObject):
 
         def done(pid, key=key):
             self._person_id_cache[key] = pid
+            self._person_id_cache = self._capped(
+                self._person_id_cache, self.MAX_PERSON_ID)
             self.settings.setValue(
                 self.PERSON_ID_CACHE_KEY, json.dumps(self._person_id_cache))
             self._person_id_pending.discard(key)
