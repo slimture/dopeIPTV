@@ -229,8 +229,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         else:
             self._size_to_screen()   # first run: fit the actual display
         QTimer.singleShot(0, self._restore_splitter_state)
-        self._show_busy()
-        self._set_status(tr("status_loading_channels"))
+        self._show_busy(tr("status_loading_channels"))
         QTimer.singleShot(100, self._load_categories)
         # Cross-device sync of watched movies/episodes from Trakt. Deferred
         # so the initial category/EPG traffic goes first - the sync runs
@@ -1408,8 +1407,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         pl = self.playlist_store.get(pid) if self.playlist_store else None
         if not pl:
             return
-        self._show_busy()
-        self._set_status(tr("status_connecting", name=pl['name']))
+        self._show_busy(tr("status_connecting", name=pl['name']))
         self._show_toast(tr("status_connecting", name=pl['name']))
         candidate = make_client(pl)
 
@@ -1563,8 +1561,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.cat_list.blockSignals(False)
             self.cat_list.setCurrentRow(0)
             return
-        self._show_busy()
-        self._set_status(tr("status_loading_categories"))
+        self._show_busy(tr("status_loading_categories"))
         fn = {"live": self.client.live_categories,
               "vod": self.client.vod_categories,
               "series": self.client.series_categories}[self.mode]
@@ -1820,8 +1817,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # Synthetic category: every title sorted by the provider's
             # publish/update time, newest first (capped so a huge library
             # doesn't lag the list).
-            self._show_busy()
-            self._set_status(tr("status_loading_content"))
+            self._show_busy(tr("status_loading_recent"))
             rmode = self.mode
             rgen = self._load_gen
             skey = "added" if rmode == "vod" else "last_modified"
@@ -1857,8 +1853,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             run_async(self.pool, lambda: rfetch(None),
                       recent_done, recent_fail)
             return
-        self._show_busy()
-        self._set_status(tr("status_loading_content"))
+        self._show_busy(self._loading_message())
         fn = {"live": self.client.live_streams,
               "vod": self.client.vod_streams,
               "series": self.client.series_list}[self.mode]
@@ -2258,8 +2253,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         sid = series.get("series_id")
         if sid is None:
             return
-        self._show_busy()
-        self._set_status(tr("status_loading_episodes"))
+        self._show_busy(tr("status_loading_episodes"))
 
         def done(info):
             self._hide_busy()
@@ -2770,6 +2764,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _show_toast(self, text: str, duration_ms: int = 0) -> None:
         self._toast.show_message(text, duration_ms)
 
+    def _loading_message(self) -> str:
+        return {"live": tr("status_loading_channels"),
+                "vod": tr("status_loading_movies"),
+                "series": tr("status_loading_series")}.get(
+            self.mode, tr("status_loading_content"))
+
     def _set_status(self, text: str, error: bool = False) -> None:
         self.count_lbl.setStyleSheet(
             f"color:{P['error']}; font-size:11px; font-weight:600;"
@@ -2957,10 +2957,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     # -- recordings ----------------------------------------------------------------
 
 
-    def _show_busy(self) -> None:
-        """Show the top 'busy' strip. Always indeterminate (no jumpy 0-100 %),
-        and armed with a watchdog so it can never get stuck on screen: every
-        call restarts a timer that force-hides it if nothing refreshes it."""
+    _SPIN = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
+    def _show_busy(self, message: str | None = None) -> None:
+        """Show the top 'busy' strip, and - when the content area is empty and
+        a message is given - a centred spinner + label ('Loading movies…') so
+        it reads as 'working', not a broken blank list. Always indeterminate,
+        and armed with a watchdog so it can never get stuck on screen."""
         bar = self.loading_bar
         bar.setRange(0, 0)
         bar.setVisible(True)
@@ -2972,12 +2975,62 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             wd.timeout.connect(self._hide_busy)
             self._busy_watchdog = wd
         wd.start()
+        if message:
+            self._set_status(message)
+        self._update_busy_overlay(message)
 
     def _hide_busy(self) -> None:
         wd = getattr(self, "_busy_watchdog", None)
         if wd is not None:
             wd.stop()
         self.loading_bar.setVisible(False)
+        ov = getattr(self, "_busy_overlay", None)
+        if ov is not None:
+            ov.hide()
+            self._busy_spin_timer.stop()
+
+    def _ensure_busy_overlay(self):
+        ov = getattr(self, "_busy_overlay", None)
+        if ov is None:
+            ov = QLabel(self.listw)
+            ov.setObjectName("BusyOverlay")
+            ov.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            ov.setStyleSheet(
+                "#BusyOverlay {"
+                f" background: {P['hover']}; color: {P['text']};"
+                f" border: 1px solid {P['border_in']}; border-radius: 10px;"
+                " padding: 12px 20px; font-size: 13px; font-weight: 600; }")
+            ov.hide()
+            self._busy_overlay = ov
+            self._busy_spin_i = 0
+            self._busy_text = ""
+            t = QTimer(self)
+            t.setInterval(110)
+            t.timeout.connect(self._tick_busy_overlay)
+            self._busy_spin_timer = t
+        return self._busy_overlay
+
+    def _tick_busy_overlay(self) -> None:
+        ov = self._busy_overlay
+        self._busy_spin_i = (self._busy_spin_i + 1) % len(self._SPIN)
+        ov.setText(f"{self._SPIN[self._busy_spin_i]}   {self._busy_text}")
+        ov.adjustSize()
+        ov.move((self.listw.width() - ov.width()) // 2,
+                max(24, (self.listw.height() - ov.height()) // 3))
+
+    def _update_busy_overlay(self, message: str | None) -> None:
+        if not hasattr(self, "listw") or not hasattr(self, "list_model"):
+            return
+        ov = self._ensure_busy_overlay()
+        if message and self.list_model.rowCount() == 0:
+            self._busy_text = message
+            self._tick_busy_overlay()
+            ov.show()
+            ov.raise_()
+            self._busy_spin_timer.start()
+        else:
+            ov.hide()
+            self._busy_spin_timer.stop()
 
     def _on_epg_progress(self, value: int) -> None:
         # The guide download reports progress erratically - often no total, and

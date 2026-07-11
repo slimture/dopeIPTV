@@ -1667,6 +1667,25 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Загрузка контента…",
         "th": "กำลังโหลดเนื้อหา…",
     },
+    "status_loading_movies": {
+        "en": "Loading movies…", "sv": "Laddar filmer…",
+        "es": "Cargando películas…", "de": "Filme werden geladen…",
+        "fr": "Chargement des films…", "zh": "正在加载电影…",
+        "ru": "Загрузка фильмов…", "th": "กำลังโหลดหนัง…",
+    },
+    "status_loading_series": {
+        "en": "Loading series…", "sv": "Laddar serier…",
+        "es": "Cargando series…", "de": "Serien werden geladen…",
+        "fr": "Chargement des séries…", "zh": "正在加载剧集…",
+        "ru": "Загрузка сериалов…", "th": "กำลังโหลดซีรีส์…",
+    },
+    "status_loading_recent": {
+        "en": "Loading recently added…", "sv": "Laddar senast tillagt…",
+        "es": "Cargando añadidos recientes…",
+        "de": "Kürzlich hinzugefügte werden geladen…",
+        "fr": "Chargement des ajouts récents…", "zh": "正在加载最近添加…",
+        "ru": "Загрузка недавних…", "th": "กำลังโหลดที่เพิ่มล่าสุด…",
+    },
     "status_loading_episodes": {
         "en": "Loading episodes…",
         "sv": "Laddar avsnitt…",
