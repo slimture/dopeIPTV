@@ -561,6 +561,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.stop_btn.clicked.connect(self._exit_pip_if_active)
             self.player.stopped.connect(self._on_player_stopped)
             self.player.resume_requested.connect(self._resume_last)
+            self.player.stalled.connect(self._on_player_stalled)
             # Keep the player pane visible on stop - mpv clears to black -
             # instead of hiding it, so the window just goes black.
             dl.addWidget(self.player, 1)
@@ -2553,6 +2554,25 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.stream_error.show()
         if self.player:
             self.player.title_lbl.setText("")
+
+    def _on_player_stalled(self) -> None:
+        """The player reported the live stream frozen (buffer-starved). Reconnect
+        silently, respecting the same retry budget as a hard error."""
+        lp = getattr(self, "_last_playback", None)
+        if not (self.player and self.player.isVisible()):
+            return
+        if not lp or lp.get("kind") != "live":
+            return
+        now = time.time()
+        if now - getattr(self, "_last_stream_error_ts", 0.0) > 20:
+            self._stream_retries = 0
+        if getattr(self, "_stream_retries", 0) >= self.MAX_STREAM_RETRIES:
+            return   # tried hard already; leave it for the user to zap
+        self._last_stream_error_ts = now
+        self._stream_retries = getattr(self, "_stream_retries", 0) + 1
+        self.player.current_url = None
+        self._set_status(tr("status_reconnecting"))
+        QTimer.singleShot(300, self._retry_last_stream)
 
     def _retry_last_stream(self) -> None:
         lp = getattr(self, "_last_playback", None)

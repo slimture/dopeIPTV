@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import time
 
 from PyQt6.QtCore import (
     QByteArray, QEvent, QObject, QPointF, QRect, QRectF, QSize, Qt, QTimer,
@@ -272,6 +273,15 @@ class _MpvGLWidget(QOpenGLWidget):
         soft = {"user_agent": "dopeIPTV/1.0", "keep_open": "yes",
                 "input_default_bindings": False, "input_vo_keyboard": False,
                 "osc": False,
+                # Network resilience for live streams: abort a dead connection
+                # instead of hanging forever (that then surfaces as an error we
+                # auto-reconnect from), and let ffmpeg transparently reconnect
+                # dropped HTTP streams. Any option a minimal libmpv build
+                # rejects is skipped by the per-key loop below.
+                "network-timeout": 30,
+                "demuxer-lavf-o": "reconnect=1,reconnect_streamed=1,"
+                                  "reconnect_on_network_error=1,"
+                                  "reconnect_delay_max=5",
                 # Never let mpv open its own window, and keep its OSD silent -
                 # otherwise it draws the media title centred on black while a
                 # stream buffers, which can surface as a stray frame.
@@ -461,9 +471,13 @@ class EmbeddedPlayer(QWidget):
     pip_context_menu = pyqtSignal(object)
     stopped = pyqtSignal()
     resume_requested = pyqtSignal()
+    stalled = pyqtSignal()
 
     OVERLAY_HIDE_MS = 3000
     VIDEO_BOX_HEIGHT = 260
+    # How long mpv may sit idle (buffer-starved) while not paused before we
+    # treat the stream as frozen and ask for a reconnect.
+    STALL_SECS = 12
     MINIBTN = 28
     ICON_PX = 15  # drawn control-icon size inside the 28px buttons
 
@@ -751,6 +765,7 @@ class EmbeddedPlayer(QWidget):
         self._fs_ui = False
         self.current_url: str | None = None
         self._muted = False
+        self._stall_since = 0.0
         try:
             vol = int(self._settings.value("volume", 100)) \
                 if self._settings else 100
@@ -1209,6 +1224,7 @@ class EmbeddedPlayer(QWidget):
             # Fresh play cycle - drop the stop-in-progress flag so any real
             # error from this new stream (auth failed, 404, ...) is surfaced.
             self._stopping = False
+            self._stall_since = 0.0
             self._blackout.hide()
             self.video.set_blank(False)
             self.title_lbl.setText(title or "")
@@ -1515,6 +1531,22 @@ class EmbeddedPlayer(QWidget):
         except Exception:
             return
         self._sync_pause_label(paused)
+        # Freeze watchdog: mpv reports core-idle while it has nothing to render
+        # (buffer starved / stream stalled). If that persists while we're not
+        # paused, the stream has frozen - ask for a reconnect. Covers live too,
+        # which returns below as non-seekable.
+        try:
+            idle = bool(m.core_idle) and self.current_url is not None
+        except Exception:
+            idle = False
+        if paused or not idle:
+            self._stall_since = 0.0
+        else:
+            if not self._stall_since:
+                self._stall_since = time.time()
+            elif time.time() - self._stall_since > self.STALL_SECS:
+                self._stall_since = 0.0
+                self.stalled.emit()
         seekable = bool(dur) and dur > 1
         self._seekable = seekable
         if not seekable:

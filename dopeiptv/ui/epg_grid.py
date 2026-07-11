@@ -152,6 +152,10 @@ class EpgGridDialog(QDialog):
         now_x = self.CH_COL_W + (now - self._start) / 60 * self.PX_PER_MIN
         self.view.horizontalScrollBar().setValue(max(0, int(now_x
                                                              - self.CH_COL_W - 40)))
+        # Open on the channel you're watching (if any), so the guide lands on
+        # what's playing instead of the top of a long line-up.
+        if getattr(self, "_playing_row", None) is not None:
+            self._scroll_to_playing()
 
     def keyPressEvent(self, event) -> None:
         # In-guide shortcuts: N jumps to now, P to the playing channel, Enter
