@@ -305,8 +305,10 @@ class _MpvGLWidget(QOpenGLWidget):
                 # 60/120/144Hz screen - the same cadence standalone mpv uses.
                 # It needs an accurate display-fps estimate, which report_swap
                 # now provides; if a minimal libmpv build lacks it the per-key
-                # loop below just skips it.
-                "video-sync": "display-resample",
+                # loop below just skips it. Overridable (DOPEIPTV_VIDEO_SYNC=
+                # audio reverts to mpv's default, timing-tolerant sync).
+                "video-sync": (os.environ.get("DOPEIPTV_VIDEO_SYNC")
+                               or "display-resample"),
                 # (No 'osc' option: the on-screen controller is a feature of
                 # the standalone mpv GUI and doesn't exist in the libmpv/render
                 # build we use - setting it only logged a harmless skip.)
@@ -339,6 +341,14 @@ class _MpvGLWidget(QOpenGLWidget):
             soft["demuxer-max-bytes"] = _dmax
         if _dback:
             soft["demuxer-max-back-bytes"] = _dback
+        # mpv's late-frame dropping. Default 'vo' drops a frame it judges would
+        # display late; if our present timing is periodically off that shows up
+        # as a batch of dropped frames. DOPEIPTV_FRAMEDROP=no shows every frame
+        # instead (any lateness self-corrects) to test whether the drop logic
+        # is what's visible as the periodic hitch.
+        _fd = os.environ.get("DOPEIPTV_FRAMEDROP")
+        if _fd:
+            soft["framedrop"] = _fd
         soft.update(self.EXTRA_OPTS)
         for key, val in soft.items():
             try:
