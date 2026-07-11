@@ -81,10 +81,21 @@ def test_continue_watching_lists_movies_with_progress():
     assert by_name["Dune"]["_resume_pos"] == 1800
 
 
-def test_continue_watching_excludes_episodes_and_near_start():
+def test_continue_watching_includes_episodes_with_context():
     r = ResumeStore(FakeSettings(), "p")
     r.record("episode", 5, pos=600, dur=1800,
-             item={"name": "Ep", "stream_id": 5})   # episodes not listed
+             item={"name": "S1 E2", "id": 5, "container_extension": "mp4"},
+             series_ctx={"series_id": 88, "name": "Severance"})
+    rows = r.continue_watching()
+    assert len(rows) == 1
+    ep = rows[0]
+    assert ep["_kind"] == "episode"
+    assert ep["_series_ctx"]["series_id"] == 88
+    assert ep["id"] == 5
+
+
+def test_continue_watching_drops_near_start():
+    r = ResumeStore(FakeSettings(), "p")
     r.record("vod", 9, pos=30, dur=3600,
              item={"name": "Barely", "stream_id": 9})  # < 60s dropped
     assert r.continue_watching() == []

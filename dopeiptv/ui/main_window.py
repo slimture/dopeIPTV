@@ -2270,6 +2270,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def play_item(self, it, player=None, external: bool = False) -> None:
         if not it or it.get("_header"):
             return
+        # A Continue-watching episode row plays straight from its stored series
+        # context (it isn't reachable through the normal series drill-down).
+        if it.get("_kind") == "episode" and it.get("_series_ctx") is not None:
+            self._play_continue_episode(it, player, external)
+            return
         if self.mode == "series" and not self.series_ctx:
             self._enter_series(it)
             return
@@ -2417,17 +2422,46 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not (self.player and self.player.current_url and self._playing_key
                 and self._playing_group in ("vod", "episode", "rec")):
             return
+        lp = self._last_playback or {}
         self.resume.record(self._playing_group, self._playing_key,
                            self.player.playback_position(),
                            self.player.playback_duration(),
-                           item=(self._last_playback or {}).get("item"))
+                           item=lp.get("item"),
+                           series_ctx=lp.get("series_ctx"))
         self._playback_max_pct = max(self._playback_max_pct,
                                      self.player.progress_percent())
 
+    def _play_continue_episode(self, it, player=None,
+                               external: bool = False) -> None:
+        """Replay a partly-watched episode from the Continue-watching list,
+        using its stored series context to build the stream URL."""
+        ctx = it.get("_series_ctx") or None
+        saved = self.series_ctx
+        self.series_ctx = ctx or saved
+        try:
+            url = self.client.episode_url(
+                it.get("id"), it.get("container_extension"))
+            if not url:
+                return
+            title = it.get("name") or it.get("title") or "dopeIPTV"
+            if external or player == "vlc":
+                launch_player(player or "mpv", url, title, self)
+                return
+            # No autoplay-queue from this flat list: pin an empty override so
+            # _start_playback doesn't snapshot the Continue list as episodes.
+            self._ep_queue_override = []
+            self._ep_index_override = -1
+            self._start_playback(
+                url, title, it.get("stream_icon") or it.get("cover"),
+                self._item_key(it), "episode", record=True, item=it)
+        finally:
+            self.series_ctx = saved
+
     def _remove_continue(self, it) -> None:
-        """Forget a movie's resume point (from the Continue-watching menu),
+        """Forget a title's resume point (from the Continue-watching menu),
         then refresh the list - the category disappears once it's empty."""
-        self.resume.clear("vod", self._item_key(it))
+        group = "episode" if it.get("_kind") == "episode" else "vod"
+        self.resume.clear(group, self._item_key(it))
         cur = self.cat_list.currentItem()
         cur_cat = cur.data(Qt.ItemDataRole.UserRole) if cur else None
         if self.mode == "vod" and cur_cat == "__continue__":
