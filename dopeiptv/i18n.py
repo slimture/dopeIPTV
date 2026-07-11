@@ -4667,6 +4667,12 @@ _STRINGS: dict[str, dict[str, str]] = {
         "fr": "Reprendre", "zh": "继续观看",
         "ru": "Продолжить просмотр", "th": "ดูต่อ",
     },
+    "cat_recent": {
+        "en": "Recently added", "sv": "Senast tillagt",
+        "es": "Añadido recientemente", "de": "Kürzlich hinzugefügt",
+        "fr": "Ajouts récents", "zh": "最近添加",
+        "ru": "Недавно добавленные", "th": "เพิ่มล่าสุด",
+    },
     "ctx_continue_remove": {
         "en": "Remove from Continue watching",
         "sv": "Ta bort från Fortsätt titta",

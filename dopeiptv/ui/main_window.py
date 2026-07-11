@@ -1577,6 +1577,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 cw = QListWidgetItem("▶  " + tr("cat_continue"))
                 cw.setData(Qt.ItemDataRole.UserRole, "__continue__")
                 self.cat_list.addItem(cw)
+            # "Recently added" for Movies and Series - the latest titles the
+            # provider has published, newest first.
+            if self.mode in ("vod", "series"):
+                rc = QListWidgetItem("🆕  " + tr("cat_recent"))
+                rc.setData(Qt.ItemDataRole.UserRole, "__recent__")
+                self.cat_list.addItem(rc)
             for c in cats:
                 cid = c.get("category_id")
                 if self.overrides.is_hidden(self.mode, cid):
@@ -1796,6 +1802,47 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # resume store (no network fetch).
             self.all_items = self.resume.continue_watching()
             self._apply_filter()
+            return
+        if category_id == "__recent__" and self.mode in ("vod", "series"):
+            # Synthetic category: every title sorted by the provider's
+            # publish/update time, newest first (capped so a huge library
+            # doesn't lag the list).
+            self._show_busy()
+            self._set_status(tr("status_loading_content"))
+            rmode = self.mode
+            rgen = self._load_gen
+            skey = "added" if rmode == "vod" else "last_modified"
+            rfetch = (self.client.vod_streams if rmode == "vod"
+                      else self.client.series_list)
+
+            def recent_done(items):
+                if rgen != self._load_gen or self.mode != rmode:
+                    return
+                self._hide_busy()
+                items = items or []
+                excluded = self.overrides.excluded_ids(
+                    rmode, include_locked=not self.parental.session_unlocked)
+                if excluded:
+                    items = [it for it in items
+                             if str(it.get("category_id")) not in excluded]
+
+                def _added(it):
+                    try:
+                        return int(it.get(skey) or 0)
+                    except (TypeError, ValueError):
+                        return 0
+                self.all_items = sorted(
+                    items, key=_added, reverse=True)[:200]
+                self._apply_filter()
+
+            def recent_fail(msg):
+                if rgen != self._load_gen:
+                    return
+                self._hide_busy()
+                self._error(msg)
+
+            run_async(self.pool, lambda: rfetch(None),
+                      recent_done, recent_fail)
             return
         self._show_busy()
         self._set_status(tr("status_loading_content"))
