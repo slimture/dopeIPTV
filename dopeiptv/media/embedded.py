@@ -366,6 +366,15 @@ class _MpvGLWidget(QOpenGLWidget):
                 "h": int(self.height() * ratio),
                 "fbo": self.defaultFramebufferObject(),
             })
+            # Tell mpv a frame was just presented. Without this it can't
+            # measure the real display refresh, so its frame-timing estimate
+            # drifts and high-fps / 4K content judders and drops frames. The
+            # buffer swap happens right after paintGL returns, so reporting
+            # here (once per painted frame) is the standard approximation.
+            try:
+                self._ctx.report_swap()
+            except Exception:
+                pass
         except Exception as e:
             print(f"[dopeIPTV] paintGL render failed: {e}", file=sys.stderr)
             self._blank = True
