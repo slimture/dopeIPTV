@@ -14,10 +14,6 @@ from PyQt6.QtGui import (
     QColor, QCursor, QIcon, QOpenGLContext, QPainter, QPen, QPixmap, QPolygonF,
 )
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
-try:  # native-window video surface (DOPEIPTV_NATIVE_VIDEO test build)
-    from PyQt6.QtOpenGL import QOpenGLWindow
-except Exception:  # pragma: no cover - present in every normal PyQt6 build
-    QOpenGLWindow = None
 from PyQt6.QtWidgets import (
     QApplication, QHBoxLayout, QLabel, QLineEdit, QMenu, QSizePolicy, QSlider,
     QVBoxLayout, QWidget, QPushButton,
@@ -414,140 +410,6 @@ class _MpvGLWidget(QOpenGLWidget):
             self.mpv = None
 
 
-# --- Native-window video surface (experimental, opt-in) --------------------
-# DOPEIPTV_NATIVE_VIDEO=1 swaps the QOpenGLWidget video surface for a real
-# native window (QOpenGLWindow embedded via createWindowContainer). The point
-# is to test whether the residual 4K judder comes from QOpenGLWidget's
-# offscreen-FBO + Qt-composite path: a native window is driver-vsync'd and mpv
-# renders straight into it, so report_swap()/video-sync=display-resample get
-# true presentation timing - exactly what standalone mpv (vo=gpu) gets.
-#
-# TRADE-OFF (why this is a test, not the default): a native child window always
-# paints on top of its Qt siblings, so every on-video overlay (seek bar,
-# fullscreen controls, stats, info toast) sits *behind* the video and is
-# invisible here. The bottom control bar lives in the layout below the video,
-# so basic play/pause/stop/fullscreen still work - enough to judge smoothness.
-_NATIVE_VIDEO = (os.environ.get("DOPEIPTV_NATIVE_VIDEO") == "1"
-                 and QOpenGLWindow is not None)
-
-
-if QOpenGLWindow is not None:
-
-    class _MpvGLWindow(QOpenGLWindow):
-        """Native-window twin of _MpvGLWidget. Reuses the widget's render
-        internals verbatim (they only touch GL calls both classes share) and
-        re-emits the same input signals. Only the two key handlers and the
-        mouse handlers are rewritten, because QWindow lacks setFocus() and the
-        reused methods' zero-arg super() is bound to _MpvGLWidget."""
-
-        frame_ready = pyqtSignal()
-        playback_error = pyqtSignal(str)
-        video_mouse_press = pyqtSignal(object)
-        video_mouse_move = pyqtSignal(object)
-        video_mouse_release = pyqtSignal(object)
-        video_dbl_click = pyqtSignal()
-        video_key_press = pyqtSignal(object)
-        video_key_release = pyqtSignal(object)
-
-        EXTRA_OPTS: dict = {}
-        _SEEK_KEYS = _MpvGLWidget._SEEK_KEYS
-        _PLAYER_KEYS = _MpvGLWidget._PLAYER_KEYS
-
-        # Render internals shared with the widget (none of these call super()).
-        _get_proc_address = _MpvGLWidget._get_proc_address
-        initializeGL = _MpvGLWidget.initializeGL
-        _build_mpv_render = _MpvGLWidget._build_mpv_render
-        paintGL = _MpvGLWidget.paintGL
-        shutdown = _MpvGLWidget.shutdown
-        set_blank = _MpvGLWidget.set_blank
-
-        def __init__(self) -> None:
-            super().__init__()
-            self.mpv = None
-            self._ctx = None
-            self._gl_init_error: str | None = None
-            self._blank = False
-            self.frame_ready.connect(self.update)
-
-        def keyPressEvent(self, event) -> None:
-            if (event.key() in self._PLAYER_KEYS
-                    and event.modifiers() == Qt.KeyboardModifier.NoModifier):
-                self.video_key_press.emit(event)
-                event.accept()
-                return
-            super().keyPressEvent(event)
-
-        def keyReleaseEvent(self, event) -> None:
-            if (event.key() in self._SEEK_KEYS
-                    and event.modifiers() == Qt.KeyboardModifier.NoModifier):
-                self.video_key_release.emit(event)
-                event.accept()
-                return
-            super().keyReleaseEvent(event)
-
-        def mousePressEvent(self, event) -> None:
-            self.requestActivate()
-            self.video_mouse_press.emit(event)
-
-        def mouseMoveEvent(self, event) -> None:
-            self.video_mouse_move.emit(event)
-
-        def mouseReleaseEvent(self, event) -> None:
-            self.video_mouse_release.emit(event)
-
-        def mouseDoubleClickEvent(self, event) -> None:
-            self.video_dbl_click.emit()
-
-    class _MpvNativeHost(QWidget):
-        """QWidget shell embedding _MpvGLWindow via createWindowContainer and
-        re-exposing _MpvGLWidget's public surface (.mpv, the signals,
-        set_blank/shutdown/update) so PlayerPane uses it unchanged."""
-
-        playback_error = pyqtSignal(str)
-        video_mouse_press = pyqtSignal(object)
-        video_mouse_move = pyqtSignal(object)
-        video_mouse_release = pyqtSignal(object)
-        video_dbl_click = pyqtSignal()
-        video_key_press = pyqtSignal(object)
-        video_key_release = pyqtSignal(object)
-
-        _FORWARD = ("playback_error", "video_mouse_press", "video_mouse_move",
-                    "video_mouse_release", "video_dbl_click",
-                    "video_key_press", "video_key_release")
-
-        def __init__(self, parent: QWidget | None = None) -> None:
-            super().__init__(parent)
-            self.setMinimumHeight(190)
-            self.setSizePolicy(QSizePolicy.Policy.Expanding,
-                               QSizePolicy.Policy.Expanding)
-            self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-            self._win = _MpvGLWindow()
-            self._container = QWidget.createWindowContainer(self._win, self)
-            self._container.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-            lay = QVBoxLayout(self)
-            lay.setContentsMargins(0, 0, 0, 0)
-            lay.addWidget(self._container)
-            for name in self._FORWARD:
-                getattr(self._win, name).connect(getattr(self, name))
-            print("[dopeIPTV] NATIVE video surface active "
-                  "(DOPEIPTV_NATIVE_VIDEO=1) - on-video overlays are hidden "
-                  "in this test build", file=sys.stderr)
-
-        @property
-        def mpv(self):
-            return self._win.mpv
-
-        def set_blank(self, blank: bool) -> None:
-            self._win.set_blank(blank)
-
-        def shutdown(self) -> None:
-            self._win.shutdown()
-
-        def update(self, *args) -> None:
-            self._win.update()
-            super().update()
-
-
 class _SeekSlider(QSlider):
     """Horizontal seek bar: click jumps to position, drag scrubs, seek on release."""
 
@@ -708,8 +570,7 @@ class EmbeddedPlayer(QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(2)
 
-        self.video = (_MpvNativeHost(self) if _NATIVE_VIDEO
-                      else _MpvGLWidget(self))
+        self.video = _MpvGLWidget(self)
         self.video.installEventFilter(self)
         self.video.setMouseTracking(True)
         # Route mpv errors through a filter so a user-initiated stop doesn't
