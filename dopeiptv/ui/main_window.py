@@ -309,6 +309,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._sidebar_logo.clicked.connect(self._jump_to_now_playing)
         sl.addWidget(self._sidebar_logo)
         sl.addSpacing(6)
+        # Update indicator: a small arrow in the logo's top-right corner, shown
+        # only when a newer release exists. It bounces and is red at startup
+        # (for 30 s) to catch the eye, then settles to the theme accent colour.
+        # Clicking it opens About (changelog + download) - the logo itself still
+        # jumps to what's playing. It's a child of the logo, so it rides along
+        # and hides automatically when the sidebar collapses to a rail.
+        self._update_arrow = QPushButton("⬆", self._sidebar_logo)
+        self._update_arrow.setObjectName("UpdateArrow")
+        self._update_arrow.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._update_arrow.setFixedSize(18, 18)
+        self._update_arrow.clicked.connect(self.show_about)
+        self._update_arrow.hide()
+        self._sidebar_logo.installEventFilter(self)
 
         # Glyphs used when the sidebar is collapsed to an icon rail.
         self._rail_glyphs = {
@@ -410,22 +423,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         settings_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
                                    QSizePolicy.Policy.Fixed)
         settings_btn.clicked.connect(self.open_settings)
-        # Discreet "update available" pill just above Settings, shown only when
-        # the startup check finds a newer release. Click opens About (which has
-        # the changelog + download); nothing shows when you're up to date.
-        self._update_pill = QPushButton("", objectName="UpdatePill")
-        self._update_pill.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._update_pill.setSizePolicy(QSizePolicy.Policy.Ignored,
-                                        QSizePolicy.Policy.Fixed)
-        self._update_pill.setStyleSheet(
-            "QPushButton#UpdatePill {"
-            f" background:{P.get('accent', '#3DDC84')}; color:#0B0B0F;"
-            " border:none; border-radius:7px; padding:6px 10px; margin:2px 0;"
-            " font-size:12px; font-weight:600; }"
-            "QPushButton#UpdatePill:hover { text-decoration:underline; }")
-        self._update_pill.clicked.connect(self.show_about)
-        self._update_pill.hide()
-        sl.addWidget(self._update_pill)
         sl.addWidget(settings_btn)
 
         # Middle column
@@ -879,7 +876,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._settings_btn.setText("⚙" if collapsed else tr("btn_settings"))
         self._set_rail(self._guide_btn, collapsed)
         self._set_rail(self._settings_btn, collapsed)
-        self._refresh_update_pill()
 
     def _apply_sidebar_collapsed(self) -> None:
         collapsed = getattr(self, "_sidebar_collapsed", False)
@@ -965,6 +961,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self._set_sidebar_collapsed(False)
 
     def eventFilter(self, obj, event):
+        # Keep the update arrow pinned to the logo's top-right corner as the
+        # sidebar (and thus the logo) changes width.
+        if (obj is getattr(self, "_sidebar_logo", None)
+                and event.type() == QEvent.Type.Resize):
+            self._position_update_arrow()
         # Track the whole drag gesture on the side divider. On press we free the
         # pane (unpin min/max) so it can move both ways for as long as the button
         # is held; on release we commit the final pinned width. This lets a
@@ -985,19 +986,32 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self._apply_sidebar_collapsed()
         return super().eventFilter(obj, event)
 
-    def _refresh_update_pill(self) -> None:
-        """Show/hide the 'update available' pill and adapt its label to the
-        sidebar's collapsed/expanded state."""
-        if not hasattr(self, "_update_pill"):
+    def _position_update_arrow(self) -> None:
+        if not hasattr(self, "_update_arrow"):
             return
-        if not getattr(self, "_update_available", False):
-            self._update_pill.hide()
+        w = self._sidebar_logo.width()
+        self._update_arrow.move(max(0, w - self._update_arrow.width() - 2), 3)
+
+    def _set_update_arrow_color(self, color: str) -> None:
+        if not (getattr(self, "_update_available", False)
+                and hasattr(self, "_update_arrow")):
             return
-        collapsed = getattr(self, "_sidebar_collapsed", False)
-        self._update_pill.setText("⬆" if collapsed else tr("update_pill"))
-        self._update_pill.setToolTip(
-            tr("about_update_available", version=self._update_latest))
-        self._update_pill.show()
+        self._update_arrow.setStyleSheet(
+            "QPushButton#UpdateArrow { background:transparent; border:none;"
+            f" color:{color}; font-size:15px; font-weight:900; }}")
+
+    def _bounce_update_arrow(self) -> None:
+        from PyQt6.QtCore import QPropertyAnimation, QEasingCurve, QPoint
+        base = self._update_arrow.pos()
+        anim = QPropertyAnimation(self._update_arrow, b"pos", self)
+        anim.setDuration(850)
+        anim.setStartValue(base)
+        anim.setKeyValueAt(0.5, QPoint(base.x(), base.y() + 6))
+        anim.setEndValue(base)
+        anim.setEasingCurve(QEasingCurve.Type.OutBounce)
+        anim.setLoopCount(3)
+        anim.start()
+        self._arrow_anim = anim  # keep a reference alive
 
     def _maybe_check_updates(self) -> None:
         """Once-a-day background check for a newer release; on a hit, light the
@@ -1033,7 +1047,21 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         newer = bool(latest_tag) and is_newer(latest_tag, VERSION)
         self._update_available = newer
         self._update_latest = latest_tag if newer else ""
-        self._refresh_update_pill()
+        if not hasattr(self, "_update_arrow"):
+            return
+        if not newer:
+            self._update_arrow.hide()
+            return
+        self._update_arrow.setToolTip(
+            tr("about_update_available", version=latest_tag))
+        self._set_update_arrow_color("#E5484D")   # red first, to catch the eye
+        self._position_update_arrow()
+        self._update_arrow.show()
+        self._update_arrow.raise_()
+        self._bounce_update_arrow()
+        # After 30 s, settle from the attention-grabbing red to the theme accent.
+        QTimer.singleShot(30_000, lambda: self._set_update_arrow_color(
+            P.get("accent", "#3DDC84")))
 
     def _set_focus_mode(self, on: bool) -> None:
         """Focus mode hides the whole content list so the player pane gets the
