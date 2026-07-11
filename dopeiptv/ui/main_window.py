@@ -1425,8 +1425,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             lambda _: self._epg_progress_finished())
 
     def _clear_epg_cache(self) -> None:
-        """Delete the cached guide from disk, then re-fetch it fresh."""
+        """Delete the cached guide for the current playlist, sweep away caches
+        left by playlists that no longer exist, then re-fetch fresh."""
         self.xmltv.clear_cache()
+        try:
+            prune_epg_caches(p.get("id") for p in self.playlist_store.all()) \
+                if self.playlist_store else None
+        except Exception:
+            pass
         self._show_toast(tr("epg_cache_cleared"))
         self._refresh_epg_now()
 
@@ -2937,17 +2943,30 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         """The player reported the live stream frozen (buffer-starved)."""
         self._reconnect_live("stall")
 
+    def _auto_reconnect_live(self) -> bool:
+        return self.settings.value("auto_reconnect_live", "true") == "true"
+
     def _reconnect_live(self, reason: str) -> None:
         """Silently recover the current live stream after it froze
         (buffer-starved) or hit EOF (the server dropped the connection or a
         segment gap ended it - with keep-open mpv pauses on the last frame
         instead of stopping, which looks like the app killed it). Guarded by a
         small retry budget so a genuinely dead channel doesn't loop forever; the
-        budget resets after 20s of healthy playback."""
+        budget resets after 20s of healthy playback.
+
+        Skipped when auto-reconnect is off: on a single-connection account,
+        reconnecting steals the connection back from whatever other device just
+        took it, so users who share their account can turn this off and let the
+        stream simply stop instead of fighting for the slot."""
         lp = getattr(self, "_last_playback", None)
         if not (self.player and self.player.isVisible()):
             return
         if not lp or lp.get("kind") != "live":
+            return
+        if not self._auto_reconnect_live():
+            msg = tr("status_stream_dropped")
+            self._set_status(msg)
+            self.player.set_overlay_info(msg)
             return
         now = time.time()
         if now - getattr(self, "_last_stream_error_ts", 0.0) > 20:

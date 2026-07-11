@@ -314,6 +314,9 @@ class _SettingsMixin:
         autoplay_next_box = self._combo(
             [("true", tr("option_yes")), ("false", tr("option_no"))],
             self.settings.value("autoplay_next_episode", "true"))
+        autorecon_box = self._combo(
+            [("true", tr("option_yes")), ("false", tr("option_no"))],
+            self.settings.value("auto_reconnect_live", "true"))
         fmt_box = self._combo(
             [("ts", "ts"), ("m3u8", "m3u8")],
             self.settings.value("stream_format", "ts"))
@@ -378,6 +381,7 @@ class _SettingsMixin:
         pf.addRow(tr("setting_playback_mode"), mode_box)
         pf.addRow(tr("setting_autoplay_preview"), autoplay_box)
         pf.addRow(tr("setting_autoplay_next"), autoplay_next_box)
+        pf.addRow(tr("setting_auto_reconnect"), autorecon_box)
         pf.addRow(tr("setting_stream_format"), fmt_box)
         pf.addRow(tr("setting_audio_lang"), alang_box)
         pf.addRow(tr("setting_subtitles"), sub_box)
@@ -1093,6 +1097,8 @@ class _SettingsMixin:
                 "autoplay_preview", autoplay_box.currentData())
             self.settings.setValue(
                 "autoplay_next_episode", autoplay_next_box.currentData())
+            self.settings.setValue(
+                "auto_reconnect_live", autorecon_box.currentData())
             if x11_box is not None:
                 self.settings.setValue(
                     "force_x11", "true" if x11_box.isChecked() else "false")

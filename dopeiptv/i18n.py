@@ -374,6 +374,16 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Автовоспроизведение следующего эпизода",
         "th": "เล่นตอนถัดไปอัตโนมัติ",
     },
+    "setting_auto_reconnect": {
+        "en": "Auto-reconnect live streams",
+        "sv": "Återanslut live-streamar automatiskt",
+        "es": "Reconectar transmisiones en directo automáticamente",
+        "de": "Live-Streams automatisch neu verbinden",
+        "fr": "Reconnexion automatique des flux en direct",
+        "zh": "自动重新连接直播流",
+        "ru": "Автоматически переподключать прямые трансляции",
+        "th": "เชื่อมต่อสตรีมสดใหม่อัตโนมัติ",
+    },
     "setting_stream_format": {
         "en": "Live stream format",
         "sv": "Format för liveström",
@@ -1810,6 +1820,16 @@ _STRINGS: dict[str, dict[str, str]] = {
         "es": "Reconectando…", "de": "Neu verbinden…",
         "fr": "Reconnexion…", "zh": "正在重新连接…",
         "ru": "Переподключение…", "th": "กำลังเชื่อมต่อใหม่…",
+    },
+    "status_stream_dropped": {
+        "en": "Live stream dropped — double-click to reconnect",
+        "sv": "Live-streamen tappades — dubbelklicka för att återansluta",
+        "es": "Transmisión en directo interrumpida — doble clic para reconectar",
+        "de": "Live-Stream abgebrochen — Doppelklick zum Neuverbinden",
+        "fr": "Flux en direct interrompu — double-cliquez pour reconnecter",
+        "zh": "直播流已中断 — 双击重新连接",
+        "ru": "Прямая трансляция прервана — двойной щелчок для переподключения",
+        "th": "สตรีมสดหลุด — ดับเบิลคลิกเพื่อเชื่อมต่อใหม่",
     },
     "status_stream_error": {
         "en": "Stream error: {msg}",
