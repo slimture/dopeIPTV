@@ -153,6 +153,32 @@ def _install_crash_hooks() -> None:
         pass
 
 
+def _install_gc_debug() -> None:
+    """Log every cyclic-GC collection and its wall-time to stderr (opt-in via
+    DOPEIPTV_GC_DEBUG=1). Used to confirm whether the periodic video micro-
+    freeze lines up with a full (gen2) collection pause - if a gen2 line prints
+    tens of milliseconds every several seconds, the GC is the stall source."""
+    import gc
+    import time
+    state = {"t0": 0.0}
+
+    def _cb(phase, info):
+        if phase == "start":
+            state["t0"] = time.perf_counter()
+            return
+        dt = (time.perf_counter() - state["t0"]) * 1000.0
+        gen = info.get("generation", 0)
+        # Only the full (gen2) sweeps are expensive enough to drop a frame;
+        # also surface any collection that happens to run long.
+        if gen >= 2 or dt >= 3.0:
+            print(f"[dopeIPTV][gc] gen{gen} {dt:.1f}ms "
+                  f"collected={info.get('collected')} "
+                  f"uncollectable={info.get('uncollectable')}",
+                  file=sys.stderr)
+
+    gc.callbacks.append(_cb)
+
+
 def main() -> int:
     """Launch the application."""
     # One unconditional startup line so packaging smoke tests can prove
@@ -335,4 +361,26 @@ def main() -> int:
         w.show_welcome()
     for _ in range(5):
         app.processEvents()
+
+    # Keep Python's cyclic garbage collector from micro-freezing video. Every
+    # full (gen2) collection scans *every* tracked object - the tens of
+    # thousands of Qt/mpv wrapper objects built during startup - which is a
+    # ~10-30ms pause that drops a video frame. Under the small per-frame
+    # allocation churn of playback that recurs roughly every several seconds,
+    # showing up as a regular micro-stutter that standalone mpv (C, no GC)
+    # never has. gc.freeze() moves all long-lived startup objects into a
+    # permanent generation that is never scanned again, so later collections
+    # only walk the small short-lived per-frame garbage and stay cheap; the
+    # raised thresholds also make full collections run far less often. Do a
+    # collect() first so only real survivors get frozen.
+    import gc
+    if os.environ.get("DOPEIPTV_GC_DEBUG") == "1":
+        _install_gc_debug()
+    try:
+        gc.collect()
+        gc.freeze()
+        gc.set_threshold(10_000, 50, 50)
+    except Exception as e:
+        print(f"[dopeIPTV] GC tuning skipped: {e}", file=sys.stderr)
+
     return app.exec()
