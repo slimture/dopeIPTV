@@ -294,6 +294,12 @@ class _MpvGLWidget(QOpenGLWidget):
                 "demuxer-lavf-o": "reconnect=1,reconnect_streamed=1,"
                                   "reconnect_on_network_error=1,"
                                   "reconnect_delay_max=5",
+                # Cap the demuxer cache so a long, high-bitrate 4K stream can't
+                # let the read-ahead / back buffer balloon in RAM. cache-secs
+                # still governs how much time we buffer; these are the hard
+                # byte ceilings (mpv defaults are 150 MiB fwd / 50 MiB back).
+                "demuxer-max-bytes": "96MiB",
+                "demuxer-max-back-bytes": "32MiB",
                 # Never let mpv open its own window, and keep its OSD silent -
                 # otherwise it draws the media title centred on black while a
                 # stream buffers, which can surface as a stray frame.
