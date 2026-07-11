@@ -18,8 +18,10 @@ _SNAP_FIELDS = ("name", "title", "stream_id", "series_id", "id",
                 "container_extension", "stream_icon", "cover", "category_id",
                 "season", "episode_num", "_tmdb_id")
 # Series-context fields kept for an episode so it can be replayed from the
-# flat Continue-watching list (episode_url needs the series id).
-_CTX_FIELDS = ("series_id", "name", "title")
+# flat Continue-watching list (episode_url needs the series id) and so the row
+# can show the series' name + artwork instead of a bare episode title.
+_CTX_FIELDS = ("series_id", "name", "title", "cover", "stream_icon",
+               "_tmdb_id")
 
 
 class ResumeStore:
@@ -98,7 +100,20 @@ class ResumeStore:
             row["_progress_pct"] = round(100 * pos / dur) if dur else 0
             row["_ts"] = int(v.get("ts") or 0)
             if kind == "episode":
-                row["_series_ctx"] = v.get("ctx") or {}
+                ctx = v.get("ctx") or {}
+                row["_series_ctx"] = ctx
+                # Episodes rarely carry their own artwork/name, so borrow the
+                # series' so the row shows which show it is (poster + name).
+                art = ctx.get("cover") or ctx.get("stream_icon")
+                if art:
+                    row.setdefault("stream_icon", art)
+                    row.setdefault("cover", art)
+                if ctx.get("_tmdb_id") is not None:
+                    row.setdefault("_tmdb_id", ctx["_tmdb_id"])
+                sname = ctx.get("name") or ctx.get("title")
+                ep = row.get("name") or ""
+                if sname:
+                    row["name"] = f"{sname} · {ep}" if ep else sname
             out.append(row)
         out.sort(key=lambda r: r.get("_ts", 0), reverse=True)
         return out
