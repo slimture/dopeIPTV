@@ -1580,9 +1580,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             all_item = QListWidgetItem(tr("cat_all"))
             all_item.setData(Qt.ItemDataRole.UserRole, None)
             self.cat_list.addItem(all_item)
-            # A synthetic "Continue watching" category for Movies, shown only
-            # when there are partly-watched titles to resume.
-            if self.mode == "vod" and self.resume.continue_watching():
+            # A synthetic "Continue watching" category, shown when there are
+            # partly-watched titles of this section's kind (movies under
+            # Movies, episodes under Series).
+            cont_kind = {"vod": "vod", "series": "episode"}.get(self.mode)
+            if cont_kind and self._continue_items(cont_kind):
                 cw = QListWidgetItem("▶  " + tr("cat_continue"))
                 cw.setData(Qt.ItemDataRole.UserRole, "__continue__")
                 self.cat_list.addItem(cw)
@@ -1806,10 +1808,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  ("fav_series", "series", "series", series)],
                 "watched")
             return
-        if self.mode == "vod" and category_id == "__continue__":
-            # Synthetic category: partly-watched movies, straight from the
-            # resume store (no network fetch).
-            self.all_items = self.resume.continue_watching()
+        if category_id == "__continue__" and self.mode in ("vod", "series"):
+            # Synthetic category: partly-watched titles of this section's kind
+            # (movies under Movies, episodes under Series), from the resume
+            # store (no network fetch).
+            kind = "vod" if self.mode == "vod" else "episode"
+            self.all_items = self._continue_items(kind)
             self._apply_filter()
             return
         if category_id == "__recent__" and self.mode in ("vod", "series"):
@@ -2513,6 +2517,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         finally:
             self.series_ctx = saved
 
+    def _continue_items(self, kind: str) -> list:
+        """Continue-watching rows of one kind ('vod' or 'episode')."""
+        return [it for it in self.resume.continue_watching()
+                if it.get("_kind") == kind]
+
     def _remove_continue(self, it) -> None:
         """Forget a title's resume point (from the Continue-watching menu),
         then refresh the list - the category disappears once it's empty."""
@@ -2520,9 +2529,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.resume.clear(group, self._item_key(it))
         cur = self.cat_list.currentItem()
         cur_cat = cur.data(Qt.ItemDataRole.UserRole) if cur else None
-        if self.mode == "vod" and cur_cat == "__continue__":
-            if self.resume.continue_watching():
-                self.all_items = self.resume.continue_watching()
+        if self.mode in ("vod", "series") and cur_cat == "__continue__":
+            kind = "vod" if self.mode == "vod" else "episode"
+            remaining = self._continue_items(kind)
+            if remaining:
+                self.all_items = remaining
                 self._apply_filter()
             else:
                 self._load_categories()
