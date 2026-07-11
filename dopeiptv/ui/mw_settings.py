@@ -23,7 +23,6 @@ from ..i18n import tr
 from .dialogs import PlaylistDialog
 from .epg_grid import EpgGridDialog
 from ..providers.metadata import TmdbClient, bundled_tmdb_key
-from ..providers.trakt import REDIRECT_URI
 from ..media.players import embedded_playback_reason
 from .theme import ACCENTS, P, THEMES, apply_theme, build_style
 from ..core.updates import GITHUB_REPO, fetch_latest_release, is_newer
@@ -723,39 +722,6 @@ class _SettingsMixin:
         browser_hint.setWordWrap(True)
         tf.addWidget(browser_hint)
 
-        # -- Advanced path: bring your own Trakt API app ----------------------
-        creds_hint = QLabel(tr("trakt_creds_hint")
-                            + f"\nRedirect URI: {REDIRECT_URI}")
-        creds_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
-        creds_hint.setWordWrap(True)
-        tf.addWidget(creds_hint)
-        create_app_btn = QPushButton(tr("trakt_create_app"))
-        create_app_btn.clicked.connect(
-            lambda: QDesktopServices.openUrl(
-                QUrl("https://trakt.tv/oauth/applications/new")))
-        create_app_row = QHBoxLayout()
-        create_app_row.addWidget(create_app_btn)
-        create_app_row.addStretch(1)
-        tf.addLayout(create_app_row)
-        tform = QFormLayout()
-        tform.setSpacing(10)
-        # Show the effective keys (the built-in app's, unless the user set
-        # their own) so the fields aren't confusingly blank after a
-        # successful sign-in.
-        trakt_id_edit = QLineEdit(self.trakt.client_id)
-        trakt_id_edit.setPlaceholderText(tr("trakt_client_id_ph"))
-        trakt_secret_edit = QLineEdit(self.trakt.client_secret)
-        trakt_secret_edit.setPlaceholderText(tr("trakt_client_secret_ph"))
-        trakt_secret_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        tform.addRow(tr("field_client_id"), trakt_id_edit)
-        tform.addRow(tr("field_client_secret"), trakt_secret_edit)
-        tf.addLayout(tform)
-        creds_row = QHBoxLayout()
-        trakt_creds_btn = QPushButton(tr("trakt_save_creds"))
-        creds_row.addWidget(trakt_creds_btn)
-        creds_row.addStretch(1)
-        tf.addLayout(creds_row)
-
         # -- Session actions --------------------------------------------------
         trakt_btns = QHBoxLayout()
         trakt_disconnect_btn = QPushButton(tr("trakt_disconnect"))
@@ -833,26 +799,11 @@ class _SettingsMixin:
             self._trakt_browser_auth_dialog(d)
             refresh_trakt_status()
 
-        def do_save_creds():
-            # Advanced path: only store the entered Client ID / Secret. The
-            # actual sign-in always goes through 'Connect via browser' (Trakt
-            # user auth can't be done from credentials alone).
-            cid = trakt_id_edit.text().strip()
-            secret = trakt_secret_edit.text().strip()
-            if not cid or not secret:
-                QMessageBox.warning(
-                    d, "Trakt", tr("msg_trakt_enter_creds"))
-                return
-            self.settings.setValue("trakt_client_id", cid)
-            self.settings.setValue("trakt_client_secret", secret)
-            trakt_status.setText(tr("trakt_creds_saved"))
-
         def do_trakt_disconnect():
             self.trakt.disconnect()
             refresh_trakt_status()
 
         trakt_browser_btn.clicked.connect(do_connect_browser)
-        trakt_creds_btn.clicked.connect(do_save_creds)
         trakt_disconnect_btn.clicked.connect(do_trakt_disconnect)
         trakt_watchlist_btn.clicked.connect(
             lambda: self._open_trakt_dialog(d))
