@@ -1068,10 +1068,6 @@ class _SettingsMixin:
             self.settings.setValue(
                 "tmdb_api_key", tmdb_key_edit.text().strip())
             self.cover.reload()
-            self.settings.setValue(
-                "trakt_client_id", trakt_id_edit.text().strip())
-            self.settings.setValue(
-                "trakt_client_secret", trakt_secret_edit.text().strip())
             if self.player:
                 self.player.apply_default_options()
             self._apply_view_settings()

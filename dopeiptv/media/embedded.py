@@ -74,6 +74,16 @@ def _control_icon(name: str, color: str, px: int = 28) -> QIcon:
                                  QPointF(L, midy)]))
         p.drawPolygon(QPolygonF([QPointF(R, T), QPointF(R, B),
                                  QPointF(midx, midy)]))
+    elif name == "nextep":
+        # Skip-to-next: a right-pointing triangle plus a vertical bar (⏭),
+        # drawn to the same box as the others so it lines up perfectly.
+        fill()
+        tri_r = L + w * 0.66
+        p.drawPolygon(QPolygonF([QPointF(L, T), QPointF(L, B),
+                                 QPointF(tri_r, midy)]))
+        bar_w = w * 0.16
+        p.drawRoundedRect(QRectF(R - bar_w, T, bar_w, h),
+                          bar_w * 0.25, bar_w * 0.25)
     elif name == "exit":
         stroke(S * 0.11)
         p.drawLine(QPointF(L, T), QPointF(R, B))
@@ -744,11 +754,11 @@ class EmbeddedPlayer(QWidget):
         all_icon_btns = (
             self.prev_btn, self.next_btn, self.pause_btn, self.back_btn,
             self.fwd_btn, self.ts_btn, self.rec_btn, self.opts_btn,
-            self.stop_btn, self.fs_btn, self.mute_btn,
+            self.stop_btn, self.nextep_btn, self.fs_btn, self.mute_btn,
             self.fs_prev_btn, self.fs_next_btn, self.fs_pause_btn,
-            self.fs_back_btn, self.fs_fwd_btn, self.fs_ts_btn,
-            self.fs_rec_btn, self.fs_opts_btn, self.fs_exit_btn,
-            self.fs_mute_btn,
+            self.fs_nextep_btn, self.fs_back_btn, self.fs_fwd_btn,
+            self.fs_ts_btn, self.fs_rec_btn, self.fs_opts_btn,
+            self.fs_exit_btn, self.fs_mute_btn,
         )
         for b in all_icon_btns:
             b.setFixedSize(m, m)
@@ -765,11 +775,12 @@ class EmbeddedPlayer(QWidget):
             self.pause_btn: "pause", self.ts_btn: "rewind",
             self.rec_btn: "record", self.opts_btn: "options",
             self.stop_btn: "stop", self.fs_btn: "fullscreen",
-            self.mute_btn: "volume",
+            self.mute_btn: "volume", self.nextep_btn: "nextep",
             self.fs_prev_btn: "prev", self.fs_next_btn: "next",
             self.fs_pause_btn: "pause", self.fs_ts_btn: "rewind",
             self.fs_rec_btn: "record", self.fs_opts_btn: "options",
             self.fs_exit_btn: "exit", self.fs_mute_btn: "volume",
+            self.fs_nextep_btn: "nextep",
         }
         self._icon_color = P.get("text2", "#ECECF1")
         self.refresh_icons()
