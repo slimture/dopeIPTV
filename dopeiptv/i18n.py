@@ -315,6 +315,16 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Автопроигрывание превью при выборе",
         "th": "เล่นตัวอย่างอัตโนมัติเมื่อเลือก",
     },
+    "setting_autoplay_next": {
+        "en": "Auto-play next episode",
+        "sv": "Spela nästa avsnitt automatiskt",
+        "es": "Reproducir el siguiente episodio automáticamente",
+        "de": "Nächste Folge automatisch abspielen",
+        "fr": "Lire automatiquement l'épisode suivant",
+        "zh": "自动播放下一集",
+        "ru": "Автовоспроизведение следующего эпизода",
+        "th": "เล่นตอนถัดไปอัตโนมัติ",
+    },
     "setting_stream_format": {
         "en": "Live stream format",
         "sv": "Format för liveström",

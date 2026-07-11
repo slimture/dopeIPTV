@@ -472,6 +472,7 @@ class EmbeddedPlayer(QWidget):
     stopped = pyqtSignal()
     resume_requested = pyqtSignal()
     stalled = pyqtSignal()
+    finished = pyqtSignal()
 
     OVERLAY_HIDE_MS = 3000
     VIDEO_BOX_HEIGHT = 260
@@ -766,6 +767,7 @@ class EmbeddedPlayer(QWidget):
         self.current_url: str | None = None
         self._muted = False
         self._stall_since = 0.0
+        self._eof_seen = False
         try:
             vol = int(self._settings.value("volume", 100)) \
                 if self._settings else 100
@@ -1225,6 +1227,7 @@ class EmbeddedPlayer(QWidget):
             # error from this new stream (auth failed, 404, ...) is surfaced.
             self._stopping = False
             self._stall_since = 0.0
+            self._eof_seen = False
             self._blackout.hide()
             self.video.set_blank(False)
             self.title_lbl.setText(title or "")
@@ -1547,6 +1550,19 @@ class EmbeddedPlayer(QWidget):
             elif time.time() - self._stall_since > self.STALL_SECS:
                 self._stall_since = 0.0
                 self.stalled.emit()
+        # Natural end-of-file: with keep-open=yes mpv pauses on the last frame
+        # and flags eof-reached. Emit finished() once so the app can autoplay
+        # the next episode. (Live streams never end, so this never fires there.)
+        try:
+            eof = bool(m.eof_reached) and self.current_url is not None
+        except Exception:
+            eof = False
+        if eof:
+            if not self._eof_seen:
+                self._eof_seen = True
+                self.finished.emit()
+        else:
+            self._eof_seen = False
         seekable = bool(dur) and dur > 1
         self._seekable = seekable
         if not seekable:
