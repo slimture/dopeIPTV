@@ -989,8 +989,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _position_update_arrow(self) -> None:
         if not hasattr(self, "_update_arrow"):
             return
-        w = self._sidebar_logo.width()
-        self._update_arrow.move(max(0, w - self._update_arrow.width() - 2), 3)
+        # Anchor to the top-right corner of the *pill* (which the logo draws
+        # centred inside its own, wider widget), not the widget's edge.
+        logo = self._sidebar_logo
+        pill_w = getattr(type(logo), "LOGO_W", 92)
+        pill_h = getattr(type(logo), "LOGO_H", 40)
+        x0 = (logo.width() - pill_w) / 2.0
+        y0 = (logo.height() - pill_h) / 2.0
+        a = self._update_arrow
+        a.move(int(x0 + pill_w - a.width() + 5), int(max(0, y0 - 5)))
 
     def _set_update_arrow_color(self, color: str) -> None:
         if not (getattr(self, "_update_available", False)
@@ -1059,6 +1066,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._update_arrow.show()
         self._update_arrow.raise_()
         self._bounce_update_arrow()
+        print(f"[dopeIPTV] update arrow: logo="
+              f"{self._sidebar_logo.width()}x{self._sidebar_logo.height()} "
+              f"pos={self._update_arrow.pos().x()},{self._update_arrow.pos().y()} "
+              f"visible={self._update_arrow.isVisible()}", file=sys.stderr)
         # After 30 s, settle from the attention-grabbing red to the theme accent.
         QTimer.singleShot(30_000, lambda: self._set_update_arrow_color(
             P.get("accent", "#3DDC84")))
