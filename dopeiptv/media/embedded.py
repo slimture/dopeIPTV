@@ -1604,6 +1604,11 @@ class EmbeddedPlayer(QWidget):
         vo_drops = prop("vo-drop-frame-count", lambda v: str(int(v)))
         if dropped != "—" and vo_drops != "—":
             dropped = f"{dropped} / {vo_drops} vo"
+        # Display-sync timing faults: with video-sync=display-resample a
+        # periodic present-timing correction shows up here (not as a "drop"),
+        # so these two pinpoint a render/vsync-side hitch vs a decode-side one.
+        mistimed = prop("mistimed-frame-count", lambda v: str(int(v)))
+        delayed = prop("vo-delayed-frame-count", lambda v: str(int(v)))
 
         lines = [
             f"Video: {track_info('video')}",
@@ -1611,6 +1616,7 @@ class EmbeddedPlayer(QWidget):
             f"HW dec: {hwdec}",
             f"A/V sync: {prop('avsync', lambda v: f'{v:.3f} s')}",
             f"Dropped: {dropped}",
+            f"Timing: {mistimed} mistimed / {delayed} delayed",
             f"FPS: {prop('estimated-vf-fps', lambda v: f'{v:.1f}')}",
             f"Bitrate: {prop('video-bitrate', lambda v: f'{v / 1000:.0f} kbps' if v else '—')}",
             f"Cache: {prop('demuxer-cache-duration', lambda v: f'{v:.1f} s')}",
