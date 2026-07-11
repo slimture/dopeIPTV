@@ -402,11 +402,20 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         ml.setContentsMargins(0, 14, 0, 10)
         ml.setSpacing(10)
 
+        busy_row = QHBoxLayout()
+        busy_row.setSpacing(8)
         self.loading_bar = QProgressBar(objectName="LoadBar")
         self.loading_bar.setRange(0, 0)
         self.loading_bar.setTextVisible(False)
+        # A label beside the top strip that names what's loading, so a
+        # refresh (where the list keeps its old rows and the centred overlay
+        # stays hidden) still says e.g. 'Updating TV guide…'.
+        self._busy_label = QLabel("")
+        self._busy_label.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        busy_row.addWidget(self.loading_bar, 1)
+        busy_row.addWidget(self._busy_label)
         self._hide_busy()
-        ml.addWidget(self.loading_bar)
+        ml.addLayout(busy_row)
 
         self.search = QLineEdit(objectName="Search")
         self.search.setPlaceholderText(tr("search_placeholder"))
@@ -2975,6 +2984,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             wd.timeout.connect(self._hide_busy)
             self._busy_watchdog = wd
         wd.start()
+        if hasattr(self, "_busy_label"):
+            self._busy_label.setText(message or "")
+            self._busy_label.setVisible(bool(message))
         if message:
             self._set_status(message)
         self._update_busy_overlay(message)
@@ -2984,6 +2996,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if wd is not None:
             wd.stop()
         self.loading_bar.setVisible(False)
+        if hasattr(self, "_busy_label"):
+            self._busy_label.setText("")
+            self._busy_label.setVisible(False)
         ov = getattr(self, "_busy_overlay", None)
         if ov is not None:
             ov.hide()
@@ -3037,9 +3052,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # nothing at all during the several-second parse after it hits 100 % -
         # so a percentage looked jumpy and got stuck. Drive a calm indeterminate
         # strip + a one-off status line instead.
-        self._show_busy()
-        if value <= 0:
-            self._set_status(tr("status_loading_programme_guide"))
+        self._show_busy(tr("status_loading_programme_guide"))
 
     def _epg_progress_finished(self) -> None:
         self._hide_busy()
