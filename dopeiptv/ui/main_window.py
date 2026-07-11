@@ -760,7 +760,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # they can be resumed later even if the app is closed abruptly.
         self._resume_timer = QTimer(self)
         self._resume_timer.timeout.connect(self._save_resume_position)
-        self._resume_timer.start(12_000)
+        # DOPEIPTV_NO_RESUME_TIMER=1 leaves the periodic resume-save off, to
+        # test whether that 12s tick is what periodically stalls playback.
+        if os.environ.get("DOPEIPTV_NO_RESUME_TIMER") != "1":
+            self._resume_timer.start(12_000)
         # High-water playback progress (percent) of the current title. Kept
         # up to date by the resume timer because mpv stops reporting a
         # position once the file has ended - without this, a title watched
