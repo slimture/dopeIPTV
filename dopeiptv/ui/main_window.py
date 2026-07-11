@@ -22,7 +22,8 @@ from PyQt6.QtWidgets import (
     QSizePolicy, QSplitter, QToolButton, QVBoxLayout, QWidget,
 )
 
-from .. import APP_NAME, ORG
+from .. import APP_NAME, ORG, VERSION
+from ..core.updates import GITHUB_REPO, fetch_latest_release, is_newer
 from ..i18n import tr
 from .channel_list import (
     CategoryColorDelegate, ChannelDelegate, ChannelListModel, ChannelListView,
@@ -253,6 +254,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # so the initial category/EPG traffic goes first - the sync runs
         # for the full account which can take a couple of seconds.
         QTimer.singleShot(2500, self._maybe_sync_watched)
+        # Discreet update check well after the initial load has settled.
+        QTimer.singleShot(4000, self._maybe_check_updates)
 
         self._auto_refresh_timer = QTimer(self)
         self._auto_refresh_timer.timeout.connect(self._maybe_auto_refresh)
@@ -408,6 +411,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                                    QSizePolicy.Policy.Fixed)
         settings_btn.clicked.connect(self.open_settings)
         sl.addWidget(settings_btn)
+        # A discreet "update available" badge in the button's top-right corner.
+        # Hidden until the startup check finds a newer release; works whether
+        # the button shows the "Settings" text or the collapsed gear glyph.
+        self._update_dot = QLabel(settings_btn)
+        self._update_dot.setFixedSize(9, 9)
+        self._update_dot.setAttribute(
+            Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._update_dot.setStyleSheet(
+            "background:#3DDC84; border-radius:4px;")
+        self._update_dot.hide()
+        settings_btn.installEventFilter(self)
 
         # Middle column
         mid = QWidget(objectName="MiddlePane")
@@ -945,6 +959,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self._set_sidebar_collapsed(False)
 
     def eventFilter(self, obj, event):
+        # Keep the update badge pinned to the settings button's top-right
+        # corner as the sidebar collapses/expands (the button's width changes).
+        if (obj is getattr(self, "_settings_btn", None)
+                and event.type() in (QEvent.Type.Resize, QEvent.Type.Show)):
+            self._position_update_dot()
         # Track the whole drag gesture on the side divider. On press we free the
         # pane (unpin min/max) so it can move both ways for as long as the button
         # is held; on release we commit the final pinned width. This lets a
@@ -964,6 +983,45 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 # an expand the target is the current width, so it stays put.
                 self._apply_sidebar_collapsed()
         return super().eventFilter(obj, event)
+
+    def _position_update_dot(self) -> None:
+        b = self._settings_btn
+        self._update_dot.move(b.width() - self._update_dot.width() - 8, 6)
+
+    def _maybe_check_updates(self) -> None:
+        """Once-a-day background check for a newer release; on a hit, light the
+        badge on the Settings button. Cached in QSettings so it doesn't hit
+        GitHub every launch and works offline (fails silently). Opt-out via the
+        'check for updates' setting."""
+        if self.settings.value("check_updates", "true") != "true":
+            return
+        try:
+            last = float(self.settings.value("update_check_ts", 0) or 0)
+        except (TypeError, ValueError):
+            last = 0.0
+        if time.time() - last < 86400:
+            self._apply_update_state(
+                self.settings.value("update_latest_tag", "") or "")
+            return
+
+        def done(rel):
+            tag = (rel or {}).get("tag", "") or ""
+            self.settings.setValue("update_check_ts", str(int(time.time())))
+            self.settings.setValue("update_latest_tag", tag)
+            self._apply_update_state(tag)
+
+        run_async(self.pool, lambda: fetch_latest_release(GITHUB_REPO),
+                  done, lambda _e: None)
+
+    def _apply_update_state(self, latest_tag: str) -> None:
+        newer = bool(latest_tag) and is_newer(latest_tag, VERSION)
+        self._update_dot.setVisible(newer)
+        if newer:
+            self._position_update_dot()
+            self._settings_btn.setToolTip(
+                tr("about_update_available", version=latest_tag))
+        else:
+            self._settings_btn.setToolTip(tr("btn_settings"))
 
     def _set_focus_mode(self, on: bool) -> None:
         """Focus mode hides the whole content list so the player pane gets the

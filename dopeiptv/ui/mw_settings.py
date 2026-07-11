@@ -525,6 +525,11 @@ class _SettingsMixin:
         uf.addRow(cache_hint)
         refresh_cache_label()
 
+        updates_box = QCheckBox(tr("setting_check_updates"))
+        updates_box.setChecked(
+            self.settings.value("check_updates", "true") == "true")
+        uf.addRow("", updates_box)
+
         tabs.addTab(ui_tab, tr("tab_interface"))
 
         # Playlists tab
@@ -1099,6 +1104,9 @@ class _SettingsMixin:
                 "autoplay_next_episode", autoplay_next_box.currentData())
             self.settings.setValue(
                 "auto_reconnect_live", autorecon_box.currentData())
+            self.settings.setValue(
+                "check_updates",
+                "true" if updates_box.isChecked() else "false")
             if x11_box is not None:
                 self.settings.setValue(
                     "force_x11", "true" if x11_box.isChecked() else "false")

@@ -2017,6 +2017,16 @@ _STRINGS: dict[str, dict[str, str]] = {
 
     # ── Recording ─────────────────────────────────────────────────────────
 
+    "setting_check_updates": {
+        "en": "Check for updates on startup",
+        "sv": "Sök efter uppdateringar vid start",
+        "es": "Buscar actualizaciones al iniciar",
+        "de": "Beim Start nach Updates suchen",
+        "fr": "Rechercher les mises à jour au démarrage",
+        "zh": "启动时检查更新",
+        "ru": "Проверять обновления при запуске",
+        "th": "ตรวจหาการอัปเดตเมื่อเริ่มต้น",
+    },
     "setting_force_x11": {
         "en": "Run via X11 backend (needs restart)",
         "sv": "Kör via X11-backend (kräver omstart)",
