@@ -782,6 +782,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                   activated=self._shortcut_stats)
         QShortcut(QKeySequence("Ctrl+G"), self,
                   activated=self._shortcut_epg_guide)
+        # Jump back to the previously watched live channel (TV "last" button).
+        QShortcut(QKeySequence(Qt.Key.Key_Backspace), self,
+                  activated=self._last_channel)
+
+        # Channel-number quick-jump state (digits typed in the list).
+        self._prev_live_item = None
+        self._chan_buffer = ""
+        self._chan_timer = QTimer(self)
+        self._chan_timer.setSingleShot(True)
+        self._chan_timer.timeout.connect(self._channel_jump)
 
         self._apply_view_settings()
 
@@ -2584,6 +2594,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if kind in ("movie", "episode"):
             self._trakt_start_for_item(kind, item)
         self.stream_error.hide()
+        # Remember the channel we're leaving so the "last channel" key can
+        # bounce back to it.
+        if (kind == "live" and self._playing_group == "live"
+                and self._playing_item
+                and self._item_key(self._playing_item) != key):
+            self._prev_live_item = self._playing_item
         self._playing_item = item if kind == "live" else None
         # Remember the full context so a Stop -> Play round-trip can replay
         # exactly this title (and resume where it left off) instead of falling
@@ -2727,6 +2743,43 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         else:
             self._start_playback(lp["url"], lp["title"], lp.get("icon_url"),
                                  lp.get("key"), "live")
+
+    def _last_channel(self) -> None:
+        """Jump back to the previously watched live channel (TV 'last' key)."""
+        if self._typing():
+            return
+        prev = getattr(self, "_prev_live_item", None)
+        if prev:
+            # play_live_channel -> _start_playback records the channel we're
+            # leaving as the new 'previous', so pressing it again bounces back.
+            self.play_live_channel(prev)
+
+    def _channel_digit(self, digit: str) -> None:
+        """Accumulate a typed channel number and jump after a short pause."""
+        if self.mode not in ("live", "fav"):
+            return
+        self._chan_buffer = (self._chan_buffer + digit)[:5]
+        self._set_status(tr("chan_entry", num=self._chan_buffer))
+        self._chan_timer.start(1200)
+
+    def _channel_jump(self) -> None:
+        buf = self._chan_buffer
+        self._chan_buffer = ""
+        if not buf:
+            return
+        target = None
+        for i in range(self.list_model.rowCount()):
+            it = self.list_model.item_at(i)
+            if it and not it.get("_header") and str(it.get("num")) == buf:
+                target = i
+                break
+        if target is None:
+            self._set_status(tr("chan_not_found", num=buf))
+            return
+        idx = self.list_model.index(target)
+        self.listw.setCurrentIndex(idx)
+        self.listw.scrollTo(idx)
+        self.play()
 
     def _zap(self, direction: int) -> None:
         if self.mode not in ("live", "fav", "vod", "series",

@@ -1727,6 +1727,17 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Воспроизведение: {title}",
         "th": "กำลังเล่น: {title}",
     },
+    "chan_entry": {
+        "en": "Channel: {num}", "sv": "Kanal: {num}", "es": "Canal: {num}",
+        "de": "Kanal: {num}", "fr": "Chaîne : {num}", "zh": "频道：{num}",
+        "ru": "Канал: {num}", "th": "ช่อง: {num}",
+    },
+    "chan_not_found": {
+        "en": "No channel #{num}", "sv": "Ingen kanal #{num}",
+        "es": "Sin canal n.º {num}", "de": "Kein Kanal #{num}",
+        "fr": "Aucune chaîne n° {num}", "zh": "无 {num} 号频道",
+        "ru": "Нет канала №{num}", "th": "ไม่มีช่อง #{num}",
+    },
     "status_no_favorites": {
         "en": "No favorites yet - right-click a channel in TV to add one.",
         "sv": "Inga favoriter ännu - högerklicka en kanal i TV för att lägga till.",

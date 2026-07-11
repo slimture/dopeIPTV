@@ -41,6 +41,23 @@ class ChannelListView(QListView):
         self.setContentsMargins(0, 0, 0, 0)
         self.setViewportMargins(0, 0, 0, 0)
 
+    def keyPressEvent(self, e) -> None:
+        # Type a channel number to jump straight to it (classic TV zapping).
+        # Digits are routed to the window; Enter confirms immediately. Falls
+        # through to the default (arrow navigation etc.) otherwise.
+        txt = e.text()
+        win = self.window()
+        if txt.isdigit() and hasattr(win, "_channel_digit"):
+            win._channel_digit(txt)
+            e.accept()
+            return
+        if (e.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter)
+                and getattr(win, "_chan_buffer", "")):
+            win._channel_jump()
+            e.accept()
+            return
+        super().keyPressEvent(e)
+
     def mousePressEvent(self, e) -> None:
         if e.button() == Qt.MouseButton.RightButton:
             e.accept()
