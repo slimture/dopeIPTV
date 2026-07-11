@@ -323,12 +323,6 @@ class _MpvGLWidget(QOpenGLWidget):
                 "demuxer-lavf-o": "reconnect=1,reconnect_streamed=1,"
                                   "reconnect_on_network_error=1,"
                                   "reconnect_delay_max=5",
-                # Cap the demuxer cache so a long, high-bitrate 4K stream can't
-                # let the read-ahead / back buffer balloon in RAM. cache-secs
-                # still governs how much time we buffer; these are the hard
-                # byte ceilings (mpv defaults are 150 MiB fwd / 50 MiB back).
-                "demuxer-max-bytes": "96MiB",
-                "demuxer-max-back-bytes": "32MiB",
                 # Never let mpv open its own window, and keep its OSD silent -
                 # otherwise it draws the media title centred on black while a
                 # stream buffers, which can surface as a stray frame.
@@ -336,6 +330,19 @@ class _MpvGLWidget(QOpenGLWidget):
         if sys.platform == "darwin":
             from ..core.platform_macos import extra_mpv_opts
             soft.update(extra_mpv_opts())
+        # Demuxer cache: default to mpv's own buffering (what standalone mpv
+        # uses). A hard byte cap here bounds RAM but also removes the cushion a
+        # high-bitrate VBR 4K stream needs - too small a cap starves the
+        # decoder on bitrate spikes and shows up as a periodic ~10s hitch that
+        # external mpv (bigger default cache) never has. Only cap when the user
+        # explicitly opts in via DOPEIPTV_DEMUX_MAX / DOPEIPTV_DEMUX_MAX_BACK
+        # (e.g. "192MiB"), trading a little smoothness headroom for less RAM.
+        _dmax = os.environ.get("DOPEIPTV_DEMUX_MAX")
+        _dback = os.environ.get("DOPEIPTV_DEMUX_MAX_BACK")
+        if _dmax:
+            soft["demuxer-max-bytes"] = _dmax
+        if _dback:
+            soft["demuxer-max-back-bytes"] = _dback
         soft.update(self.EXTRA_OPTS)
         for key, val in soft.items():
             try:
