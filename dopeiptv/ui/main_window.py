@@ -656,7 +656,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.media_rating_lbl.hide()
         left_col.addWidget(self.media_rating_lbl, 0, Qt.AlignmentFlag.AlignLeft)
 
-        self.play_mpv = QPushButton("▶  " + tr("btn_play"), objectName="Primary")
+        self.play_mpv = QPushButton("▶  " + tr("btn_play"), objectName="PlayGhost")
         self.play_mpv.setToolTip(tr("tooltip_play_in_mpv"))
         self.play_mpv.setSizePolicy(QSizePolicy.Policy.Fixed,
                                     QSizePolicy.Policy.Fixed)
