@@ -307,21 +307,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                                          QSizePolicy.Policy.Fixed)
         self._sidebar_logo.setToolTip(tr("tooltip_jump_playing"))
         self._sidebar_logo.clicked.connect(self._jump_to_now_playing)
+        # The logo draws a small update badge in its top-right corner when a
+        # newer release is out; clicking that corner opens About.
+        self._sidebar_logo.update_clicked.connect(self.show_about)
         sl.addWidget(self._sidebar_logo)
         sl.addSpacing(6)
-        # Update indicator: a small arrow in the logo's top-right corner, shown
-        # only when a newer release exists. It bounces and is red at startup
-        # (for 30 s) to catch the eye, then settles to the theme accent colour.
-        # Clicking it opens About (changelog + download) - the logo itself still
-        # jumps to what's playing. It's a child of the logo, so it rides along
-        # and hides automatically when the sidebar collapses to a rail.
-        self._update_arrow = QPushButton("⬆", self._sidebar_logo)
-        self._update_arrow.setObjectName("UpdateArrow")
-        self._update_arrow.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._update_arrow.setFixedSize(18, 18)
-        self._update_arrow.clicked.connect(self.show_about)
-        self._update_arrow.hide()
-        self._sidebar_logo.installEventFilter(self)
 
         # Glyphs used when the sidebar is collapsed to an icon rail.
         self._rail_glyphs = {
@@ -961,11 +951,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self._set_sidebar_collapsed(False)
 
     def eventFilter(self, obj, event):
-        # Keep the update arrow pinned to the logo's top-right corner as the
-        # sidebar (and thus the logo) changes width.
-        if (obj is getattr(self, "_sidebar_logo", None)
-                and event.type() == QEvent.Type.Resize):
-            self._position_update_arrow()
         # Track the whole drag gesture on the side divider. On press we free the
         # pane (unpin min/max) so it can move both ways for as long as the button
         # is held; on release we commit the final pinned width. This lets a
@@ -985,40 +970,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 # an expand the target is the current width, so it stays put.
                 self._apply_sidebar_collapsed()
         return super().eventFilter(obj, event)
-
-    def _position_update_arrow(self) -> None:
-        if not hasattr(self, "_update_arrow"):
-            return
-        # Anchor to the top-right corner of the *pill* (which the logo draws
-        # centred inside its own, wider widget), not the widget's edge.
-        logo = self._sidebar_logo
-        pill_w = getattr(type(logo), "LOGO_W", 92)
-        pill_h = getattr(type(logo), "LOGO_H", 40)
-        x0 = (logo.width() - pill_w) / 2.0
-        y0 = (logo.height() - pill_h) / 2.0
-        a = self._update_arrow
-        a.move(int(x0 + pill_w - a.width() + 5), int(max(0, y0 - 5)))
-
-    def _set_update_arrow_color(self, color: str) -> None:
-        if not (getattr(self, "_update_available", False)
-                and hasattr(self, "_update_arrow")):
-            return
-        self._update_arrow.setStyleSheet(
-            "QPushButton#UpdateArrow { background:transparent; border:none;"
-            f" color:{color}; font-size:15px; font-weight:900; }}")
-
-    def _bounce_update_arrow(self) -> None:
-        from PyQt6.QtCore import QPropertyAnimation, QEasingCurve, QPoint
-        base = self._update_arrow.pos()
-        anim = QPropertyAnimation(self._update_arrow, b"pos", self)
-        anim.setDuration(850)
-        anim.setStartValue(base)
-        anim.setKeyValueAt(0.5, QPoint(base.x(), base.y() + 6))
-        anim.setEndValue(base)
-        anim.setEasingCurve(QEasingCurve.Type.OutBounce)
-        anim.setLoopCount(3)
-        anim.start()
-        self._arrow_anim = anim  # keep a reference alive
 
     def _maybe_check_updates(self) -> None:
         """Once-a-day background check for a newer release; on a hit, light the
@@ -1052,27 +1003,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _apply_update_state(self, latest_tag: str) -> None:
         newer = bool(latest_tag) and is_newer(latest_tag, VERSION)
-        self._update_available = newer
-        self._update_latest = latest_tag if newer else ""
-        if not hasattr(self, "_update_arrow"):
-            return
+        logo = self._sidebar_logo
         if not newer:
-            self._update_arrow.hide()
+            logo.set_update(False)
+            logo.setToolTip(tr("tooltip_jump_playing"))
             return
-        self._update_arrow.setToolTip(
-            tr("about_update_available", version=latest_tag))
-        self._set_update_arrow_color("#E5484D")   # red first, to catch the eye
-        self._position_update_arrow()
-        self._update_arrow.show()
-        self._update_arrow.raise_()
-        self._bounce_update_arrow()
-        print(f"[dopeIPTV] update arrow: logo="
-              f"{self._sidebar_logo.width()}x{self._sidebar_logo.height()} "
-              f"pos={self._update_arrow.pos().x()},{self._update_arrow.pos().y()} "
-              f"visible={self._update_arrow.isVisible()}", file=sys.stderr)
+        logo.set_update(True, "#E5484D")   # red first, to catch the eye
+        logo.setToolTip(tr("about_update_available", version=latest_tag))
+        logo.bounce()
         # After 30 s, settle from the attention-grabbing red to the theme accent.
-        QTimer.singleShot(30_000, lambda: self._set_update_arrow_color(
-            P.get("accent", "#3DDC84")))
+        QTimer.singleShot(30_000, lambda: logo.set_update(
+            True, P.get("accent", "#3DDC84")))
 
     def _set_focus_mode(self, on: bool) -> None:
         """Focus mode hides the whole content list so the player pane gets the

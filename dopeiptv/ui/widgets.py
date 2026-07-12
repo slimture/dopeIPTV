@@ -71,16 +71,55 @@ class _SidebarLogo(QWidget):
     LOGO_H = 40
 
     clicked = pyqtSignal()
+    update_clicked = pyqtSignal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setFixedHeight(self.LOGO_H + 10)
         self.setToolTip(APP_NAME)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._update_on = False
+        self._update_color = QColor("#E5484D")
+        self._bounce_dy = 0.0
+
+    def set_update(self, on: bool, color=None) -> None:
+        """Show/hide the corner update badge and (optionally) recolour it."""
+        self._update_on = bool(on)
+        if color is not None:
+            self._update_color = QColor(color)
+        self.update()
+
+    def _badge_rect(self) -> "QRectF":
+        w, h = float(self.LOGO_W), float(self.LOGO_H)
+        x0 = (self.width() - w) / 2.0
+        y0 = (self.height() - h) / 2.0
+        r, cx, cy = 8.0, x0 + w - 6.0, y0 + 6.0
+        return QRectF(cx - r, cy - r, 2 * r, 2 * r)
+
+    def bounce(self) -> None:
+        """A short hop of the update badge to catch the eye at startup."""
+        from PyQt6.QtCore import QVariantAnimation, QEasingCurve
+        anim = QVariantAnimation(self)
+        anim.setDuration(850)
+        anim.setStartValue(0.0)
+        anim.setKeyValueAt(0.5, -4.0)
+        anim.setEndValue(0.0)
+        anim.setEasingCurve(QEasingCurve.Type.OutBounce)
+        anim.setLoopCount(3)
+        anim.valueChanged.connect(self._on_bounce)
+        anim.start()
+        self._bounce_anim = anim
+
+    def _on_bounce(self, v) -> None:
+        self._bounce_dy = float(v)
+        self.update()
 
     def mousePressEvent(self, e) -> None:
         if e.button() == Qt.MouseButton.LeftButton:
-            self.clicked.emit()
+            if self._update_on and self._badge_rect().contains(e.position()):
+                self.update_clicked.emit()
+            else:
+                self.clicked.emit()
             e.accept()
             return
         super().mousePressEvent(e)
@@ -133,4 +172,29 @@ class _SidebarLogo(QWidget):
             painter.drawRoundedRect(
                 QRectF(bx, base_y - bh, bar_w, bh),
                 bar_w * 0.4, bar_w * 0.4)
+
+        # Update badge: a small coloured circle with a white up-arrow in the
+        # pill's top-right corner, drawn on top so it's always visible (a child
+        # widget over this custom paint didn't render). Colour comes from the
+        # caller (red at startup, theme accent after 30 s); a transient bounce
+        # offset nudges it up.
+        if self._update_on:
+            br = self._badge_rect()
+            cx = br.center().x()
+            cy = br.center().y() + self._bounce_dy
+            r = br.width() / 2.0
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(self._update_color)
+            painter.drawEllipse(QPointF(cx, cy), r, r)
+            aw, ah = r * 0.60, r * 0.72
+            arrow = QPainterPath()
+            arrow.moveTo(cx, cy - ah * 0.62)                 # tip
+            arrow.lineTo(cx - aw, cy + ah * 0.12)
+            arrow.lineTo(cx - aw * 0.42, cy + ah * 0.12)
+            arrow.lineTo(cx - aw * 0.42, cy + ah * 0.62)     # stem
+            arrow.lineTo(cx + aw * 0.42, cy + ah * 0.62)
+            arrow.lineTo(cx + aw * 0.42, cy + ah * 0.12)
+            arrow.lineTo(cx + aw, cy + ah * 0.12)
+            arrow.closeSubpath()
+            painter.fillPath(arrow, QColor("white"))
         painter.end()
