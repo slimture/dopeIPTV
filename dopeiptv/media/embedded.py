@@ -653,9 +653,11 @@ class EmbeddedPlayer(QWidget):
         self.vol.setFixedWidth(40)
         self.vol.setToolTip(tr("tooltip_volume"))
         self.vol.valueChanged.connect(self._set_volume)
-        self.ts_btn = QPushButton("⏪", objectName="MiniBtn")
+        # '◀◀' (geometric triangles) rather than the '⏪' emoji, which ignores
+        # the colour and rendered grey; amber flags a timeshift channel.
+        self.ts_btn = QPushButton("◀◀", objectName="MiniBtn")
         self.ts_btn.setToolTip(tr("tooltip_timeshift"))
-        self.ts_btn.setStyleSheet("color:#F2B01E;")   # amber timeshift marker
+        self.ts_btn.setStyleSheet("color:#F2B01E; font-size:11px;")
         self.ts_btn.clicked.connect(
             lambda: self.timeshift_menu.emit(self.ts_btn))
         self.ts_btn.hide()
@@ -774,8 +776,9 @@ class EmbeddedPlayer(QWidget):
         self.fs_vol.setFixedWidth(80)
         self.fs_vol.setToolTip(tr("tooltip_volume"))
         self.fs_vol.valueChanged.connect(self._set_volume)
-        self.fs_ts_btn = QPushButton("⏪", objectName="MiniBtn")
+        self.fs_ts_btn = QPushButton("◀◀", objectName="MiniBtn")
         self.fs_ts_btn.setToolTip(tr("tooltip_timeshift"))
+        self.fs_ts_btn.setStyleSheet("color:#F2B01E; font-size:11px;")
         self.fs_ts_btn.clicked.connect(
             lambda: self.timeshift_menu.emit(self.fs_ts_btn))
         self.fs_ts_btn.hide()
@@ -937,8 +940,19 @@ class EmbeddedPlayer(QWidget):
         self.ts_label.setStyleSheet(
             "background: transparent; color: #FFFFFF;"
             "font-size: 11px; font-weight: 700;")
+        # Jump straight back to the live edge from anywhere in the archive.
+        self.ts_live_btn = QPushButton("⏭ LIVE")
+        self.ts_live_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.ts_live_btn.setStyleSheet(
+            "QPushButton{background: #FF5C5C; color:#fff; border:none;"
+            "border-radius: 8px; padding: 2px 10px; font-size: 11px;"
+            "font-weight: 700;}"
+            "QPushButton:hover{background:#e14b4b;}")
+        self.ts_live_btn.clicked.connect(lambda: self.timeshift_seek.emit(0))
+        self.ts_live_btn.hide()
         _tl.addWidget(self.ts_slider, 1)
         _tl.addWidget(self.ts_label)
+        _tl.addWidget(self.ts_live_btn)
         self.ts_timeline.hide()
 
         # App-level filter for bare Left/Right seeking of a seekable video, so
@@ -1163,6 +1177,10 @@ class EmbeddedPlayer(QWidget):
     # -- docked hover scrubber -------------------------------------------------
 
     def _show_seek_overlay(self) -> None:
+        # Timeshift channels use the live timeline instead; don't stack the VOD
+        # seek overlay on top of it (they share the bottom of the video).
+        if self.ts_timeline.isVisible():
+            return
         for w in (self.back_btn, self.fwd_btn, self.seek, self.time_lbl):
             w.show()
         self._place_seek_overlay()
@@ -1224,6 +1242,7 @@ class EmbeddedPlayer(QWidget):
         self.ts_slider.setRange(0, self._ts_depth)
         self.ts_slider.setValue(self._ts_depth)
         self.ts_label.setText("● LIVE")
+        self.ts_live_btn.hide()
         self._place_ts_timeline()
         self.ts_timeline.show()
         self.ts_timeline.raise_()
@@ -1240,8 +1259,9 @@ class EmbeddedPlayer(QWidget):
         self.ts_slider.blockSignals(True)
         self.ts_slider.setValue(val)
         self.ts_slider.blockSignals(False)
-        self.ts_label.setText(
-            "● LIVE" if offset_min < 1 else f"−{self._fmt_offset(offset_min)}")
+        live = offset_min < 1
+        self.ts_label.setText("● LIVE" if live else f"−{self._fmt_offset(offset_min)}")
+        self.ts_live_btn.setVisible(not live)
 
     def _on_ts_seek(self, value: int) -> None:
         self.timeshift_seek.emit(int(self._ts_depth - value))

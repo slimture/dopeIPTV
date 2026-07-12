@@ -15,7 +15,7 @@ from ..core.workers import run_async, tmdb_url_from_provider
 from PyQt6.QtCore import QSize, QTimer, Qt
 from PyQt6.QtGui import QIcon, QPainter, QPainterPath, QPixmap
 from PyQt6.QtWidgets import QAbstractItemView, QDialog, QDialogButtonBox, QFrame, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QMenu, QVBoxLayout, QWidget
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 class _DetailMixin:
@@ -687,8 +687,8 @@ class _DetailMixin:
             all_posts.append(post)
             if start and stop and start <= now < stop and not current:
                 current = post
-            elif start and start > now:
-                upcoming.append(post)
+            elif start and now < start <= now + timedelta(hours=6):
+                upcoming.append(post)   # only the next 6 hours
         upcoming.sort(key=lambda p: p["start"])
 
         if current:

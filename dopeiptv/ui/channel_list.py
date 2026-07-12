@@ -566,7 +566,7 @@ class ChannelDelegate(QStyledItemDelegate):
                                   num_rect.width() - num_str_w - 4,
                                   num_rect.height())
                 painter.setPen(QColor(self.TIMESHIFT_COLOR))
-                painter.drawText(arch_rect, va_right, "⏪")
+                painter.drawText(arch_rect, va_right, "◀◀")
             painter.setPen(QColor(P["muted3"]))
             painter.drawText(num_rect, va_right, num_str)
             if is_fav:
