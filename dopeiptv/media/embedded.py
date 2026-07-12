@@ -1163,20 +1163,16 @@ class EmbeddedPlayer(QWidget):
     # -- overlay ---------------------------------------------------------------
 
     def set_live_badge(self, kind: str | None) -> None:
-        """Show a top-left status pill: 'live' (red) at the live edge,
-        'timeshift' (neutral) while watching the archive, or None to hide it."""
+        """Show a top-left 'not live' pill when watching the catch-up archive or
+        while a live stream is paused (behind the live edge). Anything else -
+        including the live edge itself - hides it (no permanent LIVE tag)."""
         b = self.live_badge
-        if kind == "live":
-            b.setText("● LIVE")
-            colour = "#FF5C5C"
-        elif kind == "timeshift":
-            b.setText("⧗ TIMESHIFT")
-            colour = "#FFFFFF"
-        else:
+        if kind != "timeshift":
             b.hide()
             return
+        b.setText("⧗ TIMESHIFT")
         b.setStyleSheet(
-            f"background: rgba(0,0,0,150); color: {colour};"
+            "background: rgba(0,0,0,150); color: #FFFFFF;"
             "border-radius: 9px; padding: 3px 9px;"
             "font-size: 11px; font-weight: 700;")
         b.adjustSize()

@@ -1128,8 +1128,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _on_paused_changed(self, paused: bool) -> None:
         self._apply_play_icon()
+        lp = getattr(self, "_last_playback", None)
+        on_live = bool(lp) and lp.get("kind") == "live"
         if paused:
             self._pause_started = time.time()
+            # Pausing a live stream means you're no longer at the live edge.
+            if self.player and on_live and not self._playing_catchup:
+                self.player.set_live_badge("timeshift")
             return
         # Resumed. DVR-style pause for timeshift channels: if we paused the live
         # edge for longer than the buffer can hold, re-open the provider archive
@@ -1138,15 +1143,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._pause_started = None
         if started is None or getattr(self, "_playing_catchup", False):
             return   # not paused by us, or already playing a seekable archive
-        lp = getattr(self, "_last_playback", None)
         it = lp.get("item") if lp else None
-        if (not it or lp.get("kind") != "live"
-                or self._timeshift_days(it) <= 0):
-            return   # only live timeshift channels have an archive to fall to
         elapsed = time.time() - started
-        if elapsed < 6:
-            return   # short pause: mpv's own buffer resumes it seamlessly
-        self._play_timeshift(it, back_min=elapsed / 60.0)
+        if (it and lp.get("kind") == "live"
+                and self._timeshift_days(it) > 0 and elapsed >= 6):
+            # Long pause on a timeshift channel: resume from the archive.
+            self._play_timeshift(it, back_min=elapsed / 60.0)
+        elif self.player and on_live:
+            # Buffer resume at ~the live edge: drop the 'not live' badge.
+            self.player.set_live_badge(None)
 
     def _play_overlay_clicked(self) -> None:
         state = self._overlay_state()
@@ -3146,12 +3151,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Reflect the new playback state on the poster overlay (play -> pause /
         # stop) when the item being played is the one shown in the detail pane.
         self._apply_play_icon()
-        # Top-left live/timeshift badge in the player: only meaningful for live
-        # channels (LIVE at the edge, TIMESHIFT on the archive); hidden for VOD.
+        # 'Not live' badge: shown only on the catch-up archive; hidden at the
+        # live edge and for VOD (no permanent LIVE tag).
         if self.player:
             self.player.set_live_badge(
-                ("timeshift" if self._playing_catchup else "live")
-                if kind == "live" else None)
+                "timeshift" if (kind == "live" and self._playing_catchup)
+                else None)
 
     def _player_missing(self, name: str) -> None:
         QMessageBox.warning(

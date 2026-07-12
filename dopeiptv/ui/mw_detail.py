@@ -542,11 +542,13 @@ class _DetailMixin:
         self._epg_note("Loading programme guide…")
 
         def fetch():
-            listings = self.client.short_epg(sid, 8)
+            # Fetch a deeper slice than we show (current + ~a dozen upcoming)
+            # so the panel isn't limited to 2-3 "next" entries.
+            listings = self.client.short_epg(sid, 24)
             if not listings:
                 listings = self.client.epg_table(sid)
             if not listings:
-                listings = self.xmltv.listings_for(it)
+                listings = self.xmltv.listings_for(it, limit=24)
             return listings
 
         run_async(self.pool, fetch,
