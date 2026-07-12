@@ -669,6 +669,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.play_mpv.setCursor(Qt.CursorShape.PointingHandCursor)
         self._apply_play_icon()
         self.play_mpv.clicked.connect(lambda: self.play("mpv"))
+        # Start hidden: the poster and its play overlay only appear once a
+        # channel/movie/series is selected (see _show_detail), so an empty
+        # detail pane has no stray box or button.
+        self.d_logo.hide()
+        self.play_mpv.hide()
         left_col.addStretch(1)
         header_row.addLayout(left_col)
 
@@ -2095,6 +2100,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         label = self.LABELS.get(model_kind, "")
         self._set_status(f"{n} {label}".strip() if n
                          else (empty_msg or f"0 {label}".strip()))
+        # On the very first populated list, select the first playable row (not a
+        # section header) so the detail pane shows something straight away -
+        # selecting only, never auto-playing.
+        if n and not getattr(self, "_did_initial_select", False):
+            for row in range(self.list_model.rowCount()):
+                item = self.list_model.item_at(row)
+                if item and not item.get("_header"):
+                    self._did_initial_select = True
+                    self.listw.setCurrentIndex(self.list_model.index(row))
+                    break
 
     def _show_grouped(self, sections: list, model_kind: str,
                       empty_msg: str | None = None) -> None:
