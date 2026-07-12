@@ -43,6 +43,11 @@ class _DetailMixin:
             self.d_logo.hide()
             self.play_mpv.hide()
             return
+        # A partly-watched episode in Continue watching has no series_id of its
+        # own to look up, so resolve its info from the stored series context.
+        if it.get("_kind") == "episode" and it.get("_series_ctx"):
+            self._show_continue_episode_detail(it)
+            return
         self.d_logo.show()
         self.play_mpv.show()
         name = self.channel_display_name(it)
@@ -126,6 +131,26 @@ class _DetailMixin:
                 sid = it.get("_key")
             if sid is not None:
                 self._request_media_info("series", sid, self._current_key)
+
+    def _show_continue_episode_detail(self, it) -> None:
+        """Continue-watching episode row: show the series' poster + info (plot,
+        cast, genre) with the episode's name, since the row itself carries no
+        series_id to resolve."""
+        ctx = it.get("_series_ctx") or {}
+        self.d_logo.show()
+        self.play_mpv.show()
+        self._detail_name = it.get("name") or it.get("title") or ""
+        self.d_logo.setFixedSize(*self.POSTER_SIZE_MEDIA)
+        self._position_play_over_poster()
+        self.media_info.setFixedHeight(self.POSTER_SIZE_MEDIA[1])
+        self.d_logo.setPixmap(QPixmap())
+        self.d_logo.setStyleSheet(self.PLACEHOLDER_LOGO_STYLE)
+        self.d_logo.setText(
+            (ctx.get("name") or self._detail_name).strip()[:1].upper())
+        self._load_detail_poster(ctx, True, "series")
+        sid = ctx.get("series_id")
+        if sid is not None:
+            self._request_media_info("series", sid, self._current_key)
 
     @property
     def PLACEHOLDER_LOGO_STYLE(self) -> str:
