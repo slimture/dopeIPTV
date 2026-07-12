@@ -1011,9 +1011,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         logo.set_update(True, "#E5484D")   # red first, to catch the eye
         logo.setToolTip(tr("about_update_available", version=latest_tag))
         logo.bounce()
-        # After 30 s, settle from the attention-grabbing red to the theme accent.
+        # After 30 s, settle from the attention-grabbing red to the theme
+        # accent - in follow mode, so it keeps matching if the theme changes.
         QTimer.singleShot(30_000, lambda: logo.set_update(
-            True, P.get("accent", "#3DDC84")))
+            True, follow_accent=True))
 
     def _set_focus_mode(self, on: bool) -> None:
         """Focus mode hides the whole content list so the player pane gets the

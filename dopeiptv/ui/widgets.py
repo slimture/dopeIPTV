@@ -80,11 +80,15 @@ class _SidebarLogo(QWidget):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._update_on = False
         self._update_color = QColor("#E5484D")
+        self._update_follow_accent = False
         self._bounce_dy = 0.0
 
-    def set_update(self, on: bool, color=None) -> None:
-        """Show/hide the corner update badge and (optionally) recolour it."""
+    def set_update(self, on: bool, color=None, follow_accent: bool = False) -> None:
+        """Show/hide the corner update badge and set its colour. Pass an
+        explicit ``color`` for a fixed hue, or ``follow_accent=True`` to track
+        the live theme accent (so it keeps matching when the theme changes)."""
         self._update_on = bool(on)
+        self._update_follow_accent = bool(follow_accent)
         if color is not None:
             self._update_color = QColor(color)
         self.update()
@@ -93,7 +97,7 @@ class _SidebarLogo(QWidget):
         w, h = float(self.LOGO_W), float(self.LOGO_H)
         x0 = (self.width() - w) / 2.0
         y0 = (self.height() - h) / 2.0
-        r, cx, cy = 8.0, x0 + w - 6.0, y0 + 6.0
+        r, cx, cy = 10.0, x0 + w - 5.0, y0 + 5.0
         return QRectF(cx - r, cy - r, 2 * r, 2 * r)
 
     def bounce(self) -> None:
@@ -183,8 +187,10 @@ class _SidebarLogo(QWidget):
             cx = br.center().x()
             cy = br.center().y() + self._bounce_dy
             r = br.width() / 2.0
+            badge_color = (QColor(P.get("accent", "#4C8DFF"))
+                           if self._update_follow_accent else self._update_color)
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(self._update_color)
+            painter.setBrush(badge_color)
             painter.drawEllipse(QPointF(cx, cy), r, r)
             aw, ah = r * 0.60, r * 0.72
             arrow = QPainterPath()
