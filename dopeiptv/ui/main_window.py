@@ -1156,8 +1156,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         it = lp.get("item") if lp else None
         elapsed = time.time() - started
         if (it and lp.get("kind") == "live"
-                and self._timeshift_days(it) > 0 and elapsed >= 6):
-            # Long pause on a timeshift channel: resume from the archive.
+                and self._timeshift_days(it) > 0 and elapsed >= 120):
+            # Only a *long* pause (beyond what mpv's buffer holds) falls to the
+            # archive. Shorter pauses resume seamlessly from the buffer, which
+            # is the real pause - re-opening a tiny archive segment for them
+            # just produced a stuttery 1-minute clip.
             self._play_timeshift(it, back_min=elapsed / 60.0)
         elif self.player and on_live:
             # Buffer resume at ~the live edge: drop the 'not live' badge.
@@ -3319,6 +3322,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not (self.player and self.player.isVisible()):
             return
         if not lp or lp.get("kind") != "live":
+            return
+        if getattr(self, "_playing_catchup", False):
+            # Catch-up/archive playback: seeking makes mpv briefly go idle,
+            # which looks like a stall. Never fall back to the live edge here
+            # (that yanked the user out of the archive) - the segment is
+            # seekable, so let mpv settle after the seek.
             return
         if not self._auto_reconnect_live():
             msg = tr("status_stream_dropped")

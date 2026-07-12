@@ -86,10 +86,10 @@ class _DetailMixin:
             return
 
         if self.mode == "history" and snap_kind not in ("vod", "series"):
-            # For live/recording history rows the artwork + TMDB card
-            # is all we have; only fall through for movie/series
-            # history rows so they also get provider-side info
-            # (plot, year, episode list).
+            # A live channel opened from History still gets its programme guide
+            # (like the live view); recording history rows have only artwork.
+            if snap_kind == "live":
+                self._request_epg()
             return
 
         if self.series_ctx:
@@ -531,25 +531,37 @@ class _DetailMixin:
 
     def _request_epg(self) -> None:
         it = self.list_model.item_at(self.listw.currentIndex().row())
-        if (not it or self._content_kind() not in ("live", "fav")
-                or self.series_ctx):
+        if not it or self.series_ctx:
             return
-        sid = it.get("stream_id")
-        if sid is None:
+        # Live channels in the live/fav views, and live rows opened from History.
+        is_live = (self._content_kind() in ("live", "fav")
+                   or (self.mode == "history" and it.get("_kind") == "live"))
+        if not is_live:
             return
+        sid = it.get("stream_id")   # may be None for a History row
         key = self._item_key(it)
         self._clear_epg_rows()
         self._epg_note("Loading programme guide…")
 
         def fetch():
-            # Fetch a deeper slice than we show (current + ~a dozen upcoming)
-            # so the panel isn't limited to 2-3 "next" entries.
-            listings = self.client.short_epg(sid, 24)
-            if not listings:
-                listings = self.client.epg_table(sid)
-            if not listings:
-                listings = self.xmltv.listings_for(it, limit=24)
-            return listings
+            # Many providers' short_epg returns only 2-3 entries even when the
+            # downloaded XMLTV guide has the full schedule. Gather every source
+            # and keep whichever has the most, so the panel isn't capped at a
+            # couple of "next" entries. The provider sources need a stream_id
+            # (absent on History rows); the XMLTV guide matches by name.
+            candidates = []
+            sources = [lambda: self.xmltv.listings_for(it, limit=24)]
+            if sid is not None:
+                sources = [lambda: self.client.short_epg(sid, 24),
+                           lambda: self.client.epg_table(sid)] + sources
+            for src in sources:
+                try:
+                    got = src()
+                except Exception:
+                    got = None
+                if got:
+                    candidates.append(got)
+            return max(candidates, key=len) if candidates else []
 
         run_async(self.pool, fetch,
                   lambda e: self._show_epg(e, key),

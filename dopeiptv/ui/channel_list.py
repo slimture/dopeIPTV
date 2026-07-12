@@ -178,6 +178,8 @@ class ChannelListModel(QAbstractListModel):
 class ChannelDelegate(QStyledItemDelegate):
     """Custom-painted delegate for list and grid modes at three densities."""
 
+    TIMESHIFT_COLOR = "#F2B01E"   # amber: catch-up / timeshift marker
+
     DENSITIES = {
         "compact": (50, 32, 10, 8),
         "medium":  (66, 44, 11, 9),
@@ -546,20 +548,27 @@ class ChannelDelegate(QStyledItemDelegate):
             num_w = 52 if has_archive else 34
             if is_fav:
                 num_w += 18
-            painter.setPen(QColor(P["muted3"]))
             fnum = QFont()
             fnum.setPointSize(10)
             painter.setFont(fnum)
             num_rect = QRect(
                 rect.right() - 12 - num_w, rect.top(),
                 num_w, rect.height())
-            suffix = str(it["num"])
+            num_str = str(it["num"])
+            va_right = (Qt.AlignmentFlag.AlignVCenter
+                        | Qt.AlignmentFlag.AlignRight)
             if has_archive:
-                suffix = "⏪ " + suffix
-            painter.drawText(
-                num_rect,
-                Qt.AlignmentFlag.AlignVCenter
-                | Qt.AlignmentFlag.AlignRight, suffix)
+                # Amber ⏪ flags a catch-up/timeshift channel; the number stays
+                # muted so only the timeshift marker draws the eye.
+                fm = painter.fontMetrics()
+                num_str_w = fm.horizontalAdvance(num_str)
+                arch_rect = QRect(num_rect.left(), num_rect.top(),
+                                  num_rect.width() - num_str_w - 4,
+                                  num_rect.height())
+                painter.setPen(QColor(self.TIMESHIFT_COLOR))
+                painter.drawText(arch_rect, va_right, "⏪")
+            painter.setPen(QColor(P["muted3"]))
+            painter.drawText(num_rect, va_right, num_str)
             if is_fav:
                 painter.setPen(QColor("#FFD700"))
                 fstar = QFont()

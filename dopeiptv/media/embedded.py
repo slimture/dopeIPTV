@@ -655,6 +655,7 @@ class EmbeddedPlayer(QWidget):
         self.vol.valueChanged.connect(self._set_volume)
         self.ts_btn = QPushButton("⏪", objectName="MiniBtn")
         self.ts_btn.setToolTip(tr("tooltip_timeshift"))
+        self.ts_btn.setStyleSheet("color:#F2B01E;")   # amber timeshift marker
         self.ts_btn.clicked.connect(
             lambda: self.timeshift_menu.emit(self.ts_btn))
         self.ts_btn.hide()
