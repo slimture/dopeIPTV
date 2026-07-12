@@ -254,7 +254,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # so the initial category/EPG traffic goes first - the sync runs
         # for the full account which can take a couple of seconds.
         QTimer.singleShot(2500, self._maybe_sync_watched)
-        # Discreet update check well after the initial load has settled.
+        # Light the badge from the cached result almost immediately so it isn't
+        # missing for the first few seconds, then do the (throttled) network
+        # check later so it doesn't compete with the initial load.
+        QTimer.singleShot(400, self._apply_cached_update)
         QTimer.singleShot(4000, self._maybe_check_updates)
 
         self._auto_refresh_timer = QTimer(self)
@@ -1007,6 +1010,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         run_async(self.pool, lambda: fetch_latest_release(GITHUB_REPO),
                   done, lambda _e: None)
 
+    def _apply_cached_update(self) -> None:
+        """Light the badge from the last cached result at startup so it appears
+        right away, without waiting for (or making) a network call."""
+        if self.settings.value("check_updates", "true") != "true":
+            return
+        if os.environ.get("DOPEIPTV_FAKE_UPDATE") == "1":
+            self._apply_update_state("v99.0.0")
+            return
+        tag = self.settings.value("update_latest_tag", "") or ""
+        if tag:
+            self._apply_update_state(tag)
+
     def _apply_update_state(self, latest_tag: str) -> None:
         newer = bool(latest_tag) and is_newer(latest_tag, VERSION)
         logo = self._sidebar_logo
@@ -1014,14 +1029,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             logo.set_update(False)
             logo.setToolTip(tr("tooltip_jump_playing"))
             return
-        logo.set_update(True, "#E5484D")   # red first, to catch the eye
         logo.setToolTip(tr("about_update_available", version=latest_tag))
+        # The attention-grabbing part (red badge, bounce, toast, red->accent
+        # settle) runs once per version, so the cached apply at startup and the
+        # later network check for the same tag don't double up.
+        if getattr(self, "_update_shown_tag", None) == latest_tag:
+            return
+        self._update_shown_tag = latest_tag
+        logo.set_update(True, "#E5484D")   # red first, to catch the eye
         logo.bounce()
-        # A brief bottom toast the first time we surface a given version, so the
-        # new badge is self-explanatory instead of a mystery dot.
-        if getattr(self, "_update_toast_tag", None) != latest_tag:
-            self._update_toast_tag = latest_tag
-            self._show_toast(tr("update_toast", version=latest_tag), 7000)
+        # A brief bottom toast so the new badge is self-explanatory.
+        self._show_toast(tr("update_toast", version=latest_tag), 7000)
         # After 30 s, settle from the attention-grabbing red to the theme
         # accent - in follow mode, so it keeps matching if the theme changes.
         QTimer.singleShot(30_000, lambda: logo.set_update(
