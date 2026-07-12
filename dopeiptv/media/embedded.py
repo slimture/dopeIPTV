@@ -24,6 +24,18 @@ from .players import _libmpv, _register_error_callback
 from ..ui.theme import P
 
 
+def _env_num(name: str, default, cast):
+    """Read a numeric override from the environment, falling back to *default*
+    when unset or malformed (so a stray value can never abort player start)."""
+    raw = os.environ.get(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        return cast(raw)
+    except (TypeError, ValueError):
+        return default
+
+
 def _control_icon(name: str, color: str, px: int = 28) -> QIcon:
     """Draw a media-control glyph as a crisp, perfectly centred monochrome
     icon. Hand-drawing (instead of relying on Unicode glyphs, whose ink sits
@@ -310,6 +322,16 @@ class _MpvGLWidget(QOpenGLWidget):
                 "demuxer-lavf-o": "reconnect=1,reconnect_streamed=1,"
                                   "reconnect_on_network_error=1,"
                                   "reconnect_delay_max=5",
+                # Faster channel switching: ffmpeg otherwise probes up to ~5 s /
+                # 5 MB of a live MPEG-TS stream before it shows the first frame.
+                # A live TS declares its codecs up front, so a shorter probe
+                # reaches the picture much sooner with no practical downside.
+                # Tunable/disable-able via env (seconds / bytes; 0 = ffmpeg's
+                # own default) for streams that need deeper probing.
+                "demuxer-lavf-analyzeduration": _env_num(
+                    "DOPEIPTV_ANALYZEDURATION", 1.0, float),
+                "demuxer-lavf-probesize": _env_num(
+                    "DOPEIPTV_PROBESIZE", 2_000_000, int),
                 # Never let mpv open its own window, and keep its OSD silent -
                 # otherwise it draws the media title centred on black while a
                 # stream buffers, which can surface as a stray frame.

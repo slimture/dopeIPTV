@@ -319,7 +319,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Glyphs used when the sidebar is collapsed to an icon rail.
         self._rail_glyphs = {
             "live": "📺", "vod": "🎬", "series": "🎞", "fav": "★",
-            "watchlist": "🕒", "watched": "✓", "rec": "⏺", "history": "🕘",
+            # Watch later = a bookmark, history = a clock: distinct glyphs so the
+            # collapsed rail doesn't show two near-identical clock faces. REC is
+            # a red dot (the plain record glyph rendered as a white circle).
+            "watchlist": "🔖", "watched": "✓", "rec": "🔴", "history": "🕘",
         }
         self._nav_texts: dict[str, str] = {}
         self.nav_btns: dict[str, QPushButton] = {}
@@ -438,7 +441,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # refresh (where the list keeps its old rows and the centred overlay
         # stays hidden) still says e.g. 'Updating TV guide…'.
         self._busy_label = QLabel("")
-        self._busy_label.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        self._busy_label.setStyleSheet(
+            f"color:{P['accent']}; font-size:11px; font-weight:600;")
         busy_row.addWidget(self.loading_bar, 1)
         busy_row.addWidget(self._busy_label)
         self._hide_busy()
@@ -1502,6 +1506,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             cache_path=epg_cache_path(pid) if pid else None,
             progress_cb=self.epg_progress.emit)
         self._info_cache.clear()
+        # Name the wait after what the user did (refresh the playlist), not the
+        # guide reload that happens to be the slow part of it.
+        self._busy_epg_msg = tr("status_refreshing_playlist")
         self._set_status(tr("status_refreshing_playlist"), emphasis=True)
         self._load_categories()
         run_async(
@@ -2567,6 +2574,25 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         CastDialog(self, url, title).exec()
 
+    def stop_local_playback_for_cast(self) -> None:
+        """Free the local stream when a cast starts. The Chromecast pulls the
+        URL itself (one connection from the device), so on a single-connection
+        account leaving the embedded/reused-window player running too would be a
+        second connection the provider refuses. Called by the cast dialog on a
+        successful cast."""
+        p = getattr(self, "player", None)
+        if p is not None and getattr(p, "current_url", None):
+            try:
+                p.stop()
+            except Exception:
+                pass
+        mw = getattr(self, "mpv_window", None)
+        if mw is not None:
+            try:
+                mw.stop()
+            except Exception:
+                pass
+
     def _autoplay_preview(self) -> bool:
         # Default off: a live channel plays on double-click (the desktop
         # standard), so single-clicking or arrowing through the list doesn't
@@ -3261,7 +3287,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._busy_label.setText(message or "")
             self._busy_label.setVisible(bool(message))
         if message:
-            self._set_status(message)
+            self._set_status(message, emphasis=True)
         self._update_busy_overlay(message)
 
     def _hide_busy(self) -> None:
@@ -3324,10 +3350,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # The guide download reports progress erratically - often no total, and
         # nothing at all during the several-second parse after it hits 100 % -
         # so a percentage looked jumpy and got stuck. Drive a calm indeterminate
-        # strip + a one-off status line instead.
-        self._show_busy(tr("status_loading_programme_guide"))
+        # strip + a one-off status line instead. During a full playlist refresh
+        # the guide reload is the slow part, but "Loading programme guide" reads
+        # as unrelated to what the user clicked, so name that context instead.
+        self._show_busy(getattr(self, "_busy_epg_msg", None)
+                        or tr("status_loading_programme_guide"))
 
     def _epg_progress_finished(self) -> None:
+        self._busy_epg_msg = None
         self._hide_busy()
 
     def _error(self, msg: str) -> None:
