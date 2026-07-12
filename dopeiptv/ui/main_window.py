@@ -619,8 +619,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.next_episode.connect(self._play_next_episode)
             # Keep the poster overlay's play/pause/stop glyph in sync with the
             # player (guarded: the overlay is built later in this constructor).
-            self.player.paused_changed.connect(
-                lambda _p: self._apply_play_icon())
+            self.player.paused_changed.connect(self._on_paused_changed)
             self.player.stopped.connect(self._apply_play_icon)
             self.player.finished.connect(self._apply_play_icon)
             # Keep the player pane visible on stop - mpv clears to black -
@@ -1126,6 +1125,28 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._overlay_state(), "play")
         self.play_mpv.setIcon(self._overlay_glyph(size, glyph))
         self.play_mpv.setIconSize(QSize(size, size))
+
+    def _on_paused_changed(self, paused: bool) -> None:
+        self._apply_play_icon()
+        if paused:
+            self._pause_started = time.time()
+            return
+        # Resumed. DVR-style pause for timeshift channels: if we paused the live
+        # edge for longer than the buffer can hold, re-open the provider archive
+        # from the moment we paused, instead of stalling on an exhausted buffer.
+        started = getattr(self, "_pause_started", None)
+        self._pause_started = None
+        if started is None or getattr(self, "_playing_catchup", False):
+            return   # not paused by us, or already playing a seekable archive
+        lp = getattr(self, "_last_playback", None)
+        it = lp.get("item") if lp else None
+        if (not it or lp.get("kind") != "live"
+                or self._timeshift_days(it) <= 0):
+            return   # only live timeshift channels have an archive to fall to
+        elapsed = time.time() - started
+        if elapsed < 6:
+            return   # short pause: mpv's own buffer resumes it seamlessly
+        self._play_timeshift(it, back_min=elapsed / 60.0)
 
     def _play_overlay_clicked(self) -> None:
         state = self._overlay_state()
@@ -2587,6 +2608,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         fmt = self.settings.value("stream_format", "ts")
         url = self.client.live_url(it.get("stream_id"), fmt)
         title = it.get("name") or "dopeIPTV"
+        self._playing_catchup = False   # live edge: DVR-pause may apply
         self._start_playback(url, title, it.get("stream_icon"),
                              self._item_key(it), "live", item=it)
 

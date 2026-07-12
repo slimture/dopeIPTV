@@ -640,6 +640,10 @@ class _RecordingMixin:
         name = self.channel_display_name(it)
         title = (f"{what} ({name}, timeshift)" if what
                  else f"{name} (timeshift)")
+        # A catch-up/archive URL is a seekable segment, so pausing it is fine
+        # (no live-edge buffer to exhaust) - mark it so the DVR-pause handler
+        # leaves it alone.
+        self._playing_catchup = True
         self._start_playback(url, title, it.get("stream_icon"),
                              self._item_key(it), "live", record=False,
                              item=it)
