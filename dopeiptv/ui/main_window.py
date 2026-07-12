@@ -32,7 +32,7 @@ from ..providers.chromecast import CastDialog, ChromecastManager
 from ..providers.client import (
     DemoClient, OfflineClient, XtreamClient, make_client,
 )
-from ..media.embedded import EmbeddedPlayer
+from ..media.embedded import EmbeddedPlayer, _control_icon
 from ..providers.epg import XmltvGuide, epg_cache_path, prune_epg_caches
 from ..services.coverart import CoverArtService
 from ..services.resume import ResumeStore
@@ -45,7 +45,7 @@ from ..core.stores import (
     CategoryOverrides, ChannelOverrides, FavoriteStore, HistoryStore,
     ParentalControl, PlaylistStore, WatchedStore, WatchlistStore,
 )
-from .theme import P
+from .theme import ACCENT, P
 from ..providers.trakt import TraktClient
 from ..core.wakelock import WakeLock
 from .widgets import _SidebarLogo, _Toast
@@ -656,13 +656,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.media_rating_lbl.hide()
         left_col.addWidget(self.media_rating_lbl, 0, Qt.AlignmentFlag.AlignLeft)
 
-        # Icon-only play button: a compact ▶ instead of a poster-wide "Play"
-        # bar. The tooltip and the universal play glyph keep it obvious.
-        self.play_mpv = QPushButton("▶", objectName="PlayGhost")
+        # Icon-only play button: a compact accent ▶ instead of a poster-wide
+        # "Play" bar. The triangle is drawn as an icon (perfectly centred,
+        # unlike the off-centre ▶ text glyph) and follows the theme accent.
+        self.play_mpv = QPushButton(objectName="PlayGhost")
         self.play_mpv.setToolTip(tr("tooltip_play_in_mpv"))
         self.play_mpv.setFixedSize(46, 40)
+        self.play_mpv.setIconSize(QSize(18, 18))
+        self._apply_play_icon()
         self.play_mpv.clicked.connect(lambda: self.play("mpv"))
-        left_col.addWidget(self.play_mpv, 0, Qt.AlignmentFlag.AlignLeft)
+        left_col.addWidget(self.play_mpv, 0, Qt.AlignmentFlag.AlignHCenter)
         left_col.addStretch(1)
         header_row.addLayout(left_col)
 
@@ -1067,6 +1070,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # accent - in follow mode, so it keeps matching if the theme changes.
         QTimer.singleShot(30_000, lambda: logo.set_update(
             True, follow_accent=True))
+
+    def _apply_play_icon(self) -> None:
+        """(Re)draw the detail-pane play triangle in the current theme accent.
+        Called at build time and whenever the accent changes."""
+        self.play_mpv.setIcon(_control_icon("play", P.get("accent", ACCENT), 18))
 
     def _set_focus_mode(self, on: bool) -> None:
         """Focus mode hides the whole content list so the player pane gets the

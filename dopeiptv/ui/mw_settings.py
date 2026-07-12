@@ -155,6 +155,7 @@ class _SettingsMixin:
         self.update_status_btn.setStyleSheet(
             f"color:{P['accent']}; font-size:11px; font-weight:600;"
             "border:none; background:transparent; padding:0 4px;")
+        self._apply_play_icon()   # redraw the play triangle in the new accent
         if self.d_logo.text():
             self.d_logo.setStyleSheet(self.PLACEHOLDER_LOGO_STYLE)
         if self.player:
