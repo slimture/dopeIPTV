@@ -319,10 +319,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Glyphs used when the sidebar is collapsed to an icon rail.
         self._rail_glyphs = {
             "live": "📺", "vod": "🎬", "series": "🎞", "fav": "★",
-            # Watch later = a bookmark, history = a clock: distinct glyphs so the
-            # collapsed rail doesn't show two near-identical clock faces. REC is
-            # a red dot (the plain record glyph rendered as a white circle).
-            "watchlist": "🔖", "watched": "✓", "rec": "🔴", "history": "🕘",
+            # Watch later = a pin (saved to watch), history = a clock: distinct
+            # glyphs so the collapsed rail doesn't show two near-identical clock
+            # faces. REC is a red dot (the plain record glyph is a white circle).
+            "watchlist": "📌", "watched": "✓", "rec": "🔴", "history": "🕘",
         }
         self._nav_texts: dict[str, str] = {}
         self.nav_btns: dict[str, QPushButton] = {}

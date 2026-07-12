@@ -348,6 +348,15 @@ class ChannelDelegate(QStyledItemDelegate):
         return (group == w._playing_group
                 and w._item_key(it) == w._playing_key)
 
+    @staticmethod
+    def _hover_overlay(tint_hex: str) -> QColor:
+        """A faint veil to lay over a row that has a custom background colour,
+        so hovering gives feedback without hiding the colour. Dark veil on a
+        light colour, light veil on a dark one, so it reads on either."""
+        c = QColor(tint_hex)
+        lum = 0.299 * c.red() + 0.587 * c.green() + 0.114 * c.blue()
+        return QColor(0, 0, 0, 40) if lum > 140 else QColor(255, 255, 255, 40)
+
     def _paint_grid(self, painter, option, index) -> None:
         it = index.data(Qt.ItemDataRole.UserRole) or {}
         kind = it.get("_ekind") or index.model().kind
@@ -369,7 +378,9 @@ class ChannelDelegate(QStyledItemDelegate):
             painter.drawRoundedRect(inner, 12, 12)
         elif option.state & QStyle.StateFlag.State_MouseOver:
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor(P["hover"]))
+            # Keep a custom background on hover: veil it instead of covering it.
+            painter.setBrush(self._hover_overlay(tint_bg) if tint_bg
+                             else QColor(P["hover"]))
             painter.drawRoundedRect(inner, 12, 12)
         if playing:
             pen = QPen(QColor(ACCENT))
@@ -467,7 +478,9 @@ class ChannelDelegate(QStyledItemDelegate):
         if option.state & QStyle.StateFlag.State_Selected:
             painter.fillRect(rect, QColor(P["sel"]))
         elif option.state & QStyle.StateFlag.State_MouseOver:
-            painter.fillRect(rect, QColor(P["hover"]))
+            # Keep a custom background on hover: veil it instead of covering it.
+            painter.fillRect(rect, self._hover_overlay(tint_bg) if tint_bg
+                             else QColor(P["hover"]))
         if playing:
             painter.fillRect(
                 QRect(rect.left(), rect.top() + 4, 3, rect.height() - 8),
