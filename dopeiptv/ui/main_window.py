@@ -656,10 +656,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.media_rating_lbl.hide()
         left_col.addWidget(self.media_rating_lbl, 0, Qt.AlignmentFlag.AlignLeft)
 
-        self.play_mpv = QPushButton("▶  " + tr("btn_play"), objectName="PlayGhost")
+        # Icon-only play button: a compact ▶ instead of a poster-wide "Play"
+        # bar. The tooltip and the universal play glyph keep it obvious.
+        self.play_mpv = QPushButton("▶", objectName="PlayGhost")
         self.play_mpv.setToolTip(tr("tooltip_play_in_mpv"))
-        self.play_mpv.setSizePolicy(QSizePolicy.Policy.Fixed,
-                                    QSizePolicy.Policy.Fixed)
+        self.play_mpv.setFixedSize(46, 40)
         self.play_mpv.clicked.connect(lambda: self.play("mpv"))
         left_col.addWidget(self.play_mpv, 0, Qt.AlignmentFlag.AlignLeft)
         left_col.addStretch(1)

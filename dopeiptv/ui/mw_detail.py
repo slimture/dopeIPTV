@@ -70,9 +70,6 @@ class _DetailMixin:
         poster_size = (self.POSTER_SIZE_MEDIA if is_media
                        else self.POSTER_SIZE_LIVE)
         self.d_logo.setFixedSize(*poster_size)
-        # Make the Play button span the poster's width so its (centered) label
-        # sits centered under the poster/TV icon rather than off to the left.
-        self.play_mpv.setFixedWidth(poster_size[0])
         if is_media:
             # Match the info box to the poster height so their bottoms align.
             self.media_info.setFixedHeight(self.POSTER_SIZE_MEDIA[1])
