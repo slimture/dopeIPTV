@@ -912,6 +912,12 @@ class EmbeddedPlayer(QWidget):
         self._stats_timer.setInterval(1000)
         self._stats_timer.timeout.connect(self._update_stats_text)
 
+        # Top-left "am I live?" badge: red LIVE at the live edge, a neutral
+        # TIMESHIFT pill when watching the catch-up archive. Child of the video
+        # so it floats over the picture; top-left anchor needs no reposition.
+        self.live_badge = QLabel("", self.video)
+        self.live_badge.hide()
+
         # macOS: route arrow-seek + cursor-hide through an app-level filter,
         # because a QOpenGLWidget can't drive them itself there. No-op on Linux.
         self._mac_input_filter = (
@@ -1155,6 +1161,28 @@ class EmbeddedPlayer(QWidget):
             vg.y() + vg.height() - self.seek_overlay.height() - margin)
 
     # -- overlay ---------------------------------------------------------------
+
+    def set_live_badge(self, kind: str | None) -> None:
+        """Show a top-left status pill: 'live' (red) at the live edge,
+        'timeshift' (neutral) while watching the archive, or None to hide it."""
+        b = self.live_badge
+        if kind == "live":
+            b.setText("● LIVE")
+            colour = "#FF5C5C"
+        elif kind == "timeshift":
+            b.setText("⧗ TIMESHIFT")
+            colour = "#FFFFFF"
+        else:
+            b.hide()
+            return
+        b.setStyleSheet(
+            f"background: rgba(0,0,0,150); color: {colour};"
+            "border-radius: 9px; padding: 3px 9px;"
+            "font-size: 11px; font-weight: 700;")
+        b.adjustSize()
+        b.move(12, 12)
+        b.show()
+        b.raise_()
 
     def set_overlay_info(self, text: str) -> None:
         self._overlay_text = text or ""
@@ -1935,6 +1963,7 @@ class EmbeddedPlayer(QWidget):
         self._hide_seek_ui()
         self._stats_overlay.hide()
         self._stats_timer.stop()
+        self.live_badge.hide()
         self._sync_pause_label(True)
         self._mac_show_cursor()
         # Force several deferred repaints - the compositor sometimes ignores a

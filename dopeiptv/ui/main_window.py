@@ -3146,6 +3146,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Reflect the new playback state on the poster overlay (play -> pause /
         # stop) when the item being played is the one shown in the detail pane.
         self._apply_play_icon()
+        # Top-left live/timeshift badge in the player: only meaningful for live
+        # channels (LIVE at the edge, TIMESHIFT on the archive); hidden for VOD.
+        if self.player:
+            self.player.set_live_badge(
+                ("timeshift" if self._playing_catchup else "live")
+                if kind == "live" else None)
 
     def _player_missing(self, name: str) -> None:
         QMessageBox.warning(
