@@ -1501,7 +1501,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             progress_cb=self.epg_progress.emit)
         self._info_cache.clear()
         self._set_status(tr("status_refreshing_playlist"))
-        self._show_toast(tr("status_refreshing_playlist"))
         self._load_categories()
         run_async(
             self.pool, lambda: self.xmltv.ensure_loaded(force=True),
@@ -1512,7 +1511,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _refresh_epg_now(self) -> None:
         """Force a fresh EPG fetch now (Settings button) without reloading the
         channel list."""
-        self._show_toast(tr("status_loading_programme_guide"))
+        self._flash_status(tr("status_loading_programme_guide"))
         run_async(
             self.pool, lambda: self.xmltv.ensure_loaded(force=True),
             lambda ok: (self._epg_progress_finished(),
@@ -1528,7 +1527,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 if self.playlist_store else None
         except Exception:
             pass
-        self._show_toast(tr("epg_cache_cleared"))
+        self._flash_status(tr("epg_cache_cleared"))
         self._refresh_epg_now()
 
     def start_demo(self) -> None:
@@ -1553,7 +1552,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not pl:
             return
         self._show_busy(tr("status_connecting", name=pl['name']))
-        self._show_toast(tr("status_connecting", name=pl['name']))
+        self._set_status(tr("status_connecting", name=pl['name']))
         candidate = make_client(pl)
 
         def done(_auth):
@@ -2989,12 +2988,36 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 "series": tr("status_loading_series")}.get(
             self.mode, tr("status_loading_content"))
 
-    def _set_status(self, text: str, error: bool = False) -> None:
+    def _write_status(self, text: str, error: bool = False) -> None:
         self.count_lbl.setStyleSheet(
             f"color:{P['error']}; font-size:11px; font-weight:600;"
             if error
             else f"color:{P['muted3']}; font-size:11px;")
         self.count_lbl.setText(text)
+
+    def _set_status(self, text: str, error: bool = False) -> None:
+        """Set the resting readout of the bottom status line (channel count,
+        what's playing, an error, ...). Remembered so a transient flash can
+        return to it."""
+        self._rest_status = (text, error)
+        self._write_status(text, error)
+
+    def _flash_status(self, text: str, ms: int = 4000) -> None:
+        """Briefly show an activity message in the status line, then return to
+        the resting readout. Used for momentary events (guide refresh, cache
+        cleared, ...) so they surface in the same place as everything else
+        instead of a separate overlay, without lingering afterwards."""
+        self._write_status(text, False)
+        token = getattr(self, "_flash_token", 0) + 1
+        self._flash_token = token
+
+        def restore() -> None:
+            if getattr(self, "_flash_token", 0) != token:
+                return   # a newer status write already took over
+            text_r, err_r = getattr(self, "_rest_status", ("", False))
+            self._write_status(text_r, err_r)
+
+        QTimer.singleShot(ms, restore)
 
     MAX_STREAM_RETRIES = 2
 
