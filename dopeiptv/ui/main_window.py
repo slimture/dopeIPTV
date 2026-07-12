@@ -1141,8 +1141,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     @staticmethod
     def _overlay_glyph(size: int, kind: str) -> "QIcon":
-        """A crisp white play / pause / stop glyph with a faint dark outline so
-        it reads over any artwork (no disc behind it)."""
+        """A white play / pause / stop glyph on a soft dark disc, so it stays
+        legible over any artwork - including the many white channel logos it
+        used to vanish into."""
         from PyQt6.QtCore import QPointF, QRectF
         from PyQt6.QtGui import QIcon, QPainter, QPixmap, QPolygonF
         scale = 3
@@ -1153,29 +1154,26 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         pt.setRenderHint(QPainter.RenderHint.Antialiasing)
         pt.setPen(Qt.PenStyle.NoPen)
 
-        def shapes(grow: float):
-            if kind == "pause":
-                bw, bh, gap = S * 0.17, S * 0.5, S * 0.14
-                y = (S - bh) / 2
-                for x in (S * 0.5 - gap / 2 - bw, S * 0.5 + gap / 2):
-                    r = QRectF(x, y, bw, bh).adjusted(-grow, -grow, grow, grow)
-                    pt.drawRoundedRect(r, bw * 0.35, bw * 0.35)
-            elif kind == "stop":
-                s = S * 0.5
-                r = QRectF((S - s) / 2, (S - s) / 2, s, s).adjusted(
-                    -grow, -grow, grow, grow)
-                pt.drawRoundedRect(r, S * 0.06, S * 0.06)
-            else:                    # play triangle (optically nudged right)
-                cx, cy, w, h = S * 0.55, S * 0.5, S * 0.44, S * 0.52
-                pt.drawPolygon(QPolygonF([
-                    QPointF(cx - w * 0.5 - grow, cy - h * 0.5 - grow),
-                    QPointF(cx - w * 0.5 - grow, cy + h * 0.5 + grow),
-                    QPointF(cx + w * 0.5 + grow, cy)]))
+        # Soft dark disc for contrast (no outline/ring, just a scrim).
+        pt.setBrush(QColor(0, 0, 0, 130))
+        pt.drawEllipse(QRectF(S * 0.03, S * 0.03, S * 0.94, S * 0.94))
 
-        pt.setBrush(QColor(0, 0, 0, 120))
-        shapes(S * 0.03)             # subtle dark outline
         pt.setBrush(QColor("white"))
-        shapes(0.0)
+        if kind == "pause":
+            bw, bh, gap = S * 0.11, S * 0.34, S * 0.10
+            y = (S - bh) / 2
+            for x in (S * 0.5 - gap / 2 - bw, S * 0.5 + gap / 2):
+                pt.drawRoundedRect(QRectF(x, y, bw, bh), bw * 0.35, bw * 0.35)
+        elif kind == "stop":
+            s = S * 0.32
+            pt.drawRoundedRect(QRectF((S - s) / 2, (S - s) / 2, s, s),
+                               S * 0.05, S * 0.05)
+        else:                        # play triangle (optically nudged right)
+            cx, cy, w, h = S * 0.54, S * 0.5, S * 0.30, S * 0.36
+            pt.drawPolygon(QPolygonF([
+                QPointF(cx - w * 0.5, cy - h * 0.5),
+                QPointF(cx - w * 0.5, cy + h * 0.5),
+                QPointF(cx + w * 0.5, cy)]))
         pt.end()
         return QIcon(pm)
 

@@ -151,7 +151,7 @@ class _DetailMixin:
         """Size the play overlay to the poster (small on a channel logo, larger
         on a movie/series poster), centre it, and keep it on top."""
         b, d = self.play_mpv, self.d_logo
-        side = max(20, min(40, round(d.width() * 0.26)))
+        side = max(26, min(46, round(d.width() * 0.30)))
         b.setFixedSize(side, side)
         # Always redraw: the glyph depends on whether *this* item is the one
         # playing (play / pause / stop), not just on the size.
