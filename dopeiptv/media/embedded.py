@@ -1293,6 +1293,20 @@ class EmbeddedPlayer(QWidget):
             set_opt("video-aspect-override",
                     aspect if aspect != "auto" else "-1")
 
+        # Optional video filters (all off/neutral by default). These are plain
+        # mpv properties, applied live on the running core.
+        #  - deinterlace: smooth interlaced live SD/HD feeds.
+        #  - sharpen: unsharp mask strength (0 = off).
+        #  - tone-mapping: HDR->SDR curve; harmless on SDR content.
+        set_opt("deinterlace",
+                s.value("video_deinterlace", "false") == "true")
+        try:
+            sharpen = float(s.value("video_sharpen", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            sharpen = 0.0
+        set_opt("sharpen", max(0.0, min(sharpen, 3.0)))
+        set_opt("tone-mapping", s.value("video_tonemapping", "auto") or "auto")
+
     def playback_position(self) -> float:
         m = self.video.mpv
         try:

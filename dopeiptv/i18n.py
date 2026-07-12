@@ -1841,6 +1841,44 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Доступно обновление ({version})",
         "th": "มีอัปเดต ({version})",
     },
+    "setting_deinterlace": {
+        "en": "Deinterlace", "sv": "Avfläta",
+        "es": "Desentrelazar", "de": "Deinterlacing",
+        "fr": "Désentrelacement", "zh": "去隔行",
+        "ru": "Деинтерлейсинг", "th": "ลบเส้นอินเทอร์เลซ",
+    },
+    "setting_sharpen": {
+        "en": "Sharpen", "sv": "Skärpa",
+        "es": "Nitidez", "de": "Schärfen",
+        "fr": "Netteté", "zh": "锐化",
+        "ru": "Резкость", "th": "เพิ่มความคมชัด",
+    },
+    "setting_tonemapping": {
+        "en": "HDR tone-mapping", "sv": "HDR-tonemappning",
+        "es": "Mapeo de tonos HDR", "de": "HDR-Tonemapping",
+        "fr": "Tone-mapping HDR", "zh": "HDR 色调映射",
+        "ru": "HDR-тонирование", "th": "การแมปโทน HDR",
+    },
+    "option_off": {
+        "en": "Off", "sv": "Av", "es": "Desactivado", "de": "Aus",
+        "fr": "Désactivé", "zh": "关闭", "ru": "Выкл.", "th": "ปิด",
+    },
+    "option_low": {
+        "en": "Low", "sv": "Låg", "es": "Baja", "de": "Niedrig",
+        "fr": "Faible", "zh": "低", "ru": "Низкая", "th": "ต่ำ",
+    },
+    "option_high": {
+        "en": "High", "sv": "Hög", "es": "Alta", "de": "Hoch",
+        "fr": "Élevée", "zh": "高", "ru": "Высокая", "th": "สูง",
+    },
+    "option_tonemap_auto": {
+        "en": "Auto", "sv": "Auto", "es": "Automático", "de": "Automatisch",
+        "fr": "Auto", "zh": "自动", "ru": "Авто", "th": "อัตโนมัติ",
+    },
+    "option_tonemap_clip": {
+        "en": "Clip", "sv": "Klipp", "es": "Recorte", "de": "Clipping",
+        "fr": "Écrêtage", "zh": "裁剪", "ru": "Обрезка", "th": "ตัด",
+    },
     "status_stream_error": {
         "en": "Stream error: {msg}",
         "sv": "Strömfel: {msg}",

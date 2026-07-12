@@ -348,6 +348,18 @@ class _SettingsMixin:
              ("4:3", "4:3"), ("2.35:1", "2.35:1"),
              ("stretch", tr("option_aspect_stretch"))],
             self.settings.value("aspect_mode", "auto"))
+        deint_box = self._combo(
+            [("false", tr("option_no")), ("true", tr("option_yes"))],
+            self.settings.value("video_deinterlace", "false"))
+        sharpen_box = self._combo(
+            [("0.0", tr("option_off")), ("0.5", tr("option_low")),
+             ("1.0", tr("option_medium")), ("2.0", tr("option_high"))],
+            str(self.settings.value("video_sharpen", "0.0")))
+        tonemap_box = self._combo(
+            [("auto", tr("option_tonemap_auto")), ("hable", "Hable"),
+             ("mobius", "Mobius"), ("reinhard", "Reinhard"),
+             ("bt.2390", "BT.2390"), ("clip", tr("option_tonemap_clip"))],
+            self.settings.value("video_tonemapping", "auto"))
         buf_box = self._combo(
             [("1", "1 s"), ("3", "3 s"), ("5", "5 s"),
              ("10", "10 s"), ("30", "30 s")],
@@ -391,6 +403,9 @@ class _SettingsMixin:
         pf.addRow(tr("setting_sub_lang"), slang_box)
         pf.addRow(tr("setting_sub_lang_fallback"), slang2_box)
         pf.addRow(tr("setting_aspect_ratio"), aspect_box)
+        pf.addRow(tr("setting_deinterlace"), deint_box)
+        pf.addRow(tr("setting_sharpen"), sharpen_box)
+        pf.addRow(tr("setting_tonemapping"), tonemap_box)
         pf.addRow(tr("setting_network_buffer"), buf_box)
         pf.addRow(tr("setting_replay_delay"), replay_delay_row)
         pf.addRow(tr("setting_epg_delay"), epg_delay_row)
@@ -1130,6 +1145,12 @@ class _SettingsMixin:
                 "sub_lang2", slang2_box.currentData())
             self.settings.setValue(
                 "aspect_mode", aspect_box.currentData())
+            self.settings.setValue(
+                "video_deinterlace", deint_box.currentData())
+            self.settings.setValue(
+                "video_sharpen", sharpen_box.currentData())
+            self.settings.setValue(
+                "video_tonemapping", tonemap_box.currentData())
             self.settings.setValue(
                 "cache_secs", buf_box.currentData())
 
