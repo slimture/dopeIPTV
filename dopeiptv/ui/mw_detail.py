@@ -148,9 +148,15 @@ class _DetailMixin:
         self.play_mpv.raise_()   # keep the play overlay above the poster art
 
     def _position_play_over_poster(self) -> None:
-        """Centre the play overlay on the poster/logo and keep it on top."""
+        """Size the play overlay to the poster (small on a channel logo, larger
+        on a movie/series poster), centre it, and keep it on top."""
         b, d = self.play_mpv, self.d_logo
-        b.move((d.width() - b.width()) // 2, (d.height() - b.height()) // 2)
+        side = max(20, min(40, round(d.width() * 0.26)))
+        b.setFixedSize(side, side)
+        # Always redraw: the glyph depends on whether *this* item is the one
+        # playing (play / pause / stop), not just on the size.
+        self._apply_play_icon(side)
+        b.move((d.width() - side) // 2, (d.height() - side) // 2)
         b.raise_()
 
     def _media_title_for_tmdb(self, it) -> str:

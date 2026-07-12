@@ -554,6 +554,7 @@ class EmbeddedPlayer(QWidget):
     stalled = pyqtSignal()
     finished = pyqtSignal()
     next_episode = pyqtSignal()
+    paused_changed = pyqtSignal(bool)
 
     OVERLAY_HIDE_MS = 3000
     VIDEO_BOX_HEIGHT = 260
@@ -1463,6 +1464,7 @@ class EmbeddedPlayer(QWidget):
         icon = _control_icon(name, self._icon_color, self.ICON_PX)
         self.pause_btn.setIcon(icon)
         self.fs_pause_btn.setIcon(icon)
+        self.paused_changed.emit(paused)
 
     # -- options menu ----------------------------------------------------------
 

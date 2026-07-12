@@ -32,7 +32,7 @@ from ..providers.chromecast import CastDialog, ChromecastManager
 from ..providers.client import (
     DemoClient, OfflineClient, XtreamClient, make_client,
 )
-from ..media.embedded import EmbeddedPlayer, _control_icon
+from ..media.embedded import EmbeddedPlayer
 from ..providers.epg import XmltvGuide, epg_cache_path, prune_epg_caches
 from ..services.coverart import CoverArtService
 from ..services.resume import ResumeStore
@@ -45,7 +45,7 @@ from ..core.stores import (
     CategoryOverrides, ChannelOverrides, FavoriteStore, HistoryStore,
     ParentalControl, PlaylistStore, WatchedStore, WatchlistStore,
 )
-from .theme import ACCENT, P
+from .theme import P
 from ..providers.trakt import TraktClient
 from ..core.wakelock import WakeLock
 from .widgets import _SidebarLogo, _Toast
@@ -617,6 +617,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.stalled.connect(self._on_player_stalled)
             self.player.finished.connect(self._on_player_finished)
             self.player.next_episode.connect(self._play_next_episode)
+            # Keep the poster overlay's play/pause/stop glyph in sync with the
+            # player (guarded: the overlay is built later in this constructor).
+            self.player.paused_changed.connect(
+                lambda _p: self._apply_play_icon())
+            self.player.stopped.connect(self._apply_play_icon)
+            self.player.finished.connect(self._apply_play_icon)
             # Keep the player pane visible on stop - mpv clears to black -
             # instead of hiding it, so the window just goes black.
             dl.addWidget(self.player, 1)
@@ -664,11 +670,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # when the poster size changes.
         self.play_mpv = QPushButton(self.d_logo, objectName="PlayGhost")
         self.play_mpv.setToolTip(tr("tooltip_play_in_mpv"))
-        self.play_mpv.setFixedSize(38, 38)
-        self.play_mpv.setIconSize(QSize(20, 20))
+        self.play_mpv.setFixedSize(30, 30)
         self.play_mpv.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._apply_play_icon()
-        self.play_mpv.clicked.connect(lambda: self.play("mpv"))
+        self._apply_play_icon(30)
+        self.play_mpv.clicked.connect(self._play_overlay_clicked)
         # Start hidden: the poster and its play overlay only appear once a
         # channel/movie/series is selected (see _show_detail), so an empty
         # detail pane has no stray box or button.
@@ -1079,10 +1084,94 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         QTimer.singleShot(30_000, lambda: logo.set_update(
             True, follow_accent=True))
 
-    def _apply_play_icon(self) -> None:
-        """(Re)draw the detail-pane play triangle in the current theme accent.
-        Called at build time and whenever the accent changes."""
-        self.play_mpv.setIcon(_control_icon("play", P.get("accent", ACCENT), 20))
+    def _overlay_state(self) -> str:
+        """What the poster overlay should do right now:
+          'play'  - nothing (or a different item) is playing -> start this one
+          'pause' - this item is playing and can be paused (VOD/series/recording
+                    or a timeshift channel) -> pause
+          'resume'- this item is playing but paused -> resume
+          'stop'  - this item is a plain live channel (no timeshift), which
+                    can't meaningfully pause -> stop instead."""
+        p = self.player
+        playing_this = (p is not None and p.current_url is not None
+                        and self._playing_key is not None
+                        and self._current_key == self._playing_key)
+        if not playing_this:
+            return "play"
+        it = self.list_model.item_at(self.listw.currentIndex().row())
+        try:
+            timeshift = bool(it) and self._timeshift_days(it) > 0
+        except Exception:
+            timeshift = False
+        pausable = (self._playing_group in ("vod", "episode", "rec")
+                    or (self._playing_group == "live" and timeshift))
+        if not pausable:
+            return "stop"
+        return "resume" if getattr(p, "_paused", False) else "pause"
+
+    def _apply_play_icon(self, size: int | None = None) -> None:
+        """(Re)draw the poster overlay to match the current playback state
+        (play / pause / stop). Called on build, selection change, and whenever
+        playback or pause state changes."""
+        if not hasattr(self, "play_mpv"):
+            return
+        size = int(size or self.play_mpv.width() or 28)
+        glyph = {"pause": "pause", "stop": "stop"}.get(
+            self._overlay_state(), "play")
+        self.play_mpv.setIcon(self._overlay_glyph(size, glyph))
+        self.play_mpv.setIconSize(QSize(size, size))
+
+    def _play_overlay_clicked(self) -> None:
+        state = self._overlay_state()
+        if state == "play":
+            self.play("mpv")
+        elif state == "stop":
+            if self.player:
+                self.player.stop()
+        else:                       # pause / resume
+            if self.player:
+                self.player.toggle_pause()
+        self._apply_play_icon()
+
+    @staticmethod
+    def _overlay_glyph(size: int, kind: str) -> "QIcon":
+        """A crisp white play / pause / stop glyph with a faint dark outline so
+        it reads over any artwork (no disc behind it)."""
+        from PyQt6.QtCore import QPointF, QRectF
+        from PyQt6.QtGui import QIcon, QPainter, QPixmap, QPolygonF
+        scale = 3
+        S = max(1, int(size)) * scale
+        pm = QPixmap(S, S)
+        pm.fill(Qt.GlobalColor.transparent)
+        pt = QPainter(pm)
+        pt.setRenderHint(QPainter.RenderHint.Antialiasing)
+        pt.setPen(Qt.PenStyle.NoPen)
+
+        def shapes(grow: float):
+            if kind == "pause":
+                bw, bh, gap = S * 0.17, S * 0.5, S * 0.14
+                y = (S - bh) / 2
+                for x in (S * 0.5 - gap / 2 - bw, S * 0.5 + gap / 2):
+                    r = QRectF(x, y, bw, bh).adjusted(-grow, -grow, grow, grow)
+                    pt.drawRoundedRect(r, bw * 0.35, bw * 0.35)
+            elif kind == "stop":
+                s = S * 0.5
+                r = QRectF((S - s) / 2, (S - s) / 2, s, s).adjusted(
+                    -grow, -grow, grow, grow)
+                pt.drawRoundedRect(r, S * 0.06, S * 0.06)
+            else:                    # play triangle (optically nudged right)
+                cx, cy, w, h = S * 0.55, S * 0.5, S * 0.44, S * 0.52
+                pt.drawPolygon(QPolygonF([
+                    QPointF(cx - w * 0.5 - grow, cy - h * 0.5 - grow),
+                    QPointF(cx - w * 0.5 - grow, cy + h * 0.5 + grow),
+                    QPointF(cx + w * 0.5 + grow, cy)]))
+
+        pt.setBrush(QColor(0, 0, 0, 120))
+        shapes(S * 0.03)             # subtle dark outline
+        pt.setBrush(QColor("white"))
+        shapes(0.0)
+        pt.end()
+        return QIcon(pm)
 
     def _set_focus_mode(self, on: bool) -> None:
         """Focus mode hides the whole content list so the player pane gets the
@@ -3028,6 +3117,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     else self._player_missing("mpv"))
         else:
             launch_player("mpv", url, title, self)
+        # Reflect the new playback state on the poster overlay (play -> pause /
+        # stop) when the item being played is the one shown in the detail pane.
+        self._apply_play_icon()
 
     def _player_missing(self, name: str) -> None:
         QMessageBox.warning(

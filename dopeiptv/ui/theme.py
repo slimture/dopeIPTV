@@ -241,17 +241,11 @@ QPushButton {{
 QPushButton:hover  {{ background: {p['btn_hover']}; }}
 QPushButton#Primary {{ background: {ACCENT}; border: none; color: white; }}
 QPushButton#Primary:hover {{ background: {p['accent_hi']}; }}
-/* A small, icon-only play button laid over the detail-pane poster: a compact
-   round disc with a subtle accent ring, dark enough that the accent triangle
-   reads clearly over any artwork. 38x38 in code, so the 19px radius makes it a
-   circle; padding 0 keeps the glyph centred. */
-QPushButton#PlayGhost {{
-    background: rgba(0,0,0,0.55); border: 1px solid {_rgba(ACCENT, 0.7)};
-    border-radius: 19px; padding: 0;
-}}
-QPushButton#PlayGhost:hover {{
-    background: rgba(0,0,0,0.72); border-color: {ACCENT};
-}}
+/* The poster play/pause/stop overlay is just a white glyph (drawn in code with
+   a faint dark outline so it reads over any artwork) - no disc or ring. Fully
+   transparent button; a barely-there wash on hover is the only chrome. */
+QPushButton#PlayGhost {{ background: transparent; border: none; padding: 0; }}
+QPushButton#PlayGhost:hover {{ background: rgba(255,255,255,0.10); border-radius: 6px; }}
 QPushButton#MiniBtn {{
     padding: 0; font-size: 13px; border-radius: 6px; text-align: center;
 }}
