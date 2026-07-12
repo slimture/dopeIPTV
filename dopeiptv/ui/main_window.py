@@ -769,7 +769,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         mid.setMinimumWidth(240)
         self._side, self._mid, self._det = side, mid, det
         self._root = root
-        self._toast = _Toast(root)
+        # Parent the toast to the window itself, not the splitter: a QSplitter
+        # treats every child widget as a pane and overrides its geometry, so an
+        # overlay parented to it gets squeezed/misplaced when the splitter
+        # relayouts (e.g. after the playlist loads). As a free child of the
+        # main window it floats correctly over the content.
+        self._toast = _Toast(self)
 
         self.tick = QTimer(self)
         self.tick.timeout.connect(self._refresh_progress)
