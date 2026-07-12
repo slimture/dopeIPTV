@@ -685,7 +685,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # "Now playing" sits beside the logo instead of stacked below it -
         # the channel name is already visible in the middle list, the
         # window title bar, and the mini player's own control bar.
-        self.now_card = QFrame(objectName="Card")
+        self.now_card = QFrame(objectName="NowCard")
         nc = QVBoxLayout(self.now_card)
         nc.setContentsMargins(16, 14, 16, 14)
         nc.setSpacing(8)
@@ -700,6 +700,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         for w in (self.now_time, self.now_title, self.now_bar, self.now_desc):
             nc.addWidget(w)
         self.now_card.hide()
+        # Right-click the "now" card to record/remind the current programme.
+        self.now_card.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu)
+        self.now_card.customContextMenuRequested.connect(
+            lambda pos: self._current_epg and self._epg_programme_menu(
+                self._current_epg, self.now_card.mapToGlobal(pos)))
         header_row.addWidget(self.now_card, 1, Qt.AlignmentFlag.AlignTop)
 
         # Movie/series synopsis + metadata, shown to the *right* of the

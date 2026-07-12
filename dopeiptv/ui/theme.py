@@ -225,14 +225,26 @@ QSlider::handle:horizontal:hover {{ background: {p['accent_hi']}; }}
 #DetailTitle {{ font-size: 20px; font-weight: 700; }}
 #DetailMeta  {{ color: {p['muted']}; font-size: 12px; }}
 #NowTitle    {{ font-size: 15px; font-weight: 600; }}
-#NowTime     {{ color: {ACCENT}; font-size: 12px; font-weight: 600; }}
+#NowTime     {{ color: {ACCENT}; font-size: 11px; font-weight: 700; }}
 #NowDesc     {{ color: {p['text3']}; font-size: 12px; }}
 
 QFrame#Card {{
     background: {p['input']}; border: 1px solid {p['border_in']}; border-radius: 12px;
 }}
-QLabel#EpgRowTime  {{ color: {ACCENT}; font-size: 11px; font-weight: 600; }}
-QLabel#EpgRowTitle {{ font-size: 12px; }}
+/* "On now" card: an accent-tinted panel with a left accent rail, so the
+   current programme reads as highlighted rather than a plain grey box. */
+QFrame#NowCard {{
+    background: {_rgba(ACCENT, 0.10)};
+    border: 1px solid {_rgba(ACCENT, 0.30)};
+    border-left: 3px solid {ACCENT};
+    border-radius: 12px;
+}}
+/* Upcoming programmes: slim rows (time | title) with a hover cue, instead of
+   heavy bordered cards. */
+QFrame#EpgRow {{ background: transparent; border: none; border-radius: 8px; }}
+QFrame#EpgRow:hover {{ background: {p['hover']}; }}
+QLabel#EpgRowTime  {{ color: {ACCENT}; font-size: 12px; font-weight: 700; }}
+QLabel#EpgRowTitle {{ font-size: 13px; }}
 
 QPushButton {{
     background: {p['btn']}; border: 1px solid {p['btn_hover']}; border-radius: 9px;

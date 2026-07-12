@@ -14,7 +14,7 @@ from .widgets import _ClickableWidget
 from ..core.workers import run_async, tmdb_url_from_provider
 from PyQt6.QtCore import QSize, QTimer, Qt
 from PyQt6.QtGui import QIcon, QPainter, QPainterPath, QPixmap
-from PyQt6.QtWidgets import QAbstractItemView, QDialog, QDialogButtonBox, QFrame, QLabel, QListWidget, QListWidgetItem, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QAbstractItemView, QDialog, QDialogButtonBox, QFrame, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QMenu, QVBoxLayout, QWidget
 from datetime import datetime
 
 
@@ -680,7 +680,7 @@ class _DetailMixin:
         if current:
             self._current_epg = current
             self.now_time.setText(
-                f"NOW * {current['start']:%H:%M}-{current['stop']:%H:%M}")
+                f"● NOW   {current['start']:%H:%M} – {current['stop']:%H:%M}")
             self.now_title.setText(
                 current["title"] or "Unknown programme")
             self.now_desc.setText(current["desc"][:400])
@@ -716,17 +716,63 @@ class _DetailMixin:
                     "No programme guide available for this channel.")
 
     def _epg_card(self, post, with_date: bool = False) -> None:
-        card = QFrame(objectName="Card")
-        kl = QVBoxLayout(card)
-        kl.setContentsMargins(12, 9, 12, 9)
-        kl.setSpacing(2)
+        card = QFrame(objectName="EpgRow")
+        row = QHBoxLayout(card)
+        row.setContentsMargins(12, 8, 12, 8)
+        row.setSpacing(12)
         fmt = "%-d/%-m %H:%M" if with_date else "%H:%M"
         t = QLabel(post["start"].strftime(fmt), objectName="EpgRowTime")
+        t.setFixedWidth(84 if with_date else 44)
+        t.setAlignment(Qt.AlignmentFlag.AlignTop)
         ti = QLabel(post["title"] or "Unknown", objectName="EpgRowTitle")
         ti.setWordWrap(True)
-        kl.addWidget(t)
-        kl.addWidget(ti)
+        row.addWidget(t, 0, Qt.AlignmentFlag.AlignTop)
+        row.addWidget(ti, 1)
+        card.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        card.customContextMenuRequested.connect(
+            lambda pos, c=card, po=post:
+            self._epg_programme_menu(po, c.mapToGlobal(pos)))
         self.epg_lay.insertWidget(self.epg_lay.count() - 1, card)
+
+    # -- record / remind straight from a guide entry -------------------------
+
+    def _epg_programme_menu(self, post, global_pos) -> None:
+        """Right-click a programme (in the detail pane's guide) to record it or
+        set a reminder - the same actions the middle list and grid offer."""
+        it = self.list_model.item_at(self.listw.currentIndex().row())
+        if not it or it.get("stream_id") is None:
+            return
+        start = post["start"].timestamp() if post.get("start") else 0.0
+        stop = post["stop"].timestamp() if post.get("stop") else 0.0
+        now = datetime.now().astimezone().timestamp()
+        m = QMenu(self)
+        if stop > now:
+            m.addAction(tr("rec_record_programme"),
+                        lambda: self._record_programme(it, post, start, stop))
+        rem = getattr(self, "reminders", None)
+        if start > now and rem is not None:
+            sid = it.get("stream_id")
+            if rem.has(sid, start):
+                m.addAction(tr("reminder_remove"),
+                            lambda: rem.remove(sid, start))
+            else:
+                m.addAction(
+                    tr("reminder_add"),
+                    lambda: self._add_reminder(
+                        it, {"title": post.get("title"),
+                             "start_timestamp": start}))
+        if not m.isEmpty():
+            m.exec(global_pos)
+
+    def _record_programme(self, ch, post, start_ts, stop_ts) -> None:
+        if not self._within_storage_cap():
+            return
+        url = self.client.live_url(ch.get("stream_id"), "ts")
+        if not url:
+            return
+        now = datetime.now().astimezone().timestamp()
+        self.rec.add_job(url, ch.get("name") or post.get("title") or "recording",
+                         max(now, start_ts), stop_ts)
 
     def _refresh_progress(self) -> None:
         e = self._current_epg
