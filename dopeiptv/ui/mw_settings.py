@@ -295,11 +295,12 @@ class _SettingsMixin:
         d = QDialog(self)
         d.setWindowTitle(tr("settings_title"))
         d.setMinimumSize(820, 600)
-        # Open at a comfortable fraction of the main window instead of the bare
-        # minimum, so the grouped tabs aren't cramped - clamped to the window's
-        # own size so it never spills past it.
+        # Tall enough that the grouped tabs aren't cramped, but a fixed, modest
+        # width - the forms don't need to get wider, only taller (the earlier
+        # width-scaling made it far too wide on a big window). Clamped to the
+        # main window so it never spills past it.
         geo = self.geometry()
-        d.resize(min(geo.width(), max(920, int(geo.width() * 0.75))),
+        d.resize(min(geo.width(), 900),
                  min(geo.height(), max(660, int(geo.height() * 0.85))))
         outer = QVBoxLayout(d)
         outer.setContentsMargins(18, 18, 18, 18)
