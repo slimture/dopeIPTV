@@ -417,6 +417,42 @@ class XmltvGuide:
         out.reverse()
         return out
 
+    def search(self, items, query: str, win_start: float, win_stop: float,
+               limit: int = 300) -> list[dict]:
+        """Find programmes whose title or description contains *query*
+        (case-insensitive) airing within [win_start, win_stop], across the
+        given channel *items*. Each result carries its channel item under
+        ``_channel`` so callers can tune in or set a reminder. Sorted by start
+        time and capped at *limit*."""
+        if not self.ensure_loaded():
+            return []
+        q = (query or "").strip().lower()
+        if not q:
+            return []
+        out: list[dict] = []
+        seen: set = set()
+        for item in items:
+            sched = self._sched_for(item)
+            if not sched:
+                continue
+            starts, stops, titles, descs = sched
+            n = len(starts)
+            j = bisect_left(starts, win_start - self._MAX_PROG_SECS)
+            while j < n and starts[j] < win_stop:
+                if stops[j] > win_start and (
+                        q in titles[j].lower() or q in descs[j].lower()):
+                    # A channel can appear more than once in the line-up; key on
+                    # (name, start, title) so the same airing isn't listed twice.
+                    dedup = (item.get("name"), starts[j], titles[j])
+                    if dedup not in seen:
+                        seen.add(dedup)
+                        e = self._entry(sched, j)
+                        e["_channel"] = item
+                        out.append(e)
+                j += 1
+        out.sort(key=lambda p: p["start_timestamp"])
+        return out[:limit]
+
     def _parse(self, data: bytes) -> None:
         # Many EPG URLs serve gzipped XMLTV (.xml.gz); requests doesn't
         # transparently decompress a gzip *body* (only transfer-encoding), so

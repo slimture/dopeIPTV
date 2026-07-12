@@ -841,6 +841,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                   activated=self._shortcut_stats)
         QShortcut(QKeySequence("Ctrl+G"), self,
                   activated=self._shortcut_epg_guide)
+        QShortcut(QKeySequence("Ctrl+Shift+F"), self,
+                  activated=self._open_epg_search)
         # Jump back to the previously watched live channel (TV "last" button).
         QShortcut(QKeySequence(Qt.Key.Key_Backspace), self,
                   activated=self._last_channel)

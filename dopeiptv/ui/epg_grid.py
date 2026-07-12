@@ -122,6 +122,9 @@ class EpgGridDialog(QDialog):
         outer.addWidget(self.view, 1)
 
         bar = QHBoxLayout()
+        self.search_btn = QPushButton("🔍 " + tr("epg_search_btn"))
+        self.search_btn.clicked.connect(self._open_search)
+        bar.addWidget(self.search_btn)
         self.now_btn = QPushButton("⟳ " + tr("epg_jump_now"))
         self.now_btn.clicked.connect(self._scroll_to_now)
         bar.addWidget(self.now_btn)
@@ -176,6 +179,10 @@ class EpgGridDialog(QDialog):
 
     def _x(self, ts: float) -> float:
         return self.CH_COL_W + (ts - self._start) / 60 * self.PX_PER_MIN
+
+    def _open_search(self) -> None:
+        from .epg_search import EpgSearchDialog
+        EpgSearchDialog(self.window).exec()
 
     def _scroll_to_now(self) -> None:
         """Bring the current time back into view (after scrolling far back)."""

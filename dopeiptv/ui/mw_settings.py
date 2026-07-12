@@ -90,6 +90,13 @@ class _SettingsMixin:
         run_async(self.pool, lambda: self.client.live_streams(None),
                   done, lambda _: dlg.close())
 
+    def _open_epg_search(self) -> None:
+        """Open the guide search (Ctrl+Shift+F): find a programme by name across
+        every live channel this week and tune in or set a reminder."""
+        self._ensure_xmltv_loaded()
+        from .epg_search import EpgSearchDialog
+        EpgSearchDialog(self).exec()
+
     def _favorite_channels_for_guide(self) -> list:
         """The favorite live channels the EPG guide should cover, honoring the
         currently selected Favorites sub-category (a channel folder, or all)."""
