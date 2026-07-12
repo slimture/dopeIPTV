@@ -507,7 +507,7 @@ class _MacInputFilter(QObject):
 
     def eventFilter(self, obj, event):
         et = event.type()
-        if et == QEvent.Type.MouseMove:
+        if et == QEvent.Type.MouseMove and sys.platform == "darwin":
             from ..core.platform_macos import set_cursor_hidden
             set_cursor_hidden(False)
             if self._over_video():
@@ -918,10 +918,12 @@ class EmbeddedPlayer(QWidget):
         self.live_badge = QLabel("", self.video)
         self.live_badge.hide()
 
-        # macOS: route arrow-seek + cursor-hide through an app-level filter,
-        # because a QOpenGLWidget can't drive them itself there. No-op on Linux.
-        self._mac_input_filter = (
-            _MacInputFilter(self) if sys.platform == "darwin" else None)
+        # App-level filter for bare Left/Right seeking of a seekable video, so
+        # it works even in the docked mini-player where focus is on the list
+        # (a QOpenGLWidget can't reliably drive it itself). Live/non-seekable
+        # streams and text fields are left alone, so channel zapping and typing
+        # still work. On macOS it also handles cursor-hide over the video.
+        self._mac_input_filter = _MacInputFilter(self)
 
         self.retranslate_ui()
 
@@ -1428,12 +1430,38 @@ class EmbeddedPlayer(QWidget):
             m.play(url)
             self.current_url = url
             self._pos_timer.start()
+            # Safety net for the "silent until you replay it" case: switching
+            # streams while the previous one tears down can land with no audio
+            # track selected even though aid=auto. Re-check shortly after load
+            # and force the first audio track if none is active.
+            for delay in (500, 1500):
+                QTimer.singleShot(delay, self._ensure_audio_selected)
             return True
         except Exception as e:
             print(f"[dopeIPTV] Embedded playback failed: "
                   f"{type(e).__name__}: {e}", file=sys.stderr)
             self.current_url = None
             return False
+
+    def _ensure_audio_selected(self) -> None:
+        """If playback has audio tracks but none is active (a stream-switch
+        race that otherwise plays silent until you replay it), select the
+        first one. A no-op when audio is already playing."""
+        m = self.video.mpv
+        if m is None or self.current_url is None:
+            return
+        try:
+            if m.aid:               # already on a track (truthy id)
+                return
+            tracks = [t for t in (m.track_list or [])
+                      if t.get("type") == "audio"]
+        except Exception:
+            return
+        if tracks:
+            try:
+                m.aid = tracks[0].get("id")
+            except Exception:
+                pass
 
     # -- seeking ---------------------------------------------------------------
 

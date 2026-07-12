@@ -221,6 +221,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._current_key = None
         self._playing_key = None
         self._playing_group: str | None = None
+        self._playing_catchup = False   # watching a catch-up archive segment
+        self._pause_started = None
         self._playing_item = None
         self._focus_mode = False
         self._fav_view_tint = ("", "")
