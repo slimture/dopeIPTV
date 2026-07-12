@@ -102,15 +102,18 @@ class _SidebarLogo(QWidget):
 
     def bounce(self, duration_ms: int = 15_000) -> None:
         """Hop the update badge for roughly ``duration_ms`` to catch the eye at
-        startup, then rest so it's noticed without nagging forever."""
+        startup, then rest so it's noticed without nagging forever. Each cycle
+        is a clear hop up and back down followed by a short pause."""
         from PyQt6.QtCore import QVariantAnimation, QEasingCurve
-        hop = 850
+        hop = 1200
+        amp = -10.0
         anim = QVariantAnimation(self)
         anim.setDuration(hop)
         anim.setStartValue(0.0)
-        anim.setKeyValueAt(0.5, -4.0)
-        anim.setEndValue(0.0)
-        anim.setEasingCurve(QEasingCurve.Type.OutBounce)
+        anim.setKeyValueAt(0.14, amp)        # up quickly
+        anim.setKeyValueAt(0.34, 0.0)        # settle back down
+        anim.setEndValue(0.0)                # rest until the next hop
+        anim.setEasingCurve(QEasingCurve.Type.OutQuad)
         anim.setLoopCount(max(1, round(duration_ms / hop)))
         anim.valueChanged.connect(self._on_bounce)
         anim.finished.connect(lambda: self._on_bounce(0.0))
