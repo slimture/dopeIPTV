@@ -1507,9 +1507,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             progress_cb=self.epg_progress.emit)
         self._info_cache.clear()
         # Name the wait after what the user did (refresh the playlist), not the
-        # guide reload that happens to be the slow part of it.
+        # guide reload that happens to be the slow part of it. Shown in the top
+        # loading strip only (the bottom line stays the channel count).
         self._busy_epg_msg = tr("status_refreshing_playlist")
-        self._set_status(tr("status_refreshing_playlist"), emphasis=True)
+        self._show_busy(tr("status_refreshing_playlist"))
         self._load_categories()
         run_async(
             self.pool, lambda: self.xmltv.ensure_loaded(force=True),
@@ -1561,7 +1562,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not pl:
             return
         self._show_busy(tr("status_connecting", name=pl['name']))
-        self._set_status(tr("status_connecting", name=pl['name']), emphasis=True)
         candidate = make_client(pl)
 
         def done(_auth):
@@ -3286,8 +3286,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if hasattr(self, "_busy_label"):
             self._busy_label.setText(message or "")
             self._busy_label.setVisible(bool(message))
-        if message:
-            self._set_status(message, emphasis=True)
+        # The message lives in the top loading strip (with the progress bar);
+        # don't also write it to the bottom status line - that duplicated it and
+        # left it stuck there (the bottom line is the resting count / playing
+        # readout, updated by the view, not by a transient load).
         self._update_busy_overlay(message)
 
     def _hide_busy(self) -> None:

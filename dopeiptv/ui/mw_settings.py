@@ -15,7 +15,8 @@ from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QCheckBox, QComboBox, QDialog,
     QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout, QInputDialog,
     QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox,
-    QPushButton, QSpinBox, QTabWidget, QTextBrowser, QVBoxLayout, QWidget,
+    QPushButton, QScrollArea, QSpinBox, QTabWidget, QTextBrowser, QVBoxLayout,
+    QWidget,
 )
 
 from .. import APP_NAME, VERSION
@@ -475,7 +476,13 @@ class _SettingsMixin:
                 f"color:{P['muted2']}; font-size:11px;")
             hint.setWordWrap(True)
             pf.addRow(hint)
-        tabs.addTab(play_tab, tr("tab_playback"))
+        # The grouped Playback form is taller than the dialog, so let it scroll
+        # instead of clipping the last rows (the hint text and EPG buttons).
+        play_scroll = QScrollArea()
+        play_scroll.setWidgetResizable(True)
+        play_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        play_scroll.setWidget(play_tab)
+        tabs.addTab(play_scroll, tr("tab_playback"))
 
         # Interface tab
         ui_tab = QWidget()
