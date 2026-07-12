@@ -546,6 +546,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.count_lbl.setStyleSheet(f"color:{P['muted3']}; font-size:11px;")
         status_row = QHBoxLayout()
         status_row.addWidget(self.count_lbl, 1)
+        # Subtle "Update available" link in the status row - shown only when a
+        # newer release is out, clicking opens About. Lives here (not as an
+        # overlay toast) so it's quiet and always available while it lasts.
+        self.update_status_btn = QPushButton("")
+        self.update_status_btn.setFlat(True)
+        self.update_status_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.update_status_btn.setStyleSheet(
+            f"color:{P['accent']}; font-size:11px; font-weight:600;"
+            "border:none; background:transparent; padding:0 4px;")
+        self.update_status_btn.clicked.connect(self.show_about)
+        self.update_status_btn.hide()
+        status_row.addWidget(self.update_status_btn)
         self.rec_indicator = QPushButton("● REC")
         self.rec_indicator.setFlat(True)
         self.rec_indicator.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1028,18 +1040,20 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not newer:
             logo.set_update(False)
             logo.setToolTip(tr("tooltip_jump_playing"))
+            self.update_status_btn.hide()
             return
         logo.setToolTip(tr("about_update_available", version=latest_tag))
-        # The attention-grabbing part (red badge, bounce, toast, red->accent
-        # settle) runs once per version, so the cached apply at startup and the
-        # later network check for the same tag don't double up.
+        # Subtle, always-available link in the status row (no overlay).
+        self.update_status_btn.setText(tr("update_status", version=latest_tag))
+        self.update_status_btn.show()
+        # The attention-grabbing part (red badge, bounce, red->accent settle)
+        # runs once per version, so the cached apply at startup and the later
+        # network check for the same tag don't double up.
         if getattr(self, "_update_shown_tag", None) == latest_tag:
             return
         self._update_shown_tag = latest_tag
         logo.set_update(True, "#E5484D")   # red first, to catch the eye
         logo.bounce()
-        # A brief bottom toast so the new badge is self-explanatory.
-        self._show_toast(tr("update_toast", version=latest_tag), 7000)
         # After 30 s, settle from the attention-grabbing red to the theme
         # accent - in follow mode, so it keeps matching if the theme changes.
         QTimer.singleShot(30_000, lambda: logo.set_update(
