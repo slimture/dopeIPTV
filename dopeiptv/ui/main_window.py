@@ -664,7 +664,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # when the poster size changes.
         self.play_mpv = QPushButton(self.d_logo, objectName="PlayGhost")
         self.play_mpv.setToolTip(tr("tooltip_play_in_mpv"))
-        self.play_mpv.setFixedSize(48, 48)
+        self.play_mpv.setFixedSize(38, 38)
         self.play_mpv.setIconSize(QSize(20, 20))
         self.play_mpv.setCursor(Qt.CursorShape.PointingHandCursor)
         self._apply_play_icon()
@@ -1082,7 +1082,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _apply_play_icon(self) -> None:
         """(Re)draw the detail-pane play triangle in the current theme accent.
         Called at build time and whenever the accent changes."""
-        self.play_mpv.setIcon(_control_icon("play", P.get("accent", ACCENT), 18))
+        self.play_mpv.setIcon(_control_icon("play", P.get("accent", ACCENT), 20))
 
     def _set_focus_mode(self, on: bool) -> None:
         """Focus mode hides the whole content list so the player pane gets the
