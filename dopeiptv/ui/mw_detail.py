@@ -37,11 +37,14 @@ class _DetailMixin:
         self._current_epg = None
         self._tmdb_details = None
         if not it:
+            # Nothing selected: leave the pane clean - no empty poster box and
+            # no stray play button.
             self._detail_name = tr("detail_select_something")
-            self.d_logo.setFixedSize(*self.POSTER_SIZE_LIVE)
-            self.d_logo.setPixmap(QPixmap())
-            self.d_logo.setText("")
+            self.d_logo.hide()
+            self.play_mpv.hide()
             return
+        self.d_logo.show()
+        self.play_mpv.show()
         name = self.channel_display_name(it)
         self._detail_name = name
         # History and Watch Later rows carry the original content kind

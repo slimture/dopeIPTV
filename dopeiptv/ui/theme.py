@@ -136,6 +136,14 @@ def apply_theme(settings=None, theme: str | None = None,
 apply_theme()
 
 
+def _rgba(hex_color: str, alpha: float) -> str:
+    """A CSS rgba() string from a #rrggbb colour - used for subtle, tinted
+    borders/fills that let some background show through."""
+    c = (hex_color or "#000000").lstrip("#")
+    r, g, b = int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16)
+    return f"rgba({r},{g},{b},{alpha})"
+
+
 def build_style() -> str:
     """Generate the full application QSS from the active palette."""
     p = dict(P)
@@ -237,11 +245,11 @@ QPushButton#Primary:hover {{ background: {p['accent_hi']}; }}
    rest that only picks up the accent on hover, so it doesn't shout under the
    poster. Fixed-size in code; padding 0 so the glyph stays centred. */
 QPushButton#PlayGhost {{
-    background: transparent; border: 1px solid {p['btn_hover']};
+    background: transparent; border: 1px solid {_rgba(ACCENT, 0.5)};
     color: {p['text']}; border-radius: 9px; padding: 0;
     font-size: 16px; font-weight: 600;
 }}
-QPushButton#PlayGhost:hover {{ background: {p['btn']}; border-color: {ACCENT}; color: {ACCENT}; }}
+QPushButton#PlayGhost:hover {{ background: {p['btn']}; border-color: {ACCENT}; }}
 QPushButton#MiniBtn {{
     padding: 0; font-size: 13px; border-radius: 6px; text-align: center;
 }}
