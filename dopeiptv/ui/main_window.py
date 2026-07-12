@@ -976,12 +976,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         badge on the Settings button. Cached in QSettings so it doesn't hit
         GitHub every launch and works offline (fails silently). Opt-out via the
         'check for updates' setting."""
+        if self.settings.value("check_updates", "true") != "true":
+            return
         # Test hook: force the badge on without a network call, so the update
         # indicator can be seen even when you're already on the latest release.
+        # Placed after the opt-out check so opting out still suppresses it.
         if os.environ.get("DOPEIPTV_FAKE_UPDATE") == "1":
             self._apply_update_state("v99.0.0")
-            return
-        if self.settings.value("check_updates", "true") != "true":
             return
         try:
             last = float(self.settings.value("update_check_ts", 0) or 0)
