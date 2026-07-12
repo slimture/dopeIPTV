@@ -1049,11 +1049,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if getattr(self, "_update_shown_tag", None) == latest_tag:
             return
         self._update_shown_tag = latest_tag
-        # Subtle, non-overlay link in the status row - shown briefly (10 s) then
-        # hidden so it doesn't linger; the logo badge remains as the indicator.
+        # Subtle, non-overlay link in the status row - shown for 30 s (as long
+        # as the logo badge stays red) then hidden; the badge remains after.
         self.update_status_btn.setText(tr("update_status", version=latest_tag))
         self.update_status_btn.show()
-        QTimer.singleShot(10_000, self.update_status_btn.hide)
+        QTimer.singleShot(30_000, self.update_status_btn.hide)
         logo.set_update(True, "#E5484D")   # red first, to catch the eye
         logo.bounce()
         # After 30 s, settle from the attention-grabbing red to the theme
@@ -1500,7 +1500,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             cache_path=epg_cache_path(pid) if pid else None,
             progress_cb=self.epg_progress.emit)
         self._info_cache.clear()
-        self._set_status(tr("status_refreshing_playlist"))
+        self._set_status(tr("status_refreshing_playlist"), emphasis=True)
         self._load_categories()
         run_async(
             self.pool, lambda: self.xmltv.ensure_loaded(force=True),
@@ -1552,7 +1552,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not pl:
             return
         self._show_busy(tr("status_connecting", name=pl['name']))
-        self._set_status(tr("status_connecting", name=pl['name']))
+        self._set_status(tr("status_connecting", name=pl['name']), emphasis=True)
         candidate = make_client(pl)
 
         def done(_auth):
@@ -2988,34 +2988,44 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 "series": tr("status_loading_series")}.get(
             self.mode, tr("status_loading_content"))
 
-    def _write_status(self, text: str, error: bool = False) -> None:
-        self.count_lbl.setStyleSheet(
-            f"color:{P['error']}; font-size:11px; font-weight:600;"
-            if error
-            else f"color:{P['muted3']}; font-size:11px;")
+    def _write_status(self, text: str, error: bool = False,
+                      emphasis: bool = False) -> None:
+        # Errors are red; activity/transient messages use the theme accent and
+        # semibold (like the update text) so you actually notice something
+        # happened; the resting readout (channel count) stays calm and muted.
+        if error:
+            style = f"color:{P['error']}; font-size:11px; font-weight:600;"
+        elif emphasis:
+            style = f"color:{P['accent']}; font-size:11px; font-weight:600;"
+        else:
+            style = f"color:{P['muted3']}; font-size:11px;"
+        self.count_lbl.setStyleSheet(style)
         self.count_lbl.setText(text)
 
-    def _set_status(self, text: str, error: bool = False) -> None:
+    def _set_status(self, text: str, error: bool = False,
+                    emphasis: bool = False) -> None:
         """Set the resting readout of the bottom status line (channel count,
         what's playing, an error, ...). Remembered so a transient flash can
-        return to it."""
-        self._rest_status = (text, error)
-        self._write_status(text, error)
+        return to it. Pass ``emphasis`` for activity messages that should stand
+        out (accent, semibold) rather than the muted count style."""
+        self._rest_status = (text, error, emphasis)
+        self._write_status(text, error, emphasis)
 
     def _flash_status(self, text: str, ms: int = 4000) -> None:
         """Briefly show an activity message in the status line, then return to
         the resting readout. Used for momentary events (guide refresh, cache
         cleared, ...) so they surface in the same place as everything else
-        instead of a separate overlay, without lingering afterwards."""
-        self._write_status(text, False)
+        instead of a separate overlay, without lingering afterwards. Emphasised
+        so it's easy to notice."""
+        self._write_status(text, False, emphasis=True)
         token = getattr(self, "_flash_token", 0) + 1
         self._flash_token = token
 
         def restore() -> None:
             if getattr(self, "_flash_token", 0) != token:
                 return   # a newer status write already took over
-            text_r, err_r = getattr(self, "_rest_status", ("", False))
-            self._write_status(text_r, err_r)
+            rest = getattr(self, "_rest_status", ("", False, False))
+            self._write_status(*rest)
 
         QTimer.singleShot(ms, restore)
 
@@ -3040,7 +3050,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.current_url = None
             if not self._player_fs:
                 self.stream_error.hide()
-            self._set_status(tr("status_reconnecting"))
+            self._set_status(tr("status_reconnecting"), emphasis=True)
             if self._player_fs and self.player:
                 self.player.set_overlay_info(tr("status_reconnecting"))
             QTimer.singleShot(1500, self._retry_last_stream)
@@ -3083,7 +3093,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         if not self._auto_reconnect_live():
             msg = tr("status_stream_dropped")
-            self._set_status(msg)
+            self._set_status(msg, emphasis=True)
             self.player.set_overlay_info(msg)
             return
         now = time.time()
@@ -3097,7 +3107,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
               f"try {self._stream_retries}/{self.MAX_STREAM_RETRIES}",
               file=sys.stderr)
         self.player.current_url = None
-        self._set_status(tr("status_reconnecting"))
+        self._set_status(tr("status_reconnecting"), emphasis=True)
         QTimer.singleShot(300, self._retry_last_stream)
 
     def _retry_last_stream(self) -> None:
