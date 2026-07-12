@@ -656,16 +656,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.media_rating_lbl.hide()
         left_col.addWidget(self.media_rating_lbl, 0, Qt.AlignmentFlag.AlignLeft)
 
-        # Icon-only play button: a compact accent ▶ instead of a poster-wide
-        # "Play" bar. The triangle is drawn as an icon (perfectly centred,
-        # unlike the off-centre ▶ text glyph) and follows the theme accent.
-        self.play_mpv = QPushButton(objectName="PlayGhost")
+        # Icon-only play button, laid over the poster/logo itself (a child of
+        # d_logo, centred on it) rather than sitting below it - the familiar
+        # "play overlay on the artwork" pattern. The triangle is drawn as an
+        # icon (perfectly centred, unlike the off-centre ▶ text glyph) and
+        # follows the theme accent; _position_play_over_poster keeps it centred
+        # when the poster size changes.
+        self.play_mpv = QPushButton(self.d_logo, objectName="PlayGhost")
         self.play_mpv.setToolTip(tr("tooltip_play_in_mpv"))
-        self.play_mpv.setFixedSize(46, 40)
-        self.play_mpv.setIconSize(QSize(18, 18))
+        self.play_mpv.setFixedSize(48, 48)
+        self.play_mpv.setIconSize(QSize(20, 20))
+        self.play_mpv.setCursor(Qt.CursorShape.PointingHandCursor)
         self._apply_play_icon()
         self.play_mpv.clicked.connect(lambda: self.play("mpv"))
-        left_col.addWidget(self.play_mpv, 0, Qt.AlignmentFlag.AlignHCenter)
         left_col.addStretch(1)
         header_row.addLayout(left_col)
 

@@ -73,6 +73,7 @@ class _DetailMixin:
         poster_size = (self.POSTER_SIZE_MEDIA if is_media
                        else self.POSTER_SIZE_LIVE)
         self.d_logo.setFixedSize(*poster_size)
+        self._position_play_over_poster()
         if is_media:
             # Match the info box to the poster height so their bottoms align.
             self.media_info.setFixedHeight(self.POSTER_SIZE_MEDIA[1])
@@ -144,6 +145,13 @@ class _DetailMixin:
         self.d_logo.setStyleSheet("background:transparent;")
         self.d_logo.setText("")
         self.d_logo.setPixmap(tile)
+        self.play_mpv.raise_()   # keep the play overlay above the poster art
+
+    def _position_play_over_poster(self) -> None:
+        """Centre the play overlay on the poster/logo and keep it on top."""
+        b, d = self.play_mpv, self.d_logo
+        b.move((d.width() - b.width()) // 2, (d.height() - b.height()) // 2)
+        b.raise_()
 
     def _media_title_for_tmdb(self, it) -> str:
         if self.series_ctx:

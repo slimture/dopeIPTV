@@ -241,15 +241,17 @@ QPushButton {{
 QPushButton:hover  {{ background: {p['btn_hover']}; }}
 QPushButton#Primary {{ background: {ACCENT}; border: none; color: white; }}
 QPushButton#Primary:hover {{ background: {p['accent_hi']}; }}
-/* A quiet, icon-only play button for the detail pane: a ghost/outline ▶ at
-   rest that only picks up the accent on hover, so it doesn't shout under the
-   poster. Fixed-size in code; padding 0 so the glyph stays centred. */
+/* A quiet, icon-only play button laid over the detail-pane poster: a round,
+   lightly-tinted disc with a subtle accent ring at rest that fills in a touch
+   on hover, so it reads over artwork without shouting. 48x48 in code, so the
+   24px radius makes it a circle; padding 0 keeps the glyph centred. */
 QPushButton#PlayGhost {{
-    background: transparent; border: 1px solid {_rgba(ACCENT, 0.5)};
-    color: {p['text']}; border-radius: 9px; padding: 0;
-    font-size: 16px; font-weight: 600;
+    background: rgba(0,0,0,0.42); border: 1px solid {_rgba(ACCENT, 0.6)};
+    border-radius: 24px; padding: 0;
 }}
-QPushButton#PlayGhost:hover {{ background: {p['btn']}; border-color: {ACCENT}; }}
+QPushButton#PlayGhost:hover {{
+    background: rgba(0,0,0,0.62); border-color: {ACCENT};
+}}
 QPushButton#MiniBtn {{
     padding: 0; font-size: 13px; border-radius: 6px; text-align: center;
 }}
