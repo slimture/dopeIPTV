@@ -640,15 +640,14 @@ class _RecordingMixin:
         name = self.channel_display_name(it)
         title = (f"{what} ({name}, timeshift)" if what
                  else f"{name} (timeshift)")
-        # A catch-up/archive URL is a seekable segment, so pausing it is fine
-        # (no live-edge buffer to exhaust) - mark it so the DVR-pause handler
-        # leaves it alone. Remember the segment's content start so the live
-        # timeline can show how far behind live we are.
-        self._playing_catchup = True
+        # A catch-up/archive URL is a seekable segment. Remember the segment's
+        # content start so the live timeline can show how far behind live we
+        # are; catchup=True marks it so the DVR-pause/reconnect guards and the
+        # seek-mode logic treat it as an archive segment, not the live edge.
         self._ts_segment_start = start
         self._start_playback(url, title, it.get("stream_icon"),
                              self._item_key(it), "live", record=False,
-                             item=it)
+                             item=it, catchup=True)
 
     # (minutes back, duration i18n key) - the label is "Go back <duration>".
     TIMESHIFT_STEPS = (

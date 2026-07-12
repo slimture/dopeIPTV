@@ -2652,8 +2652,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         fmt = self.settings.value("stream_format", "ts")
         url = self.client.live_url(it.get("stream_id"), fmt)
         title = it.get("name") or "dopeIPTV"
-        self._playing_catchup = False   # live edge: DVR-pause may apply
-        self._ts_segment_start = None
         self._start_playback(url, title, it.get("stream_icon"),
                              self._item_key(it), "live", item=it)
 
@@ -3107,9 +3105,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _start_playback(self, url: str, title: str, icon_url,
                         key, kind: str, record: bool = True,
-                        item=None) -> None:
+                        item=None, catchup: bool = False) -> None:
         if not self._guard_stream_switch(url, title):
             return
+        # Whether this is a catch-up/archive segment. Set here (not by callers)
+        # so any normal play - including a live channel opened via play_item /
+        # zap, which goes straight through _start_playback - always clears it,
+        # instead of staying stuck in 'catch-up' after an archive seek.
+        self._playing_catchup = catchup
+        if not catchup:
+            self._ts_segment_start = None
         # Remember where we were in whatever was playing before switching,
         # and give the outgoing title its watched mark if it earned one.
         self._save_resume_position()
@@ -3205,7 +3210,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self.player.set_live_badge("timeshift")
             elif ts_days > 0:
                 self.player.set_seek_mode("timeline")
-                self.player.enter_timeshift(ts_days * 1440)
+                # Span a recent window (<=3 h), not the whole multi-day archive:
+                # a small drag over days jumped hours/days back. Deeper archive
+                # access stays in the ◀◀ menu.
+                self.player.enter_timeshift(min(ts_days * 1440, 180))
                 self._update_ts_timeline()
                 self.player.set_live_badge(None)
             else:
