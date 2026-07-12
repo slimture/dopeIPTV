@@ -236,7 +236,7 @@ QFrame#Card {{
 QFrame#NowCard {{
     background: {_rgba(ACCENT, 0.10)};
     border: 1px solid {_rgba(ACCENT, 0.30)};
-    border-left: 3px solid {ACCENT};
+    border-left: 2px solid {ACCENT};
     border-radius: 12px;
 }}
 /* Upcoming programmes: slim rows (time | title) with a hover cue, instead of

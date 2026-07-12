@@ -1176,7 +1176,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         pt.setPen(Qt.PenStyle.NoPen)
 
         # Soft dark disc for contrast (no outline/ring, just a scrim).
-        pt.setBrush(QColor(0, 0, 0, 130))
+        pt.setBrush(QColor(0, 0, 0, 165))
         pt.drawEllipse(QRectF(S * 0.03, S * 0.03, S * 0.94, S * 0.94))
 
         pt.setBrush(QColor("white"))

@@ -25,7 +25,7 @@ class _DetailMixin:
         self._current_key = self._item_key(it)
         self._show_detail(it)
 
-    POSTER_SIZE_LIVE = (84, 84)
+    POSTER_SIZE_LIVE = (112, 112)
     POSTER_SIZE_MEDIA = (170, 255)
 
     def _show_detail(self, it) -> None:
@@ -698,7 +698,7 @@ class _DetailMixin:
                              f" at {nxt['start']:%H:%M}")
                 self.player.set_overlay_info(info)
 
-        for post in upcoming[:6]:
+        for post in upcoming[:12]:
             self._epg_card(post)
 
         if not current and not upcoming:
