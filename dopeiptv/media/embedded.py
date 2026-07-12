@@ -712,6 +712,12 @@ class EmbeddedPlayer(QWidget):
         # Floating scrubber shown over the bottom of the docked video on
         # hover, so the seek bar doesn't permanently occupy the control row.
         self._seekable = False
+        # What seek UI this stream uses:
+        #  'vod'      - normal seek bar (movies/series/recordings)
+        #  'program'  - a catch-up segment: normal seek bar spanning it
+        #  'timeline' - a timeshift channel at the live edge: the live timeline
+        #  'live'     - a plain live channel: no seek bar at all
+        self._seek_mode = "vod"
         self.seek_overlay = QWidget(self)
         self.seek_overlay.setStyleSheet(
             "background: rgba(16,16,20,215); border-radius: 8px;")
@@ -1113,6 +1119,8 @@ class EmbeddedPlayer(QWidget):
         pass
 
     def _is_seekable(self) -> bool:
+        if self._seek_mode in ("live", "timeline"):
+            return False   # plain live can't seek; timeline has its own control
         m = self.video.mpv
         try:
             return bool(m is not None and m.duration and m.duration > 1)
@@ -1177,9 +1185,9 @@ class EmbeddedPlayer(QWidget):
     # -- docked hover scrubber -------------------------------------------------
 
     def _show_seek_overlay(self) -> None:
-        # Timeshift channels use the live timeline instead; don't stack the VOD
-        # seek overlay on top of it (they share the bottom of the video).
-        if self.ts_timeline.isVisible():
+        # No VOD seek overlay for plain live (can't seek) or timeshift-edge
+        # (the live timeline is the control) - avoids a second, useless bar.
+        if self._seek_mode in ("live", "timeline"):
             return
         for w in (self.back_btn, self.fwd_btn, self.seek, self.time_lbl):
             w.show()
@@ -1249,6 +1257,15 @@ class EmbeddedPlayer(QWidget):
 
     def exit_timeshift(self) -> None:
         self.ts_timeline.hide()
+
+    def set_seek_mode(self, mode: str) -> None:
+        """Pick which seek UI this stream uses (see _seek_mode). Hides the VOD
+        seek overlay for live/timeline so only one bar is ever shown."""
+        self._seek_mode = mode
+        if mode != "timeline":
+            self.exit_timeshift()
+        if mode in ("live", "timeline"):
+            self._hide_seek_ui()
 
     def update_timeshift_position(self, offset_min: float) -> None:
         """Move the marker to *offset_min* behind live, unless the user is
@@ -1920,7 +1937,8 @@ class EmbeddedPlayer(QWidget):
                 self.finished.emit()
         else:
             self._eof_seen = False
-        seekable = bool(dur) and dur > 1
+        seekable = (bool(dur) and dur > 1
+                    and self._seek_mode not in ("live", "timeline"))
         self._seekable = seekable
         if not seekable:
             self._hide_seek_ui()
@@ -1982,7 +2000,9 @@ class EmbeddedPlayer(QWidget):
         self._icon_color = P.get("text2", "#ECECF1")
         size = QSize(self.ICON_PX, self.ICON_PX)
         for btn, name in self._icon_names.items():
-            colour = "#FF5C5C" if name == "record" else self._icon_color
+            colour = ("#FF5C5C" if name == "record"
+                      else "#F2B01E" if name == "rewind"   # amber timeshift
+                      else self._icon_color)
             btn.setText("")
             btn.setIcon(_control_icon(name, colour, self.ICON_PX))
             btn.setIconSize(size)

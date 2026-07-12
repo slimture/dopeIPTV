@@ -3191,20 +3191,26 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Reflect the new playback state on the poster overlay (play -> pause /
         # stop) when the item being played is the one shown in the detail pane.
         self._apply_play_icon()
-        # 'Not live' badge: shown only on the catch-up archive; hidden at the
-        # live edge and for VOD (no permanent LIVE tag).
+        # Pick one seek UI per stream so there's never a second, useless bar:
+        #  VOD -> normal seek bar; plain live -> none; timeshift live edge ->
+        #  the archive timeline; a catch-up segment -> normal seek bar spanning
+        #  it (plus the amber ⧗ TIMESHIFT badge).
         if self.player:
-            self.player.set_live_badge(
-                "timeshift" if (kind == "live" and self._playing_catchup)
-                else None)
-            # Live timeline: shown for timeshift channels (scrub back into the
-            # archive), hidden for plain live and VOD.
-            if kind == "live" and item is not None \
-                    and self._timeshift_days(item) > 0:
-                self.player.enter_timeshift(self._timeshift_days(item) * 1440)
+            ts_days = self._timeshift_days(item) if item is not None else 0
+            if kind != "live":
+                self.player.set_seek_mode("vod")
+                self.player.set_live_badge(None)
+            elif ts_days > 0 and self._playing_catchup:
+                self.player.set_seek_mode("program")
+                self.player.set_live_badge("timeshift")
+            elif ts_days > 0:
+                self.player.set_seek_mode("timeline")
+                self.player.enter_timeshift(ts_days * 1440)
                 self._update_ts_timeline()
+                self.player.set_live_badge(None)
             else:
-                self.player.exit_timeshift()
+                self.player.set_seek_mode("live")
+                self.player.set_live_badge(None)
 
     def _player_missing(self, name: str) -> None:
         QMessageBox.warning(
