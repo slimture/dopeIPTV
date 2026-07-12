@@ -1043,15 +1043,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.update_status_btn.hide()
             return
         logo.setToolTip(tr("about_update_available", version=latest_tag))
-        # Subtle, always-available link in the status row (no overlay).
-        self.update_status_btn.setText(tr("update_status", version=latest_tag))
-        self.update_status_btn.show()
-        # The attention-grabbing part (red badge, bounce, red->accent settle)
-        # runs once per version, so the cached apply at startup and the later
-        # network check for the same tag don't double up.
+        # The attention-grabbing part (status link, red badge, bounce,
+        # red->accent settle) runs once per version, so the cached apply at
+        # startup and the later network check for the same tag don't double up.
         if getattr(self, "_update_shown_tag", None) == latest_tag:
             return
         self._update_shown_tag = latest_tag
+        # Subtle, non-overlay link in the status row - shown briefly (10 s) then
+        # hidden so it doesn't linger; the logo badge remains as the indicator.
+        self.update_status_btn.setText(tr("update_status", version=latest_tag))
+        self.update_status_btn.show()
+        QTimer.singleShot(10_000, self.update_status_btn.hide)
         logo.set_update(True, "#E5484D")   # red first, to catch the eye
         logo.bounce()
         # After 30 s, settle from the attention-grabbing red to the theme
