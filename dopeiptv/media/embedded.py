@@ -555,6 +555,7 @@ class EmbeddedPlayer(QWidget):
     finished = pyqtSignal()
     next_episode = pyqtSignal()
     paused_changed = pyqtSignal(bool)
+    timeshift_seek = pyqtSignal(int)   # minutes back from live (0 = go live)
 
     OVERLAY_HIDE_MS = 3000
     VIDEO_BOX_HEIGHT = 260
@@ -918,6 +919,27 @@ class EmbeddedPlayer(QWidget):
         self.live_badge = QLabel("", self.video)
         self.live_badge.hide()
 
+        # Live timeline for timeshift channels: a floating bar at the bottom of
+        # the video with LIVE at the right edge. Drag left to scrub back into
+        # the provider archive (opens a catch-up segment there). Shown only for
+        # timeshift channels; VOD keeps the ordinary seek bar.
+        self._ts_depth = 1
+        self.ts_timeline = QWidget(self)
+        self.ts_timeline.setStyleSheet(
+            "background: rgba(0,0,0,150); border-radius: 10px;")
+        _tl = QHBoxLayout(self.ts_timeline)
+        _tl.setContentsMargins(12, 6, 12, 6)
+        _tl.setSpacing(10)
+        self.ts_slider = _SeekSlider()
+        self.ts_slider.seek_requested.connect(self._on_ts_seek)
+        self.ts_label = QLabel("● LIVE")
+        self.ts_label.setStyleSheet(
+            "background: transparent; color: #FFFFFF;"
+            "font-size: 11px; font-weight: 700;")
+        _tl.addWidget(self.ts_slider, 1)
+        _tl.addWidget(self.ts_label)
+        self.ts_timeline.hide()
+
         # App-level filter for bare Left/Right seeking of a seekable video, so
         # it works even in the docked mini-player where focus is on the list
         # (a QOpenGLWidget can't reliably drive it itself). Live/non-seekable
@@ -1182,6 +1204,56 @@ class EmbeddedPlayer(QWidget):
         b.show()
         b.raise_()
 
+    # -- timeshift live timeline ---------------------------------------------
+
+    @staticmethod
+    def _fmt_offset(mins: int) -> str:
+        mins = max(0, int(mins))
+        d, rem = divmod(mins, 1440)
+        h, m = divmod(rem, 60)
+        if d:
+            return f"{d}d {h}h"
+        if h:
+            return f"{h}:{m:02d}"
+        return f"{m} min"
+
+    def enter_timeshift(self, depth_min: int) -> None:
+        """Show the live timeline spanning the last *depth_min* minutes."""
+        self._ts_depth = max(1, int(depth_min))
+        self.ts_slider.setRange(0, self._ts_depth)
+        self.ts_slider.setValue(self._ts_depth)
+        self.ts_label.setText("● LIVE")
+        self._place_ts_timeline()
+        self.ts_timeline.show()
+        self.ts_timeline.raise_()
+
+    def exit_timeshift(self) -> None:
+        self.ts_timeline.hide()
+
+    def update_timeshift_position(self, offset_min: float) -> None:
+        """Move the marker to *offset_min* behind live, unless the user is
+        dragging it right now."""
+        if not self.ts_timeline.isVisible() or self.ts_slider.dragging:
+            return
+        val = max(0, self._ts_depth - int(offset_min))
+        self.ts_slider.blockSignals(True)
+        self.ts_slider.setValue(val)
+        self.ts_slider.blockSignals(False)
+        self.ts_label.setText(
+            "● LIVE" if offset_min < 1 else f"−{self._fmt_offset(offset_min)}")
+
+    def _on_ts_seek(self, value: int) -> None:
+        self.timeshift_seek.emit(int(self._ts_depth - value))
+
+    def _place_ts_timeline(self) -> None:
+        margin = 10
+        vg = self.video.geometry()
+        self.ts_timeline.setFixedWidth(max(240, vg.width() - 2 * margin))
+        self.ts_timeline.adjustSize()
+        self.ts_timeline.move(
+            vg.x() + margin,
+            vg.y() + vg.height() - self.ts_timeline.height() - margin)
+
     def set_overlay_info(self, text: str) -> None:
         self._overlay_text = text or ""
         if self._fs_ui and self.overlay.isVisible():
@@ -1301,6 +1373,8 @@ class EmbeddedPlayer(QWidget):
             self._place_overlay()
         if self.seek_overlay.isVisible():
             self._place_seek_overlay()
+        if self.ts_timeline.isVisible():
+            self._place_ts_timeline()
 
     # -- playback defaults -----------------------------------------------------
 
@@ -1988,6 +2062,7 @@ class EmbeddedPlayer(QWidget):
         self._stats_overlay.hide()
         self._stats_timer.stop()
         self.live_badge.hide()
+        self.ts_timeline.hide()
         self._sync_pause_label(True)
         self._mac_show_cursor()
         # Force several deferred repaints - the compositor sometimes ignores a

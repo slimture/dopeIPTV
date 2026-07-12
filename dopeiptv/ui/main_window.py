@@ -624,6 +624,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.paused_changed.connect(self._on_paused_changed)
             self.player.stopped.connect(self._apply_play_icon)
             self.player.finished.connect(self._apply_play_icon)
+            self.player.timeshift_seek.connect(self._on_timeshift_seek)
             # Keep the player pane visible on stop - mpv clears to black -
             # instead of hiding it, so the window just goes black.
             dl.addWidget(self.player, 1)
@@ -822,6 +823,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.tick = QTimer(self)
         self.tick.timeout.connect(self._refresh_progress)
         self.tick.start(60_000)
+
+        # Keep the timeshift live-timeline marker current (no-op unless a
+        # timeshift channel is on screen).
+        self._ts_segment_start = None
+        self._ts_timeline_timer = QTimer(self)
+        self._ts_timeline_timer.timeout.connect(self._update_ts_timeline)
+        self._ts_timeline_timer.start(1000)
 
         # Poll EPG reminders so one fires close to its programme's start.
         self._reminder_timer = QTimer(self)
@@ -1154,6 +1162,32 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         elif self.player and on_live:
             # Buffer resume at ~the live edge: drop the 'not live' badge.
             self.player.set_live_badge(None)
+
+    def _on_timeshift_seek(self, minutes_back: int) -> None:
+        """Scrub the live timeline: jump to that point in the provider archive
+        (or back to the live edge when dropped at the right)."""
+        lp = getattr(self, "_last_playback", None)
+        it = lp.get("item") if lp else None
+        if not it:
+            return
+        if minutes_back < 1:
+            self.play_live_channel(it)
+        else:
+            self._play_timeshift(it, back_min=minutes_back)
+
+    def _update_ts_timeline(self) -> None:
+        if not (self.player and self.player.ts_timeline.isVisible()):
+            return
+        lp = getattr(self, "_last_playback", None)
+        if not lp or lp.get("kind") != "live":
+            return
+        now = time.time()
+        if self._playing_catchup and self._ts_segment_start is not None:
+            content_time = self._ts_segment_start + self.player.playback_position()
+            offset = max(0.0, (now - content_time) / 60.0)
+        else:
+            offset = 0.0   # live edge
+        self.player.update_timeshift_position(offset)
 
     def _play_overlay_clicked(self) -> None:
         state = self._overlay_state()
@@ -2616,6 +2650,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         url = self.client.live_url(it.get("stream_id"), fmt)
         title = it.get("name") or "dopeIPTV"
         self._playing_catchup = False   # live edge: DVR-pause may apply
+        self._ts_segment_start = None
         self._start_playback(url, title, it.get("stream_icon"),
                              self._item_key(it), "live", item=it)
 
@@ -3159,6 +3194,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.set_live_badge(
                 "timeshift" if (kind == "live" and self._playing_catchup)
                 else None)
+            # Live timeline: shown for timeshift channels (scrub back into the
+            # archive), hidden for plain live and VOD.
+            if kind == "live" and item is not None \
+                    and self._timeshift_days(item) > 0:
+                self.player.enter_timeshift(self._timeshift_days(item) * 1440)
+                self._update_ts_timeline()
+            else:
+                self.player.exit_timeshift()
 
     def _player_missing(self, name: str) -> None:
         QMessageBox.warning(
