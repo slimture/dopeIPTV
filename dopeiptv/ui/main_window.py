@@ -1012,6 +1012,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         logo.set_update(True, "#E5484D")   # red first, to catch the eye
         logo.setToolTip(tr("about_update_available", version=latest_tag))
         logo.bounce()
+        # A brief bottom toast the first time we surface a given version, so the
+        # new badge is self-explanatory instead of a mystery dot.
+        if getattr(self, "_update_toast_tag", None) != latest_tag:
+            self._update_toast_tag = latest_tag
+            self._show_toast(tr("update_toast", version=latest_tag), 7000)
         # After 30 s, settle from the attention-grabbing red to the theme
         # accent - in follow mode, so it keeps matching if the theme changes.
         QTimer.singleShot(30_000, lambda: logo.set_update(

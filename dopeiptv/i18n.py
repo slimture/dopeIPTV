@@ -1831,6 +1831,16 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Прямая трансляция прервана — двойной щелчок для переподключения",
         "th": "สตรีมสดหลุด — ดับเบิลคลิกเพื่อเชื่อมต่อใหม่",
     },
+    "update_toast": {
+        "en": "New version available ({version}) — click the logo",
+        "sv": "Ny version tillgänglig ({version}) — klicka på loggan",
+        "es": "Nueva versión disponible ({version}) — haz clic en el logo",
+        "de": "Neue Version verfügbar ({version}) — klicke auf das Logo",
+        "fr": "Nouvelle version disponible ({version}) — cliquez sur le logo",
+        "zh": "有新版本可用 ({version}) — 点击标志",
+        "ru": "Доступна новая версия ({version}) — нажмите на логотип",
+        "th": "มีเวอร์ชันใหม่ ({version}) — คลิกที่โลโก้",
+    },
     "status_stream_error": {
         "en": "Stream error: {msg}",
         "sv": "Strömfel: {msg}",
