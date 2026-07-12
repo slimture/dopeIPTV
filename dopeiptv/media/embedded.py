@@ -1529,6 +1529,31 @@ class EmbeddedPlayer(QWidget):
         stretch.triggered.connect(
             lambda _c: self._set_mpv("keepaspect", False))
 
+        # Video filters - same options as Settings > Playback > Video, kept in
+        # one place. Each choice is applied live and saved as the default.
+        s = self._settings
+        video = menu.addMenu(tr("opt_video"))
+
+        def _sub(parent, title, key, default, choices):
+            sm = parent.addMenu(title)
+            cur = str(s.value(key, default)) if s else default
+            for label, val in choices:
+                a = sm.addAction(label)
+                a.setCheckable(True)
+                a.setChecked(val == cur)
+                a.triggered.connect(
+                    lambda _c, k=key, v=val: self._set_video_opt(k, v))
+
+        _sub(video, tr("setting_deinterlace"), "video_deinterlace", "false",
+             ((tr("option_off"), "false"), (tr("option_on"), "true")))
+        _sub(video, tr("setting_sharpen"), "video_sharpen", "0.0",
+             ((tr("option_off"), "0.0"), (tr("option_low"), "0.5"),
+              (tr("option_medium"), "1.0"), (tr("option_high"), "2.0")))
+        _sub(video, tr("setting_tonemapping"), "video_tonemapping", "auto",
+             ((tr("option_tonemap_auto"), "auto"), ("Hable", "hable"),
+              ("Mobius", "mobius"), ("Reinhard", "reinhard"),
+              ("BT.2390", "bt.2390"), (tr("option_tonemap_clip"), "clip")))
+
         buf = menu.addMenu(tr("opt_network_buffer"))
         current_buf = self._cache_secs()
         for secs in (1, 3, 5, 10, 30):
@@ -1695,6 +1720,14 @@ class EmbeddedPlayer(QWidget):
         if self._settings:
             self._settings.setValue("cache_secs", str(secs))
         self._set_mpv("cache-secs", float(secs))
+
+    def _set_video_opt(self, key: str, value: str) -> None:
+        """Persist a video-filter choice and apply it live. Re-uses
+        apply_default_options so the running core and the saved default stay in
+        one place (the in-player Video menu and Settings write the same keys)."""
+        if self._settings:
+            self._settings.setValue(key, value)
+        self.apply_default_options()
 
     # -- position polling ------------------------------------------------------
 

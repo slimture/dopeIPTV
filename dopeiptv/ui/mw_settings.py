@@ -400,22 +400,37 @@ class _SettingsMixin:
          replay_minutes_box) = delay_row("replay_delay_min")
         (epg_delay_row, epg_sign_box, epg_hours_box,
          epg_minutes_box) = delay_row("epg_delay_min")
+        def section(text: str) -> None:
+            """A small caps subheading that groups the rows under it, so the
+            Playback tab reads as a few labelled clusters instead of one long
+            flat list."""
+            lbl = QLabel(text)
+            lbl.setStyleSheet(
+                f"color:{P['accent']}; font-size:10px; font-weight:700;"
+                "text-transform:uppercase; letter-spacing:1px; margin-top:12px;")
+            pf.addRow(lbl)
+
+        section(tr("sec_playback"))
         pf.addRow(tr("setting_playback_mode"), mode_box)
         pf.addRow(tr("setting_autoplay_preview"), autoplay_box)
         pf.addRow(tr("setting_autoplay_next"), autoplay_next_box)
         pf.addRow(tr("setting_auto_reconnect"), autorecon_box)
         pf.addRow(tr("setting_stream_format"), fmt_box)
+        section(tr("sec_audio_subs"))
         pf.addRow(tr("setting_audio_lang"), alang_box)
         pf.addRow(tr("setting_subtitles"), sub_box)
         pf.addRow(tr("setting_sub_lang"), slang_box)
         pf.addRow(tr("setting_sub_lang_fallback"), slang2_box)
+        section(tr("sec_video"))
         pf.addRow(tr("setting_aspect_ratio"), aspect_box)
         pf.addRow(tr("setting_deinterlace"), deint_box)
         pf.addRow(tr("setting_sharpen"), sharpen_box)
         pf.addRow(tr("setting_tonemapping"), tonemap_box)
+        section(tr("sec_network"))
         pf.addRow(tr("setting_network_buffer"), buf_box)
         pf.addRow(tr("setting_replay_delay"), replay_delay_row)
         pf.addRow(tr("setting_epg_delay"), epg_delay_row)
+        section(tr("sec_guide"))
         epg_cache_row = QHBoxLayout()
         refresh_epg_btn = QPushButton(tr("btn_refresh_epg"))
         clear_epg_btn = QPushButton(tr("btn_clear_epg"))

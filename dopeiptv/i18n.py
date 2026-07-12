@@ -1879,6 +1879,39 @@ _STRINGS: dict[str, dict[str, str]] = {
         "en": "Clip", "sv": "Klipp", "es": "Recorte", "de": "Clipping",
         "fr": "Écrêtage", "zh": "裁剪", "ru": "Обрезка", "th": "ตัด",
     },
+    "option_on": {
+        "en": "On", "sv": "På", "es": "Activado", "de": "Ein",
+        "fr": "Activé", "zh": "开启", "ru": "Вкл.", "th": "เปิด",
+    },
+    "opt_video": {
+        "en": "Video", "sv": "Video", "es": "Vídeo", "de": "Video",
+        "fr": "Vidéo", "zh": "视频", "ru": "Видео", "th": "วิดีโอ",
+    },
+    "sec_playback": {
+        "en": "Playback", "sv": "Uppspelning", "es": "Reproducción",
+        "de": "Wiedergabe", "fr": "Lecture", "zh": "播放",
+        "ru": "Воспроизведение", "th": "การเล่น",
+    },
+    "sec_audio_subs": {
+        "en": "Audio & subtitles", "sv": "Ljud & undertexter",
+        "es": "Audio y subtítulos", "de": "Audio & Untertitel",
+        "fr": "Audio et sous-titres", "zh": "音频与字幕",
+        "ru": "Звук и субтитры", "th": "เสียงและคำบรรยาย",
+    },
+    "sec_video": {
+        "en": "Video", "sv": "Video", "es": "Vídeo", "de": "Video",
+        "fr": "Vidéo", "zh": "视频", "ru": "Видео", "th": "วิดีโอ",
+    },
+    "sec_network": {
+        "en": "Network & timing", "sv": "Nätverk & timing",
+        "es": "Red y sincronización", "de": "Netzwerk & Timing",
+        "fr": "Réseau et synchronisation", "zh": "网络与时序",
+        "ru": "Сеть и тайминг", "th": "เครือข่ายและการจับเวลา",
+    },
+    "sec_guide": {
+        "en": "Guide", "sv": "Guide", "es": "Guía", "de": "Programm",
+        "fr": "Guide", "zh": "节目指南", "ru": "Программа", "th": "ผังรายการ",
+    },
     "epg_search_title": {
         "en": "Search the guide", "sv": "Sök i guiden",
         "es": "Buscar en la guía", "de": "Programm durchsuchen",
