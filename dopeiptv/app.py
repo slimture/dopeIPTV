@@ -9,19 +9,23 @@ from pathlib import Path
 from PyQt6.QtCore import QSettings, Qt
 from PyQt6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPixmap
 from PyQt6.QtWidgets import (
-    QApplication, QLabel, QMessageBox, QProxyStyle, QStyle,
+    QApplication, QLabel, QMessageBox, QProxyStyle, QPushButton, QStyle,
 )
 
 
 class _NoButtonIconsStyle(QProxyStyle):
-    """Strip the platform theme icons Qt puts on OK / Cancel / Save dialog
-    buttons (a green tick, a red cross, ...). We want clean text-only buttons
-    everywhere - most visibly in Settings on Linux themes that ship those
-    icons. Only this one style hint is overridden; everything else defers to
-    the real platform style, so nothing else changes on any OS."""
+    """Clean, text-only dialog buttons everywhere. Two platform-theme defaults
+    are overridden: the icons Qt puts on OK / Cancel / Save buttons (a green
+    tick, a red cross, ...), and the mnemonic underline drawn under a button
+    letter (the 'O' in OK, the 'C' in Cancel). The underline override is scoped
+    to push buttons, so menus keep their accelerator underlines; everything else
+    defers to the real platform style, so nothing else changes on any OS."""
 
     def styleHint(self, hint, option=None, widget=None, returnData=None):
         if hint == QStyle.StyleHint.SH_DialogButtonBox_ButtonsHaveIcons:
+            return 0
+        if (hint == QStyle.StyleHint.SH_UnderlineShortcut
+                and isinstance(widget, QPushButton)):
             return 0
         return super().styleHint(hint, option, widget, returnData)
 
