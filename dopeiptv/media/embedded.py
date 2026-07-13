@@ -1409,6 +1409,12 @@ class EmbeddedPlayer(QWidget):
             self._program_base = 0.0
         if mode in ("live", "timeline"):
             self._hide_seek_ui()
+        elif mode == "program" and self._fs_ui:
+            # A program-scrub re-load runs play() -> _hide_seek_ui(); re-show the
+            # fullscreen scrubber right away so the full-width bar isn't left as
+            # an empty gap until the next position poll.
+            for w in self._seek_widgets():
+                w.setVisible(True)
 
     def set_program_window(self, secs: float, base: float = 0.0) -> None:
         """In 'program' mode, present the seek bar as the whole picked programme
@@ -1548,7 +1554,12 @@ class EmbeddedPlayer(QWidget):
 
     def _place_overlay(self) -> None:
         margin = 24
-        if self.fs_seek.isVisibleTo(self.fs_controls):
+        # Size the control bar to the stream's seek MODE, not the seek widget's
+        # momentary visibility: a program-mode scrub re-loads the archive, which
+        # briefly hides the scrubber (play() calls _hide_seek_ui), and keying off
+        # that made the bar collapse to compact and re-stretch on every seek.
+        # A seek bar belongs to vod/program -> full width; live/timeline -> hug.
+        if self._seek_mode in ("vod", "program"):
             controls_w = self.width() - 2 * margin
         else:
             controls_w = self.fs_controls.sizeHint().width()
