@@ -1203,12 +1203,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             win_start = now - depth_min * 60
             span = depth_min * 60
             progs = self.xmltv.programmes_in(item, win_start, now)
-            self.player.set_timeline_markers(
-                (p["start_timestamp"] - win_start) / span for p in progs)
+            segs = []
             for p in progs:
+                a = max(0.0, (p["start_timestamp"] - win_start) / span)
+                b = min(1.0, (p["stop_timestamp"] - win_start) / span)
+                tlabel = "%s–%s" % (
+                    time.strftime("%H:%M", time.localtime(p["start_timestamp"])),
+                    time.strftime("%H:%M", time.localtime(p["stop_timestamp"])))
+                segs.append((a, b, p.get("title") or "", tlabel))
                 if p["start_timestamp"] <= content_time < p["stop_timestamp"]:
                     title = p.get("title")
-                    break
+            self.player.set_timeline_segments(segs)
         self.player.update_timeshift_position(offset, title)
 
     def _play_overlay_clicked(self) -> None:

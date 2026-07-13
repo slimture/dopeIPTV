@@ -16,7 +16,7 @@ from PyQt6.QtGui import (
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 from PyQt6.QtWidgets import (
     QApplication, QHBoxLayout, QLabel, QLineEdit, QMenu, QSizePolicy, QSlider,
-    QVBoxLayout, QWidget, QPushButton,
+    QToolTip, QVBoxLayout, QWidget, QPushButton,
 )
 
 from ..i18n import tr
@@ -440,6 +440,7 @@ class _SeekSlider(QSlider):
         super().__init__(Qt.Orientation.Horizontal, parent)
         self.dragging = False
         self._markers: list[float] = []   # programme boundaries as 0..1 fractions
+        self._segments: list = []         # (start_frac, end_frac, title, time)
 
     def set_markers(self, fractions) -> None:
         """Programme-boundary ticks along the groove, as fractions 0..1 (left
@@ -449,6 +450,18 @@ class _SeekSlider(QSlider):
         if fr != self._markers:
             self._markers = fr
             self.update()
+
+    def set_segments(self, segments) -> None:
+        """Programme segments for boundary ticks and hover tooltips, each a
+        (start_frac, end_frac, title, time_label) tuple along the groove."""
+        self._segments = list(segments)
+        self.set_markers(s[0] for s in self._segments)
+
+    def _segment_at(self, frac: float):
+        for seg in self._segments:
+            if seg[0] <= frac <= seg[1]:
+                return seg
+        return None
 
     def paintEvent(self, event) -> None:
         super().paintEvent(event)
@@ -481,9 +494,24 @@ class _SeekSlider(QSlider):
     def mouseMoveEvent(self, event) -> None:
         if self.dragging:
             self.setValue(self._value_for(event))
+            self._show_segment_tooltip(event)
             event.accept()
             return
+        self._show_segment_tooltip(event)
         super().mouseMoveEvent(event)
+
+    def _show_segment_tooltip(self, event) -> None:
+        """On the timeline, name the programme under the cursor so hovering
+        back in time tells you what was on."""
+        if not self._segments:
+            return
+        frac = event.position().x() / max(1, self.width())
+        seg = self._segment_at(max(0.0, min(1.0, frac)))
+        if seg and seg[2]:
+            text = f"{seg[3]} · {seg[2]}" if seg[3] else seg[2]
+            QToolTip.showText(event.globalPosition().toPoint(), text, self)
+        else:
+            QToolTip.hideText()
 
     def mouseReleaseEvent(self, event) -> None:
         if self.dragging and event.button() == Qt.MouseButton.LeftButton:
@@ -966,6 +994,7 @@ class EmbeddedPlayer(QWidget):
         _tl.setContentsMargins(12, 6, 12, 6)
         _tl.setSpacing(10)
         self.ts_slider = _SeekSlider()
+        self.ts_slider.setMouseTracking(True)   # hover tooltips w/o a pressed button
         self.ts_slider.seek_requested.connect(self._on_ts_seek)
         self.ts_label = QLabel("● LIVE")
         self.ts_label.setStyleSheet(
@@ -1212,9 +1241,6 @@ class EmbeddedPlayer(QWidget):
     def _show_seek_overlay(self) -> None:
         # No VOD seek overlay for plain live (can't seek) or timeshift-edge
         # (the live timeline is the control) - avoids a second, useless bar.
-        if os.environ.get("DOPEIPTV_SEEK_DEBUG"):
-            print(f"[dopeIPTV][seek] show_overlay mode={self._seek_mode} "
-                  f"seekable={self._seekable}", file=sys.stderr)
         if self._seek_mode in ("live", "timeline"):
             return
         for w in (self.back_btn, self.fwd_btn, self.seek, self.time_lbl):
@@ -1289,18 +1315,17 @@ class EmbeddedPlayer(QWidget):
     def set_seek_mode(self, mode: str) -> None:
         """Pick which seek UI this stream uses (see _seek_mode). Hides the VOD
         seek overlay for live/timeline so only one bar is ever shown."""
-        if os.environ.get("DOPEIPTV_SEEK_DEBUG"):
-            print(f"[dopeIPTV][seek] set_seek_mode({mode})", file=sys.stderr)
         self._seek_mode = mode
         if mode != "timeline":
             self.exit_timeshift()
         if mode in ("live", "timeline"):
             self._hide_seek_ui()
 
-    def set_timeline_markers(self, fractions) -> None:
-        """Draw programme-boundary ticks on the live timeline (fractions 0..1,
-        oldest to live edge)."""
-        self.ts_slider.set_markers(fractions)
+    def set_timeline_segments(self, segments) -> None:
+        """Programme segments for the live timeline: boundary ticks plus a
+        hover tooltip naming the programme at that point. Each segment is a
+        (start_frac, end_frac, title, time_label) tuple, oldest to live edge."""
+        self.ts_slider.set_segments(segments)
 
     def update_timeshift_position(self, offset_min: float,
                                   title: str | None = None) -> None:
