@@ -163,11 +163,13 @@ class EpgGridDialog(QDialog):
             cap_h = (scr.height() - 80) if scr else 800
         w = min(want_w, cap_w, 1500)
         h = min(want_h, cap_h, 900)
-        self.resize(max(min(760, cap_w), w), max(min(460, cap_h), h))
-        # Centre over the main window so it doesn't spill past its edges.
-        if mw is not None:
-            g = mw.frameGeometry()
-            self.move(g.center().x() - w // 2, max(0, g.center().y() - h // 2))
+        w = max(min(760, cap_w), w)
+        h = max(min(460, cap_h), h)
+        self.resize(w, h)
+        # Centre in the screen at start (not low or over the window's corner).
+        if scr is not None:
+            self.move(scr.x() + (scr.width() - w) // 2,
+                      scr.y() + (scr.height() - h) // 2)
         now_x = self.CH_COL_W + (now - self._start) / 60 * self.PX_PER_MIN
         self.view.horizontalScrollBar().setValue(max(0, int(now_x
                                                              - self.CH_COL_W - 40)))
