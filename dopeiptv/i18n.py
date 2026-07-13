@@ -6075,6 +6075,24 @@ _STRINGS: dict[str, dict[str, str]] = {
               "เปิดใหม่เพื่อตั้งค่าเพลย์ลิสต์แรกของคุณ",
     },
 
+    "cat_search_placeholder": {
+        "en": "Search categories & channels…",
+        "sv": "Sök kategorier & kanaler…",
+        "es": "Buscar categorías y canales…",
+        "de": "Kategorien & Sender suchen…",
+        "fr": "Rechercher catégories et chaînes…",
+        "zh": "搜索分类和频道…",
+        "ru": "Поиск категорий и каналов…",
+        "th": "ค้นหาหมวดหมู่และช่อง…",
+    },
+    "cat_search_none": {
+        "en": "No matching categories", "sv": "Inga matchande kategorier",
+        "es": "No hay categorías coincidentes",
+        "de": "Keine passenden Kategorien",
+        "fr": "Aucune catégorie correspondante", "zh": "没有匹配的分类",
+        "ru": "Нет подходящих категорий", "th": "ไม่พบหมวดหมู่ที่ตรงกัน",
+    },
+
     "ts_archive_unavailable": {
         "en": "Catch-up isn't available for this channel",
         "sv": "Catch-up är inte tillgängligt för den här kanalen",

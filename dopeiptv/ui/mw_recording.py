@@ -645,6 +645,11 @@ class _RecordingMixin:
         self._ts_candidates = urls
         self._ts_candidate_idx = 0
         self._ts_candidate_started = time.monotonic()
+        if os.environ.get("DOPEIPTV_TS_DEBUG"):
+            import sys
+            print(f"[dopeIPTV][ts] play back_min={back_min} prog={bool(prog)} "
+                  f"days={days} start={datetime.fromtimestamp(start)} "
+                  f"candidates={urls}", file=sys.stderr)
         name = self.channel_display_name(it)
         title = (f"{what} ({name}, timeshift)" if what
                  else f"{name} (timeshift)")

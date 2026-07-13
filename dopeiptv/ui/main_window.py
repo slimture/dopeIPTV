@@ -381,6 +381,20 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cat_solo_btn.toggled.connect(self._on_cat_solo_toggle)
         cat_hdr.addWidget(self.cat_solo_btn)
         sl.addLayout(cat_hdr)
+        # Search that spans category names AND their channels: type "germany"
+        # or "bbc" and the matching categories float up (ranked by how many of
+        # their channels match), each previewing a few hits. Double-click to
+        # enter that category. Only meaningful where categories exist.
+        self.cat_search = QLineEdit(objectName="CatSearch")
+        self.cat_search.setPlaceholderText(tr("cat_search_placeholder"))
+        self.cat_search.setClearButtonEnabled(True)
+        self.cat_search.textChanged.connect(self._on_cat_search)
+        sl.addWidget(self.cat_search)
+        self._cat_search_timer = QTimer(self)
+        self._cat_search_timer.setSingleShot(True)
+        self._cat_search_timer.setInterval(220)
+        self._cat_search_timer.timeout.connect(self._run_category_search)
+        self._search_index_cache: dict = {}
         self.cat_list = QListWidget()
         self.cat_list.setItemDelegate(CategoryColorDelegate(self.cat_list))
         self.cat_list.setMinimumWidth(0)
@@ -1800,6 +1814,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _load_categories(self) -> None:
         self._load_gen += 1
         gen = self._load_gen
+        # Reset the category search: it only applies to the provider sections
+        # that actually have categories (live/movies/series).
+        if hasattr(self, "cat_search"):
+            self.cat_search.blockSignals(True)
+            self.cat_search.clear()
+            self.cat_search.blockSignals(False)
+            self.cat_search.setVisible(self.mode in ("live", "vod", "series"))
         self.cat_list.clear()
         self.list_model.set_items([], self.mode)
         if self.mode == "rec":
@@ -1911,6 +1932,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 return
             self._hide_busy()
             self._raw_categories = cats or []
+            self._search_index_cache.pop(request_mode, None)  # rebuild on search
             self.cat_list.blockSignals(True)
             self.cat_list.clear()
             all_item = QListWidgetItem(tr("cat_all"))
@@ -1977,6 +1999,82 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._error(msg)
 
         run_async(self.pool, fn, done, fail)
+
+    def _on_cat_search(self, _text: str) -> None:
+        # Debounce so a fast typist doesn't trigger a rebuild per keystroke.
+        self._cat_search_timer.start()
+
+    def _run_category_search(self) -> None:
+        if self.mode not in ("live", "vod", "series"):
+            return
+        q = self.cat_search.text().strip().lower()
+        if not q:
+            self._load_categories()   # restore the normal category list
+            return
+        self._ensure_search_index(
+            self.mode, lambda idx: self._render_cat_search(q, idx))
+
+    def _ensure_search_index(self, mode: str, cb) -> None:
+        """Fetch every channel of *mode* once (grouped by category_id) so the
+        search can rank categories by how many of their channels match. Cached
+        per mode for the session; rebuilt when categories reload."""
+        cached = self._search_index_cache.get(mode)
+        if cached is not None:
+            cb(cached)
+            return
+        fetch = {"live": self.client.live_streams,
+                 "vod": self.client.vod_streams,
+                 "series": self.client.series_list}[mode]
+
+        def done(items) -> None:
+            from collections import defaultdict
+            idx: dict = defaultdict(list)
+            for it in items or []:
+                cid = it.get("category_id")
+                if cid is None:
+                    continue
+                idx[cid].append(it.get("name") or it.get("title") or "")
+            self._search_index_cache[mode] = idx
+            cb(idx)
+
+        run_async(self.pool, fetch, done, lambda _m: cb({}))
+
+    def _render_cat_search(self, q: str, idx: dict) -> None:
+        results = []
+        for c in getattr(self, "_raw_categories", []):
+            cid = c.get("category_id")
+            if self.overrides.is_hidden(self.mode, cid):
+                continue
+            cname = self.overrides.display_name(
+                self.mode, cid, c.get("category_name", "?"))
+            name_match = q in cname.lower()
+            chans = idx.get(cid, [])
+            matches = [n for n in chans if q in n.lower()]
+            if not name_match and not matches:
+                continue
+            # Rank: a category whose NAME matches wins; among the rest, the more
+            # of its channels match the higher it sits (so "bbc" surfaces UK,
+            # with its many BBC channels, above a country with just one).
+            score = (1_000_000 if name_match else 0) + len(matches)
+            sample = (matches or chans)[:3]
+            results.append((score, cname, cid, sample))
+        results.sort(key=lambda r: (-r[0], r[1].lower()))
+
+        self.cat_list.blockSignals(True)
+        self.cat_list.clear()
+        for _score, cname, cid, sample in results:
+            label = cname
+            if sample:
+                label += "  ·  " + ", ".join(sample)
+            it = QListWidgetItem(label)
+            it.setData(Qt.ItemDataRole.UserRole, cid)
+            it.setToolTip(cname)
+            self.cat_list.addItem(it)
+        if not results:
+            none_it = QListWidgetItem(tr("cat_search_none"))
+            none_it.setFlags(Qt.ItemFlag.NoItemFlags)
+            self.cat_list.addItem(none_it)
+        self.cat_list.blockSignals(False)
 
     def _category_changed(self, cur, _prev=None) -> None:
         if not cur:
@@ -3355,6 +3453,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # normal reconnect below (which replays the same archive url).
         if getattr(self, "_playing_catchup", False):
             pos = self.player.playback_position() if self.player else 0.0
+            if os.environ.get("DOPEIPTV_TS_DEBUG"):
+                print(f"[dopeIPTV][ts] catchup error: {msg} "
+                      f"(candidate {getattr(self, '_ts_candidate_idx', 0)}, "
+                      f"pos={pos})", file=sys.stderr)
             early = ((time.monotonic()
                       - getattr(self, "_ts_candidate_started", 0.0)) < 10
                      and (pos or 0.0) < 2)
