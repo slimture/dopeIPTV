@@ -58,8 +58,10 @@ class ChannelListView(QListView):
             return
         # Bare Left/Right control the player (scrub timeshift / seek VOD) when
         # one is up, rather than navigating the list and swapping the channel.
-        if (e.key() in (Qt.Key.Key_Left, Qt.Key.Key_Right)
-                and e.modifiers() == Qt.KeyboardModifier.NoModifier
+        # (macOS tags arrows with KeypadModifier, so ignore that bit.)
+        bare = (e.modifiers() & ~Qt.KeyboardModifier.KeypadModifier) == \
+            Qt.KeyboardModifier.NoModifier
+        if (e.key() in (Qt.Key.Key_Left, Qt.Key.Key_Right) and bare
                 and hasattr(win, "_handle_player_arrow")
                 and win._handle_player_arrow(e.key())):
             e.accept()

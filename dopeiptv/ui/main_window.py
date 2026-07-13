@@ -32,7 +32,7 @@ from ..providers.chromecast import CastDialog, ChromecastManager
 from ..providers.client import (
     DemoClient, OfflineClient, XtreamClient, make_client,
 )
-from ..media.embedded import EmbeddedPlayer
+from ..media.embedded import EmbeddedPlayer, _is_bare_arrow
 from ..providers.epg import XmltvGuide, epg_cache_path, prune_epg_caches
 from ..services.coverart import CoverArtService
 from ..services.resume import ResumeStore
@@ -3648,7 +3648,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def keyPressEvent(self, event) -> None:
         if (event.key() in (Qt.Key.Key_Left, Qt.Key.Key_Right)
-                and event.modifiers() == Qt.KeyboardModifier.NoModifier):
+                and _is_bare_arrow(event.modifiers())):
             # Scrub the player (timeshift/VOD) before any zap - covers the
             # fullscreen case, where this handler would otherwise zap.
             if self._handle_player_arrow(event.key()):
@@ -3734,23 +3734,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         so it works even where the app-level input filter doesn't catch it (seen
         on macOS). Returns True when it consumed the key."""
         p = self.player
-        dbg = os.environ.get("DOPEIPTV_KEY_DEBUG")
         if not p or p.current_url is None or not p.isVisible():
-            if dbg:
-                print(f"[dopeIPTV][key] arrow ignored: player={bool(p)} "
-                      f"url={getattr(p, 'current_url', None)!r} "
-                      f"visible={p.isVisible() if p else None}", file=sys.stderr)
             return False
         back = key == Qt.Key.Key_Left
-        mode = getattr(p, "_seek_mode", None)
-        seekable = p._is_seekable()
-        if dbg:
-            print(f"[dopeIPTV][key] arrow mode={mode} seekable={seekable}",
-                  file=sys.stderr)
-        if mode == "timeline":
+        if getattr(p, "_seek_mode", None) == "timeline":
             p._timeline_step(-p.TIMELINE_STEP_MIN if back else p.TIMELINE_STEP_MIN)
             return True
-        if seekable:
+        if p._is_seekable():
             p._relative_seek(-10 if back else 10)
             return True
         return False

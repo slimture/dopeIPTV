@@ -24,6 +24,13 @@ from .players import _libmpv, _register_error_callback
 from ..ui.theme import P
 
 
+def _is_bare_arrow(modifiers) -> bool:
+    """True when no real modifier is held. macOS tags arrow keys with
+    KeypadModifier, which must be ignored or no arrow ever reads as 'bare'."""
+    return (modifiers & ~Qt.KeyboardModifier.KeypadModifier) == \
+        Qt.KeyboardModifier.NoModifier
+
+
 def _env_num(name: str, default, cast):
     """Read a numeric override from the environment, falling back to *default*
     when unset or malformed (so a stray value can never abort player start)."""
@@ -575,15 +582,11 @@ class _MacInputFilter(QObject):
     def _handle_seek_key(self, event, pressed: bool) -> bool:
         if event.key() not in (Qt.Key.Key_Left, Qt.Key.Key_Right):
             return False
-        if os.environ.get("DOPEIPTV_KEY_DEBUG") and pressed:
-            p = self._player
-            print(f"[dopeIPTV][key] macfilter arrow mods={int(event.modifiers().value)} "
-                  f"url={getattr(p, 'current_url', None) is not None} "
-                  f"mode={getattr(p, '_seek_mode', None)} "
-                  f"focus={type(QApplication.focusWidget()).__name__}",
-                  file=sys.stderr)
-        # Ctrl+arrows stay a channel zap; only claim the bare presses.
-        if event.modifiers() != Qt.KeyboardModifier.NoModifier:
+        # Ctrl/Cmd+arrows stay a channel zap; only claim the bare presses. On
+        # macOS the arrow keys carry KeypadModifier, so ignore that one bit -
+        # otherwise no arrow ever counts as "bare" and every one falls through
+        # to the channel list.
+        if not _is_bare_arrow(event.modifiers()):
             return False
         p = self._player
         if p.current_url is None:
