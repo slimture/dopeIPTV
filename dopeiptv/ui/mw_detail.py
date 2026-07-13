@@ -699,6 +699,21 @@ class _DetailMixin:
         if href.startswith("cast:"):
             self._on_cast_clicked(href[len("cast:"):], None)
 
+    # Default number of upcoming programmes shown in the right column, and the
+    # range the setting allows.
+    EPG_UPCOMING_DEFAULT = 5
+    EPG_UPCOMING_MIN = 1
+    EPG_UPCOMING_MAX = 20
+
+    def _epg_upcoming_count(self) -> int:
+        """How many upcoming programmes the detail panel lists (user setting)."""
+        try:
+            n = int(self.settings.value(
+                "epg_upcoming_count", self.EPG_UPCOMING_DEFAULT))
+        except (TypeError, ValueError):
+            n = self.EPG_UPCOMING_DEFAULT
+        return max(self.EPG_UPCOMING_MIN, min(self.EPG_UPCOMING_MAX, n))
+
     def _show_epg(self, listings, key) -> None:
         if key != self._current_key:
             return
@@ -727,8 +742,8 @@ class _DetailMixin:
             all_posts.append(post)
             if start and stop and start <= now < stop and not current:
                 current = post
-            elif start and now < start <= now + timedelta(hours=6):
-                upcoming.append(post)   # only the next 6 hours
+            elif start and now < start:
+                upcoming.append(post)   # any future programme; sliced below
         upcoming.sort(key=lambda p: p["start"])
 
         if current:
@@ -752,7 +767,7 @@ class _DetailMixin:
                              f" at {nxt['start']:%H:%M}")
                 self.player.set_overlay_info(info)
 
-        for post in upcoming[:12]:
+        for post in upcoming[:self._epg_upcoming_count()]:
             self._epg_card(post)
 
         if not current and not upcoming:

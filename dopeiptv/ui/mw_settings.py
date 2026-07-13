@@ -553,8 +553,12 @@ class _SettingsMixin:
             current_language())
         lang_box.currentIndexChanged.connect(
             lambda _i: self._set_language(lang_box.currentData()))
+        epg_count_box = QSpinBox()
+        epg_count_box.setRange(self.EPG_UPCOMING_MIN, self.EPG_UPCOMING_MAX)
+        epg_count_box.setValue(self._epg_upcoming_count())
         uf.addRow(tr("setting_language"), lang_box)
         uf.addRow(tr("setting_list_size"), density_box)
+        uf.addRow(tr("setting_upcoming_count"), epg_count_box)
         uf.addRow(tr("setting_sort_by"), sort_box)
         uf.addRow(tr("setting_theme"), theme_box)
         uf.addRow(tr("setting_accent_color"), accent_box)
@@ -1222,6 +1226,8 @@ class _SettingsMixin:
             self.settings.setValue(
                 "view_density", density_box.currentData())
             self.settings.setValue(
+                "epg_upcoming_count", epg_count_box.value())
+            self.settings.setValue(
                 "sort_order", sort_box.currentData())
             self.settings.setValue(
                 "audio_lang", alang_box.currentData())
@@ -1280,6 +1286,11 @@ class _SettingsMixin:
                 self.player.apply_default_options()
             self._apply_view_settings()
             self.list_model.refresh_all()
+            # Re-render the open detail panel so a changed "upcoming count"
+            # (and other view tweaks) take effect without re-selecting.
+            cur = self.listw.currentIndex()
+            if cur.isValid():
+                self._on_current_changed(cur)
 
     def show_about(self) -> None:
         d = QDialog(self)

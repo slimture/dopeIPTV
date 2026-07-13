@@ -515,6 +515,16 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Размер списка",
         "th": "ขนาดรายการ",
     },
+    "setting_upcoming_count": {
+        "en": "Upcoming programmes shown",
+        "sv": "Antal kommande program",
+        "es": "Programas próximos mostrados",
+        "de": "Angezeigte kommende Sendungen",
+        "fr": "Programmes à venir affichés",
+        "zh": "显示的即将播出节目数",
+        "ru": "Показывать предстоящих программ",
+        "th": "จำนวนรายการที่กำลังจะมาถึงที่แสดง",
+    },
     "setting_sort_by": {
         "en": "Sort lists by",
         "sv": "Sortera listor efter",
