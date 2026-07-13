@@ -1784,6 +1784,12 @@ class EmbeddedPlayer(QWidget):
             pass
 
     def _sync_pause_label(self, paused: bool) -> None:
+        # Called every position poll - only act on an actual pause<->play
+        # transition. Re-emitting paused_changed each poll reset the app's
+        # pause-start timestamp, so a long pause measured as ~0 s (the DVR
+        # timeshift offset never kicked in).
+        if paused == getattr(self, "_paused", None):
+            return
         self._paused = paused
         name = "play" if paused else "pause"
         icon = _control_icon(name, self._icon_color, self.ICON_PX)
