@@ -1169,6 +1169,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return   # not paused by us, or already playing a seekable archive
         it = lp.get("item") if lp else None
         elapsed = time.time() - started
+        if os.environ.get("DOPEIPTV_TS_DEBUG"):
+            tv = self._timeshift_days(it) if it else 0
+            print(f"[dopeIPTV][ts] resume elapsed={elapsed:.1f} on_live={on_live} "
+                  f"ts_days={tv} catchup={self._playing_catchup} "
+                  f"tl_visible={self.player.ts_timeline.isVisible() if self.player else None}",
+                  file=sys.stderr)
         if (it and lp.get("kind") == "live"
                 and self._timeshift_days(it) > 0 and elapsed >= 120):
             # Only a *long* pause (beyond what mpv's buffer holds) falls to the
