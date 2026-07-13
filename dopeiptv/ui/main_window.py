@@ -3318,6 +3318,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             extra = None
             if kind == "live" and item is not None:
                 extra = {"stream_id": item.get("stream_id"),
+                         "num": item.get("num"),
                          "tv_archive": item.get("tv_archive"),
                          "tv_archive_duration": item.get("tv_archive_duration")}
             self.history.add(url, title, icon_url, key, kind, extra=extra)

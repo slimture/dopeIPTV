@@ -553,9 +553,17 @@ class ChannelDelegate(QStyledItemDelegate):
 
         num_w = 0
         is_fav = self.window.is_favorite_item(it, kind)
-        if kind in ("live", "fav") and it.get("num"):
-            has_archive = self.window._timeshift_days(it) > 0
+        # A live channel row shown in History counts as live for the number +
+        # catch-up marker (History has no channel number, so the marker still
+        # draws on its own).
+        live_like = (kind in ("live", "fav")
+                     or (kind == "history" and it.get("_kind") == "live"))
+        num_str = str(it["num"]) if it.get("num") else ""
+        has_archive = live_like and self.window._timeshift_days(it) > 0
+        if live_like and (num_str or has_archive):
             num_w = 52 if has_archive else 34
+            if not num_str:
+                num_w = 34 if has_archive else 0
             if is_fav:
                 num_w += 18
             fnum = QFont()
@@ -564,7 +572,6 @@ class ChannelDelegate(QStyledItemDelegate):
             num_rect = QRect(
                 rect.right() - 12 - num_w, rect.top(),
                 num_w, rect.height())
-            num_str = str(it["num"])
             va_right = (Qt.AlignmentFlag.AlignVCenter
                         | Qt.AlignmentFlag.AlignRight)
             if has_archive:
