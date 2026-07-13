@@ -6242,6 +6242,19 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Архив недоступен для этого канала - уточните у провайдера",
         "th": "ช่องนี้ไม่รองรับการดูย้อนหลัง - โปรดสอบถามผู้ให้บริการ",
     },
+    "ts_shorter_archive": {
+        "en": "Archive is shorter than listed - trying the deepest available…",
+        "sv": "Arkivet är kortare än angivet - provar det djupaste som finns…",
+        "es": "El archivo es más corto de lo indicado - probando lo más "
+              "profundo disponible…",
+        "de": "Archiv ist kürzer als angegeben - versuche das tiefste "
+              "Verfügbare…",
+        "fr": "L'archive est plus courte qu'indiqué - essai du plus loin "
+              "disponible…",
+        "zh": "存档比标示的短 - 正在尝试可用的最早时间…",
+        "ru": "Архив короче заявленного - пробуем самую раннюю доступную точку…",
+        "th": "คลังย้อนหลังสั้นกว่าที่ระบุ - กำลังลองจุดที่ลึกที่สุดที่มี…",
+    },
     "ts_checking": {
         "en": "Checking catch-up…", "sv": "Kollar catch-up…",
         "es": "Comprobando repetición…", "de": "Catch-up wird geprüft…",

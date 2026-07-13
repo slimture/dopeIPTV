@@ -715,11 +715,12 @@ class _RecordingMixin:
             # Redraw so the amber ◀◀ marker drops immediately.
             self.listw.viewport().update()
 
-    # How far inside the stated archive depth a "go back to the limit" request
-    # is pulled, and how shallow a catch-up request must be for a failure to
-    # count as "this channel serves no archive at all" (learn-and-hide).
-    TS_EDGE_MARGIN_SEC = 10 * 60      # 10 min inside the oldest edge
+    # How much a "go back to the limit" request is pulled inside the stated
+    # depth, how shallow a failing request must be to count as "no archive at
+    # all" (learn-and-hide), and how long a learned real-depth cap sticks.
+    TS_MARGIN_MIN = 10               # 10 min inside the deepest requestable point
     TS_SHALLOW_MIN = 180             # <= 3 h back
+    TS_DEPTH_TTL = 14 * 86400        # a learned short depth re-expands after 14 d
 
     def _clear_ts_broken(self) -> None:
         """Forget learned catch-up failures (manual refresh / reset button) so
@@ -727,10 +728,82 @@ class _RecordingMixin:
         pid = ((self.playlist_store.active() or {}).get("id", "")
                if self.playlist_store else "")
         self.settings.remove(f"ts_broken/{pid}")
+        self.settings.remove(f"ts_depth/{pid}")
         self._ts_broken = {}
         self._ts_broken_pid = pid
+        self._ts_depth = {}
+        self._ts_depth_pid = pid
         if hasattr(self, "listw"):
             self.listw.viewport().update()
+
+    # -- learned real archive depth ------------------------------------------
+    # A provider's tv_archive_duration can overstate what it actually serves,
+    # so a request near the stated limit fails. We remember the shallowest depth
+    # (minutes back) that failed and only offer/allow less than that - without
+    # unmarking the channel as timeshift. Stored with a timestamp so a transient
+    # failure re-expands after a while.
+
+    def _ts_depth_map(self) -> dict:
+        """{channel_key: (fail_minutes, learned_at)} for this playlist."""
+        pid = ((self.playlist_store.active() or {}).get("id", "")
+               if self.playlist_store else "")
+        if getattr(self, "_ts_depth_pid", None) != pid:
+            raw = str(self.settings.value(f"ts_depth/{pid}", "") or "")
+            m: dict = {}
+            for tok in raw.split(","):
+                parts = tok.split(":")
+                if len(parts) >= 2 and parts[0]:
+                    try:
+                        mins = int(float(parts[1]))
+                        ts = float(parts[2]) if len(parts) >= 3 else 0.0
+                    except ValueError:
+                        continue
+                    m[parts[0]] = (mins, ts)
+            self._ts_depth = m
+            self._ts_depth_pid = pid
+        return self._ts_depth
+
+    def _save_ts_depth(self) -> None:
+        pid = getattr(self, "_ts_depth_pid", "")
+        self.settings.setValue(
+            f"ts_depth/{pid}",
+            ",".join(f"{k}:{v[0]}:{int(v[1])}"
+                     for k, v in sorted(self._ts_depth.items())))
+
+    def _learn_ts_maxdepth(self, it, minutes: int) -> None:
+        """A catch-up request at *minutes* back failed: the real archive is
+        shorter. Record it (only ever tightening) so the menu/requests shrink."""
+        key = str(self._item_key(it))
+        m = self._ts_depth_map()
+        cur = m.get(key)
+        if cur is None or minutes < cur[0]:
+            m[key] = (int(minutes), time.time())
+            self._save_ts_depth()
+            if hasattr(self, "listw"):
+                self.listw.viewport().update()
+
+    def _confirm_ts_depth(self, it, minutes: int) -> None:
+        """A catch-up request at *minutes* back worked: if a stale (shorter) cap
+        was learned, the archive actually reaches this deep, so drop it."""
+        key = str(self._item_key(it))
+        m = self._ts_depth_map()
+        cur = m.get(key)
+        if cur is not None and minutes >= cur[0]:
+            del m[key]
+            self._save_ts_depth()
+
+    def _effective_ts_minutes(self, it) -> int:
+        """The deepest catch-up we'll actually request (minutes back): the
+        provider's stated depth, capped by any learned-shorter real depth, and
+        always pulled a margin inside so the very oldest edge isn't requested."""
+        days = self._timeshift_days(it)
+        if not days:
+            return 0
+        full = days * 1440
+        cur = self._ts_depth_map().get(str(self._item_key(it)))
+        if cur and (cur[1] == 0.0 or time.time() - cur[1] < self.TS_DEPTH_TTL):
+            full = min(full, cur[0])
+        return max(self.TS_MARGIN_MIN, full - self.TS_MARGIN_MIN)
 
     @staticmethod
     def _ts_provider_flagged(it) -> bool:
@@ -743,13 +816,18 @@ class _RecordingMixin:
             return False
 
     def _reset_channel_timeshift(self, it) -> None:
-        """Forget a single channel's learned catch-up failure, so its ◀◀ marker
-        and menu come back. Used from the live channel's context menu."""
+        """Forget a single channel's learned catch-up failure and short-depth
+        cap, so its ◀◀ marker, full menu and archive depth come back. Used from
+        the live channel's context menu."""
         key = str(self._item_key(it))
         m = self._ts_broken_map()
         if key in m:
             del m[key]
             self._save_ts_broken()
+        dm = self._ts_depth_map()
+        if key in dm:
+            del dm[key]
+            self._save_ts_depth()
         if hasattr(self, "listw"):
             self.listw.viewport().update()
         self._flash_status(tr("ts_reset_done_one"))
@@ -768,26 +846,26 @@ class _RecordingMixin:
         now = time.time()
         if prog:
             start = prog["start_timestamp"]
-            duration_min = max(
-                1, int((prog["stop_timestamp"] - start) // 60) + 2)
             what = prog.get("title") or "programme"
         else:
             start = now - (back_min or 30) * 60
-            duration_min = max(1, int((now - start) // 60) + 1)
             what = None
-        # Never request the very oldest edge of the archive: providers usually
-        # drop the last few minutes, so a "go back 3 days" on a 3-day archive
-        # lands just past the end and fails. Pull back a safety margin so a
-        # request at the stated depth still resolves to real content.
-        oldest = now - days * 86400 + self.TS_EDGE_MARGIN_SEC
-        # A failure on a request *near the archive limit* only means that depth
-        # isn't available - it must NOT unmark a channel that works closer to
-        # live. Only a shallow request failing implies the provider serves no
-        # catch-up at all (learn-and-hide).
-        depth_min = days * 1440
+        # Clamp to the effective archive depth: the provider's stated depth,
+        # capped by any learned-shorter real depth, and a margin inside the
+        # oldest edge (providers drop the last few minutes, so a request at the
+        # exact stated limit lands just past the end and fails).
+        floor = now - self._effective_ts_minutes(it) * 60
+        # A failure on a request *near the limit* only means that depth isn't
+        # available - it must NOT unmark a working channel. Only a shallow,
+        # un-clamped request failing implies no catch-up at all (learn-and-hide).
+        clamped = start < floor - 1
+        start = max(start, floor)
         requested_back_min = (now - start) / 60.0
-        clamped = start < oldest
-        start = max(start, oldest)
+        if prog:
+            duration_min = max(
+                1, int((prog["stop_timestamp"] - start) // 60) + 2)
+        else:
+            duration_min = max(1, int((now - start) // 60) + 1)
         allow_mark_broken = (not clamped
                              and requested_back_min <= self.TS_SHALLOW_MIN)
         start += self._replay_delay_minutes() * 60
@@ -824,14 +902,36 @@ class _RecordingMixin:
                 return   # a newer play/probe superseded this one
             if not url:
                 if allow_mark_broken:
+                    # A shallow request failed: the provider serves no catch-up.
                     self._mark_ts_broken(it)
+                else:
+                    # A deep request failed: the archive is shorter than stated.
+                    # Learn the real limit (keeping the channel as timeshift),
+                    # then retry one step shallower so a single click still lands
+                    # at the deepest point that works - instead of dumping the
+                    # user to live with no seek bar.
+                    self._learn_ts_maxdepth(it, int(round(requested_back_min)))
+                    if not prog:
+                        nxt = self._next_shallower_step(
+                            int(round(requested_back_min)))
+                        if nxt is not None:
+                            self._flash_status(tr("ts_shorter_archive"))
+                            self._play_timeshift(it, back_min=nxt)
+                            return
                 self._flash_status(tr("ts_archive_unavailable"), ms=6000)
-                # The live video never stopped - just drop the now-pointless
-                # timeline back to a plain live view.
+                # The live video never stopped. Restore the live timeline (not
+                # plain live) so the user can still scrub to a shallower point
+                # without restarting the channel.
                 if self.player:
-                    self.player.set_seek_mode("live")
-                    self.player.set_live_badge(None)
+                    self._playing_catchup = False
+                    if self._timeshift_days(it):
+                        self._apply_seek_mode(it, "live")
+                    else:
+                        self.player.set_seek_mode("live")
+                        self.player.set_live_badge(None)
                 return
+            # Archive reaches this depth after all - drop any stale short cap.
+            self._confirm_ts_depth(it, int(round(requested_back_min)))
             self._ts_candidates = [url]
             self._ts_candidate_idx = 0
             self._ts_candidate_started = time.monotonic()
@@ -892,8 +992,16 @@ class _RecordingMixin:
         (4320, "dur_3d"), (7200, "dur_5d"), (10080, "dur_7d"),
     )
 
+    def _next_shallower_step(self, minutes: int):
+        """The largest 'go back' step strictly shallower than *minutes* (used to
+        fall back one level when a deeper request turns out to exceed the real
+        archive). None when there's nothing shallower."""
+        lower = [s for s, _ in self.TIMESHIFT_STEPS if s < minutes]
+        return max(lower) if lower else None
+
     def _build_timeshift_menu(self, ts_menu, it) -> None:
         days = self._timeshift_days(it)
+        eff_min = self._effective_ts_minutes(it)
         ts_menu.addAction(tr("ts_go_live"),
                           lambda: self.play_live_channel(it))
         ts_menu.addSeparator()
@@ -905,8 +1013,11 @@ class _RecordingMixin:
         ts_menu.addAction(tr("ts_browse_past"),
                           lambda: self._open_catchup_dialog(it))
         ts_menu.addSeparator()
+        # Only offer depths the archive can actually reach (stated depth, capped
+        # by any learned-shorter real depth), so "go back 3 days" never appears
+        # for an archive that only really serves ~1 day.
         for mins, dur_key in self.TIMESHIFT_STEPS:
-            if mins > days * 1440:
+            if mins > eff_min:
                 break
             ts_menu.addAction(
                 tr("ts_go_back", t=tr(dur_key)),
