@@ -2648,15 +2648,28 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         # Not in the current (possibly category-filtered) list: remember the
         # target and navigate to a view that contains it, then select once it
-        # has loaded (see _load_categories / _apply_filter).
+        # has loaded (see _load_categories / _apply_filter). Land on the item's
+        # own category so the sidebar reflects what's playing, not just "All".
         self._pending_jump_key = self._playing_key
+        self._pending_jump_cat = (self._playing_item or {}).get("category_id")
         QTimer.singleShot(2500, self._clear_pending_jump)   # safety net
         target = {"live": "live", "vod": "vod",
                   "episode": "series"}.get(self._playing_group, self.mode)
         if self.mode != target:
-            self.switch_mode(target)     # done() picks "All" while a jump pends
+            self.switch_mode(target)     # done() honours _pending_jump_cat
         elif self.cat_list.count():
-            self.cat_list.setCurrentRow(0)   # "All" -> shows every item
+            row, cat = 0, self._pending_jump_cat
+            if cat is not None:
+                for i in range(self.cat_list.count()):
+                    if self.cat_list.item(i).data(
+                            Qt.ItemDataRole.UserRole) == cat:
+                        row = i
+                        break
+            self._pending_jump_cat = None
+            if self.cat_list.currentRow() == row:
+                self._apply_filter()   # same category: just (re)select the row
+            else:
+                self.cat_list.setCurrentRow(row)
 
     def _clear_pending_jump(self) -> None:
         self._pending_jump_key = None
