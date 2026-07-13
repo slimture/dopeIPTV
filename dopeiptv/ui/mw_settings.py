@@ -25,8 +25,13 @@ class _WheelGuard(QObject):
     """Stops the mouse wheel from ever changing a combo/spin/slider in the
     Settings window - it's far too easy to nudge a setting while just trying to
     scroll the page. The wheel is always swallowed on these controls (you change
-    a setting by clicking, not scrolling) and redirected to the enclosing scroll
-    area so the page still scrolls under the cursor."""
+    a setting by clicking, not scrolling) and instead scrolls the enclosing
+    scroll area directly, so the page still moves under the cursor.
+
+    The page is scrolled by nudging the scroll bar value - NOT by re-dispatching
+    the wheel event. Re-dispatching (QApplication.sendEvent) re-enters the
+    application-level event filters, which recursed infinitely and crashed the
+    app the moment you scrolled over a control."""
 
     def eventFilter(self, obj, ev):
         if ev.type() == QEvent.Type.Wheel:
@@ -34,7 +39,10 @@ class _WheelGuard(QObject):
             while area is not None and not isinstance(area, QScrollArea):
                 area = area.parent()
             if area is not None:
-                QApplication.sendEvent(area.viewport(), ev)
+                sb = area.verticalScrollBar()
+                delta = ev.angleDelta().y() or ev.angleDelta().x()
+                if delta:
+                    sb.setValue(sb.value() - delta)
             return True   # never let the control itself act on the wheel
         return False
 
