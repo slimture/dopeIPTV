@@ -3139,6 +3139,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self.player.play(url, title):
             self.wake.acquire(f"Playing {title}")
         self._apply_seek_mode(it, "live")
+        # Refresh the poster overlay glyph (play -> pause for a timeshift
+        # channel, -> stop for plain live). Unlike _start_playback, the preview
+        # path doesn't otherwise call this, so the button stayed on 'play'.
+        self._apply_play_icon()
 
     def playback_mode(self) -> str:
         default = "embedded" if self.player else "window"
