@@ -9,15 +9,38 @@ from __future__ import annotations
 import sys
 from datetime import datetime
 
-from PyQt6.QtCore import Qt, QTimer, QUrl
+from PyQt6.QtCore import QEvent, QObject, Qt, QTimer, QUrl
 from PyQt6.QtGui import QDesktopServices, QIcon
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QApplication, QCheckBox, QComboBox, QDialog,
+    QAbstractItemView, QAbstractSlider, QAbstractSpinBox, QApplication,
+    QCheckBox, QComboBox, QDialog,
     QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout, QInputDialog,
     QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox,
     QPushButton, QScrollArea, QSizePolicy, QSpinBox, QTabWidget, QTextBrowser,
     QVBoxLayout, QWidget,
 )
+
+
+class _WheelGuard(QObject):
+    """Stops the mouse wheel from changing a combo/spin/slider that merely
+    happens to sit under the cursor while the user scrolls the Settings page.
+    The wheel is redirected to the enclosing scroll area (so the page scrolls),
+    and the control only reacts to the wheel once it has focus (i.e. was
+    clicked) - so you change a setting by clicking, not by scrolling past it."""
+
+    def eventFilter(self, obj, ev):
+        if ev.type() == QEvent.Type.Wheel and not obj.hasFocus():
+            area = obj.parent()
+            while area is not None and not isinstance(area, QScrollArea):
+                area = area.parent()
+            if area is not None:
+                QApplication.sendEvent(area.viewport(), ev)
+            return True
+        return False
+
+
+# One shared, app-lifetime instance (a QObject filter can serve every control).
+_WHEEL_GUARD = _WheelGuard()
 
 from .. import APP_NAME, BUILD_VERSION, VERSION
 from ..i18n import tr
@@ -1373,6 +1396,12 @@ class _SettingsMixin:
 
         recheck.clicked.connect(check)
         check()               # auto-check on open
+        # Guard every value control so scrolling the page doesn't change a
+        # setting under the cursor - you click to change, not scroll past.
+        for cls in (QComboBox, QAbstractSpinBox, QAbstractSlider):
+            for w in d.findChildren(cls):
+                w.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+                w.installEventFilter(_WHEEL_GUARD)
         d.exec()
 
     # -- EPG refresh with progress -------------------------------------------------
