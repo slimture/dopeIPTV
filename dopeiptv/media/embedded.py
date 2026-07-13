@@ -2158,8 +2158,13 @@ class EmbeddedPlayer(QWidget):
             self._eof_seen = False
         seekable = (bool(dur) and dur > 1
                     and self._seek_mode not in ("live", "timeline"))
-        self._seekable = seekable
-        if not seekable:
+        # In 'program' mode the bar is virtual and always present: scrubbing it
+        # re-loads the archive, which briefly zeroes mpv's duration. Keep the
+        # bar shown (with its known window) across that blip so it doesn't
+        # collapse and re-stretch on every seek.
+        program_bar = self._seek_mode == "program" and self._program_window > 1
+        self._seekable = seekable or program_bar
+        if not self._seekable:
             self._hide_seek_ui()
             self._sync_fs_controls_width(False)
             return
