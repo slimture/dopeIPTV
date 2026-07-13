@@ -2837,8 +2837,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.rec.finish_all_inplayer("channel changed")
         self.player.show()
         self.player.set_overlay_info(title)
+        # A preview is always a fresh live edge - clear any catch-up state so
+        # the seek mode resolves to the live timeline (or plain live), not a
+        # leftover VOD/timeline-scrub state.
+        self._playing_catchup = False
+        self._ts_catchup_program = False
+        self._ts_segment_start = None
         if self.player.play(url, title):
             self.wake.acquire(f"Playing {title}")
+        self._apply_seek_mode(it, "live")
 
     def playback_mode(self) -> str:
         default = "embedded" if self.player else "window"
@@ -3216,43 +3223,50 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Reflect the new playback state on the poster overlay (play -> pause /
         # stop) when the item being played is the one shown in the detail pane.
         self._apply_play_icon()
-        # Pick one seek UI per stream so there's never a second, useless bar:
-        #  VOD -> normal seek bar; plain live -> none; timeshift live edge ->
-        #  the archive timeline; a catch-up segment -> normal seek bar spanning
-        #  it (plus the amber ⧗ TIMESHIFT badge).
-        if self.player:
-            ts_days = self._timeshift_days(item) if item is not None else 0
-            if kind != "live":
-                self.player.set_seek_mode("vod")
-                self.player.set_live_badge(None)
-            elif (ts_days > 0 and self._playing_catchup
-                  and getattr(self, "_ts_catchup_program", False)):
-                # A programme picked from the menu/EPG - a normal seek bar
-                # spanning just that programme.
-                self.player.set_seek_mode("program")
-                self.player.set_live_badge("timeshift")
-            elif ts_days > 0 and self._playing_catchup:
-                # Scrubbed back on the live timeline (or "go back X") - keep the
-                # timeline visible, just positioned behind live, so the user can
-                # keep scrubbing across the whole window instead of being locked
-                # into the single archive segment.
-                self._ts_depth_min = min(ts_days * 1440, 180)
-                self.player.set_seek_mode("timeline")
-                self.player.enter_timeshift(self._ts_depth_min)
-                self._update_ts_timeline()
-                self.player.set_live_badge("timeshift")
-            elif ts_days > 0:
-                # Span a recent window (<=3 h), not the whole multi-day archive:
-                # a small drag over days jumped hours/days back. Deeper archive
-                # access stays in the ◀◀ menu.
-                self._ts_depth_min = min(ts_days * 1440, 180)
-                self.player.set_seek_mode("timeline")
-                self.player.enter_timeshift(self._ts_depth_min)
-                self._update_ts_timeline()
-                self.player.set_live_badge(None)
-            else:
-                self.player.set_seek_mode("live")
-                self.player.set_live_badge(None)
+        self._apply_seek_mode(item, kind)
+
+    def _apply_seek_mode(self, item, kind: str) -> None:
+        """Pick one seek UI per stream so there's never a second, useless bar:
+        VOD -> normal seek bar; plain live -> none; timeshift live edge ->
+        the archive timeline; a catch-up segment -> normal seek bar spanning
+        it (plus the amber ⧗ TIMESHIFT badge). Called from every play path -
+        including the auto-preview, which plays straight through player.play()
+        and would otherwise leave the mode stuck at its 'vod' default and show
+        a buffer bar on live channels."""
+        if not self.player:
+            return
+        ts_days = self._timeshift_days(item) if item is not None else 0
+        if kind != "live":
+            self.player.set_seek_mode("vod")
+            self.player.set_live_badge(None)
+        elif (ts_days > 0 and self._playing_catchup
+              and getattr(self, "_ts_catchup_program", False)):
+            # A programme picked from the menu/EPG - a normal seek bar
+            # spanning just that programme.
+            self.player.set_seek_mode("program")
+            self.player.set_live_badge("timeshift")
+        elif ts_days > 0 and self._playing_catchup:
+            # Scrubbed back on the live timeline (or "go back X") - keep the
+            # timeline visible, just positioned behind live, so the user can
+            # keep scrubbing across the whole window instead of being locked
+            # into the single archive segment.
+            self._ts_depth_min = min(ts_days * 1440, 180)
+            self.player.set_seek_mode("timeline")
+            self.player.enter_timeshift(self._ts_depth_min)
+            self._update_ts_timeline()
+            self.player.set_live_badge("timeshift")
+        elif ts_days > 0:
+            # Span a recent window (<=3 h), not the whole multi-day archive:
+            # a small drag over days jumped hours/days back. Deeper archive
+            # access stays in the ◀◀ menu.
+            self._ts_depth_min = min(ts_days * 1440, 180)
+            self.player.set_seek_mode("timeline")
+            self.player.enter_timeshift(self._ts_depth_min)
+            self._update_ts_timeline()
+            self.player.set_live_badge(None)
+        else:
+            self.player.set_seek_mode("live")
+            self.player.set_live_badge(None)
 
     def _player_missing(self, name: str) -> None:
         QMessageBox.warning(
