@@ -1212,6 +1212,9 @@ class EmbeddedPlayer(QWidget):
     def _show_seek_overlay(self) -> None:
         # No VOD seek overlay for plain live (can't seek) or timeshift-edge
         # (the live timeline is the control) - avoids a second, useless bar.
+        if os.environ.get("DOPEIPTV_SEEK_DEBUG"):
+            print(f"[dopeIPTV][seek] show_overlay mode={self._seek_mode} "
+                  f"seekable={self._seekable}", file=sys.stderr)
         if self._seek_mode in ("live", "timeline"):
             return
         for w in (self.back_btn, self.fwd_btn, self.seek, self.time_lbl):
@@ -1286,6 +1289,8 @@ class EmbeddedPlayer(QWidget):
     def set_seek_mode(self, mode: str) -> None:
         """Pick which seek UI this stream uses (see _seek_mode). Hides the VOD
         seek overlay for live/timeline so only one bar is ever shown."""
+        if os.environ.get("DOPEIPTV_SEEK_DEBUG"):
+            print(f"[dopeIPTV][seek] set_seek_mode({mode})", file=sys.stderr)
         self._seek_mode = mode
         if mode != "timeline":
             self.exit_timeshift()
