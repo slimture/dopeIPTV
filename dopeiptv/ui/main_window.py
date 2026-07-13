@@ -32,7 +32,7 @@ from ..providers.chromecast import CastDialog, ChromecastManager
 from ..providers.client import (
     DemoClient, OfflineClient, XtreamClient, make_client,
 )
-from ..media.embedded import EmbeddedPlayer, _is_bare_arrow
+from ..media.embedded import EmbeddedPlayer, _is_bare_arrow, _is_shift_arrow
 from ..providers.epg import XmltvGuide, epg_cache_path, prune_epg_caches
 from ..services.coverart import CoverArtService
 from ..services.resume import ResumeStore
@@ -3080,10 +3080,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.player.set_overlay_info(title)
         # A preview is always a fresh live edge - clear any catch-up state so
         # the seek mode resolves to the live timeline (or plain live), not a
-        # leftover VOD/timeline-scrub state.
+        # leftover VOD/timeline-scrub state. The behind-live offset is
+        # per-channel, so reset it (and any pending pause) here too - otherwise
+        # previewing another timeshift channel while paused inherits the old
+        # channel's "-Ns behind live" value.
         self._playing_catchup = False
         self._ts_catchup_program = False
         self._ts_segment_start = None
+        self._ts_live_offset = 0.0
+        self._pause_started = None
         if self.player.play(url, title):
             self.wake.acquire(f"Playing {title}")
         self._apply_seek_mode(it, "live")
@@ -3403,6 +3408,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._ts_segment_start = None
             self._ts_catchup_program = False
             self._ts_live_offset = 0.0   # fresh tune = at the live edge
+            self._pause_started = None   # per-channel: don't carry a stale pause
         # Remember where we were in whatever was playing before switching,
         # and give the outgoing title its watched mark if it earned one.
         self._save_resume_position()
@@ -4065,15 +4071,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     # -- keyboard and close --------------------------------------------------------
 
     def keyPressEvent(self, event) -> None:
-        if (event.key() in (Qt.Key.Key_Left, Qt.Key.Key_Right)
-                and _is_bare_arrow(event.modifiers())):
-            # Scrub the player (timeshift/VOD) before any zap - covers the
-            # fullscreen case, where this handler would otherwise zap.
-            if self._handle_player_arrow(event.key()):
-                return
-            if self._player_fs:
-                self._zap(1 if event.key() == Qt.Key.Key_Right else -1)
-                return
+        if event.key() in (Qt.Key.Key_Left, Qt.Key.Key_Right):
+            bare = _is_bare_arrow(event.modifiers())
+            shift = _is_shift_arrow(event.modifiers())
+            if bare or shift:
+                # Scrub the player (fine-seek, or Shift = timeline step) before
+                # any zap - covers the fullscreen case, where this handler would
+                # otherwise zap.
+                if self._handle_player_arrow(event.key(), step=shift):
+                    return
+                if bare and self._player_fs:
+                    self._zap(1 if event.key() == Qt.Key.Key_Right else -1)
+                    return
         super().keyPressEvent(event)
 
     # Rebindable actions: (id, default key sequence, i18n label key). The
@@ -4147,16 +4156,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if sc is not None:
                 sc.setKey(QKeySequence(self.shortcut_sequence(sid, default)))
 
-    def _handle_player_arrow(self, key) -> bool:
-        """Bare Left/Right while the player is up: scrub the timeshift timeline
-        or seek VOD, instead of letting the key navigate the channel list (which
-        with auto-preview swaps the channel). Called from the list's key handler
-        so it works even where the app-level input filter doesn't catch it (seen
-        on macOS). Returns True when it consumed the key."""
+    def _handle_player_arrow(self, key, step: bool = False) -> bool:
+        """Left/Right while the player is up: a bare arrow fine-seeks (VOD /
+        catch-up / live buffer), Shift+arrow (*step*) jumps the timeshift
+        timeline into the archive - instead of letting the key navigate the
+        channel list (which with auto-preview swaps the channel). Called from
+        the list's key handler so it works even where the app-level input filter
+        doesn't catch it (seen on macOS). Returns True when it consumed the
+        key."""
         p = self.player
         if not p or not p.isVisible():
             return False
-        return p.arrow_scrub(key == Qt.Key.Key_Left)
+        return p.arrow_scrub(key == Qt.Key.Key_Left, step=step)
 
     def _size_to_screen(self) -> None:
         """First run only: open at a comfortable fraction of the actual

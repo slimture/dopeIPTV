@@ -31,6 +31,13 @@ def _is_bare_arrow(modifiers) -> bool:
         Qt.KeyboardModifier.NoModifier
 
 
+def _is_shift_arrow(modifiers) -> bool:
+    """True when only Shift is held (again ignoring the macOS KeypadModifier).
+    Shift+arrow steps the timeshift timeline; a bare arrow fine-seeks."""
+    return (modifiers & ~Qt.KeyboardModifier.KeypadModifier) == \
+        Qt.KeyboardModifier.ShiftModifier
+
+
 def _env_num(name: str, default, cast):
     """Read a numeric override from the environment, falling back to *default*
     when unset or malformed (so a stray value can never abort player start)."""
@@ -582,11 +589,13 @@ class _MacInputFilter(QObject):
     def _handle_seek_key(self, event, pressed: bool) -> bool:
         if event.key() not in (Qt.Key.Key_Left, Qt.Key.Key_Right):
             return False
-        # Ctrl/Cmd+arrows stay a channel zap; only claim the bare presses. On
-        # macOS the arrow keys carry KeypadModifier, so ignore that one bit -
-        # otherwise no arrow ever counts as "bare" and every one falls through
-        # to the channel list.
-        if not _is_bare_arrow(event.modifiers()):
+        # Ctrl/Cmd+arrows stay a channel zap; claim the bare presses (fine-seek)
+        # and Shift+arrow (timeline step). On macOS the arrow keys carry
+        # KeypadModifier, so ignore that one bit - otherwise no arrow ever
+        # counts as "bare" and every one falls through to the channel list.
+        bare = _is_bare_arrow(event.modifiers())
+        shift = _is_shift_arrow(event.modifiers())
+        if not (bare or shift):
             return False
         p = self._player
         if p.current_url is None:
@@ -594,23 +603,27 @@ class _MacInputFilter(QObject):
         # Never steal arrows from a text field (search box, PIN entry, ...).
         if isinstance(QApplication.focusWidget(), QLineEdit):
             return False
-        # Timeshift live edge: step the timeline into the archive - one jump per
-        # press (no auto-repeat) since each reloads a segment. Once inside a
-        # seekable catch-up segment we fall through to normal fine-seeking
-        # below, so both work.
-        if p._on_timeline_edge():
+        back = event.key() == Qt.Key.Key_Left
+        timeline = p.ts_timeline.isVisible()
+        # Shift+arrow: step the timeline into the archive - one jump per press
+        # (no auto-repeat) since each reloads a segment.
+        if shift and timeline:
             if pressed and not event.isAutoRepeat():
-                p._timeline_step(-p.TIMELINE_STEP_MIN
-                                 if event.key() == Qt.Key.Key_Left
-                                 else p.TIMELINE_STEP_MIN)
+                p.arrow_scrub(back, step=True)
             return True
-        if not p._mpv_seekable():
-            return False
-        if pressed:
-            p._on_seek_key_press(event)
-        else:
-            p._on_seek_key_release(event)
-        return True
+        # Bare arrow on a seekable stream (movie, catch-up segment, live
+        # buffer): fine-seek, with hold-to-seek while the key is down.
+        if p._mpv_seekable():
+            if pressed:
+                p._on_seek_key_press(event)
+            else:
+                p._on_seek_key_release(event)
+            return True
+        # Non-seekable timeshift live edge: swallow the bare arrow so it doesn't
+        # swap the channel (use Shift+arrow to step into the archive).
+        if timeline:
+            return True
+        return False
 
 
 class EmbeddedPlayer(QWidget):
@@ -1216,25 +1229,28 @@ class EmbeddedPlayer(QWidget):
         except Exception:
             return False
 
-    def _on_timeline_edge(self) -> bool:
-        """In timeline mode, True when we're at the live edge (no seekable
-        archive segment loaded) - so arrows step the timeline into the archive
-        rather than fine-seeking the (sometimes duration-reporting) live feed."""
-        return (self._seek_mode == "timeline"
-                and not (self._on_archive_segment and self._mpv_seekable()))
-
-    def arrow_scrub(self, back: bool) -> bool:
-        """Single bare-arrow action. At the timeshift live edge, step the
-        timeline into the archive; inside a seekable segment (VOD or catch-up),
-        fine-seek by SEEK_BACK/SEEK_FWD. Returns True when it consumed the key."""
+    def arrow_scrub(self, back: bool, step: bool = False) -> bool:
+        """Single arrow action. A bare arrow fine-seeks by SEEK_BACK/SEEK_FWD
+        (within a movie, a catch-up segment, or the live buffer); Shift+arrow
+        (*step*) jumps the live timeline TIMELINE_STEP_MIN into the archive.
+        Returns True when it consumed the key."""
         if self.current_url is None:
             return False
-        if self._on_timeline_edge():
+        timeline = self.ts_timeline.isVisible()
+        if step and timeline:
+            # Shift+arrow: explicit timeline step into the archive.
             self._timeline_step(-self.TIMELINE_STEP_MIN if back
                                 else self.TIMELINE_STEP_MIN)
             return True
         if self._mpv_seekable():
+            # Bare arrow (or Shift on a non-timeline stream): fine-seek within a
+            # movie, a catch-up segment, or a seekable live buffer.
             self._relative_seek(-self.SEEK_BACK if back else self.SEEK_FWD)
+            return True
+        if timeline:
+            # Timeshift live edge mpv won't fine-seek: swallow the bare arrow so
+            # it doesn't swap the channel, but don't do a jarring multi-minute
+            # jump - Shift+arrow steps into the archive when you want that.
             return True
         return False
 

@@ -56,14 +56,16 @@ class ChannelListView(QListView):
             win._channel_jump()
             e.accept()
             return
-        # Bare Left/Right control the player (scrub timeshift / seek VOD) when
-        # one is up, rather than navigating the list and swapping the channel.
-        # (macOS tags arrows with KeypadModifier, so ignore that bit.)
-        bare = (e.modifiers() & ~Qt.KeyboardModifier.KeypadModifier) == \
-            Qt.KeyboardModifier.NoModifier
-        if (e.key() in (Qt.Key.Key_Left, Qt.Key.Key_Right) and bare
+        # Left/Right control the player when one is up, rather than navigating
+        # the list and swapping the channel: a bare arrow fine-seeks, Shift+arrow
+        # steps the timeshift timeline. (macOS tags arrows with KeypadModifier,
+        # so ignore that bit.)
+        mods = e.modifiers() & ~Qt.KeyboardModifier.KeypadModifier
+        bare = mods == Qt.KeyboardModifier.NoModifier
+        shift = mods == Qt.KeyboardModifier.ShiftModifier
+        if (e.key() in (Qt.Key.Key_Left, Qt.Key.Key_Right) and (bare or shift)
                 and hasattr(win, "_handle_player_arrow")
-                and win._handle_player_arrow(e.key())):
+                and win._handle_player_arrow(e.key(), step=shift)):
             e.accept()
             return
         super().keyPressEvent(e)
