@@ -1468,10 +1468,12 @@ class EmbeddedPlayer(QWidget):
         cap = min(self.width() - 2 * margin, 640)
         self.overlay.setFixedWidth(max(120, min(text_w + 34, cap)))
         self.overlay.adjustSize()
-        self.overlay.move(
-            margin,
-            self.height() - self.fs_controls.height()
-            - margin - 8 - self.overlay.height())
+        # Sit just above the control bar - and above the timeshift timeline too
+        # when it's showing, so the info text never lands on top of the bar.
+        bottom = self.height() - self.fs_controls.height() - margin - 8
+        if self.ts_timeline.isVisible():
+            bottom -= self.ts_timeline.height() + 12
+        self.overlay.move(margin, bottom - self.overlay.height())
 
     def _lock_video_box(self) -> None:
         # The video surface always fills whatever the *player* is given;

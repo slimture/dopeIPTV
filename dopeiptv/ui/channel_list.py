@@ -56,6 +56,14 @@ class ChannelListView(QListView):
             win._channel_jump()
             e.accept()
             return
+        # Bare Left/Right control the player (scrub timeshift / seek VOD) when
+        # one is up, rather than navigating the list and swapping the channel.
+        if (e.key() in (Qt.Key.Key_Left, Qt.Key.Key_Right)
+                and e.modifiers() == Qt.KeyboardModifier.NoModifier
+                and hasattr(win, "_handle_player_arrow")
+                and win._handle_player_arrow(e.key())):
+            e.accept()
+            return
         super().keyPressEvent(e)
 
     def mousePressEvent(self, e) -> None:

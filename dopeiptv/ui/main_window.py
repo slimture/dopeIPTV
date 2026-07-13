@@ -3659,6 +3659,24 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 return
         super().keyPressEvent(event)
 
+    def _handle_player_arrow(self, key) -> bool:
+        """Bare Left/Right while the player is up: scrub the timeshift timeline
+        or seek VOD, instead of letting the key navigate the channel list (which
+        with auto-preview swaps the channel). Called from the list's key handler
+        so it works even where the app-level input filter doesn't catch it (seen
+        on macOS). Returns True when it consumed the key."""
+        p = self.player
+        if not p or p.current_url is None or not p.isVisible():
+            return False
+        back = key == Qt.Key.Key_Left
+        if getattr(p, "_seek_mode", None) == "timeline":
+            p._timeline_step(-p.TIMELINE_STEP_MIN if back else p.TIMELINE_STEP_MIN)
+            return True
+        if p._is_seekable():
+            p._relative_seek(-10 if back else 10)
+            return True
+        return False
+
     def _size_to_screen(self) -> None:
         """First run only: open at a comfortable fraction of the actual
         display instead of a fixed 1240x780, and centre it. Capped so it
