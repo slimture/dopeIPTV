@@ -579,10 +579,21 @@ class _MacInputFilter(QObject):
         if event.modifiers() != Qt.KeyboardModifier.NoModifier:
             return False
         p = self._player
-        if p.current_url is None or not p._is_seekable():
+        if p.current_url is None:
             return False
         # Never steal arrows from a text field (search box, PIN entry, ...).
         if isinstance(QApplication.focusWidget(), QLineEdit):
+            return False
+        # Timeshift live timeline: arrows step along the archive (back/forward)
+        # instead of falling through to a channel change. One jump per press
+        # (no auto-repeat) since each reloads an archive segment.
+        if p._seek_mode == "timeline":
+            if pressed and not event.isAutoRepeat():
+                p._timeline_step(-p.TIMELINE_STEP_MIN
+                                 if event.key() == Qt.Key.Key_Left
+                                 else p.TIMELINE_STEP_MIN)
+            return True
+        if not p._is_seekable():
             return False
         if pressed:
             p._on_seek_key_press(event)
@@ -615,6 +626,8 @@ class EmbeddedPlayer(QWidget):
     # How long mpv may sit idle (buffer-starved) while not paused before we
     # treat the stream as frozen and ask for a reconnect.
     STALL_SECS = 12
+    # Minutes a Left/Right arrow press moves the timeshift live timeline.
+    TIMELINE_STEP_MIN = 5
     MINIBTN = 28
     ICON_PX = 15  # drawn control-icon size inside the 28px buttons
 
@@ -1308,6 +1321,15 @@ class EmbeddedPlayer(QWidget):
         self._place_ts_timeline()
         self.ts_timeline.show()
         self.ts_timeline.raise_()
+        # On the very first play (esp. the auto-preview at startup) the video
+        # surface hasn't been laid out at its docked size yet, so the geometry
+        # read above is stale and the bar lands too high. Reposition once the
+        # layout has settled.
+        QTimer.singleShot(0, self._reposition_ts_timeline)
+
+    def _reposition_ts_timeline(self) -> None:
+        if self.ts_timeline.isVisible():
+            self._place_ts_timeline()
 
     def exit_timeshift(self) -> None:
         self.ts_timeline.hide()
@@ -1345,6 +1367,16 @@ class EmbeddedPlayer(QWidget):
 
     def _on_ts_seek(self, value: int) -> None:
         self.timeshift_seek.emit(int(self._ts_depth - value))
+
+    def _timeline_step(self, minutes: int) -> None:
+        """Nudge the live timeline by *minutes* (negative = back into the
+        archive, positive = toward live) - the arrow-key equivalent of dragging
+        the slider."""
+        if not self.ts_timeline.isVisible():
+            return
+        val = max(0, min(self._ts_depth, self.ts_slider.value() + minutes))
+        self.ts_slider.setValue(val)
+        self.timeshift_seek.emit(int(self._ts_depth - val))
 
     def _place_ts_timeline(self) -> None:
         margin = 10
