@@ -340,16 +340,10 @@ class _MpvGLWidget(QOpenGLWidget):
                 "demuxer-lavf-o": "reconnect=1,reconnect_streamed=1,"
                                   "reconnect_on_network_error=1,"
                                   "reconnect_delay_max=5",
-                # Faster channel switching: ffmpeg otherwise probes up to ~5 s /
-                # 5 MB of a live MPEG-TS stream before it shows the first frame.
-                # A live TS declares its codecs up front, so a shorter probe
-                # reaches the picture much sooner with no practical downside.
-                # Tunable/disable-able via env (seconds / bytes; 0 = ffmpeg's
-                # own default) for streams that need deeper probing.
-                "demuxer-lavf-analyzeduration": _env_num(
-                    "DOPEIPTV_ANALYZEDURATION", 1.0, float),
-                "demuxer-lavf-probesize": _env_num(
-                    "DOPEIPTV_PROBESIZE", 2_000_000, int),
+                # (Stream probe depth is set per-play in play(): a short probe
+                # for live-TS zapping, ffmpeg's full defaults for movies/series
+                # - a global short probe under-analysed 4K VOD streams, and a
+                # mid-play decoder reinit then came back black on hwdec.)
                 # Never let mpv open its own window, and keep its OSD silent -
                 # otherwise it draws the media title centred on black while a
                 # stream buffers, which can surface as a stray frame.
@@ -1711,7 +1705,8 @@ class EmbeddedPlayer(QWidget):
         except Exception:
             return 0.0
 
-    def play(self, url: str, title: str, start: float = 0.0) -> bool:
+    def play(self, url: str, title: str, start: float = 0.0,
+             fast_open: bool = False) -> bool:
         try:
             # Fresh play cycle - drop the stop-in-progress flag so any real
             # error from this new stream (auth failed, 404, ...) is surfaced.
@@ -1749,6 +1744,26 @@ class EmbeddedPlayer(QWidget):
             try:
                 m["cache"] = "yes"
                 m["cache-secs"] = float(self._cache_secs())
+            except Exception:
+                pass
+            # Stream probing, per stream kind. A live MPEG-TS declares its
+            # codecs up front, so a short ffmpeg probe (*fast_open*) makes
+            # channel zapping much faster. Movies/series/recordings need
+            # ffmpeg's FULL analysis: a globally short probe left 4K HEVC codec
+            # parameters incomplete, and a mid-play decoder reinit (e.g.
+            # enabling a subtitle) then came back as black video on hardware
+            # decoding. 0 = ffmpeg's own defaults. Env values override both.
+            try:
+                if fast_open:
+                    m["demuxer-lavf-analyzeduration"] = _env_num(
+                        "DOPEIPTV_ANALYZEDURATION", 1.0, float)
+                    m["demuxer-lavf-probesize"] = _env_num(
+                        "DOPEIPTV_PROBESIZE", 2_000_000, int)
+                else:
+                    m["demuxer-lavf-analyzeduration"] = _env_num(
+                        "DOPEIPTV_ANALYZEDURATION", 0.0, float)
+                    m["demuxer-lavf-probesize"] = _env_num(
+                        "DOPEIPTV_PROBESIZE", 0, int)
             except Exception:
                 pass
             self.apply_default_options()

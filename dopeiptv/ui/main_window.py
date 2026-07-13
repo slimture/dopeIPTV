@@ -3136,7 +3136,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._ts_segment_start = None
         self._ts_live_offset = 0.0
         self._pause_started = None
-        if self.player.play(url, title):
+        if self.player.play(url, title, fast_open=True):
             self.wake.acquire(f"Playing {title}")
         self._apply_seek_mode(it, "live")
         # Refresh the poster overlay glyph (play -> pause for a timeshift
@@ -3531,7 +3531,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.rec.finish_all_inplayer("channel changed")
             self.player.show()
             self.player.set_overlay_info(title)
-            if self.player.play(url, title, start=resume_at):
+            # Fast (short-probe) open only for live zapping; movies/series/
+            # recordings get ffmpeg's full stream analysis (see play()).
+            if self.player.play(url, title, start=resume_at,
+                                fast_open=(kind == "live")):
                 self.wake.acquire(f"Playing {title}")
             else:
                 self.player.hide()
