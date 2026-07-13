@@ -622,38 +622,66 @@ class _RecordingMixin:
             pass
         return 0
 
-    def _ts_broken_set(self) -> set:
-        """Channel keys (this playlist) whose advertised catch-up doesn't work.
-        Loaded lazily and cached; persisted per playlist so it survives across
-        sessions and is cleared by a manual playlist refresh (re-trust)."""
+    # How long a learned catch-up failure sticks before the channel is
+    # re-tested - so a channel that gains a real archive later lights up again
+    # on its own, without waiting for a manual refresh.
+    TS_BROKEN_TTL = 14 * 86400   # 14 days
+
+    def _ts_broken_map(self) -> dict:
+        """{channel_key: failed_at_epoch} for this playlist. Loaded lazily and
+        cached; persisted so it survives sessions."""
         pid = ((self.playlist_store.active() or {}).get("id", "")
                if self.playlist_store else "")
         if getattr(self, "_ts_broken_pid", None) != pid:
-            raw = self.settings.value(f"ts_broken/{pid}", "") or ""
-            self._ts_broken = {k for k in str(raw).split(",") if k}
+            raw = str(self.settings.value(f"ts_broken/{pid}", "") or "")
+            m: dict = {}
+            for tok in raw.split(","):
+                if ":" in tok:
+                    k, _, ts = tok.rpartition(":")
+                    try:
+                        m[k] = float(ts)
+                    except ValueError:
+                        pass
+                elif tok:
+                    m[tok] = 0.0   # legacy entry (no timestamp) - never expires
+            self._ts_broken = m
             self._ts_broken_pid = pid
         return self._ts_broken
+
+    def _ts_broken_set(self) -> set:
+        """Channel keys still considered broken (failure within the TTL)."""
+        now = time.time()
+        return {k for k, ts in self._ts_broken_map().items()
+                if ts == 0.0 or now - ts < self.TS_BROKEN_TTL}
+
+    def _save_ts_broken(self) -> None:
+        pid = getattr(self, "_ts_broken_pid", "")
+        m = self._ts_broken
+        self.settings.setValue(
+            f"ts_broken/{pid}",
+            ",".join(f"{k}:{int(ts)}" for k, ts in sorted(m.items())))
 
     def _mark_ts_broken(self, it) -> None:
         if it is None:
             return
         key = str(self._item_key(it))
-        broken = self._ts_broken_set()
-        if key and key not in broken:
-            broken.add(key)
-            pid = getattr(self, "_ts_broken_pid", "")
-            self.settings.setValue(f"ts_broken/{pid}", ",".join(sorted(broken)))
+        m = self._ts_broken_map()
+        if key:
+            m[key] = time.time()
+            self._save_ts_broken()
             # Redraw so the amber ◀◀ marker drops immediately.
             self.listw.viewport().update()
 
     def _clear_ts_broken(self) -> None:
-        """Forget learned catch-up failures (called on a manual refresh) so the
-        provider's tv_archive flag is trusted again."""
+        """Forget learned catch-up failures (manual refresh / reset button) so
+        the provider's tv_archive flags are trusted again."""
         pid = ((self.playlist_store.active() or {}).get("id", "")
                if self.playlist_store else "")
         self.settings.remove(f"ts_broken/{pid}")
-        self._ts_broken = set()
+        self._ts_broken = {}
         self._ts_broken_pid = pid
+        if hasattr(self, "listw"):
+            self.listw.viewport().update()
 
     def _play_timeshift(self, it, back_min=None, prog=None) -> None:
         sid = it.get("stream_id")

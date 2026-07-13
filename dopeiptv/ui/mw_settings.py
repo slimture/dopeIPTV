@@ -594,6 +594,24 @@ class _SettingsMixin:
         uf.addRow(cache_hint)
         refresh_cache_label()
 
+        # Forget channels the app learned don't really serve catch-up, so their
+        # timeshift marker is trusted again (also happens on a playlist refresh).
+        ts_reset_btn = QPushButton(tr("ts_reset_broken"))
+
+        def reset_ts() -> None:
+            self._clear_ts_broken()
+            self._flash_status(tr("ts_reset_done"))
+
+        ts_reset_btn.clicked.connect(reset_ts)
+        ts_row = QHBoxLayout()
+        ts_row.addWidget(ts_reset_btn)
+        ts_row.addStretch(1)
+        uf.addRow(tr("sec_timeshift"), ts_row)
+        ts_hint = QLabel(tr("ts_reset_hint"))
+        ts_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        ts_hint.setWordWrap(True)
+        uf.addRow(ts_hint)
+
         updates_box = QCheckBox(tr("setting_check_updates"))
         updates_box.setChecked(
             self.settings.value("check_updates", "true") == "true")

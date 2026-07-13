@@ -6093,6 +6093,43 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Нет подходящих категорий", "th": "ไม่พบหมวดหมู่ที่ตรงกัน",
     },
 
+    "sec_timeshift": {
+        "en": "Timeshift", "sv": "Timeshift", "es": "Timeshift",
+        "de": "Timeshift", "fr": "Timeshift", "zh": "时移",
+        "ru": "Таймшифт", "th": "ไทม์ชิฟต์",
+    },
+    "ts_reset_broken": {
+        "en": "Reset timeshift channels", "sv": "Återställ timeshift-kanaler",
+        "es": "Restablecer canales timeshift",
+        "de": "Timeshift-Sender zurücksetzen",
+        "fr": "Réinitialiser les chaînes timeshift", "zh": "重置时移频道",
+        "ru": "Сбросить каналы таймшифта", "th": "รีเซ็ตช่องไทม์ชิฟต์",
+    },
+    "ts_reset_done": {
+        "en": "Timeshift channels reset", "sv": "Timeshift-kanaler återställda",
+        "es": "Canales timeshift restablecidos",
+        "de": "Timeshift-Sender zurückgesetzt",
+        "fr": "Chaînes timeshift réinitialisées", "zh": "时移频道已重置",
+        "ru": "Каналы таймшифта сброшены", "th": "รีเซ็ตช่องไทม์ชิฟต์แล้ว",
+    },
+    "ts_reset_hint": {
+        "en": "Show catch-up again on channels the app learned don't serve it. "
+              "They're re-tested automatically after a while, too.",
+        "sv": "Visa catch-up igen på kanaler appen lärt sig saknar det. "
+              "De testas också automatiskt om efter ett tag.",
+        "es": "Vuelve a mostrar la repetición en canales que el programa "
+              "aprendió que no la ofrecen. También se reintentan tras un tiempo.",
+        "de": "Catch-up wieder auf Sendern anzeigen, bei denen die App gelernt "
+              "hat, dass es fehlt. Sie werden nach einer Weile neu geprüft.",
+        "fr": "Réafficher le replay sur les chaînes que l'appli a apprises "
+              "sans replay. Elles sont aussi retestées après un moment.",
+        "zh": "在应用判定不支持回看的频道上重新显示回看。过一段时间也会自动重试。",
+        "ru": "Снова показывать архив на каналах, где приложение сочло его "
+              "недоступным. Со временем они также проверяются заново.",
+        "th": "แสดงการดูย้อนหลังอีกครั้งบนช่องที่แอปเรียนรู้ว่าไม่มี "
+              "และจะทดสอบใหม่อัตโนมัติหลังผ่านไปสักพัก",
+    },
+
     "ts_archive_unavailable": {
         "en": "Catch-up isn't available for this channel",
         "sv": "Catch-up är inte tillgängligt för den här kanalen",
