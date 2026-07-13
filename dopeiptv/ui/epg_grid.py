@@ -163,13 +163,9 @@ class EpgGridDialog(QDialog):
             cap_h = (scr.height() - 80) if scr else 800
         w = min(want_w, cap_w, 1500)
         h = min(want_h, cap_h, 900)
-        w = max(min(760, cap_w), w)
-        h = max(min(460, cap_h), h)
-        self.resize(w, h)
-        # Centre in the screen at start (not low or over the window's corner).
-        if scr is not None:
-            self.move(scr.x() + (scr.width() - w) // 2,
-                      scr.y() + (scr.height() - h) // 2)
+        self.resize(max(min(760, cap_w), w), max(min(460, cap_h), h))
+        # Centring happens in showEvent - a move() here (before the window is
+        # shown) doesn't stick on macOS, which then opens it low/offset.
         now_x = self.CH_COL_W + (now - self._start) / 60 * self.PX_PER_MIN
         self.view.horizontalScrollBar().setValue(max(0, int(now_x
                                                              - self.CH_COL_W - 40)))
@@ -177,6 +173,19 @@ class EpgGridDialog(QDialog):
         # what's playing instead of the top of a long line-up.
         if getattr(self, "_playing_row", None) is not None:
             self._scroll_to_playing()
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        # Centre in the screen once, after the window has its final size and a
+        # real screen - doing it in __init__ (pre-show) doesn't stick on macOS.
+        if getattr(self, "_centred", False):
+            return
+        self._centred = True
+        scr = (self.window.screen() if self.window else None) or self.screen()
+        if scr is not None:
+            g = scr.availableGeometry()
+            self.move(g.x() + (g.width() - self.width()) // 2,
+                      g.y() + (g.height() - self.height()) // 2)
 
     def keyPressEvent(self, event) -> None:
         # In-guide shortcuts: N jumps to now, P to the playing channel, Enter
