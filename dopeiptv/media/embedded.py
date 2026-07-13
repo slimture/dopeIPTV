@@ -1401,10 +1401,13 @@ class EmbeddedPlayer(QWidget):
         self.ts_slider.set_segments(segments)
 
     def update_timeshift_position(self, offset_min: float,
-                                  title: str | None = None) -> None:
+                                  title: str | None = None,
+                                  paused: bool = False) -> None:
         """Move the marker to *offset_min* behind live, unless the user is
         dragging it right now. *title* names the programme at that point so the
-        user can see where in the schedule they are."""
+        user can see where in the schedule they are. *paused* forces the
+        'not live' state (label + Go-live button) the instant a live-edge stream
+        is paused, without waiting for the offset to grow past the tolerance."""
         if not self.ts_timeline.isVisible() or self.ts_slider.dragging:
             return
         val = max(0, self._ts_depth - int(round(offset_min)))
@@ -1413,11 +1416,15 @@ class EmbeddedPlayer(QWidget):
         self.ts_slider.blockSignals(False)
         # ~5 s tolerance counts as live; sub-minute gaps show in seconds so a
         # short DVR pause reads as "−30s behind" rather than a false "LIVE".
-        live = offset_min < (5 / 60.0)
+        # A pause is 'not live' immediately, regardless of the tiny offset.
+        live = (not paused) and offset_min < (5 / 60.0)
+        secs = int(round(offset_min * 60))
         if live:
             edge = "● LIVE"
+        elif paused and secs <= 0:
+            edge = "⏸ PAUSED"
         elif offset_min < 1:
-            edge = f"−{int(round(offset_min * 60))}s"
+            edge = f"−{secs}s"
         else:
             edge = f"−{self._fmt_offset(offset_min)}"
         self.ts_label.setText(f"{edge} · {title}" if title else edge)

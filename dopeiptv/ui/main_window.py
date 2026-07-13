@@ -1156,9 +1156,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         on_live = bool(lp) and lp.get("kind") == "live"
         if paused:
             self._pause_started = time.time()
-            # Pausing a live stream means you're no longer at the live edge.
+            # Pausing a live stream means you're no longer at the live edge:
+            # show the badge and flip the timeline to 'not live' immediately
+            # (don't wait for the 1 s timer or the offset to accrue).
             if self.player and on_live and not self._playing_catchup:
                 self.player.set_live_badge("timeshift")
+                self._update_ts_timeline()
             return
         # Resumed. DVR-style pause for timeshift channels: if we paused the live
         # edge for longer than the buffer can hold, re-open the provider archive
@@ -1224,6 +1227,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         else:
             # Live edge, but a buffer pause may have left us behind live.
             behind = getattr(self, "_ts_live_offset", 0.0)
+            # If we're paused *right now*, the gap is already growing - reflect
+            # it immediately (Go-live button + "−Ns" label) instead of waiting
+            # for resume to bake it into _ts_live_offset.
+            started = getattr(self, "_pause_started", None)
+            if started is not None:
+                behind += max(0.0, now - started)
             content_time = now - behind
             offset = behind / 60.0
         # Programme-boundary ticks on the timeline, plus the name of the
@@ -1246,7 +1255,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 if p["start_timestamp"] <= content_time < p["stop_timestamp"]:
                     title = p.get("title")
             self.player.set_timeline_segments(segs)
-        self.player.update_timeshift_position(offset, title)
+        # A live-edge pause is definitively 'not live' the instant it happens,
+        # so flip the label + Go-live button immediately rather than waiting for
+        # the offset to creep past the ~5 s live tolerance.
+        paused = (getattr(self, "_pause_started", None) is not None
+                  and not self._playing_catchup)
+        self.player.update_timeshift_position(offset, title, paused=paused)
 
     def _play_overlay_clicked(self) -> None:
         state = self._overlay_state()
