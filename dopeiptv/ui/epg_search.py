@@ -166,7 +166,7 @@ class EpgSearchDialog(QDialog):
         if e["stop_timestamp"] < time.time() and self.window._timeshift_days(ch):
             self.window._play_timeshift(ch, prog=e)
         else:
-            self.window.play_live_channel(ch)
+            self.window.tune_from_guide(ch)
         self.accept()
 
     def _remind_current(self) -> None:

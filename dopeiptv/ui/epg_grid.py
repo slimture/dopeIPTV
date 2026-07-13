@@ -430,7 +430,7 @@ class EpgGridDialog(QDialog):
         if p["stop_timestamp"] < time.time() and self.window._timeshift_days(ch):
             self.window._play_timeshift(ch, prog=p)
         else:
-            self.window.play_live_channel(ch)
+            self.window.tune_from_guide(ch)
         self.accept()
 
     def _context_at(self, scene_pos, global_pos) -> None:
@@ -445,7 +445,7 @@ class EpgGridDialog(QDialog):
         if past and self.window._timeshift_days(ch):
             m.addAction(tr("epg_play_this_programme"), self._play_selected)
         m.addAction(tr("ts_go_live") if past else tr("epg_play_channel"),
-                    lambda: (self.window.play_live_channel(ch), self.accept()))
+                    lambda: (self.window.tune_from_guide(ch), self.accept()))
         if ch.get("stream_id") is not None and p["stop_timestamp"] > time.time():
             m.addAction(tr("rec_record_programme"), lambda: self._record(ch, p))
         # Remind me when a future programme starts.

@@ -6098,6 +6098,48 @@ _STRINGS: dict[str, dict[str, str]] = {
         "de": "Timeshift", "fr": "Timeshift", "zh": "时移",
         "ru": "Таймшифт", "th": "ไทม์ชิฟต์",
     },
+    "reminders_menu": {
+        "en": "Reminders…", "sv": "Påminnelser…", "es": "Recordatorios…",
+        "de": "Erinnerungen…", "fr": "Rappels…", "zh": "提醒…",
+        "ru": "Напоминания…", "th": "การเตือน…",
+    },
+    "reminders_title": {
+        "en": "Reminders", "sv": "Påminnelser", "es": "Recordatorios",
+        "de": "Erinnerungen", "fr": "Rappels", "zh": "提醒",
+        "ru": "Напоминания", "th": "การเตือน",
+    },
+    "reminders_empty": {
+        "en": "No reminders set", "sv": "Inga påminnelser",
+        "es": "Sin recordatorios", "de": "Keine Erinnerungen",
+        "fr": "Aucun rappel", "zh": "没有提醒",
+        "ru": "Нет напоминаний", "th": "ไม่มีการเตือน",
+    },
+    "reminders_remove": {
+        "en": "Remove", "sv": "Ta bort", "es": "Quitar", "de": "Entfernen",
+        "fr": "Retirer", "zh": "移除", "ru": "Удалить", "th": "ลบ",
+    },
+    "reminder_starts_in": {
+        "en": "starts in {t}", "sv": "börjar om {t}", "es": "empieza en {t}",
+        "de": "beginnt in {t}", "fr": "commence dans {t}", "zh": "{t}后开始",
+        "ru": "начнётся через {t}", "th": "เริ่มในอีก {t}",
+    },
+    "reminder_starting": {
+        "en": "starting now", "sv": "börjar nu", "es": "empieza ahora",
+        "de": "beginnt jetzt", "fr": "commence maintenant", "zh": "即将开始",
+        "ru": "начинается", "th": "กำลังเริ่ม",
+    },
+    "reminder_watch_named": {
+        "en": "Watch {title}", "sv": "Titta på {title}", "es": "Ver {title}",
+        "de": "{title} ansehen", "fr": "Regarder {title}", "zh": "观看 {title}",
+        "ru": "Смотреть {title}", "th": "ดู {title}",
+    },
+    "reminder_multi_body": {
+        "en": "{n} programmes are starting now", "sv": "{n} program börjar nu",
+        "es": "{n} programas están empezando",
+        "de": "{n} Sendungen beginnen jetzt",
+        "fr": "{n} programmes commencent", "zh": "{n} 个节目即将开始",
+        "ru": "{n} передач начинается", "th": "{n} รายการกำลังเริ่ม",
+    },
     "rec_edit_info": {
         "en": "Edit info…", "sv": "Redigera info…", "es": "Editar info…",
         "de": "Info bearbeiten…", "fr": "Modifier les infos…",

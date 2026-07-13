@@ -140,12 +140,17 @@ class _RecordingMixin:
             f"your account only allows one stream at a time, starting "
             f"“{title}” can kill that recording.",
             [("Watch the recorded channel", "primary"),
+             ("Stop recording and switch", "danger"),
              ("Play anyway (I have multiple streams)", "normal"),
              ("Cancel", "normal")])
         if idx == 0:
             self._watch_recording_file(j)
             return False
         if idx == 1:
+            for k in active:
+                self.rec.cancel(k["id"])
+            return True
+        if idx == 2:
             self._multi_stream_ok = True
             return True
         return False

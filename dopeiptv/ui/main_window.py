@@ -230,6 +230,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._fav_view_tint = ("", "")
         self._pending_cat_select = _UNSET
         self._pending_jump_key = None
+        self._pending_jump_cat = None
         self._stream_retries = 0
         self._last_stream_error_ts = 0.0
         self._pip_win = None
@@ -277,6 +278,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         settings_action.triggered.connect(self.open_settings)
         refresh_action = app_menu.addAction(tr("menu_refresh_playlist"))
         refresh_action.triggered.connect(self.refresh_playlist)
+        reminders_action = app_menu.addAction(tr("reminders_menu"))
+        reminders_action.triggered.connect(self._open_reminders)
         app_menu.addSeparator()
         about_action = app_menu.addAction(tr("menu_about"))
         about_action.triggered.connect(self.show_about)
@@ -293,6 +296,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._i18n_actions = {
             settings_action: lambda: tr("btn_settings") + "…",
             refresh_action: lambda: tr("menu_refresh_playlist"),
+            reminders_action: lambda: tr("reminders_menu"),
             about_action: lambda: tr("menu_about"),
             quit_action: lambda: tr("menu_quit"),
         }
@@ -2000,9 +2004,20 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._pending_cat_select = _UNSET
             row = 1 if self.cat_list.count() > 1 else 0
             # A pending "jump to now playing" wants every item visible, so land
-            # on the "All" row (0) rather than the first category.
+            # on the "All" row (0) rather than the first category - unless we
+            # know the target's category (e.g. tuning from the EPG guide), in
+            # which case land there so the sidebar reflects where the channel
+            # lives (it still contains the channel, so the jump selects it).
             if getattr(self, "_pending_jump_key", None) is not None:
                 row = 0
+                cat = getattr(self, "_pending_jump_cat", None)
+                if cat is not None:
+                    for i in range(self.cat_list.count()):
+                        if self.cat_list.item(i).data(
+                                Qt.ItemDataRole.UserRole) == cat:
+                            row = i
+                            break
+                    self._pending_jump_cat = None
             if keep is not _UNSET:
                 for i in range(self.cat_list.count()):
                     if self.cat_list.item(i).data(
@@ -2645,6 +2660,20 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _clear_pending_jump(self) -> None:
         self._pending_jump_key = None
+        self._pending_jump_cat = None
+
+    def tune_from_guide(self, ch) -> None:
+        """Play a channel picked from the EPG guide, then jump the middle
+        column to it and select its category in the sidebar so the guide
+        selection is reflected everywhere."""
+        self.play_live_channel(ch)
+        self._pending_jump_key = self._item_key(ch)
+        self._pending_jump_cat = ch.get("category_id")
+        QTimer.singleShot(3000, self._clear_pending_jump)
+        if self.mode != "live":
+            self.switch_mode("live")
+        else:
+            self._load_categories()
 
     def _channel_hidden(self, it, kind: str) -> bool:
         if kind not in ("live", "vod", "series", "fav"):
@@ -3702,9 +3731,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             tr("reminder_set", title=p.get("title") or ch.get("name") or ""),
             4000)
 
+    def _open_reminders(self) -> None:
+        from .reminders import RemindersDialog
+        RemindersDialog(self).exec()
+
     def _check_reminders(self) -> None:
-        for r in self.reminders.due(int(time.time())):
-            self._fire_reminder(r)
+        due = self.reminders.due(int(time.time()))
+        if not due:
+            return
+        if len(due) == 1:
+            self._fire_reminder(due[0])
+        else:
+            self._fire_reminders(due)
 
     def _fire_reminder(self, r: dict) -> None:
         ch = r.get("ch") or {}
@@ -3718,6 +3756,23 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if idx == 0 and ch.get("stream_id") is not None:
             self.switch_mode("live")
             self.play_live_channel(ch)
+
+    def _fire_reminders(self, due: list) -> None:
+        """Several reminders came due at once: one dialog listing them, each a
+        button that tunes that channel - instead of stacked pop-ups."""
+        options = []
+        for r in due:
+            t = r.get("title") or (r.get("ch") or {}).get("name") or "?"
+            options.append((tr("reminder_watch_named", title=t), "primary"))
+        options.append((tr("common_dismiss"), "normal"))
+        idx = self._choice_dialog(
+            tr("reminder_now_title"),
+            tr("reminder_multi_body", n=len(due)), options)
+        if idx is not None and idx < len(due):
+            ch = (due[idx].get("ch") or {})
+            if ch.get("stream_id") is not None:
+                self.switch_mode("live")
+                self.play_live_channel(ch)
 
     def _last_channel(self) -> None:
         """Jump back to the previously watched live channel (TV 'last' key)."""
