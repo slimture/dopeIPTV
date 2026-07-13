@@ -3251,6 +3251,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._ts_depth_min = min(ts_days * 1440, self._TS_TIMELINE_MAX_MIN)
             self.player.set_seek_mode("timeline")
             self.player.enter_timeshift(self._ts_depth_min)
+            self.player.set_on_archive_segment(True)   # arrows fine-seek here
             self._update_ts_timeline()
             self.player.set_live_badge("timeshift")
         elif ts_days > 0:
@@ -3259,6 +3260,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._ts_depth_min = min(ts_days * 1440, self._TS_TIMELINE_MAX_MIN)
             self.player.set_seek_mode("timeline")
             self.player.enter_timeshift(self._ts_depth_min)
+            self.player.set_on_archive_segment(False)  # live edge: arrows step
             self._update_ts_timeline()
             self.player.set_live_badge(None)
         else:
@@ -3734,16 +3736,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         so it works even where the app-level input filter doesn't catch it (seen
         on macOS). Returns True when it consumed the key."""
         p = self.player
-        if not p or p.current_url is None or not p.isVisible():
+        if not p or not p.isVisible():
             return False
-        back = key == Qt.Key.Key_Left
-        if getattr(p, "_seek_mode", None) == "timeline":
-            p._timeline_step(-p.TIMELINE_STEP_MIN if back else p.TIMELINE_STEP_MIN)
-            return True
-        if p._is_seekable():
-            p._relative_seek(-10 if back else 10)
-            return True
-        return False
+        return p.arrow_scrub(key == Qt.Key.Key_Left)
 
     def _size_to_screen(self) -> None:
         """First run only: open at a comfortable fraction of the actual

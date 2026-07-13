@@ -594,16 +594,17 @@ class _MacInputFilter(QObject):
         # Never steal arrows from a text field (search box, PIN entry, ...).
         if isinstance(QApplication.focusWidget(), QLineEdit):
             return False
-        # Timeshift live timeline: arrows step along the archive (back/forward)
-        # instead of falling through to a channel change. One jump per press
-        # (no auto-repeat) since each reloads an archive segment.
-        if p._seek_mode == "timeline":
+        # Timeshift live edge: step the timeline into the archive - one jump per
+        # press (no auto-repeat) since each reloads a segment. Once inside a
+        # seekable catch-up segment we fall through to normal fine-seeking
+        # below, so both work.
+        if p._on_timeline_edge():
             if pressed and not event.isAutoRepeat():
                 p._timeline_step(-p.TIMELINE_STEP_MIN
                                  if event.key() == Qt.Key.Key_Left
                                  else p.TIMELINE_STEP_MIN)
             return True
-        if not p._is_seekable():
+        if not p._mpv_seekable():
             return False
         if pressed:
             p._on_seek_key_press(event)
@@ -636,8 +637,12 @@ class EmbeddedPlayer(QWidget):
     # How long mpv may sit idle (buffer-starved) while not paused before we
     # treat the stream as frozen and ask for a reconnect.
     STALL_SECS = 12
-    # Minutes a Left/Right arrow press moves the timeshift live timeline.
+    # Minutes a Left/Right arrow press moves the timeshift live timeline (at the
+    # live edge); once inside a seekable archive segment, arrows fine-seek by
+    # these seconds instead - matching the on-screen ◀ 10s / 30s ▶ buttons.
     TIMELINE_STEP_MIN = 5
+    SEEK_BACK = 10
+    SEEK_FWD = 30
     MINIBTN = 28
     ICON_PX = 15  # drawn control-icon size inside the 28px buttons
 
@@ -794,6 +799,7 @@ class EmbeddedPlayer(QWidget):
         #  'timeline' - a timeshift channel at the live edge: the live timeline
         #  'live'     - a plain live channel: no seek bar at all
         self._seek_mode = "vod"
+        self._on_archive_segment = False  # timeline mode: on a seekable segment
         self.seek_overlay = QWidget(self)
         self.seek_overlay.setStyleSheet(
             "background: rgba(16,16,20,215); border-radius: 8px;")
@@ -1198,11 +1204,39 @@ class EmbeddedPlayer(QWidget):
     def _is_seekable(self) -> bool:
         if self._seek_mode in ("live", "timeline"):
             return False   # plain live can't seek; timeline has its own control
+        return self._mpv_seekable()
+
+    def _mpv_seekable(self) -> bool:
+        """Whether the underlying mpv stream can seek (has a real duration),
+        independent of _seek_mode - a catch-up archive segment is seekable even
+        in 'timeline' mode, so arrows can fine-seek inside it."""
         m = self.video.mpv
         try:
             return bool(m is not None and m.duration and m.duration > 1)
         except Exception:
             return False
+
+    def _on_timeline_edge(self) -> bool:
+        """In timeline mode, True when we're at the live edge (no seekable
+        archive segment loaded) - so arrows step the timeline into the archive
+        rather than fine-seeking the (sometimes duration-reporting) live feed."""
+        return (self._seek_mode == "timeline"
+                and not (self._on_archive_segment and self._mpv_seekable()))
+
+    def arrow_scrub(self, back: bool) -> bool:
+        """Single bare-arrow action. At the timeshift live edge, step the
+        timeline into the archive; inside a seekable segment (VOD or catch-up),
+        fine-seek by SEEK_BACK/SEEK_FWD. Returns True when it consumed the key."""
+        if self.current_url is None:
+            return False
+        if self._on_timeline_edge():
+            self._timeline_step(-self.TIMELINE_STEP_MIN if back
+                                else self.TIMELINE_STEP_MIN)
+            return True
+        if self._mpv_seekable():
+            self._relative_seek(-self.SEEK_BACK if back else self.SEEK_FWD)
+            return True
+        return False
 
     def _mac_show_cursor(self) -> None:
         """Un-hide the macOS override cursor (safety for when playback ends
@@ -1217,9 +1251,9 @@ class EmbeddedPlayer(QWidget):
         if event.key() in (Qt.Key.Key_Up, Qt.Key.Key_Down):
             self._nudge_volume(5 if event.key() == Qt.Key.Key_Up else -5)
             return
-        if not self._is_seekable():
+        if not self._mpv_seekable():
             return
-        step = -10 if event.key() == Qt.Key.Key_Left else 10
+        step = -self.SEEK_BACK if event.key() == Qt.Key.Key_Left else self.SEEK_FWD
         if event.isAutoRepeat():
             return  # the hold timer drives the continuous seek
         self._relative_seek(step)
@@ -1350,8 +1384,15 @@ class EmbeddedPlayer(QWidget):
         self._seek_mode = mode
         if mode != "timeline":
             self.exit_timeshift()
+            self._on_archive_segment = False
         if mode in ("live", "timeline"):
             self._hide_seek_ui()
+
+    def set_on_archive_segment(self, on: bool) -> None:
+        """Tell the player whether the current timeline-mode stream is a
+        seekable catch-up segment (arrows fine-seek) or the live edge (arrows
+        step the timeline into the archive)."""
+        self._on_archive_segment = bool(on)
 
     def set_timeline_segments(self, segments) -> None:
         """Programme segments for the live timeline: boundary ticks plus a
