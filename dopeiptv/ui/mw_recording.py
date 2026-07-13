@@ -50,14 +50,14 @@ class _RecordingMixin:
             self._load_items(
                 cur.data(Qt.ItemDataRole.UserRole) if cur else None)
         elif n:
-            self._set_status(
-                f"● Recording {n} stream{'s' if n > 1 else ''}...")
+            # Transient only - the persistent "● REC" pill is the lasting
+            # indicator. A resting _set_status here used to linger as
+            # "Recording N streams" long after recording had stopped.
+            self._flash_status(
+                f"● Recording {n} stream{'s' if n > 1 else ''}…")
 
     def _on_recording_stopped(self, title: str, reason: str) -> None:
-        abnormal = reason not in ("finished", "stopped")
-        self._set_status(
-            f"● Recording stopped: {title} ({reason})",
-            error=abnormal)
+        self._flash_status(f"● Recording stopped: {title} ({reason})")
         if self._player_fs and self.player:
             self.player.set_overlay_info(
                 f"Recording stopped: {title} ({reason})")
@@ -304,12 +304,12 @@ class _RecordingMixin:
         mult = {"MB": 10**6, "GB": 10**9, "TB": 10**12}[unit_box.currentData()]
         self.rec.session_cap = int(val * mult)
 
-    def _record_now(self, it, minutes) -> None:
+    def _record_now(self, it, minutes, title_override=None) -> None:
         if it.get("stream_id") is None:
             return
         if not self._within_storage_cap():
             return
-        title = self.channel_display_name(it)
+        title = title_override or self.channel_display_name(it)
         now = time.time()
         stop_ts = None if minutes is None else now + minutes * 60
         length = ("until stopped" if minutes is None

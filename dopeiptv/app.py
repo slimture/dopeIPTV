@@ -29,7 +29,7 @@ class _NoButtonIconsStyle(QProxyStyle):
             return 0
         return super().styleHint(hint, option, widget, returnData)
 
-from . import APP_NAME, ORG, VERSION
+from . import APP_NAME, BUILD_VERSION, ORG, VERSION
 from .providers.client import OfflineClient, make_client
 from .ui.dialogs import PlaylistDialog
 from .ui.main_window import MainWindow
@@ -161,7 +161,7 @@ def main() -> int:
     """Launch the application."""
     # One unconditional startup line so packaging smoke tests can prove
     # Python + our package imported cleanly before any GL/Qt init runs.
-    print(f"[dopeIPTV] {VERSION} starting", file=sys.stderr, flush=True)
+    print(f"[dopeIPTV] {BUILD_VERSION} starting", file=sys.stderr, flush=True)
 
     if "--self-check" in sys.argv:
         # GUI-less packaging check: did the *bundled* libmpv load? This runs

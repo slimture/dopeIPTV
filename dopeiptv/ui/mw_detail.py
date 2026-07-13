@@ -812,12 +812,21 @@ class _DetailMixin:
     def _record_programme(self, ch, post, start_ts, stop_ts) -> None:
         if not self._within_storage_cap():
             return
+        now = datetime.now().astimezone().timestamp()
+        title = post.get("title") or ch.get("name") or "recording"
+        # A programme that's on the air right now records like "record this
+        # channel": if you're watching it, _record_now captures the stream you
+        # already pull (one connection) instead of opening a second - and it
+        # offers the switch/background prompt otherwise. Only a genuinely future
+        # programme becomes a scheduled job that opens a connection at air time.
+        if start_ts <= now < stop_ts:
+            minutes = max(1, int((stop_ts - now) // 60) + 1)
+            self._record_now(ch, minutes, title_override=title)
+            return
         url = self.client.live_url(ch.get("stream_id"), "ts")
         if not url:
             return
-        now = datetime.now().astimezone().timestamp()
-        self.rec.add_job(url, ch.get("name") or post.get("title") or "recording",
-                         max(now, start_ts), stop_ts)
+        self.rec.add_job(url, title, max(now, start_ts), stop_ts)
 
     def _refresh_progress(self) -> None:
         e = self._current_epg

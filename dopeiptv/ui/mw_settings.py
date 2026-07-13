@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
-from .. import APP_NAME, VERSION
+from .. import APP_NAME, BUILD_VERSION, VERSION
 from ..i18n import tr
 from .dialogs import PlaylistDialog
 from .epg_grid import EpgGridDialog
@@ -1283,7 +1283,7 @@ class _SettingsMixin:
 
         title = QLabel(
             f"<b style='font-size:18px'>{APP_NAME}</b>"
-            f"&nbsp;&nbsp;<span style='color:{P['muted2']}'>{VERSION}</span>")
+            f"&nbsp;&nbsp;<span style='color:{P['muted2']}'>{BUILD_VERSION}</span>")
         lay.addWidget(title)
         desc = QLabel(tr("about_desc"))
         desc.setWordWrap(True)
