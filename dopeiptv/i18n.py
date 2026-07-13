@@ -1869,6 +1869,54 @@ _STRINGS: dict[str, dict[str, str]] = {
         "fr": "Tone-mapping HDR", "zh": "HDR 色调映射",
         "ru": "HDR-тонирование", "th": "การแมปโทน HDR",
     },
+    "setting_hwdec": {
+        "en": "Hardware decoding", "sv": "Hårdvaruavkodning",
+        "es": "Decodificación por hardware", "de": "Hardware-Dekodierung",
+        "fr": "Décodage matériel", "zh": "硬件解码",
+        "ru": "Аппаратное декодирование", "th": "การถอดรหัสด้วยฮาร์ดแวร์",
+    },
+    "setting_hwdec_hint": {
+        "en": "If video goes black or glitches (e.g. when enabling subtitles "
+              "on 4K), switch this off - the picture then decodes on the CPU.",
+        "sv": "Om bilden blir svart eller hackar (t.ex. när subtitles slås på "
+              "för 4K), stäng av detta - bilden avkodas då på CPU:n.",
+        "es": "Si el vídeo se pone negro o falla (p. ej. al activar subtítulos "
+              "en 4K), desactívalo: la imagen se decodifica en la CPU.",
+        "de": "Wird das Bild schwarz oder fehlerhaft (z. B. beim Aktivieren "
+              "von Untertiteln bei 4K), hier ausschalten - dann dekodiert die "
+              "CPU.",
+        "fr": "Si la vidéo devient noire ou instable (p. ex. en activant les "
+              "sous-titres en 4K), désactivez ceci - l'image est alors "
+              "décodée par le CPU.",
+        "zh": "如果视频变黑或出现故障（例如在 4K 上开启字幕时），请关闭此项 - "
+              "画面将改由 CPU 解码。",
+        "ru": "Если видео чернеет или сбоит (например, при включении "
+              "субтитров на 4K), выключите это - декодировать будет "
+              "процессор.",
+        "th": "หากวิดีโอกลายเป็นสีดำหรือมีปัญหา (เช่น เมื่อเปิดซับไตเติลบน 4K) "
+              "ให้ปิดตัวเลือกนี้ - ภาพจะถูกถอดรหัสด้วย CPU แทน",
+    },
+    "option_hwdec_safe": {
+        "en": "On - safe (recommended)", "sv": "På - säker (rekommenderas)",
+        "es": "Activada - segura (recomendado)",
+        "de": "An - sicher (empfohlen)",
+        "fr": "Activé - sûr (recommandé)", "zh": "开启 - 安全（推荐）",
+        "ru": "Вкл. - безопасно (рекомендуется)",
+        "th": "เปิด - ปลอดภัย (แนะนำ)",
+    },
+    "option_hwdec_direct": {
+        "en": "On - direct (zero-copy)", "sv": "På - direkt (zero-copy)",
+        "es": "Activada - directa (zero-copy)",
+        "de": "An - direkt (Zero-Copy)",
+        "fr": "Activé - direct (zero-copy)", "zh": "开启 - 直通（零拷贝）",
+        "ru": "Вкл. - прямое (zero-copy)", "th": "เปิด - โดยตรง (zero-copy)",
+    },
+    "option_hwdec_off": {
+        "en": "Off - software (CPU)", "sv": "Av - mjukvara (CPU)",
+        "es": "Desactivada - software (CPU)", "de": "Aus - Software (CPU)",
+        "fr": "Désactivé - logiciel (CPU)", "zh": "关闭 - 软件解码（CPU）",
+        "ru": "Выкл. - программно (CPU)", "th": "ปิด - ซอฟต์แวร์ (CPU)",
+    },
     "option_off": {
         "en": "Off", "sv": "Av", "es": "Desactivado", "de": "Aus",
         "fr": "Désactivé", "zh": "关闭", "ru": "Выкл.", "th": "ปิด",

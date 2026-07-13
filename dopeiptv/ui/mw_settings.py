@@ -401,6 +401,11 @@ class _SettingsMixin:
              ("4:3", "4:3"), ("2.35:1", "2.35:1"),
              ("stretch", tr("option_aspect_stretch"))],
             self.settings.value("aspect_mode", "auto"))
+        hwdec_box = self._combo(
+            [("auto-copy-safe", tr("option_hwdec_safe")),
+             ("auto-safe", tr("option_hwdec_direct")),
+             ("no", tr("option_hwdec_off"))],
+            str(self.settings.value("hwdec_mode", "") or "auto-copy-safe"))
         deint_box = self._combo(
             [("false", tr("option_no")), ("true", tr("option_yes"))],
             self.settings.value("video_deinterlace", "false"))
@@ -468,6 +473,11 @@ class _SettingsMixin:
         pf.addRow(tr("setting_sub_lang"), slang_box)
         pf.addRow(tr("setting_sub_lang_fallback"), slang2_box)
         section(tr("sec_video"))
+        pf.addRow(tr("setting_hwdec"), hwdec_box)
+        hwdec_hint = QLabel(tr("setting_hwdec_hint"))
+        hwdec_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        hwdec_hint.setWordWrap(True)
+        pf.addRow(hwdec_hint)
         pf.addRow(tr("setting_aspect_ratio"), aspect_box)
         pf.addRow(tr("setting_deinterlace"), deint_box)
         pf.addRow(tr("setting_sharpen"), sharpen_box)
@@ -1260,6 +1270,12 @@ class _SettingsMixin:
                 "sub_lang2", slang2_box.currentData())
             self.settings.setValue(
                 "aspect_mode", aspect_box.currentData())
+            self.settings.setValue(
+                "hwdec_mode", hwdec_box.currentData())
+            if self.player:
+                # Stage it for the next mpv build too (a fresh core reads the
+                # widget attribute, not live settings).
+                self.player.video.hwdec_pref = hwdec_box.currentData()
             self.settings.setValue(
                 "video_deinterlace", deint_box.currentData())
             self.settings.setValue(

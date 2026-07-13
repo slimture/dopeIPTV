@@ -322,7 +322,11 @@ class _MpvGLWidget(QOpenGLWidget):
                 # vulkan-copy) - the heavy decode still runs on hardware. It
                 # also uses noticeably less RAM here than the interop path.
                 # Enthusiasts can force zero-copy with DOPEIPTV_HWDEC=nvdec etc.
+                # Priority: env override > user setting (Settings > Playback,
+                # for driver stacks where hwdec breaks - e.g. subtitles turning
+                # 4K video black) > the safe-copy default.
                 "hwdec": (os.environ.get("DOPEIPTV_HWDEC")
+                          or getattr(self, "hwdec_pref", None)
                           or "auto-copy-safe"),
                 # (No 'osc' option: the on-screen controller is a feature of
                 # the standalone mpv GUI and doesn't exist in the libmpv/render
@@ -689,6 +693,11 @@ class EmbeddedPlayer(QWidget):
         lay.setSpacing(2)
 
         self.video = _MpvGLWidget(self)
+        # Hardware-decode preference from Settings, staged on the widget before
+        # its lazy GL init builds the mpv core (env DOPEIPTV_HWDEC still wins).
+        if settings is not None:
+            self.video.hwdec_pref = str(
+                settings.value("hwdec_mode", "") or "") or None
         self.video.installEventFilter(self)
         self.video.setMouseTracking(True)
         # Route mpv errors through a filter so a user-initiated stop doesn't
@@ -1640,6 +1649,15 @@ class EmbeddedPlayer(QWidget):
             except Exception:
                 pass
 
+        # Hardware decoding: applied live so switching it in Settings takes
+        # effect without a restart (mpv reinits the decoder on the fly). The
+        # DOPEIPTV_HWDEC env override still has the last word. 'Off' is the
+        # escape hatch for driver stacks where hwdec breaks - e.g. enabling a
+        # subtitle turning 4K video black while the subs still render.
+        hwdec = (os.environ.get("DOPEIPTV_HWDEC")
+                 or str(s.value("hwdec_mode", "") or "")
+                 or "auto-copy-safe")
+        set_opt("hwdec", hwdec)
         set_opt("alang", s.value("audio_lang", "") or "")
         sub_mode = s.value("sub_mode", "auto")
         if sub_mode == "off":
