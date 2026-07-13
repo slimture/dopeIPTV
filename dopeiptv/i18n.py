@@ -6075,6 +6075,17 @@ _STRINGS: dict[str, dict[str, str]] = {
               "เปิดใหม่เพื่อตั้งค่าเพลย์ลิสต์แรกของคุณ",
     },
 
+    "ts_archive_unavailable": {
+        "en": "Catch-up isn't available for this channel",
+        "sv": "Catch-up är inte tillgängligt för den här kanalen",
+        "es": "La repetición no está disponible para este canal",
+        "de": "Catch-up ist für diesen Sender nicht verfügbar",
+        "fr": "Le replay n'est pas disponible pour cette chaîne",
+        "zh": "此频道不支持回看",
+        "ru": "Архив недоступен для этого канала",
+        "th": "ช่องนี้ไม่รองรับการดูย้อนหลัง",
+    },
+
     # ── Keyboard shortcuts editor ─────────────────────────────────────────
     "sc_title": {
         "en": "Keyboard shortcuts", "sv": "Kortkommandon",

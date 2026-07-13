@@ -3088,6 +3088,20 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         watched and optionally autoplay the next one."""
         last = getattr(self, "_last_playback", None)
         if last and last.get("kind") == "live":
+            if getattr(self, "_playing_catchup", False):
+                # Reached the end of an archive segment. If it actually played,
+                # the user has caught up to ~now, so continue at the live edge.
+                # If it ended almost immediately, the provider isn't really
+                # serving catch-up for this channel - say so instead of
+                # silently bouncing to live.
+                dur = self.player.playback_duration() if self.player else 0.0
+                it = last.get("item")
+                if not (dur and dur > 10):
+                    self._set_status(tr("ts_archive_unavailable"),
+                                     emphasis=True)
+                if it is not None:
+                    self.play_live_channel(it)
+                return
             self._reconnect_live("eof")
             return
         if not last or last.get("kind") != "episode":
@@ -3397,6 +3411,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         lp = getattr(self, "_last_playback", None)
         if not lp or lp.get("kind") != "live":
             return
+        # A catch-up/archive segment must be replayed by its own archive URL.
+        # Re-deriving a live URL (below) would silently yank the user to the
+        # live edge - which is exactly what made a channel whose provider
+        # doesn't actually serve catch-up "jump straight to live" on a scrub.
+        if getattr(self, "_playing_catchup", False) and lp.get("url"):
+            self._start_playback(
+                lp["url"], lp["title"], lp.get("icon_url"), lp.get("key"),
+                "live", record=False, item=lp.get("item"), catchup=True)
+            return
         it = lp.get("item")
         # Re-derive a fresh URL from the channel when we know its id (handles a
         # token/timestamp that expired). Replayed from History we only have the
@@ -3668,9 +3691,21 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             "focus_mode": lambda: self._set_focus_mode(not self._focus_mode),
         }
 
+    def _shortcut_key(self, sid: str) -> str:
+        # Scope per-OS: modifier conventions differ (Qt maps Ctrl->Cmd on
+        # macOS) and a config shared across machines shouldn't cross-bind.
+        return f"shortcut/{sys.platform}/{sid}"
+
     def shortcut_sequence(self, sid: str, default: str) -> str:
         """The user's key sequence for *sid*, or the default when unset."""
-        return self.settings.value(f"shortcut/{sid}", default) or default
+        return self.settings.value(self._shortcut_key(sid), default) or default
+
+    def save_shortcut(self, sid: str, seq: str, default: str) -> None:
+        """Persist (or clear, when equal to default/empty) one binding."""
+        if seq and seq != default:
+            self.settings.setValue(self._shortcut_key(sid), seq)
+        else:
+            self.settings.remove(self._shortcut_key(sid))
 
     def _install_shortcuts(self) -> None:
         """Create every rebindable QShortcut from its saved (or default) key

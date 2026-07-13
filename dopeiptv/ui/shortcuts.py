@@ -81,12 +81,8 @@ class ShortcutsDialog(QDialog):
             edit.setKeySequence(QKeySequence(default))
 
     def _save(self) -> None:
-        s = self.window.settings
         for sid, (edit, default) in self._edits.items():
-            seq = edit.keySequence().toString()
-            if seq and seq != default:
-                s.setValue(f"shortcut/{sid}", seq)
-            else:
-                s.remove(f"shortcut/{sid}")   # back to default
+            self.window.save_shortcut(sid, edit.keySequence().toString(),
+                                      default)
         self.window.apply_shortcuts()
         self.accept()
