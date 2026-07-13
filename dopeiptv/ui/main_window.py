@@ -3047,11 +3047,29 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _play_preview(self) -> None:
         it = self.list_model.item_at(self.listw.currentIndex().row())
-        if (not it or self._content_kind() not in ("live", "fav")
-                or self.series_ctx or not self.player
+        if (not it or self.series_ctx or not self.player
                 or self.playback_mode() != "embedded"):
             return
-        url, title = self._stream_for(it)
+        kind = self._content_kind()
+        # Preview live channels: the TV / Favorites channel lists, plus live
+        # rows inside History (a movie/episode/recording row there is not a
+        # live channel and must not auto-play).
+        history_live = kind == "history" and it.get("_kind") == "live"
+        if kind not in ("live", "fav") and not history_live:
+            return
+        if history_live:
+            # Rebuild a fresh live URL from the stored stream_id (the snapshot's
+            # _url may be stale), falling back to that snapshot when the row
+            # predates stream_id enrichment.
+            sid = it.get("stream_id")
+            if sid is not None:
+                fmt = self.settings.value("stream_format", "ts")
+                url = self.client.live_url(sid, fmt)
+            else:
+                url = it.get("_url")
+            title = it.get("name") or "dopeIPTV"
+        else:
+            url, title = self._stream_for(it)
         if not url:
             return
         if self.player.current_url == url:

@@ -101,6 +101,15 @@ class _DetailMixin:
             # (like the live view); recording history rows have only artwork.
             if snap_kind == "live":
                 self._request_epg()
+                # ...and the same auto-preview as the TV list, so arrowing
+                # through History previews live channels too (movies/episodes/
+                # recordings there aren't previewed).
+                if (self.player and self._autoplay_preview()
+                        and self.playback_mode() == "embedded"
+                        and not self._rmb_selecting
+                        and (it.get("stream_id") is not None
+                             or it.get("_url"))):
+                    self._preview_timer.start(350)
             return
 
         if self.series_ctx:
