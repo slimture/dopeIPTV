@@ -1407,12 +1407,19 @@ class EmbeddedPlayer(QWidget):
         user can see where in the schedule they are."""
         if not self.ts_timeline.isVisible() or self.ts_slider.dragging:
             return
-        val = max(0, self._ts_depth - int(offset_min))
+        val = max(0, self._ts_depth - int(round(offset_min)))
         self.ts_slider.blockSignals(True)
         self.ts_slider.setValue(val)
         self.ts_slider.blockSignals(False)
-        live = offset_min < 1
-        edge = "● LIVE" if live else f"−{self._fmt_offset(offset_min)}"
+        # ~5 s tolerance counts as live; sub-minute gaps show in seconds so a
+        # short DVR pause reads as "−30s behind" rather than a false "LIVE".
+        live = offset_min < (5 / 60.0)
+        if live:
+            edge = "● LIVE"
+        elif offset_min < 1:
+            edge = f"−{int(round(offset_min * 60))}s"
+        else:
+            edge = f"−{self._fmt_offset(offset_min)}"
         self.ts_label.setText(f"{edge} · {title}" if title else edge)
         self.ts_live_btn.setVisible(not live)
 

@@ -224,6 +224,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._playing_catchup = False   # watching a catch-up archive segment
         self._ts_catchup_program = False  # catch-up is a picked programme (vs scrub)
         self._ts_depth_min = 0            # live-timeline window span (minutes)
+        self._ts_live_offset = 0.0        # seconds behind live from buffer pauses
         self._pause_started = None
         self._playing_item = None
         self._focus_mode = False
@@ -1173,8 +1174,20 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # Only a *long* pause (beyond what mpv's buffer holds) falls to the
             # archive. Shorter pauses resume seamlessly from the buffer, which
             # is the real pause - re-opening a tiny archive segment for them
-            # just produced a stuttery 1-minute clip.
-            self._play_timeshift(it, back_min=elapsed / 60.0)
+            # just produced a stuttery 1-minute clip. Include any offset already
+            # accrued from earlier short pauses so we land at the right spot.
+            total = getattr(self, "_ts_live_offset", 0.0) + elapsed
+            self._play_timeshift(it, back_min=total / 60.0)
+        elif (it and lp.get("kind") == "live"
+              and self._timeshift_days(it) > 0 and elapsed >= 2):
+            # Short pause on a timeshift channel: mpv resumes from its buffer,
+            # so you're now `elapsed` behind the live edge. Track that gap and
+            # keep the 'not live' badge + timeline offset, instead of pretending
+            # you're live again.
+            self._ts_live_offset = getattr(self, "_ts_live_offset", 0.0) + elapsed
+            if self.player:
+                self.player.set_live_badge("timeshift")
+            self._update_ts_timeline()
         elif self.player and on_live:
             # Buffer resume at ~the live edge: drop the 'not live' badge.
             self.player.set_live_badge(None)
@@ -1203,8 +1216,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             content_time = self._ts_segment_start + self.player.playback_position()
             offset = max(0.0, (now - content_time) / 60.0)
         else:
-            content_time = now
-            offset = 0.0   # live edge
+            # Live edge, but a buffer pause may have left us behind live.
+            behind = getattr(self, "_ts_live_offset", 0.0)
+            content_time = now - behind
+            offset = behind / 60.0
         # Programme-boundary ticks on the timeline, plus the name of the
         # programme at the cursor so the user can see where in the schedule
         # they are (rather than a bare "-1:30").
@@ -3367,6 +3382,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not catchup:
             self._ts_segment_start = None
             self._ts_catchup_program = False
+            self._ts_live_offset = 0.0   # fresh tune = at the live edge
         # Remember where we were in whatever was playing before switching,
         # and give the outgoing title its watched mark if it earned one.
         self._save_resume_position()
