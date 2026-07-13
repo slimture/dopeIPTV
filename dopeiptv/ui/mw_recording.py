@@ -635,8 +635,16 @@ class _RecordingMixin:
             what = None
         start = max(start, now - days * 86400)
         start += self._replay_delay_minutes() * 60
-        url = self.client.timeshift_url(
+        # Candidate archive-URL formats (providers differ). Play the first;
+        # _playback_error walks to the next on an early failure so we auto-pick
+        # whichever scheme this provider actually serves.
+        urls = self.client.timeshift_urls(
             sid, datetime.fromtimestamp(start), duration_min)
+        if not urls:
+            return
+        self._ts_candidates = urls
+        self._ts_candidate_idx = 0
+        self._ts_candidate_started = time.monotonic()
         name = self.channel_display_name(it)
         title = (f"{what} ({name}, timeshift)" if what
                  else f"{name} (timeshift)")
@@ -649,7 +657,7 @@ class _RecordingMixin:
         # spanning just that programme; a timeline scrub or "go back X" keeps
         # the live timeline so the user can keep scrubbing across the window.
         self._ts_catchup_program = bool(prog)
-        self._start_playback(url, title, it.get("stream_icon"),
+        self._start_playback(urls[0], title, it.get("stream_icon"),
                              self._item_key(it), "live", record=False,
                              item=it, catchup=True)
 

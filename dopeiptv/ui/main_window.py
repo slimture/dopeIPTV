@@ -3161,7 +3161,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                      if kind in self._RESUMABLE else 0.0)
         self._trakt_stop_current()
         if record and kind:
-            self.history.add(url, title, icon_url, key, kind)
+            # For a live channel, remember its stream_id + archive depth so a
+            # later replay from History still has timeshift/catch-up available.
+            extra = None
+            if kind == "live" and item is not None:
+                extra = {"stream_id": item.get("stream_id"),
+                         "tv_archive": item.get("tv_archive"),
+                         "tv_archive_duration": item.get("tv_archive_duration")}
+            self.history.add(url, title, icon_url, key, kind, extra=extra)
         if kind in ("movie", "episode"):
             self._trakt_start_for_item(kind, item)
         self.stream_error.hide()
@@ -3341,6 +3348,28 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.rec.finish_all_inplayer("stream error")
         self.wake.release()
         self._trakt_active = None
+        # A catch-up segment that fails right after starting is usually the
+        # wrong archive-URL format for this provider - walk to the next
+        # candidate. Only while still probing (early failure); once a format has
+        # played for a while, later drops are transient and fall through to the
+        # normal reconnect below (which replays the same archive url).
+        if getattr(self, "_playing_catchup", False):
+            pos = self.player.playback_position() if self.player else 0.0
+            early = ((time.monotonic()
+                      - getattr(self, "_ts_candidate_started", 0.0)) < 10
+                     and (pos or 0.0) < 2)
+            if early:
+                if self._try_next_ts_candidate():
+                    return
+                # No format worked: the provider isn't serving catch-up here.
+                self._playing_catchup = False
+                if self.player:
+                    self.player.current_url = None
+                self._set_status(tr("ts_archive_unavailable"), error=True)
+                lp = getattr(self, "_last_playback", None)
+                if lp and lp.get("item"):
+                    self.play_live_channel(lp["item"])
+                return
         # Live streams drop briefly all the time (single-connection accounts,
         # HLS segment hiccups, the window being dragged). Reconnect silently a
         # couple of times before surfacing the error. Reset the counter when
@@ -3421,6 +3450,23 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.player.current_url = None
         self._set_status(tr("status_reconnecting"), emphasis=True)
         QTimer.singleShot(300, self._retry_last_stream)
+
+    def _try_next_ts_candidate(self) -> bool:
+        """Play the next candidate archive-URL format for the current catch-up
+        segment. Returns False when none are left. Lets the app auto-pick
+        whichever timeshift scheme a provider actually serves."""
+        cands = getattr(self, "_ts_candidates", None)
+        idx = getattr(self, "_ts_candidate_idx", 0)
+        if not cands or idx + 1 >= len(cands):
+            return False
+        self._ts_candidate_idx = idx + 1
+        self._ts_candidate_started = time.monotonic()
+        lp = getattr(self, "_last_playback", None) or {}
+        self._start_playback(
+            cands[idx + 1], lp.get("title", ""), lp.get("icon_url"),
+            lp.get("key"), "live", record=False,
+            item=lp.get("item"), catchup=True)
+        return True
 
     def _retry_last_stream(self) -> None:
         lp = getattr(self, "_last_playback", None)

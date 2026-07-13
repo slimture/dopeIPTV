@@ -179,16 +179,21 @@ class HistoryStore:
                                json.dumps(self.entries[:self.MAX_ENTRIES]))
 
     def add(self, url: str, title: str, icon_url: str | None,
-            key: str, kind: str) -> None:
+            key: str, kind: str, extra: dict | None = None) -> None:
         if not url:
             return
         self.entries = [e for e in self.entries
                         if not (e.get("_key") == key and e.get("_kind") == kind)]
-        self.entries.insert(0, {
+        entry = {
             "name": title, "stream_icon": icon_url,
             "_url": url, "_key": key, "_kind": kind,
             "_watched_at": datetime.now().isoformat(),
-        })
+        }
+        # Carry through extra channel fields (e.g. stream_id, tv_archive) so a
+        # live channel replayed from History keeps its catch-up/timeshift.
+        if extra:
+            entry.update({k: v for k, v in extra.items() if v is not None})
+        self.entries.insert(0, entry)
         self.entries = self.entries[:self.MAX_ENTRIES]
         self._save()
 

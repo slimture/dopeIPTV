@@ -117,9 +117,25 @@ class XtreamClient:
 
     def timeshift_url(self, stream_id: int | str, start_dt: datetime,
                       duration_min: int) -> str:
+        return self.timeshift_urls(stream_id, start_dt, duration_min)[0]
+
+    def timeshift_urls(self, stream_id: int | str, start_dt: datetime,
+                       duration_min: int) -> list[str]:
+        """Candidate catch-up URLs in preference order. Panels differ in how
+        they expose archive - the standard /timeshift .ts path, an .m3u8 (HLS)
+        variant, and the older timeshift.php form - so the player tries each in
+        turn and keeps the first that actually plays, instead of the caller
+        having to know which scheme a given provider uses."""
         stamp = start_dt.strftime("%Y-%m-%d:%H-%M")
-        return (f"{self.server}/timeshift/{self.username}/{self.password}/"
-                f"{int(duration_min)}/{stamp}/{stream_id}.ts")
+        dur = int(duration_min)
+        base = f"{self.server}/timeshift/{self.username}/{self.password}"
+        return [
+            f"{base}/{dur}/{stamp}/{stream_id}.ts",
+            f"{base}/{dur}/{stamp}/{stream_id}.m3u8",
+            (f"{self.server}/streaming/timeshift.php?username={self.username}"
+             f"&password={self.password}&stream={stream_id}"
+             f"&start={stamp}&duration={dur}"),
+        ]
 
 
 class OfflineClient:
@@ -191,6 +207,10 @@ class OfflineClient:
     def timeshift_url(self, stream_id: int | str, start_dt: datetime,
                       duration_min: int) -> str:
         return ""
+
+    def timeshift_urls(self, stream_id: int | str, start_dt: datetime,
+                       duration_min: int) -> list[str]:
+        return []
 
 
 class M3UClient(OfflineClient):
