@@ -4454,6 +4454,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self.mpv_window:
             self.mpv_window.shutdown()
         self.mpv.stop()
+        # The app exits via os._exit (here on stuck workers, and always after
+        # the event loop - see app.main), which skips QSettings' auto-sync on
+        # destruction. Flush every settings file explicitly so this session's
+        # layout, resume points and watched/cache writes actually persist.
+        for st in (self.settings, self._resume_settings, self._cache_settings):
+            try:
+                st.sync()
+            except Exception:
+                pass
         threading.Thread(target=self.cast.shutdown, daemon=True).start()
         # Cancel every queued background download. Wait a moderate
         # amount of time for in-flight workers to finish so libmpv,

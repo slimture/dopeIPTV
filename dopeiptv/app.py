@@ -322,4 +322,13 @@ def main() -> int:
     for _ in range(5):
         app.processEvents()
 
-    return app.exec()
+    rc = app.exec()
+    # After the event loop returns, MainWindow.closeEvent has already torn down
+    # mpv, recording, casting and flushed all persistence. Letting the Python
+    # interpreter then garbage-collect the Qt object tree (notably the libmpv
+    # QOpenGLWidget) can segfault on shutdown - the C++ objects get freed in an
+    # order sip/PyQt don't guarantee, especially on newer Pythons. Everything
+    # important is already released, so exit hard and skip that GC teardown.
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(rc if isinstance(rc, int) else 0)

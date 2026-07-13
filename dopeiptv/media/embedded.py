@@ -2161,6 +2161,7 @@ class EmbeddedPlayer(QWidget):
         self._seekable = seekable
         if not seekable:
             self._hide_seek_ui()
+            self._sync_fs_controls_width(False)
             return
         # A picked catch-up programme: present the bar as the whole programme,
         # with the playhead at (base into the programme + position in the loaded
@@ -2182,6 +2183,19 @@ class EmbeddedPlayer(QWidget):
         for w in (self.fs_seek, self.fs_time_lbl,
                   self.fs_back_btn, self.fs_fwd_btn):
             w.setVisible(True)
+        self._sync_fs_controls_width(True)
+
+    def _sync_fs_controls_width(self, seek_shown: bool) -> None:
+        """Keep the fullscreen control-bar width matched to whether the seek bar
+        is showing. Without this the bar can stay full-width after the scrubber
+        is hidden (a picked catch-up programme re-loads on each scrub, blanking
+        the bar for a moment) - leaving a big empty stretch gap with the buttons
+        flung to the edges."""
+        if getattr(self, "_fs_seek_shown", None) == seek_shown:
+            return
+        self._fs_seek_shown = seek_shown
+        if self._fs_ui and self.fs_controls.isVisible():
+            self._place_overlay()
 
     def progress_percent(self) -> float:
         m = self.video.mpv
