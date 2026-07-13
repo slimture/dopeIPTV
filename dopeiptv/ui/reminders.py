@@ -2,8 +2,9 @@
 
 Answers "what have I got queued, and when does it start?" - a single place that
 lists all reminders (soonest first), each counting down (hours/minutes, then
-seconds as it gets close), with a remove button and a double-click to tune the
-channel. A 1 s timer keeps the countdowns fresh while it's open.
+seconds as it gets close). Remove the selected one, or double-click to tune the
+channel. A 1 s timer keeps the countdowns fresh while it's open. Deliberately
+plain one-line rows (no per-item widgets) so nothing clips across platforms.
 """
 
 from __future__ import annotations
@@ -11,9 +12,10 @@ from __future__ import annotations
 import time
 
 from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QDialog, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton,
-    QVBoxLayout, QWidget,
+    QVBoxLayout,
 )
 
 from ..i18n import tr
@@ -41,13 +43,16 @@ class RemindersDialog(QDialog):
         super().__init__(window)
         self.window = window
         self.setWindowTitle(tr("reminders_title"))
-        self.resize(460, 480)
+        self.resize(460, 460)
 
         lay = QVBoxLayout(self)
         lay.setContentsMargins(14, 14, 14, 14)
         lay.setSpacing(8)
+
         self.list = QListWidget()
-        self.list.itemDoubleClicked.connect(self._tune_selected)
+        self.list.setAlternatingRowColors(True)
+        self.list.setWordWrap(True)
+        self.list.itemDoubleClicked.connect(self._tune)
         lay.addWidget(self.list, 1)
 
         self.empty = QLabel(tr("reminders_empty"))
@@ -56,11 +61,17 @@ class RemindersDialog(QDialog):
         lay.addWidget(self.empty)
 
         btns = QHBoxLayout()
+        self.remove_btn = QPushButton(tr("reminders_remove"))
+        self.remove_btn.clicked.connect(self._remove_selected)
+        btns.addWidget(self.remove_btn)
         btns.addStretch(1)
         close = QPushButton(tr("common_close"))
         close.clicked.connect(self.accept)
         btns.addWidget(close)
         lay.addLayout(btns)
+
+        QShortcut(QKeySequence(Qt.Key.Key_Delete), self.list,
+                  activated=self._remove_selected)
 
         self._rows: list[dict] = []
         self._rebuild()
@@ -75,46 +86,39 @@ class RemindersDialog(QDialog):
                             key=lambda r: r.get("start") or 0)
         self.empty.setVisible(not self._rows)
         self.list.setVisible(bool(self._rows))
+        self.remove_btn.setEnabled(bool(self._rows))
         for r in self._rows:
-            row = QWidget()
-            rl = QHBoxLayout(row)
-            rl.setContentsMargins(8, 6, 8, 6)
-            rl.setSpacing(10)
-            ch = r.get("ch") or {}
-            title = r.get("title") or ch.get("name") or "?"
-            text = QLabel(f"<b>{title}</b><br>"
-                          f"<span style='color:{P['muted2']}'>"
-                          f"{ch.get('name') or ''}</span>")
-            text.setTextFormat(Qt.TextFormat.RichText)
-            rl.addWidget(text, 1)
-            countdown = QLabel()
-            countdown.setStyleSheet(f"color:{P['accent']}; font-weight:600;")
-            r["_countdown_lbl"] = countdown
-            rl.addWidget(countdown)
-            remove = QPushButton(tr("reminders_remove"))
-            remove.clicked.connect(
-                lambda _c=False, rr=r: self._remove(rr))
-            rl.addWidget(remove)
-            item = QListWidgetItem(self.list)
-            item.setSizeHint(row.sizeHint())
+            item = QListWidgetItem(self._label(r))
             item.setData(Qt.ItemDataRole.UserRole, r)
             self.list.addItem(item)
-            self.list.setItemWidget(item, row)
-        self._tick()
+        if self._rows:
+            self.list.setCurrentRow(0)
+
+    def _label(self, r: dict) -> str:
+        ch = r.get("ch") or {}
+        title = r.get("title") or ch.get("name") or "?"
+        left = int(r.get("start") or 0) - int(time.time())
+        cd = tr("reminder_starts_in", t=fmt_countdown(left))
+        chan = ch.get("name") or ""
+        head = f"{title} · {chan}" if chan else title
+        return f"{head}\n{cd}"
 
     def _tick(self) -> None:
-        now = int(time.time())
-        for r in self._rows:
-            lbl = r.get("_countdown_lbl")
-            if lbl is not None:
-                left = int(r.get("start") or 0) - now
-                lbl.setText(tr("reminder_starts_in", t=fmt_countdown(left)))
+        for i in range(self.list.count()):
+            item = self.list.item(i)
+            r = item.data(Qt.ItemDataRole.UserRole)
+            if r is not None:
+                item.setText(self._label(r))
 
-    def _remove(self, r: dict) -> None:
+    def _remove_selected(self) -> None:
+        item = self.list.currentItem()
+        if item is None:
+            return
+        r = item.data(Qt.ItemDataRole.UserRole) or {}
         self.window.reminders.remove(r.get("stream_id"), r.get("start"))
         self._rebuild()
 
-    def _tune_selected(self, item: QListWidgetItem) -> None:
+    def _tune(self, item: QListWidgetItem) -> None:
         r = item.data(Qt.ItemDataRole.UserRole)
         ch = (r or {}).get("ch") or {}
         if ch.get("stream_id") is not None:
