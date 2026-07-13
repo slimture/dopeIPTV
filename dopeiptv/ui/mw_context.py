@@ -59,6 +59,13 @@ class _ContextMenuMixin:
                 m.addSeparator()
                 self._build_timeshift_menu(
                     m.addMenu(tr("tooltip_timeshift")), it)
+            elif self._ts_provider_flagged(it):
+                # The provider flags this channel with catch-up but we've
+                # learned (or wrongly learned) it as broken, so its ◀◀ marker
+                # is hidden. Offer a per-channel reset to bring it back.
+                m.addSeparator()
+                m.addAction(tr("ts_reset_channel"),
+                            lambda it=it: self._reset_channel_timeshift(it))
             m.addSeparator()
             self._build_record_menu(m.addMenu(tr("rec_record")), it)
         if (content_kind in ("live", "fav")

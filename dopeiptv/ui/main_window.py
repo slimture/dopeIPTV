@@ -3848,7 +3848,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._set_status(tr("ts_archive_unavailable"), error=True)
         lp = getattr(self, "_last_playback", None)
         if lp and lp.get("item"):
-            self._mark_ts_broken(lp["item"])
+            # Only unmark the channel when this was a shallow request; a deep
+            # (near-limit) request coming back as live just means that depth
+            # isn't served, not that the channel has no catch-up.
+            if getattr(self, "_ts_allow_mark_broken", True):
+                self._mark_ts_broken(lp["item"])
             self.play_live_channel(lp["item"])
 
     def _try_next_ts_candidate(self) -> bool:

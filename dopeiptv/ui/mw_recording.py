@@ -715,6 +715,12 @@ class _RecordingMixin:
             # Redraw so the amber ◀◀ marker drops immediately.
             self.listw.viewport().update()
 
+    # How far inside the stated archive depth a "go back to the limit" request
+    # is pulled, and how shallow a catch-up request must be for a failure to
+    # count as "this channel serves no archive at all" (learn-and-hide).
+    TS_EDGE_MARGIN_SEC = 10 * 60      # 10 min inside the oldest edge
+    TS_SHALLOW_MIN = 180             # <= 3 h back
+
     def _clear_ts_broken(self) -> None:
         """Forget learned catch-up failures (manual refresh / reset button) so
         the provider's tv_archive flags are trusted again."""
@@ -725,6 +731,28 @@ class _RecordingMixin:
         self._ts_broken_pid = pid
         if hasattr(self, "listw"):
             self.listw.viewport().update()
+
+    @staticmethod
+    def _ts_provider_flagged(it) -> bool:
+        """Whether the provider marks this channel as having catch-up
+        (tv_archive), independent of any learned-broken state - i.e. a
+        'timeshift channel' from the user's point of view."""
+        try:
+            return bool(it) and int(it.get("tv_archive") or 0) > 0
+        except (TypeError, ValueError):
+            return False
+
+    def _reset_channel_timeshift(self, it) -> None:
+        """Forget a single channel's learned catch-up failure, so its ◀◀ marker
+        and menu come back. Used from the live channel's context menu."""
+        key = str(self._item_key(it))
+        m = self._ts_broken_map()
+        if key in m:
+            del m[key]
+            self._save_ts_broken()
+        if hasattr(self, "listw"):
+            self.listw.viewport().update()
+        self._flash_status(tr("ts_reset_done_one"))
 
     def _play_timeshift(self, it, back_min=None, prog=None,
                         prog_origin=None) -> None:
@@ -747,7 +775,21 @@ class _RecordingMixin:
             start = now - (back_min or 30) * 60
             duration_min = max(1, int((now - start) // 60) + 1)
             what = None
-        start = max(start, now - days * 86400)
+        # Never request the very oldest edge of the archive: providers usually
+        # drop the last few minutes, so a "go back 3 days" on a 3-day archive
+        # lands just past the end and fails. Pull back a safety margin so a
+        # request at the stated depth still resolves to real content.
+        oldest = now - days * 86400 + self.TS_EDGE_MARGIN_SEC
+        # A failure on a request *near the archive limit* only means that depth
+        # isn't available - it must NOT unmark a channel that works closer to
+        # live. Only a shallow request failing implies the provider serves no
+        # catch-up at all (learn-and-hide).
+        depth_min = days * 1440
+        requested_back_min = (now - start) / 60.0
+        clamped = start < oldest
+        start = max(start, oldest)
+        allow_mark_broken = (not clamped
+                             and requested_back_min <= self.TS_SHALLOW_MIN)
         start += self._replay_delay_minutes() * 60
         # Candidate archive-URL formats (providers differ). Play the first;
         # _playback_error walks to the next on an early failure so we auto-pick
@@ -771,6 +813,9 @@ class _RecordingMixin:
         # the channel is marked as having no working catch-up and the user just
         # gets a status message, with no stutter.
         self._flash_status(tr("ts_checking"))
+        # Carried to _verify_catchup so a deep request that comes back as live
+        # (not seekable) also can't unmark a channel that works closer to live.
+        self._ts_allow_mark_broken = allow_mark_broken
         probe_token = getattr(self, "_ts_probe_token", 0) + 1
         self._ts_probe_token = probe_token
 
@@ -778,7 +823,8 @@ class _RecordingMixin:
             if probe_token != getattr(self, "_ts_probe_token", 0):
                 return   # a newer play/probe superseded this one
             if not url:
-                self._mark_ts_broken(it)
+                if allow_mark_broken:
+                    self._mark_ts_broken(it)
                 self._flash_status(tr("ts_archive_unavailable"), ms=6000)
                 # The live video never stopped - just drop the now-pointless
                 # timeline back to a plain live view.
