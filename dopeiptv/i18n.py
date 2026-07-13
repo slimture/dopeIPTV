@@ -6315,6 +6315,11 @@ _STRINGS: dict[str, dict[str, str]] = {
         "fr": "Rechercher dans le guide", "zh": "搜索指南",
         "ru": "Поиск в телегиде", "th": "ค้นหาผังรายการ",
     },
+    "sc_reminders": {
+        "en": "Reminders", "sv": "Påminnelser", "es": "Recordatorios",
+        "de": "Erinnerungen", "fr": "Rappels", "zh": "提醒",
+        "ru": "Напоминания", "th": "การเตือน",
+    },
     "sc_sidebar": {
         "en": "Toggle sidebar", "sv": "Visa/dölj sidopanel",
         "es": "Mostrar/ocultar barra lateral", "de": "Seitenleiste umschalten",

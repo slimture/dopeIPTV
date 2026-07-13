@@ -128,6 +128,9 @@ class EpgGridDialog(QDialog):
         self.now_btn = QPushButton("⟳ " + tr("epg_jump_now"))
         self.now_btn.clicked.connect(self._scroll_to_now)
         bar.addWidget(self.now_btn)
+        self.reminders_btn = QPushButton("🔔 " + tr("reminders_title"))
+        self.reminders_btn.clicked.connect(self.window._open_reminders)
+        bar.addWidget(self.reminders_btn)
         # Jumps the board back up to the channel you're watching (handy after
         # scrolling far down a long line-up). Only shown when one is playing.
         self.playing_btn = QPushButton("▶ " + tr("epg_jump_playing"))
