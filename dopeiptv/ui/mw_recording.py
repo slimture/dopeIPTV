@@ -609,14 +609,51 @@ class _RecordingMixin:
 
     # -- timeshift / catch-up ------------------------------------------------------
 
-    @staticmethod
-    def _timeshift_days(it) -> int:
+    def _timeshift_days(self, it) -> int:
         try:
+            # A channel we've learned doesn't actually serve catch-up (the
+            # provider set tv_archive but the archive URL returns HTML/live) is
+            # no longer treated as timeshift, so its marker + menu disappear.
+            if str(self._item_key(it)) in self._ts_broken_set():
+                return 0
             if int(it.get("tv_archive") or 0):
                 return int(it.get("tv_archive_duration") or 1) or 1
         except (TypeError, ValueError):
             pass
         return 0
+
+    def _ts_broken_set(self) -> set:
+        """Channel keys (this playlist) whose advertised catch-up doesn't work.
+        Loaded lazily and cached; persisted per playlist so it survives across
+        sessions and is cleared by a manual playlist refresh (re-trust)."""
+        pid = ((self.playlist_store.active() or {}).get("id", "")
+               if self.playlist_store else "")
+        if getattr(self, "_ts_broken_pid", None) != pid:
+            raw = self.settings.value(f"ts_broken/{pid}", "") or ""
+            self._ts_broken = {k for k in str(raw).split(",") if k}
+            self._ts_broken_pid = pid
+        return self._ts_broken
+
+    def _mark_ts_broken(self, it) -> None:
+        if it is None:
+            return
+        key = str(self._item_key(it))
+        broken = self._ts_broken_set()
+        if key and key not in broken:
+            broken.add(key)
+            pid = getattr(self, "_ts_broken_pid", "")
+            self.settings.setValue(f"ts_broken/{pid}", ",".join(sorted(broken)))
+            # Redraw so the amber ◀◀ marker drops immediately.
+            self.listw.viewport().update()
+
+    def _clear_ts_broken(self) -> None:
+        """Forget learned catch-up failures (called on a manual refresh) so the
+        provider's tv_archive flag is trusted again."""
+        pid = ((self.playlist_store.active() or {}).get("id", "")
+               if self.playlist_store else "")
+        self.settings.remove(f"ts_broken/{pid}")
+        self._ts_broken = set()
+        self._ts_broken_pid = pid
 
     def _play_timeshift(self, it, back_min=None, prog=None) -> None:
         sid = it.get("stream_id")

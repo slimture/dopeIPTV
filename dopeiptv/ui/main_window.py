@@ -1710,6 +1710,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def refresh_playlist(self) -> None:
         self._last_playlist_refresh = time.time()
+        self._clear_ts_broken()   # re-trust the provider's tv_archive flags
         pl = self.playlist_store.active() if self.playlist_store else None
         pid = (pl or {}).get("id")
         self.xmltv = XmltvGuide(
@@ -3496,12 +3497,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 if self._try_next_ts_candidate():
                     return
                 # No format worked: the provider isn't serving catch-up here.
+                # Learn it so this channel stops advertising timeshift.
                 self._playing_catchup = False
                 if self.player:
                     self.player.current_url = None
                 self._set_status(tr("ts_archive_unavailable"), error=True)
                 lp = getattr(self, "_last_playback", None)
                 if lp and lp.get("item"):
+                    self._mark_ts_broken(lp["item"])
                     self.play_live_channel(lp["item"])
                 return
         # Live streams drop briefly all the time (single-connection accounts,
@@ -3648,6 +3651,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._set_status(tr("ts_archive_unavailable"), error=True)
         lp = getattr(self, "_last_playback", None)
         if lp and lp.get("item"):
+            self._mark_ts_broken(lp["item"])
             self.play_live_channel(lp["item"])
 
     def _try_next_ts_candidate(self) -> bool:
