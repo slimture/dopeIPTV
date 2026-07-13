@@ -923,6 +923,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._cat_section_label.setVisible(not collapsed)
         self.cat_solo_btn.setVisible(not collapsed)
         self.cat_list.setVisible(not collapsed)
+        # The category-search toggle (and its box) belong to the expanded
+        # sidebar only - hide them on the collapsed icon rail, restoring the
+        # mode's own visibility (set in _load_categories) when expanded.
+        if hasattr(self, "cat_search_btn"):
+            self.cat_search_btn.setVisible(
+                not collapsed and getattr(self, "_cat_search_supported", False))
+            if collapsed:
+                self.cat_search.hide()
         # Short letter labels in the rail so it's obvious what each is
         # (an emoji alone read as an anonymous box for some users).
         self._guide_btn.setText("EPG" if collapsed else tr("btn_epg_guide"))
@@ -1840,6 +1848,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # History) so the same 🔍 works everywhere, adapted to each.
             show = cat_mode or self.mode in (
                 "fav", "watchlist", "watched", "rec", "history")
+            self._cat_search_supported = show
             self.cat_search.setPlaceholderText(
                 tr("cat_search_placeholder") if cat_mode
                 else tr("cat_search_items"))
@@ -1850,7 +1859,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.cat_search_btn.blockSignals(True)
             self.cat_search_btn.setChecked(False)
             self.cat_search_btn.blockSignals(False)
-            self.cat_search_btn.setVisible(show)
+            # Not on the collapsed icon rail (see _apply_sidebar_chrome).
+            self.cat_search_btn.setVisible(
+                show and not getattr(self, "_sidebar_collapsed", False))
         self.cat_list.clear()
         self.list_model.set_items([], self.mode)
         if self.mode == "rec":
