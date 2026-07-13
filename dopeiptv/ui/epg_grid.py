@@ -181,11 +181,24 @@ class EpgGridDialog(QDialog):
         if getattr(self, "_centred", False):
             return
         self._centred = True
-        scr = (self.window.screen() if self.window else None) or self.screen()
+        mw = self.window
+        if mw is not None and mw.isVisible():
+            c = mw.frameGeometry().center()
+            x, y = c.x() - self.width() // 2, c.y() - self.height() // 2
+        else:
+            scr0 = self.screen()
+            g = scr0.availableGeometry() if scr0 else None
+            if g is None:
+                return
+            x, y = g.x() + (g.width() - self.width()) // 2, \
+                g.y() + (g.height() - self.height()) // 2
+        # Keep it fully on-screen even when the window sits near an edge.
+        scr = (mw.screen() if mw else None) or self.screen()
         if scr is not None:
-            g = scr.availableGeometry()
-            self.move(g.x() + (g.width() - self.width()) // 2,
-                      g.y() + (g.height() - self.height()) // 2)
+            a = scr.availableGeometry()
+            x = max(a.x(), min(x, a.x() + a.width() - self.width()))
+            y = max(a.y(), min(y, a.y() + a.height() - self.height()))
+        self.move(x, y)
 
     def keyPressEvent(self, event) -> None:
         # In-guide shortcuts: N jumps to now, P to the playing channel, Enter
