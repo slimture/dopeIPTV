@@ -22,20 +22,20 @@ from PyQt6.QtWidgets import (
 
 
 class _WheelGuard(QObject):
-    """Stops the mouse wheel from changing a combo/spin/slider that merely
-    happens to sit under the cursor while the user scrolls the Settings page.
-    The wheel is redirected to the enclosing scroll area (so the page scrolls),
-    and the control only reacts to the wheel once it has focus (i.e. was
-    clicked) - so you change a setting by clicking, not by scrolling past it."""
+    """Stops the mouse wheel from ever changing a combo/spin/slider in the
+    Settings window - it's far too easy to nudge a setting while just trying to
+    scroll the page. The wheel is always swallowed on these controls (you change
+    a setting by clicking, not scrolling) and redirected to the enclosing scroll
+    area so the page still scrolls under the cursor."""
 
     def eventFilter(self, obj, ev):
-        if ev.type() == QEvent.Type.Wheel and not obj.hasFocus():
+        if ev.type() == QEvent.Type.Wheel:
             area = obj.parent()
             while area is not None and not isinstance(area, QScrollArea):
                 area = area.parent()
             if area is not None:
                 QApplication.sendEvent(area.viewport(), ev)
-            return True
+            return True   # never let the control itself act on the wheel
         return False
 
 
@@ -556,9 +556,15 @@ class _SettingsMixin:
         epg_count_box = QSpinBox()
         epg_count_box.setRange(self.EPG_UPCOMING_MIN, self.EPG_UPCOMING_MAX)
         epg_count_box.setValue(self._epg_upcoming_count())
+        epg_count_box.setFixedWidth(90)
+        # Wrap in a row with a stretch so it stays a small box (a full-width
+        # form field rendered as one long, hard-to-read strip).
+        epg_count_row = QHBoxLayout()
+        epg_count_row.addWidget(epg_count_box)
+        epg_count_row.addStretch(1)
         uf.addRow(tr("setting_language"), lang_box)
         uf.addRow(tr("setting_list_size"), density_box)
-        uf.addRow(tr("setting_upcoming_count"), epg_count_box)
+        uf.addRow(tr("setting_upcoming_count"), epg_count_row)
         uf.addRow(tr("setting_sort_by"), sort_box)
         uf.addRow(tr("setting_theme"), theme_box)
         uf.addRow(tr("setting_accent_color"), accent_box)
