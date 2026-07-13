@@ -6074,6 +6074,115 @@ _STRINGS: dict[str, dict[str, str]] = {
         "th": "รีเซ็ตการตั้งค่าทั้งหมดแล้ว dopeIPTV จะปิดตัวลง - "
               "เปิดใหม่เพื่อตั้งค่าเพลย์ลิสต์แรกของคุณ",
     },
+
+    # ── Keyboard shortcuts editor ─────────────────────────────────────────
+    "sc_title": {
+        "en": "Keyboard shortcuts", "sv": "Kortkommandon",
+        "es": "Atajos de teclado", "de": "Tastenkürzel",
+        "fr": "Raccourcis clavier", "zh": "键盘快捷键",
+        "ru": "Горячие клавиши", "th": "แป้นพิมพ์ลัด",
+    },
+    "sc_open": {
+        "en": "Keyboard shortcuts…", "sv": "Kortkommandon…",
+        "es": "Atajos de teclado…", "de": "Tastenkürzel…",
+        "fr": "Raccourcis clavier…", "zh": "键盘快捷键…",
+        "ru": "Горячие клавиши…", "th": "แป้นพิมพ์ลัด…",
+    },
+    "sc_hint": {
+        "en": "Click a field and press the new key combination. "
+              "Escape and Delete stay reserved.",
+        "sv": "Klicka i ett fält och tryck den nya tangentkombinationen. "
+              "Escape och Delete är reserverade.",
+        "es": "Haz clic en un campo y pulsa la nueva combinación. "
+              "Escape y Suprimir están reservadas.",
+        "de": "Feld anklicken und neue Tastenkombination drücken. "
+              "Escape und Entf bleiben reserviert.",
+        "fr": "Cliquez dans un champ et appuyez sur la nouvelle combinaison. "
+              "Échap et Suppr restent réservées.",
+        "zh": "点击输入框并按下新的组合键。Escape 和 Delete 为保留键。",
+        "ru": "Щёлкните поле и нажмите новую комбинацию клавиш. "
+              "Escape и Delete зарезервированы.",
+        "th": "คลิกช่องแล้วกดคีย์ผสมใหม่ ปุ่ม Escape และ Delete ถูกสงวนไว้",
+    },
+    "sc_reset": {
+        "en": "Reset to defaults", "sv": "Återställ standard",
+        "es": "Restablecer valores", "de": "Standard wiederherstellen",
+        "fr": "Réinitialiser", "zh": "恢复默认",
+        "ru": "Сбросить по умолчанию", "th": "รีเซ็ตเป็นค่าเริ่มต้น",
+    },
+    "sc_save": {
+        "en": "Save", "sv": "Spara", "es": "Guardar", "de": "Speichern",
+        "fr": "Enregistrer", "zh": "保存", "ru": "Сохранить", "th": "บันทึก",
+    },
+    "sc_next_channel": {
+        "en": "Next channel", "sv": "Nästa kanal", "es": "Canal siguiente",
+        "de": "Nächster Sender", "fr": "Chaîne suivante", "zh": "下一个频道",
+        "ru": "Следующий канал", "th": "ช่องถัดไป",
+    },
+    "sc_prev_channel": {
+        "en": "Previous channel", "sv": "Föregående kanal",
+        "es": "Canal anterior", "de": "Vorheriger Sender",
+        "fr": "Chaîne précédente", "zh": "上一个频道",
+        "ru": "Предыдущий канал", "th": "ช่องก่อนหน้า",
+    },
+    "sc_last_channel": {
+        "en": "Last channel", "sv": "Senaste kanalen", "es": "Último canal",
+        "de": "Letzter Sender", "fr": "Dernière chaîne", "zh": "上一次频道",
+        "ru": "Последний канал", "th": "ช่องล่าสุด",
+    },
+    "sc_play_pause": {
+        "en": "Play / Pause", "sv": "Spela / Pausa",
+        "es": "Reproducir / Pausar", "de": "Wiedergabe / Pause",
+        "fr": "Lecture / Pause", "zh": "播放 / 暂停",
+        "ru": "Воспроизведение / Пауза", "th": "เล่น / หยุดชั่วคราว",
+    },
+    "sc_fullscreen": {
+        "en": "Fullscreen", "sv": "Helskärm", "es": "Pantalla completa",
+        "de": "Vollbild", "fr": "Plein écran", "zh": "全屏",
+        "ru": "Полный экран", "th": "เต็มจอ",
+    },
+    "sc_mute": {
+        "en": "Mute", "sv": "Ljud av", "es": "Silenciar", "de": "Stumm",
+        "fr": "Muet", "zh": "静音", "ru": "Без звука", "th": "ปิดเสียง",
+    },
+    "sc_pip": {
+        "en": "Picture-in-picture", "sv": "Bild-i-bild",
+        "es": "Imagen en imagen", "de": "Bild-in-Bild",
+        "fr": "Image dans l’image", "zh": "画中画",
+        "ru": "Картинка в картинке", "th": "ภาพซ้อนภาพ",
+    },
+    "sc_record": {
+        "en": "Record", "sv": "Spela in", "es": "Grabar", "de": "Aufnehmen",
+        "fr": "Enregistrer", "zh": "录制", "ru": "Запись", "th": "บันทึก",
+    },
+    "sc_stats": {
+        "en": "Playback stats", "sv": "Uppspelningsstatistik",
+        "es": "Estadísticas de reproducción", "de": "Wiedergabestatistik",
+        "fr": "Statistiques de lecture", "zh": "播放统计",
+        "ru": "Статистика воспроизведения", "th": "สถิติการเล่น",
+    },
+    "sc_epg_guide": {
+        "en": "TV guide", "sv": "TV-tablå", "es": "Guía de TV",
+        "de": "TV-Programm", "fr": "Guide TV", "zh": "电视指南",
+        "ru": "Телегид", "th": "ผังรายการทีวี",
+    },
+    "sc_epg_search": {
+        "en": "Search guide", "sv": "Sök i tablån",
+        "es": "Buscar en la guía", "de": "Programm durchsuchen",
+        "fr": "Rechercher dans le guide", "zh": "搜索指南",
+        "ru": "Поиск в телегиде", "th": "ค้นหาผังรายการ",
+    },
+    "sc_sidebar": {
+        "en": "Toggle sidebar", "sv": "Visa/dölj sidopanel",
+        "es": "Mostrar/ocultar barra lateral", "de": "Seitenleiste umschalten",
+        "fr": "Afficher/masquer la barre latérale", "zh": "切换侧边栏",
+        "ru": "Боковая панель", "th": "สลับแถบข้าง",
+    },
+    "sc_focus_mode": {
+        "en": "Focus mode", "sv": "Fokusläge", "es": "Modo enfoque",
+        "de": "Fokusmodus", "fr": "Mode concentration", "zh": "专注模式",
+        "ru": "Режим фокуса", "th": "โหมดโฟกัส",
+    },
 }
 
 

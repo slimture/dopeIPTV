@@ -98,6 +98,12 @@ class _SettingsMixin:
         from .epg_search import EpgSearchDialog
         EpgSearchDialog(self).exec()
 
+    def _open_shortcuts(self) -> None:
+        """Open the keyboard-shortcuts editor: rebind any action to your own
+        keys (saved live via apply_shortcuts)."""
+        from .shortcuts import ShortcutsDialog
+        ShortcutsDialog(self).exec()
+
     def _favorite_channels_for_guide(self) -> list:
         """The favorite live channels the EPG guide should cover, honoring the
         currently selected Favorites sub-category (a channel folder, or all)."""
@@ -584,6 +590,13 @@ class _SettingsMixin:
         updates_box.setChecked(
             self.settings.value("check_updates", "true") == "true")
         uf.addRow("", updates_box)
+
+        shortcuts_btn = QPushButton(tr("sc_open"))
+        shortcuts_btn.clicked.connect(self._open_shortcuts)
+        sc_row = QHBoxLayout()
+        sc_row.addWidget(shortcuts_btn)
+        sc_row.addStretch(1)
+        uf.addRow(tr("sc_title"), sc_row)
 
         tabs.addTab(ui_tab, tr("tab_interface"))
 

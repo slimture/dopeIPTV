@@ -851,39 +851,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._current_epg = None
         self._player_fs = False
 
-        QShortcut(QKeySequence("Ctrl+Right"), self,
-                  activated=lambda: self._zap(1))
-        QShortcut(QKeySequence("Ctrl+Left"), self,
-                  activated=lambda: self._zap(-1))
+        # Escape and Delete are structural/context-sensitive, so they stay
+        # fixed; everything else is user-rebindable (see _install_shortcuts).
         QShortcut(QKeySequence(Qt.Key.Key_Escape), self,
                   activated=self._on_escape)
-        QShortcut(QKeySequence(Qt.Key.Key_F), self,
-                  activated=self._toggle_fullscreen_shortcut)
         QShortcut(QKeySequence(Qt.Key.Key_Delete), self,
                   activated=self._delete_pressed)
-        QShortcut(QKeySequence(Qt.Key.Key_Space), self,
-                  activated=self._toggle_pause_shortcut)
-        QShortcut(QKeySequence("Ctrl+B"), self,
-                  activated=lambda: self.side_btn.toggle())
-        QShortcut(QKeySequence("Ctrl+Shift+M"), self,
-                  activated=lambda: self._set_focus_mode(not self._focus_mode))
-        # Player controls (single letters, mpv-style). Guarded so they never
-        # fire while typing in a text field, and only act with the player up.
-        QShortcut(QKeySequence(Qt.Key.Key_M), self,
-                  activated=self._shortcut_mute)
-        QShortcut(QKeySequence(Qt.Key.Key_P), self,
-                  activated=self._shortcut_pip)
-        QShortcut(QKeySequence(Qt.Key.Key_R), self,
-                  activated=self._shortcut_record)
-        QShortcut(QKeySequence(Qt.Key.Key_I), self,
-                  activated=self._shortcut_stats)
-        QShortcut(QKeySequence("Ctrl+G"), self,
-                  activated=self._shortcut_epg_guide)
-        QShortcut(QKeySequence("Ctrl+Shift+F"), self,
-                  activated=self._open_epg_search)
-        # Jump back to the previously watched live channel (TV "last" button).
-        QShortcut(QKeySequence(Qt.Key.Key_Backspace), self,
-                  activated=self._last_channel)
+        self._install_shortcuts()
 
         # Channel-number quick-jump state (digits typed in the list).
         self._prev_live_item = None
@@ -3658,6 +3632,63 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self._zap(-1)
                 return
         super().keyPressEvent(event)
+
+    # Rebindable actions: (id, default key sequence, i18n label key). The
+    # callbacks are wired in _install_shortcuts. Order here is display order.
+    SHORTCUT_ACTIONS = (
+        ("zap_next", "Ctrl+Right", "sc_next_channel"),
+        ("zap_prev", "Ctrl+Left", "sc_prev_channel"),
+        ("last_channel", "Backspace", "sc_last_channel"),
+        ("pause", "Space", "sc_play_pause"),
+        ("fullscreen", "F", "sc_fullscreen"),
+        ("mute", "M", "sc_mute"),
+        ("pip", "P", "sc_pip"),
+        ("record", "R", "sc_record"),
+        ("stats", "I", "sc_stats"),
+        ("epg_guide", "Ctrl+G", "sc_epg_guide"),
+        ("epg_search", "Ctrl+Shift+F", "sc_epg_search"),
+        ("sidebar", "Ctrl+B", "sc_sidebar"),
+        ("focus_mode", "Ctrl+Shift+M", "sc_focus_mode"),
+    )
+
+    def _shortcut_callbacks(self):
+        return {
+            "zap_next": lambda: self._zap(1),
+            "zap_prev": lambda: self._zap(-1),
+            "last_channel": self._last_channel,
+            "pause": self._toggle_pause_shortcut,
+            "fullscreen": self._toggle_fullscreen_shortcut,
+            "mute": self._shortcut_mute,
+            "pip": self._shortcut_pip,
+            "record": self._shortcut_record,
+            "stats": self._shortcut_stats,
+            "epg_guide": self._shortcut_epg_guide,
+            "epg_search": self._open_epg_search,
+            "sidebar": lambda: self.side_btn.toggle(),
+            "focus_mode": lambda: self._set_focus_mode(not self._focus_mode),
+        }
+
+    def shortcut_sequence(self, sid: str, default: str) -> str:
+        """The user's key sequence for *sid*, or the default when unset."""
+        return self.settings.value(f"shortcut/{sid}", default) or default
+
+    def _install_shortcuts(self) -> None:
+        """Create every rebindable QShortcut from its saved (or default) key
+        sequence. Kept in self._shortcuts so apply_shortcuts() can rebind them
+        live when the user edits them in Settings."""
+        cbs = self._shortcut_callbacks()
+        self._shortcuts = {}
+        for sid, default, _label in self.SHORTCUT_ACTIONS:
+            seq = self.shortcut_sequence(sid, default)
+            sc = QShortcut(QKeySequence(seq), self, activated=cbs[sid])
+            self._shortcuts[sid] = sc
+
+    def apply_shortcuts(self) -> None:
+        """Re-read the saved key sequences and rebind the live QShortcuts."""
+        for sid, default, _label in self.SHORTCUT_ACTIONS:
+            sc = getattr(self, "_shortcuts", {}).get(sid)
+            if sc is not None:
+                sc.setKey(QKeySequence(self.shortcut_sequence(sid, default)))
 
     def _handle_player_arrow(self, key) -> bool:
         """Bare Left/Right while the player is up: scrub the timeshift timeline
