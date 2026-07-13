@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import html
 import re
+import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -128,13 +129,20 @@ class XtreamClient:
         having to know which scheme a given provider uses."""
         stamp = start_dt.strftime("%Y-%m-%d:%H-%M")
         dur = int(duration_min)
+        start = int(start_dt.timestamp())
+        now = int(time.time())
         base = f"{self.server}/timeshift/{self.username}/{self.password}"
+        live = f"{self.server}/{self.username}/{self.password}/{stream_id}"
         return [
             f"{base}/{dur}/{stamp}/{stream_id}.ts",
             f"{base}/{dur}/{stamp}/{stream_id}.m3u8",
             (f"{self.server}/streaming/timeshift.php?username={self.username}"
              f"&password={self.password}&stream={stream_id}"
              f"&start={stamp}&duration={dur}"),
+            # utc/lutc "append" form some panels use on the live URL.
+            f"{live}?utc={start}&lutc={now}",
+            f"{self.server}/live/{self.username}/{self.password}/"
+            f"{stream_id}.m3u8?utc={start}&lutc={now}",
         ]
 
 
@@ -261,12 +269,29 @@ class M3UClient(OfflineClient):
                 attrs = dict(self._ATTR.findall(m.group("attrs")))
                 name = (m.group("name").strip()
                         or attrs.get("tvg-name", "")).strip() or "?"
+                # Catch-up / archive metadata (IPTV M3U convention): a channel
+                # advertises archive via catchup / catchup-source / catchup-days
+                # (or the older timeshift / tvg-rec). Keep the raw type+template
+                # so timeshift_urls can build the archive URL this provider
+                # actually uses, and expose tv_archive(+duration) so the generic
+                # timeshift detection lights up just like on Xtream.
+                catchup = (attrs.get("catchup")
+                           or attrs.get("catchup-type", "")).strip()
+                catchup_src = attrs.get("catchup-source", "").strip()
+                days = (attrs.get("catchup-days") or attrs.get("timeshift")
+                        or attrs.get("tvg-rec") or "").strip()
+                has_archive = bool(catchup or catchup_src or days)
                 pending = {
                     "name": name,
                     "stream_icon": attrs.get("tvg-logo", ""),
                     "epg_channel_id": attrs.get("tvg-id", ""),
                     "category_name": attrs.get("group-title", "").strip()
                     or "Uncategorized",
+                    "catchup": catchup,
+                    "catchup_source": catchup_src,
+                    "tv_archive": 1 if has_archive else 0,
+                    "tv_archive_duration": int(days) if days.isdigit() else (
+                        7 if has_archive else 0),
                 }
             elif line.startswith("#EXTM3U"):
                 # Header line: many playlists advertise their XMLTV guide here
@@ -322,14 +347,83 @@ class M3UClient(OfflineClient):
 
     def live_url(self, stream_id: int | str, fmt: str = "ts") -> str:
         self._ensure()
+        return (self._channel(stream_id) or {}).get("_url", "")
+
+    def _channel(self, stream_id: int | str) -> dict | None:
         try:
             sid = int(stream_id)
         except (TypeError, ValueError):
-            return ""
+            return None
         for c in self._channels:
             if c["stream_id"] == sid:
-                return c["_url"]
-        return ""
+                return c
+        return None
+
+    def timeshift_urls(self, stream_id: int | str, start_dt: datetime,
+                       duration_min: int) -> list[str]:
+        """Build catch-up URLs for an M3U channel from its catchup / catchup-
+        source tags (the IPTV convention). Handles the common schemes -
+        explicit template, ``append``, ``shift`` (utc/lutc) and ``flussonic`` -
+        and always adds the utc/lutc and flussonic forms as fallbacks so a
+        provider that doesn't spell out a source still gets a fair try."""
+        self._ensure()
+        ch = self._channel(stream_id)
+        if ch is None:
+            return []
+        base = ch.get("_url", "")
+        if not base:
+            return []
+        start = int(start_dt.timestamp())
+        dur = int(duration_min) * 60
+        end = start + dur
+        now = int(time.time())
+        offset = max(0, now - start)
+        ctype = (ch.get("catchup") or "").lower()
+        src = ch.get("catchup_source") or ""
+
+        def subst(t: str) -> str:
+            rep = {
+                "${start}": str(start), "${end}": str(end),
+                "${timestamp}": str(start), "${utc}": str(start),
+                "${lutc}": str(now), "${now}": str(now),
+                "${duration}": str(dur), "${offset}": str(offset),
+                "{utc}": str(start), "{utcend}": str(end),
+                "{start}": str(start), "{end}": str(end),
+                "{duration}": str(dur), "{offset}": str(offset),
+                "{lutc}": str(now),
+                "{Y}": start_dt.strftime("%Y"), "{m}": start_dt.strftime("%m"),
+                "{d}": start_dt.strftime("%d"), "{H}": start_dt.strftime("%H"),
+                "{M}": start_dt.strftime("%M"), "{S}": start_dt.strftime("%S"),
+            }
+            for k, v in rep.items():
+                t = t.replace(k, v)
+            return t
+
+        cands: list[str] = []
+        if src:
+            s = subst(src)
+            if s.startswith(("?", "&")):
+                cands.append(base.split("?")[0] + s)
+            elif "://" in s:
+                cands.append(s)
+            else:
+                cands.append(base.rstrip("/") + "/" + s.lstrip("/"))
+        # shift / utc query form (also a generic fallback).
+        sep = "&" if "?" in base else "?"
+        cands.append(f"{base}{sep}utc={start}&lutc={now}")
+        # flussonic path forms.
+        m = re.match(r"(?P<pre>.*/)[^/]+\.(?P<ext>m3u8|ts)(?P<qs>\?.*)?$", base)
+        if m:
+            pre, ext, qs = m.group("pre"), m.group("ext"), m.group("qs") or ""
+            cands.append(f"{pre}timeshift_abs-{start}.{ext}{qs}")
+            cands.append(f"{pre}index-{start}-{dur}.{ext}{qs}")
+        seen: set[str] = set()
+        out: list[str] = []
+        for u in cands:
+            if u and u not in seen:
+                seen.add(u)
+                out.append(u)
+        return out
 
 
 def make_client(playlist: dict):

@@ -378,17 +378,28 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cat_solo_btn.setAutoRaise(True)
         self.cat_solo_btn.setFixedSize(22, 18)
         self.cat_solo_btn.setToolTip(tr("tooltip_solo_category"))
+        # A search toggle that reveals the category search box only when you
+        # want it, so it doesn't take a permanent row in the sidebar.
+        self.cat_search_btn = QToolButton(objectName="SectionToggle")
+        self.cat_search_btn.setText("🔍")
+        self.cat_search_btn.setCheckable(True)
+        self.cat_search_btn.setAutoRaise(True)
+        self.cat_search_btn.setFixedSize(22, 18)
+        self.cat_search_btn.setToolTip(tr("cat_search_placeholder"))
+        self.cat_search_btn.toggled.connect(self._toggle_cat_search)
+        cat_hdr.addWidget(self.cat_search_btn)
         self.cat_solo_btn.toggled.connect(self._on_cat_solo_toggle)
         cat_hdr.addWidget(self.cat_solo_btn)
         sl.addLayout(cat_hdr)
         # Search that spans category names AND their channels: type "germany"
         # or "bbc" and the matching categories float up (ranked by how many of
         # their channels match), each previewing a few hits. Double-click to
-        # enter that category. Only meaningful where categories exist.
+        # enter that category. Hidden until the 🔍 toggle is clicked.
         self.cat_search = QLineEdit(objectName="CatSearch")
         self.cat_search.setPlaceholderText(tr("cat_search_placeholder"))
         self.cat_search.setClearButtonEnabled(True)
         self.cat_search.textChanged.connect(self._on_cat_search)
+        self.cat_search.hide()
         sl.addWidget(self.cat_search)
         self._cat_search_timer = QTimer(self)
         self._cat_search_timer.setSingleShot(True)
@@ -1815,12 +1826,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._load_gen += 1
         gen = self._load_gen
         # Reset the category search: it only applies to the provider sections
-        # that actually have categories (live/movies/series).
+        # that actually have categories (live/movies/series). Collapse the box
+        # back to just its 🔍 toggle on every section switch.
         if hasattr(self, "cat_search"):
+            has_cats = self.mode in ("live", "vod", "series")
             self.cat_search.blockSignals(True)
             self.cat_search.clear()
             self.cat_search.blockSignals(False)
-            self.cat_search.setVisible(self.mode in ("live", "vod", "series"))
+            self.cat_search.hide()
+            self.cat_search_btn.blockSignals(True)
+            self.cat_search_btn.setChecked(False)
+            self.cat_search_btn.blockSignals(False)
+            self.cat_search_btn.setVisible(has_cats)
         self.cat_list.clear()
         self.list_model.set_items([], self.mode)
         if self.mode == "rec":
@@ -1999,6 +2016,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._error(msg)
 
         run_async(self.pool, fn, done, fail)
+
+    def _toggle_cat_search(self, on: bool) -> None:
+        self.cat_search.setVisible(on)
+        if on:
+            self.cat_search.setFocus()
+        elif self.cat_search.text():
+            self.cat_search.clear()   # clearing restores the category list
 
     def _on_cat_search(self, _text: str) -> None:
         # Debounce so a fast typist doesn't trigger a rebuild per keystroke.
@@ -3543,7 +3567,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if now - getattr(self, "_last_stream_error_ts", 0.0) > 20:
             self._stream_retries = 0
         if getattr(self, "_stream_retries", 0) >= self.MAX_STREAM_RETRIES:
-            return   # tried hard already; leave it for the user to zap
+            # Quick budget spent. Don't die - keep trying on a slow timer so a
+            # channel that comes back (transient drop, provider hiccup) resumes
+            # on its own instead of staying frozen. Armed once; re-armed each
+            # slow attempt. A successful play resets the counters after 20 s.
+            self._arm_slow_reconnect()
+            return
         self._last_stream_error_ts = now
         self._stream_retries = getattr(self, "_stream_retries", 0) + 1
         print(f"[dopeIPTV] live reconnect ({reason}) "
@@ -3552,6 +3581,37 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.player.current_url = None
         self._set_status(tr("status_reconnecting"), emphasis=True)
         QTimer.singleShot(300, self._retry_last_stream)
+
+    SLOW_RECONNECT_MS = 15000
+
+    def _arm_slow_reconnect(self) -> None:
+        if getattr(self, "_slow_reconnect_armed", False):
+            return
+        self._slow_reconnect_armed = True
+        # Remember which channel this is for, so a fire after the user zapped
+        # away doesn't yank a working channel offline.
+        self._slow_reconnect_key = self._playing_key
+        self._set_status(tr("status_reconnecting"), emphasis=True)
+        if self.player:
+            self.player.set_overlay_info(tr("status_reconnecting"))
+        QTimer.singleShot(self.SLOW_RECONNECT_MS, self._slow_reconnect)
+
+    def _slow_reconnect(self) -> None:
+        self._slow_reconnect_armed = False
+        lp = getattr(self, "_last_playback", None)
+        if not (self.player and self.player.isVisible()):
+            return
+        if not lp or lp.get("kind") != "live":
+            return
+        if self._playing_key != getattr(self, "_slow_reconnect_key", None):
+            return   # user moved on; leave the current channel alone
+        if getattr(self, "_playing_catchup", False):
+            return
+        if not self._auto_reconnect_live():
+            return
+        self._stream_retries = 0   # a fresh quick budget for this slow attempt
+        self._last_stream_error_ts = 0.0
+        self._retry_last_stream()
 
     def _try_next_ts_candidate(self) -> bool:
         """Play the next candidate archive-URL format for the current catch-up
