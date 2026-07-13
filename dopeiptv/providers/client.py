@@ -127,23 +127,36 @@ class XtreamClient:
         variant, and the older timeshift.php form - so the player tries each in
         turn and keeps the first that actually plays, instead of the caller
         having to know which scheme a given provider uses."""
-        stamp = start_dt.strftime("%Y-%m-%d:%H-%M")
         dur = int(duration_min)
         start = int(start_dt.timestamp())
         now = int(time.time())
+        # The /timeshift/ path takes a formatted stamp; panels disagree on
+        # whether it's local or UTC, so try both (a wrong-timezone stamp points
+        # outside the archive and comes back as "unrecognized file format").
+        stamp = start_dt.strftime("%Y-%m-%d:%H-%M")
+        stamp_utc = datetime.utcfromtimestamp(start).strftime("%Y-%m-%d:%H-%M")
         base = f"{self.server}/timeshift/{self.username}/{self.password}"
         live = f"{self.server}/{self.username}/{self.password}/{stream_id}"
-        return [
-            f"{base}/{dur}/{stamp}/{stream_id}.ts",
-            f"{base}/{dur}/{stamp}/{stream_id}.m3u8",
-            (f"{self.server}/streaming/timeshift.php?username={self.username}"
-             f"&password={self.password}&stream={stream_id}"
-             f"&start={stamp}&duration={dur}"),
-            # utc/lutc "append" form some panels use on the live URL.
-            f"{live}?utc={start}&lutc={now}",
-            f"{self.server}/live/{self.username}/{self.password}/"
-            f"{stream_id}.m3u8?utc={start}&lutc={now}",
-        ]
+
+        def php(s):
+            return (f"{self.server}/streaming/timeshift.php?"
+                    f"username={self.username}&password={self.password}"
+                    f"&stream={stream_id}&start={s}&duration={dur}")
+
+        out = [f"{base}/{dur}/{stamp}/{stream_id}.ts",
+               f"{base}/{dur}/{stamp}/{stream_id}.m3u8"]
+        if stamp_utc != stamp:
+            out += [f"{base}/{dur}/{stamp_utc}/{stream_id}.ts",
+                    f"{base}/{dur}/{stamp_utc}/{stream_id}.m3u8"]
+        out += [php(stamp)]
+        if stamp_utc != stamp:
+            out += [php(stamp_utc)]
+        # utc/lutc forms last: some panels honour them (real archive), but
+        # others ignore them and just serve live, so they're the last resort.
+        out += [f"{live}?utc={start}&lutc={now}",
+                f"{self.server}/live/{self.username}/{self.password}/"
+                f"{stream_id}.m3u8?utc={start}&lutc={now}"]
+        return out
 
 
 class OfflineClient:

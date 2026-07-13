@@ -3364,6 +3364,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # stop) when the item being played is the one shown in the detail pane.
         self._apply_play_icon()
         self._apply_seek_mode(item, kind)
+        # Catch-up sanity check: some providers accept an archive URL but just
+        # serve the live feed (the seekbar jumps back yet you're still live).
+        # A real archive segment is seekable; verify a few seconds in and, if
+        # it isn't, try the next candidate or report it unavailable.
+        if catchup:
+            token = getattr(self, "_catchup_verify_token", 0) + 1
+            self._catchup_verify_token = token
+            QTimer.singleShot(5000, lambda t=token: self._verify_catchup(t))
 
     def _apply_seek_mode(self, item, kind: str) -> None:
         """Pick one seek UI per stream so there's never a second, useless bar:
@@ -3612,6 +3620,35 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._stream_retries = 0   # a fresh quick budget for this slow attempt
         self._last_stream_error_ts = 0.0
         self._retry_last_stream()
+
+    def _verify_catchup(self, token: int) -> None:
+        """A catch-up URL that plays but isn't seekable means the provider
+        served the live feed instead of the archive - walk to the next format
+        or, when exhausted, report catch-up unavailable and settle on live."""
+        if token != getattr(self, "_catchup_verify_token", 0):
+            return   # superseded by a newer play
+        if not getattr(self, "_playing_catchup", False):
+            return
+        if not (self.player and self.player.current_url):
+            return
+        m = self.player.video.mpv
+        try:
+            seekable = bool(m and m.seekable)
+        except Exception:
+            return   # can't tell - leave it be
+        if seekable:
+            return   # genuine archive segment
+        if os.environ.get("DOPEIPTV_TS_DEBUG"):
+            print(f"[dopeIPTV][ts] candidate "
+                  f"{getattr(self, '_ts_candidate_idx', 0)} played but is live "
+                  f"(not seekable)", file=sys.stderr)
+        if self._try_next_ts_candidate():
+            return
+        self._playing_catchup = False
+        self._set_status(tr("ts_archive_unavailable"), error=True)
+        lp = getattr(self, "_last_playback", None)
+        if lp and lp.get("item"):
+            self.play_live_channel(lp["item"])
 
     def _try_next_ts_candidate(self) -> bool:
         """Play the next candidate archive-URL format for the current catch-up
