@@ -575,6 +575,13 @@ class _MacInputFilter(QObject):
     def _handle_seek_key(self, event, pressed: bool) -> bool:
         if event.key() not in (Qt.Key.Key_Left, Qt.Key.Key_Right):
             return False
+        if os.environ.get("DOPEIPTV_KEY_DEBUG") and pressed:
+            p = self._player
+            print(f"[dopeIPTV][key] macfilter arrow mods={int(event.modifiers().value)} "
+                  f"url={getattr(p, 'current_url', None) is not None} "
+                  f"mode={getattr(p, '_seek_mode', None)} "
+                  f"focus={type(QApplication.focusWidget()).__name__}",
+                  file=sys.stderr)
         # Ctrl+arrows stay a channel zap; only claim the bare presses.
         if event.modifiers() != Qt.KeyboardModifier.NoModifier:
             return False

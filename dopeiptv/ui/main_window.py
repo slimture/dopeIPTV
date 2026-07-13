@@ -3647,12 +3647,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     # -- keyboard and close --------------------------------------------------------
 
     def keyPressEvent(self, event) -> None:
-        if self._player_fs:
-            if event.key() == Qt.Key.Key_Right:
-                self._zap(1)
+        if (event.key() in (Qt.Key.Key_Left, Qt.Key.Key_Right)
+                and event.modifiers() == Qt.KeyboardModifier.NoModifier):
+            # Scrub the player (timeshift/VOD) before any zap - covers the
+            # fullscreen case, where this handler would otherwise zap.
+            if self._handle_player_arrow(event.key()):
                 return
-            if event.key() == Qt.Key.Key_Left:
-                self._zap(-1)
+            if self._player_fs:
+                self._zap(1 if event.key() == Qt.Key.Key_Right else -1)
                 return
         super().keyPressEvent(event)
 
@@ -3732,13 +3734,23 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         so it works even where the app-level input filter doesn't catch it (seen
         on macOS). Returns True when it consumed the key."""
         p = self.player
+        dbg = os.environ.get("DOPEIPTV_KEY_DEBUG")
         if not p or p.current_url is None or not p.isVisible():
+            if dbg:
+                print(f"[dopeIPTV][key] arrow ignored: player={bool(p)} "
+                      f"url={getattr(p, 'current_url', None)!r} "
+                      f"visible={p.isVisible() if p else None}", file=sys.stderr)
             return False
         back = key == Qt.Key.Key_Left
-        if getattr(p, "_seek_mode", None) == "timeline":
+        mode = getattr(p, "_seek_mode", None)
+        seekable = p._is_seekable()
+        if dbg:
+            print(f"[dopeIPTV][key] arrow mode={mode} seekable={seekable}",
+                  file=sys.stderr)
+        if mode == "timeline":
             p._timeline_step(-p.TIMELINE_STEP_MIN if back else p.TIMELINE_STEP_MIN)
             return True
-        if p._is_seekable():
+        if seekable:
             p._relative_seek(-10 if back else 10)
             return True
         return False

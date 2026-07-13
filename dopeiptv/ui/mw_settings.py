@@ -584,8 +584,9 @@ class _SettingsMixin:
 
         clear_cache_btn.clicked.connect(clear_cache)
         cache_row = QHBoxLayout()
-        cache_row.addWidget(cache_lbl, 1)
+        cache_row.addWidget(cache_lbl)
         cache_row.addWidget(clear_cache_btn)
+        cache_row.addStretch(1)
         uf.addRow(cache_row)
         cache_hint = QLabel(tr("settings_image_cache_hint"))
         cache_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
