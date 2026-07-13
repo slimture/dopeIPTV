@@ -6124,6 +6124,11 @@ _STRINGS: dict[str, dict[str, str]] = {
         "en": "Remove", "sv": "Ta bort", "es": "Quitar", "de": "Entfernen",
         "fr": "Retirer", "zh": "移除", "ru": "Удалить", "th": "ลบ",
     },
+    "reminders_remove_n": {
+        "en": "Remove {n}", "sv": "Ta bort {n}", "es": "Quitar {n}",
+        "de": "{n} entfernen", "fr": "Retirer {n}", "zh": "移除 {n} 个",
+        "ru": "Удалить: {n}", "th": "ลบ {n} รายการ",
+    },
     "reminder_starts_in": {
         "en": "starts in {t}", "sv": "börjar om {t}", "es": "empieza en {t}",
         "de": "beginnt in {t}", "fr": "commence dans {t}", "zh": "{t}后开始",

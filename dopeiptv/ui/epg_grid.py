@@ -152,9 +152,22 @@ class EpgGridDialog(QDialog):
         scr = self.screen().availableGeometry() if self.screen() else None
         want_w = self.CH_COL_W + self._grid_w + 40
         want_h = self.HEADER_H + len(self.channels) * self.ROW_H + 110
-        w = min(want_w, (scr.width() - 80) if scr else 1200, 1500)
-        h = min(want_h, (scr.height() - 80) if scr else 800, 900)
-        self.resize(max(760, w), max(460, h))
+        # Cap to the main window, not the whole screen, so the guide stays in
+        # proportion to the app instead of ballooning to 1500 px on a big
+        # display while the window itself is small.
+        mw = self.window
+        if mw is not None and mw.width() > 200:
+            cap_w, cap_h = int(mw.width() * 0.94), int(mw.height() * 0.94)
+        else:
+            cap_w = (scr.width() - 80) if scr else 1200
+            cap_h = (scr.height() - 80) if scr else 800
+        w = min(want_w, cap_w, 1500)
+        h = min(want_h, cap_h, 900)
+        self.resize(max(min(760, cap_w), w), max(min(460, cap_h), h))
+        # Centre over the main window so it doesn't spill past its edges.
+        if mw is not None:
+            g = mw.frameGeometry()
+            self.move(g.center().x() - w // 2, max(0, g.center().y() - h // 2))
         now_x = self.CH_COL_W + (now - self._start) / 60 * self.PX_PER_MIN
         self.view.horizontalScrollBar().setValue(max(0, int(now_x
                                                              - self.CH_COL_W - 40)))

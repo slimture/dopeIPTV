@@ -2797,6 +2797,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         return {"live": "live", "fav": "live", "vod": "movie"}.get(
             self._content_kind(), "other")
 
+    def _play_kind_for(self, it) -> str:
+        """The playback/resume kind for a row. In mixed views (Favorites 'All',
+        History, ...) the section-derived _history_kind() would treat a movie as
+        'live' and skip its resume prompt, so honour the row's own kind tag when
+        it carries one."""
+        ek = it.get("_kind") or it.get("_ekind")
+        mapped = {"vod": "movie", "movie": "movie", "series": "series",
+                  "episode": "episode", "live": "live", "fav": "live"}.get(ek)
+        return mapped or self._history_kind()
+
     # -- selection, EPG and detail panel -------------------------------------------
 
 
@@ -2923,7 +2933,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         else:
             url, title = self._stream_for(it)
             icon = it.get("stream_icon") or it.get("cover")
-            key, kind = self._item_key(it), self._history_kind()
+            key, kind = self._item_key(it), self._play_kind_for(it)
         if not url:
             return
 

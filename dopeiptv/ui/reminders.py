@@ -14,8 +14,8 @@ import time
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
-    QDialog, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton,
-    QVBoxLayout,
+    QAbstractItemView, QDialog, QHBoxLayout, QLabel, QListWidget,
+    QListWidgetItem, QMenu, QPushButton, QVBoxLayout,
 )
 
 from ..i18n import tr
@@ -52,7 +52,12 @@ class RemindersDialog(QDialog):
         self.list = QListWidget()
         self.list.setAlternatingRowColors(True)
         self.list.setWordWrap(True)
+        self.list.setSelectionMode(
+            QAbstractItemView.SelectionMode.ExtendedSelection)
         self.list.itemDoubleClicked.connect(self._tune)
+        self.list.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu)
+        self.list.customContextMenuRequested.connect(self._menu)
         lay.addWidget(self.list, 1)
 
         self.empty = QLabel(tr("reminders_empty"))
@@ -111,12 +116,27 @@ class RemindersDialog(QDialog):
                 item.setText(self._label(r))
 
     def _remove_selected(self) -> None:
-        item = self.list.currentItem()
-        if item is None:
+        items = self.list.selectedItems() or (
+            [self.list.currentItem()] if self.list.currentItem() else [])
+        for item in items:
+            r = item.data(Qt.ItemDataRole.UserRole) or {}
+            self.window.reminders.remove(r.get("stream_id"), r.get("start"))
+        if items:
+            self._rebuild()
+
+    def _menu(self, pos) -> None:
+        if not self.list.selectedItems():
+            item = self.list.itemAt(pos)
+            if item is not None:
+                item.setSelected(True)
+        if not self.list.selectedItems():
             return
-        r = item.data(Qt.ItemDataRole.UserRole) or {}
-        self.window.reminders.remove(r.get("stream_id"), r.get("start"))
-        self._rebuild()
+        n = len(self.list.selectedItems())
+        m = QMenu(self)
+        m.addAction(tr("reminders_remove_n", n=n) if n > 1
+                    else tr("reminders_remove"),
+                    self._remove_selected)
+        m.exec(self.list.mapToGlobal(pos))
 
     def _tune(self, item: QListWidgetItem) -> None:
         r = item.data(Qt.ItemDataRole.UserRole)
