@@ -541,6 +541,13 @@ class _SettingsMixin:
         theme_hint.setWordWrap(True)
         uf.addRow(theme_hint)
 
+        shortcuts_btn = QPushButton(tr("sc_open"))
+        shortcuts_btn.clicked.connect(self._open_shortcuts)
+        sc_row = QHBoxLayout()
+        sc_row.addWidget(shortcuts_btn)
+        sc_row.addStretch(1)
+        uf.addRow(tr("sc_title"), sc_row)
+
         # Disk-cache controls: covers/logos accumulate under
         # QStandardPaths.CacheLocation and don't clean themselves.
         # The live cache is the shared "images" dir; the two legacy
@@ -590,13 +597,6 @@ class _SettingsMixin:
         updates_box.setChecked(
             self.settings.value("check_updates", "true") == "true")
         uf.addRow("", updates_box)
-
-        shortcuts_btn = QPushButton(tr("sc_open"))
-        shortcuts_btn.clicked.connect(self._open_shortcuts)
-        sc_row = QHBoxLayout()
-        sc_row.addWidget(shortcuts_btn)
-        sc_row.addStretch(1)
-        uf.addRow(tr("sc_title"), sc_row)
 
         tabs.addTab(ui_tab, tr("tab_interface"))
 
