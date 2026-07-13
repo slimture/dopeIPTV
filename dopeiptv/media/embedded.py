@@ -812,6 +812,7 @@ class EmbeddedPlayer(QWidget):
         #  'timeline' - a timeshift channel at the live edge: the live timeline
         #  'live'     - a plain live channel: no seek bar at all
         self._seek_mode = "vod"
+        self._program_window = 0.0        # 'program' mode: clamp bar to N secs
         self._on_archive_segment = False  # timeline mode: on a seekable segment
         self.seek_overlay = QWidget(self)
         self.seek_overlay.setStyleSheet(
@@ -1401,8 +1402,17 @@ class EmbeddedPlayer(QWidget):
         if mode != "timeline":
             self.exit_timeshift()
             self._on_archive_segment = False
+        if mode != "program":
+            self._program_window = 0.0
         if mode in ("live", "timeline"):
             self._hide_seek_ui()
+
+    def set_program_window(self, secs: float) -> None:
+        """In 'program' mode, clamp the seek bar to *secs* (the picked
+        programme's length). The provider's archive stream usually runs on past
+        the programme to the live edge, so without this mpv reports many hours
+        and the scrubber can jump straight to live."""
+        self._program_window = max(0.0, float(secs or 0.0))
 
     def set_on_archive_segment(self, on: bool) -> None:
         """Tell the player whether the current timeline-mode stream is a
@@ -2133,6 +2143,12 @@ class EmbeddedPlayer(QWidget):
         if not seekable:
             self._hide_seek_ui()
             return
+        # A picked catch-up programme: present the bar as just that programme,
+        # even though the underlying archive stream keeps running to live.
+        if (self._seek_mode == "program" and self._program_window > 1
+                and dur > self._program_window):
+            dur = self._program_window
+            pos = min(pos or 0.0, dur)
         text = f"{_format_time(pos)} / {_format_time(dur)}"
         # Keep both scrubbers' values current; the docked one lives in the
         # hover overlay (shown on mouse-over), the other in the fullscreen

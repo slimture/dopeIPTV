@@ -785,6 +785,12 @@ class _RecordingMixin:
             self._ts_candidate_started = time.monotonic()
             self._ts_segment_start = start
             self._ts_catchup_program = bool(prog)
+            # Remember the programme's end so the seek bar can be clamped to just
+            # this programme - the provider's archive URL often runs on to the
+            # live edge, so mpv would otherwise report many hours and let the
+            # scrubber jump straight to live.
+            self._ts_program_stop = (prog.get("stop_timestamp")
+                                     if prog else None)
             self._start_playback(url, title, it.get("stream_icon"), key,
                                  "live", record=False, item=it, catchup=True)
 

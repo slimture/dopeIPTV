@@ -223,6 +223,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._playing_group: str | None = None
         self._playing_catchup = False   # watching a catch-up archive segment
         self._ts_catchup_program = False  # catch-up is a picked programme (vs scrub)
+        self._ts_program_stop = None      # picked programme's stop timestamp
         self._ts_depth_min = 0            # live-timeline window span (minutes)
         self._ts_live_offset = 0.0        # seconds behind live from buffer pauses
         self._pause_started = None
@@ -3104,6 +3105,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # channel's "-Ns behind live" value.
         self._playing_catchup = False
         self._ts_catchup_program = False
+        self._ts_program_stop = None
         self._ts_segment_start = None
         self._ts_live_offset = 0.0
         self._pause_started = None
@@ -3425,6 +3427,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not catchup:
             self._ts_segment_start = None
             self._ts_catchup_program = False
+            self._ts_program_stop = None
             self._ts_live_offset = 0.0   # fresh tune = at the live edge
             self._pause_started = None   # per-channel: don't carry a stale pause
         # Remember where we were in whatever was playing before switching,
@@ -3542,8 +3545,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.set_live_badge(None)
         elif (ts_days > 0 and self._playing_catchup
               and getattr(self, "_ts_catchup_program", False)):
-            # A programme picked from the menu/EPG - a normal seek bar
-            # spanning just that programme.
+            # A programme picked from the menu/EPG - a normal seek bar spanning
+            # just that programme. Clamp it to the programme's length: the
+            # archive stream starts at the programme but usually runs on to the
+            # live edge, so without this the bar reads many hours and scrubbing
+            # jumps to live.
+            seg = getattr(self, "_ts_segment_start", None)
+            stop = getattr(self, "_ts_program_stop", None)
+            window = (stop - seg) if (seg and stop and stop > seg) else 0.0
+            self.player.set_program_window(window)
             self.player.set_seek_mode("program")
             self.player.set_live_badge("timeshift")
         elif ts_days > 0 and self._playing_catchup:
