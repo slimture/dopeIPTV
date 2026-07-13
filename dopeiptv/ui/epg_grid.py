@@ -145,6 +145,9 @@ class EpgGridDialog(QDialog):
         self.play_btn.setEnabled(False)
         self.play_btn.clicked.connect(self._play_selected)
         bar.addWidget(self.play_btn)
+        self.close_btn = QPushButton(tr("common_close"))
+        self.close_btn.clicked.connect(self.reject)
+        bar.addWidget(self.close_btn)
         outer.addLayout(bar)
 
         self._build()
