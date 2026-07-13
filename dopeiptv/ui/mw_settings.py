@@ -1211,6 +1211,13 @@ class _SettingsMixin:
         buttons.rejected.connect(d.reject)
         outer.addWidget(buttons)
 
+        # Guard every value control so scrolling the page doesn't change a
+        # setting under the cursor - you click to change, not scroll past.
+        for cls in (QComboBox, QAbstractSpinBox, QAbstractSlider):
+            for w in d.findChildren(cls):
+                w.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+                w.installEventFilter(_WHEEL_GUARD)
+
         if d.exec():
             self.settings.setValue(
                 "stream_format", fmt_box.currentData())
@@ -1413,12 +1420,6 @@ class _SettingsMixin:
 
         recheck.clicked.connect(check)
         check()               # auto-check on open
-        # Guard every value control so scrolling the page doesn't change a
-        # setting under the cursor - you click to change, not scroll past.
-        for cls in (QComboBox, QAbstractSpinBox, QAbstractSlider):
-            for w in d.findChildren(cls):
-                w.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-                w.installEventFilter(_WHEEL_GUARD)
         d.exec()
 
     # -- EPG refresh with progress -------------------------------------------------

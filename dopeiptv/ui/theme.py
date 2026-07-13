@@ -405,6 +405,32 @@ QLineEdit {{
 }}
 QLineEdit:focus {{ border: 1px solid {ACCENT}; }}
 
+QSpinBox, QDoubleSpinBox {{
+    background: {p['input']}; color: {p['text']};
+    border: 1px solid {p['border_in']}; border-radius: 8px;
+    padding: 5px 8px; font-size: 12px;
+}}
+QSpinBox:focus, QDoubleSpinBox:focus {{ border: 1px solid {ACCENT}; }}
+QSpinBox::up-button, QSpinBox::down-button,
+QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{
+    subcontrol-origin: border; width: 16px; border: none;
+    background: transparent;
+}}
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
+    image: none; width: 0; height: 0;
+    border-left: 4px solid transparent; border-right: 4px solid transparent;
+    border-bottom: 5px solid {p['muted2']};
+}}
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
+    image: none; width: 0; height: 0;
+    border-left: 4px solid transparent; border-right: 4px solid transparent;
+    border-top: 5px solid {p['muted2']};
+}}
+QSpinBox::up-arrow:hover, QDoubleSpinBox::up-arrow:hover {{
+    border-bottom-color: {p['text']}; }}
+QSpinBox::down-arrow:hover, QDoubleSpinBox::down-arrow:hover {{
+    border-top-color: {p['text']}; }}
+
 QFileDialog QTreeView, QFileDialog QListView {{
     background: {p['input']}; border: 1px solid {p['border_in']};
     border-radius: 6px; color: {p['text']}; outline: none;
