@@ -15,6 +15,12 @@ from PyQt6.QtWidgets import QApplication, QInputDialog, QLineEdit, QMenu, QMessa
 
 class _ContextMenuMixin:
     def _context_menu(self, pos) -> None:
+        # Swallow the stray context-menu event that macOS delivers to the
+        # now-visible channel list right after a right-click "Exit PiP" - it
+        # would otherwise pop the channel menu the instant the app returns.
+        import time
+        if time.monotonic() - getattr(self, "_pip_exit_ts", 0.0) < 0.5:
+            return
         idx = self.listw.indexAt(pos)
         if not idx.isValid():
             return

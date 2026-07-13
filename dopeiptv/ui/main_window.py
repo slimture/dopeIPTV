@@ -1546,10 +1546,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # the user right-clicks it for the compositor's own "Always on Top"
         # (exactly how Firefox PiP does it). On X11 the hint works, so we use
         # the clean frameless floating window.
-        flags = Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint
-        if "wayland" not in QApplication.platformName().lower():
-            flags |= Qt.WindowType.FramelessWindowHint
-        self.setWindowFlags(flags)
+        #
+        # macOS: a Qt.Tool window is an NSPanel that hides itself whenever the
+        # app is deactivated - so the moment you click another app the PiP
+        # vanishes, i.e. "always on top" appears broken. Use a plain frameless
+        # window there instead, which keeps floating above other apps.
+        self.setWindowFlags(self._pip_window_flags())
         self.show()
         # Restore the last PiP position/size, else default to bottom-right.
         geo = self._saved_pip_geometry()
@@ -1565,6 +1567,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             QTimer.singleShot(delay, lambda g=geo: self._pip_win is not None
                               and (self.setGeometry(g), self.raise_()))
 
+    def _pip_window_flags(self, on_top: bool = True) -> "Qt.WindowType":
+        flags = Qt.WindowType.Window
+        if on_top:
+            flags |= Qt.WindowType.WindowStaysOnTopHint
+        # Tool = NSPanel on macOS, which auto-hides on app deactivate - skip it
+        # there so the PiP keeps floating above other apps. Elsewhere Tool keeps
+        # it out of the taskbar.
+        if sys.platform != "darwin":
+            flags |= Qt.WindowType.Tool
+        if "wayland" not in QApplication.platformName().lower():
+            flags |= Qt.WindowType.FramelessWindowHint
+        return flags
+
     def _saved_pip_geometry(self) -> "QRect | None":
         raw = self.settings.value("pip_geometry", "")
         try:
@@ -1578,6 +1593,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _exit_pip(self) -> None:
         if self._pip_win is None:
             return
+        # Timestamp the exit so the channel list can swallow the stray
+        # context-menu event macOS delivers to it as the app returns.
+        self._pip_exit_ts = time.monotonic()
         # Remember the PiP window's position/size for next time.
         g = self.geometry()
         self.settings.setValue(
@@ -1642,13 +1660,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _set_pip_on_top(self, on: bool) -> None:
         if self._pip_win is None:
             return
-        flags = self.windowFlags()
-        if on:
-            flags |= Qt.WindowType.WindowStaysOnTopHint
-        else:
-            flags &= ~Qt.WindowType.WindowStaysOnTopHint
         geo = self.geometry()
-        self.setWindowFlags(flags)
+        self.setWindowFlags(self._pip_window_flags(on_top=on))
         self.setGeometry(geo)      # setWindowFlags can drop the geometry
         self.show()
         self.raise_()
