@@ -6098,6 +6098,26 @@ _STRINGS: dict[str, dict[str, str]] = {
         "de": "Timeshift", "fr": "Timeshift", "zh": "时移",
         "ru": "Таймшифт", "th": "ไทม์ชิฟต์",
     },
+    "rec_edit_info": {
+        "en": "Edit info…", "sv": "Redigera info…", "es": "Editar info…",
+        "de": "Info bearbeiten…", "fr": "Modifier les infos…",
+        "zh": "编辑信息…", "ru": "Изменить сведения…", "th": "แก้ไขข้อมูล…",
+    },
+    "rec_info_title": {
+        "en": "Recording info", "sv": "Inspelningsinfo",
+        "es": "Información de la grabación", "de": "Aufnahme-Info",
+        "fr": "Infos de l'enregistrement", "zh": "录制信息",
+        "ru": "Сведения о записи", "th": "ข้อมูลการบันทึก",
+    },
+    "rec_info_name": {
+        "en": "Title", "sv": "Titel", "es": "Título", "de": "Titel",
+        "fr": "Titre", "zh": "标题", "ru": "Название", "th": "ชื่อเรื่อง",
+    },
+    "rec_info_desc": {
+        "en": "Description", "sv": "Beskrivning", "es": "Descripción",
+        "de": "Beschreibung", "fr": "Description", "zh": "描述",
+        "ru": "Описание", "th": "คำอธิบาย",
+    },
     "sec_maintenance": {
         "en": "Maintenance", "sv": "Underhåll", "es": "Mantenimiento",
         "de": "Wartung", "fr": "Maintenance", "zh": "维护",

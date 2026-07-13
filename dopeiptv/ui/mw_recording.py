@@ -526,6 +526,7 @@ class _RecordingMixin:
         for it in items:
             try:
                 os.remove(it["_path"])
+                self.rec.write_info(it["_path"], "", "")  # drop info sidecar
                 self.rec.prune_path(it["_path"])
             except OSError as e:
                 self._set_status(
@@ -550,8 +551,44 @@ class _RecordingMixin:
             name + os.path.splitext(path)[1])
         try:
             os.rename(path, new_path)
+            self.rec.move_info(path, new_path)   # keep the info sidecar attached
         except OSError as e:
             QMessageBox.warning(self, tr("msg_rename_rec_title"), str(e))
+        cur = self.cat_list.currentItem()
+        self._load_items(
+            cur.data(Qt.ItemDataRole.UserRole) if cur else None)
+
+    def _edit_recording_info(self, it) -> None:
+        """Let the user set a display title and description for a recording,
+        stored in a sidecar next to the file (the filename stays untouched)."""
+        path = it.get("_path")
+        if not path:
+            return
+        info = self.rec.read_info(path)
+        d = QDialog(self)
+        d.setWindowTitle(tr("rec_info_title"))
+        d.setMinimumWidth(420)
+        lay = QVBoxLayout(d)
+        lay.setContentsMargins(16, 16, 16, 16)
+        lay.setSpacing(8)
+        lay.addWidget(QLabel(tr("rec_info_name")))
+        title_edit = QLineEdit(info.get("title") or it.get("_filename", ""))
+        lay.addWidget(title_edit)
+        lay.addWidget(QLabel(tr("rec_info_desc")))
+        from PyQt6.QtWidgets import QPlainTextEdit
+        desc_edit = QPlainTextEdit(info.get("description", ""))
+        desc_edit.setMinimumHeight(120)
+        lay.addWidget(desc_edit)
+        btns = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save
+            | QDialogButtonBox.StandardButton.Cancel)
+        btns.accepted.connect(d.accept)
+        btns.rejected.connect(d.reject)
+        lay.addWidget(btns)
+        if d.exec() != QDialog.DialogCode.Accepted:
+            return
+        self.rec.write_info(path, title_edit.text(),
+                            desc_edit.toPlainText())
         cur = self.cat_list.currentItem()
         self._load_items(
             cur.data(Qt.ItemDataRole.UserRole) if cur else None)
@@ -562,8 +599,9 @@ class _RecordingMixin:
         try:
             os.makedirs(target, exist_ok=True)
             for it in items:
-                shutil.move(it["_path"], os.path.join(
-                    target, os.path.basename(it["_path"])))
+                dest = os.path.join(target, os.path.basename(it["_path"]))
+                shutil.move(it["_path"], dest)
+                self.rec.move_info(it["_path"], dest)
         except OSError as e:
             QMessageBox.warning(self, tr("msg_move_rec_title"), str(e))
         self._load_categories()
@@ -925,6 +963,8 @@ class _RecordingMixin:
             m.addSeparator()
             m.addAction(tr("ctx_rename"),
                         lambda: self._rename_recording(it))
+            m.addAction(tr("rec_edit_info"),
+                        lambda: self._edit_recording_info(it))
             move = m.addMenu(
                 tr("ctx_move_to") if not many
                 else tr("rec_move_n", n=len(items)))

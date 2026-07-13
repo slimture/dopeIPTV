@@ -88,6 +88,12 @@ class _DetailMixin:
         self._load_detail_poster(it, is_media, media_kind)
 
         if self.mode == "rec":
+            # Show the user-entered description (if any) in the info panel.
+            desc = (it.get("_desc") or "").strip()
+            self.media_plot.setText(desc)
+            self.media_plot.setVisible(bool(desc))
+            self.media_meta.setVisible(False)
+            self.media_info.setVisible(bool(desc))
             return
 
         if self.mode == "history" and snap_kind not in ("vod", "series"):
