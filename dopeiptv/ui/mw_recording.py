@@ -707,29 +707,73 @@ class _RecordingMixin:
             sid, datetime.fromtimestamp(start), duration_min)
         if not urls:
             return
-        self._ts_candidates = urls
-        self._ts_candidate_idx = 0
-        self._ts_candidate_started = time.monotonic()
         if os.environ.get("DOPEIPTV_TS_DEBUG"):
             import sys
-            print(f"[dopeIPTV][ts] play back_min={back_min} prog={bool(prog)} "
+            print(f"[dopeIPTV][ts] probe back_min={back_min} prog={bool(prog)} "
                   f"days={days} start={datetime.fromtimestamp(start)} "
                   f"candidates={urls}", file=sys.stderr)
         name = self.channel_display_name(it)
         title = (f"{what} ({name}, timeshift)" if what
                  else f"{name} (timeshift)")
-        # A catch-up/archive URL is a seekable segment. Remember the segment's
-        # content start so the live timeline can show how far behind live we
-        # are; catchup=True marks it so the DVR-pause/reconnect guards and the
-        # seek-mode logic treat it as an archive segment, not the live edge.
-        self._ts_segment_start = start
-        # A specific programme (picked from the menu/EPG) gets its own seek bar
-        # spanning just that programme; a timeline scrub or "go back X" keeps
-        # the live timeline so the user can keep scrubbing across the window.
-        self._ts_catchup_program = bool(prog)
-        self._start_playback(urls[0], title, it.get("stream_icon"),
-                             self._item_key(it), "live", record=False,
-                             item=it, catchup=True)
+        key = self._item_key(it)
+        # Probe the candidate URLs over HTTP in the background - the live video
+        # keeps playing untouched. Only when a candidate is confirmed to serve
+        # real video do we switch the player to it (one clean swap); if none do,
+        # the channel is marked as having no working catch-up and the user just
+        # gets a status message, with no stutter.
+        self._flash_status(tr("ts_checking"))
+        probe_token = getattr(self, "_ts_probe_token", 0) + 1
+        self._ts_probe_token = probe_token
+
+        def done(url):
+            if probe_token != getattr(self, "_ts_probe_token", 0):
+                return   # a newer play/probe superseded this one
+            if not url:
+                self._mark_ts_broken(it)
+                self._flash_status(tr("ts_archive_unavailable"), ms=6000)
+                # The live video never stopped - just drop the now-pointless
+                # timeline back to a plain live view.
+                if self.player:
+                    self.player.set_seek_mode("live")
+                    self.player.set_live_badge(None)
+                return
+            self._ts_candidates = [url]
+            self._ts_candidate_idx = 0
+            self._ts_candidate_started = time.monotonic()
+            self._ts_segment_start = start
+            self._ts_catchup_program = bool(prog)
+            self._start_playback(url, title, it.get("stream_icon"), key,
+                                 "live", record=False, item=it, catchup=True)
+
+        run_async(self.pool,
+                  lambda u=list(urls): self._probe_ts_candidates(u),
+                  done, lambda _e: done(None))
+
+    def _probe_ts_candidates(self, urls) -> str | None:
+        """(worker thread) Return the first candidate URL that actually serves
+        video, or None. Filters out the HTML error pages / redirects a provider
+        hands back for channels it doesn't really archive - so we never churn
+        the player through dead URLs."""
+        sess = getattr(self.client, "session", None)
+        for u in urls:
+            try:
+                r = sess.get(u, stream=True, timeout=(4, 4),
+                             headers={"Range": "bytes=0-8191"})
+                ctype = (r.headers.get("Content-Type") or "").lower()
+                chunk = next(r.iter_content(4096), b"") or b""
+                r.close()
+            except Exception:
+                continue
+            head = chunk.lstrip()
+            if "text/html" in ctype or head[:1] in (b"<", b"{"):
+                continue   # error / JSON error page, not a stream
+            if (chunk[:1] == b"\x47"                 # MPEG-TS sync byte
+                    or head[:7] == b"#EXTM3U"        # HLS playlist
+                    or "mpegurl" in ctype
+                    or "video" in ctype
+                    or "octet-stream" in ctype):
+                return u
+        return None
 
     # (minutes back, duration i18n key) - the label is "Go back <duration>".
     TIMESHIFT_STEPS = (

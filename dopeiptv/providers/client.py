@@ -143,6 +143,11 @@ class XtreamClient:
                     f"username={self.username}&password={self.password}"
                     f"&stream={stream_id}&start={s}&duration={dur}")
 
+        # Archive-specific endpoints only. The utc/lutc-on-the-live-URL forms
+        # were dropped: many panels ignore those params and just serve live,
+        # which is worse than a clean "not available" - and the background probe
+        # can't tell that apart, so we don't offer them for Xtream.
+        _ = (start, now, live)  # (kept for clarity re: what we deliberately omit)
         out = [f"{base}/{dur}/{stamp}/{stream_id}.ts",
                f"{base}/{dur}/{stamp}/{stream_id}.m3u8"]
         if stamp_utc != stamp:
@@ -151,11 +156,6 @@ class XtreamClient:
         out += [php(stamp)]
         if stamp_utc != stamp:
             out += [php(stamp_utc)]
-        # utc/lutc forms last: some panels honour them (real archive), but
-        # others ignore them and just serve live, so they're the last resort.
-        out += [f"{live}?utc={start}&lutc={now}",
-                f"{self.server}/live/{self.username}/{self.password}/"
-                f"{stream_id}.m3u8?utc={start}&lutc={now}"]
         return out
 
 

@@ -6136,14 +6136,24 @@ _STRINGS: dict[str, dict[str, str]] = {
     },
 
     "ts_archive_unavailable": {
-        "en": "Catch-up isn't available for this channel",
-        "sv": "Catch-up är inte tillgängligt för den här kanalen",
-        "es": "La repetición no está disponible para este canal",
-        "de": "Catch-up ist für diesen Sender nicht verfügbar",
-        "fr": "Le replay n'est pas disponible pour cette chaîne",
-        "zh": "此频道不支持回看",
-        "ru": "Архив недоступен для этого канала",
-        "th": "ช่องนี้ไม่รองรับการดูย้อนหลัง",
+        "en": "Catch-up isn't available for this channel - check with your "
+              "provider",
+        "sv": "Catch-up saknas för den här kanalen - kolla med din leverantör",
+        "es": "La repetición no está disponible para este canal - consulta a "
+              "tu proveedor",
+        "de": "Catch-up ist für diesen Sender nicht verfügbar - frag deinen "
+              "Anbieter",
+        "fr": "Le replay n'est pas disponible pour cette chaîne - contactez "
+              "votre fournisseur",
+        "zh": "此频道不支持回看 - 请咨询你的服务商",
+        "ru": "Архив недоступен для этого канала - уточните у провайдера",
+        "th": "ช่องนี้ไม่รองรับการดูย้อนหลัง - โปรดสอบถามผู้ให้บริการ",
+    },
+    "ts_checking": {
+        "en": "Checking catch-up…", "sv": "Kollar catch-up…",
+        "es": "Comprobando repetición…", "de": "Catch-up wird geprüft…",
+        "fr": "Vérification du replay…", "zh": "正在检查回看…",
+        "ru": "Проверка архива…", "th": "กำลังตรวจสอบการดูย้อนหลัง…",
     },
 
     # ── Keyboard shortcuts editor ─────────────────────────────────────────
