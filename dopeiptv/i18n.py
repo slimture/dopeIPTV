@@ -6098,6 +6098,11 @@ _STRINGS: dict[str, dict[str, str]] = {
         "de": "Timeshift", "fr": "Timeshift", "zh": "时移",
         "ru": "Таймшифт", "th": "ไทม์ชิฟต์",
     },
+    "sec_maintenance": {
+        "en": "Maintenance", "sv": "Underhåll", "es": "Mantenimiento",
+        "de": "Wartung", "fr": "Maintenance", "zh": "维护",
+        "ru": "Обслуживание", "th": "การบำรุงรักษา",
+    },
     "ts_reset_broken": {
         "en": "Reset timeshift channels", "sv": "Återställ timeshift-kanaler",
         "es": "Restablecer canales timeshift",

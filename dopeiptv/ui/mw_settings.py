@@ -15,8 +15,8 @@ from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QCheckBox, QComboBox, QDialog,
     QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout, QInputDialog,
     QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox,
-    QPushButton, QScrollArea, QSpinBox, QTabWidget, QTextBrowser, QVBoxLayout,
-    QWidget,
+    QPushButton, QScrollArea, QSizePolicy, QSpinBox, QTabWidget, QTextBrowser,
+    QVBoxLayout, QWidget,
 )
 
 from .. import APP_NAME, VERSION
@@ -541,24 +541,28 @@ class _SettingsMixin:
         theme_hint.setWordWrap(True)
         uf.addRow(theme_hint)
 
+        updates_box = QCheckBox(tr("setting_check_updates"))
+        updates_box.setChecked(
+            self.settings.value("check_updates", "true") == "true")
+        uf.addRow("", updates_box)
+
+        # -- Maintenance: the three actions grouped as one tidy button row,
+        # each explained by a tooltip so no inline hints clutter the form.
         shortcuts_btn = QPushButton(tr("sc_open"))
+        shortcuts_btn.setToolTip(tr("sc_title"))
         shortcuts_btn.clicked.connect(self._open_shortcuts)
-        sc_row = QHBoxLayout()
-        sc_row.addWidget(shortcuts_btn)
-        sc_row.addStretch(1)
-        uf.addRow(tr("sc_title"), sc_row)
 
         # Disk-cache controls: covers/logos accumulate under
-        # QStandardPaths.CacheLocation and don't clean themselves.
-        # The live cache is the shared "images" dir; the two legacy
-        # dirs predate the loaders sharing one directory - keep them
-        # in the sweep so files from old sessions still get counted
-        # and cleared.
+        # QStandardPaths.CacheLocation and don't clean themselves. The live
+        # cache is the shared "images" dir; the two legacy dirs predate the
+        # loaders sharing one directory - keep them in the sweep so files from
+        # old sessions still get counted and cleared.
         cache_dirs = [default_image_cache_dir("images"),
                       default_image_cache_dir("logos"),
                       default_image_cache_dir("posters")]
         cache_lbl = QLabel()
         clear_cache_btn = QPushButton(tr("settings_image_cache_clear"))
+        clear_cache_btn.setToolTip(tr("settings_image_cache_hint"))
 
         def _fmt_size(n: int) -> str:
             for unit in ("B", "KB", "MB", "GB"):
@@ -583,39 +587,31 @@ class _SettingsMixin:
             refresh_cache_label()
 
         clear_cache_btn.clicked.connect(clear_cache)
-        cache_row = QHBoxLayout()
-        cache_row.addWidget(cache_lbl)
-        cache_row.addWidget(clear_cache_btn)
-        cache_row.addStretch(1)
-        uf.addRow(cache_row)
-        cache_hint = QLabel(tr("settings_image_cache_hint"))
-        cache_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
-        cache_hint.setWordWrap(True)
-        uf.addRow(cache_hint)
-        refresh_cache_label()
 
-        # Forget channels the app learned don't really serve catch-up, so their
-        # timeshift marker is trusted again (also happens on a playlist refresh).
         ts_reset_btn = QPushButton(tr("ts_reset_broken"))
+        ts_reset_btn.setToolTip(tr("ts_reset_hint"))
 
         def reset_ts() -> None:
             self._clear_ts_broken()
             self._flash_status(tr("ts_reset_done"))
 
         ts_reset_btn.clicked.connect(reset_ts)
-        ts_row = QHBoxLayout()
-        ts_row.addWidget(ts_reset_btn)
-        ts_row.addStretch(1)
-        uf.addRow(tr("sec_timeshift"), ts_row)
-        ts_hint = QLabel(tr("ts_reset_hint"))
-        ts_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
-        ts_hint.setWordWrap(True)
-        uf.addRow(ts_hint)
 
-        updates_box = QCheckBox(tr("setting_check_updates"))
-        updates_box.setChecked(
-            self.settings.value("check_updates", "true") == "true")
-        uf.addRow("", updates_box)
+        maint_lbl = QLabel(tr("sec_maintenance"))
+        maint_lbl.setStyleSheet(
+            f"color:{P['accent']}; font-size:10px; font-weight:700;"
+            "text-transform:uppercase; letter-spacing:1px; margin-top:12px;")
+        uf.addRow(maint_lbl)
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(8)
+        for b in (shortcuts_btn, clear_cache_btn, ts_reset_btn):
+            b.setSizePolicy(QSizePolicy.Policy.Expanding,
+                            QSizePolicy.Policy.Fixed)
+            btn_row.addWidget(b)
+        uf.addRow(btn_row)
+        cache_lbl.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        uf.addRow(cache_lbl)
+        refresh_cache_label()
 
         tabs.addTab(ui_tab, tr("tab_interface"))
 
