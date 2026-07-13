@@ -644,6 +644,7 @@ class EmbeddedPlayer(QWidget):
     next_episode = pyqtSignal()
     paused_changed = pyqtSignal(bool)
     timeshift_seek = pyqtSignal(int)   # minutes back from live (0 = go live)
+    program_seek = pyqtSignal(int)     # seconds from the picked programme start
 
     OVERLAY_HIDE_MS = 3000
     VIDEO_BOX_HEIGHT = 260
@@ -813,6 +814,7 @@ class EmbeddedPlayer(QWidget):
         #  'live'     - a plain live channel: no seek bar at all
         self._seek_mode = "vod"
         self._program_window = 0.0        # 'program' mode: clamp bar to N secs
+        self._program_base = 0.0          # secs of the programme before this segment
         self._on_archive_segment = False  # timeline mode: on a seekable segment
         self.seek_overlay = QWidget(self)
         self.seek_overlay.setStyleSheet(
@@ -1404,15 +1406,19 @@ class EmbeddedPlayer(QWidget):
             self._on_archive_segment = False
         if mode != "program":
             self._program_window = 0.0
+            self._program_base = 0.0
         if mode in ("live", "timeline"):
             self._hide_seek_ui()
 
-    def set_program_window(self, secs: float) -> None:
-        """In 'program' mode, clamp the seek bar to *secs* (the picked
-        programme's length). The provider's archive stream usually runs on past
-        the programme to the live edge, so without this mpv reports many hours
-        and the scrubber can jump straight to live."""
+    def set_program_window(self, secs: float, base: float = 0.0) -> None:
+        """In 'program' mode, present the seek bar as the whole picked programme
+        (*secs* long), with the currently loaded archive segment beginning
+        *base* seconds into it. The provider's archive stream usually runs on
+        past the programme to the live edge - and in-stream seeking on it snaps
+        to live - so the bar is a *virtual* timeline: scrubbing it re-loads the
+        archive at the chosen offset (program_seek) instead of seeking mpv."""
         self._program_window = max(0.0, float(secs or 0.0))
+        self._program_base = max(0.0, float(base or 0.0))
 
     def set_on_archive_segment(self, on: bool) -> None:
         """Tell the player whether the current timeline-mode stream is a
@@ -1783,6 +1789,12 @@ class EmbeddedPlayer(QWidget):
         self._hide_seek_overlay(force=True)
 
     def _do_seek(self, seconds: int) -> None:
+        # In 'program' mode the seek bar is virtual: the archive stream can't be
+        # seeked in place (it snaps to live), so ask the app to re-load the
+        # archive at the chosen programme offset instead.
+        if self._seek_mode == "program" and self._program_window > 1:
+            self.program_seek.emit(int(max(0, seconds)))
+            return
         m = self.video.mpv
         if m is None:
             return
@@ -1792,6 +1804,13 @@ class EmbeddedPlayer(QWidget):
             pass
 
     def _relative_seek(self, seconds: int) -> None:
+        # 'program' mode: a relative nudge is a re-load at the new offset (see
+        # _do_seek) - the loaded archive segment isn't seekable in place.
+        if self._seek_mode == "program" and self._program_window > 1:
+            cur = self._program_base + self.playback_position()
+            target = max(0, min(self._program_window, cur + seconds))
+            self.program_seek.emit(int(target))
+            return
         m = self.video.mpv
         if m is None:
             return
@@ -2143,12 +2162,13 @@ class EmbeddedPlayer(QWidget):
         if not seekable:
             self._hide_seek_ui()
             return
-        # A picked catch-up programme: present the bar as just that programme,
-        # even though the underlying archive stream keeps running to live.
-        if (self._seek_mode == "program" and self._program_window > 1
-                and dur > self._program_window):
+        # A picked catch-up programme: present the bar as the whole programme,
+        # with the playhead at (base into the programme + position in the loaded
+        # segment), even though the underlying archive stream keeps running to
+        # live. Scrubbing this bar re-loads the archive (program_seek).
+        if self._seek_mode == "program" and self._program_window > 1:
             dur = self._program_window
-            pos = min(pos or 0.0, dur)
+            pos = max(0.0, min(self._program_base + (pos or 0.0), dur))
         text = f"{_format_time(pos)} / {_format_time(dur)}"
         # Keep both scrubbers' values current; the docked one lives in the
         # hover overlay (shown on mouse-over), the other in the fullscreen

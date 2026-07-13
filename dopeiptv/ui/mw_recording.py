@@ -726,7 +726,13 @@ class _RecordingMixin:
         if hasattr(self, "listw"):
             self.listw.viewport().update()
 
-    def _play_timeshift(self, it, back_min=None, prog=None) -> None:
+    def _play_timeshift(self, it, back_min=None, prog=None,
+                        prog_origin=None) -> None:
+        # prog_origin: the picked programme's *original* start (the seek-bar's
+        # 0-point). Set when re-loading the archive at a scrubbed position so
+        # the bar keeps spanning the whole programme with the playhead offset,
+        # instead of restarting the bar at each seek. Defaults to the segment
+        # start for a fresh programme pick.
         sid = it.get("stream_id")
         days = self._timeshift_days(it)
         if sid is None or not days:
@@ -785,12 +791,21 @@ class _RecordingMixin:
             self._ts_candidate_started = time.monotonic()
             self._ts_segment_start = start
             self._ts_catchup_program = bool(prog)
-            # Remember the programme's end so the seek bar can be clamped to just
-            # this programme - the provider's archive URL often runs on to the
-            # live edge, so mpv would otherwise report many hours and let the
-            # scrubber jump straight to live.
-            self._ts_program_stop = (prog.get("stop_timestamp")
-                                     if prog else None)
+            # Remember the programme's span so the seek bar can be clamped to
+            # just this programme (the provider's archive URL runs on to the
+            # live edge). _ts_program_start is the bar's 0-point; it stays fixed
+            # across scrub-reloads (prog_origin) so the playhead moves inside the
+            # same bar instead of the bar restarting each seek.
+            if prog:
+                self._ts_program_start = (
+                    prog_origin if prog_origin is not None
+                    else prog.get("start_timestamp"))
+                self._ts_program_stop = prog.get("stop_timestamp")
+                self._ts_program_title = prog.get("title")
+            else:
+                self._ts_program_start = None
+                self._ts_program_stop = None
+                self._ts_program_title = None
             self._start_playback(url, title, it.get("stream_icon"), key,
                                  "live", record=False, item=it, catchup=True)
 

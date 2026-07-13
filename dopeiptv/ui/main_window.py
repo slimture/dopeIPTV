@@ -223,7 +223,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._playing_group: str | None = None
         self._playing_catchup = False   # watching a catch-up archive segment
         self._ts_catchup_program = False  # catch-up is a picked programme (vs scrub)
+        self._ts_program_start = None     # picked programme's start (bar origin)
         self._ts_program_stop = None      # picked programme's stop timestamp
+        self._ts_program_title = None     # picked programme's title (for reloads)
         self._ts_depth_min = 0            # live-timeline window span (minutes)
         self._ts_live_offset = 0.0        # seconds behind live from buffer pauses
         self._pause_started = None
@@ -658,6 +660,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.stopped.connect(self._apply_play_icon)
             self.player.finished.connect(self._apply_play_icon)
             self.player.timeshift_seek.connect(self._on_timeshift_seek)
+            self.player.program_seek.connect(self._seek_program)
             # Keep the player pane visible on stop - mpv clears to black -
             # instead of hiding it, so the window just goes black.
             dl.addWidget(self.player, 1)
@@ -1213,6 +1216,28 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.play_live_channel(it)
         else:
             self._play_timeshift(it, back_min=minutes_back)
+
+    def _seek_program(self, disp_secs: int) -> None:
+        """Scrub the picked-programme bar: re-load the archive so it starts at
+        *disp_secs* into the programme. The archive stream can't be seeked in
+        place (it snaps to live), so each scrub re-opens it at the new offset,
+        keeping the bar spanning the whole programme (prog_origin)."""
+        lp = getattr(self, "_last_playback", None)
+        it = lp.get("item") if lp else None
+        origin = getattr(self, "_ts_program_start", None)
+        stop = getattr(self, "_ts_program_stop", None)
+        if not (it and origin and stop and stop > origin):
+            return
+        disp_secs = max(0, int(disp_secs))
+        new_start = origin + disp_secs
+        # Don't scrub past the very end of the programme (leave a few seconds so
+        # there's something to play).
+        new_start = min(new_start, int(stop) - 5)
+        if new_start < origin:
+            new_start = origin
+        prog = {"start_timestamp": new_start, "stop_timestamp": int(stop),
+                "title": getattr(self, "_ts_program_title", None) or ""}
+        self._play_timeshift(it, prog=prog, prog_origin=origin)
 
     def _update_ts_timeline(self) -> None:
         if not (self.player and self.player.ts_timeline.isVisible()):
@@ -3105,7 +3130,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # channel's "-Ns behind live" value.
         self._playing_catchup = False
         self._ts_catchup_program = False
+        self._ts_program_start = None
         self._ts_program_stop = None
+        self._ts_program_title = None
         self._ts_segment_start = None
         self._ts_live_offset = 0.0
         self._pause_started = None
@@ -3427,7 +3454,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not catchup:
             self._ts_segment_start = None
             self._ts_catchup_program = False
+            self._ts_program_start = None
             self._ts_program_stop = None
+            self._ts_program_title = None
             self._ts_live_offset = 0.0   # fresh tune = at the live edge
             self._pause_started = None   # per-channel: don't carry a stale pause
         # Remember where we were in whatever was playing before switching,
@@ -3545,15 +3574,21 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.set_live_badge(None)
         elif (ts_days > 0 and self._playing_catchup
               and getattr(self, "_ts_catchup_program", False)):
-            # A programme picked from the menu/EPG - a normal seek bar spanning
-            # just that programme. Clamp it to the programme's length: the
-            # archive stream starts at the programme but usually runs on to the
-            # live edge, so without this the bar reads many hours and scrubbing
-            # jumps to live.
-            seg = getattr(self, "_ts_segment_start", None)
+            # A programme picked from the menu/EPG - a seek bar spanning the
+            # whole programme. The archive stream starts at the loaded segment
+            # but runs on to the live edge and can't be seeked in place, so the
+            # bar is virtual: its length is the programme, the playhead sits at
+            # (segment offset into the programme), and scrubbing re-loads the
+            # archive (see _seek_program) rather than seeking mpv - which would
+            # snap to live.
+            origin = getattr(self, "_ts_program_start", None)
             stop = getattr(self, "_ts_program_stop", None)
-            window = (stop - seg) if (seg and stop and stop > seg) else 0.0
-            self.player.set_program_window(window)
+            seg = getattr(self, "_ts_segment_start", None)
+            window = (stop - origin) if (origin and stop
+                                         and stop > origin) else 0.0
+            base = (seg - origin) if (origin and seg
+                                      and seg >= origin) else 0.0
+            self.player.set_program_window(window, base)
             self.player.set_seek_mode("program")
             self.player.set_live_badge("timeshift")
         elif ts_days > 0 and self._playing_catchup:
