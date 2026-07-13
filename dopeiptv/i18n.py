@@ -6085,6 +6085,12 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Поиск категорий и каналов…",
         "th": "ค้นหาหมวดหมู่และช่อง…",
     },
+    "cat_search_items": {
+        "en": "Search this list…", "sv": "Sök i listan…",
+        "es": "Buscar en la lista…", "de": "Liste durchsuchen…",
+        "fr": "Rechercher dans la liste…", "zh": "搜索此列表…",
+        "ru": "Поиск в списке…", "th": "ค้นหาในรายการนี้…",
+    },
     "cat_search_none": {
         "en": "No matching categories", "sv": "Inga matchande kategorier",
         "es": "No hay categorías coincidentes",

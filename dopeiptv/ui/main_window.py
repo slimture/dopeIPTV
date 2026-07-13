@@ -1834,7 +1834,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # that actually have categories (live/movies/series). Collapse the box
         # back to just its 🔍 toggle on every section switch.
         if hasattr(self, "cat_search"):
-            has_cats = self.mode in ("live", "vod", "series")
+            cat_mode = self.mode in ("live", "vod", "series")
+            # Category search where categories exist; a plain list filter in the
+            # folder/list sections (Favorites, Watch Later, Watched, Recordings,
+            # History) so the same 🔍 works everywhere, adapted to each.
+            show = cat_mode or self.mode in (
+                "fav", "watchlist", "watched", "rec", "history")
+            self.cat_search.setPlaceholderText(
+                tr("cat_search_placeholder") if cat_mode
+                else tr("cat_search_items"))
             self.cat_search.blockSignals(True)
             self.cat_search.clear()
             self.cat_search.blockSignals(False)
@@ -1842,7 +1850,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.cat_search_btn.blockSignals(True)
             self.cat_search_btn.setChecked(False)
             self.cat_search_btn.blockSignals(False)
-            self.cat_search_btn.setVisible(has_cats)
+            self.cat_search_btn.setVisible(show)
         self.cat_list.clear()
         self.list_model.set_items([], self.mode)
         if self.mode == "rec":
@@ -2045,14 +2053,34 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._cat_search_timer.start()
 
     def _run_category_search(self) -> None:
-        if self.mode not in ("live", "vod", "series"):
-            return
         q = self.cat_search.text().strip().lower()
-        if not q:
-            self._load_categories()   # restore the normal category list
-            return
-        self._ensure_search_index(
-            self.mode, lambda idx: self._render_cat_search(q, idx))
+        if self.mode in ("live", "vod", "series"):
+            if not q:
+                self._load_categories()   # restore the normal category list
+                return
+            self._ensure_search_index(
+                self.mode, lambda idx: self._render_cat_search(q, idx))
+        elif self.mode in ("fav", "watchlist", "watched", "rec", "history"):
+            # Folder/list sections have no provider categories to rank, so the
+            # search just filters the items on screen by name.
+            if not q:
+                self._apply_filter()
+            else:
+                self._render_item_search(q)
+
+    def _render_item_search(self, q: str) -> None:
+        kind = self._content_kind()
+        text = self.search.text().lower().strip()   # honour the top search too
+        items = [it for it in (self.all_items or [])
+                 if not it.get("_header")
+                 and not self._channel_hidden(it, kind)]
+        if text:
+            items = [it for it in items
+                     if text in self.channel_display_name(it).lower()]
+        items = [it for it in items
+                 if q in self.channel_display_name(it).lower()]
+        self.list_model.set_items(self._sorted(items), kind)
+        self._set_status(f"{len(items)} {self.LABELS.get(kind, '')}")
 
     def _ensure_search_index(self, mode: str, cb) -> None:
         """Fetch every channel of *mode* once (grouped by category_id) so the
