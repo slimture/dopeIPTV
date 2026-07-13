@@ -222,6 +222,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._playing_key = None
         self._playing_group: str | None = None
         self._playing_catchup = False   # watching a catch-up archive segment
+        self._ts_catchup_program = False  # catch-up is a picked programme (vs scrub)
+        self._ts_depth_min = 0            # live-timeline window span (minutes)
         self._pause_started = None
         self._playing_item = None
         self._focus_mode = False
@@ -1184,13 +1186,30 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         lp = getattr(self, "_last_playback", None)
         if not lp or lp.get("kind") != "live":
             return
+        item = lp.get("item")
         now = time.time()
         if self._playing_catchup and self._ts_segment_start is not None:
             content_time = self._ts_segment_start + self.player.playback_position()
             offset = max(0.0, (now - content_time) / 60.0)
         else:
+            content_time = now
             offset = 0.0   # live edge
-        self.player.update_timeshift_position(offset)
+        # Programme-boundary ticks on the timeline, plus the name of the
+        # programme at the cursor so the user can see where in the schedule
+        # they are (rather than a bare "-1:30").
+        depth_min = getattr(self, "_ts_depth_min", 0)
+        title = None
+        if item is not None and depth_min:
+            win_start = now - depth_min * 60
+            span = depth_min * 60
+            progs = self.xmltv.programmes_in(item, win_start, now)
+            self.player.set_timeline_markers(
+                (p["start_timestamp"] - win_start) / span for p in progs)
+            for p in progs:
+                if p["start_timestamp"] <= content_time < p["stop_timestamp"]:
+                    title = p.get("title")
+                    break
+        self.player.update_timeshift_position(offset, title)
 
     def _play_overlay_clicked(self) -> None:
         state = self._overlay_state()
@@ -3115,6 +3134,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._playing_catchup = catchup
         if not catchup:
             self._ts_segment_start = None
+            self._ts_catchup_program = False
         # Remember where we were in whatever was playing before switching,
         # and give the outgoing title its watched mark if it earned one.
         self._save_resume_position()
@@ -3205,15 +3225,29 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if kind != "live":
                 self.player.set_seek_mode("vod")
                 self.player.set_live_badge(None)
-            elif ts_days > 0 and self._playing_catchup:
+            elif (ts_days > 0 and self._playing_catchup
+                  and getattr(self, "_ts_catchup_program", False)):
+                # A programme picked from the menu/EPG - a normal seek bar
+                # spanning just that programme.
                 self.player.set_seek_mode("program")
                 self.player.set_live_badge("timeshift")
-            elif ts_days > 0:
+            elif ts_days > 0 and self._playing_catchup:
+                # Scrubbed back on the live timeline (or "go back X") - keep the
+                # timeline visible, just positioned behind live, so the user can
+                # keep scrubbing across the whole window instead of being locked
+                # into the single archive segment.
+                self._ts_depth_min = min(ts_days * 1440, 180)
                 self.player.set_seek_mode("timeline")
+                self.player.enter_timeshift(self._ts_depth_min)
+                self._update_ts_timeline()
+                self.player.set_live_badge("timeshift")
+            elif ts_days > 0:
                 # Span a recent window (<=3 h), not the whole multi-day archive:
                 # a small drag over days jumped hours/days back. Deeper archive
                 # access stays in the ◀◀ menu.
-                self.player.enter_timeshift(min(ts_days * 1440, 180))
+                self._ts_depth_min = min(ts_days * 1440, 180)
+                self.player.set_seek_mode("timeline")
+                self.player.enter_timeshift(self._ts_depth_min)
                 self._update_ts_timeline()
                 self.player.set_live_badge(None)
             else:

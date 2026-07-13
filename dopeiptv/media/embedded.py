@@ -439,6 +439,31 @@ class _SeekSlider(QSlider):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(Qt.Orientation.Horizontal, parent)
         self.dragging = False
+        self._markers: list[float] = []   # programme boundaries as 0..1 fractions
+
+    def set_markers(self, fractions) -> None:
+        """Programme-boundary ticks along the groove, as fractions 0..1 (left
+        to right). Empty (the default) draws nothing, so the plain VOD seek bar
+        is unaffected."""
+        fr = sorted(f for f in fractions if 0.0 < f < 1.0)
+        if fr != self._markers:
+            self._markers = fr
+            self.update()
+
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        if not self._markers:
+            return
+        w, h = self.width(), self.height()
+        painter = QPainter(self)
+        pen = QPen(QColor(255, 255, 255, 130))
+        pen.setWidth(1)
+        painter.setPen(pen)
+        y0, y1 = int(h * 0.28), int(h * 0.72)
+        for f in self._markers:
+            x = int(f * (w - 1))
+            painter.drawLine(x, y0, x, y1)
+        painter.end()
 
     def _value_for(self, event) -> int:
         ratio = event.position().x() / max(1, self.width())
@@ -1267,9 +1292,16 @@ class EmbeddedPlayer(QWidget):
         if mode in ("live", "timeline"):
             self._hide_seek_ui()
 
-    def update_timeshift_position(self, offset_min: float) -> None:
+    def set_timeline_markers(self, fractions) -> None:
+        """Draw programme-boundary ticks on the live timeline (fractions 0..1,
+        oldest to live edge)."""
+        self.ts_slider.set_markers(fractions)
+
+    def update_timeshift_position(self, offset_min: float,
+                                  title: str | None = None) -> None:
         """Move the marker to *offset_min* behind live, unless the user is
-        dragging it right now."""
+        dragging it right now. *title* names the programme at that point so the
+        user can see where in the schedule they are."""
         if not self.ts_timeline.isVisible() or self.ts_slider.dragging:
             return
         val = max(0, self._ts_depth - int(offset_min))
@@ -1277,7 +1309,8 @@ class EmbeddedPlayer(QWidget):
         self.ts_slider.setValue(val)
         self.ts_slider.blockSignals(False)
         live = offset_min < 1
-        self.ts_label.setText("● LIVE" if live else f"−{self._fmt_offset(offset_min)}")
+        edge = "● LIVE" if live else f"−{self._fmt_offset(offset_min)}"
+        self.ts_label.setText(f"{edge} · {title}" if title else edge)
         self.ts_live_btn.setVisible(not live)
 
     def _on_ts_seek(self, value: int) -> None:

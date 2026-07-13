@@ -645,6 +645,10 @@ class _RecordingMixin:
         # are; catchup=True marks it so the DVR-pause/reconnect guards and the
         # seek-mode logic treat it as an archive segment, not the live edge.
         self._ts_segment_start = start
+        # A specific programme (picked from the menu/EPG) gets its own seek bar
+        # spanning just that programme; a timeline scrub or "go back X" keeps
+        # the live timeline so the user can keep scrubbing across the window.
+        self._ts_catchup_program = bool(prog)
         self._start_playback(url, title, it.get("stream_icon"),
                              self._item_key(it), "live", record=False,
                              item=it, catchup=True)
