@@ -2862,6 +2862,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     # Content kinds whose playback position is worth remembering/resuming.
     _RESUMABLE = ("movie", "episode", "recording")
 
+    # How far back the live timeline spans (minutes). A window, not the whole
+    # multi-day archive, so a small drag stays fine-grained; matches the 6 h
+    # upcoming-programme window. Deeper access stays in the ◀◀ menu.
+    _TS_TIMELINE_MAX_MIN = 360
+
     # Cache keys that are large and/or frequently rewritten - moved out of the
     # shared settings so writing them never rewrites the small settings file
     # (and, conversely, so a small settings write never has to rewrite them).
@@ -3255,16 +3260,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # timeline visible, just positioned behind live, so the user can
             # keep scrubbing across the whole window instead of being locked
             # into the single archive segment.
-            self._ts_depth_min = min(ts_days * 1440, 180)
+            self._ts_depth_min = min(ts_days * 1440, self._TS_TIMELINE_MAX_MIN)
             self.player.set_seek_mode("timeline")
             self.player.enter_timeshift(self._ts_depth_min)
             self._update_ts_timeline()
             self.player.set_live_badge("timeshift")
         elif ts_days > 0:
-            # Span a recent window (<=3 h), not the whole multi-day archive:
-            # a small drag over days jumped hours/days back. Deeper archive
-            # access stays in the ◀◀ menu.
-            self._ts_depth_min = min(ts_days * 1440, 180)
+            # Span a recent window (see _TS_TIMELINE_MAX_MIN), not the whole
+            # multi-day archive: a small drag over days jumped hours/days back.
+            self._ts_depth_min = min(ts_days * 1440, self._TS_TIMELINE_MAX_MIN)
             self.player.set_seek_mode("timeline")
             self.player.enter_timeshift(self._ts_depth_min)
             self._update_ts_timeline()

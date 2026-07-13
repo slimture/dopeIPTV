@@ -1351,9 +1351,15 @@ class EmbeddedPlayer(QWidget):
         vg = self.video.geometry()
         self.ts_timeline.setFixedWidth(max(240, vg.width() - 2 * margin))
         self.ts_timeline.adjustSize()
-        self.ts_timeline.move(
-            vg.x() + margin,
-            vg.y() + vg.height() - self.ts_timeline.height() - margin)
+        if self._fs_ui:
+            # Fullscreen: the control bar floats at the bottom, so sit above the
+            # zone it reserves (bottom margin 24 + bar height) with a gap, even
+            # while the bar is auto-hidden - otherwise the two overlap.
+            ctrl_h = self.fs_controls.sizeHint().height()
+            y = self.height() - 24 - ctrl_h - 12 - self.ts_timeline.height()
+        else:
+            y = vg.y() + vg.height() - self.ts_timeline.height() - margin
+        self.ts_timeline.move(vg.x() + margin, max(margin, y))
 
     def set_overlay_info(self, text: str) -> None:
         self._overlay_text = text or ""
