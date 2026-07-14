@@ -443,7 +443,24 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                           ("rec", tr("nav_recordings")),
                           ("history", tr("nav_history"))):
             _make_nav(key, text, lib_lay)
+        # The box must not be stretchable: it holds fixed-height buttons, and a
+        # default Preferred policy let the layout balloon it when the rail has
+        # spare height, spreading the library icons far apart.
+        self._library_box.setSizePolicy(QSizePolicy.Policy.Preferred,
+                                        QSizePolicy.Policy.Fixed)
         sl.addWidget(self._library_box)
+        # Rail-only filler. Expanded, the CATEGORY LIST is the layout's stretch
+        # item and soaks up the spare height - but on the icon rail it's
+        # hidden, and a QVBoxLayout with no stretch item spreads its surplus
+        # between the remaining rows instead, which blew the icons apart
+        # (browse tight, library gaps ~10x). Shown only on the rail, this
+        # invisible expanding filler takes over the category list's job so the
+        # icons stay packed at the top and the actions stay at the bottom.
+        self._rail_filler = QWidget()
+        self._rail_filler.setSizePolicy(QSizePolicy.Policy.Ignored,
+                                        QSizePolicy.Policy.Expanding)
+        self._rail_filler.hide()
+        sl.addWidget(self._rail_filler, 1)
         self._apply_nav_icons()
         self.nav_btns["live"].setChecked(True)
         # Restore the remembered collapsed state (setChecked fires the handler).
@@ -1098,6 +1115,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._lib_header.setVisible(not collapsed)
             self._library_box.setVisible(
                 collapsed or not self._lib_toggle.isChecked())
+        # The rail's stand-in stretch item (see construction note).
+        if hasattr(self, "_rail_filler"):
+            self._rail_filler.setVisible(collapsed)
         # The category-search toggle (and its box) belong to the expanded
         # sidebar only - hide them on the collapsed icon rail, restoring the
         # mode's own visibility (set in _load_categories) when expanded.
