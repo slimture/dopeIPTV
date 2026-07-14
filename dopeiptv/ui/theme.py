@@ -187,8 +187,11 @@ QMainWindow, QDialog {{ background: {p['bg']}; }}
 
 QPushButton#NavBtn {{
     background: transparent; border: none; border-radius: 8px;
-    padding: 4px 12px; text-align: left; font-size: 13px; color: {p['text2']};
+    padding: 4px 12px; text-align: left; font-size: 14px; color: {p['text2']};
 }}
+/* Browse (TV/Movies/Series) reads a notch or two above the Library rows - a
+   small type hierarchy that structures the sidebar without extra chrome. */
+QPushButton#NavBtn[primary="true"] {{ font-size: 16px; }}
 QPushButton#NavBtn:hover  {{ background: {p['hover']}; }}
 QPushButton#NavBtn:checked {{ background: {ACCENT}; color: white; font-weight: 600; }}
 QPushButton#NavBtn[rail="true"] {{ text-align: center; padding: 4px 0; font-size: 19px; }}
@@ -416,6 +419,14 @@ QPushButton#InlineToggle {{
     padding: 4px 12px; font-size: 11px; border-radius: 7px;
 }}
 QPushButton#InlineToggle:checked {{ background: {ACCENT}; border: none; color: white; }}
+/* The compact ⊞/⇅ stand-ins for the Size/Sort combos are QToolButtons (they
+   open a menu); match the pushbutton look and hide the extra menu arrow. */
+QToolButton#InlineToggle {{
+    background: {p['btn']}; border: 1px solid {p['btn_hover']};
+    padding: 4px 0; font-size: 12px; border-radius: 7px;
+}}
+QToolButton#InlineToggle:hover {{ background: {p['btn_hover']}; }}
+QToolButton#InlineToggle::menu-indicator {{ image: none; }}
 #MiddlePane QLabel {{ color: {p['muted2']}; font-size: 11px; }}
 QDateTimeEdit {{
     background: {p['input']}; border: 1px solid {p['border_in']}; border-radius: 8px;

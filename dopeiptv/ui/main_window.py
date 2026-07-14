@@ -371,18 +371,20 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         }
         self._nav_texts: dict[str, str] = {}
         self.nav_btns: dict[str, QPushButton] = {}
-        self._nav_icon_size = 18
 
-        def _make_nav(key: str, text: str, into) -> None:
+        def _make_nav(key: str, text: str, into, primary: bool = False) -> None:
             b = QPushButton(text, objectName="NavBtn")
             b.setCheckable(True)
             b.setFlat(True)
             b.setToolTip(text)
+            # Browse (TV/Movies/Series) is the primary tier: a couple of
+            # notches larger than the Library rows (see the NavBtn[primary]
+            # theme rule; _apply_nav_icons paints its icons larger to match).
+            b.setProperty("primary", "true" if primary else "false")
             # A fixed-size icon so every label starts at the SAME x (emoji
             # glyphs have different advance widths, so putting them in the text
-            # left the labels ragged). The icon is (re)painted by
+            # left the labels ragged). The icon is (re)painted and sized by
             # _apply_nav_icons in the theme's muted tone, white when checked.
-            b.setIconSize(QSize(self._nav_icon_size, self._nav_icon_size))
             # "Ignored" horizontal policy: the button fills the width when
             # there's room but imposes no text-based minimum, so the sidebar
             # can be dragged narrow enough to cross the auto-collapse threshold
@@ -403,7 +405,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Browse: the content-type modes, always visible at the top.
         for key, text in (("live", tr("nav_tv")), ("vod", tr("nav_movies")),
                           ("series", tr("nav_series"))):
-            _make_nav(key, text, sl)
+            _make_nav(key, text, sl, primary=True)
 
         # Library: the personal lists, grouped under a collapsible disclosure
         # header (same arrow affordance as Categories) so they don't add to the
@@ -636,6 +638,30 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.grid_btn.setChecked(
             self.settings.value("view_grid", "false") == "true")
         self.grid_btn.toggled.connect(self._inline_view_changed)
+        # Compact stand-ins for the Size/Sort combos, mirroring how the grid
+        # toggle shrinks to a glyph: tool buttons that open the same choices as
+        # a popup menu (fully readable at any pane width, no clipped text).
+        # Shown only when the pane is narrow - see _apply_mid_compact.
+        self._size_menu_btn = QToolButton(objectName="InlineToggle")
+        self._size_menu_btn.setText("⊞")
+        self._size_menu_btn.setToolTip(tr("label_size"))
+        self._size_menu_btn.setFixedWidth(30)
+        self._size_menu_btn.setPopupMode(
+            QToolButton.ToolButtonPopupMode.InstantPopup)
+        self._sort_menu_btn = QToolButton(objectName="InlineToggle")
+        self._sort_menu_btn.setText("⇅")
+        self._sort_menu_btn.setToolTip(tr("label_sort"))
+        self._sort_menu_btn.setFixedWidth(30)
+        self._sort_menu_btn.setPopupMode(
+            QToolButton.ToolButtonPopupMode.InstantPopup)
+        for _btn, _box in ((self._size_menu_btn, self.size_box),
+                           (self._sort_menu_btn, self.sort_box)):
+            _m = QMenu(_btn)
+            _btn.setMenu(_m)
+            _m.aboutToShow.connect(
+                lambda m=_m, box=_box: self._fill_combo_menu(m, box))
+        self._size_menu_btn.hide()
+        self._sort_menu_btn.hide()
         self._size_label = QLabel(tr("label_size"))
         self._sort_label = QLabel(tr("label_sort"))
         # Toggle for the left category column - handy for clean screenshots
@@ -656,8 +682,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         ctl.addWidget(self.focus_btn)
         ctl.addWidget(self._size_label)
         ctl.addWidget(self.size_box)
+        ctl.addWidget(self._size_menu_btn)
         ctl.addWidget(self._sort_label)
         ctl.addWidget(self.sort_box)
+        ctl.addWidget(self._sort_menu_btn)
         ctl.addStretch()
         ctl.addWidget(self.grid_btn)
         ml.addLayout(ctl)
@@ -1242,19 +1270,33 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._mid_compact = compact
         self._size_label.setVisible(not compact)
         self._sort_label.setVisible(not compact)
-        # Sized so the whole strip fits the middle pane's 240px minimum:
-        # 28+28 (toggles) + 60+60 (combos) + 34 (grid) + spacings ≈ 240.
+        # Every text control swaps to a glyph form instead of clipping: the
+        # combos are REPLACED by the ⊞/⇅ menu buttons (their popup lists the
+        # same choices, fully readable at any width), and the grid toggle
+        # becomes ▦. 28+28 (toggles) + 30+30 (menus) + 34 (grid) + spacings
+        # fits the pane's 240px minimum with room to spare.
+        self.size_box.setVisible(not compact)
+        self.sort_box.setVisible(not compact)
+        self._size_menu_btn.setVisible(compact)
+        self._sort_menu_btn.setVisible(compact)
         self.side_btn.setFixedWidth(28 if compact else 34)
         self.focus_btn.setFixedWidth(28 if compact else 34)
-        for box in (self.size_box, self.sort_box):
-            box.setMaximumWidth(60 if compact else 16777215)
-            # The popup sizes itself from the view, not the closed box - pin
-            # its minimum to the widest entry so a narrow box still opens to a
-            # fully readable list.
-            box.view().setMinimumWidth(box.view().sizeHintForColumn(0) + 28)
         self.grid_btn.setText("▦" if compact else tr("btn_grid"))
         self.grid_btn.setMaximumWidth(34 if compact else 16777215)
         self.grid_btn.setToolTip(tr("btn_grid"))
+
+    def _fill_combo_menu(self, menu: QMenu, box) -> None:
+        """The compact ⊞/⇅ buttons mirror their (hidden) combo as a popup
+        menu: same items, current one checked, and picking an item drives the
+        combo's index so the normal persist/apply path runs. Rebuilt on every
+        open, so it always reflects the current items and language."""
+        menu.clear()
+        for i in range(box.count()):
+            act = menu.addAction(box.itemText(i))
+            act.setCheckable(True)
+            act.setChecked(i == box.currentIndex())
+            act.triggered.connect(
+                lambda _c, i=i, box=box: box.setCurrentIndex(i))
 
     def _maybe_auto_collapse_sidebar(self) -> None:
         """Collapse the sidebar to the icon rail automatically when the whole
@@ -1680,13 +1722,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             Qt.ArrowType.RightArrow if checked else Qt.ArrowType.DownArrow)
         self._apply_cat_solo()
 
-    def _nav_icon(self, glyph: str) -> QIcon:
-        """A fixed-size icon painted from GLYPH in the theme's muted tone (the
+    def _nav_icon(self, glyph: str, s: int) -> QIcon:
+        """An icon of size S painted from GLYPH in the theme's muted tone (the
         normal/Off state) and white (the checked/On state), so it always
         matches the nav label. U+FE0E requests the glyph's monochrome text
         presentation so it takes the pen colour rather than a bright emoji."""
         icon = QIcon()
-        s = self._nav_icon_size
         dpr = self.devicePixelRatioF() or 1.0
         for color, state in ((P["text2"], QIcon.State.Off),
                              ("#FFFFFF", QIcon.State.On)):
@@ -1714,11 +1755,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _apply_nav_icons(self) -> None:
         """(Re)build every nav button's icon in the current theme tones. Called
-        at construction and whenever the theme/accent changes."""
+        at construction and whenever the theme/accent changes. Browse icons are
+        a couple of notches larger than Library ones - the same hierarchy as
+        the label sizes (NavBtn[primary] in the theme)."""
         if not hasattr(self, "nav_btns"):
             return
         for key, b in self.nav_btns.items():
-            b.setIcon(self._nav_icon(self._rail_glyphs[key]))
+            s = 22 if key in ("live", "vod", "series") else 19
+            b.setIcon(self._nav_icon(self._rail_glyphs[key], s))
+            b.setIconSize(QSize(s, s))
 
     def _on_library_toggle(self, collapsed: bool) -> None:
         """Fold the Library group (Favorites..History) away behind its
