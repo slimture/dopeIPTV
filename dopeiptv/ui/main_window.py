@@ -437,9 +437,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._cat_search_timer.setInterval(220)
         self._cat_search_timer.timeout.connect(self._run_category_search)
         self._search_index_cache: dict = {}
-        self.cat_list = QListWidget()
+        self.cat_list = QListWidget(objectName="CatList")
         self.cat_list.setItemDelegate(CategoryColorDelegate(self.cat_list))
         self.cat_list.setMinimumWidth(0)
+        # Give the list a real minimum height so, on a short sidebar, the OUTER
+        # scroll area shows a scrollbar (keeping the bottom actions - Guide,
+        # Settings - reachable) instead of the QVBoxLayout compressing the
+        # fixed buttons below their size hint and clipping their text. On a tall
+        # sidebar this minimum is never the binding constraint, so nothing
+        # changes there.
+        self.cat_list.setMinimumHeight(80)
         self.cat_list.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.cat_list.currentItemChanged.connect(self._category_changed)
@@ -4358,10 +4365,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if getattr(self, "_focus_mode", False):
             self._position_reopen()
         # Compact the nav buttons when the sidebar can't comfortably show them
-        # all at full height (small laptops), roomy otherwise.
+        # all at full height (small laptops, and Windows at display scaling
+        # where a maximised window's usable height is well under the physical
+        # pixels), roomy otherwise.
         if hasattr(self, "_side_scroll"):
             self._apply_nav_compact(
-                self._side_scroll.viewport().height() < 620)
+                self._side_scroll.viewport().height() < 700)
         # The justified poster grid re-flows its columns from ChannelListView's
         # own resizeEvent, so nothing else to do here.
 

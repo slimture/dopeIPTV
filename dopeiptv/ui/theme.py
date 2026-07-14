@@ -188,6 +188,9 @@ QListWidget {{
     color: {p['text2']};
 }}
 QListWidget::item {{ border-radius: 8px; padding: 7px 10px; margin: 1px 6px; }}
+/* The sidebar's category list is a long, scannable list, so its rows are a
+   touch tighter than the default list item (less vertical padding/margin). */
+QListWidget#CatList::item {{ padding: 4px 10px; margin: 1px 4px; }}
 QListWidget::item:hover    {{ background: {p['hover']}; }}
 QListWidget::item:selected {{ background: {p['sel']}; color: {p['text']}; }}
 
