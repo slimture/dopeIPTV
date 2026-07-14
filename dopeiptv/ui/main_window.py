@@ -765,12 +765,41 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # instead of hiding it, so the window just goes black.
             dl.addWidget(self.player, 1)
 
+        # Everything below the video lives in ONE scroll column. This is the
+        # structural guarantee that the channel logo / programme info can never
+        # end up over the video: the player keeps its fixed height at the top
+        # of the pane, and when the window is small this container simply
+        # shrinks and scrolls. (Transparent backgrounds are scoped with ID
+        # selectors - a bare 'background: transparent' cascades onto child
+        # widgets; see the #SideContent note.)
+        self._info_scroll = QScrollArea(objectName="InfoScroll")
+        self._info_scroll.setWidgetResizable(True)
+        self._info_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._info_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._info_scroll.setStyleSheet(
+            "QScrollArea#InfoScroll { background: transparent; border: 0; }")
+        self._info_scroll.viewport().setObjectName("InfoViewport")
+        self._info_scroll.viewport().setStyleSheet(
+            "QWidget#InfoViewport { background: transparent; }")
+        _info_content = QWidget(objectName="InfoContent")
+        _info_content.setStyleSheet(
+            "QWidget#InfoContent { background: transparent; }")
+        self._info_scroll.setWidget(_info_content)
+        il = QVBoxLayout(_info_content)
+        il.setContentsMargins(0, 0, 0, 0)
+        il.setSpacing(12)
+        # A small floor keeps at least a strip of info visible; beyond that the
+        # column scrolls rather than anything overlapping.
+        self._info_scroll.setMinimumHeight(96)
+        dl.addWidget(self._info_scroll, 1)
+
         self.stream_error = QLabel("")
         self.stream_error.setStyleSheet(
             f"color:{P['error']}; font-size:12px;")
         self.stream_error.setWordWrap(True)
         self.stream_error.hide()
-        dl.addWidget(self.stream_error)
+        il.addWidget(self.stream_error)
 
         self._detail_name = tr("detail_select_something")
 
@@ -880,7 +909,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # _show_detail to the poster height) makes the bottoms line up too.
         header_row.addWidget(self.media_info, 1, Qt.AlignmentFlag.AlignTop)
         header_row.setAlignment(Qt.AlignmentFlag.AlignTop)
-        dl.addLayout(header_row)
+        il.addLayout(header_row)
 
         self.cast_scroll = QScrollArea()
         self.cast_scroll.setWidgetResizable(True)
@@ -903,7 +932,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cast_lay.addStretch()
         self.cast_scroll.setWidget(self.cast_holder)
         self.cast_scroll.hide()
-        dl.addWidget(self.cast_scroll)
+        il.addWidget(self.cast_scroll)
 
         self.epg_scroll = QScrollArea()
         self.epg_scroll.setWidgetResizable(True)
@@ -914,8 +943,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.epg_lay.setSpacing(8)
         self.epg_lay.addStretch()
         self.epg_scroll.setWidget(self.epg_holder)
-        self.epg_scroll.setMinimumHeight(0)   # free to shrink on a short pane
-        dl.addWidget(self.epg_scroll, 1)
+        # Keep a useful strip of the programme list: when the pane is shorter
+        # than everything needs, the OUTER info column starts scrolling instead
+        # of the EPG being squashed to nothing.
+        self.epg_scroll.setMinimumHeight(140)
+        il.addWidget(self.epg_scroll, 1)
 
         root.addWidget(side)
         root.addWidget(mid)
@@ -961,12 +993,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # height fits the docked player (which scales with screen width) plus
         # its control bar, the pane chrome and a little info. PiP temporarily
         # drops this and restores it on exit.
-        # Height must fit the docked player (box + control bar) AND the channel
-        # logo / info row beneath it, or the fixed-height player overlaps that
-        # row. box_h + 260 covers the player (~box_h+52), the 84px logo row,
-        # pane margins and window chrome, with the scroll areas free to shrink.
+        # Height fits the docked player (fixed box + control bar) plus the
+        # info column's small floor and chrome. Overlap is impossible at ANY
+        # size - everything under the video lives in the info scroll column -
+        # so this floor is about usability, not correctness.
+        # player(box_h+~52) + pane margins(40) + spacing(12) + info floor(96)
+        # + menu bar/chrome ≈ box_h + 240.
         box_h = getattr(self.player, "VIDEO_BOX_HEIGHT", 260) if self.player else 0
-        min_h = (box_h + 260) if self.player else 320
+        min_h = (box_h + 240) if self.player else 320
         self._base_min = QSize(700, min_h)
         self.setMinimumSize(self._base_min)
         # Parent the toast to the window itself, not the splitter: a QSplitter
@@ -1055,14 +1089,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # group's icons are always shown on the rail (honour the collapse only
         # when expanded).
         if hasattr(self, "_lib_header"):
-            self._lib_section_label.setVisible(not collapsed)
-            self._lib_toggle.setVisible(not collapsed)
-            # On the rail, shrink the header's top gap so the library icons sit
-            # just a touch below Browse (not far down) while the inter-icon
-            # spacing stays the same in both groups. Expanded keeps a roomier
-            # gap under the LIBRARY label.
-            self._lib_header.layout().setContentsMargins(
-                0, 2 if collapsed else 8, 0, 0)
+            # Rail: hide the Library header ENTIRELY. It was the one item whose
+            # height didn't match a nav button, which made the rail's icon
+            # spacing read as uneven - with it gone, every adjacent pair of
+            # rail icons is separated by exactly the same layout spacing, top
+            # to bottom. When expanded, the header (label + arrow + top gap)
+            # is what separates the two groups.
+            self._lib_header.setVisible(not collapsed)
             self._library_box.setVisible(
                 collapsed or not self._lib_toggle.isChecked())
         # The category-search toggle (and its box) belong to the expanded
