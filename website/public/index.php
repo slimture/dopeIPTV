@@ -195,6 +195,15 @@ foreach ($shots as [$file, $alt, $title, $cap]):
         </a>
 <?php endif; ?>
       </div>
+<?php
+      $hasWindows = false;
+      foreach ($assets as $a) {
+          $hay = strtolower(($a['label'] ?? '') . ' ' . ($a['sub'] ?? ''));
+          if (($a['icon'] ?? '') === '🪟' || str_contains($hay, 'windows')) { $hasWindows = true; break; }
+      }
+      if ($hasWindows): ?>
+      <p class="autonote">🪟 On Windows, unzip the folder and run <code>dopeiptv.exe</code>. Because the app isn't code-signed yet, SmartScreen may show <b>“Windows protected your PC”</b> — click <b>More info → Run anyway</b>. It's only a warning, nothing is blocked or removed.</p>
+<?php endif; ?>
       <p class="autonote">↻ Generated on the server from the <code>slimture/dopeIPTV</code> GitHub releases — new builds appear automatically.</p>
 <?php if (is_file(__DIR__ . '/files/SHA256SUMS')): ?>
       <p class="autonote">🔒 Verify your download — <a class="verify-link" href="/files/SHA256SUMS">SHA-256 checksums</a> · <code>sha256sum -c SHA256SUMS</code></p>
