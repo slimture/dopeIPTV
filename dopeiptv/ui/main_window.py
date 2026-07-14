@@ -4336,26 +4336,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         super().moveEvent(event)
         self._schedule_save_layout()
 
-    def _apply_nav_compact(self, compact: bool) -> None:
-        """Responsive: on a short window, shrink the sidebar nav buttons' (and
-        the bottom actions') vertical padding so TV..History take less height;
-        restore it on a tall window. All platforms, purely visual. Driven by the
-        sidebar's own available height, so it adapts to the real fit."""
-        if (getattr(self, "_nav_compact", None) == compact
-                or not hasattr(self, "nav_btns")):
-            return
-        self._nav_compact = compact
-        btns = list(self.nav_btns.values())
-        for name in ("_guide_btn", "_settings_btn"):
-            b = getattr(self, name, None)
-            if b is not None:
-                btns.append(b)
-        val = "true" if compact else "false"
-        for b in btns:
-            b.setProperty("compact", val)
-            b.style().unpolish(b)
-            b.style().polish(b)
-
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         self._schedule_save_layout()
@@ -4364,13 +4344,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._position_provider_hint()
         if getattr(self, "_focus_mode", False):
             self._position_reopen()
-        # Compact the nav buttons when the sidebar can't comfortably show them
-        # all at full height (small laptops, and Windows at display scaling
-        # where a maximised window's usable height is well under the physical
-        # pixels), roomy otherwise.
-        if hasattr(self, "_side_scroll"):
-            self._apply_nav_compact(
-                self._side_scroll.viewport().height() < 700)
         # The justified poster grid re-flows its columns from ChannelListView's
         # own resizeEvent, so nothing else to do here.
 

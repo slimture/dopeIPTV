@@ -168,11 +168,6 @@ QPushButton#NavBtn {{
 }}
 QPushButton#NavBtn:hover  {{ background: {p['hover']}; }}
 QPushButton#NavBtn:checked {{ background: {ACCENT}; color: white; font-weight: 600; }}
-/* Auto-compact on short screens: less vertical padding so TV..History (and the
-   bottom actions) take less height. Toggled by MainWindow.resizeEvent. Defined
-   BEFORE the rail rule so the collapsed icon rail's own padding still wins. */
-QPushButton#NavBtn[compact="true"] {{ padding-top: 3px; padding-bottom: 3px; }}
-QPushButton#SideAction[compact="true"] {{ padding-top: 3px; padding-bottom: 3px; }}
 QPushButton#NavBtn[rail="true"] {{ text-align: center; padding: 8px 0; font-size: 19px; }}
 QPushButton#SideAction[rail="true"] {{
     text-align: center; padding: 8px 0; font-size: 14px; font-weight: 600;
