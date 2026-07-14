@@ -1808,12 +1808,23 @@ class EmbeddedPlayer(QWidget):
             # changed setting takes effect on the next opened stream. 'Off' is
             # the escape hatch for driver stacks where hwdec breaks; the
             # DOPEIPTV_HWDEC env var still wins.
+            #
+            # Always start a fresh stream at the user's *base* hardware mode -
+            # never at _effective_hwdec(). The effective value consults mpv's
+            # live 'sid', which at this instant still belongs to the PREVIOUS
+            # file. If that file had the subtitle fallback active (hwdec=no),
+            # reading it here would start the new file in software too, and the
+            # sid observer would then flip hwdec back to hardware *mid-playback*
+            # once the new file parses - a live hardware switch this driver
+            # stack corrupts (artifacts, even with no subtitle on the new file).
+            # A new file has no composited subtitle yet, so base is correct; the
+            # sid observer applies the software fallback afterwards only if a
+            # real subtitle actually turns on in this file.
             try:
-                m["hwdec"] = self._effective_hwdec()
+                m["hwdec"] = self._hwdec_base()
             except Exception:
                 pass
             self.apply_default_options()
-            self.apply_hwdec()   # honour the subtitle fallback if subs are on
             try:
                 m["volume"] = float(self.vol.value())
                 m["mute"] = self._muted
