@@ -9,7 +9,6 @@ restart needed. Escape and Delete are reserved and not listed.
 
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeySequence
 from PyQt6.QtWidgets import (
     QDialog, QGridLayout, QHBoxLayout, QKeySequenceEdit, QLabel, QPushButton,

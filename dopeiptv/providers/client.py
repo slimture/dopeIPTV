@@ -391,7 +391,6 @@ class M3UClient(OfflineClient):
         end = start + dur
         now = int(time.time())
         offset = max(0, now - start)
-        ctype = (ch.get("catchup") or "").lower()
         src = ch.get("catchup_source") or ""
 
         def subst(t: str) -> str:

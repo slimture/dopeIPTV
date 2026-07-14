@@ -12,7 +12,7 @@ from __future__ import annotations
 import time
 from datetime import datetime
 
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,

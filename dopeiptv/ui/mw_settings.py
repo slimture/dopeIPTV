@@ -56,6 +56,7 @@ from .dialogs import PlaylistDialog
 from .epg_grid import EpgGridDialog
 from ..providers.metadata import TmdbClient, bundled_tmdb_key
 from ..providers.client import make_client
+from ..core.recording import format_size
 from ..media.players import embedded_playback_reason
 from .theme import ACCENTS, P, THEMES, apply_theme, build_style
 from ..core.updates import GITHUB_REPO, fetch_latest_release, is_newer
@@ -615,17 +616,10 @@ class _SettingsMixin:
         clear_cache_btn = QPushButton(tr("settings_image_cache_clear"))
         clear_cache_btn.setToolTip(tr("settings_image_cache_hint"))
 
-        def _fmt_size(n: int) -> str:
-            for unit in ("B", "KB", "MB", "GB"):
-                if n < 1024 or unit == "GB":
-                    return f"{n:.1f} {unit}" if unit != "B" else f"{n} B"
-                n /= 1024
-            return f"{n:.1f} GB"
-
         def refresh_cache_label() -> None:
             total = sum(dir_size_bytes(d) for d in cache_dirs)
             cache_lbl.setText(
-                tr("settings_image_cache_label", size=_fmt_size(total)))
+                tr("settings_image_cache_label", size=format_size(total)))
             clear_cache_btn.setEnabled(total > 0)
 
         def clear_cache() -> None:

@@ -29,7 +29,7 @@ class _NoButtonIconsStyle(QProxyStyle):
             return 0
         return super().styleHint(hint, option, widget, returnData)
 
-from . import APP_NAME, BUILD_VERSION, ORG, VERSION
+from . import APP_NAME, BUILD_VERSION, ORG
 from .providers.client import OfflineClient, make_client
 from .ui.dialogs import PlaylistDialog
 from .ui.main_window import MainWindow
