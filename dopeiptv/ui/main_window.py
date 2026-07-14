@@ -336,7 +336,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._side_scroll.setWidget(_side_content)
         sl = QVBoxLayout(_side_content)
         sl.setContentsMargins(12, 16, 12, 12)
-        sl.setSpacing(4)
+        # Tight vertical rhythm so the TV..History nav stack stays compact.
+        sl.setSpacing(2)
 
         # Small themed logo at the top of the sidebar (recolours with theme).
         self._sidebar_logo = _SidebarLogo()

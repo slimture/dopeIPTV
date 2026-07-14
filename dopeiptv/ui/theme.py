@@ -164,11 +164,23 @@ QMainWindow, QDialog {{ background: {p['bg']}; }}
 
 QPushButton#NavBtn {{
     background: transparent; border: none; border-radius: 8px;
-    padding: 8px 12px; text-align: left; font-size: 13px; color: {p['text2']};
+    padding: 6px 12px; text-align: left; font-size: 13px; color: {p['text2']};
 }}
 QPushButton#NavBtn:hover  {{ background: {p['hover']}; }}
 QPushButton#NavBtn:checked {{ background: {ACCENT}; color: white; font-weight: 600; }}
 QPushButton#NavBtn[rail="true"] {{ text-align: center; padding: 8px 0; font-size: 19px; }}
+/* Guide / Settings: the sidebar's bottom actions. Give them a visible filled
+   pill with a border so they read as buttons (not plain text like the nav
+   items), plus an obvious hover so it's clear they're clickable. */
+QPushButton#SideAction {{
+    background: {p['btn']}; border: 1px solid {p['border']}; border-radius: 8px;
+    padding: 9px 14px; text-align: left; font-size: 13px; font-weight: 600;
+    color: {p['text2']}; margin-top: 3px;
+}}
+QPushButton#SideAction:hover {{
+    background: {p['btn_hover']}; border-color: {ACCENT}; color: {p['text']};
+}}
+QPushButton#SideAction:pressed {{ background: {p['hover']}; }}
 QPushButton#SideAction[rail="true"] {{
     text-align: center; padding: 8px 0; font-size: 14px; font-weight: 600;
 }}
