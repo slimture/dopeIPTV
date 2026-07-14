@@ -125,6 +125,11 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("file")
     p.add_argument("--hwdec", default="auto-copy-safe")
+    p.add_argument("--sid", type=int, default=None,
+                   help="force a specific subtitle track id (see the list)")
+    p.add_argument("--seek", type=float, default=None,
+                   help="seek to this many seconds after enabling the sub, to "
+                        "reach a point with dialogue")
     p.add_argument("--minimal", action="store_true")
     for flag in ("no-osd0", "no-cache", "no-deinterlace", "no-sharpen",
                  "no-tonemapping", "no-aspect", "no-report-swap"):
@@ -152,13 +157,24 @@ def main():
                   "Use a file that has embedded subs (the one you saw break in "
                   "the app), then re-run.")
             return
-        sid = subs[0].get("id")
+        if a.sid is not None:
+            sid = a.sid
+        else:
+            # Skip 'Forced' tracks - they only draw on foreign signs, so at the
+            # start of a film nothing renders and nothing reproduces. Prefer a
+            # full subtitle so text actually composites.
+            full = [t for t in subs
+                    if "forced" not in (t.get("title") or "").lower()]
+            sid = (full or subs)[0].get("id")
         print(f"[test] >>> enabling subtitle sid={sid} "
               f"(lang={subs[0].get('lang')} codec={subs[0].get('codec')}) - "
               f"WATCH THE VIDEO NOW <<<")
         try:
             w.mpv["sub-visibility"] = True
             w.mpv["sid"] = sid
+            if a.seek is not None:
+                w.mpv.command("seek", a.seek, "absolute")
+                print(f"[test] seeking to {a.seek}s for dialogue")
         except Exception as e:
             print(f"[test] enabling sid={sid} failed: {e}")
 
