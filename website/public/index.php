@@ -182,7 +182,7 @@ foreach ($shots as [$file, $alt, $title, $cap]):
       </div>
       <div class="dls">
 <?php if ($assets): foreach ($assets as $a): ?>
-        <a class="dl" href="<?= h($a['url']) ?>" rel="nofollow">
+        <a class="dl" href="<?= h($a['url']) ?>" rel="nofollow"<?= !empty($a['sha256']) ? ' title="SHA-256: ' . h($a['sha256']) . '"' : '' ?>>
           <span class="os"><?= h($a['icon'] ?? '📦') ?></span>
           <span class="meta"><span class="name"><?= h($a['label']) ?></span><span class="sub"><?= h($a['sub'] ?? '') ?></span></span>
           <span class="go">Download →</span>
@@ -196,6 +196,9 @@ foreach ($shots as [$file, $alt, $title, $cap]):
 <?php endif; ?>
       </div>
       <p class="autonote">↻ Generated on the server from the <code>slimture/dopeIPTV</code> GitHub releases — new builds appear automatically.</p>
+<?php if (is_file(__DIR__ . '/files/SHA256SUMS')): ?>
+      <p class="autonote">🔒 Verify your download: <a class="verify-link" href="/files/SHA256SUMS">SHA-256 checksums</a> — <code>sha256sum -c SHA256SUMS</code> (hover a button to see its hash).</p>
+<?php endif; ?>
     </div>
   </section>
 </main>

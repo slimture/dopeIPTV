@@ -144,6 +144,8 @@ h2 { font-size: clamp(1.7rem, 3.6vw, 2.3rem); letter-spacing: -.02em; margin: 0;
 .dl .go { margin-left: auto; color: var(--accent); font-weight: 600; font-size: 14px; white-space: nowrap; }
 .autonote { margin-top: 18px; font-size: 13px; color: var(--faint); display: flex; align-items: center; gap: 9px; }
 .autonote code { font-family: var(--mono); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; color: var(--muted); }
+.autonote a.verify-link { color: var(--accent); font-weight: 600; }
+.autonote a.verify-link:hover { text-decoration: underline; }
 footer { border-top: 1px solid var(--line); padding: 36px 0 56px; margin-top: 20px; }
 footer .wrap { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
 footer .v { font-family: var(--mono); font-size: 12px; color: var(--faint); }

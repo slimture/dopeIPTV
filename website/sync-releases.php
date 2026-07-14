@@ -136,14 +136,35 @@ foreach (($rel['assets'] ?? []) as $a) {
     } else {
         fwrite(STDERR, "[sync] $name already current\n");
     }
+    // SHA-256 for download verification: prefer GitHub's own digest (free, no
+    // re-hashing), fall back to hashing the mirrored file (streamed, not loaded
+    // into memory) for older releases that don't carry a digest.
+    $sha = '';
+    if (!empty($a['digest']) && strncmp($a['digest'], 'sha256:', 7) === 0) {
+        $sha = substr($a['digest'], 7);
+    } elseif (is_file($dest)) {
+        $sha = hash_file('sha256', $dest) ?: '';
+    }
+
     [$label, $sub, $icon] = classify($name);
     $assets[] = [
-        'label' => $label,
-        'sub'   => $sub ? ($sub . ' · ' . human_size((int)$a['size'])) : human_size((int)$a['size']),
-        'icon'  => $icon,
-        'url'   => '/files/' . rawurlencode($name),
-        'name'  => $name,
+        'label'  => $label,
+        'sub'    => $sub ? ($sub . ' · ' . human_size((int)$a['size'])) : human_size((int)$a['size']),
+        'icon'   => $icon,
+        'url'    => '/files/' . rawurlencode($name),
+        'name'   => $name,
+        'sha256' => $sha,
     ];
+}
+
+// A standard SHA256SUMS file so users can run `sha256sum -c SHA256SUMS`.
+$sumsName = 'SHA256SUMS';
+$sums = '';
+foreach ($assets as $x) { if ($x['sha256']) { $sums .= $x['sha256'] . '  ' . $x['name'] . "\n"; } }
+if ($sums !== '') {
+    file_put_contents(FILES_DIR . '/' . $sumsName . '.part', $sums);
+    rename(FILES_DIR . '/' . $sumsName . '.part', FILES_DIR . '/' . $sumsName);
+    $keep[$sumsName] = true;
 }
 
 // Prune files that are no longer part of the latest release.
