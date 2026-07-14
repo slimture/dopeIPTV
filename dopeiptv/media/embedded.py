@@ -1668,19 +1668,26 @@ class EmbeddedPlayer(QWidget):
             set_opt("video-aspect-override",
                     aspect if aspect != "auto" else "-1")
 
-        # Optional video filters (all off/neutral by default). These are plain
-        # mpv properties, applied live on the running core.
+        # Optional video filters. Only touch these when the user has actually
+        # picked a non-default value - a plain movie then runs with mpv's own
+        # defaults, exactly like standalone mpv. (Setting even the neutral value
+        # - deinterlace=no, sharpen=0, tone-mapping=auto - can disturb mpv's
+        # render/filter graph in ways vanilla mpv never does; on some drivers
+        # that surfaced as 4K video turning black once a subtitle was enabled.)
         #  - deinterlace: smooth interlaced live SD/HD feeds.
         #  - sharpen: unsharp mask strength (0 = off).
-        #  - tone-mapping: HDR->SDR curve; harmless on SDR content.
-        set_opt("deinterlace",
-                s.value("video_deinterlace", "false") == "true")
+        #  - tone-mapping: HDR->SDR curve.
+        if s.value("video_deinterlace", "false") == "true":
+            set_opt("deinterlace", True)
         try:
             sharpen = float(s.value("video_sharpen", 0.0) or 0.0)
         except (TypeError, ValueError):
             sharpen = 0.0
-        set_opt("sharpen", max(0.0, min(sharpen, 3.0)))
-        set_opt("tone-mapping", s.value("video_tonemapping", "auto") or "auto")
+        if sharpen > 0:
+            set_opt("sharpen", max(0.0, min(sharpen, 3.0)))
+        tonemap = s.value("video_tonemapping", "auto") or "auto"
+        if tonemap != "auto":
+            set_opt("tone-mapping", tonemap)
 
     def playback_position(self) -> float:
         m = self.video.mpv
