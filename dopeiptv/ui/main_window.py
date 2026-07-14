@@ -13,7 +13,7 @@ from PyQt6.QtCore import (
     QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QAction, QColor, QKeySequence, QShortcut,
+    QAction, QColor, QIcon, QKeySequence, QShortcut,
 )
 from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QFrame, QHBoxLayout,
@@ -1306,7 +1306,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         legible over any artwork - including the many white channel logos it
         used to vanish into."""
         from PyQt6.QtCore import QPointF, QRectF
-        from PyQt6.QtGui import QIcon, QPainter, QPixmap, QPolygonF
+        from PyQt6.QtGui import QPainter, QPixmap, QPolygonF
         scale = 3
         S = max(1, int(size)) * scale
         pm = QPixmap(S, S)

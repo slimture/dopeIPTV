@@ -248,6 +248,7 @@ class M3UClient(OfflineClient):
         super().__init__()
         self.server = (url or "").strip()
         self._channels: list[dict] = []
+        self._by_stream_id: dict[int, dict] = {}
         self._loaded = False
         # EPG URL advertised by the playlist's #EXTM3U header
         # (url-tvg / x-tvg-url), auto-detected while parsing.
@@ -326,6 +327,10 @@ class M3UClient(OfflineClient):
                 channels.append(pending)
                 pending = None
         self._channels = channels
+        # Index by stream_id for O(1) lookup - _channel() (and thus stream_url,
+        # hit on every zap) would otherwise linear-scan the whole list. Rebuilt
+        # here, the only place _channels is (re)assigned, so it can't go stale.
+        self._by_stream_id = {c["stream_id"]: c for c in channels}
 
     def authenticate(self) -> dict:
         # Fetching + parsing the list is this provider's "auth": it proves the
@@ -367,10 +372,7 @@ class M3UClient(OfflineClient):
             sid = int(stream_id)
         except (TypeError, ValueError):
             return None
-        for c in self._channels:
-            if c["stream_id"] == sid:
-                return c
-        return None
+        return self._by_stream_id.get(sid)
 
     def timeshift_urls(self, stream_id: int | str, start_dt: datetime,
                        duration_min: int) -> list[str]:

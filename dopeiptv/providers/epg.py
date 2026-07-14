@@ -463,6 +463,15 @@ class XmltvGuide:
                 data = gzip.decompress(data)
             except OSError:
                 pass
+        # Robustness: refuse a guide that declares its own internal XML
+        # entities. A hostile or broken EPG URL could otherwise ship a
+        # "billion laughs" entity-expansion bomb that balloons memory during
+        # iterparse. Entity definitions live in the DOCTYPE prolog, before the
+        # root element, so scanning the head is enough - and real XMLTV never
+        # declares custom entities (a plain <!DOCTYPE tv SYSTEM "xmltv.dtd">
+        # carries none and is left to parse normally). Caught by ensure_loaded.
+        if b"<!ENTITY" in data[:65536]:
+            raise ValueError("XMLTV declares internal entities; refusing to parse")
         cutoff = (datetime.now().astimezone().timestamp()
                   - self.KEEP_PAST_DAYS * 86400)
         rows: dict[str, list[tuple]] = {}

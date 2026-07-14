@@ -189,6 +189,26 @@ def test_xmltv_parser_survives_malformed():
         # Any other exception type propagates and fails the test.
 
 
+def test_xmltv_parser_rejects_entity_bomb():
+    """A 'billion laughs' entity-expansion guide must be refused up front (fast,
+    no memory blow-up), not fed to the parser. ensure_loaded() catches this."""
+    bomb = (
+        b"<?xml version='1.0'?>"
+        b"<!DOCTYPE tv ["
+        b"<!ENTITY a 'aaaaaaaaaa'>"
+        b"<!ENTITY b '&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;'>"
+        b"<!ENTITY c '&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;'>"
+        b"]>"
+        b"<tv><programme>&c;</programme></tv>"
+    )
+    with pytest.raises(ValueError):
+        _guide()._parse(bomb)
+    # A legitimate external-DTD DOCTYPE (no inline entities) still parses.
+    ok = (b"<?xml version='1.0'?><!DOCTYPE tv SYSTEM 'xmltv.dtd'>"
+          b"<tv><channel id='x'><display-name>X</display-name></channel></tv>")
+    _guide()._parse(ok)   # must not raise
+
+
 def test_xmltv_parser_indexes_valid_guide():
     now = datetime.now(timezone.utc)
     start = now.strftime("%Y%m%d%H%M%S %z") or now.strftime("%Y%m%d%H%M%S +0000")
