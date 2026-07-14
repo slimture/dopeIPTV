@@ -151,10 +151,18 @@ def _install_crash_hooks() -> None:
     sys.unraisablehook = _unraisable_hook
     # C-level crashes (segfault before qFatal, mpv, GL) - dump a
     # native backtrace to stderr.
-    try:
-        faulthandler.enable(file=sys.stderr, all_threads=True)
-    except Exception:
-        pass
+    #
+    # NOT on Windows: libmpv/ffmpeg raise benign first-chance SEH exceptions
+    # (code 0xe24c4a02) as part of normal playback, and faulthandler's
+    # all-threads stack walk in response to each one itself access-violates,
+    # turning harmless exceptions into a hard crash the moment you play a
+    # stream. Linux/macOS never raise those SEH exceptions, so faulthandler is
+    # kept there unchanged.
+    if sys.platform != "win32":
+        try:
+            faulthandler.enable(file=sys.stderr, all_threads=True)
+        except Exception:
+            pass
 
 
 def main() -> int:
