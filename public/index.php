@@ -16,6 +16,59 @@ $version = $rel['version'] ?? '0.7.0';
 $assets  = $rel['assets'] ?? [];
 $relDate = !empty($rel['published_at']) ? date('M j, Y', strtotime($rel['published_at'])) : '';
 function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
+
+/**
+ * Plain-language download metadata derived from the asset filename, so the
+ * page can group by OS and say clearly what each file is and which CPU it's
+ * for (the raw "x86_64" / two-.deb listing confused people). Returns:
+ *   os    - group key: 'Windows' | 'macOS' | 'Linux' | 'Other'
+ *   icon  - group emoji
+ *   title - what the file is ("AppImage", ".deb package", ...)
+ *   fmt   - one-line "what/when" hint
+ *   arch  - human CPU label ("Intel / AMD (64-bit)" vs "ARM64")
+ *   rank  - sort order within the OS group (recommended first)
+ *   rec   - true for the option most people should pick
+ */
+function dl_meta(string $name): array {
+    $n = strtolower($name);
+    $arm = (strpos($n, 'arm') !== false || strpos($n, 'aarch64') !== false);
+    $cpu = $arm ? 'ARM (64-bit)' : 'Intel / AMD (64-bit)';
+    if (str_ends_with($n, '.dmg'))
+        return ['os'=>'macOS','icon'=>'🍎','title'=>'macOS disk image','fmt'=>'.dmg — drag to Applications','arch'=>'Apple Silicon & Intel','rank'=>10,'rec'=>true];
+    if (str_ends_with($n, '.pkg'))
+        return ['os'=>'macOS','icon'=>'🍎','title'=>'macOS installer','fmt'=>'.pkg','arch'=>'Apple Silicon & Intel','rank'=>20,'rec'=>false];
+    if (str_ends_with($n, '.exe') || str_ends_with($n, '.msi'))
+        return ['os'=>'Windows','icon'=>'🪟','title'=>'Windows installer','fmt'=>'.exe','arch'=>$cpu,'rank'=>10,'rec'=>true];
+    if (str_ends_with($n, '.zip') && strpos($n, 'win') !== false)
+        return ['os'=>'Windows','icon'=>'🪟','title'=>'Windows portable','fmt'=>'.zip — unzip &amp; run, no install','arch'=>$cpu,'rank'=>10,'rec'=>true];
+    if (str_ends_with($n, '.appimage'))
+        return ['os'=>'Linux','icon'=>'🐧','title'=>'AppImage','fmt'=>'runs on any distro — no install','arch'=>$cpu,'rank'=>($arm?12:10),'rec'=>!$arm];
+    if (str_ends_with($n, '.deb'))
+        return ['os'=>'Linux','icon'=>'🐧','title'=>'.deb package','fmt'=>'for Debian / Ubuntu','arch'=>$cpu,'rank'=>($arm?22:20),'rec'=>false];
+    if (str_ends_with($n, '.rpm'))
+        return ['os'=>'Linux','icon'=>'🐧','title'=>'.rpm package','fmt'=>'for Fedora / RHEL','arch'=>$cpu,'rank'=>30,'rec'=>false];
+    if (str_ends_with($n, '.flatpak'))
+        return ['os'=>'Linux','icon'=>'📦','title'=>'Flatpak','fmt'=>'all distros','arch'=>'Universal','rank'=>40,'rec'=>false];
+    return ['os'=>'Other','icon'=>'📦','title'=>$name,'fmt'=>'','arch'=>'','rank'=>99,'rec'=>false];
+}
+
+// Group the release assets by OS so the list reads as "pick your system,
+// then your CPU" instead of a flat jumble of two .debs and two AppImages.
+$osOrder = ['Windows', 'macOS', 'Linux', 'Other'];
+$osHelp  = [
+    'Linux'   => 'Not sure? Get the <b>AppImage</b> — it runs on any distribution with no install. Choose <b>.deb</b> on Debian/Ubuntu. Pick <b>Intel / AMD</b> unless you\'re on an ARM machine (Raspberry Pi, ARM server).',
+    'macOS'   => 'One image works on both Apple Silicon (M-series) and Intel Macs.',
+    'Windows' => 'Portable build — unzip and run, nothing to install.',
+];
+$groups = [];
+foreach ($assets as $a) {
+    $m = dl_meta($a['name'] ?? '');
+    $groups[$m['os']][] = $a + ['_m' => $m];
+}
+foreach ($groups as &$g) {
+    usort($g, fn($x, $y) => ($x['_m']['rank'] <=> $y['_m']['rank']));
+}
+unset($g);
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -180,21 +233,39 @@ foreach ($shots as [$file, $alt, $title, $cap]):
         </div>
         <span class="release-tag"><b>v<?= h($version) ?></b><?= $relDate ? ' · ' . h($relDate) : ' · latest' ?></span>
       </div>
-      <div class="dls">
-<?php if ($assets): foreach ($assets as $a): ?>
-        <a class="dl" href="<?= h($a['url']) ?>" rel="nofollow"<?= !empty($a['sha256']) ? ' title="SHA-256: ' . h($a['sha256']) . '"' : '' ?>>
-          <span class="os"><?= h($a['icon'] ?? '📦') ?></span>
-          <span class="meta"><span class="name"><?= h($a['label']) ?></span><span class="sub"><?= h($a['sub'] ?? '') ?></span></span>
-          <span class="go">Download →</span>
-        </a>
+<?php if ($assets): foreach ($osOrder as $os): if (empty($groups[$os])) continue; ?>
+      <div class="dl-group">
+        <div class="dl-group-head">
+          <span class="dl-os-ico"><?= h($groups[$os][0]['_m']['icon']) ?></span>
+          <h3><?= h($os) ?></h3>
+        </div>
+<?php if (!empty($osHelp[$os])): ?>
+        <p class="dl-guide"><?= $osHelp[$os] ?></p>
+<?php endif; ?>
+        <div class="dls">
+<?php foreach ($groups[$os] as $a):
+          $m = $a['_m'];
+          $size = '';
+          if (preg_match('/([\d.]+\s?(?:KB|MB|GB|B))\s*$/i', $a['sub'] ?? '', $mm)) { $size = $mm[1]; }
+?>
+          <a class="dl<?= $m['rec'] ? ' rec' : '' ?>" href="<?= h($a['url']) ?>" rel="nofollow"<?= !empty($a['sha256']) ? ' title="SHA-256: ' . h($a['sha256']) . '"' : '' ?>>
+            <span class="meta">
+              <span class="name"><?= h($m['title']) ?><?php if ($m['rec']): ?> <span class="badge">Recommended</span><?php endif; ?></span>
+              <span class="sub"><span class="arch"><?= h($m['arch']) ?></span><?= $m['fmt'] ? ' · ' . $m['fmt'] : '' ?><?= $size ? ' · ' . h($size) : '' ?></span>
+            </span>
+            <span class="go">Download →</span>
+          </a>
+<?php endforeach; ?>
+        </div>
+      </div>
 <?php endforeach; else: ?>
+      <div class="dls">
         <a class="dl" href="<?= h($REPO) ?>/releases/latest" rel="nofollow">
-          <span class="os">📦</span>
           <span class="meta"><span class="name">All packages on GitHub</span><span class="sub">latest release</span></span>
           <span class="go">Open →</span>
         </a>
-<?php endif; ?>
       </div>
+<?php endif; ?>
 <?php
       $hasWindows = false;
       foreach ($assets as $a) {

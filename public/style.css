@@ -131,16 +131,27 @@ h2 { font-size: clamp(1.7rem, 3.6vw, 2.3rem); letter-spacing: -.02em; margin: 0;
 .dl-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-bottom: 24px; }
 .release-tag { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--line-2); border-radius: 999px; padding: 6px 12px; }
 .release-tag b { color: var(--accent); }
+/* Downloads, grouped by OS so people pick their system, then their CPU. */
+.dl-group { margin-bottom: 26px; }
+.dl-group:last-of-type { margin-bottom: 0; }
+.dl-group-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.dl-os-ico { font-size: 22px; line-height: 1; }
+.dl-group-head h3 { font-size: 17px; font-weight: 700; margin: 0; }
+.dl-guide { font-size: 13px; color: var(--muted); line-height: 1.7; margin: 0 0 14px; }
+.dl-guide b { color: var(--text); font-weight: 600; }
 .dls { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
 @media (max-width: 720px) { .dls { grid-template-columns: 1fr; } }
 .dl { display: flex; align-items: center; gap: 16px; background: var(--surface); border: 1px solid var(--line);
-  border-radius: 12px; padding: 16px 18px; transition: border-color .2s ease; }
+  border-radius: 12px; padding: 15px 18px; transition: border-color .2s ease, background .2s ease; }
 .dl:hover { border-color: var(--accent); }
-.dl .os { width: 44px; height: 44px; border-radius: 10px; flex: none; display: grid; place-items: center;
-  background: var(--surface-2); border: 1px solid var(--line); font-size: 22px; }
-.dl .meta { min-width: 0; display: flex; flex-direction: column; }
-.dl .meta .name { font-weight: 600; }
-.dl .meta .sub { font-family: var(--mono); font-size: 12px; color: var(--faint); }
+.dl.rec { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
+.dl .meta { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.dl .meta .name { font-weight: 600; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dl .meta .sub { font-size: 12px; color: var(--faint); }
+.dl .meta .sub .arch { font-weight: 600; color: var(--muted); }
+.badge { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 999px; padding: 1px 7px; }
 .dl .go { margin-left: auto; color: var(--accent); font-weight: 600; font-size: 14px; white-space: nowrap; }
 .autonote { margin-top: 18px; font-size: 13px; color: var(--faint); line-height: 1.75; }
 .autonote code { font-family: var(--mono); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; color: var(--muted); overflow-wrap: anywhere; }
