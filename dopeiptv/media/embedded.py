@@ -623,7 +623,9 @@ class _MacInputFilter(QObject):
         if isinstance(QApplication.focusWidget(), QLineEdit):
             return False
         back = event.key() == Qt.Key.Key_Left
-        timeline = p.ts_timeline.isVisible()
+        # Gate on the MODE, not the bar's visibility - the bar now auto-hides,
+        # but a timeshift channel is still steppable while it's tucked away.
+        timeline = p._seek_mode == "timeline"
         # Shift+arrow: step the timeline into the archive - one jump per press
         # (no auto-repeat) since each reloads a segment.
         if shift and timeline:
@@ -858,6 +860,13 @@ class EmbeddedPlayer(QWidget):
         self._seek_overlay_timer.setSingleShot(True)
         self._seek_overlay_timer.setInterval(2500)
         self._seek_overlay_timer.timeout.connect(self._hide_seek_overlay)
+        # The timeshift live timeline auto-hides like the scrubber: it reappears
+        # on mouse-move over the video (and on a keyboard step) and fades after
+        # a few idle seconds, so it doesn't sit over the picture forever.
+        self._ts_hide_timer = QTimer(self)
+        self._ts_hide_timer.setSingleShot(True)
+        self._ts_hide_timer.setInterval(self.TS_BAR_HIDE_MS)
+        self._ts_hide_timer.timeout.connect(self._hide_ts_timeline)
 
         self.overlay = QLabel("", self)
         self.overlay.setStyleSheet(
@@ -1225,6 +1234,10 @@ class EmbeddedPlayer(QWidget):
     }
 
     def _on_video_move(self, event) -> None:
+        # A timeshift channel's timeline reappears on any mouse activity over
+        # the video (docked or fullscreen) and re-arms its idle fade.
+        if self._seek_mode == "timeline":
+            self._show_ts_timeline()
         if self._pip_mode and not self._fs_ui:
             self._show_pip_bar()
             if self._seekable:
@@ -1263,7 +1276,8 @@ class EmbeddedPlayer(QWidget):
         Returns True when it consumed the key."""
         if self.current_url is None:
             return False
-        timeline = self.ts_timeline.isVisible()
+        # Mode, not bar visibility - the timeline auto-hides but stays steppable.
+        timeline = self._seek_mode == "timeline"
         if step and timeline:
             # Shift+arrow: explicit timeline step into the archive.
             self._timeline_step(-self.TIMELINE_STEP_MIN if back
@@ -1398,6 +1412,8 @@ class EmbeddedPlayer(QWidget):
             return f"{h}:{m:02d}"
         return f"{m} min"
 
+    TS_BAR_HIDE_MS = 3500
+
     def enter_timeshift(self, depth_min: int) -> None:
         """Show the live timeline spanning the last *depth_min* minutes."""
         self._ts_depth = max(1, int(depth_min))
@@ -1405,20 +1421,37 @@ class EmbeddedPlayer(QWidget):
         self.ts_slider.setValue(self._ts_depth)
         self.ts_label.setText("● LIVE")
         self.ts_live_btn.hide()
-        self._place_ts_timeline()
-        self.ts_timeline.show()
-        self.ts_timeline.raise_()
+        self._show_ts_timeline()
         # On the very first play (esp. the auto-preview at startup) the video
         # surface hasn't been laid out at its docked size yet, so the geometry
         # read above is stale and the bar lands too high. Reposition once the
         # layout has settled.
         QTimer.singleShot(0, self._reposition_ts_timeline)
 
+    def _show_ts_timeline(self) -> None:
+        """Reveal the timeshift timeline and arm its idle auto-hide. Only acts
+        in timeline mode, so a stray mouse-move on a VOD/live stream can't
+        summon it."""
+        if self._seek_mode != "timeline":
+            return
+        self._place_ts_timeline()
+        self.ts_timeline.show()
+        self.ts_timeline.raise_()
+        self._ts_hide_timer.start()
+
+    def _hide_ts_timeline(self) -> None:
+        # Keep it up while the user is scrubbing it or hovering over it.
+        if self.ts_slider.dragging or self.ts_timeline.underMouse():
+            self._ts_hide_timer.start()
+            return
+        self.ts_timeline.hide()
+
     def _reposition_ts_timeline(self) -> None:
         if self.ts_timeline.isVisible():
             self._place_ts_timeline()
 
     def exit_timeshift(self) -> None:
+        self._ts_hide_timer.stop()
         self.ts_timeline.hide()
 
     def set_seek_mode(self, mode: str) -> None:
@@ -1470,7 +1503,9 @@ class EmbeddedPlayer(QWidget):
         user can see where in the schedule they are. *paused* forces the
         'not live' state (label + Go-live button) the instant a live-edge stream
         is paused, without waiting for the offset to grow past the tolerance."""
-        if not self.ts_timeline.isVisible() or self.ts_slider.dragging:
+        # Keep the (possibly auto-hidden) timeline model current in timeline
+        # mode, so it's right the instant it's revealed. Don't fight a drag.
+        if self._seek_mode != "timeline" or self.ts_slider.dragging:
             return
         val = max(0, self._ts_depth - int(round(offset_min)))
         self.ts_slider.blockSignals(True)
@@ -1499,11 +1534,12 @@ class EmbeddedPlayer(QWidget):
         """Nudge the live timeline by *minutes* (negative = back into the
         archive, positive = toward live) - the arrow-key equivalent of dragging
         the slider."""
-        if not self.ts_timeline.isVisible():
+        if self._seek_mode != "timeline":
             return
         val = max(0, min(self._ts_depth, self.ts_slider.value() + minutes))
         self.ts_slider.setValue(val)
         self.timeshift_seek.emit(int(self._ts_depth - val))
+        self._show_ts_timeline()   # reveal so the user sees where they landed
 
     def _place_ts_timeline(self) -> None:
         margin = 10
