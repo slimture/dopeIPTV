@@ -100,10 +100,20 @@ class GL(QOpenGLWidget):
         if self._ctx is None:
             return
         ratio = self.devicePixelRatioF()
-        self._ctx.render(flip_y=True, opengl_fbo={
-            "w": int(self.width() * ratio),
-            "h": int(self.height() * ratio),
-            "fbo": self.defaultFramebufferObject()})
+        try:
+            self._ctx.render(flip_y=True, opengl_fbo={
+                "w": int(self.width() * ratio),
+                "h": int(self.height() * ratio),
+                "fbo": self.defaultFramebufferObject()})
+        except BaseException as e:
+            # Print once, keep going, don't crash - so we learn WHY it fails.
+            if not getattr(self, "_render_err", False):
+                self._render_err = True
+                import traceback
+                print(f"\n[test] !!! render() FAILED: {type(e).__name__}: {e}")
+                traceback.print_exc()
+                print("[test] (this is the moment the app shows black)\n")
+            return
         if not self._args.no_report_swap:
             try:
                 self._ctx.report_swap()
