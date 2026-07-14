@@ -4,7 +4,7 @@ I was looking for a good IPTV-client on Linux but couldn't find one. So I vibe
 coded dopeIPTV based on what I think is a good IPTV-player. I think you will
 like it.
 
-It's primarily for Linux (works okay on macOS) with a modern dark interface,
+It's primarily for Linux (and works well on MacOS) with a modern dark interface,
 supporting the **Xtream Codes API** and **M3U playlists**, **EPG**, and an
 **embedded mpv** video player (with optional external mpv/VLC playback).
 
