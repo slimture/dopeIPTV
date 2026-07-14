@@ -64,7 +64,16 @@ class GL(QOpenGLWidget):
 
     def initializeGL(self):
         a = self._args
-        self.mpv = mpv.MPV(vo="libmpv", terminal=False)
+
+        def _log(level, prefix, text):
+            sys.stderr.write(f"[mpv/{level}] {prefix}: {text}")
+            sys.stderr.flush()
+
+        if a.verbose:
+            self.mpv = mpv.MPV(vo="libmpv", terminal=False,
+                               log_handler=_log, loglevel="v")
+        else:
+            self.mpv = mpv.MPV(vo="libmpv", terminal=False)
 
         def opt(k, v):
             try:
@@ -143,6 +152,9 @@ def main():
     p.add_argument("--sw-on-sub", action="store_true",
                    help="switch to software decoding when the subtitle is "
                         "enabled (the proposed app fix)")
+    p.add_argument("--verbose", action="store_true",
+                   help="print mpv's own debug log - shows the real error when "
+                        "the subtitle breaks the render")
     p.add_argument("--minimal", action="store_true")
     for flag in ("no-osd0", "no-cache", "no-deinterlace", "no-sharpen",
                  "no-tonemapping", "no-aspect", "no-report-swap"):
