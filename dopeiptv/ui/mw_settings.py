@@ -186,6 +186,8 @@ class _SettingsMixin:
         self.settings.setValue("accent", accent)
         apply_theme(self.settings)
         QApplication.instance().setStyleSheet(build_style())
+        if hasattr(self, "_apply_nav_icons"):
+            self._apply_nav_icons()   # re-tint the sidebar icons to the new theme
         self._sidebar_logo.update()
         self.listw.viewport().update()
         self.count_lbl.setStyleSheet(

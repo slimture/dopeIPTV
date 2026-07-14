@@ -13,7 +13,7 @@ from PyQt6.QtCore import (
     QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QAction, QColor, QIcon, QKeySequence, QShortcut,
+    QAction, QColor, QFont, QIcon, QKeySequence, QPainter, QPixmap, QShortcut,
 )
 from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QBoxLayout, QFrame, QHBoxLayout,
@@ -361,23 +361,27 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         sl.addWidget(self._sidebar_logo)
         sl.addSpacing(6)
 
-        # Glyphs used when the sidebar is collapsed to an icon rail.
+        # Source glyphs for the nav icons (rendered to fixed-size monochrome
+        # pixmaps below). Each must be visually distinct: watch-later is a
+        # bookmark, recordings a record dot, history a clock - no two alike.
         self._rail_glyphs = {
             "live": "📺", "vod": "🎬", "series": "🎞", "fav": "★",
-            # Watch later = a pin (saved to watch), history = a clock: distinct
-            # glyphs so the collapsed rail doesn't show two near-identical clock
-            # faces. REC is a red dot (the plain record glyph is a white circle).
-            "watchlist": "📌", "watched": "✓", "rec": "🔴", "history": "🕘",
+            "watchlist": "🔖", "watched": "✓", "rec": "⏺", "history": "🕘",
         }
         self._nav_texts: dict[str, str] = {}
-        self._nav_labels: dict[str, str] = {}   # icon + label, for expanded mode
         self.nav_btns: dict[str, QPushButton] = {}
+        self._nav_icon_size = 18
 
         def _make_nav(key: str, text: str, into) -> None:
-            b = QPushButton(objectName="NavBtn")
+            b = QPushButton(text, objectName="NavBtn")
             b.setCheckable(True)
             b.setFlat(True)
             b.setToolTip(text)
+            # A fixed-size icon so every label starts at the SAME x (emoji
+            # glyphs have different advance widths, so putting them in the text
+            # left the labels ragged). The icon is (re)painted by
+            # _apply_nav_icons in the theme's muted tone, white when checked.
+            b.setIconSize(QSize(self._nav_icon_size, self._nav_icon_size))
             # "Ignored" horizontal policy: the button fills the width when
             # there's room but imposes no text-based minimum, so the sidebar
             # can be dragged narrow enough to cross the auto-collapse threshold
@@ -391,11 +395,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 lambda pos, k=key, bt=b: self._nav_color_menu(
                     k, bt.mapToGlobal(pos)))
             self._nav_texts[key] = text
-            # Muted, monochrome icon before the label. U+FE0E requests text-
-            # style (non-colour) presentation so the glyph takes the button's
-            # own text colour and stays calm instead of a bright emoji.
-            self._nav_labels[key] = f"{self._rail_glyphs[key]}︎   {text}"
-            b.setText(self._nav_labels[key])
             into.addWidget(b)
             self.nav_btns[key] = b
             self._apply_nav_color(key)
@@ -407,10 +406,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
         # Library: the personal lists, grouped under a collapsible disclosure
         # header (same arrow affordance as Categories) so they don't add to the
-        # wall of nav items when you don't need them.
-        sl.addSpacing(6)
-        lib_hdr = QHBoxLayout()
-        lib_hdr.setContentsMargins(0, 0, 0, 0)
+        # wall of nav items when you don't need them. The header lives in its
+        # own widget (with a little top gap) so the whole thing - gap included -
+        # disappears on the icon rail, keeping the library icons tight against
+        # the browse icons there.
+        self._lib_header = QWidget()
+        lib_hdr = QHBoxLayout(self._lib_header)
+        lib_hdr.setContentsMargins(0, 8, 0, 0)
         lib_hdr.setSpacing(4)
         self._lib_section_label = QLabel(
             tr("sidebar_library"), objectName="SectionLabel")
@@ -425,7 +427,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._lib_toggle.setToolTip(tr("tooltip_toggle_library"))
         self._lib_toggle.toggled.connect(self._on_library_toggle)
         lib_hdr.addWidget(self._lib_toggle)
-        sl.addLayout(lib_hdr)
+        sl.addWidget(self._lib_header)
 
         # Container so the whole group collapses/reveals in one move. No
         # stylesheet on it (a bare 'background' would cascade onto the child
@@ -441,7 +443,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                           ("history", tr("nav_history"))):
             _make_nav(key, text, lib_lay)
         sl.addWidget(self._library_box)
-        sl.addSpacing(4)
+        self._apply_nav_icons()
         self.nav_btns["live"].setChecked(True)
         # Restore the remembered collapsed state (setChecked fires the handler).
         if self.settings is not None:
@@ -1016,10 +1018,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not hasattr(self, "nav_btns"):
             return
         for key, b in self.nav_btns.items():
-            # Rail: just the monochrome glyph (U+FE0E keeps it calm/themed);
-            # expanded: the icon + label.
-            b.setText(self._rail_glyphs.get(key, "•") + "︎" if collapsed
-                      else self._nav_labels[key])
+            # Rail: icon only (centred); expanded: icon + label. The icon
+            # itself is always set (see _apply_nav_icons).
+            b.setText("" if collapsed else self._nav_texts[key])
             self._set_rail(b, collapsed)
         # Everything that only makes sense expanded: logo, the whole
         # category area, and full-text buttons become short labels or hide.
@@ -1027,11 +1028,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._cat_section_label.setVisible(not collapsed)
         self.cat_solo_btn.setVisible(not collapsed)
         self.cat_list.setVisible(not collapsed)
-        # Library group header is an expanded-only affordance; on the rail the
-        # group's icons are always shown (honour the collapse only expanded).
-        if hasattr(self, "_lib_toggle"):
-            self._lib_section_label.setVisible(not collapsed)
-            self._lib_toggle.setVisible(not collapsed)
+        # Library group header (with its top gap) is an expanded-only
+        # affordance; hide the whole header widget on the rail so the library
+        # icons sit tight against the browse icons. The group's icons are
+        # always shown on the rail (honour the collapse only when expanded).
+        if hasattr(self, "_lib_header"):
+            self._lib_header.setVisible(not collapsed)
             self._library_box.setVisible(
                 collapsed or not self._lib_toggle.isChecked())
         # The category-search toggle (and its box) belong to the expanded
@@ -1535,6 +1537,39 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cat_solo_btn.setArrowType(
             Qt.ArrowType.RightArrow if checked else Qt.ArrowType.DownArrow)
         self._apply_cat_solo()
+
+    def _nav_icon(self, glyph: str) -> QIcon:
+        """A fixed-size icon painted from GLYPH in the theme's muted tone (the
+        normal/Off state) and white (the checked/On state), so it always
+        matches the nav label. U+FE0E requests the glyph's monochrome text
+        presentation so it takes the pen colour rather than a bright emoji."""
+        icon = QIcon()
+        s = self._nav_icon_size
+        dpr = self.devicePixelRatioF() or 1.0
+        for color, state in ((P["text2"], QIcon.State.Off),
+                             ("#FFFFFF", QIcon.State.On)):
+            pm = QPixmap(round(s * dpr), round(s * dpr))
+            pm.setDevicePixelRatio(dpr)
+            pm.fill(Qt.GlobalColor.transparent)
+            pr = QPainter(pm)
+            pr.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
+            f = QFont()
+            f.setPixelSize(round(s * 0.82))
+            pr.setFont(f)
+            pr.setPen(QColor(color))
+            pr.drawText(QRect(0, 0, s, s),
+                        Qt.AlignmentFlag.AlignCenter, glyph + "︎")
+            pr.end()
+            icon.addPixmap(pm, QIcon.Mode.Normal, state)
+        return icon
+
+    def _apply_nav_icons(self) -> None:
+        """(Re)build every nav button's icon in the current theme tones. Called
+        at construction and whenever the theme/accent changes."""
+        if not hasattr(self, "nav_btns"):
+            return
+        for key, b in self.nav_btns.items():
+            b.setIcon(self._nav_icon(self._rail_glyphs[key]))
 
     def _on_library_toggle(self, collapsed: bool) -> None:
         """Fold the Library group (Favorites..History) away behind its
