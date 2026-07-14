@@ -323,6 +323,15 @@ class _MpvGLWidget(QOpenGLWidget):
                 "hwdec": (os.environ.get("DOPEIPTV_HWDEC")
                           or getattr(self, "hwdec_pref", None)
                           or "no"),
+                # Safety net for those who opt into hardware decoding: if the
+                # hardware DECODER fails (unsupported codec on this GPU, a
+                # corrupt stream, a driver hiccup), drop to software after a
+                # single failed frame instead of showing garbage. Note this only
+                # catches decoder failures - it does NOT catch render-path GL
+                # errors (e.g. the nvidia-open INVALID_ENUM where the decoder
+                # succeeds but the texture upload corrupts), which is why
+                # software stays the default rather than hardware+fallback.
+                "hwdec_software_fallback": "1",
                 # (No 'osc' option: the on-screen controller is a feature of
                 # the standalone mpv GUI and doesn't exist in the libmpv/render
                 # build we use - setting it only logged a harmless skip.)
