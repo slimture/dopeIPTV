@@ -49,6 +49,30 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.7.0" date="2026-07-14">
+      <description>
+        <p>Timeshift and catch-up TV, a reminders manager, search everywhere, and rock-solid playback.</p>
+        <ul>
+          <li>Timeshift and catch-up - a live timeline to scrub back into a channel's archive, DVR-style pause of live TV, and play a specific past programme; the app learns each channel's real archive depth and recovers from over-deep requests</li>
+          <li>Reminders manager to find and multi-delete programme reminders, plus programme search across the whole guide and a configurable number of upcoming programmes</li>
+          <li>Search everywhere - category search that also matches the channels inside a category, and left-column search in Favorites, Watch Later, Watched, Recordings and History</li>
+          <li>Customizable keyboard shortcuts with sensible per-OS defaults</li>
+          <li>Software decoding is now the default (like standalone mpv) for playback that never glitches; hardware decoding is an opt-in setting with an automatic software fallback</li>
+          <li>Editable recording title and description, faster channel switching, and fixes for an exit crash, macOS arrow scrubbing and Picture-in-Picture</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.6.4" date="2026-07-12">
+      <description>
+        <p>Stability and housekeeping: smooth 4K, no bloat over time, and self-healing live TV.</p>
+        <ul>
+          <li>Smooth 4K playback - the periodic stutter is fixed (resume-position and caches moved out of the main settings file), and hardware decoding is used across GPUs</li>
+          <li>No bloat over time - TMDB caches are capped, EPG guides are gzip-compressed on disk, and orphaned guides are cleaned up at startup</li>
+          <li>Live TV reconnects on drop instead of freezing, with a toggle for single-connection accounts; double-click to play a channel, a last-channel key, and type-a-number to jump</li>
+          <li>Continue watching for movies and episodes, Recently added, programme reminders, and a discreet once-a-day update indicator</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.6.3" date="2026-07-11">
       <description>
         <p>Keyboard shortcuts, a calmer progress indicator, and playback stability.</p>
