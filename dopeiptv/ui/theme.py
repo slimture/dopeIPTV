@@ -144,9 +144,29 @@ def _rgba(hex_color: str, alpha: float) -> str:
     return f"rgba({r},{g},{b},{alpha})"
 
 
+def _mix(fg: str, bg: str, ratio: float) -> str:
+    """A SOLID #rrggbb that is ``ratio`` of ``fg`` blended over ``bg``. Unlike
+    an rgba() fill, this stays fully opaque, so it reads the same over a
+    transparent parent (e.g. the sidebar's scroll content) as it would over a
+    solid one - no see-through washout."""
+    f = (fg or "#000000").lstrip("#")
+    b = (bg or "#000000").lstrip("#")
+    fr, fg_, fb = int(f[0:2], 16), int(f[2:4], 16), int(f[4:6], 16)
+    br, bg_, bb = int(b[0:2], 16), int(b[2:4], 16), int(b[4:6], 16)
+    r = round(fr * ratio + br * (1 - ratio))
+    g = round(fg_ * ratio + bg_ * (1 - ratio))
+    bl = round(fb * ratio + bb * (1 - ratio))
+    return f"#{r:02X}{g:02X}{bl:02X}"
+
+
 def build_style() -> str:
     """Generate the full application QSS from the active palette."""
     p = dict(P)
+    # Solid accent-tinted surface for the sidebar action buttons (Guide,
+    # Settings): opaque so it shows clearly over the transparent scroll
+    # content, and tinted toward the accent so it reads as an interactive
+    # button on every theme rather than blending into the sidebar.
+    side_action_bg = _mix(ACCENT, p['side'], 0.28)
     return f"""
 * {{
     font-family: "SF Pro Text", "Inter", "Cantarell", "Noto Sans", sans-serif;
@@ -173,7 +193,7 @@ QPushButton#NavBtn[rail="true"] {{ text-align: center; padding: 8px 0; font-size
    pill with a border so they read as buttons (not plain text like the nav
    items), plus an obvious hover so it's clear they're clickable. */
 QPushButton#SideAction {{
-    background: {p['sel']}; border: 1px solid {ACCENT};
+    background: {side_action_bg}; border: 1px solid {ACCENT};
     border-radius: 8px; padding: 9px 14px; text-align: center;
     font-size: 13px; font-weight: 600; color: {p['text']}; margin-top: 3px;
 }}

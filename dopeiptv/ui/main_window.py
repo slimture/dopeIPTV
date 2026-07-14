@@ -327,12 +327,21 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._side_scroll.setVerticalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        # Transparent so the themed #Sidebar background (on `side`) shows through.
-        self._side_scroll.setStyleSheet("background: transparent; border: 0;")
-        self._side_scroll.viewport().setStyleSheet("background: transparent;")
+        # Transparent so the themed #Sidebar background (on `side`) shows
+        # through. IMPORTANT: scope these to the widgets themselves with ID
+        # selectors - a bare `background: transparent` cascades to child
+        # widgets and wipes their own backgrounds (it silently blanked the
+        # Guide/Settings action buttons' fill).
+        self._side_scroll.setObjectName("SideScroll")
+        self._side_scroll.setStyleSheet(
+            "QScrollArea#SideScroll { background: transparent; border: 0; }")
+        self._side_scroll.viewport().setObjectName("SideViewport")
+        self._side_scroll.viewport().setStyleSheet(
+            "QWidget#SideViewport { background: transparent; }")
         _side_outer.addWidget(self._side_scroll)
-        _side_content = QWidget()
-        _side_content.setStyleSheet("background: transparent;")
+        _side_content = QWidget(objectName="SideContent")
+        _side_content.setStyleSheet(
+            "QWidget#SideContent { background: transparent; }")
         self._side_scroll.setWidget(_side_content)
         sl = QVBoxLayout(_side_content)
         sl.setContentsMargins(12, 16, 12, 12)
