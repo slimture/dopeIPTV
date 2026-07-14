@@ -75,6 +75,10 @@ class GL(QOpenGLWidget):
 
         opt("hwdec", a.hwdec)
         opt("keep-open", "yes")
+        if a.dr:
+            opt("vd-lavc-dr", a.dr)
+        if a.blend:
+            opt("blend-subtitles", a.blend)
         if not a.minimal:
             if not a.no_osd0:
                 opt("osd-level", 0)
@@ -125,6 +129,12 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("file")
     p.add_argument("--hwdec", default="auto-copy-safe")
+    p.add_argument("--dr", choices=("no", "auto", "yes"), default=None,
+                   help="vd-lavc-dr (direct rendering); 'no' is the known fix "
+                        "for copy-hwdec corruption in embedded render contexts")
+    p.add_argument("--blend", choices=("no", "yes", "video"), default=None,
+                   help="blend-subtitles: bake subs into the video frame "
+                        "instead of the separate OSD pass")
     p.add_argument("--sid", type=int, default=None,
                    help="force a specific subtitle track id (see the list)")
     p.add_argument("--seek", type=float, default=None,
