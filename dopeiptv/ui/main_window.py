@@ -1130,6 +1130,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             floor = self._side.minimumSizeHint().width()
             if w < 150 or w <= floor + 12:
                 self._collapse_w = w
+                self._auto_collapsed = False   # manual action takes over
                 self._set_sidebar_collapsed(True)
         else:
             # Re-expand by dragging back out. Only while the handle is held (a
@@ -1137,7 +1138,33 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # where it collapsed, so it won't flip-flop at the threshold.
             if (getattr(self, "_side_dragging", False)
                     and w >= getattr(self, "_collapse_w", 150) + 40):
+                self._auto_collapsed = False   # manual action takes over
                 self._set_sidebar_collapsed(False)
+
+    def _maybe_auto_collapse_sidebar(self) -> None:
+        """Collapse the sidebar to the icon rail automatically when the whole
+        window gets too narrow for the three columns to breathe, and expand it
+        again when there's room - but only if WE auto-collapsed it (a manual
+        collapse/expand is left alone). Edge-triggered on the width threshold so
+        it never fights a manual toggle within the narrow band."""
+        if (getattr(self, "_player_fs", False)
+                or getattr(self, "_side_dragging", False)
+                or not hasattr(self, "_det")):
+            return
+        expanded = getattr(self, "_sidebar_expanded_w", 200)
+        threshold = (expanded + self._mid.minimumWidth()
+                     + self._det.minimumWidth() + 40)
+        narrow = self.width() < threshold
+        if narrow == getattr(self, "_last_narrow", False):
+            return
+        self._last_narrow = narrow
+        collapsed = getattr(self, "_sidebar_collapsed", False)
+        if narrow and not collapsed:
+            self._auto_collapsed = True
+            self._set_sidebar_collapsed(True)
+        elif not narrow and collapsed and getattr(self, "_auto_collapsed", False):
+            self._auto_collapsed = False
+            self._set_sidebar_collapsed(False)
 
     def eventFilter(self, obj, event):
         # Track the whole drag gesture on the side divider. On press we free the
@@ -4468,6 +4495,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         self._schedule_save_layout()
+        self._maybe_auto_collapse_sidebar()
         if self._welcome is not None and self._welcome.isVisible():
             self._welcome.cover()
         self._position_provider_hint()
