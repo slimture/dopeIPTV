@@ -6,6 +6,7 @@ keep their original `self.*` access, so behaviour is unchanged.
 
 from __future__ import annotations
 
+import re
 import sys
 from datetime import datetime
 
@@ -1335,6 +1336,20 @@ class _SettingsMixin:
             if cur.isValid():
                 self._on_current_changed(cur)
 
+    @staticmethod
+    def _format_release_notes(body: str) -> str:
+        """Clean a GitHub release body for QTextBrowser's markdown renderer.
+        GitHub wraps the detail in <details>/<summary> HTML, which Qt's markdown
+        renderer can't handle - it swallowed the section headings and left bare
+        bullet lists with no context. Strip those wrappers (and the redundant
+        top '## dopeIPTV x.y.z' title - the status line already names the
+        version) so the headings and bullets render as clean markdown."""
+        body = re.sub(r"(?is)<summary>.*?</summary>", "", body)
+        body = re.sub(r"(?i)</?details>", "", body)
+        body = re.sub(r"(?im)^\s*##\s+dopeIPTV\b.*$", "", body, count=1)
+        body = re.sub(r"\n{3,}", "\n\n", body)
+        return body.strip()
+
     def show_about(self) -> None:
         d = QDialog(self)
         d.setWindowTitle(f"{tr('menu_about')} {APP_NAME}")
@@ -1373,7 +1388,13 @@ class _SettingsMixin:
         lay.addWidget(status)
         notes = QTextBrowser()
         notes.setOpenExternalLinks(True)
-        notes.setMaximumHeight(220)
+        # Roomier + a sensible minimum so the release notes are actually
+        # readable when an update is offered (it scrolls past the max).
+        notes.setMinimumHeight(140)
+        notes.setMaximumHeight(340)
+        notes.setStyleSheet(
+            f"QTextBrowser {{ border:1px solid {P['border']};"
+            f" border-radius:8px; padding:4px 8px; font-size:12px; }}")
         notes.hide()
         lay.addWidget(notes)
 
@@ -1423,8 +1444,12 @@ class _SettingsMixin:
                 status.setStyleSheet(
                     f"color:{P['text']}; font-size:12px; font-weight:600;")
                 if rel.get("body"):
-                    notes.setMarkdown(rel["body"])
+                    notes.setMarkdown(self._format_release_notes(rel["body"]))
                     notes.show()
+                    # Grow the dialog so the notes get real room the first time
+                    # an update appears (the check is async, after show()).
+                    d.setMinimumWidth(520)
+                    d.adjustSize()
                 if rel.get("url"):
                     try:
                         dl_btn.clicked.disconnect()
