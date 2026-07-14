@@ -145,10 +145,28 @@ function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
         <h2>Clean, dark, and out of your way.</h2>
       </div>
       <div class="shots">
-        <div class="shot"><div class="ph">screenshot · main window</div><div class="cap"><b>Channels &amp; player</b> — the list, the guide and the video in one layout.</div></div>
-        <div class="shot"><div class="ph">screenshot · EPG guide</div><div class="cap"><b>Programme guide</b> — grid view with catch-up markers.</div></div>
-        <div class="shot"><div class="ph">screenshot · timeshift</div><div class="cap"><b>Timeshift timeline</b> — scrub the archive, live edge marked.</div></div>
-        <div class="shot"><div class="ph">screenshot · recordings</div><div class="cap"><b>Recordings</b> — timers, storage caps and playback.</div></div>
+<?php
+// Each row lights up automatically the moment the PNG exists in screenshots/ -
+// drop in main.png / epg.png / timeshift.png / recordings.png and they appear,
+// no code change. Until then the placeholder is shown.
+$shots = [
+    ['main.png',       'dopeIPTV main window with the channel list, guide and video', 'Channels &amp; player', 'the list, the guide and the video in one layout.'],
+    ['epg.png',        'dopeIPTV EPG programme guide grid',                            'Programme guide',       'grid view with catch-up markers.'],
+    ['timeshift.png',  'dopeIPTV timeshift timeline scrubbing a channel archive',      'Timeshift timeline',    'scrub the archive, live edge marked.'],
+    ['recordings.png', 'dopeIPTV recordings library with timers',                      'Recordings',            'timers, storage caps and playback.'],
+];
+foreach ($shots as [$file, $alt, $title, $cap]):
+    $exists = is_file(__DIR__ . '/screenshots/' . $file);
+?>
+        <div class="shot">
+<?php if ($exists): ?>
+          <img src="/screenshots/<?= h($file) ?>" alt="<?= h($alt) ?>" width="1280" height="800" loading="lazy">
+<?php else: ?>
+          <div class="ph">screenshot · <?= $title ?></div>
+<?php endif; ?>
+          <div class="cap"><b><?= $title ?></b> — <?= $cap ?></div>
+        </div>
+<?php endforeach; ?>
       </div>
     </div>
   </section>
