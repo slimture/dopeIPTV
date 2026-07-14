@@ -23,7 +23,7 @@ const UA         = 'dopeiptv-site-sync';
 
 // Only these end-user installer types are listed/mirrored; dev artifacts like
 // the .whl and the source .tar.gz are skipped.
-const USER_EXTS = ['.dmg', '.appimage', '.deb', '.rpm', '.flatpak', '.pkg', '.exe', '.msi'];
+const USER_EXTS = ['.dmg', '.appimage', '.deb', '.rpm', '.flatpak', '.pkg', '.exe', '.msi', '.zip'];
 
 function auth_headers(string $accept): array {
     $h = ["User-Agent: " . UA, "Accept: $accept"];
@@ -93,6 +93,11 @@ function classify(string $name): array {
     if (str_ends_with($n, '.flatpak'))   return ['Flatpak', 'Flathub · all distros', '📦'];
     if (str_ends_with($n, '.pkg'))       return ['macOS · .pkg', 'installer', '🍎'];
     if (str_ends_with($n, '.exe') || str_ends_with($n, '.msi')) return ['Windows', 'installer', '🪟'];
+    if (str_ends_with($n, '.zip')) {
+        return (strpos($n, 'win') !== false)
+            ? ['Windows · portable', 'x64 · unzip &amp; run', '🪟']
+            : ['Archive', 'zip', '📦'];
+    }
     return [$name, '', '📦'];
 }
 
