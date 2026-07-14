@@ -543,10 +543,15 @@ jobs:
         with:
           files: '*.zip'
           body_path: RELEASE_NOTES.md
+      # Upload the app FOLDER, not the .zip: the Actions artifact download UI
+      # always re-zips whatever you give it, so uploading our .zip produced a
+      # zip-in-a-zip. Uploading the folder means one unzip yields the runnable
+      # dopeiptv\ directory. (Release-tag downloads still get the single .zip
+      # attached above.)
       - uses: actions/upload-artifact@v4
         with:
-          name: windows-x64
-          path: '*.zip'
+          name: dopeIPTV-windows-x64
+          path: dist/dopeiptv
 
   # --------------------------------------------------------------- Flatpak ---
   # Most likely to need iteration (building libmpv in Flatpak). Kept from
