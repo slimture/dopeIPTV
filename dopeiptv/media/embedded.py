@@ -1640,6 +1640,7 @@ class EmbeddedPlayer(QWidget):
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         self._lock_video_box()
+        self._relayout_controls()
         if self._blackout.isVisible():
             self._blackout.setGeometry(self.video.rect())
         if self.overlay.isVisible() or self.fs_controls.isVisible():
@@ -1648,6 +1649,20 @@ class EmbeddedPlayer(QWidget):
             self._place_seek_overlay()
         if self.ts_timeline.isVisible():
             self._place_ts_timeline()
+
+    def _relayout_controls(self) -> None:
+        """Responsive docked control bar: when the right column is dragged
+        narrow, drop the lowest-priority always-on controls - the volume
+        slider first, then PiP - so the transport buttons keep their size and
+        nothing spills outside the column. The mute button stays (volume is
+        still reachable by scrolling the video or Up/Down). Leaves the
+        state-driven buttons (timeshift / record / next-episode) alone."""
+        # Use the player's own width (reliable during resizeEvent; the bar's
+        # child width can still lag the layout pass). Thresholds are generous
+        # so controls reappear well before they'd crowd.
+        w = self.width()
+        self.vol.setVisible(w >= 350)
+        self.pip_btn.setVisible(w >= 310)
 
     # -- playback defaults -----------------------------------------------------
 
