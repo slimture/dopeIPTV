@@ -64,6 +64,13 @@ class GL(QOpenGLWidget):
 
     def initializeGL(self):
         a = self._args
+        glctx = QOpenGLContext.currentContext()
+        if glctx is not None:
+            f = glctx.format()
+            v = f.version()
+            print(f"[test] GL context: {v[0]}.{v[1]} "
+                  f"profile={f.profile().name} "
+                  f"renderableType={f.renderableType().name}")
 
         def _log(level, prefix, text):
             sys.stderr.write(f"[mpv/{level}] {prefix}: {text}")
@@ -160,6 +167,21 @@ def main():
                  "no-tonemapping", "no-aspect", "no-report-swap"):
         p.add_argument(f"--{flag}", action="store_true")
     a = p.parse_args()
+
+    if a.gl:
+        # Force a real DESKTOP OpenGL context (not GLES). On NVIDIA/Wayland Qt
+        # hands mpv an OpenGL ES context, and mpv's GLES path fails to create
+        # the 16-bit video / OSD textures (INVALID_ENUM) -> black + subs. Both
+        # the app-attribute AND the surface format are needed, set before the
+        # QApplication exists.
+        from PyQt6.QtGui import QSurfaceFormat
+        QApplication.setAttribute(
+            Qt.ApplicationAttribute.AA_UseDesktopOpenGL)
+        fmt = QSurfaceFormat()
+        fmt.setRenderableType(QSurfaceFormat.RenderableType.OpenGL)
+        fmt.setVersion(3, 3)
+        fmt.setProfile(QSurfaceFormat.OpenGLContextProfile.CompatibilityProfile)
+        QSurfaceFormat.setDefaultFormat(fmt)
 
     app = QApplication(sys.argv)
     w = GL(a)
