@@ -124,14 +124,17 @@ foreach (($rel['assets'] ?? []) as $a) {
     $dest = FILES_DIR . '/' . $name;
     // Download only when missing or size changed (GitHub assets are immutable per release).
     if (!is_file($dest) || filesize($dest) !== (int)($a['size'] ?? -1)) {
+        fwrite(STDERR, "[sync] fetching $name (" . human_size((int)$a['size']) . ") ... ");
         if (!download_to($a['browser_download_url'], $dest . '.part')) {
             @unlink($dest . '.part');
-            fwrite(STDERR, "[sync] failed to fetch $name; skipping\n");
+            fwrite(STDERR, "FAILED\n");
             unset($keep[$name]);
             continue;
         }
         rename($dest . '.part', $dest);   // atomic swap
-        fwrite(STDERR, "[sync] mirrored $name (" . human_size((int)$a['size']) . ")\n");
+        fwrite(STDERR, "done\n");
+    } else {
+        fwrite(STDERR, "[sync] $name already current\n");
     }
     [$label, $sub, $icon] = classify($name);
     $assets[] = [
