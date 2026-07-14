@@ -210,6 +210,17 @@ _STRINGS: dict[str, dict[str, str]] = {
         "th": "หมวดหมู่",
     },
 
+    "sidebar_library": {
+        "en": "LIBRARY",
+        "sv": "BIBLIOTEK",
+        "es": "BIBLIOTECA",
+        "de": "BIBLIOTHEK",
+        "fr": "BIBLIOTHÈQUE",
+        "zh": "媒体库",
+        "ru": "БИБЛИОТЕКА",
+        "th": "คลัง",
+    },
+
     # ── Settings dialog tabs ──────────────────────────────────────────────
 
     "settings_title": {
@@ -1371,6 +1382,16 @@ _STRINGS: dict[str, dict[str, str]] = {
         "zh": "折叠分类 — 仅显示当前分类",
         "ru": "Свернуть категории — показать только текущую",
         "th": "ย่อหมวดหมู่ — แสดงเฉพาะหมวดปัจจุบัน",
+    },
+    "tooltip_toggle_library": {
+        "en": "Show or hide your library",
+        "sv": "Visa eller dölj biblioteket",
+        "es": "Mostrar u ocultar tu biblioteca",
+        "de": "Bibliothek ein- oder ausblenden",
+        "fr": "Afficher ou masquer votre bibliothèque",
+        "zh": "显示或隐藏媒体库",
+        "ru": "Показать или скрыть библиотеку",
+        "th": "แสดงหรือซ่อนคลังของคุณ",
     },
     "rec_today": {
         "en": "Today", "sv": "Idag", "es": "Hoy", "de": "Heute",

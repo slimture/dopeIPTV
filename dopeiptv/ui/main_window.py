@@ -370,13 +370,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             "watchlist": "📌", "watched": "✓", "rec": "🔴", "history": "🕘",
         }
         self._nav_texts: dict[str, str] = {}
+        self._nav_labels: dict[str, str] = {}   # icon + label, for expanded mode
         self.nav_btns: dict[str, QPushButton] = {}
-        for key, text in (("live", tr("nav_tv")), ("vod", tr("nav_movies")),
-                          ("series", tr("nav_series")), ("fav", tr("nav_favorites")),
-                          ("watchlist", tr("nav_watchlist")),
-                          ("watched", tr("nav_watched")),
-                          ("rec", tr("nav_recordings")), ("history", tr("nav_history"))):
-            b = QPushButton(text, objectName="NavBtn")
+
+        def _make_nav(key: str, text: str, into) -> None:
+            b = QPushButton(objectName="NavBtn")
             b.setCheckable(True)
             b.setFlat(True)
             b.setToolTip(text)
@@ -392,11 +390,63 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             b.customContextMenuRequested.connect(
                 lambda pos, k=key, bt=b: self._nav_color_menu(
                     k, bt.mapToGlobal(pos)))
-            sl.addWidget(b)
-            self.nav_btns[key] = b
             self._nav_texts[key] = text
+            # Muted, monochrome icon before the label. U+FE0E requests text-
+            # style (non-colour) presentation so the glyph takes the button's
+            # own text colour and stays calm instead of a bright emoji.
+            self._nav_labels[key] = f"{self._rail_glyphs[key]}︎   {text}"
+            b.setText(self._nav_labels[key])
+            into.addWidget(b)
+            self.nav_btns[key] = b
             self._apply_nav_color(key)
+
+        # Browse: the content-type modes, always visible at the top.
+        for key, text in (("live", tr("nav_tv")), ("vod", tr("nav_movies")),
+                          ("series", tr("nav_series"))):
+            _make_nav(key, text, sl)
+
+        # Library: the personal lists, grouped under a collapsible disclosure
+        # header (same arrow affordance as Categories) so they don't add to the
+        # wall of nav items when you don't need them.
+        sl.addSpacing(6)
+        lib_hdr = QHBoxLayout()
+        lib_hdr.setContentsMargins(0, 0, 0, 0)
+        lib_hdr.setSpacing(4)
+        self._lib_section_label = QLabel(
+            tr("sidebar_library"), objectName="SectionLabel")
+        self._lib_section_label.setMinimumWidth(0)
+        lib_hdr.addWidget(self._lib_section_label)
+        lib_hdr.addStretch()
+        self._lib_toggle = QToolButton(objectName="SectionToggle")
+        self._lib_toggle.setCheckable(True)
+        self._lib_toggle.setArrowType(Qt.ArrowType.DownArrow)
+        self._lib_toggle.setAutoRaise(True)
+        self._lib_toggle.setFixedSize(22, 18)
+        self._lib_toggle.setToolTip(tr("tooltip_toggle_library"))
+        self._lib_toggle.toggled.connect(self._on_library_toggle)
+        lib_hdr.addWidget(self._lib_toggle)
+        sl.addLayout(lib_hdr)
+
+        # Container so the whole group collapses/reveals in one move. No
+        # stylesheet on it (a bare 'background' would cascade onto the child
+        # buttons and wipe their :checked accent - see the #SideContent note).
+        self._library_box = QWidget()
+        lib_lay = QVBoxLayout(self._library_box)
+        lib_lay.setContentsMargins(0, 0, 0, 0)
+        lib_lay.setSpacing(2)
+        for key, text in (("fav", tr("nav_favorites")),
+                          ("watchlist", tr("nav_watchlist")),
+                          ("watched", tr("nav_watched")),
+                          ("rec", tr("nav_recordings")),
+                          ("history", tr("nav_history"))):
+            _make_nav(key, text, lib_lay)
+        sl.addWidget(self._library_box)
+        sl.addSpacing(4)
         self.nav_btns["live"].setChecked(True)
+        # Restore the remembered collapsed state (setChecked fires the handler).
+        if self.settings is not None:
+            self._lib_toggle.setChecked(
+                self.settings.value("library_collapsed", False, type=bool))
 
         # "Categories" header with a small "solo" toggle on the right that
         # collapses the list to just the active category. Kept in a zero-margin
@@ -966,8 +1016,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not hasattr(self, "nav_btns"):
             return
         for key, b in self.nav_btns.items():
-            b.setText(self._rail_glyphs.get(key, "•") if collapsed
-                      else self._nav_texts[key])
+            # Rail: just the monochrome glyph (U+FE0E keeps it calm/themed);
+            # expanded: the icon + label.
+            b.setText(self._rail_glyphs.get(key, "•") + "︎" if collapsed
+                      else self._nav_labels[key])
             self._set_rail(b, collapsed)
         # Everything that only makes sense expanded: logo, the whole
         # category area, and full-text buttons become short labels or hide.
@@ -975,6 +1027,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._cat_section_label.setVisible(not collapsed)
         self.cat_solo_btn.setVisible(not collapsed)
         self.cat_list.setVisible(not collapsed)
+        # Library group header is an expanded-only affordance; on the rail the
+        # group's icons are always shown (honour the collapse only expanded).
+        if hasattr(self, "_lib_toggle"):
+            self._lib_section_label.setVisible(not collapsed)
+            self._lib_toggle.setVisible(not collapsed)
+            self._library_box.setVisible(
+                collapsed or not self._lib_toggle.isChecked())
         # The category-search toggle (and its box) belong to the expanded
         # sidebar only - hide them on the collapsed icon rail, restoring the
         # mode's own visibility (set in _load_categories) when expanded.
@@ -1476,6 +1535,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cat_solo_btn.setArrowType(
             Qt.ArrowType.RightArrow if checked else Qt.ArrowType.DownArrow)
         self._apply_cat_solo()
+
+    def _on_library_toggle(self, collapsed: bool) -> None:
+        """Fold the Library group (Favorites..History) away behind its
+        disclosure arrow, the same gesture as the Categories header. On the
+        collapsed icon rail the group is always shown (its header/arrow are
+        hidden there), so the collapse only applies to the expanded sidebar."""
+        self._lib_toggle.setArrowType(
+            Qt.ArrowType.RightArrow if collapsed else Qt.ArrowType.DownArrow)
+        if hasattr(self, "_library_box"):
+            rail = getattr(self, "_sidebar_collapsed", False)
+            self._library_box.setVisible(rail or not collapsed)
+        if self.settings is not None:
+            self.settings.setValue("library_collapsed", collapsed)
 
     def _apply_cat_solo(self) -> None:
         if not hasattr(self, "cat_list"):
