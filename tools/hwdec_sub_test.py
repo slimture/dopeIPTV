@@ -181,9 +181,10 @@ def main():
     def status():
         m = w.mpv
         try:
-            print(f"[test] status: sid={m['sid']} "
-                  f"video-black-check dwidth={m['dwidth']} "
-                  f"time={m['time-pos']:.1f} sub-text={m['sub-text']!r}")
+            print(f"[test] status: hwdec-current={m['hwdec-current']} "
+                  f"gpu-api={m.get('gpu-api', '?')} sid={m['sid']} "
+                  f"dwidth={m['dwidth']} time={m['time-pos']:.1f} "
+                  f"sub-text={m['sub-text']!r}")
         except Exception:
             pass
 
