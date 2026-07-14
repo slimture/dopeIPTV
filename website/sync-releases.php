@@ -21,19 +21,26 @@ const UA         = 'dopeiptv-site-sync';
 
 @mkdir(FILES_DIR, 0755, true);
 
-/** Minimal HTTP GET with a User-Agent (GitHub requires one). Returns body or null. */
-function http_get(string $url, bool $binary = false): ?string {
-    $token = getenv('GITHUB_TOKEN');
-    $headers = ["User-Agent: " . UA, "Accept: application/vnd.github+json"];
-    if ($token) { $headers[] = "Authorization: Bearer $token"; }
+// Only these end-user installer types are listed/mirrored; dev artifacts like
+// the .whl and the source .tar.gz are skipped.
+const USER_EXTS = ['.dmg', '.appimage', '.deb', '.rpm', '.flatpak', '.pkg', '.exe', '.msi'];
+
+function auth_headers(string $accept): array {
+    $h = ["User-Agent: " . UA, "Accept: $accept"];
+    $t = getenv('GITHUB_TOKEN');
+    if ($t) { $h[] = "Authorization: Bearer $t"; }
+    return $h;
+}
+
+/** GET a (small) text/JSON body with a User-Agent. Returns body or null. */
+function http_get(string $url): ?string {
+    $headers = auth_headers('application/vnd.github+json');
     if (function_exists('curl_init')) {
         $ch = curl_init($url);
         curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_HTTPHEADER     => $headers,
-            CURLOPT_TIMEOUT        => $binary ? 600 : 30,
-            CURLOPT_FAILONERROR    => true,
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_HTTPHEADER => $headers, CURLOPT_TIMEOUT => 30,
+            CURLOPT_FAILONERROR => true,
         ]);
         $body = curl_exec($ch);
         $ok = ($body !== false && curl_getinfo($ch, CURLINFO_HTTP_CODE) < 400);
@@ -41,10 +48,38 @@ function http_get(string $url, bool $binary = false): ?string {
         return $ok ? $body : null;
     }
     $ctx = stream_context_create(['http' => [
-        'method' => 'GET', 'header' => implode("\r\n", $headers), 'timeout' => $binary ? 600 : 30,
-    ]]);
+        'method' => 'GET', 'header' => implode("\r\n", $headers), 'timeout' => 30]]);
     $body = @file_get_contents($url, false, $ctx);
     return $body === false ? null : $body;
+}
+
+/** Stream a (possibly large) asset straight to disk - never into memory, so a
+ *  160 MB AppImage doesn't blow PHP's memory_limit. Returns true on success. */
+function download_to(string $url, string $dest): bool {
+    $headers = auth_headers('application/octet-stream');
+    $fp = fopen($dest, 'wb');
+    if (!$fp) { return false; }
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_FILE => $fp, CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_HTTPHEADER => $headers, CURLOPT_TIMEOUT => 1800,
+            CURLOPT_FAILONERROR => true,
+        ]);
+        $ok = (curl_exec($ch) !== false && curl_getinfo($ch, CURLINFO_HTTP_CODE) < 400);
+        curl_close($ch);
+        fclose($fp);
+        return $ok;
+    }
+    fclose($fp);
+    $ctx = stream_context_create(['http' => [
+        'header' => implode("\r\n", $headers), 'timeout' => 1800]]);
+    $in = @fopen($url, 'rb', false, $ctx);
+    if (!$in) { return false; }
+    $out = fopen($dest, 'wb');
+    $ok = (stream_copy_to_stream($in, $out) !== false);
+    fclose($in); fclose($out);
+    return $ok;
 }
 
 /** Classify an asset filename into a friendly label, sub-line and icon. */
@@ -56,9 +91,8 @@ function classify(string $name): array {
     if (str_ends_with($n, '.deb'))       return ['Linux · .deb', 'Debian / Ubuntu' . ($arm ? ' (ARM64)' : ''), '🐧'];
     if (str_ends_with($n, '.rpm'))       return ['Linux · .rpm', 'Fedora / RHEL', '🐧'];
     if (str_ends_with($n, '.flatpak'))   return ['Flatpak', 'Flathub · all distros', '📦'];
-    if (str_ends_with($n, '.tar.gz') || str_ends_with($n, '.tar.xz')) return ['Linux · archive', $arm ? 'ARM64' : 'x86_64', '🐧'];
+    if (str_ends_with($n, '.pkg'))       return ['macOS · .pkg', 'installer', '🍎'];
     if (str_ends_with($n, '.exe') || str_ends_with($n, '.msi')) return ['Windows', 'installer', '🪟'];
-    if (str_ends_with($n, '.zip'))       return ['Archive', 'zip', '📦'];
     return [$name, '', '📦'];
 }
 
@@ -79,15 +113,25 @@ $keep    = [];   // filenames we want to retain in files/
 
 foreach (($rel['assets'] ?? []) as $a) {
     $name = basename($a['name']);
+    // Skip dev/source artifacts (.whl, .tar.gz, checksums, …) - end users only
+    // want installers.
+    $ln = strtolower($name);
+    $isUser = false;
+    foreach (USER_EXTS as $ext) { if (str_ends_with($ln, $ext)) { $isUser = true; break; } }
+    if (!$isUser) { continue; }
+
     $keep[$name] = true;
     $dest = FILES_DIR . '/' . $name;
     // Download only when missing or size changed (GitHub assets are immutable per release).
     if (!is_file($dest) || filesize($dest) !== (int)($a['size'] ?? -1)) {
-        $bin = http_get($a['browser_download_url'], true);
-        if ($bin === null) { fwrite(STDERR, "[sync] failed to fetch $name; skipping\n"); continue; }
-        file_put_contents($dest . '.part', $bin);
+        if (!download_to($a['browser_download_url'], $dest . '.part')) {
+            @unlink($dest . '.part');
+            fwrite(STDERR, "[sync] failed to fetch $name; skipping\n");
+            unset($keep[$name]);
+            continue;
+        }
         rename($dest . '.part', $dest);   // atomic swap
-        fwrite(STDERR, "[sync] mirrored $name (" . human_size(strlen($bin)) . ")\n");
+        fwrite(STDERR, "[sync] mirrored $name (" . human_size((int)$a['size']) . ")\n");
     }
     [$label, $sub, $icon] = classify($name);
     $assets[] = [
