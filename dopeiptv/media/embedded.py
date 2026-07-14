@@ -340,10 +340,16 @@ class _MpvGLWidget(QOpenGLWidget):
                 "demuxer-lavf-o": "reconnect=1,reconnect_streamed=1,"
                                   "reconnect_on_network_error=1,"
                                   "reconnect_delay_max=5",
-                # (Stream probe depth is set per-play in play(): a short probe
-                # for live-TS zapping, ffmpeg's full defaults for movies/series
-                # - a global short probe under-analysed 4K VOD streams, and a
-                # mid-play decoder reinit then came back black on hwdec.)
+                # Faster channel switching: ffmpeg otherwise probes up to ~5 s /
+                # 5 MB of a live MPEG-TS stream before it shows the first frame.
+                # A live TS declares its codecs up front, so a shorter probe
+                # reaches the picture much sooner with no practical downside.
+                # Tunable/disable-able via env (seconds / bytes; 0 = ffmpeg's
+                # own default) for streams that need deeper probing.
+                "demuxer-lavf-analyzeduration": _env_num(
+                    "DOPEIPTV_ANALYZEDURATION", 1.0, float),
+                "demuxer-lavf-probesize": _env_num(
+                    "DOPEIPTV_PROBESIZE", 2_000_000, int),
                 # Never let mpv open its own window, and keep its OSD silent -
                 # otherwise it draws the media title centred on black while a
                 # stream buffers, which can surface as a stray frame.
@@ -641,6 +647,7 @@ class EmbeddedPlayer(QWidget):
     finished = pyqtSignal()
     next_episode = pyqtSignal()
     paused_changed = pyqtSignal(bool)
+    sub_track_changed = pyqtSignal()   # subtitle selection changed (mpv thread)
     timeshift_seek = pyqtSignal(int)   # minutes back from live (0 = go live)
     program_seek = pyqtSignal(int)     # seconds from the picked programme start
 
@@ -698,6 +705,9 @@ class EmbeddedPlayer(QWidget):
         # surface the "aborted / loading failed" mpv fires while it winds
         # the stream down as a "Stream error" toast.
         self._stopping = False
+        # Re-apply the hwdec fallback on the Qt thread whenever the subtitle
+        # selection changes (the signal is emitted from mpv's observer thread).
+        self.sub_track_changed.connect(self.apply_hwdec)
         self.video.playback_error.connect(self._on_playback_error)
         self.video.video_dbl_click.connect(self._on_video_dbl_click)
         self.video.video_mouse_press.connect(self._on_video_press)
@@ -1630,6 +1640,53 @@ class EmbeddedPlayer(QWidget):
 
     # -- playback defaults -----------------------------------------------------
 
+    # -- hardware decoding + subtitle fallback --------------------------------
+
+    def _hwdec_base(self) -> str:
+        """The user's chosen hardware-decode mode (env > setting > safe copy)."""
+        return (os.environ.get("DOPEIPTV_HWDEC")
+                or (str(self._settings.value("hwdec_mode", "") or "")
+                    if self._settings else "")
+                or "auto-copy-safe")
+
+    def _subtitle_active(self) -> bool:
+        """True when a real subtitle track is currently selected."""
+        m = self.video.mpv
+        try:
+            sid = m["sid"] if m is not None else None
+        except Exception:
+            return False
+        return bool(sid) and str(sid).lower() not in ("no", "false", "none", "0")
+
+    def _effective_hwdec(self) -> str:
+        """The hwdec mode to actually use right now. Honours the 'software when
+        subtitles are shown' fallback for driver stacks (e.g. nvidia-open) whose
+        libmpv render path corrupts hardware-decoded video once a subtitle is
+        composited - so hardware is used everywhere except while a subtitle is
+        actually on, instead of losing it outright."""
+        base = self._hwdec_base()
+        if base == "no":
+            return "no"
+        if (self._settings is not None
+                and str(self._settings.value("hwdec_sub_fallback", "false"))
+                == "true" and self._subtitle_active()):
+            return "no"
+        return base
+
+    def apply_hwdec(self) -> None:
+        """(Re)apply the effective hwdec mode - only when it actually changes,
+        so we don't reinitialise the decoder needlessly. Called on play and when
+        the subtitle selection changes."""
+        m = self.video.mpv
+        if m is None:
+            return
+        target = self._effective_hwdec()
+        try:
+            if str(m["hwdec"]) != target:
+                m["hwdec"] = target
+        except Exception:
+            pass
+
     def apply_default_options(self) -> None:
         """Apply persistent playback defaults from Settings to the mpv core."""
         m = self.video.mpv
@@ -1668,26 +1725,19 @@ class EmbeddedPlayer(QWidget):
             set_opt("video-aspect-override",
                     aspect if aspect != "auto" else "-1")
 
-        # Optional video filters. Only touch these when the user has actually
-        # picked a non-default value - a plain movie then runs with mpv's own
-        # defaults, exactly like standalone mpv. (Setting even the neutral value
-        # - deinterlace=no, sharpen=0, tone-mapping=auto - can disturb mpv's
-        # render/filter graph in ways vanilla mpv never does; on some drivers
-        # that surfaced as 4K video turning black once a subtitle was enabled.)
+        # Optional video filters (all off/neutral by default). These are plain
+        # mpv properties, applied live on the running core.
         #  - deinterlace: smooth interlaced live SD/HD feeds.
         #  - sharpen: unsharp mask strength (0 = off).
-        #  - tone-mapping: HDR->SDR curve.
-        if s.value("video_deinterlace", "false") == "true":
-            set_opt("deinterlace", True)
+        #  - tone-mapping: HDR->SDR curve; harmless on SDR content.
+        set_opt("deinterlace",
+                s.value("video_deinterlace", "false") == "true")
         try:
             sharpen = float(s.value("video_sharpen", 0.0) or 0.0)
         except (TypeError, ValueError):
             sharpen = 0.0
-        if sharpen > 0:
-            set_opt("sharpen", max(0.0, min(sharpen, 3.0)))
-        tonemap = s.value("video_tonemapping", "auto") or "auto"
-        if tonemap != "auto":
-            set_opt("tone-mapping", tonemap)
+        set_opt("sharpen", max(0.0, min(sharpen, 3.0)))
+        set_opt("tone-mapping", s.value("video_tonemapping", "auto") or "auto")
 
     def playback_position(self) -> float:
         m = self.video.mpv
@@ -1703,8 +1753,7 @@ class EmbeddedPlayer(QWidget):
         except Exception:
             return 0.0
 
-    def play(self, url: str, title: str, start: float = 0.0,
-             fast_open: bool = False) -> bool:
+    def play(self, url: str, title: str, start: float = 0.0) -> bool:
         try:
             # Fresh play cycle - drop the stop-in-progress flag so any real
             # error from this new stream (auth failed, 404, ...) is surfaced.
@@ -1744,41 +1793,27 @@ class EmbeddedPlayer(QWidget):
                 m["cache-secs"] = float(self._cache_secs())
             except Exception:
                 pass
-            # Hardware decoding, set once per stream (not in apply_default_options
-            # - that also runs on every Settings save, and re-assigning hwdec
+            # Watch the subtitle selection so the hwdec fallback can react when
+            # a sub is auto-selected after the file is parsed (set up once).
+            if not getattr(self, "_sid_observed", False):
+                try:
+                    m.observe_property(
+                        "sid", lambda *_a: self.sub_track_changed.emit())
+                    self._sid_observed = True
+                except Exception:
+                    pass
+            # Hardware decoding, set per stream (not in apply_default_options -
+            # that also runs on every Settings save, and re-assigning hwdec
             # mid-playback reinitialises the decoder and glitches the video). A
             # changed setting takes effect on the next opened stream. 'Off' is
-            # the escape hatch for driver stacks where hwdec breaks (e.g. a
-            # subtitle turning 4K video black); DOPEIPTV_HWDEC env still wins.
+            # the escape hatch for driver stacks where hwdec breaks; the
+            # DOPEIPTV_HWDEC env var still wins.
             try:
-                hwdec = (os.environ.get("DOPEIPTV_HWDEC")
-                         or (str(self._settings.value("hwdec_mode", "") or "")
-                             if self._settings else "")
-                         or "auto-copy-safe")
-                m["hwdec"] = hwdec
-            except Exception:
-                pass
-            # Stream probing, per stream kind. A live MPEG-TS declares its
-            # codecs up front, so a short ffmpeg probe (*fast_open*) makes
-            # channel zapping much faster. Movies/series/recordings need
-            # ffmpeg's FULL analysis: a globally short probe left 4K HEVC codec
-            # parameters incomplete, and a mid-play decoder reinit (e.g.
-            # enabling a subtitle) then came back as black video on hardware
-            # decoding. 0 = ffmpeg's own defaults. Env values override both.
-            try:
-                if fast_open:
-                    m["demuxer-lavf-analyzeduration"] = _env_num(
-                        "DOPEIPTV_ANALYZEDURATION", 1.0, float)
-                    m["demuxer-lavf-probesize"] = _env_num(
-                        "DOPEIPTV_PROBESIZE", 2_000_000, int)
-                else:
-                    m["demuxer-lavf-analyzeduration"] = _env_num(
-                        "DOPEIPTV_ANALYZEDURATION", 0.0, float)
-                    m["demuxer-lavf-probesize"] = _env_num(
-                        "DOPEIPTV_PROBESIZE", 0, int)
+                m["hwdec"] = self._effective_hwdec()
             except Exception:
                 pass
             self.apply_default_options()
+            self.apply_hwdec()   # honour the subtitle fallback if subs are on
             try:
                 m["volume"] = float(self.vol.value())
                 m["mute"] = self._muted

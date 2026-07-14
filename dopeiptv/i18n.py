@@ -1896,6 +1896,44 @@ _STRINGS: dict[str, dict[str, str]] = {
         "th": "หากวิดีโอกลายเป็นสีดำหรือมีปัญหา (เช่น เมื่อเปิดซับไตเติลบน 4K) "
               "ให้ปิดตัวเลือกนี้ - ภาพจะถูกถอดรหัสด้วย CPU แทน",
     },
+    "setting_hwdec_sub_fallback": {
+        "en": "Software decode when subtitles are shown",
+        "sv": "Mjukvaruavkodning när subtitles visas",
+        "es": "Decodificación por software con subtítulos",
+        "de": "Software-Dekodierung bei Untertiteln",
+        "fr": "Décodage logiciel avec sous-titres",
+        "zh": "显示字幕时使用软件解码",
+        "ru": "Программное декодирование при субтитрах",
+        "th": "ถอดรหัสด้วยซอฟต์แวร์เมื่อแสดงซับไตเติล",
+    },
+    "setting_hwdec_sub_fallback_hint": {
+        "en": "Keeps hardware decoding on everywhere, but drops to the CPU only "
+              "while a subtitle is on - for drivers (e.g. nvidia-open) whose "
+              "render path blacks out hardware-decoded video with subtitles.",
+        "sv": "Behåller hårdvaruavkodning överallt, men går över till CPU:n bara "
+              "medan en subtitle är på - för drivrutiner (t.ex. nvidia-open) vars "
+              "render-väg svartlägger hårdvaruavkodad video med subtitles.",
+        "es": "Mantiene la decodificación por hardware en todo, pero pasa a la "
+              "CPU solo con subtítulos activos - para controladores (p. ej. "
+              "nvidia-open) cuya ruta de render deja en negro el vídeo por "
+              "hardware con subtítulos.",
+        "de": "Behält die Hardware-Dekodierung überall bei, wechselt aber nur "
+              "bei aktiven Untertiteln zur CPU - für Treiber (z. B. nvidia-open), "
+              "deren Render-Pfad hardware-dekodiertes Video mit Untertiteln "
+              "schwarz macht.",
+        "fr": "Garde le décodage matériel partout, mais bascule sur le CPU "
+              "seulement quand un sous-titre est affiché - pour les pilotes "
+              "(p. ex. nvidia-open) dont le rendu noircit la vidéo matérielle "
+              "avec sous-titres.",
+        "zh": "在所有情况下保持硬件解码，仅在显示字幕时切换到 CPU - 适用于"
+              "渲染路径在有字幕时使硬解视频变黑的驱动（如 nvidia-open）。",
+        "ru": "Сохраняет аппаратное декодирование везде, но переключается на "
+              "процессор только при показе субтитров - для драйверов (например "
+              "nvidia-open), у которых видео с субтитрами чернеет.",
+        "th": "คงการถอดรหัสด้วยฮาร์ดแวร์ไว้ทุกที่ แต่จะสลับไปใช้ CPU เฉพาะขณะ "
+              "เปิดซับไตเติล - สำหรับไดรเวอร์ (เช่น nvidia-open) ที่เส้นทางเรนเดอร์ "
+              "ทำให้วิดีโอที่ถอดรหัสด้วยฮาร์ดแวร์เป็นสีดำเมื่อมีซับไตเติล",
+    },
     "option_hwdec_safe": {
         "en": "On - safe (recommended)", "sv": "På - säker (rekommenderas)",
         "es": "Activada - segura (recomendado)",
