@@ -130,14 +130,41 @@ def main():
     w.mpv.play(a.file)
 
     def enable_sub():
-        print("[test] >>> enabling subtitle (sid=1) NOW - watch the video <<<")
+        tl = w.mpv.track_list or []
+        print("[test] tracks:")
+        for t in tl:
+            print(f"    type={t.get('type')} id={t.get('id')} "
+                  f"lang={t.get('lang')} title={t.get('title')} "
+                  f"codec={t.get('codec')}")
+        subs = [t for t in tl if t.get("type") == "sub"]
+        if not subs:
+            print("[test] !! NO subtitle tracks in this file - nothing to test. "
+                  "Use a file that has embedded subs (the one you saw break in "
+                  "the app), then re-run.")
+            return
+        sid = subs[0].get("id")
+        print(f"[test] >>> enabling subtitle sid={sid} "
+              f"(lang={subs[0].get('lang')} codec={subs[0].get('codec')}) - "
+              f"WATCH THE VIDEO NOW <<<")
         try:
-            w.mpv["sid"] = 1
+            w.mpv["sub-visibility"] = True
+            w.mpv["sid"] = sid
         except Exception as e:
-            print(f"[test] sid=1 failed: {e}; trying 'auto'")
-            w.mpv["sid"] = "auto"
+            print(f"[test] enabling sid={sid} failed: {e}")
+
+    def status():
+        m = w.mpv
+        try:
+            print(f"[test] status: sid={m['sid']} "
+                  f"video-black-check dwidth={m['dwidth']} "
+                  f"time={m['time-pos']:.1f} sub-text={m['sub-text']!r}")
+        except Exception:
+            pass
 
     QTimer.singleShot(4000, enable_sub)
+    st = QTimer()
+    st.timeout.connect(status)
+    st.start(2000)
     sys.exit(app.exec())
 
 
