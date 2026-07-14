@@ -142,10 +142,21 @@ h2 { font-size: clamp(1.7rem, 3.6vw, 2.3rem); letter-spacing: -.02em; margin: 0;
 .dl .meta .name { font-weight: 600; }
 .dl .meta .sub { font-family: var(--mono); font-size: 12px; color: var(--faint); }
 .dl .go { margin-left: auto; color: var(--accent); font-weight: 600; font-size: 14px; white-space: nowrap; }
-.autonote { margin-top: 18px; font-size: 13px; color: var(--faint); display: flex; align-items: center; gap: 9px; }
-.autonote code { font-family: var(--mono); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; color: var(--muted); }
+.autonote { margin-top: 18px; font-size: 13px; color: var(--faint); line-height: 1.75; }
+.autonote code { font-family: var(--mono); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; color: var(--muted); overflow-wrap: anywhere; }
 .autonote a.verify-link { color: var(--accent); font-weight: 600; }
 .autonote a.verify-link:hover { text-decoration: underline; }
+
+/* Open-source credits */
+.credits-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+@media (max-width: 720px) { .credits-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 440px) { .credits-grid { grid-template-columns: 1fr; } }
+.credit { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 15px 18px; }
+.credit h3 { margin: 0 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-family: var(--mono); font-weight: 700; }
+.credit p { margin: 0; font-size: .95rem; }
+.credit a { color: var(--accent); }
+.credit a:hover { text-decoration: underline; }
+.disclaimer { margin-top: 20px; font-size: 12px; line-height: 1.7; color: var(--faint); max-width: 74ch; }
 footer { border-top: 1px solid var(--line); padding: 36px 0 56px; margin-top: 20px; }
 footer .wrap { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
 footer .v { font-family: var(--mono); font-size: 12px; color: var(--faint); }

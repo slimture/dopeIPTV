@@ -197,8 +197,27 @@ foreach ($shots as [$file, $alt, $title, $cap]):
       </div>
       <p class="autonote">↻ Generated on the server from the <code>slimture/dopeIPTV</code> GitHub releases — new builds appear automatically.</p>
 <?php if (is_file(__DIR__ . '/files/SHA256SUMS')): ?>
-      <p class="autonote">🔒 Verify your download: <a class="verify-link" href="/files/SHA256SUMS">SHA-256 checksums</a> — <code>sha256sum -c SHA256SUMS</code> (hover a button to see its hash).</p>
+      <p class="autonote">🔒 Verify your download — <a class="verify-link" href="/files/SHA256SUMS">SHA-256 checksums</a> · <code>sha256sum -c SHA256SUMS</code></p>
 <?php endif; ?>
+    </div>
+  </section>
+
+  <section id="credits" style="padding-top:0;">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">Open source</span>
+        <h2>Free software, standing on giants.</h2>
+        <p>dopeIPTV is <b>free and open source</b> under the GPL-3.0 licence — no ads, no tracking, no accounts. It's built with, and grateful to, these projects and services:</p>
+      </div>
+      <div class="credits-grid">
+        <div class="credit"><h3>Playback</h3><p><a href="https://mpv.io" rel="noopener">mpv</a> &amp; <a href="https://ffmpeg.org" rel="noopener">FFmpeg</a>, via python-mpv</p></div>
+        <div class="credit"><h3>Interface</h3><p>Qt &amp; <a href="https://www.riverbankcomputing.com/software/pyqt/" rel="noopener">PyQt6</a></p></div>
+        <div class="credit"><h3>Casting</h3><p><a href="https://github.com/home-assistant-libs/pychromecast" rel="noopener">PyChromecast</a> — Google Cast</p></div>
+        <div class="credit"><h3>Metadata &amp; artwork</h3><p><a href="https://www.themoviedb.org" rel="noopener">The Movie Database (TMDB)</a></p></div>
+        <div class="credit"><h3>Watched sync</h3><p><a href="https://trakt.tv" rel="noopener">Trakt</a></p></div>
+        <div class="credit"><h3>Licences</h3><p><a href="<?= h($REPO) ?>/blob/main/docs/THIRD-PARTY-LICENSES.md" rel="noopener">GPL-3.0 &amp; third-party</a></p></div>
+      </div>
+      <p class="disclaimer">This product uses the TMDB API but is not endorsed or certified by TMDB. This product uses the Trakt API but is not endorsed or certified by Trakt. All trademarks are the property of their respective owners.</p>
     </div>
   </section>
 </main>
