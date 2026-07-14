@@ -1,0 +1,3 @@
+# Release assets are mirrored here by sync-releases.php at runtime - not committed.
+*
+!.gitignore
