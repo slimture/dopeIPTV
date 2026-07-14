@@ -164,7 +164,7 @@ QMainWindow, QDialog {{ background: {p['bg']}; }}
 
 QPushButton#NavBtn {{
     background: transparent; border: none; border-radius: 8px;
-    padding: 6px 12px; text-align: left; font-size: 13px; color: {p['text2']};
+    padding: 4px 12px; text-align: left; font-size: 13px; color: {p['text2']};
 }}
 QPushButton#NavBtn:hover  {{ background: {p['hover']}; }}
 QPushButton#NavBtn:checked {{ background: {ACCENT}; color: white; font-weight: 600; }}
