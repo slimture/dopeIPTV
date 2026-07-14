@@ -397,7 +397,18 @@ class _MpvGLWidget(QOpenGLWidget):
             self.mpv, "opengl",
             opengl_init_params={
                 "get_proc_address": self._proc_address_fn})
-        self._ctx.update_cb = lambda: self.frame_ready.emit()
+        # mpv fires this render-update callback from its OWN render thread.
+        # On Linux/macOS emitting a Qt signal from there is fine (Qt posts a
+        # queued repaint). On Windows that cross-thread signal emit access-
+        # violates inside libmpv's callback wrapper, so there we set no update
+        # callback and instead drive repaints from a main-thread timer
+        # (poll-render): slightly more GPU when idle, but rock-solid.
+        if sys.platform == "win32":
+            self._render_timer = QTimer(self)
+            self._render_timer.timeout.connect(self.update)
+            self._render_timer.start(16)          # ~60 fps
+        else:
+            self._ctx.update_cb = lambda: self.frame_ready.emit()
         _register_error_callback(self.mpv, self.playback_error)
 
     def paintGL(self) -> None:
