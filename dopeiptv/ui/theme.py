@@ -173,13 +173,14 @@ QPushButton#NavBtn[rail="true"] {{ text-align: center; padding: 8px 0; font-size
    pill with a border so they read as buttons (not plain text like the nav
    items), plus an obvious hover so it's clear they're clickable. */
 QPushButton#SideAction {{
-    background: {p['btn_hover']}; border: 1px solid {p['border_in']};
+    background: {p['sel']}; border: 1px solid {ACCENT};
     border-radius: 8px; padding: 9px 14px; text-align: center;
     font-size: 13px; font-weight: 600; color: {p['text']}; margin-top: 3px;
 }}
 QPushButton#SideAction:hover {{
-    background: {p['sel']}; border-color: {ACCENT}; color: {p['text']};
+    background: {ACCENT}; border-color: {ACCENT}; color: white;
 }}
+QPushButton#SideAction:pressed {{ background: {p['accent_hi']}; }}
 QPushButton#SideAction:pressed {{ background: {p['hover']}; }}
 QPushButton#SideAction[rail="true"] {{
     text-align: center; padding: 8px 0; font-size: 14px; font-weight: 600;
