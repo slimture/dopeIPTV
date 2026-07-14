@@ -16,7 +16,7 @@ from PyQt6.QtGui import (
     QAction, QColor, QIcon, QKeySequence, QShortcut,
 )
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QApplication, QFrame, QHBoxLayout,
+    QAbstractItemView, QApplication, QBoxLayout, QFrame, QHBoxLayout,
     QLabel, QLineEdit, QListWidget, QListWidgetItem,
     QMainWindow, QMenu, QMessageBox, QProgressBar, QPushButton, QScrollArea,
     QSizePolicy, QSplitter, QToolButton, QVBoxLayout, QWidget,
@@ -464,17 +464,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cat_list.customContextMenuRequested.connect(self._cat_menu)
         sl.addWidget(self.cat_list, 1)
 
-        self._guide_btn = guide_btn = QPushButton(
-            tr("btn_epg_guide"), objectName="SideAction")
-        guide_btn.setToolTip(tr("btn_epg_guide"))
-        guide_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
-                                QSizePolicy.Policy.Fixed)
-        guide_btn.clicked.connect(self._open_epg_guide)
-        sl.addWidget(guide_btn)
-
         # Contextual "Sync now" - only shown in the Trakt-backed lists
         # (Watched, Watch Later, Favorites -> Trakt) so the user can pull
-        # fresh data without digging into Settings.
+        # fresh data without digging into Settings. Sits above the action row.
         self._sync_now_btn = QPushButton(tr("btn_sync_now"))
         self._sync_now_btn.clicked.connect(self._sidebar_sync_now)
         # Deliberately loud (red, bold) so it's obvious when it appears -
@@ -487,6 +479,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._sync_now_btn.hide()
         sl.addWidget(self._sync_now_btn)
 
+        # EPG Guide + Settings sit side by side in one compact row rather than
+        # two stretched full-width pills. The row is a QBoxLayout whose
+        # direction flips to vertical on the collapsed icon rail (60 px is too
+        # narrow for two buttons abreast) - see _apply_sidebar_chrome.
+        self._guide_btn = guide_btn = QPushButton(
+            tr("btn_epg_guide"), objectName="SideAction")
+        guide_btn.setToolTip(tr("btn_epg_guide"))
+        guide_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
+                                QSizePolicy.Policy.Fixed)
+        guide_btn.clicked.connect(self._open_epg_guide)
         # (Reload lives in the menu bar's "Refresh playlist" and the
         # per-playlist auto-refresh setting; a sidebar button here was just
         # an easy mis-click.)
@@ -496,7 +498,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         settings_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
                                    QSizePolicy.Policy.Fixed)
         settings_btn.clicked.connect(self.open_settings)
-        sl.addWidget(settings_btn)
+        self._actions_box = QBoxLayout(QBoxLayout.Direction.LeftToRight)
+        self._actions_box.setContentsMargins(0, 0, 0, 0)
+        self._actions_box.setSpacing(6)
+        self._actions_box.addWidget(guide_btn)
+        self._actions_box.addWidget(settings_btn)
+        sl.addLayout(self._actions_box)
 
         # Middle column
         mid = QWidget(objectName="MiddlePane")
@@ -982,6 +989,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._settings_btn.setText("⚙" if collapsed else tr("btn_settings"))
         self._set_rail(self._guide_btn, collapsed)
         self._set_rail(self._settings_btn, collapsed)
+        # Side by side when expanded, stacked on the narrow rail.
+        if hasattr(self, "_actions_box"):
+            self._actions_box.setDirection(
+                QBoxLayout.Direction.TopToBottom if collapsed
+                else QBoxLayout.Direction.LeftToRight)
 
     def _apply_sidebar_collapsed(self) -> None:
         collapsed = getattr(self, "_sidebar_collapsed", False)
