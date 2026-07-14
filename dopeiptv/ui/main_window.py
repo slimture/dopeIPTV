@@ -914,6 +914,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.epg_lay.setSpacing(8)
         self.epg_lay.addStretch()
         self.epg_scroll.setWidget(self.epg_holder)
+        self.epg_scroll.setMinimumHeight(0)   # free to shrink on a short pane
         dl.addWidget(self.epg_scroll, 1)
 
         root.addWidget(side)
@@ -960,8 +961,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # height fits the docked player (which scales with screen width) plus
         # its control bar, the pane chrome and a little info. PiP temporarily
         # drops this and restores it on exit.
+        # Height must fit the docked player (box + control bar) AND the channel
+        # logo / info row beneath it, or the fixed-height player overlaps that
+        # row. box_h + 260 covers the player (~box_h+52), the 84px logo row,
+        # pane margins and window chrome, with the scroll areas free to shrink.
         box_h = getattr(self.player, "VIDEO_BOX_HEIGHT", 260) if self.player else 0
-        min_h = (box_h + 190) if self.player else 320
+        min_h = (box_h + 260) if self.player else 320
         self._base_min = QSize(700, min_h)
         self.setMinimumSize(self._base_min)
         # Parent the toast to the window itself, not the splitter: a QSplitter
@@ -1052,6 +1057,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if hasattr(self, "_lib_header"):
             self._lib_section_label.setVisible(not collapsed)
             self._lib_toggle.setVisible(not collapsed)
+            # On the rail, shrink the header's top gap so the library icons sit
+            # just a touch below Browse (not far down) while the inter-icon
+            # spacing stays the same in both groups. Expanded keeps a roomier
+            # gap under the LIBRARY label.
+            self._lib_header.layout().setContentsMargins(
+                0, 2 if collapsed else 8, 0, 0)
             self._library_box.setVisible(
                 collapsed or not self._lib_toggle.isChecked())
         # The category-search toggle (and its box) belong to the expanded
