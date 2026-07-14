@@ -1,20 +1,14 @@
 ## dopeIPTV 0.7.1
 
-The **Windows + polish** release: dopeIPTV now runs on **Windows** (portable
-build — unzip and run, no install), alongside a big pass of **responsive UI**
-and **timeshift** refinements. Linux and macOS are unchanged.
+A **UI/UX polish** release: a redesigned, responsive left panel, a layout that
+never overflows or overlaps at any window size, and a calmer timeshift player.
 
-**Highlights:** **Windows support** · **redesigned left panel** (icons + a
-collapsible library) · **responsive layout** that never overflows or overlaps ·
-**timeshift timeline auto-hides** · **accent colours follow your theme
-everywhere**.
+**Highlights:** **redesigned left panel** (icons + a collapsible library) ·
+**responsive layout** that never overflows or overlaps · **timeshift timeline
+auto-hides** · **accent colours follow your theme everywhere**.
 
 <details>
 <summary><b>Full release notes</b> — click to expand</summary>
-
-### Windows
-- **New Windows build** — a portable ZIP: unzip the folder and run `dopeiptv.exe`, nothing to install (works on locked-down machines). libmpv/FFmpeg bundled. Because it isn't code-signed yet, SmartScreen may prompt once — **More info → Run anyway**.
-- Fully separate from the Linux/macOS builds; those code paths are untouched.
 
 ### Left panel
 - **Icons for every nav item**, painted in the theme's muted tone (white when selected) and re-tinted when you change theme or accent — labels stay perfectly aligned.

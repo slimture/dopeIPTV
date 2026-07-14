@@ -531,23 +531,21 @@ jobs:
         env:
           LIBMPV_DIR: ${{ github.workspace }}/libmpv
         run: pyinstaller --noconfirm dopeiptv-win.spec   # -> dist/dopeiptv/
+      # Windows is still in TESTING - deliberately NOT attached to the public
+      # release. It's only uploaded as a CI artifact you download from the
+      # Actions run to test. Re-add a softprops/action-gh-release "Attach to
+      # release" step here (files: '*.zip', on refs/tags/) when Windows is ready
+      # to ship publicly.
       - name: Package portable zip
         shell: bash
         run: |
           V=${{ steps.v.outputs.version }}
           ( cd dist && 7z a "../dopeIPTV-${V}-windows-x64.zip" dopeiptv )
           ls -la *.zip
-      - name: Attach to release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: '*.zip'
-          body_path: RELEASE_NOTES.md
       # Upload the app FOLDER, not the .zip: the Actions artifact download UI
       # always re-zips whatever you give it, so uploading our .zip produced a
       # zip-in-a-zip. Uploading the folder means one unzip yields the runnable
-      # dopeiptv\ directory. (Release-tag downloads still get the single .zip
-      # attached above.)
+      # dopeiptv\ directory.
       - uses: actions/upload-artifact@v4
         with:
           name: dopeIPTV-windows-x64
