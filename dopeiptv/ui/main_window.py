@@ -9,11 +9,12 @@ import time
 from datetime import datetime
 
 from PyQt6.QtCore import (
-    QEvent, QRect, QSettings, QSize, Qt, QThreadPool,
+    QEvent, QPointF, QRect, QSettings, QSize, Qt, QThreadPool,
     QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QAction, QColor, QFont, QIcon, QKeySequence, QPainter, QPixmap, QShortcut,
+    QAction, QColor, QFont, QFontMetricsF, QIcon, QKeySequence, QPainter,
+    QPixmap, QShortcut,
 )
 from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QBoxLayout, QFrame, QHBoxLayout,
@@ -1031,12 +1032,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._cat_section_label.setVisible(not collapsed)
         self.cat_solo_btn.setVisible(not collapsed)
         self.cat_list.setVisible(not collapsed)
-        # Library group header (with its top gap) is an expanded-only
-        # affordance; hide the whole header widget on the rail so the library
-        # icons sit tight against the browse icons. The group's icons are
-        # always shown on the rail (honour the collapse only when expanded).
+        # Keep the Library header widget itself visible in both modes so its
+        # top gap always separates Browse from Library (you can see they're two
+        # groups). On the rail only its label + arrow hide - the gap stays. The
+        # group's icons are always shown on the rail (honour the collapse only
+        # when expanded).
         if hasattr(self, "_lib_header"):
-            self._lib_header.setVisible(not collapsed)
+            self._lib_section_label.setVisible(not collapsed)
+            self._lib_toggle.setVisible(not collapsed)
             self._library_box.setVisible(
                 collapsed or not self._lib_toggle.isChecked())
         # The category-search toggle (and its box) belong to the expanded
@@ -1587,8 +1590,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             f.setPixelSize(round(s * 0.82))
             pr.setFont(f)
             pr.setPen(QColor(color))
-            pr.drawText(QRect(0, 0, s, s),
-                        Qt.AlignmentFlag.AlignCenter, glyph + "︎")
+            g = glyph + "︎"
+            # Centre by the glyph's actual ink bounds, not the font's
+            # ascent/descent box - emoji glyphs carry uneven top/bottom bearing
+            # that otherwise pushes the icon visibly low against the label.
+            fm = QFontMetricsF(f)
+            br = fm.tightBoundingRect(g)
+            x = (s - br.width()) / 2.0 - br.x()
+            y = (s - br.height()) / 2.0 - br.y()
+            pr.drawText(QPointF(x, y), g)
             pr.end()
             icon.addPixmap(pm, QIcon.Mode.Normal, state)
         return icon

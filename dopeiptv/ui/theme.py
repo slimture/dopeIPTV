@@ -191,7 +191,7 @@ QPushButton#NavBtn {{
 }}
 QPushButton#NavBtn:hover  {{ background: {p['hover']}; }}
 QPushButton#NavBtn:checked {{ background: {ACCENT}; color: white; font-weight: 600; }}
-QPushButton#NavBtn[rail="true"] {{ text-align: center; padding: 8px 0; font-size: 19px; }}
+QPushButton#NavBtn[rail="true"] {{ text-align: center; padding: 4px 0; font-size: 19px; }}
 /* Guide / Settings: the sidebar's bottom actions. Give them a visible filled
    pill with a border so they read as buttons (not plain text like the nav
    items), plus an obvious hover so it's clear they're clickable. */
