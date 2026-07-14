@@ -118,12 +118,55 @@ class RecordingManager(QObject):
                         st = os.stat(p)
                     except OSError:
                         continue
-                    out.append({"name": os.path.splitext(n)[0], "_path": p,
-                                "_key": p, "_kind": "recording",
-                                "_size": st.st_size,
-                                "added": str(int(st.st_mtime))})
+                    info = self.read_info(p)
+                    out.append({
+                        "name": info.get("title") or os.path.splitext(n)[0],
+                        "_path": p, "_key": p, "_kind": "recording",
+                        "_size": st.st_size, "added": str(int(st.st_mtime)),
+                        "_desc": info.get("description", ""),
+                        "_filename": os.path.splitext(n)[0]})
         out.sort(key=lambda f: f["added"], reverse=True)
         return out
+
+    # -- editable info (title / description) sidecar --------------------------
+
+    @staticmethod
+    def info_path(video_path: str) -> str:
+        return video_path + ".info.json"
+
+    def read_info(self, video_path: str) -> dict:
+        try:
+            with open(self.info_path(video_path), "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+            return data if isinstance(data, dict) else {}
+        except (OSError, ValueError):
+            return {}
+
+    def write_info(self, video_path: str, title: str, description: str) -> None:
+        """Save a title/description sidecar next to the recording. Writing empty
+        values removes the sidecar so the filename is used again."""
+        sidecar = self.info_path(video_path)
+        title, description = title.strip(), description.strip()
+        if not title and not description:
+            try:
+                os.remove(sidecar)
+            except OSError:
+                pass
+            return
+        try:
+            with open(sidecar, "w", encoding="utf-8") as fh:
+                json.dump({"title": title, "description": description}, fh)
+        except OSError:
+            pass
+
+    def move_info(self, old_video: str, new_video: str) -> None:
+        """Keep the sidecar attached when a recording is renamed or moved."""
+        src = self.info_path(old_video)
+        if os.path.exists(src):
+            try:
+                shutil.move(src, self.info_path(new_video))
+            except OSError:
+                pass
 
     # -- recorder backend ---------------------------------------------------
 

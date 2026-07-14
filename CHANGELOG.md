@@ -1,0 +1,146 @@
+# Changelog
+
+All notable changes to dopeIPTV, newest first. This project loosely follows
+[Keep a Changelog](https://keepachangelog.com/) and
+[Semantic Versioning](https://semver.org/). Each release is also published, with
+downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
+
+## [0.7.0]
+
+**Timeshift &amp; catch-up TV**: scrub back into a channel's archive on a live
+timeline, pause live TV, or jump to a specific past programme — plus a
+**reminders manager**, **search everywhere**, **customizable keyboard
+shortcuts**, and **rock-solid video playback** by default.
+
+<details>
+<summary><b>Full notes</b></summary>
+
+### Timeshift, catch-up &amp; DVR
+- **Live timeline** on timeshift channels — scrub back into the provider's archive and watch what already aired.
+- **DVR-style pause** — pause live TV and resume behind live; the player shows how far behind live you are and drops the LIVE tag the moment you pause.
+- **Pick a specific past programme** from the guide and play just that show, with a seek bar clamped to the programme's own length.
+- **Archive-depth learning** — the app learns how far back each channel really reaches, adapts the “go back” span to it, and recovers gracefully from over-deep requests instead of dropping the channel.
+- **Catch-up from History** — resume timeshift straight from a channel in your History, with a catch-up marker on those rows.
+- **Per-channel reset** — right-click a timeshift channel to clear its learned archive state.
+- Amber timeshift markers, a **Go-live** button, and arrow-key scrubbing (fine-seek inside a segment, Shift+arrow for a coarse timeline step).
+
+### Reminders &amp; guide
+- **Reminders manager** — find, review and multi-delete programme reminders in one place; the store is crash-proof against decorated rows.
+- **Programme search across the whole guide** — find a show by name anywhere in the EPG.
+- **Configurable “upcoming programmes”** in the detail pane (default 5, adjustable).
+- Guide polish: a **Close** button, centring over the main window, and deeper EPG fetches.
+
+### Search everywhere
+- **Category search** — match category names *and* the channels inside them, with smart ranking; collapsible on the sidebar.
+- **Left-column search** in Favorites, Watch Later, Watched, Recordings and History.
+- **Jump-to-now-playing** (sidebar logo) also selects the playing channel's category.
+
+### Keyboard &amp; navigation
+- **Customizable keyboard-shortcuts editor** with sensible per-OS defaults.
+
+### Video &amp; playback
+- **Software decoding is now the default** — like standalone mpv. Modern CPUs handle even 4K 10-bit HEVC/HDR comfortably, and it's immune to the GPU/driver render hazards that could black out hardware-decoded video with subtitles (e.g. the nvidia-open stack).
+- **Hardware decoding is an opt-in** setting (Settings → Playback → Video) for those who want it, with mpv's `hwdec-software-fallback` as a safety net for genuine decoder failures.
+- **Video filters** — optional deinterlace, sharpen and HDR tone-mapping, plus a **Video** menu in the in-player options.
+- Faster channel switching via a light stream probe for live zapping (full analysis is kept for VOD).
+
+### Recordings
+- **Editable recording title &amp; description.**
+- Recording **stops cleanly when you switch the channel** it's capturing.
+
+### Settings &amp; interface
+- Playback settings are **grouped and scrollable**, and **scrolling the page never changes a control** — you have to click into it.
+- **Themed spin boxes** (fixes the white-on-white “upcoming count” box) and a tidy **Maintenance** row.
+
+### Fixes
+- **Fixed an exit segfault** on newer Python during teardown.
+- **macOS:** arrow-key scrubbing works, and Picture-in-Picture stays floating.
+- Audio no longer goes silent after switching a movie to a TV channel.
+</details>
+
+## [0.6.4]
+
+Stability &amp; housekeeping: **4K plays smoothly**, the app **no longer bloats or
+slows down over time**, and **live TV recovers from drops on its own** — plus
+continue watching, EPG reminders, and a discreet update check.
+
+<details>
+<summary><b>Full notes</b></summary>
+
+### Smooth 4K &amp; playback stability
+- **Fixed the periodic 4K stutter.** The resume‑position save was rewriting the whole multi‑MB settings file every 12 s — it now lives in its own small file, so playback is never hitched by it.
+- **Fixed the video stutter when dragging the volume slider** (and other quick settings): the big TMDB/Trakt caches shared that same file, so they've moved to a dedicated `cache.ini` and small writes are instant.
+- **Hardware decoding on by default** (`hwdec=auto-copy-safe`) for smooth 4K across GPUs, with `DOPEIPTV_HWDEC` / `DOPEIPTV_DEMUX_MAX` / `DOPEIPTV_VIDEO_SYNC` escape hatches.
+- Audio no longer goes silent after switching a movie to a TV channel.
+
+### No bloat or slow‑down over time
+- **TMDB caches are now capped** so months of browsing can't grow them without bound.
+- **EPG guides are gzip‑compressed on disk** (hundreds of MB → tens) — raw guide and parsed index.
+- **Orphaned EPG caches are cleaned up at startup** — guides for playlists you've removed no longer pile up (can reclaim gigabytes).
+- New **Settings → Playback → “Refresh guide now”** and **“Clear EPG cache”**.
+
+### Live TV
+- **Live streams reconnect on drop** instead of freezing on the last frame.
+- **“Auto‑reconnect live streams” toggle** — turn it off on a single‑connection/shared account so the app doesn't grab the connection back from another device.
+- **Zap conveniences:** a “last channel” key and type‑a‑number to jump.
+- **Double‑click to play a channel** by default (single‑click / arrow‑key zapping is now an opt‑in setting).
+- **Account status panel:** expiry, days left, and connections for the selected provider.
+
+### Continue watching &amp; Recently added
+- **Continue watching** for partly‑watched movies **and** episodes, with the series' artwork + name on episode rows — under both Movies and Series.
+- **Recently added** — newest Movies and Series first.
+
+### EPG &amp; reminders
+- **Programme reminders** — get notified when a show starts, then tune straight in.
+- Clearer loading: a centred spinner and a label that names what's loading.
+
+### Player extras
+- **Next‑episode button** and **auto‑play the next episode** at the end.
+- **Sleep timer** — stop playback after a chosen number of minutes (presets or custom).
+- Stats‑for‑nerds fixes (no more blank rows).
+
+### Trakt &amp; Settings
+- Simpler Trakt connect (connect via browser).
+- Watched rows are named from Trakt's own title when TMDB has no match.
+
+### Polish &amp; fixes
+- **Discreet update indicator** — a small “Update available” pill in the sidebar when a newer release is out (once‑a‑day background check; opt out in Settings → Interface).
+- Sidebar rail collapses/expands smoothly within a single drag and snaps clean on release.
+- Version numbers realigned, a latent startup crash fixed, and debug scaffolding removed.
+</details>
+
+## [0.6.3]
+
+A stability‑and‑polish release: **keyboard shortcuts** across the player and EPG
+guide, a **calmer progress indicator**, and a batch of **playback stability**
+fixes — plus the app is now **Flathub‑ready** (fully offline build).
+
+<details>
+<summary><b>Full notes</b></summary>
+
+### Keyboard shortcuts
+- **Global:** `Ctrl+G` opens the EPG guide, `Ctrl+B` toggles the sidebar rail, `Ctrl+Shift+M` toggles focus mode.
+- **While the player is up:** `M` mute, `P` Picture‑in‑Picture, `R` record, `I` stream stats, `←`/`→` zap channels, `↑`/`↓` nudge the volume.
+- **In the EPG grid:** `N` jumps to now, `P` to the playing channel, `Enter` plays the selected programme.
+
+### Progress indicator
+- The loading strip is now a **steady indeterminate indicator** instead of a percentage bar that could stick at “100%”.
+- A **watchdog** clears it automatically if a background job never reports back.
+
+### Playback stability
+- **Auto‑reconnect** — a live stream that drops on a network hiccup retries quietly instead of failing.
+- **Stall recovery** — a watchdog notices a frozen picture and recovers it.
+- **No drop on window move** — moving/reparenting the window no longer tears down and rebuilds the video.
+
+### Packaging
+- **Flathub‑ready** — the Flatpak manifest builds **fully offline** from pinned, vendored wheels, plus a submission guide.
+- Fresh **store screenshots**.
+</details>
+
+## Earlier releases
+
+Notes for **0.6.2** and earlier are on the
+[GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
+
+[0.6.4]: https://github.com/slimture/dopeIPTV/compare/v0.6.3...v0.6.4
+[0.6.3]: https://github.com/slimture/dopeIPTV/compare/v0.6.2...v0.6.3

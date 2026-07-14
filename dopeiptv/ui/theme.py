@@ -136,6 +136,14 @@ def apply_theme(settings=None, theme: str | None = None,
 apply_theme()
 
 
+def _rgba(hex_color: str, alpha: float) -> str:
+    """A CSS rgba() string from a #rrggbb colour - used for subtle, tinted
+    borders/fills that let some background show through."""
+    c = (hex_color or "#000000").lstrip("#")
+    r, g, b = int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16)
+    return f"rgba({r},{g},{b},{alpha})"
+
+
 def build_style() -> str:
     """Generate the full application QSS from the active palette."""
     p = dict(P)
@@ -217,14 +225,26 @@ QSlider::handle:horizontal:hover {{ background: {p['accent_hi']}; }}
 #DetailTitle {{ font-size: 20px; font-weight: 700; }}
 #DetailMeta  {{ color: {p['muted']}; font-size: 12px; }}
 #NowTitle    {{ font-size: 15px; font-weight: 600; }}
-#NowTime     {{ color: {ACCENT}; font-size: 12px; font-weight: 600; }}
+#NowTime     {{ color: {ACCENT}; font-size: 11px; font-weight: 700; }}
 #NowDesc     {{ color: {p['text3']}; font-size: 12px; }}
 
 QFrame#Card {{
     background: {p['input']}; border: 1px solid {p['border_in']}; border-radius: 12px;
 }}
-QLabel#EpgRowTime  {{ color: {ACCENT}; font-size: 11px; font-weight: 600; }}
-QLabel#EpgRowTitle {{ font-size: 12px; }}
+/* "On now" card: an accent-tinted panel with a left accent rail, so the
+   current programme reads as highlighted rather than a plain grey box. */
+QFrame#NowCard {{
+    background: {_rgba(ACCENT, 0.10)};
+    border: 1px solid {_rgba(ACCENT, 0.30)};
+    border-left: 2px solid {ACCENT};
+    border-radius: 12px;
+}}
+/* Upcoming programmes: slim rows (time | title) with a hover cue, instead of
+   heavy bordered cards. */
+QFrame#EpgRow {{ background: transparent; border: none; border-radius: 8px; }}
+QFrame#EpgRow:hover {{ background: {p['hover']}; }}
+QLabel#EpgRowTime  {{ color: {ACCENT}; font-size: 12px; font-weight: 700; }}
+QLabel#EpgRowTitle {{ font-size: 13px; }}
 
 QPushButton {{
     background: {p['btn']}; border: 1px solid {p['btn_hover']}; border-radius: 9px;
@@ -233,6 +253,11 @@ QPushButton {{
 QPushButton:hover  {{ background: {p['btn_hover']}; }}
 QPushButton#Primary {{ background: {ACCENT}; border: none; color: white; }}
 QPushButton#Primary:hover {{ background: {p['accent_hi']}; }}
+/* The poster play/pause/stop overlay is just a white glyph (drawn in code with
+   a faint dark outline so it reads over any artwork) - no disc or ring. Fully
+   transparent button; a barely-there wash on hover is the only chrome. */
+QPushButton#PlayGhost {{ background: transparent; border: none; padding: 0; }}
+QPushButton#PlayGhost:hover {{ background: rgba(255,255,255,0.10); border-radius: 6px; }}
 QPushButton#MiniBtn {{
     padding: 0; font-size: 13px; border-radius: 6px; text-align: center;
 }}
@@ -379,6 +404,32 @@ QLineEdit {{
     padding: 8px 10px;
 }}
 QLineEdit:focus {{ border: 1px solid {ACCENT}; }}
+
+QSpinBox, QDoubleSpinBox {{
+    background: {p['input']}; color: {p['text']};
+    border: 1px solid {p['border_in']}; border-radius: 8px;
+    padding: 5px 8px; font-size: 12px;
+}}
+QSpinBox:focus, QDoubleSpinBox:focus {{ border: 1px solid {ACCENT}; }}
+QSpinBox::up-button, QSpinBox::down-button,
+QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{
+    subcontrol-origin: border; width: 16px; border: none;
+    background: transparent;
+}}
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
+    image: none; width: 0; height: 0;
+    border-left: 4px solid transparent; border-right: 4px solid transparent;
+    border-bottom: 5px solid {p['muted2']};
+}}
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
+    image: none; width: 0; height: 0;
+    border-left: 4px solid transparent; border-right: 4px solid transparent;
+    border-top: 5px solid {p['muted2']};
+}}
+QSpinBox::up-arrow:hover, QDoubleSpinBox::up-arrow:hover {{
+    border-bottom-color: {p['text']}; }}
+QSpinBox::down-arrow:hover, QDoubleSpinBox::down-arrow:hover {{
+    border-top-color: {p['text']}; }}
 
 QFileDialog QTreeView, QFileDialog QListView {{
     background: {p['input']}; border: 1px solid {p['border_in']};

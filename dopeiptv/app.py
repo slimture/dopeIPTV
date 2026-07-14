@@ -9,23 +9,27 @@ from pathlib import Path
 from PyQt6.QtCore import QSettings, Qt
 from PyQt6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPixmap
 from PyQt6.QtWidgets import (
-    QApplication, QLabel, QMessageBox, QProxyStyle, QStyle,
+    QApplication, QLabel, QMessageBox, QProxyStyle, QPushButton, QStyle,
 )
 
 
 class _NoButtonIconsStyle(QProxyStyle):
-    """Strip the platform theme icons Qt puts on OK / Cancel / Save dialog
-    buttons (a green tick, a red cross, ...). We want clean text-only buttons
-    everywhere - most visibly in Settings on Linux themes that ship those
-    icons. Only this one style hint is overridden; everything else defers to
-    the real platform style, so nothing else changes on any OS."""
+    """Clean, text-only dialog buttons everywhere. Two platform-theme defaults
+    are overridden: the icons Qt puts on OK / Cancel / Save buttons (a green
+    tick, a red cross, ...), and the mnemonic underline drawn under a button
+    letter (the 'O' in OK, the 'C' in Cancel). The underline override is scoped
+    to push buttons, so menus keep their accelerator underlines; everything else
+    defers to the real platform style, so nothing else changes on any OS."""
 
     def styleHint(self, hint, option=None, widget=None, returnData=None):
         if hint == QStyle.StyleHint.SH_DialogButtonBox_ButtonsHaveIcons:
             return 0
+        if (hint == QStyle.StyleHint.SH_UnderlineShortcut
+                and isinstance(widget, QPushButton)):
+            return 0
         return super().styleHint(hint, option, widget, returnData)
 
-from . import APP_NAME, ORG, VERSION
+from . import APP_NAME, BUILD_VERSION, ORG, VERSION
 from .providers.client import OfflineClient, make_client
 from .ui.dialogs import PlaylistDialog
 from .ui.main_window import MainWindow
@@ -157,7 +161,7 @@ def main() -> int:
     """Launch the application."""
     # One unconditional startup line so packaging smoke tests can prove
     # Python + our package imported cleanly before any GL/Qt init runs.
-    print(f"[dopeIPTV] {VERSION} starting", file=sys.stderr, flush=True)
+    print(f"[dopeIPTV] {BUILD_VERSION} starting", file=sys.stderr, flush=True)
 
     if "--self-check" in sys.argv:
         # GUI-less packaging check: did the *bundled* libmpv load? This runs
@@ -318,4 +322,13 @@ def main() -> int:
     for _ in range(5):
         app.processEvents()
 
-    return app.exec()
+    rc = app.exec()
+    # After the event loop returns, MainWindow.closeEvent has already torn down
+    # mpv, recording, casting and flushed all persistence. Letting the Python
+    # interpreter then garbage-collect the Qt object tree (notably the libmpv
+    # QOpenGLWidget) can segfault on shutdown - the C++ objects get freed in an
+    # order sip/PyQt don't guarantee, especially on newer Pythons. Everything
+    # important is already released, so exit hard and skip that GC teardown.
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(rc if isinstance(rc, int) else 0)

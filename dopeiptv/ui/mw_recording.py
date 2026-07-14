@@ -50,14 +50,14 @@ class _RecordingMixin:
             self._load_items(
                 cur.data(Qt.ItemDataRole.UserRole) if cur else None)
         elif n:
-            self._set_status(
-                f"● Recording {n} stream{'s' if n > 1 else ''}...")
+            # Transient only - the persistent "● REC" pill is the lasting
+            # indicator. A resting _set_status here used to linger as
+            # "Recording N streams" long after recording had stopped.
+            self._flash_status(
+                f"● Recording {n} stream{'s' if n > 1 else ''}…")
 
     def _on_recording_stopped(self, title: str, reason: str) -> None:
-        abnormal = reason not in ("finished", "stopped")
-        self._set_status(
-            f"● Recording stopped: {title} ({reason})",
-            error=abnormal)
+        self._flash_status(f"● Recording stopped: {title} ({reason})")
         if self._player_fs and self.player:
             self.player.set_overlay_info(
                 f"Recording stopped: {title} ({reason})")
@@ -140,12 +140,17 @@ class _RecordingMixin:
             f"your account only allows one stream at a time, starting "
             f"“{title}” can kill that recording.",
             [("Watch the recorded channel", "primary"),
+             ("Stop recording and switch", "danger"),
              ("Play anyway (I have multiple streams)", "normal"),
              ("Cancel", "normal")])
         if idx == 0:
             self._watch_recording_file(j)
             return False
         if idx == 1:
+            for k in active:
+                self.rec.cancel(k["id"])
+            return True
+        if idx == 2:
             self._multi_stream_ok = True
             return True
         return False
@@ -304,12 +309,12 @@ class _RecordingMixin:
         mult = {"MB": 10**6, "GB": 10**9, "TB": 10**12}[unit_box.currentData()]
         self.rec.session_cap = int(val * mult)
 
-    def _record_now(self, it, minutes) -> None:
+    def _record_now(self, it, minutes, title_override=None) -> None:
         if it.get("stream_id") is None:
             return
         if not self._within_storage_cap():
             return
-        title = self.channel_display_name(it)
+        title = title_override or self.channel_display_name(it)
         now = time.time()
         stop_ts = None if minutes is None else now + minutes * 60
         length = ("until stopped" if minutes is None
@@ -526,6 +531,7 @@ class _RecordingMixin:
         for it in items:
             try:
                 os.remove(it["_path"])
+                self.rec.write_info(it["_path"], "", "")  # drop info sidecar
                 self.rec.prune_path(it["_path"])
             except OSError as e:
                 self._set_status(
@@ -550,8 +556,44 @@ class _RecordingMixin:
             name + os.path.splitext(path)[1])
         try:
             os.rename(path, new_path)
+            self.rec.move_info(path, new_path)   # keep the info sidecar attached
         except OSError as e:
             QMessageBox.warning(self, tr("msg_rename_rec_title"), str(e))
+        cur = self.cat_list.currentItem()
+        self._load_items(
+            cur.data(Qt.ItemDataRole.UserRole) if cur else None)
+
+    def _edit_recording_info(self, it) -> None:
+        """Let the user set a display title and description for a recording,
+        stored in a sidecar next to the file (the filename stays untouched)."""
+        path = it.get("_path")
+        if not path:
+            return
+        info = self.rec.read_info(path)
+        d = QDialog(self)
+        d.setWindowTitle(tr("rec_info_title"))
+        d.setMinimumWidth(420)
+        lay = QVBoxLayout(d)
+        lay.setContentsMargins(16, 16, 16, 16)
+        lay.setSpacing(8)
+        lay.addWidget(QLabel(tr("rec_info_name")))
+        title_edit = QLineEdit(info.get("title") or it.get("_filename", ""))
+        lay.addWidget(title_edit)
+        lay.addWidget(QLabel(tr("rec_info_desc")))
+        from PyQt6.QtWidgets import QPlainTextEdit
+        desc_edit = QPlainTextEdit(info.get("description", ""))
+        desc_edit.setMinimumHeight(120)
+        lay.addWidget(desc_edit)
+        btns = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save
+            | QDialogButtonBox.StandardButton.Cancel)
+        btns.accepted.connect(d.accept)
+        btns.rejected.connect(d.reject)
+        lay.addWidget(btns)
+        if d.exec() != QDialog.DialogCode.Accepted:
+            return
+        self.rec.write_info(path, title_edit.text(),
+                            desc_edit.toPlainText())
         cur = self.cat_list.currentItem()
         self._load_items(
             cur.data(Qt.ItemDataRole.UserRole) if cur else None)
@@ -562,8 +604,9 @@ class _RecordingMixin:
         try:
             os.makedirs(target, exist_ok=True)
             for it in items:
-                shutil.move(it["_path"], os.path.join(
-                    target, os.path.basename(it["_path"])))
+                dest = os.path.join(target, os.path.basename(it["_path"]))
+                shutil.move(it["_path"], dest)
+                self.rec.move_info(it["_path"], dest)
         except OSError as e:
             QMessageBox.warning(self, tr("msg_move_rec_title"), str(e))
         self._load_categories()
@@ -609,16 +652,196 @@ class _RecordingMixin:
 
     # -- timeshift / catch-up ------------------------------------------------------
 
-    @staticmethod
-    def _timeshift_days(it) -> int:
+    def _timeshift_days(self, it) -> int:
         try:
+            # A channel we've learned doesn't actually serve catch-up (the
+            # provider set tv_archive but the archive URL returns HTML/live) is
+            # no longer treated as timeshift, so its marker + menu disappear.
+            if str(self._item_key(it)) in self._ts_broken_set():
+                return 0
             if int(it.get("tv_archive") or 0):
                 return int(it.get("tv_archive_duration") or 1) or 1
         except (TypeError, ValueError):
             pass
         return 0
 
-    def _play_timeshift(self, it, back_min=None, prog=None) -> None:
+    # How long a learned catch-up failure sticks before the channel is
+    # re-tested - so a channel that gains a real archive later lights up again
+    # on its own, without waiting for a manual refresh.
+    TS_BROKEN_TTL = 14 * 86400   # 14 days
+
+    def _ts_broken_map(self) -> dict:
+        """{channel_key: failed_at_epoch} for this playlist. Loaded lazily and
+        cached; persisted so it survives sessions."""
+        pid = ((self.playlist_store.active() or {}).get("id", "")
+               if self.playlist_store else "")
+        if getattr(self, "_ts_broken_pid", None) != pid:
+            raw = str(self.settings.value(f"ts_broken/{pid}", "") or "")
+            m: dict = {}
+            for tok in raw.split(","):
+                if ":" in tok:
+                    k, _, ts = tok.rpartition(":")
+                    try:
+                        m[k] = float(ts)
+                    except ValueError:
+                        pass
+                elif tok:
+                    m[tok] = 0.0   # legacy entry (no timestamp) - never expires
+            self._ts_broken = m
+            self._ts_broken_pid = pid
+        return self._ts_broken
+
+    def _ts_broken_set(self) -> set:
+        """Channel keys still considered broken (failure within the TTL)."""
+        now = time.time()
+        return {k for k, ts in self._ts_broken_map().items()
+                if ts == 0.0 or now - ts < self.TS_BROKEN_TTL}
+
+    def _save_ts_broken(self) -> None:
+        pid = getattr(self, "_ts_broken_pid", "")
+        m = self._ts_broken
+        self.settings.setValue(
+            f"ts_broken/{pid}",
+            ",".join(f"{k}:{int(ts)}" for k, ts in sorted(m.items())))
+
+    def _mark_ts_broken(self, it) -> None:
+        if it is None:
+            return
+        key = str(self._item_key(it))
+        m = self._ts_broken_map()
+        if key:
+            m[key] = time.time()
+            self._save_ts_broken()
+            # Redraw so the amber ◀◀ marker drops immediately.
+            self.listw.viewport().update()
+
+    # How much a "go back to the limit" request is pulled inside the stated
+    # depth, how shallow a failing request must be to count as "no archive at
+    # all" (learn-and-hide), and how long a learned real-depth cap sticks.
+    TS_MARGIN_MIN = 10               # 10 min inside the deepest requestable point
+    # Only a failure this shallow (~the smallest 'go back' step) means the
+    # channel serves NO catch-up at all. Anything deeper failing just caps the
+    # learned depth - it must never unmark a channel that works closer to live.
+    TS_SHALLOW_MIN = 45              # <= 45 min back (the 30-min step + slack)
+    TS_DEPTH_TTL = 14 * 86400        # a learned short depth re-expands after 14 d
+
+    def _clear_ts_broken(self) -> None:
+        """Forget learned catch-up failures (manual refresh / reset button) so
+        the provider's tv_archive flags are trusted again."""
+        pid = ((self.playlist_store.active() or {}).get("id", "")
+               if self.playlist_store else "")
+        self.settings.remove(f"ts_broken/{pid}")
+        self.settings.remove(f"ts_depth/{pid}")
+        self._ts_broken = {}
+        self._ts_broken_pid = pid
+        self._ts_depth = {}
+        self._ts_depth_pid = pid
+        if hasattr(self, "listw"):
+            self.listw.viewport().update()
+
+    # -- learned real archive depth ------------------------------------------
+    # A provider's tv_archive_duration can overstate what it actually serves,
+    # so a request near the stated limit fails. We remember the shallowest depth
+    # (minutes back) that failed and only offer/allow less than that - without
+    # unmarking the channel as timeshift. Stored with a timestamp so a transient
+    # failure re-expands after a while.
+
+    def _ts_depth_map(self) -> dict:
+        """{channel_key: (fail_minutes, learned_at)} for this playlist."""
+        pid = ((self.playlist_store.active() or {}).get("id", "")
+               if self.playlist_store else "")
+        if getattr(self, "_ts_depth_pid", None) != pid:
+            raw = str(self.settings.value(f"ts_depth/{pid}", "") or "")
+            m: dict = {}
+            for tok in raw.split(","):
+                parts = tok.split(":")
+                if len(parts) >= 2 and parts[0]:
+                    try:
+                        mins = int(float(parts[1]))
+                        ts = float(parts[2]) if len(parts) >= 3 else 0.0
+                    except ValueError:
+                        continue
+                    m[parts[0]] = (mins, ts)
+            self._ts_depth = m
+            self._ts_depth_pid = pid
+        return self._ts_depth
+
+    def _save_ts_depth(self) -> None:
+        pid = getattr(self, "_ts_depth_pid", "")
+        self.settings.setValue(
+            f"ts_depth/{pid}",
+            ",".join(f"{k}:{v[0]}:{int(v[1])}"
+                     for k, v in sorted(self._ts_depth.items())))
+
+    def _learn_ts_maxdepth(self, it, minutes: int) -> None:
+        """A catch-up request at *minutes* back failed: the real archive is
+        shorter. Record it (only ever tightening) so the menu/requests shrink."""
+        key = str(self._item_key(it))
+        m = self._ts_depth_map()
+        cur = m.get(key)
+        if cur is None or minutes < cur[0]:
+            m[key] = (int(minutes), time.time())
+            self._save_ts_depth()
+            if hasattr(self, "listw"):
+                self.listw.viewport().update()
+
+    def _confirm_ts_depth(self, it, minutes: int) -> None:
+        """A catch-up request at *minutes* back worked: if a stale (shorter) cap
+        was learned, the archive actually reaches this deep, so drop it."""
+        key = str(self._item_key(it))
+        m = self._ts_depth_map()
+        cur = m.get(key)
+        if cur is not None and minutes >= cur[0]:
+            del m[key]
+            self._save_ts_depth()
+
+    def _effective_ts_minutes(self, it) -> int:
+        """The deepest catch-up we'll actually request (minutes back): the
+        provider's stated depth, capped by any learned-shorter real depth, and
+        always pulled a margin inside so the very oldest edge isn't requested."""
+        days = self._timeshift_days(it)
+        if not days:
+            return 0
+        full = days * 1440
+        cur = self._ts_depth_map().get(str(self._item_key(it)))
+        if cur and (cur[1] == 0.0 or time.time() - cur[1] < self.TS_DEPTH_TTL):
+            full = min(full, cur[0])
+        return max(self.TS_MARGIN_MIN, full - self.TS_MARGIN_MIN)
+
+    @staticmethod
+    def _ts_provider_flagged(it) -> bool:
+        """Whether the provider marks this channel as having catch-up
+        (tv_archive), independent of any learned-broken state - i.e. a
+        'timeshift channel' from the user's point of view."""
+        try:
+            return bool(it) and int(it.get("tv_archive") or 0) > 0
+        except (TypeError, ValueError):
+            return False
+
+    def _reset_channel_timeshift(self, it) -> None:
+        """Forget a single channel's learned catch-up failure and short-depth
+        cap, so its ◀◀ marker, full menu and archive depth come back. Used from
+        the live channel's context menu."""
+        key = str(self._item_key(it))
+        m = self._ts_broken_map()
+        if key in m:
+            del m[key]
+            self._save_ts_broken()
+        dm = self._ts_depth_map()
+        if key in dm:
+            del dm[key]
+            self._save_ts_depth()
+        if hasattr(self, "listw"):
+            self.listw.viewport().update()
+        self._flash_status(tr("ts_reset_done_one"))
+
+    def _play_timeshift(self, it, back_min=None, prog=None,
+                        prog_origin=None, _depth_retry=False) -> None:
+        # prog_origin: the picked programme's *original* start (the seek-bar's
+        # 0-point). Set when re-loading the archive at a scrubbed position so
+        # the bar keeps spanning the whole programme with the playhead offset,
+        # instead of restarting the bar at each seek. Defaults to the segment
+        # start for a fresh programme pick.
         sid = it.get("stream_id")
         days = self._timeshift_days(it)
         if sid is None or not days:
@@ -626,23 +849,150 @@ class _RecordingMixin:
         now = time.time()
         if prog:
             start = prog["start_timestamp"]
-            duration_min = max(
-                1, int((prog["stop_timestamp"] - start) // 60) + 2)
             what = prog.get("title") or "programme"
         else:
             start = now - (back_min or 30) * 60
-            duration_min = max(1, int((now - start) // 60) + 1)
             what = None
-        start = max(start, now - days * 86400)
+        # Clamp to the effective archive depth: the provider's stated depth,
+        # capped by any learned-shorter real depth, and a margin inside the
+        # oldest edge (providers drop the last few minutes, so a request at the
+        # exact stated limit lands just past the end and fails).
+        floor = now - self._effective_ts_minutes(it) * 60
+        # A failure on a request *near the limit* only means that depth isn't
+        # available - it must NOT unmark a working channel. Only a shallow,
+        # un-clamped request failing implies no catch-up at all (learn-and-hide).
+        clamped = start < floor - 1
+        start = max(start, floor)
+        requested_back_min = (now - start) / 60.0
+        if prog:
+            duration_min = max(
+                1, int((prog["stop_timestamp"] - start) // 60) + 2)
+        else:
+            duration_min = max(1, int((now - start) // 60) + 1)
+        # Only a shallow "go back N" that fails means the channel serves no
+        # catch-up at all. A programme pick / scrub is never allowed to unmark
+        # a channel (a picked-programme URL can fail on a channel whose plain
+        # archive works fine), and a retry never unmarks either.
+        allow_mark_broken = (not _depth_retry and prog is None
+                             and not clamped
+                             and requested_back_min <= self.TS_SHALLOW_MIN)
         start += self._replay_delay_minutes() * 60
-        url = self.client.timeshift_url(
+        # Candidate archive-URL formats (providers differ). Play the first;
+        # _playback_error walks to the next on an early failure so we auto-pick
+        # whichever scheme this provider actually serves.
+        urls = self.client.timeshift_urls(
             sid, datetime.fromtimestamp(start), duration_min)
+        if not urls:
+            return
+        if os.environ.get("DOPEIPTV_TS_DEBUG"):
+            import sys
+            print(f"[dopeIPTV][ts] probe back_min={back_min} prog={bool(prog)} "
+                  f"days={days} start={datetime.fromtimestamp(start)} "
+                  f"candidates={urls}", file=sys.stderr)
         name = self.channel_display_name(it)
         title = (f"{what} ({name}, timeshift)" if what
                  else f"{name} (timeshift)")
-        self._start_playback(url, title, it.get("stream_icon"),
-                             self._item_key(it), "live", record=False,
-                             item=it)
+        key = self._item_key(it)
+        # Probe the candidate URLs over HTTP in the background - the live video
+        # keeps playing untouched. Only when a candidate is confirmed to serve
+        # real video do we switch the player to it (one clean swap); if none do,
+        # the channel is marked as having no working catch-up and the user just
+        # gets a status message, with no stutter.
+        self._flash_status(tr("ts_checking"))
+        # Carried to _verify_catchup so a deep request that comes back as live
+        # (not seekable) also can't unmark a channel that works closer to live.
+        self._ts_allow_mark_broken = allow_mark_broken
+        probe_token = getattr(self, "_ts_probe_token", 0) + 1
+        self._ts_probe_token = probe_token
+
+        def done(url):
+            if probe_token != getattr(self, "_ts_probe_token", 0):
+                return   # a newer play/probe superseded this one
+            if not url:
+                if allow_mark_broken:
+                    # A shallow request failed: the provider serves no catch-up.
+                    self._mark_ts_broken(it)
+                else:
+                    # A deep request failed: the archive is shorter than stated.
+                    # Learn the real limit (keeping the channel as timeshift),
+                    # then retry one step shallower so a single click still lands
+                    # at the deepest point that works - instead of dumping the
+                    # user to live with no seek bar.
+                    self._learn_ts_maxdepth(it, int(round(requested_back_min)))
+                    if not prog:
+                        nxt = self._next_shallower_step(
+                            int(round(requested_back_min)))
+                        if nxt is not None:
+                            self._flash_status(tr("ts_shorter_archive"))
+                            self._play_timeshift(it, back_min=nxt,
+                                                 _depth_retry=True)
+                            return
+                self._flash_status(tr("ts_archive_unavailable"), ms=6000)
+                # The live video never stopped. Restore the live timeline (not
+                # plain live) so the user can still scrub to a shallower point
+                # without restarting the channel.
+                if self.player:
+                    self._playing_catchup = False
+                    if self._timeshift_days(it):
+                        self._apply_seek_mode(it, "live")
+                    else:
+                        self.player.set_seek_mode("live")
+                        self.player.set_live_badge(None)
+                return
+            # Archive reaches this depth after all - drop any stale short cap.
+            self._confirm_ts_depth(it, int(round(requested_back_min)))
+            self._ts_candidates = [url]
+            self._ts_candidate_idx = 0
+            self._ts_candidate_started = time.monotonic()
+            self._ts_segment_start = start
+            self._ts_catchup_program = bool(prog)
+            # Remember the programme's span so the seek bar can be clamped to
+            # just this programme (the provider's archive URL runs on to the
+            # live edge). _ts_program_start is the bar's 0-point; it stays fixed
+            # across scrub-reloads (prog_origin) so the playhead moves inside the
+            # same bar instead of the bar restarting each seek.
+            if prog:
+                self._ts_program_start = (
+                    prog_origin if prog_origin is not None
+                    else prog.get("start_timestamp"))
+                self._ts_program_stop = prog.get("stop_timestamp")
+                self._ts_program_title = prog.get("title")
+            else:
+                self._ts_program_start = None
+                self._ts_program_stop = None
+                self._ts_program_title = None
+            self._start_playback(url, title, it.get("stream_icon"), key,
+                                 "live", record=False, item=it, catchup=True)
+
+        run_async(self.pool,
+                  lambda u=list(urls): self._probe_ts_candidates(u),
+                  done, lambda _e: done(None))
+
+    def _probe_ts_candidates(self, urls) -> str | None:
+        """(worker thread) Return the first candidate URL that actually serves
+        video, or None. Filters out the HTML error pages / redirects a provider
+        hands back for channels it doesn't really archive - so we never churn
+        the player through dead URLs."""
+        sess = getattr(self.client, "session", None)
+        for u in urls:
+            try:
+                r = sess.get(u, stream=True, timeout=(4, 4),
+                             headers={"Range": "bytes=0-8191"})
+                ctype = (r.headers.get("Content-Type") or "").lower()
+                chunk = next(r.iter_content(4096), b"") or b""
+                r.close()
+            except Exception:
+                continue
+            head = chunk.lstrip()
+            if "text/html" in ctype or head[:1] in (b"<", b"{"):
+                continue   # error / JSON error page, not a stream
+            if (chunk[:1] == b"\x47"                 # MPEG-TS sync byte
+                    or head[:7] == b"#EXTM3U"        # HLS playlist
+                    or "mpegurl" in ctype
+                    or "video" in ctype
+                    or "octet-stream" in ctype):
+                return u
+        return None
 
     # (minutes back, duration i18n key) - the label is "Go back <duration>".
     TIMESHIFT_STEPS = (
@@ -651,8 +1001,16 @@ class _RecordingMixin:
         (4320, "dur_3d"), (7200, "dur_5d"), (10080, "dur_7d"),
     )
 
+    def _next_shallower_step(self, minutes: int):
+        """The largest 'go back' step strictly shallower than *minutes* (used to
+        fall back one level when a deeper request turns out to exceed the real
+        archive). None when there's nothing shallower."""
+        lower = [s for s, _ in self.TIMESHIFT_STEPS if s < minutes]
+        return max(lower) if lower else None
+
     def _build_timeshift_menu(self, ts_menu, it) -> None:
         days = self._timeshift_days(it)
+        eff_min = self._effective_ts_minutes(it)
         ts_menu.addAction(tr("ts_go_live"),
                           lambda: self.play_live_channel(it))
         ts_menu.addSeparator()
@@ -664,8 +1022,11 @@ class _RecordingMixin:
         ts_menu.addAction(tr("ts_browse_past"),
                           lambda: self._open_catchup_dialog(it))
         ts_menu.addSeparator()
+        # Only offer depths the archive can actually reach (stated depth, capped
+        # by any learned-shorter real depth), so "go back 3 days" never appears
+        # for an archive that only really serves ~1 day.
         for mins, dur_key in self.TIMESHIFT_STEPS:
-            if mins > days * 1440:
+            if mins > eff_min:
                 break
             ts_menu.addAction(
                 tr("ts_go_back", t=tr(dur_key)),
@@ -794,6 +1155,8 @@ class _RecordingMixin:
             m.addSeparator()
             m.addAction(tr("ctx_rename"),
                         lambda: self._rename_recording(it))
+            m.addAction(tr("rec_edit_info"),
+                        lambda: self._edit_recording_info(it))
             move = m.addMenu(
                 tr("ctx_move_to") if not many
                 else tr("rec_move_n", n=len(items)))

@@ -58,7 +58,9 @@ class ReminderStore:
                    for r in self._items)
 
     def all(self) -> list[dict]:
-        return list(self._items)
+        # Copies, so a caller decorating a row (e.g. a UI countdown label)
+        # can't mutate - or make unserialisable - the stored reminders.
+        return [dict(r) for r in self._items]
 
     def due(self, now: int) -> list[dict]:
         """Reminders whose start has arrived (within the grace window). Fired
@@ -77,4 +79,10 @@ class ReminderStore:
         return due
 
     def _save(self) -> None:
-        self._settings.setValue(self._key, json.dumps(self._items))
+        # Persist only the known fields, so a stray non-serialisable key that
+        # some caller may have dropped onto an item (e.g. a Qt widget) can never
+        # break saving.
+        clean = [{"stream_id": r.get("stream_id"), "ch": r.get("ch"),
+                  "title": r.get("title"), "start": r.get("start")}
+                 for r in self._items]
+        self._settings.setValue(self._key, json.dumps(clean))

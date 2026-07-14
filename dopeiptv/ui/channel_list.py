@@ -56,6 +56,18 @@ class ChannelListView(QListView):
             win._channel_jump()
             e.accept()
             return
+        # Left/Right control the player when one is up, rather than navigating
+        # the list and swapping the channel: a bare arrow fine-seeks, Shift+arrow
+        # steps the timeshift timeline. (macOS tags arrows with KeypadModifier,
+        # so ignore that bit.)
+        mods = e.modifiers() & ~Qt.KeyboardModifier.KeypadModifier
+        bare = mods == Qt.KeyboardModifier.NoModifier
+        shift = mods == Qt.KeyboardModifier.ShiftModifier
+        if (e.key() in (Qt.Key.Key_Left, Qt.Key.Key_Right) and (bare or shift)
+                and hasattr(win, "_handle_player_arrow")
+                and win._handle_player_arrow(e.key(), step=shift)):
+            e.accept()
+            return
         super().keyPressEvent(e)
 
     def mousePressEvent(self, e) -> None:
@@ -177,6 +189,8 @@ class ChannelListModel(QAbstractListModel):
 
 class ChannelDelegate(QStyledItemDelegate):
     """Custom-painted delegate for list and grid modes at three densities."""
+
+    TIMESHIFT_COLOR = "#F2B01E"   # amber: catch-up / timeshift marker
 
     DENSITIES = {
         "compact": (50, 32, 10, 8),
@@ -348,6 +362,15 @@ class ChannelDelegate(QStyledItemDelegate):
         return (group == w._playing_group
                 and w._item_key(it) == w._playing_key)
 
+    @staticmethod
+    def _hover_overlay(tint_hex: str) -> QColor:
+        """A faint veil to lay over a row that has a custom background colour,
+        so hovering gives feedback without hiding the colour. Dark veil on a
+        light colour, light veil on a dark one, so it reads on either."""
+        c = QColor(tint_hex)
+        lum = 0.299 * c.red() + 0.587 * c.green() + 0.114 * c.blue()
+        return QColor(0, 0, 0, 40) if lum > 140 else QColor(255, 255, 255, 40)
+
     def _paint_grid(self, painter, option, index) -> None:
         it = index.data(Qt.ItemDataRole.UserRole) or {}
         kind = it.get("_ekind") or index.model().kind
@@ -369,7 +392,9 @@ class ChannelDelegate(QStyledItemDelegate):
             painter.drawRoundedRect(inner, 12, 12)
         elif option.state & QStyle.StateFlag.State_MouseOver:
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor(P["hover"]))
+            # Keep a custom background on hover: veil it instead of covering it.
+            painter.setBrush(self._hover_overlay(tint_bg) if tint_bg
+                             else QColor(P["hover"]))
             painter.drawRoundedRect(inner, 12, 12)
         if playing:
             pen = QPen(QColor(ACCENT))
@@ -467,7 +492,9 @@ class ChannelDelegate(QStyledItemDelegate):
         if option.state & QStyle.StateFlag.State_Selected:
             painter.fillRect(rect, QColor(P["sel"]))
         elif option.state & QStyle.StateFlag.State_MouseOver:
-            painter.fillRect(rect, QColor(P["hover"]))
+            # Keep a custom background on hover: veil it instead of covering it.
+            painter.fillRect(rect, self._hover_overlay(tint_bg) if tint_bg
+                             else QColor(P["hover"]))
         if playing:
             painter.fillRect(
                 QRect(rect.left(), rect.top() + 4, 3, rect.height() - 8),
@@ -528,25 +555,39 @@ class ChannelDelegate(QStyledItemDelegate):
 
         num_w = 0
         is_fav = self.window.is_favorite_item(it, kind)
-        if kind in ("live", "fav") and it.get("num"):
-            has_archive = self.window._timeshift_days(it) > 0
+        # A live channel row shown in History counts as live for the number +
+        # catch-up marker (History has no channel number, so the marker still
+        # draws on its own).
+        live_like = (kind in ("live", "fav")
+                     or (kind == "history" and it.get("_kind") == "live"))
+        num_str = str(it["num"]) if it.get("num") else ""
+        has_archive = live_like and self.window._timeshift_days(it) > 0
+        if live_like and (num_str or has_archive):
             num_w = 52 if has_archive else 34
+            if not num_str:
+                num_w = 34 if has_archive else 0
             if is_fav:
                 num_w += 18
-            painter.setPen(QColor(P["muted3"]))
             fnum = QFont()
             fnum.setPointSize(10)
             painter.setFont(fnum)
             num_rect = QRect(
                 rect.right() - 12 - num_w, rect.top(),
                 num_w, rect.height())
-            suffix = str(it["num"])
+            va_right = (Qt.AlignmentFlag.AlignVCenter
+                        | Qt.AlignmentFlag.AlignRight)
             if has_archive:
-                suffix = "⏪ " + suffix
-            painter.drawText(
-                num_rect,
-                Qt.AlignmentFlag.AlignVCenter
-                | Qt.AlignmentFlag.AlignRight, suffix)
+                # Amber ⏪ flags a catch-up/timeshift channel; the number stays
+                # muted so only the timeshift marker draws the eye.
+                fm = painter.fontMetrics()
+                num_str_w = fm.horizontalAdvance(num_str)
+                arch_rect = QRect(num_rect.left(), num_rect.top(),
+                                  num_rect.width() - num_str_w - 4,
+                                  num_rect.height())
+                painter.setPen(QColor(self.TIMESHIFT_COLOR))
+                painter.drawText(arch_rect, va_right, "◀◀")
+            painter.setPen(QColor(P["muted3"]))
+            painter.drawText(num_rect, va_right, num_str)
             if is_fav:
                 painter.setPen(QColor("#FFD700"))
                 fstar = QFont()

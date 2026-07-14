@@ -32,7 +32,7 @@ from ..providers.chromecast import CastDialog, ChromecastManager
 from ..providers.client import (
     DemoClient, OfflineClient, XtreamClient, make_client,
 )
-from ..media.embedded import EmbeddedPlayer
+from ..media.embedded import EmbeddedPlayer, _is_bare_arrow, _is_shift_arrow
 from ..providers.epg import XmltvGuide, epg_cache_path, prune_epg_caches
 from ..services.coverart import CoverArtService
 from ..services.resume import ResumeStore
@@ -221,11 +221,20 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._current_key = None
         self._playing_key = None
         self._playing_group: str | None = None
+        self._playing_catchup = False   # watching a catch-up archive segment
+        self._ts_catchup_program = False  # catch-up is a picked programme (vs scrub)
+        self._ts_program_start = None     # picked programme's start (bar origin)
+        self._ts_program_stop = None      # picked programme's stop timestamp
+        self._ts_program_title = None     # picked programme's title (for reloads)
+        self._ts_depth_min = 0            # live-timeline window span (minutes)
+        self._ts_live_offset = 0.0        # seconds behind live from buffer pauses
+        self._pause_started = None
         self._playing_item = None
         self._focus_mode = False
         self._fav_view_tint = ("", "")
         self._pending_cat_select = _UNSET
         self._pending_jump_key = None
+        self._pending_jump_cat = None
         self._stream_retries = 0
         self._last_stream_error_ts = 0.0
         self._pip_win = None
@@ -254,7 +263,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # so the initial category/EPG traffic goes first - the sync runs
         # for the full account which can take a couple of seconds.
         QTimer.singleShot(2500, self._maybe_sync_watched)
-        # Discreet update check well after the initial load has settled.
+        # Light the badge from the cached result almost immediately so it isn't
+        # missing for the first few seconds, then do the (throttled) network
+        # check later so it doesn't compete with the initial load.
+        QTimer.singleShot(400, self._apply_cached_update)
         QTimer.singleShot(4000, self._maybe_check_updates)
 
         self._auto_refresh_timer = QTimer(self)
@@ -270,6 +282,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         settings_action.triggered.connect(self.open_settings)
         refresh_action = app_menu.addAction(tr("menu_refresh_playlist"))
         refresh_action.triggered.connect(self.refresh_playlist)
+        reminders_action = app_menu.addAction(tr("reminders_menu"))
+        reminders_action.triggered.connect(self._open_reminders)
         app_menu.addSeparator()
         about_action = app_menu.addAction(tr("menu_about"))
         about_action.triggered.connect(self.show_about)
@@ -286,6 +300,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._i18n_actions = {
             settings_action: lambda: tr("btn_settings") + "…",
             refresh_action: lambda: tr("menu_refresh_playlist"),
+            reminders_action: lambda: tr("reminders_menu"),
             about_action: lambda: tr("menu_about"),
             quit_action: lambda: tr("menu_quit"),
         }
@@ -307,13 +322,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                                          QSizePolicy.Policy.Fixed)
         self._sidebar_logo.setToolTip(tr("tooltip_jump_playing"))
         self._sidebar_logo.clicked.connect(self._jump_to_now_playing)
+        # The logo draws a small update badge in its top-right corner when a
+        # newer release is out; clicking that corner opens About.
+        self._sidebar_logo.update_clicked.connect(self.show_about)
         sl.addWidget(self._sidebar_logo)
         sl.addSpacing(6)
 
         # Glyphs used when the sidebar is collapsed to an icon rail.
         self._rail_glyphs = {
             "live": "📺", "vod": "🎬", "series": "🎞", "fav": "★",
-            "watchlist": "🕒", "watched": "✓", "rec": "⏺", "history": "🕘",
+            # Watch later = a pin (saved to watch), history = a clock: distinct
+            # glyphs so the collapsed rail doesn't show two near-identical clock
+            # faces. REC is a red dot (the plain record glyph is a white circle).
+            "watchlist": "📌", "watched": "✓", "rec": "🔴", "history": "🕘",
         }
         self._nav_texts: dict[str, str] = {}
         self.nav_btns: dict[str, QPushButton] = {}
@@ -365,9 +386,34 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cat_solo_btn.setAutoRaise(True)
         self.cat_solo_btn.setFixedSize(22, 18)
         self.cat_solo_btn.setToolTip(tr("tooltip_solo_category"))
+        # A search toggle that reveals the category search box only when you
+        # want it, so it doesn't take a permanent row in the sidebar.
+        self.cat_search_btn = QToolButton(objectName="SectionToggle")
+        self.cat_search_btn.setText("🔍")
+        self.cat_search_btn.setCheckable(True)
+        self.cat_search_btn.setAutoRaise(True)
+        self.cat_search_btn.setFixedSize(22, 18)
+        self.cat_search_btn.setToolTip(tr("cat_search_placeholder"))
+        self.cat_search_btn.toggled.connect(self._toggle_cat_search)
+        cat_hdr.addWidget(self.cat_search_btn)
         self.cat_solo_btn.toggled.connect(self._on_cat_solo_toggle)
         cat_hdr.addWidget(self.cat_solo_btn)
         sl.addLayout(cat_hdr)
+        # Search that spans category names AND their channels: type "germany"
+        # or "bbc" and the matching categories float up (ranked by how many of
+        # their channels match), each previewing a few hits. Double-click to
+        # enter that category. Hidden until the 🔍 toggle is clicked.
+        self.cat_search = QLineEdit(objectName="CatSearch")
+        self.cat_search.setPlaceholderText(tr("cat_search_placeholder"))
+        self.cat_search.setClearButtonEnabled(True)
+        self.cat_search.textChanged.connect(self._on_cat_search)
+        self.cat_search.hide()
+        sl.addWidget(self.cat_search)
+        self._cat_search_timer = QTimer(self)
+        self._cat_search_timer.setSingleShot(True)
+        self._cat_search_timer.setInterval(220)
+        self._cat_search_timer.timeout.connect(self._run_category_search)
+        self._search_index_cache: dict = {}
         self.cat_list = QListWidget()
         self.cat_list.setItemDelegate(CategoryColorDelegate(self.cat_list))
         self.cat_list.setMinimumWidth(0)
@@ -411,17 +457,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                                    QSizePolicy.Policy.Fixed)
         settings_btn.clicked.connect(self.open_settings)
         sl.addWidget(settings_btn)
-        # A discreet "update available" badge in the button's top-right corner.
-        # Hidden until the startup check finds a newer release; works whether
-        # the button shows the "Settings" text or the collapsed gear glyph.
-        self._update_dot = QLabel(settings_btn)
-        self._update_dot.setFixedSize(9, 9)
-        self._update_dot.setAttribute(
-            Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self._update_dot.setStyleSheet(
-            "background:#3DDC84; border-radius:4px;")
-        self._update_dot.hide()
-        settings_btn.installEventFilter(self)
 
         # Middle column
         mid = QWidget(objectName="MiddlePane")
@@ -443,7 +478,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # refresh (where the list keeps its old rows and the centred overlay
         # stays hidden) still says e.g. 'Updating TV guide…'.
         self._busy_label = QLabel("")
-        self._busy_label.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        self._busy_label.setStyleSheet(
+            f"color:{P['accent']}; font-size:11px; font-weight:600;")
         busy_row.addWidget(self.loading_bar, 1)
         busy_row.addWidget(self._busy_label)
         self._hide_busy()
@@ -551,6 +587,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.count_lbl.setStyleSheet(f"color:{P['muted3']}; font-size:11px;")
         status_row = QHBoxLayout()
         status_row.addWidget(self.count_lbl, 1)
+        # Subtle "Update available" link in the status row - shown only when a
+        # newer release is out, clicking opens About. Lives here (not as an
+        # overlay toast) so it's quiet and always available while it lasts.
+        self.update_status_btn = QPushButton("")
+        self.update_status_btn.setFlat(True)
+        self.update_status_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.update_status_btn.setStyleSheet(
+            f"color:{P['accent']}; font-size:11px; font-weight:600;"
+            "border:none; background:transparent; padding:0 4px;")
+        self.update_status_btn.clicked.connect(self.show_about)
+        self.update_status_btn.hide()
+        status_row.addWidget(self.update_status_btn)
         self.rec_indicator = QPushButton("● REC")
         self.rec_indicator.setFlat(True)
         self.rec_indicator.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -606,6 +654,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.stalled.connect(self._on_player_stalled)
             self.player.finished.connect(self._on_player_finished)
             self.player.next_episode.connect(self._play_next_episode)
+            # Keep the poster overlay's play/pause/stop glyph in sync with the
+            # player (guarded: the overlay is built later in this constructor).
+            self.player.paused_changed.connect(self._on_paused_changed)
+            self.player.stopped.connect(self._apply_play_icon)
+            self.player.finished.connect(self._apply_play_icon)
+            self.player.timeshift_seek.connect(self._on_timeshift_seek)
+            self.player.program_seek.connect(self._seek_program)
             # Keep the player pane visible on stop - mpv clears to black -
             # instead of hiding it, so the window just goes black.
             dl.addWidget(self.player, 1)
@@ -645,19 +700,30 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.media_rating_lbl.hide()
         left_col.addWidget(self.media_rating_lbl, 0, Qt.AlignmentFlag.AlignLeft)
 
-        self.play_mpv = QPushButton("▶  " + tr("btn_play"), objectName="Primary")
+        # Icon-only play button, laid over the poster/logo itself (a child of
+        # d_logo, centred on it) rather than sitting below it - the familiar
+        # "play overlay on the artwork" pattern. The triangle is drawn as an
+        # icon (perfectly centred, unlike the off-centre ▶ text glyph) and
+        # follows the theme accent; _position_play_over_poster keeps it centred
+        # when the poster size changes.
+        self.play_mpv = QPushButton(self.d_logo, objectName="PlayGhost")
         self.play_mpv.setToolTip(tr("tooltip_play_in_mpv"))
-        self.play_mpv.setSizePolicy(QSizePolicy.Policy.Fixed,
-                                    QSizePolicy.Policy.Fixed)
-        self.play_mpv.clicked.connect(lambda: self.play("mpv"))
-        left_col.addWidget(self.play_mpv, 0, Qt.AlignmentFlag.AlignLeft)
+        self.play_mpv.setFixedSize(30, 30)
+        self.play_mpv.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._apply_play_icon(30)
+        self.play_mpv.clicked.connect(self._play_overlay_clicked)
+        # Start hidden: the poster and its play overlay only appear once a
+        # channel/movie/series is selected (see _show_detail), so an empty
+        # detail pane has no stray box or button.
+        self.d_logo.hide()
+        self.play_mpv.hide()
         left_col.addStretch(1)
         header_row.addLayout(left_col)
 
         # "Now playing" sits beside the logo instead of stacked below it -
         # the channel name is already visible in the middle list, the
         # window title bar, and the mini player's own control bar.
-        self.now_card = QFrame(objectName="Card")
+        self.now_card = QFrame(objectName="NowCard")
         nc = QVBoxLayout(self.now_card)
         nc.setContentsMargins(16, 14, 16, 14)
         nc.setSpacing(8)
@@ -672,6 +738,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         for w in (self.now_time, self.now_title, self.now_bar, self.now_desc):
             nc.addWidget(w)
         self.now_card.hide()
+        # Right-click the "now" card to record/remind the current programme.
+        self.now_card.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu)
+        self.now_card.customContextMenuRequested.connect(
+            lambda pos: self._current_epg and self._epg_programme_menu(
+                self._current_epg, self.now_card.mapToGlobal(pos)))
         header_row.addWidget(self.now_card, 1, Qt.AlignmentFlag.AlignTop)
 
         # Movie/series synopsis + metadata, shown to the *right* of the
@@ -777,11 +849,23 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         mid.setMinimumWidth(240)
         self._side, self._mid, self._det = side, mid, det
         self._root = root
-        self._toast = _Toast(root)
+        # Parent the toast to the window itself, not the splitter: a QSplitter
+        # treats every child widget as a pane and overrides its geometry, so an
+        # overlay parented to it gets squeezed/misplaced when the splitter
+        # relayouts (e.g. after the playlist loads). As a free child of the
+        # main window it floats correctly over the content.
+        self._toast = _Toast(self)
 
         self.tick = QTimer(self)
         self.tick.timeout.connect(self._refresh_progress)
         self.tick.start(60_000)
+
+        # Keep the timeshift live-timeline marker current (no-op unless a
+        # timeshift channel is on screen).
+        self._ts_segment_start = None
+        self._ts_timeline_timer = QTimer(self)
+        self._ts_timeline_timer.timeout.connect(self._update_ts_timeline)
+        self._ts_timeline_timer.start(1000)
 
         # Poll EPG reminders so one fires close to its programme's start.
         self._reminder_timer = QTimer(self)
@@ -801,37 +885,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._current_epg = None
         self._player_fs = False
 
-        QShortcut(QKeySequence("Ctrl+Right"), self,
-                  activated=lambda: self._zap(1))
-        QShortcut(QKeySequence("Ctrl+Left"), self,
-                  activated=lambda: self._zap(-1))
+        # Escape and Delete are structural/context-sensitive, so they stay
+        # fixed; everything else is user-rebindable (see _install_shortcuts).
         QShortcut(QKeySequence(Qt.Key.Key_Escape), self,
                   activated=self._on_escape)
-        QShortcut(QKeySequence(Qt.Key.Key_F), self,
-                  activated=self._toggle_fullscreen_shortcut)
         QShortcut(QKeySequence(Qt.Key.Key_Delete), self,
                   activated=self._delete_pressed)
-        QShortcut(QKeySequence(Qt.Key.Key_Space), self,
-                  activated=self._toggle_pause_shortcut)
-        QShortcut(QKeySequence("Ctrl+B"), self,
-                  activated=lambda: self.side_btn.toggle())
-        QShortcut(QKeySequence("Ctrl+Shift+M"), self,
-                  activated=lambda: self._set_focus_mode(not self._focus_mode))
-        # Player controls (single letters, mpv-style). Guarded so they never
-        # fire while typing in a text field, and only act with the player up.
-        QShortcut(QKeySequence(Qt.Key.Key_M), self,
-                  activated=self._shortcut_mute)
-        QShortcut(QKeySequence(Qt.Key.Key_P), self,
-                  activated=self._shortcut_pip)
-        QShortcut(QKeySequence(Qt.Key.Key_R), self,
-                  activated=self._shortcut_record)
-        QShortcut(QKeySequence(Qt.Key.Key_I), self,
-                  activated=self._shortcut_stats)
-        QShortcut(QKeySequence("Ctrl+G"), self,
-                  activated=self._shortcut_epg_guide)
-        # Jump back to the previously watched live channel (TV "last" button).
-        QShortcut(QKeySequence(Qt.Key.Key_Backspace), self,
-                  activated=self._last_channel)
+        self._install_shortcuts()
 
         # Channel-number quick-jump state (digits typed in the list).
         self._prev_live_item = None
@@ -868,6 +928,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._cat_section_label.setVisible(not collapsed)
         self.cat_solo_btn.setVisible(not collapsed)
         self.cat_list.setVisible(not collapsed)
+        # The category-search toggle (and its box) belong to the expanded
+        # sidebar only - hide them on the collapsed icon rail, restoring the
+        # mode's own visibility (set in _load_categories) when expanded.
+        if hasattr(self, "cat_search_btn"):
+            self.cat_search_btn.setVisible(
+                not collapsed and getattr(self, "_cat_search_supported", False))
+            if collapsed:
+                self.cat_search.hide()
         # Short letter labels in the rail so it's obvious what each is
         # (an emoji alone read as an anonymous box for some users).
         self._guide_btn.setText("EPG" if collapsed else tr("btn_epg_guide"))
@@ -959,11 +1027,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self._set_sidebar_collapsed(False)
 
     def eventFilter(self, obj, event):
-        # Keep the update badge pinned to the settings button's top-right
-        # corner as the sidebar collapses/expands (the button's width changes).
-        if (obj is getattr(self, "_settings_btn", None)
-                and event.type() in (QEvent.Type.Resize, QEvent.Type.Show)):
-            self._position_update_dot()
         # Track the whole drag gesture on the side divider. On press we free the
         # pane (unpin min/max) so it can move both ways for as long as the button
         # is held; on release we commit the final pinned width. This lets a
@@ -984,16 +1047,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self._apply_sidebar_collapsed()
         return super().eventFilter(obj, event)
 
-    def _position_update_dot(self) -> None:
-        b = self._settings_btn
-        self._update_dot.move(b.width() - self._update_dot.width() - 8, 6)
-
     def _maybe_check_updates(self) -> None:
         """Once-a-day background check for a newer release; on a hit, light the
         badge on the Settings button. Cached in QSettings so it doesn't hit
         GitHub every launch and works offline (fails silently). Opt-out via the
         'check for updates' setting."""
         if self.settings.value("check_updates", "true") != "true":
+            return
+        # Test hook: force the badge on without a network call, so the update
+        # indicator can be seen even when you're already on the latest release.
+        # Placed after the opt-out check so opting out still suppresses it.
+        if os.environ.get("DOPEIPTV_FAKE_UPDATE") == "1":
+            self._apply_update_state("v99.0.0")
             return
         try:
             last = float(self.settings.value("update_check_ts", 0) or 0)
@@ -1013,15 +1078,265 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         run_async(self.pool, lambda: fetch_latest_release(GITHUB_REPO),
                   done, lambda _e: None)
 
+    def _apply_cached_update(self) -> None:
+        """Light the badge from the last cached result at startup so it appears
+        right away, without waiting for (or making) a network call."""
+        if self.settings.value("check_updates", "true") != "true":
+            return
+        if os.environ.get("DOPEIPTV_FAKE_UPDATE") == "1":
+            self._apply_update_state("v99.0.0")
+            return
+        tag = self.settings.value("update_latest_tag", "") or ""
+        if tag:
+            self._apply_update_state(tag)
+
     def _apply_update_state(self, latest_tag: str) -> None:
         newer = bool(latest_tag) and is_newer(latest_tag, VERSION)
-        self._update_dot.setVisible(newer)
-        if newer:
-            self._position_update_dot()
-            self._settings_btn.setToolTip(
-                tr("about_update_available", version=latest_tag))
+        logo = self._sidebar_logo
+        if not newer:
+            logo.set_update(False)
+            logo.setToolTip(tr("tooltip_jump_playing"))
+            self.update_status_btn.hide()
+            return
+        logo.setToolTip(tr("about_update_available", version=latest_tag))
+        # The attention-grabbing part (status link, red badge, bounce,
+        # red->accent settle) runs once per version, so the cached apply at
+        # startup and the later network check for the same tag don't double up.
+        if getattr(self, "_update_shown_tag", None) == latest_tag:
+            return
+        self._update_shown_tag = latest_tag
+        # Subtle, non-overlay link in the status row - shown for 30 s (as long
+        # as the logo badge stays red) then hidden; the badge remains after.
+        self.update_status_btn.setText(tr("update_status", version=latest_tag))
+        self.update_status_btn.show()
+        QTimer.singleShot(30_000, self.update_status_btn.hide)
+        logo.set_update(True, "#E5484D")   # red first, to catch the eye
+        logo.bounce()
+        # After 30 s, settle from the attention-grabbing red to the theme
+        # accent - in follow mode, so it keeps matching if the theme changes.
+        QTimer.singleShot(30_000, lambda: logo.set_update(
+            True, follow_accent=True))
+
+    def _overlay_state(self) -> str:
+        """What the poster overlay should do right now:
+          'play'  - nothing (or a different item) is playing -> start this one
+          'pause' - this item is playing and can be paused (VOD/series/recording
+                    or a timeshift channel) -> pause
+          'resume'- this item is playing but paused -> resume
+          'stop'  - this item is a plain live channel (no timeshift), which
+                    can't meaningfully pause -> stop instead."""
+        p = self.player
+        playing_this = (p is not None and p.current_url is not None
+                        and self._playing_key is not None
+                        and self._current_key == self._playing_key)
+        if not playing_this:
+            return "play"
+        it = self.list_model.item_at(self.listw.currentIndex().row())
+        try:
+            timeshift = bool(it) and self._timeshift_days(it) > 0
+        except Exception:
+            timeshift = False
+        pausable = (self._playing_group in ("vod", "episode", "rec")
+                    or (self._playing_group == "live" and timeshift))
+        if not pausable:
+            return "stop"
+        return "resume" if getattr(p, "_paused", False) else "pause"
+
+    def _apply_play_icon(self, size: int | None = None) -> None:
+        """(Re)draw the poster overlay to match the current playback state
+        (play / pause / stop). Called on build, selection change, and whenever
+        playback or pause state changes."""
+        if not hasattr(self, "play_mpv"):
+            return
+        size = int(size or self.play_mpv.width() or 28)
+        glyph = {"pause": "pause", "stop": "stop"}.get(
+            self._overlay_state(), "play")
+        self.play_mpv.setIcon(self._overlay_glyph(size, glyph))
+        self.play_mpv.setIconSize(QSize(size, size))
+
+    def _on_paused_changed(self, paused: bool) -> None:
+        self._apply_play_icon()
+        lp = getattr(self, "_last_playback", None)
+        on_live = bool(lp) and lp.get("kind") == "live"
+        if paused:
+            self._pause_started = time.time()
+            # Pausing a live stream means you're no longer at the live edge:
+            # show the badge and flip the timeline to 'not live' immediately
+            # (don't wait for the 1 s timer or the offset to accrue).
+            if self.player and on_live and not self._playing_catchup:
+                self.player.set_live_badge("timeshift")
+                self._update_ts_timeline()
+            return
+        # Resumed. DVR-style pause for timeshift channels: if we paused the live
+        # edge for longer than the buffer can hold, re-open the provider archive
+        # from the moment we paused, instead of stalling on an exhausted buffer.
+        started = getattr(self, "_pause_started", None)
+        self._pause_started = None
+        if started is None or getattr(self, "_playing_catchup", False):
+            return   # not paused by us, or already playing a seekable archive
+        it = lp.get("item") if lp else None
+        elapsed = time.time() - started
+        if os.environ.get("DOPEIPTV_TS_DEBUG"):
+            tv = self._timeshift_days(it) if it else 0
+            print(f"[dopeIPTV][ts] resume elapsed={elapsed:.1f} on_live={on_live} "
+                  f"ts_days={tv} catchup={self._playing_catchup} "
+                  f"tl_visible={self.player.ts_timeline.isVisible() if self.player else None}",
+                  file=sys.stderr)
+        if (it and lp.get("kind") == "live"
+                and self._timeshift_days(it) > 0 and elapsed >= 120):
+            # Only a *long* pause (beyond what mpv's buffer holds) falls to the
+            # archive. Shorter pauses resume seamlessly from the buffer, which
+            # is the real pause - re-opening a tiny archive segment for them
+            # just produced a stuttery 1-minute clip. Include any offset already
+            # accrued from earlier short pauses so we land at the right spot.
+            total = getattr(self, "_ts_live_offset", 0.0) + elapsed
+            self._play_timeshift(it, back_min=total / 60.0)
+        elif (it and lp.get("kind") == "live"
+              and self._timeshift_days(it) > 0 and elapsed >= 2):
+            # Short pause on a timeshift channel: mpv resumes from its buffer,
+            # so you're now `elapsed` behind the live edge. Track that gap and
+            # keep the 'not live' badge + timeline offset, instead of pretending
+            # you're live again.
+            self._ts_live_offset = getattr(self, "_ts_live_offset", 0.0) + elapsed
+            if self.player:
+                self.player.set_live_badge("timeshift")
+            self._update_ts_timeline()
+        elif self.player and on_live:
+            # Buffer resume at ~the live edge: drop the 'not live' badge.
+            self.player.set_live_badge(None)
+
+    def _on_timeshift_seek(self, minutes_back: int) -> None:
+        """Scrub the live timeline: jump to that point in the provider archive
+        (or back to the live edge when dropped at the right)."""
+        lp = getattr(self, "_last_playback", None)
+        it = lp.get("item") if lp else None
+        if not it:
+            return
+        if minutes_back < 1:
+            self.play_live_channel(it)
         else:
-            self._settings_btn.setToolTip(tr("btn_settings"))
+            self._play_timeshift(it, back_min=minutes_back)
+
+    def _seek_program(self, disp_secs: int) -> None:
+        """Scrub the picked-programme bar: re-load the archive so it starts at
+        *disp_secs* into the programme. The archive stream can't be seeked in
+        place (it snaps to live), so each scrub re-opens it at the new offset,
+        keeping the bar spanning the whole programme (prog_origin)."""
+        lp = getattr(self, "_last_playback", None)
+        it = lp.get("item") if lp else None
+        origin = getattr(self, "_ts_program_start", None)
+        stop = getattr(self, "_ts_program_stop", None)
+        if not (it and origin and stop and stop > origin):
+            return
+        disp_secs = max(0, int(disp_secs))
+        new_start = origin + disp_secs
+        # Don't scrub past the very end of the programme (leave a few seconds so
+        # there's something to play).
+        new_start = min(new_start, int(stop) - 5)
+        if new_start < origin:
+            new_start = origin
+        prog = {"start_timestamp": new_start, "stop_timestamp": int(stop),
+                "title": getattr(self, "_ts_program_title", None) or ""}
+        self._play_timeshift(it, prog=prog, prog_origin=origin)
+
+    def _update_ts_timeline(self) -> None:
+        if not (self.player and self.player.ts_timeline.isVisible()):
+            return
+        lp = getattr(self, "_last_playback", None)
+        if not lp or lp.get("kind") != "live":
+            return
+        item = lp.get("item")
+        now = time.time()
+        if self._playing_catchup and self._ts_segment_start is not None:
+            content_time = self._ts_segment_start + self.player.playback_position()
+            offset = max(0.0, (now - content_time) / 60.0)
+        else:
+            # Live edge, but a buffer pause may have left us behind live.
+            behind = getattr(self, "_ts_live_offset", 0.0)
+            # If we're paused *right now*, the gap is already growing - reflect
+            # it immediately (Go-live button + "−Ns" label) instead of waiting
+            # for resume to bake it into _ts_live_offset.
+            started = getattr(self, "_pause_started", None)
+            if started is not None:
+                behind += max(0.0, now - started)
+            content_time = now - behind
+            offset = behind / 60.0
+        # Programme-boundary ticks on the timeline, plus the name of the
+        # programme at the cursor so the user can see where in the schedule
+        # they are (rather than a bare "-1:30").
+        depth_min = getattr(self, "_ts_depth_min", 0)
+        title = None
+        if item is not None and depth_min:
+            win_start = now - depth_min * 60
+            span = depth_min * 60
+            progs = self.xmltv.programmes_in(item, win_start, now)
+            segs = []
+            for p in progs:
+                a = max(0.0, (p["start_timestamp"] - win_start) / span)
+                b = min(1.0, (p["stop_timestamp"] - win_start) / span)
+                tlabel = "%s–%s" % (
+                    time.strftime("%H:%M", time.localtime(p["start_timestamp"])),
+                    time.strftime("%H:%M", time.localtime(p["stop_timestamp"])))
+                segs.append((a, b, p.get("title") or "", tlabel))
+                if p["start_timestamp"] <= content_time < p["stop_timestamp"]:
+                    title = p.get("title")
+            self.player.set_timeline_segments(segs)
+        # A live-edge pause is definitively 'not live' the instant it happens,
+        # so flip the label + Go-live button immediately rather than waiting for
+        # the offset to creep past the ~5 s live tolerance.
+        paused = (getattr(self, "_pause_started", None) is not None
+                  and not self._playing_catchup)
+        self.player.update_timeshift_position(offset, title, paused=paused)
+
+    def _play_overlay_clicked(self) -> None:
+        state = self._overlay_state()
+        if state == "play":
+            self.play("mpv")
+        elif state == "stop":
+            if self.player:
+                self.player.stop()
+        else:                       # pause / resume
+            if self.player:
+                self.player.toggle_pause()
+        self._apply_play_icon()
+
+    @staticmethod
+    def _overlay_glyph(size: int, kind: str) -> "QIcon":
+        """A white play / pause / stop glyph on a soft dark disc, so it stays
+        legible over any artwork - including the many white channel logos it
+        used to vanish into."""
+        from PyQt6.QtCore import QPointF, QRectF
+        from PyQt6.QtGui import QIcon, QPainter, QPixmap, QPolygonF
+        scale = 3
+        S = max(1, int(size)) * scale
+        pm = QPixmap(S, S)
+        pm.fill(Qt.GlobalColor.transparent)
+        pt = QPainter(pm)
+        pt.setRenderHint(QPainter.RenderHint.Antialiasing)
+        pt.setPen(Qt.PenStyle.NoPen)
+
+        # Soft dark disc for contrast (no outline/ring, just a scrim).
+        pt.setBrush(QColor(0, 0, 0, 165))
+        pt.drawEllipse(QRectF(S * 0.03, S * 0.03, S * 0.94, S * 0.94))
+
+        pt.setBrush(QColor("white"))
+        if kind == "pause":
+            bw, bh, gap = S * 0.11, S * 0.34, S * 0.10
+            y = (S - bh) / 2
+            for x in (S * 0.5 - gap / 2 - bw, S * 0.5 + gap / 2):
+                pt.drawRoundedRect(QRectF(x, y, bw, bh), bw * 0.35, bw * 0.35)
+        elif kind == "stop":
+            s = S * 0.32
+            pt.drawRoundedRect(QRectF((S - s) / 2, (S - s) / 2, s, s),
+                               S * 0.05, S * 0.05)
+        else:                        # play triangle (optically nudged right)
+            cx, cy, w, h = S * 0.54, S * 0.5, S * 0.30, S * 0.36
+            pt.drawPolygon(QPolygonF([
+                QPointF(cx - w * 0.5, cy - h * 0.5),
+                QPointF(cx - w * 0.5, cy + h * 0.5),
+                QPointF(cx + w * 0.5, cy)]))
+        pt.end()
+        return QIcon(pm)
 
     def _set_focus_mode(self, on: bool) -> None:
         """Focus mode hides the whole content list so the player pane gets the
@@ -1329,10 +1644,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # the user right-clicks it for the compositor's own "Always on Top"
         # (exactly how Firefox PiP does it). On X11 the hint works, so we use
         # the clean frameless floating window.
-        flags = Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint
-        if "wayland" not in QApplication.platformName().lower():
-            flags |= Qt.WindowType.FramelessWindowHint
-        self.setWindowFlags(flags)
+        #
+        # macOS: a Qt.Tool window is an NSPanel that hides itself whenever the
+        # app is deactivated - so the moment you click another app the PiP
+        # vanishes, i.e. "always on top" appears broken. Use a plain frameless
+        # window there instead, which keeps floating above other apps.
+        self.setWindowFlags(self._pip_window_flags())
         self.show()
         # Restore the last PiP position/size, else default to bottom-right.
         geo = self._saved_pip_geometry()
@@ -1348,6 +1665,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             QTimer.singleShot(delay, lambda g=geo: self._pip_win is not None
                               and (self.setGeometry(g), self.raise_()))
 
+    def _pip_window_flags(self, on_top: bool = True) -> "Qt.WindowType":
+        flags = Qt.WindowType.Window
+        if on_top:
+            flags |= Qt.WindowType.WindowStaysOnTopHint
+        # Tool = NSPanel on macOS, which auto-hides on app deactivate - skip it
+        # there so the PiP keeps floating above other apps. Elsewhere Tool keeps
+        # it out of the taskbar.
+        if sys.platform != "darwin":
+            flags |= Qt.WindowType.Tool
+        if "wayland" not in QApplication.platformName().lower():
+            flags |= Qt.WindowType.FramelessWindowHint
+        return flags
+
     def _saved_pip_geometry(self) -> "QRect | None":
         raw = self.settings.value("pip_geometry", "")
         try:
@@ -1361,6 +1691,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _exit_pip(self) -> None:
         if self._pip_win is None:
             return
+        # Timestamp the exit so the channel list can swallow the stray
+        # context-menu event macOS delivers to it as the app returns.
+        self._pip_exit_ts = time.monotonic()
         # Remember the PiP window's position/size for next time.
         g = self.geometry()
         self.settings.setValue(
@@ -1425,13 +1758,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _set_pip_on_top(self, on: bool) -> None:
         if self._pip_win is None:
             return
-        flags = self.windowFlags()
-        if on:
-            flags |= Qt.WindowType.WindowStaysOnTopHint
-        else:
-            flags &= ~Qt.WindowType.WindowStaysOnTopHint
         geo = self.geometry()
-        self.setWindowFlags(flags)
+        self.setWindowFlags(self._pip_window_flags(on_top=on))
         self.setGeometry(geo)      # setWindowFlags can drop the geometry
         self.show()
         self.raise_()
@@ -1455,6 +1783,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def refresh_playlist(self) -> None:
         self._last_playlist_refresh = time.time()
+        self._clear_ts_broken()   # re-trust the provider's tv_archive flags
         pl = self.playlist_store.active() if self.playlist_store else None
         pid = (pl or {}).get("id")
         self.xmltv = XmltvGuide(
@@ -1462,8 +1791,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             cache_path=epg_cache_path(pid) if pid else None,
             progress_cb=self.epg_progress.emit)
         self._info_cache.clear()
-        self._set_status(tr("status_refreshing_playlist"))
-        self._show_toast(tr("status_refreshing_playlist"))
+        # Name the wait after what the user did (refresh the playlist), not the
+        # guide reload that happens to be the slow part of it. Shown in the top
+        # loading strip only (the bottom line stays the channel count).
+        self._busy_epg_msg = tr("status_refreshing_playlist")
+        self._show_busy(tr("status_refreshing_playlist"))
         self._load_categories()
         run_async(
             self.pool, lambda: self.xmltv.ensure_loaded(force=True),
@@ -1474,7 +1806,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _refresh_epg_now(self) -> None:
         """Force a fresh EPG fetch now (Settings button) without reloading the
         channel list."""
-        self._show_toast(tr("status_loading_programme_guide"))
+        self._flash_status(tr("status_loading_programme_guide"))
         run_async(
             self.pool, lambda: self.xmltv.ensure_loaded(force=True),
             lambda ok: (self._epg_progress_finished(),
@@ -1490,7 +1822,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 if self.playlist_store else None
         except Exception:
             pass
-        self._show_toast(tr("epg_cache_cleared"))
+        self._flash_status(tr("epg_cache_cleared"))
         self._refresh_epg_now()
 
     def start_demo(self) -> None:
@@ -1515,7 +1847,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not pl:
             return
         self._show_busy(tr("status_connecting", name=pl['name']))
-        self._show_toast(tr("status_connecting", name=pl['name']))
         candidate = make_client(pl)
 
         def done(_auth):
@@ -1568,6 +1899,30 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _load_categories(self) -> None:
         self._load_gen += 1
         gen = self._load_gen
+        # Reset the category search: it only applies to the provider sections
+        # that actually have categories (live/movies/series). Collapse the box
+        # back to just its 🔍 toggle on every section switch.
+        if hasattr(self, "cat_search"):
+            cat_mode = self.mode in ("live", "vod", "series")
+            # Category search where categories exist; a plain list filter in the
+            # folder/list sections (Favorites, Watch Later, Watched, Recordings,
+            # History) so the same 🔍 works everywhere, adapted to each.
+            show = cat_mode or self.mode in (
+                "fav", "watchlist", "watched", "rec", "history")
+            self._cat_search_supported = show
+            self.cat_search.setPlaceholderText(
+                tr("cat_search_placeholder") if cat_mode
+                else tr("cat_search_items"))
+            self.cat_search.blockSignals(True)
+            self.cat_search.clear()
+            self.cat_search.blockSignals(False)
+            self.cat_search.hide()
+            self.cat_search_btn.blockSignals(True)
+            self.cat_search_btn.setChecked(False)
+            self.cat_search_btn.blockSignals(False)
+            # Not on the collapsed icon rail (see _apply_sidebar_chrome).
+            self.cat_search_btn.setVisible(
+                show and not getattr(self, "_sidebar_collapsed", False))
         self.cat_list.clear()
         self.list_model.set_items([], self.mode)
         if self.mode == "rec":
@@ -1679,6 +2034,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 return
             self._hide_busy()
             self._raw_categories = cats or []
+            self._search_index_cache.pop(request_mode, None)  # rebuild on search
             self.cat_list.blockSignals(True)
             self.cat_list.clear()
             all_item = QListWidgetItem(tr("cat_all"))
@@ -1728,9 +2084,20 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._pending_cat_select = _UNSET
             row = 1 if self.cat_list.count() > 1 else 0
             # A pending "jump to now playing" wants every item visible, so land
-            # on the "All" row (0) rather than the first category.
+            # on the "All" row (0) rather than the first category - unless we
+            # know the target's category (e.g. tuning from the EPG guide), in
+            # which case land there so the sidebar reflects where the channel
+            # lives (it still contains the channel, so the jump selects it).
             if getattr(self, "_pending_jump_key", None) is not None:
                 row = 0
+                cat = getattr(self, "_pending_jump_cat", None)
+                if cat is not None:
+                    for i in range(self.cat_list.count()):
+                        if self.cat_list.item(i).data(
+                                Qt.ItemDataRole.UserRole) == cat:
+                            row = i
+                            break
+                    self._pending_jump_cat = None
             if keep is not _UNSET:
                 for i in range(self.cat_list.count()):
                     if self.cat_list.item(i).data(
@@ -1745,6 +2112,109 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._error(msg)
 
         run_async(self.pool, fn, done, fail)
+
+    def _toggle_cat_search(self, on: bool) -> None:
+        self.cat_search.setVisible(on)
+        if on:
+            self.cat_search.setFocus()
+        elif self.cat_search.text():
+            self.cat_search.clear()   # clearing restores the category list
+
+    def _on_cat_search(self, _text: str) -> None:
+        # Debounce so a fast typist doesn't trigger a rebuild per keystroke.
+        self._cat_search_timer.start()
+
+    def _run_category_search(self) -> None:
+        q = self.cat_search.text().strip().lower()
+        if self.mode in ("live", "vod", "series"):
+            if not q:
+                self._load_categories()   # restore the normal category list
+                return
+            self._ensure_search_index(
+                self.mode, lambda idx: self._render_cat_search(q, idx))
+        elif self.mode in ("fav", "watchlist", "watched", "rec", "history"):
+            # Folder/list sections have no provider categories to rank, so the
+            # search just filters the items on screen by name.
+            if not q:
+                self._apply_filter()
+            else:
+                self._render_item_search(q)
+
+    def _render_item_search(self, q: str) -> None:
+        kind = self._content_kind()
+        text = self.search.text().lower().strip()   # honour the top search too
+        items = [it for it in (self.all_items or [])
+                 if not it.get("_header")
+                 and not self._channel_hidden(it, kind)]
+        if text:
+            items = [it for it in items
+                     if text in self.channel_display_name(it).lower()]
+        items = [it for it in items
+                 if q in self.channel_display_name(it).lower()]
+        self.list_model.set_items(self._sorted(items), kind)
+        self._set_status(f"{len(items)} {self.LABELS.get(kind, '')}")
+
+    def _ensure_search_index(self, mode: str, cb) -> None:
+        """Fetch every channel of *mode* once (grouped by category_id) so the
+        search can rank categories by how many of their channels match. Cached
+        per mode for the session; rebuilt when categories reload."""
+        cached = self._search_index_cache.get(mode)
+        if cached is not None:
+            cb(cached)
+            return
+        fetch = {"live": self.client.live_streams,
+                 "vod": self.client.vod_streams,
+                 "series": self.client.series_list}[mode]
+
+        def done(items) -> None:
+            from collections import defaultdict
+            idx: dict = defaultdict(list)
+            for it in items or []:
+                cid = it.get("category_id")
+                if cid is None:
+                    continue
+                idx[cid].append(it.get("name") or it.get("title") or "")
+            self._search_index_cache[mode] = idx
+            cb(idx)
+
+        run_async(self.pool, fetch, done, lambda _m: cb({}))
+
+    def _render_cat_search(self, q: str, idx: dict) -> None:
+        results = []
+        for c in getattr(self, "_raw_categories", []):
+            cid = c.get("category_id")
+            if self.overrides.is_hidden(self.mode, cid):
+                continue
+            cname = self.overrides.display_name(
+                self.mode, cid, c.get("category_name", "?"))
+            name_match = q in cname.lower()
+            chans = idx.get(cid, [])
+            matches = [n for n in chans if q in n.lower()]
+            if not name_match and not matches:
+                continue
+            # Rank: a category whose NAME matches wins; among the rest, the more
+            # of its channels match the higher it sits (so "bbc" surfaces UK,
+            # with its many BBC channels, above a country with just one).
+            score = (1_000_000 if name_match else 0) + len(matches)
+            sample = (matches or chans)[:3]
+            results.append((score, cname, cid, sample))
+        results.sort(key=lambda r: (-r[0], r[1].lower()))
+
+        self.cat_list.blockSignals(True)
+        self.cat_list.clear()
+        for _score, cname, cid, sample in results:
+            label = cname
+            if sample:
+                label += "  ·  " + ", ".join(sample)
+            it = QListWidgetItem(label)
+            it.setData(Qt.ItemDataRole.UserRole, cid)
+            it.setToolTip(cname)
+            self.cat_list.addItem(it)
+        if not results:
+            none_it = QListWidgetItem(tr("cat_search_none"))
+            none_it.setFlags(Qt.ItemFlag.NoItemFlags)
+            self.cat_list.addItem(none_it)
+        self.cat_list.blockSignals(False)
 
     def _category_changed(self, cur, _prev=None) -> None:
         if not cur:
@@ -2037,6 +2507,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         label = self.LABELS.get(model_kind, "")
         self._set_status(f"{n} {label}".strip() if n
                          else (empty_msg or f"0 {label}".strip()))
+        # On the very first populated list, select the first playable row (not a
+        # section header) so the detail pane shows something straight away -
+        # selecting only, never auto-playing.
+        if n and not getattr(self, "_did_initial_select", False):
+            for row in range(self.list_model.rowCount()):
+                item = self.list_model.item_at(row)
+                if item and not item.get("_header"):
+                    self._did_initial_select = True
+                    self.listw.setCurrentIndex(self.list_model.index(row))
+                    break
 
     def _show_grouped(self, sections: list, model_kind: str,
                       empty_msg: str | None = None) -> None:
@@ -2268,18 +2748,45 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         # Not in the current (possibly category-filtered) list: remember the
         # target and navigate to a view that contains it, then select once it
-        # has loaded (see _load_categories / _apply_filter).
+        # has loaded (see _load_categories / _apply_filter). Land on the item's
+        # own category so the sidebar reflects what's playing, not just "All".
         self._pending_jump_key = self._playing_key
+        self._pending_jump_cat = (self._playing_item or {}).get("category_id")
         QTimer.singleShot(2500, self._clear_pending_jump)   # safety net
         target = {"live": "live", "vod": "vod",
                   "episode": "series"}.get(self._playing_group, self.mode)
         if self.mode != target:
-            self.switch_mode(target)     # done() picks "All" while a jump pends
+            self.switch_mode(target)     # done() honours _pending_jump_cat
         elif self.cat_list.count():
-            self.cat_list.setCurrentRow(0)   # "All" -> shows every item
+            row, cat = 0, self._pending_jump_cat
+            if cat is not None:
+                for i in range(self.cat_list.count()):
+                    if self.cat_list.item(i).data(
+                            Qt.ItemDataRole.UserRole) == cat:
+                        row = i
+                        break
+            self._pending_jump_cat = None
+            if self.cat_list.currentRow() == row:
+                self._apply_filter()   # same category: just (re)select the row
+            else:
+                self.cat_list.setCurrentRow(row)
 
     def _clear_pending_jump(self) -> None:
         self._pending_jump_key = None
+        self._pending_jump_cat = None
+
+    def tune_from_guide(self, ch) -> None:
+        """Play a channel picked from the EPG guide, then jump the middle
+        column to it and select its category in the sidebar so the guide
+        selection is reflected everywhere."""
+        self.play_live_channel(ch)
+        self._pending_jump_key = self._item_key(ch)
+        self._pending_jump_cat = ch.get("category_id")
+        QTimer.singleShot(3000, self._clear_pending_jump)
+        if self.mode != "live":
+            self.switch_mode("live")
+        else:
+            self._load_categories()
 
     def _channel_hidden(self, it, kind: str) -> bool:
         if kind not in ("live", "vod", "series", "fav"):
@@ -2350,6 +2857,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return "episode"
         return {"live": "live", "fav": "live", "vod": "movie"}.get(
             self._content_kind(), "other")
+
+    def _play_kind_for(self, it) -> str:
+        """The playback/resume kind for a row. In mixed views (Favorites 'All',
+        History, ...) the section-derived _history_kind() would treat a movie as
+        'live' and skip its resume prompt, so honour the row's own kind tag when
+        it carries one."""
+        ek = it.get("_kind") or it.get("_ekind")
+        mapped = {"vod": "movie", "movie": "movie", "series": "series",
+                  "episode": "episode", "live": "live", "fav": "live"}.get(ek)
+        return mapped or self._history_kind()
 
     # -- selection, EPG and detail panel -------------------------------------------
 
@@ -2477,7 +2994,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         else:
             url, title = self._stream_for(it)
             icon = it.get("stream_icon") or it.get("cover")
-            key, kind = self._item_key(it), self._history_kind()
+            key, kind = self._item_key(it), self._play_kind_for(it)
         if not url:
             return
 
@@ -2528,6 +3045,25 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         CastDialog(self, url, title).exec()
 
+    def stop_local_playback_for_cast(self) -> None:
+        """Free the local stream when a cast starts. The Chromecast pulls the
+        URL itself (one connection from the device), so on a single-connection
+        account leaving the embedded/reused-window player running too would be a
+        second connection the provider refuses. Called by the cast dialog on a
+        successful cast."""
+        p = getattr(self, "player", None)
+        if p is not None and getattr(p, "current_url", None):
+            try:
+                p.stop()
+            except Exception:
+                pass
+        mw = getattr(self, "mpv_window", None)
+        if mw is not None:
+            try:
+                mw.stop()
+            except Exception:
+                pass
+
     def _autoplay_preview(self) -> bool:
         # Default off: a live channel plays on double-click (the desktop
         # standard), so single-clicking or arrowing through the list doesn't
@@ -2537,11 +3073,29 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _play_preview(self) -> None:
         it = self.list_model.item_at(self.listw.currentIndex().row())
-        if (not it or self._content_kind() not in ("live", "fav")
-                or self.series_ctx or not self.player
+        if (not it or self.series_ctx or not self.player
                 or self.playback_mode() != "embedded"):
             return
-        url, title = self._stream_for(it)
+        kind = self._content_kind()
+        # Preview live channels: the TV / Favorites channel lists, plus live
+        # rows inside History (a movie/episode/recording row there is not a
+        # live channel and must not auto-play).
+        history_live = kind == "history" and it.get("_kind") == "live"
+        if kind not in ("live", "fav") and not history_live:
+            return
+        if history_live:
+            # Rebuild a fresh live URL from the stored stream_id (the snapshot's
+            # _url may be stale), falling back to that snapshot when the row
+            # predates stream_id enrichment.
+            sid = it.get("stream_id")
+            if sid is not None:
+                fmt = self.settings.value("stream_format", "ts")
+                url = self.client.live_url(sid, fmt)
+            else:
+                url = it.get("_url")
+            title = it.get("name") or "dopeIPTV"
+        else:
+            url, title = self._stream_for(it)
         if not url:
             return
         if self.player.current_url == url:
@@ -2568,8 +3122,27 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.rec.finish_all_inplayer("channel changed")
         self.player.show()
         self.player.set_overlay_info(title)
+        # A preview is always a fresh live edge - clear any catch-up state so
+        # the seek mode resolves to the live timeline (or plain live), not a
+        # leftover VOD/timeline-scrub state. The behind-live offset is
+        # per-channel, so reset it (and any pending pause) here too - otherwise
+        # previewing another timeshift channel while paused inherits the old
+        # channel's "-Ns behind live" value.
+        self._playing_catchup = False
+        self._ts_catchup_program = False
+        self._ts_program_start = None
+        self._ts_program_stop = None
+        self._ts_program_title = None
+        self._ts_segment_start = None
+        self._ts_live_offset = 0.0
+        self._pause_started = None
         if self.player.play(url, title):
             self.wake.acquire(f"Playing {title}")
+        self._apply_seek_mode(it, "live")
+        # Refresh the poster overlay glyph (play -> pause for a timeshift
+        # channel, -> stop for plain live). Unlike _start_playback, the preview
+        # path doesn't otherwise call this, so the button stayed on 'play'.
+        self._apply_play_icon()
 
     def playback_mode(self) -> str:
         default = "embedded" if self.player else "window"
@@ -2580,6 +3153,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     # Content kinds whose playback position is worth remembering/resuming.
     _RESUMABLE = ("movie", "episode", "recording")
+
+    # How far back the live timeline spans (minutes). A window, not the whole
+    # multi-day archive, so a small drag stays fine-grained; matches the 6 h
+    # upcoming-programme window. Deeper access stays in the ◀◀ menu.
+    _TS_TIMELINE_MAX_MIN = 360
 
     # Cache keys that are large and/or frequently rewritten - moved out of the
     # shared settings so writing them never rewrites the small settings file
@@ -2828,6 +3406,20 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         watched and optionally autoplay the next one."""
         last = getattr(self, "_last_playback", None)
         if last and last.get("kind") == "live":
+            if getattr(self, "_playing_catchup", False):
+                # Reached the end of an archive segment. If it actually played,
+                # the user has caught up to ~now, so continue at the live edge.
+                # If it ended almost immediately, the provider isn't really
+                # serving catch-up for this channel - say so instead of
+                # silently bouncing to live.
+                dur = self.player.playback_duration() if self.player else 0.0
+                it = last.get("item")
+                if not (dur and dur > 10):
+                    self._set_status(tr("ts_archive_unavailable"),
+                                     emphasis=True)
+                if it is not None:
+                    self.play_live_channel(it)
+                return
             self._reconnect_live("eof")
             return
         if not last or last.get("kind") != "episode":
@@ -2855,9 +3447,22 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _start_playback(self, url: str, title: str, icon_url,
                         key, kind: str, record: bool = True,
-                        item=None) -> None:
+                        item=None, catchup: bool = False) -> None:
         if not self._guard_stream_switch(url, title):
             return
+        # Whether this is a catch-up/archive segment. Set here (not by callers)
+        # so any normal play - including a live channel opened via play_item /
+        # zap, which goes straight through _start_playback - always clears it,
+        # instead of staying stuck in 'catch-up' after an archive seek.
+        self._playing_catchup = catchup
+        if not catchup:
+            self._ts_segment_start = None
+            self._ts_catchup_program = False
+            self._ts_program_start = None
+            self._ts_program_stop = None
+            self._ts_program_title = None
+            self._ts_live_offset = 0.0   # fresh tune = at the live edge
+            self._pause_started = None   # per-channel: don't carry a stale pause
         # Remember where we were in whatever was playing before switching,
         # and give the outgoing title its watched mark if it earned one.
         self._save_resume_position()
@@ -2866,7 +3471,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                      if kind in self._RESUMABLE else 0.0)
         self._trakt_stop_current()
         if record and kind:
-            self.history.add(url, title, icon_url, key, kind)
+            # For a live channel, remember its stream_id + archive depth so a
+            # later replay from History still has timeshift/catch-up available.
+            extra = None
+            if kind == "live" and item is not None:
+                extra = {"stream_id": item.get("stream_id"),
+                         "num": item.get("num"),
+                         "tv_archive": item.get("tv_archive"),
+                         "tv_archive_duration": item.get("tv_archive_duration")}
+            self.history.add(url, title, icon_url, key, kind, extra=extra)
         if kind in ("movie", "episode"):
             self._trakt_start_for_item(kind, item)
         self.stream_error.hide()
@@ -2936,6 +3549,75 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     else self._player_missing("mpv"))
         else:
             launch_player("mpv", url, title, self)
+        # Reflect the new playback state on the poster overlay (play -> pause /
+        # stop) when the item being played is the one shown in the detail pane.
+        self._apply_play_icon()
+        self._apply_seek_mode(item, kind)
+        # Catch-up sanity check: some providers accept an archive URL but just
+        # serve the live feed (the seekbar jumps back yet you're still live).
+        # A real archive segment is seekable; verify a few seconds in and, if
+        # it isn't, try the next candidate or report it unavailable.
+        if catchup:
+            token = getattr(self, "_catchup_verify_token", 0) + 1
+            self._catchup_verify_token = token
+            QTimer.singleShot(5000, lambda t=token: self._verify_catchup(t))
+
+    def _apply_seek_mode(self, item, kind: str) -> None:
+        """Pick one seek UI per stream so there's never a second, useless bar:
+        VOD -> normal seek bar; plain live -> none; timeshift live edge ->
+        the archive timeline; a catch-up segment -> normal seek bar spanning
+        it (plus the amber ⧗ TIMESHIFT badge). Called from every play path -
+        including the auto-preview, which plays straight through player.play()
+        and would otherwise leave the mode stuck at its 'vod' default and show
+        a buffer bar on live channels."""
+        if not self.player:
+            return
+        ts_days = self._timeshift_days(item) if item is not None else 0
+        if kind != "live":
+            self.player.set_seek_mode("vod")
+            self.player.set_live_badge(None)
+        elif (ts_days > 0 and self._playing_catchup
+              and getattr(self, "_ts_catchup_program", False)):
+            # A programme picked from the menu/EPG - a seek bar spanning the
+            # whole programme. The archive stream starts at the loaded segment
+            # but runs on to the live edge and can't be seeked in place, so the
+            # bar is virtual: its length is the programme, the playhead sits at
+            # (segment offset into the programme), and scrubbing re-loads the
+            # archive (see _seek_program) rather than seeking mpv - which would
+            # snap to live.
+            origin = getattr(self, "_ts_program_start", None)
+            stop = getattr(self, "_ts_program_stop", None)
+            seg = getattr(self, "_ts_segment_start", None)
+            window = (stop - origin) if (origin and stop
+                                         and stop > origin) else 0.0
+            base = (seg - origin) if (origin and seg
+                                      and seg >= origin) else 0.0
+            self.player.set_program_window(window, base)
+            self.player.set_seek_mode("program")
+            self.player.set_live_badge("timeshift")
+        elif ts_days > 0 and self._playing_catchup:
+            # Scrubbed back on the live timeline (or "go back X") - keep the
+            # timeline visible, just positioned behind live, so the user can
+            # keep scrubbing across the whole window instead of being locked
+            # into the single archive segment.
+            self._ts_depth_min = min(ts_days * 1440, self._TS_TIMELINE_MAX_MIN)
+            self.player.set_seek_mode("timeline")
+            self.player.enter_timeshift(self._ts_depth_min)
+            self.player.set_on_archive_segment(True)   # arrows fine-seek here
+            self._update_ts_timeline()
+            self.player.set_live_badge("timeshift")
+        elif ts_days > 0:
+            # Span a recent window (see _TS_TIMELINE_MAX_MIN), not the whole
+            # multi-day archive: a small drag over days jumped hours/days back.
+            self._ts_depth_min = min(ts_days * 1440, self._TS_TIMELINE_MAX_MIN)
+            self.player.set_seek_mode("timeline")
+            self.player.enter_timeshift(self._ts_depth_min)
+            self.player.set_on_archive_segment(False)  # live edge: arrows step
+            self._update_ts_timeline()
+            self.player.set_live_badge(None)
+        else:
+            self.player.set_seek_mode("live")
+            self.player.set_live_badge(None)
 
     def _player_missing(self, name: str) -> None:
         QMessageBox.warning(
@@ -2951,12 +3633,46 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 "series": tr("status_loading_series")}.get(
             self.mode, tr("status_loading_content"))
 
-    def _set_status(self, text: str, error: bool = False) -> None:
-        self.count_lbl.setStyleSheet(
-            f"color:{P['error']}; font-size:11px; font-weight:600;"
-            if error
-            else f"color:{P['muted3']}; font-size:11px;")
+    def _write_status(self, text: str, error: bool = False,
+                      emphasis: bool = False) -> None:
+        # Errors are red; activity/transient messages use the theme accent and
+        # semibold (like the update text) so you actually notice something
+        # happened; the resting readout (channel count) stays calm and muted.
+        if error:
+            style = f"color:{P['error']}; font-size:11px; font-weight:600;"
+        elif emphasis:
+            style = f"color:{P['accent']}; font-size:11px; font-weight:600;"
+        else:
+            style = f"color:{P['muted3']}; font-size:11px;"
+        self.count_lbl.setStyleSheet(style)
         self.count_lbl.setText(text)
+
+    def _set_status(self, text: str, error: bool = False,
+                    emphasis: bool = False) -> None:
+        """Set the resting readout of the bottom status line (channel count,
+        what's playing, an error, ...). Remembered so a transient flash can
+        return to it. Pass ``emphasis`` for activity messages that should stand
+        out (accent, semibold) rather than the muted count style."""
+        self._rest_status = (text, error, emphasis)
+        self._write_status(text, error, emphasis)
+
+    def _flash_status(self, text: str, ms: int = 4000) -> None:
+        """Briefly show an activity message in the status line, then return to
+        the resting readout. Used for momentary events (guide refresh, cache
+        cleared, ...) so they surface in the same place as everything else
+        instead of a separate overlay, without lingering afterwards. Emphasised
+        so it's easy to notice."""
+        self._write_status(text, False, emphasis=True)
+        token = getattr(self, "_flash_token", 0) + 1
+        self._flash_token = token
+
+        def restore() -> None:
+            if getattr(self, "_flash_token", 0) != token:
+                return   # a newer status write already took over
+            rest = getattr(self, "_rest_status", ("", False, False))
+            self._write_status(*rest)
+
+        QTimer.singleShot(ms, restore)
 
     MAX_STREAM_RETRIES = 2
 
@@ -2964,6 +3680,34 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.rec.finish_all_inplayer("stream error")
         self.wake.release()
         self._trakt_active = None
+        # A catch-up segment that fails right after starting is usually the
+        # wrong archive-URL format for this provider - walk to the next
+        # candidate. Only while still probing (early failure); once a format has
+        # played for a while, later drops are transient and fall through to the
+        # normal reconnect below (which replays the same archive url).
+        if getattr(self, "_playing_catchup", False):
+            pos = self.player.playback_position() if self.player else 0.0
+            if os.environ.get("DOPEIPTV_TS_DEBUG"):
+                print(f"[dopeIPTV][ts] catchup error: {msg} "
+                      f"(candidate {getattr(self, '_ts_candidate_idx', 0)}, "
+                      f"pos={pos})", file=sys.stderr)
+            early = ((time.monotonic()
+                      - getattr(self, "_ts_candidate_started", 0.0)) < 10
+                     and (pos or 0.0) < 2)
+            if early:
+                if self._try_next_ts_candidate():
+                    return
+                # No format worked: the provider isn't serving catch-up here.
+                # Learn it so this channel stops advertising timeshift.
+                self._playing_catchup = False
+                if self.player:
+                    self.player.current_url = None
+                self._set_status(tr("ts_archive_unavailable"), error=True)
+                lp = getattr(self, "_last_playback", None)
+                if lp and lp.get("item"):
+                    self._mark_ts_broken(lp["item"])
+                    self.play_live_channel(lp["item"])
+                return
         # Live streams drop briefly all the time (single-connection accounts,
         # HLS segment hiccups, the window being dragged). Reconnect silently a
         # couple of times before surfacing the error. Reset the counter when
@@ -2979,7 +3723,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.current_url = None
             if not self._player_fs:
                 self.stream_error.hide()
-            self._set_status(tr("status_reconnecting"))
+            self._set_status(tr("status_reconnecting"), emphasis=True)
             if self._player_fs and self.player:
                 self.player.set_overlay_info(tr("status_reconnecting"))
             QTimer.singleShot(1500, self._retry_last_stream)
@@ -3020,28 +3764,130 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         if not lp or lp.get("kind") != "live":
             return
+        if getattr(self, "_playing_catchup", False):
+            # Catch-up/archive playback: seeking makes mpv briefly go idle,
+            # which looks like a stall. Never fall back to the live edge here
+            # (that yanked the user out of the archive) - the segment is
+            # seekable, so let mpv settle after the seek.
+            return
         if not self._auto_reconnect_live():
             msg = tr("status_stream_dropped")
-            self._set_status(msg)
+            self._set_status(msg, emphasis=True)
             self.player.set_overlay_info(msg)
             return
         now = time.time()
         if now - getattr(self, "_last_stream_error_ts", 0.0) > 20:
             self._stream_retries = 0
         if getattr(self, "_stream_retries", 0) >= self.MAX_STREAM_RETRIES:
-            return   # tried hard already; leave it for the user to zap
+            # Quick budget spent. Don't die - keep trying on a slow timer so a
+            # channel that comes back (transient drop, provider hiccup) resumes
+            # on its own instead of staying frozen. Armed once; re-armed each
+            # slow attempt. A successful play resets the counters after 20 s.
+            self._arm_slow_reconnect()
+            return
         self._last_stream_error_ts = now
         self._stream_retries = getattr(self, "_stream_retries", 0) + 1
         print(f"[dopeIPTV] live reconnect ({reason}) "
               f"try {self._stream_retries}/{self.MAX_STREAM_RETRIES}",
               file=sys.stderr)
         self.player.current_url = None
-        self._set_status(tr("status_reconnecting"))
+        self._set_status(tr("status_reconnecting"), emphasis=True)
         QTimer.singleShot(300, self._retry_last_stream)
+
+    SLOW_RECONNECT_MS = 15000
+
+    def _arm_slow_reconnect(self) -> None:
+        if getattr(self, "_slow_reconnect_armed", False):
+            return
+        self._slow_reconnect_armed = True
+        # Remember which channel this is for, so a fire after the user zapped
+        # away doesn't yank a working channel offline.
+        self._slow_reconnect_key = self._playing_key
+        self._set_status(tr("status_reconnecting"), emphasis=True)
+        if self.player:
+            self.player.set_overlay_info(tr("status_reconnecting"))
+        QTimer.singleShot(self.SLOW_RECONNECT_MS, self._slow_reconnect)
+
+    def _slow_reconnect(self) -> None:
+        self._slow_reconnect_armed = False
+        lp = getattr(self, "_last_playback", None)
+        if not (self.player and self.player.isVisible()):
+            return
+        if not lp or lp.get("kind") != "live":
+            return
+        if self._playing_key != getattr(self, "_slow_reconnect_key", None):
+            return   # user moved on; leave the current channel alone
+        if getattr(self, "_playing_catchup", False):
+            return
+        if not self._auto_reconnect_live():
+            return
+        self._stream_retries = 0   # a fresh quick budget for this slow attempt
+        self._last_stream_error_ts = 0.0
+        self._retry_last_stream()
+
+    def _verify_catchup(self, token: int) -> None:
+        """A catch-up URL that plays but isn't seekable means the provider
+        served the live feed instead of the archive - walk to the next format
+        or, when exhausted, report catch-up unavailable and settle on live."""
+        if token != getattr(self, "_catchup_verify_token", 0):
+            return   # superseded by a newer play
+        if not getattr(self, "_playing_catchup", False):
+            return
+        if not (self.player and self.player.current_url):
+            return
+        m = self.player.video.mpv
+        try:
+            seekable = bool(m and m.seekable)
+        except Exception:
+            return   # can't tell - leave it be
+        if seekable:
+            return   # genuine archive segment
+        if os.environ.get("DOPEIPTV_TS_DEBUG"):
+            print(f"[dopeIPTV][ts] candidate "
+                  f"{getattr(self, '_ts_candidate_idx', 0)} played but is live "
+                  f"(not seekable)", file=sys.stderr)
+        if self._try_next_ts_candidate():
+            return
+        self._playing_catchup = False
+        self._set_status(tr("ts_archive_unavailable"), error=True)
+        lp = getattr(self, "_last_playback", None)
+        if lp and lp.get("item"):
+            # Only unmark the channel when this was a shallow request; a deep
+            # (near-limit) request coming back as live just means that depth
+            # isn't served, not that the channel has no catch-up.
+            if getattr(self, "_ts_allow_mark_broken", True):
+                self._mark_ts_broken(lp["item"])
+            self.play_live_channel(lp["item"])
+
+    def _try_next_ts_candidate(self) -> bool:
+        """Play the next candidate archive-URL format for the current catch-up
+        segment. Returns False when none are left. Lets the app auto-pick
+        whichever timeshift scheme a provider actually serves."""
+        cands = getattr(self, "_ts_candidates", None)
+        idx = getattr(self, "_ts_candidate_idx", 0)
+        if not cands or idx + 1 >= len(cands):
+            return False
+        self._ts_candidate_idx = idx + 1
+        self._ts_candidate_started = time.monotonic()
+        lp = getattr(self, "_last_playback", None) or {}
+        self._start_playback(
+            cands[idx + 1], lp.get("title", ""), lp.get("icon_url"),
+            lp.get("key"), "live", record=False,
+            item=lp.get("item"), catchup=True)
+        return True
 
     def _retry_last_stream(self) -> None:
         lp = getattr(self, "_last_playback", None)
         if not lp or lp.get("kind") != "live":
+            return
+        # A catch-up/archive segment must be replayed by its own archive URL.
+        # Re-deriving a live URL (below) would silently yank the user to the
+        # live edge - which is exactly what made a channel whose provider
+        # doesn't actually serve catch-up "jump straight to live" on a scrub.
+        if getattr(self, "_playing_catchup", False) and lp.get("url"):
+            self._start_playback(
+                lp["url"], lp["title"], lp.get("icon_url"), lp.get("key"),
+                "live", record=False, item=lp.get("item"), catchup=True)
             return
         it = lp.get("item")
         # Re-derive a fresh URL from the channel when we know its id (handles a
@@ -3061,9 +3907,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             tr("reminder_set", title=p.get("title") or ch.get("name") or ""),
             4000)
 
+    def _open_reminders(self) -> None:
+        from .reminders import RemindersDialog
+        RemindersDialog(self).exec()
+
     def _check_reminders(self) -> None:
-        for r in self.reminders.due(int(time.time())):
-            self._fire_reminder(r)
+        due = self.reminders.due(int(time.time()))
+        if not due:
+            return
+        if len(due) == 1:
+            self._fire_reminder(due[0])
+        else:
+            self._fire_reminders(due)
 
     def _fire_reminder(self, r: dict) -> None:
         ch = r.get("ch") or {}
@@ -3077,6 +3932,23 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if idx == 0 and ch.get("stream_id") is not None:
             self.switch_mode("live")
             self.play_live_channel(ch)
+
+    def _fire_reminders(self, due: list) -> None:
+        """Several reminders came due at once: one dialog listing them, each a
+        button that tunes that channel - instead of stacked pop-ups."""
+        options = []
+        for r in due:
+            t = r.get("title") or (r.get("ch") or {}).get("name") or "?"
+            options.append((tr("reminder_watch_named", title=t), "primary"))
+        options.append((tr("common_dismiss"), "normal"))
+        idx = self._choice_dialog(
+            tr("reminder_now_title"),
+            tr("reminder_multi_body", n=len(due)), options)
+        if idx is not None and idx < len(due):
+            ch = (due[idx].get("ch") or {})
+            if ch.get("stream_id") is not None:
+                self.switch_mode("live")
+                self.play_live_channel(ch)
 
     def _last_channel(self) -> None:
         """Jump back to the previously watched live channel (TV 'last' key)."""
@@ -3187,8 +4059,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if hasattr(self, "_busy_label"):
             self._busy_label.setText(message or "")
             self._busy_label.setVisible(bool(message))
-        if message:
-            self._set_status(message)
+        # The message lives in the top loading strip (with the progress bar);
+        # don't also write it to the bottom status line - that duplicated it and
+        # left it stuck there (the bottom line is the resting count / playing
+        # readout, updated by the view, not by a transient load).
         self._update_busy_overlay(message)
 
     def _hide_busy(self) -> None:
@@ -3251,10 +4125,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # The guide download reports progress erratically - often no total, and
         # nothing at all during the several-second parse after it hits 100 % -
         # so a percentage looked jumpy and got stuck. Drive a calm indeterminate
-        # strip + a one-off status line instead.
-        self._show_busy(tr("status_loading_programme_guide"))
+        # strip + a one-off status line instead. During a full playlist refresh
+        # the guide reload is the slow part, but "Loading programme guide" reads
+        # as unrelated to what the user clicked, so name that context instead.
+        self._show_busy(getattr(self, "_busy_epg_msg", None)
+                        or tr("status_loading_programme_guide"))
 
     def _epg_progress_finished(self) -> None:
+        self._busy_epg_msg = None
         self._hide_busy()
 
     def _error(self, msg: str) -> None:
@@ -3264,14 +4142,103 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     # -- keyboard and close --------------------------------------------------------
 
     def keyPressEvent(self, event) -> None:
-        if self._player_fs:
-            if event.key() == Qt.Key.Key_Right:
-                self._zap(1)
-                return
-            if event.key() == Qt.Key.Key_Left:
-                self._zap(-1)
-                return
+        if event.key() in (Qt.Key.Key_Left, Qt.Key.Key_Right):
+            bare = _is_bare_arrow(event.modifiers())
+            shift = _is_shift_arrow(event.modifiers())
+            if bare or shift:
+                # Scrub the player (fine-seek, or Shift = timeline step) before
+                # any zap - covers the fullscreen case, where this handler would
+                # otherwise zap.
+                if self._handle_player_arrow(event.key(), step=shift):
+                    return
+                if bare and self._player_fs:
+                    self._zap(1 if event.key() == Qt.Key.Key_Right else -1)
+                    return
         super().keyPressEvent(event)
+
+    # Rebindable actions: (id, default key sequence, i18n label key). The
+    # callbacks are wired in _install_shortcuts. Order here is display order.
+    SHORTCUT_ACTIONS = (
+        ("zap_next", "Ctrl+Right", "sc_next_channel"),
+        ("zap_prev", "Ctrl+Left", "sc_prev_channel"),
+        ("last_channel", "Backspace", "sc_last_channel"),
+        ("pause", "Space", "sc_play_pause"),
+        ("fullscreen", "F", "sc_fullscreen"),
+        ("mute", "M", "sc_mute"),
+        ("pip", "P", "sc_pip"),
+        ("record", "R", "sc_record"),
+        ("stats", "I", "sc_stats"),
+        ("epg_guide", "Ctrl+G", "sc_epg_guide"),
+        ("epg_search", "Ctrl+Shift+F", "sc_epg_search"),
+        ("reminders", "Ctrl+Shift+R", "sc_reminders"),
+        ("sidebar", "Ctrl+B", "sc_sidebar"),
+        ("focus_mode", "Ctrl+Shift+M", "sc_focus_mode"),
+    )
+
+    def _shortcut_callbacks(self):
+        return {
+            "zap_next": lambda: self._zap(1),
+            "zap_prev": lambda: self._zap(-1),
+            "last_channel": self._last_channel,
+            "pause": self._toggle_pause_shortcut,
+            "fullscreen": self._toggle_fullscreen_shortcut,
+            "mute": self._shortcut_mute,
+            "pip": self._shortcut_pip,
+            "record": self._shortcut_record,
+            "stats": self._shortcut_stats,
+            "epg_guide": self._shortcut_epg_guide,
+            "epg_search": self._open_epg_search,
+            "reminders": self._open_reminders,
+            "sidebar": lambda: self.side_btn.toggle(),
+            "focus_mode": lambda: self._set_focus_mode(not self._focus_mode),
+        }
+
+    def _shortcut_key(self, sid: str) -> str:
+        # Scope per-OS: modifier conventions differ (Qt maps Ctrl->Cmd on
+        # macOS) and a config shared across machines shouldn't cross-bind.
+        return f"shortcut/{sys.platform}/{sid}"
+
+    def shortcut_sequence(self, sid: str, default: str) -> str:
+        """The user's key sequence for *sid*, or the default when unset."""
+        return self.settings.value(self._shortcut_key(sid), default) or default
+
+    def save_shortcut(self, sid: str, seq: str, default: str) -> None:
+        """Persist (or clear, when equal to default/empty) one binding."""
+        if seq and seq != default:
+            self.settings.setValue(self._shortcut_key(sid), seq)
+        else:
+            self.settings.remove(self._shortcut_key(sid))
+
+    def _install_shortcuts(self) -> None:
+        """Create every rebindable QShortcut from its saved (or default) key
+        sequence. Kept in self._shortcuts so apply_shortcuts() can rebind them
+        live when the user edits them in Settings."""
+        cbs = self._shortcut_callbacks()
+        self._shortcuts = {}
+        for sid, default, _label in self.SHORTCUT_ACTIONS:
+            seq = self.shortcut_sequence(sid, default)
+            sc = QShortcut(QKeySequence(seq), self, activated=cbs[sid])
+            self._shortcuts[sid] = sc
+
+    def apply_shortcuts(self) -> None:
+        """Re-read the saved key sequences and rebind the live QShortcuts."""
+        for sid, default, _label in self.SHORTCUT_ACTIONS:
+            sc = getattr(self, "_shortcuts", {}).get(sid)
+            if sc is not None:
+                sc.setKey(QKeySequence(self.shortcut_sequence(sid, default)))
+
+    def _handle_player_arrow(self, key, step: bool = False) -> bool:
+        """Left/Right while the player is up: a bare arrow fine-seeks (VOD /
+        catch-up / live buffer), Shift+arrow (*step*) jumps the timeshift
+        timeline into the archive - instead of letting the key navigate the
+        channel list (which with auto-preview swaps the channel). Called from
+        the list's key handler so it works even where the app-level input filter
+        doesn't catch it (seen on macOS). Returns True when it consumed the
+        key."""
+        p = self.player
+        if not p or not p.isVisible():
+            return False
+        return p.arrow_scrub(key == Qt.Key.Key_Left, step=step)
 
     def _size_to_screen(self) -> None:
         """First run only: open at a comfortable fraction of the actual
@@ -3491,6 +4458,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self.mpv_window:
             self.mpv_window.shutdown()
         self.mpv.stop()
+        # The app exits via os._exit (here on stuck workers, and always after
+        # the event loop - see app.main), which skips QSettings' auto-sync on
+        # destruction. Flush every settings file explicitly so this session's
+        # layout, resume points and watched/cache writes actually persist.
+        for st in (self.settings, self._resume_settings, self._cache_settings):
+            try:
+                st.sync()
+            except Exception:
+                pass
         threading.Thread(target=self.cast.shutdown, daemon=True).start()
         # Cancel every queued background download. Wait a moderate
         # amount of time for in-flight workers to finish so libmpv,

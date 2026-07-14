@@ -515,6 +515,16 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Размер списка",
         "th": "ขนาดรายการ",
     },
+    "setting_upcoming_count": {
+        "en": "Upcoming programmes shown",
+        "sv": "Antal kommande program",
+        "es": "Programas próximos mostrados",
+        "de": "Angezeigte kommende Sendungen",
+        "fr": "Programmes à venir affichés",
+        "zh": "显示的即将播出节目数",
+        "ru": "Показывать предстоящих программ",
+        "th": "จำนวนรายการที่กำลังจะมาถึงที่แสดง",
+    },
     "setting_sort_by": {
         "en": "Sort lists by",
         "sv": "Sortera listor efter",
@@ -1830,6 +1840,200 @@ _STRINGS: dict[str, dict[str, str]] = {
         "zh": "直播流已中断 — 双击重新连接",
         "ru": "Прямая трансляция прервана — двойной щелчок для переподключения",
         "th": "สตรีมสดหลุด — ดับเบิลคลิกเพื่อเชื่อมต่อใหม่",
+    },
+    "update_status": {
+        "en": "Update available ({version})",
+        "sv": "Uppdatering tillgänglig ({version})",
+        "es": "Actualización disponible ({version})",
+        "de": "Update verfügbar ({version})",
+        "fr": "Mise à jour disponible ({version})",
+        "zh": "有可用更新 ({version})",
+        "ru": "Доступно обновление ({version})",
+        "th": "มีอัปเดต ({version})",
+    },
+    "setting_deinterlace": {
+        "en": "Deinterlace", "sv": "Avfläta",
+        "es": "Desentrelazar", "de": "Deinterlacing",
+        "fr": "Désentrelacement", "zh": "去隔行",
+        "ru": "Деинтерлейсинг", "th": "ลบเส้นอินเทอร์เลซ",
+    },
+    "setting_sharpen": {
+        "en": "Sharpen", "sv": "Skärpa",
+        "es": "Nitidez", "de": "Schärfen",
+        "fr": "Netteté", "zh": "锐化",
+        "ru": "Резкость", "th": "เพิ่มความคมชัด",
+    },
+    "setting_tonemapping": {
+        "en": "HDR tone-mapping", "sv": "HDR-tonemappning",
+        "es": "Mapeo de tonos HDR", "de": "HDR-Tonemapping",
+        "fr": "Tone-mapping HDR", "zh": "HDR 色调映射",
+        "ru": "HDR-тонирование", "th": "การแมปโทน HDR",
+    },
+    "setting_hwdec": {
+        "en": "Hardware decoding", "sv": "Hårdvaruavkodning",
+        "es": "Decodificación por hardware", "de": "Hardware-Dekodierung",
+        "fr": "Décodage matériel", "zh": "硬件解码",
+        "ru": "Аппаратное декодирование", "th": "การถอดรหัสด้วยฮาร์ดแวร์",
+    },
+    "setting_hwdec_hint": {
+        "en": "Software (CPU) decoding is the default and handles even 4K fine. "
+              "Turn on hardware decoding to offload the GPU; if video then goes "
+              "black or glitches (some drivers, e.g. nvidia-open, with "
+              "subtitles), switch it back off.",
+        "sv": "Mjukvaruavkodning (CPU) är standard och klarar även 4K bra. Slå "
+              "på hårdvaruavkodning för att avlasta med GPU:n; om bilden då blir "
+              "svart eller hackar (vissa drivrutiner, t.ex. nvidia-open, med "
+              "subtitles), stäng av den igen.",
+        "es": "La decodificación por software (CPU) es la predeterminada y "
+              "maneja incluso 4K sin problemas. Activa la decodificación por "
+              "hardware para descargar la GPU; si el vídeo se pone negro o falla "
+              "(algunos controladores, p. ej. nvidia-open, con subtítulos), "
+              "desactívala.",
+        "de": "Software-Dekodierung (CPU) ist Standard und schafft auch 4K "
+              "problemlos. Hardware-Dekodierung einschalten, um die GPU zu "
+              "nutzen; wird das Bild dann schwarz oder fehlerhaft (manche "
+              "Treiber, z. B. nvidia-open, mit Untertiteln), wieder ausschalten.",
+        "fr": "Le décodage logiciel (CPU) est la valeur par défaut et gère même "
+              "la 4K sans souci. Activez le décodage matériel pour soulager le "
+              "GPU ; si la vidéo devient noire ou instable (certains pilotes, "
+              "p. ex. nvidia-open, avec sous-titres), désactivez-le.",
+        "zh": "软件（CPU）解码为默认，连 4K 也能流畅处理。开启硬件解码可减轻 "
+              "GPU 负担；若视频随后变黑或出现故障（某些驱动，如 nvidia-open，"
+              "在有字幕时），请将其关闭。",
+        "ru": "Программное декодирование (CPU) используется по умолчанию и "
+              "справляется даже с 4K. Включите аппаратное декодирование, чтобы "
+              "разгрузить GPU; если видео чернеет или сбоит (некоторые драйверы, "
+              "например nvidia-open, с субтитрами), выключите его обратно.",
+        "th": "การถอดรหัสด้วยซอฟต์แวร์ (CPU) เป็นค่าเริ่มต้นและรองรับแม้กระทั่ง 4K "
+              "ได้ดี เปิดการถอดรหัสด้วยฮาร์ดแวร์เพื่อลดภาระ GPU หากวิดีโอกลายเป็น "
+              "สีดำหรือมีปัญหา (ไดรเวอร์บางตัว เช่น nvidia-open เมื่อมีซับไตเติล) "
+              "ให้ปิดกลับ",
+    },
+    "option_hwdec_safe": {
+        "en": "On - safe", "sv": "På - säker",
+        "es": "Activada - segura",
+        "de": "An - sicher",
+        "fr": "Activé - sûr", "zh": "开启 - 安全",
+        "ru": "Вкл. - безопасно",
+        "th": "เปิด - ปลอดภัย",
+    },
+    "option_hwdec_direct": {
+        "en": "On - direct (zero-copy)", "sv": "På - direkt (zero-copy)",
+        "es": "Activada - directa (zero-copy)",
+        "de": "An - direkt (Zero-Copy)",
+        "fr": "Activé - direct (zero-copy)", "zh": "开启 - 直通（零拷贝）",
+        "ru": "Вкл. - прямое (zero-copy)", "th": "เปิด - โดยตรง (zero-copy)",
+    },
+    "option_hwdec_off": {
+        "en": "Off - software (CPU, recommended)",
+        "sv": "Av - mjukvara (CPU, rekommenderas)",
+        "es": "Desactivada - software (CPU, recomendado)",
+        "de": "Aus - Software (CPU, empfohlen)",
+        "fr": "Désactivé - logiciel (CPU, recommandé)",
+        "zh": "关闭 - 软件解码（CPU，推荐）",
+        "ru": "Выкл. - программно (CPU, рекомендуется)",
+        "th": "ปิด - ซอฟต์แวร์ (CPU, แนะนำ)",
+    },
+    "option_off": {
+        "en": "Off", "sv": "Av", "es": "Desactivado", "de": "Aus",
+        "fr": "Désactivé", "zh": "关闭", "ru": "Выкл.", "th": "ปิด",
+    },
+    "option_low": {
+        "en": "Low", "sv": "Låg", "es": "Baja", "de": "Niedrig",
+        "fr": "Faible", "zh": "低", "ru": "Низкая", "th": "ต่ำ",
+    },
+    "option_high": {
+        "en": "High", "sv": "Hög", "es": "Alta", "de": "Hoch",
+        "fr": "Élevée", "zh": "高", "ru": "Высокая", "th": "สูง",
+    },
+    "option_tonemap_auto": {
+        "en": "Auto", "sv": "Auto", "es": "Automático", "de": "Automatisch",
+        "fr": "Auto", "zh": "自动", "ru": "Авто", "th": "อัตโนมัติ",
+    },
+    "option_tonemap_clip": {
+        "en": "Clip", "sv": "Klipp", "es": "Recorte", "de": "Clipping",
+        "fr": "Écrêtage", "zh": "裁剪", "ru": "Обрезка", "th": "ตัด",
+    },
+    "option_on": {
+        "en": "On", "sv": "På", "es": "Activado", "de": "Ein",
+        "fr": "Activé", "zh": "开启", "ru": "Вкл.", "th": "เปิด",
+    },
+    "opt_video": {
+        "en": "Video", "sv": "Video", "es": "Vídeo", "de": "Video",
+        "fr": "Vidéo", "zh": "视频", "ru": "Видео", "th": "วิดีโอ",
+    },
+    "sec_playback": {
+        "en": "Playback", "sv": "Uppspelning", "es": "Reproducción",
+        "de": "Wiedergabe", "fr": "Lecture", "zh": "播放",
+        "ru": "Воспроизведение", "th": "การเล่น",
+    },
+    "sec_audio_subs": {
+        "en": "Audio & subtitles", "sv": "Ljud & undertexter",
+        "es": "Audio y subtítulos", "de": "Audio & Untertitel",
+        "fr": "Audio et sous-titres", "zh": "音频与字幕",
+        "ru": "Звук и субтитры", "th": "เสียงและคำบรรยาย",
+    },
+    "sec_video": {
+        "en": "Video", "sv": "Video", "es": "Vídeo", "de": "Video",
+        "fr": "Vidéo", "zh": "视频", "ru": "Видео", "th": "วิดีโอ",
+    },
+    "sec_network": {
+        "en": "Network & timing", "sv": "Nätverk & timing",
+        "es": "Red y sincronización", "de": "Netzwerk & Timing",
+        "fr": "Réseau et synchronisation", "zh": "网络与时序",
+        "ru": "Сеть и тайминг", "th": "เครือข่ายและการจับเวลา",
+    },
+    "sec_guide": {
+        "en": "Guide", "sv": "Guide", "es": "Guía", "de": "Programm",
+        "fr": "Guide", "zh": "节目指南", "ru": "Программа", "th": "ผังรายการ",
+    },
+    "epg_search_title": {
+        "en": "Search the guide", "sv": "Sök i guiden",
+        "es": "Buscar en la guía", "de": "Programm durchsuchen",
+        "fr": "Rechercher dans le guide", "zh": "搜索节目指南",
+        "ru": "Поиск в программе", "th": "ค้นหาในผังรายการ",
+    },
+    "epg_search_btn": {
+        "en": "Search", "sv": "Sök", "es": "Buscar", "de": "Suchen",
+        "fr": "Rechercher", "zh": "搜索", "ru": "Поиск", "th": "ค้นหา",
+    },
+    "epg_search_placeholder": {
+        "en": "Search programmes (e.g. Formula 1)",
+        "sv": "Sök program (t.ex. Formel 1)",
+        "es": "Buscar programas (p. ej. Fórmula 1)",
+        "de": "Sendungen suchen (z. B. Formel 1)",
+        "fr": "Rechercher des programmes (p. ex. Formule 1)",
+        "zh": "搜索节目（例如 F1）",
+        "ru": "Поиск передач (напр. Формула 1)",
+        "th": "ค้นหารายการ (เช่น ฟอร์มูล่าวัน)",
+    },
+    "epg_search_hint": {
+        "en": "Type at least 2 characters to search this week's guide.",
+        "sv": "Skriv minst 2 tecken för att söka i veckans guide.",
+        "es": "Escribe al menos 2 caracteres para buscar en la guía de esta semana.",
+        "de": "Gib mindestens 2 Zeichen ein, um im Programm dieser Woche zu suchen.",
+        "fr": "Saisissez au moins 2 caractères pour rechercher dans le guide de la semaine.",
+        "zh": "输入至少 2 个字符以搜索本周节目。",
+        "ru": "Введите не менее 2 символов для поиска в программе на неделю.",
+        "th": "พิมพ์อย่างน้อย 2 ตัวอักษรเพื่อค้นหาผังรายการสัปดาห์นี้",
+    },
+    "epg_searching": {
+        "en": "Searching…", "sv": "Söker…", "es": "Buscando…",
+        "de": "Suche läuft…", "fr": "Recherche…", "zh": "正在搜索…",
+        "ru": "Поиск…", "th": "กำลังค้นหา…",
+    },
+    "epg_search_count": {
+        "en": "{n} matches", "sv": "{n} träffar", "es": "{n} resultados",
+        "de": "{n} Treffer", "fr": "{n} résultats", "zh": "{n} 个结果",
+        "ru": "Найдено: {n}", "th": "{n} รายการ",
+    },
+    "epg_search_none": {
+        "en": "No matches this week.", "sv": "Inga träffar den här veckan.",
+        "es": "Sin resultados esta semana.",
+        "de": "Keine Treffer diese Woche.",
+        "fr": "Aucun résultat cette semaine.", "zh": "本周无匹配结果。",
+        "ru": "На этой неделе совпадений нет.",
+        "th": "ไม่พบรายการในสัปดาห์นี้",
     },
     "status_stream_error": {
         "en": "Stream error: {msg}",
@@ -5944,6 +6148,307 @@ _STRINGS: dict[str, dict[str, str]] = {
               "запустите его снова, чтобы настроить первый плейлист.",
         "th": "รีเซ็ตการตั้งค่าทั้งหมดแล้ว dopeIPTV จะปิดตัวลง - "
               "เปิดใหม่เพื่อตั้งค่าเพลย์ลิสต์แรกของคุณ",
+    },
+
+    "cat_search_placeholder": {
+        "en": "Search categories & channels…",
+        "sv": "Sök kategorier & kanaler…",
+        "es": "Buscar categorías y canales…",
+        "de": "Kategorien & Sender suchen…",
+        "fr": "Rechercher catégories et chaînes…",
+        "zh": "搜索分类和频道…",
+        "ru": "Поиск категорий и каналов…",
+        "th": "ค้นหาหมวดหมู่และช่อง…",
+    },
+    "cat_search_items": {
+        "en": "Search this list…", "sv": "Sök i listan…",
+        "es": "Buscar en la lista…", "de": "Liste durchsuchen…",
+        "fr": "Rechercher dans la liste…", "zh": "搜索此列表…",
+        "ru": "Поиск в списке…", "th": "ค้นหาในรายการนี้…",
+    },
+    "cat_search_none": {
+        "en": "No matching categories", "sv": "Inga matchande kategorier",
+        "es": "No hay categorías coincidentes",
+        "de": "Keine passenden Kategorien",
+        "fr": "Aucune catégorie correspondante", "zh": "没有匹配的分类",
+        "ru": "Нет подходящих категорий", "th": "ไม่พบหมวดหมู่ที่ตรงกัน",
+    },
+
+    "sec_timeshift": {
+        "en": "Timeshift", "sv": "Timeshift", "es": "Timeshift",
+        "de": "Timeshift", "fr": "Timeshift", "zh": "时移",
+        "ru": "Таймшифт", "th": "ไทม์ชิฟต์",
+    },
+    "reminders_menu": {
+        "en": "Reminders…", "sv": "Påminnelser…", "es": "Recordatorios…",
+        "de": "Erinnerungen…", "fr": "Rappels…", "zh": "提醒…",
+        "ru": "Напоминания…", "th": "การเตือน…",
+    },
+    "reminders_title": {
+        "en": "Reminders", "sv": "Påminnelser", "es": "Recordatorios",
+        "de": "Erinnerungen", "fr": "Rappels", "zh": "提醒",
+        "ru": "Напоминания", "th": "การเตือน",
+    },
+    "reminders_empty": {
+        "en": "No reminders set", "sv": "Inga påminnelser",
+        "es": "Sin recordatorios", "de": "Keine Erinnerungen",
+        "fr": "Aucun rappel", "zh": "没有提醒",
+        "ru": "Нет напоминаний", "th": "ไม่มีการเตือน",
+    },
+    "reminders_remove": {
+        "en": "Remove", "sv": "Ta bort", "es": "Quitar", "de": "Entfernen",
+        "fr": "Retirer", "zh": "移除", "ru": "Удалить", "th": "ลบ",
+    },
+    "reminders_remove_n": {
+        "en": "Remove {n}", "sv": "Ta bort {n}", "es": "Quitar {n}",
+        "de": "{n} entfernen", "fr": "Retirer {n}", "zh": "移除 {n} 个",
+        "ru": "Удалить: {n}", "th": "ลบ {n} รายการ",
+    },
+    "reminder_starts_in": {
+        "en": "starts in {t}", "sv": "börjar om {t}", "es": "empieza en {t}",
+        "de": "beginnt in {t}", "fr": "commence dans {t}", "zh": "{t}后开始",
+        "ru": "начнётся через {t}", "th": "เริ่มในอีก {t}",
+    },
+    "reminder_starting": {
+        "en": "starting now", "sv": "börjar nu", "es": "empieza ahora",
+        "de": "beginnt jetzt", "fr": "commence maintenant", "zh": "即将开始",
+        "ru": "начинается", "th": "กำลังเริ่ม",
+    },
+    "reminder_watch_named": {
+        "en": "Watch {title}", "sv": "Titta på {title}", "es": "Ver {title}",
+        "de": "{title} ansehen", "fr": "Regarder {title}", "zh": "观看 {title}",
+        "ru": "Смотреть {title}", "th": "ดู {title}",
+    },
+    "reminder_multi_body": {
+        "en": "{n} programmes are starting now", "sv": "{n} program börjar nu",
+        "es": "{n} programas están empezando",
+        "de": "{n} Sendungen beginnen jetzt",
+        "fr": "{n} programmes commencent", "zh": "{n} 个节目即将开始",
+        "ru": "{n} передач начинается", "th": "{n} รายการกำลังเริ่ม",
+    },
+    "rec_edit_info": {
+        "en": "Edit info…", "sv": "Redigera info…", "es": "Editar info…",
+        "de": "Info bearbeiten…", "fr": "Modifier les infos…",
+        "zh": "编辑信息…", "ru": "Изменить сведения…", "th": "แก้ไขข้อมูล…",
+    },
+    "rec_info_title": {
+        "en": "Recording info", "sv": "Inspelningsinfo",
+        "es": "Información de la grabación", "de": "Aufnahme-Info",
+        "fr": "Infos de l'enregistrement", "zh": "录制信息",
+        "ru": "Сведения о записи", "th": "ข้อมูลการบันทึก",
+    },
+    "rec_info_name": {
+        "en": "Title", "sv": "Titel", "es": "Título", "de": "Titel",
+        "fr": "Titre", "zh": "标题", "ru": "Название", "th": "ชื่อเรื่อง",
+    },
+    "rec_info_desc": {
+        "en": "Description", "sv": "Beskrivning", "es": "Descripción",
+        "de": "Beschreibung", "fr": "Description", "zh": "描述",
+        "ru": "Описание", "th": "คำอธิบาย",
+    },
+    "sec_maintenance": {
+        "en": "Maintenance", "sv": "Underhåll", "es": "Mantenimiento",
+        "de": "Wartung", "fr": "Maintenance", "zh": "维护",
+        "ru": "Обслуживание", "th": "การบำรุงรักษา",
+    },
+    "ts_reset_channel": {
+        "en": "Reset timeshift for this channel",
+        "sv": "Återställ timeshift för den här kanalen",
+        "es": "Restablecer timeshift para este canal",
+        "de": "Timeshift für diesen Sender zurücksetzen",
+        "fr": "Réinitialiser le timeshift pour cette chaîne",
+        "zh": "重置此频道的时移",
+        "ru": "Сбросить таймшифт для этого канала",
+        "th": "รีเซ็ตไทม์ชิฟต์สำหรับช่องนี้",
+    },
+    "ts_reset_done_one": {
+        "en": "Timeshift reset for this channel",
+        "sv": "Timeshift återställd för kanalen",
+        "es": "Timeshift restablecido para este canal",
+        "de": "Timeshift für den Sender zurückgesetzt",
+        "fr": "Timeshift réinitialisé pour cette chaîne",
+        "zh": "已重置此频道的时移",
+        "ru": "Таймшифт для канала сброшен",
+        "th": "รีเซ็ตไทม์ชิฟต์สำหรับช่องนี้แล้ว",
+    },
+    "ts_reset_broken": {
+        "en": "Reset timeshift channels", "sv": "Återställ timeshift-kanaler",
+        "es": "Restablecer canales timeshift",
+        "de": "Timeshift-Sender zurücksetzen",
+        "fr": "Réinitialiser les chaînes timeshift", "zh": "重置时移频道",
+        "ru": "Сбросить каналы таймшифта", "th": "รีเซ็ตช่องไทม์ชิฟต์",
+    },
+    "ts_reset_done": {
+        "en": "Timeshift channels reset", "sv": "Timeshift-kanaler återställda",
+        "es": "Canales timeshift restablecidos",
+        "de": "Timeshift-Sender zurückgesetzt",
+        "fr": "Chaînes timeshift réinitialisées", "zh": "时移频道已重置",
+        "ru": "Каналы таймшифта сброшены", "th": "รีเซ็ตช่องไทม์ชิฟต์แล้ว",
+    },
+    "ts_reset_hint": {
+        "en": "Show catch-up again on channels the app learned don't serve it. "
+              "They're re-tested automatically after a while, too.",
+        "sv": "Visa catch-up igen på kanaler appen lärt sig saknar det. "
+              "De testas också automatiskt om efter ett tag.",
+        "es": "Vuelve a mostrar la repetición en canales que el programa "
+              "aprendió que no la ofrecen. También se reintentan tras un tiempo.",
+        "de": "Catch-up wieder auf Sendern anzeigen, bei denen die App gelernt "
+              "hat, dass es fehlt. Sie werden nach einer Weile neu geprüft.",
+        "fr": "Réafficher le replay sur les chaînes que l'appli a apprises "
+              "sans replay. Elles sont aussi retestées après un moment.",
+        "zh": "在应用判定不支持回看的频道上重新显示回看。过一段时间也会自动重试。",
+        "ru": "Снова показывать архив на каналах, где приложение сочло его "
+              "недоступным. Со временем они также проверяются заново.",
+        "th": "แสดงการดูย้อนหลังอีกครั้งบนช่องที่แอปเรียนรู้ว่าไม่มี "
+              "และจะทดสอบใหม่อัตโนมัติหลังผ่านไปสักพัก",
+    },
+
+    "ts_archive_unavailable": {
+        "en": "Catch-up isn't available for this channel - check with your "
+              "provider",
+        "sv": "Catch-up saknas för den här kanalen - kolla med din leverantör",
+        "es": "La repetición no está disponible para este canal - consulta a "
+              "tu proveedor",
+        "de": "Catch-up ist für diesen Sender nicht verfügbar - frag deinen "
+              "Anbieter",
+        "fr": "Le replay n'est pas disponible pour cette chaîne - contactez "
+              "votre fournisseur",
+        "zh": "此频道不支持回看 - 请咨询你的服务商",
+        "ru": "Архив недоступен для этого канала - уточните у провайдера",
+        "th": "ช่องนี้ไม่รองรับการดูย้อนหลัง - โปรดสอบถามผู้ให้บริการ",
+    },
+    "ts_shorter_archive": {
+        "en": "Archive is shorter than listed - trying the deepest available…",
+        "sv": "Arkivet är kortare än angivet - provar det djupaste som finns…",
+        "es": "El archivo es más corto de lo indicado - probando lo más "
+              "profundo disponible…",
+        "de": "Archiv ist kürzer als angegeben - versuche das tiefste "
+              "Verfügbare…",
+        "fr": "L'archive est plus courte qu'indiqué - essai du plus loin "
+              "disponible…",
+        "zh": "存档比标示的短 - 正在尝试可用的最早时间…",
+        "ru": "Архив короче заявленного - пробуем самую раннюю доступную точку…",
+        "th": "คลังย้อนหลังสั้นกว่าที่ระบุ - กำลังลองจุดที่ลึกที่สุดที่มี…",
+    },
+    "ts_checking": {
+        "en": "Checking catch-up…", "sv": "Kollar catch-up…",
+        "es": "Comprobando repetición…", "de": "Catch-up wird geprüft…",
+        "fr": "Vérification du replay…", "zh": "正在检查回看…",
+        "ru": "Проверка архива…", "th": "กำลังตรวจสอบการดูย้อนหลัง…",
+    },
+
+    # ── Keyboard shortcuts editor ─────────────────────────────────────────
+    "sc_title": {
+        "en": "Keyboard shortcuts", "sv": "Kortkommandon",
+        "es": "Atajos de teclado", "de": "Tastenkürzel",
+        "fr": "Raccourcis clavier", "zh": "键盘快捷键",
+        "ru": "Горячие клавиши", "th": "แป้นพิมพ์ลัด",
+    },
+    "sc_open": {
+        "en": "Keyboard shortcuts…", "sv": "Kortkommandon…",
+        "es": "Atajos de teclado…", "de": "Tastenkürzel…",
+        "fr": "Raccourcis clavier…", "zh": "键盘快捷键…",
+        "ru": "Горячие клавиши…", "th": "แป้นพิมพ์ลัด…",
+    },
+    "sc_hint": {
+        "en": "Click a field and press the new key combination. "
+              "Escape and Delete stay reserved.",
+        "sv": "Klicka i ett fält och tryck den nya tangentkombinationen. "
+              "Escape och Delete är reserverade.",
+        "es": "Haz clic en un campo y pulsa la nueva combinación. "
+              "Escape y Suprimir están reservadas.",
+        "de": "Feld anklicken und neue Tastenkombination drücken. "
+              "Escape und Entf bleiben reserviert.",
+        "fr": "Cliquez dans un champ et appuyez sur la nouvelle combinaison. "
+              "Échap et Suppr restent réservées.",
+        "zh": "点击输入框并按下新的组合键。Escape 和 Delete 为保留键。",
+        "ru": "Щёлкните поле и нажмите новую комбинацию клавиш. "
+              "Escape и Delete зарезервированы.",
+        "th": "คลิกช่องแล้วกดคีย์ผสมใหม่ ปุ่ม Escape และ Delete ถูกสงวนไว้",
+    },
+    "sc_reset": {
+        "en": "Reset to defaults", "sv": "Återställ standard",
+        "es": "Restablecer valores", "de": "Standard wiederherstellen",
+        "fr": "Réinitialiser", "zh": "恢复默认",
+        "ru": "Сбросить по умолчанию", "th": "รีเซ็ตเป็นค่าเริ่มต้น",
+    },
+    "sc_save": {
+        "en": "Save", "sv": "Spara", "es": "Guardar", "de": "Speichern",
+        "fr": "Enregistrer", "zh": "保存", "ru": "Сохранить", "th": "บันทึก",
+    },
+    "sc_next_channel": {
+        "en": "Next channel", "sv": "Nästa kanal", "es": "Canal siguiente",
+        "de": "Nächster Sender", "fr": "Chaîne suivante", "zh": "下一个频道",
+        "ru": "Следующий канал", "th": "ช่องถัดไป",
+    },
+    "sc_prev_channel": {
+        "en": "Previous channel", "sv": "Föregående kanal",
+        "es": "Canal anterior", "de": "Vorheriger Sender",
+        "fr": "Chaîne précédente", "zh": "上一个频道",
+        "ru": "Предыдущий канал", "th": "ช่องก่อนหน้า",
+    },
+    "sc_last_channel": {
+        "en": "Last channel", "sv": "Senaste kanalen", "es": "Último canal",
+        "de": "Letzter Sender", "fr": "Dernière chaîne", "zh": "上一次频道",
+        "ru": "Последний канал", "th": "ช่องล่าสุด",
+    },
+    "sc_play_pause": {
+        "en": "Play / Pause", "sv": "Spela / Pausa",
+        "es": "Reproducir / Pausar", "de": "Wiedergabe / Pause",
+        "fr": "Lecture / Pause", "zh": "播放 / 暂停",
+        "ru": "Воспроизведение / Пауза", "th": "เล่น / หยุดชั่วคราว",
+    },
+    "sc_fullscreen": {
+        "en": "Fullscreen", "sv": "Helskärm", "es": "Pantalla completa",
+        "de": "Vollbild", "fr": "Plein écran", "zh": "全屏",
+        "ru": "Полный экран", "th": "เต็มจอ",
+    },
+    "sc_mute": {
+        "en": "Mute", "sv": "Ljud av", "es": "Silenciar", "de": "Stumm",
+        "fr": "Muet", "zh": "静音", "ru": "Без звука", "th": "ปิดเสียง",
+    },
+    "sc_pip": {
+        "en": "Picture-in-picture", "sv": "Bild-i-bild",
+        "es": "Imagen en imagen", "de": "Bild-in-Bild",
+        "fr": "Image dans l’image", "zh": "画中画",
+        "ru": "Картинка в картинке", "th": "ภาพซ้อนภาพ",
+    },
+    "sc_record": {
+        "en": "Record", "sv": "Spela in", "es": "Grabar", "de": "Aufnehmen",
+        "fr": "Enregistrer", "zh": "录制", "ru": "Запись", "th": "บันทึก",
+    },
+    "sc_stats": {
+        "en": "Playback stats", "sv": "Uppspelningsstatistik",
+        "es": "Estadísticas de reproducción", "de": "Wiedergabestatistik",
+        "fr": "Statistiques de lecture", "zh": "播放统计",
+        "ru": "Статистика воспроизведения", "th": "สถิติการเล่น",
+    },
+    "sc_epg_guide": {
+        "en": "TV guide", "sv": "TV-tablå", "es": "Guía de TV",
+        "de": "TV-Programm", "fr": "Guide TV", "zh": "电视指南",
+        "ru": "Телегид", "th": "ผังรายการทีวี",
+    },
+    "sc_epg_search": {
+        "en": "Search guide", "sv": "Sök i tablån",
+        "es": "Buscar en la guía", "de": "Programm durchsuchen",
+        "fr": "Rechercher dans le guide", "zh": "搜索指南",
+        "ru": "Поиск в телегиде", "th": "ค้นหาผังรายการ",
+    },
+    "sc_reminders": {
+        "en": "Reminders", "sv": "Påminnelser", "es": "Recordatorios",
+        "de": "Erinnerungen", "fr": "Rappels", "zh": "提醒",
+        "ru": "Напоминания", "th": "การเตือน",
+    },
+    "sc_sidebar": {
+        "en": "Toggle sidebar", "sv": "Visa/dölj sidopanel",
+        "es": "Mostrar/ocultar barra lateral", "de": "Seitenleiste umschalten",
+        "fr": "Afficher/masquer la barre latérale", "zh": "切换侧边栏",
+        "ru": "Боковая панель", "th": "สลับแถบข้าง",
+    },
+    "sc_focus_mode": {
+        "en": "Focus mode", "sv": "Fokusläge", "es": "Modo enfoque",
+        "de": "Fokusmodus", "fr": "Mode concentration", "zh": "专注模式",
+        "ru": "Режим фокуса", "th": "โหมดโฟกัส",
     },
 }
 

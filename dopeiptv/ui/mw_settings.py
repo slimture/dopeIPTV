@@ -9,16 +9,48 @@ from __future__ import annotations
 import sys
 from datetime import datetime
 
-from PyQt6.QtCore import Qt, QTimer, QUrl
+from PyQt6.QtCore import QEvent, QObject, Qt, QTimer, QUrl
 from PyQt6.QtGui import QDesktopServices, QIcon
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QApplication, QCheckBox, QComboBox, QDialog,
+    QAbstractItemView, QAbstractSlider, QAbstractSpinBox, QApplication,
+    QCheckBox, QComboBox, QDialog,
     QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout, QInputDialog,
     QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox,
-    QPushButton, QSpinBox, QTabWidget, QTextBrowser, QVBoxLayout, QWidget,
+    QPushButton, QScrollArea, QSizePolicy, QSpinBox, QTabWidget, QTextBrowser,
+    QVBoxLayout, QWidget,
 )
 
-from .. import APP_NAME, VERSION
+
+class _WheelGuard(QObject):
+    """Stops the mouse wheel from ever changing a combo/spin/slider in the
+    Settings window - it's far too easy to nudge a setting while just trying to
+    scroll the page. The wheel is always swallowed on these controls (you change
+    a setting by clicking, not scrolling) and instead scrolls the enclosing
+    scroll area directly, so the page still moves under the cursor.
+
+    The page is scrolled by nudging the scroll bar value - NOT by re-dispatching
+    the wheel event. Re-dispatching (QApplication.sendEvent) re-enters the
+    application-level event filters, which recursed infinitely and crashed the
+    app the moment you scrolled over a control."""
+
+    def eventFilter(self, obj, ev):
+        if ev.type() == QEvent.Type.Wheel:
+            area = obj.parent()
+            while area is not None and not isinstance(area, QScrollArea):
+                area = area.parent()
+            if area is not None:
+                sb = area.verticalScrollBar()
+                delta = ev.angleDelta().y() or ev.angleDelta().x()
+                if delta:
+                    sb.setValue(sb.value() - delta)
+            return True   # never let the control itself act on the wheel
+        return False
+
+
+# One shared, app-lifetime instance (a QObject filter can serve every control).
+_WHEEL_GUARD = _WheelGuard()
+
+from .. import APP_NAME, BUILD_VERSION, VERSION
 from ..i18n import tr
 from .dialogs import PlaylistDialog
 from .epg_grid import EpgGridDialog
@@ -90,6 +122,19 @@ class _SettingsMixin:
         run_async(self.pool, lambda: self.client.live_streams(None),
                   done, lambda _: dlg.close())
 
+    def _open_epg_search(self) -> None:
+        """Open the guide search (Ctrl+Shift+F): find a programme by name across
+        every live channel this week and tune in or set a reminder."""
+        self._ensure_xmltv_loaded()
+        from .epg_search import EpgSearchDialog
+        EpgSearchDialog(self).exec()
+
+    def _open_shortcuts(self) -> None:
+        """Open the keyboard-shortcuts editor: rebind any action to your own
+        keys (saved live via apply_shortcuts)."""
+        from .shortcuts import ShortcutsDialog
+        ShortcutsDialog(self).exec()
+
     def _favorite_channels_for_guide(self) -> list:
         """The favorite live channels the EPG guide should cover, honoring the
         currently selected Favorites sub-category (a channel folder, or all)."""
@@ -144,6 +189,10 @@ class _SettingsMixin:
         self.listw.viewport().update()
         self.count_lbl.setStyleSheet(
             f"color:{P['muted3']}; font-size:11px;")
+        self.update_status_btn.setStyleSheet(
+            f"color:{P['accent']}; font-size:11px; font-weight:600;"
+            "border:none; background:transparent; padding:0 4px;")
+        self._apply_play_icon()   # redraw the play triangle in the new accent
         if self.d_logo.text():
             self.d_logo.setStyleSheet(self.PLACEHOLDER_LOGO_STYLE)
         if self.player:
@@ -284,6 +333,13 @@ class _SettingsMixin:
         d = QDialog(self)
         d.setWindowTitle(tr("settings_title"))
         d.setMinimumSize(820, 600)
+        # Tall enough that the grouped tabs aren't cramped, but a fixed, modest
+        # width - the forms don't need to get wider, only taller (the earlier
+        # width-scaling made it far too wide on a big window). Clamped to the
+        # main window so it never spills past it.
+        geo = self.geometry()
+        d.resize(min(geo.width(), 900),
+                 min(geo.height(), max(660, int(geo.height() * 0.85))))
         outer = QVBoxLayout(d)
         outer.setContentsMargins(18, 18, 18, 18)
         tabs = QTabWidget()
@@ -345,6 +401,23 @@ class _SettingsMixin:
              ("4:3", "4:3"), ("2.35:1", "2.35:1"),
              ("stretch", tr("option_aspect_stretch"))],
             self.settings.value("aspect_mode", "auto"))
+        hwdec_box = self._combo(
+            [("no", tr("option_hwdec_off")),
+             ("auto-copy-safe", tr("option_hwdec_safe")),
+             ("auto-safe", tr("option_hwdec_direct"))],
+            str(self.settings.value("hwdec_mode", "") or "no"))
+        deint_box = self._combo(
+            [("false", tr("option_no")), ("true", tr("option_yes"))],
+            self.settings.value("video_deinterlace", "false"))
+        sharpen_box = self._combo(
+            [("0.0", tr("option_off")), ("0.5", tr("option_low")),
+             ("1.0", tr("option_medium")), ("2.0", tr("option_high"))],
+            str(self.settings.value("video_sharpen", "0.0")))
+        tonemap_box = self._combo(
+            [("auto", tr("option_tonemap_auto")), ("hable", "Hable"),
+             ("mobius", "Mobius"), ("reinhard", "Reinhard"),
+             ("bt.2390", "BT.2390"), ("clip", tr("option_tonemap_clip"))],
+            self.settings.value("video_tonemapping", "auto"))
         buf_box = self._combo(
             [("1", "1 s"), ("3", "3 s"), ("5", "5 s"),
              ("10", "10 s"), ("30", "30 s")],
@@ -378,19 +451,42 @@ class _SettingsMixin:
          replay_minutes_box) = delay_row("replay_delay_min")
         (epg_delay_row, epg_sign_box, epg_hours_box,
          epg_minutes_box) = delay_row("epg_delay_min")
+        def section(text: str) -> None:
+            """A small caps subheading that groups the rows under it, so the
+            Playback tab reads as a few labelled clusters instead of one long
+            flat list."""
+            lbl = QLabel(text)
+            lbl.setStyleSheet(
+                f"color:{P['accent']}; font-size:10px; font-weight:700;"
+                "text-transform:uppercase; letter-spacing:1px; margin-top:12px;")
+            pf.addRow(lbl)
+
+        section(tr("sec_playback"))
         pf.addRow(tr("setting_playback_mode"), mode_box)
         pf.addRow(tr("setting_autoplay_preview"), autoplay_box)
         pf.addRow(tr("setting_autoplay_next"), autoplay_next_box)
         pf.addRow(tr("setting_auto_reconnect"), autorecon_box)
         pf.addRow(tr("setting_stream_format"), fmt_box)
+        section(tr("sec_audio_subs"))
         pf.addRow(tr("setting_audio_lang"), alang_box)
         pf.addRow(tr("setting_subtitles"), sub_box)
         pf.addRow(tr("setting_sub_lang"), slang_box)
         pf.addRow(tr("setting_sub_lang_fallback"), slang2_box)
+        section(tr("sec_video"))
         pf.addRow(tr("setting_aspect_ratio"), aspect_box)
+        pf.addRow(tr("setting_deinterlace"), deint_box)
+        pf.addRow(tr("setting_sharpen"), sharpen_box)
+        pf.addRow(tr("setting_tonemapping"), tonemap_box)
+        pf.addRow(tr("setting_hwdec"), hwdec_box)
+        hwdec_hint = QLabel(tr("setting_hwdec_hint"))
+        hwdec_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        hwdec_hint.setWordWrap(True)
+        pf.addRow(hwdec_hint)
+        section(tr("sec_network"))
         pf.addRow(tr("setting_network_buffer"), buf_box)
         pf.addRow(tr("setting_replay_delay"), replay_delay_row)
         pf.addRow(tr("setting_epg_delay"), epg_delay_row)
+        section(tr("sec_guide"))
         epg_cache_row = QHBoxLayout()
         refresh_epg_btn = QPushButton(tr("btn_refresh_epg"))
         clear_epg_btn = QPushButton(tr("btn_clear_epg"))
@@ -435,7 +531,13 @@ class _SettingsMixin:
                 f"color:{P['muted2']}; font-size:11px;")
             hint.setWordWrap(True)
             pf.addRow(hint)
-        tabs.addTab(play_tab, tr("tab_playback"))
+        # The grouped Playback form is taller than the dialog, so let it scroll
+        # instead of clipping the last rows (the hint text and EPG buttons).
+        play_scroll = QScrollArea()
+        play_scroll.setWidgetResizable(True)
+        play_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        play_scroll.setWidget(play_tab)
+        tabs.addTab(play_scroll, tr("tab_playback"))
 
         # Interface tab
         ui_tab = QWidget()
@@ -469,8 +571,18 @@ class _SettingsMixin:
             current_language())
         lang_box.currentIndexChanged.connect(
             lambda _i: self._set_language(lang_box.currentData()))
+        epg_count_box = QSpinBox()
+        epg_count_box.setRange(self.EPG_UPCOMING_MIN, self.EPG_UPCOMING_MAX)
+        epg_count_box.setValue(self._epg_upcoming_count())
+        epg_count_box.setFixedWidth(90)
+        # Wrap in a row with a stretch so it stays a small box (a full-width
+        # form field rendered as one long, hard-to-read strip).
+        epg_count_row = QHBoxLayout()
+        epg_count_row.addWidget(epg_count_box)
+        epg_count_row.addStretch(1)
         uf.addRow(tr("setting_language"), lang_box)
         uf.addRow(tr("setting_list_size"), density_box)
+        uf.addRow(tr("setting_upcoming_count"), epg_count_row)
         uf.addRow(tr("setting_sort_by"), sort_box)
         uf.addRow(tr("setting_theme"), theme_box)
         uf.addRow(tr("setting_accent_color"), accent_box)
@@ -480,17 +592,28 @@ class _SettingsMixin:
         theme_hint.setWordWrap(True)
         uf.addRow(theme_hint)
 
+        updates_box = QCheckBox(tr("setting_check_updates"))
+        updates_box.setChecked(
+            self.settings.value("check_updates", "true") == "true")
+        uf.addRow("", updates_box)
+
+        # -- Maintenance: the three actions grouped as one tidy button row,
+        # each explained by a tooltip so no inline hints clutter the form.
+        shortcuts_btn = QPushButton(tr("sc_open"))
+        shortcuts_btn.setToolTip(tr("sc_title"))
+        shortcuts_btn.clicked.connect(self._open_shortcuts)
+
         # Disk-cache controls: covers/logos accumulate under
-        # QStandardPaths.CacheLocation and don't clean themselves.
-        # The live cache is the shared "images" dir; the two legacy
-        # dirs predate the loaders sharing one directory - keep them
-        # in the sweep so files from old sessions still get counted
-        # and cleared.
+        # QStandardPaths.CacheLocation and don't clean themselves. The live
+        # cache is the shared "images" dir; the two legacy dirs predate the
+        # loaders sharing one directory - keep them in the sweep so files from
+        # old sessions still get counted and cleared.
         cache_dirs = [default_image_cache_dir("images"),
                       default_image_cache_dir("logos"),
                       default_image_cache_dir("posters")]
         cache_lbl = QLabel()
         clear_cache_btn = QPushButton(tr("settings_image_cache_clear"))
+        clear_cache_btn.setToolTip(tr("settings_image_cache_hint"))
 
         def _fmt_size(n: int) -> str:
             for unit in ("B", "KB", "MB", "GB"):
@@ -515,20 +638,31 @@ class _SettingsMixin:
             refresh_cache_label()
 
         clear_cache_btn.clicked.connect(clear_cache)
-        cache_row = QHBoxLayout()
-        cache_row.addWidget(cache_lbl, 1)
-        cache_row.addWidget(clear_cache_btn)
-        uf.addRow(cache_row)
-        cache_hint = QLabel(tr("settings_image_cache_hint"))
-        cache_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
-        cache_hint.setWordWrap(True)
-        uf.addRow(cache_hint)
-        refresh_cache_label()
 
-        updates_box = QCheckBox(tr("setting_check_updates"))
-        updates_box.setChecked(
-            self.settings.value("check_updates", "true") == "true")
-        uf.addRow("", updates_box)
+        ts_reset_btn = QPushButton(tr("ts_reset_broken"))
+        ts_reset_btn.setToolTip(tr("ts_reset_hint"))
+
+        def reset_ts() -> None:
+            self._clear_ts_broken()
+            self._flash_status(tr("ts_reset_done"))
+
+        ts_reset_btn.clicked.connect(reset_ts)
+
+        maint_lbl = QLabel(tr("sec_maintenance"))
+        maint_lbl.setStyleSheet(
+            f"color:{P['accent']}; font-size:10px; font-weight:700;"
+            "text-transform:uppercase; letter-spacing:1px; margin-top:12px;")
+        uf.addRow(maint_lbl)
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(8)
+        for b in (shortcuts_btn, clear_cache_btn, ts_reset_btn):
+            b.setSizePolicy(QSizePolicy.Policy.Expanding,
+                            QSizePolicy.Policy.Fixed)
+            btn_row.addWidget(b)
+        uf.addRow(btn_row)
+        cache_lbl.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        uf.addRow(cache_lbl)
+        refresh_cache_label()
 
         tabs.addTab(ui_tab, tr("tab_interface"))
 
@@ -1095,6 +1229,13 @@ class _SettingsMixin:
         buttons.rejected.connect(d.reject)
         outer.addWidget(buttons)
 
+        # Guard every value control so scrolling the page doesn't change a
+        # setting under the cursor - you click to change, not scroll past.
+        for cls in (QComboBox, QAbstractSpinBox, QAbstractSlider):
+            for w in d.findChildren(cls):
+                w.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+                w.installEventFilter(_WHEEL_GUARD)
+
         if d.exec():
             self.settings.setValue(
                 "stream_format", fmt_box.currentData())
@@ -1116,6 +1257,8 @@ class _SettingsMixin:
             self.settings.setValue(
                 "view_density", density_box.currentData())
             self.settings.setValue(
+                "epg_upcoming_count", epg_count_box.value())
+            self.settings.setValue(
                 "sort_order", sort_box.currentData())
             self.settings.setValue(
                 "audio_lang", alang_box.currentData())
@@ -1127,6 +1270,21 @@ class _SettingsMixin:
                 "sub_lang2", slang2_box.currentData())
             self.settings.setValue(
                 "aspect_mode", aspect_box.currentData())
+            self.settings.setValue(
+                "hwdec_mode", hwdec_box.currentData())
+            if self.player:
+                # Stage it for the next mpv build (a fresh core reads the widget
+                # attribute, not live settings). A changed decode mode takes
+                # effect on the next opened stream - we never re-assign hwdec on
+                # the running stream, which would reinitialise the decoder and
+                # glitch the video.
+                self.player.video.hwdec_pref = hwdec_box.currentData()
+            self.settings.setValue(
+                "video_deinterlace", deint_box.currentData())
+            self.settings.setValue(
+                "video_sharpen", sharpen_box.currentData())
+            self.settings.setValue(
+                "video_tonemapping", tonemap_box.currentData())
             self.settings.setValue(
                 "cache_secs", buf_box.currentData())
 
@@ -1168,6 +1326,11 @@ class _SettingsMixin:
                 self.player.apply_default_options()
             self._apply_view_settings()
             self.list_model.refresh_all()
+            # Re-render the open detail panel so a changed "upcoming count"
+            # (and other view tweaks) take effect without re-selecting.
+            cur = self.listw.currentIndex()
+            if cur.isValid():
+                self._on_current_changed(cur)
 
     def show_about(self) -> None:
         d = QDialog(self)
@@ -1194,7 +1357,7 @@ class _SettingsMixin:
 
         title = QLabel(
             f"<b style='font-size:18px'>{APP_NAME}</b>"
-            f"&nbsp;&nbsp;<span style='color:{P['muted2']}'>{VERSION}</span>")
+            f"&nbsp;&nbsp;<span style='color:{P['muted2']}'>{BUILD_VERSION}</span>")
         lay.addWidget(title)
         desc = QLabel(tr("about_desc"))
         desc.setWordWrap(True)

@@ -1,3 +1,51 @@
+## dopeIPTV 0.7.0
+
+The **timeshift & catch-up** release: scrub back into a channel's archive on a
+live timeline, **pause live TV**, or jump to a **specific past programme** — plus
+a **reminders manager**, **search everywhere**, **customizable keyboard
+shortcuts**, and **rock-solid video** by default.
+
+**Highlights:** **live timeline** to scrub the archive · **DVR pause** · **play a specific past programme** · **archive-depth learning** · **reminders manager** · **category & left-column search** · **customizable keyboard shortcuts** · **software decode by default** (hardware opt-in) · **editable recordings**.
+
+<details>
+<summary><b>Full release notes</b> — click to expand</summary>
+
+### Timeshift, catch-up & DVR
+- **Live timeline** on timeshift channels — scrub back into the provider's archive and watch what already aired.
+- **DVR-style pause** — pause live TV and resume behind live; the player shows how far behind live you are and drops the LIVE tag the moment you pause.
+- **Pick a specific past programme** from the guide and play just that show, with a seek bar clamped to the programme's own length.
+- **Archive-depth learning** — the app learns how far back each channel really reaches, adapts the “go back” span to it, and recovers gracefully from over-deep requests instead of dropping the channel.
+- **Catch-up from History**, a **Go-live** button, amber timeshift markers, and arrow-key scrubbing (fine-seek inside a segment, Shift+arrow for a coarse step).
+- **Per-channel reset** — right-click a timeshift channel to clear its learned archive state.
+
+### Reminders & guide
+- **Reminders manager** — find, review and multi-delete programme reminders in one place.
+- **Programme search across the whole guide** — find a show by name anywhere in the EPG.
+- **Configurable “upcoming programmes”** in the detail pane (default 5, adjustable), plus a guide **Close** button and deeper EPG fetches.
+
+### Search everywhere
+- **Category search** — match category names *and* the channels inside them, with smart ranking.
+- **Left-column search** in Favorites, Watch Later, Watched, Recordings and History.
+- **Jump-to-now-playing** also selects the playing channel's category.
+
+### Keyboard & navigation
+- **Customizable keyboard-shortcuts editor** with sensible per-OS defaults.
+
+### Video & playback
+- **Software decoding is now the default** — like standalone mpv. Modern CPUs handle even 4K 10-bit HEVC/HDR comfortably, and it's immune to the GPU/driver render hazards that could black out hardware-decoded video with subtitles (e.g. the nvidia-open stack).
+- **Hardware decoding is an opt-in** setting (Settings → Playback → Video), with mpv's software fallback as a safety net for genuine decoder failures.
+- **Video filters** — optional deinterlace, sharpen and HDR tone-mapping, plus a **Video** menu in the in-player options.
+- Faster channel switching via a light stream probe for live zapping.
+
+### Recordings
+- **Editable recording title & description**, and recording **stops cleanly when you switch** the channel it's capturing.
+
+### Settings & polish
+- Playback settings are **grouped and scrollable**, and **scrolling the page never changes a control**.
+- **Themed spin boxes** (fixes the white-on-white “upcoming count” box) and a tidy **Maintenance** row.
+- **Fixed an exit segfault** on newer Python; on **macOS**, arrow-key scrubbing works and Picture-in-Picture stays floating; audio no longer goes silent after switching a movie to a TV channel.
+</details>
+
 ## dopeIPTV 0.6.4
 
 A stability-and-housekeeping release: **4K plays smoothly**, the app **no longer

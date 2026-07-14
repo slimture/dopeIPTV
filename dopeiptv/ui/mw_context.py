@@ -15,6 +15,12 @@ from PyQt6.QtWidgets import QApplication, QInputDialog, QLineEdit, QMenu, QMessa
 
 class _ContextMenuMixin:
     def _context_menu(self, pos) -> None:
+        # Swallow the stray context-menu event that macOS delivers to the
+        # now-visible channel list right after a right-click "Exit PiP" - it
+        # would otherwise pop the channel menu the instant the app returns.
+        import time
+        if time.monotonic() - getattr(self, "_pip_exit_ts", 0.0) < 0.5:
+            return
         idx = self.listw.indexAt(pos)
         if not idx.isValid():
             return
@@ -53,6 +59,13 @@ class _ContextMenuMixin:
                 m.addSeparator()
                 self._build_timeshift_menu(
                     m.addMenu(tr("tooltip_timeshift")), it)
+            elif self._ts_provider_flagged(it):
+                # The provider flags this channel with catch-up but we've
+                # learned (or wrongly learned) it as broken, so its ◀◀ marker
+                # is hidden. Offer a per-channel reset to bring it back.
+                m.addSeparator()
+                m.addAction(tr("ts_reset_channel"),
+                            lambda it=it: self._reset_channel_timeshift(it))
             m.addSeparator()
             self._build_record_menu(m.addMenu(tr("rec_record")), it)
         if (content_kind in ("live", "fav")

@@ -16,12 +16,38 @@ from PyQt6.QtGui import (
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 from PyQt6.QtWidgets import (
     QApplication, QHBoxLayout, QLabel, QLineEdit, QMenu, QSizePolicy, QSlider,
-    QVBoxLayout, QWidget, QPushButton,
+    QToolTip, QVBoxLayout, QWidget, QPushButton,
 )
 
 from ..i18n import tr
 from .players import _libmpv, _register_error_callback
 from ..ui.theme import P
+
+
+def _is_bare_arrow(modifiers) -> bool:
+    """True when no real modifier is held. macOS tags arrow keys with
+    KeypadModifier, which must be ignored or no arrow ever reads as 'bare'."""
+    return (modifiers & ~Qt.KeyboardModifier.KeypadModifier) == \
+        Qt.KeyboardModifier.NoModifier
+
+
+def _is_shift_arrow(modifiers) -> bool:
+    """True when only Shift is held (again ignoring the macOS KeypadModifier).
+    Shift+arrow steps the timeshift timeline; a bare arrow fine-seeks."""
+    return (modifiers & ~Qt.KeyboardModifier.KeypadModifier) == \
+        Qt.KeyboardModifier.ShiftModifier
+
+
+def _env_num(name: str, default, cast):
+    """Read a numeric override from the environment, falling back to *default*
+    when unset or malformed (so a stray value can never abort player start)."""
+    raw = os.environ.get(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        return cast(raw)
+    except (TypeError, ValueError):
+        return default
 
 
 def _control_icon(name: str, color: str, px: int = 28) -> QIcon:
@@ -283,21 +309,29 @@ class _MpvGLWidget(QOpenGLWidget):
         # set them one at a time and skip any this build rejects.
         soft = {"user_agent": "dopeIPTV/1.0", "keep_open": "yes",
                 "input_default_bindings": False, "input_vo_keyboard": False,
-                # Hardware decoding - without this mpv software-decodes, which
-                # stutters on 4K (esp. 10-bit HEVC/HDR) even on fast CPUs.
-                # 'auto-copy-safe' decodes on the GPU's dedicated engine and
-                # copies the frame back to RAM for upload as a normal texture.
-                # We deliberately prefer the *copy* path over zero-copy interop:
-                # our OpenGL render-API + QOpenGLWidget context can't always
-                # negotiate direct GL interop (vaapi-egl / cuda-gl), and when
-                # that fails you get a black frame or a software fallback. The
-                # copy path works with any GL context and any GPU that has a
-                # decoder (AMD vaapi-copy, Intel vaapi-copy, NVIDIA nvdec /
-                # vulkan-copy) - the heavy decode still runs on hardware. It
-                # also uses noticeably less RAM here than the interop path.
-                # Enthusiasts can force zero-copy with DOPEIPTV_HWDEC=nvdec etc.
+                # Video decoding. Default is 'no' (software) - the same default
+                # mpv itself ships. Modern CPUs decode even 4K 10-bit HEVC/HDR
+                # comfortably, and software decode is completely immune to the
+                # GPU/driver hazards of the libmpv OpenGL render API (e.g. the
+                # nvidia-open stack turning hardware-decoded video black once a
+                # subtitle composites). Users who want hardware decoding can opt
+                # in from Settings > Playback (or DOPEIPTV_HWDEC). When enabled,
+                # 'auto-copy-safe' decodes on the GPU and copies the frame back
+                # to RAM for upload as a normal texture, which works with any GL
+                # context and any GPU that has a decoder.
+                # Priority: env override > user setting > software default.
                 "hwdec": (os.environ.get("DOPEIPTV_HWDEC")
-                          or "auto-copy-safe"),
+                          or getattr(self, "hwdec_pref", None)
+                          or "no"),
+                # Safety net for those who opt into hardware decoding: if the
+                # hardware DECODER fails (unsupported codec on this GPU, a
+                # corrupt stream, a driver hiccup), drop to software after a
+                # single failed frame instead of showing garbage. Note this only
+                # catches decoder failures - it does NOT catch render-path GL
+                # errors (e.g. the nvidia-open INVALID_ENUM where the decoder
+                # succeeds but the texture upload corrupts), which is why
+                # software stays the default rather than hardware+fallback.
+                "hwdec_software_fallback": "1",
                 # (No 'osc' option: the on-screen controller is a feature of
                 # the standalone mpv GUI and doesn't exist in the libmpv/render
                 # build we use - setting it only logged a harmless skip.)
@@ -310,6 +344,16 @@ class _MpvGLWidget(QOpenGLWidget):
                 "demuxer-lavf-o": "reconnect=1,reconnect_streamed=1,"
                                   "reconnect_on_network_error=1,"
                                   "reconnect_delay_max=5",
+                # Faster channel switching: ffmpeg otherwise probes up to ~5 s /
+                # 5 MB of a live MPEG-TS stream before it shows the first frame.
+                # A live TS declares its codecs up front, so a shorter probe
+                # reaches the picture much sooner with no practical downside.
+                # Tunable/disable-able via env (seconds / bytes; 0 = ffmpeg's
+                # own default) for streams that need deeper probing.
+                "demuxer-lavf-analyzeduration": _env_num(
+                    "DOPEIPTV_ANALYZEDURATION", 1.0, float),
+                "demuxer-lavf-probesize": _env_num(
+                    "DOPEIPTV_PROBESIZE", 2_000_000, int),
                 # Never let mpv open its own window, and keep its OSD silent -
                 # otherwise it draws the media title centred on black while a
                 # stream buffers, which can surface as a stray frame.
@@ -417,6 +461,44 @@ class _SeekSlider(QSlider):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(Qt.Orientation.Horizontal, parent)
         self.dragging = False
+        self._markers: list[float] = []   # programme boundaries as 0..1 fractions
+        self._segments: list = []         # (start_frac, end_frac, title, time)
+
+    def set_markers(self, fractions) -> None:
+        """Programme-boundary ticks along the groove, as fractions 0..1 (left
+        to right). Empty (the default) draws nothing, so the plain VOD seek bar
+        is unaffected."""
+        fr = sorted(f for f in fractions if 0.0 < f < 1.0)
+        if fr != self._markers:
+            self._markers = fr
+            self.update()
+
+    def set_segments(self, segments) -> None:
+        """Programme segments for boundary ticks and hover tooltips, each a
+        (start_frac, end_frac, title, time_label) tuple along the groove."""
+        self._segments = list(segments)
+        self.set_markers(s[0] for s in self._segments)
+
+    def _segment_at(self, frac: float):
+        for seg in self._segments:
+            if seg[0] <= frac <= seg[1]:
+                return seg
+        return None
+
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        if not self._markers:
+            return
+        w, h = self.width(), self.height()
+        painter = QPainter(self)
+        pen = QPen(QColor(255, 255, 255, 130))
+        pen.setWidth(1)
+        painter.setPen(pen)
+        y0, y1 = int(h * 0.28), int(h * 0.72)
+        for f in self._markers:
+            x = int(f * (w - 1))
+            painter.drawLine(x, y0, x, y1)
+        painter.end()
 
     def _value_for(self, event) -> int:
         ratio = event.position().x() / max(1, self.width())
@@ -434,9 +516,24 @@ class _SeekSlider(QSlider):
     def mouseMoveEvent(self, event) -> None:
         if self.dragging:
             self.setValue(self._value_for(event))
+            self._show_segment_tooltip(event)
             event.accept()
             return
+        self._show_segment_tooltip(event)
         super().mouseMoveEvent(event)
+
+    def _show_segment_tooltip(self, event) -> None:
+        """On the timeline, name the programme under the cursor so hovering
+        back in time tells you what was on."""
+        if not self._segments:
+            return
+        frac = event.position().x() / max(1, self.width())
+        seg = self._segment_at(max(0.0, min(1.0, frac)))
+        if seg and seg[2]:
+            text = f"{seg[3]} · {seg[2]}" if seg[3] else seg[2]
+            QToolTip.showText(event.globalPosition().toPoint(), text, self)
+        else:
+            QToolTip.hideText()
 
     def mouseReleaseEvent(self, event) -> None:
         if self.dragging and event.button() == Qt.MouseButton.LeftButton:
@@ -485,7 +582,7 @@ class _MacInputFilter(QObject):
 
     def eventFilter(self, obj, event):
         et = event.type()
-        if et == QEvent.Type.MouseMove:
+        if et == QEvent.Type.MouseMove and sys.platform == "darwin":
             from ..core.platform_macos import set_cursor_hidden
             set_cursor_hidden(False)
             if self._over_video():
@@ -500,20 +597,41 @@ class _MacInputFilter(QObject):
     def _handle_seek_key(self, event, pressed: bool) -> bool:
         if event.key() not in (Qt.Key.Key_Left, Qt.Key.Key_Right):
             return False
-        # Ctrl+arrows stay a channel zap; only claim the bare presses.
-        if event.modifiers() != Qt.KeyboardModifier.NoModifier:
+        # Ctrl/Cmd+arrows stay a channel zap; claim the bare presses (fine-seek)
+        # and Shift+arrow (timeline step). On macOS the arrow keys carry
+        # KeypadModifier, so ignore that one bit - otherwise no arrow ever
+        # counts as "bare" and every one falls through to the channel list.
+        bare = _is_bare_arrow(event.modifiers())
+        shift = _is_shift_arrow(event.modifiers())
+        if not (bare or shift):
             return False
         p = self._player
-        if p.current_url is None or not p._is_seekable():
+        if p.current_url is None:
             return False
         # Never steal arrows from a text field (search box, PIN entry, ...).
         if isinstance(QApplication.focusWidget(), QLineEdit):
             return False
-        if pressed:
-            p._on_seek_key_press(event)
-        else:
-            p._on_seek_key_release(event)
-        return True
+        back = event.key() == Qt.Key.Key_Left
+        timeline = p.ts_timeline.isVisible()
+        # Shift+arrow: step the timeline into the archive - one jump per press
+        # (no auto-repeat) since each reloads a segment.
+        if shift and timeline:
+            if pressed and not event.isAutoRepeat():
+                p.arrow_scrub(back, step=True)
+            return True
+        # Bare arrow on a seekable stream (movie, catch-up segment, live
+        # buffer): fine-seek, with hold-to-seek while the key is down.
+        if p._mpv_seekable():
+            if pressed:
+                p._on_seek_key_press(event)
+            else:
+                p._on_seek_key_release(event)
+            return True
+        # Non-seekable timeshift live edge: swallow the bare arrow so it doesn't
+        # swap the channel (use Shift+arrow to step into the archive).
+        if timeline:
+            return True
+        return False
 
 
 class EmbeddedPlayer(QWidget):
@@ -532,12 +650,21 @@ class EmbeddedPlayer(QWidget):
     stalled = pyqtSignal()
     finished = pyqtSignal()
     next_episode = pyqtSignal()
+    paused_changed = pyqtSignal(bool)
+    timeshift_seek = pyqtSignal(int)   # minutes back from live (0 = go live)
+    program_seek = pyqtSignal(int)     # seconds from the picked programme start
 
     OVERLAY_HIDE_MS = 3000
     VIDEO_BOX_HEIGHT = 260
     # How long mpv may sit idle (buffer-starved) while not paused before we
     # treat the stream as frozen and ask for a reconnect.
     STALL_SECS = 12
+    # Minutes a Left/Right arrow press moves the timeshift live timeline (at the
+    # live edge); once inside a seekable archive segment, arrows fine-seek by
+    # these seconds instead - matching the on-screen ◀ 10s / 30s ▶ buttons.
+    TIMELINE_STEP_MIN = 5
+    SEEK_BACK = 10
+    SEEK_FWD = 30
     MINIBTN = 28
     ICON_PX = 15  # drawn control-icon size inside the 28px buttons
 
@@ -570,6 +697,11 @@ class EmbeddedPlayer(QWidget):
         lay.setSpacing(2)
 
         self.video = _MpvGLWidget(self)
+        # Hardware-decode preference from Settings, staged on the widget before
+        # its lazy GL init builds the mpv core (env DOPEIPTV_HWDEC still wins).
+        if settings is not None:
+            self.video.hwdec_pref = str(
+                settings.value("hwdec_mode", "") or "") or None
         self.video.installEventFilter(self)
         self.video.setMouseTracking(True)
         # Route mpv errors through a filter so a user-initiated stop doesn't
@@ -629,8 +761,11 @@ class EmbeddedPlayer(QWidget):
         self.vol.setFixedWidth(40)
         self.vol.setToolTip(tr("tooltip_volume"))
         self.vol.valueChanged.connect(self._set_volume)
-        self.ts_btn = QPushButton("⏪", objectName="MiniBtn")
+        # '◀◀' (geometric triangles) rather than the '⏪' emoji, which ignores
+        # the colour and rendered grey; amber flags a timeshift channel.
+        self.ts_btn = QPushButton("◀◀", objectName="MiniBtn")
         self.ts_btn.setToolTip(tr("tooltip_timeshift"))
+        self.ts_btn.setStyleSheet("color:#F2B01E; font-size:11px;")
         self.ts_btn.clicked.connect(
             lambda: self.timeshift_menu.emit(self.ts_btn))
         self.ts_btn.hide()
@@ -685,6 +820,15 @@ class EmbeddedPlayer(QWidget):
         # Floating scrubber shown over the bottom of the docked video on
         # hover, so the seek bar doesn't permanently occupy the control row.
         self._seekable = False
+        # What seek UI this stream uses:
+        #  'vod'      - normal seek bar (movies/series/recordings)
+        #  'program'  - a catch-up segment: normal seek bar spanning it
+        #  'timeline' - a timeshift channel at the live edge: the live timeline
+        #  'live'     - a plain live channel: no seek bar at all
+        self._seek_mode = "vod"
+        self._program_window = 0.0        # 'program' mode: clamp bar to N secs
+        self._program_base = 0.0          # secs of the programme before this segment
+        self._on_archive_segment = False  # timeline mode: on a seekable segment
         self.seek_overlay = QWidget(self)
         self.seek_overlay.setStyleSheet(
             "background: rgba(16,16,20,215); border-radius: 8px;")
@@ -749,8 +893,9 @@ class EmbeddedPlayer(QWidget):
         self.fs_vol.setFixedWidth(80)
         self.fs_vol.setToolTip(tr("tooltip_volume"))
         self.fs_vol.valueChanged.connect(self._set_volume)
-        self.fs_ts_btn = QPushButton("⏪", objectName="MiniBtn")
+        self.fs_ts_btn = QPushButton("◀◀", objectName="MiniBtn")
         self.fs_ts_btn.setToolTip(tr("tooltip_timeshift"))
+        self.fs_ts_btn.setStyleSheet("color:#F2B01E; font-size:11px;")
         self.fs_ts_btn.clicked.connect(
             lambda: self.timeshift_menu.emit(self.fs_ts_btn))
         self.fs_ts_btn.hide()
@@ -889,10 +1034,51 @@ class EmbeddedPlayer(QWidget):
         self._stats_timer.setInterval(1000)
         self._stats_timer.timeout.connect(self._update_stats_text)
 
-        # macOS: route arrow-seek + cursor-hide through an app-level filter,
-        # because a QOpenGLWidget can't drive them itself there. No-op on Linux.
-        self._mac_input_filter = (
-            _MacInputFilter(self) if sys.platform == "darwin" else None)
+        # Top-left "am I live?" badge: red LIVE at the live edge, a neutral
+        # TIMESHIFT pill when watching the catch-up archive. Child of the video
+        # so it floats over the picture; top-left anchor needs no reposition.
+        self.live_badge = QLabel("", self.video)
+        self.live_badge.hide()
+
+        # Live timeline for timeshift channels: a floating bar at the bottom of
+        # the video with LIVE at the right edge. Drag left to scrub back into
+        # the provider archive (opens a catch-up segment there). Shown only for
+        # timeshift channels; VOD keeps the ordinary seek bar.
+        self._ts_depth = 1
+        self.ts_timeline = QWidget(self)
+        self.ts_timeline.setStyleSheet(
+            "background: rgba(0,0,0,150); border-radius: 10px;")
+        _tl = QHBoxLayout(self.ts_timeline)
+        _tl.setContentsMargins(12, 6, 12, 6)
+        _tl.setSpacing(10)
+        self.ts_slider = _SeekSlider()
+        self.ts_slider.setMouseTracking(True)   # hover tooltips w/o a pressed button
+        self.ts_slider.seek_requested.connect(self._on_ts_seek)
+        self.ts_label = QLabel("● LIVE")
+        self.ts_label.setStyleSheet(
+            "background: transparent; color: #FFFFFF;"
+            "font-size: 11px; font-weight: 700;")
+        # Jump straight back to the live edge from anywhere in the archive.
+        self.ts_live_btn = QPushButton("⏭ LIVE")
+        self.ts_live_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.ts_live_btn.setStyleSheet(
+            "QPushButton{background: #FF5C5C; color:#fff; border:none;"
+            "border-radius: 8px; padding: 2px 10px; font-size: 11px;"
+            "font-weight: 700;}"
+            "QPushButton:hover{background:#e14b4b;}")
+        self.ts_live_btn.clicked.connect(lambda: self.timeshift_seek.emit(0))
+        self.ts_live_btn.hide()
+        _tl.addWidget(self.ts_slider, 1)
+        _tl.addWidget(self.ts_label)
+        _tl.addWidget(self.ts_live_btn)
+        self.ts_timeline.hide()
+
+        # App-level filter for bare Left/Right seeking of a seekable video, so
+        # it works even in the docked mini-player where focus is on the list
+        # (a QOpenGLWidget can't reliably drive it itself). Live/non-seekable
+        # streams and text fields are left alone, so channel zapping and typing
+        # still work. On macOS it also handles cursor-hide over the video.
+        self._mac_input_filter = _MacInputFilter(self)
 
         self.retranslate_ui()
 
@@ -1045,11 +1231,44 @@ class EmbeddedPlayer(QWidget):
         pass
 
     def _is_seekable(self) -> bool:
+        if self._seek_mode in ("live", "timeline"):
+            return False   # plain live can't seek; timeline has its own control
+        return self._mpv_seekable()
+
+    def _mpv_seekable(self) -> bool:
+        """Whether the underlying mpv stream can seek (has a real duration),
+        independent of _seek_mode - a catch-up archive segment is seekable even
+        in 'timeline' mode, so arrows can fine-seek inside it."""
         m = self.video.mpv
         try:
             return bool(m is not None and m.duration and m.duration > 1)
         except Exception:
             return False
+
+    def arrow_scrub(self, back: bool, step: bool = False) -> bool:
+        """Single arrow action. A bare arrow fine-seeks by SEEK_BACK/SEEK_FWD
+        (within a movie, a catch-up segment, or the live buffer); Shift+arrow
+        (*step*) jumps the live timeline TIMELINE_STEP_MIN into the archive.
+        Returns True when it consumed the key."""
+        if self.current_url is None:
+            return False
+        timeline = self.ts_timeline.isVisible()
+        if step and timeline:
+            # Shift+arrow: explicit timeline step into the archive.
+            self._timeline_step(-self.TIMELINE_STEP_MIN if back
+                                else self.TIMELINE_STEP_MIN)
+            return True
+        if self._mpv_seekable():
+            # Bare arrow (or Shift on a non-timeline stream): fine-seek within a
+            # movie, a catch-up segment, or a seekable live buffer.
+            self._relative_seek(-self.SEEK_BACK if back else self.SEEK_FWD)
+            return True
+        if timeline:
+            # Timeshift live edge mpv won't fine-seek: swallow the bare arrow so
+            # it doesn't swap the channel, but don't do a jarring multi-minute
+            # jump - Shift+arrow steps into the archive when you want that.
+            return True
+        return False
 
     def _mac_show_cursor(self) -> None:
         """Un-hide the macOS override cursor (safety for when playback ends
@@ -1064,9 +1283,9 @@ class EmbeddedPlayer(QWidget):
         if event.key() in (Qt.Key.Key_Up, Qt.Key.Key_Down):
             self._nudge_volume(5 if event.key() == Qt.Key.Key_Up else -5)
             return
-        if not self._is_seekable():
+        if not self._mpv_seekable():
             return
-        step = -10 if event.key() == Qt.Key.Key_Left else 10
+        step = -self.SEEK_BACK if event.key() == Qt.Key.Key_Left else self.SEEK_FWD
         if event.isAutoRepeat():
             return  # the hold timer drives the continuous seek
         self._relative_seek(step)
@@ -1109,6 +1328,10 @@ class EmbeddedPlayer(QWidget):
     # -- docked hover scrubber -------------------------------------------------
 
     def _show_seek_overlay(self) -> None:
+        # No VOD seek overlay for plain live (can't seek) or timeshift-edge
+        # (the live timeline is the control) - avoids a second, useless bar.
+        if self._seek_mode in ("live", "timeline"):
+            return
         for w in (self.back_btn, self.fwd_btn, self.seek, self.time_lbl):
             w.show()
         self._place_seek_overlay()
@@ -1132,6 +1355,159 @@ class EmbeddedPlayer(QWidget):
             vg.y() + vg.height() - self.seek_overlay.height() - margin)
 
     # -- overlay ---------------------------------------------------------------
+
+    def set_live_badge(self, kind: str | None) -> None:
+        """Show a top-left 'not live' pill when watching the catch-up archive or
+        while a live stream is paused (behind the live edge). Anything else -
+        including the live edge itself - hides it (no permanent LIVE tag)."""
+        b = self.live_badge
+        if kind != "timeshift":
+            b.hide()
+            return
+        b.setText("⧗ TIMESHIFT")
+        b.setStyleSheet(
+            "background: rgba(0,0,0,150); color: #FFFFFF;"
+            "border-radius: 9px; padding: 3px 9px;"
+            "font-size: 11px; font-weight: 700;")
+        b.adjustSize()
+        b.move(12, 12)
+        b.show()
+        b.raise_()
+
+    # -- timeshift live timeline ---------------------------------------------
+
+    @staticmethod
+    def _fmt_offset(mins: int) -> str:
+        mins = max(0, int(mins))
+        d, rem = divmod(mins, 1440)
+        h, m = divmod(rem, 60)
+        if d:
+            return f"{d}d {h}h"
+        if h:
+            return f"{h}:{m:02d}"
+        return f"{m} min"
+
+    def enter_timeshift(self, depth_min: int) -> None:
+        """Show the live timeline spanning the last *depth_min* minutes."""
+        self._ts_depth = max(1, int(depth_min))
+        self.ts_slider.setRange(0, self._ts_depth)
+        self.ts_slider.setValue(self._ts_depth)
+        self.ts_label.setText("● LIVE")
+        self.ts_live_btn.hide()
+        self._place_ts_timeline()
+        self.ts_timeline.show()
+        self.ts_timeline.raise_()
+        # On the very first play (esp. the auto-preview at startup) the video
+        # surface hasn't been laid out at its docked size yet, so the geometry
+        # read above is stale and the bar lands too high. Reposition once the
+        # layout has settled.
+        QTimer.singleShot(0, self._reposition_ts_timeline)
+
+    def _reposition_ts_timeline(self) -> None:
+        if self.ts_timeline.isVisible():
+            self._place_ts_timeline()
+
+    def exit_timeshift(self) -> None:
+        self.ts_timeline.hide()
+
+    def set_seek_mode(self, mode: str) -> None:
+        """Pick which seek UI this stream uses (see _seek_mode). Hides the VOD
+        seek overlay for live/timeline so only one bar is ever shown."""
+        self._seek_mode = mode
+        if mode != "timeline":
+            self.exit_timeshift()
+            self._on_archive_segment = False
+        if mode != "program":
+            self._program_window = 0.0
+            self._program_base = 0.0
+        if mode in ("live", "timeline"):
+            self._hide_seek_ui()
+        elif mode == "program" and self._fs_ui:
+            # A program-scrub re-load runs play() -> _hide_seek_ui(); re-show the
+            # fullscreen scrubber right away so the full-width bar isn't left as
+            # an empty gap until the next position poll.
+            for w in self._seek_widgets():
+                w.setVisible(True)
+
+    def set_program_window(self, secs: float, base: float = 0.0) -> None:
+        """In 'program' mode, present the seek bar as the whole picked programme
+        (*secs* long), with the currently loaded archive segment beginning
+        *base* seconds into it. The provider's archive stream usually runs on
+        past the programme to the live edge - and in-stream seeking on it snaps
+        to live - so the bar is a *virtual* timeline: scrubbing it re-loads the
+        archive at the chosen offset (program_seek) instead of seeking mpv."""
+        self._program_window = max(0.0, float(secs or 0.0))
+        self._program_base = max(0.0, float(base or 0.0))
+
+    def set_on_archive_segment(self, on: bool) -> None:
+        """Tell the player whether the current timeline-mode stream is a
+        seekable catch-up segment (arrows fine-seek) or the live edge (arrows
+        step the timeline into the archive)."""
+        self._on_archive_segment = bool(on)
+
+    def set_timeline_segments(self, segments) -> None:
+        """Programme segments for the live timeline: boundary ticks plus a
+        hover tooltip naming the programme at that point. Each segment is a
+        (start_frac, end_frac, title, time_label) tuple, oldest to live edge."""
+        self.ts_slider.set_segments(segments)
+
+    def update_timeshift_position(self, offset_min: float,
+                                  title: str | None = None,
+                                  paused: bool = False) -> None:
+        """Move the marker to *offset_min* behind live, unless the user is
+        dragging it right now. *title* names the programme at that point so the
+        user can see where in the schedule they are. *paused* forces the
+        'not live' state (label + Go-live button) the instant a live-edge stream
+        is paused, without waiting for the offset to grow past the tolerance."""
+        if not self.ts_timeline.isVisible() or self.ts_slider.dragging:
+            return
+        val = max(0, self._ts_depth - int(round(offset_min)))
+        self.ts_slider.blockSignals(True)
+        self.ts_slider.setValue(val)
+        self.ts_slider.blockSignals(False)
+        # ~5 s tolerance counts as live; sub-minute gaps show in seconds so a
+        # short DVR pause reads as "−30s behind" rather than a false "LIVE".
+        # A pause is 'not live' immediately, regardless of the tiny offset.
+        live = (not paused) and offset_min < (5 / 60.0)
+        secs = int(round(offset_min * 60))
+        if live:
+            edge = "● LIVE"
+        elif paused and secs <= 0:
+            edge = "⏸ PAUSED"
+        elif offset_min < 1:
+            edge = f"−{secs}s"
+        else:
+            edge = f"−{self._fmt_offset(offset_min)}"
+        self.ts_label.setText(f"{edge} · {title}" if title else edge)
+        self.ts_live_btn.setVisible(not live)
+
+    def _on_ts_seek(self, value: int) -> None:
+        self.timeshift_seek.emit(int(self._ts_depth - value))
+
+    def _timeline_step(self, minutes: int) -> None:
+        """Nudge the live timeline by *minutes* (negative = back into the
+        archive, positive = toward live) - the arrow-key equivalent of dragging
+        the slider."""
+        if not self.ts_timeline.isVisible():
+            return
+        val = max(0, min(self._ts_depth, self.ts_slider.value() + minutes))
+        self.ts_slider.setValue(val)
+        self.timeshift_seek.emit(int(self._ts_depth - val))
+
+    def _place_ts_timeline(self) -> None:
+        margin = 10
+        vg = self.video.geometry()
+        self.ts_timeline.setFixedWidth(max(240, vg.width() - 2 * margin))
+        self.ts_timeline.adjustSize()
+        if self._fs_ui:
+            # Fullscreen: the control bar floats at the bottom, so sit above the
+            # zone it reserves (bottom margin 24 + bar height) with a gap, even
+            # while the bar is auto-hidden - otherwise the two overlap.
+            ctrl_h = self.fs_controls.sizeHint().height()
+            y = self.height() - 24 - ctrl_h - 12 - self.ts_timeline.height()
+        else:
+            y = vg.y() + vg.height() - self.ts_timeline.height() - margin
+        self.ts_timeline.move(vg.x() + margin, max(margin, y))
 
     def set_overlay_info(self, text: str) -> None:
         self._overlay_text = text or ""
@@ -1191,7 +1567,12 @@ class EmbeddedPlayer(QWidget):
 
     def _place_overlay(self) -> None:
         margin = 24
-        if self.fs_seek.isVisibleTo(self.fs_controls):
+        # Size the control bar to the stream's seek MODE, not the seek widget's
+        # momentary visibility: a program-mode scrub re-loads the archive, which
+        # briefly hides the scrubber (play() calls _hide_seek_ui), and keying off
+        # that made the bar collapse to compact and re-stretch on every seek.
+        # A seek bar belongs to vod/program -> full width; live/timeline -> hug.
+        if self._seek_mode in ("vod", "program"):
             controls_w = self.width() - 2 * margin
         else:
             controls_w = self.fs_controls.sizeHint().width()
@@ -1208,10 +1589,12 @@ class EmbeddedPlayer(QWidget):
         cap = min(self.width() - 2 * margin, 640)
         self.overlay.setFixedWidth(max(120, min(text_w + 34, cap)))
         self.overlay.adjustSize()
-        self.overlay.move(
-            margin,
-            self.height() - self.fs_controls.height()
-            - margin - 8 - self.overlay.height())
+        # Sit just above the control bar - and above the timeshift timeline too
+        # when it's showing, so the info text never lands on top of the bar.
+        bottom = self.height() - self.fs_controls.height() - margin - 8
+        if self.ts_timeline.isVisible():
+            bottom -= self.ts_timeline.height() + 12
+        self.overlay.move(margin, bottom - self.overlay.height())
 
     def _lock_video_box(self) -> None:
         # The video surface always fills whatever the *player* is given;
@@ -1252,8 +1635,24 @@ class EmbeddedPlayer(QWidget):
             self._place_overlay()
         if self.seek_overlay.isVisible():
             self._place_seek_overlay()
+        if self.ts_timeline.isVisible():
+            self._place_ts_timeline()
 
     # -- playback defaults -----------------------------------------------------
+
+    # -- hardware decoding -----------------------------------------------------
+
+    def _hwdec_base(self) -> str:
+        """The decode mode to use (env > setting > software default).
+
+        Default is 'no' (software), like standalone mpv: modern CPUs decode
+        even 4K 10-bit HEVC/HDR fine, and it sidesteps the driver hazards of the
+        libmpv OpenGL render API entirely. Users opt into hardware decoding from
+        Settings > Playback (or the DOPEIPTV_HWDEC env override)."""
+        return (os.environ.get("DOPEIPTV_HWDEC")
+                or (str(self._settings.value("hwdec_mode", "") or "")
+                    if self._settings else "")
+                or "no")
 
     def apply_default_options(self) -> None:
         """Apply persistent playback defaults from Settings to the mpv core."""
@@ -1292,6 +1691,20 @@ class EmbeddedPlayer(QWidget):
             set_opt("keepaspect", True)
             set_opt("video-aspect-override",
                     aspect if aspect != "auto" else "-1")
+
+        # Optional video filters (all off/neutral by default). These are plain
+        # mpv properties, applied live on the running core.
+        #  - deinterlace: smooth interlaced live SD/HD feeds.
+        #  - sharpen: unsharp mask strength (0 = off).
+        #  - tone-mapping: HDR->SDR curve; harmless on SDR content.
+        set_opt("deinterlace",
+                s.value("video_deinterlace", "false") == "true")
+        try:
+            sharpen = float(s.value("video_sharpen", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            sharpen = 0.0
+        set_opt("sharpen", max(0.0, min(sharpen, 3.0)))
+        set_opt("tone-mapping", s.value("video_tonemapping", "auto") or "auto")
 
     def playback_position(self) -> float:
         m = self.video.mpv
@@ -1347,6 +1760,16 @@ class EmbeddedPlayer(QWidget):
                 m["cache-secs"] = float(self._cache_secs())
             except Exception:
                 pass
+            # Decode mode, set per stream (not in apply_default_options - that
+            # also runs on every Settings save, and re-assigning hwdec
+            # mid-playback reinitialises the decoder and glitches the video). A
+            # changed setting takes effect on the next opened stream. The
+            # default is software ('no'); hardware is opt-in for those who want
+            # it, and DOPEIPTV_HWDEC still wins over the setting.
+            try:
+                m["hwdec"] = self._hwdec_base()
+            except Exception:
+                pass
             self.apply_default_options()
             try:
                 m["volume"] = float(self.vol.value())
@@ -1367,12 +1790,38 @@ class EmbeddedPlayer(QWidget):
             m.play(url)
             self.current_url = url
             self._pos_timer.start()
+            # Safety net for the "silent until you replay it" case: switching
+            # streams while the previous one tears down can land with no audio
+            # track selected even though aid=auto. Re-check shortly after load
+            # and force the first audio track if none is active.
+            for delay in (500, 1500):
+                QTimer.singleShot(delay, self._ensure_audio_selected)
             return True
         except Exception as e:
             print(f"[dopeIPTV] Embedded playback failed: "
                   f"{type(e).__name__}: {e}", file=sys.stderr)
             self.current_url = None
             return False
+
+    def _ensure_audio_selected(self) -> None:
+        """If playback has audio tracks but none is active (a stream-switch
+        race that otherwise plays silent until you replay it), select the
+        first one. A no-op when audio is already playing."""
+        m = self.video.mpv
+        if m is None or self.current_url is None:
+            return
+        try:
+            if m.aid:               # already on a track (truthy id)
+                return
+            tracks = [t for t in (m.track_list or [])
+                      if t.get("type") == "audio"]
+        except Exception:
+            return
+        if tracks:
+            try:
+                m.aid = tracks[0].get("id")
+            except Exception:
+                pass
 
     # -- seeking ---------------------------------------------------------------
 
@@ -1388,6 +1837,12 @@ class EmbeddedPlayer(QWidget):
         self._hide_seek_overlay(force=True)
 
     def _do_seek(self, seconds: int) -> None:
+        # In 'program' mode the seek bar is virtual: the archive stream can't be
+        # seeked in place (it snaps to live), so ask the app to re-load the
+        # archive at the chosen programme offset instead.
+        if self._seek_mode == "program" and self._program_window > 1:
+            self.program_seek.emit(int(max(0, seconds)))
+            return
         m = self.video.mpv
         if m is None:
             return
@@ -1397,6 +1852,13 @@ class EmbeddedPlayer(QWidget):
             pass
 
     def _relative_seek(self, seconds: int) -> None:
+        # 'program' mode: a relative nudge is a re-load at the new offset (see
+        # _do_seek) - the loaded archive segment isn't seekable in place.
+        if self._seek_mode == "program" and self._program_window > 1:
+            cur = self._program_base + self.playback_position()
+            target = max(0, min(self._program_window, cur + seconds))
+            self.program_seek.emit(int(target))
+            return
         m = self.video.mpv
         if m is None:
             return
@@ -1422,11 +1884,18 @@ class EmbeddedPlayer(QWidget):
             pass
 
     def _sync_pause_label(self, paused: bool) -> None:
+        # Called every position poll - only act on an actual pause<->play
+        # transition. Re-emitting paused_changed each poll reset the app's
+        # pause-start timestamp, so a long pause measured as ~0 s (the DVR
+        # timeshift offset never kicked in).
+        if paused == getattr(self, "_paused", None):
+            return
         self._paused = paused
         name = "play" if paused else "pause"
         icon = _control_icon(name, self._icon_color, self.ICON_PX)
         self.pause_btn.setIcon(icon)
         self.fs_pause_btn.setIcon(icon)
+        self.paused_changed.emit(paused)
 
     # -- options menu ----------------------------------------------------------
 
@@ -1492,6 +1961,31 @@ class EmbeddedPlayer(QWidget):
         stretch = aspect.addAction(tr("opt_aspect_stretch"))
         stretch.triggered.connect(
             lambda _c: self._set_mpv("keepaspect", False))
+
+        # Video filters - same options as Settings > Playback > Video, kept in
+        # one place. Each choice is applied live and saved as the default.
+        s = self._settings
+        video = menu.addMenu(tr("opt_video"))
+
+        def _sub(parent, title, key, default, choices):
+            sm = parent.addMenu(title)
+            cur = str(s.value(key, default)) if s else default
+            for label, val in choices:
+                a = sm.addAction(label)
+                a.setCheckable(True)
+                a.setChecked(val == cur)
+                a.triggered.connect(
+                    lambda _c, k=key, v=val: self._set_video_opt(k, v))
+
+        _sub(video, tr("setting_deinterlace"), "video_deinterlace", "false",
+             ((tr("option_off"), "false"), (tr("option_on"), "true")))
+        _sub(video, tr("setting_sharpen"), "video_sharpen", "0.0",
+             ((tr("option_off"), "0.0"), (tr("option_low"), "0.5"),
+              (tr("option_medium"), "1.0"), (tr("option_high"), "2.0")))
+        _sub(video, tr("setting_tonemapping"), "video_tonemapping", "auto",
+             ((tr("option_tonemap_auto"), "auto"), ("Hable", "hable"),
+              ("Mobius", "mobius"), ("Reinhard", "reinhard"),
+              ("BT.2390", "bt.2390"), (tr("option_tonemap_clip"), "clip")))
 
         buf = menu.addMenu(tr("opt_network_buffer"))
         current_buf = self._cache_secs()
@@ -1660,6 +2154,14 @@ class EmbeddedPlayer(QWidget):
             self._settings.setValue("cache_secs", str(secs))
         self._set_mpv("cache-secs", float(secs))
 
+    def _set_video_opt(self, key: str, value: str) -> None:
+        """Persist a video-filter choice and apply it live. Re-uses
+        apply_default_options so the running core and the saved default stay in
+        one place (the in-player Video menu and Settings write the same keys)."""
+        if self._settings:
+            self._settings.setValue(key, value)
+        self.apply_default_options()
+
     # -- position polling ------------------------------------------------------
 
     def _poll_position(self) -> None:
@@ -1702,11 +2204,25 @@ class EmbeddedPlayer(QWidget):
                 self.finished.emit()
         else:
             self._eof_seen = False
-        seekable = bool(dur) and dur > 1
-        self._seekable = seekable
-        if not seekable:
+        seekable = (bool(dur) and dur > 1
+                    and self._seek_mode not in ("live", "timeline"))
+        # In 'program' mode the bar is virtual and always present: scrubbing it
+        # re-loads the archive, which briefly zeroes mpv's duration. Keep the
+        # bar shown (with its known window) across that blip so it doesn't
+        # collapse and re-stretch on every seek.
+        program_bar = self._seek_mode == "program" and self._program_window > 1
+        self._seekable = seekable or program_bar
+        if not self._seekable:
             self._hide_seek_ui()
+            self._sync_fs_controls_width(False)
             return
+        # A picked catch-up programme: present the bar as the whole programme,
+        # with the playhead at (base into the programme + position in the loaded
+        # segment), even though the underlying archive stream keeps running to
+        # live. Scrubbing this bar re-loads the archive (program_seek).
+        if self._seek_mode == "program" and self._program_window > 1:
+            dur = self._program_window
+            pos = max(0.0, min(self._program_base + (pos or 0.0), dur))
         text = f"{_format_time(pos)} / {_format_time(dur)}"
         # Keep both scrubbers' values current; the docked one lives in the
         # hover overlay (shown on mouse-over), the other in the fullscreen
@@ -1720,6 +2236,19 @@ class EmbeddedPlayer(QWidget):
         for w in (self.fs_seek, self.fs_time_lbl,
                   self.fs_back_btn, self.fs_fwd_btn):
             w.setVisible(True)
+        self._sync_fs_controls_width(True)
+
+    def _sync_fs_controls_width(self, seek_shown: bool) -> None:
+        """Keep the fullscreen control-bar width matched to whether the seek bar
+        is showing. Without this the bar can stay full-width after the scrubber
+        is hidden (a picked catch-up programme re-loads on each scrub, blanking
+        the bar for a moment) - leaving a big empty stretch gap with the buttons
+        flung to the edges."""
+        if getattr(self, "_fs_seek_shown", None) == seek_shown:
+            return
+        self._fs_seek_shown = seek_shown
+        if self._fs_ui and self.fs_controls.isVisible():
+            self._place_overlay()
 
     def progress_percent(self) -> float:
         m = self.video.mpv
@@ -1764,7 +2293,9 @@ class EmbeddedPlayer(QWidget):
         self._icon_color = P.get("text2", "#ECECF1")
         size = QSize(self.ICON_PX, self.ICON_PX)
         for btn, name in self._icon_names.items():
-            colour = "#FF5C5C" if name == "record" else self._icon_color
+            colour = ("#FF5C5C" if name == "record"
+                      else "#F2B01E" if name == "rewind"   # amber timeshift
+                      else self._icon_color)
             btn.setText("")
             btn.setIcon(_control_icon(name, colour, self.ICON_PX))
             btn.setIconSize(size)
@@ -1864,6 +2395,8 @@ class EmbeddedPlayer(QWidget):
         self._hide_seek_ui()
         self._stats_overlay.hide()
         self._stats_timer.stop()
+        self.live_badge.hide()
+        self.ts_timeline.hide()
         self._sync_pause_label(True)
         self._mac_show_cursor()
         # Force several deferred repaints - the compositor sometimes ignores a

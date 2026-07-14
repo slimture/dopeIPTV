@@ -14,7 +14,7 @@ from .widgets import _ClickableWidget
 from ..core.workers import run_async, tmdb_url_from_provider
 from PyQt6.QtCore import QSize, QTimer, Qt
 from PyQt6.QtGui import QIcon, QPainter, QPainterPath, QPixmap
-from PyQt6.QtWidgets import QAbstractItemView, QDialog, QDialogButtonBox, QFrame, QLabel, QListWidget, QListWidgetItem, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QAbstractItemView, QDialog, QDialogButtonBox, QFrame, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QMenu, QVBoxLayout, QWidget
 from datetime import datetime
 
 
@@ -25,7 +25,7 @@ class _DetailMixin:
         self._current_key = self._item_key(it)
         self._show_detail(it)
 
-    POSTER_SIZE_LIVE = (84, 84)
+    POSTER_SIZE_LIVE = (112, 112)
     POSTER_SIZE_MEDIA = (170, 255)
 
     def _show_detail(self, it) -> None:
@@ -37,11 +37,19 @@ class _DetailMixin:
         self._current_epg = None
         self._tmdb_details = None
         if not it:
+            # Nothing selected: leave the pane clean - no empty poster box and
+            # no stray play button.
             self._detail_name = tr("detail_select_something")
-            self.d_logo.setFixedSize(*self.POSTER_SIZE_LIVE)
-            self.d_logo.setPixmap(QPixmap())
-            self.d_logo.setText("")
+            self.d_logo.hide()
+            self.play_mpv.hide()
             return
+        # A partly-watched episode in Continue watching has no series_id of its
+        # own to look up, so resolve its info from the stored series context.
+        if it.get("_kind") == "episode" and it.get("_series_ctx"):
+            self._show_continue_episode_detail(it)
+            return
+        self.d_logo.show()
+        self.play_mpv.show()
         name = self.channel_display_name(it)
         self._detail_name = name
         # History and Watch Later rows carry the original content kind
@@ -70,9 +78,7 @@ class _DetailMixin:
         poster_size = (self.POSTER_SIZE_MEDIA if is_media
                        else self.POSTER_SIZE_LIVE)
         self.d_logo.setFixedSize(*poster_size)
-        # Make the Play button span the poster's width so its (centered) label
-        # sits centered under the poster/TV icon rather than off to the left.
-        self.play_mpv.setFixedWidth(poster_size[0])
+        self._position_play_over_poster()
         if is_media:
             # Match the info box to the poster height so their bottoms align.
             self.media_info.setFixedHeight(self.POSTER_SIZE_MEDIA[1])
@@ -82,13 +88,28 @@ class _DetailMixin:
         self._load_detail_poster(it, is_media, media_kind)
 
         if self.mode == "rec":
+            # Show the user-entered description (if any) in the info panel.
+            desc = (it.get("_desc") or "").strip()
+            self.media_plot.setText(desc)
+            self.media_plot.setVisible(bool(desc))
+            self.media_meta.setVisible(False)
+            self.media_info.setVisible(bool(desc))
             return
 
         if self.mode == "history" and snap_kind not in ("vod", "series"):
-            # For live/recording history rows the artwork + TMDB card
-            # is all we have; only fall through for movie/series
-            # history rows so they also get provider-side info
-            # (plot, year, episode list).
+            # A live channel opened from History still gets its programme guide
+            # (like the live view); recording history rows have only artwork.
+            if snap_kind == "live":
+                self._request_epg()
+                # ...and the same auto-preview as the TV list, so arrowing
+                # through History previews live channels too (movies/episodes/
+                # recordings there aren't previewed).
+                if (self.player and self._autoplay_preview()
+                        and self.playback_mode() == "embedded"
+                        and not self._rmb_selecting
+                        and (it.get("stream_id") is not None
+                             or it.get("_url"))):
+                    self._preview_timer.start(350)
             return
 
         if self.series_ctx:
@@ -126,6 +147,26 @@ class _DetailMixin:
             if sid is not None:
                 self._request_media_info("series", sid, self._current_key)
 
+    def _show_continue_episode_detail(self, it) -> None:
+        """Continue-watching episode row: show the series' poster + info (plot,
+        cast, genre) with the episode's name, since the row itself carries no
+        series_id to resolve."""
+        ctx = it.get("_series_ctx") or {}
+        self.d_logo.show()
+        self.play_mpv.show()
+        self._detail_name = it.get("name") or it.get("title") or ""
+        self.d_logo.setFixedSize(*self.POSTER_SIZE_MEDIA)
+        self._position_play_over_poster()
+        self.media_info.setFixedHeight(self.POSTER_SIZE_MEDIA[1])
+        self.d_logo.setPixmap(QPixmap())
+        self.d_logo.setStyleSheet(self.PLACEHOLDER_LOGO_STYLE)
+        self.d_logo.setText(
+            (ctx.get("name") or self._detail_name).strip()[:1].upper())
+        self._load_detail_poster(ctx, True, "series")
+        sid = ctx.get("series_id")
+        if sid is not None:
+            self._request_media_info("series", sid, self._current_key)
+
     @property
     def PLACEHOLDER_LOGO_STYLE(self) -> str:
         return (f"background:{P['sel']}; border-radius:18px; "
@@ -144,6 +185,19 @@ class _DetailMixin:
         self.d_logo.setStyleSheet("background:transparent;")
         self.d_logo.setText("")
         self.d_logo.setPixmap(tile)
+        self.play_mpv.raise_()   # keep the play overlay above the poster art
+
+    def _position_play_over_poster(self) -> None:
+        """Size the play overlay to the poster (small on a channel logo, larger
+        on a movie/series poster), centre it, and keep it on top."""
+        b, d = self.play_mpv, self.d_logo
+        side = max(26, min(46, round(d.width() * 0.30)))
+        b.setFixedSize(side, side)
+        # Always redraw: the glyph depends on whether *this* item is the one
+        # playing (play / pause / stop), not just on the size.
+        self._apply_play_icon(side)
+        b.move((d.width() - side) // 2, (d.height() - side) // 2)
+        b.raise_()
 
     def _media_title_for_tmdb(self, it) -> str:
         if self.series_ctx:
@@ -517,23 +571,37 @@ class _DetailMixin:
 
     def _request_epg(self) -> None:
         it = self.list_model.item_at(self.listw.currentIndex().row())
-        if (not it or self._content_kind() not in ("live", "fav")
-                or self.series_ctx):
+        if not it or self.series_ctx:
             return
-        sid = it.get("stream_id")
-        if sid is None:
+        # Live channels in the live/fav views, and live rows opened from History.
+        is_live = (self._content_kind() in ("live", "fav")
+                   or (self.mode == "history" and it.get("_kind") == "live"))
+        if not is_live:
             return
+        sid = it.get("stream_id")   # may be None for a History row
         key = self._item_key(it)
         self._clear_epg_rows()
         self._epg_note("Loading programme guide…")
 
         def fetch():
-            listings = self.client.short_epg(sid, 8)
-            if not listings:
-                listings = self.client.epg_table(sid)
-            if not listings:
-                listings = self.xmltv.listings_for(it)
-            return listings
+            # Many providers' short_epg returns only 2-3 entries even when the
+            # downloaded XMLTV guide has the full schedule. Gather every source
+            # and keep whichever has the most, so the panel isn't capped at a
+            # couple of "next" entries. The provider sources need a stream_id
+            # (absent on History rows); the XMLTV guide matches by name.
+            candidates = []
+            sources = [lambda: self.xmltv.listings_for(it, limit=24)]
+            if sid is not None:
+                sources = [lambda: self.client.short_epg(sid, 24),
+                           lambda: self.client.epg_table(sid)] + sources
+            for src in sources:
+                try:
+                    got = src()
+                except Exception:
+                    got = None
+                if got:
+                    candidates.append(got)
+            return max(candidates, key=len) if candidates else []
 
         run_async(self.pool, fetch,
                   lambda e: self._show_epg(e, key),
@@ -631,6 +699,21 @@ class _DetailMixin:
         if href.startswith("cast:"):
             self._on_cast_clicked(href[len("cast:"):], None)
 
+    # Default number of upcoming programmes shown in the right column, and the
+    # range the setting allows.
+    EPG_UPCOMING_DEFAULT = 5
+    EPG_UPCOMING_MIN = 1
+    EPG_UPCOMING_MAX = 20
+
+    def _epg_upcoming_count(self) -> int:
+        """How many upcoming programmes the detail panel lists (user setting)."""
+        try:
+            n = int(self.settings.value(
+                "epg_upcoming_count", self.EPG_UPCOMING_DEFAULT))
+        except (TypeError, ValueError):
+            n = self.EPG_UPCOMING_DEFAULT
+        return max(self.EPG_UPCOMING_MIN, min(self.EPG_UPCOMING_MAX, n))
+
     def _show_epg(self, listings, key) -> None:
         if key != self._current_key:
             return
@@ -659,14 +742,14 @@ class _DetailMixin:
             all_posts.append(post)
             if start and stop and start <= now < stop and not current:
                 current = post
-            elif start and start > now:
-                upcoming.append(post)
+            elif start and now < start:
+                upcoming.append(post)   # any future programme; sliced below
         upcoming.sort(key=lambda p: p["start"])
 
         if current:
             self._current_epg = current
             self.now_time.setText(
-                f"NOW * {current['start']:%H:%M}-{current['stop']:%H:%M}")
+                f"● NOW   {current['start']:%H:%M} – {current['stop']:%H:%M}")
             self.now_title.setText(
                 current["title"] or "Unknown programme")
             self.now_desc.setText(current["desc"][:400])
@@ -684,7 +767,7 @@ class _DetailMixin:
                              f" at {nxt['start']:%H:%M}")
                 self.player.set_overlay_info(info)
 
-        for post in upcoming[:6]:
+        for post in upcoming[:self._epg_upcoming_count()]:
             self._epg_card(post)
 
         if not current and not upcoming:
@@ -702,17 +785,72 @@ class _DetailMixin:
                     "No programme guide available for this channel.")
 
     def _epg_card(self, post, with_date: bool = False) -> None:
-        card = QFrame(objectName="Card")
-        kl = QVBoxLayout(card)
-        kl.setContentsMargins(12, 9, 12, 9)
-        kl.setSpacing(2)
+        card = QFrame(objectName="EpgRow")
+        row = QHBoxLayout(card)
+        row.setContentsMargins(12, 8, 12, 8)
+        row.setSpacing(12)
         fmt = "%-d/%-m %H:%M" if with_date else "%H:%M"
         t = QLabel(post["start"].strftime(fmt), objectName="EpgRowTime")
+        t.setFixedWidth(84 if with_date else 44)
+        t.setAlignment(Qt.AlignmentFlag.AlignTop)
         ti = QLabel(post["title"] or "Unknown", objectName="EpgRowTitle")
         ti.setWordWrap(True)
-        kl.addWidget(t)
-        kl.addWidget(ti)
+        row.addWidget(t, 0, Qt.AlignmentFlag.AlignTop)
+        row.addWidget(ti, 1)
+        card.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        card.customContextMenuRequested.connect(
+            lambda pos, c=card, po=post:
+            self._epg_programme_menu(po, c.mapToGlobal(pos)))
         self.epg_lay.insertWidget(self.epg_lay.count() - 1, card)
+
+    # -- record / remind straight from a guide entry -------------------------
+
+    def _epg_programme_menu(self, post, global_pos) -> None:
+        """Right-click a programme (in the detail pane's guide) to record it or
+        set a reminder - the same actions the middle list and grid offer."""
+        it = self.list_model.item_at(self.listw.currentIndex().row())
+        if not it or it.get("stream_id") is None:
+            return
+        start = post["start"].timestamp() if post.get("start") else 0.0
+        stop = post["stop"].timestamp() if post.get("stop") else 0.0
+        now = datetime.now().astimezone().timestamp()
+        m = QMenu(self)
+        if stop > now:
+            m.addAction(tr("rec_record_programme"),
+                        lambda: self._record_programme(it, post, start, stop))
+        rem = getattr(self, "reminders", None)
+        if start > now and rem is not None:
+            sid = it.get("stream_id")
+            if rem.has(sid, start):
+                m.addAction(tr("reminder_remove"),
+                            lambda: rem.remove(sid, start))
+            else:
+                m.addAction(
+                    tr("reminder_add"),
+                    lambda: self._add_reminder(
+                        it, {"title": post.get("title"),
+                             "start_timestamp": start}))
+        if not m.isEmpty():
+            m.exec(global_pos)
+
+    def _record_programme(self, ch, post, start_ts, stop_ts) -> None:
+        if not self._within_storage_cap():
+            return
+        now = datetime.now().astimezone().timestamp()
+        title = post.get("title") or ch.get("name") or "recording"
+        # A programme that's on the air right now records like "record this
+        # channel": if you're watching it, _record_now captures the stream you
+        # already pull (one connection) instead of opening a second - and it
+        # offers the switch/background prompt otherwise. Only a genuinely future
+        # programme becomes a scheduled job that opens a connection at air time.
+        if start_ts <= now < stop_ts:
+            minutes = max(1, int((stop_ts - now) // 60) + 1)
+            self._record_now(ch, minutes, title_override=title)
+            return
+        url = self.client.live_url(ch.get("stream_id"), "ts")
+        if not url:
+            return
+        self.rec.add_job(url, title, max(now, start_ts), stop_ts)
 
     def _refresh_progress(self) -> None:
         e = self._current_epg

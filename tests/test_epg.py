@@ -87,6 +87,38 @@ def test_guide_queries():
     assert [e["title"] for e in past] == ["Earlier Show"]
 
 
+def test_guide_search():
+    g = _make_guide()
+    items = [{"epg_channel_id": "c1", "name": "Alpha TV", "stream_id": 1}]
+    now = datetime.now(timezone.utc).timestamp()
+    win_start, win_stop = now - 3 * 3600, now + 4 * 3600
+    # title match, carries the channel item, only the one hit
+    res = g.search(items, "up next", win_start, win_stop)
+    assert [e["title"] for e in res] == ["Up Next"]
+    assert res[0]["_channel"] is items[0]
+    # description match, case-insensitive
+    res2 = g.search(items, "CURRENTLY", win_start, win_stop)
+    assert [e["title"] for e in res2] == ["Airing Now"]
+    # results are sorted by start time
+    res3 = g.search(items, "on", win_start, win_stop)
+    starts = [e["start_timestamp"] for e in res3]
+    assert starts == sorted(starts) and len(starts) >= 2
+    # empty / too-short query and no match return nothing
+    assert g.search(items, "  ", win_start, win_stop) == []
+    assert g.search(items, "cricket", win_start, win_stop) == []
+
+
+def test_guide_search_dedupes_duplicate_channels():
+    g = _make_guide()
+    # The same channel listed twice (common in real line-ups) must not double
+    # up the same airing.
+    items = [{"epg_channel_id": "c1", "name": "Alpha TV"},
+             {"epg_channel_id": "c1", "name": "Alpha TV"}]
+    now = datetime.now(timezone.utc).timestamp()
+    res = g.search(items, "up next", now - 3 * 3600, now + 4 * 3600)
+    assert len(res) == 1
+
+
 def test_guide_name_fallback():
     """No epg_channel_id: resolve through the normalized display name."""
     g = _make_guide()

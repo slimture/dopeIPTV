@@ -163,10 +163,19 @@ class CastDialog(QDialog):
             return
         name = item.text()
         self._set_status(tr("cast_starting", name=name))
+
+        def done(n):
+            self._set_status(tr("cast_casting_to", name=n))
+            # Hand the single connection to the Chromecast: stop local playback
+            # so a single-connection account isn't asked for two streams.
+            stop = getattr(self.window, "stop_local_playback_for_cast", None)
+            if callable(stop):
+                stop()
+
         run_async(self.window.pool,
                   lambda: self.window.cast.cast(name, self.url,
                                                  self.stream_title),
-                  lambda n: self._set_status(tr("cast_casting_to", name=n)),
+                  done,
                   lambda msg: self._set_status(tr("cast_failed", msg=msg)))
 
     def _stop(self) -> None:

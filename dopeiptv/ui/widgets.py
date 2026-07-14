@@ -71,16 +71,64 @@ class _SidebarLogo(QWidget):
     LOGO_H = 40
 
     clicked = pyqtSignal()
+    update_clicked = pyqtSignal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setFixedHeight(self.LOGO_H + 10)
         self.setToolTip(APP_NAME)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._update_on = False
+        self._update_color = QColor("#E5484D")
+        self._update_follow_accent = False
+        self._bounce_dy = 0.0
+
+    def set_update(self, on: bool, color=None, follow_accent: bool = False) -> None:
+        """Show/hide the corner update badge and set its colour. Pass an
+        explicit ``color`` for a fixed hue, or ``follow_accent=True`` to track
+        the live theme accent (so it keeps matching when the theme changes)."""
+        self._update_on = bool(on)
+        self._update_follow_accent = bool(follow_accent)
+        if color is not None:
+            self._update_color = QColor(color)
+        self.update()
+
+    def _badge_rect(self) -> "QRectF":
+        w, h = float(self.LOGO_W), float(self.LOGO_H)
+        x0 = (self.width() - w) / 2.0
+        y0 = (self.height() - h) / 2.0
+        r, cx, cy = 10.0, x0 + w - 5.0, y0 + 5.0
+        return QRectF(cx - r, cy - r, 2 * r, 2 * r)
+
+    def bounce(self, hops: int = 4, period_ms: int = 4000) -> None:
+        """Hop the update badge ``hops`` times, one hop every ``period_ms``, to
+        catch the eye at startup without nagging. Each cycle is a quick hop up
+        and back down followed by a long rest before the next hop."""
+        from PyQt6.QtCore import QVariantAnimation, QEasingCurve
+        amp = -10.0
+        anim = QVariantAnimation(self)
+        anim.setDuration(period_ms)
+        anim.setStartValue(0.0)
+        anim.setKeyValueAt(0.05, amp)        # up quickly
+        anim.setKeyValueAt(0.16, 0.0)        # settle back down
+        anim.setEndValue(0.0)                # long rest until the next hop
+        anim.setEasingCurve(QEasingCurve.Type.OutQuad)
+        anim.setLoopCount(max(1, hops))
+        anim.valueChanged.connect(self._on_bounce)
+        anim.finished.connect(lambda: self._on_bounce(0.0))
+        anim.start()
+        self._bounce_anim = anim
+
+    def _on_bounce(self, v) -> None:
+        self._bounce_dy = float(v)
+        self.update()
 
     def mousePressEvent(self, e) -> None:
         if e.button() == Qt.MouseButton.LeftButton:
-            self.clicked.emit()
+            if self._update_on and self._badge_rect().contains(e.position()):
+                self.update_clicked.emit()
+            else:
+                self.clicked.emit()
             e.accept()
             return
         super().mousePressEvent(e)
@@ -133,4 +181,31 @@ class _SidebarLogo(QWidget):
             painter.drawRoundedRect(
                 QRectF(bx, base_y - bh, bar_w, bh),
                 bar_w * 0.4, bar_w * 0.4)
+
+        # Update badge: a small coloured circle with a white up-arrow in the
+        # pill's top-right corner, drawn on top so it's always visible (a child
+        # widget over this custom paint didn't render). Colour comes from the
+        # caller (red at startup, theme accent after 30 s); a transient bounce
+        # offset nudges it up.
+        if self._update_on:
+            br = self._badge_rect()
+            cx = br.center().x()
+            cy = br.center().y() + self._bounce_dy
+            r = br.width() / 2.0
+            badge_color = (QColor(P.get("accent", "#4C8DFF"))
+                           if self._update_follow_accent else self._update_color)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(badge_color)
+            painter.drawEllipse(QPointF(cx, cy), r, r)
+            aw, ah = r * 0.60, r * 0.72
+            arrow = QPainterPath()
+            arrow.moveTo(cx, cy - ah * 0.62)                 # tip
+            arrow.lineTo(cx - aw, cy + ah * 0.12)
+            arrow.lineTo(cx - aw * 0.42, cy + ah * 0.12)
+            arrow.lineTo(cx - aw * 0.42, cy + ah * 0.62)     # stem
+            arrow.lineTo(cx + aw * 0.42, cy + ah * 0.62)
+            arrow.lineTo(cx + aw * 0.42, cy + ah * 0.12)
+            arrow.lineTo(cx + aw, cy + ah * 0.12)
+            arrow.closeSubpath()
+            painter.fillPath(arrow, QColor("white"))
         painter.end()

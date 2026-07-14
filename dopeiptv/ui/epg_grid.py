@@ -122,9 +122,15 @@ class EpgGridDialog(QDialog):
         outer.addWidget(self.view, 1)
 
         bar = QHBoxLayout()
+        self.search_btn = QPushButton("🔍 " + tr("epg_search_btn"))
+        self.search_btn.clicked.connect(self._open_search)
+        bar.addWidget(self.search_btn)
         self.now_btn = QPushButton("⟳ " + tr("epg_jump_now"))
         self.now_btn.clicked.connect(self._scroll_to_now)
         bar.addWidget(self.now_btn)
+        self.reminders_btn = QPushButton("🔔 " + tr("reminders_title"))
+        self.reminders_btn.clicked.connect(self.window._open_reminders)
+        bar.addWidget(self.reminders_btn)
         # Jumps the board back up to the channel you're watching (handy after
         # scrolling far down a long line-up). Only shown when one is playing.
         self.playing_btn = QPushButton("▶ " + tr("epg_jump_playing"))
@@ -139,6 +145,9 @@ class EpgGridDialog(QDialog):
         self.play_btn.setEnabled(False)
         self.play_btn.clicked.connect(self._play_selected)
         bar.addWidget(self.play_btn)
+        self.close_btn = QPushButton(tr("common_close"))
+        self.close_btn.clicked.connect(self.reject)
+        bar.addWidget(self.close_btn)
         outer.addLayout(bar)
 
         self._build()
@@ -146,9 +155,20 @@ class EpgGridDialog(QDialog):
         scr = self.screen().availableGeometry() if self.screen() else None
         want_w = self.CH_COL_W + self._grid_w + 40
         want_h = self.HEADER_H + len(self.channels) * self.ROW_H + 110
-        w = min(want_w, (scr.width() - 80) if scr else 1200, 1500)
-        h = min(want_h, (scr.height() - 80) if scr else 800, 900)
-        self.resize(max(760, w), max(460, h))
+        # Cap to the main window, not the whole screen, so the guide stays in
+        # proportion to the app instead of ballooning to 1500 px on a big
+        # display while the window itself is small.
+        mw = self.window
+        if mw is not None and mw.width() > 200:
+            cap_w, cap_h = int(mw.width() * 0.94), int(mw.height() * 0.94)
+        else:
+            cap_w = (scr.width() - 80) if scr else 1200
+            cap_h = (scr.height() - 80) if scr else 800
+        w = min(want_w, cap_w, 1500)
+        h = min(want_h, cap_h, 900)
+        self.resize(max(min(760, cap_w), w), max(min(460, cap_h), h))
+        # Centring happens in showEvent - a move() here (before the window is
+        # shown) doesn't stick on macOS, which then opens it low/offset.
         now_x = self.CH_COL_W + (now - self._start) / 60 * self.PX_PER_MIN
         self.view.horizontalScrollBar().setValue(max(0, int(now_x
                                                              - self.CH_COL_W - 40)))
@@ -156,6 +176,32 @@ class EpgGridDialog(QDialog):
         # what's playing instead of the top of a long line-up.
         if getattr(self, "_playing_row", None) is not None:
             self._scroll_to_playing()
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        # Centre in the screen once, after the window has its final size and a
+        # real screen - doing it in __init__ (pre-show) doesn't stick on macOS.
+        if getattr(self, "_centred", False):
+            return
+        self._centred = True
+        mw = self.window
+        if mw is not None and mw.isVisible():
+            c = mw.frameGeometry().center()
+            x, y = c.x() - self.width() // 2, c.y() - self.height() // 2
+        else:
+            scr0 = self.screen()
+            g = scr0.availableGeometry() if scr0 else None
+            if g is None:
+                return
+            x, y = g.x() + (g.width() - self.width()) // 2, \
+                g.y() + (g.height() - self.height()) // 2
+        # Keep it fully on-screen even when the window sits near an edge.
+        scr = (mw.screen() if mw else None) or self.screen()
+        if scr is not None:
+            a = scr.availableGeometry()
+            x = max(a.x(), min(x, a.x() + a.width() - self.width()))
+            y = max(a.y(), min(y, a.y() + a.height() - self.height()))
+        self.move(x, y)
 
     def keyPressEvent(self, event) -> None:
         # In-guide shortcuts: N jumps to now, P to the playing channel, Enter
@@ -176,6 +222,10 @@ class EpgGridDialog(QDialog):
 
     def _x(self, ts: float) -> float:
         return self.CH_COL_W + (ts - self._start) / 60 * self.PX_PER_MIN
+
+    def _open_search(self) -> None:
+        from .epg_search import EpgSearchDialog
+        EpgSearchDialog(self.window).exec()
 
     def _scroll_to_now(self) -> None:
         """Bring the current time back into view (after scrolling far back)."""
@@ -423,7 +473,7 @@ class EpgGridDialog(QDialog):
         if p["stop_timestamp"] < time.time() and self.window._timeshift_days(ch):
             self.window._play_timeshift(ch, prog=p)
         else:
-            self.window.play_live_channel(ch)
+            self.window.tune_from_guide(ch)
         self.accept()
 
     def _context_at(self, scene_pos, global_pos) -> None:
@@ -438,7 +488,7 @@ class EpgGridDialog(QDialog):
         if past and self.window._timeshift_days(ch):
             m.addAction(tr("epg_play_this_programme"), self._play_selected)
         m.addAction(tr("ts_go_live") if past else tr("epg_play_channel"),
-                    lambda: (self.window.play_live_channel(ch), self.accept()))
+                    lambda: (self.window.tune_from_guide(ch), self.accept()))
         if ch.get("stream_id") is not None and p["stop_timestamp"] > time.time():
             m.addAction(tr("rec_record_programme"), lambda: self._record(ch, p))
         # Remind me when a future programme starts.
