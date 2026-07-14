@@ -2589,6 +2589,10 @@ _STRINGS: dict[str, dict[str, str]] = {
         "th": "แอป IPTV ที่สวยงามสำหรับ Xtream Codes และเพลย์ลิสต์ M3U - พร้อม "
               "EPG, การเล่นในตัว mpv/VLC, รายการโปรด, การบันทึก และซิงก์ Trakt",
     },
+    "about_website": {
+        "en": "Website", "sv": "Webbplats", "es": "Sitio web", "de": "Website",
+        "fr": "Site web", "zh": "网站", "ru": "Веб-сайт", "th": "เว็บไซต์",
+    },
     "about_github": {
         "en": "GitHub", "sv": "GitHub", "es": "GitHub", "de": "GitHub",
         "fr": "GitHub", "zh": "GitHub", "ru": "GitHub", "th": "GitHub",

@@ -309,9 +309,32 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         root.setHandleWidth(6)
         self.setCentralWidget(root)
 
-        # Sidebar
+        # Sidebar. Its content lives inside a scroll area so that on a short
+        # screen (small laptops) the bottom actions - EPG guide, Settings -
+        # stay reachable by scrolling instead of being clipped off. On a tall
+        # screen the scroll bar never appears and it looks identical to before.
+        # The scroll area sits INSIDE `side` (not in its place), so the
+        # collapse-to-rail and splitter logic, which drive `side` and the button
+        # widgets directly, are untouched.
         side = QWidget(objectName="Sidebar")
-        sl = QVBoxLayout(side)
+        _side_outer = QVBoxLayout(side)
+        _side_outer.setContentsMargins(0, 0, 0, 0)
+        _side_outer.setSpacing(0)
+        self._side_scroll = QScrollArea()
+        self._side_scroll.setWidgetResizable(True)
+        self._side_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._side_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._side_scroll.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        # Transparent so the themed #Sidebar background (on `side`) shows through.
+        self._side_scroll.setStyleSheet("background: transparent; border: 0;")
+        self._side_scroll.viewport().setStyleSheet("background: transparent;")
+        _side_outer.addWidget(self._side_scroll)
+        _side_content = QWidget()
+        _side_content.setStyleSheet("background: transparent;")
+        self._side_scroll.setWidget(_side_content)
+        sl = QVBoxLayout(_side_content)
         sl.setContentsMargins(12, 16, 12, 12)
         sl.setSpacing(4)
 
