@@ -258,8 +258,15 @@ class _SettingsMixin:
         }
         for key, btn in self.nav_btns.items():
             if key in nav_labels:
-                btn.setText(tr(nav_labels[key]))
+                self._nav_texts[key] = tr(nav_labels[key])
+                btn.setToolTip(self._nav_texts[key])
+                # On the icon rail the buttons are icon-only - don't stamp
+                # text back onto them; the label lands when the rail expands.
+                if not getattr(self, "_sidebar_collapsed", False):
+                    btn.setText(self._nav_texts[key])
         self._cat_section_label.setText(tr("sidebar_categories"))
+        if hasattr(self, "_lib_section_label"):
+            self._lib_section_label.setText(tr("sidebar_library"))
         self._guide_btn.setText(tr("btn_epg_guide"))
         self._settings_btn.setText(tr("btn_settings"))
         self.search.setPlaceholderText(tr("search_placeholder"))

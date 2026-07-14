@@ -985,6 +985,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # _apply_sidebar_collapsed) is what makes this stick mid-drag - a hard
         # width constraint the splitter honours, unlike a setSizes() call.
         root.splitterMoved.connect(self._maybe_collapse_on_drag)
+        # The middle pane's width also changes with divider drags, not just
+        # window resizes, so keep its control strip's compact mode in sync.
+        root.splitterMoved.connect(self._update_mid_compact)
         # When collapsed the rail's width is pinned (so it can't stretch), which
         # freezes its divider handle - so watch the handle for a rightward drag
         # to re-expand it without reaching for the ☰ button.
@@ -1106,13 +1109,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # group's icons are always shown on the rail (honour the collapse only
         # when expanded).
         if hasattr(self, "_lib_header"):
-            # Rail: hide the Library header ENTIRELY. It was the one item whose
-            # height didn't match a nav button, which made the rail's icon
-            # spacing read as uneven - with it gone, every adjacent pair of
-            # rail icons is separated by exactly the same layout spacing, top
-            # to bottom. When expanded, the header (label + arrow + top gap)
-            # is what separates the two groups.
-            self._lib_header.setVisible(not collapsed)
+            # Rail: the header keeps only its 8px top margin (label and arrow
+            # hide), leaving a clear but modest gap between the Browse and
+            # Library groups, while the icon-to-icon spacing inside each group
+            # stays identical - the rail filler prevents the old row-spreading,
+            # so this gap is fixed and predictable.
+            self._lib_header.setVisible(True)
+            self._lib_section_label.setVisible(not collapsed)
+            self._lib_toggle.setVisible(not collapsed)
             self._library_box.setVisible(
                 collapsed or not self._lib_toggle.isChecked())
         # The rail's stand-in stretch item (see construction note).
@@ -1222,6 +1226,35 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     and w >= getattr(self, "_collapse_w", 150) + 40):
                 self._auto_collapsed = False   # manual action takes over
                 self._set_sidebar_collapsed(False)
+
+    def _update_mid_compact(self, *_a) -> None:
+        if hasattr(self, "_mid"):
+            self._apply_mid_compact(self._mid.width() < 400)
+
+    def _apply_mid_compact(self, compact: bool) -> None:
+        """Responsive middle-pane control strip: when the list column is
+        narrow, drop the Size/Sort captions, cap the closed combos' width and
+        shrink the grid toggle to a glyph, so everything stays visible and
+        clickable instead of overflowing the pane. The dropdown POPUP keeps
+        its full width, so the choices themselves remain readable."""
+        if getattr(self, "_mid_compact", None) == compact:
+            return
+        self._mid_compact = compact
+        self._size_label.setVisible(not compact)
+        self._sort_label.setVisible(not compact)
+        # Sized so the whole strip fits the middle pane's 240px minimum:
+        # 28+28 (toggles) + 60+60 (combos) + 34 (grid) + spacings ≈ 240.
+        self.side_btn.setFixedWidth(28 if compact else 34)
+        self.focus_btn.setFixedWidth(28 if compact else 34)
+        for box in (self.size_box, self.sort_box):
+            box.setMaximumWidth(60 if compact else 16777215)
+            # The popup sizes itself from the view, not the closed box - pin
+            # its minimum to the widest entry so a narrow box still opens to a
+            # fully readable list.
+            box.view().setMinimumWidth(box.view().sizeHintForColumn(0) + 28)
+        self.grid_btn.setText("▦" if compact else tr("btn_grid"))
+        self.grid_btn.setMaximumWidth(34 if compact else 16777215)
+        self.grid_btn.setToolTip(tr("btn_grid"))
 
     def _maybe_auto_collapse_sidebar(self) -> None:
         """Collapse the sidebar to the icon rail automatically when the whole
@@ -4585,6 +4618,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         super().resizeEvent(event)
         self._schedule_save_layout()
         self._maybe_auto_collapse_sidebar()
+        self._update_mid_compact()
         if self._welcome is not None and self._welcome.isVisible():
             self._welcome.cover()
         self._position_provider_hint()
