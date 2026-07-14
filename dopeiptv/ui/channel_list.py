@@ -8,7 +8,15 @@ from PyQt6.QtWidgets import (
     QListView, QStyle, QStyledItemDelegate,
 )
 
-from .theme import ACCENT, P
+from .theme import P
+
+# Read the accent live from the palette dict (which apply_theme mutates in
+# place) rather than importing the module-level ACCENT by value - a plain
+# `from .theme import ACCENT` would freeze it at the default and never track
+# the user's chosen theme/accent (that's why the EPG progress bar and the
+# playing highlights stayed blue).
+def _accent() -> str:
+    return P.get("accent", "#4C8DFF")
 
 
 class CategoryColorDelegate(QStyledItemDelegate):
@@ -280,7 +288,7 @@ class ChannelDelegate(QStyledItemDelegate):
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor("#ed1c24" if source == "trakt" else ACCENT))
+        painter.setBrush(QColor("#ed1c24" if source == "trakt" else _accent()))
         painter.drawEllipse(x, y, size, size)
         # Check mark: two short strokes inside the circle.
         pen = QPen(QColor("#ffffff"))
@@ -397,7 +405,7 @@ class ChannelDelegate(QStyledItemDelegate):
                              else QColor(P["hover"]))
             painter.drawRoundedRect(inner, 12, 12)
         if playing:
-            pen = QPen(QColor(ACCENT))
+            pen = QPen(QColor(_accent()))
             pen.setWidth(2)
             painter.setPen(pen)
             painter.setBrush(Qt.BrushStyle.NoBrush)
@@ -458,7 +466,7 @@ class ChannelDelegate(QStyledItemDelegate):
             self._paint_fav_star(painter, logo_rect, max(18, logo_sz // 5))
 
         painter.setPen(
-            QColor(ACCENT) if playing
+            QColor(_accent()) if playing
             else QColor(tint_fg) if tint_fg else QColor(P["text"]))
         fname = QFont()
         fname.setPointSize(self.grid_name_pt)
@@ -498,7 +506,7 @@ class ChannelDelegate(QStyledItemDelegate):
         if playing:
             painter.fillRect(
                 QRect(rect.left(), rect.top() + 4, 3, rect.height() - 8),
-                QColor(ACCENT))
+                QColor(_accent()))
 
         name = self.window.channel_display_name(it)
         logo_rect = QRect(
@@ -626,7 +634,7 @@ class ChannelDelegate(QStyledItemDelegate):
         y = rect.top() + (rect.height() - block_h) // 2
 
         painter.setPen(
-            QColor(ACCENT) if playing
+            QColor(_accent()) if playing
             else QColor(tint_fg) if tint_fg else QColor(P["text"]))
         fname = QFont()
         fname.setPointSize(self.name_pt)
@@ -659,7 +667,7 @@ class ChannelDelegate(QStyledItemDelegate):
             fill_w = int(
                 bar_rect.width() * max(0, min(100, pct)) / 100)
             if fill_w > 0:
-                painter.setBrush(QColor(ACCENT))
+                painter.setBrush(QColor(_accent()))
                 painter.drawRoundedRect(
                     QRect(bar_rect.x(), bar_rect.y(),
                           fill_w, bar_rect.height()), 2, 2)
@@ -671,7 +679,7 @@ class ChannelDelegate(QStyledItemDelegate):
             painter.drawRoundedRect(bar_rect, 2, 2)
             fill_w = int(bar_rect.width() * max(0, min(100, resume_pct)) / 100)
             if fill_w > 0:
-                painter.setBrush(QColor(ACCENT))
+                painter.setBrush(QColor(_accent()))
                 painter.drawRoundedRect(
                     QRect(bar_rect.x(), bar_rect.y(),
                           fill_w, bar_rect.height()), 2, 2)
