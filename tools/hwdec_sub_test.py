@@ -162,6 +162,9 @@ def main():
     p.add_argument("--verbose", action="store_true",
                    help="print mpv's own debug log - shows the real error when "
                         "the subtitle breaks the render")
+    p.add_argument("--gl", action="store_true",
+                   help="force a desktop OpenGL context instead of GLES "
+                        "(the proposed fix)")
     p.add_argument("--minimal", action="store_true")
     for flag in ("no-osd0", "no-cache", "no-deinterlace", "no-sharpen",
                  "no-tonemapping", "no-aspect", "no-report-swap"):
