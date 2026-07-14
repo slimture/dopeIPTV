@@ -140,6 +140,9 @@ def main():
     p.add_argument("--seek", type=float, default=None,
                    help="seek to this many seconds after enabling the sub, to "
                         "reach a point with dialogue")
+    p.add_argument("--sw-on-sub", action="store_true",
+                   help="switch to software decoding when the subtitle is "
+                        "enabled (the proposed app fix)")
     p.add_argument("--minimal", action="store_true")
     for flag in ("no-osd0", "no-cache", "no-deinterlace", "no-sharpen",
                  "no-tonemapping", "no-aspect", "no-report-swap"):
@@ -180,6 +183,12 @@ def main():
               f"(lang={subs[0].get('lang')} codec={subs[0].get('codec')}) - "
               f"WATCH THE VIDEO NOW <<<")
         try:
+            if a.sw_on_sub:
+                # The fix under test: drop to software decoding the moment a
+                # subtitle goes on (hardware decode + OSD composite is what
+                # breaks). Set it just before enabling the sub.
+                print("[test] switching hwdec=no for subtitle playback")
+                w.mpv["hwdec"] = "no"
             w.mpv["sub-visibility"] = True
             w.mpv["sid"] = sid
             if a.seek is not None:
