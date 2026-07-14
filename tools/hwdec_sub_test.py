@@ -76,11 +76,19 @@ class GL(QOpenGLWidget):
             sys.stderr.write(f"[mpv/{level}] {prefix}: {text}")
             sys.stderr.flush()
 
-        if a.verbose:
+        if a.verbose or a.gpu_debug:
             self.mpv = mpv.MPV(vo="libmpv", terminal=False,
-                               log_handler=_log, loglevel="v")
+                               log_handler=_log,
+                               loglevel="debug" if a.gpu_debug else "v")
         else:
             self.mpv = mpv.MPV(vo="libmpv", terminal=False)
+        if a.gpu_debug:
+            # Install GL debug output (KHR_debug) so mpv logs the exact call and
+            # enum that trips INVALID_ENUM - what the mpv issue template wants.
+            try:
+                self.mpv["gpu-debug"] = True
+            except Exception as e:
+                print(f"[test] gpu-debug not set: {e}")
 
         def opt(k, v):
             try:
@@ -165,6 +173,9 @@ def main():
     p.add_argument("--gl", action="store_true",
                    help="force a desktop OpenGL context instead of GLES "
                         "(the proposed fix)")
+    p.add_argument("--gpu-debug", action="store_true",
+                   help="enable mpv gpu-debug (KHR_debug) for the exact GL "
+                        "call/enum behind INVALID_ENUM")
     p.add_argument("--minimal", action="store_true")
     for flag in ("no-osd0", "no-cache", "no-deinterlace", "no-sharpen",
                  "no-tonemapping", "no-aspect", "no-report-swap"):

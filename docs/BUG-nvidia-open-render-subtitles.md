@@ -17,8 +17,11 @@ libmpv_render: after creating texture: OpenGL error INVALID_ENUM.
 
 for both the video plane texture and the OSD (subtitle) texture.
 
-- Standalone `mpv` (which uses `vo=gpu-next` / Vulkan) plays the **same file with
-  the same subtitle and the same hardware decoding perfectly.**
+- **Standalone `mpv` does NOT reproduce** — the same file, subtitle and
+  `--hwdec=auto-copy-safe` render correctly with **both `--vo=gpu-next` and the
+  classic `--vo=gpu`** (`--no-config`). The failure is specific to the **libmpv
+  OpenGL render API rendering into an externally-supplied (Qt QOpenGLWidget) GL
+  context** — not to mpv's renderer itself.
 - `hwdec=no` (software decode) through the render API is fine.
 - Every hardware backend fails identically: `auto-copy-safe` (→ `vulkan-copy`),
   `nvdec`, `nvdec-copy`, `auto-safe`.
@@ -71,16 +74,23 @@ Note: `INVALID_ENUM` is also logged with `hwdec=no`, where playback works — so
 the error alone is not fatal, but with hardware decoding the video plane texture
 is affected and the picture is lost.
 
-## Reproduction
-
-`tools/hwdec_sub_test.py` in this repository builds the libmpv render API on a
-bare `QOpenGLWidget`, plays a file, enables the first full subtitle after 4 s,
-and captures mpv's verbose log:
+## Standalone mpv (does NOT reproduce)
 
 ```
-python3 tools/hwdec_sub_test.py FILE --minimal --sid 3 --seek 600 --verbose 2>mpv.log
-python3 tools/hwdec_sub_test.py FILE --minimal --sid 3 --seek 600 --gl           # desktop GL
-python3 tools/hwdec_sub_test.py FILE --minimal --sid 3 --seek 600 --hwdec no      # works
+mpv --no-config --vo=gpu      --hwdec=auto-copy-safe --sid=3 --start=600 FILE   # OK
+mpv --no-config --vo=gpu-next --hwdec=auto-copy-safe --sid=3 --start=600 FILE   # OK
+```
+
+## Reproduction (libmpv render API only)
+
+`tools/hwdec_sub_test.py` in this repository builds the libmpv OpenGL render API
+on a bare `QOpenGLWidget` (≈190 lines, only PyQt6 + libmpv), plays a file,
+enables the first full subtitle after 4 s, and captures the log:
+
+```
+python3 tools/hwdec_sub_test.py FILE --minimal --sid 3 --seek 600 --gpu-debug 2>gpu-debug.log
+python3 tools/hwdec_sub_test.py FILE --minimal --sid 3 --seek 600 --gl            # forced desktop GL 4.6 - still fails
+python3 tools/hwdec_sub_test.py FILE --minimal --sid 3 --seek 600 --hwdec no       # works
 ```
 
 ## Expected
