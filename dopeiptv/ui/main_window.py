@@ -944,7 +944,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Floor wide enough that the docked player's full control row (transport
         # + options + PiP + fullscreen + mute + volume) always fits, so dragging
         # the divider in never crushes the buttons or drops the volume slider.
-        det.setMinimumWidth(340)
+        # The pane's 20px side margins mean the player is 40px narrower than the
+        # pane, so the floor is the ~340px bar plus those margins.
+        det.setMinimumWidth(380)
         # Keep the content list from being squeezed away: dragging the sidebar
         # divider far right used to swallow the whole middle column (leaving
         # sidebar + player and no list, which just looks broken). A floor plus
