@@ -309,25 +309,20 @@ class _MpvGLWidget(QOpenGLWidget):
         # set them one at a time and skip any this build rejects.
         soft = {"user_agent": "dopeIPTV/1.0", "keep_open": "yes",
                 "input_default_bindings": False, "input_vo_keyboard": False,
-                # Hardware decoding - without this mpv software-decodes, which
-                # stutters on 4K (esp. 10-bit HEVC/HDR) even on fast CPUs.
-                # 'auto-copy-safe' decodes on the GPU's dedicated engine and
-                # copies the frame back to RAM for upload as a normal texture.
-                # We deliberately prefer the *copy* path over zero-copy interop:
-                # our OpenGL render-API + QOpenGLWidget context can't always
-                # negotiate direct GL interop (vaapi-egl / cuda-gl), and when
-                # that fails you get a black frame or a software fallback. The
-                # copy path works with any GL context and any GPU that has a
-                # decoder (AMD vaapi-copy, Intel vaapi-copy, NVIDIA nvdec /
-                # vulkan-copy) - the heavy decode still runs on hardware. It
-                # also uses noticeably less RAM here than the interop path.
-                # Enthusiasts can force zero-copy with DOPEIPTV_HWDEC=nvdec etc.
-                # Priority: env override > user setting (Settings > Playback,
-                # for driver stacks where hwdec breaks - e.g. subtitles turning
-                # 4K video black) > the safe-copy default.
+                # Video decoding. Default is 'no' (software) - the same default
+                # mpv itself ships. Modern CPUs decode even 4K 10-bit HEVC/HDR
+                # comfortably, and software decode is completely immune to the
+                # GPU/driver hazards of the libmpv OpenGL render API (e.g. the
+                # nvidia-open stack turning hardware-decoded video black once a
+                # subtitle composites). Users who want hardware decoding can opt
+                # in from Settings > Playback (or DOPEIPTV_HWDEC). When enabled,
+                # 'auto-copy-safe' decodes on the GPU and copies the frame back
+                # to RAM for upload as a normal texture, which works with any GL
+                # context and any GPU that has a decoder.
+                # Priority: env override > user setting > software default.
                 "hwdec": (os.environ.get("DOPEIPTV_HWDEC")
                           or getattr(self, "hwdec_pref", None)
-                          or "auto-copy-safe"),
+                          or "no"),
                 # (No 'osc' option: the on-screen controller is a feature of
                 # the standalone mpv GUI and doesn't exist in the libmpv/render
                 # build we use - setting it only logged a harmless skip.)
@@ -647,7 +642,6 @@ class EmbeddedPlayer(QWidget):
     finished = pyqtSignal()
     next_episode = pyqtSignal()
     paused_changed = pyqtSignal(bool)
-    sub_track_changed = pyqtSignal()   # subtitle selection changed (mpv thread)
     timeshift_seek = pyqtSignal(int)   # minutes back from live (0 = go live)
     program_seek = pyqtSignal(int)     # seconds from the picked programme start
 
@@ -705,9 +699,6 @@ class EmbeddedPlayer(QWidget):
         # surface the "aborted / loading failed" mpv fires while it winds
         # the stream down as a "Stream error" toast.
         self._stopping = False
-        # Re-apply the hwdec fallback on the Qt thread whenever the subtitle
-        # selection changes (the signal is emitted from mpv's observer thread).
-        self.sub_track_changed.connect(self.apply_hwdec)
         self.video.playback_error.connect(self._on_playback_error)
         self.video.video_dbl_click.connect(self._on_video_dbl_click)
         self.video.video_mouse_press.connect(self._on_video_press)
@@ -1640,52 +1631,19 @@ class EmbeddedPlayer(QWidget):
 
     # -- playback defaults -----------------------------------------------------
 
-    # -- hardware decoding + subtitle fallback --------------------------------
+    # -- hardware decoding -----------------------------------------------------
 
     def _hwdec_base(self) -> str:
-        """The user's chosen hardware-decode mode (env > setting > safe copy)."""
+        """The decode mode to use (env > setting > software default).
+
+        Default is 'no' (software), like standalone mpv: modern CPUs decode
+        even 4K 10-bit HEVC/HDR fine, and it sidesteps the driver hazards of the
+        libmpv OpenGL render API entirely. Users opt into hardware decoding from
+        Settings > Playback (or the DOPEIPTV_HWDEC env override)."""
         return (os.environ.get("DOPEIPTV_HWDEC")
                 or (str(self._settings.value("hwdec_mode", "") or "")
                     if self._settings else "")
-                or "auto-copy-safe")
-
-    def _subtitle_active(self) -> bool:
-        """True when a real subtitle track is currently selected."""
-        m = self.video.mpv
-        try:
-            sid = m["sid"] if m is not None else None
-        except Exception:
-            return False
-        return bool(sid) and str(sid).lower() not in ("no", "false", "none", "0")
-
-    def _effective_hwdec(self) -> str:
-        """The hwdec mode to actually use right now. Honours the 'software when
-        subtitles are shown' fallback for driver stacks (e.g. nvidia-open) whose
-        libmpv render path corrupts hardware-decoded video once a subtitle is
-        composited - so hardware is used everywhere except while a subtitle is
-        actually on, instead of losing it outright."""
-        base = self._hwdec_base()
-        if base == "no":
-            return "no"
-        if (self._settings is not None
-                and str(self._settings.value("hwdec_sub_fallback", "false"))
-                == "true" and self._subtitle_active()):
-            return "no"
-        return base
-
-    def apply_hwdec(self) -> None:
-        """(Re)apply the effective hwdec mode - only when it actually changes,
-        so we don't reinitialise the decoder needlessly. Called on play and when
-        the subtitle selection changes."""
-        m = self.video.mpv
-        if m is None:
-            return
-        target = self._effective_hwdec()
-        try:
-            if str(m["hwdec"]) != target:
-                m["hwdec"] = target
-        except Exception:
-            pass
+                or "no")
 
     def apply_default_options(self) -> None:
         """Apply persistent playback defaults from Settings to the mpv core."""
@@ -1793,33 +1751,12 @@ class EmbeddedPlayer(QWidget):
                 m["cache-secs"] = float(self._cache_secs())
             except Exception:
                 pass
-            # Watch the subtitle selection so the hwdec fallback can react when
-            # a sub is auto-selected after the file is parsed (set up once).
-            if not getattr(self, "_sid_observed", False):
-                try:
-                    m.observe_property(
-                        "sid", lambda *_a: self.sub_track_changed.emit())
-                    self._sid_observed = True
-                except Exception:
-                    pass
-            # Hardware decoding, set per stream (not in apply_default_options -
-            # that also runs on every Settings save, and re-assigning hwdec
+            # Decode mode, set per stream (not in apply_default_options - that
+            # also runs on every Settings save, and re-assigning hwdec
             # mid-playback reinitialises the decoder and glitches the video). A
-            # changed setting takes effect on the next opened stream. 'Off' is
-            # the escape hatch for driver stacks where hwdec breaks; the
-            # DOPEIPTV_HWDEC env var still wins.
-            #
-            # Always start a fresh stream at the user's *base* hardware mode -
-            # never at _effective_hwdec(). The effective value consults mpv's
-            # live 'sid', which at this instant still belongs to the PREVIOUS
-            # file. If that file had the subtitle fallback active (hwdec=no),
-            # reading it here would start the new file in software too, and the
-            # sid observer would then flip hwdec back to hardware *mid-playback*
-            # once the new file parses - a live hardware switch this driver
-            # stack corrupts (artifacts, even with no subtitle on the new file).
-            # A new file has no composited subtitle yet, so base is correct; the
-            # sid observer applies the software fallback afterwards only if a
-            # real subtitle actually turns on in this file.
+            # changed setting takes effect on the next opened stream. The
+            # default is software ('no'); hardware is opt-in for those who want
+            # it, and DOPEIPTV_HWDEC still wins over the setting.
             try:
                 m["hwdec"] = self._hwdec_base()
             except Exception:

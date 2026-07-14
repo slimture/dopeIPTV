@@ -402,13 +402,10 @@ class _SettingsMixin:
              ("stretch", tr("option_aspect_stretch"))],
             self.settings.value("aspect_mode", "auto"))
         hwdec_box = self._combo(
-            [("auto-copy-safe", tr("option_hwdec_safe")),
-             ("auto-safe", tr("option_hwdec_direct")),
-             ("no", tr("option_hwdec_off"))],
-            str(self.settings.value("hwdec_mode", "") or "auto-copy-safe"))
-        hwdec_sub_box = self._combo(
-            [("false", tr("option_no")), ("true", tr("option_yes"))],
-            str(self.settings.value("hwdec_sub_fallback", "false")))
+            [("no", tr("option_hwdec_off")),
+             ("auto-copy-safe", tr("option_hwdec_safe")),
+             ("auto-safe", tr("option_hwdec_direct"))],
+            str(self.settings.value("hwdec_mode", "") or "no"))
         deint_box = self._combo(
             [("false", tr("option_no")), ("true", tr("option_yes"))],
             self.settings.value("video_deinterlace", "false"))
@@ -481,11 +478,6 @@ class _SettingsMixin:
         hwdec_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         hwdec_hint.setWordWrap(True)
         pf.addRow(hwdec_hint)
-        pf.addRow(tr("setting_hwdec_sub_fallback"), hwdec_sub_box)
-        hwdec_sub_hint = QLabel(tr("setting_hwdec_sub_fallback_hint"))
-        hwdec_sub_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
-        hwdec_sub_hint.setWordWrap(True)
-        pf.addRow(hwdec_sub_hint)
         pf.addRow(tr("setting_aspect_ratio"), aspect_box)
         pf.addRow(tr("setting_deinterlace"), deint_box)
         pf.addRow(tr("setting_sharpen"), sharpen_box)
@@ -1280,14 +1272,13 @@ class _SettingsMixin:
                 "aspect_mode", aspect_box.currentData())
             self.settings.setValue(
                 "hwdec_mode", hwdec_box.currentData())
-            self.settings.setValue(
-                "hwdec_sub_fallback", hwdec_sub_box.currentData())
             if self.player:
-                # Stage it for the next mpv build too (a fresh core reads the
-                # widget attribute, not live settings), and re-evaluate the
-                # subtitle fallback now.
+                # Stage it for the next mpv build (a fresh core reads the widget
+                # attribute, not live settings). A changed decode mode takes
+                # effect on the next opened stream - we never re-assign hwdec on
+                # the running stream, which would reinitialise the decoder and
+                # glitch the video.
                 self.player.video.hwdec_pref = hwdec_box.currentData()
-                self.player.apply_hwdec()
             self.settings.setValue(
                 "video_deinterlace", deint_box.currentData())
             self.settings.setValue(

@@ -1876,71 +1876,46 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Аппаратное декодирование", "th": "การถอดรหัสด้วยฮาร์ดแวร์",
     },
     "setting_hwdec_hint": {
-        "en": "If video goes black or glitches (e.g. when enabling subtitles "
-              "on 4K), switch this off - the picture then decodes on the CPU.",
-        "sv": "Om bilden blir svart eller hackar (t.ex. när subtitles slås på "
-              "för 4K), stäng av detta - bilden avkodas då på CPU:n.",
-        "es": "Si el vídeo se pone negro o falla (p. ej. al activar subtítulos "
-              "en 4K), desactívalo: la imagen se decodifica en la CPU.",
-        "de": "Wird das Bild schwarz oder fehlerhaft (z. B. beim Aktivieren "
-              "von Untertiteln bei 4K), hier ausschalten - dann dekodiert die "
-              "CPU.",
-        "fr": "Si la vidéo devient noire ou instable (p. ex. en activant les "
-              "sous-titres en 4K), désactivez ceci - l'image est alors "
-              "décodée par le CPU.",
-        "zh": "如果视频变黑或出现故障（例如在 4K 上开启字幕时），请关闭此项 - "
-              "画面将改由 CPU 解码。",
-        "ru": "Если видео чернеет или сбоит (например, при включении "
-              "субтитров на 4K), выключите это - декодировать будет "
-              "процессор.",
-        "th": "หากวิดีโอกลายเป็นสีดำหรือมีปัญหา (เช่น เมื่อเปิดซับไตเติลบน 4K) "
-              "ให้ปิดตัวเลือกนี้ - ภาพจะถูกถอดรหัสด้วย CPU แทน",
-    },
-    "setting_hwdec_sub_fallback": {
-        "en": "Software decode when subtitles are shown",
-        "sv": "Mjukvaruavkodning när subtitles visas",
-        "es": "Decodificación por software con subtítulos",
-        "de": "Software-Dekodierung bei Untertiteln",
-        "fr": "Décodage logiciel avec sous-titres",
-        "zh": "显示字幕时使用软件解码",
-        "ru": "Программное декодирование при субтитрах",
-        "th": "ถอดรหัสด้วยซอฟต์แวร์เมื่อแสดงซับไตเติล",
-    },
-    "setting_hwdec_sub_fallback_hint": {
-        "en": "Keeps hardware decoding on everywhere, but drops to the CPU only "
-              "while a subtitle is on - for drivers (e.g. nvidia-open) whose "
-              "render path blacks out hardware-decoded video with subtitles.",
-        "sv": "Behåller hårdvaruavkodning överallt, men går över till CPU:n bara "
-              "medan en subtitle är på - för drivrutiner (t.ex. nvidia-open) vars "
-              "render-väg svartlägger hårdvaruavkodad video med subtitles.",
-        "es": "Mantiene la decodificación por hardware en todo, pero pasa a la "
-              "CPU solo con subtítulos activos - para controladores (p. ej. "
-              "nvidia-open) cuya ruta de render deja en negro el vídeo por "
-              "hardware con subtítulos.",
-        "de": "Behält die Hardware-Dekodierung überall bei, wechselt aber nur "
-              "bei aktiven Untertiteln zur CPU - für Treiber (z. B. nvidia-open), "
-              "deren Render-Pfad hardware-dekodiertes Video mit Untertiteln "
-              "schwarz macht.",
-        "fr": "Garde le décodage matériel partout, mais bascule sur le CPU "
-              "seulement quand un sous-titre est affiché - pour les pilotes "
-              "(p. ex. nvidia-open) dont le rendu noircit la vidéo matérielle "
-              "avec sous-titres.",
-        "zh": "在所有情况下保持硬件解码，仅在显示字幕时切换到 CPU - 适用于"
-              "渲染路径在有字幕时使硬解视频变黑的驱动（如 nvidia-open）。",
-        "ru": "Сохраняет аппаратное декодирование везде, но переключается на "
-              "процессор только при показе субтитров - для драйверов (например "
-              "nvidia-open), у которых видео с субтитрами чернеет.",
-        "th": "คงการถอดรหัสด้วยฮาร์ดแวร์ไว้ทุกที่ แต่จะสลับไปใช้ CPU เฉพาะขณะ "
-              "เปิดซับไตเติล - สำหรับไดรเวอร์ (เช่น nvidia-open) ที่เส้นทางเรนเดอร์ "
-              "ทำให้วิดีโอที่ถอดรหัสด้วยฮาร์ดแวร์เป็นสีดำเมื่อมีซับไตเติล",
+        "en": "Software (CPU) decoding is the default and handles even 4K fine. "
+              "Turn on hardware decoding to offload the GPU; if video then goes "
+              "black or glitches (some drivers, e.g. nvidia-open, with "
+              "subtitles), switch it back off.",
+        "sv": "Mjukvaruavkodning (CPU) är standard och klarar även 4K bra. Slå "
+              "på hårdvaruavkodning för att avlasta med GPU:n; om bilden då blir "
+              "svart eller hackar (vissa drivrutiner, t.ex. nvidia-open, med "
+              "subtitles), stäng av den igen.",
+        "es": "La decodificación por software (CPU) es la predeterminada y "
+              "maneja incluso 4K sin problemas. Activa la decodificación por "
+              "hardware para descargar la GPU; si el vídeo se pone negro o falla "
+              "(algunos controladores, p. ej. nvidia-open, con subtítulos), "
+              "desactívala.",
+        "de": "Software-Dekodierung (CPU) ist Standard und schafft auch 4K "
+              "problemlos. Hardware-Dekodierung einschalten, um die GPU zu "
+              "nutzen; wird das Bild dann schwarz oder fehlerhaft (manche "
+              "Treiber, z. B. nvidia-open, mit Untertiteln), wieder ausschalten.",
+        "fr": "Le décodage logiciel (CPU) est la valeur par défaut et gère même "
+              "la 4K sans souci. Activez le décodage matériel pour soulager le "
+              "GPU ; si la vidéo devient noire ou instable (certains pilotes, "
+              "p. ex. nvidia-open, avec sous-titres), désactivez-le.",
+        "zh": "软件（CPU）解码为默认，连 4K 也能流畅处理。开启硬件解码可减轻 "
+              "GPU 负担；若视频随后变黑或出现故障（某些驱动，如 nvidia-open，"
+              "在有字幕时），请将其关闭。",
+        "ru": "Программное декодирование (CPU) используется по умолчанию и "
+              "справляется даже с 4K. Включите аппаратное декодирование, чтобы "
+              "разгрузить GPU; если видео чернеет или сбоит (некоторые драйверы, "
+              "например nvidia-open, с субтитрами), выключите его обратно.",
+        "th": "การถอดรหัสด้วยซอฟต์แวร์ (CPU) เป็นค่าเริ่มต้นและรองรับแม้กระทั่ง 4K "
+              "ได้ดี เปิดการถอดรหัสด้วยฮาร์ดแวร์เพื่อลดภาระ GPU หากวิดีโอกลายเป็น "
+              "สีดำหรือมีปัญหา (ไดรเวอร์บางตัว เช่น nvidia-open เมื่อมีซับไตเติล) "
+              "ให้ปิดกลับ",
     },
     "option_hwdec_safe": {
-        "en": "On - safe (recommended)", "sv": "På - säker (rekommenderas)",
-        "es": "Activada - segura (recomendado)",
-        "de": "An - sicher (empfohlen)",
-        "fr": "Activé - sûr (recommandé)", "zh": "开启 - 安全（推荐）",
-        "ru": "Вкл. - безопасно (рекомендуется)",
-        "th": "เปิด - ปลอดภัย (แนะนำ)",
+        "en": "On - safe", "sv": "På - säker",
+        "es": "Activada - segura",
+        "de": "An - sicher",
+        "fr": "Activé - sûr", "zh": "开启 - 安全",
+        "ru": "Вкл. - безопасно",
+        "th": "เปิด - ปลอดภัย",
     },
     "option_hwdec_direct": {
         "en": "On - direct (zero-copy)", "sv": "På - direkt (zero-copy)",
@@ -1950,10 +1925,14 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Вкл. - прямое (zero-copy)", "th": "เปิด - โดยตรง (zero-copy)",
     },
     "option_hwdec_off": {
-        "en": "Off - software (CPU)", "sv": "Av - mjukvara (CPU)",
-        "es": "Desactivada - software (CPU)", "de": "Aus - Software (CPU)",
-        "fr": "Désactivé - logiciel (CPU)", "zh": "关闭 - 软件解码（CPU）",
-        "ru": "Выкл. - программно (CPU)", "th": "ปิด - ซอฟต์แวร์ (CPU)",
+        "en": "Off - software (CPU, recommended)",
+        "sv": "Av - mjukvara (CPU, rekommenderas)",
+        "es": "Desactivada - software (CPU, recomendado)",
+        "de": "Aus - Software (CPU, empfohlen)",
+        "fr": "Désactivé - logiciel (CPU, recommandé)",
+        "zh": "关闭 - 软件解码（CPU，推荐）",
+        "ru": "Выкл. - программно (CPU, рекомендуется)",
+        "th": "ปิด - ซอฟต์แวร์ (CPU, แนะนำ)",
     },
     "option_off": {
         "en": "Off", "sv": "Av", "es": "Desactivado", "de": "Aus",
