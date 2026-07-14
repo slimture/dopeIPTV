@@ -103,7 +103,9 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=False,
+    # TEMP: console=True so a terminal window shows Qt/mpv/GL errors while we
+    # debug the black render surface on Windows. Flip back to False once fixed.
+    console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
