@@ -541,6 +541,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # fresh data without digging into Settings. Sits above the action row.
         self._sync_now_btn = QPushButton(tr("btn_sync_now"))
         self._sync_now_btn.clicked.connect(self._sidebar_sync_now)
+        # "Ignored" horizontal policy + no text-based minimum, like the nav
+        # buttons: otherwise this button's label width pinned the sidebar wider
+        # than the icon rail, so it couldn't collapse while a Trakt-backed list
+        # (Watched / Trakt favourites) had the button showing.
+        self._sync_now_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
+                                         QSizePolicy.Policy.Fixed)
+        self._sync_now_btn.setMinimumWidth(0)
         # Deliberately loud (red, bold) so it's obvious when it appears -
         # it only shows in the Trakt-backed lists, so it shouldn't blend
         # in with the neutral sidebar buttons.
@@ -1150,6 +1157,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # The rail's stand-in stretch item (see construction note).
         if hasattr(self, "_rail_filler"):
             self._rail_filler.setVisible(collapsed)
+        # Re-evaluate the 'Sync now' button: it's expanded-only (hidden on the
+        # rail), so collapsing/expanding must refresh it.
+        if hasattr(self, "_sync_now_btn"):
+            self._update_sync_btn()
         # The category-search toggle (and its box) belong to the expanded
         # sidebar only - hide them on the collapsed icon rail, restoring the
         # mode's own visibility (set in _load_categories) when expanded.

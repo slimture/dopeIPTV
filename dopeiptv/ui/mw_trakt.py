@@ -211,6 +211,9 @@ class _TraktMixin:
             self.mode == "watched"
             or (self.mode == "fav" and isinstance(data, tuple)
                 and data[0] == "trakt"))
+        # Never on the collapsed icon rail - a red text button has no place
+        # there, and it belongs to the expanded sidebar only.
+        show = show and not getattr(self, "_sidebar_collapsed", False)
         self._sync_now_btn.setVisible(bool(show))
 
     def _sidebar_sync_now(self) -> None:
