@@ -1658,11 +1658,13 @@ class EmbeddedPlayer(QWidget):
         still reachable by scrolling the video or Up/Down). Leaves the
         state-driven buttons (timeshift / record / next-episode) alone."""
         # Use the player's own width (reliable during resizeEvent; the bar's
-        # child width can still lag the layout pass). Thresholds are generous
-        # so controls reappear well before they'd crowd.
+        # child width can still lag the layout pass). The detail pane's minimum
+        # width (340) is sized so everything fits, so these only ever fire if
+        # the player is used somewhere narrower than that - a safety net, not
+        # the normal path.
         w = self.width()
-        self.vol.setVisible(w >= 350)
-        self.pip_btn.setVisible(w >= 310)
+        self.vol.setVisible(w >= 330)
+        self.pip_btn.setVisible(w >= 300)
 
     # -- playback defaults -----------------------------------------------------
 

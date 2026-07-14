@@ -940,7 +940,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._side_handle = root.handle(1)
         if self._side_handle is not None:
             self._side_handle.installEventFilter(self)
-        det.setMinimumWidth(280)
+        # Floor wide enough that the docked player's full control row (transport
+        # + options + PiP + fullscreen + mute + volume) always fits, so dragging
+        # the divider in never crushes the buttons or drops the volume slider.
+        det.setMinimumWidth(340)
         # Keep the content list from being squeezed away: dragging the sidebar
         # divider far right used to swallow the whole middle column (leaving
         # sidebar + player and no list, which just looks broken). A floor plus
