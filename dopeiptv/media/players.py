@@ -13,6 +13,8 @@ import time
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtWidgets import QMessageBox
 
+from ..i18n import tr
+
 from ..core.player_exec import find_player_executable
 
 _libmpv_error: str | None = None
@@ -119,9 +121,8 @@ def launch_player(player: str, url: str, title: str | None = None,
                url] if exe else None
         name = "VLC"
     if not cmd:
-        QMessageBox.warning(parent, "Player not found",
-                            f"{name} was not found. Install it, e.g.\n\n"
-                            f"  sudo apt install {name.lower()}")
+        QMessageBox.warning(parent, tr("status_player_not_found"),
+                            tr("status_player_not_found_msg", name=name))
         return
     subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                      start_new_session=True, env=_system_env())

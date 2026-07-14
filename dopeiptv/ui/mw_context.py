@@ -270,7 +270,7 @@ class _ContextMenuMixin:
         current = self.channel_ov.display_name(
             mode, key, it.get("name") or it.get("title") or "")
         name, ok = QInputDialog.getText(
-            self, "Rename channel", "New name:", text=current)
+            self, tr("ctx_rename_channel"), tr("cm_new_name"), text=current)
         if ok:
             self.channel_ov.update(mode, key, name=name.strip())
             self._apply_filter()
@@ -413,7 +413,7 @@ class _ContextMenuMixin:
         if not self.parental.has_pin():
             return True
         pin, ok = QInputDialog.getText(
-            self, "Parental control", "Enter PIN:",
+            self, tr("parental_control"), tr("parental_enter_pin"),
             QLineEdit.EchoMode.Password)
         if not ok:
             return False
@@ -428,8 +428,7 @@ class _ContextMenuMixin:
         if self.parental.has_pin():
             return True
         pin, ok = QInputDialog.getText(
-            self, "Parental control",
-            "No PIN is set yet. Choose a PIN to protect locked content:",
+            self, tr("parental_control"), tr("pin_choose_prompt"),
             QLineEdit.EchoMode.Password)
         pin = (pin or "").strip()
         if ok and pin:
@@ -581,7 +580,7 @@ class _ContextMenuMixin:
             next((c.get("category_name", "") for c in self._raw_categories
                   if c.get("category_id") == cid), ""))
         name, ok = QInputDialog.getText(
-            self, "Rename category", "New name:", text=current)
+            self, tr("cm_rename_title"), tr("cm_new_name"), text=current)
         if ok:
             self.overrides.update(self.mode, cid, name=name.strip())
             self._load_categories()
@@ -589,8 +588,7 @@ class _ContextMenuMixin:
     def _set_category_icon(self, cid) -> None:
         current = self.overrides.get(self.mode, cid).get("icon", "")
         icon, ok = QInputDialog.getText(
-            self, "Set category icon",
-            "Enter an emoji or short text (leave blank to remove):",
+            self, tr("set_cat_icon_title"), tr("set_cat_icon_prompt"),
             text=current)
         if ok:
             self.overrides.update(self.mode, cid, icon=icon.strip())

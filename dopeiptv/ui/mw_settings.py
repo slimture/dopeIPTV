@@ -1011,7 +1011,7 @@ class _SettingsMixin:
             if self.parental.has_pin() and not self._request_unlock():
                 return
             pin, ok = QInputDialog.getText(
-                d, "Parental control", "New PIN:",
+                d, tr("parental_control"), tr("pin_new_prompt"),
                 QLineEdit.EchoMode.Password)
             pin = (pin or "").strip()
             if ok and pin:

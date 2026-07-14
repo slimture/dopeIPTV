@@ -284,7 +284,7 @@ class _RecordingMixin:
         f.setSpacing(10)
         row = QHBoxLayout()
         val_edit = QLineEdit()
-        val_edit.setPlaceholderText("e.g. 75")
+        val_edit.setPlaceholderText(tr("size_value_placeholder"))
         unit_box = self._combo(
             [("MB", "MB"), ("GB", "GB"), ("TB", "TB")], "GB")
         row.addWidget(val_edit)
@@ -545,7 +545,7 @@ class _RecordingMixin:
         if not path:
             return
         name, ok = QInputDialog.getText(
-            self, "Rename recording", "New name:",
+            self, tr("msg_rename_rec_title"), tr("cm_new_name"),
             text=it.get("name", ""))
         name = (safe_filename(name.strip())
                 if ok and name.strip() else "")

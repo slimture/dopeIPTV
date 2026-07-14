@@ -4613,6 +4613,47 @@ _STRINGS: dict[str, dict[str, str]] = {
         "de": "Neuer Name:", "fr": "Nouveau nom :", "zh": "新名称：",
         "ru": "Новое имя:", "th": "ชื่อใหม่:",
     },
+    "pin_new_prompt": {
+        "en": "New PIN:", "sv": "Ny PIN:", "es": "Nuevo PIN:",
+        "de": "Neue PIN:", "fr": "Nouveau code PIN :", "zh": "新 PIN：",
+        "ru": "Новый PIN:", "th": "PIN ใหม่:",
+    },
+    "pin_choose_prompt": {
+        "en": "No PIN is set yet. Choose a PIN to protect locked content:",
+        "sv": "Ingen PIN är angiven ännu. Välj en PIN för att skydda låst "
+              "innehåll:",
+        "es": "Aún no hay PIN. Elige un PIN para proteger el contenido "
+              "bloqueado:",
+        "de": "Es ist noch keine PIN gesetzt. Wähle eine PIN, um gesperrte "
+              "Inhalte zu schützen:",
+        "fr": "Aucun code PIN défini. Choisissez un code PIN pour protéger le "
+              "contenu verrouillé :",
+        "zh": "尚未设置 PIN。请选择一个 PIN 以保护锁定的内容：",
+        "ru": "PIN ещё не задан. Выберите PIN для защиты заблокированного "
+              "содержимого:",
+        "th": "ยังไม่ได้ตั้ง PIN เลือก PIN เพื่อปกป้องเนื้อหาที่ถูกล็อก:",
+    },
+    "set_cat_icon_title": {
+        "en": "Set category icon", "sv": "Ange kategoriikon",
+        "es": "Establecer icono de categoría", "de": "Kategoriesymbol festlegen",
+        "fr": "Définir l'icône de catégorie", "zh": "设置分类图标",
+        "ru": "Задать значок категории", "th": "ตั้งไอคอนหมวดหมู่",
+    },
+    "set_cat_icon_prompt": {
+        "en": "Enter an emoji or short text (leave blank to remove):",
+        "sv": "Ange en emoji eller kort text (lämna tomt för att ta bort):",
+        "es": "Introduce un emoji o texto corto (deja vacío para quitar):",
+        "de": "Emoji oder kurzen Text eingeben (leer lassen zum Entfernen):",
+        "fr": "Saisissez un emoji ou un texte court (laisser vide pour "
+              "supprimer) :",
+        "zh": "输入表情或简短文字（留空则移除）：",
+        "ru": "Введите эмодзи или короткий текст (пусто — убрать):",
+        "th": "ป้อนอิโมจิหรือข้อความสั้น (เว้นว่างเพื่อลบ):",
+    },
+    "size_value_placeholder": {
+        "en": "e.g. 75", "sv": "t.ex. 75", "es": "p. ej. 75", "de": "z. B. 75",
+        "fr": "p. ex. 75", "zh": "例如 75", "ru": "напр. 75", "th": "เช่น 75",
+    },
 
     # ── Channel / category context menus (extras) ────────────────────────
     "ctx_reset_color": {
