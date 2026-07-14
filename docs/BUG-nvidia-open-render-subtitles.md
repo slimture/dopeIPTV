@@ -113,5 +113,13 @@ texture format the driver accepts.
 
 ## Workaround in this app
 
-A "software decode when subtitles are shown" toggle: keep hardware decoding
-everywhere, drop to `hwdec=no` only while a subtitle is active.
+Software decoding (`hwdec=no`) is now the default - it sidesteps the render
+path entirely and is unaffected. Hardware decoding is an opt-in setting for
+users who want it; when enabled we also set `hwdec-software-fallback=1`, though
+that only catches decoder failures, not this render-path `INVALID_ENUM` (the
+decoder succeeds here, so the fallback never triggers).
+
+An earlier "software decode only while a subtitle is shown" toggle was tried and
+removed: switching `hwdec` live on the running stream to recover left the
+pipeline corrupted on the next file, so a fixed decode mode per stream is the
+only reliable behaviour on this driver stack.
