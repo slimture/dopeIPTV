@@ -719,7 +719,10 @@ class _RecordingMixin:
     # depth, how shallow a failing request must be to count as "no archive at
     # all" (learn-and-hide), and how long a learned real-depth cap sticks.
     TS_MARGIN_MIN = 10               # 10 min inside the deepest requestable point
-    TS_SHALLOW_MIN = 180             # <= 3 h back
+    # Only a failure this shallow (~the smallest 'go back' step) means the
+    # channel serves NO catch-up at all. Anything deeper failing just caps the
+    # learned depth - it must never unmark a channel that works closer to live.
+    TS_SHALLOW_MIN = 45              # <= 45 min back (the 30-min step + slack)
     TS_DEPTH_TTL = 14 * 86400        # a learned short depth re-expands after 14 d
 
     def _clear_ts_broken(self) -> None:
@@ -833,7 +836,7 @@ class _RecordingMixin:
         self._flash_status(tr("ts_reset_done_one"))
 
     def _play_timeshift(self, it, back_min=None, prog=None,
-                        prog_origin=None) -> None:
+                        prog_origin=None, _depth_retry=False) -> None:
         # prog_origin: the picked programme's *original* start (the seek-bar's
         # 0-point). Set when re-loading the archive at a scrubbed position so
         # the bar keeps spanning the whole programme with the playhead offset,
@@ -866,7 +869,7 @@ class _RecordingMixin:
                 1, int((prog["stop_timestamp"] - start) // 60) + 2)
         else:
             duration_min = max(1, int((now - start) // 60) + 1)
-        allow_mark_broken = (not clamped
+        allow_mark_broken = (not _depth_retry and not clamped
                              and requested_back_min <= self.TS_SHALLOW_MIN)
         start += self._replay_delay_minutes() * 60
         # Candidate archive-URL formats (providers differ). Play the first;
@@ -916,7 +919,8 @@ class _RecordingMixin:
                             int(round(requested_back_min)))
                         if nxt is not None:
                             self._flash_status(tr("ts_shorter_archive"))
-                            self._play_timeshift(it, back_min=nxt)
+                            self._play_timeshift(it, back_min=nxt,
+                                                 _depth_retry=True)
                             return
                 self._flash_status(tr("ts_archive_unavailable"), ms=6000)
                 # The live video never stopped. Restore the live timeline (not
