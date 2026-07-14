@@ -869,7 +869,12 @@ class _RecordingMixin:
                 1, int((prog["stop_timestamp"] - start) // 60) + 2)
         else:
             duration_min = max(1, int((now - start) // 60) + 1)
-        allow_mark_broken = (not _depth_retry and not clamped
+        # Only a shallow "go back N" that fails means the channel serves no
+        # catch-up at all. A programme pick / scrub is never allowed to unmark
+        # a channel (a picked-programme URL can fail on a channel whose plain
+        # archive works fine), and a retry never unmarks either.
+        allow_mark_broken = (not _depth_retry and prog is None
+                             and not clamped
                              and requested_back_min <= self.TS_SHALLOW_MIN)
         start += self._replay_delay_minutes() * 60
         # Candidate archive-URL formats (providers differ). Play the first;

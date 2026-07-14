@@ -1643,15 +1643,6 @@ class EmbeddedPlayer(QWidget):
             except Exception:
                 pass
 
-        # Hardware decoding: applied live so switching it in Settings takes
-        # effect without a restart (mpv reinits the decoder on the fly). The
-        # DOPEIPTV_HWDEC env override still has the last word. 'Off' is the
-        # escape hatch for driver stacks where hwdec breaks - e.g. enabling a
-        # subtitle turning 4K video black while the subs still render.
-        hwdec = (os.environ.get("DOPEIPTV_HWDEC")
-                 or str(s.value("hwdec_mode", "") or "")
-                 or "auto-copy-safe")
-        set_opt("hwdec", hwdec)
         set_opt("alang", s.value("audio_lang", "") or "")
         sub_mode = s.value("sub_mode", "auto")
         if sub_mode == "off":
@@ -1744,6 +1735,20 @@ class EmbeddedPlayer(QWidget):
             try:
                 m["cache"] = "yes"
                 m["cache-secs"] = float(self._cache_secs())
+            except Exception:
+                pass
+            # Hardware decoding, set once per stream (not in apply_default_options
+            # - that also runs on every Settings save, and re-assigning hwdec
+            # mid-playback reinitialises the decoder and glitches the video). A
+            # changed setting takes effect on the next opened stream. 'Off' is
+            # the escape hatch for driver stacks where hwdec breaks (e.g. a
+            # subtitle turning 4K video black); DOPEIPTV_HWDEC env still wins.
+            try:
+                hwdec = (os.environ.get("DOPEIPTV_HWDEC")
+                         or (str(self._settings.value("hwdec_mode", "") or "")
+                             if self._settings else "")
+                         or "auto-copy-safe")
+                m["hwdec"] = hwdec
             except Exception:
                 pass
             # Stream probing, per stream kind. A live MPEG-TS declares its
