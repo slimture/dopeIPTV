@@ -70,6 +70,18 @@ libmpv_render: Reallocating OSD texture to 256x128.
 libmpv_render: after creating texture: OpenGL error INVALID_ENUM.
 ```
 
+With `--gpu-debug` the error is bracketed around video rendering / texture
+creation itself:
+
+```
+libmpv_render: after video rendering: OpenGL error INVALID_ENUM.
+libmpv_render: before video texture creation: OpenGL error INVALID_ENUM.
+```
+
+and the reported context is GLES (Qt's default on Wayland/NVIDIA):
+`GL_OES_*`, `GL_ANDROID_extension_pack_es31a`, `GL_EXT_texture_norm16`, …
+Forcing a desktop OpenGL 4.6 context does not change the outcome.
+
 Note: `INVALID_ENUM` is also logged with `hwdec=no`, where playback works — so
 the error alone is not fatal, but with hardware decoding the video plane texture
 is affected and the picture is lost.
