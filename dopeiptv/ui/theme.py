@@ -162,11 +162,14 @@ def _mix(fg: str, bg: str, ratio: float) -> str:
 def build_style() -> str:
     """Generate the full application QSS from the active palette."""
     p = dict(P)
-    # Solid accent-tinted surface for the sidebar action buttons (Guide,
-    # Settings): opaque so it shows clearly over the transparent scroll
-    # content, and tinted toward the accent so it reads as an interactive
-    # button on every theme rather than blending into the sidebar.
-    side_action_bg = _mix(ACCENT, p['side'], 0.28)
+    # Sidebar action buttons (Guide, Settings): a solid, theme-neutral raised
+    # surface with a soft edge, both derived from the palette so they track the
+    # theme instead of standing out in a clashing colour. Opaque so they show
+    # clearly over the transparent scroll content. The accent is reserved for
+    # hover, where a bit of colour is expected.
+    side_action_bg = _mix(p['text'], p['side'], 0.11)
+    side_action_edge = _mix(p['text'], p['side'], 0.26)
+    side_action_hover = _mix(p['text'], p['side'], 0.20)
     return f"""
 * {{
     font-family: "SF Pro Text", "Inter", "Cantarell", "Noto Sans", sans-serif;
@@ -193,14 +196,14 @@ QPushButton#NavBtn[rail="true"] {{ text-align: center; padding: 8px 0; font-size
    pill with a border so they read as buttons (not plain text like the nav
    items), plus an obvious hover so it's clear they're clickable. */
 QPushButton#SideAction {{
-    background: {side_action_bg}; border: 1px solid {ACCENT};
+    background: {side_action_bg}; border: 1px solid {side_action_edge};
     border-radius: 8px; padding: 9px 14px; text-align: center;
-    font-size: 13px; font-weight: 600; color: {p['text']}; margin-top: 3px;
+    font-size: 13px; font-weight: 600; color: {p['text2']}; margin-top: 3px;
 }}
 QPushButton#SideAction:hover {{
-    background: {ACCENT}; border-color: {ACCENT}; color: white;
+    background: {side_action_hover}; border-color: {ACCENT}; color: {p['text']};
 }}
-QPushButton#SideAction:pressed {{ background: {p['accent_hi']}; }}
+QPushButton#SideAction:pressed {{ background: {side_action_edge}; }}
 QPushButton#SideAction:pressed {{ background: {p['hover']}; }}
 QPushButton#SideAction[rail="true"] {{
     text-align: center; padding: 8px 0; font-size: 14px; font-weight: 600;
