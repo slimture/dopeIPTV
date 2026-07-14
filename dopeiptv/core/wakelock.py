@@ -25,22 +25,27 @@ class WakeLock:
 
     def __init__(self) -> None:
         self._cookies: list[tuple] = []
-        self._macos_lock = None
+        # A platform-native lock (macOS caffeinate / Windows
+        # SetThreadExecutionState); when set it fully replaces the D-Bus path.
+        self._native = None
         if sys.platform == "darwin":
             from .platform_macos import WakeLockMacOS
-            self._macos_lock = WakeLockMacOS()
+            self._native = WakeLockMacOS()
+        elif sys.platform == "win32":
+            from .platform_windows import WakeLockWindows
+            self._native = WakeLockWindows()
 
     @property
     def held(self) -> bool:
-        if self._macos_lock is not None:
-            return self._macos_lock.held
+        if self._native is not None:
+            return self._native.held
         return bool(self._cookies)
 
     def acquire(self, reason: str = "Playing video") -> None:
         if self.held:
             return
-        if self._macos_lock is not None:
-            self._macos_lock.acquire(reason)
+        if self._native is not None:
+            self._native.acquire(reason)
             return
         try:
             from PyQt6.QtDBus import QDBusConnection, QDBusInterface
@@ -59,8 +64,8 @@ class WakeLock:
                 self._cookies.append((iface, args[0]))
 
     def release(self) -> None:
-        if self._macos_lock is not None:
-            self._macos_lock.release()
+        if self._native is not None:
+            self._native.release()
             return
         for iface, cookie in self._cookies:
             try:

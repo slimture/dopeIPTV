@@ -36,7 +36,12 @@ def _prepare_bundled_libmpv() -> None:
     if not getattr(sys, "frozen", False):
         return
     import ctypes.util
-    soname = "libmpv.2.dylib" if sys.platform == "darwin" else "libmpv.so.2"
+    if sys.platform == "darwin":
+        soname = "libmpv.2.dylib"
+    elif sys.platform == "win32":
+        soname = "mpv-2.dll"
+    else:
+        soname = "libmpv.so.2"
     candidates = [getattr(sys, "_MEIPASS", None),
                   os.path.dirname(sys.executable)]
     bundled = next((os.path.join(d, soname) for d in candidates
@@ -55,6 +60,9 @@ def _prepare_bundled_libmpv() -> None:
 
 if sys.platform == "darwin":
     from ..core.platform_macos import find_libmpv
+    find_libmpv()
+elif sys.platform == "win32":
+    from ..core.platform_windows import find_libmpv
     find_libmpv()
 
 _prepare_bundled_libmpv()

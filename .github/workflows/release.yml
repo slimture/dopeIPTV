@@ -477,6 +477,77 @@ jobs:
           name: macos-dmg
           path: '*.dmg'
 
+  # --------------------------------------------------------------- Windows ---
+  # Produces a portable zip (unzip -> run dopeiptv.exe). New/experimental, so
+  # continue-on-error keeps it from blocking the other formats while the
+  # libmpv-fetch step settles on the first real run.
+  windows-zip:
+    name: Windows (x64)
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bake built-in TMDB key
+        shell: bash
+        env:
+          DOPEIPTV_TMDB_KEY: ${{ secrets.DOPEIPTV_TMDB_KEY }}
+        run: |
+          printf 'TMDB_API_KEY = "%s"\n' "${DOPEIPTV_TMDB_KEY}" > dopeiptv/_tmdb_key.py
+          if [ -z "${DOPEIPTV_TMDB_KEY}" ]; then
+            echo "::warning::DOPEIPTV_TMDB_KEY secret is empty - the built-in TMDB option will NOT appear in this build."
+          fi
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python build deps
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip pyinstaller pillow
+          python -m pip install -r requirements.txt
+      - name: Fetch libmpv (mpv-2.dll)
+        shell: bash
+        run: |
+          mkdir -p libmpv
+          # Latest self-contained libmpv dev build (ffmpeg is baked in).
+          url=$(curl -sSL https://api.github.com/repos/zhongfly/mpv-winbuild/releases/latest \
+                | python -c "import sys,json;a=json.load(sys.stdin)['assets'];print(next(x['browser_download_url'] for x in a if 'mpv-dev-x86_64' in x['name'] and x['name'].endswith('.7z')))")
+          echo "mpv-dev: $url"
+          curl -sSL -o mpv-dev.7z "$url"
+          7z x mpv-dev.7z -ompv-dev
+          dll=$(find mpv-dev -iname 'libmpv-2.dll' -o -iname 'mpv-2.dll' | head -1)
+          echo "libmpv dll: $dll"
+          cp "$dll" libmpv/mpv-2.dll
+          ls -la libmpv
+      - name: Build .ico from the app PNG
+        shell: bash
+        run: |
+          python -c "from PIL import Image; Image.open('packaging/io.github.slimture.dopeIPTV.png').save('packaging/dopeIPTV.ico', sizes=[(16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256)])"
+      - name: Version
+        id: v
+        shell: bash
+        run: echo "version=$(python -c 'import dopeiptv;print(dopeiptv.VERSION)')" >> "$GITHUB_OUTPUT"
+      - name: PyInstaller bundle
+        shell: bash
+        env:
+          LIBMPV_DIR: ${{ github.workspace }}/libmpv
+        run: pyinstaller --noconfirm dopeiptv-win.spec   # -> dist/dopeiptv/
+      - name: Package portable zip
+        shell: bash
+        run: |
+          V=${{ steps.v.outputs.version }}
+          ( cd dist && 7z a "../dopeIPTV-${V}-windows-x64.zip" dopeiptv )
+          ls -la *.zip
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: '*.zip'
+          body_path: RELEASE_NOTES.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: '*.zip'
+
   # --------------------------------------------------------------- Flatpak ---
   # Most likely to need iteration (building libmpv in Flatpak). Kept from
   # blocking the release with continue-on-error.

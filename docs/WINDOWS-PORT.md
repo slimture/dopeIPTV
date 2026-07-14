@@ -1,5 +1,21 @@
 # Porting dopeIPTV to Windows — scope & action list
 
+## Status
+
+**Scaffolding has landed** (items A, C, E, F, H, I below):
+- `core/platform_windows.py` — libmpv discovery, desktop-OpenGL setup, `WakeLockWindows`.
+- Wired into `app.py` (OpenGL on win32), `media/players.py` (libmpv soname + discovery), `core/wakelock.py` (native lock).
+- `dopeiptv-win.spec` (PyInstaller onedir, bundles `mpv-2.dll`, `.ico`).
+- CI: a `windows-zip` job in `release.yml` (fetches libmpv, builds a portable zip, attaches it to the release). `continue-on-error` while it settles.
+- Website recognises the Windows `.zip` (sync `USER_EXTS` + `classify`), hero OS-detect updated.
+
+**Remaining before it's usable:**
+1. **Spike item B** — run `tools/hwdec_sub_test.py` on a real Windows box (Intel/AMD/NVIDIA) to confirm the libmpv render API paints. This is the go/no-go.
+2. **First CI run** — the libmpv-fetch step (zhongfly `mpv-dev-x86_64` archive) likely needs one tweak against the real asset names; `continue-on-error` keeps it from blocking a release meanwhile.
+3. Optional polish: item D (player paths), an installer instead of a zip.
+
+---
+
 **Verdict:** feasible, **moderate effort (~2–4 focused days)**, not a rewrite.
 PyQt6 + libmpv (render API) is a well-trodden cross-platform stack, and the code
 is already platform-abstracted (a `platform_macos` module, a `WakeLock`

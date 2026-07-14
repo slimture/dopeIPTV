@@ -200,6 +200,9 @@ def main() -> int:
         if _libmpv is not None:
             from .core.platform_macos import setup_opengl
             setup_opengl()
+    elif sys.platform == "win32" and _libmpv is not None:
+        from .core.platform_windows import setup_opengl
+        setup_opengl()
 
     # Opt-in X11/XWayland backend (Settings > "Run via X11"). Must be set
     # before QApplication. Guarded so it can never wedge startup: Linux only,
