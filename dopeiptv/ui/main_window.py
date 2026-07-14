@@ -954,6 +954,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         mid.setMinimumWidth(240)
         self._side, self._mid, self._det = side, mid, det
         self._root = root
+        # A base minimum window size: below this the three columns can't hold
+        # the docked player plus its info without overlapping (the info would
+        # creep up into the video). Width = rail + middle + detail floors;
+        # height fits the docked player (which scales with screen width) plus
+        # its control bar, the pane chrome and a little info. PiP temporarily
+        # drops this and restores it on exit.
+        box_h = getattr(self.player, "VIDEO_BOX_HEIGHT", 260) if self.player else 0
+        min_h = (box_h + 190) if self.player else 320
+        self._base_min = QSize(700, min_h)
+        self.setMinimumSize(self._base_min)
         # Parent the toast to the window itself, not the splitter: a QSplitter
         # treats every child widget as a pane and overrides its geometry, so an
         # overlay parented to it gets squeezed/misplaced when the splitter
@@ -1903,7 +1913,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
         self.player.set_pip_mode(False)
         self.player.video.setMinimumHeight(190)
-        self.setMinimumSize(0, 0)
+        self.setMinimumSize(getattr(self, "_base_min", QSize(700, 440)))
         self._side.show()
         self._mid.show()
         for w in getattr(self, "_pip_det_hidden", []):
