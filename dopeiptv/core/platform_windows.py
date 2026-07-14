@@ -43,25 +43,20 @@ def find_libmpv() -> None:
 
 
 def setup_opengl() -> None:
-    """Request a desktop OpenGL context for the libmpv render API.
+    """Enable GL context sharing for the libmpv render widget.
 
-    Qt on Windows may otherwise hand mpv an ANGLE (GLES-over-D3D) context, which
-    the render API can't always use. Ask for shared desktop OpenGL and a plain
-    3.3 compatibility format before the QApplication is built.
+    We deliberately do NOT force a global desktop-OpenGL surface format here.
+    Setting ``QSurfaceFormat.setDefaultFormat()`` / ``AA_UseDesktopOpenGL``
+    app-wide made Qt composite *every* top-level window through that one
+    context, and on some machines that left the whole UI black (only the native
+    window chrome drawn). The player's ``QOpenGLWidget`` negotiates a working
+    context on its own - exactly like the Linux build, which sets nothing - so
+    all we do is allow context sharing.
     """
     from PyQt6.QtCore import Qt
-    from PyQt6.QtGui import QSurfaceFormat
     from PyQt6.QtWidgets import QApplication
 
     QApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
-    try:
-        QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseDesktopOpenGL)
-    except Exception:
-        pass
-    fmt = QSurfaceFormat()
-    fmt.setVersion(3, 3)
-    fmt.setProfile(QSurfaceFormat.OpenGLContextProfile.CompatibilityProfile)
-    QSurfaceFormat.setDefaultFormat(fmt)
 
 
 class WakeLockWindows:
