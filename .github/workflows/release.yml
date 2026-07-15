@@ -540,6 +540,9 @@ jobs:
         shell: bash
         run: |
           V=${{ steps.v.outputs.version }}
+          # Ship a plain-text README in the folder: how to run past SmartScreen,
+          # make a shortcut, and remove every trace of the app.
+          cp packaging/WINDOWS-README.txt "dist/dopeiptv/README.txt"
           ( cd dist && 7z a "../dopeIPTV-${V}-windows-x64.zip" dopeiptv )
           ls -la *.zip
       # Upload the app FOLDER, not the .zip: the Actions artifact download UI
