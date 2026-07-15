@@ -4,9 +4,10 @@ I was looking for a good IPTV-client on Linux but couldn't find one. So I vibe
 coded dopeIPTV based on what I think is a good IPTV-player. I think you will
 like it.
 
-It's primarily for Linux (and works well on MacOS) with a modern dark interface,
-supporting the **Xtream Codes API** and **M3U playlists**, **EPG**, and an
-**embedded mpv** video player (with optional external mpv/VLC playback).
+It's primarily for Linux — and runs on **macOS** and **Windows** too — with a
+modern dark interface, supporting the **Xtream Codes API** and **M3U
+playlists**, **EPG**, and an **embedded mpv** video player (with optional
+external mpv/VLC playback).
 
 > **dopeIPTV is a player, not a content source.** You connect it to a service
 > you already subscribe to (an Xtream Codes account or an M3U playlist) — it
@@ -57,22 +58,40 @@ packages (`mpv`, `ffmpeg`, and optionally `vlc`) come from your distro.
 
 ## Installation
 
-### Option A — AppImage / Flatpak / .deb (easiest, no dependencies to install)
+### Option A — download a ready-to-run build (easiest, no dependencies to install)
 
-Download the latest package for your system from the
-[Releases page](https://github.com/slimture/dopeIPTV/releases) — a
-self-contained `dopeIPTV-*.AppImage`, a `.deb` for Debian/Ubuntu, or a
-`.flatpak`. For the AppImage:
+Grab the latest build for your system from the
+[Releases page](https://github.com/slimture/dopeIPTV/releases) or
+[iptv.dope.rs](https://iptv.dope.rs). Every packaged build bundles Python,
+PyQt6, libmpv and ffmpeg, so the **embedded** player works out of the box —
+nothing else to install.
+
+**Linux** — a self-contained `dopeIPTV-*.AppImage`, a `.deb` for
+Debian/Ubuntu, or a `.flatpak`. For the AppImage:
 
 ```bash
 chmod +x dopeIPTV-*.AppImage
 ./dopeIPTV-*.AppImage
 ```
 
-The AppImage bundles Python, PyQt6, libmpv, and ffmpeg — nothing else to
-install, and the **embedded** player works out of the box. (To integrate it
-into your application menu, use a tool like
+(To integrate the AppImage into your application menu, use a tool like
 [Gear Lever](https://flathub.org/apps/it.mijorus.gearlever) or AppImageLauncher.)
+
+**macOS** — open the `.dmg` and drag dopeIPTV to Applications. The app isn't
+notarized by Apple yet, so the first launch is blocked: **right-click the app →
+Open**, then **Open** in the dialog (or allow it under **System Settings →
+Privacy & Security → Open Anyway**). If macOS says the app is *"damaged"*, clear
+the download flag: `xattr -dr com.apple.quarantine /Applications/dopeIPTV.app`.
+It's safe — the warning only means the build isn't code-signed.
+
+**Windows** — a portable `dopeIPTV-*-windows-x64.zip`: unzip the folder and run
+`dopeiptv.exe`, no installer and no admin rights. The app isn't code-signed
+yet, so SmartScreen may show *"Windows protected your PC"* — click **More info →
+Run anyway**. An optional Start-menu/desktop shortcut lives under
+**Settings → Interface → Maintenance → Create shortcut**, and the bundled
+`README.txt` covers removing every trace of the app.
+
+> Linux is the primary target; macOS and Windows are a bonus.
 
 > **Note — "Open externally" needs a system player.** The built-in embedded
 > player is fully self-contained. But the right-click **Open externally**

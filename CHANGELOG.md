@@ -5,6 +5,26 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
+## [0.7.2]
+
+**Windows joins Linux and macOS** — a portable Windows x64 build (unzip and
+run, no installer) — plus timeshift and UI fixes.
+
+- **Windows (portable)** — unzip the folder and run `dopeiptv.exe`, no installer and no admin rights; an optional Start-menu/desktop shortcut under Settings → Interface → Maintenance, a bundled README, and a fix for a crash on exit in the windowed build.
+- **Timeshift** — channels that advertise catch-up but don't actually serve it now hide the timeshift affordance (list marker, in-player rewind button and seek-bar overlay) instead of leaving it behind an "archive unavailable" message. Channels with a genuinely shorter archive are unaffected.
+- The category-search magnifier now sits centred in its button.
+- Website: grouped, plain-language download page (OS + CPU), a subtle per-file download counter, and macOS/Windows first-launch notes.
+
+## [0.7.1]
+
+A **UI/UX polish** release: a redesigned, responsive left panel and a calmer
+timeshift player.
+
+- **Redesigned left panel** — icons for every nav item, a Browse/Library split with a collapsible Library group, and Guide/Settings as a compact side-by-side pair. The sidebar auto-collapses to the icon rail when the window gets narrow.
+- **Responsive layout** — the middle-column controls go compact on a narrow column, the player's control row never drops the volume, and everything below the video lives in one scroll column so the logo/programme info can't overlap the picture. A minimum window size prevents squeezing panes into overlap.
+- **Timeshift timeline auto-hides** after a few idle seconds and reappears on interaction.
+- Accent colours follow your chosen theme everywhere (EPG "now" progress bar, playing highlights); the sidebar collapses correctly in the Watched/Trakt lists; About → website link and better release-notes formatting.
+
 ## [0.7.0]
 
 **Timeshift &amp; catch-up TV**: scrub back into a channel's archive on a live

@@ -1,5 +1,6 @@
 # dopeIPTV — Full Feature List
 
+- **Runs on Linux, macOS and Windows** from one codebase — the same embedded libmpv player on all three (Linux is the primary target; macOS and Windows builds ship as a `.dmg` and a portable `.zip`)
 - Log in with Xtream Codes credentials (server, username, password) — settings are saved
 - TV, Movies, and Series with seasons and episodes, plus Favorites and History
 - **Multiple languages**: the whole interface is translated into English, Svenska, Español, Deutsch, Français, 中文, Русский and ไทย — pick your language under Settings → Interface and the menus switch **live**, no restart

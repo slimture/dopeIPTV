@@ -1,5 +1,9 @@
 # Porting dopeIPTV to Windows — scope & action list
 
+> **Shipped in 0.7.2.** A portable Windows x64 build (`dopeIPTV-*-windows-x64.zip`)
+> is built by CI and attached to every release. The notes below are kept as the
+> historical porting plan / design record.
+
 ## Status
 
 **Scaffolding has landed** (items A, C, E, F, H, I below):
