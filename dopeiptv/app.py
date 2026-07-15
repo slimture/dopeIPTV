@@ -167,6 +167,16 @@ def _install_crash_hooks() -> None:
 
 def main() -> int:
     """Launch the application."""
+    # PyInstaller's windowed (no-console) build - our Windows release - leaves
+    # sys.stdout (and sometimes sys.stderr) as None. Any print()/flush() then
+    # crashes with "'NoneType' object has no attribute 'write'/'flush'" - which
+    # is exactly what bit the shutdown flush below, and would bite every stray
+    # debug print too. Give them a throwaway sink so all output is harmless.
+    # No-op where a real console exists (Linux/macOS, or the dev console build).
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w")
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w")
     # One unconditional startup line so packaging smoke tests can prove
     # Python + our package imported cleanly before any GL/Qt init runs.
     print(f"[dopeIPTV] {BUILD_VERSION} starting", file=sys.stderr, flush=True)
