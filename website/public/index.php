@@ -9,7 +9,7 @@ $SITE   = 'https://iptv.dope.rs';
 $REPO   = 'https://github.com/slimture/dopeIPTV';
 $DESC   = 'dopeIPTV is a fast, open-source desktop IPTV player for Xtream Codes '
         . '& M3U with a full EPG guide, live timeshift, catch-up TV and recording. '
-        . 'For Linux and macOS.';
+        . 'For Linux, macOS and Windows.';
 
 $rel = @json_decode(@file_get_contents(__DIR__ . '/releases.json'), true);
 $version = $rel['version'] ?? '0.7.0';
@@ -147,7 +147,7 @@ unset($g);
       <div>
         <span class="eyebrow"><span class="dot"></span> On air · version <?= h($version) ?></span>
         <h1>Live TV, catch-up and recordings — in one <span class="hl">native desktop</span> app.</h1>
-        <p class="lede">A fast, keyboard-driven IPTV client for Xtream Codes &amp; M3U. Scrub back into a channel's archive, pause live TV, browse the full EPG, and record — with a built-in mpv player. For Linux &amp; macOS.</p>
+        <p class="lede">A fast, keyboard-driven IPTV client for Xtream Codes &amp; M3U. Scrub back into a channel's archive, pause live TV, browse the full EPG, and record — with a built-in mpv player. For Linux, macOS &amp; Windows.</p>
         <div class="cta-row">
           <a class="btn primary" id="heroDownload" href="#download">Download for your system</a>
           <a class="btn ghost" href="<?= h($REPO) ?>">View source</a>
