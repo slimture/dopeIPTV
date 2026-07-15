@@ -714,6 +714,13 @@ class _RecordingMixin:
             self._save_ts_broken()
             # Redraw so the amber ◀◀ marker drops immediately.
             self.listw.viewport().update()
+            # If this is the channel on screen, drop the in-player timeshift
+            # affordance too: _sync_player_buttons re-reads _timeshift_days
+            # (now 0 for this key) and hides the control-bar ◀◀ button, so a
+            # channel we just learned has no working archive stops advertising
+            # it. The live video is untouched - this only toggles button
+            # visibility.
+            self._sync_player_buttons()
 
     # How much a "go back to the limit" request is pulled inside the stated
     # depth, how shallow a failing request must be to count as "no archive at

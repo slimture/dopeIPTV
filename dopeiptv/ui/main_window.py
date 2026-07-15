@@ -494,11 +494,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # A search toggle that reveals the category search box only when you
         # want it, so it doesn't take a permanent row in the sidebar.
         self.cat_search_btn = QToolButton(objectName="SectionToggle")
-        self.cat_search_btn.setText("🔍")
         self.cat_search_btn.setCheckable(True)
         self.cat_search_btn.setAutoRaise(True)
         self.cat_search_btn.setFixedSize(22, 18)
         self.cat_search_btn.setToolTip(tr("cat_search_placeholder"))
+        self._apply_cat_search_icon()   # ink-centred 🔍 (not a top-left glyph)
         self.cat_search_btn.toggled.connect(self._toggle_cat_search)
         cat_hdr.addWidget(self.cat_search_btn)
         self.cat_solo_btn.toggled.connect(self._on_cat_solo_toggle)
@@ -1733,36 +1733,52 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             Qt.ArrowType.RightArrow if checked else Qt.ArrowType.DownArrow)
         self._apply_cat_solo()
 
+    def _glyph_pixmap(self, glyph: str, s: int, color: str) -> QPixmap:
+        """A transparent SxS pixmap with GLYPH painted in COLOR, centred by the
+        glyph's actual ink bounds (not the font's ascent/descent box - emoji
+        carry uneven top/bottom/side bearing that otherwise shoves them low and
+        to the left). U+FE0E requests the glyph's monochrome text presentation
+        so it takes the pen colour rather than a bright emoji."""
+        dpr = self.devicePixelRatioF() or 1.0
+        pm = QPixmap(round(s * dpr), round(s * dpr))
+        pm.setDevicePixelRatio(dpr)
+        pm.fill(Qt.GlobalColor.transparent)
+        pr = QPainter(pm)
+        pr.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
+        f = QFont()
+        f.setPixelSize(round(s * 0.82))
+        pr.setFont(f)
+        pr.setPen(QColor(color))
+        g = glyph + "︎"
+        fm = QFontMetricsF(f)
+        br = fm.tightBoundingRect(g)
+        x = (s - br.width()) / 2.0 - br.x()
+        y = (s - br.height()) / 2.0 - br.y()
+        pr.drawText(QPointF(x, y), g)
+        pr.end()
+        return pm
+
     def _nav_icon(self, glyph: str, s: int) -> QIcon:
         """An icon of size S painted from GLYPH in the theme's muted tone (the
         normal/Off state) and white (the checked/On state), so it always
-        matches the nav label. U+FE0E requests the glyph's monochrome text
-        presentation so it takes the pen colour rather than a bright emoji."""
+        matches the nav label."""
         icon = QIcon()
-        dpr = self.devicePixelRatioF() or 1.0
-        for color, state in ((P["text2"], QIcon.State.Off),
-                             ("#FFFFFF", QIcon.State.On)):
-            pm = QPixmap(round(s * dpr), round(s * dpr))
-            pm.setDevicePixelRatio(dpr)
-            pm.fill(Qt.GlobalColor.transparent)
-            pr = QPainter(pm)
-            pr.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
-            f = QFont()
-            f.setPixelSize(round(s * 0.82))
-            pr.setFont(f)
-            pr.setPen(QColor(color))
-            g = glyph + "︎"
-            # Centre by the glyph's actual ink bounds, not the font's
-            # ascent/descent box - emoji glyphs carry uneven top/bottom bearing
-            # that otherwise pushes the icon visibly low against the label.
-            fm = QFontMetricsF(f)
-            br = fm.tightBoundingRect(g)
-            x = (s - br.width()) / 2.0 - br.x()
-            y = (s - br.height()) / 2.0 - br.y()
-            pr.drawText(QPointF(x, y), g)
-            pr.end()
-            icon.addPixmap(pm, QIcon.Mode.Normal, state)
+        icon.addPixmap(self._glyph_pixmap(glyph, s, P["text2"]),
+                       QIcon.Mode.Normal, QIcon.State.Off)
+        icon.addPixmap(self._glyph_pixmap(glyph, s, "#FFFFFF"),
+                       QIcon.Mode.Normal, QIcon.State.On)
         return icon
+
+    def _apply_cat_search_icon(self) -> None:
+        """(Re)paint the category-search 🔍 as a dead-centred icon in the theme's
+        muted tone. A plain QToolButton text emoji sits shoved to the top-left of
+        its hover square; an ink-centred icon fixes that and re-tints on theme
+        change."""
+        if not hasattr(self, "cat_search_btn"):
+            return
+        self.cat_search_btn.setIcon(
+            QIcon(self._glyph_pixmap("🔍", 14, P["text2"])))
+        self.cat_search_btn.setIconSize(QSize(14, 14))
 
     def _apply_nav_icons(self) -> None:
         """(Re)build every nav button's icon in the current theme tones. Called
@@ -1775,6 +1791,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             s = 22 if key in ("live", "vod", "series") else 19
             b.setIcon(self._nav_icon(self._rail_glyphs[key], s))
             b.setIconSize(QSize(s, s))
+        self._apply_cat_search_icon()   # re-tint 🔍 to the new theme's muted tone
 
     def _on_library_toggle(self, collapsed: bool) -> None:
         """Fold the Library group (Favorites..History) away behind its
