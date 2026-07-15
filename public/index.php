@@ -266,12 +266,9 @@ foreach ($shots as [$file, $alt, $title, $cap]):
           <a class="dl<?= $m['rec'] ? ' rec' : '' ?>" href="<?= h($dlHref) ?>" rel="nofollow"<?= !empty($a['sha256']) ? ' title="SHA-256: ' . h($a['sha256']) . '"' : '' ?>>
             <span class="meta">
               <span class="name"><?= h($m['title']) ?><?php if ($m['rec']): ?> <span class="badge">Recommended</span><?php endif; ?></span>
-              <span class="sub"><span class="arch"><?= h($m['arch']) ?></span><?= $m['fmt'] ? ' · ' . $m['fmt'] : '' ?><?= $size ? ' · ' . h($size) : '' ?></span>
+              <span class="sub"><span class="arch"><?= h($m['arch']) ?></span><?= $m['fmt'] ? ' · ' . $m['fmt'] : '' ?><?= $size ? ' · ' . h($size) : '' ?><?php if ($dlN > 0): ?> · <span class="dl-count" title="downloads">↓ <?= number_format($dlN) ?></span><?php endif; ?></span>
             </span>
-            <span class="go">
-              <span class="dl-count" title="downloads of this file">⭳ <?= number_format($dlN) ?></span>
-              <span class="go-cta">Download →</span>
-            </span>
+            <span class="go">Download →</span>
           </a>
 <?php endforeach; ?>
         </div>
