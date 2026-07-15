@@ -3,7 +3,7 @@
 (function () {
   "use strict";
   var ua = navigator.userAgent || "";
-  var os = "Linux · macOS", label = "Download for your system";
+  var os = "Linux · macOS · Windows", label = "Download for your system";
   if (/Mac/i.test(ua)) { os = "macOS"; label = "Download for macOS"; }
   else if (/Windows/i.test(ua)) { os = "Windows"; label = "Download for Windows"; }
   else if (/Linux|X11|CrOS/i.test(ua)) { os = "Linux"; label = "Download for Linux"; }

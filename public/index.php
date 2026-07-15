@@ -91,7 +91,7 @@ unset($g);
 <link rel="canonical" href="<?= h($SITE) ?>/">
 <meta name="theme-color" content="#0f1218">
 <meta name="robots" content="index,follow">
-<meta name="keywords" content="IPTV player, Xtream Codes, M3U, EPG, XMLTV, timeshift, catch-up TV, IPTV recording, Linux IPTV, macOS IPTV, dopeIPTV">
+<meta name="keywords" content="IPTV player, Xtream Codes, M3U, EPG, XMLTV, timeshift, catch-up TV, IPTV recording, Linux IPTV, macOS IPTV, Windows IPTV, dopeIPTV">
 <!-- Open Graph -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="dopeIPTV">
@@ -116,7 +116,7 @@ unset($g);
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "dopeIPTV",
-  "operatingSystem": "Linux, macOS",
+  "operatingSystem": "Linux, macOS, Windows",
   "applicationCategory": "MultimediaApplication",
   "description": <?= json_encode($DESC) ?>,
   "softwareVersion": "<?= h($version) ?>",
@@ -152,7 +152,7 @@ unset($g);
           <a class="btn primary" id="heroDownload" href="#download">Download for your system</a>
           <a class="btn ghost" href="<?= h($REPO) ?>">View source</a>
         </div>
-        <p class="platnote"><b id="osLabel">Linux · macOS</b> — free &amp; open source</p>
+        <p class="platnote"><b id="osLabel">Linux · macOS · Windows</b> — free &amp; open source</p>
       </div>
       <div class="mock" aria-hidden="true">
         <div class="titlebar"><span class="tl-dot"></span><span class="tl-dot"></span><span class="tl-dot"></span></div>
