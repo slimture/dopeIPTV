@@ -4233,10 +4233,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._set_status(tr("ts_archive_unavailable"), error=True)
         lp = getattr(self, "_last_playback", None)
         if lp and lp.get("item"):
-            # Only unmark the channel when this was a shallow request; a deep
-            # (near-limit) request coming back as live just means that depth
-            # isn't served, not that the channel has no catch-up.
-            if getattr(self, "_ts_allow_mark_broken", True):
+            # This URL played but is the live feed, not a seekable archive. Hide
+            # the channel's catch-up unless the request sat right at the depth
+            # limit (clamped) - that only means the oldest edge isn't kept, not
+            # that the archive is fake. A within-depth request served live is a
+            # fake archive at a point a real one would serve, so mark it broken.
+            # (A picked programme never unmarks: its URL can fail on a channel
+            # whose plain archive is fine.)
+            if (not getattr(self, "_ts_last_clamped", False)
+                    and not getattr(self, "_ts_catchup_program", False)):
                 self._mark_ts_broken(lp["item"])
             self.play_live_channel(lp["item"])
 

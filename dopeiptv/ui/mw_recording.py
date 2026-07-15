@@ -871,6 +871,11 @@ class _RecordingMixin:
         clamped = start < floor - 1
         start = max(start, floor)
         requested_back_min = (now - start) / 60.0
+        # Carried to _verify_catchup: a *within-depth* (un-clamped) request that
+        # plays but turns out to be the live feed (not seekable) is a fake
+        # archive at a point a real one would serve, so it may be hidden - only a
+        # request right at the depth limit is spared (that depth just isn't kept).
+        self._ts_last_clamped = clamped
         if prog:
             duration_min = max(
                 1, int((prog["stop_timestamp"] - start) // 60) + 2)
@@ -906,9 +911,6 @@ class _RecordingMixin:
         # the channel is marked as having no working catch-up and the user just
         # gets a status message, with no stutter.
         self._flash_status(tr("ts_checking"))
-        # Carried to _verify_catchup so a deep request that comes back as live
-        # (not seekable) also can't unmark a channel that works closer to live.
-        self._ts_allow_mark_broken = allow_mark_broken
         probe_token = getattr(self, "_ts_probe_token", 0) + 1
         self._ts_probe_token = probe_token
 
@@ -934,6 +936,14 @@ class _RecordingMixin:
                             self._play_timeshift(it, back_min=nxt,
                                                  _depth_retry=True)
                             return
+                        # Walked the retry chain all the way down to the
+                        # shallowest step (30 min) and even that serves no
+                        # archive: the provider advertises catch-up it doesn't
+                        # actually have. Hide it, same as a shallow failure -
+                        # 30 min back is well within any real archive, so this
+                        # can't wrongly hide a channel that only has a shallow
+                        # window (that path returns a URL and never gets here).
+                        self._mark_ts_broken(it)
                 self._flash_status(tr("ts_archive_unavailable"), ms=6000)
                 # The live video never stopped. Restore the live timeline (not
                 # plain live) so the user can still scrub to a shallower point
