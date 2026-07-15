@@ -652,6 +652,23 @@ class _SettingsMixin:
 
         ts_reset_btn.clicked.connect(reset_ts)
 
+        maint_btns = [shortcuts_btn, clear_cache_btn, ts_reset_btn]
+        # Portable Windows build: let the user add Start-menu/desktop shortcuts
+        # so it feels installed. Each is just a .lnk file (no registry), easy
+        # to delete. Hidden on Linux/macOS, which have their own launchers.
+        if sys.platform == "win32":
+            win_sc_btn = QPushButton(tr("win_shortcut_btn"))
+            win_sc_btn.setToolTip(tr("win_shortcut_hint"))
+
+            def _make_win_shortcut() -> None:
+                from ..core.platform_windows import create_shortcut
+                made = create_shortcut()
+                self._flash_status(tr("win_shortcut_done") if made
+                                   else tr("win_shortcut_fail"))
+
+            win_sc_btn.clicked.connect(_make_win_shortcut)
+            maint_btns.append(win_sc_btn)
+
         maint_lbl = QLabel(tr("sec_maintenance"))
         maint_lbl.setStyleSheet(
             f"color:{P['accent']}; font-size:10px; font-weight:700;"
@@ -659,7 +676,7 @@ class _SettingsMixin:
         uf.addRow(maint_lbl)
         btn_row = QHBoxLayout()
         btn_row.setSpacing(8)
-        for b in (shortcuts_btn, clear_cache_btn, ts_reset_btn):
+        for b in maint_btns:
             b.setSizePolicy(QSizePolicy.Policy.Expanding,
                             QSizePolicy.Policy.Fixed)
             btn_row.addWidget(b)

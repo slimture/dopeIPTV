@@ -6317,6 +6317,32 @@ _STRINGS: dict[str, dict[str, str]] = {
         "de": "Wartung", "fr": "Maintenance", "zh": "维护",
         "ru": "Обслуживание", "th": "การบำรุงรักษา",
     },
+    "win_shortcut_btn": {
+        "en": "Create shortcut", "sv": "Skapa genväg", "es": "Crear acceso directo",
+        "de": "Verknüpfung erstellen", "fr": "Créer un raccourci", "zh": "创建快捷方式",
+        "ru": "Создать ярлык", "th": "สร้างทางลัด",
+    },
+    "win_shortcut_hint": {
+        "en": "Add dopeIPTV to the Start menu and desktop",
+        "sv": "Lägg till dopeIPTV på Start-menyn och skrivbordet",
+        "es": "Añadir dopeIPTV al menú Inicio y al escritorio",
+        "de": "dopeIPTV zum Startmenü und Desktop hinzufügen",
+        "fr": "Ajouter dopeIPTV au menu Démarrer et au bureau",
+        "zh": "将 dopeIPTV 添加到开始菜单和桌面",
+        "ru": "Добавить dopeIPTV в меню «Пуск» и на рабочий стол",
+        "th": "เพิ่ม dopeIPTV ไปยังเมนู Start และเดสก์ท็อป",
+    },
+    "win_shortcut_done": {
+        "en": "Shortcut created", "sv": "Genväg skapad", "es": "Acceso directo creado",
+        "de": "Verknüpfung erstellt", "fr": "Raccourci créé", "zh": "已创建快捷方式",
+        "ru": "Ярлык создан", "th": "สร้างทางลัดแล้ว",
+    },
+    "win_shortcut_fail": {
+        "en": "Couldn't create shortcut", "sv": "Kunde inte skapa genväg",
+        "es": "No se pudo crear el acceso directo", "de": "Verknüpfung fehlgeschlagen",
+        "fr": "Échec de la création du raccourci", "zh": "无法创建快捷方式",
+        "ru": "Не удалось создать ярлык", "th": "สร้างทางลัดไม่สำเร็จ",
+    },
     "ts_reset_channel": {
         "en": "Reset timeshift for this channel",
         "sv": "Återställ timeshift för den här kanalen",

@@ -92,6 +92,55 @@ class WakeLockWindows:
         self._held = False
 
 
+def create_shortcut(desktop: bool = True, start_menu: bool = True,
+                    name: str = "dopeIPTV") -> list[str]:
+    """Create .lnk shortcuts to the running exe (Start menu and/or desktop),
+    so the portable build feels installed without an installer. Returns the
+    shortcut paths created. A no-op returning [] off Windows or from a source
+    run. Uses PowerShell's WScript.Shell COM, so it needs no extra dependency
+    and writes nothing to the registry - each shortcut is a single file the
+    user can delete."""
+    if sys.platform != "win32" or not getattr(sys, "frozen", False):
+        return []
+    import subprocess
+
+    exe = sys.executable
+    workdir = os.path.dirname(exe)
+    targets = []
+    if start_menu and os.environ.get("APPDATA"):
+        targets.append(os.path.join(
+            os.environ["APPDATA"], "Microsoft", "Windows", "Start Menu",
+            "Programs", f"{name}.lnk"))
+    if desktop and os.environ.get("USERPROFILE"):
+        targets.append(os.path.join(
+            os.environ["USERPROFILE"], "Desktop", f"{name}.lnk"))
+
+    def _q(s: str) -> str:                 # PowerShell single-quote escaping
+        return s.replace("'", "''")
+
+    made: list[str] = []
+    for lnk in targets:
+        try:
+            os.makedirs(os.path.dirname(lnk), exist_ok=True)
+            ps = (
+                "$w=New-Object -ComObject WScript.Shell;"
+                f"$s=$w.CreateShortcut('{_q(lnk)}');"
+                f"$s.TargetPath='{_q(exe)}';"
+                f"$s.WorkingDirectory='{_q(workdir)}';"
+                f"$s.IconLocation='{_q(exe)},0';"
+                "$s.Save()"
+            )
+            subprocess.run(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+                creationflags=0x08000000,   # CREATE_NO_WINDOW - no console flash
+                timeout=15, check=True,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            made.append(lnk)
+        except Exception:
+            pass
+    return made
+
+
 def libmpv_install_hint() -> str:
     """User-facing hint when libmpv can't be loaded (dev runs without the DLL)."""
     return ("mpv-2.dll was not found. The installer bundles it; for a source "
