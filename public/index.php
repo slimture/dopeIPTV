@@ -17,6 +17,16 @@ $assets  = $rel['assets'] ?? [];
 $relDate = !empty($rel['published_at']) ? date('M j, Y', strtotime($rel['published_at'])) : '';
 function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
+// Per-file download tallies, written by dl.php (the /dl.php?f=NAME redirector
+// every download link goes through). Kept one level above the web root so it's
+// neither web-served nor pruned by the release sync. Missing/unreadable -> no
+// counts shown and the page still works.
+$dlCounts = @json_decode(@file_get_contents(dirname(__DIR__) . '/downloads.json'), true);
+if (!is_array($dlCounts)) { $dlCounts = []; }
+function dl_count(array $counts, string $name): int {
+    return (int)($counts[$name] ?? 0);
+}
+
 /**
  * Plain-language download metadata derived from the asset filename, so the
  * page can group by OS and say clearly what each file is and which CPU it's
@@ -249,13 +259,19 @@ foreach ($shots as [$file, $alt, $title, $cap]):
           $m = $a['_m'];
           $size = '';
           if (preg_match('/([\d.]+\s?(?:KB|MB|GB|B))\s*$/i', $a['sub'] ?? '', $mm)) { $size = $mm[1]; }
+          $dlName = (string)($a['name'] ?? '');
+          $dlHref = $dlName !== '' ? '/dl.php?f=' . rawurlencode($dlName) : ($a['url'] ?? '#');
+          $dlN = dl_count($dlCounts, $dlName);
 ?>
-          <a class="dl<?= $m['rec'] ? ' rec' : '' ?>" href="<?= h($a['url']) ?>" rel="nofollow"<?= !empty($a['sha256']) ? ' title="SHA-256: ' . h($a['sha256']) . '"' : '' ?>>
+          <a class="dl<?= $m['rec'] ? ' rec' : '' ?>" href="<?= h($dlHref) ?>" rel="nofollow"<?= !empty($a['sha256']) ? ' title="SHA-256: ' . h($a['sha256']) . '"' : '' ?>>
             <span class="meta">
               <span class="name"><?= h($m['title']) ?><?php if ($m['rec']): ?> <span class="badge">Recommended</span><?php endif; ?></span>
               <span class="sub"><span class="arch"><?= h($m['arch']) ?></span><?= $m['fmt'] ? ' · ' . $m['fmt'] : '' ?><?= $size ? ' · ' . h($size) : '' ?></span>
             </span>
-            <span class="go">Download →</span>
+            <span class="go">
+              <span class="dl-count" title="downloads of this file">⭳ <?= number_format($dlN) ?></span>
+              <span class="go-cta">Download →</span>
+            </span>
           </a>
 <?php endforeach; ?>
         </div>

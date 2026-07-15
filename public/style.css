@@ -152,7 +152,11 @@ h2 { font-size: clamp(1.7rem, 3.6vw, 2.3rem); letter-spacing: -.02em; margin: 0;
 .badge { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
   color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
   background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 999px; padding: 1px 7px; }
-.dl .go { margin-left: auto; color: var(--accent); font-weight: 600; font-size: 14px; white-space: nowrap; }
+.dl .go { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 3px;
+  color: var(--accent); font-weight: 600; font-size: 14px; white-space: nowrap; }
+.dl .go .go-cta { color: var(--accent); }
+.dl .go .dl-count { font-size: 12px; font-weight: 600; color: var(--muted);
+  font-variant-numeric: tabular-nums; letter-spacing: .01em; }
 .autonote { margin-top: 18px; font-size: 13px; color: var(--faint); line-height: 1.75; }
 .autonote code { font-family: var(--mono); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; color: var(--muted); overflow-wrap: anywhere; }
 .autonote a.verify-link { color: var(--accent); font-weight: 600; }
