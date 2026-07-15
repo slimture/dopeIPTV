@@ -49,6 +49,26 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.7.2" date="2026-07-15">
+      <description>
+        <p>Windows joins Linux and macOS, plus timeshift and UI fixes.</p>
+        <ul>
+          <li>A portable Windows x64 build (unzip and run, no installer), and a fix for a crash on exit in the windowed build</li>
+          <li>Channels that advertise catch-up but don't actually serve it now hide the timeshift affordance instead of leaving a dead rewind button and seek bar behind an "archive unavailable" message</li>
+          <li>The category search magnifier now sits centred in its button</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.7.1" date="2026-07-14">
+      <description>
+        <p>A UI/UX polish release: a redesigned, responsive left panel and a calmer timeshift player.</p>
+        <ul>
+          <li>Redesigned left panel with icons and a collapsible Library group; a layout that never overflows or overlaps at any window size</li>
+          <li>The timeshift timeline auto-hides after a few idle seconds and reappears on interaction</li>
+          <li>Accent colours follow your chosen theme everywhere, including the middle-column progress bar and playing highlights</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.7.0" date="2026-07-14">
       <description>
         <p>Timeshift and catch-up TV, a reminders manager, search everywhere, and rock-solid playback.</p>
