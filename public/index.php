@@ -54,11 +54,13 @@ function dl_meta(string $name): array {
 
 // Group the release assets by OS so the list reads as "pick your system,
 // then your CPU" instead of a flat jumble of two .debs and two AppImages.
-$osOrder = ['Windows', 'macOS', 'Linux', 'Other'];
+// Linux first - it's the focus of this release; Windows last (newest, still
+// finding its feet).
+$osOrder = ['Linux', 'macOS', 'Windows', 'Other'];
 $osHelp  = [
     'Linux'   => 'Not sure? Get the <b>AppImage</b> — it runs on any distribution with no install. Choose <b>.deb</b> on Debian/Ubuntu. Pick <b>Intel / AMD</b> unless you\'re on an ARM machine (Raspberry Pi, ARM server).',
     'macOS'   => 'One image works on both Apple Silicon (M-series) and Intel Macs.',
-    'Windows' => 'Portable build — unzip and run, nothing to install.',
+    'Windows' => 'Portable build — unzip and run, nothing to install. Newest platform, still being polished.',
 ];
 $groups = [];
 foreach ($assets as $a) {
@@ -267,12 +269,16 @@ foreach ($shots as [$file, $alt, $title, $cap]):
       </div>
 <?php endif; ?>
 <?php
-      $hasWindows = false;
+      $hasMac = false; $hasWindows = false;
       foreach ($assets as $a) {
-          $hay = strtolower(($a['label'] ?? '') . ' ' . ($a['sub'] ?? ''));
-          if (($a['icon'] ?? '') === '🪟' || str_contains($hay, 'windows')) { $hasWindows = true; break; }
+          $nm = strtolower($a['name'] ?? '');
+          if (($a['icon'] ?? '') === '🍎' || str_ends_with($nm, '.dmg') || str_ends_with($nm, '.pkg') || str_contains($nm, 'macos')) { $hasMac = true; }
+          if (($a['icon'] ?? '') === '🪟' || str_contains($nm, 'win')) { $hasWindows = true; }
       }
-      if ($hasWindows): ?>
+      if ($hasMac): ?>
+      <p class="autonote">🍎 On macOS, open the <code>.dmg</code> and drag dopeIPTV to Applications. Because the app isn't notarized by Apple yet, the first launch may be blocked — <b>right-click the app → Open</b>, then <b>Open</b> in the dialog (or allow it under <b>System Settings → Privacy &amp; Security → Open Anyway</b>). If macOS instead says the app is <b>“damaged”</b>, clear the download flag in Terminal: <code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code>. It's safe — the warning only means the build isn't code-signed.</p>
+<?php endif; ?>
+<?php if ($hasWindows): ?>
       <p class="autonote">🪟 On Windows, unzip the folder and run <code>dopeiptv.exe</code>. Because the app isn't code-signed yet, SmartScreen may show <b>“Windows protected your PC”</b> — click <b>More info → Run anyway</b>. It's only a warning, nothing is blocked or removed.</p>
 <?php endif; ?>
       <p class="autonote">↻ Generated on the server from the <code>slimture/dopeIPTV</code> GitHub releases — new builds appear automatically.</p>
