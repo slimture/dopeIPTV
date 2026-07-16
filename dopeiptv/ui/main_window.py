@@ -1904,6 +1904,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.player.set_fullscreen_ui(True)
         self._update_provider_hint()   # tuck the '+ Add provider' hint away
         self._was_fullscreen = self.isFullScreen()
+        # Remember if the window was maximized/zoomed and its exact geometry, so
+        # leaving video-fullscreen restores that state instead of shrinking to
+        # the pre-maximize size. showNormal() alone drops the maximized state
+        # (reported on macOS: a maximized window shrinks after video fullscreen).
+        self._was_maximized = self.isMaximized()
+        if not self._was_fullscreen:
+            self._pre_fs_geo = self.geometry()
         self.showFullScreen()
 
     def _on_escape(self) -> None:
@@ -1933,7 +1940,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._det.setStyleSheet("")
         self.menuBar().show()
         if not getattr(self, "_was_fullscreen", False):
-            self.showNormal()
+            if getattr(self, "_was_maximized", False):
+                # Re-zoom to the maximized state it had before going fullscreen.
+                self.showMaximized()
+            else:
+                self.showNormal()
+                # Deterministically restore the exact windowed size/position -
+                # a manually-enlarged window otherwise comes back smaller.
+                geo = getattr(self, "_pre_fs_geo", None)
+                if geo is not None:
+                    self.setGeometry(geo)
         # Restore the window geometry *before* unlocking the video's
         # fixed height - _lock_video_box() reads the player's current
         # size, and computing it while the window is still fullscreen-
