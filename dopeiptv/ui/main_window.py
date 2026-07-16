@@ -796,19 +796,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._reopen_btn.hide()
 
         self.player: EmbeddedPlayer | None = None
-        # Player engine is selectable (Settings -> Playback). Default is mpv;
-        # the libVLC backend is an experimental opt-in that falls back to mpv
-        # when python-vlc / libVLC isn't available, so the mpv path is never
-        # disturbed for the default case.
-        _engine = str(self.settings.value("player_engine", "mpv") or "mpv").lower()
-        if _engine == "vlc":
-            from ..media.vlc_embedded import (
-                VlcEmbeddedPlayer, vlc_playback_supported)
-            if vlc_playback_supported():
-                self.player = VlcEmbeddedPlayer(settings=self.settings)
-        if self.player is None and embedded_playback_supported():
+        if embedded_playback_supported():
             self.player = EmbeddedPlayer(settings=self.settings)
-        if self.player is not None:
             self.player.hide()
             self.player.fs_btn.clicked.connect(self._toggle_player_fullscreen)
             self.player.double_clicked.connect(self._toggle_player_fullscreen)
