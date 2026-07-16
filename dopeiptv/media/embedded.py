@@ -1154,24 +1154,19 @@ class EmbeddedPlayer(QWidget):
             return
         self.playback_error.emit(msg)
 
-    def _popout_frameless(self) -> bool:
-        return bool(self.window().windowFlags()
-                    & Qt.WindowType.FramelessWindowHint)
-
     def _on_video_press(self, event) -> None:
-        if not self._popout_mode:
+        if not self._popout_mode or self._fs_ui:
             # Docked / fullscreen: the video has no special press handling.
             return
         if event.button() == Qt.MouseButton.RightButton:
             # Detached window: right-click opens its context menu.
             self.popout_context_menu.emit(event.globalPosition().toPoint())
             return
-        if (event.button() == Qt.MouseButton.LeftButton
-                and self._popout_frameless()):
-            # No title bar to grab, so arm a drag-to-move from the video. The
-            # move only starts once the pointer has actually moved (see
-            # _on_video_move), so a plain click / double-click still toggles
-            # fullscreen instead of dragging.
+        if event.button() == Qt.MouseButton.LeftButton:
+            # Drag the video to move the pop-out window - works with or without
+            # a title bar. The move only starts once the pointer has actually
+            # moved (see _on_video_move), so a plain click / double-click still
+            # toggles fullscreen instead of dragging.
             self._popout_drag_from = event.position().toPoint()
 
     def _on_video_move(self, event) -> None:
