@@ -127,6 +127,12 @@ class _PopoutMixin:
         ph = getattr(self, "_popout_placeholder", None)
         if ph is not None:
             self._det.layout().removeWidget(ph)
+            # Detach from the detail pane *synchronously* (not just deleteLater):
+            # PiP/fullscreen entry scans self._det.children() and would otherwise
+            # grab this not-yet-deleted placeholder, hide it, then crash on
+            # w.show() once deleteLater finally removes it.
+            ph.hide()
+            ph.setParent(None)
             ph.deleteLater()
             self._popout_placeholder = None
         win.deleteLater()
