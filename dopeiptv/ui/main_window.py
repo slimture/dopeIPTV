@@ -260,6 +260,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         QTimer.singleShot(0, self._restore_splitter_state)
         self._show_busy(tr("status_loading_channels"))
         QTimer.singleShot(100, self._load_categories)
+        # Learn which Browse modes this provider actually has, then hide the
+        # empty ones (deferred so the visible category load goes first).
+        QTimer.singleShot(150, self._refresh_mode_availability)
         # Cross-device sync of watched movies/episodes from Trakt. Deferred
         # so the initial category/EPG traffic goes first - the sync runs
         # for the full account which can take a couple of seconds.
@@ -371,6 +374,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         }
         self._nav_texts: dict[str, str] = {}
         self.nav_btns: dict[str, QPushButton] = {}
+        # Browse-mode availability per active provider (see
+        # _refresh_mode_availability): hides TV/Movies/Series a provider has no
+        # content for. Empty/unknown = shown, so nothing hides until we KNOW.
+        self._avail_gen = 0
+        self._mode_avail: dict[str, bool] = {}
 
         def _make_nav(key: str, text: str, into, primary: bool = False) -> None:
             b = QPushButton(text, objectName="NavBtn")
@@ -2205,6 +2213,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._busy_epg_msg = tr("status_refreshing_playlist")
         self._show_busy(tr("status_refreshing_playlist"))
         self._load_categories()
+        # New/refreshed provider: re-learn which Browse modes it has and hide
+        # the empty ones (Browse nav is shown by default until this resolves).
+        self._refresh_mode_availability()
         run_async(
             self.pool, lambda: self.xmltv.ensure_loaded(force=True),
             lambda ok: (self._epg_progress_finished(),
@@ -2303,6 +2314,59 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # history (respects the 1 h TTL, so it's a no-op if just synced).
         if mode == "watched":
             self._maybe_sync_watched()
+
+    def _refresh_mode_availability(self) -> None:
+        """Hide a Browse mode (TV/Movies/Series) the active provider has no
+        content for, so a live-only (or VOD-only) provider doesn't show empty
+        sections. TV/Movies/Series are the Xtream API's three fixed types, so we
+        probe each type's category list in the background; an empty list hides
+        that mode. Fail-open: a probe that errors (or an all-empty result) leaves
+        every mode shown, so a transient hiccup or an uncategorised provider
+        never blanks a working section. Purely nav visibility - no effect on
+        playback or the mpv/VLC player."""
+        if not self.client:
+            return
+        self._avail_gen += 1
+        gen = self._avail_gen
+        self._mode_avail = {}
+        # Start from all-visible so a mode hidden for the previous provider
+        # doesn't linger while the new provider's probes are in flight.
+        for m in ("live", "vod", "series"):
+            if m in self.nav_btns:
+                self.nav_btns[m].setVisible(True)
+        fns = {"live": getattr(self.client, "live_categories", None),
+               "vod": getattr(self.client, "vod_categories", None),
+               "series": getattr(self.client, "series_categories", None)}
+        for key, fn in fns.items():
+            if fn is None:
+                continue   # client doesn't offer this type -> leave it shown
+            def done(cats, key=key, gen=gen):
+                if gen != self._avail_gen:
+                    return   # a newer provider/refresh superseded this probe
+                self._mode_avail[key] = bool(cats)
+                self._apply_mode_visibility()
+            run_async(self.pool, fn, done, lambda _e: None)
+
+    def _apply_mode_visibility(self) -> None:
+        modes = ("live", "vod", "series")
+        known = {m: self._mode_avail.get(m) for m in modes}
+        # Fail open until we know at least one mode has content, so an all-empty
+        # result (e.g. an auth glitch) never hides the whole Browse group.
+        if not any(v is True for v in known.values()):
+            for m in modes:
+                if m in self.nav_btns:
+                    self.nav_btns[m].setVisible(True)
+            return
+        for m in modes:
+            if m in self.nav_btns:
+                # Hide only on a definite empty (False); unknown (None) stays.
+                self.nav_btns[m].setVisible(known[m] is not False)
+        # If the mode you're on just got hidden, move to the first visible one.
+        if self.mode in modes and known[self.mode] is False:
+            for m in modes:
+                if known[m] is not False:
+                    self.switch_mode(m)
+                    break
 
     def _load_categories(self) -> None:
         self._load_gen += 1
