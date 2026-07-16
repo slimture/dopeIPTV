@@ -3,18 +3,13 @@
 from __future__ import annotations
 
 import hashlib
-import os
 import re
-import sys
 import time
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Callable
 
-# DOPEIPTV_IMG_DEBUG=1 traces every image decision (RAM/disk/network
-# hit, HTTP status, decode failure, dead-marking) to stderr - the
-# support tool for "covers aren't loading" reports.
-_IMG_DEBUG = bool(os.environ.get("DOPEIPTV_IMG_DEBUG"))
+from .log import log
 
 # A browser-style User-Agent for image fetches. python-requests'
 # default UA gets rejected outright by several image hosts the IPTV
@@ -31,8 +26,10 @@ _IMG_HEADERS = {
 
 
 def _img_dbg(msg: str) -> None:
-    if _IMG_DEBUG:
-        print(f"[dopeIPTV:img] {msg}", file=sys.stderr, flush=True)
+    # Verbose image-pipeline trace (RAM/disk/network hit, HTTP status, decode
+    # failure, dead-marking), shown with DOPEIPTV_LOG=debug - the support tool
+    # for "covers aren't loading" reports.
+    log.debug("[img] %s", msg)
 
 
 # A TMDB poster/backdrop path embedded in a provider image URL. Many

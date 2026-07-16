@@ -6,24 +6,20 @@ from __future__ import annotations
 import json
 import os
 import re
-import sys
 from typing import Callable
 
 import requests
 from PyQt6.QtCore import QObject, QSettings, QThreadPool, QTimer
 
 
+from ..core.log import log
 from ..core.workers import run_async
-
-# Same env switch as the image loader: DOPEIPTV_IMG_DEBUG=1 traces
-# every TMDB title resolution (query used, match / no-match / error)
-# to stderr so cover problems can be diagnosed from a user log.
-_TMDB_DEBUG = bool(os.environ.get("DOPEIPTV_IMG_DEBUG"))
 
 
 def _tmdb_dbg(msg: str) -> None:
-    if _TMDB_DEBUG:
-        print(f"[dopeIPTV:tmdb] {msg}", file=sys.stderr, flush=True)
+    # Verbose TMDB title-resolution trace (query, match/no-match/error), shown
+    # with DOPEIPTV_LOG=debug so cover problems can be diagnosed from a log.
+    log.debug("[tmdb] %s", msg)
 
 
 def bundled_tmdb_key() -> str:

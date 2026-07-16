@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import QMessageBox
 
 from ..i18n import tr
 
+from ..core.log import log
 from ..core.player_exec import find_player_executable
 
 _libmpv_error: str | None = None
@@ -280,8 +281,8 @@ class MpvWindowPlayer(QObject):
                 m.play(url)
                 return True
             except Exception as e:
-                print(f"[dopeIPTV] mpv window playback failed: "
-                     f"{type(e).__name__}: {e}", file=sys.stderr)
+                log.error("mpv window playback failed: %s: %s",
+                          type(e).__name__, e)
                 self._mpv = None
         return False
 
@@ -291,8 +292,8 @@ class MpvWindowPlayer(QObject):
         try:
             self._mpv.fullscreen = not self._mpv.fullscreen
         except Exception as e:
-            print(f"[dopeIPTV] mpv fullscreen toggle failed: "
-                 f"{type(e).__name__}: {e}", file=sys.stderr)
+            log.warning("mpv fullscreen toggle failed: %s: %s",
+                        type(e).__name__, e)
 
     def is_active(self) -> bool:
         return self._mpv is not None

@@ -10,6 +10,7 @@ import shutil
 import time
 from ..providers.client import b64, epg_times
 from ..i18n import tr
+from ..core.log import log
 from ..core.recording import format_size, safe_filename
 from .theme import P
 from ..core.workers import run_async
@@ -896,11 +897,9 @@ class _RecordingMixin:
             sid, datetime.fromtimestamp(start), duration_min)
         if not urls:
             return
-        if os.environ.get("DOPEIPTV_TS_DEBUG"):
-            import sys
-            print(f"[dopeIPTV][ts] probe back_min={back_min} prog={bool(prog)} "
-                  f"days={days} start={datetime.fromtimestamp(start)} "
-                  f"candidates={urls}", file=sys.stderr)
+        log.debug("[ts] probe back_min=%s prog=%s days=%s start=%s "
+                  "candidates=%s", back_min, bool(prog), days,
+                  datetime.fromtimestamp(start), urls)
         name = self.channel_display_name(it)
         title = (f"{what} ({name}, timeshift)" if what
                  else f"{name} (timeshift)")

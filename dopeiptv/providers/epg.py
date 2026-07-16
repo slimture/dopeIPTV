@@ -5,7 +5,6 @@ from __future__ import annotations
 import gzip
 import io
 import pickle
-import sys
 import threading
 import time
 import xml.etree.ElementTree as ET
@@ -18,6 +17,7 @@ from typing import Callable
 import requests
 from PyQt6.QtCore import QStandardPaths
 
+from ..core.log import log
 from .client import XtreamClient
 
 
@@ -259,8 +259,7 @@ class XmltvGuide:
                     self._write_index()
                 self._loaded = True
                 self._failed = False
-                print(f"[dopeIPTV] EPG loaded from {source} "
-                      f"({len(data) // 1024} KB)", file=sys.stderr)
+                log.info("EPG loaded from %s (%d KB)", source, len(data) // 1024)
             except Exception:
                 self._failed = self._loaded is False
             return self._loaded

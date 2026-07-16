@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
     QToolTip, QVBoxLayout, QWidget, QPushButton,
 )
 
+from ..core.log import log
 from ..i18n import tr
 from .players import _libmpv, _register_error_callback
 from ..ui.theme import P
@@ -257,12 +258,10 @@ class _MpvGLWidget(QOpenGLWidget):
         glctx = QOpenGLContext.currentContext()
         if glctx is not None:
             v = glctx.format().version()
-            print(f"[dopeIPTV] GL context: {v[0]}.{v[1]} "
-                  f"profile={glctx.format().profile().name}",
-                  file=sys.stderr)
+            log.info("GL context: %s.%s profile=%s", v[0], v[1],
+                     glctx.format().profile().name)
         else:
-            print("[dopeIPTV] WARNING: no GL context in initializeGL",
-                  file=sys.stderr)
+            log.warning("no GL context in initializeGL")
         # If mpv already exists, this is a *repeat* initializeGL - the window's
         # GL context was recreated (e.g. the compositor reparented the window
         # while dragging it, or it moved to another monitor). Do NOT rebuild:
@@ -271,8 +270,7 @@ class _MpvGLWidget(QOpenGLWidget):
         # Keep the existing instance; paintGL already tolerates a stale context
         # by drawing a black frame until it settles.
         if self.mpv is not None:
-            print("[dopeIPTV] initializeGL re-entered; keeping existing mpv",
-                  file=sys.stderr)
+            log.info("initializeGL re-entered; keeping existing mpv")
             return
         # Building the mpv render context can fail hard on a weak or
         # software-only GL stack (typically a VM with no GPU acceleration).
@@ -284,13 +282,13 @@ class _MpvGLWidget(QOpenGLWidget):
         # targets (with a GPU) never hit this path.
         try:
             self._build_mpv_render()
-            print("[dopeIPTV] Render context ready", file=sys.stderr)
+            log.info("Render context ready")
         except Exception as e:
             self._ctx = None
             self.mpv = None
             self._gl_init_error = f"{type(e).__name__}: {e}"
-            print(f"[dopeIPTV] embedded GL init failed, in-app video "
-                  f"disabled: {self._gl_init_error}", file=sys.stderr)
+            log.error("embedded GL init failed, in-app video disabled: %s",
+                      self._gl_init_error)
             # Defer the toast so it fires after the window is up, not from
             # inside the GL callback.
             QTimer.singleShot(1500, lambda: self.playback_error.emit(
@@ -300,7 +298,7 @@ class _MpvGLWidget(QOpenGLWidget):
         # vo=libmpv is mandatory for the render API and exists in every
         # libmpv build - create the instance with just that (plus a quiet
         # terminal), then apply the rest tolerantly below.
-        print("[dopeIPTV] Creating mpv instance...", file=sys.stderr)
+        log.info("Creating mpv instance...")
         self.mpv = _libmpv.MPV(vo="libmpv", terminal=False)
         # Best-effort options. Some minimal libmpv builds (notably the one
         # compiled inside our Flatpak) don't implement every option - e.g.
@@ -387,10 +385,8 @@ class _MpvGLWidget(QOpenGLWidget):
             try:
                 self.mpv[key.replace("_", "-")] = val
             except Exception as e:
-                print(f"[dopeIPTV] mpv option {key!r} skipped: {e}",
-                      file=sys.stderr)
-        print("[dopeIPTV] mpv created, creating render context...",
-              file=sys.stderr)
+                log.debug("mpv option %r skipped: %s", key, e)
+        log.info("mpv created, creating render context...")
         self._proc_address_fn = _libmpv.MpvGlGetProcAddressFn(
             self._get_proc_address)
         self._ctx = _libmpv.MpvRenderContext(
@@ -446,7 +442,7 @@ class _MpvGLWidget(QOpenGLWidget):
             except Exception:
                 pass
         except Exception as e:
-            print(f"[dopeIPTV] paintGL render failed: {e}", file=sys.stderr)
+            log.debug("paintGL render failed: %s", e)
             self._blank = True
 
     def shutdown(self) -> None:
@@ -1862,8 +1858,7 @@ class EmbeddedPlayer(QWidget):
                 QTimer.singleShot(delay, self._ensure_audio_selected)
             return True
         except Exception as e:
-            print(f"[dopeIPTV] Embedded playback failed: "
-                  f"{type(e).__name__}: {e}", file=sys.stderr)
+            log.error("Embedded playback failed: %s: %s", type(e).__name__, e)
             self.current_url = None
             return False
 
@@ -2203,8 +2198,7 @@ class EmbeddedPlayer(QWidget):
         try:
             m[prop] = value
         except Exception as e:
-            print(f"[dopeIPTV] set {prop}={value} failed: {e}",
-                  file=sys.stderr)
+            log.debug("set %s=%s failed: %s", prop, value, e)
 
     def _cache_secs(self) -> int:
         try:
@@ -2407,7 +2401,7 @@ class EmbeddedPlayer(QWidget):
             m["stream-record"] = path
             return True
         except Exception as e:
-            print(f"[dopeIPTV] stream-record failed: {e}", file=sys.stderr)
+            log.error("stream-record failed: %s", e)
             return False
 
     def stop_stream_record(self) -> None:

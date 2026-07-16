@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 import threading
@@ -24,6 +25,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .. import APP_NAME, ORG, VERSION
+from ..core.log import log
 from ..core.updates import GITHUB_REPO, fetch_latest_release, is_newer
 from ..i18n import tr
 from .channel_list import (
@@ -85,10 +87,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         try:
             keep = [p.get("id") for p in playlists.items] if playlists else []
             n = prune_epg_caches(keep)
-            print(f"[dopeIPTV] EPG cache prune: kept {len(keep)} playlist(s) "
-                  f"{keep}, removed {n} orphaned file(s)", file=sys.stderr)
+            log.info("EPG cache prune: kept %d playlist(s) %s, removed %d "
+                     "orphaned file(s)", len(keep), keep, n)
         except Exception as e:
-            print(f"[dopeIPTV] EPG cache prune failed: {e}", file=sys.stderr)
+            log.warning("EPG cache prune failed: %s", e)
         self.pool = QThreadPool.globalInstance()
         # 320 px covers the biggest cell we render (xlarge grid uses a 200 px
         # logo, and a HiDPI screen doubles the pixel budget), so channel
@@ -1503,12 +1505,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return   # not paused by us, or already playing a seekable archive
         it = lp.get("item") if lp else None
         elapsed = time.time() - started
-        if os.environ.get("DOPEIPTV_TS_DEBUG"):
+        if log.isEnabledFor(logging.DEBUG):
             tv = self._timeshift_days(it) if it else 0
-            print(f"[dopeIPTV][ts] resume elapsed={elapsed:.1f} on_live={on_live} "
-                  f"ts_days={tv} catchup={self._playing_catchup} "
-                  f"tl_visible={self.player.ts_timeline.isVisible() if self.player else None}",
-                  file=sys.stderr)
+            log.debug("[ts] resume elapsed=%.1f on_live=%s ts_days=%s "
+                      "catchup=%s tl_visible=%s", elapsed, on_live, tv,
+                      self._playing_catchup,
+                      self.player.ts_timeline.isVisible()
+                      if self.player else None)
         if (it and lp.get("kind") == "live"
                 and self._timeshift_days(it) > 0 and elapsed >= 120):
             # Only a *long* pause (beyond what mpv's buffer holds) falls to the
@@ -3663,8 +3666,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 if moved:
                     shared.sync()
         except Exception as e:
-            print(f"[dopeIPTV] cache settings migration skipped: {e}",
-                  file=sys.stderr)
+            log.warning("cache settings migration skipped: %s", e)
         return cs
 
     def _open_resume_settings(self, shared: QSettings) -> QSettings:
@@ -3692,8 +3694,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 if moved:
                     shared.sync()
         except Exception as e:
-            print(f"[dopeIPTV] resume settings migration skipped: {e}",
-                  file=sys.stderr)
+            log.warning("resume settings migration skipped: %s", e)
         return rs
 
     def _save_resume_position(self) -> None:
@@ -4159,10 +4160,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # normal reconnect below (which replays the same archive url).
         if getattr(self, "_playing_catchup", False):
             pos = self.player.playback_position() if self.player else 0.0
-            if os.environ.get("DOPEIPTV_TS_DEBUG"):
-                print(f"[dopeIPTV][ts] catchup error: {msg} "
-                      f"(candidate {getattr(self, '_ts_candidate_idx', 0)}, "
-                      f"pos={pos})", file=sys.stderr)
+            log.debug("[ts] catchup error: %s (candidate %s, pos=%s)", msg,
+                      getattr(self, "_ts_candidate_idx", 0), pos)
             early = ((time.monotonic()
                       - getattr(self, "_ts_candidate_started", 0.0)) < 10
                      and (pos or 0.0) < 2)
@@ -4259,9 +4258,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         self._last_stream_error_ts = now
         self._stream_retries = getattr(self, "_stream_retries", 0) + 1
-        print(f"[dopeIPTV] live reconnect ({reason}) "
-              f"try {self._stream_retries}/{self.MAX_STREAM_RETRIES}",
-              file=sys.stderr)
+        log.info("live reconnect (%s) try %s/%s", reason, self._stream_retries,
+                 self.MAX_STREAM_RETRIES)
         self.player.current_url = None
         self._set_status(tr("status_reconnecting"), emphasis=True)
         QTimer.singleShot(300, self._retry_last_stream)
@@ -4314,10 +4312,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return   # can't tell - leave it be
         if seekable:
             return   # genuine archive segment
-        if os.environ.get("DOPEIPTV_TS_DEBUG"):
-            print(f"[dopeIPTV][ts] candidate "
-                  f"{getattr(self, '_ts_candidate_idx', 0)} played but is live "
-                  f"(not seekable)", file=sys.stderr)
+        log.debug("[ts] candidate %s played but is live (not seekable)",
+                  getattr(self, "_ts_candidate_idx", 0))
         if self._try_next_ts_candidate():
             return
         self._playing_catchup = False

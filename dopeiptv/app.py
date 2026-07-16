@@ -30,6 +30,7 @@ class _NoButtonIconsStyle(QProxyStyle):
         return super().styleHint(hint, option, widget, returnData)
 
 from . import APP_NAME, BUILD_VERSION, ORG
+from .core.log import configure_logging, log
 from .providers.client import OfflineClient, make_client
 from .ui.dialogs import PlaylistDialog
 from .ui.main_window import MainWindow
@@ -177,9 +178,10 @@ def main() -> int:
         sys.stdout = open(os.devnull, "w")
     if sys.stderr is None:
         sys.stderr = open(os.devnull, "w")
+    configure_logging()
     # One unconditional startup line so packaging smoke tests can prove
     # Python + our package imported cleanly before any GL/Qt init runs.
-    print(f"[dopeIPTV] {BUILD_VERSION} starting", file=sys.stderr, flush=True)
+    log.info("%s starting", BUILD_VERSION)
 
     if "--self-check" in sys.argv:
         # GUI-less packaging check: did the *bundled* libmpv load? This runs
@@ -193,11 +195,9 @@ def main() -> int:
         else:
             reason = embedded_playback_reason()
         if reason:
-            print(f"[dopeIPTV] self-check: embedded playback DISABLED: "
-                  f"{reason}", file=sys.stderr)
+            log.error("self-check: embedded playback DISABLED: %s", reason)
             return 1
-        print("[dopeIPTV] self-check: embedded playback OK "
-              "(bundled libmpv loaded)", file=sys.stderr)
+        log.info("self-check: embedded playback OK (bundled libmpv loaded)")
         return 0
 
     _install_crash_hooks()
@@ -206,8 +206,7 @@ def main() -> int:
     _original_msg_handler = qInstallMessageHandler(_qt_message_filter)
 
     if _libmpv is None:
-        print(f"[dopeIPTV] Embedded playback disabled: {_libmpv_error}",
-              file=sys.stderr)
+        log.warning("Embedded playback disabled: %s", _libmpv_error)
 
     if _libmpv is not None:
         os.environ.setdefault("LC_NUMERIC", "C")
@@ -249,14 +248,13 @@ def main() -> int:
     set_language(settings.value("language", "en"))
     apply_theme(settings)
     app.setStyleSheet(build_style())
-    print(f"[dopeIPTV] Qt platform: {app.platformName()}", file=sys.stderr)
+    log.info("Qt platform: %s", app.platformName())
     if _libmpv is not None:
         reason = embedded_playback_reason()
         if reason:
-            print(f"[dopeIPTV] Embedded playback disabled: {reason}",
-                  file=sys.stderr)
+            log.warning("Embedded playback disabled: %s", reason)
         else:
-            print("[dopeIPTV] Embedded playback: enabled", file=sys.stderr)
+            log.info("Embedded playback: enabled")
     store = PlaylistStore(settings)
 
     client = None
