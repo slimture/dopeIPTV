@@ -155,11 +155,13 @@ class VlcEmbeddedPlayer(QWidget):
         self.pip_btn.clicked.connect(self.pip_requested)
         self.fs_btn = QPushButton("⛶", objectName="MiniBtn")
 
-        # Present but hidden: the host reads these attributes.
+        # Present but hidden: the host reads these attributes (both the normal
+        # and the fullscreen-overlay variants of the record / timeshift buttons).
         self.rec_btn = QPushButton("●", objectName="MiniBtn")
         self.ts_btn = QPushButton("◀◀", objectName="MiniBtn")
         self.fs_rec_btn = QPushButton("●", objectName="MiniBtn")
-        for b in (self.rec_btn, self.ts_btn, self.fs_rec_btn):
+        self.fs_ts_btn = QPushButton("◀◀", objectName="MiniBtn")
+        for b in (self.rec_btn, self.ts_btn, self.fs_rec_btn, self.fs_ts_btn):
             b.hide()
         # The host repositions/reads .ts_timeline; a hidden stub is enough.
         self.ts_timeline = QWidget(self)
