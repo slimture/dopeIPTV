@@ -309,8 +309,9 @@ class XmltvGuide:
         cid = (item.get("epg_channel_id") or "").strip().lower()
         sched = self._by_id.get(cid)
         if sched is None:
-            cid = self._by_name.get(normalize_name(item.get("name")))
-            sched = self._by_id.get(cid)
+            name_cid = self._by_name.get(normalize_name(item.get("name")))
+            if name_cid is not None:
+                sched = self._by_id.get(name_cid)
         return sched
 
     @staticmethod

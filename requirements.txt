@@ -1,4 +1,4 @@
-PyQt6>=6.5
-requests>=2.28
-python-mpv>=1.0
-pychromecast>=13.0
+PyQt6>=6.5,<7
+requests>=2.28,<3
+python-mpv>=1.0,<2
+pychromecast>=13.0,<15

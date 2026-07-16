@@ -15,10 +15,13 @@ license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
 
 dependencies = [
-    "PyQt6>=6.5",
-    "requests>=2.28",
-    "python-mpv>=1.0",
-    "pychromecast>=13.0",
+    # Lower bounds = the oldest tested; upper bounds guard against a future
+    # major release changing an API out from under a build without a deliberate
+    # bump here (reproducible-ish builds without a full lockfile to maintain).
+    "PyQt6>=6.5,<7",
+    "requests>=2.28,<3",
+    "python-mpv>=1.0,<2",
+    "pychromecast>=13.0,<15",
 ]
 
 [project.scripts]
@@ -26,6 +29,24 @@ dopeiptv = "dopeiptv.app:main"
 
 [tool.setuptools.packages.find]
 include = ["dopeiptv*"]
+
+[tool.mypy]
+# Gradual typing: check the pure-logic modules first (the highest-value, most-
+# tested code, no PyQt/UI noise). follow_imports=silent means imported modules
+# are resolved for types but their own errors aren't reported, so the gate
+# stays scoped to these files. Expand `files` as more modules get typed.
+python_version = "3.11"
+ignore_missing_imports = true
+# Untyped third-party libs (requests, PyQt6, python-mpv, ...) become Any rather
+# than erroring, so the gate is deterministic without pinning stub packages -
+# our own code is still fully checked.
+disable_error_code = ["import-untyped"]
+follow_imports = "silent"
+files = [
+    "dopeiptv/providers/client.py",
+    "dopeiptv/providers/epg.py",
+    "dopeiptv/core/stores.py",
+]
 
 [tool.pytest.ini_options]
 # Only collect the real test suite. Without this, pytest also discovers

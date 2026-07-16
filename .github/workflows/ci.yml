@@ -43,10 +43,12 @@ jobs:
           python -m pip install --upgrade pip
           # Pin ruff so a future release adding rules can't turn the gate red
           # without an intentional bump here.
-          pip install "ruff==0.15.8" pytest
+          pip install "ruff==0.15.8" "mypy==1.18.2" pytest
           pip install -r requirements.txt
       - name: Ruff (lint)
         run: ruff check dopeiptv tests
+      - name: Mypy (types, scoped to the logic modules)
+        run: mypy
       - name: Pytest
         env:
           QT_QPA_PLATFORM: offscreen   # no display on the runner
