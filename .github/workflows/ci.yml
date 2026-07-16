@@ -1,0 +1,53 @@
+name: CI
+
+# Fast quality gate on every push and PR: lint (ruff) + the full pytest suite.
+# This is the green check to look at BEFORE tagging a release - it catches the
+# class of breakage (undefined names, broken imports, failing tests) that used
+# to only surface once a build ran. Kept separate from release.yml, which only
+# runs on version tags.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Cancel superseded runs on the same ref so a rapid push series doesn't queue.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-test:
+    name: Lint + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: System libraries for the PyQt6 import
+        run: |
+          # PyQt6 loads libEGL/libGL and xcb plugins at import time, so even a
+          # headless test import needs these present (mirrors the release job).
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libxkbcommon0 libxcb-cursor0 libxcb-icccm4 \
+            libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
+            libxcb-shape0 libxcb-xkb1 libpulse0 libdbus-1-3
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Pin ruff so a future release adding rules can't turn the gate red
+          # without an intentional bump here.
+          pip install "ruff==0.15.8" pytest
+          pip install -r requirements.txt
+      - name: Ruff (lint)
+        run: ruff check dopeiptv tests
+      - name: Pytest
+        env:
+          QT_QPA_PLATFORM: offscreen   # no display on the runner
+        run: pytest -q
