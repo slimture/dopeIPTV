@@ -7,7 +7,6 @@ import os
 import sys
 import threading
 import time
-from datetime import datetime
 
 from PyQt6.QtCore import (
     QEvent, QPointF, QRect, QSettings, QSize, Qt, QThreadPool,
@@ -32,7 +31,7 @@ from .channel_list import (
 )
 from ..providers.chromecast import CastDialog, ChromecastManager
 from ..providers.client import (
-    DemoClient, OfflineClient, XtreamClient, make_client,
+    DemoClient, XtreamClient, make_client,
 )
 from ..media.embedded import EmbeddedPlayer
 from ..providers.epg import XmltvGuide, epg_cache_path, prune_epg_caches
@@ -51,7 +50,6 @@ from .theme import P
 from ..providers.trakt import TraktClient
 from ..core.wakelock import WakeLock
 from .widgets import _SidebarLogo, _Toast
-from .welcome import WelcomeOverlay
 from .mw_settings import _SettingsMixin
 from .mw_trakt import _TraktMixin
 from .mw_recording import _RecordingMixin
@@ -59,10 +57,12 @@ from .mw_busy import _BusyMixin
 from .mw_context import _ContextMenuMixin
 from .mw_detail import _DetailMixin
 from .mw_nav import _NavMixin
+from .mw_onboarding import _OnboardingMixin
 from .mw_reminders import _RemindersMixin
 from .mw_search import _SearchMixin
 from .mw_shortcuts import _ShortcutsMixin
 from .mw_sidebar import _SidebarMixin
+from .mw_sort import _SortMixin
 from .mw_updates import _UpdatesMixin
 from ..core.workers import (
     LogoLoader, default_image_cache_dir, run_async)
@@ -76,7 +76,8 @@ _UNSET = object()
 class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _ContextMenuMixin, _DetailMixin, _RemindersMixin,
                  _BusyMixin, _UpdatesMixin, _SearchMixin, _SidebarMixin,
-                 _NavMixin, _ShortcutsMixin, QMainWindow):
+                 _NavMixin, _ShortcutsMixin, _OnboardingMixin, _SortMixin,
+                 QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
     epg_progress = pyqtSignal(int)
@@ -1746,7 +1747,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         streams) so the app can be tried without any credentials. Reuses the
         normal live path - the demo client just answers with a fixed channel
         list."""
-        from ..providers.client import DemoClient
         self.client = DemoClient()
         self._base_title = tr("demo_title")
         self.setWindowTitle(self._base_title)
@@ -2496,67 +2496,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         "movie": {"movie", "vod"},
         "series": {"series", "episode"},
     }
-
-    @staticmethod
-    def _sort_key_name(it):
-        return (it.get("name") or it.get("title") or "").lower()
-
-    def _sort_setting_key(self) -> str:
-        """Per-category sort key, so each category can keep its own order."""
-        return f"sort::{self.mode}::{getattr(self, '_current_cat', None)!r}"
-
-    def _current_sort_raw(self) -> str:
-        """The current category's own choice: 'global' (follow the app-wide
-        default) unless it has been overridden."""
-        return self.settings.value(self._sort_setting_key(), "global")
-
-    def _sync_sort_box(self) -> None:
-        """Point the toolbar sort dropdown at the current category's order, so
-        it never carries a stale value into _inline_view_changed (which would
-        write that order onto whatever category is showing now)."""
-        if not hasattr(self, "sort_box"):
-            return
-        self.sort_box.blockSignals(True)
-        i = self.sort_box.findData(self._current_sort_raw())
-        if i >= 0:
-            self.sort_box.setCurrentIndex(i)
-        self.sort_box.blockSignals(False)
-
-    def _current_sort_order(self) -> str:
-        """The effective sort order for the current category - its own
-        override, or the global default when it is set to follow global."""
-        raw = self._current_sort_raw()
-        if raw == "global":
-            return self.settings.value("sort_order", "default")
-        return raw
-
-    @staticmethod
-    def _recency_key(it) -> int:
-        # Newest-first key that works across views: provider "added", else the
-        # history "_watched_at" ISO timestamp.
-        a = it.get("added")
-        if a:
-            try:
-                return int(a)
-            except (TypeError, ValueError):
-                pass
-        wa = it.get("_watched_at")
-        if wa:
-            try:
-                return int(datetime.fromisoformat(wa).timestamp())
-            except (TypeError, ValueError):
-                pass
-        return 0
-
-    def _sorted(self, items: list) -> list:
-        order = self._current_sort_order()
-        if order == "alpha_asc":
-            return sorted(items, key=MainWindow._sort_key_name)
-        if order == "alpha_desc":
-            return sorted(items, key=MainWindow._sort_key_name, reverse=True)
-        if order == "recent":
-            return sorted(items, key=MainWindow._recency_key, reverse=True)
-        return items
 
     def channel_display_name(self, it) -> str:
         base = it.get("name") or it.get("title") or "?"
@@ -3938,108 +3877,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # own resizeEvent, so nothing else to do here.
 
     # -- first-run onboarding ------------------------------------------------
-
-    def show_welcome(self) -> None:
-        """Show the first-run onboarding wizard (no provider configured)."""
-        if self._welcome is None:
-            self._welcome = WelcomeOverlay(
-                self, settings=self.settings,
-                on_connect=self._wizard_connect,
-                on_explore=self._wizard_explore,
-                on_connect_trakt=lambda: self._trakt_connect_flow(self),
-                on_language_change=self._wizard_language,
-                on_demo=self.start_demo)
-        else:
-            self._welcome.reset()
-        self._welcome.cover()
-        self._update_provider_hint()
-
-    def _wizard_language(self, code: str) -> None:
-        from ..i18n import set_language
-        set_language(code)
-        self.settings.setValue("language", code)
-        self.retranslate_ui()
-
-    def _wizard_connect(self, server: str, user: str, pw: str,
-                        kind: str = "xtream") -> None:
-        name = server.split("//")[-1].split("/")[0] or "My playlist"
-        pl = self.playlist_store.add(
-            {"name": name, "kind": kind, "server": server, "username": user,
-             "password": pw, "epg_url": "", "refresh": "never"})
-        self.playlist_store.set_active(pl["id"])
-        self.switch_playlist(pl["id"])
-        # The wizard stays open for the optional Trakt step and hides itself
-        # on Finish; the provider hint should not appear now.
-        self._update_provider_hint()
-
-    def _wizard_explore(self) -> None:
-        self._set_status(tr("welcome_add_hint"))
-        self._update_provider_hint()
-
-    # -- "no provider yet" affordance ----------------------------------------
-
-    def _update_provider_hint(self) -> None:
-        """Show a big pulsing '+ Add provider' button in the middle pane
-        whenever the app is running without a real provider and the wizard is
-        closed. It brings the wizard back and disappears the moment a provider
-        is added."""
-        # Show the hint until a REAL provider is added: explore mode
-        # (OfflineClient) and the demo (DemoClient) both still want it, so the
-        # user can graduate from trying channels to entering their own. A real
-        # Xtream/M3U client removes it for good. M3UClient also subclasses
-        # OfflineClient, so key on the exact types. Never float it over a
-        # maximized/fullscreen video.
-        no_provider = type(self.client) in (OfflineClient, DemoClient)
-        overlay_up = self._welcome is not None and self._welcome.isVisible()
-        if no_provider and not overlay_up and not self._player_fs:
-            if self._add_provider_btn is None:
-                self._build_provider_hint()
-            self._add_provider_btn.setText(tr("onb_add_provider"))
-            self._add_provider_btn.show()
-            self._add_provider_btn.raise_()
-            self._position_provider_hint()
-            self._add_provider_anim.start()
-        elif self._add_provider_btn is not None:
-            self._add_provider_anim.stop()
-            self._add_provider_btn.hide()
-
-    def _build_provider_hint(self) -> None:
-        from PyQt6.QtCore import QPropertyAnimation
-        from PyQt6.QtWidgets import QGraphicsOpacityEffect
-        btn = QPushButton(tr("onb_add_provider"), self)
-        btn.setMinimumHeight(46)
-        btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        # Always red, independent of the app theme, so it clearly reads as
-        # a call to action.
-        btn.setStyleSheet(
-            "QPushButton { background:#e5354b; color:#ffffff; font-weight:700;"
-            " font-size:14px; border:none; border-radius:10px; padding:0 22px; }"
-            "QPushButton:hover { background:#c8283b; }")
-        btn.clicked.connect(self.show_welcome)
-        # Slow opacity pulse to draw the eye without being noisy.
-        eff = QGraphicsOpacityEffect(btn)
-        btn.setGraphicsEffect(eff)
-        anim = QPropertyAnimation(eff, b"opacity", self)
-        anim.setDuration(1500)
-        anim.setStartValue(1.0)
-        anim.setKeyValueAt(0.5, 0.45)
-        anim.setEndValue(1.0)
-        anim.setLoopCount(-1)
-        self._add_provider_btn = btn
-        self._add_provider_anim = anim
-
-    def _position_provider_hint(self) -> None:
-        btn = self._add_provider_btn
-        if btn is None or not btn.isVisible():
-            return
-        # Lower third of the middle list pane, mapped into window coordinates.
-        btn.adjustSize()
-        w = max(240, btn.width() + 40)
-        h = 46
-        tl = self.listw.mapTo(self, self.listw.rect().topLeft())
-        x = tl.x() + (self.listw.width() - w) // 2
-        y = tl.y() + int(self.listw.height() * 0.90) - h // 2
-        btn.setGeometry(x, y, w, h)
 
     def closeEvent(self, event) -> None:
         # In PiP the main window itself is the little floating player, so its
