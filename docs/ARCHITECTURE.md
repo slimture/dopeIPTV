@@ -58,6 +58,7 @@ dopeiptv/
     mw_sidebar.py      Sidebar chrome (collapse / icon rail / mid-compact)
     mw_nav.py          Nav chrome (focus mode, nav colours/icons, Library)
     mw_shortcuts.py    Keyboard shortcuts + registry
+    mw_popout.py       Detached-window ("pop out") player mixin
     mw_busy.py         Loading indicator + spinner overlay
     mw_updates.py      Update-check badge/status wiring
     mw_reminders.py    Programme-reminder UI (set / list / fire)

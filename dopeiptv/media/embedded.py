@@ -654,6 +654,7 @@ class EmbeddedPlayer(QWidget):
     record_menu = pyqtSignal(object)
     pip_requested = pyqtSignal()
     pip_context_menu = pyqtSignal(object)
+    popout_requested = pyqtSignal()
     stopped = pyqtSignal()
     resume_requested = pyqtSignal()
     stalled = pyqtSignal()
@@ -685,6 +686,7 @@ class EmbeddedPlayer(QWidget):
         # on the control bar) while the rest of __init__ is still running.
         self._fs_ui = False
         self._pip_mode = False
+        self._popout_mode = False
         self.seek_overlay = None
         self._settings = settings
         # Docked video-box height scales with the display so the mini player
@@ -800,6 +802,9 @@ class EmbeddedPlayer(QWidget):
         self.pip_btn = QPushButton("PiP", objectName="MiniBtn")
         self.pip_btn.setToolTip(tr("tooltip_pip"))
         self.pip_btn.clicked.connect(self.pip_requested)
+        self.pop_btn = QPushButton("⧉", objectName="MiniBtn")
+        self.pop_btn.setToolTip(tr("tooltip_popout"))
+        self.pop_btn.clicked.connect(self.popout_requested)
         self.fs_btn = QPushButton("⛶", objectName="MiniBtn")
         self.fs_btn.setToolTip(tr("tooltip_fullscreen"))
         # Group by function: prev/next are the "channel zap" pair (same
@@ -816,6 +821,7 @@ class EmbeddedPlayer(QWidget):
         bl.addWidget(self.ts_btn)
         bl.addWidget(self.rec_btn)
         bl.addWidget(self.opts_btn)
+        bl.addWidget(self.pop_btn)
         bl.addWidget(self.pip_btn)
         bl.addWidget(self.fs_btn)
         bl.addSpacing(6)
@@ -971,6 +977,7 @@ class EmbeddedPlayer(QWidget):
             b.setFixedSize(m, m)
         self.pip_btn.setFixedHeight(m)
         self.pip_btn.setMinimumWidth(m)
+        self.pop_btn.setFixedSize(m, m)
         for s in (self.vol, self.fs_vol):
             s.setFixedHeight(m)
 
@@ -1114,6 +1121,9 @@ class EmbeddedPlayer(QWidget):
         self.stop_btn.setToolTip(tr("tooltip_stop_playback"))
         self.pip_btn.setToolTip(
             tr("tooltip_exit_pip") if self._pip_mode else tr("tooltip_pip"))
+        self.pop_btn.setToolTip(
+            tr("tooltip_popout_exit") if self._popout_mode
+            else tr("tooltip_popout"))
         self.fs_btn.setToolTip(tr("tooltip_fullscreen"))
         self.fs_prev_btn.setToolTip(tr("tooltip_previous_channel") + " (Left)")
         self.fs_next_btn.setToolTip(tr("tooltip_next_channel") + " (Right)")
@@ -1336,6 +1346,17 @@ class EmbeddedPlayer(QWidget):
             self.bar.show()
         # Entering PiP must drop the docked fixed height (so the video fills
         # the PiP frame); leaving it must restore that constant height.
+        self._lock_video_box()
+
+    def set_popout_mode(self, enabled: bool) -> None:
+        """Detached-window mode: the pop-out window drives the size, so release
+        the docked fixed height and let the video fill the window. Unlike PiP
+        the full control bar stays visible (it's a normal window, not a mini
+        overlay)."""
+        self._popout_mode = enabled
+        self.bar.show()
+        self.pop_btn.setToolTip(
+            tr("tooltip_popout_exit") if enabled else tr("tooltip_popout"))
         self._lock_video_box()
 
     def _show_pip_bar(self) -> None:
@@ -1644,12 +1665,13 @@ class EmbeddedPlayer(QWidget):
         # only its minimum differs. What varies is who sizes the player.
         self.video.setMinimumHeight(190 if self._fs_ui else 0)
         self.video.setMaximumHeight(16777215)
-        if self._fs_ui or self._pip_mode:
-            # Fullscreen and PiP: the window (or the PiP frame) drives the
-            # size, so release every constraint on the player and let its
-            # layout stretch fill the available space. PiP windows are
-            # deliberately small; forcing a docked floor there is what used
-            # to wedge black bars after the PiP<->fullscreen round trip.
+        if self._fs_ui or self._pip_mode or self._popout_mode:
+            # Fullscreen, PiP and the detached pop-out window all let the
+            # host window drive the size, so release every constraint on the
+            # player and let its layout stretch to fill the available space.
+            # PiP windows are deliberately small; forcing a docked floor there
+            # is what used to wedge black bars after the PiP<->fullscreen round
+            # trip.
             self.setMinimumHeight(0)
             self.setMaximumHeight(16777215)
         else:
@@ -1696,6 +1718,7 @@ class EmbeddedPlayer(QWidget):
         # the normal path.
         w = self.width()
         self.vol.setVisible(w >= 330)
+        self.pop_btn.setVisible(w >= 315)
         self.pip_btn.setVisible(w >= 300)
 
     # -- playback defaults -----------------------------------------------------

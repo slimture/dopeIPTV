@@ -25,7 +25,7 @@ external mpv/VLC playback).
 
 ## Features
 
-- **Embedded video** via libmpv's OpenGL render API — plays right inside the app on any compositor (GNOME, KDE, Hyprland, ...), with fullscreen, Picture-in-Picture, a hover scrubber and arrow-key seeking
+- **Embedded video** via libmpv's OpenGL render API — plays right inside the app on any compositor (GNOME, KDE, Hyprland, ...), with fullscreen, Picture-in-Picture, a pop-out window for a second screen, a hover scrubber and arrow-key seeking
 - **TV, Movies & Series** with seasons/episodes, favorites, history, and instant search across thousands of channels
 - **8 languages** — English, Svenska, Español, Deutsch, Français, 中文, Русский, ไทย — switchable live in Settings
 - **Resume playback** — movies/series/recordings remember where you stopped and offer to continue
@@ -164,6 +164,7 @@ the first time the app starts.
 | Stats for nerds | ⚙ → Stats for nerds (live overlay on the video) |
 | Fullscreen | Double-click the video, or press `F` — `Esc` to leave |
 | Picture-in-Picture | The **PiP** button in the player bar |
+| Pop the player out to its own window | The **⧉** button in the player bar (keep it on a second screen while you browse — click it again, or close the window, to dock it back) |
 | Zap to next/previous channel | Ctrl+Right / Ctrl+Left |
 | Rename / hide a channel | Right-click it |
 | Open in an external player (mpv/VLC) | Right-click → Open externally |

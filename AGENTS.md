@@ -44,8 +44,9 @@ in the `mw_*` mixins beside it, each mixed into `MainWindow`:
 `mw_search` (sidebar search), `mw_sidebar` (panel collapse / icon rail),
 `mw_nav` (focus mode, nav colours/icons, Library group), `mw_shortcuts`
 (keyboard shortcuts), `mw_busy` (loading indicator), `mw_updates`
-(update badge) and `mw_reminders`. What stays in `main_window.py` is the
-`__init__`/`_build_ui` composition and the playback path (start/stop,
+(update badge), `mw_reminders`, `mw_sort`, `mw_onboarding` and
+`mw_popout` (detached-window player). What stays in `main_window.py` is
+the `__init__`/`_build_ui` composition and the playback path (start/stop,
 seek, PiP, fullscreen, reconnect) - keep playback code there.
 When making changes:
 

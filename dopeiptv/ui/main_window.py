@@ -56,6 +56,7 @@ from .mw_context import _ContextMenuMixin
 from .mw_detail import _DetailMixin
 from .mw_nav import _NavMixin
 from .mw_onboarding import _OnboardingMixin
+from .mw_popout import _PopoutMixin
 from .mw_reminders import _RemindersMixin
 from .mw_search import _SearchMixin
 from .mw_shortcuts import _ShortcutsMixin
@@ -75,7 +76,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _ContextMenuMixin, _DetailMixin, _RemindersMixin,
                  _BusyMixin, _UpdatesMixin, _SearchMixin, _SidebarMixin,
                  _NavMixin, _ShortcutsMixin, _OnboardingMixin, _SortMixin,
-                 QMainWindow):
+                 _PopoutMixin, QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
     epg_progress = pyqtSignal(int)
@@ -239,6 +240,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._stream_retries = 0
         self._last_stream_error_ts = 0.0
         self._pip_win = None
+        self._popout_win = None
+        self._popout_placeholder = None
         self._last_player = None
         self._last_playlist_refresh = time.time()
         self._load_gen = 0
@@ -807,6 +810,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.playback_error.connect(self._playback_error)
             self.player.zap.connect(self._zap)
             self.player.pip_requested.connect(self._toggle_pip)
+            self.player.popout_requested.connect(self._toggle_popout)
             self.player.pip_context_menu.connect(self._pip_context_menu)
             self.player.stop_btn.clicked.connect(self._exit_pip_if_active)
             self.player.stopped.connect(self._on_player_stopped)
@@ -1372,6 +1376,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self._pip_win is not None:
             self._toggle_pip_fullscreen()
             return
+        if self._popout_win is not None:
+            self._toggle_popout_fullscreen()
+            return
         if self._player_fs:
             self._exit_player_fullscreen()
             return
@@ -1417,6 +1424,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._exit_player_fullscreen()
 
     def _exit_player_fullscreen(self) -> None:
+        # When the player is detached, its fullscreen belongs to the pop-out
+        # window - route the exit there instead of the main window.
+        if self._popout_win is not None:
+            if self._popout_win.isFullScreen():
+                self._toggle_popout_fullscreen()
+            return
         if not self._player_fs:
             if self.isFullScreen():
                 self.showNormal()
@@ -1509,6 +1522,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _toggle_pip(self) -> None:
         if not self.player:
             return
+        # PiP and the detached pop-out both take over the one player widget;
+        # if it's popped out, bring it home before starting PiP.
+        if self._popout_win is not None:
+            self._exit_popout()
         if self._pip_win is not None:
             self._exit_pip()
             return
@@ -3863,6 +3880,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         d = getattr(self, "_cast_dialog", None)
         if d is not None:
             d.close()
+        # Bring a detached player home first so mpv teardown acts on the widget
+        # in the main window, not one owned by a separate pop-out window.
+        self._exit_popout_if_active()
         # All persistence must land BEFORE we skip the interpreter
         # teardown below. Layout, resume position, TMDB cache flush,
         # recording state, mpv teardown, cast disconnect - each of
