@@ -24,9 +24,8 @@ from PyQt6.QtWidgets import (
     QSizePolicy, QSplitter, QToolButton, QVBoxLayout, QWidget,
 )
 
-from .. import APP_NAME, ORG, VERSION
+from .. import APP_NAME, ORG
 from ..core.log import log
-from ..core.updates import GITHUB_REPO, fetch_latest_release, is_newer
 from ..i18n import tr
 from .channel_list import (
     CategoryColorDelegate, ChannelDelegate, ChannelListModel, ChannelListView,
@@ -60,6 +59,7 @@ from .mw_busy import _BusyMixin
 from .mw_context import _ContextMenuMixin
 from .mw_detail import _DetailMixin
 from .mw_reminders import _RemindersMixin
+from .mw_updates import _UpdatesMixin
 from ..core.workers import (
     LogoLoader, default_image_cache_dir, run_async)
 
@@ -71,7 +71,7 @@ _UNSET = object()
 
 class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _ContextMenuMixin, _DetailMixin, _RemindersMixin,
-                 _BusyMixin, QMainWindow):
+                 _BusyMixin, _UpdatesMixin, QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
     epg_progress = pyqtSignal(int)
@@ -1378,76 +1378,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 # an expand the target is the current width, so it stays put.
                 self._apply_sidebar_collapsed()
         return super().eventFilter(obj, event)
-
-    def _maybe_check_updates(self) -> None:
-        """Once-a-day background check for a newer release; on a hit, light the
-        badge on the Settings button. Cached in QSettings so it doesn't hit
-        GitHub every launch and works offline (fails silently). Opt-out via the
-        'check for updates' setting."""
-        if self.settings.value("check_updates", "true") != "true":
-            return
-        # Test hook: force the badge on without a network call, so the update
-        # indicator can be seen even when you're already on the latest release.
-        # Placed after the opt-out check so opting out still suppresses it.
-        if os.environ.get("DOPEIPTV_FAKE_UPDATE") == "1":
-            self._apply_update_state("v99.0.0")
-            return
-        try:
-            last = float(self.settings.value("update_check_ts", 0) or 0)
-        except (TypeError, ValueError):
-            last = 0.0
-        if time.time() - last < 86400:
-            self._apply_update_state(
-                self.settings.value("update_latest_tag", "") or "")
-            return
-
-        def done(rel):
-            tag = (rel or {}).get("tag", "") or ""
-            self.settings.setValue("update_check_ts", str(int(time.time())))
-            self.settings.setValue("update_latest_tag", tag)
-            self._apply_update_state(tag)
-
-        run_async(self.pool, lambda: fetch_latest_release(GITHUB_REPO),
-                  done, lambda _e: None)
-
-    def _apply_cached_update(self) -> None:
-        """Light the badge from the last cached result at startup so it appears
-        right away, without waiting for (or making) a network call."""
-        if self.settings.value("check_updates", "true") != "true":
-            return
-        if os.environ.get("DOPEIPTV_FAKE_UPDATE") == "1":
-            self._apply_update_state("v99.0.0")
-            return
-        tag = self.settings.value("update_latest_tag", "") or ""
-        if tag:
-            self._apply_update_state(tag)
-
-    def _apply_update_state(self, latest_tag: str) -> None:
-        newer = bool(latest_tag) and is_newer(latest_tag, VERSION)
-        logo = self._sidebar_logo
-        if not newer:
-            logo.set_update(False)
-            logo.setToolTip(tr("tooltip_jump_playing"))
-            self.update_status_btn.hide()
-            return
-        logo.setToolTip(tr("about_update_available", version=latest_tag))
-        # The attention-grabbing part (status link, red badge, bounce,
-        # red->accent settle) runs once per version, so the cached apply at
-        # startup and the later network check for the same tag don't double up.
-        if getattr(self, "_update_shown_tag", None) == latest_tag:
-            return
-        self._update_shown_tag = latest_tag
-        # Subtle, non-overlay link in the status row - shown for 30 s (as long
-        # as the logo badge stays red) then hidden; the badge remains after.
-        self.update_status_btn.setText(tr("update_status", version=latest_tag))
-        self.update_status_btn.show()
-        QTimer.singleShot(30_000, self.update_status_btn.hide)
-        logo.set_update(True, "#E5484D")   # red first, to catch the eye
-        logo.bounce()
-        # After 30 s, settle from the attention-grabbing red to the theme
-        # accent - in follow mode, so it keeps matching if the theme changes.
-        QTimer.singleShot(30_000, lambda: logo.set_update(
-            True, follow_accent=True))
 
     def _overlay_state(self) -> str:
         """What the poster overlay should do right now:
