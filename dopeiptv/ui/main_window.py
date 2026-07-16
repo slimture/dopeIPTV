@@ -38,9 +38,7 @@ from ..providers.epg import XmltvGuide, epg_cache_path, prune_epg_caches
 from ..services.coverart import CoverArtService
 from ..services.resume import ResumeStore
 from ..services.reminders import ReminderStore
-from ..media.players import (
-    MpvIpcPlayer, MpvWindowPlayer, _libmpv, embedded_playback_supported, launch_player,
-)
+from ..media.players import embedded_playback_supported, launch_player
 from ..core.recording import RecordingManager
 from ..core.stores import (
     CategoryOverrides, ChannelOverrides, FavoriteStore, HistoryStore,
@@ -209,15 +207,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.watchlist = WatchlistStore(self._cache_settings)
         self._watched_sync_running = False
         self._raw_categories: list = []
-        self.mpv = MpvIpcPlayer()
-        self.mpv_window = MpvWindowPlayer() if _libmpv is not None else None
-        if self.mpv_window:
-            self.mpv_window.zap_requested.connect(self._zap)
-            self.mpv_window.playback_error.connect(self._playback_error)
-            self.mpv_window.closed.connect(lambda: self.wake.release())
-        if not settings.value("playback_mode_v2"):
-            settings.remove("playback_mode")
-            settings.setValue("playback_mode_v2", "1")
         self.mode: str = "live"
         self.all_items: list = []
         # Which Favorites section is showing: "chan", "movie" or
@@ -2853,19 +2842,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def stop_local_playback_for_cast(self) -> None:
         """Free the local stream when a cast starts. The Chromecast pulls the
         URL itself (one connection from the device), so on a single-connection
-        account leaving the embedded/reused-window player running too would be a
-        second connection the provider refuses. Called by the cast dialog on a
+        account leaving the embedded player running too would be a second
+        connection the provider refuses. Called by the cast dialog on a
         successful cast."""
         p = getattr(self, "player", None)
         if p is not None and getattr(p, "current_url", None):
             try:
                 p.stop()
-            except Exception:
-                pass
-        mw = getattr(self, "mpv_window", None)
-        if mw is not None:
-            try:
-                mw.stop()
             except Exception:
                 pass
 
@@ -2950,11 +2933,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._apply_play_icon()
 
     def playback_mode(self) -> str:
-        default = "embedded" if self.player else "window"
-        mode = self.settings.value("playback_mode", default)
-        if mode == "embedded" and not self.player:
-            mode = "window"
-        return mode
+        """The in-app embedded player is the only playback surface. Without
+        libmpv we fall back to launching an external mpv window per channel."""
+        return "embedded" if self.player else "external"
 
     # Content kinds whose playback position is worth remembering/resuming.
     _RESUMABLE = ("movie", "episode", "recording")
@@ -3329,8 +3310,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.listw.viewport().update()
         self.setWindowTitle(title or self._base_title)
         self._set_status(tr("status_playing", title=title))
-        mode = self.playback_mode()
-        if mode == "embedded" and self.player:
+        if self.player:
             self.rec.finish_all_inplayer("channel changed")
             self.player.show()
             self.player.set_overlay_info(title)
@@ -3339,18 +3319,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             else:
                 self.player.hide()
                 launch_player("mpv", url, title, self)
-        elif mode == "window":
-            if self.mpv_window:
-                if self.mpv_window.play(url, title):
-                    self.wake.acquire(f"Playing {title}")
-                else:
-                    launch_player("mpv", url, title, self)
-            else:
-                run_async(
-                    self.pool, lambda: self.mpv.load(url, title),
-                    lambda ok: None if ok
-                    else self._player_missing("mpv"))
         else:
+            # No embedded player (libmpv unavailable): open externally.
             launch_player("mpv", url, title, self)
         # Reflect the new playback state on the poster overlay (play -> pause /
         # stop) when the item being played is the one shown in the detail pane.
@@ -3912,9 +3882,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.rec.shutdown()
         if self.player:
             self.player.shutdown()
-        if self.mpv_window:
-            self.mpv_window.shutdown()
-        self.mpv.stop()
         # The app exits via os._exit (here on stuck workers, and always after
         # the event loop - see app.main), which skips QSettings' auto-sync on
         # destruction. Flush every settings file explicitly so this session's

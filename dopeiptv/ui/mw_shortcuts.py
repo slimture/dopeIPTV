@@ -55,8 +55,6 @@ class _ShortcutsMixin:
     def _toggle_fullscreen_shortcut(self) -> None:
         if self.player and self.player.isVisible():
             self._toggle_player_fullscreen()
-        elif self.mpv_window and self.mpv_window.is_active():
-            self.mpv_window.toggle_fullscreen()
 
     def keyPressEvent(self, event) -> None:
         if event.key() in (Qt.Key.Key_Left, Qt.Key.Key_Right):

@@ -355,16 +355,6 @@ _STRINGS: dict[str, dict[str, str]] = {
 
     # ── Settings labels (Playback) ────────────────────────────────────────
 
-    "setting_playback_mode": {
-        "en": "Playback mode (mpv)",
-        "sv": "Uppspelningsläge (mpv)",
-        "es": "Modo de reproducción (mpv)",
-        "de": "Wiedergabemodus (mpv)",
-        "fr": "Mode de lecture (mpv)",
-        "zh": "播放模式 (mpv)",
-        "ru": "Режим воспроизведения (mpv)",
-        "th": "โหมดเล่น (mpv)",
-    },
     "setting_autoplay_preview": {
         "en": "Auto-play preview on selection",
         "sv": "Spela förhandsvisning automatiskt vid val",
@@ -579,36 +569,6 @@ _STRINGS: dict[str, dict[str, str]] = {
 
     # ── Combo box option labels ───────────────────────────────────────────
 
-    "option_embedded": {
-        "en": "Embedded (in app)",
-        "sv": "Inbäddad (i appen)",
-        "es": "Integrado (en la app)",
-        "de": "Eingebettet (in der App)",
-        "fr": "Intégré (dans l'app)",
-        "zh": "内嵌（应用内）",
-        "ru": "Встроенный (в приложении)",
-        "th": "ฝัง (ในแอป)",
-    },
-    "option_reused_window": {
-        "en": "Reused mpv window",
-        "sv": "Återanvänt mpv-fönster",
-        "es": "Ventana mpv reutilizada",
-        "de": "Wiederverwendetes mpv-Fenster",
-        "fr": "Fenêtre mpv réutilisée",
-        "zh": "复用 mpv 窗口",
-        "ru": "Повторно используемое окно mpv",
-        "th": "หน้าต่าง mpv ที่ใช้ซ้ำ",
-    },
-    "option_external_player": {
-        "en": "External player",
-        "sv": "Extern spelare",
-        "es": "Reproductor externo",
-        "de": "Externer Player",
-        "fr": "Lecteur externe",
-        "zh": "外部播放器",
-        "ru": "Внешний плеер",
-        "th": "เครื่องเล่นภายนอก",
-    },
     "option_compact": {
         "en": "Compact",
         "sv": "Kompakt",

@@ -369,12 +369,6 @@ class _SettingsMixin:
         play_tab = QWidget()
         pf = QFormLayout(play_tab)
         pf.setSpacing(10)
-        mode_items = [("embedded", tr("option_embedded")),
-                      ("window", tr("option_reused_window")),
-                      ("external", tr("option_external_player"))]
-        if not self.player:
-            mode_items = [m for m in mode_items if m[0] != "embedded"]
-        mode_box = self._combo(mode_items, self.playback_mode())
         autoplay_box = self._combo(
             [("true", tr("option_yes")), ("false", tr("option_no"))],
             "true" if self._autoplay_preview() else "false")
@@ -473,7 +467,6 @@ class _SettingsMixin:
             pf.addRow(lbl)
 
         section(tr("sec_playback"))
-        pf.addRow(tr("setting_playback_mode"), mode_box)
         pf.addRow(tr("setting_autoplay_preview"), autoplay_box)
         pf.addRow(tr("setting_autoplay_next"), autoplay_next_box)
         pf.addRow(tr("setting_auto_reconnect"), autorecon_box)
@@ -526,18 +519,11 @@ class _SettingsMixin:
         delay_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         delay_hint.setWordWrap(True)
         pf.addRow(delay_hint)
-        mode_hint = QLabel(
-            "Embedded plays in the app. Reused mpv window keeps "
-            "one external window you can zap in (Ctrl+←/→). "
-            "External opens a fresh window each time.")
-        mode_hint.setStyleSheet(
-            f"color:{P['muted2']}; font-size:11px;")
-        mode_hint.setWordWrap(True)
-        pf.addRow(mode_hint)
         if not self.player:
             reason = embedded_playback_reason() or "unknown reason"
             hint = QLabel(
-                f"Embedded playback unavailable: {reason}")
+                "Embedded playback unavailable: "
+                f"{reason}. Channels open in an external mpv window.")
             hint.setStyleSheet(
                 f"color:{P['muted2']}; font-size:11px;")
             hint.setWordWrap(True)
@@ -1272,9 +1258,6 @@ class _SettingsMixin:
             if x11_box is not None:
                 self.settings.setValue(
                     "force_x11", "true" if x11_box.isChecked() else "false")
-            if mode_box.currentData():
-                self.settings.setValue(
-                    "playback_mode", mode_box.currentData())
             self.settings.setValue(
                 "view_density", density_box.currentData())
             self.settings.setValue(
