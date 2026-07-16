@@ -4036,6 +4036,18 @@ _STRINGS: dict[str, dict[str, str]] = {
         "de": "Immer im Vordergrund", "fr": "Toujours au premier plan",
         "zh": "置顶", "ru": "Поверх всех окон", "th": "ปักหมุดบนสุด",
     },
+    "popout_hide_titlebar": {
+        "en": "Hide title bar", "sv": "Dölj titelrad",
+        "es": "Ocultar barra de título", "de": "Titelleiste ausblenden",
+        "fr": "Masquer la barre de titre", "zh": "隐藏标题栏",
+        "ru": "Скрыть заголовок окна", "th": "ซ่อนแถบชื่อ",
+    },
+    "popout_show_titlebar": {
+        "en": "Show title bar", "sv": "Visa titelrad",
+        "es": "Mostrar barra de título", "de": "Titelleiste anzeigen",
+        "fr": "Afficher la barre de titre", "zh": "显示标题栏",
+        "ru": "Показать заголовок окна", "th": "แสดงแถบชื่อ",
+    },
     "popout_wayland_hint": {
         "en": "Always on top: right-click the title bar (Wayland)",
         "sv": "Alltid överst: högerklicka på titelraden (Wayland)",

@@ -685,6 +685,7 @@ class EmbeddedPlayer(QWidget):
         # on the control bar) while the rest of __init__ is still running.
         self._fs_ui = False
         self._popout_mode = False
+        self._popout_drag_from = None
         self.seek_overlay = None
         self._settings = settings
         # Docked video-box height scales with the display so the mini player
@@ -1153,24 +1154,46 @@ class EmbeddedPlayer(QWidget):
             return
         self.playback_error.emit(msg)
 
+    def _popout_frameless(self) -> bool:
+        return bool(self.window().windowFlags()
+                    & Qt.WindowType.FramelessWindowHint)
+
     def _on_video_press(self, event) -> None:
-        # Right-click in the detached pop-out window opens its context menu
-        # (Always on top / bring back). Everywhere else the video has no
-        # special press handling.
-        if self._popout_mode and event.button() == Qt.MouseButton.RightButton:
+        if not self._popout_mode:
+            # Docked / fullscreen: the video has no special press handling.
+            return
+        if event.button() == Qt.MouseButton.RightButton:
+            # Detached window: right-click opens its context menu.
             self.popout_context_menu.emit(event.globalPosition().toPoint())
+            return
+        if (event.button() == Qt.MouseButton.LeftButton
+                and self._popout_frameless()):
+            # No title bar to grab, so arm a drag-to-move from the video. The
+            # move only starts once the pointer has actually moved (see
+            # _on_video_move), so a plain click / double-click still toggles
+            # fullscreen instead of dragging.
+            self._popout_drag_from = event.position().toPoint()
 
     def _on_video_move(self, event) -> None:
         # A timeshift channel's timeline reappears on any mouse activity over
         # the video (docked or fullscreen) and re-arms its idle fade.
         if self._seek_mode == "timeline":
             self._show_ts_timeline()
+        drag_from = getattr(self, "_popout_drag_from", None)
+        if (drag_from is not None
+                and event.buttons() & Qt.MouseButton.LeftButton):
+            if (event.position().toPoint() - drag_from).manhattanLength() > 6:
+                self._popout_drag_from = None
+                handle = self.window().windowHandle()
+                if handle is not None:
+                    handle.startSystemMove()
+            return
         if not self._fs_ui and self._seekable:
             # Docked / pop-out, seekable content: reveal the floating scrubber.
             self._show_seek_overlay()
 
     def _on_video_release(self, event) -> None:
-        pass
+        self._popout_drag_from = None
 
     def _is_seekable(self) -> bool:
         if self._seek_mode in ("live", "timeline"):

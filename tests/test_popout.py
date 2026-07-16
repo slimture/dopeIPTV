@@ -103,6 +103,21 @@ h._set_popout_on_top(False)
 app.processEvents()
 assert not bool(h._popout_win.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
 
+# Hide-title-bar toggle flips the frameless flag and persists.
+h._set_popout_frameless(True)
+app.processEvents()
+assert bool(h._popout_win.windowFlags() & Qt.WindowType.FramelessWindowHint)
+assert h.settings.value("popout_frameless") == "true"
+h._set_popout_frameless(False)
+app.processEvents()
+assert not bool(h._popout_win.windowFlags() & Qt.WindowType.FramelessWindowHint)
+
+# Escape while not fullscreen must not dock or raise; it only leaves
+# fullscreen, so the window stays detached here.
+h._popout_escape()
+app.processEvents()
+assert h._popout_win is not None
+
 # Reparent back in: player home, placeholder fully detached (the crash guard).
 h._toggle_popout()
 app.processEvents()
