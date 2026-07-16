@@ -27,6 +27,13 @@ dopeiptv = "dopeiptv.app:main"
 [tool.setuptools.packages.find]
 include = ["dopeiptv*"]
 
+[tool.pytest.ini_options]
+# Only collect the real test suite. Without this, pytest also discovers
+# tools/hwdec_sub_test.py (it matches *_test.py) and tries to import it - that
+# script does `import mpv` at module load, which fails where libmpv isn't
+# installed (e.g. the CI runner), erroring collection before any test runs.
+testpaths = ["tests"]
+
 [tool.ruff]
 target-version = "py311"
 
