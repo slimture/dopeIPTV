@@ -433,6 +433,11 @@ class _SettingsMixin:
             [("1", "1 s"), ("3", "3 s"), ("5", "5 s"),
              ("10", "10 s"), ("30", "30 s")],
             str(self.settings.value("cache_secs", "10")))
+        # Experimental: pick the embedded player engine. mpv is the default and
+        # by far the most tested; libVLC is an opt-in spike (see vlc_embedded).
+        engine_box = self._combo(
+            [("mpv", "mpv (recommended)"), ("vlc", "libVLC (experimental)")],
+            str(self.settings.value("player_engine", "mpv") or "mpv"))
 
         def delay_row(key: str):
             try:
@@ -473,6 +478,15 @@ class _SettingsMixin:
             pf.addRow(lbl)
 
         section(tr("sec_playback"))
+        pf.addRow("Player engine", engine_box)
+        engine_hint = QLabel(
+            "mpv is the default and most tested. libVLC is experimental — it "
+            "needs VLC installed, has no timeshift or single-connection "
+            "recording, and needs X11/XWayland on Linux (no pure Wayland). "
+            "Restart the app to apply a change.")
+        engine_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
+        engine_hint.setWordWrap(True)
+        pf.addRow(engine_hint)
         pf.addRow(tr("setting_playback_mode"), mode_box)
         pf.addRow(tr("setting_autoplay_preview"), autoplay_box)
         pf.addRow(tr("setting_autoplay_next"), autoplay_next_box)
@@ -1293,6 +1307,10 @@ class _SettingsMixin:
                 "aspect_mode", aspect_box.currentData())
             self.settings.setValue(
                 "hwdec_mode", hwdec_box.currentData())
+            # Engine swap takes effect on the next launch (the player is built
+            # once at startup); the hint under the combo says so.
+            self.settings.setValue(
+                "player_engine", engine_box.currentData())
             if self.player:
                 # Stage it for the next mpv build (a fresh core reads the widget
                 # attribute, not live settings). A changed decode mode takes
