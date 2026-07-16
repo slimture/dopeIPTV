@@ -47,7 +47,7 @@ in the `mw_*` mixins beside it, each mixed into `MainWindow`:
 (update badge), `mw_reminders`, `mw_sort`, `mw_onboarding` and
 `mw_popout` (detached-window player). What stays in `main_window.py` is
 the `__init__`/`_build_ui` composition and the playback path (start/stop,
-seek, PiP, fullscreen, reconnect) - keep playback code there.
+seek, fullscreen, reconnect) - keep playback code there.
 When making changes:
 
 - **UI changes**: find the method by name across `ui/main_window.py` and

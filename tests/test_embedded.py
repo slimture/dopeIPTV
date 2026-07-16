@@ -32,7 +32,7 @@ def test_embedded_player_constructs(qapp):
     player = EmbeddedPlayer()
     # The event-filter guard flags must exist immediately after __init__.
     assert player._fs_ui is False
-    assert player._pip_mode is False
+    assert player._popout_mode is False
     # Force pending events (font/style changes) through the filter; this is
     # what triggered the original AttributeError.
     qapp.processEvents()

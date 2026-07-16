@@ -1,6 +1,6 @@
 """Keyboard-shortcut mixin for MainWindow.
 
-The single-key player shortcuts (pause/mute/PiP/record/stats/guide/fullscreen)
+The single-key player shortcuts (pause/mute/pop-out/record/stats/guide/fullscreen)
 and the shortcut registry (keyPressEvent dispatch, per-action key storage,
 install/apply, and the video-focused arrow handling). These are thin dispatch
 into self.player / self.* - no playback logic lives here. Moved out of
@@ -34,9 +34,9 @@ class _ShortcutsMixin:
         if not self._typing() and self._player_up():
             self.player.toggle_mute()
 
-    def _shortcut_pip(self) -> None:
+    def _shortcut_popout(self) -> None:
         if not self._typing() and self._player_up():
-            self._toggle_pip()
+            self._toggle_popout()
 
     def _shortcut_record(self) -> None:
         if not self._typing() and self._player_up():
@@ -80,7 +80,7 @@ class _ShortcutsMixin:
         ("pause", "Space", "sc_play_pause"),
         ("fullscreen", "F", "sc_fullscreen"),
         ("mute", "M", "sc_mute"),
-        ("pip", "P", "sc_pip"),
+        ("popout", "P", "sc_popout"),
         ("record", "R", "sc_record"),
         ("stats", "I", "sc_stats"),
         ("epg_guide", "Ctrl+G", "sc_epg_guide"),
@@ -98,7 +98,7 @@ class _ShortcutsMixin:
             "pause": self._toggle_pause_shortcut,
             "fullscreen": self._toggle_fullscreen_shortcut,
             "mute": self._shortcut_mute,
-            "pip": self._shortcut_pip,
+            "popout": self._shortcut_popout,
             "record": self._shortcut_record,
             "stats": self._shortcut_stats,
             "epg_guide": self._shortcut_epg_guide,

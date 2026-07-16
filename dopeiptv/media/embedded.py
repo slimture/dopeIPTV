@@ -652,9 +652,8 @@ class EmbeddedPlayer(QWidget):
     exit_fullscreen = pyqtSignal()
     timeshift_menu = pyqtSignal(object)
     record_menu = pyqtSignal(object)
-    pip_requested = pyqtSignal()
-    pip_context_menu = pyqtSignal(object)
     popout_requested = pyqtSignal()
+    popout_context_menu = pyqtSignal(object)
     stopped = pyqtSignal()
     resume_requested = pyqtSignal()
     stalled = pyqtSignal()
@@ -685,7 +684,6 @@ class EmbeddedPlayer(QWidget):
         # can be delivered to the filtered widgets (e.g. font/style changes
         # on the control bar) while the rest of __init__ is still running.
         self._fs_ui = False
-        self._pip_mode = False
         self._popout_mode = False
         self.seek_overlay = None
         self._settings = settings
@@ -799,9 +797,6 @@ class EmbeddedPlayer(QWidget):
         self.nextep_btn.setToolTip(tr("tooltip_next_episode"))
         self.nextep_btn.clicked.connect(self.next_episode)
         self.nextep_btn.hide()
-        self.pip_btn = QPushButton("PiP", objectName="MiniBtn")
-        self.pip_btn.setToolTip(tr("tooltip_pip"))
-        self.pip_btn.clicked.connect(self.pip_requested)
         self.pop_btn = QPushButton("⧉", objectName="MiniBtn")
         self.pop_btn.setToolTip(tr("tooltip_popout"))
         self.pop_btn.clicked.connect(self.popout_requested)
@@ -822,7 +817,6 @@ class EmbeddedPlayer(QWidget):
         bl.addWidget(self.rec_btn)
         bl.addWidget(self.opts_btn)
         bl.addWidget(self.pop_btn)
-        bl.addWidget(self.pip_btn)
         bl.addWidget(self.fs_btn)
         bl.addSpacing(6)
         bl.addWidget(self.mute_btn)
@@ -961,8 +955,7 @@ class EmbeddedPlayer(QWidget):
         # Give every control-bar button the exact same square size, then
         # replace its Unicode glyph with a hand-drawn, perfectly centred icon
         # (see _control_icon) so the symbols line up at identical size and
-        # height. The one text button (PiP) keeps its width but shares the
-        # height; the volume sliders match the height too.
+        # height. The volume sliders match the height too.
         m = self.MINIBTN
         all_icon_btns = (
             self.prev_btn, self.next_btn, self.pause_btn, self.back_btn,
@@ -975,15 +968,13 @@ class EmbeddedPlayer(QWidget):
         )
         for b in all_icon_btns:
             b.setFixedSize(m, m)
-        self.pip_btn.setFixedHeight(m)
-        self.pip_btn.setMinimumWidth(m)
         self.pop_btn.setFixedSize(m, m)
         for s in (self.vol, self.fs_vol):
             s.setFixedHeight(m)
 
         # Map each symbol button to a drawn-icon name. -10/+30 (seek amounts)
-        # and PiP stay as text labels; the pause/mute icons are swapped live
-        # in _sync_pause_label / toggle_mute.
+        # and the pop-out glyph stay as text labels; the pause/mute icons are
+        # swapped live in _sync_pause_label / toggle_mute.
         self._icon_names = {
             self.prev_btn: "prev", self.next_btn: "next",
             self.pause_btn: "pause", self.ts_btn: "rewind",
@@ -1027,11 +1018,6 @@ class EmbeddedPlayer(QWidget):
         self._sleep_timer = QTimer(self)
         self._sleep_timer.setSingleShot(True)
         self._sleep_timer.timeout.connect(self._on_sleep_elapsed)
-
-        self._pip_mode = False
-        self._pip_bar_timer = QTimer(self)
-        self._pip_bar_timer.setSingleShot(True)
-        self._pip_bar_timer.timeout.connect(self._hide_pip_bar)
 
         # Black cover widget that sits over the mpv render surface when we
         # want the pane to be visibly black. Painted with a plain QPalette
@@ -1119,8 +1105,6 @@ class EmbeddedPlayer(QWidget):
         self.rec_btn.setToolTip(tr("tooltip_record"))
         self.opts_btn.setToolTip(tr("tooltip_audio_subs_aspect"))
         self.stop_btn.setToolTip(tr("tooltip_stop_playback"))
-        self.pip_btn.setToolTip(
-            tr("tooltip_exit_pip") if self._pip_mode else tr("tooltip_pip"))
         self.pop_btn.setToolTip(
             tr("tooltip_popout_exit") if self._popout_mode
             else tr("tooltip_popout"))
@@ -1137,7 +1121,7 @@ class EmbeddedPlayer(QWidget):
         self.fs_opts_btn.setToolTip(tr("tooltip_audio_subs_aspect"))
         self.fs_exit_btn.setToolTip(tr("tooltip_exit_fullscreen") + " (Esc)")
 
-    # -- event filter (fullscreen overlay + pip bar on control hover) ---------
+    # -- event filter (fullscreen overlay reveal on hover) --------------------
 
     def eventFilter(self, obj, event):
         if self.seek_overlay is not None and obj in (self.seek_overlay,
@@ -1151,36 +1135,12 @@ class EmbeddedPlayer(QWidget):
             if event.type() == event.Type.MouseMove:
                 if self._fs_ui:
                     self._show_overlay()
-        elif obj is self.bar and self._pip_mode:
-            if event.type() in (event.Type.Enter, event.Type.MouseMove):
-                self._pip_bar_timer.start(self.PIP_BAR_HIDE_MS)
-                if event.type() == event.Type.MouseMove:
-                    try:
-                        pos = event.position().toPoint()
-                    except Exception:
-                        pos = event.pos()
-                    edges = self._resize_edges_for_window(pos, self.bar)
-                    cursor = self._EDGE_CURSORS.get(edges)
-                    self.bar.setCursor(
-                        cursor if cursor else Qt.CursorShape.ArrowCursor)
-            elif event.type() == event.Type.MouseButtonPress:
-                try:
-                    pos = event.position().toPoint()
-                except Exception:
-                    pos = event.pos()
-                edges = self._resize_edges_for_window(pos, self.bar)
-                win = self.window().windowHandle()
-                if edges and win:
-                    win.startSystemResize(edges)
-                    return True
         elif self._fs_ui and event.type() in (event.Type.Enter,
                                               event.Type.MouseMove):
             self._overlay_timer.start()
         return super().eventFilter(obj, event)
 
     # -- video mouse handlers (signals from _MpvGLWidget) ------------------
-
-    RESIZE_MARGIN = 12
 
     def _on_video_dbl_click(self) -> None:
         self.double_clicked.emit()
@@ -1193,68 +1153,20 @@ class EmbeddedPlayer(QWidget):
             return
         self.playback_error.emit(msg)
 
-    def _resize_edges_for_window(self, local_pos, source_widget):
-        """Map a local mouse position to window-level edge flags for PiP resize."""
-        global_pos = source_widget.mapTo(self.window(), local_pos)
-        win_size = self.window().size()
-        edges = Qt.Edge(0)
-        if global_pos.x() <= self.RESIZE_MARGIN:
-            edges |= Qt.Edge.LeftEdge
-        elif global_pos.x() >= win_size.width() - self.RESIZE_MARGIN:
-            edges |= Qt.Edge.RightEdge
-        if global_pos.y() <= self.RESIZE_MARGIN:
-            edges |= Qt.Edge.TopEdge
-        elif global_pos.y() >= win_size.height() - self.RESIZE_MARGIN:
-            edges |= Qt.Edge.BottomEdge
-        return edges
-
     def _on_video_press(self, event) -> None:
-        if self._pip_mode and event.button() == Qt.MouseButton.RightButton:
-            self.pip_context_menu.emit(event.globalPosition().toPoint())
-            return
-        if event.button() != Qt.MouseButton.LeftButton or not self._pip_mode:
-            return
-        win = self.window().windowHandle()
-        if win is None:
-            return
-        edges = self._resize_edges_for_window(
-            event.position().toPoint(), self.video)
-        if edges:
-            win.startSystemResize(edges)
-        else:
-            win.startSystemMove()
-
-    _EDGE_CURSORS = {
-        Qt.Edge.LeftEdge: Qt.CursorShape.SizeHorCursor,
-        Qt.Edge.RightEdge: Qt.CursorShape.SizeHorCursor,
-        Qt.Edge.TopEdge: Qt.CursorShape.SizeVerCursor,
-        Qt.Edge.BottomEdge: Qt.CursorShape.SizeVerCursor,
-        Qt.Edge.LeftEdge | Qt.Edge.TopEdge:
-            Qt.CursorShape.SizeFDiagCursor,
-        Qt.Edge.RightEdge | Qt.Edge.BottomEdge:
-            Qt.CursorShape.SizeFDiagCursor,
-        Qt.Edge.RightEdge | Qt.Edge.TopEdge:
-            Qt.CursorShape.SizeBDiagCursor,
-        Qt.Edge.LeftEdge | Qt.Edge.BottomEdge:
-            Qt.CursorShape.SizeBDiagCursor,
-    }
+        # Right-click in the detached pop-out window opens its context menu
+        # (Always on top / bring back). Everywhere else the video has no
+        # special press handling.
+        if self._popout_mode and event.button() == Qt.MouseButton.RightButton:
+            self.popout_context_menu.emit(event.globalPosition().toPoint())
 
     def _on_video_move(self, event) -> None:
         # A timeshift channel's timeline reappears on any mouse activity over
         # the video (docked or fullscreen) and re-arms its idle fade.
         if self._seek_mode == "timeline":
             self._show_ts_timeline()
-        if self._pip_mode and not self._fs_ui:
-            self._show_pip_bar()
-            if self._seekable:
-                self._show_seek_overlay()
-            if not (event.buttons() & Qt.MouseButton.LeftButton):
-                edges = self._resize_edges_for_window(
-                    event.position().toPoint(), self.video)
-                cursor = self._EDGE_CURSORS.get(edges)
-                self.video.setCursor(cursor if cursor else Qt.CursorShape.ArrowCursor)
-        elif not self._fs_ui and self._seekable:
-            # Docked, seekable content: reveal the floating scrubber.
+        if not self._fs_ui and self._seekable:
+            # Docked / pop-out, seekable content: reveal the floating scrubber.
             self._show_seek_overlay()
 
     def _on_video_release(self, event) -> None:
@@ -1332,40 +1244,17 @@ class EmbeddedPlayer(QWidget):
         mpv and unmutes if needed)."""
         self.vol.setValue(max(0, min(100, self.vol.value() + delta)))
 
-    # -- pip bar auto-hide -----------------------------------------------------
-
-    PIP_BAR_HIDE_MS = 2500
-
-    def set_pip_mode(self, enabled: bool) -> None:
-        self._pip_mode = enabled
-        if enabled:
-            self._hide_seek_overlay(force=True)
-            self._show_pip_bar()
-        else:
-            self._pip_bar_timer.stop()
-            self.bar.show()
-        # Entering PiP must drop the docked fixed height (so the video fills
-        # the PiP frame); leaving it must restore that constant height.
-        self._lock_video_box()
+    # -- detached pop-out window -----------------------------------------------
 
     def set_popout_mode(self, enabled: bool) -> None:
         """Detached-window mode: the pop-out window drives the size, so release
-        the docked fixed height and let the video fill the window. Unlike PiP
-        the full control bar stays visible (it's a normal window, not a mini
-        overlay)."""
+        the docked fixed height and let the video fill the window. The full
+        control bar stays visible (it's a normal framed window)."""
         self._popout_mode = enabled
         self.bar.show()
         self.pop_btn.setToolTip(
             tr("tooltip_popout_exit") if enabled else tr("tooltip_popout"))
         self._lock_video_box()
-
-    def _show_pip_bar(self) -> None:
-        self.bar.show()
-        self._pip_bar_timer.start(self.PIP_BAR_HIDE_MS)
-
-    def _hide_pip_bar(self) -> None:
-        if self._pip_mode:
-            self.bar.hide()
 
     # -- docked hover scrubber -------------------------------------------------
 
@@ -1665,13 +1554,12 @@ class EmbeddedPlayer(QWidget):
         # only its minimum differs. What varies is who sizes the player.
         self.video.setMinimumHeight(190 if self._fs_ui else 0)
         self.video.setMaximumHeight(16777215)
-        if self._fs_ui or self._pip_mode or self._popout_mode:
-            # Fullscreen, PiP and the detached pop-out window all let the
-            # host window drive the size, so release every constraint on the
-            # player and let its layout stretch to fill the available space.
-            # PiP windows are deliberately small; forcing a docked floor there
-            # is what used to wedge black bars after the PiP<->fullscreen round
-            # trip.
+        if self._fs_ui or self._popout_mode:
+            # Fullscreen and the detached pop-out window both let the host
+            # window drive the size, so release every constraint on the player
+            # and let its layout stretch to fill the available space. (Forcing
+            # a docked floor in a free-resizing window is what used to wedge
+            # black bars after a fullscreen round trip.)
             self.setMinimumHeight(0)
             self.setMaximumHeight(16777215)
         else:
@@ -1707,7 +1595,7 @@ class EmbeddedPlayer(QWidget):
     def _relayout_controls(self) -> None:
         """Responsive docked control bar: when the right column is dragged
         narrow, drop the lowest-priority always-on controls - the volume
-        slider first, then PiP - so the transport buttons keep their size and
+        slider first, then the pop-out button - so the transport buttons keep their size and
         nothing spills outside the column. The mute button stays (volume is
         still reachable by scrolling the video or Up/Down). Leaves the
         state-driven buttons (timeshift / record / next-episode) alone."""
@@ -1719,7 +1607,6 @@ class EmbeddedPlayer(QWidget):
         w = self.width()
         self.vol.setVisible(w >= 330)
         self.pop_btn.setVisible(w >= 315)
-        self.pip_btn.setVisible(w >= 300)
 
     # -- playback defaults -----------------------------------------------------
 

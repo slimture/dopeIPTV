@@ -92,6 +92,17 @@ h._popout_fs_toggled_at = 0.0
 h._toggle_popout_fullscreen()
 app.processEvents()
 
+# Always-on-top toggle (the right-click menu action that replaced PiP's) must
+# flip the window flag and persist the choice.
+from PyQt6.QtCore import Qt
+h._set_popout_on_top(True)
+app.processEvents()
+assert bool(h._popout_win.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
+assert h.settings.value("popout_on_top") == "true"
+h._set_popout_on_top(False)
+app.processEvents()
+assert not bool(h._popout_win.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
+
 # Reparent back in: player home, placeholder fully detached (the crash guard).
 h._toggle_popout()
 app.processEvents()

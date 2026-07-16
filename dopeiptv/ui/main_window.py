@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import logging
 import os
-import sys
 import threading
 import time
 
 from PyQt6.QtCore import (
-    QEvent, QPointF, QRect, QSettings, QSize, Qt, QThreadPool,
+    QEvent, QPointF, QSettings, QSize, Qt, QThreadPool,
     QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import (
@@ -239,7 +238,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._pending_jump_cat = None
         self._stream_retries = 0
         self._last_stream_error_ts = 0.0
-        self._pip_win = None
         self._popout_win = None
         self._popout_placeholder = None
         self._last_player = None
@@ -809,10 +807,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.stop_btn.clicked.connect(self._trakt_stop_current)
             self.player.playback_error.connect(self._playback_error)
             self.player.zap.connect(self._zap)
-            self.player.pip_requested.connect(self._toggle_pip)
             self.player.popout_requested.connect(self._toggle_popout)
-            self.player.pip_context_menu.connect(self._pip_context_menu)
-            self.player.stop_btn.clicked.connect(self._exit_pip_if_active)
+            self.player.popout_context_menu.connect(self._popout_context_menu)
+            self.player.stop_btn.clicked.connect(self._exit_popout_if_active)
             self.player.stopped.connect(self._on_player_stopped)
             self.player.resume_requested.connect(self._resume_last)
             self.player.stalled.connect(self._on_player_stalled)
@@ -1042,8 +1039,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self._side_handle is not None:
             self._side_handle.installEventFilter(self)
         # Floor wide enough that the docked player's full control row (transport
-        # + options + PiP + fullscreen + mute + volume) always fits, so dragging
-        # the divider in never crushes the buttons or drops the volume slider.
+        # + options + pop-out + fullscreen + mute + volume) always fits, so
+        # dragging the divider in never crushes the buttons or drops the slider.
         # The pane's 20px side margins mean the player is 40px narrower than the
         # pane, so the floor is the ~340px bar plus those margins.
         det.setMinimumWidth(380)
@@ -1058,8 +1055,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # the docked player plus its info without overlapping (the info would
         # creep up into the video). Width = rail + middle + detail floors;
         # height fits the docked player (which scales with screen width) plus
-        # its control bar, the pane chrome and a little info. PiP temporarily
-        # drops this and restores it on exit.
+        # its control bar, the pane chrome and a little info.
         # Height fits the docked player (fixed box + control bar) plus the
         # info column's small floor and chrome. Overlap is impossible at ANY
         # size - everything under the video lives in the info scroll column -
@@ -1373,9 +1369,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if now - getattr(self, "_fs_toggled_at", 0.0) < 0.4:
             return
         self._fs_toggled_at = now
-        if self._pip_win is not None:
-            self._toggle_pip_fullscreen()
-            return
         if self._popout_win is not None:
             self._toggle_popout_fullscreen()
             return
@@ -1481,212 +1474,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             QTimer.singleShot(0, lambda: (
                 self.listw.verticalScrollBar().setValue(scroll)))
         self._update_provider_hint()   # bring the hint back if in explore mode
-
-    def _toggle_pip_fullscreen(self) -> None:
-        if self.isFullScreen():
-            self.setWindowFlags(
-                Qt.WindowType.Tool
-                | Qt.WindowType.FramelessWindowHint
-                | Qt.WindowType.WindowStaysOnTopHint)
-            self.showNormal()
-            geo = getattr(self, "_pip_fs_geo", None)
-            if not geo:
-                self.resize(480, 270)
-                screen_geo = self.screen().availableGeometry()
-                self.move(screen_geo.right() - 500,
-                          screen_geo.bottom() - 290)
-                geo = self.geometry()
-            # Restore the small PiP geometry *before* unlocking the video's
-            # fixed height, so _lock_video_box() sizes it to the final PiP
-            # dimensions instead of the still-fullscreen ones.
-            self.player.set_fullscreen_ui(False)
-            self.player.set_pip_mode(True)
-            # Changing window flags recreates the native window on X11, and
-            # the WM re-places the fresh frameless window (usually centered)
-            # asynchronously. Setting the geometry once here races with that,
-            # so also re-assert it on the next event-loop turns until it
-            # sticks at the remembered PiP position.
-            self.setGeometry(geo)
-            for delay in (0, 30, 120):
-                QTimer.singleShot(
-                    delay, lambda g=geo: self._pip_win is not None
-                    and not self.isFullScreen() and self.setGeometry(g))
-        else:
-            self._pip_fs_geo = self.geometry()
-            self.setWindowFlags(Qt.WindowType.Window)
-            self.player.set_fullscreen_ui(True)
-            self.showFullScreen()
-
-    # -- picture-in-picture (mini mode — no reparenting) ----------------------------
-
-    def _toggle_pip(self) -> None:
-        if not self.player:
-            return
-        # PiP and the detached pop-out both take over the one player widget;
-        # if it's popped out, bring it home before starting PiP.
-        if self._popout_win is not None:
-            self._exit_popout()
-        if self._pip_win is not None:
-            self._exit_pip()
-            return
-        if self._player_fs:
-            self._exit_player_fullscreen()
-
-        self._pip_win = True
-        self._pip_geo = self.geometry()
-        self._pip_state = self.windowState()
-        self._pip_splitter_sizes = self._root.sizes()
-
-        self._side.hide()
-        self._mid.hide()
-        self._pip_det_hidden: list[QWidget] = []
-        for w in self._det.children():
-            if (isinstance(w, QWidget) and w is not self.player
-                    and w.isVisible()):
-                self._pip_det_hidden.append(w)
-                w.hide()
-        det_lay = self._det.layout()
-        self._pip_margins = det_lay.contentsMargins()
-        det_lay.setContentsMargins(0, 0, 0, 0)
-        self._det.setStyleSheet(
-            "#DetailPane { background:#000000; border:none; }")
-        self.menuBar().hide()
-        self.player.pip_btn.setToolTip(tr("tooltip_exit_pip"))
-        self.player.fs_btn.hide()
-        self.player.video.setMinimumHeight(0)
-        self.player.set_pip_mode(True)
-
-        if self.isFullScreen() or self.isMaximized():
-            self.showNormal()
-        self.setMinimumSize(240, 135)
-        # Wayland (GNOME/Mutter) ignores WindowStaysOnTopHint - a client can't
-        # pin its own stacking there. So on Wayland we KEEP the title bar, and
-        # the user right-clicks it for the compositor's own "Always on Top"
-        # (exactly how Firefox PiP does it). On X11 the hint works, so we use
-        # the clean frameless floating window.
-        #
-        # macOS: a Qt.Tool window is an NSPanel that hides itself whenever the
-        # app is deactivated - so the moment you click another app the PiP
-        # vanishes, i.e. "always on top" appears broken. Use a plain frameless
-        # window there instead, which keeps floating above other apps.
-        self.setWindowFlags(self._pip_window_flags())
-        self.show()
-        # Restore the last PiP position/size, else default to bottom-right.
-        geo = self._saved_pip_geometry()
-        if geo is None:
-            screen_geo = self.screen().availableGeometry()
-            geo = QRect(screen_geo.right() - 500, screen_geo.bottom() - 290,
-                        480, 270)
-        self.setGeometry(geo)
-        # Re-assert geometry + stacking across the next event-loop turns:
-        # changing window flags recreates the native window on X11 and the WM
-        # may otherwise re-place or lower it.
-        for delay in (0, 40, 150):
-            QTimer.singleShot(delay, lambda g=geo: self._pip_win is not None
-                              and (self.setGeometry(g), self.raise_()))
-
-    def _pip_window_flags(self, on_top: bool = True) -> "Qt.WindowType":
-        flags = Qt.WindowType.Window
-        if on_top:
-            flags |= Qt.WindowType.WindowStaysOnTopHint
-        # Tool = NSPanel on macOS, which auto-hides on app deactivate - skip it
-        # there so the PiP keeps floating above other apps. Elsewhere Tool keeps
-        # it out of the taskbar.
-        if sys.platform != "darwin":
-            flags |= Qt.WindowType.Tool
-        if "wayland" not in QApplication.platformName().lower():
-            flags |= Qt.WindowType.FramelessWindowHint
-        return flags
-
-    def _saved_pip_geometry(self) -> "QRect | None":
-        raw = self.settings.value("pip_geometry", "")
-        try:
-            x, y, w, h = (int(v) for v in str(raw).split(","))
-        except (ValueError, TypeError):
-            return None
-        if w < 200 or h < 120:
-            return None
-        return QRect(x, y, w, h)
-
-    def _exit_pip(self) -> None:
-        if self._pip_win is None:
-            return
-        # Timestamp the exit so the channel list can swallow the stray
-        # context-menu event macOS delivers to it as the app returns.
-        self._pip_exit_ts = time.monotonic()
-        # Remember the PiP window's position/size for next time.
-        g = self.geometry()
-        self.settings.setValue(
-            "pip_geometry", f"{g.x()},{g.y()},{g.width()},{g.height()}")
-        self._pip_win = None
-
-        self.player.set_pip_mode(False)
-        self.player.video.setMinimumHeight(190)
-        self.setMinimumSize(getattr(self, "_base_min", QSize(700, 440)))
-        self._side.show()
-        self._mid.show()
-        for w in getattr(self, "_pip_det_hidden", []):
-            w.show()
-        self._pip_det_hidden = []
-        m = getattr(self, "_pip_margins", None)
-        if m is not None:
-            self._det.layout().setContentsMargins(
-                m.left(), m.top(), m.right(), m.bottom())
-        self._det.setStyleSheet("")
-        self.menuBar().show()
-        self.player.pip_btn.setToolTip(tr("tooltip_pip"))
-        self.player.fs_btn.show()
-
-        self.setWindowFlags(
-            Qt.WindowType.Window)
-        self.show()
-        geo = getattr(self, "_pip_geo", None)
-        state = getattr(self, "_pip_state", None)
-        if geo:
-            self.setGeometry(geo)
-        if state and state != Qt.WindowState.WindowNoState:
-            self.setWindowState(state)
-        # Put the panel widths back (deferred, after the window geometry has
-        # been restored) so the detail pane doesn't keep its PiP-wide size.
-        saved = getattr(self, "_pip_splitter_sizes", None)
-        if saved:
-            QTimer.singleShot(0, lambda s=saved: self._root.setSizes(s))
-
-    def _pip_context_menu(self, global_pos) -> None:
-        if self._pip_win is None:
-            return
-        m = QMenu(self)
-        # Right-click "Always on top" only where the client can actually set
-        # its stacking (X11/XWayland/Windows/macOS). On native Wayland the
-        # compositor ignores it, so there the title-bar menu is the only route
-        # and adding a dead toggle here would just mislead.
-        if "wayland" not in QApplication.platformName().lower():
-            act = m.addAction(tr("pip_always_on_top"))
-            act.setCheckable(True)
-            act.setChecked(bool(self.windowFlags()
-                                & Qt.WindowType.WindowStaysOnTopHint))
-            act.toggled.connect(self._set_pip_on_top)
-        else:
-            # Native Wayland can't pin from the client - point the user at the
-            # compositor's own title-bar menu (a disabled, informational row).
-            hint = m.addAction(tr("pip_wayland_hint"))
-            hint.setEnabled(False)
-        m.addSeparator()
-        m.addAction(tr("tooltip_exit_pip"), self._exit_pip)
-        m.exec(global_pos)
-
-    def _set_pip_on_top(self, on: bool) -> None:
-        if self._pip_win is None:
-            return
-        geo = self.geometry()
-        self.setWindowFlags(self._pip_window_flags(on_top=on))
-        self.setGeometry(geo)      # setWindowFlags can drop the geometry
-        self.show()
-        self.raise_()
-
-    def _exit_pip_if_active(self) -> None:
-        if self._pip_win is not None:
-            self._exit_pip()
 
     # -- playlists -----------------------------------------------------------------
 
@@ -3836,11 +3623,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _save_layout(self) -> None:
         """Write the current window geometry + splitter state to disk. Skipped
-        while in PiP or fullscreen (those sizes are transient)."""
+        while in fullscreen (that size is transient). A detached pop-out is a
+        separate window, so the main window geometry stays valid to save."""
         if not hasattr(self, "_root"):
             return
-        if (self._pip_win is not None or self.isFullScreen()
-                or self._player_fs):
+        if self.isFullScreen() or self._player_fs:
             return
         self.settings.setValue("splitter_state", self._root.saveState())
         self.settings.setValue("window_geometry", self.saveGeometry())
@@ -3866,13 +3653,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     # -- first-run onboarding ------------------------------------------------
 
     def closeEvent(self, event) -> None:
-        # In PiP the main window itself is the little floating player, so its
-        # own close button would otherwise quit the app. Treat it as "leave
-        # PiP" and drop back to the normal mini-player window instead.
-        if self._pip_win is not None:
-            event.ignore()
-            self._exit_pip()
-            return
         # Close the non-modal cast panel first: as a separate top-level
         # window it would otherwise keep the app alive (quitOnLastWindowClosed
         # never fires) and leave the process hanging after the main window

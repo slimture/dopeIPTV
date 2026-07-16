@@ -16,7 +16,8 @@ from __future__ import annotations
 import time
 
 from PyQt6.QtCore import QRect, Qt
-from PyQt6.QtWidgets import QPushButton, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import (
+    QApplication, QMenu, QPushButton, QVBoxLayout, QWidget)
 
 from ..i18n import tr
 
@@ -51,15 +52,19 @@ class _PopoutMixin:
         if self._popout_win is not None:
             self._exit_popout()
             return
-        # Pop-out and PiP/fullscreen are mutually exclusive takes on the same
-        # widget - leave those first so only one owns the player at a time.
-        if self._pip_win is not None:
-            self._exit_pip()
+        # Pop-out and fullscreen are mutually exclusive takes on the same
+        # widget - leave fullscreen first so only one owns the player.
         if self._player_fs:
             self._exit_player_fullscreen()
 
         win = _PopoutWindow(self._exit_popout)
         win.setWindowTitle(tr("popout_title"))
+        # Restore the "always on top" choice (right-click toggles it). Wayland
+        # can't pin a client's stacking, so the flag is a no-op there.
+        if (self.settings.value("popout_on_top", "false") == "true"
+                and "wayland" not in QApplication.platformName().lower()):
+            win.setWindowFlags(Qt.WindowType.Window
+                               | Qt.WindowType.WindowStaysOnTopHint)
 
         # Where the video used to sit in the detail pane, drop a clickable
         # placeholder the same height so the pane doesn't jump, and clicking it
@@ -81,7 +86,6 @@ class _PopoutMixin:
         # height so the video fills the window.
         win.layout().addWidget(self.player)
         self.player.set_popout_mode(True)
-        self.player.pip_btn.hide()   # no PiP while already detached
         self.player.show()
 
         self._popout_win = win
@@ -119,7 +123,6 @@ class _PopoutMixin:
             "popout_geometry", f"{g.x()},{g.y()},{g.width()},{g.height()}")
 
         self.player.set_popout_mode(False)
-        self.player.pip_btn.show()
         # Reparent back to the top of the detail pane (stretch 1, as built).
         self._det.layout().insertWidget(0, self.player, 1)
         self.player.show()
@@ -128,7 +131,7 @@ class _PopoutMixin:
         if ph is not None:
             self._det.layout().removeWidget(ph)
             # Detach from the detail pane *synchronously* (not just deleteLater):
-            # PiP/fullscreen entry scans self._det.children() and would otherwise
+            # fullscreen entry scans self._det.children() and would otherwise
             # grab this not-yet-deleted placeholder, hide it, then crash on
             # w.show() once deleteLater finally removes it.
             ph.hide()
@@ -161,3 +164,39 @@ class _PopoutMixin:
     def _exit_popout_if_active(self) -> None:
         if self._popout_win is not None:
             self._exit_popout()
+
+    def _popout_context_menu(self, global_pos) -> None:
+        """Right-click menu on the detached video: pin it above other windows
+        (the replacement for the old PiP always-on-top), or bring it back."""
+        if self._popout_win is None:
+            return
+        m = QMenu(self)
+        # "Always on top" only where the client can actually set its stacking
+        # (X11/XWayland/Windows/macOS). Native Wayland ignores the hint, so
+        # point the user at the compositor's own title-bar menu instead.
+        if "wayland" not in QApplication.platformName().lower():
+            act = m.addAction(tr("popout_always_on_top"))
+            act.setCheckable(True)
+            act.setChecked(bool(self._popout_win.windowFlags()
+                                & Qt.WindowType.WindowStaysOnTopHint))
+            act.toggled.connect(self._set_popout_on_top)
+        else:
+            hint = m.addAction(tr("popout_wayland_hint"))
+            hint.setEnabled(False)
+        m.addSeparator()
+        m.addAction(tr("tooltip_popout_exit"), self._exit_popout)
+        m.exec(global_pos)
+
+    def _set_popout_on_top(self, on: bool) -> None:
+        win = self._popout_win
+        if win is None:
+            return
+        self.settings.setValue("popout_on_top", "true" if on else "false")
+        geo = win.geometry()
+        flags = Qt.WindowType.Window
+        if on:
+            flags |= Qt.WindowType.WindowStaysOnTopHint
+        win.setWindowFlags(flags)
+        win.setGeometry(geo)       # setWindowFlags can drop the geometry
+        win.show()
+        win.raise_()

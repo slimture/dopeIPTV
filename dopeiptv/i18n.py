@@ -1543,26 +1543,6 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Без звука / со звуком",
         "th": "ปิด / เปิดเสียง",
     },
-    "tooltip_pip": {
-        "en": "Picture-in-Picture",
-        "sv": "Bild-i-bild",
-        "es": "Imagen en imagen",
-        "de": "Bild-in-Bild",
-        "fr": "Image dans l'image",
-        "zh": "画中画",
-        "ru": "Картинка в картинке",
-        "th": "ภาพซ้อนภาพ",
-    },
-    "tooltip_exit_pip": {
-        "en": "Exit Picture-in-Picture",
-        "sv": "Avsluta bild-i-bild",
-        "es": "Salir de imagen en imagen",
-        "de": "Bild-in-Bild beenden",
-        "fr": "Quitter l'image dans l'image",
-        "zh": "退出画中画",
-        "ru": "Выйти из картинки в картинке",
-        "th": "ออกจากภาพซ้อนภาพ",
-    },
     "tooltip_popout": {
         "en": "Pop out to a separate window",
         "sv": "Öppna i separat fönster",
@@ -2263,28 +2243,28 @@ _STRINGS: dict[str, dict[str, str]] = {
         "th": "รันผ่านแบ็กเอนด์ X11 (ต้องรีสตาร์ต)",
     },
     "setting_force_x11_hint": {
-        "en": "Wayland only: run under XWayland so the Picture-in-Picture "
-              "window can float frameless and always-on-top. May look slightly "
-              "softer on fractional HiDPI scaling.",
-        "sv": "Endast Wayland: kör under XWayland så att bild-i-bild-fönstret "
-              "kan flyta ramlöst och alltid överst. Kan se något mjukare ut "
+        "en": "Wayland only: run under XWayland so the pop-out player window "
+              "can stay always-on-top. May look slightly softer on fractional "
+              "HiDPI scaling.",
+        "sv": "Endast Wayland: kör under XWayland så att det utpoppade "
+              "spelarfönstret kan ligga alltid överst. Kan se något mjukare ut "
               "vid fraktionell HiDPI-skalning.",
-        "es": "Solo Wayland: ejecuta bajo XWayland para que la ventana PiP "
-              "flote sin marco y siempre visible. Puede verse algo borroso con "
-              "escala HiDPI fraccionada.",
-        "de": "Nur Wayland: läuft unter XWayland, damit das Bild-im-Bild-"
-              "Fenster rahmenlos und immer im Vordergrund schweben kann. Kann "
-              "bei fraktionaler HiDPI-Skalierung etwas weicher wirken.",
+        "es": "Solo Wayland: ejecuta bajo XWayland para que la ventana flotante "
+              "del reproductor pueda estar siempre visible. Puede verse algo "
+              "borroso con escala HiDPI fraccionada.",
+        "de": "Nur Wayland: läuft unter XWayland, damit das ausgeklappte "
+              "Player-Fenster immer im Vordergrund bleiben kann. Kann bei "
+              "fraktionaler HiDPI-Skalierung etwas weicher wirken.",
         "fr": "Wayland uniquement : exécute sous XWayland pour que la fenêtre "
-              "PiP flotte sans cadre et toujours au premier plan. Peut paraître "
-              "légèrement flou en mise à l'échelle HiDPI fractionnaire.",
-        "zh": "仅 Wayland：在 XWayland 下运行，使画中画窗口可无边框浮动并置顶。"
+              "détachée du lecteur puisse rester toujours au premier plan. Peut "
+              "paraître légèrement flou en mise à l'échelle HiDPI fractionnaire.",
+        "zh": "仅 Wayland：在 XWayland 下运行，使弹出的播放器窗口可以始终置顶。"
               "在分数 HiDPI 缩放下可能略微模糊。",
-        "ru": "Только Wayland: запуск под XWayland, чтобы окно «картинка в "
-              "картинке» было безрамочным и поверх всех окон. При дробном "
-              "HiDPI-масштабе может выглядеть чуть мягче.",
-        "th": "เฉพาะ Wayland: รันภายใต้ XWayland เพื่อให้หน้าต่าง PiP "
-              "ลอยแบบไร้ขอบและอยู่บนสุดได้ อาจดูนุ่มขึ้นเล็กน้อยเมื่อสเกล HiDPI แบบเศษส่วน",
+        "ru": "Только Wayland: запуск под XWayland, чтобы отделённое окно плеера "
+              "могло оставаться поверх всех окон. При дробном HiDPI-масштабе "
+              "может выглядеть чуть мягче.",
+        "th": "เฉพาะ Wayland: รันภายใต้ XWayland เพื่อให้หน้าต่างเครื่องเล่นที่แยกออกมา "
+              "อยู่บนสุดเสมอได้ อาจดูนุ่มขึ้นเล็กน้อยเมื่อสเกล HiDPI แบบเศษส่วน",
     },
     "ext_play_title": {
         "en": "Open external player?",
@@ -4051,12 +4031,12 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Меню обновлены. Перезапустите dopeIPTV, чтобы перевести всё приложение.",
         "th": "เมนูอัปเดตแล้ว รีสตาร์ท dopeIPTV เพื่อแปลทุกส่วนของแอป",
     },
-    "pip_always_on_top": {
+    "popout_always_on_top": {
         "en": "Always on top", "sv": "Alltid överst", "es": "Siempre visible",
         "de": "Immer im Vordergrund", "fr": "Toujours au premier plan",
         "zh": "置顶", "ru": "Поверх всех окон", "th": "ปักหมุดบนสุด",
     },
-    "pip_wayland_hint": {
+    "popout_wayland_hint": {
         "en": "Always on top: right-click the title bar (Wayland)",
         "sv": "Alltid överst: högerklicka på titelraden (Wayland)",
         "es": "Siempre visible: clic derecho en la barra de título (Wayland)",
@@ -6499,11 +6479,11 @@ _STRINGS: dict[str, dict[str, str]] = {
         "en": "Mute", "sv": "Ljud av", "es": "Silenciar", "de": "Stumm",
         "fr": "Muet", "zh": "静音", "ru": "Без звука", "th": "ปิดเสียง",
     },
-    "sc_pip": {
-        "en": "Picture-in-picture", "sv": "Bild-i-bild",
-        "es": "Imagen en imagen", "de": "Bild-in-Bild",
-        "fr": "Image dans l’image", "zh": "画中画",
-        "ru": "Картинка в картинке", "th": "ภาพซ้อนภาพ",
+    "sc_popout": {
+        "en": "Pop out player", "sv": "Poppa ut spelaren",
+        "es": "Ventana flotante", "de": "Player ausklappen",
+        "fr": "Détacher le lecteur", "zh": "弹出播放器",
+        "ru": "Отделить плеер", "th": "แยกหน้าต่างเครื่องเล่น",
     },
     "sc_record": {
         "en": "Record", "sv": "Spela in", "es": "Grabar", "de": "Aufnehmen",
