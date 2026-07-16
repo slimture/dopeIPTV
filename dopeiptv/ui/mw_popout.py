@@ -94,6 +94,8 @@ class _PopoutMixin:
         # height so the video fills the window.
         win.layout().addWidget(self.player)
         self.player.set_popout_mode(True)
+        self.player.set_popout_autohide(
+            self.settings.value("popout_autohide", "true") == "true")
         self.player.show()
 
         win.setGeometry(self._saved_popout_geometry())
@@ -223,6 +225,10 @@ class _PopoutMixin:
         bar = m.addAction(tr("popout_show_titlebar") if frameless
                           else tr("popout_hide_titlebar"))
         bar.triggered.connect(lambda: self._set_popout_frameless(not frameless))
+        auto = m.addAction(tr("popout_autohide_controls"))
+        auto.setCheckable(True)
+        auto.setChecked(self.settings.value("popout_autohide", "true") == "true")
+        auto.toggled.connect(self._set_popout_autohide)
         m.addSeparator()
         m.addAction(tr("tooltip_popout_exit"), self._exit_popout)
         m.exec(global_pos)
@@ -234,3 +240,8 @@ class _PopoutMixin:
     def _set_popout_frameless(self, hidden: bool) -> None:
         self.settings.setValue("popout_frameless", "true" if hidden else "false")
         self._apply_popout_flags()
+
+    def _set_popout_autohide(self, on: bool) -> None:
+        self.settings.setValue("popout_autohide", "true" if on else "false")
+        if self.player:
+            self.player.set_popout_autohide(on)

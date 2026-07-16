@@ -4036,6 +4036,13 @@ _STRINGS: dict[str, dict[str, str]] = {
         "de": "Immer im Vordergrund", "fr": "Toujours au premier plan",
         "zh": "置顶", "ru": "Поверх всех окон", "th": "ปักหมุดบนสุด",
     },
+    "popout_autohide_controls": {
+        "en": "Auto-hide controls", "sv": "Dölj kontroller automatiskt",
+        "es": "Ocultar controles automáticamente",
+        "de": "Steuerung automatisch ausblenden",
+        "fr": "Masquer les commandes automatiquement", "zh": "自动隐藏控制栏",
+        "ru": "Автоскрытие панели управления", "th": "ซ่อนแถบควบคุมอัตโนมัติ",
+    },
     "popout_hide_titlebar": {
         "en": "Hide title bar", "sv": "Dölj titelrad",
         "es": "Ocultar barra de título", "de": "Titelleiste ausblenden",

@@ -112,6 +112,14 @@ h._set_popout_frameless(False)
 app.processEvents()
 assert not bool(h._popout_win.windowFlags() & Qt.WindowType.FramelessWindowHint)
 
+# Auto-hide-controls toggle persists and drives the player flag (default on).
+assert h.player._popout_autohide is True
+h._set_popout_autohide(False)
+assert h.settings.value("popout_autohide") == "false"
+assert h.player._popout_autohide is False
+h._set_popout_autohide(True)
+assert h.player._popout_autohide is True
+
 # Escape while not fullscreen must not dock or raise; it only leaves
 # fullscreen, so the window stays detached here.
 h._popout_escape()

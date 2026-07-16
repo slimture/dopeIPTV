@@ -686,6 +686,11 @@ class EmbeddedPlayer(QWidget):
         self._fs_ui = False
         self._popout_mode = False
         self._popout_drag_from = None
+        self._popout_autohide = False
+        self._popout_bar_timer = QTimer(self)
+        self._popout_bar_timer.setSingleShot(True)
+        self._popout_bar_timer.setInterval(2500)
+        self._popout_bar_timer.timeout.connect(self._hide_popout_bar)
         self.seek_overlay = None
         self._settings = settings
         # Docked video-box height scales with the display so the mini player
@@ -1136,6 +1141,11 @@ class EmbeddedPlayer(QWidget):
             if event.type() == event.Type.MouseMove:
                 if self._fs_ui:
                     self._show_overlay()
+        elif obj is self.bar and self._popout_autohide:
+            # Keep the auto-hiding pop-out bar up while the pointer is on it,
+            # so it never fades out from under a button you're reaching for.
+            if event.type() in (event.Type.Enter, event.Type.MouseMove):
+                self._popout_bar_timer.start()
         elif self._fs_ui and event.type() in (event.Type.Enter,
                                               event.Type.MouseMove):
             self._overlay_timer.start()
@@ -1174,6 +1184,8 @@ class EmbeddedPlayer(QWidget):
         # the video (docked or fullscreen) and re-arms its idle fade.
         if self._seek_mode == "timeline":
             self._show_ts_timeline()
+        if self._popout_mode:
+            self._reveal_popout_bar()   # no-op unless auto-hide is on
         drag_from = getattr(self, "_popout_drag_from", None)
         if (drag_from is not None
                 and event.buttons() & Qt.MouseButton.LeftButton):
@@ -1266,13 +1278,36 @@ class EmbeddedPlayer(QWidget):
 
     def set_popout_mode(self, enabled: bool) -> None:
         """Detached-window mode: the pop-out window drives the size, so release
-        the docked fixed height and let the video fill the window. The full
-        control bar stays visible (it's a normal framed window)."""
+        the docked fixed height and let the video fill the window."""
         self._popout_mode = enabled
+        if not enabled:
+            # Back to docked: the bar is always visible there.
+            self._popout_autohide = False
+            self._popout_bar_timer.stop()
         self.bar.show()
         self.pop_btn.setToolTip(
             tr("tooltip_popout_exit") if enabled else tr("tooltip_popout"))
         self._lock_video_box()
+
+    def set_popout_autohide(self, enabled: bool) -> None:
+        """When on, the pop-out control bar fades after a few seconds of no
+        pointer activity and reappears on mouse movement over the video (like a
+        video player). Off keeps it permanently visible."""
+        self._popout_autohide = enabled
+        self.bar.show()
+        if enabled and self._popout_mode:
+            self._popout_bar_timer.start()
+        else:
+            self._popout_bar_timer.stop()
+
+    def _hide_popout_bar(self) -> None:
+        if self._popout_mode and self._popout_autohide and not self._fs_ui:
+            self.bar.hide()
+
+    def _reveal_popout_bar(self) -> None:
+        if self._popout_mode and self._popout_autohide:
+            self.bar.show()
+            self._popout_bar_timer.start()
 
     # -- docked hover scrubber -------------------------------------------------
 

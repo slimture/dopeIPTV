@@ -163,7 +163,7 @@ the first time the app starts.
 | Audio track / subtitles / aspect / buffer | The ⚙ button in the player bar (also in fullscreen) |
 | Stats for nerds | ⚙ → Stats for nerds (live overlay on the video) |
 | Fullscreen | Double-click the video, or press `F` — `Esc` to leave |
-| Pop the player out to its own window | The **⧉** button in the player bar (keep it on a second screen while you browse — click it again, or close the window, to dock it back). Drag the video to move the window; right-click it for **Always on top** or **Hide title bar**; `Esc` leaves its fullscreen. |
+| Pop the player out to its own window | The **⧉** button in the player bar (keep it on a second screen while you browse — click it again, or close the window, to dock it back). Drag the video to move the window; right-click it for **Always on top**, **Hide title bar** or **Auto-hide controls**; `Esc` leaves its fullscreen. |
 | Zap to next/previous channel | Ctrl+Right / Ctrl+Left |
 | Rename / hide a channel | Right-click it |
 | Open in an external player (mpv/VLC) | Right-click → Open externally |
