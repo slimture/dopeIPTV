@@ -110,7 +110,9 @@ class _PopoutMixin:
         if (self.settings.value("popout_on_top", "false") == "true"
                 and not wayland):
             flags |= Qt.WindowType.WindowStaysOnTopHint
-        if self.settings.value("popout_frameless", "false") == "true":
+        # Frameless (no title bar) by default - a clean video window. Drag the
+        # video to move it, right-click to show the title bar or dock it back.
+        if self.settings.value("popout_frameless", "true") == "true":
             flags |= Qt.WindowType.FramelessWindowHint
         return flags
 
@@ -227,7 +229,8 @@ class _PopoutMixin:
         bar.triggered.connect(lambda: self._set_popout_frameless(not frameless))
         auto = m.addAction(tr("popout_autohide_controls"))
         auto.setCheckable(True)
-        auto.setChecked(self.settings.value("popout_autohide", "true") == "true")
+        auto.setChecked(
+            self.settings.value("popout_autohide", "true") == "true")
         auto.toggled.connect(self._set_popout_autohide)
         m.addSeparator()
         m.addAction(tr("tooltip_popout_exit"), self._exit_popout)

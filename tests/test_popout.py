@@ -103,14 +103,15 @@ h._set_popout_on_top(False)
 app.processEvents()
 assert not bool(h._popout_win.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
 
-# Hide-title-bar toggle flips the frameless flag and persists.
-h._set_popout_frameless(True)
-app.processEvents()
+# Frameless (no title bar) is the default; the toggle can restore it.
 assert bool(h._popout_win.windowFlags() & Qt.WindowType.FramelessWindowHint)
-assert h.settings.value("popout_frameless") == "true"
 h._set_popout_frameless(False)
 app.processEvents()
 assert not bool(h._popout_win.windowFlags() & Qt.WindowType.FramelessWindowHint)
+assert h.settings.value("popout_frameless") == "false"
+h._set_popout_frameless(True)
+app.processEvents()
+assert bool(h._popout_win.windowFlags() & Qt.WindowType.FramelessWindowHint)
 
 # Auto-hide-controls toggle persists and drives the player flag (default on).
 assert h.player._popout_autohide is True
