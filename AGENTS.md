@@ -22,8 +22,11 @@ map and the one-way import rule.
 | `core/stores.py` | Data persistence layer |
 | `core/workers.py` | Thread pool helpers, LogoLoader, image caches |
 | `core/recording.py` | Recording manager |
+| `core/updates.py` | GitHub latest-release check |
 | `core/wakelock.py` | Screensaver inhibitor |
+| `core/log.py` | Central logging (`configure_logging`, `DOPEIPTV_LOG`) |
 | `core/platform_macos.py` | macOS-specific helpers |
+| `core/platform_windows.py` | Windows-specific helpers |
 | `media/embedded.py` | Embedded mpv player widget |
 | `media/players.py` | External player launch, libmpv detection |
 | `ui/main_window.py` | MainWindow composition root (+ `mw_*` mixins) |
@@ -36,12 +39,20 @@ map and the one-way import rule.
 ## Working with individual modules
 
 `ui/main_window.py` is a thin composition root: the real behaviour lives
-in the `mw_*` mixins beside it (`mw_settings`, `mw_trakt`,
-`mw_recording`, `mw_context`, `mw_detail`), each mixed into `MainWindow`.
+in the `mw_*` mixins beside it, each mixed into `MainWindow`:
+`mw_settings`, `mw_trakt`, `mw_recording`, `mw_context`, `mw_detail`,
+`mw_search` (sidebar search), `mw_sidebar` (panel collapse / icon rail),
+`mw_nav` (focus mode, nav colours/icons, Library group), `mw_shortcuts`
+(keyboard shortcuts), `mw_busy` (loading indicator), `mw_updates`
+(update badge) and `mw_reminders`. What stays in `main_window.py` is the
+`__init__`/`_build_ui` composition and the playback path (start/stop,
+seek, PiP, fullscreen, reconnect) - keep playback code there.
 When making changes:
 
 - **UI changes**: find the method by name across `ui/main_window.py` and
   the `mw_*` mixins (e.g. `open_settings` lives in `mw_settings.py`).
+  A mixin method resolves on `MainWindow` via MRO, so a pure move between
+  them never changes behaviour.
 - **Playback**: `media/embedded.py` for the in-app player,
   `media/players.py` for external players.
 - **Theme/style**: `ui/theme.py` contains `THEMES`, `ACCENTS`, palette
@@ -53,7 +64,7 @@ When making changes:
 
 ## Conventions
 
-- Python 3.10+, `from __future__ import annotations` in every file
+- Python 3.11+, `from __future__ import annotations` in every file
 - PyQt6 (not PyQt5) - all Qt imports use the PyQt6 namespace
 - No comments unless the "why" is non-obvious
 - Type hints on public method signatures
@@ -74,3 +85,24 @@ pattern of `FavoriteStore` or `HistoryStore`.
 
 **Change the channel list appearance**: modify `ChannelDelegate` paint
 methods in `ui/channel_list.py`.
+
+## Quality gate
+
+CI (`.github/workflows/ci.yml`) runs on every push/PR - reproduce it
+locally before committing:
+
+```bash
+ruff check dopeiptv tests     # lint (pyflakes + bugbear + comprehensions)
+mypy                          # types - scoped to the logic modules today
+QT_QPA_PLATFORM=offscreen pytest -q
+```
+
+- Prefer `print()` never; log through the shared logger:
+  `from ..core.log import log` then `log.info/warning/error/debug(...)`.
+  `DOPEIPTV_LOG=debug` shows debug traces; `DOPEIPTV_LOG_FILE=/path` tees
+  to a rotating file.
+- `mypy` currently type-checks `providers/client.py`, `providers/epg.py`
+  and `core/stores.py` (see `[tool.mypy] files` in `pyproject.toml`);
+  grow that list as modules gain type hints.
+- Bump the version in **both** `dopeiptv/__init__.py` and `pyproject.toml`
+  on a release - `tests/test_version.py` fails the build if they drift.

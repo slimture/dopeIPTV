@@ -17,18 +17,22 @@ dopeiptv/
   i18n.py              Translation tables + set_language / tr()
 
   providers/           Data sources (the network / provider edge)
-    client.py          XtreamClient + OfflineClient (empty first-run stand-in)
+    client.py          XtreamClient, OfflineClient/M3UClient/DemoClient
     epg.py             XmltvGuide - XMLTV parser with disk cache + index
     metadata.py        TMDB client, PosterResolver (cover art)
     trakt.py           Trakt.tv sync (watched, watchlist)
+    oauth_loopback.py  Loopback HTTP server for the Trakt OAuth redirect
     chromecast.py      ChromecastManager, CastDialog
 
   core/                Storage, background work, OS integration
     stores.py          JSON data stores (playlists, favorites, history, ...)
     workers.py         QThreadPool helpers, LogoLoader, byte-bounded caches
     recording.py       RecordingManager - ffmpeg/mpv stream-copy, timers
+    updates.py         GitHub latest-release check (is_newer, fetch)
     wakelock.py        Screensaver/suspend inhibitor (DBus + caffeinate)
+    log.py             Central logging (configure_logging, DOPEIPTV_LOG)
     platform_macos.py  macOS-specific helpers (OpenGL, libmpv, paths)
+    platform_windows.py Windows helpers (libmpv discovery, wakelock, shortcut)
     player_exec.py     Locate the external mpv / VLC binary on the host
 
   media/               Playback
@@ -38,6 +42,7 @@ dopeiptv/
   services/            Window-agnostic application services
     coverart.py        CoverArtService - TMDB resolver lifecycle + the
                        ordered list/detail cover-candidate logic
+    reminders.py       ReminderStore - programme reminders (persistence)
     resume.py          ResumeStore - per-playlist resume positions
                        (persistence + keep/drop rule)
 
@@ -49,12 +54,23 @@ dopeiptv/
     mw_recording.py    Recording / timeshift mixin
     mw_context.py      Right-click context-menu mixin
     mw_detail.py       EPG / detail-panel mixin
+    mw_search.py       Sidebar category / item search mixin
+    mw_sidebar.py      Sidebar chrome (collapse / icon rail / mid-compact)
+    mw_nav.py          Nav chrome (focus mode, nav colours/icons, Library)
+    mw_shortcuts.py    Keyboard shortcuts + registry
+    mw_busy.py         Loading indicator + spinner overlay
+    mw_updates.py      Update-check badge/status wiring
+    mw_reminders.py    Programme-reminder UI (set / list / fire)
     widgets.py         Small standalone widgets
     welcome.py         First-run welcome overlay (connect / explore)
     channel_list.py    Virtualized list: model, view, painted delegate
-    dialogs.py         Login, playlist editor, EPG guide, content manager
+    dialogs.py         Login, playlist editor, content manager
+    epg_grid.py        EPG timeline grid view
+    epg_search.py      Programme search across the whole guide
+    reminders.py       Reminders manager dialog
+    shortcuts.py       Keyboard-shortcuts editor dialog
     tmdb_match.py      Manual TMDB match dialog
-    theme.py           5 themes x 7 accents, palette dict P, QSS generator
+    theme.py           9 themes x 7 accents, palette dict P, QSS generator
 ```
 
 Import direction is one-way: `ui` may use `services`, `media`, `core`

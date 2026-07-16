@@ -73,18 +73,41 @@ in the background.  Cache files live in the platform's cache directory.
 
 ## Theme system
 
-Five themes (Midnight, Charcoal, Graphite, Slate, Nord) and seven accent
-colors.  The active theme populates a global palette dict `P` and accent
-string `ACCENT`.  `build_style()` generates the full QSS from these.
-Theme changes take effect immediately without restarting playback.
+Nine themes (Graphite, Midnight, OLED, Nord, Dracula, Gruvbox, Solarized,
+Catppuccin, Light) and seven accent colors.  The active theme populates a
+global palette dict `P`.  `build_style()` generates the full QSS from
+these.  Theme changes take effect immediately without restarting playback.
 
-## Testing
+## Logging
 
-```bash
-pip install pytest
-pytest tests/
+All diagnostics go through one logger (`dopeiptv/core/log.py`), configured
+once in `app.py`'s `main()`. Use it instead of `print()`:
+
+```python
+from ..core.log import log
+log.info("…"); log.warning("…"); log.error("…"); log.debug("…")
 ```
 
-The test suite contains import smoke tests and unit tests for pure
-utility functions.  GUI tests are not included (they would require a
-display server).
+- `DOPEIPTV_LOG=debug` turns on the verbose timeshift / image / TMDB traces
+  (one switch; it replaced the old `DOPEIPTV_TS_DEBUG` / `DOPEIPTV_IMG_DEBUG`
+  flags).
+- `DOPEIPTV_LOG_FILE=/path/to.log` also tees everything to a small rotating
+  file - the easiest thing to attach to a bug report.
+
+## Quality gate (CI)
+
+`.github/workflows/ci.yml` runs on every push and PR. Reproduce it locally
+before committing:
+
+```bash
+pip install ruff mypy pytest
+ruff check dopeiptv tests                    # lint: pyflakes + bugbear + C4
+mypy                                         # types (scoped, see pyproject)
+QT_QPA_PLATFORM=offscreen pytest -q          # the full suite, headless
+```
+
+The suite is import smoke tests + unit tests for pure logic (no GUI tests -
+they'd need a display server). `mypy` type-checks the pure-logic modules
+today (`[tool.mypy] files` in `pyproject.toml`); grow that list as modules
+gain type hints. A release build also runs a GUI-less `--self-check` that
+loads the bundled libmpv.
