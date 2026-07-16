@@ -310,7 +310,8 @@ class WelcomeOverlay(QWidget):
         self._c_connect.setText(tr("btn_connect"))
         self._f_title.setText(tr("onb_features_title"))
         for lbl, key in zip(self._feats, ("onb_feat_1", "onb_feat_2",
-                                          "onb_feat_3", "onb_feat_4")):
+                                          "onb_feat_3", "onb_feat_4"),
+                            strict=False):
             lbl.setText("•  " + tr(key))
         self._c_back.setText(tr("onb_back"))
         self._c_skip.setText(tr("onb_skip"))

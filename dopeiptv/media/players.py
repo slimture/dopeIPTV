@@ -271,7 +271,7 @@ class MpvWindowPlayer(QObject):
         self.shutdown()
 
     def play(self, url: str, title: str | None = None) -> bool:
-        for attempt in range(2):
+        for _attempt in range(2):
             try:
                 m = self._ensure_mpv()
                 try:

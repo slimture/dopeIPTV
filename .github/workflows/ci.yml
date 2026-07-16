@@ -51,3 +51,11 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen   # no display on the runner
         run: pytest -q
+      - name: Dependency audit (advisory)
+        # Flags known CVEs in the installed dependencies. Advisory only
+        # (continue-on-error) so a newly-disclosed upstream CVE surfaces here
+        # without blocking commits/releases through no change of ours.
+        continue-on-error: true
+        run: |
+          pip install pip-audit
+          pip-audit --strict || true

@@ -77,7 +77,7 @@ def test_authenticate_parses_and_empty_raises():
     empty._fetch = lambda: "#EXTM3U\n"
     try:
         empty.authenticate()
-        assert False, "empty playlist should raise"
+        raise AssertionError("empty playlist should raise")
     except RuntimeError:
         pass
 

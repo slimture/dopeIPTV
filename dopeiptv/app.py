@@ -286,10 +286,13 @@ def main() -> int:
         auth_err = [None]
 
         def _do_auth():
+            # B023 false positive: the thread is join()ed within this same
+            # iteration below, so the closure reads the current candidate /
+            # auth_err, never a later loop value.
             try:
-                candidate.authenticate()
+                candidate.authenticate()  # noqa: B023
             except Exception as exc:
-                auth_err[0] = exc
+                auth_err[0] = exc  # noqa: B023
 
         t = threading.Thread(target=_do_auth, daemon=True)
         t.start()

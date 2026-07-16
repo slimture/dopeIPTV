@@ -38,10 +38,16 @@ testpaths = ["tests"]
 target-version = "py311"
 
 [tool.ruff.lint]
-# High-signal defaults only: pyflakes (F) catches undefined names, unused
-# imports/variables and the like, plus E9 syntax errors. E402/E731/E741 are
-# pre-existing, deliberate choices (ordered platform-bootstrap imports in
-# app.py/mw_settings.py, a couple of tiny lambdas), so they're ignored to keep
-# the gate green and focused on real problems. Tighten (add B, I, ...) later.
-select = ["E4", "E7", "E9", "F"]
-ignore = ["E402", "E731", "E741"]
+# High-signal rules: pyflakes (F) for undefined names / unused imports, E9
+# syntax, flake8-bugbear (B) for real bug patterns (loop-var closures, zip
+# length mismatch, ...), and flake8-comprehensions (C4).
+# Ignored, all deliberate / idiomatic here:
+#   E402  - ordered platform-bootstrap imports (app.py, mw_settings.py)
+#   E731  - a couple of tiny lambdas
+#   E741  - one 'l' loop var
+#   B008  - function call in a default argument. In a Qt/callback codebase this
+#           is idiomatic and safe: QModelIndex() defaults, and the recommended
+#           `tid=t.get("id")` pattern that binds a loop var into a lambda (the
+#           very fix bugbear's own B023 asks for).
+select = ["E4", "E7", "E9", "F", "B", "C4"]
+ignore = ["E402", "E731", "E741", "B008"]

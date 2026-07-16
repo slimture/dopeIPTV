@@ -131,7 +131,7 @@ def _control_icon(name: str, color: str, px: int = 28) -> QIcon:
         rows = (T, midy, B)
         knobs = (R - w * 0.18, L + w * 0.22, R - w * 0.34)
         rad = S * 0.07
-        for y, kx in zip(rows, knobs):
+        for y, kx in zip(rows, knobs, strict=True):
             stroke(S * 0.075)
             p.drawLine(QPointF(L, y), QPointF(R, y))
             fill()

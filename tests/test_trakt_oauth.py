@@ -67,7 +67,7 @@ def test_exchange_code_raises_on_rejection(monkeypatch):
     tc = _client("exchange_fail")
     try:
         tc.exchange_code("X")
-        assert False, "expected TraktAuthError"
+        raise AssertionError("expected TraktAuthError")
     except T.TraktAuthError:
         pass
 

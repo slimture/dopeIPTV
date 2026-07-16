@@ -529,7 +529,7 @@ class WatchedStore:
 
     def _save(self) -> None:
         def dump_eps(eps):
-            return {str(k): sorted(list(v)) for k, v in eps.items()}
+            return {str(k): sorted(v) for k, v in eps.items()}
         payload = {
             "trakt_movies": sorted(self.trakt_movies),
             "local_movies": sorted(self.local_movies),
