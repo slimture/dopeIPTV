@@ -5,6 +5,12 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
+## [0.8.1]
+
+**Fix: working catch-up channels could silently lose their timeshift.**
+
+- A momentary network failure during the archive check (timeout, DNS/TLS error, refused connection) was treated as proof that a channel serves no catch-up, hiding its whole timeshift UI for 14 days with no message. Only a real provider response (an error page instead of a stream) can hide a channel's catch-up now; network failures leave everything untouched and show a clear "couldn't reach the archive" status instead. Channels already hidden on 0.8.0 come back after one playlist refresh (↻).
+
 ## [0.8.0]
 
 **Multiview** — watch up to nine live channels at once — plus a sharper,
