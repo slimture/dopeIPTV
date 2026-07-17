@@ -283,6 +283,25 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     # -- UI construction -------------------------------------------------------
 
+    def _populate_playlist_menu(self) -> None:
+        """(Re)fill the Playlists menu with a checkable entry per playlist, the
+        active one ticked. Switching is one click - no trip through Settings."""
+        menu = self._playlist_menu
+        menu.clear()
+        store = self.playlist_store
+        if not store or not store.playlists():
+            act = menu.addAction(tr("pl_mgmt_unavailable"))
+            act.setEnabled(False)
+            return
+        active = store.active_id
+        for p in store.playlists():
+            act = menu.addAction(p.get("name") or p.get("server") or "?")
+            act.setCheckable(True)
+            act.setChecked(p["id"] == active)
+            if p["id"] != active:
+                act.triggered.connect(
+                    lambda _c=False, pid=p["id"]: self.switch_playlist(pid))
+
     def _build_ui(self) -> None:
         menubar = self.menuBar()
         app_menu = menubar.addMenu(APP_NAME)
@@ -292,6 +311,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         refresh_action.triggered.connect(self.refresh_playlist)
         reminders_action = app_menu.addAction(tr("reminders_menu"))
         reminders_action.triggered.connect(self._open_reminders)
+        multiview_action = app_menu.addAction(tr("menu_multiview"))
+        multiview_action.triggered.connect(self._show_multiview)
         if sys.platform != "darwin":
             app_menu.addSeparator()
         about_action = app_menu.addAction(tr("menu_about"))
@@ -314,11 +335,21 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             refresh_action.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
             reminders_action.setMenuRole(
                 QAction.MenuRole.ApplicationSpecificRole)
+            multiview_action.setMenuRole(
+                QAction.MenuRole.ApplicationSpecificRole)
+        # A quick playlist switcher so hopping between providers (e.g. to feed
+        # multiview cells from different accounts) doesn't mean a trip through
+        # Settings. Its own top-level menu - a distinct name, so macOS shows it
+        # cleanly beside the app menu (not as a duplicate). Rebuilt on open so
+        # it always reflects the current playlists and the active one.
+        self._playlist_menu = menubar.addMenu(tr("menu_playlists"))
+        self._playlist_menu.aboutToShow.connect(self._populate_playlist_menu)
         # Kept for live language switching (see retranslate_ui).
         self._i18n_actions = {
             settings_action: lambda: tr("btn_settings") + "…",
             refresh_action: lambda: tr("menu_refresh_playlist"),
             reminders_action: lambda: tr("reminders_menu"),
+            multiview_action: lambda: tr("menu_multiview"),
             about_action: lambda: tr("menu_about"),
             quit_action: lambda: tr("menu_quit"),
         }

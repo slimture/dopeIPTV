@@ -41,6 +41,9 @@ class Host(QMainWindow, _MultiviewMixin):
 
 
 h = Host()
+# Skip the one-time "multiview needs N connections" info dialog (it's modal
+# and would block this headless run).
+h.settings.setValue("mv_info_seen", "true")
 assert h._multiview_win is None
 
 # First add opens the window and fills cell 0, which takes focus.

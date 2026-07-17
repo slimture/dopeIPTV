@@ -18,7 +18,8 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
-    QApplication, QGridLayout, QLabel, QVBoxLayout, QWidget)
+    QApplication, QCheckBox, QGridLayout, QLabel, QMessageBox, QVBoxLayout,
+    QWidget)
 
 from ..core.log import log
 from ..i18n import tr
@@ -219,6 +220,25 @@ class _MultiviewMixin:
         self.add_to_multiview(
             url, it.get("name") or it.get("title") or "", cell)
 
+    def _ensure_multiview_window(self):
+        """Create the multiview window if needed, then bring it to the front.
+        raise_ + activateWindow is the reliable cross-platform way back to it -
+        on macOS separate app windows don't cycle with Cmd+Tab, so this (and
+        the View menu entry) is how the user re-focuses it."""
+        self._maybe_show_multiview_info()
+        if self._multiview_win is None:
+            self._multiview_win = _MultiviewWindow(self)
+            self._multiview_win.resize(960, 560)
+        w = self._multiview_win
+        w.show()
+        w.raise_()
+        w.activateWindow()
+        return w
+
+    def _show_multiview(self) -> None:
+        """Open/raise the (possibly empty) multiview window - the menu entry."""
+        self._ensure_multiview_window()
+
     def add_to_multiview(self, url: str, title: str,
                          cell: int | None = None) -> None:
         """Open the multiview window (if needed) and drop a stream into it."""
@@ -228,12 +248,22 @@ class _MultiviewMixin:
         # account refuses the multiview cell (the same channel then only plays
         # docked), and you'd have two streams and two audio tracks at once.
         self._stop_docked_for_multiview()
-        if self._multiview_win is None:
-            self._multiview_win = _MultiviewWindow(self)
-            self._multiview_win.resize(960, 560)
-        self._multiview_win.add_stream(url, title, cell)
-        self._multiview_win.show()
-        self._multiview_win.raise_()
+        self._ensure_multiview_window().add_stream(url, title, cell)
+
+    def _maybe_show_multiview_info(self) -> None:
+        """One-time notice that multiview needs enough provider connections,
+        with a 'don't show again' opt-out."""
+        if self.settings.value("mv_info_seen", "false") == "true":
+            return
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Information)
+        box.setWindowTitle(tr("mv_info_title"))
+        box.setText(tr("mv_info_body"))
+        cb = QCheckBox(tr("dont_show_again"))
+        box.setCheckBox(cb)
+        box.exec()
+        if cb.isChecked():
+            self.settings.setValue("mv_info_seen", "true")
 
     def _stop_docked_for_multiview(self) -> None:
         p = getattr(self, "player", None)
