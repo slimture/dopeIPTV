@@ -196,6 +196,38 @@ def _arrow_png(direction: str, color: str, size: int = 10) -> str:
     return path.replace("\\", "/")
 
 
+def _check_png(color: str, size: int = 12) -> str:
+    """Path to an antialiased check-mark PNG for the QCheckBox indicator
+    (same rationale as _arrow_png: drawn QSS marks don't render reliably)."""
+    import os
+
+    from PyQt6.QtCore import QPointF, QStandardPaths, Qt
+    from PyQt6.QtGui import QColor, QPainter, QPen, QPixmap, QPolygonF
+    base = QStandardPaths.writableLocation(
+        QStandardPaths.StandardLocation.CacheLocation)
+    os.makedirs(base, exist_ok=True)
+    path = os.path.join(base, f"qss_check_{size}_{color.lstrip('#')}.png")
+    if not os.path.exists(path):
+        ss = 4
+        big = QPixmap(size * ss, size * ss)
+        big.fill(Qt.GlobalColor.transparent)
+        pr = QPainter(big)
+        pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        S = float(size * ss)
+        pen = QPen(QColor(color))
+        pen.setWidthF(S * 0.14)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        pr.setPen(pen)
+        pr.drawPolyline(QPolygonF([
+            QPointF(S * 0.18, S * 0.55), QPointF(S * 0.42, S * 0.76),
+            QPointF(S * 0.82, S * 0.26)]))
+        pr.end()
+        big.scaled(size, size, Qt.AspectRatioMode.IgnoreAspectRatio,
+                   Qt.TransformationMode.SmoothTransformation).save(path)
+    return path.replace("\\", "/")
+
+
 def build_style() -> str:
     """Generate the full application QSS from the active palette."""
     p = dict(P)
@@ -203,6 +235,11 @@ def build_style() -> str:
     arrow_down = _arrow_png("down", p['text2'])
     arrow_up_sm = _arrow_png("up", p['text2'], 8)
     arrow_down_sm = _arrow_png("down", p['text2'], 8)
+    check_png = _check_png("#FFFFFF")
+    # Checkbox border mixed well toward the text colour, so the box is
+    # clearly visible even on the near-black OLED palette (its border_in is
+    # almost invisible against pure black).
+    chk_border = _mix(p['text'], p['input'], 0.45)
     # Sidebar action buttons (Guide, Settings): a solid, theme-neutral raised
     # surface with a soft edge, both derived from the palette so they track the
     # theme instead of standing out in a clashing colour. Opaque so they show
@@ -440,11 +477,13 @@ QTabWidget::pane {{
     top: -1px;
 }}
 /* Left-packed tabs with QSS-controlled spacing on every OS (macOS's native
-   metrics centred and spread them differently from Linux). */
+   metrics centred and spread them differently from Linux). qproperty pins
+   the tab bar's expanding flag off for every QTabBar, no code path needed. */
 QTabWidget::tab-bar {{ alignment: left; }}
+QTabBar {{ qproperty-expanding: 0; }}
 QTabBar::tab {{
-    background: transparent; color: {p['text2']}; padding: 7px 12px;
-    border-radius: 7px; margin: 1px; font-size: 12px; min-width: 46px;
+    background: transparent; color: {p['text2']}; padding: 7px 10px;
+    border-radius: 7px; margin: 0px 1px; font-size: 12px;
 }}
 QTabBar::tab:selected {{ background: {p['btn']}; color: {p['text']}; }}
 QTabBar::tab:hover:!selected {{ background: {p['hover']}; }}
@@ -519,6 +558,24 @@ QLineEdit {{
     padding: 8px 10px;
 }}
 QLineEdit:focus {{ border: 1px solid {ACCENT}; }}
+
+/* Check boxes: a clearly bordered indicator that fills with the accent when
+   checked (drawn check-mark image - see _check_png). Styled explicitly so it
+   stays visible on every palette; the style default drew a dark box that
+   vanished on the pure-black OLED theme. */
+QCheckBox {{ spacing: 8px; }}
+QCheckBox::indicator {{
+    width: 18px; height: 18px; border: 1px solid {chk_border};
+    border-radius: 4px; background: {p['input']};
+}}
+QCheckBox::indicator:hover {{ border-color: {ACCENT}; }}
+QCheckBox::indicator:checked {{
+    background: {ACCENT}; border-color: {ACCENT};
+    image: url("{check_png}");
+}}
+QCheckBox::indicator:disabled {{
+    border-color: {p['border_in']}; background: {p['pane']};
+}}
 
 QSpinBox, QDoubleSpinBox {{
     background: {p['input']}; color: {p['text']};

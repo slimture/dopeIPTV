@@ -3028,6 +3028,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         offset in seconds (0 to start from the beginning)."""
         pos = self.resume.saved_position(key, kind)
         if pos <= 0:
+            # Nothing to offer: either never watched >1 min, watched past 95%
+            # (counted as finished), or saved under another kind pre-fix.
+            log.debug("resume: no saved position for %s (kind=%s)", key, kind)
             return 0.0
         idx = self._choice_dialog(
             tr("resume_title"),
