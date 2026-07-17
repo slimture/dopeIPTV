@@ -116,13 +116,25 @@ class _NavMixin:
         pm.fill(Qt.GlobalColor.transparent)
         pr = QPainter(pm)
         pr.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
-        f = QFont()
-        f.setPixelSize(round(s * 0.82))
-        pr.setFont(f)
-        pr.setPen(QColor(color))
         g = glyph + "︎"
+        px = s * 0.82
+        f = QFont()
+        f.setPixelSize(round(px))
         fm = QFontMetricsF(f)
         br = fm.tightBoundingRect(g)
+        # Some emoji (🔖, 🕘, ...) carry ink wider/taller than the text box, so
+        # at the nominal size their glyph overflows the SxS pixmap and clips at
+        # its edges. Shrink the font until the ink fits inside the box (with a
+        # hair of padding). Plain text glyphs (★, ✓) already fit, so this only
+        # touches the ones that would clip.
+        biggest = max(br.width(), br.height())
+        limit = s * 0.94
+        if biggest > limit:
+            f.setPixelSize(max(1, round(px * limit / biggest)))
+            fm = QFontMetricsF(f)
+            br = fm.tightBoundingRect(g)
+        pr.setFont(f)
+        pr.setPen(QColor(color))
         x = (s - br.width()) / 2.0 - br.x()
         y = (s - br.height()) / 2.0 - br.y()
         pr.drawText(QPointF(x, y), g)

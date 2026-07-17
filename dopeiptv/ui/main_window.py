@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 import threading
 import time
 
@@ -289,7 +290,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         refresh_action.triggered.connect(self.refresh_playlist)
         reminders_action = app_menu.addAction(tr("reminders_menu"))
         reminders_action.triggered.connect(self._open_reminders)
-        app_menu.addSeparator()
+        if sys.platform != "darwin":
+            app_menu.addSeparator()
         about_action = app_menu.addAction(tr("menu_about"))
         about_action.triggered.connect(self.show_about)
         quit_action = app_menu.addAction(tr("menu_quit"))
@@ -301,6 +303,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         about_action.setMenuRole(QAction.MenuRole.AboutRole)
         settings_action.setMenuRole(QAction.MenuRole.PreferencesRole)
         quit_action.setMenuRole(QAction.MenuRole.QuitRole)
+        if sys.platform == "darwin":
+            # Refresh playlist / Reminders have no standard macOS role, so Qt
+            # leaves them behind in a second, duplicate "dopeIPTV" menu.
+            # ApplicationSpecificRole folds them into the one real app menu, so
+            # there's no duplicate. (No-op on Linux/Windows, where the single
+            # menu with these items is intentional.)
+            refresh_action.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
+            reminders_action.setMenuRole(
+                QAction.MenuRole.ApplicationSpecificRole)
         # Kept for live language switching (see retranslate_ui).
         self._i18n_actions = {
             settings_action: lambda: tr("btn_settings") + "…",
