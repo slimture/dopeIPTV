@@ -283,10 +283,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     # -- UI construction -------------------------------------------------------
 
-    def _populate_playlist_menu(self) -> None:
-        """(Re)fill the Playlists menu with a checkable entry per playlist, the
-        active one ticked. Switching is one click - no trip through Settings."""
-        menu = self._playlist_menu
+    def _fill_playlist_menu(self, menu: QMenu) -> None:
+        """Fill *menu* with a checkable entry per playlist, the active one
+        ticked. Used by the sidebar playlist switcher."""
         menu.clear()
         store = self.playlist_store
         if not store or not store.playlists():
@@ -301,6 +300,24 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if p["id"] != active:
                 act.triggered.connect(
                     lambda _c=False, pid=p["id"]: self.switch_playlist(pid))
+
+    def _show_playlist_menu(self) -> None:
+        """Pop the playlist switcher below the sidebar's playlist button."""
+        menu = QMenu(self)
+        self._fill_playlist_menu(menu)
+        btn = self._playlist_btn
+        menu.exec(btn.mapToGlobal(btn.rect().bottomLeft()))
+
+    def _update_playlist_btn(self) -> None:
+        """Reflect the active playlist on the sidebar switcher button."""
+        if not hasattr(self, "_playlist_btn"):
+            return
+        store = self.playlist_store
+        pl = store.get(store.active_id) if (store and store.active_id) else None
+        name = (pl or {}).get("name", "") if pl else ""
+        self._playlist_btn.setText("▾  " + name if name
+                                   else tr("menu_playlists"))
+        self._playlist_btn.setVisible(bool(store and store.playlists()))
 
     def _build_ui(self) -> None:
         menubar = self.menuBar()
@@ -337,13 +354,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 QAction.MenuRole.ApplicationSpecificRole)
             multiview_action.setMenuRole(
                 QAction.MenuRole.ApplicationSpecificRole)
-        # A quick playlist switcher so hopping between providers (e.g. to feed
-        # multiview cells from different accounts) doesn't mean a trip through
-        # Settings. Its own top-level menu - a distinct name, so macOS shows it
-        # cleanly beside the app menu (not as a duplicate). Rebuilt on open so
-        # it always reflects the current playlists and the active one.
-        self._playlist_menu = menubar.addMenu(tr("menu_playlists"))
-        self._playlist_menu.aboutToShow.connect(self._populate_playlist_menu)
         # Kept for live language switching (see retranslate_ui).
         self._i18n_actions = {
             settings_action: lambda: tr("btn_settings") + "…",
@@ -409,6 +419,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._sidebar_logo.update_clicked.connect(self.show_about)
         sl.addWidget(self._sidebar_logo)
         sl.addSpacing(6)
+
+        # Visible playlist switcher at the top of the sidebar: one click to hop
+        # providers (e.g. to feed multiview cells from different accounts)
+        # without a trip through Settings. Shows the active playlist; the menu
+        # is built on demand. Hidden when there's nothing to switch.
+        self._playlist_btn = QPushButton("", objectName="SideAction")
+        self._playlist_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
+                                         QSizePolicy.Policy.Fixed)
+        self._playlist_btn.setToolTip(tr("menu_playlists"))
+        self._playlist_btn.clicked.connect(self._show_playlist_menu)
+        sl.addWidget(self._playlist_btn)
+        sl.addSpacing(6)
+        self._update_playlist_btn()
 
         # Source glyphs for the nav icons (rendered to fixed-size monochrome
         # pixmaps below). Each must be visually distinct: watch-later is a
@@ -636,6 +659,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._actions_box.addWidget(guide_btn)
         self._actions_box.addWidget(settings_btn)
         sl.addLayout(self._actions_box)
+        # Multiview on its own full-width row below Guide/Settings, so it's a
+        # visible one-click affordance (the app menu entry is easy to miss,
+        # and on macOS a hidden multiview window won't Cmd+Tab back).
+        self._multiview_btn = QPushButton(
+            tr("menu_multiview"), objectName="SideAction")
+        self._multiview_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
+                                          QSizePolicy.Policy.Fixed)
+        self._multiview_btn.setToolTip(tr("menu_multiview"))
+        self._multiview_btn.clicked.connect(self._show_multiview)
+        sl.addWidget(self._multiview_btn)
 
         # Middle column
         mid = QWidget(objectName="MiddlePane")
@@ -1616,6 +1649,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.reminders = ReminderStore(self.settings, pid)
             self._base_title = pl["name"]
             self.setWindowTitle(self._base_title)
+            self._update_playlist_btn()
             self._update_provider_hint()
             self.refresh_playlist()
 

@@ -78,6 +78,17 @@ class _SidebarMixin:
         self._settings_btn.setText("⚙" if collapsed else tr("btn_settings"))
         self._set_rail(self._guide_btn, collapsed)
         self._set_rail(self._settings_btn, collapsed)
+        if hasattr(self, "_multiview_btn"):
+            self._multiview_btn.setText("▦" if collapsed else tr("menu_multiview"))
+            self._set_rail(self._multiview_btn, collapsed)
+        if hasattr(self, "_playlist_btn"):
+            # The button normally shows the active playlist name; on the rail
+            # collapse it to a list glyph and restore the name on expand.
+            if collapsed:
+                self._playlist_btn.setText("☰")
+            else:
+                self._update_playlist_btn()
+            self._set_rail(self._playlist_btn, collapsed)
         # Side by side when expanded, stacked on the narrow rail.
         if hasattr(self, "_actions_box"):
             self._actions_box.setDirection(

@@ -270,6 +270,9 @@ class _SettingsMixin:
             self._lib_section_label.setText(tr("sidebar_library"))
         self._guide_btn.setText(tr("btn_epg_guide"))
         self._settings_btn.setText(tr("btn_settings"))
+        if hasattr(self, "_multiview_btn"):
+            self._multiview_btn.setText(tr("menu_multiview"))
+        self._update_playlist_btn()
         self.search.setPlaceholderText(tr("search_placeholder"))
         self._size_label.setText(tr("label_size"))
         self._sort_label.setText(tr("label_sort"))
