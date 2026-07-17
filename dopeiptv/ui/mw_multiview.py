@@ -22,6 +22,9 @@ Kept out of main_window.py to keep that file lean.
 """
 from __future__ import annotations
 
+import time
+from datetime import datetime
+
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication, QCheckBox, QDialogButtonBox, QGridLayout, QLabel, QMenu,
@@ -67,6 +70,19 @@ class _MultiviewCell(QWidget):
         self._win_span = 0.0
         self._live_start: float | None = None
         self._live_edge = 0.0
+        # Timeshift (provider archive) state. When the channel is catch-up
+        # capable the seek bar becomes an archive timeline: dragging re-requests
+        # the stream at a server offset (client.timeshift_urls), same mechanism
+        # as the docked player. _ts_seg_start is the wall-clock content start of
+        # the loaded archive segment, or None while at the live edge.
+        self._item: dict | None = None
+        self._client = None
+        self._live_url: str | None = None
+        self._ts_capable = False
+        self._ts_days = 0
+        self._ts_seg_start: float | None = None
+        self._ts_candidates: list[str] = []
+        self._ts_cand_idx = 0
         self.setStyleSheet("background:#000000;")
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
@@ -158,15 +174,36 @@ class _MultiviewCell(QWidget):
 
     # -- playback ------------------------------------------------------------
 
-    def play(self, url: str, title: str) -> bool:
+    def play(self, url: str, title: str, item: dict | None = None,
+             client=None) -> bool:
         self.url = url
         self.title = title
+        self._live_url = url
+        self._item = item
+        self._client = client
+        self._ts_seg_start = None    # start at the live edge
+        self._ts_candidates = []
+        self._ts_cand_idx = 0
+        # Catch-up capable? Needs the provider flag, a real depth, a stream id
+        # and a client that can build archive URLs.
+        days = int((item or {}).get("tv_archive_duration") or 0) if item else 0
+        self._ts_days = days
+        self._ts_capable = bool(
+            item and int((item or {}).get("tv_archive") or 0) and days > 0
+            and (item or {}).get("stream_id") is not None
+            and client is not None and hasattr(client, "timeshift_urls"))
         self._live_start = None    # fresh rolling window for the new stream
         self._live_edge = 0.0
         self._win_span = 0.0
         self._title.setText(title or "")
         self._title.adjustSize()
         self._empty.hide()
+        return self._mpv_play(url)
+
+    def _mpv_play(self, url: str) -> bool:
+        """Point this cell's mpv at *url* without disturbing the cell's channel
+        / live-url / timeshift bookkeeping (used both for the initial play and
+        for archive-segment / go-live swaps)."""
         if self.video.mpv is None:
             self.video.show()
             QApplication.instance().processEvents()
@@ -174,12 +211,10 @@ class _MultiviewCell(QWidget):
         if m is None:
             return False
         try:
-            m["force-media-title"] = title or ""
+            m["force-media-title"] = self.title or ""
             m["cache"] = "yes"
-            # Keep a back-buffer so a timeshift/catch-up stream is seekable
-            # within the cached window (mpv then reports it seekable and the
-            # cell's scrub bar activates). This is the cell's own isolated mpv,
-            # so it never touches the docked player's settings.
+            # Back-buffer so a live stream stays scrubbable within its cache.
+            # The cell's own isolated mpv - never the docked player's settings.
             m["cache-secs"] = 600
             m["demuxer-max-back-bytes"] = 200 * 1024 * 1024
             m["mute"] = self._muted
@@ -190,7 +225,56 @@ class _MultiviewCell(QWidget):
                         type(e).__name__, e)
             return False
 
+    # -- timeshift (provider archive) ---------------------------------------
+
+    def _ts_depth_min(self) -> int:
+        return max(1, self._ts_days) * 24 * 60
+
+    def _go_live(self) -> None:
+        self._ts_seg_start = None
+        self._ts_candidates = []
+        self._ts_cand_idx = 0
+        if self._live_url:
+            self._mpv_play(self._live_url)
+
+    def _go_timeshift(self, back_min: float) -> None:
+        """Load the provider archive starting *back_min* before now. Candidate
+        URL schemes are tried in order (walked on error in _on_error)."""
+        if not self._ts_capable or self._client is None:
+            return
+        sid = (self._item or {}).get("stream_id")
+        now = time.time()
+        # Keep a small margin inside the oldest edge (providers drop the last
+        # few minutes, so a request at the exact limit fails).
+        back_min = min(back_min, self._ts_depth_min() - 2)
+        if back_min < 1:
+            self._go_live()
+            return
+        start = now - back_min * 60
+        duration_min = max(1, int(back_min) + 1)
+        try:
+            urls = self._client.timeshift_urls(
+                sid, datetime.fromtimestamp(start), duration_min)
+        except Exception as e:
+            log.warning("multiview timeshift url build failed: %s", e)
+            return
+        if not urls:
+            return
+        self._ts_candidates = list(urls)
+        self._ts_cand_idx = 0
+        self._ts_seg_start = start
+        self._mpv_play(self._ts_candidates[0])
+
     def _on_error(self, _msg: str) -> None:
+        # Mid-timeshift: walk to the next candidate URL scheme, then fall back
+        # to live if none serve the archive.
+        if self._ts_seg_start is not None:
+            if self._ts_cand_idx + 1 < len(self._ts_candidates):
+                self._ts_cand_idx += 1
+                self._mpv_play(self._ts_candidates[self._ts_cand_idx])
+                return
+            self._go_live()
+            return
         self._title.setText(tr("mv_cell_error", title=self.title or ""))
         self.title = self._title.text()
         self._title.setVisible(True)
@@ -230,13 +314,42 @@ class _MultiviewCell(QWidget):
         m = self.video.mpv
         if m is None or self.url is None:
             return
+        if self._ts_capable:
+            # Step the archive timeline by 5 min (negative secs = further back).
+            cur_off = self._ts_offset_now()
+            new_off_min = (cur_off + (300 if secs < 0 else -300)) / 60.0
+            if new_off_min < 0.5:
+                self._go_live()
+            else:
+                self._go_timeshift(new_off_min)
+            return
         try:
             m.command("seek", secs, "relative")
         except Exception:
             pass
 
+    def _ts_offset_now(self) -> float:
+        """Seconds behind live for the currently loaded archive segment
+        (0 at the live edge)."""
+        if self._ts_seg_start is None:
+            return 0.0
+        try:
+            tp = float(self.video.mpv.time_pos or 0)
+        except Exception:
+            tp = 0.0
+        return max(0.0, time.time() - (self._ts_seg_start + tp))
+
     def _on_seek_released(self) -> None:
         self._seeking = False
+        if self._ts_capable:
+            # The bar is an archive timeline: right edge = live, left = oldest.
+            depth = self._ts_depth_min()
+            back_min = depth * (1.0 - self._seek.value() / 1000.0)
+            if back_min < 2:
+                self._go_live()
+            else:
+                self._go_timeshift(back_min)
+            return
         m = self.video.mpv
         if m is None or self.url is None or self._win_span < 1:
             return
@@ -265,6 +378,28 @@ class _MultiviewCell(QWidget):
         self._pause.setVisible(paused)
         if paused:
             self._pause.raise_()
+        if self._ts_capable:
+            # Archive timeline: the bar spans [now - depth, now]; the knob sits
+            # at the current offset from live, "-h:mm:ss" behind or "LIVE".
+            depth_sec = self._ts_depth_min() * 60.0
+            offset = self._ts_offset_now()
+            live = offset < 30
+            show = self._focused or self._overlays_on
+            self._seek.setVisible(show)
+            self._time.setVisible(show)
+            if show:
+                self._seek.raise_()
+                self._time.raise_()
+                if not self._seeking:
+                    val = int((depth_sec - min(offset, depth_sec))
+                              / depth_sec * 1000)
+                    self._seek.blockSignals(True)
+                    self._seek.setValue(val)
+                    self._seek.blockSignals(False)
+                    self._time.setText(tr("mv_live") if live
+                                       else f"-{_fmt(offset)}")
+                    self._time.adjustSize()
+            return
         try:
             pos = float(m.time_pos or 0)
         except Exception:
@@ -319,6 +454,12 @@ class _MultiviewCell(QWidget):
         self._live_start = None
         self._live_edge = 0.0
         self._win_span = 0.0
+        self._live_url = None
+        self._item = None
+        self._client = None
+        self._ts_capable = False
+        self._ts_seg_start = None
+        self._ts_candidates = []
         self._title.hide()
         self._pause.hide()
         self._seek.hide()
@@ -445,13 +586,14 @@ class _MultiviewWindow(QWidget):
 
     # -- streams / focus -----------------------------------------------------
 
-    def add_stream(self, url: str, title: str, cell: int | None = None) -> None:
+    def add_stream(self, url: str, title: str, cell: int | None = None,
+                   item: dict | None = None, client=None) -> None:
         if cell is not None and 0 <= cell < len(self.cells):
             target = self.cells[cell]
         else:
             target = next((c for c in self.cells if c.url is None),
                           self._focused or self.cells[0])
-        target.play(url, title)
+        target.play(url, title, item, client)
         self._focus_cell(target)
         self._reveal_overlays()
 
@@ -464,10 +606,10 @@ class _MultiviewWindow(QWidget):
     def _swap_cells(self, a: "_MultiviewCell", b: "_MultiviewCell") -> None:
         """Exchange the two cells' videos (swap places / move into an empty
         cell), then re-apply audio focus."""
-        ua, ta = a.url, a.title
-        ub, tb = b.url, b.title
-        a.play(ub, tb) if ub else a.clear()
-        b.play(ua, ta) if ua else b.clear()
+        ua, ta, ia, ca = a._live_url, a.title, a._item, a._client
+        ub, tb, ib, cb = b._live_url, b.title, b._item, b._client
+        a.play(ub, tb, ib, cb) if ub else a.clear()
+        b.play(ua, ta, ia, ca) if ua else b.clear()
         self._focus_cell(self._focused if self._focused in self.cells else a)
 
     def _cell_context_menu(self, cell: "_MultiviewCell", pos) -> None:
@@ -573,7 +715,8 @@ class _MultiviewMixin:
         except Exception:
             url = it.get("_url")
         self.add_to_multiview(
-            url, it.get("name") or it.get("title") or "", cell)
+            url, it.get("name") or it.get("title") or "", cell,
+            item=it, client=self.client)
 
     def _ensure_multiview_window(self):
         """Create the multiview window if needed, then bring it to the front.
@@ -611,17 +754,20 @@ class _MultiviewMixin:
         it = getattr(self, "_playing_item", None)
         title = ((it or {}).get("name") or (it or {}).get("title")
                  or getattr(self, "_base_title", "") or "")
-        self.add_to_multiview(url, title)
+        self.add_to_multiview(url, title, item=it,
+                              client=getattr(self, "client", None))
 
     def add_to_multiview(self, url: str, title: str,
-                         cell: int | None = None) -> None:
+                         cell: int | None = None, item: dict | None = None,
+                         client=None) -> None:
         if not url:
             return
         # Free the docked player's connection: otherwise a single-connection
         # account refuses the multiview cell (the same channel then only plays
         # docked), and you'd have two streams and two audio tracks at once.
         self._stop_docked_for_multiview()
-        self._ensure_multiview_window().add_stream(url, title, cell)
+        self._ensure_multiview_window().add_stream(
+            url, title, cell, item=item, client=client)
 
     def _maybe_show_multiview_info(self) -> None:
         """One-time notice that multiview needs enough provider connections,

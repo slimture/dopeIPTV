@@ -30,6 +30,10 @@ class Client:
     def live_url(self, sid, fmt):
         return "http://x/live/%s.%s" % (sid, fmt)
 
+    def timeshift_urls(self, sid, start_dt, dur):
+        base = "http://x/ts/%s/%s" % (sid, int(start_dt.timestamp()))
+        return [base + ".ts", base + ".m3u8"]
+
 
 class Host(QMainWindow, _MultiviewMixin):
     def __init__(self):
@@ -90,6 +94,28 @@ assert bool(w.windowFlags() & _Qt.WindowType.FramelessWindowHint)
 h._add_channel_to_multiview({"stream_id": 5, "name": "Five"})
 app.processEvents()
 assert any(c.url and c.url.endswith("5.ts") for c in w.cells)
+# A plain channel is not timeshift-capable (no tv_archive).
+five = next(c for c in w.cells if c.url and c.url.endswith("5.ts"))
+assert not five._ts_capable
+
+# A catch-up channel (tv_archive + depth) gets the archive timeline: seeking
+# back re-requests the provider archive via client.timeshift_urls, and the
+# error-walk steps through candidate URL schemes before falling back to live.
+h._add_channel_to_multiview(
+    {"stream_id": 8, "name": "Arch", "tv_archive": 1,
+     "tv_archive_duration": 2}, cell=3)
+app.processEvents()
+ts = w.cells[3]
+assert ts._ts_capable and ts._ts_days == 2
+assert ts._live_url.endswith("8.ts")
+ts._go_timeshift(45)
+assert ts._ts_seg_start is not None
+assert ts._ts_candidates and ts._ts_candidates[0].startswith("http://x/ts/8/")
+i0 = ts._ts_cand_idx
+ts._on_error("boom")          # walk to the next candidate scheme
+assert ts._ts_cand_idx == i0 + 1
+ts._go_live()
+assert ts._ts_seg_start is None and ts._ts_candidates == []
 
 # Targeting a specific cell (0..3) sends the stream there and focuses it.
 h.add_to_multiview("http://x/live/7.ts", "Seven", cell=2)

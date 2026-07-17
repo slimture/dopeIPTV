@@ -3328,6 +3328,10 @@ _STRINGS: dict[str, dict[str, str]] = {
         "de": "Fenster {n}", "fr": "Fenêtre {n}", "zh": "窗口 {n}",
         "ru": "Окно {n}", "th": "หน้าต่าง {n}",
     },
+    "mv_live": {
+        "en": "LIVE", "sv": "DIREKT", "es": "EN VIVO", "de": "LIVE",
+        "fr": "EN DIRECT", "zh": "直播", "ru": "ПРЯМОЙ ЭФИР", "th": "สด",
+    },
     "mv_title": {
         "en": "dopeIPTV — Multiview", "sv": "dopeIPTV — Multiview",
         "es": "dopeIPTV — Multivista", "de": "dopeIPTV — Multiview",
