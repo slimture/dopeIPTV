@@ -676,6 +676,92 @@ class _SettingsMixin:
 
         tabs.addTab(ui_tab, tr("tab_interface"))
 
+        # Multiview tab - grouped under small section headers (Window /
+        # Behavior / Controls) so it reads as three short blocks, not a wall
+        # of checkboxes.
+        mv_tab = QWidget()
+        mvv = QVBoxLayout(mv_tab)
+        mvv.setSpacing(8)
+
+        def _mv_section(key: str) -> None:
+            lbl = QLabel(tr(key))
+            lbl.setStyleSheet(
+                f"color:{P['muted2']}; font-size:11px; font-weight:700;"
+                "letter-spacing:1.2px; margin-top:4px;")
+            mvv.addWidget(lbl)
+
+        _mv_section("mv_sec_window")
+        mv_titlebar_box = QCheckBox(tr("mv_set_titlebar"))
+        mv_titlebar_box.setChecked(
+            self.settings.value("mv_frameless", "true") != "true")
+        mvv.addWidget(mv_titlebar_box)
+        mv_ontop_box = QCheckBox(tr("mv_set_on_top"))
+        mv_ontop_box.setChecked(
+            self.settings.value("mv_on_top", "false") == "true")
+        mvv.addWidget(mv_ontop_box)
+        mv_geo_box = QCheckBox(tr("mv_set_remember_geo"))
+        mv_geo_box.setChecked(
+            self.settings.value("mv_remember_geo", "true") == "true")
+        mvv.addWidget(mv_geo_box)
+        mvv.addSpacing(6)
+
+        _mv_section("mv_sec_behavior")
+        mv_stop_box = QCheckBox(tr("mv_set_stop_docked"))
+        mv_stop_box.setChecked(
+            self.settings.value("mv_stop_docked", "true") == "true")
+        mvv.addWidget(mv_stop_box)
+        mv_unmute_box = QCheckBox(tr("mv_set_new_unmuted"))
+        mv_unmute_box.setChecked(
+            self.settings.value("mv_new_unmuted", "true") == "true")
+        mvv.addWidget(mv_unmute_box)
+        mv_conflict_row = QHBoxLayout()
+        mv_conflict_row.addWidget(QLabel(tr("mv_set_conflict")))
+        mv_conflict_box = QComboBox()
+        mv_conflict_box.addItem(tr("mv_conflict_ask"), "ask")
+        mv_conflict_box.addItem(tr("mv_close"), "close")
+        mv_conflict_box.addItem(tr("mv_keep"), "keep")
+        cur_mode = str(self.settings.value("mv_conflict_mode", "ask"))
+        mv_conflict_box.setCurrentIndex(
+            max(0, mv_conflict_box.findData(cur_mode)))
+        mv_conflict_row.addWidget(mv_conflict_box, 1)
+        mvv.addLayout(mv_conflict_row)
+        mvv.addSpacing(6)
+
+        _mv_section("mv_sec_controls")
+        mv_hide_row = QHBoxLayout()
+        mv_hide_row.addWidget(QLabel(tr("mv_set_autohide")))
+        mv_hide_spin = QSpinBox()
+        mv_hide_spin.setRange(1, 15)
+        try:
+            mv_hide_spin.setValue(
+                int(float(self.settings.value("mv_autohide_secs", 2))))
+        except (TypeError, ValueError):
+            mv_hide_spin.setValue(2)
+        mv_hide_row.addWidget(mv_hide_spin)
+        mv_hide_row.addStretch(1)
+        mvv.addLayout(mv_hide_row)
+        mv_step_row = QHBoxLayout()
+        mv_step_row.addWidget(QLabel(tr("mv_set_seek_step")))
+        mv_step_spin = QSpinBox()
+        mv_step_spin.setRange(1, 60)
+        try:
+            mv_step_spin.setValue(
+                int(float(self.settings.value("mv_seek_step_min", 5))))
+        except (TypeError, ValueError):
+            mv_step_spin.setValue(5)
+        mv_step_row.addWidget(mv_step_spin)
+        mv_step_row.addStretch(1)
+        mvv.addLayout(mv_step_row)
+        mv_info_btn = QPushButton(tr("mv_set_reset_info"))
+        mv_info_btn.clicked.connect(
+            lambda: self.settings.setValue("mv_info_seen", "false"))
+        mv_info_row = QHBoxLayout()
+        mv_info_row.addWidget(mv_info_btn)
+        mv_info_row.addStretch(1)
+        mvv.addLayout(mv_info_row)
+        mvv.addStretch()
+        tabs.addTab(mv_tab, tr("tab_multiview"))
+
         # Playlists tab
         pl_tab = QWidget()
         pv = QVBoxLayout(pl_tab)
@@ -1328,6 +1414,25 @@ class _SettingsMixin:
                 "metadata_source", meta_source_box.currentData())
             self.settings.setValue(
                 "tmdb_api_key", tmdb_key_edit.text().strip())
+            self.settings.setValue(
+                "mv_frameless",
+                "false" if mv_titlebar_box.isChecked() else "true")
+            self.settings.setValue(
+                "mv_on_top", "true" if mv_ontop_box.isChecked() else "false")
+            self.settings.setValue(
+                "mv_remember_geo",
+                "true" if mv_geo_box.isChecked() else "false")
+            self.settings.setValue(
+                "mv_stop_docked",
+                "true" if mv_stop_box.isChecked() else "false")
+            self.settings.setValue(
+                "mv_new_unmuted",
+                "true" if mv_unmute_box.isChecked() else "false")
+            self.settings.setValue(
+                "mv_conflict_mode", mv_conflict_box.currentData())
+            self.settings.setValue("mv_autohide_secs", mv_hide_spin.value())
+            self.settings.setValue("mv_seek_step_min", mv_step_spin.value())
+            self._apply_multiview_settings()
             self.cover.reload()
             if self.player:
                 self.player.apply_default_options()

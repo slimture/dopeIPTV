@@ -43,13 +43,16 @@ def _fmt(secs: float) -> str:
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
 
-def _glyph(kind: str, s: int, dpr: float, alpha: int = 235) -> QPixmap:
+def _glyph(kind: str, s: int, alpha: int = 235) -> QPixmap:
     """White vector control glyphs (pause / play / x). Drawn, not text: the
     ⏸/▶/✕ characters take their emoji presentation on macOS and render as
     black marks that ignore the stylesheet colour - invisible on the dark
-    control scrims."""
-    pm = QPixmap(round(s * dpr), round(s * dpr))
-    pm.setDevicePixelRatio(dpr)
+    control scrims. Rendered at 3x and tagged with that density, so it stays
+    crisp on any screen (the widget's DPR at construction time can be a
+    pre-Retina 1.0, which left the marks pixelated)."""
+    ss = 3.0
+    pm = QPixmap(round(s * ss), round(s * ss))
+    pm.setDevicePixelRatio(ss)
     pm.fill(Qt.GlobalColor.transparent)
     pr = QPainter(pm)
     pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
@@ -157,6 +160,14 @@ class _MultiviewCell(QWidget):
             "background:rgba(0,0,0,150); color:#ECECF1; padding:3px 8px;"
             "font-size:12px; font-weight:600;")
         self._title.hide()
+        # Which playlist/account this cell streams from - a muted sub-line
+        # under the title (cells can come from different accounts).
+        self.playlist_name = ""
+        self._pl = QLabel("", self.video)
+        self._pl.setStyleSheet(
+            "background:rgba(0,0,0,120); color:#9A9AA5; padding:1px 8px;"
+            "font-size:10px;")
+        self._pl.hide()
         self._empty = QLabel(tr("mv_empty_cell"), self.video)
         self._empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._empty.setStyleSheet("color:#7A7A85; font-size:12px;")
@@ -166,16 +177,15 @@ class _MultiviewCell(QWidget):
             "background:transparent; color:rgba(255,255,255,140);"
             "font-size:56px; font-weight:800;")
         self._num.hide()
-        dpr = self.devicePixelRatioF() or 1.0
         self._pause = QLabel("", self.video)
         self._pause.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._pause.setStyleSheet("background:transparent;")
-        self._pause.setPixmap(_glyph("pause", 44, dpr, alpha=200))
+        self._pause.setPixmap(_glyph("pause", 44, alpha=200))
         self._pause.hide()
         # None of these read-only overlays should intercept mouse events - the
         # video underneath must keep getting click-to-focus, drag and
         # double-click. (The seek slider is deliberately left interactive.)
-        for w in (self._title, self._empty, self._num, self._pause):
+        for w in (self._title, self._pl, self._empty, self._num, self._pause):
             w.setAttribute(
                 Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         # Bottom controls, as DIRECT children of the GL widget - the one
@@ -185,8 +195,8 @@ class _MultiviewCell(QWidget):
         # programme + click-to-jump), an offset/position label, and a LIVE
         # pill that jumps back to the live edge - the same look and gestures
         # as the docked timeline.
-        self._icon_pause = QIcon(_glyph("pause", 13, dpr))
-        self._icon_play = QIcon(_glyph("play", 13, dpr))
+        self._icon_pause = QIcon(_glyph("pause", 13))
+        self._icon_play = QIcon(_glyph("play", 13))
         self._pause_btn = QPushButton("", self.video)
         self._pause_btn.setIcon(self._icon_pause)
         self._pause_btn.setIconSize(QSize(13, 13))
@@ -278,9 +288,14 @@ class _MultiviewCell(QWidget):
         self._overlays_on = on
         self._num.setVisible(on)
         self._title.setVisible(on and bool(self.title))
+        self._pl.setVisible(on and bool(self._pl.text()))
+        # The focus border (red = audible cell) fades with the overlays too.
+        self._border.setVisible(on)
         if on:
+            self._border.raise_()
             self._num.raise_()
             self._title.raise_()
+            self._pl.raise_()
             self._raise_controls()
         else:
             # Controls auto-hide with the rest of the overlays (refresh_state
@@ -294,6 +309,8 @@ class _MultiviewCell(QWidget):
         self._border.setGeometry(r)
         self._title.adjustSize()
         self._title.move(0, 0)
+        self._pl.adjustSize()
+        self._pl.move(0, self._title.height())
         self._empty.setGeometry(r)
         self._num.setGeometry(r)
         self._pause.setGeometry(r)
@@ -302,13 +319,16 @@ class _MultiviewCell(QWidget):
     # -- playback ------------------------------------------------------------
 
     def play(self, url: str, title: str, item: dict | None = None,
-             client=None, guide=None) -> bool:
+             client=None, guide=None, playlist: str = "") -> bool:
         self.url = url
         self.title = title
         self._live_url = url
         self._item = item
         self._client = client
         self._guide = guide
+        self.playlist_name = playlist or ""
+        self._pl.setText(self.playlist_name)
+        self._pl.adjustSize()
         self._progs = []
         self._progs_at = 0.0
         self._ts_seg_start = None    # start at the live edge
@@ -414,11 +434,13 @@ class _MultiviewCell(QWidget):
         self._focused = on
         # Draw the marker on top of the video (see _border). Red = the active
         # (unmuted) cell; a dim frame otherwise so every cell reads as a tile.
+        # Visibility follows the overlay auto-hide (see show_overlays).
         self._border.setStyleSheet(
             "background:transparent; border:3px solid #e5354b;" if on
             else "background:transparent; border:2px solid #303038;")
-        self._border.setVisible(True)
-        self._border.raise_()
+        self._border.setVisible(self._overlays_on)
+        if self._overlays_on:
+            self._border.raise_()
 
     def set_muted(self, muted: bool) -> None:
         self._muted = muted
@@ -445,9 +467,11 @@ class _MultiviewCell(QWidget):
         if m is None or self.url is None:
             return
         if self._ts_capable:
-            # Step the archive timeline by 5 min (negative secs = further back).
+            # Step the archive timeline (negative secs = further back). The
+            # step size comes from Settings (mv_seek_step_min).
+            step = getattr(self, "_ts_step_sec", 300)
             cur_off = self._ts_offset_now()
-            new_off_min = (cur_off + (300 if secs < 0 else -300)) / 60.0
+            new_off_min = (cur_off + (step if secs < 0 else -step)) / 60.0
             if new_off_min < 0.5:
                 self._go_live()
             else:
@@ -644,6 +668,9 @@ class _MultiviewCell(QWidget):
         self._guide = None
         self._progs = []
         self._progs_at = 0.0
+        self.playlist_name = ""
+        self._pl.setText("")
+        self._pl.hide()
         self._seek.set_segments([])
         self._title.hide()
         self._pause.hide()
@@ -730,7 +757,7 @@ class _MultiviewWindow(QWidget):
         # Drawn white ✕ (the text glyph rendered black on macOS) on a scrim
         # with a light border, so it stands out over dark video too.
         self._close_btn.setIcon(
-            QIcon(_glyph("x", 14, self.devicePixelRatioF() or 1.0)))
+            QIcon(_glyph("x", 14)))
         self._close_btn.setIconSize(QSize(14, 14))
         self._close_btn.setStyleSheet(
             "#MvClose { background:rgba(20,20,24,200);"
@@ -743,15 +770,31 @@ class _MultiviewWindow(QWidget):
         self._close_btn.hide()
         self._overlay_timer = QTimer(self)
         self._overlay_timer.setSingleShot(True)
-        self._overlay_timer.setInterval(2000)
         self._overlay_timer.timeout.connect(self._hide_overlays)
         # Poll cell state (position / pause) for the seek bars.
         self._state_timer = QTimer(self)
         self._state_timer.setInterval(500)
         self._state_timer.timeout.connect(self._refresh_states)
         self._state_timer.start()
+        self.apply_settings()
         self.setWindowFlags(self._flags())
         self._focus_cell(self.cells[0])
+
+    def apply_settings(self) -> None:
+        """Pull the tunable knobs (Settings → Multiview) into the live window:
+        overlay/cursor auto-hide delay and the arrow-key timeshift step."""
+        s = self._owner.settings
+        try:
+            secs = float(s.value("mv_autohide_secs", 2))
+        except (TypeError, ValueError):
+            secs = 2.0
+        self._overlay_timer.setInterval(max(500, int(secs * 1000)))
+        try:
+            step_min = float(s.value("mv_seek_step_min", 5))
+        except (TypeError, ValueError):
+            step_min = 5.0
+        for c in self.cells:
+            c._ts_step_sec = max(60, int(step_min * 60))
 
     # -- window flags --------------------------------------------------------
 
@@ -784,14 +827,23 @@ class _MultiviewWindow(QWidget):
     # -- streams / focus -----------------------------------------------------
 
     def add_stream(self, url: str, title: str, cell: int | None = None,
-                   item: dict | None = None, client=None, guide=None) -> None:
+                   item: dict | None = None, client=None, guide=None,
+                   playlist: str = "") -> None:
         if cell is not None and 0 <= cell < len(self.cells):
             target = self.cells[cell]
         else:
             target = next((c for c in self.cells if c.url is None),
                           self._focused or self.cells[0])
-        target.play(url, title, item, client, guide)
-        self._focus_cell(target)
+        target.play(url, title, item, client, guide, playlist)
+        # Settings: a newly added channel can either take audio focus (the
+        # default) or start muted, leaving the current audio alone.
+        unmute = (self._owner.settings.value("mv_new_unmuted", "true")
+                  == "true")
+        if (unmute or self._focused is None or self._focused.url is None
+                or self._focused is target):
+            self._focus_cell(target)
+        else:
+            target.set_muted(True)
         self._reveal_overlays()
 
     def _focus_cell(self, cell: "_MultiviewCell") -> None:
@@ -803,10 +855,12 @@ class _MultiviewWindow(QWidget):
     def _swap_cells(self, a: "_MultiviewCell", b: "_MultiviewCell") -> None:
         """Exchange the two cells' videos (swap places / move into an empty
         cell), then re-apply audio focus."""
-        ua, ta, ia, ca, ga = a._live_url, a.title, a._item, a._client, a._guide
-        ub, tb, ib, cb, gb = b._live_url, b.title, b._item, b._client, b._guide
-        a.play(ub, tb, ib, cb, gb) if ub else a.clear()
-        b.play(ua, ta, ia, ca, ga) if ua else b.clear()
+        sa = (a._live_url, a.title, a._item, a._client, a._guide,
+              a.playlist_name)
+        sb = (b._live_url, b.title, b._item, b._client, b._guide,
+              b.playlist_name)
+        a.play(*sb) if sb[0] else a.clear()
+        b.play(*sa) if sa[0] else b.clear()
         self._focus_cell(self._focused if self._focused in self.cells else a)
 
     def _cell_context_menu(self, cell: "_MultiviewCell", pos) -> None:
@@ -897,10 +951,10 @@ class _MultiviewWindow(QWidget):
         for c in self.cells:
             c.show_overlays(False)
         self._close_btn.hide()
-        # Maximized / fullscreen, the pointer naturally rests over the video -
-        # hide it along with the overlays (any movement brings both back).
-        if ((self.isMaximized() or self.isFullScreen())
-                and not self._cursor_hidden):
+        # The pointer rests over the video whatever the window state - hide it
+        # along with the overlays (any movement brings both back). Cursor
+        # shapes are per-widget, so this only blanks it over multiview.
+        if not self._cursor_hidden:
             self._cursor_hidden = True
             self.setCursor(Qt.CursorShape.BlankCursor)
             for c in self.cells:
@@ -951,7 +1005,13 @@ class _MultiviewMixin:
             url = it.get("_url")
         self.add_to_multiview(
             url, it.get("name") or it.get("title") or "", cell,
-            item=it, client=self.client, guide=getattr(self, "xmltv", None))
+            item=it, client=self.client, guide=getattr(self, "xmltv", None),
+            playlist=self._active_playlist_name())
+
+    def _active_playlist_name(self) -> str:
+        store = getattr(self, "playlist_store", None)
+        pl = store.active() if store else None
+        return (pl or {}).get("name") or ""
 
     def _ensure_multiview_window(self):
         """Create the multiview window if needed, then bring it to the front.
@@ -960,7 +1020,12 @@ class _MultiviewMixin:
         self._maybe_show_multiview_info()
         if self._multiview_win is None:
             self._multiview_win = _MultiviewWindow(self)
-            self._multiview_win.resize(960, 560)
+            geo = (self.settings.value("mv_geometry")
+                   if self.settings.value("mv_remember_geo", "true") == "true"
+                   else None)
+            if not (geo is not None
+                    and self._multiview_win.restoreGeometry(geo)):
+                self._multiview_win.resize(960, 560)
         w = self._multiview_win
         w.show()
         w.raise_()
@@ -991,19 +1056,24 @@ class _MultiviewMixin:
                  or getattr(self, "_base_title", "") or "")
         self.add_to_multiview(url, title, item=it,
                               client=getattr(self, "client", None),
-                              guide=getattr(self, "xmltv", None))
+                              guide=getattr(self, "xmltv", None),
+                              playlist=self._active_playlist_name())
 
     def add_to_multiview(self, url: str, title: str,
                          cell: int | None = None, item: dict | None = None,
-                         client=None, guide=None) -> None:
+                         client=None, guide=None, playlist: str = "") -> None:
         if not url:
             return
         # Free the docked player's connection: otherwise a single-connection
         # account refuses the multiview cell (the same channel then only plays
         # docked), and you'd have two streams and two audio tracks at once.
-        self._stop_docked_for_multiview()
+        # Optional (Settings): an account with spare connections can keep the
+        # docked player running instead.
+        if self.settings.value("mv_stop_docked", "true") == "true":
+            self._stop_docked_for_multiview()
         self._ensure_multiview_window().add_stream(
-            url, title, cell, item=item, client=client, guide=guide)
+            url, title, cell, item=item, client=client, guide=guide,
+            playlist=playlist)
 
     def _maybe_show_multiview_info(self) -> None:
         """One-time notice that multiview needs enough provider connections,
@@ -1052,6 +1122,14 @@ class _MultiviewMixin:
         win = self._multiview_win
         if win is None or not any(c.url for c in win.cells):
             return
+        # Settings can pre-answer the question: always close multiview
+        # silently, or always keep it (no dialog either way).
+        mode = str(self.settings.value("mv_conflict_mode", "ask"))
+        if mode == "keep":
+            return
+        if mode == "close":
+            self._close_multiview()
+            return
         if getattr(win, "_conflict_kept", False):
             return
         from PyQt6.QtWidgets import QDialog
@@ -1096,10 +1174,21 @@ class _MultiviewMixin:
             pass
         self._apply_play_icon()
 
+    def _apply_multiview_settings(self) -> None:
+        """Push freshly saved Settings → Multiview values into a live window
+        (auto-hide delay, seek step, window flags)."""
+        win = self._multiview_win
+        if win is None:
+            return
+        win.apply_settings()
+        win._apply_flags()
+
     def _close_multiview(self) -> None:
         win = self._multiview_win
         if win is None:
             return
+        if self.settings.value("mv_remember_geo", "true") == "true":
+            self.settings.setValue("mv_geometry", win.saveGeometry())
         self._multiview_win = None
         for c in win.cells:
             c.shutdown()

@@ -47,7 +47,7 @@ from ..core.stores import (
 from .theme import P
 from ..providers.trakt import TraktClient
 from ..core.wakelock import WakeLock
-from .widgets import _SidebarLogo, _Toast
+from .widgets import _HoverTextButton, _SidebarLogo, _Toast
 from .mw_settings import _SettingsMixin
 from .mw_trakt import _TraktMixin
 from .mw_recording import _RecordingMixin
@@ -319,11 +319,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         store = self.playlist_store
         pl = store.get(store.active_id) if (store and store.active_id) else None
         name = (pl or {}).get("name", "") if pl else ""
-        # Icon-only in both sidebar states: the drawn playlist-stack mark
-        # under the logo. The active playlist's name lives in the tooltip
-        # (and is always visible in the window title), so the control stays
-        # a clean square icon instead of a text pill.
+        # Icon-only at rest in both sidebar states: the drawn playlist-stack
+        # mark under the logo. Hovering it (expanded only) reveals the active
+        # playlist's name next to the icon; the name also lives in the
+        # tooltip and the window title.
         self._playlist_btn.setText("")
+        self._playlist_btn.hover_text = name
         self._playlist_btn.setIcon(
             QIcon(self._action_pixmap("stack", 18, P["text2"])))
         self._playlist_btn.setIconSize(QSize(18, 18))
@@ -439,7 +440,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # providers (e.g. to feed multiview cells from different accounts)
         # without a trip through Settings. Shows the active playlist; the menu
         # is built on demand. Hidden when there's nothing to switch.
-        self._playlist_btn = QPushButton("", objectName="PlaylistChip")
+        self._playlist_btn = _HoverTextButton("", objectName="PlaylistChip")
         # Fit the pill to its label (the active playlist name) instead of
         # stretching the full sidebar width; centred under the logo. On the
         # collapsed rail it goes back to filling the rail (see

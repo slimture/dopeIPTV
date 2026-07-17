@@ -4,10 +4,31 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QPointF, QRectF, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QPainter, QPainterPath, QPen
-from PyQt6.QtWidgets import QLabel, QWidget
+from PyQt6.QtWidgets import QLabel, QPushButton, QWidget
 
 from .. import APP_NAME
 from .theme import P
+
+
+class _HoverTextButton(QPushButton):
+    """Icon button that reveals a text label while hovered (and drops it on
+    leave). Used by the sidebar playlist switcher: a clean square icon at
+    rest, the active playlist's name when you point at it. Disabled on the
+    collapsed rail (the rail's fixed width can't fit text)."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.hover_text = ""
+
+    def enterEvent(self, event) -> None:
+        if self.hover_text and not self.property("rail"):
+            self.setText(self.hover_text)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:
+        if self.text():
+            self.setText("")
+        super().leaveEvent(event)
 
 
 class _ClickableWidget(QWidget):
