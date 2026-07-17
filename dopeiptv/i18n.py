@@ -3428,6 +3428,12 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Останавливать основной плеер при отправке в мультиэкран",
         "th": "หยุดเครื่องเล่นหลักเมื่อส่งไปยังมัลติวิว",
     },
+    "mv_set_cells": {
+        "en": "Number of windows", "sv": "Antal fönster",
+        "es": "Número de ventanas", "de": "Anzahl der Fenster",
+        "fr": "Nombre de fenêtres", "zh": "窗口数量",
+        "ru": "Количество окон", "th": "จำนวนหน้าต่าง",
+    },
     "mv_set_new_unmuted": {
         "en": "Newly added channel takes audio focus",
         "sv": "Nytillagd kanal får ljudfokus",

@@ -206,10 +206,19 @@ class _SidebarMixin:
         self.sort_box.setVisible(not compact)
         self._size_menu_btn.setVisible(compact)
         self._sort_menu_btn.setVisible(compact)
-        self.side_btn.setFixedWidth(28 if compact else 34)
-        self.focus_btn.setFixedWidth(28 if compact else 34)
+        # One uniform tile size for every compact control (the mixed 28/30/34
+        # widths and free heights made the strip look like differently sized
+        # boxes).
+        for b in (self.side_btn, self.focus_btn, self._size_menu_btn,
+                  self._sort_menu_btn, self.grid_btn):
+            b.setFixedHeight(28)
+        self.side_btn.setFixedWidth(30 if compact else 34)
+        self.focus_btn.setFixedWidth(30 if compact else 34)
+        self._size_menu_btn.setFixedWidth(30)
+        self._sort_menu_btn.setFixedWidth(30)
         self.grid_btn.setText("▦" if compact else tr("btn_grid"))
-        self.grid_btn.setMaximumWidth(34 if compact else 16777215)
+        self.grid_btn.setMinimumWidth(30 if compact else 0)
+        self.grid_btn.setMaximumWidth(30 if compact else 16777215)
         self.grid_btn.setToolTip(tr("btn_grid"))
 
     def _fill_combo_menu(self, menu: QMenu, box) -> None:

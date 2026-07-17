@@ -49,13 +49,24 @@ class _ContextMenuMixin:
         content_kind = self._content_kind()
         if (content_kind in ("live", "fav")
                 and it.get("stream_id") is not None):
-            # Pick which grid cell (1..4) to send the stream to; each shows the
-            # channel it currently holds so you know what you'd replace.
+            # Pick which grid window to send the stream to; each shows the
+            # channel it currently holds so you know what you'd replace. The
+            # count follows Settings → Multiview (2/4/6/9).
             mv = m.addMenu(tr("mv_add"))
             mvw = getattr(self, "_multiview_win", None)
-            for n in range(4):
+            if mvw is not None:
+                mv_count = len(mvw.cells)
+            else:
+                try:
+                    mv_count = int(self.settings.value("mv_cells", 4))
+                except (TypeError, ValueError):
+                    mv_count = 4
+                if mv_count not in (2, 4, 6, 9):
+                    mv_count = 4
+            for n in range(mv_count):
                 occupant = ""
-                if mvw is not None and mvw.cells[n].title:
+                if (mvw is not None and n < len(mvw.cells)
+                        and mvw.cells[n].title):
                     occupant = f"  —  {mvw.cells[n].title}"
                 mv.addAction(
                     tr("mv_cell", n=n + 1) + occupant,

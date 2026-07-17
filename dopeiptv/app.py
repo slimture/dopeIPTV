@@ -235,7 +235,14 @@ def main() -> int:
             pass
 
     app = QApplication(sys.argv)
-    app.setStyle(_NoButtonIconsStyle(app.style()))
+    # Base the proxy on Fusion, not the native platform style: the app is
+    # fully QSS-themed anyway, and the native macOS style ignores QSS
+    # subcontrol arrows (spin-box steppers, combo-box ▼), leaving bare boxes.
+    # Fusion renders the stylesheet faithfully on every OS.
+    from PyQt6.QtWidgets import QStyleFactory
+    _base = QStyleFactory.create("Fusion")
+    app.setStyle(_NoButtonIconsStyle(_base if _base is not None
+                                     else app.style()))
     app.setApplicationName(APP_NAME)
     app.setOrganizationName(ORG)
     app.setApplicationDisplayName(APP_NAME)

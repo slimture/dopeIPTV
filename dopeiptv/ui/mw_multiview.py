@@ -493,6 +493,47 @@ class _MultiviewCell(QWidget):
     def is_muted(self) -> bool:
         return self._muted
 
+    def tracks(self) -> tuple[list, list]:
+        """(audio, subtitle) track dicts from this cell's mpv, empty when
+        nothing is loaded - so the menus only appear when there is a choice."""
+        m = self.video.mpv
+        if m is None or self.url is None:
+            return [], []
+        try:
+            tl = list(m.track_list or [])
+        except Exception:
+            return [], []
+        auds = [t for t in tl if t.get("type") == "audio"]
+        subs = [t for t in tl if t.get("type") == "sub"]
+        return auds, subs
+
+    @staticmethod
+    def track_label(t: dict) -> str:
+        lang = t.get("lang") or ""
+        title = t.get("title") or ""
+        if lang and title:
+            return f"{lang} — {title}"
+        return lang or title or f"#{t.get('id')}"
+
+    def set_audio(self, tid) -> None:
+        m = self.video.mpv
+        if m is None:
+            return
+        try:
+            m["aid"] = tid
+        except Exception:
+            pass
+
+    def set_sub(self, tid) -> None:
+        """Select subtitle track *tid*, or turn subtitles off when None."""
+        m = self.video.mpv
+        if m is None:
+            return
+        try:
+            m["sid"] = "no" if tid is None else tid
+        except Exception:
+            pass
+
     def toggle_pause(self) -> None:
         m = self.video.mpv
         if m is None or self.url is None:
@@ -773,8 +814,17 @@ class _MultiviewWindow(QWidget):
         grid = QGridLayout(self)
         grid.setContentsMargins(0, 0, 0, 0)
         grid.setSpacing(2)
+        # Grid size from Settings: 2 (1x2), 4 (2x2), 6 (2x3) or 9 (3x3)
+        # windows. Applied when the multiview window is (re)created.
+        try:
+            count = int(owner.settings.value("mv_cells", 4))
+        except (TypeError, ValueError):
+            count = 4
+        if count not in (2, 4, 6, 9):
+            count = 4
+        cols = {2: 2, 4: 2, 6: 3, 9: 3}[count]
         self.cells: list[_MultiviewCell] = []
-        for i in range(4):
+        for i in range(count):
             c = _MultiviewCell(i + 1, self)
             c.focus_requested.connect(self._focus_cell)
             c.context_requested.connect(self._cell_context_menu)
@@ -782,7 +832,7 @@ class _MultiviewWindow(QWidget):
             c.maximize_requested.connect(self._toggle_max)
             c.video.video_key_press.connect(
                 lambda ev, cell=c: self._cell_key(cell, ev))
-            grid.addWidget(c, i // 2, i % 2)
+            grid.addWidget(c, i // cols, i % cols)
             self.cells.append(c)
         self._focused: _MultiviewCell | None = None
         self._cursor_hidden = False
@@ -791,7 +841,7 @@ class _MultiviewWindow(QWidget):
         # not the window: a plain child of the window renders *behind* the
         # sibling QOpenGLWidgets (so it was invisible); a child of the GL widget
         # composites on top, the same trick the cell's title/border use.
-        self._close_host = self.cells[1].video   # top-right cell (row0, col1)
+        self._close_host = self.cells[cols - 1].video   # top-right cell
         self._close_btn = _CloseButton(self._close_host)
         self._close_btn.setToolTip(tr("mv_close"))
         self._close_btn.clicked.connect(self.close)
@@ -903,6 +953,33 @@ class _MultiviewWindow(QWidget):
                 move.addAction(
                     tr("mv_cell", n=other.number),
                     lambda _c=False, o=other: self._swap_cells(cell, o))
+            # Audio / subtitle track choice, only when the stream actually
+            # offers alternatives (single-track streams keep the menu clean).
+            auds, subs = cell.tracks()
+            if len(auds) > 1:
+                am = m.addMenu(tr("opt_audio_track"))
+                for t in auds:
+                    act = am.addAction(cell.track_label(t))
+                    act.setCheckable(True)
+                    act.setChecked(bool(t.get("selected")))
+                    act.triggered.connect(
+                        lambda _c=False, tid=t.get("id"), c=cell:
+                        c.set_audio(tid))
+            if subs:
+                sm = m.addMenu(tr("opt_subtitles"))
+                any_sel = any(t.get("selected") for t in subs)
+                off = sm.addAction(tr("opt_off"))
+                off.setCheckable(True)
+                off.setChecked(not any_sel)
+                off.triggered.connect(
+                    lambda _c=False, c=cell: c.set_sub(None))
+                for t in subs:
+                    act = sm.addAction(cell.track_label(t))
+                    act.setCheckable(True)
+                    act.setChecked(bool(t.get("selected")))
+                    act.triggered.connect(
+                        lambda _c=False, tid=t.get("id"), c=cell:
+                        c.set_sub(tid))
             m.addAction(tr("mv_remove_cell"), cell.clear)
             m.addSeparator()
         if "wayland" not in QApplication.platformName().lower():
@@ -1215,9 +1292,17 @@ class _MultiviewMixin:
 
     def _apply_multiview_settings(self) -> None:
         """Push freshly saved Settings → Multiview values into a live window
-        (auto-hide delay, seek step, window flags)."""
+        (auto-hide delay, seek step, window flags). A changed grid size needs
+        a rebuild - close the window so the next open uses the new layout."""
         win = self._multiview_win
         if win is None:
+            return
+        try:
+            count = int(self.settings.value("mv_cells", 4))
+        except (TypeError, ValueError):
+            count = 4
+        if count in (2, 4, 6, 9) and count != len(win.cells):
+            self._close_multiview()
             return
         win.apply_settings()
         win._apply_flags()

@@ -705,6 +705,19 @@ class _SettingsMixin:
         mv_geo_box.setChecked(
             self.settings.value("mv_remember_geo", "true") == "true")
         mvv.addWidget(mv_geo_box)
+        mv_cells_row = QHBoxLayout()
+        mv_cells_row.addWidget(QLabel(tr("mv_set_cells")))
+        mv_cells_box = QComboBox()
+        for n, label in ((2, "2  (1 × 2)"), (4, "4  (2 × 2)"),
+                         (6, "6  (2 × 3)"), (9, "9  (3 × 3)")):
+            mv_cells_box.addItem(label, n)
+        try:
+            cur_cells = int(self.settings.value("mv_cells", 4))
+        except (TypeError, ValueError):
+            cur_cells = 4
+        mv_cells_box.setCurrentIndex(max(0, mv_cells_box.findData(cur_cells)))
+        mv_cells_row.addWidget(mv_cells_box, 1)
+        mvv.addLayout(mv_cells_row)
         mvv.addSpacing(6)
 
         _mv_section("mv_sec_behavior")
@@ -1096,6 +1109,13 @@ class _SettingsMixin:
             lambda: self._open_trakt_dialog(d))
         refresh_trakt_status()
         tabs.addTab(trakt_tab, tr("tab_trakt"))
+        # Size the dialog to the REAL tab row (language and tab count change
+        # its width), instead of guessing a fixed minimum - no more scroll
+        # arrows eating tabs when a new category lands.
+        tab_w = tabs.tabBar().sizeHint().width() + 76
+        d.setMinimumWidth(max(d.minimumWidth(), tab_w))
+        if d.width() < tab_w:
+            d.resize(tab_w, d.height())
 
         def refresh_pin_status():
             if self.parental.has_pin():
@@ -1437,6 +1457,7 @@ class _SettingsMixin:
                 "mv_conflict_mode", mv_conflict_box.currentData())
             self.settings.setValue("mv_autohide_secs", mv_hide_spin.value())
             self.settings.setValue("mv_seek_step_min", mv_step_spin.value())
+            self.settings.setValue("mv_cells", mv_cells_box.currentData())
             self._apply_multiview_settings()
             self.cover.reload()
             if self.player:

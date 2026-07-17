@@ -224,10 +224,12 @@ QPushButton#PlaylistChip:hover {{
     background: {side_action_hover}; border-color: {ACCENT}; color: {p['text']};
 }}
 QPushButton#PlaylistChip[rail="true"] {{
-    /* Same footprint as the nav rail icons above it (they use 4px 0). */
-    background: {side_action_bg}; border: 1px solid {side_action_edge};
-    border-radius: 8px; padding: 4px 0; margin-top: 0px;
+    /* On the rail it sits among the flat nav icons - same footprint, no
+       pill chrome (the bordered pill read as a taller, different control). */
+    background: transparent; border: none; border-radius: 8px;
+    padding: 4px 0; margin-top: 0px;
 }}
+QPushButton#PlaylistChip[rail="true"]:hover {{ background: {p['hover']}; }}
 
 #SectionLabel {{
     color: {p['muted2']}; font-size: 10px; font-weight: 700;
@@ -432,9 +434,13 @@ QComboBox#InlineCombo::down-arrow {{
     border-left: 3px solid transparent; border-right: 3px solid transparent;
     border-top: 4px solid {p['muted2']}; margin-right: 4px;
 }}
+/* Same visible box as the QToolButton form below, so the compact control
+   strip's buttons all read as equal tiles. */
 QPushButton#InlineToggle {{
-    padding: 4px 12px; font-size: 11px; border-radius: 7px;
+    background: {p['btn']}; border: 1px solid {p['btn_hover']};
+    padding: 4px 8px; font-size: 11px; border-radius: 7px;
 }}
+QPushButton#InlineToggle:hover {{ background: {p['btn_hover']}; }}
 QPushButton#InlineToggle:checked {{ background: {ACCENT}; border: none; color: white; }}
 /* The compact ⊞/⇅ stand-ins for the Size/Sort combos are QToolButtons (they
    open a menu); match the pushbutton look and hide the extra menu arrow. */
