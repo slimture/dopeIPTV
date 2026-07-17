@@ -10,8 +10,10 @@ import re
 import sys
 from datetime import datetime
 
-from PyQt6.QtCore import QEvent, QObject, QSize, Qt, QTimer, QUrl
-from PyQt6.QtGui import QDesktopServices, QFont, QFontMetrics, QIcon
+from PyQt6.QtCore import QEvent, QObject, QRectF, QSize, Qt, QTimer, QUrl
+from PyQt6.QtGui import (
+    QColor, QCursor, QDesktopServices, QFont, QFontMetrics, QIcon, QPainter,
+)
 from PyQt6.QtWidgets import (
     QAbstractItemView, QAbstractSlider, QAbstractSpinBox, QApplication,
     QCheckBox, QComboBox, QDialog,
@@ -36,11 +38,12 @@ class _TightTabBar(QTabBar):
         # bar (visible as a stray line above the tabs, partly repainted away
         # under the selected one); the styled pane draws its own border.
         self.setDrawBase(False)
+        self.setMouseTracking(True)   # hover chip repaints (custom paint)
 
     def tabSizeHint(self, index: int) -> QSize:
-        # Measure with a BOLD variant of the tab font: some platforms paint
-        # the selected tab bolder than the rest, and a width measured with
-        # the regular weight then clips the label on selection.
+        # Measure with a BOLD variant of the tab font: the selected tab is
+        # painted bold, and a width measured with the regular weight would
+        # clip the label on selection.
         sz = super().tabSizeHint(index)
         f = QFont(self.font())
         f.setBold(True)
@@ -49,6 +52,46 @@ class _TightTabBar(QTabBar):
 
     def minimumTabSizeHint(self, index: int) -> QSize:
         return self.tabSizeHint(index)
+
+    def sizeHint(self) -> QSize:
+        # A little headroom past the last tab, so nothing ever paints against
+        # the bar's right boundary.
+        sz = super().sizeHint()
+        return QSize(sz.width() + 12, sz.height())
+
+    def paintEvent(self, _event) -> None:
+        # Paint the tabs entirely ourselves. Letting the style paint them
+        # kept producing a selected-tab background drawn LARGER than the tab
+        # rect on macOS - its overhang clipped at the bar boundary on the
+        # last tab, immune to every size/width fix. Owning the pixels ends
+        # it: rounded chip for the selected (and hovered) tab, label centred
+        # in the exact rect the layout computed.
+        pr = QPainter(self)
+        pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        hover = self.tabAt(self.mapFromGlobal(QCursor.pos()))
+        for i in range(self.count()):
+            selected = i == self.currentIndex()
+            if selected or i == hover:
+                pr.setPen(Qt.PenStyle.NoPen)
+                pr.setBrush(QColor(P["btn"] if selected else P["hover"]))
+                pr.drawRoundedRect(
+                    QRectF(self.tabRect(i)).adjusted(1.0, 3.0, -1.0, -3.0),
+                    7.0, 7.0)
+            f = QFont(self.font())
+            f.setBold(selected)
+            pr.setFont(f)
+            pr.setPen(QColor(P["text"] if selected else P["text2"]))
+            pr.drawText(self.tabRect(i), Qt.AlignmentFlag.AlignCenter,
+                        self.tabText(i))
+        pr.end()
+
+    def mouseMoveEvent(self, event) -> None:
+        super().mouseMoveEvent(event)
+        self.update()   # refresh the hover chip
+
+    def leaveEvent(self, event) -> None:
+        super().leaveEvent(event)
+        self.update()
 
 
 class _TightTabs(QTabWidget):
