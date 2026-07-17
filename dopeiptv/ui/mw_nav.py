@@ -175,6 +175,20 @@ class _NavMixin:
             b.setIcon(self._nav_icon(self._rail_glyphs[key], s))
             b.setIconSize(QSize(s, s))
         self._apply_cat_search_icon()   # re-tint 🔍 to the new theme's muted tone
+        self._apply_action_icons()      # Guide / Settings / Multiview glyphs
+
+    def _apply_action_icons(self) -> None:
+        """Paint the three sidebar action buttons (Guide / Settings /
+        Multiview) as centred monochrome glyph icons in the theme's muted
+        tone, so they read as a compact icon row (expanded) or stack (rail)
+        rather than three wide text pills. Re-tinted on theme change."""
+        for name, glyph in (("_guide_btn", "🗓"), ("_settings_btn", "⚙"),
+                            ("_multiview_btn", "▦")):
+            btn = getattr(self, name, None)
+            if btn is None:
+                continue
+            btn.setIcon(QIcon(self._glyph_pixmap(glyph, 18, P["text2"])))
+            btn.setIconSize(QSize(18, 18))
 
     def _on_library_toggle(self, collapsed: bool) -> None:
         """Fold the Library group (Favorites..History) away behind its

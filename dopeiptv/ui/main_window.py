@@ -638,12 +638,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._sync_now_btn.hide()
         sl.addWidget(self._sync_now_btn)
 
-        # EPG Guide + Settings sit side by side in one compact row rather than
-        # two stretched full-width pills. The row is a QBoxLayout whose
+        # Guide + Settings + Multiview as a compact row of three glyph icons
+        # (tooltips carry their names) rather than wide text pills - the icons
+        # are painted by _apply_action_icons. The row is a QBoxLayout whose
         # direction flips to vertical on the collapsed icon rail (60 px is too
-        # narrow for two buttons abreast) - see _apply_sidebar_chrome.
-        self._guide_btn = guide_btn = QPushButton(
-            tr("btn_epg_guide"), objectName="SideAction")
+        # narrow for three buttons abreast) - see _apply_sidebar_chrome.
+        self._guide_btn = guide_btn = QPushButton("", objectName="SideAction")
         guide_btn.setToolTip(tr("btn_epg_guide"))
         guide_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
                                 QSizePolicy.Policy.Fixed)
@@ -652,27 +652,27 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # per-playlist auto-refresh setting; a sidebar button here was just
         # an easy mis-click.)
         self._settings_btn = settings_btn = QPushButton(
-            tr("btn_settings"), objectName="SideAction")
+            "", objectName="SideAction")
         settings_btn.setToolTip(tr("btn_settings"))
         settings_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
                                    QSizePolicy.Policy.Fixed)
         settings_btn.clicked.connect(self.open_settings)
+        # Multiview joins the same row (the app-menu entry is easy to miss, and
+        # on macOS a hidden multiview window won't Cmd+Tab back).
+        self._multiview_btn = multiview_btn = QPushButton(
+            "", objectName="SideAction")
+        multiview_btn.setToolTip(tr("menu_multiview"))
+        multiview_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
+                                    QSizePolicy.Policy.Fixed)
+        multiview_btn.clicked.connect(self._show_multiview)
         self._actions_box = QBoxLayout(QBoxLayout.Direction.LeftToRight)
         self._actions_box.setContentsMargins(0, 0, 0, 0)
         self._actions_box.setSpacing(6)
         self._actions_box.addWidget(guide_btn)
         self._actions_box.addWidget(settings_btn)
+        self._actions_box.addWidget(multiview_btn)
         sl.addLayout(self._actions_box)
-        # Multiview on its own full-width row below Guide/Settings, so it's a
-        # visible one-click affordance (the app menu entry is easy to miss,
-        # and on macOS a hidden multiview window won't Cmd+Tab back).
-        self._multiview_btn = QPushButton(
-            tr("menu_multiview"), objectName="SideAction")
-        self._multiview_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
-                                          QSizePolicy.Policy.Fixed)
-        self._multiview_btn.setToolTip(tr("menu_multiview"))
-        self._multiview_btn.clicked.connect(self._show_multiview)
-        sl.addWidget(self._multiview_btn)
+        self._apply_action_icons()
 
         # Middle column
         mid = QWidget(objectName="MiddlePane")

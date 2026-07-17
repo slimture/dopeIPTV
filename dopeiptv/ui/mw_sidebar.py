@@ -72,14 +72,11 @@ class _SidebarMixin:
                 not collapsed and getattr(self, "_cat_search_supported", False))
             if collapsed:
                 self.cat_search.hide()
-        # Short letter labels in the rail so it's obvious what each is
-        # (an emoji alone read as an anonymous box for some users).
-        self._guide_btn.setText("EPG" if collapsed else tr("btn_epg_guide"))
-        self._settings_btn.setText("⚙" if collapsed else tr("btn_settings"))
+        # Guide / Settings / Multiview are glyph-icon buttons in both modes
+        # (see _apply_action_icons); only the rail pill styling toggles.
         self._set_rail(self._guide_btn, collapsed)
         self._set_rail(self._settings_btn, collapsed)
         if hasattr(self, "_multiview_btn"):
-            self._multiview_btn.setText("▦" if collapsed else tr("menu_multiview"))
             self._set_rail(self._multiview_btn, collapsed)
         if hasattr(self, "_playlist_btn"):
             # The button normally shows the active playlist name; on the rail
