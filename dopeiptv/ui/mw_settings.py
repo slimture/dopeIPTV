@@ -346,14 +346,16 @@ class _SettingsMixin:
     def open_settings(self) -> None:
         d = QDialog(self)
         d.setWindowTitle(tr("settings_title"))
-        d.setMinimumSize(820, 600)
+        # Roomy enough for the full tab row (the Multiview tab pushed the old
+        # 820 width into scroll arrows) and the taller grouped forms.
+        d.setMinimumSize(900, 660)
         # Tall enough that the grouped tabs aren't cramped, but a fixed, modest
         # width - the forms don't need to get wider, only taller (the earlier
         # width-scaling made it far too wide on a big window). Clamped to the
         # main window so it never spills past it.
         geo = self.geometry()
-        d.resize(min(geo.width(), 900),
-                 min(geo.height(), max(660, int(geo.height() * 0.85))))
+        d.resize(min(geo.width(), 960),
+                 min(geo.height(), max(700, int(geo.height() * 0.85))))
         outer = QVBoxLayout(d)
         outer.setContentsMargins(18, 18, 18, 18)
         tabs = QTabWidget()
@@ -1141,6 +1143,9 @@ class _SettingsMixin:
 
         def reload_pl_list():
             pl_list.clear()
+            # The sidebar switcher chip appears/disappears with the second
+            # playlist - reflect adds/removes right away, not on next collapse.
+            self._update_playlist_btn()
             if not store:
                 pl_list.addItem(tr("pl_mgmt_unavailable"))
                 return

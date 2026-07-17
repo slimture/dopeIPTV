@@ -3428,6 +3428,16 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Останавливать основной плеер при отправке в мультиэкран",
         "th": "หยุดเครื่องเล่นหลักเมื่อส่งไปยังมัลติวิว",
     },
+    "mv_set_new_unmuted": {
+        "en": "Newly added channel takes audio focus",
+        "sv": "Nytillagd kanal får ljudfokus",
+        "es": "El canal recién añadido toma el audio",
+        "de": "Neu hinzugefügter Kanal erhält den Ton",
+        "fr": "La chaîne ajoutée prend le son",
+        "zh": "新添加的频道获得音频焦点",
+        "ru": "Новый канал получает звук",
+        "th": "ช่องที่เพิ่มใหม่ได้รับเสียง",
+    },
     "mv_set_conflict": {
         "en": "When playing here while multiview runs",
         "sv": "När du spelar här medan multiview är igång",

@@ -82,6 +82,46 @@ def _glyph(kind: str, s: int, alpha: int = 235) -> QPixmap:
     return pm
 
 
+class _CloseButton(QPushButton):
+    """Fully custom-painted round close button. A stylesheet border-radius
+    circle rasterises without antialiasing on some platforms (a visibly
+    jagged ring), so the scrim disc, ring and ✕ are all drawn here with an
+    antialiased painter at the widget's real DPR."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setFixedSize(30, 30)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setStyleSheet("background:transparent; border:none;")
+
+    def enterEvent(self, event) -> None:
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:
+        self.update()
+        super().leaveEvent(event)
+
+    def paintEvent(self, _event) -> None:
+        pr = QPainter(self)
+        pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        hov = self.underMouse()
+        rf = QRectF(self.rect()).adjusted(1.0, 1.0, -1.0, -1.0)
+        pr.setPen(QPen(QColor(255, 255, 255, 230 if hov else 120), 1.2))
+        pr.setBrush(QColor(229, 53, 75, 235) if hov
+                    else QColor(20, 20, 24, 200))
+        pr.drawEllipse(rf)
+        pen = QPen(QColor(255, 255, 255, 235))
+        pen.setWidthF(1.8)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pr.setPen(pen)
+        m = 10.5
+        w, h = float(self.width()), float(self.height())
+        pr.drawLine(QPointF(m, m), QPointF(w - m, h - m))
+        pr.drawLine(QPointF(w - m, m), QPointF(m, h - m))
+        pr.end()
+
+
 class _MultiviewCell(QWidget):
     """One grid cell: a bare mpv video surface with a position number, an
     auto-hiding title strip and seek bar, click-to-focus, and per-cell
@@ -752,19 +792,7 @@ class _MultiviewWindow(QWidget):
         # sibling QOpenGLWidgets (so it was invisible); a child of the GL widget
         # composites on top, the same trick the cell's title/border use.
         self._close_host = self.cells[1].video   # top-right cell (row0, col1)
-        self._close_btn = QPushButton("", self._close_host)
-        self._close_btn.setObjectName("MvClose")
-        # Drawn white ✕ (the text glyph rendered black on macOS) on a scrim
-        # with a light border, so it stands out over dark video too.
-        self._close_btn.setIcon(
-            QIcon(_glyph("x", 14)))
-        self._close_btn.setIconSize(QSize(14, 14))
-        self._close_btn.setStyleSheet(
-            "#MvClose { background:rgba(20,20,24,200);"
-            " border:1px solid rgba(255,255,255,120); border-radius:15px; }"
-            "#MvClose:hover { background:rgba(229,53,75,235);"
-            " border-color:#FFFFFF; }")
-        self._close_btn.setFixedSize(30, 30)
+        self._close_btn = _CloseButton(self._close_host)
         self._close_btn.setToolTip(tr("mv_close"))
         self._close_btn.clicked.connect(self.close)
         self._close_btn.hide()
@@ -1003,6 +1031,17 @@ class _MultiviewMixin:
             url = self.client.live_url(sid, fmt)
         except Exception:
             url = it.get("_url")
+        # Watching in multiview counts as watching - record it in History
+        # just like docked playback does.
+        try:
+            self.history.add(
+                url, it.get("name") or it.get("title") or "",
+                it.get("stream_icon"), self._item_key(it), "live",
+                extra={"stream_id": sid, "num": it.get("num"),
+                       "tv_archive": it.get("tv_archive"),
+                       "tv_archive_duration": it.get("tv_archive_duration")})
+        except Exception:
+            pass   # hosts without a history store (tests) just skip it
         self.add_to_multiview(
             url, it.get("name") or it.get("title") or "", cell,
             item=it, client=self.client, guide=getattr(self, "xmltv", None),

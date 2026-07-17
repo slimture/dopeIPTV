@@ -478,20 +478,32 @@ QSpinBox, QDoubleSpinBox {{
     padding: 5px 8px; font-size: 12px;
 }}
 QSpinBox:focus, QDoubleSpinBox:focus {{ border: 1px solid {ACCENT}; }}
-QSpinBox::up-button, QSpinBox::down-button,
-QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{
-    subcontrol-origin: border; width: 16px; border: none;
-    background: transparent;
+/* Visible up/down stepper buttons: a filled column on the right edge with
+   clear arrows, instead of the invisible transparent zones that made spin
+   boxes read as plain little text boxes. */
+QSpinBox::up-button, QDoubleSpinBox::up-button {{
+    subcontrol-origin: border; subcontrol-position: top right;
+    width: 20px; border: none; border-left: 1px solid {p['border_in']};
+    border-top-right-radius: 8px; background: {p['hover']};
+}}
+QSpinBox::down-button, QDoubleSpinBox::down-button {{
+    subcontrol-origin: border; subcontrol-position: bottom right;
+    width: 20px; border: none; border-left: 1px solid {p['border_in']};
+    border-bottom-right-radius: 8px; background: {p['hover']};
+}}
+QSpinBox::up-button:hover, QSpinBox::down-button:hover,
+QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover {{
+    background: {p['border_in']};
 }}
 QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
     image: none; width: 0; height: 0;
-    border-left: 4px solid transparent; border-right: 4px solid transparent;
-    border-bottom: 5px solid {p['muted2']};
+    border-left: 5px solid transparent; border-right: 5px solid transparent;
+    border-bottom: 6px solid {p['text2']};
 }}
 QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
     image: none; width: 0; height: 0;
-    border-left: 4px solid transparent; border-right: 4px solid transparent;
-    border-top: 5px solid {p['muted2']};
+    border-left: 5px solid transparent; border-right: 5px solid transparent;
+    border-top: 6px solid {p['text2']};
 }}
 QSpinBox::up-arrow:hover, QDoubleSpinBox::up-arrow:hover {{
     border-bottom-color: {p['text']}; }}

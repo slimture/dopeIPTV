@@ -787,7 +787,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.side_btn.toggled.connect(self._on_side_toggle)
         # Focus mode: hide this whole list column to give the player the room,
         # reopened via the arrow strip on the detail pane's edge.
-        self.focus_btn = QPushButton("⤢", objectName="InlineToggle")
+        # Icon (not a text glyph): ⤢ as raw text sat off-centre and clipped at
+        # the compact 28 px width. _apply_action_icons re-tints it on theme
+        # change; this initial paint covers construction (which happens after
+        # the first icon pass).
+        self.focus_btn = QPushButton("", objectName="InlineToggle")
+        self.focus_btn.setIcon(QIcon(self._glyph_pixmap("⤢", 16, P["text2"])))
+        self.focus_btn.setIconSize(QSize(16, 16))
         self.focus_btn.setToolTip(tr("tooltip_hide_list"))
         self.focus_btn.setFixedWidth(34)
         self.focus_btn.clicked.connect(lambda: self._set_focus_mode(True))
@@ -2803,6 +2809,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         if not self._guard_stream_switch(url, title):
             return
+        # The preview path never reaches _start_playback, so it must carry the
+        # same side effects itself: the multiview-conflict question (close it
+        # and free its connections, or keep both) and the History entry -
+        # with autoplay-preview on, this IS how channels get played.
+        self._maybe_close_multiview_for_playback()
+        if kind != "history":
+            self.history.add(
+                url, title, it.get("stream_icon"), self._item_key(it), "live",
+                extra={"stream_id": it.get("stream_id"),
+                       "num": it.get("num"),
+                       "tv_archive": it.get("tv_archive"),
+                       "tv_archive_duration": it.get("tv_archive_duration")})
         self.stream_error.hide()
         self._playing_key = self._item_key(it)
         self._playing_group = "live"

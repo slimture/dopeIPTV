@@ -206,6 +206,14 @@ class _NavMixin:
         # both sidebar states; _update_playlist_btn repaints it).
         if hasattr(self, "_playlist_btn"):
             self._update_playlist_btn()
+        # Hide-the-list (focus mode) toggle: as a raw text glyph the ⤢ sat
+        # shoved off-centre and clipped at the compact 28 px width - paint it
+        # as a centred, ink-measured icon like the rest.
+        if hasattr(self, "focus_btn"):
+            self.focus_btn.setText("")
+            self.focus_btn.setIcon(
+                QIcon(self._glyph_pixmap("⤢", 16, P["text2"])))
+            self.focus_btn.setIconSize(QSize(16, 16))
 
     def _fill_glyph_pixmap(self, glyph: str, s: int, color: str,
                            frac: float) -> QPixmap:
