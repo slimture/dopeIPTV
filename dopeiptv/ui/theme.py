@@ -159,9 +159,50 @@ def _mix(fg: str, bg: str, ratio: float) -> str:
     return f"#{r:02X}{g:02X}{bl:02X}"
 
 
+def _arrow_png(direction: str, color: str, size: int = 10) -> str:
+    """Path to a small antialiased arrow PNG for QSS ``image:`` rules. The
+    QSS border-triangle trick renders as an empty box on several platform
+    styles (macOS especially), so real images are the only arrows that show
+    reliably everywhere. Rendered supersampled, cached per
+    direction/colour/size and regenerated only when missing."""
+    import os
+
+    from PyQt6.QtCore import QPointF, QStandardPaths, Qt
+    from PyQt6.QtGui import QColor, QPainter, QPixmap, QPolygonF
+    base = QStandardPaths.writableLocation(
+        QStandardPaths.StandardLocation.CacheLocation)
+    os.makedirs(base, exist_ok=True)
+    path = os.path.join(
+        base, f"qss_arrow_{direction}_{size}_{color.lstrip('#')}.png")
+    if not os.path.exists(path):
+        ss = 4
+        big = QPixmap(size * ss, size * ss)
+        big.fill(Qt.GlobalColor.transparent)
+        pr = QPainter(big)
+        pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        pr.setPen(Qt.PenStyle.NoPen)
+        pr.setBrush(QColor(color))
+        S = float(size * ss)
+        if direction == "up":
+            pts = [QPointF(S * 0.14, S * 0.70), QPointF(S * 0.86, S * 0.70),
+                   QPointF(S * 0.50, S * 0.26)]
+        else:
+            pts = [QPointF(S * 0.14, S * 0.30), QPointF(S * 0.86, S * 0.30),
+                   QPointF(S * 0.50, S * 0.74)]
+        pr.drawPolygon(QPolygonF(pts))
+        pr.end()
+        big.scaled(size, size, Qt.AspectRatioMode.IgnoreAspectRatio,
+                   Qt.TransformationMode.SmoothTransformation).save(path)
+    return path.replace("\\", "/")
+
+
 def build_style() -> str:
     """Generate the full application QSS from the active palette."""
     p = dict(P)
+    arrow_up = _arrow_png("up", p['text2'])
+    arrow_down = _arrow_png("down", p['text2'])
+    arrow_up_sm = _arrow_png("up", p['text2'], 8)
+    arrow_down_sm = _arrow_png("down", p['text2'], 8)
     # Sidebar action buttons (Guide, Settings): a solid, theme-neutral raised
     # surface with a soft edge, both derived from the palette so they track the
     # theme instead of standing out in a clashing colour. Opaque so they show
@@ -398,6 +439,9 @@ QTabWidget::pane {{
     border: 1px solid {p['border_in']}; border-radius: 8px; background: {p['pane']};
     top: -1px;
 }}
+/* Left-packed tabs with QSS-controlled spacing on every OS (macOS's native
+   metrics centred and spread them differently from Linux). */
+QTabWidget::tab-bar {{ alignment: left; }}
 QTabBar::tab {{
     background: transparent; color: {p['text2']}; padding: 7px 12px;
     border-radius: 7px; margin: 1px; font-size: 12px; min-width: 46px;
@@ -415,13 +459,9 @@ QComboBox::drop-down {{
     width: 18px; border: none; background: transparent;
 }}
 QComboBox::down-arrow {{
-    image: none; border: none; background: transparent;
-    width: 0; height: 0;
-    border-left: 4px solid transparent; border-right: 4px solid transparent;
-    border-top: 5px solid {p['muted2']};
-    margin-right: 6px;
+    image: url("{arrow_down}"); width: 10px; height: 10px;
+    margin-right: 5px;
 }}
-QComboBox::down-arrow:hover {{ border-top-color: {p['text']}; }}
 QComboBox QAbstractItemView {{
     background: {p['input']}; border: 1px solid {p['border_in']}; border-radius: 6px;
     selection-background-color: {ACCENT}; selection-color: white;
@@ -431,8 +471,7 @@ QComboBox QAbstractItemView::item {{ min-height: 22px; padding: 3px 8px; }}
 QComboBox#InlineCombo {{ padding: 3px 8px; font-size: 11px; }}
 QComboBox#InlineCombo::drop-down {{ width: 14px; }}
 QComboBox#InlineCombo::down-arrow {{
-    border-left: 3px solid transparent; border-right: 3px solid transparent;
-    border-top: 4px solid {p['muted2']}; margin-right: 4px;
+    image: url("{arrow_down_sm}"); width: 8px; height: 8px; margin-right: 3px;
 }}
 /* Same visible box as the QToolButton form below, so the compact control
    strip's buttons all read as equal tiles. */
@@ -455,22 +494,25 @@ QDateTimeEdit {{
     background: {p['input']}; border: 1px solid {p['border_in']}; border-radius: 8px;
     padding: 5px 10px; font-size: 12px;
 }}
-QDateTimeEdit::up-button, QDateTimeEdit::down-button {{
-    subcontrol-origin: border; width: 16px; border: none;
-    background: transparent;
+QDateTimeEdit::up-button {{
+    subcontrol-origin: border; subcontrol-position: top right;
+    width: 18px; border: none; border-left: 1px solid {p['border_in']};
+    border-top-right-radius: 8px; background: {p['hover']};
+}}
+QDateTimeEdit::down-button {{
+    subcontrol-origin: border; subcontrol-position: bottom right;
+    width: 18px; border: none; border-left: 1px solid {p['border_in']};
+    border-bottom-right-radius: 8px; background: {p['hover']};
+}}
+QDateTimeEdit::up-button:hover, QDateTimeEdit::down-button:hover {{
+    background: {p['border_in']};
 }}
 QDateTimeEdit::up-arrow {{
-    image: none; width: 0; height: 0;
-    border-left: 3px solid transparent; border-right: 3px solid transparent;
-    border-bottom: 4px solid {p['muted2']};
+    image: url("{arrow_up_sm}"); width: 8px; height: 8px;
 }}
 QDateTimeEdit::down-arrow {{
-    image: none; width: 0; height: 0;
-    border-left: 3px solid transparent; border-right: 3px solid transparent;
-    border-top: 4px solid {p['muted2']};
+    image: url("{arrow_down_sm}"); width: 8px; height: 8px;
 }}
-QDateTimeEdit::up-arrow:hover {{ border-bottom-color: {p['text']}; }}
-QDateTimeEdit::down-arrow:hover {{ border-top-color: {p['text']}; }}
 
 QLineEdit {{
     background: {p['input']}; border: 1px solid {p['border_in']}; border-radius: 8px;
@@ -502,19 +544,11 @@ QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover {{
     background: {p['border_in']};
 }}
 QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
-    image: none; width: 0; height: 0;
-    border-left: 5px solid transparent; border-right: 5px solid transparent;
-    border-bottom: 6px solid {p['text2']};
+    image: url("{arrow_up}"); width: 10px; height: 10px;
 }}
 QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
-    image: none; width: 0; height: 0;
-    border-left: 5px solid transparent; border-right: 5px solid transparent;
-    border-top: 6px solid {p['text2']};
+    image: url("{arrow_down}"); width: 10px; height: 10px;
 }}
-QSpinBox::up-arrow:hover, QDoubleSpinBox::up-arrow:hover {{
-    border-bottom-color: {p['text']}; }}
-QSpinBox::down-arrow:hover, QDoubleSpinBox::down-arrow:hover {{
-    border-top-color: {p['text']}; }}
 
 QFileDialog QTreeView, QFileDialog QListView {{
     background: {p['input']}; border: 1px solid {p['border_in']};

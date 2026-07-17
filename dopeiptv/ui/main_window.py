@@ -453,12 +453,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         sl.addSpacing(6)
         self._update_playlist_btn()
 
-        # Source glyphs for the nav icons (rendered to fixed-size monochrome
-        # pixmaps below). Each must be visually distinct: watch-later is a
-        # bookmark, recordings a record dot, history a clock - no two alike.
+        # Vector-icon kinds for the nav entries (drawn in _action_pixmap).
+        # Each must be visually distinct: watch-later is a bookmark,
+        # recordings a record dot, history a clock - no two alike. Drawn, not
+        # emoji: every OS renders its own emoji font differently.
         self._rail_glyphs = {
-            "live": "📺", "vod": "🎬", "series": "🎞", "fav": "★",
-            "watchlist": "🔖", "watched": "✓", "rec": "⏺", "history": "🕘",
+            "live": "tv", "vod": "movie", "series": "series", "fav": "star",
+            "watchlist": "bookmark", "watched": "check", "rec": "rec",
+            "history": "clock",
         }
         self._nav_texts: dict[str, str] = {}
         self.nav_btns: dict[str, QPushButton] = {}
@@ -747,6 +749,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.sort_box.setToolTip(tr("sort_scope_hint"))
         self.sort_box.currentIndexChanged.connect(self._inline_view_changed)
         self.grid_btn = QPushButton(tr("btn_grid"), objectName="InlineToggle")
+        self.grid_btn.setIcon(self._nav_icon("gridview", 14))
+        self.grid_btn.setIconSize(QSize(14, 14))
         self.grid_btn.setCheckable(True)
         self.grid_btn.setChecked(
             self.settings.value("view_grid", "false") == "true")
@@ -756,13 +760,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # a popup menu (fully readable at any pane width, no clipped text).
         # Shown only when the pane is narrow - see _apply_mid_compact.
         self._size_menu_btn = QToolButton(objectName="InlineToggle")
-        self._size_menu_btn.setText("⊞")
+        self._size_menu_btn.setIcon(
+            QIcon(self._action_pixmap("sizepick", 15, P["text2"])))
+        self._size_menu_btn.setIconSize(QSize(15, 15))
         self._size_menu_btn.setToolTip(tr("label_size"))
         self._size_menu_btn.setFixedWidth(30)
         self._size_menu_btn.setPopupMode(
             QToolButton.ToolButtonPopupMode.InstantPopup)
         self._sort_menu_btn = QToolButton(objectName="InlineToggle")
-        self._sort_menu_btn.setText("⇅")
+        self._sort_menu_btn.setIcon(
+            QIcon(self._action_pixmap("sort", 15, P["text2"])))
+        self._sort_menu_btn.setIconSize(QSize(15, 15))
         self._sort_menu_btn.setToolTip(tr("label_sort"))
         self._sort_menu_btn.setFixedWidth(30)
         self._sort_menu_btn.setPopupMode(
@@ -779,7 +787,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._sort_label = QLabel(tr("label_sort"))
         # Toggle for the left category column - handy for clean screenshots
         # (hide category names) or just more room for the list.
-        self.side_btn = QPushButton("☰", objectName="InlineToggle")
+        self.side_btn = QPushButton("", objectName="InlineToggle")
+        self.side_btn.setIcon(self._nav_icon("bars", 15))
+        self.side_btn.setIconSize(QSize(15, 15))
         self.side_btn.setCheckable(True)
         self.side_btn.setChecked(True)
         self.side_btn.setToolTip(tr("tooltip_toggle_sidebar"))
@@ -787,12 +797,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.side_btn.toggled.connect(self._on_side_toggle)
         # Focus mode: hide this whole list column to give the player the room,
         # reopened via the arrow strip on the detail pane's edge.
-        # Icon (not a text glyph): ⤢ as raw text sat off-centre and clipped at
-        # the compact 28 px width. _apply_action_icons re-tints it on theme
-        # change; this initial paint covers construction (which happens after
-        # the first icon pass).
+        # Vector icon (not a text glyph): ⤢ as raw text sat off-centre,
+        # clipped, and rendered differently per OS. _apply_action_icons
+        # re-tints it on theme change; this initial paint covers construction
+        # (which happens after the first icon pass).
         self.focus_btn = QPushButton("", objectName="InlineToggle")
-        self.focus_btn.setIcon(QIcon(self._glyph_pixmap("⤢", 16, P["text2"])))
+        self.focus_btn.setIcon(
+            QIcon(self._action_pixmap("focus", 16, P["text2"])))
         self.focus_btn.setIconSize(QSize(16, 16))
         self.focus_btn.setToolTip(tr("tooltip_hide_list"))
         self.focus_btn.setFixedWidth(34)

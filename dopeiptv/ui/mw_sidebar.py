@@ -216,7 +216,7 @@ class _SidebarMixin:
         self.focus_btn.setFixedWidth(30 if compact else 34)
         self._size_menu_btn.setFixedWidth(30)
         self._sort_menu_btn.setFixedWidth(30)
-        self.grid_btn.setText("▦" if compact else tr("btn_grid"))
+        self.grid_btn.setText("" if compact else tr("btn_grid"))
         self.grid_btn.setMinimumWidth(30 if compact else 0)
         self.grid_btn.setMaximumWidth(30 if compact else 16777215)
         self.grid_btn.setToolTip(tr("btn_grid"))

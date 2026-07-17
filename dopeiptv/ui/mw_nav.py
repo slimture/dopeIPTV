@@ -7,9 +7,11 @@ Pure UI moved out of main_window.py; every method operates on MainWindow widgets
 """
 from __future__ import annotations
 
+import math
+
 from PyQt6.QtCore import QPointF, QRectF, QSize, Qt
 from PyQt6.QtGui import (
-    QColor, QFont, QFontMetricsF, QIcon, QPainter, QPen, QPixmap,
+    QColor, QFont, QFontMetricsF, QIcon, QPainter, QPen, QPixmap, QPolygonF,
 )
 from PyQt6.QtWidgets import QColorDialog, QMenu
 
@@ -144,26 +146,24 @@ class _NavMixin:
         pr.end()
         return pm
 
-    def _nav_icon(self, glyph: str, s: int) -> QIcon:
-        """An icon of size S painted from GLYPH in the theme's muted tone (the
-        normal/Off state) and white (the checked/On state), so it always
-        matches the nav label."""
+    def _nav_icon(self, kind: str, s: int) -> QIcon:
+        """A vector icon of size S in the theme's muted tone (the normal/Off
+        state) and white (the checked/On state), so it always matches the nav
+        label - and renders identically on every OS."""
         icon = QIcon()
-        icon.addPixmap(self._glyph_pixmap(glyph, s, P["text2"]),
+        icon.addPixmap(self._action_pixmap(kind, s, P["text2"]),
                        QIcon.Mode.Normal, QIcon.State.Off)
-        icon.addPixmap(self._glyph_pixmap(glyph, s, "#FFFFFF"),
+        icon.addPixmap(self._action_pixmap(kind, s, "#FFFFFF"),
                        QIcon.Mode.Normal, QIcon.State.On)
         return icon
 
     def _apply_cat_search_icon(self) -> None:
-        """(Re)paint the category-search 🔍 as a dead-centred icon in the theme's
-        muted tone. A plain QToolButton text emoji sits shoved to the top-left of
-        its hover square; an ink-centred icon fixes that and re-tints on theme
-        change."""
+        """(Re)paint the category-search magnifier as a centred vector icon in
+        the theme's muted tone (the old 🔍 emoji looked different per OS)."""
         if not hasattr(self, "cat_search_btn"):
             return
         self.cat_search_btn.setIcon(
-            QIcon(self._glyph_pixmap("🔍", 14, P["text2"])))
+            QIcon(self._action_pixmap("search", 14, P["text2"])))
         self.cat_search_btn.setIconSize(QSize(14, 14))
 
     def _apply_nav_icons(self) -> None:
@@ -193,83 +193,77 @@ class _NavMixin:
             btn = getattr(self, name, None)
             if btn is None:
                 continue
-            if kind == "gear":
-                # The bare glyph draws small (its ink fills well under the box);
-                # scale it up so it reads at the same size as the two vector
-                # icons beside it.
-                pm = self._fill_glyph_pixmap("⚙", 18, P["text2"], 0.94)
-            else:
-                pm = self._action_pixmap(kind, 18, P["text2"])
-            btn.setIcon(QIcon(pm))
+            btn.setIcon(QIcon(self._action_pixmap(kind, 18, P["text2"])))
             btn.setIconSize(QSize(18, 18))
         # The playlist stack icon follows the theme too (same square icon in
         # both sidebar states; _update_playlist_btn repaints it).
         if hasattr(self, "_playlist_btn"):
             self._update_playlist_btn()
-        # Hide-the-list (focus mode) toggle: as a raw text glyph the ⤢ sat
-        # shoved off-centre and clipped at the compact 28 px width - paint it
-        # as a centred, ink-measured icon like the rest.
+        # Middle-column controls: focus (hide list), list toggle, grid view
+        # and the compact size/sort pickers - vector icons, re-tinted here.
         if hasattr(self, "focus_btn"):
             self.focus_btn.setText("")
             self.focus_btn.setIcon(
-                QIcon(self._glyph_pixmap("⤢", 16, P["text2"])))
+                QIcon(self._action_pixmap("focus", 16, P["text2"])))
             self.focus_btn.setIconSize(QSize(16, 16))
-
-    def _fill_glyph_pixmap(self, glyph: str, s: int, color: str,
-                           frac: float) -> QPixmap:
-        """Like _glyph_pixmap but sizes the glyph so its ink fills FRAC of the
-        SxS box (the plain helper only shrinks oversized glyphs, never grows a
-        small one - which left the gear tiny next to the vector icons)."""
-        dpr = self.devicePixelRatioF() or 1.0
-        pm = QPixmap(round(s * dpr), round(s * dpr))
-        pm.setDevicePixelRatio(dpr)
-        pm.fill(Qt.GlobalColor.transparent)
-        pr = QPainter(pm)
-        pr.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
-        g = glyph + "︎"
-        f = QFont()
-        f.setPixelSize(s)
-        fm = QFontMetricsF(f)
-        br = fm.tightBoundingRect(g)
-        biggest = max(br.width(), br.height()) or 1.0
-        f.setPixelSize(max(1, round(s * frac * s / biggest)))
-        fm = QFontMetricsF(f)
-        br = fm.tightBoundingRect(g)
-        pr.setFont(f)
-        pr.setPen(QColor(color))
-        x = (s - br.width()) / 2.0 - br.x()
-        y = (s - br.height()) / 2.0 - br.y()
-        pr.drawText(QPointF(x, y), g)
-        pr.end()
-        return pm
+        if hasattr(self, "side_btn"):
+            self.side_btn.setText("")
+            self.side_btn.setIcon(self._nav_icon("bars", 15))
+            self.side_btn.setIconSize(QSize(15, 15))
+        if hasattr(self, "grid_btn"):
+            self.grid_btn.setIcon(self._nav_icon("gridview", 14))
+            self.grid_btn.setIconSize(QSize(14, 14))
+        if hasattr(self, "_size_menu_btn"):
+            self._size_menu_btn.setText("")
+            self._size_menu_btn.setIcon(
+                QIcon(self._action_pixmap("sizepick", 15, P["text2"])))
+            self._size_menu_btn.setIconSize(QSize(15, 15))
+            self._sort_menu_btn.setText("")
+            self._sort_menu_btn.setIcon(
+                QIcon(self._action_pixmap("sort", 15, P["text2"])))
+            self._sort_menu_btn.setIconSize(QSize(15, 15))
 
     def _action_pixmap(self, kind: str, s: int, color: str) -> QPixmap:
-        """Hand-drawn monochrome icon for the sidebar action buttons.
-        'grid'  -> four rounded tiles (multiview);
-        'stack' -> two stacked cards (switch playlist, on the rail);
-        'guide' -> a framed programme grid: header row, channel column and a
-                   few programme cells (EPG)."""
+        """Hand-drawn monochrome vector icon, identical on every OS - the app
+        used to lean on emoji/symbol glyphs here, which each platform's font
+        renders differently (and some render as clipped or colour marks).
+        Kinds cover the sidebar nav (tv/movie/series/star/bookmark/check/rec/
+        clock), the action row (guide/gear/grid/stack) and the middle-column
+        controls (search/focus/bars/gridview/sizepick/sort)."""
         dpr = self.devicePixelRatioF() or 1.0
         pm = QPixmap(round(s * dpr), round(s * dpr))
         pm.setDevicePixelRatio(dpr)
         pm.fill(Qt.GlobalColor.transparent)
         pr = QPainter(pm)
         pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        col = QColor(color)
+        pen = QPen(col)
+        pen.setWidthF(max(1.2, s * 0.085))
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+
+        def stroke() -> None:
+            pr.setPen(pen)
+            pr.setBrush(Qt.BrushStyle.NoBrush)
+
+        def fill() -> None:
+            pr.setPen(Qt.PenStyle.NoPen)
+            pr.setBrush(col)
+
         if kind == "stack":
             # Two offset cards = "several playlists, pick one". The back card
             # is dimmed so the front reads as the active list.
             pr.setPen(Qt.PenStyle.NoPen)
-            back = QColor(color)
+            back = QColor(col)
             back.setAlphaF(0.45)
             pr.setBrush(back)
             pr.drawRoundedRect(QRectF(s * 0.26, s * 0.08, s * 0.64, s * 0.56),
                                s * 0.10, s * 0.10)
-            pr.setBrush(QColor(color))
+            pr.setBrush(col)
             pr.drawRoundedRect(QRectF(s * 0.10, s * 0.32, s * 0.64, s * 0.56),
                                s * 0.10, s * 0.10)
         elif kind == "grid":
-            pr.setPen(Qt.PenStyle.NoPen)
-            pr.setBrush(QColor(color))
+            fill()
             m = s * 0.09
             gap = s * 0.13
             cell = (s - 2 * m - gap) / 2.0
@@ -279,13 +273,135 @@ class _NavMixin:
                     pr.drawRoundedRect(
                         QRectF(m + j * (cell + gap), m + i * (cell + gap),
                                cell, cell), rad, rad)
+        elif kind == "tv":
+            stroke()
+            pr.drawRoundedRect(QRectF(s * 0.12, s * 0.30, s * 0.76, s * 0.52),
+                               s * 0.08, s * 0.08)
+            pr.drawLine(QPointF(s * 0.36, s * 0.28), QPointF(s * 0.22, s * 0.10))
+            pr.drawLine(QPointF(s * 0.64, s * 0.28), QPointF(s * 0.78, s * 0.10))
+            pr.drawLine(QPointF(s * 0.34, s * 0.92), QPointF(s * 0.66, s * 0.92))
+        elif kind == "movie":
+            stroke()
+            pr.drawRoundedRect(QRectF(s * 0.12, s * 0.22, s * 0.76, s * 0.58),
+                               s * 0.08, s * 0.08)
+            pr.drawLine(QPointF(s * 0.12, s * 0.42), QPointF(s * 0.88, s * 0.42))
+            for fx in (0.22, 0.44, 0.66):
+                pr.drawLine(QPointF(s * fx, s * 0.24),
+                            QPointF(s * (fx + 0.10), s * 0.42))
+        elif kind == "series":
+            back = QColor(col)
+            back.setAlphaF(0.45)
+            pr.setPen(Qt.PenStyle.NoPen)
+            pr.setBrush(back)
+            pr.drawRoundedRect(QRectF(s * 0.20, s * 0.10, s * 0.68, s * 0.50),
+                               s * 0.08, s * 0.08)
+            fill()
+            pr.drawRoundedRect(QRectF(s * 0.10, s * 0.32, s * 0.68, s * 0.52),
+                               s * 0.08, s * 0.08)
+            pr.setCompositionMode(
+                QPainter.CompositionMode.CompositionMode_Clear)
+            pr.drawPolygon(QPolygonF([
+                QPointF(s * 0.36, s * 0.44), QPointF(s * 0.36, s * 0.72),
+                QPointF(s * 0.60, s * 0.58)]))
+            pr.setCompositionMode(
+                QPainter.CompositionMode.CompositionMode_SourceOver)
+        elif kind == "star":
+            fill()
+            cx, cy = s * 0.5, s * 0.54
+            ro, ri = s * 0.44, s * 0.18
+            pts = []
+            for i in range(10):
+                r = ro if i % 2 == 0 else ri
+                a = -math.pi / 2 + i * math.pi / 5
+                pts.append(QPointF(cx + r * math.cos(a),
+                                   cy + r * math.sin(a)))
+            pr.drawPolygon(QPolygonF(pts))
+        elif kind == "bookmark":
+            fill()
+            pr.drawPolygon(QPolygonF([
+                QPointF(s * 0.28, s * 0.10), QPointF(s * 0.72, s * 0.10),
+                QPointF(s * 0.72, s * 0.90), QPointF(s * 0.50, s * 0.72),
+                QPointF(s * 0.28, s * 0.90)]))
+        elif kind == "check":
+            pen.setWidthF(max(1.6, s * 0.12))
+            stroke()
+            pr.drawPolyline(QPolygonF([
+                QPointF(s * 0.18, s * 0.55), QPointF(s * 0.42, s * 0.78),
+                QPointF(s * 0.84, s * 0.26)]))
+        elif kind == "rec":
+            stroke()
+            pr.drawEllipse(QRectF(s * 0.14, s * 0.14, s * 0.72, s * 0.72))
+            fill()
+            pr.drawEllipse(QRectF(s * 0.34, s * 0.34, s * 0.32, s * 0.32))
+        elif kind == "clock":
+            stroke()
+            pr.drawEllipse(QRectF(s * 0.12, s * 0.12, s * 0.76, s * 0.76))
+            pr.drawLine(QPointF(s * 0.5, s * 0.5), QPointF(s * 0.5, s * 0.27))
+            pr.drawLine(QPointF(s * 0.5, s * 0.5), QPointF(s * 0.67, s * 0.60))
+        elif kind == "gear":
+            fill()
+            cx = cy = s * 0.5
+            for i in range(8):
+                pr.save()
+                pr.translate(cx, cy)
+                pr.rotate(i * 45.0)
+                pr.drawRect(QRectF(-s * 0.065, -s * 0.46, s * 0.13, s * 0.18))
+                pr.restore()
+            pr.drawEllipse(QRectF(cx - s * 0.30, cy - s * 0.30,
+                                  s * 0.60, s * 0.60))
+            pr.setCompositionMode(
+                QPainter.CompositionMode.CompositionMode_Clear)
+            pr.drawEllipse(QRectF(cx - s * 0.13, cy - s * 0.13,
+                                  s * 0.26, s * 0.26))
+            pr.setCompositionMode(
+                QPainter.CompositionMode.CompositionMode_SourceOver)
+        elif kind == "search":
+            stroke()
+            pr.drawEllipse(QRectF(s * 0.14, s * 0.14, s * 0.50, s * 0.50))
+            pr.drawLine(QPointF(s * 0.61, s * 0.61), QPointF(s * 0.86, s * 0.86))
+        elif kind == "focus":
+            stroke()
+            pr.drawLine(QPointF(s * 0.34, s * 0.66), QPointF(s * 0.66, s * 0.34))
+            fill()
+            pr.drawPolygon(QPolygonF([
+                QPointF(s * 0.56, s * 0.20), QPointF(s * 0.82, s * 0.18),
+                QPointF(s * 0.80, s * 0.44)]))
+            pr.drawPolygon(QPolygonF([
+                QPointF(s * 0.44, s * 0.80), QPointF(s * 0.18, s * 0.82),
+                QPointF(s * 0.20, s * 0.56)]))
+        elif kind == "bars":
+            fill()
+            for fy in (0.20, 0.45, 0.70):
+                pr.drawRoundedRect(QRectF(s * 0.14, s * fy, s * 0.72, s * 0.11),
+                                   s * 0.05, s * 0.05)
+        elif kind == "gridview":
+            fill()
+            cell = s * 0.20
+            gap = s * 0.08
+            m0 = (s - 3 * cell - 2 * gap) / 2.0
+            for i in range(3):
+                for j in range(3):
+                    pr.drawRect(QRectF(m0 + j * (cell + gap),
+                                       m0 + i * (cell + gap), cell, cell))
+        elif kind == "sizepick":
+            stroke()
+            pr.drawRoundedRect(QRectF(s * 0.14, s * 0.14, s * 0.72, s * 0.72),
+                               s * 0.08, s * 0.08)
+            pr.drawLine(QPointF(s * 0.5, s * 0.32), QPointF(s * 0.5, s * 0.68))
+            pr.drawLine(QPointF(s * 0.32, s * 0.5), QPointF(s * 0.68, s * 0.5))
+        elif kind == "sort":
+            stroke()
+            pr.drawLine(QPointF(s * 0.34, s * 0.24), QPointF(s * 0.34, s * 0.80))
+            pr.drawLine(QPointF(s * 0.66, s * 0.20), QPointF(s * 0.66, s * 0.76))
+            fill()
+            pr.drawPolygon(QPolygonF([
+                QPointF(s * 0.22, s * 0.34), QPointF(s * 0.46, s * 0.34),
+                QPointF(s * 0.34, s * 0.14)]))
+            pr.drawPolygon(QPolygonF([
+                QPointF(s * 0.54, s * 0.66), QPointF(s * 0.78, s * 0.66),
+                QPointF(s * 0.66, s * 0.86)]))
         else:   # guide
-            pen = QPen(QColor(color))
-            pen.setWidthF(max(1.2, s * 0.085))
-            pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
-            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-            pr.setPen(pen)
-            pr.setBrush(Qt.BrushStyle.NoBrush)
+            stroke()
             m = s * 0.13
             inner = s - 2 * m
             pr.drawRoundedRect(QRectF(m, m, inner, inner), s * 0.12, s * 0.12)
