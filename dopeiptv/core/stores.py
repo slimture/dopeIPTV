@@ -173,6 +173,24 @@ class HistoryStore:
             self.entries = []
         if not isinstance(self.entries, list):
             self.entries = []
+        # Heal entries mis-recorded as 'live' by the old favorites bug (a
+        # movie played from Favorites was filed as a TV channel). The stored
+        # URL knows the truth: Xtream VOD urls contain /movie/, series
+        # episodes /series/. Without this the History view treats the movie
+        # as a channel - grouping it under TV channels and auto-previewing a
+        # garbage live URL built from its VOD id.
+        fixed = False
+        for e in self.entries:
+            if e.get("_kind") == "live":
+                u = e.get("_url") or ""
+                if "/movie/" in u:
+                    e["_kind"] = "movie"
+                    fixed = True
+                elif "/series/" in u:
+                    e["_kind"] = "episode"
+                    fixed = True
+        if fixed:
+            self._save()
 
     def _save(self) -> None:
         self.settings.setValue(self.key,

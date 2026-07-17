@@ -2810,6 +2810,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # rows inside History (a movie/episode/recording row there is not a
         # live channel and must not auto-play).
         history_live = kind == "history" and it.get("_kind") == "live"
+        # Belt: never preview a history row whose stored URL is VOD/series,
+        # whatever its kind tag claims (old entries could be mis-kinded).
+        if history_live:
+            u = it.get("_url") or ""
+            if "/movie/" in u or "/series/" in u:
+                return
         if kind not in ("live", "fav") and not history_live:
             return
         # The grouped "All favorites" view shares kind 'fav' for every row.
@@ -3198,6 +3204,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                         item=None, catchup: bool = False) -> None:
         if not self._guard_stream_switch(url, title):
             return
+        # A click that led here also armed the auto-preview timer; kill it so
+        # a pending preview can't fire 350 ms later and stomp this playback.
+        if hasattr(self, "_preview_timer"):
+            self._preview_timer.stop()
         # Multiview holds provider connections - starting playback here while
         # its streams run would be refused on a tight connection limit. Offer
         # (once per multiview window) to close it; keeping both is fine on
