@@ -77,4 +77,9 @@ def _probe_url(url: str) -> str:
         return tr("diag_forbidden", code=code)
     if code == 404:
         return tr("diag_not_found")
+    # 458 (and friends) are non-standard codes Xtream panels return to say the
+    # stream is *blocked* - anti-VPN/re-stream, a connection limit, a region or
+    # device block, or a player User-Agent that isn't on their allow-list.
+    if code == 458:
+        return tr("diag_blocked", code=code)
     return tr("diag_http_error", code=code)

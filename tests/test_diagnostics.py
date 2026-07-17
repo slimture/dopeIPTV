@@ -79,6 +79,12 @@ def test_probe_not_found(monkeypatch):
     assert "404" in diag._probe_url("http://x/live/1.ts")
 
 
+def test_probe_blocked_458(monkeypatch):
+    monkeypatch.setattr(diag.requests, "get", _fake_get(status=458))
+    msg = diag._probe_url("http://x/live/1.ts")
+    assert "458" in msg and "block" in msg.lower()
+
+
 def test_probe_ok_but_unplayable(monkeypatch):
     monkeypatch.setattr(diag.requests, "get", _fake_get(status=200))
     assert "format" in diag._probe_url("http://x/live/1.ts").lower()

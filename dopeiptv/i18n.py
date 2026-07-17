@@ -2156,6 +2156,32 @@ _STRINGS: dict[str, dict[str, str]] = {
               "плейлист",
         "th": "ผู้ให้บริการไม่มีสตรีมนี้ (HTTP 404) — ลองรีเฟรชเพลย์ลิสต์",
     },
+    "diag_blocked": {
+        "en": "The provider blocked this stream (HTTP {code}) — usually "
+              "anti-VPN/re-streaming, a connection limit, or a region/device "
+              "block. Turn off any VPN and check with your provider.",
+        "sv": "Leverantören blockerade strömmen (HTTP {code}) — oftast "
+              "anti-VPN/restream, en anslutningsgräns eller ett region-/"
+              "enhetsblock. Stäng av ev. VPN och kolla med din leverantör.",
+        "es": "El proveedor bloqueó esta transmisión (HTTP {code}) — "
+              "normalmente anti-VPN/re-streaming, un límite de conexiones o un "
+              "bloqueo de región/dispositivo. Desactiva la VPN y consulta con "
+              "tu proveedor.",
+        "de": "Der Anbieter hat diesen Stream blockiert (HTTP {code}) — meist "
+              "Anti-VPN/Re-Streaming, ein Verbindungslimit oder eine Region-/"
+              "Gerätesperre. Schalte ein VPN aus und frage deinen Anbieter.",
+        "fr": "Le fournisseur a bloqué ce flux (HTTP {code}) — souvent "
+              "anti-VPN/re-streaming, une limite de connexions ou un blocage "
+              "régional/d'appareil. Désactivez tout VPN et contactez le "
+              "fournisseur.",
+        "zh": "提供商屏蔽了此流（HTTP {code}）— 通常是反 VPN/转播、连接数限制或"
+              "地区/设备封锁。请关闭 VPN 并咨询您的提供商。",
+        "ru": "Провайдер заблокировал этот поток (HTTP {code}) — обычно "
+              "анти-VPN/ре-стриминг, лимит подключений или блокировка по "
+              "региону/устройству. Отключите VPN и уточните у провайдера.",
+        "th": "ผู้ให้บริการบล็อกสตรีมนี้ (HTTP {code}) — มักเป็นการป้องกัน VPN/รีสตรีม "
+              "การจำกัดการเชื่อมต่อ หรือการบล็อกตามภูมิภาค/อุปกรณ์ ปิด VPN แล้วสอบถามผู้ให้บริการ",
+    },
     "diag_http_error": {
         "en": "The provider returned an error (HTTP {code}) — its server is "
               "having trouble",
