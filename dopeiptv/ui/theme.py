@@ -168,12 +168,18 @@ def _arrow_png(direction: str, color: str, size: int = 10) -> str:
     import os
 
     from PyQt6.QtCore import QPointF, QStandardPaths, Qt
-    from PyQt6.QtGui import QColor, QPainter, QPixmap, QPolygonF
+    from PyQt6.QtGui import QColor, QGuiApplication, QPainter, QPixmap, \
+        QPolygonF
     base = QStandardPaths.writableLocation(
         QStandardPaths.StandardLocation.CacheLocation)
     os.makedirs(base, exist_ok=True)
     path = os.path.join(
         base, f"qss_arrow_{direction}_{size}_{color.lstrip('#')}.png")
+    if not os.path.exists(path) and QGuiApplication.instance() is None:
+        # No GUI app yet (build_style called from a bare test/headless
+        # context): constructing a QPixmap would hard-abort the process.
+        # Return the path unrendered - the QSS just gets a dead url there.
+        return path.replace("\\", "/")
     if not os.path.exists(path):
         ss = 4
         big = QPixmap(size * ss, size * ss)
@@ -202,11 +208,15 @@ def _check_png(color: str, size: int = 12) -> str:
     import os
 
     from PyQt6.QtCore import QPointF, QStandardPaths, Qt
-    from PyQt6.QtGui import QColor, QPainter, QPen, QPixmap, QPolygonF
+    from PyQt6.QtGui import QColor, QGuiApplication, QPainter, QPen, \
+        QPixmap, QPolygonF
     base = QStandardPaths.writableLocation(
         QStandardPaths.StandardLocation.CacheLocation)
     os.makedirs(base, exist_ok=True)
     path = os.path.join(base, f"qss_check_{size}_{color.lstrip('#')}.png")
+    if not os.path.exists(path) and QGuiApplication.instance() is None:
+        # See _arrow_png: no QPixmap without a QGuiApplication.
+        return path.replace("\\", "/")
     if not os.path.exists(path):
         ss = 4
         big = QPixmap(size * ss, size * ss)
