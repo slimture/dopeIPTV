@@ -282,6 +282,11 @@ class _MultiviewCell(QWidget):
             self._num.raise_()
             self._title.raise_()
             self._raise_controls()
+        else:
+            # Controls auto-hide with the rest of the overlays (refresh_state
+            # re-shows them on the next reveal).
+            for w in (self._pause_btn, self._seek, self._time, self._live_btn):
+                w.hide()
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
@@ -542,10 +547,10 @@ class _MultiviewCell(QWidget):
         if paused:
             self._pause.raise_()
         self._sync_pause_btn()
-        # Controls (pause + timeline + offset + LIVE) and the title show for
-        # the focused cell and on hover for the rest - so you can always see
-        # what's playing and pause/scrub it.
-        show = self._focused or self._overlays_on
+        # Controls (pause + timeline + offset + LIVE) follow the overlay
+        # auto-hide: revealed on hover, gone 2 s after the mouse rests - same
+        # rhythm as the docked player's floating bars.
+        show = self._overlays_on
         self._pause_btn.setVisible(show)
         if show:
             self._title.setVisible(bool(self.title))
@@ -605,7 +610,7 @@ class _MultiviewCell(QWidget):
         self._win_start = start
         self._win_span = span
         # The slider only makes sense once there's a scrubbable span; the
-        # pause button stays available regardless.
+        # pause button shows with the overlays regardless.
         self._seek.setVisible(show and span > 2)
         self._time.setVisible(show and span > 2)
         if show and span > 2 and not self._seek.dragging:
@@ -867,6 +872,18 @@ class _MultiviewWindow(QWidget):
         self._overlay_timer.start()
 
     def _hide_overlays(self) -> None:
+        # Don't yank the controls away mid-interaction: while a scrub is in
+        # progress or the pointer is resting on a control (the controls are
+        # siblings, so hovering them doesn't re-arm the cell-hover timer),
+        # postpone and check again.
+        for c in self.cells:
+            if (c._seek.dragging or c._seek.underMouse()
+                    or c._pause_btn.underMouse() or c._live_btn.underMouse()):
+                self._overlay_timer.start()
+                return
+        if self._close_btn.underMouse():
+            self._overlay_timer.start()
+            return
         for c in self.cells:
             c.show_overlays(False)
         self._close_btn.hide()
