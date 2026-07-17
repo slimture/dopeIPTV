@@ -62,6 +62,9 @@ class _NavMixin:
 
     def _nav_color_menu(self, key: str, global_pos) -> None:
         m = QMenu(self)
+        # TV: quick jump into the programme guide from the nav entry.
+        if key == "live":
+            m.addAction(tr("btn_epg_guide"), self._open_epg_guide)
         # Provider-backed lists can be reloaded straight from their entry.
         if key in ("live", "vod", "series"):
             m.addAction(tr("menu_refresh_playlist"), self.refresh_playlist)
@@ -199,6 +202,12 @@ class _NavMixin:
                 pm = self._action_pixmap(kind, 18, P["text2"])
             btn.setIcon(QIcon(pm))
             btn.setIconSize(QSize(18, 18))
+        # The rail's playlist-stack icon follows the theme too.
+        if (getattr(self, "_sidebar_collapsed", False)
+                and hasattr(self, "_playlist_btn")):
+            self._playlist_btn.setIcon(
+                QIcon(self._action_pixmap("stack", 18, P["text2"])))
+            self._playlist_btn.setIconSize(QSize(18, 18))
 
     def _fill_glyph_pixmap(self, glyph: str, s: int, color: str,
                            frac: float) -> QPixmap:
@@ -231,6 +240,7 @@ class _NavMixin:
     def _action_pixmap(self, kind: str, s: int, color: str) -> QPixmap:
         """Hand-drawn monochrome icon for the sidebar action buttons.
         'grid'  -> four rounded tiles (multiview);
+        'stack' -> two stacked cards (switch playlist, on the rail);
         'guide' -> a framed programme grid: header row, channel column and a
                    few programme cells (EPG)."""
         dpr = self.devicePixelRatioF() or 1.0
@@ -239,7 +249,19 @@ class _NavMixin:
         pm.fill(Qt.GlobalColor.transparent)
         pr = QPainter(pm)
         pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        if kind == "grid":
+        if kind == "stack":
+            # Two offset cards = "several playlists, pick one". The back card
+            # is dimmed so the front reads as the active list.
+            pr.setPen(Qt.PenStyle.NoPen)
+            back = QColor(color)
+            back.setAlphaF(0.45)
+            pr.setBrush(back)
+            pr.drawRoundedRect(QRectF(s * 0.26, s * 0.08, s * 0.64, s * 0.56),
+                               s * 0.10, s * 0.10)
+            pr.setBrush(QColor(color))
+            pr.drawRoundedRect(QRectF(s * 0.10, s * 0.32, s * 0.64, s * 0.56),
+                               s * 0.10, s * 0.10)
+        elif kind == "grid":
             pr.setPen(Qt.PenStyle.NoPen)
             pr.setBrush(QColor(color))
             m = s * 0.09

@@ -27,12 +27,12 @@ from datetime import datetime
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
-    QApplication, QCheckBox, QDialogButtonBox, QGridLayout, QHBoxLayout,
-    QLabel, QMenu, QPushButton, QSlider, QVBoxLayout, QWidget)
+    QApplication, QCheckBox, QDialogButtonBox, QGridLayout, QLabel, QMenu,
+    QPushButton, QVBoxLayout, QWidget)
 
 from ..core.log import log
 from ..i18n import tr
-from ..media.embedded import _MpvGLWidget
+from ..media.embedded import _MpvGLWidget, _SeekSlider
 
 
 def _fmt(secs: float) -> str:
@@ -61,7 +61,6 @@ class _MultiviewCell(QWidget):
         self._muted = True
         self._drag_from = None
         self._overlays_on = False
-        self._seeking = False
         # Seek-window bookkeeping. For finite content it's [0, duration]; for a
         # live stream it's a rolling window from when this cell started playing
         # (_live_start) to the live edge (_live_edge), so the scrub bar works
@@ -83,12 +82,22 @@ class _MultiviewCell(QWidget):
         self._ts_seg_start: float | None = None
         self._ts_candidates: list[str] = []
         self._ts_cand_idx = 0
+        # EPG guide for programme-boundary ticks on the timeline (and the
+        # programme name at the playhead), refreshed at most once a minute.
+        self._guide = None
+        self._progs: list = []
+        self._progs_at = 0.0
         self.setStyleSheet("background:#000000;")
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
         self.video = _MpvGLWidget(self)
         self.video.setMinimumSize(0, 0)
+        # Hover must reveal the overlays (title, controls, the window's close
+        # button) without a pressed button - same as the docked player. Without
+        # tracking, mouse-move only fires mid-drag and the overlays effectively
+        # never appear.
+        self.video.setMouseTracking(True)
         lay.addWidget(self.video)
         self.video.video_mouse_press.connect(self._on_press)
         self.video.video_mouse_move.connect(self._on_move)
@@ -132,45 +141,59 @@ class _MultiviewCell(QWidget):
         for w in (self._title, self._empty, self._num, self._pause):
             w.setAttribute(
                 Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        # Bottom control bar: pause/play, the seek/timeline slider, and a
-        # clickable time / LIVE control (click to jump to the live edge, like
-        # the docked player's Go-live). Laid out in an HBox so the time never
-        # clips off the edge. Shown for the focused cell (and on hover).
-        self._bar = QWidget(self.video)
-        self._bar.setStyleSheet("background:rgba(0,0,0,160); border-radius:6px;")
-        bl = QHBoxLayout(self._bar)
-        bl.setContentsMargins(6, 2, 6, 2)
-        bl.setSpacing(6)
-        self._pause_btn = QPushButton("⏸", self._bar)
-        self._pause_btn.setFixedSize(24, 22)
+        # Bottom controls, as DIRECT children of the GL widget - the one
+        # arrangement macOS reliably composites over the video (a nested
+        # container bar did not paint there): pause/play, the docked player's
+        # _SeekSlider (programme-boundary ticks + hover tooltips naming the
+        # programme + click-to-jump), an offset/position label, and a LIVE
+        # pill that jumps back to the live edge - the same look and gestures
+        # as the docked timeline.
+        self._pause_btn = QPushButton("⏸", self.video)
         self._pause_btn.setToolTip(tr("mv_pause"))
+        self._pause_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._pause_btn.setStyleSheet(
-            "QPushButton { background:transparent; color:#ECECF1; border:none;"
-            " font-size:14px; } QPushButton:hover { color:#e5354b; }")
+            "QPushButton { background:rgba(0,0,0,170); color:#ECECF1;"
+            " border:none; border-radius:4px; font-size:13px; }"
+            "QPushButton:hover { color:#FF5C5C; }")
         self._pause_btn.clicked.connect(self.toggle_pause)
-        bl.addWidget(self._pause_btn)
-        self._seek = QSlider(Qt.Orientation.Horizontal, self._bar)
+        self._pause_btn.hide()
+        self._seek = _SeekSlider(self.video)
         self._seek.setRange(0, 1000)
-        self._seek.sliderPressed.connect(lambda: setattr(self, "_seeking", True))
-        self._seek.sliderReleased.connect(self._on_seek_released)
-        bl.addWidget(self._seek, 1)
-        self._time = QPushButton("", self._bar)
-        self._time.setFlat(True)
-        self._time.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._seek.setMouseTracking(True)   # hover names the programme
+        self._seek.seek_requested.connect(self._on_seek_value)
+        self._seek.hide()
+        self._time = QLabel("", self.video)
         self._time.setStyleSheet(
-            "QPushButton { background:transparent; color:#ECECF1; border:none;"
-            " font-size:11px; font-weight:600; padding:0 2px; }"
-            " QPushButton:hover { color:#e5354b; }")
-        self._time.clicked.connect(self._on_time_clicked)
-        bl.addWidget(self._time)
-        self._bar.hide()
+            "background:rgba(0,0,0,170); color:#ECECF1; padding:1px 6px;"
+            "font-size:11px; font-weight:600; border-radius:4px;")
+        self._time.hide()
+        self._live_btn = QPushButton("", self.video)
+        self._live_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._live_btn.clicked.connect(self._go_live)
+        self._live_btn.hide()
+        self._apply_live_style(True)
         self.set_focused(False)
 
-    def _on_time_clicked(self) -> None:
-        # The time/LIVE control jumps to the live edge for a timeshift cell
-        # (same gesture as the docked player's Go-live button).
-        if self._ts_capable:
-            self._go_live()
+    def _apply_live_style(self, live: bool) -> None:
+        """Red solid '● LIVE' pill at the live edge; a bordered '⏭ LIVE'
+        (click to go live) while behind - mirroring the docked timeline."""
+        if live == getattr(self, "_live_style", None):
+            return
+        self._live_style = live
+        word = tr("mv_live")
+        if live:
+            self._live_btn.setText("● " + word)
+            self._live_btn.setStyleSheet(
+                "QPushButton { background:#FF5C5C; color:#fff; border:none;"
+                " border-radius:10px; padding:2px 10px; font-size:11px;"
+                " font-weight:700; }")
+        else:
+            self._live_btn.setText("⏭ " + word)
+            self._live_btn.setStyleSheet(
+                "QPushButton { background:rgba(0,0,0,170); color:#FF5C5C;"
+                " border:1px solid #FF5C5C; border-radius:10px;"
+                " padding:2px 10px; font-size:11px; font-weight:700; }"
+                "QPushButton:hover { background:rgba(255,92,92,60); }")
 
     def _sync_pause_btn(self) -> None:
         try:
@@ -178,6 +201,31 @@ class _MultiviewCell(QWidget):
         except Exception:
             paused = False
         self._pause_btn.setText("▶" if paused else "⏸")
+
+    def _layout_controls(self) -> None:
+        """Manual bottom-row layout: pause | slider | -offset | LIVE. Runs on
+        resize and on every state poll (the offset label's width changes)."""
+        r = self.video.rect()
+        bh = 22
+        y = r.height() - bh - 8
+        x = 6
+        self._pause_btn.setGeometry(x, y, 26, bh)
+        x += 32
+        right = r.width() - 6
+        if self._ts_capable:
+            lw = max(56, self._live_btn.sizeHint().width())
+            self._live_btn.setGeometry(right - lw, y, lw, bh)
+            right -= lw + 6
+        if not self._time.isHidden():
+            self._time.adjustSize()
+            tw = self._time.width()
+            self._time.setGeometry(right - tw, y, tw, bh)
+            right -= tw + 6
+        self._seek.setGeometry(x, y + (bh - 16) // 2, max(40, right - x), 16)
+
+    def _raise_controls(self) -> None:
+        for w in (self._seek, self._time, self._pause_btn, self._live_btn):
+            w.raise_()
 
     # -- overlays ------------------------------------------------------------
 
@@ -189,8 +237,9 @@ class _MultiviewCell(QWidget):
         self._num.setVisible(on)
         self._title.setVisible(on and bool(self.title))
         if on:
-            for w in (self._num, self._title, self._bar):
-                w.raise_()
+            self._num.raise_()
+            self._title.raise_()
+            self._raise_controls()
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
@@ -201,17 +250,20 @@ class _MultiviewCell(QWidget):
         self._empty.setGeometry(r)
         self._num.setGeometry(r)
         self._pause.setGeometry(r)
-        self._bar.setGeometry(6, r.height() - 34, r.width() - 12, 30)
+        self._layout_controls()
 
     # -- playback ------------------------------------------------------------
 
     def play(self, url: str, title: str, item: dict | None = None,
-             client=None) -> bool:
+             client=None, guide=None) -> bool:
         self.url = url
         self.title = title
         self._live_url = url
         self._item = item
         self._client = client
+        self._guide = guide
+        self._progs = []
+        self._progs_at = 0.0
         self._ts_seg_start = None    # start at the live edge
         self._ts_candidates = []
         self._ts_cand_idx = 0
@@ -370,12 +422,12 @@ class _MultiviewCell(QWidget):
             tp = 0.0
         return max(0.0, time.time() - (self._ts_seg_start + tp))
 
-    def _on_seek_released(self) -> None:
-        self._seeking = False
+    def _on_seek_value(self, val: int) -> None:
+        """Slider released (or clicked): jump. On a timeshift cell the bar is
+        the archive timeline (right edge = live, left = oldest archive)."""
         if self._ts_capable:
-            # The bar is an archive timeline: right edge = live, left = oldest.
             depth = self._ts_depth_min()
-            back_min = depth * (1.0 - self._seek.value() / 1000.0)
+            back_min = depth * (1.0 - val / 1000.0)
             if back_min < 2:
                 self._go_live()
             else:
@@ -384,11 +436,49 @@ class _MultiviewCell(QWidget):
         m = self.video.mpv
         if m is None or self.url is None or self._win_span < 1:
             return
-        target = self._win_start + self._seek.value() / 1000.0 * self._win_span
+        target = self._win_start + val / 1000.0 * self._win_span
         try:
             m.command("seek", target, "absolute")
         except Exception:
             pass
+
+    def _update_segments(self, depth_sec: float) -> str:
+        """Feed the timeline programme-boundary ticks (and hover names) from
+        the owner's EPG guide, and return the programme title under the
+        playhead. The guide is re-queried at most once a minute."""
+        if self._guide is None or self._item is None:
+            return ""
+        now = time.time()
+        if now - self._progs_at > 60:
+            self._progs_at = now
+            try:
+                self._progs = list(self._guide.programmes_in(
+                    self._item, now - depth_sec, now))
+            except Exception:
+                self._progs = []
+        win_start = now - depth_sec
+        segs = []
+        for p in self._progs:
+            try:
+                a = max(0.0, (p["start_timestamp"] - win_start) / depth_sec)
+                b = min(1.0, (p["stop_timestamp"] - win_start) / depth_sec)
+                tlabel = "%s–%s" % (
+                    time.strftime("%H:%M",
+                                  time.localtime(p["start_timestamp"])),
+                    time.strftime("%H:%M",
+                                  time.localtime(p["stop_timestamp"])))
+            except Exception:
+                continue
+            segs.append((a, b, p.get("title") or "", tlabel))
+        self._seek.set_segments(segs)
+        content_time = now - self._ts_offset_now()
+        for p in self._progs:
+            try:
+                if p["start_timestamp"] <= content_time < p["stop_timestamp"]:
+                    return p.get("title") or ""
+            except Exception:
+                continue
+        return ""
 
     def refresh_state(self) -> None:
         """Poll mpv for position/duration/pause and update the seek bar + pause
@@ -410,36 +500,47 @@ class _MultiviewCell(QWidget):
         if paused:
             self._pause.raise_()
         self._sync_pause_btn()
-        # The control bar (pause + seek + time/LIVE) and the channel title show
-        # for the focused cell, and on hover for the rest - so you can always
-        # see what's playing and pause/scrub it.
-        bar_on = self._focused or self._overlays_on
-        self._bar.setVisible(bar_on)
-        if bar_on:
-            self._bar.raise_()
+        # Controls (pause + timeline + offset + LIVE) and the title show for
+        # the focused cell and on hover for the rest - so you can always see
+        # what's playing and pause/scrub it.
+        show = self._focused or self._overlays_on
+        self._pause_btn.setVisible(show)
+        if show:
             self._title.setVisible(bool(self.title))
-            self._title.raise_()
         if self._ts_capable:
             # Archive timeline: the bar spans [now - depth, now]; the knob sits
-            # at the current offset from live, "-h:mm:ss" behind or "LIVE"
-            # (the time control is clickable to jump back to live).
+            # at the current offset from live. Red ● LIVE pill at the edge, a
+            # clickable ⏭ LIVE plus "-h:mm:ss" while behind - and programme
+            # ticks/names from the EPG, like the docked timeline.
             depth_sec = self._ts_depth_min() * 60.0
             offset = self._ts_offset_now()
             live = offset < 30
-            self._seek.setVisible(True)
-            if bar_on and not self._seeking:
-                val = int((depth_sec - min(offset, depth_sec))
-                          / depth_sec * 1000)
-                self._seek.blockSignals(True)
-                self._seek.setValue(val)
-                self._seek.blockSignals(False)
-                self._time.setText(tr("mv_live") if live else f"-{_fmt(offset)}")
+            self._seek.setVisible(show)
+            self._live_btn.setVisible(show)
+            self._time.setVisible(show and not live)
+            if show:
+                self._apply_live_style(live)
+                if not self._seek.dragging:
+                    val = int((depth_sec - min(offset, depth_sec))
+                              / depth_sec * 1000)
+                    self._seek.blockSignals(True)
+                    self._seek.setValue(val)
+                    self._seek.blockSignals(False)
+                if not live:
+                    self._time.setText(f"-{_fmt(offset)}")
+                prog = self._update_segments(depth_sec)
+                base = self.title or ""
+                self._title.setText(f"{base}  ·  {prog}" if prog else base)
+                self._title.adjustSize()
+                self._layout_controls()
+                self._raise_controls()
             return
+        self._live_btn.hide()
         try:
             pos = float(m.time_pos or 0)
         except Exception:
-            self._seek.setVisible(False)
-            self._time.setText("")
+            self._seek.hide()
+            self._time.hide()
             return
         try:
             dur = float(m.duration or 0)
@@ -461,16 +562,18 @@ class _MultiviewCell(QWidget):
             playhead = pos
         self._win_start = start
         self._win_span = span
-        # The slider only makes sense once there's a scrubbable span; the pause
-        # button in the bar stays available regardless.
-        self._seek.setVisible(span > 2)
-        if span > 2 and bar_on and not self._seeking:
+        # The slider only makes sense once there's a scrubbable span; the
+        # pause button stays available regardless.
+        self._seek.setVisible(show and span > 2)
+        self._time.setVisible(show and span > 2)
+        if show and span > 2 and not self._seek.dragging:
             self._seek.blockSignals(True)
             self._seek.setValue(int((playhead - start) / span * 1000))
             self._seek.blockSignals(False)
             self._time.setText(f"{_fmt(playhead - start)} / {_fmt(span)}")
-        elif span <= 2:
-            self._time.setText("")
+        if show:
+            self._layout_controls()
+            self._raise_controls()
 
     def clear(self) -> None:
         if self.video.mpv is not None:
@@ -491,9 +594,16 @@ class _MultiviewCell(QWidget):
         self._ts_capable = False
         self._ts_seg_start = None
         self._ts_candidates = []
+        self._guide = None
+        self._progs = []
+        self._progs_at = 0.0
+        self._seek.set_segments([])
         self._title.hide()
         self._pause.hide()
-        self._bar.hide()
+        self._pause_btn.hide()
+        self._seek.hide()
+        self._time.hide()
+        self._live_btn.hide()
         self._empty.show()
 
     def shutdown(self) -> None:
@@ -621,13 +731,13 @@ class _MultiviewWindow(QWidget):
     # -- streams / focus -----------------------------------------------------
 
     def add_stream(self, url: str, title: str, cell: int | None = None,
-                   item: dict | None = None, client=None) -> None:
+                   item: dict | None = None, client=None, guide=None) -> None:
         if cell is not None and 0 <= cell < len(self.cells):
             target = self.cells[cell]
         else:
             target = next((c for c in self.cells if c.url is None),
                           self._focused or self.cells[0])
-        target.play(url, title, item, client)
+        target.play(url, title, item, client, guide)
         self._focus_cell(target)
         self._reveal_overlays()
 
@@ -640,10 +750,10 @@ class _MultiviewWindow(QWidget):
     def _swap_cells(self, a: "_MultiviewCell", b: "_MultiviewCell") -> None:
         """Exchange the two cells' videos (swap places / move into an empty
         cell), then re-apply audio focus."""
-        ua, ta, ia, ca = a._live_url, a.title, a._item, a._client
-        ub, tb, ib, cb = b._live_url, b.title, b._item, b._client
-        a.play(ub, tb, ib, cb) if ub else a.clear()
-        b.play(ua, ta, ia, ca) if ua else b.clear()
+        ua, ta, ia, ca, ga = a._live_url, a.title, a._item, a._client, a._guide
+        ub, tb, ib, cb, gb = b._live_url, b.title, b._item, b._client, b._guide
+        a.play(ub, tb, ib, cb, gb) if ub else a.clear()
+        b.play(ua, ta, ia, ca, ga) if ua else b.clear()
         self._focus_cell(self._focused if self._focused in self.cells else a)
 
     def _cell_context_menu(self, cell: "_MultiviewCell", pos) -> None:
@@ -688,6 +798,12 @@ class _MultiviewWindow(QWidget):
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         self._place_close_btn()
+
+    def enterEvent(self, event) -> None:
+        # Pointer entering the window reveals the overlays (incl. the close
+        # button) right away, before any move over a cell fires.
+        self._reveal_overlays()
+        super().enterEvent(event)
 
     def _place_close_btn(self) -> None:
         # Top-right corner of the top-right cell = top-right of the window.
@@ -752,7 +868,7 @@ class _MultiviewMixin:
             url = it.get("_url")
         self.add_to_multiview(
             url, it.get("name") or it.get("title") or "", cell,
-            item=it, client=self.client)
+            item=it, client=self.client, guide=getattr(self, "xmltv", None))
 
     def _ensure_multiview_window(self):
         """Create the multiview window if needed, then bring it to the front.
@@ -791,11 +907,12 @@ class _MultiviewMixin:
         title = ((it or {}).get("name") or (it or {}).get("title")
                  or getattr(self, "_base_title", "") or "")
         self.add_to_multiview(url, title, item=it,
-                              client=getattr(self, "client", None))
+                              client=getattr(self, "client", None),
+                              guide=getattr(self, "xmltv", None))
 
     def add_to_multiview(self, url: str, title: str,
                          cell: int | None = None, item: dict | None = None,
-                         client=None) -> None:
+                         client=None, guide=None) -> None:
         if not url:
             return
         # Free the docked player's connection: otherwise a single-connection
@@ -803,7 +920,7 @@ class _MultiviewMixin:
         # docked), and you'd have two streams and two audio tracks at once.
         self._stop_docked_for_multiview()
         self._ensure_multiview_window().add_stream(
-            url, title, cell, item=item, client=client)
+            url, title, cell, item=item, client=client, guide=guide)
 
     def _maybe_show_multiview_info(self) -> None:
         """One-time notice that multiview needs enough provider connections,
