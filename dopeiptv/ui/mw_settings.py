@@ -32,6 +32,10 @@ class _TightTabBar(QTabBar):
         super().__init__(parent)
         self.setExpanding(False)
         self.setUsesScrollButtons(False)
+        # No base line: a replacement tab bar draws its frame line along the
+        # bar (visible as a stray line above the tabs, partly repainted away
+        # under the selected one); the styled pane draws its own border.
+        self.setDrawBase(False)
 
     def tabSizeHint(self, index: int) -> QSize:
         sz = super().tabSizeHint(index)
@@ -52,7 +56,9 @@ class _TightTabs(QTabWidget):
         super().__init__(parent)
         bar = _TightTabBar(self)
         self.setTabBar(bar)
+        # setTabBar resets these two on the way in - re-assert after.
         bar.setExpanding(False)
+        bar.setDrawBase(False)
 
 
 class _WheelGuard(QObject):
