@@ -22,6 +22,7 @@ dopeiptv/
     metadata.py        TMDB client, PosterResolver (cover art)
     trakt.py           Trakt.tv sync (watched, watchlist)
     oauth_loopback.py  Loopback HTTP server for the Trakt OAuth redirect
+    diagnostics.py     Plain-language "why won't this stream play?" probe
     chromecast.py      ChromecastManager, CastDialog
 
   core/                Storage, background work, OS integration

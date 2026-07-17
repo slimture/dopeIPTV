@@ -2046,6 +2046,159 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Ошибка потока: {msg}",
         "th": "ข้อผิดพลาดสตรีม: {msg}",
     },
+    "status_checking_stream": {
+        "en": "Stream failed — checking why…",
+        "sv": "Strömmen misslyckades — kollar varför…",
+        "es": "Fallo de transmisión — comprobando por qué…",
+        "de": "Stream fehlgeschlagen — Ursache wird geprüft…",
+        "fr": "Échec du flux — vérification de la cause…",
+        "zh": "流播放失败 — 正在检查原因…",
+        "ru": "Поток не работает — выясняем причину…",
+        "th": "สตรีมล้มเหลว — กำลังตรวจสอบสาเหตุ…",
+    },
+    "diag_account_status": {
+        "en": "Your account is {status} — contact your provider",
+        "sv": "Ditt konto är {status} — kontakta din leverantör",
+        "es": "Tu cuenta está {status} — contacta con tu proveedor",
+        "de": "Dein Konto ist {status} — wende dich an deinen Anbieter",
+        "fr": "Votre compte est {status} — contactez votre fournisseur",
+        "zh": "您的账户状态为 {status} — 请联系您的提供商",
+        "ru": "Ваш аккаунт: {status} — обратитесь к провайдеру",
+        "th": "บัญชีของคุณ {status} — ติดต่อผู้ให้บริการ",
+    },
+    "diag_expired": {
+        "en": "Your subscription has expired — renew it with your provider",
+        "sv": "Ditt abonnemang har gått ut — förnya hos din leverantör",
+        "es": "Tu suscripción ha caducado — renuévala con tu proveedor",
+        "de": "Dein Abo ist abgelaufen — verlängere es bei deinem Anbieter",
+        "fr": "Votre abonnement a expiré — renouvelez-le auprès du fournisseur",
+        "zh": "您的订阅已过期 — 请向提供商续订",
+        "ru": "Ваша подписка истекла — продлите её у провайдера",
+        "th": "การสมัครสมาชิกหมดอายุ — ต่ออายุกับผู้ให้บริการ",
+    },
+    "diag_conn_limit": {
+        "en": "All {active}/{maxc} connections are in use — close the stream "
+              "on your other device or app",
+        "sv": "Alla {active}/{maxc} anslutningar används — stäng strömmen på "
+              "din andra enhet eller app",
+        "es": "Todas las conexiones {active}/{maxc} están en uso — cierra la "
+              "transmisión en tu otro dispositivo o app",
+        "de": "Alle {active}/{maxc} Verbindungen sind belegt — beende den "
+              "Stream auf deinem anderen Gerät oder in der anderen App",
+        "fr": "Toutes les connexions {active}/{maxc} sont utilisées — fermez le "
+              "flux sur votre autre appareil ou application",
+        "zh": "{active}/{maxc} 个连接已全部占用 — 请在您的其他设备或应用上关闭该流",
+        "ru": "Заняты все подключения {active}/{maxc} — закройте поток на "
+              "другом устройстве или в другом приложении",
+        "th": "ใช้การเชื่อมต่อครบ {active}/{maxc} แล้ว — ปิดสตรีมบนอุปกรณ์หรือแอปอื่น",
+    },
+    "diag_timeout": {
+        "en": "The provider didn't respond (timeout) — its server is likely "
+              "down or overloaded",
+        "sv": "Leverantören svarade inte (timeout) — servern är troligen nere "
+              "eller överbelastad",
+        "es": "El proveedor no respondió (timeout) — su servidor está caído o "
+              "sobrecargado",
+        "de": "Der Anbieter hat nicht geantwortet (Timeout) — sein Server ist "
+              "vermutlich ausgefallen oder überlastet",
+        "fr": "Le fournisseur n'a pas répondu (timeout) — son serveur est "
+              "probablement hors service ou surchargé",
+        "zh": "提供商未响应（超时）— 其服务器可能已宕机或过载",
+        "ru": "Провайдер не ответил (тайм-аут) — его сервер, вероятно, недоступен "
+              "или перегружен",
+        "th": "ผู้ให้บริการไม่ตอบสนอง (หมดเวลา) — เซิร์ฟเวอร์อาจล่มหรือโหลดเกิน",
+    },
+    "diag_unreachable": {
+        "en": "Can't reach the provider — its server is down or there's a "
+              "network problem",
+        "sv": "Når inte leverantören — servern är nere eller så är det ett "
+              "nätverksproblem",
+        "es": "No se puede conectar con el proveedor — su servidor está caído o "
+              "hay un problema de red",
+        "de": "Anbieter nicht erreichbar — sein Server ist ausgefallen oder es "
+              "gibt ein Netzwerkproblem",
+        "fr": "Impossible de joindre le fournisseur — son serveur est hors "
+              "service ou il y a un problème réseau",
+        "zh": "无法连接到提供商 — 其服务器已宕机或存在网络问题",
+        "ru": "Не удаётся связаться с провайдером — его сервер недоступен или "
+              "есть проблема с сетью",
+        "th": "เชื่อมต่อผู้ให้บริการไม่ได้ — เซิร์ฟเวอร์ล่มหรือมีปัญหาเครือข่าย",
+    },
+    "diag_forbidden": {
+        "en": "The provider refused the stream (HTTP {code}) — account blocked, "
+              "or too many connections",
+        "sv": "Leverantören nekade strömmen (HTTP {code}) — kontot spärrat "
+              "eller för många anslutningar",
+        "es": "El proveedor rechazó la transmisión (HTTP {code}) — cuenta "
+              "bloqueada o demasiadas conexiones",
+        "de": "Der Anbieter hat den Stream abgelehnt (HTTP {code}) — Konto "
+              "gesperrt oder zu viele Verbindungen",
+        "fr": "Le fournisseur a refusé le flux (HTTP {code}) — compte bloqué "
+              "ou trop de connexions",
+        "zh": "提供商拒绝了该流（HTTP {code}）— 账户被封或连接过多",
+        "ru": "Провайдер отклонил поток (HTTP {code}) — аккаунт заблокирован "
+              "или слишком много подключений",
+        "th": "ผู้ให้บริการปฏิเสธสตรีม (HTTP {code}) — บัญชีถูกบล็อกหรือเชื่อมต่อมากเกินไป",
+    },
+    "diag_not_found": {
+        "en": "The provider doesn't have this stream (HTTP 404) — try "
+              "refreshing the playlist",
+        "sv": "Leverantören har inte den här strömmen (HTTP 404) — prova att "
+              "uppdatera spellistan",
+        "es": "El proveedor no tiene esta transmisión (HTTP 404) — prueba a "
+              "actualizar la lista",
+        "de": "Der Anbieter hat diesen Stream nicht (HTTP 404) — aktualisiere "
+              "die Playlist",
+        "fr": "Le fournisseur n'a pas ce flux (HTTP 404) — essayez d'actualiser "
+              "la liste",
+        "zh": "提供商没有此流（HTTP 404）— 请尝试刷新播放列表",
+        "ru": "У провайдера нет этого потока (HTTP 404) — попробуйте обновить "
+              "плейлист",
+        "th": "ผู้ให้บริการไม่มีสตรีมนี้ (HTTP 404) — ลองรีเฟรชเพลย์ลิสต์",
+    },
+    "diag_http_error": {
+        "en": "The provider returned an error (HTTP {code}) — its server is "
+              "having trouble",
+        "sv": "Leverantören svarade med ett fel (HTTP {code}) — servern har "
+              "problem",
+        "es": "El proveedor devolvió un error (HTTP {code}) — su servidor tiene "
+              "problemas",
+        "de": "Der Anbieter hat einen Fehler zurückgegeben (HTTP {code}) — sein "
+              "Server hat Probleme",
+        "fr": "Le fournisseur a renvoyé une erreur (HTTP {code}) — son serveur "
+              "rencontre des problèmes",
+        "zh": "提供商返回错误（HTTP {code}）— 其服务器出现故障",
+        "ru": "Провайдер вернул ошибку (HTTP {code}) — у его сервера проблемы",
+        "th": "ผู้ให้บริการส่งข้อผิดพลาด (HTTP {code}) — เซิร์ฟเวอร์มีปัญหา",
+    },
+    "diag_http_ok_no_play": {
+        "en": "The provider is serving the stream but it wouldn't play — likely "
+              "an unsupported format for this channel",
+        "sv": "Leverantören skickar strömmen men den gick inte att spela — "
+              "troligen ett format som inte stöds för den här kanalen",
+        "es": "El proveedor envía la transmisión pero no se reprodujo — "
+              "probablemente un formato no compatible para este canal",
+        "de": "Der Anbieter liefert den Stream, aber er ließ sich nicht "
+              "abspielen — wahrscheinlich ein nicht unterstütztes Format",
+        "fr": "Le fournisseur diffuse le flux mais il ne se lit pas — "
+              "probablement un format non pris en charge pour cette chaîne",
+        "zh": "提供商正在提供该流但无法播放 — 该频道可能是不受支持的格式",
+        "ru": "Провайдер отдаёт поток, но он не воспроизводится — вероятно, "
+              "неподдерживаемый формат для этого канала",
+        "th": "ผู้ให้บริการส่งสตรีมแต่เล่นไม่ได้ — อาจเป็นรูปแบบที่ไม่รองรับสำหรับช่องนี้",
+    },
+    "diag_generic": {
+        "en": "The stream couldn't be reached — the provider may be down",
+        "sv": "Strömmen kunde inte nås — leverantören kan vara nere",
+        "es": "No se pudo acceder a la transmisión — el proveedor puede estar "
+              "caído",
+        "de": "Der Stream war nicht erreichbar — der Anbieter ist evtl. offline",
+        "fr": "Le flux est inaccessible — le fournisseur est peut-être hors "
+              "service",
+        "zh": "无法访问该流 — 提供商可能已宕机",
+        "ru": "Не удалось получить поток — возможно, провайдер недоступен",
+        "th": "เข้าถึงสตรีมไม่ได้ — ผู้ให้บริการอาจล่ม",
+    },
     "status_player_not_found": {
         "en": "Player not found",
         "sv": "Spelaren hittades inte",

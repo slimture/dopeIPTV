@@ -3306,14 +3306,41 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._stream_retries = 0
         if self.player:
             self.player.current_url = None
-        self._set_status(f"Stream error: {msg}", error=True)
-        if self._player_fs and self.player:
-            self.player.set_overlay_info(f"Stream error: {msg}")
+        url = (lp or {}).get("url")
+        if url:
+            # mpv's "loading failed" is opaque. Probe the account and the stream
+            # URL in the background and report the real reason in plain language
+            # (expired, connection limit, provider down, HTTP status) - so an
+            # end user learns what's wrong without a debug log.
+            self._set_status(tr("status_checking_stream"), emphasis=True)
+            if self._player_fs and self.player:
+                self.player.set_overlay_info(tr("status_checking_stream"))
+            self._diagnose_stream_failure(url)
         else:
-            self.stream_error.setText(tr("status_stream_error", msg=msg))
+            self._show_stream_error(msg)
+
+    def _show_stream_error(self, text: str) -> None:
+        self._set_status(tr("status_stream_error", msg=text), error=True)
+        if self._player_fs and self.player:
+            self.player.set_overlay_info(tr("status_stream_error", msg=text))
+        else:
+            self.stream_error.setText(tr("status_stream_error", msg=text))
             self.stream_error.show()
         if self.player:
             self.player.title_lbl.setText("")
+
+    def _diagnose_stream_failure(self, url: str) -> None:
+        from ..providers.diagnostics import diagnose_stream
+
+        def show(reason: str) -> None:
+            # If a channel started playing meanwhile (the user zapped on), the
+            # earlier failure is stale - don't overwrite a working stream.
+            if self.player and self.player.current_url:
+                return
+            self._show_stream_error(reason)
+
+        run_async(self.pool, lambda: diagnose_stream(url, self.client),
+                  show, lambda _e: show(tr("diag_generic")))
 
     def _on_player_stalled(self) -> None:
         """The player reported the live stream frozen (buffer-starved)."""
