@@ -47,6 +47,17 @@ class _ContextMenuMixin:
             m.addAction(tr("ctx_cast_to_chromecast"),
                         lambda: self._open_cast_dialog(it))
         content_kind = self._content_kind()
+        # The grouped "All favorites" view shares mode 'fav' for every row;
+        # honour the row's own tag so movies/series get their own menu there.
+        # Without this a movie row fell into the CHANNEL branch: "Remove from
+        # favorites" removed from the channel store (a no-op for the movie),
+        # and it was offered channel-only actions (multiview/timeshift/record).
+        if content_kind == "fav":
+            rk = it.get("_kind") or it.get("_ekind")
+            if rk in ("vod", "movie"):
+                content_kind = "vod"
+            elif rk == "series":
+                content_kind = "series"
         if (content_kind in ("live", "fav")
                 and it.get("stream_id") is not None):
             # Pick which grid window to send the stream to; each shows the
@@ -416,8 +427,10 @@ class _ContextMenuMixin:
                         lambda: self.trakt.add_favorite(rid, k))
                     if isinstance(rid, int) else None)
         if (self.mode == "fav"
-                and self._fav_section == section
+                and self._fav_section in (section, "all")
                 and not add):
+            # Reload so the removed row disappears - also in the grouped
+            # "All" view, which shows movie/series rows too.
             cur = self.cat_list.currentItem()
             self._load_items(cur.data(Qt.ItemDataRole.UserRole) if cur
                              else (section, None))

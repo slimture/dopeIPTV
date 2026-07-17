@@ -2812,6 +2812,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         history_live = kind == "history" and it.get("_kind") == "live"
         if kind not in ("live", "fav") and not history_live:
             return
+        # The grouped "All favorites" view shares kind 'fav' for every row.
+        # Only actual channel rows may auto-preview: a movie/series row there
+        # would otherwise be crammed into a LIVE url built from its vod/series
+        # id - playing garbage and filing the movie under TV channels in
+        # History.
+        row_kind = it.get("_kind") or it.get("_ekind")
+        if row_kind not in (None, "live", "fav"):
+            return
         if history_live:
             # Rebuild a fresh live URL from the stored stream_id (the snapshot's
             # _url may be stale), falling back to that snapshot when the row
