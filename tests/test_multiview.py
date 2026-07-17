@@ -50,6 +50,15 @@ h = Host()
 h.settings.setValue("mv_info_seen", "true")
 assert h._multiview_win is None
 
+# The sidebar button is a toggle for an EMPTY grid: open, press again ->
+# closed. (With streams running it must NOT toggle - checked further down.)
+h._show_multiview()
+app.processEvents()
+assert h._multiview_win is not None and h._multiview_win.isVisible()
+h._show_multiview()
+app.processEvents()
+assert h._multiview_win is None
+
 # First add opens the window and fills cell 0, which takes focus.
 h.add_to_multiview("http://x/live/1.ts", "One")
 app.processEvents()
@@ -139,6 +148,11 @@ app.processEvents()
 h.add_to_multiview("http://x/live/10.ts", "Ten")
 app.processEvents()
 assert all(c.url is not None for c in w.cells)
+
+# With streams running the button only re-raises - never closes the grid.
+h._show_multiview()
+app.processEvents()
+assert h._multiview_win is w
 
 h._close_multiview()
 app.processEvents()

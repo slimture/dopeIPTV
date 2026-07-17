@@ -1173,6 +1173,16 @@ class _MultiviewMixin:
         return w
 
     def _show_multiview(self) -> None:
+        """Sidebar ▦ button. Opens multiview - and, pressed again while the
+        grid is open but IDLE (no streams), closes it, so the button works
+        as a toggle for an empty window instead of just re-raising it. A
+        grid with running streams is only brought to the front: a toggle
+        there would let one stray click drop every connection."""
+        w = self._multiview_win
+        if (w is not None and w.isVisible()
+                and not any(c.url for c in w.cells)):
+            self._close_multiview()
+            return
         self._ensure_multiview_window()
 
     def _docked_context_menu(self, global_pos) -> None:
