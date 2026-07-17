@@ -202,15 +202,10 @@ class _NavMixin:
                 pm = self._action_pixmap(kind, 18, P["text2"])
             btn.setIcon(QIcon(pm))
             btn.setIconSize(QSize(18, 18))
-        # The playlist stack icon follows the theme too - the big rail form
-        # when collapsed, the small chip form when expanded.
+        # The playlist stack icon follows the theme too (same square icon in
+        # both sidebar states; _update_playlist_btn repaints it).
         if hasattr(self, "_playlist_btn"):
-            if getattr(self, "_sidebar_collapsed", False):
-                self._playlist_btn.setIcon(
-                    QIcon(self._action_pixmap("stack", 18, P["text2"])))
-                self._playlist_btn.setIconSize(QSize(18, 18))
-            else:
-                self._update_playlist_btn()
+            self._update_playlist_btn()
 
     def _fill_glyph_pixmap(self, glyph: str, s: int, color: str,
                            frac: float) -> QPixmap:

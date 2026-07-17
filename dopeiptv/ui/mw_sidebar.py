@@ -80,27 +80,16 @@ class _SidebarMixin:
         if hasattr(self, "_multiview_btn"):
             self._set_rail(self._multiview_btn, collapsed)
         if hasattr(self, "_playlist_btn"):
-            # The button normally shows the active playlist name (fit to its
-            # text); on the rail it collapses to a drawn playlist-stack icon
-            # (the old ☰ text glyph read as a hamburger menu, not "switch
-            # playlist"), and the fitted name button returns on expand.
-            from PyQt6.QtCore import QSize
-            from PyQt6.QtGui import QIcon
+            # The switcher is the same square stack-icon in both states (the
+            # active playlist's name lives in its tooltip and the window
+            # title); only the sizing flips - fitted square when expanded,
+            # filling the rail when collapsed.
             from PyQt6.QtWidgets import QSizePolicy
-
-            from .theme import P
-            if collapsed:
-                self._playlist_btn.setText("")
-                self._playlist_btn.setIcon(
-                    QIcon(self._action_pixmap("stack", 18, P["text2"])))
-                self._playlist_btn.setIconSize(QSize(18, 18))
-                self._playlist_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
-                                                 QSizePolicy.Policy.Fixed)
-            else:
-                self._playlist_btn.setIcon(QIcon())
-                self._playlist_btn.setSizePolicy(QSizePolicy.Policy.Maximum,
-                                                 QSizePolicy.Policy.Fixed)
-                self._update_playlist_btn()
+            self._playlist_btn.setSizePolicy(
+                QSizePolicy.Policy.Ignored if collapsed
+                else QSizePolicy.Policy.Maximum,
+                QSizePolicy.Policy.Fixed)
+            self._update_playlist_btn()
             self._set_rail(self._playlist_btn, collapsed)
         # Side by side when expanded, stacked on the narrow rail.
         if hasattr(self, "_actions_box"):

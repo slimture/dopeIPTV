@@ -217,7 +217,7 @@ QPushButton#SideAction[rail="true"] {{
    is showing). Same stack icon as its rail form ties the two states together. */
 QPushButton#PlaylistChip {{
     background: transparent; border: 1px solid {side_action_edge};
-    border-radius: 13px; padding: 4px 12px; text-align: center;
+    border-radius: 8px; padding: 5px 9px; text-align: center;
     font-size: 12px; font-weight: 600; color: {p['text2']};
 }}
 QPushButton#PlaylistChip:hover {{

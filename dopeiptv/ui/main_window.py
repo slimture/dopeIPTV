@@ -319,13 +319,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         store = self.playlist_store
         pl = store.get(store.active_id) if (store and store.active_id) else None
         name = (pl or {}).get("name", "") if pl else ""
-        self._playlist_btn.setText((name + "  ▾") if name
-                                   else tr("menu_playlists"))
-        # The chip carries the same drawn playlist-stack mark as its rail
-        # form, tying it to the logo block above.
+        # Icon-only in both sidebar states: the drawn playlist-stack mark
+        # under the logo. The active playlist's name lives in the tooltip
+        # (and is always visible in the window title), so the control stays
+        # a clean square icon instead of a text pill.
+        self._playlist_btn.setText("")
         self._playlist_btn.setIcon(
-            QIcon(self._action_pixmap("stack", 14, P["text2"])))
-        self._playlist_btn.setIconSize(QSize(14, 14))
+            QIcon(self._action_pixmap("stack", 18, P["text2"])))
+        self._playlist_btn.setIconSize(QSize(18, 18))
+        tip = tr("menu_playlists") + (f" — {name}" if name else "")
+        self._playlist_btn.setToolTip(tip)
         # Only worth showing when there's actually more than one playlist to
         # switch between - a single-playlist user has nothing to pick.
         multiple = bool(store and len(store.playlists()) > 1)
