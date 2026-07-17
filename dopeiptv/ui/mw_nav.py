@@ -191,11 +191,42 @@ class _NavMixin:
             if btn is None:
                 continue
             if kind == "gear":
-                pm = self._glyph_pixmap("⚙", 18, P["text2"])
+                # The bare glyph draws small (its ink fills well under the box);
+                # scale it up so it reads at the same size as the two vector
+                # icons beside it.
+                pm = self._fill_glyph_pixmap("⚙", 18, P["text2"], 0.94)
             else:
                 pm = self._action_pixmap(kind, 18, P["text2"])
             btn.setIcon(QIcon(pm))
             btn.setIconSize(QSize(18, 18))
+
+    def _fill_glyph_pixmap(self, glyph: str, s: int, color: str,
+                           frac: float) -> QPixmap:
+        """Like _glyph_pixmap but sizes the glyph so its ink fills FRAC of the
+        SxS box (the plain helper only shrinks oversized glyphs, never grows a
+        small one - which left the gear tiny next to the vector icons)."""
+        dpr = self.devicePixelRatioF() or 1.0
+        pm = QPixmap(round(s * dpr), round(s * dpr))
+        pm.setDevicePixelRatio(dpr)
+        pm.fill(Qt.GlobalColor.transparent)
+        pr = QPainter(pm)
+        pr.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
+        g = glyph + "︎"
+        f = QFont()
+        f.setPixelSize(s)
+        fm = QFontMetricsF(f)
+        br = fm.tightBoundingRect(g)
+        biggest = max(br.width(), br.height()) or 1.0
+        f.setPixelSize(max(1, round(s * frac * s / biggest)))
+        fm = QFontMetricsF(f)
+        br = fm.tightBoundingRect(g)
+        pr.setFont(f)
+        pr.setPen(QColor(color))
+        x = (s - br.width()) / 2.0 - br.x()
+        y = (s - br.height()) / 2.0 - br.y()
+        pr.drawText(QPointF(x, y), g)
+        pr.end()
+        return pm
 
     def _action_pixmap(self, kind: str, s: int, color: str) -> QPixmap:
         """Hand-drawn monochrome icon for the sidebar action buttons.

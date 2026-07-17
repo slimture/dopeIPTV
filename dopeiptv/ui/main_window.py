@@ -433,14 +433,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # is built on demand. Hidden when there's nothing to switch.
         self._playlist_btn = QPushButton("", objectName="SideAction")
         # Fit the pill to its label (the active playlist name) instead of
-        # stretching the full sidebar width; left-aligned under the logo. On the
+        # stretching the full sidebar width; centred under the logo. On the
         # collapsed rail it goes back to filling the rail (see
         # _apply_sidebar_chrome).
         self._playlist_btn.setSizePolicy(QSizePolicy.Policy.Maximum,
                                          QSizePolicy.Policy.Fixed)
         self._playlist_btn.setToolTip(tr("menu_playlists"))
         self._playlist_btn.clicked.connect(self._show_playlist_menu)
-        sl.addWidget(self._playlist_btn, 0, Qt.AlignmentFlag.AlignLeft)
+        sl.addWidget(self._playlist_btn, 0, Qt.AlignmentFlag.AlignHCenter)
         sl.addSpacing(6)
         self._update_playlist_btn()
 

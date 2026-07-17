@@ -25,7 +25,7 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication, QCheckBox, QDialogButtonBox, QGridLayout, QLabel, QMenu,
-    QSlider, QVBoxLayout, QWidget)
+    QPushButton, QSlider, QVBoxLayout, QWidget)
 
 from ..core.log import log
 from ..i18n import tr
@@ -390,6 +390,19 @@ class _MultiviewWindow(QWidget):
             grid.addWidget(c, i // 2, i % 2)
             self.cells.append(c)
         self._focused: _MultiviewCell | None = None
+        # Floating close button (frameless has no title-bar X). Auto-hides with
+        # the other overlays; a child of the window, raised above the grid.
+        self._close_btn = QPushButton("✕", self)
+        self._close_btn.setObjectName("MvClose")
+        self._close_btn.setStyleSheet(
+            "#MvClose { background:rgba(20,20,24,190); color:#ECECF1;"
+            " border:none; border-radius:15px; font-size:16px;"
+            " font-weight:700; }"
+            "#MvClose:hover { background:rgba(229,53,75,235); color:#FFFFFF; }")
+        self._close_btn.setFixedSize(30, 30)
+        self._close_btn.setToolTip(tr("mv_close"))
+        self._close_btn.clicked.connect(self.close)
+        self._close_btn.hide()
         self._overlay_timer = QTimer(self)
         self._overlay_timer.setSingleShot(True)
         self._overlay_timer.setInterval(2000)
@@ -496,15 +509,26 @@ class _MultiviewWindow(QWidget):
         else:
             self.showMaximized()
 
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._place_close_btn()
+
+    def _place_close_btn(self) -> None:
+        self._close_btn.move(self.width() - self._close_btn.width() - 12, 12)
+        self._close_btn.raise_()
+
     def _reveal_overlays(self) -> None:
         for c in self.cells:
             c.show_overlays(True)
+        self._place_close_btn()
+        self._close_btn.show()
         self._refresh_states()   # so a hovered cell's seek bar appears at once
         self._overlay_timer.start()
 
     def _hide_overlays(self) -> None:
         for c in self.cells:
             c.show_overlays(False)
+        self._close_btn.hide()
 
     def _refresh_states(self) -> None:
         for c in self.cells:
