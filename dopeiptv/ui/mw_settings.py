@@ -1165,12 +1165,27 @@ class _SettingsMixin:
         tabs.addTab(trakt_tab, tr("tab_trakt"))
         # The packed row must actually FIT: per-OS fonts change the summed tab
         # widths, and with scroll buttons off an undersized dialog truncates
-        # the last tab (half-painted chip, clipped label). Size the dialog's
-        # minimum width from the real bar, measured after all tabs exist.
+        # the last tab (half-painted chip, clipped label). Two passes: an
+        # estimate now from the bar's size hint, then - once the dialog is
+        # laid out for real - an exact correction from the LAST tab's actual
+        # rect, which includes every style/margin adjustment the hint can't
+        # predict (the estimate alone still clipped the Trakt chip on macOS).
         tab_w = tabs.tabBar().sizeHint().width() + 76
         d.setMinimumWidth(max(d.minimumWidth(), tab_w))
         if d.width() < tab_w:
             d.resize(tab_w, d.height())
+
+        def _fit_tab_row() -> None:
+            bar = tabs.tabBar()
+            if not bar.count():
+                return
+            need = bar.tabRect(bar.count() - 1).right() + 1
+            chrome = max(0, d.width() - bar.width())   # dialog edges around bar
+            want = need + chrome + 12
+            if d.width() < want:
+                d.setMinimumWidth(want)
+                d.resize(want, d.height())
+        QTimer.singleShot(0, _fit_tab_row)
 
         def refresh_pin_status():
             if self.parental.has_pin():
