@@ -405,8 +405,13 @@ class _MultiviewCell(QWidget):
             m["cache"] = "yes"
             # Back-buffer so a live stream stays scrubbable within its cache.
             # The cell's own isolated mpv - never the docked player's settings.
+            # Sized per channel: catch-up channels keep the deep buffer for
+            # archive scrubbing; plain live channels get a quarter of it
+            # (still minutes of rewind for the session scrubber) - with up to
+            # nine cells the difference is over a gigabyte of ceiling.
             m["cache-secs"] = 600
-            m["demuxer-max-back-bytes"] = 200 * 1024 * 1024
+            back_mb = 200 if self._ts_capable else 48
+            m["demuxer-max-back-bytes"] = back_mb * 1024 * 1024
             m["mute"] = self._muted
             # Re-assert the user's chosen tracks: a (re)load - notably every
             # timeshift jump - resets mpv's selection to its defaults.

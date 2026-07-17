@@ -663,6 +663,7 @@ class EmbeddedPlayer(QWidget):
     paused_changed = pyqtSignal(bool)
     timeshift_seek = pyqtSignal(int)   # minutes back from live (0 = go live)
     program_seek = pyqtSignal(int)     # seconds from the picked programme start
+    track_selected = pyqtSignal(str, object)  # "aid"/"sid", track id or "no"
 
     OVERLAY_HIDE_MS = 3000
     VIDEO_BOX_HEIGHT = 260
@@ -694,6 +695,10 @@ class EmbeddedPlayer(QWidget):
         self._popout_bar_timer.timeout.connect(self._hide_popout_bar)
         self.seek_overlay = None
         self._settings = settings
+        # One-shot audio/subtitle track ids for the NEXT play() - set via
+        # set_track_prefs() to restore a title's remembered track choices.
+        self._pref_aid = None
+        self._pref_sid = None
         # Docked video-box height scales with the display so the mini player
         # is usefully large on a 27"/4K screen and modest on a laptop -
         # computed once here, then constant (nothing resizes on its own).
@@ -1748,6 +1753,13 @@ class EmbeddedPlayer(QWidget):
         except Exception:
             return 0.0
 
+    def set_track_prefs(self, aid=None, sid=None) -> None:
+        """Arm one-shot audio/subtitle track ids for the next play() - the
+        window passes a title's remembered choices here right before
+        replaying/resuming it. Cleared by play() whether applied or not."""
+        self._pref_aid = aid
+        self._pref_sid = sid
+
     def play(self, url: str, title: str, start: float = 0.0) -> bool:
         try:
             # Fresh play cycle - drop the stop-in-progress flag so any real
@@ -1799,6 +1811,23 @@ class EmbeddedPlayer(QWidget):
             except Exception:
                 pass
             self.apply_default_options()
+            # Remembered per-title track choices (resume): set before load,
+            # exactly like the multiview cells do - mpv keeps a sid/aid set
+            # while loading and selects that track once the file's tracks are
+            # known. One-shot: consumed here so the next stream starts clean.
+            pref_aid, pref_sid = self._pref_aid, self._pref_sid
+            self._pref_aid = self._pref_sid = None
+            try:
+                if pref_aid is not None:
+                    m["aid"] = int(pref_aid)
+                if pref_sid == "no":
+                    m["sid"] = "no"
+                elif pref_sid is not None:
+                    m["sid"] = int(pref_sid)
+                    m["sub-visibility"] = True
+            except Exception as e:
+                log.debug("track prefs (aid=%r sid=%r) failed: %s",
+                          pref_aid, pref_sid, e)
             try:
                 m["volume"] = float(self.vol.value())
                 m["mute"] = self._muted
@@ -1948,7 +1977,7 @@ class EmbeddedPlayer(QWidget):
             act.setCheckable(True)
             act.setChecked(bool(t.get("selected")))
             act.triggered.connect(
-                lambda _c, tid=t.get("id"): self._set_mpv("aid", tid))
+                lambda _c, tid=t.get("id"): self._pick_track("aid", tid))
         if audio.isEmpty():
             audio.addAction(tr("opt_no_audio_tracks")).setEnabled(False)
 
@@ -1957,13 +1986,13 @@ class EmbeddedPlayer(QWidget):
         off.setCheckable(True)
         sub_tracks = tracks("sub") if m else []
         off.setChecked(not any(t.get("selected") for t in sub_tracks))
-        off.triggered.connect(lambda _c: self._set_mpv("sid", "no"))
+        off.triggered.connect(lambda _c: self._pick_track("sid", "no"))
         for t in sub_tracks:
             act = subs.addAction(track_label(t))
             act.setCheckable(True)
             act.setChecked(bool(t.get("selected")))
             act.triggered.connect(
-                lambda _c, tid=t.get("id"): self._set_mpv("sid", tid))
+                lambda _c, tid=t.get("id"): self._pick_track("sid", tid))
 
         delay = menu.addMenu(tr("opt_audio_delay"))
         current_delay = 0.0
@@ -2158,6 +2187,16 @@ class EmbeddedPlayer(QWidget):
     def _place_stats(self) -> None:
         self._stats_overlay.adjustSize()
         self._stats_overlay.move(8, 8)
+
+    def _pick_track(self, prop: str, tid) -> None:
+        """User picked an audio/subtitle track from the options menu: apply
+        it and announce the choice so the window can remember it per title."""
+        self._set_mpv(prop, tid)
+        if prop == "sid" and tid != "no":
+            # Selecting a subtitle track must also make it visible - a stream
+            # opened with subtitles off leaves sub-visibility false.
+            self._set_mpv("sub-visibility", True)
+        self.track_selected.emit(prop, tid)
 
     def _set_mpv(self, prop: str, value) -> None:
         m = self.video.mpv

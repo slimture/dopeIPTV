@@ -10,10 +10,24 @@ from PyQt6.QtWidgets import (
 from ..i18n import tr
 from ..core.workers import run_async
 
-try:
-    import pychromecast as _pychromecast
-except Exception:
-    _pychromecast = None
+# pychromecast drags in zeroconf + ifaddr (~130 ms of the app's startup),
+# and this module sits on the main window's import chain - so the import is
+# deferred until casting is actually used (the Cast menu action).
+_pychromecast = None
+_pc_checked = False
+
+
+def _pc():
+    """Import pychromecast on first use; None when it isn't installed."""
+    global _pychromecast, _pc_checked
+    if not _pc_checked:
+        _pc_checked = True
+        try:
+            import pychromecast
+            _pychromecast = pychromecast
+        except Exception:
+            _pychromecast = None
+    return _pychromecast
 
 
 def cast_content_type(url: str | None) -> str:
@@ -40,7 +54,7 @@ class ChromecastManager:
 
     @staticmethod
     def available() -> bool:
-        return _pychromecast is not None
+        return _pc() is not None
 
     def scan(self) -> list[str]:
         if self._browser is not None:
@@ -49,7 +63,7 @@ class ChromecastManager:
             except Exception:
                 pass
             self._browser = None
-        devices, browser = _pychromecast.get_chromecasts(timeout=6)
+        devices, browser = _pc().get_chromecasts(timeout=6)
         self._browser = browser
         self.devices = devices
         return sorted(cc.name for cc in devices)

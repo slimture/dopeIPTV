@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import sys
@@ -937,6 +938,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.finished.connect(self._apply_play_icon)
             self.player.timeshift_seek.connect(self._on_timeshift_seek)
             self.player.program_seek.connect(self._seek_program)
+            self.player.track_selected.connect(self._on_track_selected)
             # Keep the player pane visible on stop - mpv clears to black -
             # instead of hiding it, so the window just goes black.
             dl.addWidget(self.player, 1)
@@ -3067,6 +3069,38 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
              (tr("resume_restart"), "normal")])
         return pos if idx == 0 else 0.0
 
+    # -- per-title track memory ------------------------------------------------
+    # Remember the audio/subtitle track a user picked for a movie/episode/
+    # recording, so replaying (typically "continue where you left off") comes
+    # back with the same subtitles instead of the stream default.
+
+    _TRACK_PREFS_MAX = 200
+
+    def _track_prefs(self) -> dict:
+        try:
+            d = json.loads(str(self.settings.value("track_prefs", "") or "{}"))
+            return d if isinstance(d, dict) else {}
+        except (ValueError, TypeError):
+            return {}
+
+    def _on_track_selected(self, prop: str, tid) -> None:
+        """A track was picked in the player's options menu: file it under the
+        currently playing resumable title (live channels are skipped - their
+        track layout varies per programme and aid=auto handles them)."""
+        lp = getattr(self, "_last_playback", None) or {}
+        kind, key = lp.get("kind"), lp.get("key")
+        if kind not in self._RESUMABLE or key is None:
+            return
+        prefs = self._track_prefs()
+        k = f"{kind}:{key}"
+        entry = prefs.pop(k, None)
+        entry = entry if isinstance(entry, dict) else {}
+        entry[prop] = tid
+        prefs[k] = entry            # re-insert = newest, for FIFO capping
+        while len(prefs) > self._TRACK_PREFS_MAX:
+            prefs.pop(next(iter(prefs)))
+        self.settings.setValue("track_prefs", json.dumps(prefs))
+
     @staticmethod
     def _fmt_hms(seconds: float) -> str:
         seconds = max(0, int(seconds))
@@ -3307,6 +3341,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.rec.finish_all_inplayer("channel changed")
             self.player.show()
             self.player.set_overlay_info(title)
+            # Replay with the same audio/subtitle tracks the user picked last
+            # time for this title (one-shot; play() consumes them).
+            if kind in self._RESUMABLE:
+                pref = self._track_prefs().get(f"{kind}:{key}")
+                if isinstance(pref, dict):
+                    self.player.set_track_prefs(pref.get("aid"),
+                                                pref.get("sid"))
             if self.player.play(url, title, start=resume_at):
                 self.wake.acquire(f"Playing {title}")
             else:

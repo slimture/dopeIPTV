@@ -193,7 +193,18 @@ class _NavMixin:
         Kinds cover the sidebar nav (tv/movie/series/star/bookmark/check/rec/
         clock), the action row (guide/gear/grid/stack) and the middle-column
         controls (search/focus/bars/gridview/sizepick/sort)."""
+        # Cached per (kind, size, color, dpr): layout passes - notably
+        # splitter drags, which re-run _update_playlist_btn and friends -
+        # request the same few icons over and over, and re-rendering each
+        # with QPainter every time showed up as visible drag lag.
         dpr = self.devicePixelRatioF() or 1.0
+        cache = getattr(self, "_icon_pm_cache", None)
+        if cache is None:
+            cache = self._icon_pm_cache = {}
+        cache_key = (kind, s, color, round(dpr * 100))
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
         pm = QPixmap(round(s * dpr), round(s * dpr))
         pm.setDevicePixelRatio(dpr)
         pm.fill(Qt.GlobalColor.transparent)
@@ -376,6 +387,11 @@ class _NavMixin:
                 ry = hy + (s - m - hy) * k / 3.0
                 pr.drawLine(QPointF(vx, ry), QPointF(s - m, ry))
         pr.end()
+        # A handful of kinds x sizes x theme colors; the cap only matters if
+        # someone cycles themes all day.
+        if len(cache) > 128:
+            cache.clear()
+        cache[cache_key] = pm
         return pm
 
     def _on_library_toggle(self, collapsed: bool) -> None:
