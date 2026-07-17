@@ -58,6 +58,29 @@ class _ContextMenuMixin:
                 content_kind = "vod"
             elif rk == "series":
                 content_kind = "series"
+        # History / Watch Later / Watched rows are snapshots of channels,
+        # movies or series - map them to their real kind so they get the same
+        # add/remove-favorites (and, for channels, multiview/timeshift)
+        # actions as their home views.
+        elif content_kind in ("history", "watchlist", "watched"):
+            rk = it.get("_kind") or it.get("_ekind")
+            if rk in ("vod", "movie"):
+                content_kind = "vod"
+                # History movie rows carry the provider id only as _key and
+                # the container extension only inside the stored URL -
+                # synthesize the fields a favorite snapshot (and its later
+                # playback) needs.
+                if it.get("stream_id") is None and it.get("_key") is not None:
+                    tail = (it.get("_url") or "").rsplit(".", 1)
+                    ext = (tail[1] if len(tail) == 2
+                           and 0 < len(tail[1]) <= 4 else None)
+                    it = {**it, "stream_id": it.get("_key"),
+                          "container_extension":
+                              it.get("container_extension") or ext}
+            elif rk == "series" and it.get("series_id") is not None:
+                content_kind = "series"
+            elif rk == "live":
+                content_kind = "live"
         if (content_kind in ("live", "fav")
                 and it.get("stream_id") is not None):
             # Pick which grid window to send the stream to; each shows the
