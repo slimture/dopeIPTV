@@ -11,7 +11,7 @@ import sys
 from datetime import datetime
 
 from PyQt6.QtCore import QEvent, QObject, QSize, Qt, QTimer, QUrl
-from PyQt6.QtGui import QDesktopServices, QIcon
+from PyQt6.QtGui import QDesktopServices, QFont, QFontMetrics, QIcon
 from PyQt6.QtWidgets import (
     QAbstractItemView, QAbstractSlider, QAbstractSpinBox, QApplication,
     QCheckBox, QComboBox, QDialog,
@@ -38,8 +38,13 @@ class _TightTabBar(QTabBar):
         self.setDrawBase(False)
 
     def tabSizeHint(self, index: int) -> QSize:
+        # Measure with a BOLD variant of the tab font: some platforms paint
+        # the selected tab bolder than the rest, and a width measured with
+        # the regular weight then clips the label on selection.
         sz = super().tabSizeHint(index)
-        w = self.fontMetrics().horizontalAdvance(self.tabText(index)) + 28
+        f = QFont(self.font())
+        f.setBold(True)
+        w = QFontMetrics(f).horizontalAdvance(self.tabText(index)) + 30
         return QSize(w, sz.height())
 
     def minimumTabSizeHint(self, index: int) -> QSize:
