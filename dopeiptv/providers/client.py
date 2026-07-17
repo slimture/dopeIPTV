@@ -11,6 +11,8 @@ from typing import Any
 
 import requests
 
+from ..core.log import log
+
 
 class XtreamClient:
     """HTTP client for the Xtream Codes player_api.php endpoint."""
@@ -24,20 +26,66 @@ class XtreamClient:
         self.session = requests.Session()
         self.session.headers["User-Agent"] = "dopeIPTV/1.0"
 
+    def _redact(self, text: str) -> str:
+        """Strip the username/password from a string before logging it -
+        requests embeds the full credentialed URL in its exception messages,
+        and these logs are meant to be shared in bug reports."""
+        for secret in (self.password, self.username):
+            if secret:
+                text = text.replace(secret, "***")
+        return text
+
     def _api(self, **params: Any) -> Any:
+        # Single choke point for every Xtream call, so log here for
+        # troubleshooting: which action, to which server, the HTTP status and
+        # timing. Credentials are never logged (only the server host). Turn it
+        # on with DOPEIPTV_LOG=debug (successes) - warnings always show.
         url = f"{self.server}/player_api.php"
         base: dict[str, Any] = {"username": self.username, "password": self.password}
         base.update(params)
-        r = self.session.get(url, params=base, timeout=20)
+        action = params.get("action") or "authenticate"
+        t0 = time.monotonic()
+        try:
+            r = self.session.get(url, params=base, timeout=20)
+        except requests.RequestException as e:
+            log.warning("xtream %s @ %s: request failed - %s: %s",
+                        action, self.server, type(e).__name__,
+                        self._redact(str(e)))
+            raise
+        dt = (time.monotonic() - t0) * 1000
+        if r.status_code != 200:
+            log.warning("xtream %s @ %s: HTTP %s (%.0f ms)",
+                        action, self.server, r.status_code, dt)
+        else:
+            log.debug("xtream %s @ %s: HTTP 200 (%.0f ms, %d bytes)",
+                      action, self.server, dt, len(r.content))
         r.raise_for_status()
-        return r.json()
+        try:
+            return r.json()
+        except ValueError:
+            log.warning(
+                "xtream %s @ %s: non-JSON reply (content-type=%s, %d bytes) - "
+                "usually a captive portal, wrong URL, or the provider is down",
+                action, self.server, r.headers.get("content-type", "?"),
+                len(r.content))
+            raise
 
     def authenticate(self) -> dict:
         data = self._api()
         if not isinstance(data, dict) or "user_info" not in data:
+            log.warning("xtream auth @ %s: unexpected response (no user_info)",
+                        self.server)
             raise RuntimeError("Unexpected response from the server.")
-        if str(data["user_info"].get("auth", 0)) != "1":
+        ui = data["user_info"]
+        if str(ui.get("auth", 0)) != "1":
+            log.warning("xtream auth @ %s: rejected (auth != 1, status=%s)",
+                        self.server, ui.get("status"))
             raise RuntimeError("Wrong username or password.")
+        log.info(
+            "xtream auth @ %s: ok - status=%s exp=%s connections=%s/%s trial=%s",
+            self.server, ui.get("status"), ui.get("exp_date"),
+            ui.get("active_cons"), ui.get("max_connections"),
+            ui.get("is_trial"))
         return data
 
     def account_info(self) -> dict:
@@ -46,7 +94,10 @@ class XtreamClient:
         panel. Returns {} on any error rather than raising."""
         try:
             data = self._api()
-        except Exception:
+        except Exception as e:
+            log.warning("xtream account_info @ %s failed: %s: %s",
+                        self.server, type(e).__name__,
+                        self._redact(str(e)))
             return {}
         if not isinstance(data, dict):
             return {}
@@ -97,11 +148,22 @@ class XtreamClient:
 
     def xmltv(self) -> bytes:
         """The provider's full XMLTV guide."""
-        r = self.session.get(f"{self.server}/xmltv.php",
-                             params={"username": self.username,
-                                     "password": self.password},
-                             timeout=(20, 180))
+        t0 = time.monotonic()
+        try:
+            r = self.session.get(f"{self.server}/xmltv.php",
+                                 params={"username": self.username,
+                                         "password": self.password},
+                                 timeout=(20, 180))
+        except requests.RequestException as e:
+            log.warning("xtream xmltv @ %s: request failed - %s: %s",
+                        self.server, type(e).__name__,
+                        self._redact(str(e)))
+            raise
+        if r.status_code != 200:
+            log.warning("xtream xmltv @ %s: HTTP %s", self.server, r.status_code)
         r.raise_for_status()
+        log.debug("xtream xmltv @ %s: %d bytes (%.0f ms)",
+                  self.server, len(r.content), (time.monotonic() - t0) * 1000)
         return r.content
 
     def live_url(self, stream_id: int | str, fmt: str = "ts") -> str:
