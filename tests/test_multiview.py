@@ -60,10 +60,23 @@ app.processEvents()
 assert w.cells[1].url == "http://x/live/2.ts"
 assert w._focused is w.cells[1]
 
-# Clicking cell 0 focuses it and unfocuses the rest.
+# Focusing a cell unmutes it and mutes the rest (one audio at a time).
 w._focus_cell(w.cells[0])
 app.processEvents()
 assert w.cells[0]._focused and not w.cells[1]._focused
+assert not w.cells[0].is_muted() and w.cells[1].is_muted()
+
+# Clicking the already-focused cell again toggles its mute.
+w._on_cell_clicked(w.cells[0])
+app.processEvents()
+assert w.cells[0].is_muted()
+w._on_cell_clicked(w.cells[0])
+app.processEvents()
+assert not w.cells[0].is_muted()
+
+# The window is title-bar-less (frameless) by default.
+from PyQt6.QtCore import Qt as _Qt
+assert bool(w.windowFlags() & _Qt.WindowType.FramelessWindowHint)
 
 # The channel-item helper builds the live URL (stream_format default 'ts').
 h._add_channel_to_multiview({"stream_id": 5, "name": "Five"})
@@ -80,10 +93,10 @@ assert w.cells[2].number == 3   # cell index 2 is position "3"
 # Cells are numbered 1..4 in reading order.
 assert [c.number for c in w.cells] == [1, 2, 3, 4]
 
-# Hover reveal + fade must not raise.
-w._reveal_numbers()
+# Overlay reveal + fade, and the cell context menu builders, must not raise.
+w._reveal_overlays()
 app.processEvents()
-w._hide_numbers()
+w._hide_overlays()
 app.processEvents()
 
 # Filling the 4th cell, then a 5th add replaces the focused cell (no crash).

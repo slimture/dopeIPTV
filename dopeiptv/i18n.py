@@ -3296,6 +3296,27 @@ _STRINGS: dict[str, dict[str, str]] = {
         "fr": "Ajouter au multivue", "zh": "添加到多画面",
         "ru": "Добавить в мультиэкран", "th": "เพิ่มไปยังมัลติวิว",
     },
+    "mv_mute": {
+        "en": "Mute", "sv": "Tysta", "es": "Silenciar", "de": "Stumm",
+        "fr": "Muet", "zh": "静音", "ru": "Без звука", "th": "ปิดเสียง",
+    },
+    "mv_unmute": {
+        "en": "Unmute", "sv": "Slå på ljud", "es": "Activar sonido",
+        "de": "Ton an", "fr": "Réactiver le son", "zh": "取消静音",
+        "ru": "Включить звук", "th": "เปิดเสียง",
+    },
+    "mv_close": {
+        "en": "Close multiview", "sv": "Stäng multiview",
+        "es": "Cerrar multivista", "de": "Multiview schließen",
+        "fr": "Fermer le multivue", "zh": "关闭多画面",
+        "ru": "Закрыть мультиэкран", "th": "ปิดมัลติวิว",
+    },
+    "mv_remove_cell": {
+        "en": "Remove from this cell", "sv": "Ta bort ur rutan",
+        "es": "Quitar de esta celda", "de": "Aus diesem Feld entfernen",
+        "fr": "Retirer de cette case", "zh": "从该画面移除",
+        "ru": "Убрать из ячейки", "th": "นำออกจากช่องนี้",
+    },
     "mv_cell": {
         "en": "Cell {n}", "sv": "Ruta {n}", "es": "Celda {n}",
         "de": "Feld {n}", "fr": "Case {n}", "zh": "画面 {n}",

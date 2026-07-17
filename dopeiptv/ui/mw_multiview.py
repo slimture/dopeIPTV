@@ -2,11 +2,16 @@
 
 A separate top-level window holding four lightweight video cells, each its own
 libmpv render surface (`_MpvGLWidget`) - the *docked* embedded player is never
-touched. Cells are muted by default; click one to focus it (its audio plays,
-the others stay muted) with a highlighted border. Channels are added from the
+touched. Click a cell to give it audio focus (the others stay muted); click the
+focused one again, or right-click, to mute it. Channels are added from the
 main list's right-click "Add to multiview", capturing whatever playlist is
 active at that moment - so four cells can come from four different accounts,
 sidestepping a single account's connection limit.
+
+The window mirrors the pop-out player's chrome options: title-bar-less by
+default (drag a cell to move it), with right-click "Always on top" and
+"Show title bar". Cell titles and position numbers auto-hide and reappear on
+mouse movement. Space pauses the focused cell; Left/Right seek it.
 
 Heads-up for the user: each cell is a separate stream = a separate connection
 to the provider. On a low connection-limit account the extra cells will be
@@ -18,8 +23,8 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
-    QApplication, QCheckBox, QGridLayout, QLabel, QMessageBox, QVBoxLayout,
-    QWidget)
+    QApplication, QCheckBox, QDialogButtonBox, QGridLayout, QLabel, QMenu,
+    QVBoxLayout, QWidget)
 
 from ..core.log import log
 from ..i18n import tr
@@ -27,42 +32,41 @@ from ..media.embedded import _MpvGLWidget
 
 
 class _MultiviewCell(QWidget):
-    """One grid cell: a bare mpv video surface plus a title strip and a
-    click-to-focus border. No transport controls - multiview is glanceable."""
+    """One grid cell: a bare mpv video surface with a position number, an
+    auto-hiding title strip, click-to-focus, and per-cell mute/pause/seek."""
 
-    focus_requested = pyqtSignal(object)   # emits self on click
-    hovered = pyqtSignal(object)           # emits self on mouse move over it
+    focus_requested = pyqtSignal(object)         # left-click: focus/mute toggle
+    context_requested = pyqtSignal(object, object)   # right-click: (cell, pos)
+    hovered = pyqtSignal(object)                 # mouse move: reveal overlays
 
     def __init__(self, number: int, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.number = number               # 1..4, its position label
+        self.number = number
         self.url: str | None = None
         self.title: str = ""
         self._focused = False
+        self._muted = True
+        self._drag_from = None
         self.setStyleSheet("background:#000000;")
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
         self.video = _MpvGLWidget(self)
-        self.video.setMinimumSize(0, 0)   # free to shrink in the grid
+        self.video.setMinimumSize(0, 0)
         lay.addWidget(self.video)
-        self.video.video_mouse_press.connect(
-            lambda _e: self.focus_requested.emit(self))
-        self.video.video_mouse_move.connect(
-            lambda _e: self.hovered.emit(self))
+        self.video.video_mouse_press.connect(self._on_press)
+        self.video.video_mouse_move.connect(self._on_move)
+        self.video.video_mouse_release.connect(self._on_release)
         self.video.playback_error.connect(self._on_error)
-        # Title strip over the top of the video.
+
         self._title = QLabel("", self.video)
         self._title.setStyleSheet(
             "background:rgba(0,0,0,150); color:#ECECF1; padding:3px 8px;"
             "font-size:12px; font-weight:600;")
         self._title.hide()
-        # Empty-state hint, centred.
         self._empty = QLabel(tr("mv_empty_cell"), self.video)
         self._empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._empty.setStyleSheet("color:#7A7A85; font-size:12px;")
-        # Big position number, revealed on hover (so you can pick a target
-        # cell from the list's "Add to multiview" submenu), then fades away.
         self._num = QLabel(str(number), self.video)
         self._num.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._num.setStyleSheet(
@@ -71,10 +75,14 @@ class _MultiviewCell(QWidget):
         self._num.hide()
         self.set_focused(False)
 
-    def show_number(self, on: bool) -> None:
+    # -- overlays (title + number auto-hide together) ------------------------
+
+    def show_overlays(self, on: bool) -> None:
         self._num.setVisible(on)
+        self._title.setVisible(on and bool(self.title))
         if on:
             self._num.raise_()
+            self._title.raise_()
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
@@ -83,17 +91,15 @@ class _MultiviewCell(QWidget):
         self._empty.setGeometry(self.video.rect())
         self._num.setGeometry(self.video.rect())
 
+    # -- playback ------------------------------------------------------------
+
     def play(self, url: str, title: str) -> bool:
-        """Load a stream into this cell. Mirrors the docked player's essential
-        mpv setup (title/cache/mute) without any of its chrome."""
         self.url = url
         self.title = title
         self._title.setText(title or "")
-        self._title.setVisible(bool(title))
         self._title.adjustSize()
         self._empty.hide()
         if self.video.mpv is None:
-            # Force GL init so the render context (and mpv) exists.
             self.video.show()
             QApplication.instance().processEvents()
         m = self.video.mpv
@@ -102,7 +108,7 @@ class _MultiviewCell(QWidget):
         try:
             m["force-media-title"] = title or ""
             m["cache"] = "yes"
-            m["mute"] = not self._focused
+            m["mute"] = self._muted
             m.play(url)
             return True
         except Exception as e:
@@ -112,19 +118,44 @@ class _MultiviewCell(QWidget):
 
     def _on_error(self, _msg: str) -> None:
         self._title.setText(tr("mv_cell_error", title=self.title or ""))
+        self.title = self._title.text()
         self._title.setVisible(True)
         self._title.adjustSize()
 
     def set_focused(self, on: bool) -> None:
         self._focused = on
-        if self.video.mpv is not None and self.url is not None:
-            try:
-                self.video.mpv["mute"] = not on
-            except Exception:
-                pass
         self.setStyleSheet(
             "background:#000000;"
             + ("border:2px solid #e5354b;" if on else "border:2px solid #202028;"))
+
+    def set_muted(self, muted: bool) -> None:
+        self._muted = muted
+        if self.video.mpv is not None and self.url is not None:
+            try:
+                self.video.mpv["mute"] = muted
+            except Exception:
+                pass
+
+    def is_muted(self) -> bool:
+        return self._muted
+
+    def toggle_pause(self) -> None:
+        m = self.video.mpv
+        if m is None or self.url is None:
+            return
+        try:
+            m.pause = not m.pause
+        except Exception:
+            pass
+
+    def seek(self, secs: int) -> None:
+        m = self.video.mpv
+        if m is None or self.url is None:
+            return
+        try:
+            m.command("seek", secs, "relative")
+        except Exception:
+            pass
 
     def clear(self) -> None:
         if self.video.mpv is not None:
@@ -135,6 +166,7 @@ class _MultiviewCell(QWidget):
         self.video.set_blank(True)
         self.url = None
         self.title = ""
+        self._muted = True
         self._title.hide()
         self._empty.show()
 
@@ -144,16 +176,47 @@ class _MultiviewCell(QWidget):
         except Exception:
             pass
 
+    # -- mouse: left = focus, right = menu, drag = move (frameless) ----------
+
+    def _window_frameless(self) -> bool:
+        return bool(self.window().windowFlags()
+                    & Qt.WindowType.FramelessWindowHint)
+
+    def _on_press(self, event) -> None:
+        if event.button() == Qt.MouseButton.RightButton:
+            self.context_requested.emit(
+                self, event.globalPosition().toPoint())
+            return
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.focus_requested.emit(self)
+            if self._window_frameless():
+                self._drag_from = event.position().toPoint()
+
+    def _on_move(self, event) -> None:
+        self.hovered.emit(self)
+        d = self._drag_from
+        if d is not None and (event.buttons() & Qt.MouseButton.LeftButton):
+            if (event.position().toPoint() - d).manhattanLength() > 6:
+                self._drag_from = None
+                handle = self.window().windowHandle()
+                if handle is not None:
+                    handle.startSystemMove()
+
+    def _on_release(self, event) -> None:
+        self._drag_from = None
+
 
 class _MultiviewWindow(QWidget):
-    """Top-level 2x2 grid of cells. Closing it hands control back to the owner
-    so every cell's mpv is torn down cleanly."""
+    """Top-level 2x2 grid. Flags (frameless / always-on-top) come from the
+    owner's settings; closing hands control back so every cell's mpv is torn
+    down cleanly."""
 
     def __init__(self, owner) -> None:
         super().__init__()
         self._owner = owner
         self.setWindowTitle(tr("mv_title"))
-        self.setStyleSheet("background:#000000;")
+        self.setStyleSheet("#MvWin { background:#000000; }")
+        self.setObjectName("MvWin")
         grid = QGridLayout(self)
         grid.setContentsMargins(0, 0, 0, 0)
         grid.setSpacing(2)
@@ -162,42 +225,125 @@ class _MultiviewWindow(QWidget):
         self.cells: list[_MultiviewCell] = []
         for i in range(4):
             c = _MultiviewCell(i + 1, self)
-            c.focus_requested.connect(self._focus_cell)
-            c.hovered.connect(lambda _c: self._reveal_numbers())
+            c.focus_requested.connect(self._on_cell_clicked)
+            c.context_requested.connect(self._cell_context_menu)
+            c.hovered.connect(lambda _c: self._reveal_overlays())
+            c.video.video_key_press.connect(
+                lambda ev, cell=c: self._cell_key(cell, ev))
             grid.addWidget(c, i // 2, i % 2)
             self.cells.append(c)
         self._focused: _MultiviewCell | None = None
-        # Position numbers flash on hover, then fade after a moment.
-        self._num_timer = QTimer(self)
-        self._num_timer.setSingleShot(True)
-        self._num_timer.setInterval(1400)
-        self._num_timer.timeout.connect(self._hide_numbers)
+        self._overlay_timer = QTimer(self)
+        self._overlay_timer.setSingleShot(True)
+        self._overlay_timer.setInterval(2000)
+        self._overlay_timer.timeout.connect(self._hide_overlays)
+        self.setWindowFlags(self._flags())
         self._focus_cell(self.cells[0])
 
+    # -- window flags (mirrors the pop-out chrome options) -------------------
+
+    def _flags(self) -> "Qt.WindowType":
+        flags = Qt.WindowType.Window
+        s = self._owner.settings
+        wayland = "wayland" in QApplication.platformName().lower()
+        if s.value("mv_on_top", "false") == "true" and not wayland:
+            flags |= Qt.WindowType.WindowStaysOnTopHint
+        if s.value("mv_frameless", "true") == "true":
+            flags |= Qt.WindowType.FramelessWindowHint
+        return flags
+
+    def _apply_flags(self) -> None:
+        geo = self.geometry()
+        self.setWindowFlags(self._flags())
+        self.setGeometry(geo)
+        self.show()
+        self.raise_()
+
+    def _set_on_top(self, on: bool) -> None:
+        self._owner.settings.setValue("mv_on_top", "true" if on else "false")
+        self._apply_flags()
+
+    def _set_frameless(self, hidden: bool) -> None:
+        self._owner.settings.setValue(
+            "mv_frameless", "true" if hidden else "false")
+        self._apply_flags()
+
+    # -- streams / focus / mute ---------------------------------------------
+
     def add_stream(self, url: str, title: str, cell: int | None = None) -> None:
-        """Play a stream in cell index *cell* (0..3); if None, the first free
-        cell, else the focused one."""
         if cell is not None and 0 <= cell < len(self.cells):
             target = self.cells[cell]
         else:
             target = next((c for c in self.cells if c.url is None),
                           self._focused or self.cells[0])
         target.play(url, title)
-        self._focus_cell(target)   # newly added cell takes audio focus
+        self._focus_cell(target)
+        self._reveal_overlays()
 
-    def _reveal_numbers(self) -> None:
-        for c in self.cells:
-            c.show_number(True)
-        self._num_timer.start()
-
-    def _hide_numbers(self) -> None:
-        for c in self.cells:
-            c.show_number(False)
+    def _on_cell_clicked(self, cell: "_MultiviewCell") -> None:
+        # Click the already-focused cell again to mute/unmute it; click another
+        # to move audio focus there.
+        if cell is self._focused and cell.url is not None:
+            cell.set_muted(not cell.is_muted())
+        else:
+            self._focus_cell(cell)
 
     def _focus_cell(self, cell: "_MultiviewCell") -> None:
         for c in self.cells:
             c.set_focused(c is cell)
+            c.set_muted(c is not cell)
         self._focused = cell
+
+    def _cell_context_menu(self, cell: "_MultiviewCell", pos) -> None:
+        m = QMenu(self)
+        if cell.url is not None:
+            m.addAction(tr("mv_unmute") if cell.is_muted() else tr("mv_mute"),
+                        lambda: cell.set_muted(not cell.is_muted()))
+            m.addAction(tr("mv_remove_cell"), cell.clear)
+            m.addSeparator()
+        if "wayland" not in QApplication.platformName().lower():
+            act = m.addAction(tr("popout_always_on_top"))
+            act.setCheckable(True)
+            act.setChecked(bool(self.windowFlags()
+                                & Qt.WindowType.WindowStaysOnTopHint))
+            act.toggled.connect(self._set_on_top)
+        frameless = bool(self.windowFlags()
+                         & Qt.WindowType.FramelessWindowHint)
+        bar = m.addAction(tr("popout_show_titlebar") if frameless
+                          else tr("popout_hide_titlebar"))
+        bar.triggered.connect(lambda: self._set_frameless(not frameless))
+        m.addSeparator()
+        m.addAction(tr("mv_close"), self.close)
+        m.exec(pos)
+
+    # -- overlays + keyboard -------------------------------------------------
+
+    def _reveal_overlays(self) -> None:
+        for c in self.cells:
+            c.show_overlays(True)
+        self._overlay_timer.start()
+
+    def _hide_overlays(self) -> None:
+        for c in self.cells:
+            c.show_overlays(False)
+
+    def _cell_key(self, cell: "_MultiviewCell", event) -> None:
+        if event.key() == Qt.Key.Key_Left:
+            cell.seek(-10)
+        elif event.key() == Qt.Key.Key_Right:
+            cell.seek(10)
+
+    def keyPressEvent(self, event) -> None:
+        if event.key() == Qt.Key.Key_Space and self._focused is not None:
+            self._focused.toggle_pause()
+            event.accept()
+            return
+        if event.key() == Qt.Key.Key_Escape:
+            # There's no title-bar X when frameless, so give Escape as a close.
+            self.close()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
     def closeEvent(self, event) -> None:
         event.ignore()
@@ -223,8 +369,7 @@ class _MultiviewMixin:
     def _ensure_multiview_window(self):
         """Create the multiview window if needed, then bring it to the front.
         raise_ + activateWindow is the reliable cross-platform way back to it -
-        on macOS separate app windows don't cycle with Cmd+Tab, so this (and
-        the View menu entry) is how the user re-focuses it."""
+        on macOS separate app windows don't cycle with Cmd+Tab."""
         self._maybe_show_multiview_info()
         if self._multiview_win is None:
             self._multiview_win = _MultiviewWindow(self)
@@ -236,12 +381,10 @@ class _MultiviewMixin:
         return w
 
     def _show_multiview(self) -> None:
-        """Open/raise the (possibly empty) multiview window - the menu entry."""
         self._ensure_multiview_window()
 
     def add_to_multiview(self, url: str, title: str,
                          cell: int | None = None) -> None:
-        """Open the multiview window (if needed) and drop a stream into it."""
         if not url:
             return
         # Free the docked player's connection: otherwise a single-connection
@@ -252,16 +395,26 @@ class _MultiviewMixin:
 
     def _maybe_show_multiview_info(self) -> None:
         """One-time notice that multiview needs enough provider connections,
-        with a 'don't show again' opt-out."""
+        with a 'don't show again' opt-out. A themed QDialog (not QMessageBox,
+        whose checkbox rendered invisible against the dark message box)."""
         if self.settings.value("mv_info_seen", "false") == "true":
             return
-        box = QMessageBox(self)
-        box.setIcon(QMessageBox.Icon.Information)
-        box.setWindowTitle(tr("mv_info_title"))
-        box.setText(tr("mv_info_body"))
+        from PyQt6.QtWidgets import QDialog
+        d = QDialog(self)
+        d.setWindowTitle(tr("mv_info_title"))
+        lay = QVBoxLayout(d)
+        lay.setContentsMargins(20, 18, 20, 16)
+        lay.setSpacing(14)
+        msg = QLabel(tr("mv_info_body"))
+        msg.setWordWrap(True)
+        msg.setMinimumWidth(420)
+        lay.addWidget(msg)
         cb = QCheckBox(tr("dont_show_again"))
-        box.setCheckBox(cb)
-        box.exec()
+        lay.addWidget(cb)
+        bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+        bb.accepted.connect(d.accept)
+        lay.addWidget(bb)
+        d.exec()
         if cb.isChecked():
             self.settings.setValue("mv_info_seen", "true")
 
@@ -281,7 +434,7 @@ class _MultiviewMixin:
             self.wake.release()
         except Exception:
             pass
-        self._apply_play_icon()   # poster overlay back to a 'play' glyph
+        self._apply_play_icon()
 
     def _close_multiview(self) -> None:
         win = self._multiview_win
