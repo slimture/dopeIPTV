@@ -1155,12 +1155,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._side_handle = root.handle(1)
         if self._side_handle is not None:
             self._side_handle.installEventFilter(self)
-        # The detail-pane divider gets a filter too: while a video plays,
-        # dragging it switches to outline (non-opaque) resize - see
-        # eventFilter for why.
-        self._det_handle = root.handle(2)
-        if self._det_handle is not None:
-            self._det_handle.installEventFilter(self)
         # Floor wide enough that the docked player's full control row (transport
         # + options + pop-out + fullscreen + mute + volume) always fits, so
         # dragging the divider in never crushes the buttons or drops the slider.
@@ -1261,24 +1255,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 # this snaps the rail to RAIL_W right away (no leftover gap); on
                 # an expand the target is the current width, so it stays put.
                 self._apply_sidebar_collapsed()
-        # The detail-pane divider: with a video playing, live (opaque) resize
-        # is what makes the drag lag - every mouse-move tick reallocates the
-        # GL widget's framebuffer, forces an mpv redraw at the new size and
-        # relayouts both columns. So sample the state when the drag starts:
-        # video playing -> classic outline drag (one resize, on release);
-        # idle -> the usual live resize. The left divider keeps live resize
-        # always, since its collapse-to-rail gesture needs mid-drag moves.
-        if obj is getattr(self, "_det_handle", None):
-            t = event.type()
-            if t == QEvent.Type.MouseButtonPress:
-                playing = bool(self.player and self.player.current_url)
-                self._root.setOpaqueResize(not playing)
-            elif t == QEvent.Type.MouseButtonRelease:
-                # Deferred: the handle's own release handler (which runs after
-                # this filter) only commits the outline-drag position while
-                # the splitter is still non-opaque.
-                QTimer.singleShot(0, lambda:
-                                  self._root.setOpaqueResize(True))
         return super().eventFilter(obj, event)
 
     def _overlay_state(self) -> str:
