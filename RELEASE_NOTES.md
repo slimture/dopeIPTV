@@ -35,6 +35,12 @@ hand-drawn icons on Linux/macOS/Windows** · **a Settings → Multiview tab**
 - **Add/remove favorites straight from History, Watch Later and Watched** — movie, series and channel rows each get their proper menu (History channel rows even get multiview/timeshift/record).
 - The grouped **"All favorites"** view now routes movies/series to the right store — *Remove from favorites* used to silently miss them — and no longer auto-plays a movie row as a live channel.
 
+### Remembered tracks & performance
+- **The audio/subtitle track you pick is remembered per title** — replay or resume a movie, episode or recording and it comes back with the same subtitles/audio instead of the stream default. Picking a subtitle track now also always makes it visible.
+- **Smoother divider drags** — the drawn icons are cached instead of re-rendered on every pass, and redundant list relayouts are skipped.
+- **Faster startup** — Chromecast support loads on first use of the Cast menu instead of at every launch.
+- **Leaner multiview** — the deep rewind buffer is only allocated for catch-up-capable channels; plain live windows use a fraction of the memory ceiling.
+
 ### Fixes
 - **Resume works from Favorites**: movies/series played from the Favorites sections now prompt to continue and save their position (they used to be treated as live channels).
 - **History healed**: entries mis-filed as TV channels by the old bug are re-typed automatically (the stored URL knows the truth) and play again; a pending auto-preview can no longer stomp a playback you just started.
