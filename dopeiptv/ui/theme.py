@@ -212,6 +212,22 @@ QPushButton#SideAction[rail="true"] {{
     text-align: center; padding: 8px 0; font-size: 14px; font-weight: 600;
 }}
 
+/* Playlist switcher: a compact pill "chip" sitting right under the logo, so
+   the two read as one block (logo = the app, chip = the account/playlist it
+   is showing). Same stack icon as its rail form ties the two states together. */
+QPushButton#PlaylistChip {{
+    background: transparent; border: 1px solid {side_action_edge};
+    border-radius: 13px; padding: 4px 12px; text-align: center;
+    font-size: 12px; font-weight: 600; color: {p['text2']};
+}}
+QPushButton#PlaylistChip:hover {{
+    background: {side_action_hover}; border-color: {ACCENT}; color: {p['text']};
+}}
+QPushButton#PlaylistChip[rail="true"] {{
+    background: {side_action_bg}; border: 1px solid {side_action_edge};
+    border-radius: 8px; padding: 8px 0; margin-top: 3px;
+}}
+
 #SectionLabel {{
     color: {p['muted2']}; font-size: 10px; font-weight: 700;
     letter-spacing: 1.2px; padding: 10px 14px 4px 14px;

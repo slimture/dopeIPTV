@@ -35,9 +35,10 @@ class _SidebarMixin:
             # itself is always set (see _apply_nav_icons).
             b.setText("" if collapsed else self._nav_texts[key])
             self._set_rail(b, collapsed)
-        # Everything that only makes sense expanded: logo, the whole
-        # category area, and full-text buttons become short labels or hide.
-        self._sidebar_logo.setVisible(not collapsed)
+        # The logo (= the "now playing" jump) stays on the rail too, just
+        # scaled down to fit; the category area and full-text buttons hide.
+        self._sidebar_logo.setVisible(True)
+        self._sidebar_logo.set_compact(collapsed)
         self._cat_section_label.setVisible(not collapsed)
         self.cat_solo_btn.setVisible(not collapsed)
         self.cat_list.setVisible(not collapsed)

@@ -319,8 +319,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         store = self.playlist_store
         pl = store.get(store.active_id) if (store and store.active_id) else None
         name = (pl or {}).get("name", "") if pl else ""
-        self._playlist_btn.setText("▾  " + name if name
+        self._playlist_btn.setText((name + "  ▾") if name
                                    else tr("menu_playlists"))
+        # The chip carries the same drawn playlist-stack mark as its rail
+        # form, tying it to the logo block above.
+        self._playlist_btn.setIcon(
+            QIcon(self._action_pixmap("stack", 14, P["text2"])))
+        self._playlist_btn.setIconSize(QSize(14, 14))
         # Only worth showing when there's actually more than one playlist to
         # switch between - a single-playlist user has nothing to pick.
         multiple = bool(store and len(store.playlists()) > 1)
@@ -431,7 +436,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # providers (e.g. to feed multiview cells from different accounts)
         # without a trip through Settings. Shows the active playlist; the menu
         # is built on demand. Hidden when there's nothing to switch.
-        self._playlist_btn = QPushButton("", objectName="SideAction")
+        self._playlist_btn = QPushButton("", objectName="PlaylistChip")
         # Fit the pill to its label (the active playlist name) instead of
         # stretching the full sidebar width; centred under the logo. On the
         # collapsed rail it goes back to filling the rail (see

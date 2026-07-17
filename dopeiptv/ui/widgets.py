@@ -83,6 +83,18 @@ class _SidebarLogo(QWidget):
         self._update_follow_accent = False
         self._bounce_dy = 0.0
 
+    def set_compact(self, on: bool) -> None:
+        """Rail mode: the same mark scaled down to fit the 60 px icon rail
+        (instance attrs shadow the class constants; paintEvent reads self.*,
+        so everything - pill, triangle, bars, badge - scales together)."""
+        if on:
+            self.LOGO_W, self.LOGO_H = 44, 20
+        else:
+            for a in ("LOGO_W", "LOGO_H"):
+                self.__dict__.pop(a, None)
+        self.setFixedHeight(self.LOGO_H + 10)
+        self.update()
+
     def set_update(self, on: bool, color=None, follow_accent: bool = False) -> None:
         """Show/hide the corner update badge and set its colour. Pass an
         explicit ``color`` for a fixed hue, or ``follow_accent=True`` to track
@@ -97,7 +109,9 @@ class _SidebarLogo(QWidget):
         w, h = float(self.LOGO_W), float(self.LOGO_H)
         x0 = (self.width() - w) / 2.0
         y0 = (self.height() - h) / 2.0
-        r, cx, cy = 10.0, x0 + w - 5.0, y0 + 5.0
+        # Badge scales with the mark (10 px at full size, smaller on the rail).
+        r = max(6.0, h * 0.25)
+        cx, cy = x0 + w - r * 0.5, y0 + r * 0.5
         return QRectF(cx - r, cy - r, 2 * r, 2 * r)
 
     def bounce(self, hops: int = 4, period_ms: int = 4000) -> None:

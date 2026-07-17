@@ -25,7 +25,8 @@ from __future__ import annotations
 import time
 from datetime import datetime
 
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QPointF, QRectF, QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap, QPolygonF
 from PyQt6.QtWidgets import (
     QApplication, QCheckBox, QDialogButtonBox, QGridLayout, QLabel, QMenu,
     QPushButton, QVBoxLayout, QWidget)
@@ -40,6 +41,42 @@ def _fmt(secs: float) -> str:
     h, rem = divmod(secs, 3600)
     m, s = divmod(rem, 60)
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+
+
+def _glyph(kind: str, s: int, dpr: float, alpha: int = 235) -> QPixmap:
+    """White vector control glyphs (pause / play / x). Drawn, not text: the
+    ⏸/▶/✕ characters take their emoji presentation on macOS and render as
+    black marks that ignore the stylesheet colour - invisible on the dark
+    control scrims."""
+    pm = QPixmap(round(s * dpr), round(s * dpr))
+    pm.setDevicePixelRatio(dpr)
+    pm.fill(Qt.GlobalColor.transparent)
+    pr = QPainter(pm)
+    pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    col = QColor(255, 255, 255, alpha)
+    if kind == "x":
+        pen = QPen(col)
+        pen.setWidthF(max(1.6, s * 0.12))
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pr.setPen(pen)
+        m = s * 0.26
+        pr.drawLine(QPointF(m, m), QPointF(s - m, s - m))
+        pr.drawLine(QPointF(s - m, m), QPointF(m, s - m))
+    elif kind == "pause":
+        pr.setPen(Qt.PenStyle.NoPen)
+        pr.setBrush(col)
+        bw = s * 0.24
+        for x in (s * 0.22, s * 0.56):
+            pr.drawRoundedRect(QRectF(x, s * 0.12, bw, s * 0.76),
+                               bw * 0.3, bw * 0.3)
+    else:   # play
+        pr.setPen(Qt.PenStyle.NoPen)
+        pr.setBrush(col)
+        pr.drawPolygon(QPolygonF([
+            QPointF(s * 0.26, s * 0.10), QPointF(s * 0.26, s * 0.90),
+            QPointF(s * 0.88, s * 0.50)]))
+    pr.end()
+    return pm
 
 
 class _MultiviewCell(QWidget):
@@ -129,11 +166,11 @@ class _MultiviewCell(QWidget):
             "background:transparent; color:rgba(255,255,255,140);"
             "font-size:56px; font-weight:800;")
         self._num.hide()
-        self._pause = QLabel("⏸", self.video)
+        dpr = self.devicePixelRatioF() or 1.0
+        self._pause = QLabel("", self.video)
         self._pause.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._pause.setStyleSheet(
-            "background:transparent; color:rgba(255,255,255,200);"
-            "font-size:44px;")
+        self._pause.setStyleSheet("background:transparent;")
+        self._pause.setPixmap(_glyph("pause", 44, dpr, alpha=200))
         self._pause.hide()
         # None of these read-only overlays should intercept mouse events - the
         # video underneath must keep getting click-to-focus, drag and
@@ -148,13 +185,17 @@ class _MultiviewCell(QWidget):
         # programme + click-to-jump), an offset/position label, and a LIVE
         # pill that jumps back to the live edge - the same look and gestures
         # as the docked timeline.
-        self._pause_btn = QPushButton("⏸", self.video)
+        self._icon_pause = QIcon(_glyph("pause", 13, dpr))
+        self._icon_play = QIcon(_glyph("play", 13, dpr))
+        self._pause_btn = QPushButton("", self.video)
+        self._pause_btn.setIcon(self._icon_pause)
+        self._pause_btn.setIconSize(QSize(13, 13))
         self._pause_btn.setToolTip(tr("mv_pause"))
         self._pause_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._pause_btn.setStyleSheet(
-            "QPushButton { background:rgba(0,0,0,170); color:#ECECF1;"
-            " border:none; border-radius:4px; font-size:13px; }"
-            "QPushButton:hover { color:#FF5C5C; }")
+            "QPushButton { background:rgba(0,0,0,170); border:none;"
+            " border-radius:4px; }"
+            "QPushButton:hover { background:rgba(255,92,92,110); }")
         self._pause_btn.clicked.connect(self.toggle_pause)
         self._pause_btn.hide()
         self._seek = _SeekSlider(self.video)
@@ -200,7 +241,8 @@ class _MultiviewCell(QWidget):
             paused = bool(self.video.mpv.pause) if self.video.mpv else False
         except Exception:
             paused = False
-        self._pause_btn.setText("▶" if paused else "⏸")
+        self._pause_btn.setIcon(self._icon_play if paused
+                                else self._icon_pause)
 
     def _layout_controls(self) -> None:
         """Manual bottom-row layout: pause | slider | -offset | LIVE. Runs on
@@ -677,13 +719,18 @@ class _MultiviewWindow(QWidget):
         # sibling QOpenGLWidgets (so it was invisible); a child of the GL widget
         # composites on top, the same trick the cell's title/border use.
         self._close_host = self.cells[1].video   # top-right cell (row0, col1)
-        self._close_btn = QPushButton("✕", self._close_host)
+        self._close_btn = QPushButton("", self._close_host)
         self._close_btn.setObjectName("MvClose")
+        # Drawn white ✕ (the text glyph rendered black on macOS) on a scrim
+        # with a light border, so it stands out over dark video too.
+        self._close_btn.setIcon(
+            QIcon(_glyph("x", 14, self.devicePixelRatioF() or 1.0)))
+        self._close_btn.setIconSize(QSize(14, 14))
         self._close_btn.setStyleSheet(
-            "#MvClose { background:rgba(20,20,24,190); color:#ECECF1;"
-            " border:none; border-radius:15px; font-size:16px;"
-            " font-weight:700; }"
-            "#MvClose:hover { background:rgba(229,53,75,235); color:#FFFFFF; }")
+            "#MvClose { background:rgba(20,20,24,200);"
+            " border:1px solid rgba(255,255,255,120); border-radius:15px; }"
+            "#MvClose:hover { background:rgba(229,53,75,235);"
+            " border-color:#FFFFFF; }")
         self._close_btn.setFixedSize(30, 30)
         self._close_btn.setToolTip(tr("mv_close"))
         self._close_btn.clicked.connect(self.close)
