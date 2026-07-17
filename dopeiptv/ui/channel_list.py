@@ -140,13 +140,21 @@ class ChannelListView(QListView):
         # is naturally centred with no explicit shift.
         if cols == 1:
             slot_w = raw_vw
-        self.setGridSize(QSize(slot_w, cell.height()))
         leftover = raw_vw - cols * slot_w
         # The +7 fixed offset compensates for Qt's ~14 px vertical-scrollbar
         # reservation on the right of the viewport - even when the scrollbar
         # isn't showing, that space is set aside and would otherwise appear as
         # asymmetric right padding. Same constant applies at every column count.
         left_pad = (leftover // 2 + 7)
+        # Skip the (unconditional, full item-relayout) setGridSize /
+        # setViewportMargins calls when nothing would change - resize events
+        # also fire for pure height changes and re-entrant layout passes, and
+        # during a splitter drag every skipped relayout is felt directly.
+        applied = (slot_w, cell.height(), left_pad)
+        if getattr(self, "_justify_applied", None) == applied:
+            return
+        self._justify_applied = applied
+        self.setGridSize(QSize(slot_w, cell.height()))
         self.setViewportMargins(left_pad, 0, 0, 0)
 
 
