@@ -2912,40 +2912,41 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "О мультиэкране", "th": "เกี่ยวกับมัลติวิว",
     },
     "mv_info_body": {
-        "en": "Each cell is a separate stream, so each uses one connection to "
+        "en": "Each window is a separate stream, so each uses one connection to "
               "your provider. To watch several at once your account needs "
-              "enough simultaneous connections — e.g. 4 for a full grid. Cells "
-              "beyond your account's limit will be refused by the provider.",
-        "sv": "Varje ruta är en egen ström och använder därför en anslutning "
+              "enough simultaneous connections — e.g. 4 for a full grid. "
+              "Windows beyond your account's limit will be refused by the "
+              "provider.",
+        "sv": "Varje fönster är en egen ström och använder därför en anslutning "
               "till din leverantör. För att se flera samtidigt behöver ditt "
               "konto tillräckligt många samtidiga anslutningar — t.ex. 4 för "
-              "ett fullt rutnät. Rutor utöver kontots gräns nekas av "
+              "ett fullt rutnät. Fönster utöver kontots gräns nekas av "
               "leverantören.",
-        "es": "Cada celda es una transmisión independiente, por lo que usa una "
-              "conexión con tu proveedor. Para ver varias a la vez tu cuenta "
-              "necesita suficientes conexiones simultáneas — p. ej. 4 para una "
-              "cuadrícula completa. Las celdas que superen tu límite serán "
-              "rechazadas por el proveedor.",
-        "de": "Jedes Feld ist ein eigener Stream und nutzt daher eine "
+        "es": "Cada ventana es una transmisión independiente, por lo que usa "
+              "una conexión con tu proveedor. Para ver varias a la vez tu "
+              "cuenta necesita suficientes conexiones simultáneas — p. ej. 4 "
+              "para una cuadrícula completa. Las ventanas que superen tu límite "
+              "serán rechazadas por el proveedor.",
+        "de": "Jedes Fenster ist ein eigener Stream und nutzt daher eine "
               "Verbindung zu deinem Anbieter. Um mehrere gleichzeitig zu sehen, "
               "braucht dein Konto genügend gleichzeitige Verbindungen — z. B. 4 "
-              "für ein volles Raster. Felder über dein Limit hinaus werden vom "
+              "für ein volles Raster. Fenster über dein Limit hinaus werden vom "
               "Anbieter abgelehnt.",
-        "fr": "Chaque case est un flux distinct et utilise donc une connexion à "
-              "votre fournisseur. Pour en regarder plusieurs à la fois, votre "
-              "compte doit disposer d'assez de connexions simultanées — par ex. "
-              "4 pour une grille complète. Les cases au-delà de votre limite "
-              "seront refusées par le fournisseur.",
-        "zh": "每个画面都是独立的流，因此各占用一个到提供商的连接。要同时观看多个，"
-              "你的账户需要足够的并发连接——例如满格需要 4 个。超出账户上限的画面"
+        "fr": "Chaque fenêtre est un flux distinct et utilise donc une "
+              "connexion à votre fournisseur. Pour en regarder plusieurs à la "
+              "fois, votre compte doit disposer d'assez de connexions "
+              "simultanées — par ex. 4 pour une grille complète. Les fenêtres "
+              "au-delà de votre limite seront refusées par le fournisseur.",
+        "zh": "每个窗口都是独立的流，因此各占用一个到提供商的连接。要同时观看多个，"
+              "你的账户需要足够的并发连接——例如满格需要 4 个。超出账户上限的窗口"
               "会被提供商拒绝。",
-        "ru": "Каждая ячейка — отдельный поток, поэтому использует одно "
+        "ru": "Каждое окно — отдельный поток, поэтому использует одно "
               "подключение к провайдеру. Чтобы смотреть несколько сразу, "
               "аккаунту нужно достаточно одновременных подключений — например, "
-              "4 для полной сетки. Ячейки сверх лимита провайдер отклонит.",
-        "th": "แต่ละช่องเป็นสตรีมแยกกัน จึงใช้การเชื่อมต่อกับผู้ให้บริการหนึ่งการเชื่อมต่อ "
-              "หากต้องการดูหลายช่องพร้อมกัน บัญชีของคุณต้องมีการเชื่อมต่อพร้อมกันเพียงพอ — "
-              "เช่น 4 สำหรับตารางเต็ม ช่องที่เกินขีดจำกัดจะถูกผู้ให้บริการปฏิเสธ",
+              "4 для полной сетки. Окна сверх лимита провайдер отклонит.",
+        "th": "แต่ละหน้าต่างเป็นสตรีมแยกกัน จึงใช้การเชื่อมต่อกับผู้ให้บริการหนึ่งการเชื่อมต่อ "
+              "หากต้องการดูหลายหน้าต่างพร้อมกัน บัญชีของคุณต้องมีการเชื่อมต่อพร้อมกันเพียงพอ — "
+              "เช่น 4 สำหรับตารางเต็ม หน้าต่างที่เกินขีดจำกัดจะถูกผู้ให้บริการปฏิเสธ",
     },
 
     # ── Labels for item counts ────────────────────────────────────────────
@@ -3331,6 +3332,11 @@ _STRINGS: dict[str, dict[str, str]] = {
     "mv_live": {
         "en": "LIVE", "sv": "DIREKT", "es": "EN VIVO", "de": "LIVE",
         "fr": "EN DIRECT", "zh": "直播", "ru": "ПРЯМОЙ ЭФИР", "th": "สด",
+    },
+    "mv_pause": {
+        "en": "Pause / play", "sv": "Pausa / spela", "es": "Pausar / reproducir",
+        "de": "Pause / Wiedergabe", "fr": "Pause / lecture", "zh": "暂停 / 播放",
+        "ru": "Пауза / воспроизведение", "th": "หยุด / เล่น",
     },
     "mv_title": {
         "en": "dopeIPTV — Multiview", "sv": "dopeIPTV — Multiview",
