@@ -49,6 +49,10 @@ class _ContextMenuMixin:
         content_kind = self._content_kind()
         if (content_kind in ("live", "fav")
                 and it.get("stream_id") is not None):
+            m.addAction(tr("mv_add"),
+                        lambda it=it: self._add_channel_to_multiview(it))
+        if (content_kind in ("live", "fav")
+                and it.get("stream_id") is not None):
             if self._timeshift_days(it):
                 m.addSeparator()
                 self._build_timeshift_menu(

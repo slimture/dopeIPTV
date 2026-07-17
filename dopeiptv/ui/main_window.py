@@ -55,6 +55,7 @@ from .mw_busy import _BusyMixin
 from .mw_context import _ContextMenuMixin
 from .mw_detail import _DetailMixin
 from .mw_nav import _NavMixin
+from .mw_multiview import _MultiviewMixin
 from .mw_onboarding import _OnboardingMixin
 from .mw_popout import _PopoutMixin
 from .mw_reminders import _RemindersMixin
@@ -76,7 +77,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _ContextMenuMixin, _DetailMixin, _RemindersMixin,
                  _BusyMixin, _UpdatesMixin, _SearchMixin, _SidebarMixin,
                  _NavMixin, _ShortcutsMixin, _OnboardingMixin, _SortMixin,
-                 _PopoutMixin, QMainWindow):
+                 _PopoutMixin, _MultiviewMixin, QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
     epg_progress = pyqtSignal(int)
@@ -241,6 +242,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._last_stream_error_ts = 0.0
         self._popout_win = None
         self._popout_placeholder = None
+        self._multiview_win = None
         self._last_player = None
         self._last_playlist_refresh = time.time()
         self._load_gen = 0
@@ -3701,6 +3703,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Bring a detached player home first so mpv teardown acts on the widget
         # in the main window, not one owned by a separate pop-out window.
         self._exit_popout_if_active()
+        # Tear down any multiview cells (each owns its own mpv render context).
+        self._close_multiview_if_active()
         # All persistence must land BEFORE we skip the interpreter
         # teardown below. Layout, resume position, TMDB cache flush,
         # recording state, mpv teardown, cast disconnect - each of

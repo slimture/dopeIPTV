@@ -60,6 +60,7 @@ dopeiptv/
     mw_nav.py          Nav chrome (focus mode, nav colours/icons, Library)
     mw_shortcuts.py    Keyboard shortcuts + registry
     mw_popout.py       Detached-window ("pop out") player mixin
+    mw_multiview.py    Multiview: 2x2 grid of live streams (own mpv per cell)
     mw_busy.py         Loading indicator + spinner overlay
     mw_updates.py      Update-check badge/status wiring
     mw_reminders.py    Programme-reminder UI (set / list / fire)
