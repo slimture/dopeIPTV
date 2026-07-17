@@ -1157,6 +1157,14 @@ class _SettingsMixin:
             lambda: self._open_trakt_dialog(d))
         refresh_trakt_status()
         tabs.addTab(trakt_tab, tr("tab_trakt"))
+        # The packed row must actually FIT: per-OS fonts change the summed tab
+        # widths, and with scroll buttons off an undersized dialog truncates
+        # the last tab (half-painted chip, clipped label). Size the dialog's
+        # minimum width from the real bar, measured after all tabs exist.
+        tab_w = tabs.tabBar().sizeHint().width() + 76
+        d.setMinimumWidth(max(d.minimumWidth(), tab_w))
+        if d.width() < tab_w:
+            d.resize(tab_w, d.height())
 
         def refresh_pin_status():
             if self.parental.has_pin():
