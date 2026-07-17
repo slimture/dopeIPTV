@@ -6890,6 +6890,22 @@ _STRINGS: dict[str, dict[str, str]] = {
         "fr": "Vérification du replay…", "zh": "正在检查回看…",
         "ru": "Проверка архива…", "th": "กำลังตรวจสอบการดูย้อนหลัง…",
     },
+    "ts_check_failed": {
+        "en": "Couldn't reach the catch-up archive - check the connection "
+              "and try again",
+        "sv": "Kunde inte nå arkivet - kontrollera anslutningen och försök "
+              "igen",
+        "es": "No se pudo acceder al archivo de repetición - comprueba la "
+              "conexión e inténtalo de nuevo",
+        "de": "Catch-up-Archiv nicht erreichbar - Verbindung prüfen und "
+              "erneut versuchen",
+        "fr": "Impossible d'accéder à l'archive du replay - vérifiez la "
+              "connexion et réessayez",
+        "zh": "无法访问回看存档 - 请检查网络连接后重试",
+        "ru": "Не удалось связаться с архивом - проверьте соединение и "
+              "повторите попытку",
+        "th": "ไม่สามารถเข้าถึงคลังรายการย้อนหลังได้ - ตรวจสอบการเชื่อมต่อแล้วลองใหม่",
+    },
 
     # ── Keyboard shortcuts editor ─────────────────────────────────────────
     "sc_title": {

@@ -913,11 +913,20 @@ class _RecordingMixin:
         probe_token = getattr(self, "_ts_probe_token", 0) + 1
         self._ts_probe_token = probe_token
 
-        def done(url):
+        def done(res):
             if probe_token != getattr(self, "_ts_probe_token", 0):
                 return   # a newer play/probe superseded this one
+            url, proven_dead = (res if isinstance(res, tuple)
+                                else (res, True))
             if not url:
-                if allow_mark_broken:
+                if not proven_dead:
+                    # Every candidate failed at the NETWORK level (timeout,
+                    # DNS, TLS, refused) - the provider never answered, so
+                    # this proves nothing about the channel's archive. Say so
+                    # and leave the learned marks/depths untouched; the next
+                    # attempt starts clean.
+                    self._flash_status(tr("ts_check_failed"), ms=6000)
+                elif allow_mark_broken:
                     # A shallow request failed: the provider serves no catch-up.
                     self._mark_ts_broken(it)
                 else:
@@ -943,7 +952,8 @@ class _RecordingMixin:
                         # can't wrongly hide a channel that only has a shallow
                         # window (that path returns a URL and never gets here).
                         self._mark_ts_broken(it)
-                self._flash_status(tr("ts_archive_unavailable"), ms=6000)
+                if proven_dead:
+                    self._flash_status(tr("ts_archive_unavailable"), ms=6000)
                 # The live video never stopped. Restore the live timeline (not
                 # plain live) so the user can still scrub to a shallower point
                 # without restarting the channel.
@@ -982,14 +992,22 @@ class _RecordingMixin:
 
         run_async(self.pool,
                   lambda u=list(urls): self._probe_ts_candidates(u),
-                  done, lambda _e: done(None))
+                  # A crashed probe proves nothing either - never mark on it.
+                  done, lambda _e: done((None, False)))
 
-    def _probe_ts_candidates(self, urls) -> str | None:
-        """(worker thread) Return the first candidate URL that actually serves
-        video, or None. Filters out the HTML error pages / redirects a provider
-        hands back for channels it doesn't really archive - so we never churn
-        the player through dead URLs."""
+    def _probe_ts_candidates(self, urls) -> tuple:
+        """(worker thread) Return (url, proven_dead): the first candidate URL
+        that actually serves video, or (None, flag). Filters out the HTML
+        error pages / redirects a provider hands back for channels it doesn't
+        really archive - so we never churn the player through dead URLs.
+
+        proven_dead only goes True when the provider RESPONDED with something
+        that is not a stream (HTML/JSON error page, wrong content). A timeout,
+        DNS/TLS or connection error says nothing about whether the channel has
+        an archive, so those must never count as proof - a flaky link once
+        marked working channels as broken for 14 days, silently."""
         sess = getattr(self.client, "session", None)
+        proven_dead = False
         for u in urls:
             try:
                 r = sess.get(u, stream=True, timeout=(4, 4),
@@ -997,18 +1015,21 @@ class _RecordingMixin:
                 ctype = (r.headers.get("Content-Type") or "").lower()
                 chunk = next(r.iter_content(4096), b"") or b""
                 r.close()
-            except Exception:
+            except Exception as e:
+                log.debug("[ts] probe network error for %s: %s", u, e)
                 continue
             head = chunk.lstrip()
             if "text/html" in ctype or head[:1] in (b"<", b"{"):
-                continue   # error / JSON error page, not a stream
+                proven_dead = True   # a real answer: this URL is not a stream
+                continue
             if (chunk[:1] == b"\x47"                 # MPEG-TS sync byte
                     or head[:7] == b"#EXTM3U"        # HLS playlist
                     or "mpegurl" in ctype
                     or "video" in ctype
                     or "octet-stream" in ctype):
-                return u
-        return None
+                return u, False
+            proven_dead = True       # responded, but with something unplayable
+        return None, proven_dead
 
     # (minutes back, duration i18n key) - the label is "Go back <duration>".
     TIMESHIFT_STEPS = (

@@ -168,6 +168,53 @@ def test_history_healing_is_surgical():
     assert kinds == {"F": "movie", "E": "episode", "C": "live", "M": "movie"}
 
 
+# -- timeshift probe: network failure is not proof ----------------------------
+
+def test_ts_probe_distinguishes_network_failure_from_dead_archive():
+    """A probe that never REACHES the provider (timeout/DNS/TLS) must not
+    report the archive as proven dead - that verdict hides the channel's
+    timeshift for 14 days. Only a real non-stream response counts."""
+    from dopeiptv.ui.mw_recording import _RecordingMixin
+
+    class _Resp:
+        def __init__(self, ctype, body):
+            self.headers = {"Content-Type": ctype}
+            self._body = body
+
+        def iter_content(self, _n):
+            yield self._body
+
+        def close(self):
+            pass
+
+    class _Sess:
+        def __init__(self, mode):
+            self.mode = mode
+
+        def get(self, _u, **_kw):
+            if self.mode == "timeout":
+                raise OSError("timed out")
+            if self.mode == "html":
+                return _Resp("text/html", b"<html>not found</html>")
+            return _Resp("video/mp2t", b"\x47" + b"\x00" * 187)
+
+    class _Stub:
+        pass
+
+    stub = _Stub()
+    probe = _RecordingMixin._probe_ts_candidates
+
+    stub.client = type("C", (), {})()
+    stub.client.session = _Sess("timeout")
+    assert probe(stub, ["http://x/a.ts", "http://x/b.ts"]) == (None, False)
+
+    stub.client.session = _Sess("html")
+    assert probe(stub, ["http://x/a.ts"]) == (None, True)
+
+    stub.client.session = _Sess("ok")
+    assert probe(stub, ["http://x/a.ts"]) == ("http://x/a.ts", False)
+
+
 # -- the whole UI builds in every language ------------------------------------
 
 def test_ui_builds_in_all_languages():
