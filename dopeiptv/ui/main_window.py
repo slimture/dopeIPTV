@@ -9,7 +9,7 @@ import threading
 import time
 
 from PyQt6.QtCore import (
-    QEvent, QPointF, QSettings, QSize, Qt, QThreadPool,
+    QEvent, QPoint, QPointF, QSettings, QSize, Qt, QThreadPool,
     QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import (
@@ -302,11 +302,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     lambda _c=False, pid=p["id"]: self.switch_playlist(pid))
 
     def _show_playlist_menu(self) -> None:
-        """Pop the playlist switcher below the sidebar's playlist button."""
+        """Pop the playlist switcher centered directly under the sidebar's
+        playlist button (not left-aligned to its corner)."""
         menu = QMenu(self)
         self._fill_playlist_menu(menu)
         btn = self._playlist_btn
-        menu.exec(btn.mapToGlobal(btn.rect().bottomLeft()))
+        below = btn.mapToGlobal(btn.rect().bottomLeft())
+        menu_w = menu.sizeHint().width()
+        x = below.x() + (btn.width() - menu_w) // 2
+        menu.exec(QPoint(x, below.y()))
 
     def _update_playlist_btn(self) -> None:
         """Reflect the active playlist on the sidebar switcher button."""
@@ -1565,8 +1569,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if secs and time.time() - self._last_playlist_refresh >= secs:
             self.refresh_playlist()
 
-    def refresh_playlist(self) -> None:
-        self._last_playlist_refresh = time.time()
+    def refresh_playlist(self, force: bool = True) -> None:
+        """Reload the active playlist. With *force* (the Refresh button / auto-
+        refresh timer) the guide is re-fetched from the network; with
+        force=False (a playlist switch) the channel list is rebuilt but the
+        guide loads from cache when it's still fresh - no forced network reload,
+        so switching stays snappy and the auto-refresh time setting still
+        governs when a real re-fetch happens."""
+        if force:
+            self._last_playlist_refresh = time.time()
         self._clear_ts_broken()   # re-trust the provider's tv_archive flags
         pl = self.playlist_store.active() if self.playlist_store else None
         pid = (pl or {}).get("id")
@@ -1585,7 +1596,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # the empty ones (Browse nav is shown by default until this resolves).
         self._refresh_mode_availability()
         run_async(
-            self.pool, lambda: self.xmltv.ensure_loaded(force=True),
+            self.pool, lambda: self.xmltv.ensure_loaded(force=force),
             lambda ok: (self._epg_progress_finished(),
                         self.list_model.refresh_all() if ok else None),
             lambda _: self._epg_progress_finished())
@@ -1651,7 +1662,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.setWindowTitle(self._base_title)
             self._update_playlist_btn()
             self._update_provider_hint()
-            self.refresh_playlist()
+            # Switching rebuilds the list but loads the guide from cache when
+            # fresh - no forced network reload. A manual Refresh or the auto-
+            # refresh time setting still drives a real re-fetch.
+            self.refresh_playlist(force=False)
 
         def fail(msg):
             self._hide_busy()

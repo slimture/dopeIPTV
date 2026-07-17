@@ -66,13 +66,21 @@ app.processEvents()
 assert w.cells[0]._focused and not w.cells[1]._focused
 assert not w.cells[0].is_muted() and w.cells[1].is_muted()
 
-# Clicking the already-focused cell again toggles its mute.
-w._on_cell_clicked(w.cells[0])
+# Single-click only focuses now (no accidental mute while grabbing to drag);
+# mute is a right-click action driven through set_muted.
+w.cells[0].set_muted(True)
 app.processEvents()
 assert w.cells[0].is_muted()
-w._on_cell_clicked(w.cells[0])
+w.cells[0].set_muted(False)
 app.processEvents()
 assert not w.cells[0].is_muted()
+
+# Swapping two cells exchanges their streams (right-click "Move / swap with").
+w._focus_cell(w.cells[0])
+u0, u1 = w.cells[0].url, w.cells[1].url
+w._swap_cells(w.cells[0], w.cells[1])
+app.processEvents()
+assert w.cells[0].url == u1 and w.cells[1].url == u0
 
 # The window is title-bar-less (frameless) by default.
 from PyQt6.QtCore import Qt as _Qt

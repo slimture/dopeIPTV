@@ -3305,6 +3305,12 @@ _STRINGS: dict[str, dict[str, str]] = {
         "de": "Ton an", "fr": "Réactiver le son", "zh": "取消静音",
         "ru": "Включить звук", "th": "เปิดเสียง",
     },
+    "mv_move": {
+        "en": "Move / swap with", "sv": "Flytta / byt plats med",
+        "es": "Mover / intercambiar con", "de": "Verschieben / tauschen mit",
+        "fr": "Déplacer / échanger avec", "zh": "移动 / 交换到",
+        "ru": "Переместить / поменять с", "th": "ย้าย / สลับกับ",
+    },
     "mv_close": {
         "en": "Close multiview", "sv": "Stäng multiview",
         "es": "Cerrar multivista", "de": "Multiview schließen",

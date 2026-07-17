@@ -2,16 +2,17 @@
 
 A separate top-level window holding four lightweight video cells, each its own
 libmpv render surface (`_MpvGLWidget`) - the *docked* embedded player is never
-touched. Click a cell to give it audio focus (the others stay muted); click the
-focused one again, or right-click, to mute it. Channels are added from the
-main list's right-click "Add to multiview", capturing whatever playlist is
-active at that moment - so four cells can come from four different accounts,
-sidestepping a single account's connection limit.
+touched. Click a cell to give it audio focus (the others stay muted); right-
+click for mute, swap/move, and remove. Channels are added from the main list's
+right-click "Add to multiview", capturing whatever playlist is active at that
+moment - so four cells can come from four different accounts, sidestepping a
+single account's connection limit.
 
 The window mirrors the pop-out player's chrome options: title-bar-less by
 default (drag a cell to move it), with right-click "Always on top" and
-"Show title bar". Cell titles and position numbers auto-hide and reappear on
-mouse movement. Space pauses the focused cell; Left/Right seek it.
+"Show title bar". Cell titles/numbers auto-hide and reappear on mouse
+movement; a seek bar shows position/pause for seekable (timeshift/catch-up)
+cells. Space pauses the focused cell; Left/Right seek it.
 
 Heads-up for the user: each cell is a separate stream = a separate connection
 to the provider. On a low connection-limit account the extra cells will be
@@ -24,20 +25,28 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication, QCheckBox, QDialogButtonBox, QGridLayout, QLabel, QMenu,
-    QVBoxLayout, QWidget)
+    QSlider, QVBoxLayout, QWidget)
 
 from ..core.log import log
 from ..i18n import tr
 from ..media.embedded import _MpvGLWidget
 
 
+def _fmt(secs: float) -> str:
+    secs = int(max(0, secs))
+    h, rem = divmod(secs, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+
+
 class _MultiviewCell(QWidget):
     """One grid cell: a bare mpv video surface with a position number, an
-    auto-hiding title strip, click-to-focus, and per-cell mute/pause/seek."""
+    auto-hiding title strip and seek bar, click-to-focus, and per-cell
+    mute/pause/seek."""
 
-    focus_requested = pyqtSignal(object)         # left-click: focus/mute toggle
-    context_requested = pyqtSignal(object, object)   # right-click: (cell, pos)
-    hovered = pyqtSignal(object)                 # mouse move: reveal overlays
+    focus_requested = pyqtSignal(object)
+    context_requested = pyqtSignal(object, object)   # (cell, global pos)
+    hovered = pyqtSignal(object)
 
     def __init__(self, number: int, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -47,6 +56,9 @@ class _MultiviewCell(QWidget):
         self._focused = False
         self._muted = True
         self._drag_from = None
+        self._overlays_on = False
+        self._seeking = False
+        self._dur = 0.0
         self.setStyleSheet("background:#000000;")
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
@@ -73,23 +85,50 @@ class _MultiviewCell(QWidget):
             "background:transparent; color:rgba(255,255,255,140);"
             "font-size:56px; font-weight:800;")
         self._num.hide()
+        self._pause = QLabel("⏸", self.video)
+        self._pause.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._pause.setStyleSheet(
+            "background:transparent; color:rgba(255,255,255,200);"
+            "font-size:44px;")
+        self._pause.hide()
+        # Seek bar + time, shown for seekable (timeshift/catch-up) content when
+        # the overlays are revealed.
+        self._seek = QSlider(Qt.Orientation.Horizontal, self.video)
+        self._seek.setRange(0, 1000)
+        self._seek.sliderPressed.connect(lambda: setattr(self, "_seeking", True))
+        self._seek.sliderReleased.connect(self._on_seek_released)
+        self._seek.hide()
+        self._time = QLabel("", self.video)
+        self._time.setStyleSheet(
+            "background:rgba(0,0,0,150); color:#ECECF1; padding:1px 6px;"
+            "font-size:11px;")
+        self._time.hide()
         self.set_focused(False)
 
-    # -- overlays (title + number auto-hide together) ------------------------
+    # -- overlays ------------------------------------------------------------
 
     def show_overlays(self, on: bool) -> None:
+        self._overlays_on = on
         self._num.setVisible(on)
         self._title.setVisible(on and bool(self.title))
         if on:
-            self._num.raise_()
-            self._title.raise_()
+            for w in (self._num, self._title, self._seek, self._time):
+                w.raise_()
+        else:
+            self._seek.hide()
+            self._time.hide()
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
+        r = self.video.rect()
         self._title.adjustSize()
         self._title.move(0, 0)
-        self._empty.setGeometry(self.video.rect())
-        self._num.setGeometry(self.video.rect())
+        self._empty.setGeometry(r)
+        self._num.setGeometry(r)
+        self._pause.setGeometry(r)
+        self._seek.setGeometry(10, r.height() - 26, r.width() - 90, 16)
+        self._time.adjustSize()
+        self._time.move(r.width() - self._time.width() - 8, r.height() - 26)
 
     # -- playback ------------------------------------------------------------
 
@@ -157,6 +196,49 @@ class _MultiviewCell(QWidget):
         except Exception:
             pass
 
+    def _on_seek_released(self) -> None:
+        self._seeking = False
+        m = self.video.mpv
+        if m is None or self.url is None or self._dur < 1:
+            return
+        try:
+            m.command("seek", self._seek.value() / 1000.0 * self._dur,
+                      "absolute")
+        except Exception:
+            pass
+
+    def refresh_state(self) -> None:
+        """Poll mpv for position/duration/pause and update the seek bar + pause
+        glyph. Called on a timer by the window; robust to a not-yet-ready mpv."""
+        m = self.video.mpv
+        if m is None or self.url is None:
+            return
+        try:
+            paused = bool(m.pause)
+        except Exception:
+            paused = False
+        self._pause.setVisible(paused)
+        if paused:
+            self._pause.raise_()
+        try:
+            dur = float(m.duration or 0)
+            pos = float(m.time_pos or 0)
+            seekable = bool(m.seekable)
+        except Exception:
+            self._seek.hide()
+            self._time.hide()
+            return
+        self._dur = dur
+        show = self._overlays_on and seekable and dur > 1
+        self._seek.setVisible(show)
+        self._time.setVisible(show)
+        if show and not self._seeking:
+            self._seek.blockSignals(True)
+            self._seek.setValue(int(pos / dur * 1000))
+            self._seek.blockSignals(False)
+            self._time.setText(f"{_fmt(pos)} / {_fmt(dur)}")
+            self._time.adjustSize()
+
     def clear(self) -> None:
         if self.video.mpv is not None:
             try:
@@ -168,6 +250,9 @@ class _MultiviewCell(QWidget):
         self.title = ""
         self._muted = True
         self._title.hide()
+        self._pause.hide()
+        self._seek.hide()
+        self._time.hide()
         self._empty.show()
 
     def shutdown(self) -> None:
@@ -176,7 +261,7 @@ class _MultiviewCell(QWidget):
         except Exception:
             pass
 
-    # -- mouse: left = focus, right = menu, drag = move (frameless) ----------
+    # -- mouse ---------------------------------------------------------------
 
     def _window_frameless(self) -> bool:
         return bool(self.window().windowFlags()
@@ -188,6 +273,9 @@ class _MultiviewCell(QWidget):
                 self, event.globalPosition().toPoint())
             return
         if event.button() == Qt.MouseButton.LeftButton:
+            # Focus only (audio). Mute lives on the right-click menu, so a
+            # left-click - e.g. to grab and drag the frameless window - never
+            # mutes by accident.
             self.focus_requested.emit(self)
             if self._window_frameless():
                 self._drag_from = event.position().toPoint()
@@ -215,17 +303,15 @@ class _MultiviewWindow(QWidget):
         super().__init__()
         self._owner = owner
         self.setWindowTitle(tr("mv_title"))
-        self.setStyleSheet("#MvWin { background:#000000; }")
         self.setObjectName("MvWin")
+        self.setStyleSheet("#MvWin { background:#000000; }")
         grid = QGridLayout(self)
         grid.setContentsMargins(0, 0, 0, 0)
         grid.setSpacing(2)
-        # Cells numbered 1..4 in reading order: 1 top-left, 2 top-right,
-        # 3 bottom-left, 4 bottom-right.
         self.cells: list[_MultiviewCell] = []
         for i in range(4):
             c = _MultiviewCell(i + 1, self)
-            c.focus_requested.connect(self._on_cell_clicked)
+            c.focus_requested.connect(self._focus_cell)
             c.context_requested.connect(self._cell_context_menu)
             c.hovered.connect(lambda _c: self._reveal_overlays())
             c.video.video_key_press.connect(
@@ -237,10 +323,15 @@ class _MultiviewWindow(QWidget):
         self._overlay_timer.setSingleShot(True)
         self._overlay_timer.setInterval(2000)
         self._overlay_timer.timeout.connect(self._hide_overlays)
+        # Poll cell state (position / pause) for the seek bars.
+        self._state_timer = QTimer(self)
+        self._state_timer.setInterval(500)
+        self._state_timer.timeout.connect(self._refresh_states)
+        self._state_timer.start()
         self.setWindowFlags(self._flags())
         self._focus_cell(self.cells[0])
 
-    # -- window flags (mirrors the pop-out chrome options) -------------------
+    # -- window flags --------------------------------------------------------
 
     def _flags(self) -> "Qt.WindowType":
         flags = Qt.WindowType.Window
@@ -268,7 +359,7 @@ class _MultiviewWindow(QWidget):
             "mv_frameless", "true" if hidden else "false")
         self._apply_flags()
 
-    # -- streams / focus / mute ---------------------------------------------
+    # -- streams / focus -----------------------------------------------------
 
     def add_stream(self, url: str, title: str, cell: int | None = None) -> None:
         if cell is not None and 0 <= cell < len(self.cells):
@@ -280,25 +371,33 @@ class _MultiviewWindow(QWidget):
         self._focus_cell(target)
         self._reveal_overlays()
 
-    def _on_cell_clicked(self, cell: "_MultiviewCell") -> None:
-        # Click the already-focused cell again to mute/unmute it; click another
-        # to move audio focus there.
-        if cell is self._focused and cell.url is not None:
-            cell.set_muted(not cell.is_muted())
-        else:
-            self._focus_cell(cell)
-
     def _focus_cell(self, cell: "_MultiviewCell") -> None:
         for c in self.cells:
             c.set_focused(c is cell)
             c.set_muted(c is not cell)
         self._focused = cell
 
+    def _swap_cells(self, a: "_MultiviewCell", b: "_MultiviewCell") -> None:
+        """Exchange the two cells' videos (swap places / move into an empty
+        cell), then re-apply audio focus."""
+        ua, ta = a.url, a.title
+        ub, tb = b.url, b.title
+        a.play(ub, tb) if ub else a.clear()
+        b.play(ua, ta) if ua else b.clear()
+        self._focus_cell(self._focused if self._focused in self.cells else a)
+
     def _cell_context_menu(self, cell: "_MultiviewCell", pos) -> None:
         m = QMenu(self)
         if cell.url is not None:
             m.addAction(tr("mv_unmute") if cell.is_muted() else tr("mv_mute"),
                         lambda: cell.set_muted(not cell.is_muted()))
+            move = m.addMenu(tr("mv_move"))
+            for other in self.cells:
+                if other is cell:
+                    continue
+                move.addAction(
+                    tr("mv_cell", n=other.number),
+                    lambda _c=False, o=other: self._swap_cells(cell, o))
             m.addAction(tr("mv_remove_cell"), cell.clear)
             m.addSeparator()
         if "wayland" not in QApplication.platformName().lower():
@@ -316,7 +415,7 @@ class _MultiviewWindow(QWidget):
         m.addAction(tr("mv_close"), self.close)
         m.exec(pos)
 
-    # -- overlays + keyboard -------------------------------------------------
+    # -- overlays + polling + keyboard --------------------------------------
 
     def _reveal_overlays(self) -> None:
         for c in self.cells:
@@ -326,6 +425,10 @@ class _MultiviewWindow(QWidget):
     def _hide_overlays(self) -> None:
         for c in self.cells:
             c.show_overlays(False)
+
+    def _refresh_states(self) -> None:
+        for c in self.cells:
+            c.refresh_state()
 
     def _cell_key(self, cell: "_MultiviewCell", event) -> None:
         if event.key() == Qt.Key.Key_Left:
@@ -339,8 +442,7 @@ class _MultiviewWindow(QWidget):
             event.accept()
             return
         if event.key() == Qt.Key.Key_Escape:
-            # There's no title-bar X when frameless, so give Escape as a close.
-            self.close()
+            self.close()   # no title-bar X when frameless
             event.accept()
             return
         super().keyPressEvent(event)
@@ -405,11 +507,23 @@ class _MultiviewMixin:
         lay = QVBoxLayout(d)
         lay.setContentsMargins(20, 18, 20, 16)
         lay.setSpacing(14)
+        d.setStyleSheet("QDialog { background:#1b1b20; }")
         msg = QLabel(tr("mv_info_body"))
         msg.setWordWrap(True)
         msg.setMinimumWidth(420)
+        msg.setStyleSheet("color:#ECECF1; font-size:13px;")
         lay.addWidget(msg)
         cb = QCheckBox(tr("dont_show_again"))
+        # Force a fully self-drawn indicator: on macOS the native check box
+        # renders as an invisible same-colour square against the dark dialog.
+        # An explicit bordered box that fills with the accent when checked is
+        # visible regardless of platform/native styling.
+        cb.setStyleSheet(
+            "QCheckBox { color:#ECECF1; font-size:13px; spacing:8px; }"
+            "QCheckBox::indicator { width:18px; height:18px;"
+            " border:1px solid #6A6A75; border-radius:3px; background:#2A2A32; }"
+            "QCheckBox::indicator:checked {"
+            " background:#e5354b; border:1px solid #e5354b; }")
         lay.addWidget(cb)
         bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
         bb.accepted.connect(d.accept)
