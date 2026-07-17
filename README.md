@@ -26,6 +26,7 @@ external mpv/VLC playback).
 ## Features
 
 - **Embedded video** via libmpv's OpenGL render API — plays right inside the app on any compositor (GNOME, KDE, Hyprland, ...), with fullscreen, a pop-out window (detach to a second screen, optionally always-on-top), a hover scrubber and arrow-key seeking
+- **Multiview** — watch 2/4/6/9 live channels at once in a separate grid, each an independent stream (even from different playlists), with per-window audio/subtitles, click-to-focus audio and a real timeshift timeline on catch-up channels
 - **TV, Movies & Series** with seasons/episodes, favorites, history, and instant search across thousands of channels
 - **8 languages** — English, Svenska, Español, Deutsch, Français, 中文, Русский, ไทย — switchable live in Settings
 - **Resume playback** — movies/series/recordings remember where you stopped and offer to continue

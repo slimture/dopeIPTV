@@ -7,7 +7,7 @@ name = "dopeiptv"
 # MUST stay in lock-step with dopeiptv/__init__.py's __version__. A test
 # (tests/test_version.py) fails the build if they drift, so a release can't
 # ship an sdist named after the wrong version again. Bump BOTH on a release.
-version = "0.7.3"
+version = "0.8.0"
 description = "Modern IPTV player"
 readme = "README.md"
 requires-python = ">=3.11"

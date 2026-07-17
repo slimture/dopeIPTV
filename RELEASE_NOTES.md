@@ -1,30 +1,45 @@
-## dopeIPTV 0.7.3
+## dopeIPTV 0.8.0
 
-**A real pop-out player, simpler playback, and stream errors that finally
-tell you what's wrong.**
+**Multiview — watch up to nine live channels at once** — plus a sharper,
+truly cross-platform interface and a long list of fixes.
 
-**Highlights:** **pop-out the player into its own window** (second screen,
-always-on-top, drag the video to move) · **Playback mode setting removed** —
-embedded just works · **plain-language stream errors** instead of "loading
-failed" · **provider troubleshooting logs**.
+**Highlights:** **multiview grid (2/4/6/9 windows, even across playlists)**
+· **per-window audio/subtitles and a real timeshift timeline** · **identical
+hand-drawn icons on Linux/macOS/Windows** · **a Settings → Multiview tab**
+· **favorites from History/Watch Later/Watched** · **many macOS fixes**.
 
 <details>
 <summary><b>Full release notes</b> — click to expand</summary>
 
-### Pop-out player — new
-- **Detach the video into its own window** with the **⧉** button in the player bar (or press `P`) and keep it on a second screen while you keep browsing and zapping channels in the main window.
-- It's the **same in-app player moved out**, not a second one — so the full control bar, seeking, timeshift and channel-zap all come with it, and it renders through the same cross-platform path (works the same on Linux, macOS and Windows).
-- By default it's a **clean, title-bar-less video window** — drag the video itself to move it. Right-click it for **Always on top**, **Show title bar**, or **Auto-hide controls** (on by default: the bar fades when idle and returns on mouse movement). **Double-click** for fullscreen, **`Esc`** to leave it; close the window or click **⧉** again to dock it back.
-- This **replaces Picture-in-Picture**, which it fully supersedes (PiP's "always on top" lives on as the right-click toggle).
+### Multiview — new
+- **Watch several live channels at once** in a separate grid window: **2 (1×2), 4 (2×2), 6 (2×3) or 9 (3×3)** windows, chosen under Settings → Multiview. Open it from the sidebar's ▦ button, or right-click a channel → **Add to multiview** and pick the target window (each entry shows what it would replace).
+- **Every window is its own stream** — mix channels from **different playlists/accounts** to sidestep a single account's connection limit. A one-time notice explains the connection cost; the sidebar's playlist chip switches accounts in one click.
+- **Click a window for audio focus** — the red border marks the audible one, the rest stay muted. Right-click for **mute**, **audio track**, **subtitles** (only shown when the stream actually has them), **move/swap between windows**, or **remove**.
+- **Real timeshift on catch-up channels**: the seek bar is an archive timeline with **programme ticks from the EPG** — hover names the programme, drag to any point in the provider's archive, arrow keys step (step size configurable), and a **LIVE pill** jumps back to the live edge. Plain channels get a session scrubber instead.
+- Each window shows its **channel, current programme and source playlist**; titles, controls, the close button and the **mouse cursor auto-hide** and return on movement. **Double-click maximizes** the grid; Esc steps back out. **Space** pauses the focused window.
+- **Send the playing video to multiview** from the docked player's right-click menu — the connection carries over instead of doubling up (configurable). Starting playback in the main window while multiview runs asks whether to close it — or set an always-close/always-keep policy.
+- Multiview viewing is **recorded in History**, and the window's size/position is remembered.
 
-### Simpler playback
-- **Removed the "Playback mode" setting.** The embedded player is the player; **Open externally** (mpv / VLC) stays on the right-click menu for a fresh external window. The two old modes — "reused mpv window" and "external" — were buggy or redundant and are gone. Where the embedded player can't run (no libmpv), channels open in an external mpv window automatically.
+### A truly cross-platform interface
+- **Every icon is now hand-drawn vector art** — sidebar navigation, Guide/Settings/Multiview, search, sort, grid and player controls render **pixel-identically on Linux, macOS and Windows** (they used to be emoji glyphs, which every OS drew differently — sometimes clipped or invisible).
+- The **playlist switcher is a compact icon chip** under the logo: hover reveals the active playlist's name, it hides entirely with a single playlist, and it updates the moment you add/remove one. The logo (= *jump to now playing*) now stays on the collapsed icon rail, scaled to fit.
+- **EPG Guide via right-click** — on the TV nav entry, on live categories and on channels in the list.
 
-### Stream errors in plain language
-- When a channel won't play, the app now tells you **why** instead of the opaque "loading failed": an **expired subscription**, **all connections in use** (someone/something else is on your account), the **provider blocking the stream** (including the non-standard `458` code — usually anti-VPN/re-streaming or a connection/region block), an **unreachable or timing-out server**, or a **format it can't play**. It checks your account and probes the stream in the background — no debug mode required.
+### Settings overhaul
+- A new **Multiview tab**, grouped into Window / Behavior / Controls.
+- **Number fields have real stepper arrows** and **dropdowns a visible ▼** on every OS (drawn image assets — the old style-drawn arrows simply didn't render on macOS).
+- **Checkboxes are clearly visible on the OLED pure-black theme** (bordered indicator, accent fill, drawn check mark).
+- The **tab row is custom-painted** — identical packed spacing and selection chip on every platform — and the dialog sizes itself to fit it.
 
-### Troubleshooting
-- `DOPEIPTV_LOG=debug` now logs every provider call — authentication state (status, expiry, active/max connections), HTTP status and timing — with your **username and password redacted**. `DOPEIPTV_LOG_FILE=/path` also tees it to a rotating file, so a log is safe to attach to a bug report.
+### Favorites everywhere
+- **Add/remove favorites straight from History, Watch Later and Watched** — movie, series and channel rows each get their proper menu (History channel rows even get multiview/timeshift/record).
+- The grouped **"All favorites"** view now routes movies/series to the right store — *Remove from favorites* used to silently miss them — and no longer auto-plays a movie row as a live channel.
+
+### Fixes
+- **Resume works from Favorites**: movies/series played from the Favorites sections now prompt to continue and save their position (they used to be treated as live channels).
+- **History healed**: entries mis-filed as TV channels by the old bug are re-typed automatically (the stored URL knows the truth) and play again; a pending auto-preview can no longer stomp a playback you just started.
+- **Switching playlists** no longer forces a full EPG re-download — the guide loads from cache when fresh; manual Refresh and the auto-refresh schedule still fetch anew.
+- **macOS**: no duplicate app menu, no clipped sidebar icons, and Settings → **Reset all settings no longer crashes on exit** (and a reset no longer re-seeds the cleared config on the way out).
 
 > Linux is and remains the primary target — Windows and macOS are a bonus.
 

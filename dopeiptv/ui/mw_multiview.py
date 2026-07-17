@@ -44,12 +44,12 @@ def _fmt(secs: float) -> str:
 
 
 def _glyph(kind: str, s: int, alpha: int = 235) -> QPixmap:
-    """White vector control glyphs (pause / play / x). Drawn, not text: the
-    ⏸/▶/✕ characters take their emoji presentation on macOS and render as
-    black marks that ignore the stylesheet colour - invisible on the dark
-    control scrims. Rendered at 3x and tagged with that density, so it stays
-    crisp on any screen (the widget's DPR at construction time can be a
-    pre-Retina 1.0, which left the marks pixelated)."""
+    """White vector control glyphs (pause / play). Drawn, not text: the ⏸/▶
+    characters take their emoji presentation on macOS and render as black
+    marks that ignore the stylesheet colour - invisible on the dark control
+    scrims. Rendered at 3x and tagged with that density, so it stays crisp on
+    any screen (the widget's DPR at construction time can be a pre-Retina
+    1.0, which left the marks pixelated)."""
     ss = 3.0
     pm = QPixmap(round(s * ss), round(s * ss))
     pm.setDevicePixelRatio(ss)
@@ -57,15 +57,7 @@ def _glyph(kind: str, s: int, alpha: int = 235) -> QPixmap:
     pr = QPainter(pm)
     pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
     col = QColor(255, 255, 255, alpha)
-    if kind == "x":
-        pen = QPen(col)
-        pen.setWidthF(max(1.6, s * 0.12))
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        pr.setPen(pen)
-        m = s * 0.26
-        pr.drawLine(QPointF(m, m), QPointF(s - m, s - m))
-        pr.drawLine(QPointF(s - m, m), QPointF(m, s - m))
-    elif kind == "pause":
+    if kind == "pause":
         pr.setPen(Qt.PenStyle.NoPen)
         pr.setBrush(col)
         bw = s * 0.24

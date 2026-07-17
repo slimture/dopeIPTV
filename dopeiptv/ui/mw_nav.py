@@ -11,7 +11,7 @@ import math
 
 from PyQt6.QtCore import QPointF, QRectF, QSize, Qt
 from PyQt6.QtGui import (
-    QColor, QFont, QFontMetricsF, QIcon, QPainter, QPen, QPixmap, QPolygonF,
+    QColor, QIcon, QPainter, QPen, QPixmap, QPolygonF,
 )
 from PyQt6.QtWidgets import QColorDialog, QMenu
 
@@ -108,43 +108,6 @@ class _NavMixin:
         self.cat_solo_btn.setArrowType(
             Qt.ArrowType.RightArrow if checked else Qt.ArrowType.DownArrow)
         self._apply_cat_solo()
-
-    def _glyph_pixmap(self, glyph: str, s: int, color: str) -> QPixmap:
-        """A transparent SxS pixmap with GLYPH painted in COLOR, centred by the
-        glyph's actual ink bounds (not the font's ascent/descent box - emoji
-        carry uneven top/bottom/side bearing that otherwise shoves them low and
-        to the left). U+FE0E requests the glyph's monochrome text presentation
-        so it takes the pen colour rather than a bright emoji."""
-        dpr = self.devicePixelRatioF() or 1.0
-        pm = QPixmap(round(s * dpr), round(s * dpr))
-        pm.setDevicePixelRatio(dpr)
-        pm.fill(Qt.GlobalColor.transparent)
-        pr = QPainter(pm)
-        pr.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
-        g = glyph + "︎"
-        px = s * 0.82
-        f = QFont()
-        f.setPixelSize(round(px))
-        fm = QFontMetricsF(f)
-        br = fm.tightBoundingRect(g)
-        # Some emoji (🔖, 🕘, ...) carry ink wider/taller than the text box, so
-        # at the nominal size their glyph overflows the SxS pixmap and clips at
-        # its edges. Shrink the font until the ink fits inside the box (with a
-        # hair of padding). Plain text glyphs (★, ✓) already fit, so this only
-        # touches the ones that would clip.
-        biggest = max(br.width(), br.height())
-        limit = s * 0.94
-        if biggest > limit:
-            f.setPixelSize(max(1, round(px * limit / biggest)))
-            fm = QFontMetricsF(f)
-            br = fm.tightBoundingRect(g)
-        pr.setFont(f)
-        pr.setPen(QColor(color))
-        x = (s - br.width()) / 2.0 - br.x()
-        y = (s - br.height()) / 2.0 - br.y()
-        pr.drawText(QPointF(x, y), g)
-        pr.end()
-        return pm
 
     def _nav_icon(self, kind: str, s: int) -> QIcon:
         """A vector icon of size S in the theme's muted tone (the normal/Off
