@@ -3238,6 +3238,11 @@ _STRINGS: dict[str, dict[str, str]] = {
         "fr": "Ajouter au multivue", "zh": "添加到多画面",
         "ru": "Добавить в мультиэкран", "th": "เพิ่มไปยังมัลติวิว",
     },
+    "mv_cell": {
+        "en": "Cell {n}", "sv": "Ruta {n}", "es": "Celda {n}",
+        "de": "Feld {n}", "fr": "Case {n}", "zh": "画面 {n}",
+        "ru": "Ячейка {n}", "th": "ช่อง {n}",
+    },
     "mv_title": {
         "en": "dopeIPTV — Multiview", "sv": "dopeIPTV — Multiview",
         "es": "dopeIPTV — Multivista", "de": "dopeIPTV — Multiview",

@@ -49,8 +49,17 @@ class _ContextMenuMixin:
         content_kind = self._content_kind()
         if (content_kind in ("live", "fav")
                 and it.get("stream_id") is not None):
-            m.addAction(tr("mv_add"),
-                        lambda it=it: self._add_channel_to_multiview(it))
+            # Pick which grid cell (1..4) to send the stream to; each shows the
+            # channel it currently holds so you know what you'd replace.
+            mv = m.addMenu(tr("mv_add"))
+            mvw = getattr(self, "_multiview_win", None)
+            for n in range(4):
+                occupant = ""
+                if mvw is not None and mvw.cells[n].title:
+                    occupant = f"  —  {mvw.cells[n].title}"
+                mv.addAction(
+                    tr("mv_cell", n=n + 1) + occupant,
+                    lambda it=it, n=n: self._add_channel_to_multiview(it, n))
         if (content_kind in ("live", "fav")
                 and it.get("stream_id") is not None):
             if self._timeshift_days(it):

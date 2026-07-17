@@ -67,6 +67,22 @@ h._add_channel_to_multiview({"stream_id": 5, "name": "Five"})
 app.processEvents()
 assert any(c.url and c.url.endswith("5.ts") for c in w.cells)
 
+# Targeting a specific cell (0..3) sends the stream there and focuses it.
+h.add_to_multiview("http://x/live/7.ts", "Seven", cell=2)
+app.processEvents()
+assert w.cells[2].url == "http://x/live/7.ts"
+assert w._focused is w.cells[2]
+assert w.cells[2].number == 3   # cell index 2 is position "3"
+
+# Cells are numbered 1..4 in reading order.
+assert [c.number for c in w.cells] == [1, 2, 3, 4]
+
+# Hover reveal + fade must not raise.
+w._reveal_numbers()
+app.processEvents()
+w._hide_numbers()
+app.processEvents()
+
 # Filling the 4th cell, then a 5th add replaces the focused cell (no crash).
 h.add_to_multiview("http://x/live/9.ts", "Nine")
 app.processEvents()
