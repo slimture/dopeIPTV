@@ -338,6 +338,11 @@ class EpgGridDialog(QDialog):
         else:
             cell.setBrush(QBrush(base.darker(120)))
             cell.setPen(QPen(QColor(P["bg"]), 1))
+        # The channel-name cell is clickable too (prog=None -> tune live).
+        # Hit-testing keys off data(0), which only programme blocks used to
+        # carry - a channel without EPG rows had no clickable surface at all,
+        # so it simply couldn't be played from the guide.
+        cell.setData(0, {"channel": ch, "prog": None})
         self._chan_group.addToGroup(cell)
         # ⏪ marks a channel with catch-up (timeshift), matching the main list.
         label_text = (("▶  " if playing else "")
@@ -351,6 +356,7 @@ class EpgGridDialog(QDialog):
         name.setBrush(QColor("#ffffff"))
         self._elide(name, self.CH_COL_W - 16)
         name.setPos(8, y + (self.ROW_H - name.boundingRect().height()) / 2)
+        name.setData(0, {"channel": ch, "prog": None})
         self._chan_group.addToGroup(name)
         if playing:
             # Tint the whole row across the timeline so the playing channel
@@ -366,12 +372,14 @@ class EpgGridDialog(QDialog):
             band.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
             self.scene.addItem(band)
 
+        drew_any = False
         for i, p in enumerate(
                 self.window.xmltv.programmes_in(ch, self._start, self._stop)):
             x1 = max(self.CH_COL_W, self._x(p["start_timestamp"]))
             x2 = min(self.CH_COL_W + self._grid_w, self._x(p["stop_timestamp"]))
             if x2 - x1 < 2:
                 continue
+            drew_any = True
             shade = base.lighter(120) if i % 2 == 0 else base.lighter(102)
             block = QGraphicsRectItem(x1 + 1, y + 2, x2 - x1 - 2, self.ROW_H - 4)
             block.setBrush(QBrush(shade))
@@ -384,6 +392,23 @@ class EpgGridDialog(QDialog):
             self._elide(label, x2 - x1 - 10)
             label.setPos(x1 + 5, y + 7)
             label.setData(0, {"channel": ch, "prog": p})
+        if not drew_any:
+            # No EPG for this channel: fill the row with one muted block so
+            # the whole timeline is still clickable and plays the channel
+            # live - and says why it's empty.
+            block = QGraphicsRectItem(self.CH_COL_W + 1, y + 2,
+                                      self._grid_w - 2, self.ROW_H - 4)
+            block.setBrush(QBrush(base.lighter(105)))
+            block.setPen(QPen(QColor(P["bg"]), 1))
+            block.setZValue(5)
+            block.setData(0, {"channel": ch, "prog": None})
+            self.scene.addItem(block)
+            label = QGraphicsSimpleTextItem(
+                tr("epg_no_guide_available"), block)
+            label.setBrush(QColor("#9aa3b2"))
+            self._elide(label, self._grid_w - 12)
+            label.setPos(self.CH_COL_W + 6, y + 7)
+            label.setData(0, {"channel": ch, "prog": None})
 
     def _draw_now_line(self, grid_h: int) -> None:
         x = self._x(time.time())
@@ -430,15 +455,18 @@ class EpgGridDialog(QDialog):
                 break
         if block is None:
             return
+        # sceneBoundingRect, not rect(): the channel-name cells live in the
+        # pinned (translated) column group, so their item coords are shifted
+        # from scene coords once the view scrolls sideways.
         if getattr(self, "_sel_outline", None) is None \
                 or self._sel_outline.scene() is None:
             self._sel_outline = self.scene.addRect(
-                block.rect(), QPen(QColor("#ffffff"), 2),
+                block.sceneBoundingRect(), QPen(QColor("#ffffff"), 2),
                 QBrush(Qt.BrushStyle.NoBrush))
             self._sel_outline.setZValue(17)
             self._sel_outline.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
         else:
-            self._sel_outline.setRect(block.rect())
+            self._sel_outline.setRect(block.sceneBoundingRect())
         self._sel_outline.show()
 
     def _select_at(self, scene_pos) -> None:
@@ -448,6 +476,13 @@ class EpgGridDialog(QDialog):
         self._selected = data
         self._highlight_block(scene_pos)
         p = data["prog"]
+        if p is None:
+            # A channel without EPG (its name cell / empty row was clicked):
+            # selectable and playable, it just has no programme to describe.
+            self.info.setText(f"{data['channel'].get('name') or '?'} · "
+                              + tr("epg_no_guide_available"))
+            self.play_btn.setEnabled(True)
+            return
         start = datetime.fromtimestamp(p["start_timestamp"]).strftime("%H:%M")
         stop = datetime.fromtimestamp(p["stop_timestamp"]).strftime("%H:%M")
         catchup = (p["stop_timestamp"] < time.time()
@@ -469,7 +504,11 @@ class EpgGridDialog(QDialog):
             return
         ch, p = self._selected["channel"], self._selected["prog"]
         # A finished programme on a timeshift channel plays as catch-up;
-        # everything else tunes the channel live.
+        # everything else (incl. a no-EPG channel, prog=None) tunes live.
+        if p is None:
+            self.window.tune_from_guide(ch)
+            self.accept()
+            return
         if p["stop_timestamp"] < time.time() and self.window._timeshift_days(ch):
             self.window._play_timeshift(ch, prog=p)
         else:
@@ -484,6 +523,14 @@ class EpgGridDialog(QDialog):
         self._selected = data
         self.play_btn.setEnabled(True)
         m = QMenu(self)
+        if p is None:
+            # No-EPG channel: no programme to time-shift/record/remind about,
+            # so the menu is just "play it live".
+            m.addAction(tr("epg_play_channel"),
+                        lambda: (self.window.tune_from_guide(ch),
+                                 self.accept()))
+            m.exec(global_pos)
+            return
         past = p["stop_timestamp"] < time.time()
         if past and self.window._timeshift_days(ch):
             m.addAction(tr("epg_play_this_programme"), self._play_selected)
