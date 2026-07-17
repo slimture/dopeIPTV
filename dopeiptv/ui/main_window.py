@@ -2463,22 +2463,36 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _jump_to_now_playing(self) -> None:
         """Clicking the sidebar logo jumps the middle column to whatever's
         playing: select and scroll to its row, switching to its section and
-        opening the 'All' category first so the row is actually in the list."""
-        if (self._playing_key is None
-                or getattr(self, "_playing_item", None) is None):
+        opening the 'All' category first so the row is actually in the list.
+        Works for every kind - live channels, movies, series episodes and
+        recordings (_playing_item is live-only by design, so movies and
+        episodes read their snapshot from _last_playback instead)."""
+        lp = getattr(self, "_last_playback", None) or {}
+        playing = getattr(self, "_playing_item", None) or lp.get("item")
+        if self._playing_key is None or playing is None:
             self._show_toast(tr("toast_nothing_playing"))
             return
         if self._try_select_playing():
+            return
+        # A playing episode lives inside its series' episode list - re-enter
+        # the series (snapshot taken at playback start), and the pending-jump
+        # hook in _apply_filter selects the episode once the list loads.
+        if self._playing_group == "episode" and lp.get("series_ctx"):
+            self._pending_jump_key = self._playing_key
+            QTimer.singleShot(2500, self._clear_pending_jump)
+            if self.mode != "series":
+                self.switch_mode("series")
+            self._enter_series(lp["series_ctx"])
             return
         # Not in the current (possibly category-filtered) list: remember the
         # target and navigate to a view that contains it, then select once it
         # has loaded (see _load_categories / _apply_filter). Land on the item's
         # own category so the sidebar reflects what's playing, not just "All".
         self._pending_jump_key = self._playing_key
-        self._pending_jump_cat = (self._playing_item or {}).get("category_id")
+        self._pending_jump_cat = playing.get("category_id")
         QTimer.singleShot(2500, self._clear_pending_jump)   # safety net
-        target = {"live": "live", "vod": "vod",
-                  "episode": "series"}.get(self._playing_group, self.mode)
+        target = {"live": "live", "vod": "vod", "episode": "series",
+                  "rec": "rec"}.get(self._playing_group, self.mode)
         if self.mode != target:
             self.switch_mode(target)     # done() honours _pending_jump_cat
         elif self.cat_list.count():
