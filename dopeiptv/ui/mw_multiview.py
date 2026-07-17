@@ -47,6 +47,7 @@ class _MultiviewCell(QWidget):
     focus_requested = pyqtSignal(object)
     context_requested = pyqtSignal(object, object)   # (cell, global pos)
     hovered = pyqtSignal(object)
+    maximize_requested = pyqtSignal()
 
     def __init__(self, number: int, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -69,7 +70,18 @@ class _MultiviewCell(QWidget):
         self.video.video_mouse_press.connect(self._on_press)
         self.video.video_mouse_move.connect(self._on_move)
         self.video.video_mouse_release.connect(self._on_release)
+        self.video.video_dbl_click.connect(self.maximize_requested)
         self.video.playback_error.connect(self._on_error)
+
+        # Active-cell marker: a full-rect border painted as a child ON TOP of
+        # the GL surface (a stylesheet border on the cell itself is covered by
+        # the video, so it only ever flickered into view when a cell was
+        # empty). Transparent centre + transparent-for-mouse so it never eats
+        # a click meant for the video.
+        self._border = QLabel("", self.video)
+        self._border.setAttribute(
+            Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self._border.hide()
 
         self._title = QLabel("", self.video)
         self._title.setStyleSheet(
@@ -91,6 +103,12 @@ class _MultiviewCell(QWidget):
             "background:transparent; color:rgba(255,255,255,200);"
             "font-size:44px;")
         self._pause.hide()
+        # None of these read-only overlays should intercept mouse events - the
+        # video underneath must keep getting click-to-focus, drag and
+        # double-click. (The seek slider is deliberately left interactive.)
+        for w in (self._title, self._empty, self._num, self._pause):
+            w.setAttribute(
+                Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         # Seek bar + time, shown for seekable (timeshift/catch-up) content when
         # the overlays are revealed.
         self._seek = QSlider(Qt.Orientation.Horizontal, self.video)
@@ -108,19 +126,20 @@ class _MultiviewCell(QWidget):
     # -- overlays ------------------------------------------------------------
 
     def show_overlays(self, on: bool) -> None:
+        # Title + big position number auto-hide; the seek bar's visibility is
+        # owned by refresh_state so it can stay put for the focused/seekable
+        # cell instead of vanishing with the 2 s auto-hide.
         self._overlays_on = on
         self._num.setVisible(on)
         self._title.setVisible(on and bool(self.title))
         if on:
             for w in (self._num, self._title, self._seek, self._time):
                 w.raise_()
-        else:
-            self._seek.hide()
-            self._time.hide()
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         r = self.video.rect()
+        self._border.setGeometry(r)
         self._title.adjustSize()
         self._title.move(0, 0)
         self._empty.setGeometry(r)
@@ -147,6 +166,12 @@ class _MultiviewCell(QWidget):
         try:
             m["force-media-title"] = title or ""
             m["cache"] = "yes"
+            # Keep a back-buffer so a timeshift/catch-up stream is seekable
+            # within the cached window (mpv then reports it seekable and the
+            # cell's scrub bar activates). This is the cell's own isolated mpv,
+            # so it never touches the docked player's settings.
+            m["cache-secs"] = 600
+            m["demuxer-max-back-bytes"] = 200 * 1024 * 1024
             m["mute"] = self._muted
             m.play(url)
             return True
@@ -163,9 +188,13 @@ class _MultiviewCell(QWidget):
 
     def set_focused(self, on: bool) -> None:
         self._focused = on
-        self.setStyleSheet(
-            "background:#000000;"
-            + ("border:2px solid #e5354b;" if on else "border:2px solid #202028;"))
+        # Draw the marker on top of the video (see _border). Red = the active
+        # (unmuted) cell; a dim frame otherwise so every cell reads as a tile.
+        self._border.setStyleSheet(
+            "background:transparent; border:3px solid #e5354b;" if on
+            else "background:transparent; border:2px solid #303038;")
+        self._border.setVisible(True)
+        self._border.raise_()
 
     def set_muted(self, muted: bool) -> None:
         self._muted = muted
@@ -229,9 +258,16 @@ class _MultiviewCell(QWidget):
             self._time.hide()
             return
         self._dur = dur
-        show = self._overlays_on and seekable and dur > 1
+        # The focused (audio) cell keeps its scrubber up whenever the content
+        # is seekable (catch-up / archive segment / a seekable live buffer);
+        # the others reveal theirs on hover. Not tied to the 2 s title auto-
+        # hide, so a timeshift cell's seek bar is actually usable.
+        show = seekable and dur > 1 and (self._focused or self._overlays_on)
         self._seek.setVisible(show)
         self._time.setVisible(show)
+        if show:
+            self._seek.raise_()
+            self._time.raise_()
         if show and not self._seeking:
             self._seek.blockSignals(True)
             self._seek.setValue(int(pos / dur * 1000))
@@ -314,6 +350,7 @@ class _MultiviewWindow(QWidget):
             c.focus_requested.connect(self._focus_cell)
             c.context_requested.connect(self._cell_context_menu)
             c.hovered.connect(lambda _c: self._reveal_overlays())
+            c.maximize_requested.connect(self._toggle_max)
             c.video.video_key_press.connect(
                 lambda ev, cell=c: self._cell_key(cell, ev))
             grid.addWidget(c, i // 2, i % 2)
@@ -417,9 +454,18 @@ class _MultiviewWindow(QWidget):
 
     # -- overlays + polling + keyboard --------------------------------------
 
+    def _toggle_max(self) -> None:
+        """Double-click a cell to maximize the whole multiview window (and
+        double-click again to restore it)."""
+        if self.isMaximized() or self.isFullScreen():
+            self.showNormal()
+        else:
+            self.showMaximized()
+
     def _reveal_overlays(self) -> None:
         for c in self.cells:
             c.show_overlays(True)
+        self._refresh_states()   # so a hovered cell's seek bar appears at once
         self._overlay_timer.start()
 
     def _hide_overlays(self) -> None:
@@ -442,7 +488,10 @@ class _MultiviewWindow(QWidget):
             event.accept()
             return
         if event.key() == Qt.Key.Key_Escape:
-            self.close()   # no title-bar X when frameless
+            if self.isMaximized() or self.isFullScreen():
+                self.showNormal()   # step out of maximize first
+            else:
+                self.close()        # no title-bar X when frameless
             event.accept()
             return
         super().keyPressEvent(event)
