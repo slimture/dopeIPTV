@@ -3871,9 +3871,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # teardown below. Layout, resume position, TMDB cache flush,
         # recording state, mpv teardown, cast disconnect - each of
         # these is itself flush-and-return, no pending threads.
-        self._save_layout()
-        self._save_resume_position()
-        self._maybe_auto_mark_watched()
+        if not getattr(self, "_resetting", False):
+            # Skipped after Settings -> Reset all: these writes would seed the
+            # freshly cleared config with layout/resume/watched keys again.
+            self._save_layout()
+            self._save_resume_position()
+            self._maybe_auto_mark_watched()
         self.wake.release()
         self.cover.flush()
         if self._trakt_active:
@@ -3919,6 +3922,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         active_workers = any(
             p.activeThreadCount() > 0
             for p in (self.pool, self._logo_pool, self._art_pool))
-        if active_workers:
+        # macOS: QApplication.quit() enters AppKit's terminate cascade, whose
+        # exit() finalizers run while Qt timers are still live - a timer then
+        # fires into the half-destroyed QGuiApplication and segfaults (seen
+        # via Settings -> Reset all). Teardown above already drained workers
+        # and released the player, so the hard exit is safe there too.
+        if active_workers or sys.platform == "darwin":
             os._exit(0)
         QApplication.instance().quit()

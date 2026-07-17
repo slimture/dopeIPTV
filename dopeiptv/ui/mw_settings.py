@@ -271,14 +271,20 @@ class _SettingsMixin:
         # it to disk before we tell the user to restart.
         self.settings.clear()
         self.settings.sync()
+        # closeEvent persists layout/resume/watched on the way out - skip
+        # that during a reset, or the freshly cleared config gets seeded
+        # with those keys again.
+        self._resetting = True
         QMessageBox.information(
             parent_dialog, tr("settings_reset_all"),
             tr("settings_reset_done"))
         parent_dialog.reject()
         # Quit so the next launch reads a fresh (empty) config and shows the
-        # login screen. Direct restart is intentionally left to the user so
-        # they can inspect that everything actually went away.
-        QApplication.instance().quit()
+        # login screen. Route through the main window's close (player/pool
+        # teardown lives in closeEvent, which also picks the exit strategy) -
+        # a bare QApplication.quit() here segfaulted on macOS: AppKit's
+        # terminate ran exit() finalizers while Qt timers were still live.
+        self.close()
 
     def _set_language(self, code: str) -> None:
         from ..i18n import set_language, current_language
