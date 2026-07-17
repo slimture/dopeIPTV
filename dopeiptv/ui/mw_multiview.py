@@ -718,6 +718,7 @@ class _MultiviewWindow(QWidget):
             grid.addWidget(c, i // 2, i % 2)
             self.cells.append(c)
         self._focused: _MultiviewCell | None = None
+        self._cursor_hidden = False
         # Floating close button (frameless has no title-bar X). Auto-hides with
         # the other overlays. Parented to the TOP-RIGHT cell's video surface,
         # not the window: a plain child of the window renders *behind* the
@@ -843,6 +844,7 @@ class _MultiviewWindow(QWidget):
         """Double-click a cell to maximize the whole multiview window (and
         double-click again to restore it)."""
         if self.isMaximized() or self.isFullScreen():
+            self._show_cursor()
             self.showNormal()
         else:
             self.showMaximized()
@@ -863,7 +865,15 @@ class _MultiviewWindow(QWidget):
         self._close_btn.move(v.width() - self._close_btn.width() - 10, 10)
         self._close_btn.raise_()
 
+    def _show_cursor(self) -> None:
+        if self._cursor_hidden:
+            self._cursor_hidden = False
+            self.unsetCursor()
+            for c in self.cells:
+                c.video.unsetCursor()
+
     def _reveal_overlays(self) -> None:
+        self._show_cursor()
         for c in self.cells:
             c.show_overlays(True)
         self._place_close_btn()
@@ -887,6 +897,14 @@ class _MultiviewWindow(QWidget):
         for c in self.cells:
             c.show_overlays(False)
         self._close_btn.hide()
+        # Maximized / fullscreen, the pointer naturally rests over the video -
+        # hide it along with the overlays (any movement brings both back).
+        if ((self.isMaximized() or self.isFullScreen())
+                and not self._cursor_hidden):
+            self._cursor_hidden = True
+            self.setCursor(Qt.CursorShape.BlankCursor)
+            for c in self.cells:
+                c.video.setCursor(Qt.CursorShape.BlankCursor)
 
     def _refresh_states(self) -> None:
         for c in self.cells:
@@ -905,6 +923,7 @@ class _MultiviewWindow(QWidget):
             return
         if event.key() == Qt.Key.Key_Escape:
             if self.isMaximized() or self.isFullScreen():
+                self._show_cursor()
                 self.showNormal()   # step out of maximize first
             else:
                 self.close()        # no title-bar X when frameless
