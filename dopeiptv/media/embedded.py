@@ -654,6 +654,7 @@ class EmbeddedPlayer(QWidget):
     record_menu = pyqtSignal(object)
     popout_requested = pyqtSignal()
     popout_context_menu = pyqtSignal(object)
+    docked_context_menu = pyqtSignal(object)   # right-click on the docked video
     stopped = pyqtSignal()
     resume_requested = pyqtSignal()
     stalled = pyqtSignal()
@@ -1166,7 +1167,11 @@ class EmbeddedPlayer(QWidget):
 
     def _on_video_press(self, event) -> None:
         if not self._popout_mode or self._fs_ui:
-            # Docked / fullscreen: the video has no special press handling.
+            # Docked: right-click opens a context menu (e.g. send to multiview);
+            # fullscreen keeps its own handling and no drag.
+            if (event.button() == Qt.MouseButton.RightButton
+                    and not self._fs_ui):
+                self.docked_context_menu.emit(event.globalPosition().toPoint())
             return
         if event.button() == Qt.MouseButton.RightButton:
             # Detached window: right-click opens its context menu.

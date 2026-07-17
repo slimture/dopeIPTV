@@ -321,7 +321,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         name = (pl or {}).get("name", "") if pl else ""
         self._playlist_btn.setText("▾  " + name if name
                                    else tr("menu_playlists"))
-        self._playlist_btn.setVisible(bool(store and store.playlists()))
+        # Only worth showing when there's actually more than one playlist to
+        # switch between - a single-playlist user has nothing to pick.
+        multiple = bool(store and len(store.playlists()) > 1)
+        self._playlist_btn.setVisible(multiple)
 
     def _build_ui(self) -> None:
         menubar = self.menuBar()
@@ -429,11 +432,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # without a trip through Settings. Shows the active playlist; the menu
         # is built on demand. Hidden when there's nothing to switch.
         self._playlist_btn = QPushButton("", objectName="SideAction")
-        self._playlist_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
+        # Fit the pill to its label (the active playlist name) instead of
+        # stretching the full sidebar width; left-aligned under the logo. On the
+        # collapsed rail it goes back to filling the rail (see
+        # _apply_sidebar_chrome).
+        self._playlist_btn.setSizePolicy(QSizePolicy.Policy.Maximum,
                                          QSizePolicy.Policy.Fixed)
         self._playlist_btn.setToolTip(tr("menu_playlists"))
         self._playlist_btn.clicked.connect(self._show_playlist_menu)
-        sl.addWidget(self._playlist_btn)
+        sl.addWidget(self._playlist_btn, 0, Qt.AlignmentFlag.AlignLeft)
         sl.addSpacing(6)
         self._update_playlist_btn()
 
@@ -890,6 +897,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.zap.connect(self._zap)
             self.player.popout_requested.connect(self._toggle_popout)
             self.player.popout_context_menu.connect(self._popout_context_menu)
+            self.player.docked_context_menu.connect(self._docked_context_menu)
             self.player.stop_btn.clicked.connect(self._exit_popout_if_active)
             self.player.stopped.connect(self._on_player_stopped)
             self.player.resume_requested.connect(self._resume_last)

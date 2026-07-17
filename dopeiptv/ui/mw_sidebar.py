@@ -79,11 +79,17 @@ class _SidebarMixin:
         if hasattr(self, "_multiview_btn"):
             self._set_rail(self._multiview_btn, collapsed)
         if hasattr(self, "_playlist_btn"):
-            # The button normally shows the active playlist name; on the rail
-            # collapse it to a list glyph and restore the name on expand.
+            # The button normally shows the active playlist name (fit to its
+            # text); on the rail collapse it to a list glyph that fills the rail
+            # width, and restore the fitted name button on expand.
+            from PyQt6.QtWidgets import QSizePolicy
             if collapsed:
                 self._playlist_btn.setText("☰")
+                self._playlist_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
+                                                 QSizePolicy.Policy.Fixed)
             else:
+                self._playlist_btn.setSizePolicy(QSizePolicy.Policy.Maximum,
+                                                 QSizePolicy.Policy.Fixed)
                 self._update_playlist_btn()
             self._set_rail(self._playlist_btn, collapsed)
         # Side by side when expanded, stacked on the narrow rail.

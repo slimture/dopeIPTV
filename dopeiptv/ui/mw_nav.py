@@ -7,9 +7,9 @@ Pure UI moved out of main_window.py; every method operates on MainWindow widgets
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import QPointF, QSize, Qt
+from PyQt6.QtCore import QPointF, QRectF, QSize, Qt
 from PyQt6.QtGui import (
-    QColor, QFont, QFontMetricsF, QIcon, QPainter, QPixmap,
+    QColor, QFont, QFontMetricsF, QIcon, QPainter, QPen, QPixmap,
 )
 from PyQt6.QtWidgets import QColorDialog, QMenu
 
@@ -178,17 +178,67 @@ class _NavMixin:
         self._apply_action_icons()      # Guide / Settings / Multiview glyphs
 
     def _apply_action_icons(self) -> None:
-        """Paint the three sidebar action buttons (Guide / Settings /
-        Multiview) as centred monochrome glyph icons in the theme's muted
-        tone, so they read as a compact icon row (expanded) or stack (rail)
-        rather than three wide text pills. Re-tinted on theme change."""
-        for name, glyph in (("_guide_btn", "🗓"), ("_settings_btn", "⚙"),
-                            ("_multiview_btn", "▦")):
+        """Paint the three sidebar action buttons in the theme's muted tone, so
+        they read as a compact icon row (expanded) or stack (rail) rather than
+        three wide text pills. Guide and Multiview are crisp vector icons (a
+        programme-grid and a 2x2 tile grid) that render identically on every
+        platform; Settings keeps the universally-read gear glyph. Re-tinted on
+        theme change."""
+        specs = (("_guide_btn", "guide"), ("_settings_btn", "gear"),
+                 ("_multiview_btn", "grid"))
+        for name, kind in specs:
             btn = getattr(self, name, None)
             if btn is None:
                 continue
-            btn.setIcon(QIcon(self._glyph_pixmap(glyph, 18, P["text2"])))
+            if kind == "gear":
+                pm = self._glyph_pixmap("⚙", 18, P["text2"])
+            else:
+                pm = self._action_pixmap(kind, 18, P["text2"])
+            btn.setIcon(QIcon(pm))
             btn.setIconSize(QSize(18, 18))
+
+    def _action_pixmap(self, kind: str, s: int, color: str) -> QPixmap:
+        """Hand-drawn monochrome icon for the sidebar action buttons.
+        'grid'  -> four rounded tiles (multiview);
+        'guide' -> a framed programme grid: header row, channel column and a
+                   few programme cells (EPG)."""
+        dpr = self.devicePixelRatioF() or 1.0
+        pm = QPixmap(round(s * dpr), round(s * dpr))
+        pm.setDevicePixelRatio(dpr)
+        pm.fill(Qt.GlobalColor.transparent)
+        pr = QPainter(pm)
+        pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        if kind == "grid":
+            pr.setPen(Qt.PenStyle.NoPen)
+            pr.setBrush(QColor(color))
+            m = s * 0.09
+            gap = s * 0.13
+            cell = (s - 2 * m - gap) / 2.0
+            rad = cell * 0.26
+            for i in (0, 1):
+                for j in (0, 1):
+                    pr.drawRoundedRect(
+                        QRectF(m + j * (cell + gap), m + i * (cell + gap),
+                               cell, cell), rad, rad)
+        else:   # guide
+            pen = QPen(QColor(color))
+            pen.setWidthF(max(1.2, s * 0.085))
+            pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            pr.setPen(pen)
+            pr.setBrush(Qt.BrushStyle.NoBrush)
+            m = s * 0.13
+            inner = s - 2 * m
+            pr.drawRoundedRect(QRectF(m, m, inner, inner), s * 0.12, s * 0.12)
+            hy = m + inner * 0.33          # under the header row
+            pr.drawLine(QPointF(m, hy), QPointF(s - m, hy))
+            vx = m + inner * 0.36          # channel column | programmes
+            pr.drawLine(QPointF(vx, hy), QPointF(vx, s - m))
+            for k in (1, 2):              # programme-cell rows
+                ry = hy + (s - m - hy) * k / 3.0
+                pr.drawLine(QPointF(vx, ry), QPointF(s - m, ry))
+        pr.end()
+        return pm
 
     def _on_library_toggle(self, collapsed: bool) -> None:
         """Fold the Library group (Favorites..History) away behind its

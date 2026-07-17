@@ -3318,15 +3318,15 @@ _STRINGS: dict[str, dict[str, str]] = {
         "ru": "Закрыть мультиэкран", "th": "ปิดมัลติวิว",
     },
     "mv_remove_cell": {
-        "en": "Remove from this cell", "sv": "Ta bort ur rutan",
-        "es": "Quitar de esta celda", "de": "Aus diesem Feld entfernen",
-        "fr": "Retirer de cette case", "zh": "从该画面移除",
-        "ru": "Убрать из ячейки", "th": "นำออกจากช่องนี้",
+        "en": "Remove from this window", "sv": "Ta bort ur fönstret",
+        "es": "Quitar de esta ventana", "de": "Aus diesem Fenster entfernen",
+        "fr": "Retirer de cette fenêtre", "zh": "从该窗口移除",
+        "ru": "Убрать из окна", "th": "นำออกจากหน้าต่างนี้",
     },
     "mv_cell": {
-        "en": "Cell {n}", "sv": "Ruta {n}", "es": "Celda {n}",
-        "de": "Feld {n}", "fr": "Case {n}", "zh": "画面 {n}",
-        "ru": "Ячейка {n}", "th": "ช่อง {n}",
+        "en": "Window {n}", "sv": "Fönster {n}", "es": "Ventana {n}",
+        "de": "Fenster {n}", "fr": "Fenêtre {n}", "zh": "窗口 {n}",
+        "ru": "Окно {n}", "th": "หน้าต่าง {n}",
     },
     "mv_title": {
         "en": "dopeIPTV — Multiview", "sv": "dopeIPTV — Multiview",

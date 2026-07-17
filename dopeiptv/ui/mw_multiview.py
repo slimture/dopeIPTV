@@ -59,7 +59,14 @@ class _MultiviewCell(QWidget):
         self._drag_from = None
         self._overlays_on = False
         self._seeking = False
-        self._dur = 0.0
+        # Seek-window bookkeeping. For finite content it's [0, duration]; for a
+        # live stream it's a rolling window from when this cell started playing
+        # (_live_start) to the live edge (_live_edge), so the scrub bar works
+        # within mpv's buffer instead of needing a duration live never has.
+        self._win_start = 0.0
+        self._win_span = 0.0
+        self._live_start: float | None = None
+        self._live_edge = 0.0
         self.setStyleSheet("background:#000000;")
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
@@ -154,6 +161,9 @@ class _MultiviewCell(QWidget):
     def play(self, url: str, title: str) -> bool:
         self.url = url
         self.title = title
+        self._live_start = None    # fresh rolling window for the new stream
+        self._live_edge = 0.0
+        self._win_span = 0.0
         self._title.setText(title or "")
         self._title.adjustSize()
         self._empty.hide()
@@ -228,17 +238,23 @@ class _MultiviewCell(QWidget):
     def _on_seek_released(self) -> None:
         self._seeking = False
         m = self.video.mpv
-        if m is None or self.url is None or self._dur < 1:
+        if m is None or self.url is None or self._win_span < 1:
             return
+        target = self._win_start + self._seek.value() / 1000.0 * self._win_span
         try:
-            m.command("seek", self._seek.value() / 1000.0 * self._dur,
-                      "absolute")
+            m.command("seek", target, "absolute")
         except Exception:
             pass
 
     def refresh_state(self) -> None:
         """Poll mpv for position/duration/pause and update the seek bar + pause
-        glyph. Called on a timer by the window; robust to a not-yet-ready mpv."""
+        glyph. Called on a timer by the window; robust to a not-yet-ready mpv.
+
+        Finite content (catch-up / VOD / a DVR window) uses an absolute
+        [0, duration] bar. A live stream has no duration, so it gets a rolling
+        window from when the cell started playing to the live edge - scrubbing
+        that seeks back through mpv's buffer (the same idea as timeshift, within
+        what's been buffered this session)."""
         m = self.video.mpv
         if m is None or self.url is None:
             return
@@ -250,19 +266,34 @@ class _MultiviewCell(QWidget):
         if paused:
             self._pause.raise_()
         try:
-            dur = float(m.duration or 0)
             pos = float(m.time_pos or 0)
-            seekable = bool(m.seekable)
         except Exception:
             self._seek.hide()
             self._time.hide()
             return
-        self._dur = dur
-        # The focused (audio) cell keeps its scrubber up whenever the content
-        # is seekable (catch-up / archive segment / a seekable live buffer);
-        # the others reveal theirs on hover. Not tied to the 2 s title auto-
-        # hide, so a timeshift cell's seek bar is actually usable.
-        show = seekable and dur > 1 and (self._focused or self._overlays_on)
+        try:
+            dur = float(m.duration or 0)
+        except Exception:
+            dur = 0.0
+        try:
+            seekable = bool(m.seekable)
+        except Exception:
+            seekable = False
+        if seekable and dur > 1:
+            start, span, playhead = 0.0, dur, pos
+        else:
+            if self._live_start is None:
+                self._live_start = pos
+            self._live_start = min(self._live_start, pos)
+            self._live_edge = max(self._live_edge, pos)
+            start = self._live_start
+            span = self._live_edge - self._live_start
+            playhead = pos
+        self._win_start = start
+        self._win_span = span
+        # The focused (audio) cell keeps its scrubber up; the others reveal
+        # theirs on hover. Not tied to the 2 s title auto-hide, so it's usable.
+        show = span > 2 and (self._focused or self._overlays_on)
         self._seek.setVisible(show)
         self._time.setVisible(show)
         if show:
@@ -270,9 +301,9 @@ class _MultiviewCell(QWidget):
             self._time.raise_()
         if show and not self._seeking:
             self._seek.blockSignals(True)
-            self._seek.setValue(int(pos / dur * 1000))
+            self._seek.setValue(int((playhead - start) / span * 1000))
             self._seek.blockSignals(False)
-            self._time.setText(f"{_fmt(pos)} / {_fmt(dur)}")
+            self._time.setText(f"{_fmt(playhead - start)} / {_fmt(span)}")
             self._time.adjustSize()
 
     def clear(self) -> None:
@@ -285,6 +316,9 @@ class _MultiviewCell(QWidget):
         self.url = None
         self.title = ""
         self._muted = True
+        self._live_start = None
+        self._live_edge = 0.0
+        self._win_span = 0.0
         self._title.hide()
         self._pause.hide()
         self._seek.hide()
@@ -533,6 +567,27 @@ class _MultiviewMixin:
 
     def _show_multiview(self) -> None:
         self._ensure_multiview_window()
+
+    def _docked_context_menu(self, global_pos) -> None:
+        """Right-click on the docked video: send the current stream to
+        multiview. (add_to_multiview stops the docked player first, so the one
+        connection carries over into a cell instead of doubling up.)"""
+        p = getattr(self, "player", None)
+        if p is None or not getattr(p, "current_url", None):
+            return
+        menu = QMenu(self)
+        menu.addAction(tr("mv_add"), self._send_docked_to_multiview)
+        menu.exec(global_pos)
+
+    def _send_docked_to_multiview(self) -> None:
+        p = getattr(self, "player", None)
+        if p is None or not getattr(p, "current_url", None):
+            return
+        url = p.current_url
+        it = getattr(self, "_playing_item", None)
+        title = ((it or {}).get("name") or (it or {}).get("title")
+                 or getattr(self, "_base_title", "") or "")
+        self.add_to_multiview(url, title)
 
     def add_to_multiview(self, url: str, title: str,
                          cell: int | None = None) -> None:
