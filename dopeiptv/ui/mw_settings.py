@@ -359,6 +359,10 @@ class _SettingsMixin:
         outer = QVBoxLayout(d)
         outer.setContentsMargins(18, 18, 18, 18)
         tabs = QTabWidget()
+        # macOS's tab bar stretches tabs across the full width by default,
+        # spreading them far apart; keep them packed left with the QSS-set
+        # padding, same as on Linux.
+        tabs.tabBar().setExpanding(False)
         # On macOS the native tab style hands each tab a fixed slot and elides
         # anything that doesn't fit ("Playba…", "Interfac…"). Ask the tab bar
         # to never elide and let scroll buttons appear if we run out of room

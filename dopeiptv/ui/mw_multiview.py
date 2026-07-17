@@ -167,6 +167,10 @@ class _MultiviewCell(QWidget):
         self._guide = None
         self._progs: list = []
         self._progs_at = 0.0
+        # Chosen audio/subtitle tracks (None = mpv's default), re-applied on
+        # every stream (re)load - a timeshift jump resets track selection.
+        self._want_aid: int | None = None
+        self._want_sid: int | str | None = None
         self.setStyleSheet("background:#000000;")
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
@@ -374,6 +378,10 @@ class _MultiviewCell(QWidget):
         self._ts_seg_start = None    # start at the live edge
         self._ts_candidates = []
         self._ts_cand_idx = 0
+        # A new channel: its track ids have nothing to do with the previous
+        # one's, so drop any remembered audio/subtitle choice.
+        self._want_aid = None
+        self._want_sid = None
         # Catch-up capable? Needs the provider flag, a real depth, a stream id
         # and a client that can build archive URLs.
         days = int((item or {}).get("tv_archive_duration") or 0) if item else 0
@@ -408,6 +416,14 @@ class _MultiviewCell(QWidget):
             m["cache-secs"] = 600
             m["demuxer-max-back-bytes"] = 200 * 1024 * 1024
             m["mute"] = self._muted
+            # Re-assert the user's chosen tracks: a (re)load - notably every
+            # timeshift jump - resets mpv's selection to its defaults.
+            if self._want_aid is not None:
+                m["aid"] = self._want_aid
+            if self._want_sid is not None:
+                m["sid"] = self._want_sid
+                if self._want_sid != "no":
+                    m["sub-visibility"] = True
             m.play(url)
             return True
         except Exception as e:
@@ -520,19 +536,28 @@ class _MultiviewCell(QWidget):
         if m is None:
             return
         try:
-            m["aid"] = tid
-        except Exception:
-            pass
+            self._want_aid = int(tid)
+            m["aid"] = self._want_aid
+        except Exception as e:
+            log.warning("multiview set_audio(%r) failed: %s", tid, e)
 
     def set_sub(self, tid) -> None:
-        """Select subtitle track *tid*, or turn subtitles off when None."""
+        """Select subtitle track *tid*, or turn subtitles off when None.
+        The choice is remembered so a timeshift jump (which reloads the
+        stream and resets mpv's track selection) keeps the same subtitle."""
         m = self.video.mpv
         if m is None:
             return
         try:
-            m["sid"] = "no" if tid is None else tid
-        except Exception:
-            pass
+            if tid is None:
+                self._want_sid = "no"
+                m["sid"] = "no"
+            else:
+                self._want_sid = int(tid)
+                m["sid"] = self._want_sid
+                m["sub-visibility"] = True
+        except Exception as e:
+            log.warning("multiview set_sub(%r) failed: %s", tid, e)
 
     def toggle_pause(self) -> None:
         m = self.video.mpv
@@ -749,6 +774,8 @@ class _MultiviewCell(QWidget):
         self._guide = None
         self._progs = []
         self._progs_at = 0.0
+        self._want_aid = None
+        self._want_sid = None
         self.playlist_name = ""
         self._pl.setText("")
         self._pl.hide()
