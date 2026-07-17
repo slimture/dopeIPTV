@@ -136,7 +136,6 @@ class _WheelGuard(QObject):
 
 
 # One shared, app-lifetime instance (a QObject filter can serve every control).
-_WHEEL_GUARD = _WheelGuard()
 
 from .. import APP_NAME, BUILD_VERSION, VERSION
 from ..i18n import tr
@@ -1465,10 +1464,14 @@ class _SettingsMixin:
 
         # Guard every value control so scrolling the page doesn't change a
         # setting under the cursor - you click to change, not scroll past.
+        # Parented to the dialog: a module-level singleton QObject could
+        # have its C++ side torn down under some app lifetimes (seen in
+        # the test suite), leaving installEventFilter a dangling wrapper.
+        wheel_guard = _WheelGuard(d)
         for cls in (QComboBox, QAbstractSpinBox, QAbstractSlider):
             for w in d.findChildren(cls):
                 w.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-                w.installEventFilter(_WHEEL_GUARD)
+                w.installEventFilter(wheel_guard)
 
         if d.exec():
             self.settings.setValue(

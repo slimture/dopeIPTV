@@ -36,12 +36,17 @@ class FavoriteStore:
         self.key = key
         self.id_key = id_key
         try:
-            self.groups: dict[str, list[dict]] = json.loads(
-                settings.value(key, "") or "{}")
+            raw = json.loads(settings.value(key, "") or "{}")
         except Exception:
-            self.groups = {}
-        if not isinstance(self.groups, dict):
-            self.groups = {}
+            raw = {}
+        if not isinstance(raw, dict):
+            raw = {}
+        # Sanitize what came off disk: corrupt/hand-edited settings can hold
+        # non-list groups or non-dict rows, and every lookup does
+        # row.get(id_key) - one junk row would crash favorites at startup.
+        self.groups: dict[str, list[dict]] = {
+            str(g): [x for x in items if isinstance(x, dict)]
+            for g, items in raw.items() if isinstance(items, list)}
 
     def _save(self) -> None:
         self.settings.setValue(self.key, json.dumps(self.groups))
@@ -167,12 +172,15 @@ class HistoryStore:
         self.settings = settings
         self.key = key
         try:
-            self.entries: list[dict] = json.loads(
-                settings.value(key, "") or "[]")
+            raw = json.loads(settings.value(key, "") or "[]")
         except Exception:
-            self.entries = []
-        if not isinstance(self.entries, list):
-            self.entries = []
+            raw = []
+        if not isinstance(raw, list):
+            raw = []
+        # Drop non-dict rows from corrupt/hand-edited settings: every consumer
+        # (and the healing pass below) calls e.get(...), so one junk row would
+        # crash History at startup.
+        self.entries: list[dict] = [e for e in raw if isinstance(e, dict)]
         # Heal entries mis-recorded as 'live' by the old favorites bug (a
         # movie played from Favorites was filed as a TV channel). The stored
         # URL knows the truth: Xtream VOD urls contain /movie/, series
