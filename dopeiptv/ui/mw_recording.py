@@ -1010,7 +1010,11 @@ class _RecordingMixin:
         proven_dead = False
         for u in urls:
             try:
-                r = sess.get(u, stream=True, timeout=(4, 4),
+                # Generous read timeout: providers assemble archive segments
+                # on demand and the first byte can take well over 4 s cold -
+                # the probe runs in the background while live keeps playing,
+                # so waiting costs nothing visible.
+                r = sess.get(u, stream=True, timeout=(5, 10),
                              headers={"Range": "bytes=0-8191"})
                 ctype = (r.headers.get("Content-Type") or "").lower()
                 chunk = next(r.iter_content(4096), b"") or b""
