@@ -476,11 +476,7 @@ QTabWidget::pane {{
     border: 1px solid {p['border_in']}; border-radius: 8px; background: {p['pane']};
     top: -1px;
 }}
-/* Left-packed tabs with QSS-controlled spacing on every OS (macOS's native
-   metrics centred and spread them differently from Linux). qproperty pins
-   the tab bar's expanding flag off for every QTabBar, no code path needed. */
 QTabWidget::tab-bar {{ alignment: left; }}
-QTabBar {{ qproperty-expanding: 0; }}
 QTabBar::tab {{
     background: transparent; color: {p['text2']}; padding: 7px 10px;
     border-radius: 7px; margin: 0px 1px; font-size: 12px;

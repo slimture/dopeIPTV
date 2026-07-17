@@ -10,16 +10,49 @@ import re
 import sys
 from datetime import datetime
 
-from PyQt6.QtCore import QEvent, QObject, Qt, QTimer, QUrl
+from PyQt6.QtCore import QEvent, QObject, QSize, Qt, QTimer, QUrl
 from PyQt6.QtGui import QDesktopServices, QIcon
 from PyQt6.QtWidgets import (
     QAbstractItemView, QAbstractSlider, QAbstractSpinBox, QApplication,
     QCheckBox, QComboBox, QDialog,
     QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout, QInputDialog,
     QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox,
-    QPushButton, QScrollArea, QSizePolicy, QSpinBox, QTabWidget, QTextBrowser,
-    QVBoxLayout, QWidget,
+    QPushButton, QScrollArea, QSizePolicy, QSpinBox, QTabBar, QTabWidget,
+    QTextBrowser, QVBoxLayout, QWidget,
 )
+
+
+class _TightTabBar(QTabBar):
+    """Tab widths computed directly from the label text, bypassing the style
+    engine entirely. macOS kept stretching/spreading styled tabs across the
+    full bar no matter which style or QSS flags were set; owning the size
+    hint is deterministic on every platform."""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setExpanding(False)
+        self.setUsesScrollButtons(False)
+
+    def tabSizeHint(self, index: int) -> QSize:
+        sz = super().tabSizeHint(index)
+        w = self.fontMetrics().horizontalAdvance(self.tabText(index)) + 28
+        return QSize(w, sz.height())
+
+    def minimumTabSizeHint(self, index: int) -> QSize:
+        return self.tabSizeHint(index)
+
+
+class _TightTabs(QTabWidget):
+    """QTabWidget wired to the tight tab bar (setTabBar is protected, so a
+    subclass is the supported way in). Note: setTabBar RESETS the bar's
+    expanding flag to true - which is why earlier setExpanding calls never
+    stuck - so it must be re-disabled after."""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        bar = _TightTabBar(self)
+        self.setTabBar(bar)
+        bar.setExpanding(False)
 
 
 class _WheelGuard(QObject):
@@ -358,11 +391,11 @@ class _SettingsMixin:
                  min(geo.height(), max(700, int(geo.height() * 0.85))))
         outer = QVBoxLayout(d)
         outer.setContentsMargins(18, 18, 18, 18)
-        tabs = QTabWidget()
-        # macOS's tab bar stretches tabs across the full width by default,
-        # spreading them far apart; keep them packed left with the QSS-set
-        # padding, same as on Linux.
-        tabs.tabBar().setExpanding(False)
+        # Custom tab bar with code-computed tab widths (see _TightTabBar):
+        # the only approach that packs the tabs identically on macOS, Linux
+        # and Windows - style flags and QSS alone kept being overridden by
+        # macOS's tab layout.
+        tabs = _TightTabs()
         # On macOS the native tab style hands each tab a fixed slot and elides
         # anything that doesn't fit ("Playba…", "Interfac…"). Ask the tab bar
         # to never elide and let scroll buttons appear if we run out of room
@@ -1113,13 +1146,6 @@ class _SettingsMixin:
             lambda: self._open_trakt_dialog(d))
         refresh_trakt_status()
         tabs.addTab(trakt_tab, tr("tab_trakt"))
-        # Size the dialog to the REAL tab row (language and tab count change
-        # its width), instead of guessing a fixed minimum - no more scroll
-        # arrows eating tabs when a new category lands.
-        tab_w = tabs.tabBar().sizeHint().width() + 76
-        d.setMinimumWidth(max(d.minimumWidth(), tab_w))
-        if d.width() < tab_w:
-            d.resize(tab_w, d.height())
 
         def refresh_pin_status():
             if self.parental.has_pin():
