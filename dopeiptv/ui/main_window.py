@@ -2590,7 +2590,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         ek = it.get("_kind") or it.get("_ekind")
         mapped = {"vod": "movie", "movie": "movie", "series": "series",
                   "episode": "episode", "live": "live", "fav": "live"}.get(ek)
-        return mapped or self._history_kind()
+        if mapped:
+            return mapped
+        # Favorites' Movies/Series sections: their rows carry no _kind tag,
+        # and the section - not "fav == live" - says what they are (the same
+        # routing _stream_for uses). Without this a favorite movie played and
+        # resumed as "live": no resume prompt, no saved position.
+        if self.mode == "fav" and not self.series_ctx:
+            if self._fav_section == "movie":
+                return "movie"
+            if self._fav_section == "series":
+                return "series"
+        return self._history_kind()
 
     # -- selection, EPG and detail panel -------------------------------------------
 
