@@ -224,8 +224,9 @@ QPushButton#PlaylistChip:hover {{
     background: {side_action_hover}; border-color: {ACCENT}; color: {p['text']};
 }}
 QPushButton#PlaylistChip[rail="true"] {{
+    /* Same footprint as the nav rail icons above it (they use 4px 0). */
     background: {side_action_bg}; border: 1px solid {side_action_edge};
-    border-radius: 8px; padding: 8px 0; margin-top: 3px;
+    border-radius: 8px; padding: 4px 0; margin-top: 0px;
 }}
 
 #SectionLabel {{

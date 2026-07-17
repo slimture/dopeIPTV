@@ -1006,6 +1006,42 @@ class _MultiviewMixin:
         if cb.isChecked():
             self.settings.setValue("mv_info_seen", "true")
 
+    def _maybe_close_multiview_for_playback(self) -> None:
+        """Starting playback in the main window while multiview streams run:
+        offer to close multiview so its provider connections are freed (on a
+        tight connection limit the new stream would otherwise be refused).
+        Keeping both is allowed - an account with spare simultaneous
+        connections can - and that answer sticks for this multiview window,
+        so zapping doesn't re-ask on every channel."""
+        win = self._multiview_win
+        if win is None or not any(c.url for c in win.cells):
+            return
+        if getattr(win, "_conflict_kept", False):
+            return
+        from PyQt6.QtWidgets import QDialog
+        d = QDialog(self)
+        d.setWindowTitle(tr("mv_conflict_title"))
+        d.setStyleSheet("QDialog { background:#1b1b20; }")
+        lay = QVBoxLayout(d)
+        lay.setContentsMargins(20, 18, 20, 16)
+        lay.setSpacing(14)
+        msg = QLabel(tr("mv_conflict_body"))
+        msg.setWordWrap(True)
+        msg.setMinimumWidth(400)
+        msg.setStyleSheet("color:#ECECF1; font-size:13px;")
+        lay.addWidget(msg)
+        bb = QDialogButtonBox()
+        bb.addButton(tr("mv_close"), QDialogButtonBox.ButtonRole.AcceptRole)
+        bb.addButton(tr("mv_keep"), QDialogButtonBox.ButtonRole.RejectRole)
+        bb.accepted.connect(d.accept)
+        bb.rejected.connect(d.reject)
+        lay.addWidget(bb)
+        d.exec()
+        if d.result() == QDialog.DialogCode.Accepted:
+            self._close_multiview()
+        else:
+            win._conflict_kept = True
+
     def _stop_docked_for_multiview(self) -> None:
         p = getattr(self, "player", None)
         if p is None or not getattr(p, "current_url", None):

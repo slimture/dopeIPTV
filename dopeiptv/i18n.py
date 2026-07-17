@@ -3338,6 +3338,45 @@ _STRINGS: dict[str, dict[str, str]] = {
         "de": "Pause / Wiedergabe", "fr": "Pause / lecture", "zh": "暂停 / 播放",
         "ru": "Пауза / воспроизведение", "th": "หยุด / เล่น",
     },
+    "mv_conflict_title": {
+        "en": "Multiview is running", "sv": "Multiview är igång",
+        "es": "Multivista está activa", "de": "Multiview läuft",
+        "fr": "Le multivue est actif", "zh": "多画面正在运行",
+        "ru": "Мультиэкран работает", "th": "มัลติวิวกำลังทำงาน",
+    },
+    "mv_conflict_body": {
+        "en": "Multiview is still streaming and holds connections to your "
+              "provider. Close multiview and play here? If your account has "
+              "enough simultaneous connections you can keep both.",
+        "sv": "Multiview strömmar fortfarande och håller anslutningar till din "
+              "leverantör. Stäng multiview och spela här? Har ditt konto "
+              "tillräckligt många samtidiga anslutningar kan du behålla båda.",
+        "es": "Multivista sigue transmitiendo y mantiene conexiones con tu "
+              "proveedor. ¿Cerrar multivista y reproducir aquí? Si tu cuenta "
+              "tiene suficientes conexiones simultáneas puedes mantener ambas.",
+        "de": "Multiview streamt noch und hält Verbindungen zu deinem "
+              "Anbieter. Multiview schließen und hier abspielen? Hat dein "
+              "Konto genug gleichzeitige Verbindungen, kannst du beides "
+              "behalten.",
+        "fr": "Le multivue diffuse encore et occupe des connexions chez votre "
+              "fournisseur. Fermer le multivue et lire ici ? Si votre compte "
+              "dispose d'assez de connexions simultanées, vous pouvez garder "
+              "les deux.",
+        "zh": "多画面仍在播放并占用提供商连接。关闭多画面并在此播放？"
+              "如果你的账户有足够的并发连接，也可以两者并存。",
+        "ru": "Мультиэкран всё ещё вещает и занимает подключения к "
+              "провайдеру. Закрыть мультиэкран и воспроизвести здесь? Если у "
+              "аккаунта достаточно одновременных подключений, можно оставить "
+              "оба.",
+        "th": "มัลติวิวยังคงสตรีมอยู่และใช้การเชื่อมต่อกับผู้ให้บริการ ปิดมัลติวิวแล้วเล่นที่นี่หรือไม่ "
+              "หากบัญชีของคุณมีการเชื่อมต่อพร้อมกันเพียงพอ คุณสามารถเก็บทั้งสองไว้ได้",
+    },
+    "mv_keep": {
+        "en": "Keep multiview", "sv": "Behåll multiview",
+        "es": "Mantener multivista", "de": "Multiview behalten",
+        "fr": "Garder le multivue", "zh": "保留多画面",
+        "ru": "Оставить мультиэкран", "th": "คงมัลติวิวไว้",
+    },
     "mv_title": {
         "en": "dopeIPTV — Multiview", "sv": "dopeIPTV — Multiview",
         "es": "dopeIPTV — Multivista", "de": "dopeIPTV — Multiview",

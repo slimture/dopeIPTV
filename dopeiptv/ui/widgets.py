@@ -88,7 +88,9 @@ class _SidebarLogo(QWidget):
         (instance attrs shadow the class constants; paintEvent reads self.*,
         so everything - pill, triangle, bars, badge - scales together)."""
         if on:
-            self.LOGO_W, self.LOGO_H = 44, 20
+            # Small enough to clear the 60 px rail's margins with room to
+            # spare (44 px wide sat flush against the edges and clipped).
+            self.LOGO_W, self.LOGO_H = 36, 16
         else:
             for a in ("LOGO_W", "LOGO_H"):
                 self.__dict__.pop(a, None)

@@ -3143,6 +3143,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                         item=None, catchup: bool = False) -> None:
         if not self._guard_stream_switch(url, title):
             return
+        # Multiview holds provider connections - starting playback here while
+        # its streams run would be refused on a tight connection limit. Offer
+        # (once per multiview window) to close it; keeping both is fine on
+        # accounts with spare connections.
+        self._maybe_close_multiview_for_playback()
         # Whether this is a catch-up/archive segment. Set here (not by callers)
         # so any normal play - including a live channel opened via play_item /
         # zap, which goes straight through _start_playback - always clears it,
