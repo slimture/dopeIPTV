@@ -37,6 +37,12 @@ import sys
 
 CREDS_PATH = os.path.expanduser("~/.dopeiptv-airplay-probe.json")
 
+# Apple's own public HLS sample (bipbop). If THIS plays on the TV, the whole
+# AirPlay path works and any failure with a provider URL is about that
+# stream's format - run with --demo to test it.
+DEMO_URL = ("https://devstreaming-cdn.apple.com/videos/streaming/examples/"
+            "img_bipbop_adv_example_ts/master.m3u8")
+
 
 def load_creds() -> dict:
     try:
@@ -122,7 +128,10 @@ async def main() -> int:
         finally:
             await pairing.close()
 
-    if len(sys.argv) > 1:
+    if "--demo" in sys.argv[1:]:
+        url = DEMO_URL
+        print("\nUsing Apple's public HLS demo stream (bipbop).")
+    elif len(sys.argv) > 1:
         url = sys.argv[1]
     else:
         url = input("\nStream URL to play (.m3u8 recommended): ").strip()
@@ -139,8 +148,25 @@ async def main() -> int:
         print("Asking the Apple TV to play the stream - WATCH THE TV.\n"
               "(play_url blocks while the stream runs; Ctrl+C here stops "
               "the probe, the TV may keep playing a few seconds.)\n")
-        await atv.stream.play_url(url)
-        print("play_url returned - stream ended or the TV took over.")
+        try:
+            await atv.stream.play_url(url)
+            print("play_url returned - stream ended or the TV took over.")
+        except pyatv.exceptions.HttpError as e:
+            # The play command itself was ACCEPTED (we got as far as the
+            # status polling). tvOS answers 500 on /playback-info when it
+            # has no playable session - i.e. the TV most likely could not
+            # play this particular stream (container/codecs), or briefly
+            # during startup. What the TV screen showed is the verdict.
+            print(f"Status polling failed: {e}\n\n"
+                  "The play command WAS delivered. If the TV shows video "
+                  "anyway, this is only a polling quirk (fine - the real "
+                  "integration handles it). If the TV shows nothing or "
+                  "bounced back to the home screen, the TV could not play "
+                  "this stream - try:\n"
+                  "  1. python3 tools/airplay_probe.py --demo\n"
+                  "     (Apple's own HLS sample - proves the AirPlay path)\n"
+                  "  2. the same channel with .m3u8 instead of .ts\n"
+                  "  3. a couple of other channels")
     finally:
         atv.close()
     print("\nIf video played on the TV: Phase 0 is GREEN.")
