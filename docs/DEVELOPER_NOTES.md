@@ -111,3 +111,22 @@ they'd need a display server). `mypy` type-checks the pure-logic modules
 today (`[tool.mypy] files` in `pyproject.toml`); grow that list as modules
 gain type hints. A release build also runs a GUI-less `--self-check` that
 loads the bundled libmpv.
+
+## Parked: AirPlay to Apple TV
+
+Proven not viable on 2026-07-18 with real hardware: pyatv 0.18.0 pairs and
+connects to an Apple TV 4K fine, but `play_url` fails (HTTP 500 on
+`/playback-info`, nothing renders on the TV) — even with Apple's own public
+HLS demo stream, so it is not a provider-format problem. Known upstream
+issue ([pyatv #2512](https://github.com/postlund/pyatv/issues/2512), closed
+unresolved): tvOS 18 effectively broke the legacy AirPlay video API for
+third-party senders.
+
+To re-evaluate after a pyatv release that mentions AirPlay-video/`play_url`
+fixes, run `python3 tools/airplay_probe.py --demo` against an Apple TV
+(2 minutes; pairing credentials are cached). If the demo stream plays, the
+planned design is: an `AppleTVManager` mirroring `ChromecastManager` (lazy
+import, its own asyncio loop in a worker thread), Apple TVs listed in the
+shared cast dialog, a PIN pairing flow, `.m3u8` forced for live, and the
+option hidden for `.mkv` VOD (AirPlay cannot play Matroska). macOS users
+always have the OS-level fallback: Control Center screen mirroring.
