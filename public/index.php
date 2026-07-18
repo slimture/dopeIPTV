@@ -194,8 +194,8 @@ unset($g);
         <p>Not a repurposed media library — a TV client, with the timeline, the guide and the recorder where you expect them.</p>
       </div>
       <div class="grid">
-        <div class="card"><div class="ic">⊞</div><h3>Multiview</h3><p>Watch up to nine live channels at once in a grid — mix different playlists, click one for audio, with per-window timeshift and subtitles.</p></div>
         <div class="card"><div class="ic">⏱</div><h3>Timeshift &amp; catch-up</h3><p>Scrub back into a channel's archive on a live timeline, or jump straight to a past programme from the guide.</p></div>
+        <div class="card"><div class="ic">⊞</div><h3>Multiview</h3><p>Watch up to nine live channels at once in a grid — mix different playlists, click one for audio, with per-window timeshift and subtitles.</p></div>
         <div class="card"><div class="ic">⏸</div><h3>Pause live TV</h3><p>DVR-style pause and resume behind live — the player shows exactly how far behind you are.</p></div>
         <div class="card"><div class="ic">▦</div><h3>Full EPG guide</h3><p>A real programme grid with search, reminders and a configurable list of what's coming up next.</p></div>
         <div class="card"><div class="ic">⏺</div><h3>One-click recording</h3><p>Record the stream you're watching over a single connection, with timers, size caps and a Recordings library.</p></div>
