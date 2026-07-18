@@ -73,6 +73,14 @@ $osHelp  = [
     'macOS'   => 'One image works on both Apple Silicon (M-series) and Intel Macs.',
     'Windows' => 'Portable build — unzip and run, nothing to install. Newest platform, still being polished.',
 ];
+// Per-OS "how to install" note, shown right under each OS's downloads so the
+// steps sit with the files they apply to (instead of one detached block at
+// the bottom of the section).
+$osInstall = [
+    'Linux'   => '🐧 <b>AppImage:</b> make it executable and run it — nothing to install: <code>chmod +x dopeIPTV-*.AppImage &amp;&amp; ./dopeIPTV-*.AppImage</code>. <b>.deb</b> (Debian/Ubuntu): <code>sudo apt install ./dopeIPTV-*.deb</code>. <b>.rpm</b> (Fedora/RHEL): <code>sudo dnf install ./dopeIPTV-*.rpm</code>.',
+    'macOS'   => '🍎 Open the <code>.dmg</code> and drag dopeIPTV to Applications. Because the app isn\'t notarized by Apple yet, the first launch may be blocked — <b>right-click the app → Open</b>, then <b>Open</b> in the dialog (or allow it under <b>System Settings → Privacy &amp; Security → Open Anyway</b>). If macOS instead says the app is <b>“damaged”</b>, clear the download flag in Terminal: <code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code>. It\'s safe — the warning only means the build isn\'t code-signed.',
+    'Windows' => '🪟 Unzip the folder and run <code>dopeiptv.exe</code>. Because the app isn\'t code-signed yet, SmartScreen may show <b>“Windows protected your PC”</b> — click <b>More info → Run anyway</b>. It\'s only a warning, nothing is blocked or removed.',
+];
 $groups = [];
 foreach ($assets as $a) {
     $m = dl_meta($a['name'] ?? '');
@@ -274,6 +282,9 @@ foreach ($shots as [$file, $alt, $title, $cap]):
           </a>
 <?php endforeach; ?>
         </div>
+<?php if (!empty($osInstall[$os])): ?>
+        <p class="autonote"><?= $osInstall[$os] ?></p>
+<?php endif; ?>
       </div>
 <?php endforeach; else: ?>
       <div class="dls">
@@ -282,19 +293,6 @@ foreach ($shots as [$file, $alt, $title, $cap]):
           <span class="go">Open →</span>
         </a>
       </div>
-<?php endif; ?>
-<?php
-      $hasMac = false; $hasWindows = false;
-      foreach ($assets as $a) {
-          $nm = strtolower($a['name'] ?? '');
-          if (($a['icon'] ?? '') === '🍎' || str_ends_with($nm, '.dmg') || str_ends_with($nm, '.pkg') || str_contains($nm, 'macos')) { $hasMac = true; }
-          if (($a['icon'] ?? '') === '🪟' || str_contains($nm, 'win')) { $hasWindows = true; }
-      }
-      if ($hasMac): ?>
-      <p class="autonote">🍎 On macOS, open the <code>.dmg</code> and drag dopeIPTV to Applications. Because the app isn't notarized by Apple yet, the first launch may be blocked — <b>right-click the app → Open</b>, then <b>Open</b> in the dialog (or allow it under <b>System Settings → Privacy &amp; Security → Open Anyway</b>). If macOS instead says the app is <b>“damaged”</b>, clear the download flag in Terminal: <code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code>. It's safe — the warning only means the build isn't code-signed.</p>
-<?php endif; ?>
-<?php if ($hasWindows): ?>
-      <p class="autonote">🪟 On Windows, unzip the folder and run <code>dopeiptv.exe</code>. Because the app isn't code-signed yet, SmartScreen may show <b>“Windows protected your PC”</b> — click <b>More info → Run anyway</b>. It's only a warning, nothing is blocked or removed.</p>
 <?php endif; ?>
       <p class="autonote">↻ Generated on the server from the <code>slimture/dopeIPTV</code> GitHub releases — new builds appear automatically.</p>
 <?php if (is_file(__DIR__ . '/files/SHA256SUMS')): ?>
