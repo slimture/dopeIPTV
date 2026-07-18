@@ -8,7 +8,8 @@
 $SITE   = 'https://iptv.dope.rs';
 $REPO   = 'https://github.com/slimture/dopeIPTV';
 $DESC   = 'dopeIPTV is a fast, open-source desktop IPTV player for Xtream Codes '
-        . '& M3U with a full EPG guide, live timeshift, catch-up TV and recording. '
+        . '& M3U with a full EPG guide, live timeshift, catch-up TV, recording '
+        . 'and multiview — watch up to nine channels at once. '
         . 'For Linux, macOS and Windows.';
 
 $rel = @json_decode(@file_get_contents(__DIR__ . '/releases.json'), true);
@@ -91,7 +92,7 @@ unset($g);
 <link rel="canonical" href="<?= h($SITE) ?>/">
 <meta name="theme-color" content="#0f1218">
 <meta name="robots" content="index,follow">
-<meta name="keywords" content="IPTV player, Xtream Codes, M3U, EPG, XMLTV, timeshift, catch-up TV, IPTV recording, Linux IPTV, macOS IPTV, Windows IPTV, dopeIPTV">
+<meta name="keywords" content="IPTV player, Xtream Codes, M3U, EPG, XMLTV, timeshift, catch-up TV, IPTV recording, IPTV multiview, watch multiple channels, multi-screen IPTV, Linux IPTV, macOS IPTV, Windows IPTV, dopeIPTV">
 <!-- Open Graph -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="dopeIPTV">
@@ -147,7 +148,7 @@ unset($g);
       <div>
         <span class="eyebrow"><span class="dot"></span> On air · version <?= h($version) ?></span>
         <h1>Live TV, catch-up and recordings — in one <span class="hl">native desktop</span> app.</h1>
-        <p class="lede">A fast, keyboard-driven IPTV client for Xtream Codes &amp; M3U. Scrub back into a channel's archive, pause live TV, browse the full EPG, and record — with a built-in mpv player. For Linux, macOS &amp; Windows.</p>
+        <p class="lede">A fast, keyboard-driven IPTV client for Xtream Codes &amp; M3U. Scrub back into a channel's archive, pause live TV, browse the full EPG, record, and watch up to nine channels at once in multiview — with a built-in mpv player. For Linux, macOS &amp; Windows.</p>
         <div class="cta-row">
           <a class="btn primary" id="heroDownload" href="#download">Download for your system</a>
           <a class="btn ghost" href="<?= h($REPO) ?>">View source</a>
@@ -181,7 +182,7 @@ unset($g);
     <div class="wrap">
       <span class="chip">Xtream Codes</span><span class="chip">M3U / M3U8</span>
       <span class="chip">XMLTV EPG</span><span class="chip">Timeshift / catch-up</span>
-      <span class="chip">Chromecast</span><span class="chip">Trakt</span><span class="chip">8 languages</span>
+      <span class="chip">Multiview</span><span class="chip">Chromecast</span><span class="chip">Trakt</span><span class="chip">8 languages</span>
     </div>
   </div>
 
@@ -193,6 +194,7 @@ unset($g);
         <p>Not a repurposed media library — a TV client, with the timeline, the guide and the recorder where you expect them.</p>
       </div>
       <div class="grid">
+        <div class="card"><div class="ic">⊞</div><h3>Multiview</h3><p>Watch up to nine live channels at once in a grid — mix different playlists, click one for audio, with per-window timeshift and subtitles.</p></div>
         <div class="card"><div class="ic">⏱</div><h3>Timeshift &amp; catch-up</h3><p>Scrub back into a channel's archive on a live timeline, or jump straight to a past programme from the guide.</p></div>
         <div class="card"><div class="ic">⏸</div><h3>Pause live TV</h3><p>DVR-style pause and resume behind live — the player shows exactly how far behind you are.</p></div>
         <div class="card"><div class="ic">▦</div><h3>Full EPG guide</h3><p>A real programme grid with search, reminders and a configurable list of what's coming up next.</p></div>
