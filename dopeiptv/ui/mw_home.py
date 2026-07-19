@@ -14,7 +14,9 @@ from __future__ import annotations
 import time
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QPainter, QPainterPath, QPixmap
+from PyQt6.QtGui import (
+    QColor, QFont, QIcon, QPainter, QPainterPath, QPen, QPixmap,
+)
 from PyQt6.QtWidgets import (
     QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea,
     QVBoxLayout, QWidget,
@@ -25,9 +27,28 @@ from ..i18n import tr
 from .theme import ACCENT, P
 
 # Card geometry (image area; the card adds a text strip underneath).
-HERO_W, HERO_H = 240, 360          # big hero posters
-POSTER_W, POSTER_H = 150, 225      # shelf posters
-CHAN_W, CHAN_H = 240, 120          # landscape live-channel tiles
+HERO_W, HERO_H = 300, 420          # big hero posters
+POSTER_W, POSTER_H = 160, 240      # shelf posters
+CHAN_W, CHAN_H = 250, 130          # landscape live-channel tiles
+
+
+def _x_icon(size: int, color: str) -> QIcon:
+    """A drawn close X (the ✕ glyph renders as a tofu box on some fonts)."""
+    scale = 3
+    pm = QPixmap(size * scale, size * scale)
+    pm.setDevicePixelRatio(float(scale))
+    pm.fill(Qt.GlobalColor.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    pen = QPen(QColor(color))
+    pen.setWidthF(max(1.6, size * 0.14))
+    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    p.setPen(pen)
+    m = size * 0.3
+    p.drawLine(int(m), int(m), int(size - m), int(size - m))
+    p.drawLine(int(size - m), int(m), int(m), int(size - m))
+    p.end()
+    return QIcon(pm)
 
 
 def _cover_pixmap(pm: QPixmap, w: int, h: int, radius: int = 10) -> QPixmap:
@@ -157,7 +178,13 @@ class _Shelf(QWidget):
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._scroll.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        # Opaque backgrounds on the viewport + row: without them a horizontal
+        # scroll on macOS leaves the previous cards behind as trails (the
+        # transparent widgets aren't repainted under the moved content).
+        self._scroll.viewport().setStyleSheet(f"background:{P['bg']};")
         self._row = QWidget()
+        self._row.setAutoFillBackground(True)
+        self._row.setStyleSheet(f"background:{P['bg']};")
         self._h = QHBoxLayout(self._row)
         self._h.setContentsMargins(0, 0, 0, 0)
         self._h.setSpacing(14)
@@ -214,16 +241,30 @@ class HomePage(QWidget):
             if wdg is not None:
                 wdg.deleteLater()
 
+    _PILL_QSS = (
+        "QPushButton { background: %(pane)s; color: %(text)s;"
+        " border: 1px solid %(border)s; border-radius: 16px;"
+        " padding: 7px 18px; font-size: 13px; font-weight: 600; }"
+        "QPushButton:hover { border-color: %(acc)s; color: %(text)s;"
+        " background: %(hover)s; }"
+    )
+
     def _top_bar(self) -> QWidget:
         """Quick-nav pills (like the reference apps' top bar) + a close X."""
+        qss = self._PILL_QSS % {
+            "pane": QColor(P["pane"]).lighter(112).name(), "text": P["text"],
+            "border": QColor(P["pane"]).lighter(135).name(), "acc": ACCENT,
+            "hover": QColor(P["pane"]).lighter(125).name()}
         bar = QWidget()
         h = QHBoxLayout(bar)
-        h.setContentsMargins(0, 0, 0, 0)
+        h.setContentsMargins(0, 4, 0, 4)
+        h.setSpacing(10)
         h.addStretch(1)
 
         def pill(text, fn):
             b = QPushButton(text)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setStyleSheet(qss)
             b.clicked.connect(fn)
             h.addWidget(b)
 
@@ -236,10 +277,17 @@ class HomePage(QWidget):
              lambda: self._leave_to(lambda: w.switch_mode("series")))
         pill(tr("btn_settings"), w.open_settings)
         h.addStretch(1)
-        close = QPushButton("✕")
-        close.setFixedWidth(34)
+        close = QPushButton()
+        close.setIcon(_x_icon(16, P["text"]))
+        close.setFixedSize(36, 34)
         close.setToolTip(tr("common_close"))
         close.setCursor(Qt.CursorShape.PointingHandCursor)
+        close.setStyleSheet(
+            "QPushButton { background: %s; border:1px solid %s;"
+            " border-radius: 17px; }"
+            "QPushButton:hover { border-color: %s; }" % (
+                QColor(P["pane"]).lighter(112).name(),
+                QColor(P["pane"]).lighter(135).name(), ACCENT))
         close.clicked.connect(self.window._leave_home)
         h.addWidget(close)
         return bar
@@ -254,11 +302,12 @@ class HomePage(QWidget):
         def on(key):
             return s.value(key, "true") == "true"
 
-        # Hero + media shelves fill in when the async provider fetch lands.
-        self._hero_box = QWidget()
-        QHBoxLayout(self._hero_box).setContentsMargins(0, 0, 0, 0)
-        self._hero_box.layout().setSpacing(16)
-        self._v.addWidget(self._hero_box)
+        # Hero shelf fills in when the async provider fetch lands; hidden
+        # until then so it doesn't reserve an empty gap (or linger on a
+        # provider with no VOD).
+        self._hero_shelf = _Shelf(tr("home_featured"))
+        self._hero_shelf.hide()
+        self._v.addWidget(self._hero_shelf)
 
         if on("home_sh_resume"):
             rows = []
@@ -310,9 +359,17 @@ class HomePage(QWidget):
                                  it.get("name") or "?")
                     card.clicked.connect(
                         lambda it=it: self._play_history(it))
-                    self._set_art(card, it.get("_icon"),
-                                  w.logos if live else w.poster_art,
-                                  contain=live)
+                    if live:
+                        # A channel logo, contained on a panel.
+                        self._set_art(card, it.get("stream_icon"), w.logos,
+                                      contain=True)
+                    else:
+                        # A movie/episode: resolve a real poster through the
+                        # cover pipeline (the raw history icon is often a tiny
+                        # provider thumb, or missing).
+                        k = "episode" if it.get("_kind") == "episode" else "vod"
+                        self._set_art(card, self._media_art(it, k),
+                                      w.poster_art)
                     shelf.add(card)
                 shelf.finish(POSTER_H)
                 self._v.addWidget(shelf)
@@ -359,7 +416,7 @@ class HomePage(QWidget):
             vod.sort(key=lambda i: self._num(i.get("added")), reverse=True)
             ser.sort(key=lambda i: self._num(i.get("last_modified")),
                      reverse=True)
-            vod, ser = vod[:14], ser[:14]
+            vod, ser = vod[:24], ser[:20]
             w._home_media_cache = (time.time(), vod, ser)
             if gen == self._gen:
                 try:
@@ -373,15 +430,18 @@ class HomePage(QWidget):
         w = self.window
         s = w.settings
 
-        # Hero: the freshest movies as oversized posters with rating.
-        for it in vod[:4]:
+        # Hero: the freshest movies as oversized posters with rating, in a
+        # horizontally scrolling row (not a fixed four).
+        for it in vod[:12]:
             rating = str(it.get("rating") or "").strip()
             card = _Card(HERO_W, HERO_H, it.get("name") or "?",
                          (f"★ {rating}" if rating else ""))
             card.clicked.connect(lambda it=it: self._play_media(it))
             self._set_art(card, self._media_art(it), w.poster_art)
-            self._hero_box.layout().addWidget(card)
-        self._hero_box.layout().addStretch(1)
+            self._hero_shelf.add(card)
+        if vod:
+            self._hero_shelf.finish(HERO_H)
+            self._hero_shelf.show()
 
         if s.value("home_sh_movies", "true") == "true" and vod:
             shelf = _Shelf(tr("home_new_movies"))
@@ -404,11 +464,16 @@ class HomePage(QWidget):
             self._movies_box.addWidget(shelf)
 
     def _media_art(self, it: dict, kind: str = "vod") -> str | None:
+        # Episodes rarely carry their own poster: borrow the series'
+        # artwork from the stored context so an episode card still shows a
+        # poster instead of a bare initial.
+        ctx = it.get("_series_ctx") or {}
+        raw = (it.get("cover") or it.get("stream_icon")
+               or ctx.get("cover") or ctx.get("stream_icon"))
         try:
-            return self.window.cover.cover_url(it, kind) \
-                or it.get("stream_icon") or it.get("cover")
+            return self.window.cover.cover_url(it, kind) or raw
         except Exception:
-            return it.get("stream_icon") or it.get("cover")
+            return raw
 
     def _set_art(self, card: _Card, url, loader, contain: bool = False) -> None:
         if not url or loader is None:
@@ -443,14 +508,25 @@ class HomePage(QWidget):
             pass
 
     def _play_media(self, it: dict) -> None:
+        """Movie or a continue-watching row. Built directly (not via
+        play_item, whose URL/kind logic keys off the classic view's MODE -
+        a movie clicked from Home would otherwise be built as a live URL)."""
         w = self.window
         w._leave_home()
-        # play_item's series special-case keys off the current MODE; a movie
-        # clicked while the classic view sits in Series would be "entered"
-        # instead of played, so steer the mode first.
-        if w.mode == "series" and it.get("series_id") is None:
-            w.switch_mode("vod")
-        w.play_item(it)
+        # A continue-watching episode replays from its stored series context.
+        if it.get("_kind") == "episode" and it.get("_series_ctx") is not None:
+            w.play_item(it)
+            return
+        sid = it.get("stream_id")
+        if sid is None:
+            return
+        url = w.client.vod_url(sid, it.get("container_extension"))
+        if not url:
+            return
+        w._start_playback(
+            url, it.get("name") or it.get("title") or "dopeIPTV",
+            it.get("stream_icon") or it.get("cover"),
+            w._item_key(it), "movie", item=it)
 
     def _open_series(self, it: dict) -> None:
         w = self.window
@@ -460,9 +536,18 @@ class HomePage(QWidget):
         w._enter_series(it)
 
     def _play_history(self, it: dict) -> None:
+        """Replay a history row straight from its stored URL + kind, so it
+        works regardless of the classic view's current mode."""
         w = self.window
         w._leave_home()
-        w.play_item(it)
+        url = it.get("_url")
+        if not url:
+            return
+        kind = it.get("_kind") or "live"
+        if kind == "episode" and it.get("_series_ctx") is None:
+            kind = "movie"   # no series context to autoplay-next; just play it
+        w._start_playback(url, it.get("name") or "dopeIPTV",
+                          it.get("stream_icon"), it.get("_key"), kind, item=it)
 
     def keyPressEvent(self, e) -> None:
         if e.key() == Qt.Key.Key_Escape:

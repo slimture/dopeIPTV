@@ -63,6 +63,11 @@ _STRINGS: dict[str, dict[str, str]] = {
         "en": "Home", "sv": "Hem", "es": "Inicio", "de": "Start",
         "fr": "Accueil", "zh": "主页", "ru": "Главная", "th": "หน้าแรก",
     },
+    "home_featured": {
+        "en": "Featured", "sv": "Utvalt", "es": "Destacados",
+        "de": "Empfohlen", "fr": "À la une", "zh": "精选",
+        "ru": "Рекомендуемое", "th": "แนะนำ",
+    },
     "home_resume": {
         "en": "Continue watching", "sv": "Fortsätt titta",
         "es": "Seguir viendo", "de": "Weiterschauen",

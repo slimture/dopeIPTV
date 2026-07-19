@@ -57,14 +57,18 @@ assert "Halfway Movie" in joined, joined     # resume shelf
 assert "Fav Chan" in joined                  # favorites-now shelf
 assert "Chan One" in joined                  # recently viewed shelf
 
-# Clicking a media card leaves Home and routes into playback.
-played = []
-w.play_item = lambda it, *a, **k: played.append(it.get("name"))
+# Clicking a movie card leaves Home and plays it as a MOVIE (not via the
+# mode-sensitive play_item - a movie must not be built as a live URL).
+plays = []
+def fake_sp(url, title, icon, key, kind, *a, **k):
+    plays.append((title, kind))
+w._start_playback = fake_sp
+w.client.vod_url = lambda sid, ext=None: f"http://x/movie/{sid}.{ext or 'mp4'}"
 page._play_media({"stream_id": 7, "name": "Halfway Movie",
                   "container_extension": "mp4"})
 app.processEvents()
 assert not w._home_showing()
-assert played == ["Halfway Movie"], played
+assert plays == [("Halfway Movie", "movie")], plays
 
 # Switching any classic mode also leaves Home.
 w._show_home_page(); app.processEvents()
