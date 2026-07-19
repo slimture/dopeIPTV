@@ -12,14 +12,14 @@ from __future__ import annotations
 import time
 from datetime import datetime
 
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import QRectF, Qt, QTimer
 from PyQt6.QtGui import (
     QBrush, QColor, QFont, QIcon, QPainter, QPainterPath, QPen, QPixmap,
 )
 from PyQt6.QtWidgets import (
-    QDialog, QGraphicsItemGroup, QGraphicsPixmapItem, QGraphicsRectItem,
-    QGraphicsScene, QGraphicsSimpleTextItem, QGraphicsView, QHBoxLayout,
-    QLabel, QLineEdit, QMenu, QPushButton, QVBoxLayout,
+    QDialog, QGraphicsItemGroup, QGraphicsPathItem, QGraphicsPixmapItem,
+    QGraphicsRectItem, QGraphicsScene, QGraphicsSimpleTextItem, QGraphicsView,
+    QHBoxLayout, QLabel, QLineEdit, QMenu, QPushButton, QVBoxLayout,
 )
 
 from ..i18n import tr
@@ -76,13 +76,6 @@ class EpgGridDialog(QDialog):
     FUTURE_HOURS = 12       # how far ahead the board reaches
     MAX_PAST_HOURS = 48     # cap on how far back timeshift opens the board
     MAX_CHANNELS = 300       # a grid past this is unreadable anyway
-
-    # Distinct, muted row accents that read on both light and dark themes.
-    ROW_COLORS = [
-        "#3b5ba5", "#3f7d5a", "#8a5a2b", "#7a3f6e", "#2f6f7a",
-        "#8a4b4b", "#5a5a8a", "#6e7a2f", "#7a5a2f", "#4b6e8a",
-        "#616a45", "#734b73",
-    ]
 
     def __init__(self, window, channels, category_name=None) -> None:
         super().__init__(window)
@@ -491,9 +484,27 @@ class EpgGridDialog(QDialog):
             return False
         return key is not None and key == getattr(w, "_playing_key", None)
 
+    def _tone(self, key: str) -> QColor:
+        """Monochrome guide palette, all derived from the theme's pane colour
+        so the board reads as one tonal surface - logos and the accent (now /
+        playing / selected) are the only colour. Replaces the old per-row
+        rainbow, which read as noisy."""
+        pane = QColor(P["pane"])
+        return {
+            "row_a": pane,                       # zebra shade A
+            "row_b": pane.lighter(108),          # zebra shade B
+            "cell": pane.darker(104),            # channel-name column
+            "block": pane.lighter(128),          # a programme card
+            "block_now": pane.lighter(150),      # on-air card, brighter
+            "block_past": pane.lighter(110),     # already aired, recedes
+            "edge": pane.darker(118),            # thin card border
+        }[key]
+
     def _draw_channel_row(self, row: int, ch: dict) -> None:
         y = self.HEADER_H + row * self.ROW_H
-        base = QColor(self.ROW_COLORS[row % len(self.ROW_COLORS)])
+        tones = {k: self._tone(k) for k in
+                 ("row_a", "row_b", "cell", "block", "block_now",
+                  "block_past", "edge")}
         playing = self._is_playing(ch)
         if playing:
             self._playing_row = row
@@ -501,12 +512,21 @@ class EpgGridDialog(QDialog):
             has_ts = self.window._timeshift_days(ch) > 0
         except Exception:
             has_ts = False
+        # Faint zebra band behind the whole row for readability across the
+        # wide timeline (subtle, since the cards already separate programmes).
+        zebra = QGraphicsRectItem(self.CH_COL_W, y, self._grid_w, self.ROW_H)
+        zebra.setBrush(QBrush(tones["row_a"] if row % 2 == 0
+                              else tones["row_b"]))
+        zebra.setPen(QPen(Qt.PenStyle.NoPen))
+        zebra.setZValue(2)
+        zebra.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+        self.scene.addItem(zebra)
         cell = QGraphicsRectItem(0, y, self.CH_COL_W, self.ROW_H)
         if playing:
             cell.setBrush(QBrush(QColor(ACCENT)))
             cell.setPen(QPen(QColor("#ffffff"), 2))
         else:
-            cell.setBrush(QBrush(base.darker(120)))
+            cell.setBrush(QBrush(tones["cell"]))
             cell.setPen(QPen(QColor(P["bg"]), 1))
         # The channel-name cell is clickable too (prog=None -> tune live).
         # Hit-testing keys off data(0), which only programme blocks used to
@@ -568,21 +588,21 @@ class EpgGridDialog(QDialog):
         row_blocks: list = []
         drew_any = False
         now = time.time()
-        for i, p in enumerate(
-                self.window.xmltv.programmes_in(ch, self._start, self._stop)):
+        for p in self.window.xmltv.programmes_in(ch, self._start, self._stop):
             x1 = max(self.CH_COL_W, self._x(p["start_timestamp"]))
             x2 = min(self.CH_COL_W + self._grid_w, self._x(p["stop_timestamp"]))
             if x2 - x1 < 2:
                 continue
             drew_any = True
-            shade = base.lighter(120) if i % 2 == 0 else base.lighter(102)
-            block = QGraphicsRectItem(x1 + 1, y + 2, x2 - x1 - 2, self.ROW_H - 4)
-            block.setBrush(QBrush(shade))
-            block.setPen(QPen(QColor(P["bg"]), 1))
-            block.setZValue(5)
+            if p["start_timestamp"] <= now < p["stop_timestamp"]:
+                fill = tones["block_now"]
+            elif p["stop_timestamp"] <= now:
+                fill = tones["block_past"]
+            else:
+                fill = tones["block"]
             data = {"channel": ch, "prog": p}
-            block.setData(0, data)
-            self.scene.addItem(block)
+            block = self._card(x1 + 1, y + 3, x2 - x1 - 3, self.ROW_H - 6,
+                               fill, tones["edge"], data)
             # State glyphs on the block itself: a scheduled/running recording
             # and a set reminder used to be visible only in the context menu.
             prefix = ""
@@ -594,36 +614,59 @@ class EpgGridDialog(QDialog):
                     and self.window.reminders.has(ch.get("stream_id"),
                                                   p["start_timestamp"])):
                 prefix += "🔔 "
-            label = QGraphicsSimpleTextItem(prefix + (p.get("title") or "?"),
-                                            block)
-            label.setBrush(QColor("#ffffff"))
-            self._elide(label, x2 - x1 - 10)
-            label.setPos(x1 + 5, y + 7)
-            label.setData(0, data)
-            row_blocks.append({"item": block, "data": data})
+            text = prefix + (p.get("title") or "?")
+            faded = p["stop_timestamp"] <= now
+            label = self._block_label(text, x1, x2, y, data,
+                                      QColor(P["muted"]) if faded
+                                      else QColor("#ffffff"))
+            row_blocks.append({"item": block, "data": data, "label": label,
+                               "x1": x1, "x2": x2, "y": y, "text": text})
         if not drew_any:
-            # No EPG for this channel: fill the row with one muted block so
-            # the whole timeline is still clickable and plays the channel
-            # live - and says why it's empty.
-            block = QGraphicsRectItem(self.CH_COL_W + 1, y + 2,
-                                      self._grid_w - 2, self.ROW_H - 4)
-            block.setBrush(QBrush(base.lighter(105)))
-            block.setPen(QPen(QColor(P["bg"]), 1))
-            block.setZValue(5)
+            # No EPG for this channel: fill the row so the whole timeline is
+            # still clickable and plays the channel live - and says why it's
+            # empty (or that the guide is still loading).
             data = {"channel": ch, "prog": None}
-            block.setData(0, data)
-            self.scene.addItem(block)
-            # While the guide is still loading, say so instead of the
-            # misleading "no guide available for this channel".
-            label = QGraphicsSimpleTextItem(
-                tr("epg_no_guide_available") if self._epg_ready()
-                else tr("status_loading_programme_guide"), block)
-            label.setBrush(QColor("#9aa3b2"))
-            self._elide(label, self._grid_w - 12)
-            label.setPos(self.CH_COL_W + 6, y + 7)
-            label.setData(0, data)
-            row_blocks.append({"item": block, "data": data})
+            block = self._card(self.CH_COL_W + 1, y + 3, self._grid_w - 3,
+                               self.ROW_H - 6, tones["block_past"],
+                               tones["edge"], data)
+            text = (tr("epg_no_guide_available") if self._epg_ready()
+                    else tr("status_loading_programme_guide"))
+            label = self._block_label(text, self.CH_COL_W, self.CH_COL_W
+                                      + self._grid_w, y, data,
+                                      QColor("#9aa3b2"))
+            row_blocks.append({"item": block, "data": data, "label": label,
+                               "x1": self.CH_COL_W,
+                               "x2": self.CH_COL_W + self._grid_w,
+                               "y": y, "text": text})
         self._rows.append((ch, row_blocks))
+
+    def _card(self, x, y, w, h, fill, edge, data) -> QGraphicsPathItem:
+        """A rounded programme card. Rounded (a path item, not a plain rect)
+        for the softer look; carries the click payload like the old blocks."""
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(x, y, w, h), 6, 6)
+        item = QGraphicsPathItem(path)
+        item.setBrush(QBrush(fill))
+        item.setPen(QPen(edge, 1))
+        item.setZValue(5)
+        item.setData(0, data)
+        self.scene.addItem(item)
+        return item
+
+    def _block_label(self, text, x1, x2, y, data, color) -> \
+            QGraphicsSimpleTextItem:
+        """A top-level (not block-child) programme title, so it can be
+        re-anchored to the left visible edge as the timeline scrolls
+        (_reflow_labels) - the title stays readable while the card slides
+        under the channel column."""
+        label = QGraphicsSimpleTextItem(text)
+        label.setBrush(color)
+        label.setZValue(8)
+        label.setData(0, data)
+        self._elide(label, x2 - x1 - 12)
+        label.setPos(x1 + 6, y + 7)
+        self.scene.addItem(label)
+        return label
 
     def _has_rec_job(self, ch: dict, p: dict) -> bool:
         """A scheduled/running recording overlapping this programme on this
@@ -662,21 +705,20 @@ class EpgGridDialog(QDialog):
         now = time.time()
         fill = QColor(ACCENT)
         fill.setAlpha(210)
-        for row, (_ch, blocks) in enumerate(self._rows):
-            y = self.HEADER_H + row * self.ROW_H
+        for _ch, blocks in self._rows:
             for b in blocks:
                 p = b["data"]["prog"]
                 if not p or not (p["start_timestamp"] <= now
                                  < p["stop_timestamp"]):
                     continue
-                r = b["item"].rect()
+                x1, x2, y = b["x1"], b["x2"], b["y"]
                 frac = ((now - p["start_timestamp"])
                         / max(1, p["stop_timestamp"] - p["start_timestamp"]))
-                bar = QGraphicsRectItem(r.x(), y + self.ROW_H - 7,
-                                        max(2.0, r.width() * frac), 3)
+                bar = QGraphicsRectItem(x1 + 1, y + self.ROW_H - 8,
+                                        max(2.0, (x2 - x1 - 3) * frac), 3)
                 bar.setBrush(QBrush(fill))
                 bar.setPen(QPen(Qt.PenStyle.NoPen))
-                bar.setZValue(7)
+                bar.setZValue(9)
                 bar.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
                 self.scene.addItem(bar)
                 self._progress.append(bar)
@@ -712,6 +754,55 @@ class EpgGridDialog(QDialog):
         self._header_group.setY(tl.y())
         self._chan_group.setX(tl.x())
         self._corner.setPos(tl.x(), tl.y())
+        self._reflow_labels(tl.x() + self.CH_COL_W)
+
+    def _set_label(self, item, full: str, max_w: float) -> None:
+        item.setText(full)
+        self._elide(item, max_w)
+
+    def _reflow_labels(self, left: float) -> None:
+        """Keep each programme title anchored to the left visible edge of its
+        card as the timeline scrolls (TV-guide/SwipTV behaviour): a card whose
+        start has slid under the channel column still shows its title at the
+        column's right edge, until the card itself scrolls off. Only the rows
+        actually on screen are reflowed, and only the one card per row that
+        straddles the edge does the (costlier) re-elide - the rest keep their
+        static build-time position."""
+        if not self._rows:
+            return
+        pad = 6
+        vbar = self.view.verticalScrollBar()
+        top = int(vbar.value() // self.ROW_H)
+        bottom = int((vbar.value() + self.view.viewport().height())
+                     // self.ROW_H) + 1
+        for row in range(max(0, top), min(len(self._rows), bottom)):
+            for rb in self._rows[row][1]:
+                lbl = rb.get("label")
+                if lbl is None:
+                    continue
+                x1, x2, y = rb["x1"], rb["x2"], rb["y"]
+                if x2 <= left + 2:                    # card scrolled off left
+                    if not rb.get("_hidden"):
+                        lbl.setVisible(False)
+                        rb["_hidden"] = True
+                    continue
+                if rb.get("_hidden"):
+                    lbl.setVisible(True)
+                    rb["_hidden"] = False
+                if x1 >= left:                        # fully in view: static
+                    if rb.get("_stuck"):
+                        lbl.setPos(x1 + pad, y + 7)
+                        self._set_label(lbl, rb["text"], x2 - x1 - 2 * pad)
+                        rb["_stuck"] = False
+                else:                                 # straddles: stick to edge
+                    avail = x2 - left - 2 * pad
+                    if avail < 18:                    # only a sliver left: hide
+                        lbl.setVisible(False)          # rather than show "…"
+                        rb["_hidden"] = True
+                        continue
+                    lbl.setPos(left + pad, y + 7)
+                    self._set_label(lbl, rb["text"], avail)
+                    rb["_stuck"] = True
 
     # -- interaction ---------------------------------------------------------
 
