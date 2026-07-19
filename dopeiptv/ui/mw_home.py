@@ -680,16 +680,28 @@ class HomePage(QWidget):
         """Force a clean repaint after a layout change that moved shelves.
 
         Qt on macOS doesn't always repaint widgets that a layout reflow shifts,
-        so a grown hero row can leave the shelves below it ghosted behind it.
-        Repainting the canvas and the scroll viewport once the layout has
-        settled (singleShot 0) overwrites any stale frame with the page bg."""
+        so a grown hero row can leave the shelves below it ghosted behind it -
+        and filling/showing shelves while the page is hidden (returning to Home
+        while a stream plays) settles the geometry off-screen where a plain
+        update() never lands. Settle the layout, then repaint the canvas and
+        viewport *synchronously* so any stale frame is overwritten with the
+        page background. Runs on singleShot(0) so the layout is final first."""
         def _rp() -> None:
             try:
-                self._canvas.update()
-                self._scroll.viewport().update()
+                self._v.activate()                    # settle geometry now
+                self._canvas.repaint()                # synchronous full clear
+                self._scroll.viewport().repaint()
             except RuntimeError:
                 pass
         QTimer.singleShot(0, _rp)
+
+    def showEvent(self, e) -> None:
+        # Becoming visible after the page was built or filled while hidden
+        # (e.g. re-opening Home while something plays, or an async poster fetch
+        # that landed after we'd left Home) can leave shelves ghosted behind
+        # the hero on macOS. Force a clean repaint every time Home is shown.
+        super().showEvent(e)
+        self._repaint_after_reflow()
 
     def _fill_channels(self, chan: list) -> None:
         w = self.window
