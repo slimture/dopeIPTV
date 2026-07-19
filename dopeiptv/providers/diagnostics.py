@@ -54,23 +54,14 @@ def _account_reason(client) -> str | None:
     return None
 
 
-def _probe_url(url: str) -> str:
-    try:
-        r = requests.get(url, stream=True, timeout=(8, 8),
-                         headers={"User-Agent": "dopeIPTV/1.0"})
-        code = r.status_code
-        try:
-            r.close()
-        except Exception:
-            pass
-    except requests.Timeout:
-        return tr("diag_timeout")
-    except requests.ConnectionError:
-        return tr("diag_unreachable")
-    except Exception as e:
-        log.debug("stream probe failed: %s: %s", type(e).__name__, e)
-        return tr("diag_generic")
-    log.info("stream probe: HTTP %s", code)
+# HTTP statuses that mean "this stream is definitively not going to play right
+# now" (as opposed to a transient blip worth retrying) - so the UI can stop the
+# silent-reconnect loop early and surface the reason immediately.
+DEFINITIVE_CODES = (401, 403, 404, 407, 458)
+
+
+def reason_for_code(code: int) -> str:
+    """Map an HTTP status from the stream probe to a human sentence."""
     if code == 200:
         return tr("diag_http_ok_no_play")
     if code in (401, 403):
@@ -88,3 +79,40 @@ def _probe_url(url: str) -> str:
     if code == 458:
         return tr("diag_blocked", code=code)
     return tr("diag_http_error", code=code)
+
+
+def stream_status(url: str) -> int | None:
+    """The HTTP status the stream URL answers with, or None if it couldn't be
+    reached. A short timeout so it can run in parallel with the reconnect loop
+    without adding latency of its own."""
+    try:
+        r = requests.get(url, stream=True, timeout=(4, 4),
+                         headers={"User-Agent": "dopeIPTV/1.0"})
+        code = r.status_code
+        try:
+            r.close()
+        except Exception:
+            pass
+        return code
+    except Exception:
+        return None
+
+
+def _probe_url(url: str) -> str:
+    try:
+        r = requests.get(url, stream=True, timeout=(8, 8),
+                         headers={"User-Agent": "dopeIPTV/1.0"})
+        code = r.status_code
+        try:
+            r.close()
+        except Exception:
+            pass
+    except requests.Timeout:
+        return tr("diag_timeout")
+    except requests.ConnectionError:
+        return tr("diag_unreachable")
+    except Exception as e:
+        log.debug("stream probe failed: %s: %s", type(e).__name__, e)
+        return tr("diag_generic")
+    log.info("stream probe: HTTP %s", code)
+    return reason_for_code(code)

@@ -3427,6 +3427,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.set_next_available(
                 kind == "episode" and self._has_next_episode())
         self._playback_max_pct = 0.0
+        # New stream: reset the failure-diagnosis guard (a definitive-probe or
+        # the full diagnosis may show once per playback attempt).
+        self._diag_gen = getattr(self, "_diag_gen", 0) + 1
+        self._diag_shown = False
         self._sync_player_buttons()
         self._playing_key = key
         self._playing_group = {"live": "live", "movie": "vod",
@@ -3620,7 +3624,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._stream_retries = 0
         self._last_stream_error_ts = now
         lp = getattr(self, "_last_playback", None)
+        # On the first failure, probe the URL in parallel with the silent
+        # reconnect. A *definitive* status (e.g. 407 = upcoming event, or a
+        # forbidden/blocked/not-found) surfaces at once instead of after the
+        # whole retry budget - that's what made the "not started yet" dialog
+        # take several seconds. Transient results are ignored here so genuine
+        # blips still recover silently.
         if (lp and lp.get("kind") == "live" and self.player
+                and getattr(self, "_stream_retries", 0) == 0
+                and not getattr(self, "_diag_shown", False)):
+            self._early_probe_definitive(lp.get("url"), lp.get("item"))
+        if (lp and lp.get("kind") == "live" and self.player
+                and not getattr(self, "_diag_shown", False)
                 and getattr(self, "_stream_retries", 0) < self.MAX_STREAM_RETRIES):
             self._stream_retries = getattr(self, "_stream_retries", 0) + 1
             self.player.current_url = None
@@ -3657,6 +3672,34 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self.player:
             self.player.title_lbl.setText("")
 
+    def _early_probe_definitive(self, url, item) -> None:
+        """Fast parallel probe on the first live failure: only act on a
+        *definitive* HTTP status so the reason (and the upcoming-event prompt)
+        appears immediately, while transient failures keep reconnecting
+        silently."""
+        if not url:
+            return
+        from ..providers.diagnostics import (
+            DEFINITIVE_CODES, reason_for_code, stream_status)
+        gen = getattr(self, "_diag_gen", 0)
+
+        def done(code, gen=gen, item=item):
+            if (gen != getattr(self, "_diag_gen", -1)
+                    or getattr(self, "_diag_shown", False)
+                    or (self.player and self.player.current_url)
+                    or code not in DEFINITIVE_CODES):
+                return
+            self._diag_shown = True
+            self._stream_retries = self.MAX_STREAM_RETRIES   # stop retrying
+            if self.player:
+                self.player.current_url = None
+            reason = reason_for_code(code)
+            self._show_stream_error(reason)
+            if reason == tr("diag_not_started"):
+                self._offer_upcoming_actions(item)
+
+        run_async(self.pool, lambda: stream_status(url), done, lambda _e: None)
+
     def _diagnose_stream_failure(self, url: str) -> None:
         from ..providers.diagnostics import diagnose_stream
 
@@ -3664,9 +3707,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
         def show(reason: str) -> None:
             # If a channel started playing meanwhile (the user zapped on), the
-            # earlier failure is stale - don't overwrite a working stream.
+            # earlier failure is stale - don't overwrite a working stream. Also
+            # skip if the early definitive probe already surfaced this failure.
             if self.player and self.player.current_url:
                 return
+            if getattr(self, "_diag_shown", False):
+                return
+            self._diag_shown = True
             self._show_stream_error(reason)
             # An upcoming/scheduled event (HTTP 407) isn't an error to shrug at
             # - offer to set a reminder or record it. Same-session tr() makes
@@ -3816,6 +3863,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         return True
 
     def _retry_last_stream(self) -> None:
+        # The early definitive probe already gave up on this stream (e.g. an
+        # upcoming event) - don't replay it just to fail again.
+        if getattr(self, "_diag_shown", False):
+            return
         lp = getattr(self, "_last_playback", None)
         if not lp or lp.get("kind") != "live":
             return

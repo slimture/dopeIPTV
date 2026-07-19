@@ -102,6 +102,22 @@ def test_probe_unreachable(monkeypatch):
     assert diag._probe_url("http://x/live/1.ts")
 
 
+def test_reason_for_code_and_definitive():
+    assert "407" not in diag.reason_for_code(407)   # phrased as "not started"
+    assert "started" in diag.reason_for_code(407).lower()
+    assert "403" in diag.reason_for_code(403)
+    assert 407 in diag.DEFINITIVE_CODES and 403 in diag.DEFINITIVE_CODES
+    assert 200 not in diag.DEFINITIVE_CODES
+
+
+def test_stream_status_returns_code(monkeypatch):
+    monkeypatch.setattr(diag.requests, "get", _fake_get(status=407))
+    assert diag.stream_status("http://x/live/1.ts") == 407
+    monkeypatch.setattr(diag.requests, "get",
+                        _fake_get(exc=diag.requests.ConnectionError()))
+    assert diag.stream_status("http://x/live/1.ts") is None
+
+
 def test_account_reason_wins_over_probe(monkeypatch):
     # A definitive account problem should short-circuit before any URL probe.
     called = {"n": 0}
