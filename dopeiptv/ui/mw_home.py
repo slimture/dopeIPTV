@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import time
 
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (
     QColor, QFont, QIcon, QPainter, QPainterPath, QPen, QPixmap,
 )
@@ -254,14 +254,17 @@ class HomePage(QWidget):
 
     _PILL_QSS = (
         "QPushButton { background: %(pane)s; color: %(text)s;"
-        " border: 1px solid %(border)s; border-radius: 16px;"
-        " padding: 7px 18px; font-size: 13px; font-weight: 600; }"
+        " border: 1px solid %(border)s; border-radius: 19px;"
+        " padding: 9px 20px 9px 15px; font-size: 13px; font-weight: 600;"
+        " text-align: left; }"
         "QPushButton:hover { border-color: %(acc)s; color: %(text)s;"
         " background: %(hover)s; }"
     )
 
     def _top_bar(self) -> QWidget:
-        """Quick-nav pills (like the reference apps' top bar) + a close X."""
+        """Quick-nav pills (like the reference apps' top bar) + a close X. Each
+        pill carries a small accent-coloured glyph so the row reads as a set of
+        icons, not a wall of text."""
         qss = self._PILL_QSS % {
             "pane": QColor(P["pane"]).lighter(112).name(), "text": P["text"],
             "border": QColor(P["pane"]).lighter(135).name(), "acc": ACCENT,
@@ -271,22 +274,28 @@ class HomePage(QWidget):
         h.setContentsMargins(0, 4, 0, 4)
         h.setSpacing(10)
         h.addStretch(1)
+        w = self.window
 
-        def pill(text, fn):
-            b = QPushButton(text)
+        def pill(text, kind, fn):
+            b = QPushButton("  " + text)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setStyleSheet(qss)
+            try:
+                b.setIcon(QIcon(w._action_pixmap(kind, 16, ACCENT)))
+                b.setIconSize(QSize(16, 16))
+            except Exception:
+                pass
             b.clicked.connect(fn)
             h.addWidget(b)
 
-        w = self.window
-        pill(tr("nav_tv"), lambda: self._leave_to(lambda: w.switch_mode("live")))
-        pill(tr("btn_epg_guide"), self._open_guide)
-        pill(tr("nav_movies"),
+        pill(tr("nav_tv"), "tv",
+             lambda: self._leave_to(lambda: w.switch_mode("live")))
+        pill(tr("btn_epg_guide"), "grid", self._open_guide)
+        pill(tr("nav_movies"), "movie",
              lambda: self._leave_to(lambda: w.switch_mode("vod")))
-        pill(tr("nav_series"),
+        pill(tr("nav_series"), "series",
              lambda: self._leave_to(lambda: w.switch_mode("series")))
-        pill(tr("btn_settings"), w.open_settings)
+        pill(tr("btn_settings"), "gear", w.open_settings)
         h.addStretch(1)
         close = QPushButton()
         close.setIcon(_x_icon(16, P["text"]))
