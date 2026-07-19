@@ -28,13 +28,18 @@ class _RemindersMixin:
         column's right-click menu."""
         if not it or it.get("stream_id") is None:
             return
+        # The user can silence this automatic prompt (resettable in Settings >
+        # Playback). The right-click channel menu still offers the same actions.
+        if self.settings.value("hide_upcoming_prompt", "false") == "true":
+            return
         idx = self._choice_dialog(
             tr("upcoming_title"),
             tr("upcoming_body", channel=it.get("name") or ""),
             [(tr("upcoming_remind"), "primary"),
              (tr("upcoming_record_stop"), "normal"),
              (tr("upcoming_schedule"), "normal"),
-             (tr("common_cancel"), "normal")])
+             (tr("common_cancel"), "normal")],
+            dont_ask_setting="hide_upcoming_prompt")
         if idx == 0:
             self._remind_upcoming(it)
         elif idx == 1:

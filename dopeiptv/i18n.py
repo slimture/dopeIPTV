@@ -2280,6 +2280,18 @@ _STRINGS: dict[str, dict[str, str]] = {
               "плейлист",
         "th": "ผู้ให้บริการไม่มีสตรีมนี้ (HTTP 404) — ลองรีเฟรชเพลย์ลิสต์",
     },
+    "set_upcoming_prompt": {
+        "en": "Ask to remind/record when a channel isn't live yet",
+        "sv": "Fråga om påminnelse/inspelning när en kanal inte sänds än",
+        "es": "Preguntar por recordatorio/grabación cuando un canal no está en "
+              "directo",
+        "de": "Bei noch nicht sendenden Sendern nach Erinnerung/Aufnahme fragen",
+        "fr": "Proposer rappel/enregistrement quand une chaîne n'est pas encore "
+              "en direct",
+        "zh": "当频道尚未直播时询问提醒/录制",
+        "ru": "Предлагать напоминание/запись, когда канал ещё не в эфире",
+        "th": "ถามเรื่องการเตือน/บันทึกเมื่อช่องยังไม่ออกอากาศ",
+    },
     "upcoming_title": {
         "en": "Upcoming broadcast", "sv": "Kommande sändning",
         "es": "Transmisión próxima", "de": "Bevorstehende Übertragung",

@@ -479,6 +479,12 @@ class _SettingsMixin:
         autorecon_box = self._combo(
             [("true", tr("option_yes")), ("false", tr("option_no"))],
             self.settings.value("auto_reconnect_live", "true"))
+        # Stored inverted (hide_upcoming_prompt): the setting the user sees is
+        # "ask", the "Don't show again" checkbox in the prompt hides it.
+        upcoming_box = self._combo(
+            [("true", tr("option_yes")), ("false", tr("option_no"))],
+            "false" if self.settings.value(
+                "hide_upcoming_prompt", "false") == "true" else "true")
         fmt_box = self._combo(
             [("ts", "ts"), ("m3u8", "m3u8")],
             self.settings.value("stream_format", "ts"))
@@ -571,6 +577,7 @@ class _SettingsMixin:
         pf.addRow(tr("setting_autoplay_preview"), autoplay_box)
         pf.addRow(tr("setting_autoplay_next"), autoplay_next_box)
         pf.addRow(tr("setting_auto_reconnect"), autorecon_box)
+        pf.addRow(tr("set_upcoming_prompt"), upcoming_box)
         pf.addRow(tr("setting_stream_format"), fmt_box)
         section(tr("sec_audio_subs"))
         pf.addRow(tr("setting_audio_lang"), alang_box)
@@ -1505,6 +1512,10 @@ class _SettingsMixin:
         if d.exec():
             self.settings.setValue(
                 "stream_format", fmt_box.currentData())
+            # Stored inverted: the combo asks whether to *show* the prompt.
+            self.settings.setValue(
+                "hide_upcoming_prompt",
+                "false" if upcoming_box.currentData() == "true" else "true")
             self.settings.setValue(
                 "autoplay_preview", autoplay_box.currentData())
             self.settings.setValue(

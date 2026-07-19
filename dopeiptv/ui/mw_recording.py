@@ -67,11 +67,17 @@ class _RecordingMixin:
                 f"Recording stopped: {title} ({reason})")
 
     def _choice_dialog(self, title: str, message: str,
-                       options: list[tuple[str, str]]) -> int | None:
+                       options: list[tuple[str, str]],
+                       dont_ask_setting: str | None = None) -> int | None:
         """A compact, themed confirmation dialog. *options* is a list of
         (label, kind) where kind is "primary"/"normal"/"danger"; returns the
         index of the clicked option, or None if dismissed. Replaces the
-        oversized multi-button QMessageBox with clean stacked buttons."""
+        oversized multi-button QMessageBox with clean stacked buttons. When
+        *dont_ask_setting* is given, a "Don't show this again" checkbox is
+        added; ticking it and choosing an option stores "true" under that key
+        (so a caller can suppress the prompt next time; it's resettable in
+        Settings)."""
+        from PyQt6.QtWidgets import QCheckBox
         d = QDialog(self)
         d.setWindowTitle(title)
         d.setModal(True)
@@ -97,7 +103,14 @@ class _RecordingMixin:
                 lambda _c=False, i=i: (chosen.update(idx=i), d.accept()))
             btns.addWidget(b)
         lay.addLayout(btns)
+        dont = None
+        if dont_ask_setting:
+            dont = QCheckBox(tr("dont_show_again"))
+            dont.setStyleSheet(f"font-size:12px; color:{P['muted']};")
+            lay.addWidget(dont)
         d.exec()
+        if dont is not None and dont.isChecked() and chosen["idx"] is not None:
+            self.settings.setValue(dont_ask_setting, "true")
         return chosen["idx"]
 
     def _guard_stream_switch(self, url: str, title: str) -> bool:

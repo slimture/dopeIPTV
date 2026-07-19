@@ -110,17 +110,13 @@ class _Card(QFrame):
             f"background:{QColor(P['pane']).lighter(115).name()};"
             "border-radius:10px;")
         self.img.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # Hover highlight: a transparent frame that draws the accent border on
-        # TOP of the artwork. A CSS border on the image label itself fought the
-        # rounded pixmap and clipped at the corners; a separate overlay draws
-        # the full rounded outline cleanly.
-        self._hover = QFrame(self.img)
-        self._hover.setGeometry(0, 0, w, h)
-        self._hover.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self._hover.setStyleSheet(
-            f"background:transparent; border:2px solid {P['accent']};"
-            "border-radius:10px;")
-        self._hover.hide()
+        # Opaque paint: the image label always fills its rect (placeholder bg or
+        # a cover pixmap), so tell Qt not to composite anything beneath it - one
+        # less layer to repaint per card while scrolling a shelf of them.
+        self.img.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
+        # Hover highlight built lazily (only when first hovered) so a shelf of
+        # cards doesn't carry an extra QFrame each at rest.
+        self._hover: QFrame | None = None
         # Placeholder: big dimmed initial, so an artless card still reads.
         self.img.setText((title or "?").strip()[:1].upper())
         f = QFont()
@@ -158,12 +154,24 @@ class _Card(QFrame):
         self.img.setPixmap(fn(pm, self._w, self._h))
 
     def enterEvent(self, e) -> None:
+        if self._hover is None:
+            # A transparent frame that draws the accent border on TOP of the
+            # artwork (a CSS border on the image label fought the rounded pixmap
+            # and clipped at the corners).
+            hv = QFrame(self.img)
+            hv.setGeometry(0, 0, self._w, self._h)
+            hv.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+            hv.setStyleSheet(
+                f"background:transparent; border:2px solid {P['accent']};"
+                "border-radius:10px;")
+            self._hover = hv
         self._hover.raise_()
         self._hover.show()
         super().enterEvent(e)
 
     def leaveEvent(self, e) -> None:
-        self._hover.hide()
+        if self._hover is not None:
+            self._hover.hide()
         super().leaveEvent(e)
 
     def mousePressEvent(self, e) -> None:
@@ -214,14 +222,6 @@ class _Shelf(QWidget):
 
     def add(self, card: _Card) -> None:
         self._h.insertWidget(self._h.count() - 1, card)
-
-    def clear(self) -> None:
-        # Drop every card but keep the trailing stretch (the last item).
-        while self._h.count() > 1:
-            item = self._h.takeAt(0)
-            wdg = item.widget()
-            if wdg is not None:
-                wdg.deleteLater()
 
     def finish(self, img_h: int) -> None:
         # Height = image + text strip + horizontal scrollbar allowance.
@@ -552,14 +552,21 @@ class HomePage(QWidget):
             vod, ser = vod[:24], ser[:20]
             w._home_poster_cache = (time.time(), vod, ser)
             self._write_disk_posters(vod, ser)
-            if gen == self._gen:
-                try:
-                    if getattr(self, "_posters_from_disk", False):
-                        self._reset_posters()
-                        self._posters_from_disk = False
+            if gen != self._gen:
+                return
+            try:
+                if getattr(self, "_posters_from_disk", False):
+                    # We had painted disk placeholders. Rebuild the whole page
+                    # cleanly from the now-fresh memory cache instead of poking
+                    # the existing shelves - reset-and-refill left the series
+                    # shelf overlapping the hero. refresh() hits the just-set
+                    # memory cache, so it repaints without another fetch.
+                    self._posters_from_disk = False
+                    self.refresh()
+                else:
                     self._fill_posters(vod, ser)
-                except RuntimeError:
-                    pass
+            except RuntimeError:
+                pass
 
         run_async(w.pool, work, done, lambda _e: None)
 
@@ -595,17 +602,6 @@ class HomePage(QWidget):
                 json.dumps({"t": time.time(), "vod": vod, "ser": ser}))
         except Exception:
             pass
-
-    def _reset_posters(self) -> None:
-        """Clear the disk-seeded hero + movie/series shelves before repainting
-        them from the fresh provider data."""
-        self._hero_shelf.clear()
-        self._hero_shelf.hide()
-        while self._movies_box.count():
-            item = self._movies_box.takeAt(0)
-            wdg = item.widget()
-            if wdg is not None:
-                wdg.deleteLater()
 
     def _load_channels(self) -> None:
         w, gen = self.window, self._gen
