@@ -402,7 +402,8 @@ class EpgGuideDialog(QDialog):
                     f"{prog.get('title') or '?'}")
             start_ts = time.time() if live else prog["start_timestamp"]
             self.window.rec.add_job(url, title, start_ts,
-                                    prog["stop_timestamp"])
+                                    prog["stop_timestamp"],
+                                    icon=channel_it.get("stream_icon"))
             scheduled += 1
         self._refresh_schedule_marks()
         if scheduled:

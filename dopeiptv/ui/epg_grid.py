@@ -1075,5 +1075,6 @@ class EpgGridDialog(QDialog):
             return
         self.window.rec.add_job(
             url, ch.get("name") or p.get("title") or "recording",
-            max(time.time(), p["start_timestamp"]), p["stop_timestamp"])
+            max(time.time(), p["start_timestamp"]), p["stop_timestamp"],
+            icon=ch.get("stream_icon"))
         self.info.setText("● " + (p.get("title") or ch.get("name") or ""))

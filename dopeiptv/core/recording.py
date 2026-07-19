@@ -202,11 +202,13 @@ class RecordingManager(QObject):
         self.settings.setValue("recording_jobs", json.dumps(keep))
 
     def add_job(self, url: str, title: str, start_ts: float,
-                stop_ts: float | None, folder: str = "") -> dict:
+                stop_ts: float | None, folder: str = "",
+                icon: str | None = None) -> dict:
         job: dict[str, Any] = {
             "id": uuid.uuid4().hex[:10], "url": url, "title": title,
             "start": start_ts, "stop": stop_ts, "folder": folder or "",
-            "status": "scheduled", "path": "", "error": "", "proc": None}
+            "status": "scheduled", "path": "", "error": "", "proc": None,
+            "stream_icon": icon or ""}
         self.jobs.append(job)
         self._save()
         self.tick()
@@ -225,13 +227,14 @@ class RecordingManager(QObject):
                 return
 
     def add_inplayer_job(self, title: str, path: str,
-                         stop_ts: float | None, url: str = "") -> dict:
+                         stop_ts: float | None, url: str = "",
+                         icon: str | None = None) -> dict:
         """Register a recording that rides the embedded player's stream."""
         job: dict[str, Any] = {
             "id": uuid.uuid4().hex[:10], "url": url, "title": title,
             "start": time.time(), "stop": stop_ts, "folder": "",
             "status": "recording", "path": path, "error": "",
-            "proc": None, "inplayer": True}
+            "proc": None, "inplayer": True, "stream_icon": icon or ""}
         self.jobs.append(job)
         self.jobs_changed.emit()
         return job

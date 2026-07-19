@@ -33,7 +33,9 @@ class _RecordingMixin:
                 "_job": j["id"], "_key": f"job:{j['id']}",
                 "_kind": "recjob", "_status": j["status"],
                 "_error": j.get("error") or "",
-                "_path": j.get("path") or ""}
+                "_path": j.get("path") or "",
+                # The recorded channel's logo, so the row isn't iconless.
+                "stream_icon": j.get("stream_icon") or ""}
 
     def _recordings_changed(self) -> None:
         n = self.rec.active_count()
@@ -130,7 +132,8 @@ class _RecordingMixin:
                 self.rec.finish_all_inplayer(
                     "continued over a new connection")
                 self.rec.add_job(j["url"], f"{j['title']} (cont.)",
-                                 time.time(), j.get("stop"))
+                                 time.time(), j.get("stop"),
+                                 icon=j.get("stream_icon"))
                 self._multi_stream_ok = True
                 return True
             return False
@@ -367,7 +370,8 @@ class _RecordingMixin:
         if not self._recorder_ready():
             return
         url = self.client.live_url(it["stream_id"], "ts")
-        self.rec.add_job(url, title, now, stop_ts)
+        self.rec.add_job(url, title, now, stop_ts,
+                         icon=it.get("stream_icon"))
         self._set_status(
             f"● Recording {title} {length} → {self.rec.directory()}")
 
@@ -384,13 +388,15 @@ class _RecordingMixin:
         if self.player and self.player.start_stream_record(path):
             self.rec.add_inplayer_job(
                 title, path, stop_ts,
-                url=self.client.live_url(it["stream_id"], "ts"))
+                url=self.client.live_url(it["stream_id"], "ts"),
+                icon=it.get("stream_icon"))
             self._set_status(
                 f"● Recording {title} {length} - capturing "
                 "the stream you're watching (no extra connection)")
         elif self._recorder_ready():
             url = self.client.live_url(it["stream_id"], "ts")
-            self.rec.add_job(url, title, time.time(), stop_ts)
+            self.rec.add_job(url, title, time.time(), stop_ts,
+                             icon=it.get("stream_icon"))
             self._set_status(
                 f"● Recording {title} {length} → {self.rec.directory()}")
 
@@ -446,7 +452,8 @@ class _RecordingMixin:
         title = (name_edit.text().strip()
                  or self.channel_display_name(it))
         self.rec.add_job(url, title, start_ts, stop_ts,
-                         folder_box.currentData())
+                         folder_box.currentData(),
+                         icon=it.get("stream_icon"))
         when = datetime.fromtimestamp(start_ts).strftime(
             "%a %d %b %H:%M")
         self._set_status(
