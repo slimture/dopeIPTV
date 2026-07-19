@@ -11,6 +11,7 @@ so this module is pure presentation + wiring.
 
 from __future__ import annotations
 
+import json
 import time
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
@@ -24,7 +25,7 @@ from PyQt6.QtWidgets import (
 
 from ..core.workers import run_async
 from ..i18n import tr
-from .theme import ACCENT, P
+from .theme import P
 
 # Card geometry (image area; the card adds a text strip underneath).
 HERO_W, HERO_H = 300, 420          # big hero posters
@@ -92,6 +93,7 @@ class _Card(QFrame):
     progress strip (resume shelf). Hover raises an accent border."""
 
     clicked = pyqtSignal()
+    right_clicked = pyqtSignal()
 
     def __init__(self, w: int, h: int, title: str, subtitle: str = "",
                  progress: int | None = None) -> None:
@@ -116,7 +118,7 @@ class _Card(QFrame):
         self._hover.setGeometry(0, 0, w, h)
         self._hover.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self._hover.setStyleSheet(
-            f"background:transparent; border:2px solid {ACCENT};"
+            f"background:transparent; border:2px solid {P['accent']};"
             "border-radius:10px;")
         self._hover.hide()
         # Placeholder: big dimmed initial, so an artless card still reads.
@@ -130,7 +132,7 @@ class _Card(QFrame):
             bar = QFrame(self.img)
             bar.setGeometry(8, h - 10, max(6, int((w - 16) * progress / 100)),
                             4)
-            bar.setStyleSheet(f"background:{ACCENT}; border-radius:2px;")
+            bar.setStyleSheet(f"background:{P['accent']}; border-radius:2px;")
         t = QLabel(title or "?")
         t.setStyleSheet("font-weight:600; font-size:13px;")
         t.setFixedWidth(w)
@@ -167,6 +169,8 @@ class _Card(QFrame):
     def mousePressEvent(self, e) -> None:
         if e.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit()
+        elif e.button() == Qt.MouseButton.RightButton:
+            self.right_clicked.emit()
         super().mousePressEvent(e)
 
 
@@ -210,6 +214,14 @@ class _Shelf(QWidget):
 
     def add(self, card: _Card) -> None:
         self._h.insertWidget(self._h.count() - 1, card)
+
+    def clear(self) -> None:
+        # Drop every card but keep the trailing stretch (the last item).
+        while self._h.count() > 1:
+            item = self._h.takeAt(0)
+            wdg = item.widget()
+            if wdg is not None:
+                wdg.deleteLater()
 
     def finish(self, img_h: int) -> None:
         # Height = image + text strip + horizontal scrollbar allowance.
@@ -277,7 +289,7 @@ class HomePage(QWidget):
         """Quick-nav segment (like the reference apps' top bar) + a close X.
         Text-only labels sitting inside one rounded pill, each with a rounded
         per-item hover highlight."""
-        ac = QColor(ACCENT)
+        ac = QColor(P["accent"])
         qss = self._SEG_QSS % {
             "pane": QColor(P["pane"]).lighter(112).name(), "text": P["text"],
             "border": QColor(P["pane"]).lighter(135).name(),
@@ -323,7 +335,7 @@ class HomePage(QWidget):
             " border-radius: 17px; }"
             "QPushButton:hover { border-color: %s; }" % (
                 QColor(P["pane"]).lighter(112).name(),
-                QColor(P["pane"]).lighter(135).name(), ACCENT))
+                QColor(P["pane"]).lighter(135).name(), P["accent"]))
         close.clicked.connect(self.window._leave_home)
         h.addWidget(close)
         return bar
@@ -378,6 +390,8 @@ class HomePage(QWidget):
                     card = _Card(CHAN_W, CHAN_H, it.get("name") or "?", now_t)
                     card.clicked.connect(
                         lambda it=it: self._play_channel(it))
+                    card.right_clicked.connect(
+                        lambda it=it: self._channel_menu(it))
                     self._set_art(card, it.get("stream_icon"), w.logos,
                                   contain=True)
                     shelf.add(card)
@@ -508,6 +522,16 @@ class HomePage(QWidget):
         if cache and time.time() - cache[0] < self.MEDIA_CACHE_SECS:
             self._fill_posters(cache[1], cache[2])
             return
+        # Cold start: paint last session's posters straight from disk so the
+        # Featured row appears instantly, then refresh from the provider in the
+        # background and swap them in. vod_streams(None) returns the whole movie
+        # catalogue, which is inherently slow, so this is what makes Home feel
+        # fast on launch.
+        self._posters_from_disk = False
+        disk = self._read_disk_posters()
+        if disk:
+            self._posters_from_disk = True
+            self._fill_posters(disk[0], disk[1])
         client = w.client
 
         def work():
@@ -527,13 +551,61 @@ class HomePage(QWidget):
                      reverse=True)
             vod, ser = vod[:24], ser[:20]
             w._home_poster_cache = (time.time(), vod, ser)
+            self._write_disk_posters(vod, ser)
             if gen == self._gen:
                 try:
+                    if getattr(self, "_posters_from_disk", False):
+                        self._reset_posters()
+                        self._posters_from_disk = False
                     self._fill_posters(vod, ser)
                 except RuntimeError:
                     pass
 
         run_async(w.pool, work, done, lambda _e: None)
+
+    # -- instant cold-start cache (persisted to QSettings, per playlist) -------
+
+    def _disk_key(self) -> str:
+        pid = getattr(getattr(self.window, "playlist_store", None),
+                      "active_id", "") or "default"
+        return f"home_pcache_{pid}"
+
+    def _read_disk_posters(self):
+        try:
+            raw = self.window.settings.value(self._disk_key(), "") or ""
+            d = json.loads(raw) if raw else None
+        except Exception:
+            d = None
+        if not isinstance(d, dict):
+            return None
+        try:
+            # Stale after a week - better to wait for the network than show
+            # week-old "recently added".
+            if time.time() - float(d.get("t", 0)) > 7 * 24 * 3600:
+                return None
+        except (TypeError, ValueError):
+            return None
+        vod, ser = d.get("vod") or [], d.get("ser") or []
+        return (vod, ser) if (vod or ser) else None
+
+    def _write_disk_posters(self, vod: list, ser: list) -> None:
+        try:
+            self.window.settings.setValue(
+                self._disk_key(),
+                json.dumps({"t": time.time(), "vod": vod, "ser": ser}))
+        except Exception:
+            pass
+
+    def _reset_posters(self) -> None:
+        """Clear the disk-seeded hero + movie/series shelves before repainting
+        them from the fresh provider data."""
+        self._hero_shelf.clear()
+        self._hero_shelf.hide()
+        while self._movies_box.count():
+            item = self._movies_box.takeAt(0)
+            wdg = item.widget()
+            if wdg is not None:
+                wdg.deleteLater()
 
     def _load_channels(self) -> None:
         w, gen = self.window, self._gen
@@ -606,6 +678,7 @@ class HomePage(QWidget):
         for it in chan:
             card = _Card(CHAN_W, CHAN_H, it.get("name") or "?")
             card.clicked.connect(lambda it=it: self._play_channel(it))
+            card.right_clicked.connect(lambda it=it: self._channel_menu(it))
             self._set_art(card, it.get("stream_icon"), w.logos, contain=True)
             shelf.add(card)
         shelf.finish(CHAN_H)
@@ -649,11 +722,15 @@ class HomePage(QWidget):
         self.window._open_epg_guide()
 
     def _play_channel(self, it: dict) -> None:
-        # Land under TV, then tune the channel (so the classic view is on the
-        # right category behind the player).
+        # Land under TV *in this channel's own category* (so the classic list
+        # behind the player shows and selects it), then tune it.
         w = self.window
         w._leave_home()
         if w.mode != "live":
+            # The category-load callback honours these to land on the right
+            # category and select the channel, like tuning from the EPG guide.
+            w._pending_jump_key = w._item_key(it)
+            w._pending_jump_cat = it.get("category_id")
             w.switch_mode("live")
         try:
             w._current_key = w._item_key(it)
@@ -664,6 +741,24 @@ class HomePage(QWidget):
             w.play_live_channel(it)
         except Exception:
             pass
+
+    def _channel_menu(self, it: dict) -> None:
+        """Right-click on a Home channel tile: play, set a reminder, or record
+        - the same options as the classic list and the 'not started' prompt,
+        without leaving Home."""
+        from PyQt6.QtGui import QCursor
+        from PyQt6.QtWidgets import QMenu
+        if it.get("stream_id") is None:
+            return
+        w = self.window
+        m = QMenu(self)
+        m.addAction(tr("common_watch"), lambda: self._play_channel(it))
+        m.addSeparator()
+        m.addAction(tr("upcoming_remind"), lambda: w._remind_upcoming(it))
+        m.addAction(tr("upcoming_record_stop"), lambda: w._record_now(it, None))
+        m.addAction(tr("upcoming_schedule"),
+                    lambda: w._schedule_recording(it))
+        m.exec(QCursor.pos())
 
     def _play_media(self, it: dict) -> None:
         """Movie or a continue-watching row: land under Movies, then play it.
