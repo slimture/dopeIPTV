@@ -169,7 +169,13 @@ class _Shelf(QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(8)
         head = QLabel(title)
-        head.setStyleSheet("font-size:17px; font-weight:700;")
+        # Opaque background: a transparent label ghosts on macOS when the Home
+        # canvas scrolls (the old glyphs aren't cleared, so the title paints on
+        # top of itself and reads as garbled, overlapping text). The cards
+        # don't show this because they sit on their own opaque frames.
+        head.setAutoFillBackground(True)
+        head.setStyleSheet(
+            f"font-size:17px; font-weight:700; background:{P['bg']};")
         lay.addWidget(head)
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
@@ -220,6 +226,11 @@ class HomePage(QWidget):
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
         self._scroll.setFrameShape(QFrame.Shape.NoFrame)
+        # Opaque viewport so a vertical scroll fully repaints under the moved
+        # content instead of smearing transparent labels (the garbled-title
+        # ghosting on macOS).
+        self._scroll.viewport().setAutoFillBackground(True)
+        self._scroll.viewport().setStyleSheet(f"background:{P['bg']};")
         outer.addWidget(self._scroll)
         self._canvas = QWidget()
         # Own dark background, ID-scoped so it doesn't cascade onto children
@@ -552,6 +563,10 @@ class HomePage(QWidget):
         if w.mode != "live":
             w.switch_mode("live")
         try:
+            w._show_detail(it)   # panel follows the channel, not the last row
+        except Exception:
+            pass
+        try:
             w.play_live_channel(it)
         except Exception:
             pass
@@ -577,6 +592,14 @@ class HomePage(QWidget):
         url = w.client.vod_url(sid, it.get("container_extension"))
         if not url:
             return
+        # Populate the detail panel with THIS movie. Home plays straight from a
+        # card without selecting a list row, so without this the panel under
+        # the player keeps showing whatever was last selected in the classic
+        # view (e.g. the TV channel played before).
+        try:
+            w._show_detail(it)
+        except Exception:
+            pass
         w._start_playback(
             url, it.get("name") or it.get("title") or "dopeIPTV",
             it.get("stream_icon") or it.get("cover"),
@@ -605,6 +628,10 @@ class HomePage(QWidget):
             w.switch_mode(target)
         if kind == "episode" and it.get("_series_ctx") is None:
             kind = "movie"   # no series context to autoplay-next; just play it
+        try:
+            w._show_detail(it)   # panel follows this row, not the last selection
+        except Exception:
+            pass
         w._start_playback(url, it.get("name") or "dopeIPTV",
                           it.get("stream_icon"), it.get("_key"), kind, item=it)
 
