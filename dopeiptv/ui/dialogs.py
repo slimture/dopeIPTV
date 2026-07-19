@@ -481,7 +481,15 @@ class ContentManagerDialog(QDialog):
     def _populate(self) -> None:
         selected = self._selected_cid()
         self.list.clear()
-        for c in self.categories:
+        # Sort by the (possibly renamed) display name, case-insensitively, so
+        # the manager list is alphabetical and easy to scan - the provider's
+        # own order is arbitrary. This is display only; it doesn't change the
+        # sidebar's category order.
+        def _disp(c):
+            return self.overrides.display_name(
+                self.mode, c.get("category_id"),
+                c.get("category_name", "?"))
+        for c in sorted(self.categories, key=lambda c: _disp(c).lower()):
             cid = c.get("category_id")
             name = self.overrides.display_name(
                 self.mode, cid, c.get("category_name", "?"))
