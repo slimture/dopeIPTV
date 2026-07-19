@@ -42,12 +42,14 @@ class XtreamClient:
         # down/overloaded, instead of empty lists and timeouts.
         self._cache_path = cache_path
         self._disk_loaded = cache_path is None
+        # Monotonic deadline for the fail-fast cooldown after a network error.
+        self._net_down_until = 0.0
 
     def _load_disk_lists(self) -> None:
         """(under _list_lock) Lazily merge the previous session's lists in as
         stale entries - fresh fetches still win, but the stale-fallback path
         can serve them when the provider doesn't answer."""
-        if self._disk_loaded:
+        if self._disk_loaded or self._cache_path is None:
             return
         self._disk_loaded = True
         try:
@@ -154,7 +156,7 @@ class XtreamClient:
         base.update(params)
         action = params.get("action") or "authenticate"
         now = time.monotonic()
-        if now < getattr(self, "_net_down_until", 0.0):
+        if now < self._net_down_until:
             raise requests.ConnectionError(
                 f"provider unreachable - retrying in "
                 f"{self._net_down_until - now:.0f} s (cooldown)")
