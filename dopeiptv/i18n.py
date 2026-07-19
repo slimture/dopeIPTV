@@ -6837,6 +6837,38 @@ _STRINGS: dict[str, dict[str, str]] = {
     },
 
     # ── Settings: reset-to-defaults ───────────────────────────────────────
+    "settings_reset_090": {
+        "en": "Welcome to 0.9.0! Because so much changed in this release, "
+              "your settings were reset to the new defaults. Your playlists, "
+              "favorites, history, reminders, recordings and Trakt account "
+              "were kept.",
+        "sv": "Välkommen till 0.9.0! Eftersom så mycket har ändrats i den "
+              "här versionen har inställningarna återställts till de nya "
+              "standardvärdena. Dina spellistor, favoriter, historik, "
+              "påminnelser, inspelningar och Trakt-konto finns kvar.",
+        "es": "¡Bienvenido a 0.9.0! Como esta versión cambia muchísimas "
+              "cosas, los ajustes se restablecieron a los nuevos valores "
+              "predeterminados. Tus listas, favoritos, historial, "
+              "recordatorios, grabaciones y cuenta de Trakt se conservaron.",
+        "de": "Willkommen bei 0.9.0! Da sich in dieser Version sehr viel "
+              "geändert hat, wurden die Einstellungen auf die neuen "
+              "Standardwerte zurückgesetzt. Playlists, Favoriten, Verlauf, "
+              "Erinnerungen, Aufnahmen und das Trakt-Konto blieben erhalten.",
+        "fr": "Bienvenue dans la 0.9.0 ! Beaucoup de choses ayant changé "
+              "dans cette version, les paramètres ont été réinitialisés aux "
+              "nouvelles valeurs par défaut. Vos playlists, favoris, "
+              "historique, rappels, enregistrements et compte Trakt ont été "
+              "conservés.",
+        "zh": "欢迎使用 0.9.0！由于此版本变化很大，设置已重置为新的默认值。"
+              "您的播放列表、收藏、历史记录、提醒、录制和 Trakt 账户均已保留。",
+        "ru": "Добро пожаловать в 0.9.0! Так как в этой версии очень многое "
+              "изменилось, настройки были сброшены к новым значениям по "
+              "умолчанию. Плейлисты, избранное, история, напоминания, записи "
+              "и аккаунт Trakt сохранены.",
+        "th": "ยินดีต้อนรับสู่ 0.9.0! เนื่องจากเวอร์ชันนี้มีการเปลี่ยนแปลงมากมาย "
+              "การตั้งค่าจึงถูกรีเซ็ตเป็นค่าเริ่มต้นใหม่ เพลย์ลิสต์ รายการโปรด ประวัติ "
+              "การแจ้งเตือน การบันทึก และบัญชี Trakt ของคุณยังอยู่ครบ",
+    },
     "settings_reset_all": {
         "en": "Reset all settings…",
         "sv": "Återställ alla inställningar…",

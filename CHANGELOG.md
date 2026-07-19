@@ -55,6 +55,27 @@ round of player, artwork and stability work.
   bleeding through the video, double-exposed programme lists), a robustness
   test suite (246 tests), fixed EPG-grid crash on rebuild, and the stuck
   "Loading channels…" indicators are gone for good.
+- **Instant startup & outage resilience** — the app opens immediately (no
+  more blocking "Connecting to…" splash; credentials verify in the
+  background), channel/movie/series lists are cached in memory for 5
+  minutes AND mirrored to disk per playlist, so a down or overloaded
+  provider shows the last known lineup instead of empty lists. After a
+  network failure the client fails fast for 30 s (no more minutes-long
+  hangs), and any successful reply lifts the cooldown at once.
+- **Timeshift trust** — only a proven provider response ("this is an error
+  page, not a stream") may ever hide a channel's catch-up. Player-level
+  noise (an mpv error right after the swap, a too-early "not seekable"
+  reading) no longer silently strips timeshift off working channels, and
+  the archive probe treats a network failure on any URL format as
+  inconclusive. The TIMESHIFT badge no longer appears when pausing a
+  channel without an archive (that pause rides mpv's local buffer).
+- **Fewer wrong prompts** — the "upcoming broadcast" reminder/record dialog
+  is no longer shown when an overloaded panel answers 407 for an ordinary
+  live channel (the guide-on-air check and the network cooldown gate it).
+- **One-time settings reset** — because so much changed, the first launch
+  of 0.9.0 resets stored settings to the new defaults. Playlists,
+  favorites, history, reminders, recordings, category customisations,
+  parental PIN, language and the Trakt account are all kept.
 
 ## [0.8.1]
 

@@ -22,6 +22,17 @@ artwork and stability work.
 - **Snappier**: definitive stream errors (forbidden / not found / not
   started) surface in about a second; "Recently added" is cached; many
   macOS repaint fixes and 246 tests green.
+- **Instant startup, outage-proof**: the app opens immediately (credentials
+  verify in the background), lists are cached to disk per playlist so a
+  down provider still shows the last known lineup, and after a network
+  failure the client fails fast for 30 s instead of hanging for minutes.
+- **Timeshift you can trust**: only a proven provider answer can hide a
+  channel's catch-up - transient errors and early not-seekable readings
+  no longer silently strip timeshift off working channels.
+
+**Note:** the first launch of 0.9.0 resets stored settings to the new
+defaults (too much changed to carry the old ones). Playlists, favorites,
+history, reminders, recordings and your Trakt account are all kept.
 
 Full details in the [changelog](https://github.com/slimture/dopeIPTV/blob/main/CHANGELOG.md).
 

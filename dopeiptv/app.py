@@ -6,10 +6,10 @@ import os
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import QSettings, Qt
+from PyQt6.QtCore import QSettings, Qt, QTimer
 from PyQt6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPixmap
 from PyQt6.QtWidgets import (
-    QApplication, QLabel, QMessageBox, QProxyStyle, QPushButton, QStyle,
+    QApplication, QMessageBox, QProxyStyle, QPushButton, QStyle,
 )
 
 
@@ -32,7 +32,6 @@ class _NoButtonIconsStyle(QProxyStyle):
 from . import APP_NAME, BUILD_VERSION, ORG
 from .core.log import configure_logging, log
 from .providers.client import OfflineClient, make_client
-from .ui.dialogs import PlaylistDialog
 from .ui.main_window import MainWindow
 from .media.players import _libmpv, _libmpv_error, embedded_playback_reason
 
@@ -166,6 +165,54 @@ def _install_crash_hooks() -> None:
             pass
 
 
+# One-time settings migration. Bumped to 2 for 0.9.0: so much of the UI and
+# behaviour changed since 0.8.x that stale stored settings (layout geometry,
+# view modes, tuned timeouts, old flags) caused more confusion than they
+# saved - upgrading resets them ONCE to the new defaults. Everything that is
+# user DATA rather than a preference survives via the keep-list below.
+_SETTINGS_VERSION = 2
+
+_RESET_KEEP_PREFIXES = (
+    "playlists", "active_playlist",              # providers + credentials
+    "favorites", "movie_favorites", "series_favorites",
+    "history", "epg_reminders",
+    "trakt_",                                    # tokens + watched/watchlist
+    "parental",                                  # PIN hash + enablement
+    "category_overrides", "channel_overrides",   # renames/hides/locks/icons
+    "rec_",                                      # recording folder + limits
+    "server", "username", "password",            # legacy mirrors
+    "language", "tmdb_api_key",
+    "settings_version",
+)
+
+
+def _maybe_reset_settings(settings: QSettings) -> bool:
+    """On first launch of a build with a newer settings version, drop every
+    stored setting EXCEPT user data (playlists, favorites, history, Trakt,
+    recordings, overrides, reminders, language). Returns True when a reset
+    actually happened (existing install upgrading), False on fresh installs
+    and already-migrated installs."""
+    try:
+        stored = int(settings.value("settings_version", 0))
+    except (TypeError, ValueError):
+        stored = 0
+    if stored >= _SETTINGS_VERSION:
+        return False
+    had_settings = bool(settings.allKeys())
+    removed = 0
+    if had_settings:
+        for k in list(settings.allKeys()):
+            if not any(k.startswith(p) for p in _RESET_KEEP_PREFIXES):
+                settings.remove(k)
+                removed += 1
+    settings.setValue("settings_version", _SETTINGS_VERSION)
+    settings.sync()
+    if removed:
+        log.info("settings migration: reset %d settings for version %d "
+                 "(user data kept)", removed, _SETTINGS_VERSION)
+    return removed > 0
+
+
 def main() -> int:
     """Launch the application."""
     # PyInstaller's windowed (no-console) build - our Windows release - leaves
@@ -251,6 +298,7 @@ def main() -> int:
     app.setWindowIcon(icon)
     install_icon(icon)
     settings = QSettings(ORG, ORG)
+    settings_were_reset = _maybe_reset_settings(settings)
     from .i18n import set_language
     set_language(settings.value("language", "en"))
     apply_theme(settings)
@@ -264,104 +312,65 @@ def main() -> int:
             log.info("Embedded playback: enabled")
     store = PlaylistStore(settings)
 
-    client = None
-    welcome = False
-    offline = False
-    while client is None:
-        pl = store.active()
-        if pl is None:
-            # No provider configured yet (first run). Don't gate the app
-            # behind a modal login - open the window in "explore" mode with a
-            # do-nothing client and let the in-window welcome screen offer to
-            # connect a provider or just look around.
-            client = OfflineClient()
-            welcome = True
-            break
-
-        candidate = make_client(pl)
-        offline = False
-        splash = QLabel(f"  Connecting to {pl.get('name', 'server')}…",
-                        None, Qt.WindowType.SplashScreen)
-        splash.setStyleSheet(
-            "background:#17171C; color:#C9C9D2; font-size:14px;"
-            "padding:18px 28px; border-radius:10px;")
-        splash.adjustSize()
-        splash.show()
-        app.processEvents()
-
-        import threading
-        auth_err = [None]
-
-        def _do_auth():
-            # B023 false positive: the thread is join()ed within this same
-            # iteration below, so the closure reads the current candidate /
-            # auth_err, never a later loop value.
-            try:
-                candidate.authenticate()  # noqa: B023
-            except Exception as exc:
-                auth_err[0] = exc  # noqa: B023
-
-        t = threading.Thread(target=_do_auth, daemon=True)
-        t.start()
-        # Bound the splash: a down/overloaded provider used to pin
-        # "Connecting to ..." for the full network timeout before the window
-        # appeared. After 8 s, open the window anyway - the auth thread keeps
-        # running in the background, lists load when the server answers (or
-        # come from the on-disk cache), and any real credential problem
-        # surfaces in-window exactly like the "start anyway" path.
-        import time as _time
-        _t0 = _time.monotonic()
-        while t.is_alive():
-            app.processEvents()
-            t.join(0.05)
-            if _time.monotonic() - _t0 > 8:
-                log.warning("auth still pending after 8 s - opening the "
-                            "window without waiting")
-                break
-
-        if t.is_alive() or auth_err[0] is None:
-            client = candidate
-            settings.setValue("server", pl["server"])
-            settings.setValue("username", pl["username"])
-            settings.setValue("password", pl["password"])
-            splash.close()
-        else:
-            e = auth_err[0]
-            splash.close()
-            box = QMessageBox(QMessageBox.Icon.Warning, "Connection failed",
-                              f"{pl['name']}: {e}\n\n"
-                              "You can start anyway - content will load once "
-                              "the server is reachable again (retry by "
-                              "switching category, or manage playlists in "
-                              "Settings) - or fix the playlist details now.",
-                              parent=None)
-            start_btn = box.addButton("Start anyway",
-                                      QMessageBox.ButtonRole.AcceptRole)
-            edit_btn = box.addButton("Edit playlist…",
-                                     QMessageBox.ButtonRole.ActionRole)
-            quit_btn = box.addButton("Quit",
-                                     QMessageBox.ButtonRole.RejectRole)
-            box.setDefaultButton(start_btn)
-            box.exec()
-            clicked = box.clickedButton()
-            if clicked is quit_btn:
-                return 0
-            if clicked is edit_btn:
-                dlg = PlaylistDialog(None, pl)
-                if dlg.exec():
-                    store.update(pl["id"], **dlg.values())
-                continue
-            client = candidate
-            offline = True
+    # Open the window IMMEDIATELY - no splash, no blocking authenticate.
+    # The client is built from the stored playlist and credentials are
+    # verified in the background after the window is up: content loads as
+    # soon as the server answers (or from the on-disk list/EPG caches), and
+    # a genuine credential rejection surfaces as an in-window warning that
+    # points at Settings -> Playlists.
+    pl = store.active()
+    welcome = pl is None
+    if welcome:
+        # No provider configured yet (first run): "explore" mode with a
+        # do-nothing client; the welcome screen offers to connect one.
+        client = OfflineClient()
+    else:
+        client = make_client(pl)
+        settings.setValue("server", pl["server"])
+        settings.setValue("username", pl.get("username", ""))
+        settings.setValue("password", pl.get("password", ""))
 
     w = MainWindow(client, settings, store)
-    if offline:
-        w.setWindowTitle(w.windowTitle() + "  (offline)")
     w.show()
     if welcome:
         w.show_welcome()
     for _ in range(5):
         app.processEvents()
+
+    if settings_were_reset:
+        from .i18n import tr
+        QTimer.singleShot(400, lambda: QMessageBox.information(
+            w, "dopeIPTV 0.9.0", tr("settings_reset_090")))
+
+    if not welcome:
+        import threading
+        auth_err: list = [None]
+
+        def _do_auth():
+            try:
+                client.authenticate()
+            except Exception as exc:
+                auth_err[0] = exc
+
+        _t = threading.Thread(target=_do_auth, daemon=True)
+        _t.start()
+
+        def _check_auth() -> None:
+            if _t.is_alive():
+                QTimer.singleShot(500, _check_auth)
+                return
+            e = auth_err[0]
+            # Only a real credential rejection deserves a dialog; network
+            # failures already surface through the list-load error paths and
+            # recover by themselves (cooldown + caches).
+            if isinstance(e, RuntimeError) and "username or password" in str(e):
+                QMessageBox.warning(
+                    w, "Connection failed",
+                    f"{pl['name']}: {e}\n\n"
+                    "Check the playlist's credentials under Settings → "
+                    "Playlists.")
+
+        QTimer.singleShot(500, _check_auth)
 
     rc = app.exec()
     # After the event loop returns, MainWindow.closeEvent has already torn down
