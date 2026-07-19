@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import html
 import re
+import threading
 import time
 from datetime import datetime, timezone
 from typing import Any
@@ -17,6 +18,14 @@ from ..core.log import log
 class XtreamClient:
     """HTTP client for the Xtream Codes player_api.php endpoint."""
 
+    # How long a fetched channel/movie/series list stays served from memory.
+    # Lineups change rarely, and every consumer (mode switch, EPG guide, Home
+    # shelves) used to re-download the entire multi-thousand-row list on each
+    # visit - the dominant cost of "switching to TV feels slow". The Refresh
+    # button clears this (see clear_list_cache), so a manual refresh is
+    # always a real re-fetch.
+    LIST_CACHE_SECS = 300
+
     def __init__(self, server: str, username: str, password: str) -> None:
         self.server = server.rstrip("/")
         if not self.server.startswith(("http://", "https://")):
@@ -25,6 +34,41 @@ class XtreamClient:
         self.password = password
         self.session = requests.Session()
         self.session.headers["User-Agent"] = "dopeIPTV/1.0"
+        self._list_cache: dict[tuple, tuple[float, list]] = {}
+        self._list_lock = threading.Lock()
+
+    def _cached_list(self, key: tuple, fetch) -> list:
+        """Serve *key* from the short list cache, else *fetch* and store.
+
+        On a network failure a STALE copy (older than the TTL) is served when
+        one exists: a momentary timeout on a lineup that was fine minutes ago
+        should degrade to slightly-old data, not to an error and an empty
+        list. Thread-safe - list loads run on the worker pool."""
+        now = time.time()
+        with self._list_lock:
+            hit = self._list_cache.get(key)
+            if hit and now - hit[0] < self.LIST_CACHE_SECS:
+                return hit[1]
+        try:
+            data = fetch() or []
+        except requests.RequestException:
+            with self._list_lock:
+                hit = self._list_cache.get(key)
+            if hit is not None:
+                log.warning(
+                    "xtream %s @ %s: network failure - serving the cached "
+                    "list from %.0f s ago instead", key[0], self.server,
+                    now - hit[0])
+                return hit[1]
+            raise
+        with self._list_lock:
+            self._list_cache[key] = (now, data)
+        return data
+
+    def clear_list_cache(self) -> None:
+        """Drop every cached list so the next call re-fetches (Refresh)."""
+        with self._list_lock:
+            self._list_cache.clear()
 
     def _redact(self, text: str) -> str:
         """Strip the username/password from a string before logging it -
@@ -46,7 +90,10 @@ class XtreamClient:
         action = params.get("action") or "authenticate"
         t0 = time.monotonic()
         try:
-            r = self.session.get(url, params=base, timeout=20)
+            # (connect, read): a full get_live_streams/get_vod_streams reply
+            # is often several MB from a slow provider - 20 s total read kept
+            # tripping "Read timed out" on lineups that arrive fine in 30-40 s.
+            r = self.session.get(url, params=base, timeout=(10, 60))
         except requests.RequestException as e:
             log.warning("xtream %s @ %s: request failed - %s: %s",
                         action, self.server, type(e).__name__,
@@ -105,31 +152,40 @@ class XtreamClient:
                 "server_info": data.get("server_info") or {}}
 
     def live_categories(self) -> list[dict]:
-        return self._api(action="get_live_categories") or []
+        return self._cached_list(
+            ("get_live_categories",),
+            lambda: self._api(action="get_live_categories"))
 
     def live_streams(self, category_id: str | None = None) -> list[dict]:
         p: dict[str, Any] = {"action": "get_live_streams"}
         if category_id:
             p["category_id"] = category_id
-        return self._api(**p) or []
+        return self._cached_list(("get_live_streams", category_id),
+                                 lambda: self._api(**p))
 
     def vod_categories(self) -> list[dict]:
-        return self._api(action="get_vod_categories") or []
+        return self._cached_list(
+            ("get_vod_categories",),
+            lambda: self._api(action="get_vod_categories"))
 
     def vod_streams(self, category_id: str | None = None) -> list[dict]:
         p: dict[str, Any] = {"action": "get_vod_streams"}
         if category_id:
             p["category_id"] = category_id
-        return self._api(**p) or []
+        return self._cached_list(("get_vod_streams", category_id),
+                                 lambda: self._api(**p))
 
     def series_categories(self) -> list[dict]:
-        return self._api(action="get_series_categories") or []
+        return self._cached_list(
+            ("get_series_categories",),
+            lambda: self._api(action="get_series_categories"))
 
     def series_list(self, category_id: str | None = None) -> list[dict]:
         p: dict[str, Any] = {"action": "get_series"}
         if category_id:
             p["category_id"] = category_id
-        return self._api(**p) or []
+        return self._cached_list(("get_series", category_id),
+                                 lambda: self._api(**p))
 
     def series_info(self, series_id: int | str) -> dict:
         return self._api(action="get_series_info", series_id=series_id) or {}
@@ -244,6 +300,11 @@ class OfflineClient:
     def account_info(self) -> dict:
         # M3U / demo / offline providers have no account to report.
         return {}
+
+    def clear_list_cache(self) -> None:
+        # Interface parity with XtreamClient's short list cache; these
+        # clients serve from local data, so there is nothing to drop.
+        return None
 
     def live_categories(self) -> list[dict]:
         return []

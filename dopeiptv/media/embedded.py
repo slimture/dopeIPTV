@@ -552,14 +552,14 @@ class _SeekSlider(QSlider):
         if seg and seg[2]:
             parts.append(seg[2])
         if parts:
-            # Anchor the tip just above the bar at the cursor's x. The default
-            # placement (at the cursor) gets the OS's own downward offset added
-            # and landed well below the pointer, reading as detached from the
-            # bar. showText adds ~16 px below the given point, so aim high
-            # enough that the tip settles right on top of the slider.
+            # Anchor the tip just BELOW the bar at the cursor's x - above the
+            # bar it covered the pointer and got in the way of clicking, and
+            # the OS default placement sat too far down. showText adds ~16 px
+            # below the given point, so aim at the slider's bottom edge minus
+            # a little to land the tip a few px under the bar.
             gp = event.globalPosition().toPoint()
-            top = self.mapToGlobal(self.rect().topLeft()).y()
-            QToolTip.showText(QPoint(gp.x() - 16, top - 48),
+            bottom = self.mapToGlobal(self.rect().bottomLeft()).y()
+            QToolTip.showText(QPoint(gp.x() - 16, bottom - 10),
                               " · ".join(parts), self)
         else:
             QToolTip.hideText()

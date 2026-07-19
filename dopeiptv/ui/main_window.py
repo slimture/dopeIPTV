@@ -1653,6 +1653,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         governs when a real re-fetch happens."""
         if force:
             self._last_playlist_refresh = time.time()
+            # A manual refresh must be a real re-fetch: drop the client's
+            # short-TTL list cache so categories/channels come from the
+            # provider, not from memory.
+            clear = getattr(self.client, "clear_list_cache", None)
+            if clear is not None:
+                clear()
         self._clear_ts_broken()   # re-trust the provider's tv_archive flags
         pl = self.playlist_store.active() if self.playlist_store else None
         pid = (pl or {}).get("id")
