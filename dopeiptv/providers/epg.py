@@ -220,6 +220,12 @@ class XmltvGuide:
         self._write_cache(data)
         return data
 
+    def is_loaded(self) -> bool:
+        """Non-blocking: whether guide data is available right now. Lets the
+        UI (e.g. the EPG grid) tell 'no guide data for this channel' apart
+        from 'the guide simply hasn't finished loading yet'."""
+        return self._loaded
+
     def ensure_loaded(self, force: bool = False) -> bool:
         """Load the guide if needed.  Returns True when data is available."""
         with self._lock:

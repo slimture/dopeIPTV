@@ -211,6 +211,16 @@ class EpgGridDialog(QDialog):
 
         self._build()
 
+        # Opened before the EPG finished loading (startup race)? Every row
+        # then draws as a bare band. Poll until the guide reports loaded and
+        # rebuild once, so the board fills in by itself instead of needing a
+        # close-and-reopen.
+        self._epg_poll = QTimer(self)
+        self._epg_poll.setInterval(1500)
+        self._epg_poll.timeout.connect(self._maybe_reload_epg)
+        if not self._epg_ready():
+            self._epg_poll.start()
+
         scr = self.screen().availableGeometry() if self.screen() else None
         want_w = self.CH_COL_W + self._grid_w + 40
         want_h = self.HEADER_H + len(self.channels) * self.ROW_H + 110
@@ -302,6 +312,17 @@ class EpgGridDialog(QDialog):
     def _open_search(self) -> None:
         from .epg_search import EpgSearchDialog
         EpgSearchDialog(self.window).exec()
+
+    def _epg_ready(self) -> bool:
+        try:
+            return bool(self.window.xmltv.is_loaded())
+        except Exception:
+            return True   # can't tell - treat as ready, don't poll forever
+
+    def _maybe_reload_epg(self) -> None:
+        if self._epg_ready():
+            self._epg_poll.stop()
+            self._build()
 
     def _scroll_to_now(self) -> None:
         """Bring the current time back into view (after scrolling far back)."""
@@ -541,8 +562,11 @@ class EpgGridDialog(QDialog):
             data = {"channel": ch, "prog": None}
             block.setData(0, data)
             self.scene.addItem(block)
+            # While the guide is still loading, say so instead of the
+            # misleading "no guide available for this channel".
             label = QGraphicsSimpleTextItem(
-                tr("epg_no_guide_available"), block)
+                tr("epg_no_guide_available") if self._epg_ready()
+                else tr("status_loading_programme_guide"), block)
             label.setBrush(QColor("#9aa3b2"))
             self._elide(label, self._grid_w - 12)
             label.setPos(self.CH_COL_W + 6, y + 7)
