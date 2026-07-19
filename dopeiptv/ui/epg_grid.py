@@ -224,6 +224,10 @@ class EpgGridDialog(QDialog):
         self._epg_poll.timeout.connect(self._maybe_reload_epg)
         if not self._epg_ready():
             self._epg_poll.start()
+        # Stop both timers the moment the dialog closes: a late _tick or
+        # load-poll rebuild firing after teardown would work a dead scene.
+        self.finished.connect(lambda _r: (self._refresh.stop(),
+                                          self._epg_poll.stop()))
 
         scr = self.screen().availableGeometry() if self.screen() else None
         want_w = self.CH_COL_W + self._grid_w + 40
@@ -387,7 +391,23 @@ class EpgGridDialog(QDialog):
     # -- build ---------------------------------------------------------------
 
     def _build(self) -> None:
-        self.scene.clear()
+        # Null the pinned-group refs BEFORE clearing. scene.clear() deletes
+        # the underlying C++ items, and clearing also nudges the scrollbars,
+        # whose valueChanged fires _pin synchronously - which would then touch
+        # a dangling QGraphicsItemGroup wrapper (RuntimeError, the crash seen
+        # when the load-poll rebuilt a scrolled board). Blocking the scroll
+        # signals across the clear closes the window entirely.
+        self._header_group = None
+        self._chan_group = None
+        self._corner = None
+        hbar = self.view.horizontalScrollBar()
+        vbar = self.view.verticalScrollBar()
+        was_h, was_v = hbar.blockSignals(True), vbar.blockSignals(True)
+        try:
+            self.scene.clear()
+        finally:
+            hbar.blockSignals(was_h)
+            vbar.blockSignals(was_v)
         self._selected = None
         self._sel_outline = None   # dropped by scene.clear(); recreated on pick
         self._playing_row = None
@@ -684,11 +704,14 @@ class EpgGridDialog(QDialog):
     # -- sticky header / column ---------------------------------------------
 
     def _pin(self, *_a) -> None:
+        # None while a rebuild is in progress (see _build); skip until the new
+        # groups exist rather than touch a deleted wrapper.
+        if getattr(self, "_header_group", None) is None:
+            return
         tl = self.view.mapToScene(0, 0)
-        if hasattr(self, "_header_group"):
-            self._header_group.setY(tl.y())
-            self._chan_group.setX(tl.x())
-            self._corner.setPos(tl.x(), tl.y())
+        self._header_group.setY(tl.y())
+        self._chan_group.setX(tl.x())
+        self._corner.setPos(tl.x(), tl.y())
 
     # -- interaction ---------------------------------------------------------
 
