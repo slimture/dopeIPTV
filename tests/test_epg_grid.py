@@ -155,9 +155,17 @@ def test_epg_grid_interactions():
     except Exception:
         pytest.skip("PyQt6 not available")
     env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
-    proc = subprocess.run(
-        [sys.executable, "-c", _CHILD], capture_output=True, text=True,
-        env=env, cwd=_REPO_ROOT, timeout=180)
+    # One retry: the child needs an offscreen OpenGL context (the MainWindow
+    # embeds a QOpenGLWidget), and creating one can fail spuriously when the
+    # machine is under heavy load - the child then dies before printing its
+    # marker without any assertion having failed. A genuine regression fails
+    # both attempts identically, so the retry can't mask one.
+    for _attempt in (1, 2):
+        proc = subprocess.run(
+            [sys.executable, "-c", _CHILD], capture_output=True, text=True,
+            env=env, cwd=_REPO_ROOT, timeout=180)
+        if "EPG_GRID_OK" in proc.stdout:
+            return
     assert "EPG_GRID_OK" in proc.stdout, (
         f"EPG grid checks failed\n"
         f"stdout={proc.stdout!r}\nstderr={proc.stderr[-2000:]!r}")

@@ -1,23 +1,28 @@
-## dopeIPTV 0.8.1
+## dopeIPTV 0.9.0
 
-**Fix: working catch-up channels could silently lose their timeshift.**
+**Home** — a full-window start page — plus an interactive EPG guide,
+reminders & recording for upcoming programmes, and a big round of player,
+artwork and stability work.
 
-A momentary network failure during the archive check (a timeout, DNS/TLS
-error or refused connection) was treated as proof that the channel serves
-no catch-up - and the channel's whole timeshift UI (list marker, rewind
-button, archive timeline) was hidden for 14 days, with no message. One
-flaky moment was enough to disable channels whose archive works fine.
+- **Home**: a Featured hero row and shelves for Continue watching,
+  Favourites now, favourite movies & series, Recently viewed and Recently
+  added movies, series *and* TV channels. Instant cold-start posters via a
+  per-playlist disk cache. Right-click a channel tile to set a reminder or
+  record. Every shelf is configurable in Settings.
+- **EPG guide, interactive**: logos, descriptions, progress, day-jumps,
+  arrow-key navigation, sticky titles — and it follows your accent colour.
+- **Upcoming programmes**: when a stream hasn't started, get the answer at
+  once and set a **reminder** or a **recording** (until it ends, or a custom
+  length) — from the prompt, the channel list, Home or the programme guide.
+- **Player**: click the video to pause/play with a centred play/pause disc
+  (docked, fullscreen, pop-out); complete right-click menus everywhere;
+  the timeshift timeline shows the target time on hover.
+- **Artwork**: episode posters via the show's TMDB art, junk cover URLs
+  skipped, recordings show the channel logo.
+- **Snappier**: definitive stream errors (forbidden / not found / not
+  started) surface in about a second; "Recently added" is cached; many
+  macOS repaint fixes and 246 tests green.
 
-- **Only a real provider response can hide a channel's catch-up now** (an
-  HTML/JSON error page instead of a stream). Network-level failures leave
-  everything untouched.
-- When the archive can't be reached, the app now **says so** - "Couldn't
-  reach the catch-up archive - check the connection and try again" -
-  instead of failing silently or blaming the channel.
-- If channels already lost their timeshift on 0.8.0: refresh the playlist
-  (↻) once and they come back immediately.
-
-Everything else is 0.8.0 - see [its release notes](https://github.com/slimture/dopeIPTV/releases/tag/v0.8.0)
-for the multiview grid, the cross-platform interface and the rest.
+Full details in the [changelog](https://github.com/slimture/dopeIPTV/blob/main/CHANGELOG.md).
 
 > Linux is and remains the primary target - Windows and macOS are a bonus.

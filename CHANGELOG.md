@@ -5,6 +5,57 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
+## [0.9.0]
+
+**Home** — a full-window start page with a Featured hero row and shelves — plus an
+interactive EPG guide, reminders/recording for upcoming programmes, and a big
+round of player, artwork and stability work.
+
+- **Home** — a SwipTV-style start page (opens at launch, configurable): an
+  oversized **Featured** hero row, and shelves for **Continue watching**,
+  **Favourites now** (with the current programme), **favourite movies &
+  series**, **Recently viewed** and **Recently added** movies, series *and TV
+  channels*. Posters paint instantly on a cold start from a per-playlist disk
+  cache and refresh in the background. Text-only rounded quick-nav (TV / EPG
+  Guide / Movies / Series / Settings) in the accent colour. Right-click a
+  channel tile to set a reminder or record without leaving Home. Clicking a
+  channel lands the classic list in that channel's own category with the row
+  selected, and the detail panel follows. Every shelf can be toggled in
+  Settings.
+- **EPG guide, interactive** — channel logos, programme descriptions, an info
+  panel, progress on the on-air card, day-jump arrows, full arrow-key
+  navigation, sticky programme titles while scrolling, playable rows even for
+  channels without guide data, duplicate entries dropped, and the whole guide
+  follows the theme's accent colour.
+- **Upcoming programmes: reminders & recording** — when a stream hasn't
+  started yet (the provider's 407), the app says so at once and offers a
+  **reminder when it starts** or a **recording** (until the programme ends, or
+  a custom length). The same actions live on right-click — in the channel
+  list, in Home and in the detail pane's programme guide. A "don't show
+  again" opt-out is resettable in Settings.
+- **"Recently added"** — a 🆕 category under TV, Movies and Series (newest
+  first, cached briefly so re-opening is instant).
+- **Player** — click the video to pause/play with a centred play/pause disc
+  (docked, fullscreen and pop-out); the right-click menu is complete
+  everywhere (pause/stop, fullscreen, audio/subtitle tracks, delay, aspect,
+  filters, sleep timer); hovering the timeshift timeline shows the time you'd
+  jump to; the poster overlay tracks pause/play state correctly for
+  timeshift and catch-up.
+- **Artwork** — episode posters resolve through the show's TMDB artwork
+  (providers rarely ship per-episode images), junk cover URLs ("n/A" & co.)
+  are skipped, and recordings show their channel's logo.
+- **Faster failure answers** — a parallel probe surfaces definitive stream
+  errors (forbidden / not found / not started) in about a second instead of
+  after the whole retry budget.
+- **Onboarding & housekeeping** — clearer first-run flow (playlist name hint,
+  Trakt confirmation, icon-only actions), Content Manager lists categories
+  alphabetically, community health files (contributing, security policy,
+  code of conduct, issue templates).
+- **Stability** — many macOS repaint fixes (ghosted shelf titles, menus
+  bleeding through the video, double-exposed programme lists), a robustness
+  test suite (246 tests), fixed EPG-grid crash on rebuild, and the stuck
+  "Loading channels…" indicators are gone for good.
+
 ## [0.8.1]
 
 **Fix: working catch-up channels could silently lose their timeshift.**
