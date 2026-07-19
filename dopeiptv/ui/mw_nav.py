@@ -11,7 +11,7 @@ import math
 
 from PyQt6.QtCore import QPointF, QRectF, QSize, Qt
 from PyQt6.QtGui import (
-    QColor, QIcon, QPainter, QPen, QPixmap, QPolygonF,
+    QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap, QPolygonF,
 )
 from PyQt6.QtWidgets import QColorDialog, QMenu
 
@@ -137,7 +137,7 @@ class _NavMixin:
         if not hasattr(self, "nav_btns"):
             return
         for key, b in self.nav_btns.items():
-            s = 22 if key in ("live", "vod", "series") else 19
+            s = 22 if key in ("home", "live", "vod", "series") else 19
             b.setIcon(self._nav_icon(self._rail_glyphs[key], s))
             b.setIconSize(QSize(s, s))
         self._apply_cat_search_icon()   # re-tint 🔍 to the new theme's muted tone
@@ -224,7 +224,22 @@ class _NavMixin:
             pr.setPen(Qt.PenStyle.NoPen)
             pr.setBrush(col)
 
-        if kind == "stack":
+        if kind == "home":
+            # A house: roof triangle over a body with a door notch.
+            stroke()
+            pr.drawPolyline(QPointF(s * 0.14, s * 0.52), QPointF(s * 0.50, s * 0.16),
+                            QPointF(s * 0.86, s * 0.52))
+            body = QPainterPath()
+            body.moveTo(s * 0.24, s * 0.50)
+            body.lineTo(s * 0.24, s * 0.86)
+            body.lineTo(s * 0.42, s * 0.86)
+            body.lineTo(s * 0.42, s * 0.64)
+            body.lineTo(s * 0.58, s * 0.64)
+            body.lineTo(s * 0.58, s * 0.86)
+            body.lineTo(s * 0.76, s * 0.86)
+            body.lineTo(s * 0.76, s * 0.50)
+            pr.drawPath(body)
+        elif kind == "stack":
             # Two offset cards = "several playlists, pick one". The back card
             # is dimmed so the front reads as the active list.
             pr.setPen(Qt.PenStyle.NoPen)

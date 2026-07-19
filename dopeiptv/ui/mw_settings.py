@@ -873,6 +873,36 @@ class _SettingsMixin:
         mvv.addStretch()
         tabs.addTab(mv_tab, tr("tab_multiview"))
 
+        # Home tab - master toggle, open-at-start, and which shelves show.
+        home_tab = QWidget()
+        hv = QVBoxLayout(home_tab)
+        hv.setSpacing(8)
+        home_show_box = QCheckBox(tr("set_home_show"))
+        home_show_box.setChecked(
+            self.settings.value("home_enabled", "true") == "true")
+        hv.addWidget(home_show_box)
+        home_start_box = QCheckBox(tr("set_home_start"))
+        home_start_box.setChecked(
+            self.settings.value("home_start", "true") == "true")
+        hv.addWidget(home_start_box)
+        shelves_lbl = QLabel(tr("set_home_shelves"))
+        shelves_lbl.setStyleSheet(
+            f"color:{P['muted2']}; font-size:11px; font-weight:700;"
+            "letter-spacing:1.2px; margin-top:4px;")
+        hv.addWidget(shelves_lbl)
+        home_shelf_boxes: dict[str, QCheckBox] = {}
+        for skey, slabel in (("home_sh_resume", "home_resume"),
+                             ("home_sh_fav", "home_fav_now"),
+                             ("home_sh_history", "home_recent"),
+                             ("home_sh_movies", "home_new_movies"),
+                             ("home_sh_series", "home_new_series")):
+            box = QCheckBox(tr(slabel))
+            box.setChecked(self.settings.value(skey, "true") == "true")
+            hv.addWidget(box)
+            home_shelf_boxes[skey] = box
+        hv.addStretch()
+        tabs.addTab(home_tab, tr("nav_home"))
+
         # Playlists tab
         pl_tab = QWidget()
         pv = QVBoxLayout(pl_tab)
@@ -1575,6 +1605,16 @@ class _SettingsMixin:
             self.settings.setValue("mv_seek_step_min", mv_step_spin.value())
             self.settings.setValue("mv_cells", mv_cells_box.currentData())
             self._apply_multiview_settings()
+            self.settings.setValue(
+                "home_enabled",
+                "true" if home_show_box.isChecked() else "false")
+            self.settings.setValue(
+                "home_start",
+                "true" if home_start_box.isChecked() else "false")
+            for skey, box in home_shelf_boxes.items():
+                self.settings.setValue(
+                    skey, "true" if box.isChecked() else "false")
+            self._apply_home_settings()
             self.cover.reload()
             if self.player:
                 self.player.apply_default_options()

@@ -59,6 +59,63 @@ _STRINGS: dict[str, dict[str, str]] = {
 
     # ── Navigation / sidebar ──────────────────────────────────────────────
 
+    "nav_home": {
+        "en": "Home", "sv": "Hem", "es": "Inicio", "de": "Start",
+        "fr": "Accueil", "zh": "主页", "ru": "Главная", "th": "หน้าแรก",
+    },
+    "home_resume": {
+        "en": "Continue watching", "sv": "Fortsätt titta",
+        "es": "Seguir viendo", "de": "Weiterschauen",
+        "fr": "Reprendre la lecture", "zh": "继续观看",
+        "ru": "Продолжить просмотр", "th": "ดูต่อ",
+    },
+    "home_fav_now": {
+        "en": "On your favorites now", "sv": "På dina favoriter nu",
+        "es": "Ahora en tus favoritos", "de": "Jetzt auf deinen Favoriten",
+        "fr": "En ce moment sur vos favoris", "zh": "您收藏的频道正在播放",
+        "ru": "Сейчас в избранном", "th": "กำลังฉายในช่องโปรดของคุณ",
+    },
+    "home_recent": {
+        "en": "Recently viewed", "sv": "Senast visade",
+        "es": "Vistos recientemente", "de": "Zuletzt gesehen",
+        "fr": "Vus récemment", "zh": "最近观看",
+        "ru": "Недавно просмотренные", "th": "ดูล่าสุด",
+    },
+    "home_new_movies": {
+        "en": "Recently added movies", "sv": "Nyligen tillagda filmer",
+        "es": "Películas añadidas recientemente",
+        "de": "Neu hinzugefügte Filme", "fr": "Films ajoutés récemment",
+        "zh": "最新添加的电影", "ru": "Недавно добавленные фильмы",
+        "th": "ภาพยนตร์ที่เพิ่มล่าสุด",
+    },
+    "home_new_series": {
+        "en": "Recently added series", "sv": "Nyligen tillagda serier",
+        "es": "Series añadidas recientemente",
+        "de": "Neu hinzugefügte Serien", "fr": "Séries ajoutées récemment",
+        "zh": "最新添加的剧集", "ru": "Недавно добавленные сериалы",
+        "th": "ซีรีส์ที่เพิ่มล่าสุด",
+    },
+    "set_home_show": {
+        "en": "Show the Home section", "sv": "Visa Hem-sektionen",
+        "es": "Mostrar la sección de inicio",
+        "de": "Start-Bereich anzeigen",
+        "fr": "Afficher la section Accueil", "zh": "显示主页",
+        "ru": "Показывать главную", "th": "แสดงหน้าแรก",
+    },
+    "set_home_start": {
+        "en": "Open Home at startup", "sv": "Öppna Hem vid start",
+        "es": "Abrir inicio al arrancar", "de": "Start beim Öffnen anzeigen",
+        "fr": "Ouvrir l'accueil au démarrage", "zh": "启动时打开主页",
+        "ru": "Открывать главную при запуске",
+        "th": "เปิดหน้าแรกเมื่อเริ่มโปรแกรม",
+    },
+    "set_home_shelves": {
+        "en": "Sections on Home", "sv": "Sektioner på Hem",
+        "es": "Secciones en inicio", "de": "Bereiche auf Start",
+        "fr": "Sections de l'accueil", "zh": "主页栏目",
+        "ru": "Разделы на главной", "th": "ส่วนต่าง ๆ บนหน้าแรก",
+    },
+
     "nav_tv": {
         "en": "TV",
         "sv": "TV",

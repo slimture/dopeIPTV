@@ -57,6 +57,7 @@ from .mw_context import _ContextMenuMixin
 from .mw_detail import _DetailMixin
 from .mw_nav import _NavMixin
 from .mw_multiview import _MultiviewMixin
+from .mw_home import _HomeMixin
 from .mw_onboarding import _OnboardingMixin
 from .mw_popout import _PopoutMixin
 from .mw_reminders import _RemindersMixin
@@ -78,7 +79,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _ContextMenuMixin, _DetailMixin, _RemindersMixin,
                  _BusyMixin, _UpdatesMixin, _SearchMixin, _SidebarMixin,
                  _NavMixin, _ShortcutsMixin, _OnboardingMixin, _SortMixin,
-                 _PopoutMixin, _MultiviewMixin, QMainWindow):
+                 _PopoutMixin, _MultiviewMixin, _HomeMixin, QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
     epg_progress = pyqtSignal(int)
@@ -282,6 +283,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._auto_refresh_timer.timeout.connect(self._maybe_auto_refresh)
         self._auto_refresh_timer.start(5 * 60_000)
 
+        # Land on the Home page (if enabled) - the classic view keeps loading
+        # underneath, so leaving Home is instant.
+        self._maybe_open_home_at_start()
+
     # -- UI construction -------------------------------------------------------
 
     def _fill_playlist_menu(self, menu: QMenu) -> None:
@@ -383,7 +388,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
         root = QSplitter(Qt.Orientation.Horizontal)
         root.setHandleWidth(6)
-        self.setCentralWidget(root)
+        # The central area is a stack: page 0 is the classic three-column
+        # view, page 1 (added lazily) is the full-window Home section.
+        from PyQt6.QtWidgets import QStackedWidget
+        self._center_stack = QStackedWidget()
+        self._center_stack.addWidget(root)
+        self.setCentralWidget(self._center_stack)
 
         # Sidebar. Its content lives inside a scroll area so that on a short
         # screen (small laptops) the bottom actions - EPG guide, Settings -
@@ -459,6 +469,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # recordings a record dot, history a clock - no two alike. Drawn, not
         # emoji: every OS renders its own emoji font differently.
         self._rail_glyphs = {
+            "home": "home",
             "live": "tv", "vod": "movie", "series": "series", "fav": "star",
             "watchlist": "bookmark", "watched": "check", "rec": "rec",
             "history": "clock",
@@ -501,10 +512,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.nav_btns[key] = b
             self._apply_nav_color(key)
 
-        # Browse: the content-type modes, always visible at the top.
-        for key, text in (("live", tr("nav_tv")), ("vod", tr("nav_movies")),
+        # Browse: the content-type modes, always visible at the top. Home
+        # first - it is not a MODE (it swaps the whole central stack), so its
+        # click is rewired from switch_mode to the Home page below.
+        for key, text in (("home", tr("nav_home")),
+                          ("live", tr("nav_tv")), ("vod", tr("nav_movies")),
                           ("series", tr("nav_series"))):
             _make_nav(key, text, sl, primary=True)
+        self.nav_btns["home"].clicked.disconnect()
+        self.nav_btns["home"].clicked.connect(self._show_home_page)
+        self.nav_btns["home"].setVisible(self._home_enabled())
 
         # Library: the personal lists, grouped under a collapsible disclosure
         # header (same arrow affordance as Categories) so they don't add to the
@@ -1715,6 +1732,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     # -- modes and categories ------------------------------------------------------
 
     def switch_mode(self, mode: str) -> None:
+        # Any mode switch drops back from the Home page to the classic view.
+        if getattr(self, "_center_stack", None) is not None:
+            self._center_stack.setCurrentIndex(0)
         for k, b in self.nav_btns.items():
             b.setChecked(k == mode)
         self.mode = mode
