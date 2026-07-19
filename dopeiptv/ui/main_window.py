@@ -880,6 +880,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._loading_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._loading_hint.setStyleSheet(
             f"color:{P['muted2']}; font-size:13px; padding:40px 0;")
+        # Start hidden and only show it while a classic list load is actually
+        # in flight (see _load_items). Created visible it lingered forever when
+        # the app opened on Home (the classic list never loads there, so the
+        # populate that would retire it never happens) - "Loading channels..."
+        # stuck at the bottom of the middle column at startup.
+        self._loading_hint.hide()
         ml.addWidget(self._loading_hint)
 
         self.count_lbl = QLabel("")
@@ -2264,6 +2270,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self.all_items = cache[1]
                 self._apply_filter()
                 return
+            if self.list_model.rowCount() == 0:
+                self._loading_hint.show()
             self._show_busy(tr("status_loading_recent"))
 
             def recent_done(items):
@@ -2292,12 +2300,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             def recent_fail(msg):
                 if rgen != self._load_gen:
                     return
+                self._loading_hint.hide()
                 self._hide_busy()
                 self._error(msg)
 
             run_async(self.pool, lambda: rfetch(None),
                       recent_done, recent_fail)
             return
+        # Show the bottom "Loading channels..." hint only while this fetch is
+        # in flight and there's nothing in the list yet (retired on populate /
+        # modelReset). It stays hidden when re-filtering an already-filled list.
+        if self.list_model.rowCount() == 0:
+            self._loading_hint.show()
         self._show_busy(self._loading_message())
         fn = {"live": self.client.live_streams,
               "vod": self.client.vod_streams,
@@ -2325,6 +2339,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         def fail(msg):
             if gen != self._load_gen:
                 return
+            self._loading_hint.hide()
             self._error(msg)
 
         run_async(self.pool, lambda: fn(category_id), done, fail)
