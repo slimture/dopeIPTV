@@ -3301,6 +3301,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._playing_group = None
         self._playing_item = None
         self._sync_player_buttons()
+        # Redraw the poster overlay: without this it froze on the last playing
+        # state's glyph (a plain live channel leaves it stuck on 'stop').
+        self._apply_play_icon()
         self.listw.viewport().update()
         self.setWindowTitle(self._base_title)
 

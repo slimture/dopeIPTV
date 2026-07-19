@@ -53,9 +53,15 @@ def _x_icon(size: int, color: str) -> QIcon:
 
 
 def _cover_pixmap(pm: QPixmap, w: int, h: int, radius: int = 10) -> QPixmap:
-    """Scale-crop *pm* to exactly w x h (cover fit) with rounded corners."""
+    """Scale-crop *pm* to exactly w x h (cover fit) with rounded corners.
+
+    The corner triangles are painted in the page background colour (not left
+    transparent) so the pixmap fills its whole rect: that lets the card label
+    keep WA_OpaquePaintEvent - one less layer for Qt to composite per card
+    while scrolling - without the stale-corner artifacts a transparent-corner
+    pixmap caused under that flag."""
     out = QPixmap(w, h)
-    out.fill(Qt.GlobalColor.transparent)
+    out.fill(QColor(P["bg"]))
     scaled = pm.scaled(w, h, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
                        Qt.TransformationMode.SmoothTransformation)
     p = QPainter(out)
@@ -70,9 +76,10 @@ def _cover_pixmap(pm: QPixmap, w: int, h: int, radius: int = 10) -> QPixmap:
 
 def _contain_pixmap(pm: QPixmap, w: int, h: int, radius: int = 10) -> QPixmap:
     """Fit *pm* inside w x h on a panel background (for channel logos, which
-    must not be cropped the way posters can be)."""
+    must not be cropped the way posters can be). Corners painted in the page
+    background (see _cover_pixmap) so the label can stay opaque."""
     out = QPixmap(w, h)
-    out.fill(Qt.GlobalColor.transparent)
+    out.fill(QColor(P["bg"]))
     p = QPainter(out)
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
     path = QPainterPath()
@@ -84,6 +91,29 @@ def _contain_pixmap(pm: QPixmap, w: int, h: int, radius: int = 10) -> QPixmap:
     p.setClipPath(path)
     p.drawPixmap((w - scaled.width()) // 2,
                  (h - scaled.height()) // 2 - 8, scaled)
+    p.end()
+    return out
+
+
+def _placeholder_pixmap(w: int, h: int, letter: str,
+                        radius: int = 10) -> QPixmap:
+    """The artless-card placeholder: a rounded panel with a big dimmed
+    initial, painted onto the page background so the label stays opaque
+    (same reasoning as _cover_pixmap)."""
+    out = QPixmap(w, h)
+    out.fill(QColor(P["bg"]))
+    p = QPainter(out)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    path = QPainterPath()
+    path.addRoundedRect(0.0, 0.0, float(w), float(h), radius, radius)
+    p.fillPath(path, QColor(P["pane"]).lighter(115))
+    f = QFont()
+    f.setPointSize(26)
+    f.setBold(True)
+    p.setFont(f)
+    p.setPen(QColor(P["muted"]))
+    p.drawText(out.rect(), Qt.AlignmentFlag.AlignCenter,
+               (letter or "?").strip()[:1].upper())
     p.end()
     return out
 
@@ -106,25 +136,19 @@ class _Card(QFrame):
         lay.setSpacing(5)
         self.img = QLabel()
         self.img.setFixedSize(w, h)
-        self.img.setStyleSheet(
-            f"background:{QColor(P['pane']).lighter(115).name()};"
-            "border-radius:10px;")
         self.img.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # NB: no WA_OpaquePaintEvent here. The label has rounded corners, so it
-        # does NOT fully fill its rect - the four corner triangles are
-        # transparent. Marking it opaque told Qt to skip painting the page
-        # background under those corners, leaving stale pixels there ("weird
-        # borders" around the posters), which a forced repaint made obvious.
-        # Scroll stays smooth via the opaque shelf row + viewport backgrounds.
+        # Opaque paint restored: every pixmap this label ever shows
+        # (placeholder, cover, contain) now paints its rounded corners in the
+        # page background colour, so the label truly fills its rect. That lets
+        # Qt skip compositing anything beneath each card - the difference
+        # between smooth and laggy scrolling on a page of ~100 cards - without
+        # the stale-corner artifacts transparent corners caused under this flag.
+        self.img.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
         # Hover highlight built lazily (only when first hovered) so a shelf of
         # cards doesn't carry an extra QFrame each at rest.
         self._hover: QFrame | None = None
         # Placeholder: big dimmed initial, so an artless card still reads.
-        self.img.setText((title or "?").strip()[:1].upper())
-        f = QFont()
-        f.setPointSize(26)
-        f.setBold(True)
-        self.img.setFont(f)
+        self.img.setPixmap(_placeholder_pixmap(w, h, title))
         lay.addWidget(self.img)
         if progress is not None:
             bar = QFrame(self.img)
