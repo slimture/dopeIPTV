@@ -108,3 +108,22 @@ def test_home_page():
     assert "HOME_OK" in proc.stdout, (
         f"home checks failed\n"
         f"stdout={proc.stdout!r}\nstderr={proc.stderr[-2000:]!r}")
+
+
+def test_is_movie_filters_live_channels():
+    """The Movies shelf must exclude live channels a provider mixes into the
+    VOD list, and keep real movie rows (no stream_type, or 'movie')."""
+    try:
+        import PyQt6  # noqa: F401
+    except Exception:
+        pytest.skip("PyQt6 not available")
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PyQt6.QtWidgets import QApplication
+    QApplication.instance() or QApplication([])
+    from dopeiptv.ui.mw_home import HomePage
+    is_movie = HomePage._is_movie
+    assert is_movie({"stream_id": 1, "stream_type": "movie"})
+    assert is_movie({"stream_id": 2})                      # blank type kept
+    assert not is_movie({"stream_id": 3, "stream_type": "live"})
+    assert not is_movie({"stream_id": 4, "stream_type": "radio"})
+    assert not is_movie({"stream_type": "movie"})          # no id, not a movie

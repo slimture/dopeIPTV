@@ -447,6 +447,16 @@ class HomePage(QWidget):
         return out
 
     @staticmethod
+    def _is_movie(it: dict) -> bool:
+        """True for a real VOD movie row - has a stream id and a type that
+        isn't a live/radio channel. Filters channels a provider may have mixed
+        into the VOD list out of the Movies shelf."""
+        if it.get("stream_id") is None:
+            return False
+        st = str(it.get("stream_type") or "").lower()
+        return st not in ("live", "radio", "created_live")
+
+    @staticmethod
     def _num(v) -> float:
         try:
             return float(v or 0)
@@ -468,6 +478,14 @@ class HomePage(QWidget):
 
         def done(res):
             vod, ser = res
+            # Keep each shelf to its own content type. Some providers dump live
+            # channels into the VOD "all" list (or otherwise mix types), which
+            # is how a TV channel ended up under "Recently added movies" - so
+            # the Movies shelf takes only real movie rows (a stream_id, and a
+            # stream_type that isn't a live/radio channel), and the Series shelf
+            # takes only rows that actually carry a series_id.
+            vod = [i for i in vod if self._is_movie(i)]
+            ser = [i for i in ser if i.get("series_id") is not None]
             vod.sort(key=lambda i: self._num(i.get("added")), reverse=True)
             ser.sort(key=lambda i: self._num(i.get("last_modified")),
                      reverse=True)
