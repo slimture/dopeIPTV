@@ -581,6 +581,7 @@ class HomePage(QWidget):
         if w.mode != "live":
             w.switch_mode("live")
         try:
+            w._current_key = w._item_key(it)
             w._show_detail(it)   # panel follows the channel, not the last row
         except Exception:
             pass
@@ -613,8 +614,11 @@ class HomePage(QWidget):
         # Populate the detail panel with THIS movie. Home plays straight from a
         # card without selecting a list row, so without this the panel under
         # the player keeps showing whatever was last selected in the classic
-        # view (e.g. the TV channel played before).
+        # view (e.g. the TV channel played before). Set _current_key too, so the
+        # poster's play/pause overlay recognises this as the playing item and
+        # syncs (otherwise it kept showing 'play' while the movie ran).
         try:
+            w._current_key = w._item_key(it)
             w._show_detail(it)
         except Exception:
             pass
@@ -647,6 +651,7 @@ class HomePage(QWidget):
         if kind == "episode" and it.get("_series_ctx") is None:
             kind = "movie"   # no series context to autoplay-next; just play it
         try:
+            w._current_key = it.get("_key")
             w._show_detail(it)   # panel follows this row, not the last selection
         except Exception:
             pass
