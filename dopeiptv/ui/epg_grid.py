@@ -13,7 +13,9 @@ import time
 from datetime import datetime
 
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QBrush, QColor, QFont, QPen
+from PyQt6.QtGui import (
+    QBrush, QColor, QFont, QIcon, QPainter, QPainterPath, QPen, QPixmap,
+)
 from PyQt6.QtWidgets import (
     QDialog, QGraphicsItemGroup, QGraphicsPixmapItem, QGraphicsRectItem,
     QGraphicsScene, QGraphicsSimpleTextItem, QGraphicsView, QHBoxLayout,
@@ -154,18 +156,20 @@ class EpgGridDialog(QDialog):
         self.search_btn = QPushButton("🔍 " + tr("epg_search_btn"))
         self.search_btn.clicked.connect(self._open_search)
         bar.addWidget(self.search_btn)
-        self.day_back_btn = QPushButton("◀")
+        self.day_back_btn = QPushButton()
+        self.day_back_btn.setIcon(self._tri_icon(left=True))
         self.day_back_btn.setToolTip(tr("epg_day_back"))
         self.day_back_btn.setFixedWidth(34)
         self.day_back_btn.clicked.connect(lambda: self._scroll_hours(-24))
         bar.addWidget(self.day_back_btn)
-        self.now_btn = QPushButton("⟳ " + tr("epg_jump_now"))
+        self.now_btn = QPushButton(tr("epg_jump_now"))
         self.now_btn.clicked.connect(self._scroll_to_now)
         bar.addWidget(self.now_btn)
         self.tonight_btn = QPushButton(tr("epg_tonight"))
         self.tonight_btn.clicked.connect(self._scroll_tonight)
         bar.addWidget(self.tonight_btn)
-        self.day_fwd_btn = QPushButton("▶")
+        self.day_fwd_btn = QPushButton()
+        self.day_fwd_btn.setIcon(self._tri_icon(left=False))
         self.day_fwd_btn.setToolTip(tr("epg_day_fwd"))
         self.day_fwd_btn.setFixedWidth(34)
         self.day_fwd_btn.clicked.connect(lambda: self._scroll_hours(24))
@@ -175,7 +179,7 @@ class EpgGridDialog(QDialog):
         bar.addWidget(self.reminders_btn)
         # Jumps the board back up to the channel you're watching (handy after
         # scrolling far down a long line-up). Only shown when one is playing.
-        self.playing_btn = QPushButton("▶ " + tr("epg_jump_playing"))
+        self.playing_btn = QPushButton(tr("epg_jump_playing"))
         self.playing_btn.clicked.connect(self._scroll_to_playing)
         self.playing_btn.hide()
         bar.addWidget(self.playing_btn)
@@ -312,6 +316,33 @@ class EpgGridDialog(QDialog):
     def _open_search(self) -> None:
         from .epg_search import EpgSearchDialog
         EpgSearchDialog(self.window).exec()
+
+    def _tri_icon(self, left: bool) -> QIcon:
+        """A drawn left/right triangle for the icon-only day-jump buttons.
+        Drawn (not the ◀ ▶ glyphs) because those render as tofu boxes on
+        fonts that lack them - the same reason the rest of the app draws its
+        icons. Supersampled 3x so it stays crisp on any DPI."""
+        s, scale = 14, 3
+        pm = QPixmap(s * scale, s * scale)
+        pm.setDevicePixelRatio(float(scale))
+        pm.fill(Qt.GlobalColor.transparent)
+        pr = QPainter(pm)
+        pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        pr.setPen(Qt.PenStyle.NoPen)
+        pr.setBrush(QColor(P["text"]))
+        path = QPainterPath()
+        if left:
+            path.moveTo(s * 0.64, s * 0.24)
+            path.lineTo(s * 0.36, s * 0.50)
+            path.lineTo(s * 0.64, s * 0.76)
+        else:
+            path.moveTo(s * 0.36, s * 0.24)
+            path.lineTo(s * 0.64, s * 0.50)
+            path.lineTo(s * 0.36, s * 0.76)
+        path.closeSubpath()
+        pr.drawPath(path)
+        pr.end()
+        return QIcon(pm)
 
     def _epg_ready(self) -> bool:
         try:
