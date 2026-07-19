@@ -13,7 +13,7 @@ from typing import Any, Callable
 
 from PyQt6.QtCore import QThreadPool
 
-from ..core.workers import choose_cover_url
+from ..core.workers import choose_cover_url, is_tmdb_image_url
 from ..providers.metadata import PosterResolver, TmdbClient, bundled_tmdb_key
 
 
@@ -172,7 +172,7 @@ class CoverArtService:
         if (not url or url in self._logos.waiting
                 or self._logos.is_dead(url)):
             return False
-        if "image.tmdb.org" in url:
+        if is_tmdb_image_url(url):
             return True
         # When the user prefers the provider's own artwork, there's no
         # pending title-search poster that could replace this URL, so

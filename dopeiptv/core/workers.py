@@ -8,6 +8,7 @@ import time
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Callable
+from urllib.parse import urlparse
 
 from .log import log
 
@@ -50,10 +51,21 @@ _TMDB_EMBED_RE = re.compile(
     r"/([A-Za-z0-9]{26,32})(?:_[A-Za-z]+)?\.(jpe?g|png)(?:$|\?)", re.I)
 
 
+def is_tmdb_image_url(url: str | None) -> bool:
+    """True when *url*'s HOST is image.tmdb.org. A plain substring check
+    would also match the string at any position in a provider URL (e.g.
+    http://panel.example/image.tmdb.org/x.jpg) and misclassify it - the
+    CodeQL incomplete-url-substring-sanitization pattern."""
+    try:
+        return urlparse(url or "").hostname == "image.tmdb.org"
+    except ValueError:
+        return False
+
+
 def tmdb_url_from_provider(url: str | None) -> str | None:
     """If *url* is a provider image URL that embeds a TMDB poster path,
     return the direct image.tmdb.org URL for it; otherwise None."""
-    if not url or "image.tmdb.org" in url:
+    if not url or is_tmdb_image_url(url):
         return None
     m = _TMDB_EMBED_RE.search(url)
     if not m:

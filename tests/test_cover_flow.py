@@ -378,10 +378,11 @@ class FakeWindow:
             self.poster_for(it, kind), raw, kind, self.logos.is_dead)
 
     def cover_should_fetch(self, url, it, kind):
+        from dopeiptv.core.workers import is_tmdb_image_url
         if (not url or url in self.logos.waiting
                 or self.logos.is_dead(url)):
             return False
-        if "image.tmdb.org" in url:
+        if is_tmdb_image_url(url):
             return True
         return self.tmdb_resolved(it, kind)
 

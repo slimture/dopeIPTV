@@ -81,3 +81,16 @@ def test_trakt_only_row_uses_its_own_poster():
     it = {"name": "Show", "_trakt_only": True,
           "stream_icon": "https://image.tmdb.org/p/poster.jpg"}
     assert svc.cover_url(it, "series") == "https://image.tmdb.org/p/poster.jpg"
+
+
+def test_is_tmdb_image_url_checks_host_not_substring():
+    """The TMDB classification must key on the URL's HOST - a substring
+    match would also accept provider URLs that merely embed the string
+    (CodeQL py/incomplete-url-substring-sanitization)."""
+    from dopeiptv.core.workers import is_tmdb_image_url
+    assert is_tmdb_image_url("https://image.tmdb.org/t/p/w500/x.jpg")
+    assert not is_tmdb_image_url("http://panel.example/image.tmdb.org/x.jpg")
+    assert not is_tmdb_image_url("http://evil-image.tmdb.org.example/x.jpg")
+    assert not is_tmdb_image_url("http://prefix-image.tmdb.org/x.jpg")
+    assert not is_tmdb_image_url(None)
+    assert not is_tmdb_image_url("")
