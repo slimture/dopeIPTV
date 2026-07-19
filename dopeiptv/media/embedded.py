@@ -594,6 +594,15 @@ class _MacInputFilter(QObject):
             set_cursor_hidden(False)
             if self._over_video():
                 self._cursor_timer.start()
+                # A QOpenGLWidget on macOS delivers its own mouseMoveEvent
+                # erratically, so the centre play/pause button revealed from
+                # the widget's move signal came up only sometimes. Reveal it
+                # from this app-level move filter too - it fires reliably
+                # whenever the pointer is over the video.
+                try:
+                    self._player._reveal_center()
+                except Exception:
+                    pass
             else:
                 self._cursor_timer.stop()
         elif et in (QEvent.Type.KeyPress, QEvent.Type.KeyRelease):
@@ -1281,11 +1290,10 @@ class EmbeddedPlayer(QWidget):
                 if handle is not None:
                     handle.startSystemMove()
             return
-        # In fullscreen / pop-out (where the control bar auto-hides) a hover
-        # flashes the centre play/pause button; docked keeps its always-visible
-        # bar, so it only shows the centre button while actually paused.
-        if self._fs_ui or self._popout_mode:
-            self._reveal_center()
+        # A hover flashes the centre play/pause button in every mode (docked,
+        # fullscreen and pop-out) so the affordance is consistent everywhere:
+        # while playing it fades after a short idle, while paused it stays up.
+        self._reveal_center()
         if not self._fs_ui and self._seekable:
             # Docked / pop-out, seekable content: reveal the floating scrubber.
             self._show_seek_overlay()
@@ -2060,6 +2068,12 @@ class EmbeddedPlayer(QWidget):
     def _show_options_menu(self, anchor: QWidget) -> None:
         menu = QMenu(self)
         self.populate_options_menu(menu)
+        # On macOS a menu shown over the layer-backed GL video bleeds through
+        # (the video keeps repainting behind the non-native popup); force it to
+        # its own native window so it composites above the GL surface.
+        if sys.platform == "darwin":
+            menu.setAttribute(Qt.WidgetAttribute.WA_NativeWindow, True)
+            menu.winId()
         menu.exec(anchor.mapToGlobal(anchor.rect().bottomLeft()))
 
     def populate_options_menu(self, menu) -> None:

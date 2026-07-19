@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMenu, QPushButton, QVBoxLayout, QWidget)
 
 from ..i18n import tr
+from .widgets import exec_menu_over_video
 
 
 class _PopoutWindow(QWidget):
@@ -245,7 +246,7 @@ class _PopoutMixin:
             p.populate_options_menu(opts)
         m.addSeparator()
         m.addAction(tr("tooltip_popout_exit"), self._exit_popout)
-        m.exec(global_pos)
+        exec_menu_over_video(m, global_pos)
 
     def _set_popout_on_top(self, on: bool) -> None:
         self.settings.setValue("popout_on_top", "true" if on else "false")

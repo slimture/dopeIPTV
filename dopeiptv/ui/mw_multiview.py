@@ -34,6 +34,7 @@ from PyQt6.QtWidgets import (
 from ..core.log import log
 from ..i18n import tr
 from ..media.embedded import _MpvGLWidget, _SeekSlider
+from .widgets import exec_menu_over_video
 
 
 def _fmt(secs: float) -> str:
@@ -1019,7 +1020,7 @@ class _MultiviewWindow(QWidget):
         bar.triggered.connect(lambda: self._set_frameless(not frameless))
         m.addSeparator()
         m.addAction(tr("mv_close"), self.close)
-        m.exec(pos)
+        exec_menu_over_video(m, pos)
 
     # -- overlays + polling + keyboard --------------------------------------
 
@@ -1203,7 +1204,7 @@ class _MultiviewMixin:
         p.populate_options_menu(menu)
         menu.addSeparator()
         menu.addAction(tr("mv_add"), self._send_docked_to_multiview)
-        menu.exec(global_pos)
+        exec_menu_over_video(menu, global_pos)
 
     def _send_docked_to_multiview(self) -> None:
         p = getattr(self, "player", None)

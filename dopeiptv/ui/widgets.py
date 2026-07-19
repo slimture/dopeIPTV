@@ -2,12 +2,27 @@
 
 from __future__ import annotations
 
+import sys
+
 from PyQt6.QtCore import QPointF, QRectF, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import QLabel, QMessageBox, QPushButton, QWidget
 
 from .. import APP_NAME
 from .theme import P
+
+
+def exec_menu_over_video(menu, global_pos) -> None:
+    """Pop *menu* at *global_pos* so it renders cleanly over the embedded
+    video. On macOS a QMenu shown over a layer-backed QOpenGLWidget bleeds
+    through - the GL surface keeps repainting behind the non-native popup, so
+    the video shows through the menu. Forcing the menu to a native window
+    (winId materialises its own NSWindow surface) makes it composite above the
+    GL layer. A no-op cost elsewhere, so it's unconditional apart from darwin."""
+    if sys.platform == "darwin":
+        menu.setAttribute(Qt.WidgetAttribute.WA_NativeWindow, True)
+        menu.winId()
+    menu.exec(global_pos)
 
 
 def confirm(parent, title: str, text: str, *, default_yes: bool = True) -> bool:
