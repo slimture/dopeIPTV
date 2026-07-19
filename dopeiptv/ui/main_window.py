@@ -1293,9 +1293,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
           'stop'  - this item is a plain live channel (no timeshift), which
                     can't meaningfully pause -> stop instead."""
         p = self.player
+        # str() both keys: the same channel can carry an int stream_id from the
+        # provider list but a string one from a JSON-roundtripped source (Home
+        # cache, favourites, history), and a type mismatch here left the poster
+        # button on 'play' while that channel's catch-up was in fact playing.
         playing_this = (p is not None and p.current_url is not None
                         and self._playing_key is not None
-                        and self._current_key == self._playing_key)
+                        and self._current_key is not None
+                        and str(self._current_key) == str(self._playing_key))
         if not playing_this:
             return "play"
         # Base the pause/stop decision on what's PLAYING, not the row that
