@@ -1724,7 +1724,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # actually populate - otherwise the empty result cached while the
             # welcome overlay was up would linger for MEDIA_CACHE_SECS and Home
             # would look blank right after the first playlist is added.
-            self._home_media_cache = None
+            self._home_poster_cache = None
+            self._home_chan_cache = None
             if self._home_showing():
                 self._home_page.refresh()
             # Switching rebuilds the list but loads the guide from cache when
