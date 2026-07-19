@@ -37,6 +37,37 @@ def test_format_size_gb():
     assert "GB" in result
 
 
+def test_info_sidecar_keeps_icon(tmp_path):
+    """The channel logo written into a recording's sidecar survives and comes
+    back through files(), so the Recordings list shows the same badge as live
+    TV. Editing the title must not wipe the icon; clearing it removes it."""
+    from PyQt6.QtCore import QSettings
+    from dopeiptv.core.recording import RecordingManager
+
+    vid = tmp_path / "Show.mp4"
+    with open(vid, "wb") as f:
+        f.write(b"\0" * 16)
+
+    s = QSettings("dopeIPTV-test", "recicon")
+    s.clear()
+    s.setValue("recordings_dir", str(tmp_path))
+    rm = RecordingManager(s)
+
+    logo = "http://logos/chan.png"
+    rm.write_info(str(vid), "", "", icon=logo)
+    row = next(r for r in rm.files(None) if r["_path"] == str(vid))
+    assert row["stream_icon"] == logo
+
+    # Editing the title (icon=None) keeps the logo.
+    rm.write_info(str(vid), "My Title", "", icon=None)
+    row = next(r for r in rm.files(None) if r["_path"] == str(vid))
+    assert row["name"] == "My Title" and row["stream_icon"] == logo
+
+    # Explicitly clearing everything drops the sidecar.
+    rm.write_info(str(vid), "", "", icon="")
+    assert not (tmp_path / "Show.mp4.info.json").exists()
+
+
 def test_total_recordings_cap(tmp_path):
     """The folder-wide size cap counts only recordings and trips at the
     limit so a new recording can be refused."""

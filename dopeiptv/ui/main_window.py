@@ -2652,6 +2652,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
         def done(info):
             self._hide_busy()
+            # Fall back to the show's own poster so an episode row isn't a
+            # bare initial: prefer the episode still, then the series art.
+            series_cover = (series.get("cover") or series.get("cover_big")
+                            or series.get("stream_icon") or "")
             episodes = []
             for season, eps in (info.get("episodes") or {}).items():
                 for ep in eps:
@@ -2659,6 +2663,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     ep["name"] = (
                         f"S{season} * E{ep.get('episode_num', '?')} - "
                         f"{ep.get('title') or 'Episode'}")
+                    still = (ep.get("info") or {}).get("movie_image") or ""
+                    ep["stream_icon"] = (ep.get("stream_icon") or still
+                                         or series_cover)
                     episodes.append(ep)
             self.series_ctx = series
             self.all_items = episodes
@@ -2666,8 +2673,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.search.clear()
             self._apply_filter()
 
+        def failed(msg):
+            self._hide_busy()
+            log.warning("series_info(%s) failed: %s", sid, msg)
+            self._set_status(tr("err_series_open"), error=True)
+
         run_async(self.pool, lambda: self.client.series_info(sid),
-                  done, self._error)
+                  done, failed)
 
     def _leave_series(self) -> None:
         self.series_ctx = None

@@ -33,6 +33,8 @@ now = time.time()
 w.history.add("http://x/live/u/p/1.ts", "Chan One", None, 1, "live")
 w.favs.add("Default", {"stream_id": 5, "name": "Fav Chan",
                        "stream_icon": None})
+w.movie_favs.add("Default", {"stream_id": 9, "name": "Fav Movie"})
+w.series_favs.add("Default", {"series_id": 12, "name": "Fav Series"})
 w.resume.record("vod", 7, pos=600, dur=3600,
                 item={"stream_id": 7, "name": "Halfway Movie"})
 
@@ -54,7 +56,9 @@ def walk(widget):
 walk(page)
 joined = " | ".join(texts)
 assert "Halfway Movie" in joined, joined     # resume shelf
-assert "Fav Chan" in joined                  # favorites-now shelf
+assert "Fav Chan" in joined                  # favorites-now shelf (channel)
+assert "Fav Movie" in joined                 # favorites shelf (movie fav)
+assert "Fav Series" in joined                # favorites shelf (series fav)
 assert "Chan One" in joined                  # recently viewed shelf
 
 # Clicking a movie card leaves Home and plays it as a MOVIE (not via the
@@ -69,6 +73,8 @@ page._play_media({"stream_id": 7, "name": "Halfway Movie",
 app.processEvents()
 assert not w._home_showing()
 assert plays == [("Halfway Movie", "movie")], plays
+# ...and it landed under the Movies category (the classic view followed).
+assert w.mode == "vod", w.mode
 
 # Switching any classic mode also leaves Home.
 w._show_home_page(); app.processEvents()

@@ -172,6 +172,12 @@ class CoverArtService:
         if (not url or url in self._logos.waiting
                 or self._logos.is_dead(url)):
             return False
+        # Recordings carry a plain channel logo (no TMDB poster to wait for),
+        # so fetch it straight away - otherwise, with 'prefer TMDB' on, the
+        # is_resolved() gate below never passes for a recording and the row
+        # stays iconless.
+        if kind == "rec":
+            return True
         if is_tmdb_image_url(url):
             return True
         # When the user prefers the provider's own artwork, there's no

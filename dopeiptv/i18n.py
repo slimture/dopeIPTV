@@ -80,6 +80,24 @@ _STRINGS: dict[str, dict[str, str]] = {
         "fr": "En ce moment sur vos favoris", "zh": "您收藏的频道正在播放",
         "ru": "Сейчас в избранном", "th": "กำลังฉายในช่องโปรดของคุณ",
     },
+    "err_series_open": {
+        "en": "Couldn't open this series (the provider refused the request).",
+        "sv": "Kunde inte öppna serien (leverantören nekade begäran).",
+        "es": "No se pudo abrir la serie (el proveedor rechazó la solicitud).",
+        "de": "Serie konnte nicht geöffnet werden (Anbieter hat die "
+              "Anfrage abgelehnt).",
+        "fr": "Impossible d'ouvrir cette série (le fournisseur a refusé la "
+              "requête).",
+        "zh": "无法打开此剧集（提供商拒绝了请求）。",
+        "ru": "Не удалось открыть сериал (провайдер отклонил запрос).",
+        "th": "ไม่สามารถเปิดซีรีส์นี้ได้ (ผู้ให้บริการปฏิเสธคำขอ)",
+    },
+    "home_fav_media": {
+        "en": "Your favorites", "sv": "Dina favoriter",
+        "es": "Tus favoritos", "de": "Deine Favoriten",
+        "fr": "Vos favoris", "zh": "您的收藏",
+        "ru": "Избранное", "th": "รายการโปรดของคุณ",
+    },
     "home_recent": {
         "en": "Recently viewed", "sv": "Senast visade",
         "es": "Vistos recientemente", "de": "Zuletzt gesehen",
@@ -5720,6 +5738,15 @@ _STRINGS: dict[str, dict[str, str]] = {
         "es": "Eliminar {n} grabaciones", "de": "{n} Aufnahmen löschen",
         "fr": "Supprimer {n} enregistrements", "zh": "删除 {n} 个录制",
         "ru": "Удалить {n} записей", "th": "ลบ {n} การบันทึก",
+    },
+    "rec_delete_all": {
+        "en": "Delete all recordings here…",
+        "sv": "Radera alla inspelningar här…",
+        "es": "Eliminar todas las grabaciones aquí…",
+        "de": "Alle Aufnahmen hier löschen…",
+        "fr": "Supprimer tous les enregistrements ici…",
+        "zh": "删除此处所有录制…", "ru": "Удалить все записи здесь…",
+        "th": "ลบการบันทึกทั้งหมดที่นี่…",
     },
     "rec_n_recordings": {
         "en": "{n} recordings", "sv": "{n} inspelningar",

@@ -539,7 +539,7 @@ class _RecordingMixin:
         for it in items:
             try:
                 os.remove(it["_path"])
-                self.rec.write_info(it["_path"], "", "")  # drop info sidecar
+                self.rec.write_info(it["_path"], "", "", icon="")  # drop sidecar
                 self.rec.prune_path(it["_path"])
             except OSError as e:
                 self._set_status(
@@ -547,6 +547,33 @@ class _RecordingMixin:
         cur = self.cat_list.currentItem()
         self._load_items(
             cur.data(Qt.ItemDataRole.UserRole) if cur else None)
+
+    def _delete_all_recordings(self) -> None:
+        """Delete every recording in the folder currently shown (all of them
+        when 'All recordings' is selected). A single confirm, so a user with a
+        cluttered Recordings section can clear it out without ticking each row."""
+        cur = self.cat_list.currentItem()
+        sel = cur.data(Qt.ItemDataRole.UserRole) if cur else None
+        folder = "" if (sel in (None, "__all__", "__jobs__")) else sel
+        items = [it for it in self.rec.files(
+                     None if folder == "" else folder)
+                 if it.get("_path")]
+        if not items:
+            return
+        if QMessageBox.question(
+                self, tr("msg_delete_rec_title"),
+                tr("msg_delete_rec_body",
+                   what=tr("rec_n_recordings", n=len(items)))) \
+                != QMessageBox.StandardButton.Yes:
+            return
+        for it in items:
+            try:
+                os.remove(it["_path"])
+                self.rec.write_info(it["_path"], "", "", icon="")
+                self.rec.prune_path(it["_path"])
+            except OSError as e:
+                self._set_status(f"Could not delete: {e}", error=True)
+        self._load_items(sel)
 
     def _rename_recording(self, it) -> None:
         path = it.get("_path")
@@ -1222,6 +1249,8 @@ class _RecordingMixin:
                 tr("ctx_delete") if not many
                 else tr("rec_delete_n", n=len(items)),
                 lambda: self._delete_recordings_selected(it))
+            m.addAction(tr("rec_delete_all"),
+                        lambda: self._delete_all_recordings())
         m.addSeparator()
         m.addAction(tr("ctx_new_folder"), lambda: self._new_rec_folder())
         m.addAction(tr("rec_change_folder"),

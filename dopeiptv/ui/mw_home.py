@@ -348,6 +348,25 @@ class HomePage(QWidget):
                 shelf.finish(CHAN_H)
                 self._v.addWidget(shelf)
 
+            media = self._favorite_media()[:20]
+            if media:
+                shelf = _Shelf(tr("home_fav_media"))
+                for it in media:
+                    card = _Card(POSTER_W, POSTER_H, it.get("name")
+                                 or it.get("title") or "?")
+                    if it.get("_kind") == "series":
+                        card.clicked.connect(
+                            lambda it=it: self._open_series(it))
+                        art = self._media_art(it, "series")
+                    else:
+                        card.clicked.connect(
+                            lambda it=it: self._play_media(it))
+                        art = self._media_art(it, "vod")
+                    self._set_art(card, art, w.poster_art)
+                    shelf.add(card)
+                shelf.finish(POSTER_H)
+                self._v.addWidget(shelf)
+
         if on("home_sh_history"):
             rows = list(getattr(w.history, "entries", []))[:14]
             if rows:
@@ -389,6 +408,31 @@ class HomePage(QWidget):
                 if sid is not None and sid not in seen:
                     seen.add(sid)
                     out.append(it)
+        return out
+
+    def _favorite_media(self) -> list[dict]:
+        """Favourited movies and series, tagged with the kind so a card can
+        play a movie or drill into a series. Channel favourites live in their
+        own 'now playing' shelf; this is the poster shelf for VOD content, so
+        a user whose favourites are all films/shows still sees them on Home."""
+        w = self.window
+        out: list[dict] = []
+        seen: set = set()
+        for store, kind, id_key in (
+                (getattr(w, "movie_favs", None), "movie", "stream_id"),
+                (getattr(w, "series_favs", None), "series", "series_id")):
+            if store is None:
+                continue
+            for items in getattr(store, "groups", {}).values():
+                for it in items:
+                    ident = it.get(id_key)
+                    tag = (kind, ident)
+                    if ident is None or tag in seen:
+                        continue
+                    seen.add(tag)
+                    row = dict(it)
+                    row["_kind"] = kind
+                    out.append(row)
         return out
 
     @staticmethod
@@ -501,25 +545,35 @@ class HomePage(QWidget):
         self.window._open_epg_guide()
 
     def _play_channel(self, it: dict) -> None:
-        self.window._leave_home()
+        # Land under TV, then tune the channel (so the classic view is on the
+        # right category behind the player).
+        w = self.window
+        w._leave_home()
+        if w.mode != "live":
+            w.switch_mode("live")
         try:
-            self.window.play_live_channel(it)
+            w.play_live_channel(it)
         except Exception:
             pass
 
     def _play_media(self, it: dict) -> None:
-        """Movie or a continue-watching row. Built directly (not via
-        play_item, whose URL/kind logic keys off the classic view's MODE -
-        a movie clicked from Home would otherwise be built as a live URL)."""
+        """Movie or a continue-watching row: land under Movies, then play it.
+        Built directly (not via play_item, whose URL/kind logic keys off the
+        classic view's mode - a movie clicked from Home would otherwise be
+        built as a live URL)."""
         w = self.window
         w._leave_home()
         # A continue-watching episode replays from its stored series context.
         if it.get("_kind") == "episode" and it.get("_series_ctx") is not None:
+            if w.mode != "series":
+                w.switch_mode("series")
             w.play_item(it)
             return
         sid = it.get("stream_id")
         if sid is None:
             return
+        if w.mode != "vod":
+            w.switch_mode("vod")
         url = w.client.vod_url(sid, it.get("container_extension"))
         if not url:
             return
@@ -529,6 +583,7 @@ class HomePage(QWidget):
             w._item_key(it), "movie", item=it)
 
     def _open_series(self, it: dict) -> None:
+        # Land under Series and drill straight into this show's episode list.
         w = self.window
         w._leave_home()
         if w.mode != "series":
@@ -536,14 +591,18 @@ class HomePage(QWidget):
         w._enter_series(it)
 
     def _play_history(self, it: dict) -> None:
-        """Replay a history row straight from its stored URL + kind, so it
-        works regardless of the classic view's current mode."""
+        """Replay a history row: land under the right category, then play from
+        its stored URL + kind (works regardless of the prior mode)."""
         w = self.window
         w._leave_home()
         url = it.get("_url")
         if not url:
             return
         kind = it.get("_kind") or "live"
+        target = {"live": "live", "movie": "vod",
+                  "episode": "series"}.get(kind)
+        if target and w.mode != target:
+            w.switch_mode(target)
         if kind == "episode" and it.get("_series_ctx") is None:
             kind = "movie"   # no series context to autoplay-next; just play it
         w._start_playback(url, it.get("name") or "dopeIPTV",
