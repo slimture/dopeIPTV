@@ -851,6 +851,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.listw = ChannelListView(objectName="Channels")
         self.list_model = ChannelListModel()
         self.listw.setModel(self.list_model)
+        # Catch-all: whenever the model is repopulated with rows (from any of
+        # the many set_items call sites), retire the "Loading channels..." hint
+        # and any busy overlay. Some paths - the startup load when the window is
+        # inactive, jumping Home->TV - don't run through _apply_filter, so the
+        # hint could otherwise linger under a fully populated list.
+        self.list_model.modelReset.connect(self._on_list_populated)
         self.delegate = ChannelDelegate(
             self, self.settings.value("view_density", "medium"))
         self.listw.setItemDelegate(self.delegate)
@@ -2649,6 +2655,21 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return {"movie": "vod", "series": "series"}.get(
                 self._fav_section, "fav")
         return self.mode
+
+    def _on_list_populated(self) -> None:
+        """Retire the loading hint/overlay once the model actually has rows.
+
+        Wired to list_model.modelReset so it fires for every set_items path,
+        including the ones that skip _apply_filter (startup load while the
+        window is inactive, mw_search). Tolerates being called before the hint
+        widget exists, since the model is created earlier in __init__."""
+        if self.list_model.rowCount() <= 0:
+            return
+        hint = getattr(self, "_loading_hint", None)
+        if hint is not None and hint.isVisible():
+            hint.hide()
+        if hasattr(self, "_hide_busy"):
+            self._hide_busy()
 
     def _apply_filter(self) -> None:
         text = self.search.text().lower().strip()
