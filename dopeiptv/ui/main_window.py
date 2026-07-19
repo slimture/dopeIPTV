@@ -2722,6 +2722,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # bare initial: prefer the episode still, then the series art.
             series_cover = (series.get("cover") or series.get("cover_big")
                             or series.get("stream_icon") or "")
+            series_title = series.get("name") or series.get("title") or ""
             episodes = []
             for season, eps in (info.get("episodes") or {}).items():
                 for ep in eps:
@@ -2732,6 +2733,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     still = (ep.get("info") or {}).get("movie_image") or ""
                     ep["stream_icon"] = (ep.get("stream_icon") or still
                                          or series_cover)
+                    # Let the cover pipeline resolve the show's TMDB poster for
+                    # each episode (its own name never matches TMDB).
+                    ep["_series_title"] = series_title
                     episodes.append(ep)
             self.series_ctx = series
             self.all_items = episodes

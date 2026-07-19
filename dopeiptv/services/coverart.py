@@ -96,7 +96,12 @@ class CoverArtService:
     def poster_for(self, it: dict, kind: str) -> str | None:
         if not self.resolver or kind not in ("vod", "series"):
             return None
-        title = it.get("name") or it.get("title") or ""
+        # Episodes carry the show's name in "_series_title" (stamped when the
+        # series is opened), so they resolve the series' TMDB poster instead of
+        # searching TMDB for "S1 E3 - ..." (which never matches, leaving the
+        # broken provider still image).
+        title = it.get("_series_title") or it.get("name") or it.get("title") \
+            or ""
         if not title:
             return None
         return self.resolver.get(
@@ -111,14 +116,21 @@ class CoverArtService:
         round-trip that gets replaced 150 ms later when TMDB resolves."""
         if not self.resolver or kind not in ("vod", "series"):
             return True
-        title = it.get("name") or it.get("title") or ""
+        title = it.get("_series_title") or it.get("name") or it.get("title") \
+            or ""
         if not title:
             return True
         return self.resolver.is_resolved(title, kind)
 
-    @staticmethod
-    def _provider_cover(it: dict) -> str | None:
-        raw = it.get("stream_icon") or it.get("cover")
+    # Provider "no image" sentinels that aren't real URLs - fetching them just
+    # logs an Invalid-URL error and burns a retry (seen as 'n/A' in the wild).
+    _JUNK_COVERS = {"", "n/a", "na", "null", "none", "0", "-", "false"}
+
+    @classmethod
+    def _provider_cover(cls, it: dict) -> str | None:
+        raw = (it.get("stream_icon") or it.get("cover") or "").strip()
+        if raw.lower() in cls._JUNK_COVERS:
+            return None
         return raw or None
 
     @staticmethod
@@ -132,6 +144,9 @@ class CoverArtService:
             hk = it.get("_kind")
             return {"movie": "vod", "vod": "vod", "series": "series",
                     "episode": "series"}.get(hk, kind)
+        # An episode row (drilled into a series) borrows the series' poster.
+        if kind == "episode":
+            return "series"
         return kind
 
     def cover_url(self, it: dict, kind: str) -> str | None:
