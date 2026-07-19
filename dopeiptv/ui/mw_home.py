@@ -722,16 +722,12 @@ class HomePage(QWidget):
         self.window._open_epg_guide()
 
     def _play_channel(self, it: dict) -> None:
-        # Land under TV *in this channel's own category* (so the classic list
-        # behind the player shows and selects it), then tune it.
+        # Tune the channel, then land the classic list under TV *in this
+        # channel's own category* and select it (works whether or not we were
+        # already in Live mode). Playing first sets _playing_key so the list's
+        # pending-jump selects the right row.
         w = self.window
         w._leave_home()
-        if w.mode != "live":
-            # The category-load callback honours these to land on the right
-            # category and select the channel, like tuning from the EPG guide.
-            w._pending_jump_key = w._item_key(it)
-            w._pending_jump_cat = it.get("category_id")
-            w.switch_mode("live")
         try:
             w._current_key = w._item_key(it)
             w._show_detail(it)   # panel follows the channel, not the last row
@@ -739,6 +735,10 @@ class HomePage(QWidget):
             pass
         try:
             w.play_live_channel(it)
+        except Exception:
+            pass
+        try:
+            w._reveal_channel_in_list(it)
         except Exception:
             pass
 
@@ -857,6 +857,9 @@ class _HomeMixin:
     def _show_home_page(self) -> None:
         if not self._home_enabled():
             return
+        # Clear any classic-view loading strip/overlay so it doesn't linger
+        # behind (and reappear on) the Home page.
+        self._hide_busy()
         page = self._ensure_home_page()
         page.refresh()
         self._center_stack.setCurrentWidget(page)

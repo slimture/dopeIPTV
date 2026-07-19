@@ -2571,6 +2571,32 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._pending_jump_key = None
         self._pending_jump_cat = None
 
+    def _reveal_channel_in_list(self, it) -> None:
+        """Navigate the TV list to *it*'s own category and select it - used
+        when tuning a channel from Home so the classic list behind the player
+        reflects (and highlights) the channel, in its category, whether or not
+        we were already in Live mode."""
+        self._pending_jump_key = self._item_key(it)
+        self._pending_jump_cat = it.get("category_id")
+        QTimer.singleShot(2500, self._clear_pending_jump)   # safety net
+        if self.mode != "live":
+            self.switch_mode("live")   # done() honours the pending jump
+            return
+        if not self.cat_list.count():
+            return
+        row, cat = 0, self._pending_jump_cat
+        if cat is not None:
+            for i in range(self.cat_list.count()):
+                if self.cat_list.item(i).data(
+                        Qt.ItemDataRole.UserRole) == cat:
+                    row = i
+                    break
+        self._pending_jump_cat = None
+        if self.cat_list.currentRow() == row:
+            self._apply_filter()   # same category: just (re)select the row
+        else:
+            self.cat_list.setCurrentRow(row)
+
     def tune_from_guide(self, ch) -> None:
         """Play a channel picked from the EPG guide, then jump the middle
         column to it and select its category in the sidebar so the guide
@@ -2622,6 +2648,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self._pending_jump_key = None
         if self._loading_hint.isVisible():
             self._loading_hint.hide()
+        # The list is populated now, so clear any loading strip/overlay - a
+        # gen-discarded async load (e.g. rapid Home<->TV toggling) could leave
+        # the "Loading channels…" overlay stuck on until the next selection.
+        self._hide_busy()
         self._set_status(f"{len(filtered)} {self.LABELS[kind]}")
         if self.mode == "fav" and not self.series_ctx and not self.all_items:
             where = {"movie": "a movie in Movies",
