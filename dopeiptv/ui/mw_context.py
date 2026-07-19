@@ -9,6 +9,7 @@ from .dialogs import ContentManagerDialog
 from ..core.stores import FAV_DEFAULT_GROUP
 from ..i18n import tr
 from .tmdb_match import TmdbMatchDialog
+from .widgets import confirm
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QInputDialog, QLineEdit, QMenu, QMessageBox
 
@@ -366,10 +367,8 @@ class _ContextMenuMixin:
         TmdbMatchDialog(self, title, kind, on_pick).exec()
 
     def _restore_default_channels(self, mode: str) -> None:
-        if QMessageBox.question(
-                self, tr("ctx_restore_defaults").rstrip("."),
-                tr("msg_restore_defaults_body")) \
-                == QMessageBox.StandardButton.Yes:
+        if confirm(self, tr("ctx_restore_defaults").rstrip("."),
+                   tr("msg_restore_defaults_body")):
             self.channel_ov.reset_mode(mode)
             self._apply_filter()
 

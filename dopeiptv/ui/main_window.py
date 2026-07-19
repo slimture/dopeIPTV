@@ -1719,6 +1719,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.setWindowTitle(self._base_title)
             self._update_playlist_btn()
             self._update_provider_hint()
+            # Drop any Home media cached from the previous (or empty offline)
+            # provider so the new provider's Recently-added / Featured shelves
+            # actually populate - otherwise the empty result cached while the
+            # welcome overlay was up would linger for MEDIA_CACHE_SECS and Home
+            # would look blank right after the first playlist is added.
+            self._home_media_cache = None
+            if self._home_showing():
+                self._home_page.refresh()
             # Switching rebuilds the list but loads the guide from cache when
             # fresh - no forced network reload. A manual Refresh or the auto-
             # refresh time setting still drives a real re-fetch.

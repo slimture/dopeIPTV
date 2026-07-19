@@ -13,6 +13,7 @@ from ..i18n import tr
 from ..core.log import log
 from ..core.recording import format_size, safe_filename
 from .theme import P
+from .widgets import confirm
 from ..core.workers import run_async
 from PyQt6.QtCore import QDateTime, Qt
 from PyQt6.QtGui import QIcon
@@ -339,7 +340,8 @@ class _RecordingMixin:
             if self.player.start_stream_record(path):
                 self.rec.add_inplayer_job(
                     title, path, stop_ts,
-                    url=self.client.live_url(it["stream_id"], "ts"))
+                    url=self.client.live_url(it["stream_id"], "ts"),
+                    icon=it.get("stream_icon"))
                 self._set_status(
                     f"● Recording {title} {length} - capturing "
                     "the stream you're watching (no extra connection)")
@@ -531,10 +533,8 @@ class _RecordingMixin:
             return
         what = (tr("rec_n_recordings", n=len(items)) if len(items) > 1
                 else f"'{items[0]['name']}'")
-        if QMessageBox.question(
-                self, tr("msg_delete_rec_title"),
-                tr("msg_delete_rec_body", what=what)) \
-                != QMessageBox.StandardButton.Yes:
+        if not confirm(self, tr("msg_delete_rec_title"),
+                       tr("msg_delete_rec_body", what=what)):
             return
         for it in items:
             try:
@@ -560,11 +560,9 @@ class _RecordingMixin:
                  if it.get("_path")]
         if not items:
             return
-        if QMessageBox.question(
-                self, tr("msg_delete_rec_title"),
-                tr("msg_delete_rec_body",
-                   what=tr("rec_n_recordings", n=len(items)))) \
-                != QMessageBox.StandardButton.Yes:
+        if not confirm(self, tr("msg_delete_rec_title"),
+                       tr("msg_delete_rec_body",
+                          what=tr("rec_n_recordings", n=len(items)))):
             return
         for it in items:
             try:

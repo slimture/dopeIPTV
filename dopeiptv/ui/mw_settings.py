@@ -146,6 +146,7 @@ from ..providers.client import make_client
 from ..core.recording import format_size
 from ..media.players import embedded_playback_reason
 from .theme import ACCENTS, P, THEMES, apply_theme, build_style
+from .widgets import confirm
 from ..core.updates import GITHUB_REPO, fetch_latest_release, is_newer
 from ..core.workers import (
     clear_directory, default_image_cache_dir, dir_size_bytes, run_async)
@@ -167,10 +168,8 @@ class _SettingsMixin:
         # movies / series), or everything when 'All' is selected.
         sub = getattr(self, "_history_subcat", None)
         kinds = self._HISTORY_KINDS.get(sub)
-        if QMessageBox.question(
-                self, tr("msg_clear_history_title"),
-                tr("msg_clear_history_body")) \
-                == QMessageBox.StandardButton.Yes:
+        if confirm(self, tr("msg_clear_history_title"),
+                   tr("msg_clear_history_body")):
             if kinds:
                 self.history.clear_kind(kinds)
             else:
@@ -295,19 +294,11 @@ class _SettingsMixin:
         history, credentials, ...) and ask the user to restart. Two-step
         confirmation because it can't be undone. Playlists live in the same
         QSettings config, so this really does reset back to the login screen."""
-        first = QMessageBox.question(
-            parent_dialog, tr("settings_reset_all"),
-            tr("settings_reset_confirm_1"),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No)
-        if first != QMessageBox.StandardButton.Yes:
+        if not confirm(parent_dialog, tr("settings_reset_all"),
+                       tr("settings_reset_confirm_1"), default_yes=False):
             return
-        second = QMessageBox.warning(
-            parent_dialog, tr("settings_reset_all"),
-            tr("settings_reset_confirm_2"),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No)
-        if second != QMessageBox.StandardButton.Yes:
+        if not confirm(parent_dialog, tr("settings_reset_all"),
+                       tr("settings_reset_confirm_2"), default_yes=False):
             return
         # Clear() drops every key from this QSettings scope; sync() flushes
         # it to disk before we tell the user to restart.
@@ -1375,10 +1366,8 @@ class _SettingsMixin:
             pid = selected_pid()
             if not (store and pid):
                 return
-            if QMessageBox.question(
-                    d, tr("msg_remove_playlist_title"),
-                    tr("msg_remove_playlist_body")) \
-                    == QMessageBox.StandardButton.Yes:
+            if confirm(d, tr("msg_remove_playlist_title"),
+                       tr("msg_remove_playlist_body")):
                 store.remove(pid)
                 reload_pl_list()
 

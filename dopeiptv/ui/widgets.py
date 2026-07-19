@@ -4,10 +4,27 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QPointF, QRectF, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QPainter, QPainterPath, QPen
-from PyQt6.QtWidgets import QLabel, QPushButton, QWidget
+from PyQt6.QtWidgets import QLabel, QMessageBox, QPushButton, QWidget
 
 from .. import APP_NAME
 from .theme import P
+
+
+def confirm(parent, title: str, text: str, *, default_yes: bool = True) -> bool:
+    """A Yes/No confirmation with no icon - the stock QMessageBox.question
+    stamps a large question-mark glyph into the dialog that reads as clutter
+    against the app's flat styling. Returns True on Yes. Use this everywhere a
+    delete/reset/remove used to call QMessageBox.question."""
+    box = QMessageBox(parent)
+    box.setIcon(QMessageBox.Icon.NoIcon)
+    box.setWindowTitle(title)
+    box.setText(text)
+    box.setStandardButtons(
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+    box.setDefaultButton(
+        QMessageBox.StandardButton.Yes if default_yes
+        else QMessageBox.StandardButton.No)
+    return box.exec() == QMessageBox.StandardButton.Yes
 
 
 class _HoverTextButton(QPushButton):
