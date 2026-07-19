@@ -3733,6 +3733,29 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self.player:
             self.player.title_lbl.setText("")
 
+    def _upcoming_prompt_plausible(self, item) -> bool:
+        """Whether a 407 really means 'this broadcast hasn't started yet'.
+
+        Overloaded panels also answer 407 when they can't allocate a
+        connection, which popped the reminder/record dialog for ordinary
+        live channels during provider outages. Treat the 407 as overload -
+        not as a scheduled event - when the client's fail-fast cooldown is
+        armed (the server just failed at the network level) or when the
+        cached guide says the channel has a programme ON AIR right now (a
+        mid-programme channel can't be 'not started'). True event channels
+        typically carry no guide data, so their prompt still shows."""
+        try:
+            if time.monotonic() < getattr(self.client, "_net_down_until", 0.0):
+                return False
+        except Exception:
+            pass
+        try:
+            if item is not None and self.xmltv.current_programme(item):
+                return False
+        except Exception:
+            pass
+        return True
+
     def _early_probe_definitive(self, url, item) -> None:
         """Fast parallel probe on the first live failure: only act on a
         *definitive* HTTP status so the reason (and the upcoming-event prompt)
@@ -3755,6 +3778,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if self.player:
                 self.player.current_url = None
             reason = reason_for_code(code)
+            if (reason == tr("diag_not_started")
+                    and not self._upcoming_prompt_plausible(item)):
+                reason = tr("diag_generic")
             self._show_stream_error(reason)
             if reason == tr("diag_not_started"):
                 self._offer_upcoming_actions(item)
@@ -3775,12 +3801,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if getattr(self, "_diag_shown", False):
                 return
             self._diag_shown = True
-            self._show_stream_error(reason)
             # An upcoming/scheduled event (HTTP 407) isn't an error to shrug at
             # - offer to set a reminder or record it. Same-session tr() makes
-            # this string compare reliable.
+            # this string compare reliable. But an overloaded panel answers
+            # 407 too - only prompt when 'not started' is actually plausible.
+            it = (lp or {}).get("item")
+            if (reason == tr("diag_not_started")
+                    and not self._upcoming_prompt_plausible(it)):
+                reason = tr("diag_generic")
+            self._show_stream_error(reason)
             if reason == tr("diag_not_started"):
-                self._offer_upcoming_actions((lp or {}).get("item"))
+                self._offer_upcoming_actions(it)
 
         run_async(self.pool, lambda: diagnose_stream(url, self.client),
                   show, lambda _e: show(tr("diag_generic")))
