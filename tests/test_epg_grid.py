@@ -120,6 +120,23 @@ assert not d._epg_poll.isActive()
 assert d._rows[0][1][0]["data"]["prog"]["title"] == "P"
 d.deleteLater(); app.processEvents()
 
+# ---- 4. Filter finds a channel beyond the MAX_CHANNELS display cap --------
+w.xmltv.programmes_in = lambda ch, a, b: []
+many = [{"name": f"Filler {i}", "stream_id": 1000 + i, "num": i}
+        for i in range(EpgGridDialog.MAX_CHANNELS + 50)]
+many.append({"name": "V Sport Premium SE", "stream_id": 42, "num": 999})
+d = EpgGridDialog(w, many)
+app.processEvents()
+# Unfiltered: capped to MAX_CHANNELS, target (last) not shown.
+assert len(d._rows) == EpgGridDialog.MAX_CHANNELS
+assert not any(c.get("name") == "V Sport Premium SE"
+               for c, _b in d._rows)
+# Filtering searches the FULL list, so the target now appears.
+d.filter.setText("v sport")
+app.processEvents()
+assert any(c.get("name") == "V Sport Premium SE" for c, _b in d._rows)
+d.deleteLater(); app.processEvents()
+
 print("EPG_GRID_OK")
 """
 

@@ -82,7 +82,12 @@ class EpgGridDialog(QDialog):
     def __init__(self, window, channels, category_name=None) -> None:
         super().__init__(window)
         self.window = window
-        self.channels = list(channels)[:self.MAX_CHANNELS]
+        # Keep the FULL channel list; the MAX_CHANNELS cap is applied per
+        # build AFTER filtering, so a filter can still find a channel that
+        # sits beyond the first 300 of a big category (the "V Sport isn't
+        # in the guide when I search for it" bug).
+        self._all_channels = list(channels)
+        self.channels = self._all_channels[:self.MAX_CHANNELS]
         self._selected = None
         title = tr("btn_epg_guide")
         if category_name:
@@ -114,6 +119,16 @@ class EpgGridDialog(QDialog):
 
         self.scene = QGraphicsScene(self)
         self.view = _GridView(self.scene, self)
+        # Full-viewport repaint on scroll. The default minimal-update mode
+        # scrolls the rendered pixels and only repaints the newly-exposed
+        # strip - but the pinned header/column and the sticky, re-elided
+        # programme titles must be redrawn at a fixed screen position every
+        # scroll step, and minimal update leaves their previous pixels behind
+        # as ghosts (the "titles on top of each other" seen on macOS/Retina).
+        # A guide viewport holds only a few hundred items, so a full repaint
+        # per scroll frame is cheap.
+        self.view.setViewportUpdateMode(
+            QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
         # Anchor content top-left so a small scene isn't centred (which would
         # make mapToScene(0,0) negative and push the pinned header off-view).
         self.view.setAlignment(
@@ -411,9 +426,12 @@ class EpgGridDialog(QDialog):
         self._now_line = None
         self.play_btn.setEnabled(False)
         self.desc.hide()
+        # Filter the FULL list (so matches beyond the first 300 are found),
+        # then cap the result for a readable, performant grid.
         text = self.filter.text().lower().strip()
-        chans = [c for c in self.channels
-                 if not text or text in (c.get("name") or "").lower()]
+        chans = [c for c in self._all_channels
+                 if not text or text in (c.get("name") or "").lower()
+                 ][:self.MAX_CHANNELS]
         grid_h = max(self.ROW_H, len(chans) * self.ROW_H)
         self.scene.setSceneRect(0, 0, self.CH_COL_W + self._grid_w,
                                 self.HEADER_H + grid_h)
