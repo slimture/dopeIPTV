@@ -759,21 +759,31 @@ class HomePage(QWidget):
     def _play_channel(self, it: dict) -> None:
         # Tune the channel, then land the classic list under TV *in this
         # channel's own category* and select it (works whether or not we were
-        # already in Live mode). Playing first sets _playing_key so the list's
-        # pending-jump selects the right row.
+        # already in Live mode). Order matters:
+        #  1. play - sets _playing_key so the list's pending-jump can select it;
+        #  2. reveal - switches mode to live *synchronously* (list fills async);
+        #  3. detail - with mode now live, the panel classifies the item as a
+        #     channel and fetches its EPG (before the reorder it ran under the
+        #     old mode and could fetch movie info / the old row's guide);
+        #  4. stop the preview timer - _show_detail arms it, and 350 ms later
+        #     it would re-tune to whatever OLD row the list still had selected.
         w = self.window
         w._leave_home()
-        try:
-            w._current_key = w._item_key(it)
-            w._show_detail(it)   # panel follows the channel, not the last row
-        except Exception:
-            pass
         try:
             w.play_live_channel(it)
         except Exception:
             pass
         try:
             w._reveal_channel_in_list(it)
+        except Exception:
+            pass
+        try:
+            w._current_key = w._item_key(it)
+            w._show_detail(it)   # panel follows the channel, not the last row
+        except Exception:
+            pass
+        try:
+            w._preview_timer.stop()
         except Exception:
             pass
 

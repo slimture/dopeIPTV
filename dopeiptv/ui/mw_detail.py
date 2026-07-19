@@ -100,7 +100,7 @@ class _DetailMixin:
             # A live channel opened from History still gets its programme guide
             # (like the live view); recording history rows have only artwork.
             if snap_kind == "live":
-                self._request_epg()
+                self._request_epg(it)
                 # ...and the same auto-preview as the TV list, so arrowing
                 # through History previews live channels too (movies/episodes/
                 # recordings there aren't previewed).
@@ -118,7 +118,7 @@ class _DetailMixin:
             self._show_media_info(info, self._current_key)
         elif ckind in ("live", "fav"):
             if it.get("stream_id") is not None:
-                self._request_epg()
+                self._request_epg(it)
                 if (self.player and self._autoplay_preview()
                         and self.playback_mode() == "embedded"
                         and not self._rmb_selecting):
@@ -575,12 +575,18 @@ class _DetailMixin:
         lbl.setWordWrap(True)
         self.epg_lay.insertWidget(self.epg_lay.count() - 1, lbl)
 
-    def _request_epg(self) -> None:
-        it = self.list_model.item_at(self.listw.currentIndex().row())
-        if not it or self.series_ctx:
+    def _request_epg(self, it=None) -> None:
+        # An explicit *it* (a live channel tuned from Home) bypasses the
+        # list-selection and mode checks: the caller knows it's live, and the
+        # classic list may still be showing another mode/row at this point.
+        explicit = it is not None
+        if it is None:
+            it = self.list_model.item_at(self.listw.currentIndex().row())
+        if not it or (self.series_ctx and not explicit):
             return
         # Live channels in the live/fav views, and live rows opened from History.
-        is_live = (self._content_kind() in ("live", "fav")
+        is_live = (explicit
+                   or self._content_kind() in ("live", "fav")
                    or (self.mode == "history" and it.get("_kind") == "live"))
         if not is_live:
             return

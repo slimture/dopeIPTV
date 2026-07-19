@@ -876,17 +876,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.listw.customContextMenuRequested.connect(self._context_menu)
         ml.addWidget(self.listw, 1)
 
-        self._loading_hint = QLabel(tr("status_loading_channels"))
-        self._loading_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._loading_hint.setStyleSheet(
-            f"color:{P['muted2']}; font-size:13px; padding:40px 0;")
-        # Start hidden and only show it while a classic list load is actually
-        # in flight (see _load_items). Created visible it lingered forever when
-        # the app opened on Home (the classic list never loads there, so the
-        # populate that would retire it never happens) - "Loading channels..."
-        # stuck at the bottom of the middle column at startup.
-        self._loading_hint.hide()
-        ml.addWidget(self._loading_hint)
+        # NB: no bottom "Loading channels..." label here any more. It kept
+        # lingering after whichever async load path got discarded (startup on
+        # Home, playing from Home, rapid mode hops) - and the busy strip plus
+        # the centred spinner overlay already say "loading" while the list is
+        # empty, so the label only ever added a way to get stuck.
 
         self.count_lbl = QLabel("")
         self.count_lbl.setStyleSheet(f"color:{P['muted3']}; font-size:11px;")
@@ -2047,8 +2041,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 cat = getattr(self, "_pending_jump_cat", None)
                 if cat is not None:
                     for i in range(self.cat_list.count()):
-                        if self.cat_list.item(i).data(
-                                Qt.ItemDataRole.UserRole) == cat:
+                        d = self.cat_list.item(i).data(
+                            Qt.ItemDataRole.UserRole)
+                        # str() both sides: int vs str category ids.
+                        if d is not None and str(d) == str(cat):
                             row = i
                             break
                     self._pending_jump_cat = None
@@ -2270,8 +2266,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self.all_items = cache[1]
                 self._apply_filter()
                 return
-            if self.list_model.rowCount() == 0:
-                self._loading_hint.show()
             self._show_busy(tr("status_loading_recent"))
 
             def recent_done(items):
@@ -2300,18 +2294,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             def recent_fail(msg):
                 if rgen != self._load_gen:
                     return
-                self._loading_hint.hide()
                 self._hide_busy()
                 self._error(msg)
 
             run_async(self.pool, lambda: rfetch(None),
                       recent_done, recent_fail)
             return
-        # Show the bottom "Loading channels..." hint only while this fetch is
-        # in flight and there's nothing in the list yet (retired on populate /
-        # modelReset). It stays hidden when re-filtering an already-filled list.
-        if self.list_model.rowCount() == 0:
-            self._loading_hint.show()
         self._show_busy(self._loading_message())
         fn = {"live": self.client.live_streams,
               "vod": self.client.vod_streams,
@@ -2339,7 +2327,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         def fail(msg):
             if gen != self._load_gen:
                 return
-            self._loading_hint.hide()
             self._error(msg)
 
         run_async(self.pool, lambda: fn(category_id), done, fail)
@@ -2385,8 +2372,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             rows = [r for r in rows if not r.get("_header")]
         self.all_items = rows
         self.list_model.set_items(rows, model_kind)
-        if self._loading_hint.isVisible():
-            self._loading_hint.hide()
         label = self.LABELS.get(model_kind, "")
         self._set_status(f"{n} {label}".strip() if n
                          else (empty_msg or f"0 {label}".strip()))
@@ -2577,7 +2562,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # hook in _apply_filter selects the episode once the list loads.
         if self._playing_group == "episode" and lp.get("series_ctx"):
             self._pending_jump_key = self._playing_key
-            QTimer.singleShot(2500, self._clear_pending_jump)
+            QTimer.singleShot(8000, self._clear_pending_jump)
             if self.mode != "series":
                 self.switch_mode("series")
             self._enter_series(lp["series_ctx"])
@@ -2588,7 +2573,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # own category so the sidebar reflects what's playing, not just "All".
         self._pending_jump_key = self._playing_key
         self._pending_jump_cat = playing.get("category_id")
-        QTimer.singleShot(2500, self._clear_pending_jump)   # safety net
+        QTimer.singleShot(8000, self._clear_pending_jump)   # safety net
         target = {"live": "live", "vod": "vod", "episode": "series",
                   "rec": "rec"}.get(self._playing_group, self.mode)
         if self.mode != target:
@@ -2597,8 +2582,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             row, cat = 0, self._pending_jump_cat
             if cat is not None:
                 for i in range(self.cat_list.count()):
-                    if self.cat_list.item(i).data(
-                            Qt.ItemDataRole.UserRole) == cat:
+                    d = self.cat_list.item(i).data(Qt.ItemDataRole.UserRole)
+                    if d is not None and str(d) == str(cat):
                         row = i
                         break
             self._pending_jump_cat = None
@@ -2618,7 +2603,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         we were already in Live mode."""
         self._pending_jump_key = self._item_key(it)
         self._pending_jump_cat = it.get("category_id")
-        QTimer.singleShot(2500, self._clear_pending_jump)   # safety net
+        # Safety net only - long enough that a slow provider fetch of the
+        # category's channel list still lands inside the window (2.5 s wasn't:
+        # the key got cleared mid-load and the row was never selected).
+        QTimer.singleShot(8000, self._clear_pending_jump)
         if self.mode != "live":
             self.switch_mode("live")   # done() honours the pending jump
             return
@@ -2627,8 +2615,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         row, cat = 0, self._pending_jump_cat
         if cat is not None:
             for i in range(self.cat_list.count()):
-                if self.cat_list.item(i).data(
-                        Qt.ItemDataRole.UserRole) == cat:
+                d = self.cat_list.item(i).data(Qt.ItemDataRole.UserRole)
+                # str() both sides: providers mix int and str category ids.
+                if d is not None and str(d) == str(cat):
                     row = i
                     break
         self._pending_jump_cat = None
@@ -2644,7 +2633,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.play_live_channel(ch)
         self._pending_jump_key = self._item_key(ch)
         self._pending_jump_cat = ch.get("category_id")
-        QTimer.singleShot(3000, self._clear_pending_jump)
+        QTimer.singleShot(8000, self._clear_pending_jump)
         if self.mode != "live":
             self.switch_mode("live")
         else:
@@ -2672,18 +2661,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         return self.mode
 
     def _on_list_populated(self) -> None:
-        """Retire the loading hint/overlay once the model actually has rows.
+        """Retire the loading strip/overlay once the model actually has rows.
 
         Wired to list_model.modelReset so it fires for every set_items path,
         including the ones that skip _apply_filter (startup load while the
-        window is inactive, mw_search). Tolerates being called before the hint
-        widget exists, since the model is created earlier in __init__."""
+        window is inactive, mw_search). Tolerates firing during early
+        __init__, before the busy machinery exists."""
         if self.list_model.rowCount() <= 0:
             return
-        hint = getattr(self, "_loading_hint", None)
-        if hint is not None and hint.isVisible():
-            hint.hide()
-        if hasattr(self, "_hide_busy"):
+        if hasattr(self, "_hide_busy") and hasattr(self, "loading_bar"):
             self._hide_busy()
 
     def _apply_filter(self) -> None:
@@ -2701,8 +2687,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if getattr(self, "_pending_jump_key", None) is not None:
             if self._try_select_playing():
                 self._pending_jump_key = None
-        if self._loading_hint.isVisible():
-            self._loading_hint.hide()
         # The list is populated now, so clear any loading strip/overlay - a
         # gen-discarded async load (e.g. rapid Home<->TV toggling) could leave
         # the "Loading channels…" overlay stuck on until the next selection.
