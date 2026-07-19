@@ -92,9 +92,12 @@ assert d._selected["prog"] is None
 d._nav(0, -1)                           # up -> back to a programme
 assert d._selected["channel"]["name"] == "With EPG"
 
-assert len(d._progress) == 1            # exactly one on-air fill
-d._tick()                               # live refresh must not raise
-assert len(d._progress) == 1
+# Exactly one card is marked on-air ("now" state), and the live tick
+# (which rolls the highlight forward) must not raise.
+now_cards = [rb for _c, blocks in d._rows for rb in blocks
+             if rb.get("_state") == "now"]
+assert len(now_cards) == 1, len(now_cards)
+d._tick()
 
 d._scroll_hours(24); d._scroll_hours(-24); d._scroll_tonight()
 d.deleteLater(); app.processEvents()

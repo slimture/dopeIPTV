@@ -14,7 +14,8 @@ from datetime import datetime
 
 from PyQt6.QtCore import QRectF, Qt, QTimer
 from PyQt6.QtGui import (
-    QBrush, QColor, QFont, QIcon, QPainter, QPainterPath, QPen, QPixmap,
+    QBrush, QColor, QFont, QGradient, QIcon, QLinearGradient, QPainter,
+    QPainterPath, QPen, QPixmap,
 )
 from PyQt6.QtWidgets import (
     QDialog, QGraphicsItemGroup, QGraphicsPathItem, QGraphicsPixmapItem,
@@ -69,10 +70,11 @@ class _GridView(QGraphicsView):
 
 
 class EpgGridDialog(QDialog):
-    ROW_H = 48
-    HEADER_H = 30
-    CH_COL_W = 200
-    PX_PER_MIN = 6            # 360 px per hour
+    ROW_H = 60
+    HEADER_H = 34
+    CH_COL_W = 224
+    PX_PER_MIN = 7            # 420 px per hour
+    LABEL_DY = 21            # vertical inset of a card's title text
     FUTURE_HOURS = 12       # how far ahead the board reaches
     MAX_PAST_HOURS = 48     # cap on how far back timeshift opens the board
     MAX_CHANNELS = 300       # a grid past this is unreadable anyway
@@ -196,7 +198,6 @@ class EpgGridDialog(QDialog):
         self._build_gen = 0
         self._rows: list = []
         self._focus: tuple[int, int] | None = None
-        self._progress: list = []
         self._now_line = None
         self._grid_h = 0
         # Keep the board alive while open: the now-line and the progress
@@ -407,7 +408,6 @@ class EpgGridDialog(QDialog):
         self._build_gen += 1       # invalidates in-flight logo callbacks
         self._rows = []
         self._focus = None
-        self._progress = []
         self._now_line = None
         self.play_btn.setEnabled(False)
         self.desc.hide()
@@ -432,7 +432,6 @@ class EpgGridDialog(QDialog):
         for row, ch in enumerate(chans):
             self._draw_channel_row(row, ch)
         self._draw_now_line(grid_h)
-        self._update_progress()
 
         head_bg = QColor(P["pane"])
         self._corner = self.scene.addRect(
@@ -491,13 +490,13 @@ class EpgGridDialog(QDialog):
         rainbow, which read as noisy."""
         pane = QColor(P["pane"])
         return {
-            "row_a": pane,                       # zebra shade A
-            "row_b": pane.lighter(108),          # zebra shade B
-            "cell": pane.darker(104),            # channel-name column
-            "block": pane.lighter(128),          # a programme card
+            "row_a": pane.darker(112),           # recessed bg, so cards float
+            "row_b": pane.darker(106),           # subtle zebra
+            "cell": pane.darker(108),            # channel-name column
+            "block": pane.lighter(126),          # a programme card
             "block_now": pane.lighter(150),      # on-air card, brighter
-            "block_past": pane.lighter(110),     # already aired, recedes
-            "edge": pane.darker(118),            # thin card border
+            "block_past": pane.lighter(104),     # already aired, recedes
+            "edge": pane.darker(125),            # thin card border
         }[key]
 
     def _draw_channel_row(self, row: int, ch: dict) -> None:
@@ -539,7 +538,7 @@ class EpgGridDialog(QDialog):
         # generation-guarded - a rebuild (filter typing) clears the scene and
         # a late pixmap must not be added to the dead one.
         logo_url = ch.get("stream_icon")
-        text_x = 44 if logo_url else 8
+        text_x = 54 if logo_url else 10
         if logo_url and getattr(self.window, "logos", None) is not None:
             gen = self._build_gen
 
@@ -547,11 +546,11 @@ class EpgGridDialog(QDialog):
                 if gen != self._build_gen or pm is None or pm.isNull():
                     return
                 scaled = pm.scaled(
-                    32, self.ROW_H - 16,
+                    38, self.ROW_H - 18,
                     Qt.AspectRatioMode.KeepAspectRatio,
                     Qt.TransformationMode.SmoothTransformation)
                 it_pm = QGraphicsPixmapItem(scaled)
-                it_pm.setPos(8 + (32 - scaled.width()) / 2,
+                it_pm.setPos(10 + (38 - scaled.width()) / 2,
                              y + (self.ROW_H - scaled.height()) / 2)
                 it_pm.setData(0, {"channel": ch, "prog": None})
                 self._chan_group.addToGroup(it_pm)
@@ -564,7 +563,7 @@ class EpgGridDialog(QDialog):
         name = QGraphicsSimpleTextItem(label_text)
         f = QFont()
         f.setBold(True)
-        f.setPointSize(10)
+        f.setPointSize(11)
         name.setFont(f)
         name.setBrush(QColor("#ffffff"))
         self._elide(name, self.CH_COL_W - text_x - 8)
@@ -594,15 +593,10 @@ class EpgGridDialog(QDialog):
             if x2 - x1 < 2:
                 continue
             drew_any = True
-            if p["start_timestamp"] <= now < p["stop_timestamp"]:
-                fill = tones["block_now"]
-            elif p["stop_timestamp"] <= now:
-                fill = tones["block_past"]
-            else:
-                fill = tones["block"]
+            state = self._prog_state(p, now)
             data = {"channel": ch, "prog": p}
-            block = self._card(x1 + 1, y + 3, x2 - x1 - 3, self.ROW_H - 6,
-                               fill, tones["edge"], data)
+            block = self._card(x1 + 1, y + 4, x2 - x1 - 3, self.ROW_H - 8,
+                               state, tones, data)
             # State glyphs on the block itself: a scheduled/running recording
             # and a set reminder used to be visible only in the context menu.
             prefix = ""
@@ -620,15 +614,15 @@ class EpgGridDialog(QDialog):
                                       QColor(P["muted"]) if faded
                                       else QColor("#ffffff"))
             row_blocks.append({"item": block, "data": data, "label": label,
-                               "x1": x1, "x2": x2, "y": y, "text": text})
+                               "x1": x1, "x2": x2, "y": y, "text": text,
+                               "_state": state})
         if not drew_any:
             # No EPG for this channel: fill the row so the whole timeline is
             # still clickable and plays the channel live - and says why it's
             # empty (or that the guide is still loading).
             data = {"channel": ch, "prog": None}
-            block = self._card(self.CH_COL_W + 1, y + 3, self._grid_w - 3,
-                               self.ROW_H - 6, tones["block_past"],
-                               tones["edge"], data)
+            block = self._card(self.CH_COL_W + 1, y + 4, self._grid_w - 3,
+                               self.ROW_H - 8, "past", tones, data)
             text = (tr("epg_no_guide_available") if self._epg_ready()
                     else tr("status_loading_programme_guide"))
             label = self._block_label(text, self.CH_COL_W, self.CH_COL_W
@@ -637,17 +631,44 @@ class EpgGridDialog(QDialog):
             row_blocks.append({"item": block, "data": data, "label": label,
                                "x1": self.CH_COL_W,
                                "x2": self.CH_COL_W + self._grid_w,
-                               "y": y, "text": text})
+                               "y": y, "text": text, "_state": "past"})
         self._rows.append((ch, row_blocks))
 
-    def _card(self, x, y, w, h, fill, edge, data) -> QGraphicsPathItem:
-        """A rounded programme card. Rounded (a path item, not a plain rect)
-        for the softer look; carries the click payload like the old blocks."""
+    @staticmethod
+    def _prog_state(p: dict, now: float) -> str:
+        if p["start_timestamp"] <= now < p["stop_timestamp"]:
+            return "now"
+        return "past" if p["stop_timestamp"] <= now else "future"
+
+    def _card_brush(self, fill: QColor) -> QBrush:
+        """Subtle top-to-bottom bevel so cards read as raised, not flat -
+        the 'more depth' look, done as one gradient brush (no extra shadow
+        items, which 300 channels x several programmes couldn't afford)."""
+        g = QLinearGradient(0.0, 0.0, 0.0, 1.0)
+        g.setCoordinateMode(QGradient.CoordinateMode.ObjectBoundingMode)
+        g.setColorAt(0.0, fill.lighter(112))
+        g.setColorAt(1.0, fill.darker(112))
+        return QBrush(g)
+
+    def _style_card(self, item: QGraphicsPathItem, state: str,
+                    tones: dict) -> None:
+        fill = {"now": tones["block_now"], "past": tones["block_past"]}.get(
+            state, tones["block"])
+        item.setBrush(self._card_brush(fill))
+        # The on-air card is the marker now (no progress line): a brighter
+        # fill plus a 2px accent border.
+        if state == "now":
+            item.setPen(QPen(QColor(ACCENT), 2))
+        else:
+            item.setPen(QPen(tones["edge"], 1))
+
+    def _card(self, x, y, w, h, state, tones, data) -> QGraphicsPathItem:
+        """A rounded, bevelled programme card. Rounded (a path item, not a
+        plain rect) for the softer look; carries the click payload."""
         path = QPainterPath()
-        path.addRoundedRect(QRectF(x, y, w, h), 6, 6)
+        path.addRoundedRect(QRectF(x, y, w, h), 8, 8)
         item = QGraphicsPathItem(path)
-        item.setBrush(QBrush(fill))
-        item.setPen(QPen(edge, 1))
+        self._style_card(item, state, tones)
         item.setZValue(5)
         item.setData(0, data)
         self.scene.addItem(item)
@@ -663,8 +684,8 @@ class EpgGridDialog(QDialog):
         label.setBrush(color)
         label.setZValue(8)
         label.setData(0, data)
-        self._elide(label, x2 - x1 - 12)
-        label.setPos(x1 + 6, y + 7)
+        self._elide(label, x2 - x1 - 14)
+        label.setPos(x1 + 8, y + self.LABEL_DY)
         self.scene.addItem(label)
         return label
 
@@ -688,51 +709,49 @@ class EpgGridDialog(QDialog):
         return False
 
     def _draw_now_line(self, grid_h: int) -> None:
+        # A subtle accent hairline (the old bright-red 2px line read as harsh);
+        # the on-air card highlight is the real "now" marker.
         x = self._x(time.time())
+        col = QColor(ACCENT)
+        col.setAlpha(150)
         line = self.scene.addLine(x, 0, x, self.HEADER_H + grid_h,
-                                  QPen(QColor("#e5354b"), 2))
+                                  QPen(col, 1))
         line.setZValue(19)
+        line.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
         self._now_line = line
 
-    def _update_progress(self) -> None:
-        """(Re)draw the elapsed-fraction fill along the bottom of every block
-        whose programme is on air right now. Called at build and from the
-        30 s tick, so the fills creep along while the guide is open."""
-        for it in self._progress:
-            if it.scene() is not None:
-                self.scene.removeItem(it)
-        self._progress = []
+    def _mark_now(self) -> None:
+        """Re-mark which card is on air (and dim the ones that just ended),
+        so the highlight rolls onto the next programme when one finishes -
+        replaces the old progress-bar redraw. Cheap: only cards whose state
+        actually changed are restyled."""
         now = time.time()
-        fill = QColor(ACCENT)
-        fill.setAlpha(210)
+        tones = {k: self._tone(k) for k in
+                 ("block", "block_now", "block_past", "edge")}
         for _ch, blocks in self._rows:
-            for b in blocks:
-                p = b["data"]["prog"]
-                if not p or not (p["start_timestamp"] <= now
-                                 < p["stop_timestamp"]):
+            for rb in blocks:
+                p = rb["data"]["prog"]
+                if not p:
                     continue
-                x1, x2, y = b["x1"], b["x2"], b["y"]
-                frac = ((now - p["start_timestamp"])
-                        / max(1, p["stop_timestamp"] - p["start_timestamp"]))
-                bar = QGraphicsRectItem(x1 + 1, y + self.ROW_H - 8,
-                                        max(2.0, (x2 - x1 - 3) * frac), 3)
-                bar.setBrush(QBrush(fill))
-                bar.setPen(QPen(Qt.PenStyle.NoPen))
-                bar.setZValue(9)
-                bar.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
-                self.scene.addItem(bar)
-                self._progress.append(bar)
+                state = self._prog_state(p, now)
+                if state == rb.get("_state"):
+                    continue
+                rb["_state"] = state
+                self._style_card(rb["item"], state, tones)
+                lbl = rb.get("label")
+                if lbl is not None:
+                    lbl.setBrush(QColor(P["muted"]) if state == "past"
+                                 else QColor("#ffffff"))
 
     def _tick(self) -> None:
-        """30 s live refresh: the now-line and the progress fills move; the
-        block layout itself stays put (a full rebuild would drop selection
-        and is not worth it for a line that moves 3 px)."""
+        """30 s live refresh: nudge the now-line and roll the on-air card
+        highlight forward. The block layout itself stays put."""
         if self._now_line is None or self._now_line.scene() is None:
             return
         x = self._x(time.time())
         if x <= self.CH_COL_W + self._grid_w:
             self._now_line.setLine(x, 0, x, self.HEADER_H + self._grid_h)
-        self._update_progress()
+        self._mark_now()
 
     @staticmethod
     def _elide(item: QGraphicsSimpleTextItem, max_w: float) -> None:
@@ -791,7 +810,7 @@ class EpgGridDialog(QDialog):
                     rb["_hidden"] = False
                 if x1 >= left:                        # fully in view: static
                     if rb.get("_stuck"):
-                        lbl.setPos(x1 + pad, y + 7)
+                        lbl.setPos(x1 + pad, y + self.LABEL_DY)
                         self._set_label(lbl, rb["text"], x2 - x1 - 2 * pad)
                         rb["_stuck"] = False
                 else:                                 # straddles: stick to edge
@@ -800,7 +819,7 @@ class EpgGridDialog(QDialog):
                         lbl.setVisible(False)          # rather than show "…"
                         rb["_hidden"] = True
                         continue
-                    lbl.setPos(left + pad, y + 7)
+                    lbl.setPos(left + pad, y + self.LABEL_DY)
                     self._set_label(lbl, rb["text"], avail)
                     rb["_stuck"] = True
 
