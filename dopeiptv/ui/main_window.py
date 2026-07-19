@@ -1970,9 +1970,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 cw = QListWidgetItem("▶  " + tr("cat_continue"))
                 cw.setData(Qt.ItemDataRole.UserRole, "__continue__")
                 self.cat_list.addItem(cw)
-            # "Recently added" for Movies and Series - the latest titles the
+            # "Recently added" for TV, Movies and Series - the latest the
             # provider has published, newest first.
-            if self.mode in ("vod", "series"):
+            if self.mode in ("vod", "series", "live"):
                 rc = QListWidgetItem("🆕  " + tr("cat_recent"))
                 rc.setData(Qt.ItemDataRole.UserRole, "__recent__")
                 self.cat_list.addItem(rc)
@@ -2209,16 +2209,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.all_items = self._continue_items(kind)
             self._apply_filter()
             return
-        if category_id == "__recent__" and self.mode in ("vod", "series"):
+        if category_id == "__recent__" and self.mode in ("vod", "series",
+                                                          "live"):
             # Synthetic category: every title sorted by the provider's
             # publish/update time, newest first (capped so a huge library
             # doesn't lag the list).
             self._show_busy(tr("status_loading_recent"))
             rmode = self.mode
             rgen = self._load_gen
-            skey = "added" if rmode == "vod" else "last_modified"
-            rfetch = (self.client.vod_streams if rmode == "vod"
-                      else self.client.series_list)
+            skey = "last_modified" if rmode == "series" else "added"
+            rfetch = {"vod": self.client.vod_streams,
+                      "series": self.client.series_list,
+                      "live": self.client.live_streams}[rmode]
 
             def recent_done(items):
                 if rgen != self._load_gen or self.mode != rmode:
