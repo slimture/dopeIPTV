@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..i18n import tr
-from .theme import ACCENT, P
+from .theme import P
 
 
 class _GridView(QGraphicsView):
@@ -147,7 +147,7 @@ class EpgGridDialog(QDialog):
             "QScrollBar::handle:vertical{min-height:70px;}"
             "QScrollBar::handle:hover{background:%s;}"
             "QScrollBar::add-line,QScrollBar::sub-line{width:0;height:0;}"
-            % (ACCENT, P["text"]))
+            % (P["accent"], P["text"]))
         self.view.horizontalScrollBar().valueChanged.connect(self._pin)
         self.view.verticalScrollBar().valueChanged.connect(self._pin)
         self.view.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -540,7 +540,7 @@ class EpgGridDialog(QDialog):
         self.scene.addItem(zebra)
         cell = QGraphicsRectItem(0, y, self.CH_COL_W, self.ROW_H)
         if playing:
-            cell.setBrush(QBrush(QColor(ACCENT)))
+            cell.setBrush(QBrush(QColor(P["accent"])))
             cell.setPen(QPen(QColor("#ffffff"), 2))
         else:
             cell.setBrush(QBrush(tones["cell"]))
@@ -594,7 +594,7 @@ class EpgGridDialog(QDialog):
             # at. Sits above the blocks but carries no data(0), so it never
             # intercepts a click (hit-testing reads the block beneath it).
             band = QGraphicsRectItem(self.CH_COL_W, y, self._grid_w, self.ROW_H)
-            glow = QColor(ACCENT)
+            glow = QColor(P["accent"])
             glow.setAlpha(48)
             band.setBrush(QBrush(glow))
             band.setPen(QPen(Qt.PenStyle.NoPen))
@@ -693,7 +693,7 @@ class EpgGridDialog(QDialog):
         # The on-air card is the marker now (no progress line): a brighter
         # fill plus a 2px accent border.
         if state == "now":
-            item.setPen(QPen(QColor(ACCENT), 2))
+            item.setPen(QPen(QColor(P["accent"]), 2))
         else:
             item.setPen(QPen(tones["edge"], 1))
 
@@ -744,16 +744,9 @@ class EpgGridDialog(QDialog):
         return False
 
     def _draw_now_line(self, grid_h: int) -> None:
-        # A subtle accent hairline (the old bright-red 2px line read as harsh);
-        # the on-air card highlight is the real "now" marker.
-        x = self._x(time.time())
-        col = QColor(ACCENT)
-        col.setAlpha(150)
-        line = self.scene.addLine(x, 0, x, self.HEADER_H + grid_h,
-                                  QPen(col, 1))
-        line.setZValue(19)
-        line.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
-        self._now_line = line
+        # No full-height "now" line: it ran across the whole channel list and
+        # read as clutter. The highlighted on-air card is the "now" marker.
+        self._now_line = None
 
     def _mark_now(self) -> None:
         """Re-mark which card is on air (and dim the ones that just ended),
@@ -779,13 +772,8 @@ class EpgGridDialog(QDialog):
                                  else QColor("#ffffff"))
 
     def _tick(self) -> None:
-        """30 s live refresh: nudge the now-line and roll the on-air card
-        highlight forward. The block layout itself stays put."""
-        if self._now_line is None or self._now_line.scene() is None:
-            return
-        x = self._x(time.time())
-        if x <= self.CH_COL_W + self._grid_w:
-            self._now_line.setLine(x, 0, x, self.HEADER_H + self._grid_h)
+        """30 s live refresh: roll the on-air card highlight forward. The block
+        layout itself stays put."""
         self._mark_now()
 
     @staticmethod
