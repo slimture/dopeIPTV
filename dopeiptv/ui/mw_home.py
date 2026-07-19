@@ -645,8 +645,16 @@ class HomePage(QWidget):
             self._set_art(card, self._media_art(it), w.poster_art)
             self._hero_shelf.add(card)
         if vod:
+            hero_was_hidden = self._hero_shelf.isHidden()
             self._hero_shelf.finish(HERO_H)
             self._hero_shelf.show()
+            # Showing the previously-hidden hero grows the page and pushes the
+            # shelves below it down. On macOS that move can leave the shelves'
+            # pre-reflow pixels painted *behind* the hero ("stuff behind
+            # featured"). Force the canvas + scroll viewport to fully repaint
+            # once the layout has settled so no ghost frame survives.
+            if hero_was_hidden:
+                self._repaint_after_reflow()
 
         if s.value("home_sh_movies", "true") == "true" and vod:
             shelf = _Shelf(tr("home_new_movies"))
@@ -667,6 +675,21 @@ class HomePage(QWidget):
                 shelf.add(card)
             shelf.finish(POSTER_H)
             self._movies_box.addWidget(shelf)
+
+    def _repaint_after_reflow(self) -> None:
+        """Force a clean repaint after a layout change that moved shelves.
+
+        Qt on macOS doesn't always repaint widgets that a layout reflow shifts,
+        so a grown hero row can leave the shelves below it ghosted behind it.
+        Repainting the canvas and the scroll viewport once the layout has
+        settled (singleShot 0) overwrites any stale frame with the page bg."""
+        def _rp() -> None:
+            try:
+                self._canvas.update()
+                self._scroll.viewport().update()
+            except RuntimeError:
+                pass
+        QTimer.singleShot(0, _rp)
 
     def _fill_channels(self, chan: list) -> None:
         w = self.window
