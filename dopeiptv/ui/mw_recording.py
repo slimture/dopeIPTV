@@ -1053,19 +1053,21 @@ class _RecordingMixin:
         marked working channels as broken for 14 days, silently."""
         sess = getattr(self.client, "session", None)
         proven_dead = False
+        network_failed = False
         for u in urls:
             try:
                 # Generous read timeout: providers assemble archive segments
-                # on demand and the first byte can take well over 4 s cold -
+                # on demand and the first byte can take a long while cold -
                 # the probe runs in the background while live keeps playing,
                 # so waiting costs nothing visible.
-                r = sess.get(u, stream=True, timeout=(5, 10),
+                r = sess.get(u, stream=True, timeout=(5, 25),
                              headers={"Range": "bytes=0-8191"})
                 ctype = (r.headers.get("Content-Type") or "").lower()
                 chunk = next(r.iter_content(4096), b"") or b""
                 r.close()
             except Exception as e:
                 log.debug("[ts] probe network error for %s: %s", u, e)
+                network_failed = True
                 continue
             head = chunk.lstrip()
             if "text/html" in ctype or head[:1] in (b"<", b"{"):
@@ -1078,7 +1080,10 @@ class _RecordingMixin:
                     or "octet-stream" in ctype):
                 return u, False
             proven_dead = True       # responded, but with something unplayable
-        return None, proven_dead
+        # Dead is only proven when EVERY candidate got a real answer. If any
+        # format failed at the network level, the working scheme may simply
+        # have been the one that timed out - that must not hide the channel.
+        return None, proven_dead and not network_failed
 
     # (minutes back, duration i18n key) - the label is "Go back <duration>".
     TIMESHIFT_STEPS = (

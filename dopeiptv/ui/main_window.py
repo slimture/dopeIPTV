@@ -3661,15 +3661,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if early:
                 if self._try_next_ts_candidate():
                     return
-                # No format worked: the provider isn't serving catch-up here.
-                # Learn it so this channel stops advertising timeshift.
+                # No format played. Do NOT learn-and-hide from an mpv-level
+                # error: it can be a transient network blip or a single-
+                # connection conflict while the live stream releases - the
+                # HTTP probe already saw this archive serve real bytes. Only
+                # the probe's proven provider response (an error page instead
+                # of a stream) may mark a channel broken. Report and settle
+                # back on live with timeshift still advertised.
                 self._playing_catchup = False
                 if self.player:
                     self.player.current_url = None
                 self._set_status(tr("ts_archive_unavailable"), error=True)
                 lp = getattr(self, "_last_playback", None)
                 if lp and lp.get("item"):
-                    self._mark_ts_broken(lp["item"])
                     self.play_live_channel(lp["item"])
                 return
         # Live streams drop briefly all the time (single-connection accounts,
@@ -3865,10 +3869,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._last_stream_error_ts = 0.0
         self._retry_last_stream()
 
-    def _verify_catchup(self, token: int) -> None:
-        """A catch-up URL that plays but isn't seekable means the provider
-        served the live feed instead of the archive - walk to the next format
-        or, when exhausted, report catch-up unavailable and settle on live."""
+    def _verify_catchup(self, token: int, recheck: bool = False) -> None:
+        """A catch-up URL that plays but isn't seekable usually means the
+        provider served the live feed instead of the archive - walk to the
+        next format or, when exhausted, report catch-up unavailable and
+        settle on live.
+
+        mpv's 'seekable' can read False on a REAL archive segment early on
+        (the demuxer hasn't resolved a duration yet, especially over a slow
+        link), so a single failed check proves nothing: re-check once more
+        7 s later and only act when BOTH say not-seekable. And never
+        learn-and-hide from here - only the HTTP probe's proven provider
+        response may mark a channel's catch-up broken; a wrong verdict here
+        silently stripped timeshift off channels that work."""
         if token != getattr(self, "_catchup_verify_token", 0):
             return   # superseded by a newer play
         if not getattr(self, "_playing_catchup", False):
@@ -3882,7 +3895,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return   # can't tell - leave it be
         if seekable:
             return   # genuine archive segment
-        log.debug("[ts] candidate %s played but is live (not seekable)",
+        if not recheck:
+            QTimer.singleShot(
+                7000, lambda t=token: self._verify_catchup(t, recheck=True))
+            return
+        log.debug("[ts] candidate %s played but is live (not seekable twice)",
                   getattr(self, "_ts_candidate_idx", 0))
         if self._try_next_ts_candidate():
             return
@@ -3890,16 +3907,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._set_status(tr("ts_archive_unavailable"), error=True)
         lp = getattr(self, "_last_playback", None)
         if lp and lp.get("item"):
-            # This URL played but is the live feed, not a seekable archive. Hide
-            # the channel's catch-up unless the request sat right at the depth
-            # limit (clamped) - that only means the oldest edge isn't kept, not
-            # that the archive is fake. A within-depth request served live is a
-            # fake archive at a point a real one would serve, so mark it broken.
-            # (A picked programme never unmarks: its URL can fail on a channel
-            # whose plain archive is fine.)
-            if (not getattr(self, "_ts_last_clamped", False)
-                    and not getattr(self, "_ts_catchup_program", False)):
-                self._mark_ts_broken(lp["item"])
             self.play_live_channel(lp["item"])
 
     def _try_next_ts_candidate(self) -> bool:
