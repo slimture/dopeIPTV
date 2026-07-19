@@ -605,12 +605,27 @@ class EpgGridDialog(QDialog):
         row_blocks: list = []
         drew_any = False
         now = time.time()
+        prev_x2, prev_title = -1.0, None
         for p in self.window.xmltv.programmes_in(ch, self._start, self._stop):
             x1 = max(self.CH_COL_W, self._x(p["start_timestamp"]))
             x2 = min(self.CH_COL_W + self._grid_w, self._x(p["stop_timestamp"]))
             if x2 - x1 < 2:
                 continue
+            if x1 < prev_x2 - 1:
+                # Overlaps what's already drawn. Provider EPGs routinely list
+                # the same programme twice a minute apart (merged sources) -
+                # since titles became top-level items, BOTH copies rendered
+                # and interleaved into garbage text. Same title or fully
+                # covered -> a duplicate, drop it; a genuinely different
+                # overlapping entry is clipped to start where the previous
+                # card ends.
+                if p.get("title") == prev_title or x2 <= prev_x2 + 2:
+                    continue
+                x1 = prev_x2
+                if x2 - x1 < 2:
+                    continue
             drew_any = True
+            prev_x2, prev_title = x2, p.get("title")
             state = self._prog_state(p, now)
             data = {"channel": ch, "prog": p}
             block = self._card(x1 + 1, y + 4, x2 - x1 - 3, self.ROW_H - 8,
@@ -628,9 +643,11 @@ class EpgGridDialog(QDialog):
                 prefix += "🔔 "
             text = prefix + (p.get("title") or "?")
             faded = p["stop_timestamp"] <= now
-            label = self._block_label(text, x1, x2, y, data,
-                                      QColor(P["muted"]) if faded
-                                      else QColor("#ffffff"))
+            # No label on sliver cards (clipped overlaps): "…" alone is noise.
+            label = (self._block_label(text, x1, x2, y, data,
+                                       QColor(P["muted"]) if faded
+                                       else QColor("#ffffff"))
+                     if x2 - x1 >= 26 else None)
             row_blocks.append({"item": block, "data": data, "label": label,
                                "x1": x1, "x2": x2, "y": y, "text": text,
                                "_state": state})

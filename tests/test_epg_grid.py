@@ -44,6 +44,14 @@ d.resize(1200, 600)
 d.show()
 app.processEvents()
 
+# The dialog opens scrolled to "now" (wall-clock dependent), which shifts
+# the pinned channel column in scene coords. Real clicks go through
+# mapToScene so the app is fine - but this test clicks raw scene points,
+# so pin the view at origin first to make them deterministic.
+d.view.horizontalScrollBar().setValue(0)
+d.view.verticalScrollBar().setValue(0)
+app.processEvents()
+
 d._select_at(QPointF(50, d.HEADER_H + d.ROW_H + 10))     # name cell, row 1
 assert d._selected and d._selected["channel"]["name"] == "No EPG"
 assert d._selected["prog"] is None
