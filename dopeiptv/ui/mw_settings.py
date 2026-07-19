@@ -360,10 +360,14 @@ class _SettingsMixin:
         self._cat_section_label.setText(tr("sidebar_categories"))
         if hasattr(self, "_lib_section_label"):
             self._lib_section_label.setText(tr("sidebar_library"))
-        self._guide_btn.setText(tr("btn_epg_guide"))
-        self._settings_btn.setText(tr("btn_settings"))
+        # Guide / Settings / Multiview are icon-only (their names live in the
+        # tooltip). Only refresh the tooltips here - stamping text back on would
+        # turn them into icon+label pills, which showed up as stray "EPG Guide"
+        # / "Settings" / "Multiview" text in demo and no-provider mode.
+        self._guide_btn.setToolTip(tr("btn_epg_guide"))
+        self._settings_btn.setToolTip(tr("btn_settings"))
         if hasattr(self, "_multiview_btn"):
-            self._multiview_btn.setText(tr("menu_multiview"))
+            self._multiview_btn.setToolTip(tr("menu_multiview"))
         self._update_playlist_btn()
         self.search.setPlaceholderText(tr("search_placeholder"))
         self._size_label.setText(tr("label_size"))

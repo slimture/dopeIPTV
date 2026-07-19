@@ -1310,6 +1310,28 @@ _STRINGS: dict[str, dict[str, str]] = {
         "fr": "Se connecter avec Trakt", "zh": "使用 Trakt 登录",
         "ru": "Войти через Trakt", "th": "เข้าสู่ระบบด้วย Trakt",
     },
+    "onb_trakt_connected": {
+        "en": "✓ Trakt connected — your watch history will sync.",
+        "sv": "✓ Trakt anslutet — din tittarhistorik synkas.",
+        "es": "✓ Trakt conectado — tu historial se sincronizará.",
+        "de": "✓ Trakt verbunden — dein Verlauf wird synchronisiert.",
+        "fr": "✓ Trakt connecté — votre historique sera synchronisé.",
+        "zh": "✓ 已连接 Trakt — 观看记录将同步。",
+        "ru": "✓ Trakt подключён — история просмотров синхронизируется.",
+        "th": "✓ เชื่อมต่อ Trakt แล้ว — ประวัติการดูจะซิงค์",
+    },
+    "onb_trakt_reconnect": {
+        "en": "Reconnect Trakt", "sv": "Anslut Trakt igen",
+        "es": "Reconectar Trakt", "de": "Trakt erneut verbinden",
+        "fr": "Reconnecter Trakt", "zh": "重新连接 Trakt",
+        "ru": "Переподключить Trakt", "th": "เชื่อมต่อ Trakt อีกครั้ง",
+    },
+    "onb_finish_done": {
+        "en": "Done — start watching", "sv": "Klar — börja titta",
+        "es": "Listo — empezar a ver", "de": "Fertig — losschauen",
+        "fr": "Terminé — regarder", "zh": "完成 — 开始观看",
+        "ru": "Готово — смотреть", "th": "เสร็จแล้ว — เริ่มดู",
+    },
     "onb_limited_notice": {
         "en": "You're exploring without a provider, so the app is limited. "
               "Add one any time with the “+ Add provider” button in the "
@@ -3279,6 +3301,16 @@ _STRINGS: dict[str, dict[str, str]] = {
         "zh": "名称",
         "ru": "Название",
         "th": "ชื่อ",
+    },
+    "playlist_name_hint": {
+        "en": "e.g. Home, Sports (optional)",
+        "sv": "t.ex. Hemma, Sport (valfritt)",
+        "es": "p. ej. Casa, Deportes (opcional)",
+        "de": "z. B. Zuhause, Sport (optional)",
+        "fr": "ex. Maison, Sports (facultatif)",
+        "zh": "例如 家庭、体育（可选）",
+        "ru": "напр. Дом, Спорт (необязательно)",
+        "th": "เช่น บ้าน, กีฬา (ไม่บังคับ)",
     },
     "playlist_custom_epg_url": {
         "en": "Custom TV guide URL",

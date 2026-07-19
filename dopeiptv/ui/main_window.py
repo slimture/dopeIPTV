@@ -1166,6 +1166,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # The middle pane's width also changes with divider drags, not just
         # window resizes, so keep its control strip's compact mode in sync.
         root.splitterMoved.connect(self._update_mid_compact)
+        # The "+ Add provider" hint is absolutely positioned over the middle
+        # pane, so it has to follow divider drags too - otherwise it drifts off
+        # centre (or off-pane) whenever the columns are resized.
+        root.splitterMoved.connect(self._position_provider_hint)
         # When collapsed the rail's width is pinned (so it can't stretch), which
         # freezes its divider handle - so watch the handle for a rightward drag
         # to re-expand it without reaching for the ☰ button.

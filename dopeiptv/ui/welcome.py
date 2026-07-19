@@ -37,7 +37,7 @@ class WelcomeOverlay(QWidget):
     )
 
     def __init__(self, parent: QWidget, *, settings,
-                 on_connect: Callable[[str, str, str, str], None],
+                 on_connect: Callable[[str, str, str, str, str], None],
                  on_explore: Callable[[], None],
                  on_connect_trakt: Callable[[], None],
                  on_language_change: Callable[[str], None],
@@ -63,7 +63,9 @@ class WelcomeOverlay(QWidget):
             f" color: {P['text']}; }}"
             f"#OnbSub {{ font-size: 12px; color: {P['muted']}; }}"
             f"#OnbFeat {{ font-size: 12px; color: {P['muted']}; }}"
-            f"#OnbErr {{ font-size: 12px; color: {P['error']}; }}")
+            f"#OnbErr {{ font-size: 12px; color: {P['error']}; }}"
+            f"#OnbOk {{ font-size: 12px; font-weight: 700;"
+            f" color: {P.get('ok', '#3fb950')}; }}")
 
         # Stretches above and below keep the card at its natural (content)
         # height, centred - without them the card stretches to fill the whole
@@ -95,6 +97,7 @@ class WelcomeOverlay(QWidget):
         # dismiss() when this overlay is up) - a second shortcut here would
         # just make Escape ambiguous and fire neither.
 
+        self._trakt_connected = False
         self._greet_idx = 0
         self._flash = QTimer(self)
         self._flash.timeout.connect(self._next_greeting)
@@ -154,16 +157,20 @@ class WelcomeOverlay(QWidget):
         self._conn_kind.addItem(tr("playlist_kind_xtream"), "xtream")
         self._conn_kind.addItem(tr("playlist_kind_m3u"), "m3u")
         self._conn_kind.currentIndexChanged.connect(self._update_conn_kind)
+        self._name = QLineEdit(s.value("playlist_name", "") if s else "")
+        self._name.setPlaceholderText(tr("playlist_name_hint"))
         self._server = QLineEdit(s.value("server", "") if s else "")
         self._server.setPlaceholderText("http://server:port")
         self._user = QLineEdit(s.value("username", "") if s else "")
         self._pw = QLineEdit(s.value("password", "") if s else "")
         self._pw.setEchoMode(QLineEdit.EchoMode.Password)
         self._lbl_kind = QLabel(tr("playlist_kind"))
+        self._lbl_name = QLabel(tr("playlist_name"))
         self._lbl_server = QLabel(tr("login_server"))
         self._lbl_user = QLabel(tr("login_username"))
         self._lbl_pw = QLabel(tr("login_password"))
         form.addRow(self._lbl_kind, self._conn_kind)
+        form.addRow(self._lbl_name, self._name)
         form.addRow(self._lbl_server, self._server)
         form.addRow(self._lbl_user, self._user)
         form.addRow(self._lbl_pw, self._pw)
@@ -222,6 +229,11 @@ class WelcomeOverlay(QWidget):
         self._t_connect = QPushButton(tr("onb_trakt_connect"))
         self._t_connect.setMinimumHeight(30)
         self._t_connect.clicked.connect(self._on_connect_trakt)
+        # A green confirmation that appears once Trakt is linked, so the user
+        # sees the step succeeded instead of wondering if anything happened.
+        self._t_ok = QLabel("", objectName="OnbOk")
+        self._t_ok.setWordWrap(True)
+        self._t_ok.setVisible(False)
         self._t_finish = QPushButton(tr("onb_finish"), objectName="Primary")
         self._t_finish.setMinimumHeight(34)
         self._t_finish.clicked.connect(self._finish)
@@ -230,9 +242,22 @@ class WelcomeOverlay(QWidget):
         lay.addWidget(self._t_desc)
         lay.addSpacing(2)
         lay.addWidget(self._t_connect)
+        lay.addWidget(self._t_ok)
         lay.addSpacing(2)
         lay.addWidget(self._t_finish)
         return page
+
+    def set_trakt_connected(self, connected: bool) -> None:
+        """Reflect a successful Trakt link: swap the connect button for a green
+        confirmation and nudge the finish button so the step reads as done."""
+        if not connected:
+            return
+        self._trakt_connected = True
+        self._t_ok.setText(tr("onb_trakt_connected"))
+        self._t_ok.setVisible(True)
+        self._t_connect.setText(tr("onb_trakt_reconnect"))
+        self._t_finish.setText(tr("onb_finish_done"))
+        self._fit_card(self._stack.currentIndex())
 
     # -- actions -------------------------------------------------------------
 
@@ -260,6 +285,7 @@ class WelcomeOverlay(QWidget):
     def _do_connect(self) -> None:
         kind = self._conn_kind.currentData()
         server = self._server.text().strip()
+        name = self._name.text().strip()
         if kind == "m3u":
             ok = bool(server)
             user = pw = ""
@@ -274,7 +300,7 @@ class WelcomeOverlay(QWidget):
             return
         self._c_err.setText("")
         self._c_err.setVisible(False)
-        self._on_connect(server, user, pw, kind)
+        self._on_connect(server, user, pw, kind, name)
         self._stack.setCurrentIndex(2)   # continue to the optional Trakt step
 
     def dismiss(self) -> None:
@@ -304,6 +330,8 @@ class WelcomeOverlay(QWidget):
         self._w_skip.setText(tr("welcome_explore"))
         self._c_title.setText(tr("login_subtitle"))
         self._lbl_kind.setText(tr("playlist_kind"))
+        self._lbl_name.setText(tr("playlist_name"))
+        self._name.setPlaceholderText(tr("playlist_name_hint"))
         self._lbl_user.setText(tr("login_username"))
         self._lbl_pw.setText(tr("login_password"))
         self._update_conn_kind()   # re-labels the server row for the mode
@@ -317,8 +345,12 @@ class WelcomeOverlay(QWidget):
         self._c_skip.setText(tr("onb_skip"))
         self._t_title.setText(tr("onb_trakt_title"))
         self._t_desc.setText(tr("onb_trakt_desc"))
-        self._t_connect.setText(tr("onb_trakt_connect"))
-        self._t_finish.setText(tr("onb_finish"))
+        connected = self._trakt_connected
+        self._t_connect.setText(
+            tr("onb_trakt_reconnect") if connected else tr("onb_trakt_connect"))
+        self._t_ok.setText(tr("onb_trakt_connected"))
+        self._t_finish.setText(
+            tr("onb_finish_done") if connected else tr("onb_finish"))
 
     # -- geometry ------------------------------------------------------------
 

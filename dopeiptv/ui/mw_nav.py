@@ -156,6 +156,7 @@ class _NavMixin:
             btn = getattr(self, name, None)
             if btn is None:
                 continue
+            btn.setText("")   # icon-only; the name lives in the tooltip
             btn.setIcon(QIcon(self._action_pixmap(kind, 18, P["text2"])))
             btn.setIconSize(QSize(18, 18))
         # The playlist stack icon follows the theme too (same square icon in

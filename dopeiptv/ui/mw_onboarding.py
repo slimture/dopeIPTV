@@ -22,13 +22,22 @@ class _OnboardingMixin:
                 self, settings=self.settings,
                 on_connect=self._wizard_connect,
                 on_explore=self._wizard_explore,
-                on_connect_trakt=lambda: self._trakt_connect_flow(self),
+                on_connect_trakt=self._wizard_connect_trakt,
                 on_language_change=self._wizard_language,
                 on_demo=self.start_demo)
         else:
             self._welcome.reset()
+        # If Trakt was linked in an earlier visit, show it as connected.
+        self._welcome.set_trakt_connected(self.trakt.is_connected())
         self._welcome.cover()
         self._update_provider_hint()
+
+    def _wizard_connect_trakt(self) -> None:
+        """Run the Trakt sign-in flow, then reflect the result in the wizard so
+        the user gets a clear 'connected' confirmation on the same screen."""
+        self._trakt_connect_flow(self)
+        if self._welcome is not None:
+            self._welcome.set_trakt_connected(self.trakt.is_connected())
 
     def _wizard_language(self, code: str) -> None:
         from ..i18n import set_language
@@ -37,8 +46,11 @@ class _OnboardingMixin:
         self.retranslate_ui()
 
     def _wizard_connect(self, server: str, user: str, pw: str,
-                        kind: str = "xtream") -> None:
-        name = server.split("//")[-1].split("/")[0] or "My playlist"
+                        kind: str = "xtream", name: str = "") -> None:
+        # Use the name the user typed; fall back to the server host so an
+        # unnamed playlist still gets a sensible label.
+        name = name.strip() or server.split("//")[-1].split("/")[0] \
+            or "My playlist"
         pl = self.playlist_store.add(
             {"name": name, "kind": kind, "server": server, "username": user,
              "password": pw, "epg_url": "", "refresh": "never"})
@@ -106,11 +118,15 @@ class _OnboardingMixin:
         btn = self._add_provider_btn
         if btn is None or not btn.isVisible():
             return
-        # Lower third of the middle list pane, mapped into window coordinates.
+        # Centred at the bottom of the middle list pane, mapped into window
+        # coordinates. A fixed margin above the pane's bottom edge (rather than
+        # a percentage) keeps it planted in one spot as the columns are dragged
+        # or the window is resized, instead of drifting around.
         btn.adjustSize()
         w = max(240, btn.width() + 40)
         h = 46
+        margin = 22
         tl = self.listw.mapTo(self, self.listw.rect().topLeft())
         x = tl.x() + (self.listw.width() - w) // 2
-        y = tl.y() + int(self.listw.height() * 0.90) - h // 2
+        y = tl.y() + self.listw.height() - h - margin
         btn.setGeometry(x, y, w, h)
