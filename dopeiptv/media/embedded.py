@@ -7,8 +7,8 @@ import sys
 import time
 
 from PyQt6.QtCore import (
-    QByteArray, QEvent, QObject, QPointF, QRect, QRectF, QSize, Qt, QTimer,
-    pyqtSignal,
+    QByteArray, QEvent, QObject, QPoint, QPointF, QRect, QRectF, QSize, Qt,
+    QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import (
     QColor, QCursor, QIcon, QOpenGLContext, QPainter, QPen, QPixmap, QPolygonF,
@@ -552,7 +552,14 @@ class _SeekSlider(QSlider):
         if seg and seg[2]:
             parts.append(seg[2])
         if parts:
-            QToolTip.showText(event.globalPosition().toPoint(),
+            # Anchor the tip just above the bar at the cursor's x. The default
+            # placement (at the cursor) gets the OS's own downward offset added
+            # and landed well below the pointer, reading as detached from the
+            # bar. showText adds ~16 px below the given point, so aim high
+            # enough that the tip settles right on top of the slider.
+            gp = event.globalPosition().toPoint()
+            top = self.mapToGlobal(self.rect().topLeft()).y()
+            QToolTip.showText(QPoint(gp.x() - 16, top - 48),
                               " · ".join(parts), self)
         else:
             QToolTip.hideText()
