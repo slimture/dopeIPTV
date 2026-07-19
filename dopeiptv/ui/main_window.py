@@ -1144,7 +1144,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.epg_scroll = QScrollArea()
         self.epg_scroll.setWidgetResizable(True)
         self.epg_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self.epg_holder = QWidget()
+        self.epg_holder = QWidget(objectName="EpgHolder")
         self.epg_lay = QVBoxLayout(self.epg_holder)
         self.epg_lay.setContentsMargins(0, 0, 0, 0)
         self.epg_lay.setSpacing(8)

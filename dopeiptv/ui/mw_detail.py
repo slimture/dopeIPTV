@@ -561,6 +561,12 @@ class _DetailMixin:
         while self.epg_lay.count() > 1:
             w = self.epg_lay.takeAt(0).widget()
             if w:
+                # Hide *now*, not just deleteLater: a taken-out widget stays a
+                # visible child at its old geometry until the deferred delete
+                # runs, and rebuilding the rows inside a context menu's nested
+                # event loop painted old and new rows on top of each other
+                # (double-exposed programme list).
+                w.hide()
                 w.deleteLater()
 
     def _epg_note(self, text: str) -> None:

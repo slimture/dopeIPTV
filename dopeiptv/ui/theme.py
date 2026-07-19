@@ -389,11 +389,16 @@ QFrame#NowCard {{
     border-radius: 12px;
 }}
 /* Upcoming programmes: slim rows (time | title) with a hover cue, instead of
-   heavy bordered cards. */
-QFrame#EpgRow {{ background: transparent; border: none; border-radius: 8px; }}
+   heavy bordered cards. Opaque backgrounds (row + holder), not transparent:
+   on macOS a transparent row repainted in place over a parent that isn't
+   repainted leaves the old glyphs underneath, double-exposing the list when
+   the rows are rebuilt (e.g. right-clicking another channel). */
+#EpgHolder {{ background: {p['pane']}; }}
+QFrame#EpgRow {{ background: {p['pane']}; border: none; border-radius: 8px; }}
 QFrame#EpgRow:hover {{ background: {p['hover']}; }}
-QLabel#EpgRowTime  {{ color: {ACCENT}; font-size: 12px; font-weight: 700; }}
-QLabel#EpgRowTitle {{ font-size: 13px; }}
+QLabel#EpgRowTime  {{ color: {ACCENT}; font-size: 12px; font-weight: 700;
+                      background: transparent; }}
+QLabel#EpgRowTitle {{ font-size: 13px; background: transparent; }}
 
 QPushButton {{
     background: {p['btn']}; border: 1px solid {p['btn_hover']}; border-radius: 9px;
