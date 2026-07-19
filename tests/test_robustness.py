@@ -237,7 +237,9 @@ for code in LANGUAGES:
     w.retranslate_ui()
     w.open_settings()
     app.processEvents()
-print("I18N_UI_OK")
+# flush: the child can abort in Qt's C++ teardown AFTER this line, and a
+# buffered (piped) stdout would lose the marker in that crash.
+print("I18N_UI_OK", flush=True)
 """
 
 
@@ -258,9 +260,16 @@ def test_ui_builds_in_all_languages():
     import subprocess
     import sys
     env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
-    proc = subprocess.run(
-        [sys.executable, "-c", _I18N_CHILD], capture_output=True, text=True,
-        env=env, cwd=_REPO_ROOT, timeout=180)
+    # One retry, same as test_epg_grid: the child can be killed by the
+    # nondeterministic Qt/GL teardown abort (-11 with EMPTY stderr) before its
+    # marker reaches the pipe. A genuine language regression fails both
+    # attempts identically, with a traceback in stderr.
+    for _attempt in (1, 2):
+        proc = subprocess.run(
+            [sys.executable, "-c", _I18N_CHILD], capture_output=True,
+            text=True, env=env, cwd=_REPO_ROOT, timeout=180)
+        if "I18N_UI_OK" in proc.stdout:
+            return
     assert "I18N_UI_OK" in proc.stdout, (
         f"language UI build failed\n"
         f"stdout={proc.stdout!r}\nstderr={proc.stderr[-2000:]!r}")

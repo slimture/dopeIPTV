@@ -16,7 +16,7 @@ from PyQt6.QtGui import (
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 from PyQt6.QtWidgets import (
     QApplication, QHBoxLayout, QLabel, QLineEdit, QMenu, QSizePolicy, QSlider,
-    QToolTip, QVBoxLayout, QWidget, QPushButton,
+    QVBoxLayout, QWidget, QPushButton,
 )
 
 from ..core.log import log
@@ -538,10 +538,44 @@ class _SeekSlider(QSlider):
         self._show_segment_tooltip(event)
         super().mouseMoveEvent(event)
 
+    def _hover_tip_label(self) -> QLabel:
+        """A private tooltip label parented to the top-level window - QToolTip
+        adds an OS-specific offset (large on macOS) that either buried the tip
+        far below the bar or parked it on the pointer; an own label gives
+        exact placement. Recreated if the slider was reparented (pop-out)."""
+        win = self.window()
+        lbl = getattr(self, "_hover_tip", None)
+        if lbl is None or lbl.parent() is not win:
+            if lbl is not None:
+                lbl.deleteLater()
+            lbl = QLabel(win)
+            lbl.setObjectName("SeekHoverTip")
+            lbl.setStyleSheet(
+                "#SeekHoverTip { background: rgba(24,24,30,235);"
+                " color: #ECECF1; border: 1px solid rgba(255,255,255,0.14);"
+                " border-radius: 6px; padding: 3px 8px; font-size: 11px; }")
+            lbl.hide()
+            self._hover_tip = lbl
+        return lbl
+
+    def _hide_hover_tip(self) -> None:
+        lbl = getattr(self, "_hover_tip", None)
+        if lbl is not None:
+            lbl.hide()
+
+    def leaveEvent(self, event) -> None:
+        self._hide_hover_tip()
+        super().leaveEvent(event)
+
+    def hideEvent(self, event) -> None:
+        self._hide_hover_tip()
+        super().hideEvent(event)
+
     def _show_segment_tooltip(self, event) -> None:
         """On the timeline, show the wall-clock time under the cursor (so you
         can see roughly where a click lands) and, when programme data is known,
-        name what was on at that point."""
+        name what was on at that point. Placed just BELOW the bar, centred on
+        the cursor - close enough to read as attached, out of the click path."""
         frac = max(0.0, min(1.0, event.position().x() / max(1, self.width())))
         parts: list[str] = []
         if self._time_for_frac is not None:
@@ -551,18 +585,21 @@ class _SeekSlider(QSlider):
         seg = self._segment_at(frac)
         if seg and seg[2]:
             parts.append(seg[2])
-        if parts:
-            # Anchor the tip just BELOW the bar at the cursor's x - above the
-            # bar it covered the pointer and got in the way of clicking, and
-            # the OS default placement sat too far down. showText adds ~16 px
-            # below the given point, so aim at the slider's bottom edge minus
-            # a little to land the tip a few px under the bar.
-            gp = event.globalPosition().toPoint()
-            bottom = self.mapToGlobal(self.rect().bottomLeft()).y()
-            QToolTip.showText(QPoint(gp.x() - 16, bottom - 10),
-                              " · ".join(parts), self)
-        else:
-            QToolTip.hideText()
+        if not parts:
+            self._hide_hover_tip()
+            return
+        lbl = self._hover_tip_label()
+        lbl.setText(" · ".join(parts))
+        lbl.adjustSize()
+        win = self.window()
+        base = self.mapTo(win, QPoint(int(event.position().x()),
+                                      self.height()))
+        x = max(4, min(base.x() - lbl.width() // 2,
+                       win.width() - lbl.width() - 4))
+        y = min(base.y() + 6, win.height() - lbl.height() - 4)
+        lbl.move(x, y)
+        lbl.show()
+        lbl.raise_()
 
     def mouseReleaseEvent(self, event) -> None:
         if self.dragging and event.button() == Qt.MouseButton.LeftButton:

@@ -183,8 +183,19 @@ class _SidebarMixin:
                 self._set_sidebar_collapsed(False)
 
     def _update_mid_compact(self, *_a) -> None:
-        if hasattr(self, "_mid"):
-            self._apply_mid_compact(self._mid.width() < 400)
+        if not hasattr(self, "_mid"):
+            return
+        # A hidden pane (Home showing) reports a stale width - deciding from
+        # it left the strip in the wrong form; _leave_home recomputes later.
+        if not self._mid.isVisible():
+            return
+        w = self._mid.width()
+        # Hysteresis: enter compact under 400, leave only above 430, so the
+        # strip doesn't flip between icons and captions right at the line.
+        if getattr(self, "_mid_compact", None) is True:
+            self._apply_mid_compact(w < 430)
+        else:
+            self._apply_mid_compact(w < 400)
 
     def _apply_mid_compact(self, compact: bool) -> None:
         """Responsive middle-pane control strip: when the list column is

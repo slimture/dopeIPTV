@@ -942,6 +942,10 @@ class _HomeMixin:
             self.nav_btns["home"].setChecked(False)
         if self.mode in self.nav_btns:
             self.nav_btns[self.mode].setChecked(True)
+        # The middle pane was hidden while Home showed, so its width was stale
+        # and the control strip could sit in the wrong compact/full form (icons
+        # despite a wide window). Recompute once the classic view has laid out.
+        QTimer.singleShot(0, self._update_mid_compact)
 
     def _home_showing(self) -> bool:
         page = getattr(self, "_home_page", None)
