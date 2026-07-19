@@ -1198,8 +1198,11 @@ class _MultiviewMixin:
         menu.addAction(tr("btn_play") if paused else tr("btn_pause"),
                        p.toggle_pause)
         menu.addAction(tr("btn_stop"), p.stop)
-        menu.addAction(tr("tooltip_fullscreen"),
-                       lambda: p.double_clicked.emit())
+        # In fullscreen the same toggle leaves it, so label it accordingly.
+        menu.addAction(
+            tr("tooltip_exit_fullscreen") if getattr(p, "_fs_ui", False)
+            else tr("tooltip_fullscreen"),
+            lambda: p.double_clicked.emit())
         menu.addSeparator()
         p.populate_options_menu(menu)
         menu.addSeparator()

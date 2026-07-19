@@ -470,6 +470,9 @@ class _SeekSlider(QSlider):
         self.dragging = False
         self._markers: list[float] = []   # programme boundaries as 0..1 fractions
         self._segments: list = []         # (start_frac, end_frac, title, time)
+        # Optional callable frac(0..1) -> label, so hovering the bar can show
+        # the wall-clock time at that point (used by the timeshift timeline).
+        self._time_for_frac = None
 
     def set_markers(self, fractions) -> None:
         """Programme-boundary ticks along the groove, as fractions 0..1 (left
@@ -485,6 +488,12 @@ class _SeekSlider(QSlider):
         (start_frac, end_frac, title, time_label) tuple along the groove."""
         self._segments = list(segments)
         self.set_markers(s[0] for s in self._segments)
+
+    def set_time_provider(self, fn) -> None:
+        """Install a callable frac(0..1) -> str|None that names the time at a
+        hover point, so hovering the bar tells you roughly where a click lands.
+        Passing None disables it (the plain VOD bar shows no time)."""
+        self._time_for_frac = fn
 
     def _segment_at(self, frac: float):
         for seg in self._segments:
@@ -530,15 +539,21 @@ class _SeekSlider(QSlider):
         super().mouseMoveEvent(event)
 
     def _show_segment_tooltip(self, event) -> None:
-        """On the timeline, name the programme under the cursor so hovering
-        back in time tells you what was on."""
-        if not self._segments:
-            return
-        frac = event.position().x() / max(1, self.width())
-        seg = self._segment_at(max(0.0, min(1.0, frac)))
+        """On the timeline, show the wall-clock time under the cursor (so you
+        can see roughly where a click lands) and, when programme data is known,
+        name what was on at that point."""
+        frac = max(0.0, min(1.0, event.position().x() / max(1, self.width())))
+        parts: list[str] = []
+        if self._time_for_frac is not None:
+            t = self._time_for_frac(frac)
+            if t:
+                parts.append(t)
+        seg = self._segment_at(frac)
         if seg and seg[2]:
-            text = f"{seg[3]} · {seg[2]}" if seg[3] else seg[2]
-            QToolTip.showText(event.globalPosition().toPoint(), text, self)
+            parts.append(seg[2])
+        if parts:
+            QToolTip.showText(event.globalPosition().toPoint(),
+                              " · ".join(parts), self)
         else:
             QToolTip.hideText()
 
@@ -1257,10 +1272,10 @@ class EmbeddedPlayer(QWidget):
         if event.button() == Qt.MouseButton.LeftButton:
             self._press_pos = event.position().toPoint()
         if not self._popout_mode or self._fs_ui:
-            # Docked: right-click opens a context menu (e.g. send to multiview);
-            # fullscreen keeps its own handling and no drag.
-            if (event.button() == Qt.MouseButton.RightButton
-                    and not self._fs_ui):
+            # Docked or fullscreen: right-click opens the full context menu
+            # (pause/stop, fullscreen toggle, audio/subtitle/aspect options,
+            # send to multiview). No drag in these modes.
+            if event.button() == Qt.MouseButton.RightButton:
                 self.docked_context_menu.emit(event.globalPosition().toPoint())
             return
         if event.button() == Qt.MouseButton.RightButton:
@@ -1489,11 +1504,25 @@ class EmbeddedPlayer(QWidget):
 
     TS_BAR_HIDE_MS = 3500
 
+    def _ts_hover_time_label(self, frac: float) -> str | None:
+        """Wall-clock time at fraction *frac* of the live timeline (0 = oldest
+        archived, 1 = live edge), so hovering the bar shows roughly where a
+        click would land. Returns None outside timeline mode."""
+        if self._seek_mode != "timeline" or self._ts_depth <= 0:
+            return None
+        offset_min = self._ts_depth * (1.0 - max(0.0, min(1.0, frac)))
+        clock = time.strftime("%H:%M", time.localtime(time.time()
+                                                      - offset_min * 60))
+        if offset_min < 0.5:
+            return f"{clock} · LIVE"
+        return f"{clock} · −{self._fmt_offset(offset_min)}"
+
     def enter_timeshift(self, depth_min: int) -> None:
         """Show the live timeline spanning the last *depth_min* minutes."""
         self._ts_depth = max(1, int(depth_min))
         self.ts_slider.setRange(0, self._ts_depth)
         self.ts_slider.setValue(self._ts_depth)
+        self.ts_slider.set_time_provider(self._ts_hover_time_label)
         self.ts_label.setText("● LIVE")
         self.ts_live_btn.hide()
         self._show_ts_timeline()

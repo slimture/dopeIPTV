@@ -110,10 +110,12 @@ class _Card(QFrame):
             f"background:{QColor(P['pane']).lighter(115).name()};"
             "border-radius:10px;")
         self.img.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # Opaque paint: the image label always fills its rect (placeholder bg or
-        # a cover pixmap), so tell Qt not to composite anything beneath it - one
-        # less layer to repaint per card while scrolling a shelf of them.
-        self.img.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
+        # NB: no WA_OpaquePaintEvent here. The label has rounded corners, so it
+        # does NOT fully fill its rect - the four corner triangles are
+        # transparent. Marking it opaque told Qt to skip painting the page
+        # background under those corners, leaving stale pixels there ("weird
+        # borders" around the posters), which a forced repaint made obvious.
+        # Scroll stays smooth via the opaque shelf row + viewport backgrounds.
         # Hover highlight built lazily (only when first hovered) so a shelf of
         # cards doesn't carry an extra QFrame each at rest.
         self._hover: QFrame | None = None
