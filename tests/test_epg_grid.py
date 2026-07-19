@@ -111,8 +111,17 @@ d._scroll_hours(24); d._scroll_hours(-24); d._scroll_tonight()
 d.deleteLater(); app.processEvents()
 
 # ---- 3. Rebuild when the EPG finishes loading after open ------------------
+# The window's own startup guide load runs async and, when it concludes as
+# FAILED (no network on CI), sets xmltv._failed - which _epg_ready() treats
+# as "concluded", so the dialog would skip the loading-band state we're
+# testing. Wait for that load to conclude, then pin both flags under stubs.
+deadline = time.time() + 20
+while time.time() < deadline and not (w.xmltv.is_loaded()
+                                      or getattr(w.xmltv, "_failed", False)):
+    app.processEvents(); time.sleep(0.02)
 state = {"loaded": False}
 w.xmltv.is_loaded = lambda: state["loaded"]
+w.xmltv._failed = False
 w.xmltv.programmes_in = lambda ch, a, b: ([] if not state["loaded"] else [
     {"title": "P", "description": "",
      "start_timestamp": now - 600, "stop_timestamp": now + 600}])

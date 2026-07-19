@@ -941,9 +941,18 @@ class EmbeddedPlayer(QWidget):
         self._click_timer.timeout.connect(self._video_single_click)
         self._ignore_next_release = False
 
-        self.fs_controls = QWidget(self)
+        self.fs_controls = QWidget(self, objectName="FsControls")
+        # Scope the pill background to the container: a selectorless rule
+        # cascades onto every child, pinning the buttons' background so their
+        # hover state never showed. The buttons keep the flat look but get a
+        # clear hover highlight.
         self.fs_controls.setStyleSheet(
-            "background: rgba(16,16,20,210); border-radius: 10px;")
+            "#FsControls { background: rgba(16,16,20,210);"
+            " border-radius: 10px; }"
+            "#FsControls QPushButton { background: transparent;"
+            " border: none; border-radius: 6px; }"
+            "#FsControls QPushButton:hover {"
+            " background: rgba(255,255,255,0.16); }")
         fc = QHBoxLayout(self.fs_controls)
         fc.setContentsMargins(8, 6, 8, 6)
         fc.setSpacing(8)

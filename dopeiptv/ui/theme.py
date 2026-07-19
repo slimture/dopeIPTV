@@ -415,6 +415,11 @@ QPushButton#PlayGhost:hover {{ background: rgba(255,255,255,0.10); border-radius
 QPushButton#MiniBtn {{
     padding: 0; font-size: 13px; border-radius: 6px; text-align: center;
 }}
+/* A clearly visible hover cue on the player control row - the generic
+   btn->btn_hover shift is too subtle on the dark bar to read as a highlight. */
+QPushButton#MiniBtn:hover {{
+    background: {p['sel']}; border-color: {ACCENT};
+}}
 
 QToolButton#SectionToggle {{
     background: transparent; border: none; border-radius: 6px;
