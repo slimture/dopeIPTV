@@ -2280,6 +2280,23 @@ _STRINGS: dict[str, dict[str, str]] = {
               "плейлист",
         "th": "ผู้ให้บริการไม่มีสตรีมนี้ (HTTP 404) — ลองรีเฟรชเพลย์ลิสต์",
     },
+    "diag_not_started": {
+        "en": "This stream hasn't started yet — it looks like an upcoming "
+              "event. Try again once it's live.",
+        "sv": "Den här strömmen har inte börjat än — det ser ut som en kommande "
+              "sändning. Försök igen när den är live.",
+        "es": "Esta transmisión aún no ha comenzado — parece un evento próximo. "
+              "Inténtalo de nuevo cuando esté en directo.",
+        "de": "Dieser Stream hat noch nicht begonnen — offenbar eine "
+              "bevorstehende Übertragung. Versuche es erneut, wenn er live ist.",
+        "fr": "Ce flux n'a pas encore commencé — c'est un événement à venir. "
+              "Réessayez une fois qu'il est en direct.",
+        "zh": "该直播尚未开始 — 看起来是即将播出的节目。开播后再试。",
+        "ru": "Этот поток ещё не начался — похоже, это предстоящая трансляция. "
+              "Попробуйте, когда он выйдет в эфир.",
+        "th": "สตรีมนี้ยังไม่เริ่ม — ดูเหมือนเป็นรายการที่กำลังจะมาถึง "
+              "ลองอีกครั้งเมื่อออกอากาศ",
+    },
     "diag_blocked": {
         "en": "The provider blocked this stream (HTTP {code}) — usually "
               "anti-VPN/re-streaming, a connection limit, or a region/device "

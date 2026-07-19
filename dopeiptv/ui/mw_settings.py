@@ -288,6 +288,11 @@ class _SettingsMixin:
             # The drawn control icons are baked with the old text colour;
             # redraw them for the new theme.
             self.player.refresh_icons()
+        # The Home page bakes the accent into its pills and card borders at
+        # build time, so rebuild it if it's on screen to pick up the new accent.
+        if (getattr(self, "_home_page", None) is not None
+                and self._home_showing()):
+            self._home_page.refresh()
 
     def _reset_all_settings(self, parent_dialog) -> None:
         """Wipe every stored preference (theme, layout, playlists, favorites,

@@ -77,6 +77,11 @@ def _probe_url(url: str) -> str:
         return tr("diag_forbidden", code=code)
     if code == 404:
         return tr("diag_not_found")
+    # 407 is what several panels return for a channel that exists but isn't
+    # broadcasting yet (an upcoming/scheduled live event) - phrase it as
+    # "not started" rather than the meaningless "HTTP 407".
+    if code == 407:
+        return tr("diag_not_started")
     # 458 (and friends) are non-standard codes Xtream panels return to say the
     # stream is *blocked* - anti-VPN/re-stream, a connection limit, a region or
     # device block, or a player User-Agent that isn't on their allow-list.

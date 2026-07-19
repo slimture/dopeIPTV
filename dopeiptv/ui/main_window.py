@@ -2004,7 +2004,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # reselect that category so the list doesn't jump to the top.
             keep = self._pending_cat_select
             self._pending_cat_select = _UNSET
-            row = 1 if self.cat_list.count() > 1 else 0
+            # Land on the first *real* category, skipping the synthetic ones
+            # ("All" is row 0, then Recently added / Continue watching): those
+            # aren't where a user expects to arrive after switching a mode, and
+            # landing on "Recently added" for TV looked like the app forgot the
+            # previous category.
+            row = 0
+            for i in range(self.cat_list.count()):
+                d = self.cat_list.item(i).data(Qt.ItemDataRole.UserRole)
+                if d is None or (isinstance(d, str) and d.startswith("__")):
+                    continue
+                row = i
+                break
             # A pending "jump to now playing" wants every item visible, so land
             # on the "All" row (0) rather than the first category - unless we
             # know the target's category (e.g. tuning from the EPG guide), in
@@ -2026,6 +2037,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                             Qt.ItemDataRole.UserRole) == keep:
                         row = i
                         break
+            # A series drill-in was requested while switching into Series mode
+            # (e.g. clicking a show on Home). Honour it now that the categories
+            # have loaded, instead of selecting a category - otherwise this
+            # late category load would overwrite the episode list and bounce
+            # the user back to "all series" (they'd have to click twice).
+            pend = getattr(self, "_pending_series_drill", None)
+            if pend is not None and request_mode == "series":
+                self._pending_series_drill = None
+                self._enter_series(pend)
+                return
             self.cat_list.setCurrentRow(row)
 
         def fail(msg):

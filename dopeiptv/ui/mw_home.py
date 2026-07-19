@@ -108,6 +108,17 @@ class _Card(QFrame):
             f"background:{QColor(P['pane']).lighter(115).name()};"
             "border-radius:10px;")
         self.img.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # Hover highlight: a transparent frame that draws the accent border on
+        # TOP of the artwork. A CSS border on the image label itself fought the
+        # rounded pixmap and clipped at the corners; a separate overlay draws
+        # the full rounded outline cleanly.
+        self._hover = QFrame(self.img)
+        self._hover.setGeometry(0, 0, w, h)
+        self._hover.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._hover.setStyleSheet(
+            f"background:transparent; border:2px solid {ACCENT};"
+            "border-radius:10px;")
+        self._hover.hide()
         # Placeholder: big dimmed initial, so an artless card still reads.
         self.img.setText((title or "?").strip()[:1].upper())
         f = QFont()
@@ -145,13 +156,12 @@ class _Card(QFrame):
         self.img.setPixmap(fn(pm, self._w, self._h))
 
     def enterEvent(self, e) -> None:
-        self.img.setStyleSheet(self.img.styleSheet()
-                               + f"border:2px solid {ACCENT};")
+        self._hover.raise_()
+        self._hover.show()
         super().enterEvent(e)
 
     def leaveEvent(self, e) -> None:
-        self.img.setStyleSheet(self.img.styleSheet().replace(
-            f"border:2px solid {ACCENT};", ""))
+        self._hover.hide()
         super().leaveEvent(e)
 
     def mousePressEvent(self, e) -> None:
@@ -256,8 +266,7 @@ class HomePage(QWidget):
     # buttons edge-to-edge, and each button gets a soft rounded highlight on
     # hover (no hard borders) - so the row reads as a single smooth segment.
     _SEG_QSS = (
-        "#HomeNavGroup { background: %(pane)s; border: 1px solid %(border)s;"
-        " border-radius: 21px; }"
+        "#HomeNavGroup { background: transparent; border: none; }"
         "#HomeNavBtn { background: transparent; color: %(text)s; border: none;"
         " border-radius: 15px; padding: 7px 18px; font-size: 13px;"
         " font-weight: 600; }"
@@ -268,10 +277,13 @@ class HomePage(QWidget):
         """Quick-nav segment (like the reference apps' top bar) + a close X.
         Text-only labels sitting inside one rounded pill, each with a rounded
         per-item hover highlight."""
+        ac = QColor(ACCENT)
         qss = self._SEG_QSS % {
             "pane": QColor(P["pane"]).lighter(112).name(), "text": P["text"],
             "border": QColor(P["pane"]).lighter(135).name(),
-            "hover": QColor(P["pane"]).lighter(132).name()}
+            # A translucent accent so the hovered item glows in the accent
+            # colour while the label stays readable on top.
+            "hover": f"rgba({ac.red()}, {ac.green()}, {ac.blue()}, 0.28)"}
         bar = QWidget()
         h = QHBoxLayout(bar)
         h.setContentsMargins(0, 4, 0, 4)
@@ -659,8 +671,14 @@ class HomePage(QWidget):
         w = self.window
         w._leave_home()
         if w.mode != "series":
+            # Switching modes reloads the Series categories asynchronously; when
+            # that lands it would reset the middle list to "all series" and undo
+            # an immediate _enter_series (the "first click just shows all shows"
+            # bug). Hand the drill to the category-load callback instead.
+            w._pending_series_drill = it
             w.switch_mode("series")
-        w._enter_series(it)
+        else:
+            w._enter_series(it)
 
     def _play_history(self, it: dict) -> None:
         """Replay a history row: land under the right category, then play from
