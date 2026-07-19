@@ -883,6 +883,33 @@ class EmbeddedPlayer(QWidget):
         self.overlay.setWordWrap(True)
         self.overlay.hide()
 
+        # A big white play/pause disc in the centre of the video. Shared by the
+        # docked, fullscreen and pop-out views (all one widget). It stays up
+        # while paused and appears briefly on mouse activity while playing; a
+        # click toggles pause. Clicking the video itself does the same (see
+        # _on_video_release), with a double-click still reserved for fullscreen.
+        self.center_btn = QPushButton(self)
+        self.center_btn.setObjectName("CenterPlay")
+        self.center_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.center_btn.setFixedSize(72, 72)
+        self.center_btn.setStyleSheet(
+            "#CenterPlay { background: rgba(16,16,20,140); border:none;"
+            " border-radius:36px; }"
+            "#CenterPlay:hover { background: rgba(16,16,20,200); }")
+        self.center_btn.clicked.connect(self.toggle_pause)
+        self.center_btn.hide()
+        self._center_hide_timer = QTimer(self)
+        self._center_hide_timer.setSingleShot(True)
+        self._center_hide_timer.setInterval(2000)
+        self._center_hide_timer.timeout.connect(self._maybe_hide_center)
+        # Single-click vs double-click: a click waits one double-click interval
+        # before toggling pause, so a double-click (fullscreen) can cancel it.
+        self._click_timer = QTimer(self)
+        self._click_timer.setSingleShot(True)
+        self._click_timer.setInterval(QApplication.doubleClickInterval())
+        self._click_timer.timeout.connect(self._video_single_click)
+        self._ignore_next_release = False
+
         self.fs_controls = QWidget(self)
         self.fs_controls.setStyleSheet(
             "background: rgba(16,16,20,210); border-radius: 10px;")
@@ -1160,7 +1187,52 @@ class EmbeddedPlayer(QWidget):
     # -- video mouse handlers (signals from _MpvGLWidget) ------------------
 
     def _on_video_dbl_click(self) -> None:
+        # A double-click toggles fullscreen - cancel the pending single-click
+        # pause it started, and swallow the trailing release so it doesn't
+        # schedule a fresh one.
+        self._click_timer.stop()
+        self._ignore_next_release = True
         self.double_clicked.emit()
+
+    def _video_single_click(self) -> None:
+        """A confirmed single click on the video (no double-click followed):
+        toggle pause, like the centre button."""
+        if self.current_url is None:
+            return
+        self.toggle_pause()
+        self._reveal_center()
+
+    # -- centre play/pause button ---------------------------------------------
+
+    def _position_center_btn(self) -> None:
+        b = self.center_btn
+        b.move((self.width() - b.width()) // 2,
+               (self.height() - b.height()) // 2)
+
+    def _update_center_icon(self) -> None:
+        glyph = "play" if getattr(self, "_paused", False) else "pause"
+        self.center_btn.setIcon(_control_icon(glyph, "#FFFFFF", 30))
+        self.center_btn.setIconSize(QSize(30, 30))
+
+    def _reveal_center(self) -> None:
+        """Show the centre button and, while playing, arm its fade. While
+        paused it stays up until the user resumes."""
+        if getattr(self, "current_url", None) is None:
+            self.center_btn.hide()
+            return
+        self._update_center_icon()
+        self._position_center_btn()
+        self.center_btn.show()
+        self.center_btn.raise_()
+        if getattr(self, "_paused", False):
+            self._center_hide_timer.stop()
+        else:
+            self._center_hide_timer.start()
+
+    def _maybe_hide_center(self) -> None:
+        # Keep it up while paused; otherwise let it fade.
+        if not getattr(self, "_paused", False):
+            self.center_btn.hide()
 
     def _on_playback_error(self, msg: str) -> None:
         # Suppress the aborted-playback / "loading failed" mpv fires while a
@@ -1171,6 +1243,10 @@ class EmbeddedPlayer(QWidget):
         self.playback_error.emit(msg)
 
     def _on_video_press(self, event) -> None:
+        # Remember where a left-press started so the release can tell a click
+        # (toggle pause) from a drag (move the pop-out window) - in every mode.
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._press_pos = event.position().toPoint()
         if not self._popout_mode or self._fs_ui:
             # Docked: right-click opens a context menu (e.g. send to multiview);
             # fullscreen keeps its own handling and no drag.
@@ -1205,12 +1281,34 @@ class EmbeddedPlayer(QWidget):
                 if handle is not None:
                     handle.startSystemMove()
             return
+        # In fullscreen / pop-out (where the control bar auto-hides) a hover
+        # flashes the centre play/pause button; docked keeps its always-visible
+        # bar, so it only shows the centre button while actually paused.
+        if self._fs_ui or self._popout_mode:
+            self._reveal_center()
         if not self._fs_ui and self._seekable:
             # Docked / pop-out, seekable content: reveal the floating scrubber.
             self._show_seek_overlay()
 
     def _on_video_release(self, event) -> None:
         self._popout_drag_from = None
+        if event.button() != Qt.MouseButton.LeftButton:
+            return
+        press = getattr(self, "_press_pos", None)
+        self._press_pos = None
+        # Swallow the release that trails a double-click (it already toggled
+        # fullscreen).
+        if self._ignore_next_release:
+            self._ignore_next_release = False
+            return
+        # A real click (pointer didn't travel) toggles pause - after a short
+        # wait so a double-click can cancel it (that's fullscreen). A press that
+        # moved the pointer (a pop-out drag, a scrub) is not a click.
+        moved = (press is None
+                 or (event.position().toPoint() - press).manhattanLength() > 6)
+        if moved:
+            return
+        self._click_timer.start()
 
     def _is_seekable(self) -> bool:
         if self._seek_mode in ("live", "timeline"):
@@ -1648,6 +1746,8 @@ class EmbeddedPlayer(QWidget):
         self._relayout_controls()
         if self._blackout.isVisible():
             self._blackout.setGeometry(self.video.rect())
+        if self.center_btn.isVisible():
+            self._position_center_btn()
         if self.overlay.isVisible() or self.fs_controls.isVisible():
             self._place_overlay()
         if self.seek_overlay.isVisible():
@@ -1951,6 +2051,8 @@ class EmbeddedPlayer(QWidget):
         icon = _control_icon(name, self._icon_color, self.ICON_PX)
         self.pause_btn.setIcon(icon)
         self.fs_pause_btn.setIcon(icon)
+        # The big centre button stays up while paused and fades once playing.
+        self._reveal_center()
         self.paused_changed.emit(paused)
 
     # -- options menu ----------------------------------------------------------
@@ -2456,6 +2558,8 @@ class EmbeddedPlayer(QWidget):
         self.stop_stream_record()
         self.current_url = None
         self.title_lbl.setText("")
+        self._center_hide_timer.stop()
+        self.center_btn.hide()
         self._pos_timer.stop()
         self._hide_seek_ui()
         self._stats_overlay.hide()
