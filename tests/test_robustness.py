@@ -217,36 +217,50 @@ def test_ts_probe_distinguishes_network_failure_from_dead_archive():
 
 # -- the whole UI builds in every language ------------------------------------
 
+_I18N_CHILD = r"""
+import os
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from PyQt6.QtCore import QSettings
+from PyQt6.QtWidgets import QApplication, QDialog
+
+from dopeiptv.i18n import LANGUAGES, set_language
+from dopeiptv.providers.client import DemoClient
+from dopeiptv.ui.main_window import MainWindow
+
+app = QApplication.instance() or QApplication([])
+settings = QSettings("dopeiptv-test", "robustness-i18n")
+settings.clear()
+w = MainWindow(DemoClient(), settings)
+QDialog.exec = lambda self: 0   # build fully, never block
+for code in LANGUAGES:
+    set_language(code)
+    w.retranslate_ui()
+    w.open_settings()
+    app.processEvents()
+print("I18N_UI_OK")
+"""
+
+
 def test_ui_builds_in_all_languages():
     """Construct the main window once, then cycle through every language:
     retranslate the chrome and build the full settings dialog (all tabs, all
-    strings). Catches the class of bug that only crashes in one language."""
+    strings). Catches the class of bug that only crashes in one language.
+
+    Runs in a subprocess (see test_multiview): the MainWindow owns an
+    offscreen QOpenGLWidget, and building one in the shared pytest process
+    can abort the whole run at Qt teardown (segfaulted CI on c0f430a). We
+    assert on the child's success marker and ignore its exit status."""
     try:
         import PyQt6  # noqa: F401
     except Exception:
         pytest.skip("PyQt6 not available")
     import os
-    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    from PyQt6.QtCore import QSettings
-    from PyQt6.QtWidgets import QApplication, QDialog
-
-    from dopeiptv.i18n import LANGUAGES, set_language
-    from dopeiptv.providers.client import DemoClient
-    from dopeiptv.ui.main_window import MainWindow
-
-    app = QApplication.instance() or QApplication([])
-    settings = QSettings("dopeiptv-test", "robustness-i18n")
-    settings.clear()
-    w = MainWindow(DemoClient(), settings)
-    orig = QDialog.exec
-    QDialog.exec = lambda self: 0   # build fully, never block
-    try:
-        for code in LANGUAGES:
-            set_language(code)
-            w.retranslate_ui()
-            w.open_settings()
-            app.processEvents()
-    finally:
-        QDialog.exec = orig
-        set_language("en")
-        w.retranslate_ui()
+    import subprocess
+    import sys
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
+    proc = subprocess.run(
+        [sys.executable, "-c", _I18N_CHILD], capture_output=True, text=True,
+        env=env, cwd=_REPO_ROOT, timeout=180)
+    assert "I18N_UI_OK" in proc.stdout, (
+        f"language UI build failed\n"
+        f"stdout={proc.stdout!r}\nstderr={proc.stderr[-2000:]!r}")
