@@ -33,8 +33,8 @@ POSTER_W, POSTER_H = 160, 240      # shelf posters
 CHAN_W, CHAN_H = 250, 130          # landscape live-channel tiles
 
 
-def _x_icon(size: int, color: str) -> QIcon:
-    """A drawn close X (the ✕ glyph renders as a tofu box on some fonts)."""
+def _chevron_icon(size: int, color: str) -> QIcon:
+    """A drawn back chevron ‹ (font glyphs render as tofu on some systems)."""
     scale = 3
     pm = QPixmap(size * scale, size * scale)
     pm.setDevicePixelRatio(float(scale))
@@ -44,10 +44,12 @@ def _x_icon(size: int, color: str) -> QIcon:
     pen = QPen(QColor(color))
     pen.setWidthF(max(1.6, size * 0.14))
     pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
     p.setPen(pen)
-    m = size * 0.3
-    p.drawLine(int(m), int(m), int(size - m), int(size - m))
-    p.drawLine(int(size - m), int(m), int(m), int(size - m))
+    p.drawLine(int(size * 0.60), int(size * 0.26),
+               int(size * 0.38), int(size * 0.50))
+    p.drawLine(int(size * 0.38), int(size * 0.50),
+               int(size * 0.60), int(size * 0.74))
     p.end()
     return QIcon(pm)
 
@@ -294,11 +296,28 @@ class HomePage(QWidget):
     # -- building --------------------------------------------------------------
 
     def _clear(self) -> None:
-        while self._v.count():
-            it = self._v.takeAt(0)
-            wdg = it.widget()
-            if wdg is not None:
-                wdg.deleteLater()
+        """Tear down the whole page, including widgets inside NESTED layouts.
+
+        The Movies/Series and Channels shelves live in sub-layouts
+        (_movies_box/_channels_box added via addLayout); the old flat loop
+        only handled direct widgets, so those shelves were never deleted -
+        they stayed alive as canvas children at their old geometry, painting
+        BEHIND every rebuilt page ("stuff behind Featured"), and piled up
+        with each refresh. Recurse into layouts, and hide each widget
+        immediately: a deleteLater'd widget remains visible until the
+        deferred delete runs, which double-exposed the old page under the
+        new one in the meantime."""
+        def purge(lay) -> None:
+            while lay.count():
+                it = lay.takeAt(0)
+                w = it.widget()
+                sub = it.layout()
+                if w is not None:
+                    w.hide()
+                    w.deleteLater()
+                elif sub is not None:
+                    purge(sub)
+        purge(self._v)
 
     # One connected, pill-shaped nav group: a rounded container holds the
     # buttons edge-to-edge, and each button gets a soft rounded highlight on
@@ -326,8 +345,26 @@ class HomePage(QWidget):
         h = QHBoxLayout(bar)
         h.setContentsMargins(0, 4, 0, 4)
         h.setSpacing(10)
-        h.addStretch(1)
         w = self.window
+
+        # Top-LEFT: a round chip with a back chevron that returns to the
+        # classic three-column view (replaces the old close X in the right
+        # corner - leaving Home is navigation, and navigation-back lives on
+        # the left).
+        back = QPushButton()
+        back.setIcon(_chevron_icon(16, P["text"]))
+        back.setFixedSize(36, 34)
+        back.setToolTip(tr("common_close"))
+        back.setCursor(Qt.CursorShape.PointingHandCursor)
+        back.setStyleSheet(
+            "QPushButton { background: %s; border:1px solid %s;"
+            " border-radius: 17px; }"
+            "QPushButton:hover { border-color: %s; }" % (
+                QColor(P["pane"]).lighter(112).name(),
+                QColor(P["pane"]).lighter(135).name(), P["accent"]))
+        back.clicked.connect(w._leave_home)
+        h.addWidget(back)
+        h.addStretch(1)
 
         group = QFrame(objectName="HomeNavGroup")
         group.setStyleSheet(qss)
@@ -351,19 +388,11 @@ class HomePage(QWidget):
         pill(tr("btn_settings"), w.open_settings)
         h.addWidget(group)
         h.addStretch(1)
-        close = QPushButton()
-        close.setIcon(_x_icon(16, P["text"]))
-        close.setFixedSize(36, 34)
-        close.setToolTip(tr("common_close"))
-        close.setCursor(Qt.CursorShape.PointingHandCursor)
-        close.setStyleSheet(
-            "QPushButton { background: %s; border:1px solid %s;"
-            " border-radius: 17px; }"
-            "QPushButton:hover { border-color: %s; }" % (
-                QColor(P["pane"]).lighter(112).name(),
-                QColor(P["pane"]).lighter(135).name(), P["accent"]))
-        close.clicked.connect(self.window._leave_home)
-        h.addWidget(close)
+        # Symmetry spacer where the close X used to sit, so the nav pill
+        # stays visually centred with the back chip on the left.
+        pad = QWidget()
+        pad.setFixedSize(36, 34)
+        h.addWidget(pad)
         return bar
 
     def refresh(self) -> None:
@@ -583,16 +612,13 @@ class HomePage(QWidget):
             if gen != self._gen:
                 return
             try:
-                if getattr(self, "_posters_from_disk", False):
-                    # We had painted disk placeholders. Rebuild the whole page
-                    # cleanly from the now-fresh memory cache instead of poking
-                    # the existing shelves - reset-and-refill left the series
-                    # shelf overlapping the hero. refresh() hits the just-set
-                    # memory cache, so it repaints without another fetch.
-                    self._posters_from_disk = False
-                    self.refresh()
-                else:
-                    self._fill_posters(vod, ser)
+                # ALWAYS rebuild the whole page from the just-set memory cache
+                # (refresh() hits it synchronously - no second fetch), never
+                # poke shelves into the already-painted page: the incremental
+                # path revealed the hidden hero, shifting every shelf below it
+                # mid-paint - the other half of "stuff behind Featured".
+                self._posters_from_disk = False
+                self.refresh()
             except RuntimeError:
                 pass
 

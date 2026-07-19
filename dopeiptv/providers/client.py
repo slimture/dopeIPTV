@@ -79,6 +79,12 @@ class XtreamClient:
                 text = text.replace(secret, "***")
         return text
 
+    # Actions whose replies are large (the full stream/series lists, often
+    # several MB from a slow provider): these get a long read timeout. Small
+    # calls (authenticate, categories, short_epg, ...) keep a short one so a
+    # struggling server can't pin "Connecting to ..." at startup for a minute.
+    _BIG_ACTIONS = ("get_live_streams", "get_vod_streams", "get_series")
+
     def _api(self, **params: Any) -> Any:
         # Single choke point for every Xtream call, so log here for
         # troubleshooting: which action, to which server, the HTTP status and
@@ -89,11 +95,9 @@ class XtreamClient:
         base.update(params)
         action = params.get("action") or "authenticate"
         t0 = time.monotonic()
+        read_to = 60 if action in self._BIG_ACTIONS else 20
         try:
-            # (connect, read): a full get_live_streams/get_vod_streams reply
-            # is often several MB from a slow provider - 20 s total read kept
-            # tripping "Read timed out" on lineups that arrive fine in 30-40 s.
-            r = self.session.get(url, params=base, timeout=(10, 60))
+            r = self.session.get(url, params=base, timeout=(10, read_to))
         except requests.RequestException as e:
             log.warning("xtream %s @ %s: request failed - %s: %s",
                         action, self.server, type(e).__name__,
