@@ -1,0 +1,40 @@
+name: Feature request
+description: Suggest an idea or improvement
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's the problem or itch?
+      description: Describe the situation where the app falls short — the "why" matters more than the "how".
+      placeholder: "When I watch sports on two channels at once, I …"
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would you like to happen?
+      description: Your ideal solution, as concretely as you can.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+      description: Workarounds you use today, or other ways this could be solved.
+  - type: dropdown
+    id: os
+    attributes:
+      label: Primarily relevant on
+      options:
+        - All platforms
+        - Linux
+        - macOS
+        - Windows
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this hasn't been suggested before.
+          required: true

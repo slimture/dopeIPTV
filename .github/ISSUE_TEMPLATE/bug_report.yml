@@ -1,0 +1,81 @@
+name: Bug report
+description: Something in dopeIPTV doesn't work as it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time! A minute of detail here usually saves days of back-and-forth.
+  - type: input
+    id: version
+    attributes:
+      label: dopeIPTV version
+      description: Shown in the app menu → About (e.g. 0.8.1).
+      placeholder: "0.8.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Linux
+        - macOS
+        - Windows
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install it?
+      options:
+        - AppImage
+        - .deb package
+        - .rpm package
+        - Flatpak
+        - macOS .dmg
+        - Windows portable .zip
+        - From source (git)
+        - pip / pipx
+    validations:
+      required: true
+  - type: dropdown
+    id: playlist
+    attributes:
+      label: Playlist type
+      options:
+        - Xtream Codes
+        - M3U / M3U8
+        - Both
+        - Not relevant
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+      placeholder: |
+        1. Open a live channel with catch-up
+        2. Drag the seek bar 2 hours back
+        3. Expected the archive to play — instead …
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs (optional but golden)
+      description: |
+        Run the app as `DOPEIPTV_LOG=debug DOPEIPTV_LOG_FILE=/tmp/dope.log dopeiptv`,
+        reproduce the bug, then paste the relevant part. Credentials are redacted
+        automatically, but skim before posting.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this isn't a duplicate.
+          required: true
+        - label: I'm on the latest release (or said which version above).
+          required: true
