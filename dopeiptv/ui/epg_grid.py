@@ -358,8 +358,14 @@ class EpgGridDialog(QDialog):
         return QIcon(pm)
 
     def _epg_ready(self) -> bool:
+        # "Ready" means the load has *concluded*, not necessarily succeeded: a
+        # failed load (or a provider with no XMLTV source at all) must also
+        # count, otherwise the poll never stops and every row stays stuck on
+        # "loading programme guide..." instead of flipping to "no guide
+        # available".
         try:
-            return bool(self.window.xmltv.is_loaded())
+            x = self.window.xmltv
+            return bool(x.is_loaded() or getattr(x, "_failed", False))
         except Exception:
             return True   # can't tell - treat as ready, don't poll forever
 
