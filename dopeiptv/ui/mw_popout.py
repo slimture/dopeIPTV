@@ -232,6 +232,17 @@ class _PopoutMixin:
         auto.setChecked(
             self.settings.value("popout_autohide", "true") == "true")
         auto.toggled.connect(self._set_popout_autohide)
+        # Full playback options (pause/stop + audio/subtitles/aspect/…), same
+        # as the docked right-click and the options button.
+        p = getattr(self, "player", None)
+        if p is not None and getattr(p, "current_url", None):
+            m.addSeparator()
+            paused = getattr(p, "_paused", False)
+            m.addAction(tr("btn_play") if paused else tr("btn_pause"),
+                        p.toggle_pause)
+            m.addAction(tr("btn_stop"), p.stop)
+            opts = m.addMenu(tr("tooltip_audio_subs_aspect"))
+            p.populate_options_menu(opts)
         m.addSeparator()
         m.addAction(tr("tooltip_popout_exit"), self._exit_popout)
         m.exec(global_pos)

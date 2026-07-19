@@ -1186,13 +1186,22 @@ class _MultiviewMixin:
         self._ensure_multiview_window()
 
     def _docked_context_menu(self, global_pos) -> None:
-        """Right-click on the docked video: send the current stream to
-        multiview. (add_to_multiview stops the docked player first, so the one
-        connection carries over into a cell instead of doubling up.)"""
+        """Right-click on the docked video: a complete menu - pause/stop,
+        fullscreen, the full audio/subtitle/aspect/... options (same as the
+        options button and the menu bar), and send-to-multiview."""
         p = getattr(self, "player", None)
         if p is None or not getattr(p, "current_url", None):
             return
         menu = QMenu(self)
+        paused = getattr(p, "_paused", False)
+        menu.addAction(tr("btn_play") if paused else tr("btn_pause"),
+                       p.toggle_pause)
+        menu.addAction(tr("btn_stop"), p.stop)
+        menu.addAction(tr("tooltip_fullscreen"),
+                       lambda: p.double_clicked.emit())
+        menu.addSeparator()
+        p.populate_options_menu(menu)
+        menu.addSeparator()
         menu.addAction(tr("mv_add"), self._send_docked_to_multiview)
         menu.exec(global_pos)
 

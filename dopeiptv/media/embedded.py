@@ -2058,8 +2058,15 @@ class EmbeddedPlayer(QWidget):
     # -- options menu ----------------------------------------------------------
 
     def _show_options_menu(self, anchor: QWidget) -> None:
-        m = self.video.mpv
         menu = QMenu(self)
+        self.populate_options_menu(menu)
+        menu.exec(anchor.mapToGlobal(anchor.rect().bottomLeft()))
+
+    def populate_options_menu(self, menu) -> None:
+        """Fill *menu* with the full playback options (audio/subtitle tracks,
+        delay, aspect, video filters, buffer, sleep timer, stats). Shared by the
+        options button and the video right-click menu."""
+        m = self.video.mpv
 
         def tracks(kind):
             try:
@@ -2170,8 +2177,6 @@ class EmbeddedPlayer(QWidget):
         menu.addSeparator()
         stats_act = menu.addAction(tr("opt_stats_for_nerds"))
         stats_act.triggered.connect(self._show_stats)
-
-        menu.exec(anchor.mapToGlobal(anchor.rect().bottomLeft()))
 
     def _start_sleep_timer(self, minutes: int) -> None:
         """Stop playback after *minutes* (0 cancels a running timer)."""

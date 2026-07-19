@@ -549,7 +549,9 @@ class HomePage(QWidget):
             vod.sort(key=lambda i: self._num(i.get("added")), reverse=True)
             ser.sort(key=lambda i: self._num(i.get("last_modified")),
                      reverse=True)
-            vod, ser = vod[:24], ser[:20]
+            # Cap the shelves modestly: a horizontal row of ~18 poster cards is
+            # plenty, and fewer widgets keeps the vertical page scroll smooth.
+            vod, ser = vod[:18], ser[:18]
             w._home_poster_cache = (time.time(), vod, ser)
             self._write_disk_posters(vod, ser)
             if gen != self._gen:
@@ -619,7 +621,7 @@ class HomePage(QWidget):
         def done(chan):
             chan = [i for i in chan if i.get("stream_id") is not None]
             chan.sort(key=lambda i: self._num(i.get("added")), reverse=True)
-            chan = chan[:24]
+            chan = chan[:18]
             w._home_chan_cache = (time.time(), chan)
             if gen == self._gen:
                 try:

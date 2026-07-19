@@ -1292,12 +1292,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                         and self._current_key == self._playing_key)
         if not playing_this:
             return "play"
-        it = self.list_model.item_at(self.listw.currentIndex().row())
+        # Base the pause/stop decision on what's PLAYING, not the row that
+        # happens to be selected - a timeshift channel (or a catch-up segment)
+        # can pause/seek, so its button must read "pause", not "stop". The
+        # selected row often isn't the playing one, which made it show stop.
+        lp = getattr(self, "_last_playback", None)
+        play_it = (lp or {}).get("item") or self.list_model.item_at(
+            self.listw.currentIndex().row())
         try:
-            timeshift = bool(it) and self._timeshift_days(it) > 0
+            timeshift = bool(play_it) and self._timeshift_days(play_it) > 0
         except Exception:
             timeshift = False
         pausable = (self._playing_group in ("vod", "episode", "rec")
+                    or getattr(self, "_playing_catchup", False)
                     or (self._playing_group == "live" and timeshift))
         if not pausable:
             return "stop"
@@ -1726,6 +1733,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # would look blank right after the first playlist is added.
             self._home_poster_cache = None
             self._home_chan_cache = None
+            self._recent_cache = {}
             if self._home_showing():
                 self._home_page.refresh()
             # Switching rebuilds the list but loads the guide from cache when
@@ -2236,13 +2244,21 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # Synthetic category: every title sorted by the provider's
             # publish/update time, newest first (capped so a huge library
             # doesn't lag the list).
-            self._show_busy(tr("status_loading_recent"))
             rmode = self.mode
             rgen = self._load_gen
             skey = "last_modified" if rmode == "series" else "added"
             rfetch = {"vod": self.client.vod_streams,
                       "series": self.client.series_list,
                       "live": self.client.live_streams}[rmode]
+            # Short cache: re-opening "Recently added" refetched the entire
+            # library every time (slow on a big provider). Serve a recent
+            # result straight away instead.
+            cache = getattr(self, "_recent_cache", {}).get(rmode)
+            if cache and time.time() - cache[0] < 300:
+                self.all_items = cache[1]
+                self._apply_filter()
+                return
+            self._show_busy(tr("status_loading_recent"))
 
             def recent_done(items):
                 if rgen != self._load_gen or self.mode != rmode:
@@ -2262,6 +2278,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                         return 0
                 self.all_items = sorted(
                     items, key=_added, reverse=True)[:200]
+                if not hasattr(self, "_recent_cache"):
+                    self._recent_cache = {}
+                self._recent_cache[rmode] = (time.time(), self.all_items)
                 self._apply_filter()
 
             def recent_fail(msg):
