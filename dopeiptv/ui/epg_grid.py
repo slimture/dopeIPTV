@@ -12,12 +12,12 @@ from __future__ import annotations
 import time
 from datetime import datetime
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QBrush, QColor, QFont, QPen
 from PyQt6.QtWidgets import (
-    QDialog, QGraphicsItemGroup, QGraphicsRectItem, QGraphicsScene,
-    QGraphicsSimpleTextItem, QGraphicsView, QHBoxLayout, QLabel, QLineEdit,
-    QMenu, QPushButton, QVBoxLayout,
+    QDialog, QGraphicsItemGroup, QGraphicsPixmapItem, QGraphicsRectItem,
+    QGraphicsScene, QGraphicsSimpleTextItem, QGraphicsView, QHBoxLayout,
+    QLabel, QLineEdit, QMenu, QPushButton, QVBoxLayout,
 )
 
 from ..i18n import tr
@@ -45,6 +45,25 @@ class _GridView(QGraphicsView):
     def mouseDoubleClickEvent(self, e) -> None:
         self._dlg._play_at(self.mapToScene(e.pos()))
         super().mouseDoubleClickEvent(e)
+
+    def keyPressEvent(self, e) -> None:
+        # TV-style cell navigation: arrows move the selection between
+        # programme blocks instead of just scrolling the view.
+        k = e.key()
+        if k == Qt.Key.Key_Left:
+            self._dlg._nav(-1, 0)
+        elif k == Qt.Key.Key_Right:
+            self._dlg._nav(1, 0)
+        elif k == Qt.Key.Key_Up:
+            self._dlg._nav(0, -1)
+        elif k == Qt.Key.Key_Down:
+            self._dlg._nav(0, 1)
+        elif k in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            self._dlg._play_selected()
+        else:
+            super().keyPressEvent(e)
+            return
+        e.accept()
 
 
 class EpgGridDialog(QDialog):
@@ -119,15 +138,38 @@ class EpgGridDialog(QDialog):
             % (ACCENT, P["text"]))
         self.view.horizontalScrollBar().valueChanged.connect(self._pin)
         self.view.verticalScrollBar().valueChanged.connect(self._pin)
+        self.view.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         outer.addWidget(self.view, 1)
+
+        # Programme description panel: fed from the XMLTV desc of whatever
+        # block is selected - the data was always there, just never shown.
+        self.desc = QLabel("")
+        self.desc.setWordWrap(True)
+        self.desc.setStyleSheet(f"color:{P['muted']}; font-size:12px;")
+        self.desc.setMaximumHeight(56)
+        self.desc.hide()
+        outer.addWidget(self.desc)
 
         bar = QHBoxLayout()
         self.search_btn = QPushButton("🔍 " + tr("epg_search_btn"))
         self.search_btn.clicked.connect(self._open_search)
         bar.addWidget(self.search_btn)
+        self.day_back_btn = QPushButton("◀")
+        self.day_back_btn.setToolTip(tr("epg_day_back"))
+        self.day_back_btn.setFixedWidth(34)
+        self.day_back_btn.clicked.connect(lambda: self._scroll_hours(-24))
+        bar.addWidget(self.day_back_btn)
         self.now_btn = QPushButton("⟳ " + tr("epg_jump_now"))
         self.now_btn.clicked.connect(self._scroll_to_now)
         bar.addWidget(self.now_btn)
+        self.tonight_btn = QPushButton(tr("epg_tonight"))
+        self.tonight_btn.clicked.connect(self._scroll_tonight)
+        bar.addWidget(self.tonight_btn)
+        self.day_fwd_btn = QPushButton("▶")
+        self.day_fwd_btn.setToolTip(tr("epg_day_fwd"))
+        self.day_fwd_btn.setFixedWidth(34)
+        self.day_fwd_btn.clicked.connect(lambda: self._scroll_hours(24))
+        bar.addWidget(self.day_fwd_btn)
         self.reminders_btn = QPushButton("🔔 " + tr("reminders_title"))
         self.reminders_btn.clicked.connect(self.window._open_reminders)
         bar.addWidget(self.reminders_btn)
@@ -149,6 +191,23 @@ class EpgGridDialog(QDialog):
         self.close_btn.clicked.connect(self.reject)
         bar.addWidget(self.close_btn)
         outer.addLayout(bar)
+
+        # Keyboard-navigation and live-refresh state. _rows mirrors what's on
+        # screen: one entry per visible channel row, each a list of
+        # {"item": block, "data": {...}} in air order (a no-EPG row has its
+        # single filler block). _build() fills them.
+        self._build_gen = 0
+        self._rows: list = []
+        self._focus: tuple[int, int] | None = None
+        self._progress: list = []
+        self._now_line = None
+        self._grid_h = 0
+        # Keep the board alive while open: the now-line and the progress
+        # fills tick along instead of freezing at open time.
+        self._refresh = QTimer(self)
+        self._refresh.setInterval(30_000)
+        self._refresh.timeout.connect(self._tick)
+        self._refresh.start()
 
         self._build()
 
@@ -181,6 +240,9 @@ class EpgGridDialog(QDialog):
         super().showEvent(event)
         # Centre in the screen once, after the window has its final size and a
         # real screen - doing it in __init__ (pre-show) doesn't stick on macOS.
+        # Keyboard navigation should work immediately - focus the grid, not
+        # the filter field (typing still lands in the filter on click).
+        self.view.setFocus()
         if getattr(self, "_centred", False):
             return
         self._centred = True
@@ -216,6 +278,20 @@ class EpgGridDialog(QDialog):
         if k in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and self._selected:
             self._play_selected()
             return
+        # Arrows navigate cells even when focus sits on a button rather than
+        # the grid view (which handles them itself).
+        if k == Qt.Key.Key_Left:
+            self._nav(-1, 0)
+            return
+        if k == Qt.Key.Key_Right:
+            self._nav(1, 0)
+            return
+        if k == Qt.Key.Key_Up:
+            self._nav(0, -1)
+            return
+        if k == Qt.Key.Key_Down:
+            self._nav(0, 1)
+            return
         super().keyPressEvent(event)
 
     # -- geometry ------------------------------------------------------------
@@ -233,6 +309,20 @@ class EpgGridDialog(QDialog):
         self.view.horizontalScrollBar().setValue(
             max(0, int(now_x - self.CH_COL_W - 40)))
 
+    def _scroll_hours(self, hours: int) -> None:
+        """Jump the timeline by whole days/hours without dragging."""
+        bar = self.view.horizontalScrollBar()
+        bar.setValue(bar.value() + int(hours * 60 * self.PX_PER_MIN))
+
+    def _scroll_tonight(self) -> None:
+        """Jump to prime time (20:00) today - the slot people actually plan
+        their evening around."""
+        tonight = datetime.now().replace(hour=20, minute=0, second=0,
+                                         microsecond=0).timestamp()
+        x = self._x(max(self._start, min(tonight, self._stop)))
+        self.view.horizontalScrollBar().setValue(
+            max(0, int(x - self.CH_COL_W - 40)))
+
     def _scroll_to_playing(self) -> None:
         """Scroll vertically back to the row of the channel you're watching."""
         row = getattr(self, "_playing_row", None)
@@ -249,7 +339,13 @@ class EpgGridDialog(QDialog):
         self._selected = None
         self._sel_outline = None   # dropped by scene.clear(); recreated on pick
         self._playing_row = None
+        self._build_gen += 1       # invalidates in-flight logo callbacks
+        self._rows = []
+        self._focus = None
+        self._progress = []
+        self._now_line = None
         self.play_btn.setEnabled(False)
+        self.desc.hide()
         text = self.filter.text().lower().strip()
         chans = [c for c in self.channels
                  if not text or text in (c.get("name") or "").lower()]
@@ -265,11 +361,13 @@ class EpgGridDialog(QDialog):
         self.scene.addItem(self._header_group)
         self.scene.addItem(self._chan_group)
 
+        self._grid_h = grid_h
         self._draw_grid_lines(grid_h)
         self._draw_time_header()
         for row, ch in enumerate(chans):
             self._draw_channel_row(row, ch)
         self._draw_now_line(grid_h)
+        self._update_progress()
 
         head_bg = QColor(P["pane"])
         self._corner = self.scene.addRect(
@@ -344,6 +442,29 @@ class EpgGridDialog(QDialog):
         # so it simply couldn't be played from the guide.
         cell.setData(0, {"channel": ch, "prog": None})
         self._chan_group.addToGroup(cell)
+        # Channel logo (async, like the main list): reserve a fixed slot so
+        # names align whether the logo has arrived or not. The callback is
+        # generation-guarded - a rebuild (filter typing) clears the scene and
+        # a late pixmap must not be added to the dead one.
+        logo_url = ch.get("stream_icon")
+        text_x = 44 if logo_url else 8
+        if logo_url and getattr(self.window, "logos", None) is not None:
+            gen = self._build_gen
+
+            def _logo_cb(pm, y=y, gen=gen):
+                if gen != self._build_gen or pm is None or pm.isNull():
+                    return
+                scaled = pm.scaled(
+                    32, self.ROW_H - 16,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation)
+                it_pm = QGraphicsPixmapItem(scaled)
+                it_pm.setPos(8 + (32 - scaled.width()) / 2,
+                             y + (self.ROW_H - scaled.height()) / 2)
+                it_pm.setData(0, {"channel": ch, "prog": None})
+                self._chan_group.addToGroup(it_pm)
+
+            self.window.logos.get(logo_url, _logo_cb)
         # ⏪ marks a channel with catch-up (timeshift), matching the main list.
         label_text = (("▶  " if playing else "")
                       + ("⏪ " if has_ts else "")
@@ -354,8 +475,8 @@ class EpgGridDialog(QDialog):
         f.setPointSize(10)
         name.setFont(f)
         name.setBrush(QColor("#ffffff"))
-        self._elide(name, self.CH_COL_W - 16)
-        name.setPos(8, y + (self.ROW_H - name.boundingRect().height()) / 2)
+        self._elide(name, self.CH_COL_W - text_x - 8)
+        name.setPos(text_x, y + (self.ROW_H - name.boundingRect().height()) / 2)
         name.setData(0, {"channel": ch, "prog": None})
         self._chan_group.addToGroup(name)
         if playing:
@@ -372,7 +493,9 @@ class EpgGridDialog(QDialog):
             band.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
             self.scene.addItem(band)
 
+        row_blocks: list = []
         drew_any = False
+        now = time.time()
         for i, p in enumerate(
                 self.window.xmltv.programmes_in(ch, self._start, self._stop)):
             x1 = max(self.CH_COL_W, self._x(p["start_timestamp"]))
@@ -385,13 +508,27 @@ class EpgGridDialog(QDialog):
             block.setBrush(QBrush(shade))
             block.setPen(QPen(QColor(P["bg"]), 1))
             block.setZValue(5)
-            block.setData(0, {"channel": ch, "prog": p})
+            data = {"channel": ch, "prog": p}
+            block.setData(0, data)
             self.scene.addItem(block)
-            label = QGraphicsSimpleTextItem(p.get("title") or "?", block)
+            # State glyphs on the block itself: a scheduled/running recording
+            # and a set reminder used to be visible only in the context menu.
+            prefix = ""
+            if self._has_rec_job(ch, p):
+                prefix += "⏺ "
+            if (p["start_timestamp"] > now
+                    and ch.get("stream_id") is not None
+                    and getattr(self.window, "reminders", None) is not None
+                    and self.window.reminders.has(ch.get("stream_id"),
+                                                  p["start_timestamp"])):
+                prefix += "🔔 "
+            label = QGraphicsSimpleTextItem(prefix + (p.get("title") or "?"),
+                                            block)
             label.setBrush(QColor("#ffffff"))
             self._elide(label, x2 - x1 - 10)
             label.setPos(x1 + 5, y + 7)
-            label.setData(0, {"channel": ch, "prog": p})
+            label.setData(0, data)
+            row_blocks.append({"item": block, "data": data})
         if not drew_any:
             # No EPG for this channel: fill the row with one muted block so
             # the whole timeline is still clickable and plays the channel
@@ -401,20 +538,84 @@ class EpgGridDialog(QDialog):
             block.setBrush(QBrush(base.lighter(105)))
             block.setPen(QPen(QColor(P["bg"]), 1))
             block.setZValue(5)
-            block.setData(0, {"channel": ch, "prog": None})
+            data = {"channel": ch, "prog": None}
+            block.setData(0, data)
             self.scene.addItem(block)
             label = QGraphicsSimpleTextItem(
                 tr("epg_no_guide_available"), block)
             label.setBrush(QColor("#9aa3b2"))
             self._elide(label, self._grid_w - 12)
             label.setPos(self.CH_COL_W + 6, y + 7)
-            label.setData(0, {"channel": ch, "prog": None})
+            label.setData(0, data)
+            row_blocks.append({"item": block, "data": data})
+        self._rows.append((ch, row_blocks))
+
+    def _has_rec_job(self, ch: dict, p: dict) -> bool:
+        """A scheduled/running recording overlapping this programme on this
+        channel (matched on the stream id embedded in the job's URL)."""
+        rec = getattr(self.window, "rec", None)
+        sid = ch.get("stream_id")
+        if rec is None or sid is None:
+            return False
+        tag = f"/{sid}."
+        for j in getattr(rec, "jobs", []):
+            if j.get("status") not in ("scheduled", "recording"):
+                continue
+            if tag not in (j.get("url") or ""):
+                continue
+            stop = j.get("stop") or float("inf")
+            if j.get("start", 0) < p["stop_timestamp"] \
+                    and stop > p["start_timestamp"]:
+                return True
+        return False
 
     def _draw_now_line(self, grid_h: int) -> None:
         x = self._x(time.time())
         line = self.scene.addLine(x, 0, x, self.HEADER_H + grid_h,
                                   QPen(QColor("#e5354b"), 2))
         line.setZValue(19)
+        self._now_line = line
+
+    def _update_progress(self) -> None:
+        """(Re)draw the elapsed-fraction fill along the bottom of every block
+        whose programme is on air right now. Called at build and from the
+        30 s tick, so the fills creep along while the guide is open."""
+        for it in self._progress:
+            if it.scene() is not None:
+                self.scene.removeItem(it)
+        self._progress = []
+        now = time.time()
+        fill = QColor(ACCENT)
+        fill.setAlpha(210)
+        for row, (_ch, blocks) in enumerate(self._rows):
+            y = self.HEADER_H + row * self.ROW_H
+            for b in blocks:
+                p = b["data"]["prog"]
+                if not p or not (p["start_timestamp"] <= now
+                                 < p["stop_timestamp"]):
+                    continue
+                r = b["item"].rect()
+                frac = ((now - p["start_timestamp"])
+                        / max(1, p["stop_timestamp"] - p["start_timestamp"]))
+                bar = QGraphicsRectItem(r.x(), y + self.ROW_H - 7,
+                                        max(2.0, r.width() * frac), 3)
+                bar.setBrush(QBrush(fill))
+                bar.setPen(QPen(Qt.PenStyle.NoPen))
+                bar.setZValue(7)
+                bar.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+                self.scene.addItem(bar)
+                self._progress.append(bar)
+
+    def _tick(self) -> None:
+        """30 s live refresh: the now-line and the progress fills move; the
+        block layout itself stays put (a full rebuild would drop selection
+        and is not worth it for a line that moves 3 px)."""
+        if self._now_line is None or self._now_line.scene() is None:
+            return
+        x = self._x(time.time())
+        if x <= self.CH_COL_W + self._grid_w:
+            self._now_line.setLine(x, 0, x, self.HEADER_H + self._grid_h)
+        self._update_progress()
 
     @staticmethod
     def _elide(item: QGraphicsSimpleTextItem, max_w: float) -> None:
@@ -436,62 +637,152 @@ class EpgGridDialog(QDialog):
 
     # -- interaction ---------------------------------------------------------
 
-    def _block_at(self, scene_pos):
+    def _hit(self, scene_pos):
+        """(item, data) for whatever carries a data(0) payload at the given
+        scene position - programme blocks, filler rows, channel cells."""
         for it in self.scene.items(scene_pos):
             data = it.data(0)
             if isinstance(data, dict) and "channel" in data:
-                return data
-        return None
+                return it, data
+        return None, None
 
-    def _highlight_block(self, scene_pos) -> None:
-        """Outline the picked programme block so it's clear which one is
-        selected (and which one 'Play this programme' will act on)."""
-        block = None
-        for it in self.scene.items(scene_pos):
-            d = it.data(0)
-            if (isinstance(d, dict) and "channel" in d
-                    and isinstance(it, QGraphicsRectItem)):
-                block = it
-                break
-        if block is None:
-            return
+    def _block_at(self, scene_pos):
+        return self._hit(scene_pos)[1]
+
+    def _highlight_item(self, item) -> None:
         # sceneBoundingRect, not rect(): the channel-name cells live in the
         # pinned (translated) column group, so their item coords are shifted
         # from scene coords once the view scrolls sideways.
         if getattr(self, "_sel_outline", None) is None \
                 or self._sel_outline.scene() is None:
             self._sel_outline = self.scene.addRect(
-                block.sceneBoundingRect(), QPen(QColor("#ffffff"), 2),
+                item.sceneBoundingRect(), QPen(QColor("#ffffff"), 2),
                 QBrush(Qt.BrushStyle.NoBrush))
             self._sel_outline.setZValue(17)
             self._sel_outline.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
         else:
-            self._sel_outline.setRect(block.sceneBoundingRect())
+            self._sel_outline.setRect(item.sceneBoundingRect())
         self._sel_outline.show()
 
-    def _select_at(self, scene_pos) -> None:
-        data = self._block_at(scene_pos)
-        if not data:
-            return
+    def _apply_selection(self, item, data) -> None:
+        """One selection path for mouse and keyboard: outline the block,
+        remember it, and fill the info line + description panel."""
         self._selected = data
-        self._highlight_block(scene_pos)
+        self._highlight_item(item)
+        self.play_btn.setEnabled(True)
         p = data["prog"]
         if p is None:
-            # A channel without EPG (its name cell / empty row was clicked):
-            # selectable and playable, it just has no programme to describe.
+            # A channel without EPG: selectable and playable, it just has
+            # no programme to describe.
             self.info.setText(f"{data['channel'].get('name') or '?'} · "
                               + tr("epg_no_guide_available"))
-            self.play_btn.setEnabled(True)
+            self.desc.hide()
             return
-        start = datetime.fromtimestamp(p["start_timestamp"]).strftime("%H:%M")
+        day = datetime.fromtimestamp(p["start_timestamp"])
+        # Date prefix only when the programme isn't today's - keeps the
+        # common case short.
+        date_tag = ("" if day.date() == datetime.now().date()
+                    else day.strftime("%a %d %b") + " · ")
+        start = day.strftime("%H:%M")
         stop = datetime.fromtimestamp(p["stop_timestamp"]).strftime("%H:%M")
+        mins = int((p["stop_timestamp"] - p["start_timestamp"]) // 60)
         catchup = (p["stop_timestamp"] < time.time()
                    and self.window._timeshift_days(data["channel"]))
         tag = "  ⟲" if catchup else ""
         self.info.setText(
-            f"{data['channel'].get('name') or '?'} · "
-            f"{start}–{stop}  {p.get('title') or ''}{tag}")
-        self.play_btn.setEnabled(True)
+            f"{data['channel'].get('name') or '?'} · {date_tag}"
+            f"{start}–{stop} ({mins} min)  {p.get('title') or ''}{tag}")
+        d = (p.get("description") or "").strip()
+        if d:
+            self.desc.setText(d)
+            self.desc.show()
+        else:
+            self.desc.hide()
+
+    def _select_at(self, scene_pos) -> None:
+        item, data = self._hit(scene_pos)
+        if not data:
+            return
+        self._apply_selection(item, data)
+        # Track (row, col) so arrow keys continue from the clicked block.
+        row = int((scene_pos.y() - self.HEADER_H) // self.ROW_H)
+        if 0 <= row < len(self._rows):
+            blocks = self._rows[row][1]
+            col = next((i for i, b in enumerate(blocks)
+                        if b["data"] is data), None)
+            if col is None:   # channel cell / logo clicked: land on "now"
+                col = self._col_for_time(blocks, time.time())
+            self._focus = (row, col) if blocks else None
+
+    # -- keyboard navigation --------------------------------------------------
+
+    @staticmethod
+    def _col_for_time(blocks, ts: float) -> int:
+        """The block index airing at *ts*, else the nearest one - how a TV
+        guide picks the cell when you move vertically between rows."""
+        best, best_d = 0, float("inf")
+        for i, b in enumerate(blocks):
+            p = b["data"]["prog"]
+            if p is None:
+                return i
+            if p["start_timestamp"] <= ts < p["stop_timestamp"]:
+                return i
+            mid = (p["start_timestamp"] + p["stop_timestamp"]) / 2
+            if abs(mid - ts) < best_d:
+                best, best_d = i, abs(mid - ts)
+        return best
+
+    def _nav(self, dc: int, dr: int) -> None:
+        """Move the selection one cell: dc=±1 along the row (prev/next
+        programme), dr=±1 across rows (keeping the same time of day)."""
+        if not self._rows:
+            return
+        if self._focus is None:
+            row = self._playing_row if self._playing_row is not None else 0
+            blocks = self._rows[row][1]
+            if not blocks:
+                return
+            self._select_block(row, self._col_for_time(blocks, time.time()))
+            return
+        row, col = self._focus
+        row = max(0, min(len(self._rows) - 1, row))
+        if dr:
+            cur = self._rows[row][1][col]["data"]["prog"] \
+                if col < len(self._rows[row][1]) else None
+            ref = ((cur["start_timestamp"] + cur["stop_timestamp"]) / 2
+                   if cur else time.time())
+            row = max(0, min(len(self._rows) - 1, row + dr))
+            blocks = self._rows[row][1]
+            if not blocks:
+                return
+            col = self._col_for_time(blocks, ref)
+        else:
+            blocks = self._rows[row][1]
+            if not blocks:
+                return
+            col = max(0, min(len(blocks) - 1, col + dc))
+        self._select_block(row, col)
+
+    def _select_block(self, row: int, col: int) -> None:
+        b = self._rows[row][1][col]
+        self._focus = (row, col)
+        self._apply_selection(b["item"], b["data"])
+        self._ensure_block_visible(b["item"])
+
+    def _ensure_block_visible(self, item) -> None:
+        """Scroll the block into view, then push past the pinned header /
+        channel column, which ensureVisible knows nothing about."""
+        r = item.sceneBoundingRect()
+        self.view.ensureVisible(r, 30, 20)
+        tl = self.view.mapToScene(0, 0)
+        hbar = self.view.horizontalScrollBar()
+        vbar = self.view.verticalScrollBar()
+        overlap_x = (tl.x() + self.CH_COL_W) - r.left()
+        if overlap_x > 0 and r.left() > self.CH_COL_W - 1:
+            hbar.setValue(int(hbar.value() - overlap_x - 10))
+        overlap_y = (tl.y() + self.HEADER_H) - r.top()
+        if overlap_y > 0:
+            vbar.setValue(int(vbar.value() - overlap_y - 6))
 
     def _play_at(self, scene_pos) -> None:
         data = self._block_at(scene_pos)

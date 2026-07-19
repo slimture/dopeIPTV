@@ -840,6 +840,21 @@ _STRINGS: dict[str, dict[str, str]] = {
         "en": "Now", "sv": "Nu", "es": "Ahora", "de": "Jetzt",
         "fr": "En cours", "zh": "正在播放", "ru": "Сейчас", "th": "ตอนนี้",
     },
+    "epg_day_back": {
+        "en": "1 day back", "sv": "1 dag bakåt", "es": "1 día atrás",
+        "de": "1 Tag zurück", "fr": "1 jour en arrière", "zh": "后退 1 天",
+        "ru": "На день назад", "th": "ย้อนกลับ 1 วัน",
+    },
+    "epg_day_fwd": {
+        "en": "1 day forward", "sv": "1 dag framåt", "es": "1 día adelante",
+        "de": "1 Tag vor", "fr": "1 jour en avant", "zh": "前进 1 天",
+        "ru": "На день вперёд", "th": "ไปข้างหน้า 1 วัน",
+    },
+    "epg_tonight": {
+        "en": "Tonight", "sv": "Ikväll", "es": "Esta noche",
+        "de": "Heute Abend", "fr": "Ce soir", "zh": "今晚",
+        "ru": "Сегодня вечером", "th": "คืนนี้",
+    },
     "epg_record_hint": {
         "en": "Right-click an upcoming or currently-airing programme to "
               "record it (multi-select works too).",

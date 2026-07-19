@@ -60,3 +60,80 @@ def test_no_epg_channel_is_clickable_and_playable():
     d.deleteLater()
     w.deleteLater()
     app.processEvents()
+
+
+def test_grid_navigation_selection_and_progress():
+    """The interactive layer: arrow-key cell navigation lands on the on-air
+    block first, moves along rows and across rows keeping the time slot,
+    the description panel fills from the XMLTV desc, the on-air programme
+    gets a progress fill, and the day-jump helpers don't blow up."""
+    app = _app()
+    import time as _time
+
+    from PyQt6.QtCore import QSettings
+
+    from dopeiptv.providers.client import DemoClient
+    from dopeiptv.ui.epg_grid import EpgGridDialog
+    from dopeiptv.ui.main_window import MainWindow
+
+    settings = QSettings("dopeiptv-test", "epg-grid-nav")
+    settings.clear()
+    w = MainWindow(DemoClient(), settings)
+    now = _time.time()
+
+    def fake_programmes(ch, a, b, _now=now):
+        if ch.get("stream_id") != 1:
+            return []
+        return [
+            {"title": "Earlier", "description": "",
+             "start_timestamp": _now - 5400, "stop_timestamp": _now - 1800},
+            {"title": "On Air", "description": "A described programme.",
+             "start_timestamp": _now - 1800, "stop_timestamp": _now + 1800},
+            {"title": "Later", "description": "",
+             "start_timestamp": _now + 1800, "stop_timestamp": _now + 5400},
+        ]
+
+    w.xmltv.programmes_in = fake_programmes
+    chans = [
+        {"name": "One", "stream_id": 1, "num": 1, "epg_channel_id": "one.se"},
+        {"name": "Two", "stream_id": 2, "num": 2},   # no EPG -> filler block
+    ]
+    d = EpgGridDialog(w, chans)
+    d.resize(1200, 600)
+    d.show()
+    app.processEvents()
+
+    assert len(d._rows) == 2
+    assert len(d._rows[0][1]) == 3        # three programme blocks
+    assert len(d._rows[1][1]) == 1        # the no-EPG filler
+
+    # First arrow press selects the on-air block.
+    d._nav(1, 0)
+    assert d._selected["prog"]["title"] == "On Air"
+    assert d.desc.isVisible() and "described" in d.desc.text()
+
+    # Right moves to the next programme; its empty desc hides the panel.
+    d._nav(1, 0)
+    assert d._selected["prog"]["title"] == "Later"
+    assert not d.desc.isVisible()
+
+    # Down lands on the no-EPG row's filler; up returns to a programme.
+    d._nav(0, 1)
+    assert d._selected["channel"]["name"] == "Two"
+    assert d._selected["prog"] is None
+    d._nav(0, -1)
+    assert d._selected["channel"]["name"] == "One"
+
+    # The on-air programme carries exactly one progress fill.
+    assert len(d._progress) == 1
+    d._tick()                              # live refresh must not raise
+    assert len(d._progress) == 1
+
+    # Day jumps and prime-time jump are safe no-crash scrolls.
+    d._scroll_hours(24)
+    d._scroll_hours(-24)
+    d._scroll_tonight()
+
+    d.deleteLater()
+    w.deleteLater()
+    app.processEvents()
