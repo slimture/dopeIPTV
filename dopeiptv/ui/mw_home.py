@@ -466,18 +466,20 @@ class HomePage(QWidget):
     def _load_media(self) -> None:
         w, gen = self.window, self._gen
         cache = getattr(w, "_home_media_cache", None)
-        if cache and time.time() - cache[0] < self.MEDIA_CACHE_SECS:
-            self._fill_media(cache[1], cache[2])
+        if (cache and len(cache) == 4
+                and time.time() - cache[0] < self.MEDIA_CACHE_SECS):
+            self._fill_media(cache[1], cache[2], cache[3])
             return
         client = w.client
 
         def work():
             vod = list(client.vod_streams(None) or [])
             ser = list(client.series_list(None) or [])
-            return vod, ser
+            chan = list(client.live_streams(None) or [])
+            return vod, ser, chan
 
         def done(res):
-            vod, ser = res
+            vod, ser, chan = res
             # Keep each shelf to its own content type. Some providers dump live
             # channels into the VOD "all" list (or otherwise mix types), which
             # is how a TV channel ended up under "Recently added movies" - so
@@ -486,20 +488,22 @@ class HomePage(QWidget):
             # takes only rows that actually carry a series_id.
             vod = [i for i in vod if self._is_movie(i)]
             ser = [i for i in ser if i.get("series_id") is not None]
+            chan = [i for i in chan if i.get("stream_id") is not None]
             vod.sort(key=lambda i: self._num(i.get("added")), reverse=True)
             ser.sort(key=lambda i: self._num(i.get("last_modified")),
                      reverse=True)
-            vod, ser = vod[:24], ser[:20]
-            w._home_media_cache = (time.time(), vod, ser)
+            chan.sort(key=lambda i: self._num(i.get("added")), reverse=True)
+            vod, ser, chan = vod[:24], ser[:20], chan[:24]
+            w._home_media_cache = (time.time(), vod, ser, chan)
             if gen == self._gen:
                 try:
-                    self._fill_media(vod, ser)
+                    self._fill_media(vod, ser, chan)
                 except RuntimeError:
                     pass
 
         run_async(w.pool, work, done, lambda _e: None)
 
-    def _fill_media(self, vod: list, ser: list) -> None:
+    def _fill_media(self, vod: list, ser: list, chan: list) -> None:
         w = self.window
         s = w.settings
 
@@ -534,6 +538,16 @@ class HomePage(QWidget):
                               w.poster_art)
                 shelf.add(card)
             shelf.finish(POSTER_H)
+            self._movies_box.addWidget(shelf)
+        if s.value("home_sh_channels", "true") == "true" and chan:
+            shelf = _Shelf(tr("home_new_channels"))
+            for it in chan:
+                card = _Card(CHAN_W, CHAN_H, it.get("name") or "?")
+                card.clicked.connect(lambda it=it: self._play_channel(it))
+                self._set_art(card, it.get("stream_icon"), w.logos,
+                              contain=True)
+                shelf.add(card)
+            shelf.finish(CHAN_H)
             self._movies_box.addWidget(shelf)
 
     def _media_art(self, it: dict, kind: str = "vod") -> str | None:

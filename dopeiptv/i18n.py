@@ -118,6 +118,13 @@ _STRINGS: dict[str, dict[str, str]] = {
         "zh": "最新添加的剧集", "ru": "Недавно добавленные сериалы",
         "th": "ซีรีส์ที่เพิ่มล่าสุด",
     },
+    "home_new_channels": {
+        "en": "Recently added channels", "sv": "Nyligen tillagda kanaler",
+        "es": "Canales añadidos recientemente",
+        "de": "Neu hinzugefügte Sender", "fr": "Chaînes ajoutées récemment",
+        "zh": "最新添加的频道", "ru": "Недавно добавленные каналы",
+        "th": "ช่องที่เพิ่มล่าสุด",
+    },
     "set_home_show": {
         "en": "Show the Home section", "sv": "Visa Hem-sektionen",
         "es": "Mostrar la sección de inicio",

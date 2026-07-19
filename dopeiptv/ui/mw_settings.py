@@ -890,7 +890,8 @@ class _SettingsMixin:
                              ("home_sh_fav", "home_fav_now"),
                              ("home_sh_history", "home_recent"),
                              ("home_sh_movies", "home_new_movies"),
-                             ("home_sh_series", "home_new_series")):
+                             ("home_sh_series", "home_new_series"),
+                             ("home_sh_channels", "home_new_channels")):
             box = QCheckBox(tr(slabel))
             box.setChecked(self.settings.value(skey, "true") == "true")
             hv.addWidget(box)
