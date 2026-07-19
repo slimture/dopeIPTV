@@ -122,6 +122,11 @@ class _ContextMenuMixin:
                             lambda it=it: self._reset_channel_timeshift(it))
             m.addSeparator()
             self._build_record_menu(m.addMenu(tr("rec_record")), it)
+            # For a not-yet-live (or any) channel: a reminder for its upcoming
+            # programme, alongside the record options above - the same set the
+            # "stream hasn't started yet" prompt offers.
+            m.addAction(tr("upcoming_remind"),
+                        lambda it=it: self._remind_upcoming(it))
         if (content_kind in ("live", "fav")
                 and it.get("stream_id") is not None):
             # Every category works the same: a one-click "Add to favorites"

@@ -3629,12 +3629,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _diagnose_stream_failure(self, url: str) -> None:
         from ..providers.diagnostics import diagnose_stream
 
+        lp = getattr(self, "_last_playback", None)
+
         def show(reason: str) -> None:
             # If a channel started playing meanwhile (the user zapped on), the
             # earlier failure is stale - don't overwrite a working stream.
             if self.player and self.player.current_url:
                 return
             self._show_stream_error(reason)
+            # An upcoming/scheduled event (HTTP 407) isn't an error to shrug at
+            # - offer to set a reminder or record it. Same-session tr() makes
+            # this string compare reliable.
+            if reason == tr("diag_not_started"):
+                self._offer_upcoming_actions((lp or {}).get("item"))
 
         run_async(self.pool, lambda: diagnose_stream(url, self.client),
                   show, lambda _e: show(tr("diag_generic")))

@@ -21,6 +21,56 @@ class _RemindersMixin:
             tr("reminder_set", title=p.get("title") or ch.get("name") or ""),
             4000)
 
+    def _offer_upcoming_actions(self, it) -> None:
+        """A channel that isn't broadcasting yet (HTTP 407): offer to remind
+        the user, record open-ended until it ends, or schedule a recording with
+        a chosen time. Shown from the failed-playback path and the middle
+        column's right-click menu."""
+        if not it or it.get("stream_id") is None:
+            return
+        idx = self._choice_dialog(
+            tr("upcoming_title"),
+            tr("upcoming_body", channel=it.get("name") or ""),
+            [(tr("upcoming_remind"), "primary"),
+             (tr("upcoming_record_stop"), "normal"),
+             (tr("upcoming_schedule"), "normal"),
+             (tr("common_cancel"), "normal")])
+        if idx == 0:
+            self._remind_upcoming(it)
+        elif idx == 1:
+            self._record_now(it, None)
+        elif idx == 2:
+            self._schedule_recording(it)
+
+    def _remind_upcoming(self, it) -> None:
+        """Set a reminder for the next programme on a not-yet-live channel,
+        looking its start time up from the short EPG."""
+        from ..core.workers import run_async
+        from ..providers.client import b64
+        sid = it.get("stream_id")
+        if sid is None:
+            return
+
+        def work():
+            return self.client.short_epg(sid, limit=4)
+
+        def done(epg):
+            now = time.time()
+            for e in (epg or []):
+                try:
+                    st = int(e.get("start_timestamp") or 0)
+                except (TypeError, ValueError):
+                    st = 0
+                if st and st >= now - 600:
+                    self._add_reminder(
+                        it, {"title": b64(e.get("title")) or it.get("name"),
+                             "start_timestamp": st})
+                    return
+            self._show_toast(tr("upcoming_no_epg"), 4000)
+
+        run_async(self.pool, work, done,
+                  lambda _e: self._show_toast(tr("upcoming_no_epg"), 4000))
+
     def _open_reminders(self) -> None:
         from .reminders import RemindersDialog
         RemindersDialog(self).exec()

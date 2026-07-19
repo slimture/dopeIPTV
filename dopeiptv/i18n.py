@@ -2280,6 +2280,60 @@ _STRINGS: dict[str, dict[str, str]] = {
               "плейлист",
         "th": "ผู้ให้บริการไม่มีสตรีมนี้ (HTTP 404) — ลองรีเฟรชเพลย์ลิสต์",
     },
+    "upcoming_title": {
+        "en": "Upcoming broadcast", "sv": "Kommande sändning",
+        "es": "Transmisión próxima", "de": "Bevorstehende Übertragung",
+        "fr": "Diffusion à venir", "zh": "即将播出", "ru": "Скоро в эфире",
+        "th": "รายการที่กำลังจะมาถึง",
+    },
+    "upcoming_body": {
+        "en": "“{channel}” isn't live yet. Set a reminder, or record it "
+              "when it starts?",
+        "sv": "”{channel}” sänds inte än. Vill du sätta en påminnelse eller "
+              "spela in den när den börjar?",
+        "es": "«{channel}» aún no está en directo. ¿Poner un recordatorio o "
+              "grabarla cuando empiece?",
+        "de": "„{channel}“ ist noch nicht live. Erinnerung setzen oder "
+              "aufnehmen, wenn es beginnt?",
+        "fr": "« {channel} » n'est pas encore en direct. Définir un rappel ou "
+              "l'enregistrer au démarrage ?",
+        "zh": "“{channel}”尚未直播。设置提醒，或在开播时录制？",
+        "ru": "«{channel}» ещё не в эфире. Поставить напоминание или записать, "
+              "когда начнётся?",
+        "th": "“{channel}” ยังไม่ออกอากาศ ตั้งการเตือนหรือบันทึกเมื่อเริ่ม?",
+    },
+    "upcoming_remind": {
+        "en": "Remind me when it starts", "sv": "Påminn mig när den börjar",
+        "es": "Recordarme cuando empiece", "de": "Erinnern, wenn es beginnt",
+        "fr": "Me rappeler au démarrage", "zh": "开播时提醒我",
+        "ru": "Напомнить, когда начнётся", "th": "เตือนฉันเมื่อเริ่ม",
+    },
+    "upcoming_record_stop": {
+        "en": "Record until I stop it", "sv": "Spela in tills jag stoppar",
+        "es": "Grabar hasta que lo detenga", "de": "Aufnehmen bis ich stoppe",
+        "fr": "Enregistrer jusqu'à l'arrêt", "zh": "录制直到我停止",
+        "ru": "Записывать, пока не остановлю", "th": "บันทึกจนกว่าฉันจะหยุด",
+    },
+    "upcoming_schedule": {
+        "en": "Schedule a recording (choose time)…",
+        "sv": "Schemalägg inspelning (välj tid)…",
+        "es": "Programar grabación (elegir hora)…",
+        "de": "Aufnahme planen (Zeit wählen)…",
+        "fr": "Planifier un enregistrement (choisir l'heure)…",
+        "zh": "安排录制（选择时间）…",
+        "ru": "Запланировать запись (выбрать время)…",
+        "th": "ตั้งเวลาบันทึก (เลือกเวลา)…",
+    },
+    "upcoming_no_epg": {
+        "en": "No schedule info for this channel to set a reminder from.",
+        "sv": "Ingen tablåinfo för den här kanalen att sätta påminnelse från.",
+        "es": "No hay guía para este canal para crear un recordatorio.",
+        "de": "Keine Programminfo für diesen Sender für eine Erinnerung.",
+        "fr": "Aucune info de programme pour créer un rappel sur cette chaîne.",
+        "zh": "此频道没有节目信息可用于设置提醒。",
+        "ru": "Нет данных программы для этого канала, чтобы поставить напоминание.",
+        "th": "ไม่มีข้อมูลผังรายการของช่องนี้เพื่อตั้งการเตือน",
+    },
     "diag_not_started": {
         "en": "This stream hasn't started yet — it looks like an upcoming "
               "event. Try again once it's live.",
