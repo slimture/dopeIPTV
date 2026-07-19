@@ -118,15 +118,20 @@ class _OnboardingMixin:
         btn = self._add_provider_btn
         if btn is None or not btn.isVisible():
             return
-        # Centred at the bottom of the middle list pane, mapped into window
-        # coordinates. A fixed margin above the pane's bottom edge (rather than
-        # a percentage) keeps it planted in one spot as the columns are dragged
-        # or the window is resized, instead of drifting around.
+        # Centre it at the bottom of the *visible* central area. Anchoring to
+        # the middle list pane broke in demo/explore mode: the Home page sits
+        # on top of the central stack there, so the classic list is hidden and
+        # its geometry is stale - centring on it landed the button off to one
+        # side. The central stack is always laid out and always visible, so it
+        # keeps the button centred whichever page (Home or classic) is showing.
+        # A fixed margin above the bottom edge (not a percentage) keeps it
+        # planted as the window is resized or the columns are dragged.
+        anchor = getattr(self, "_center_stack", None) or self.listw
         btn.adjustSize()
         w = max(240, btn.width() + 40)
         h = 46
         margin = 22
-        tl = self.listw.mapTo(self, self.listw.rect().topLeft())
-        x = tl.x() + (self.listw.width() - w) // 2
-        y = tl.y() + self.listw.height() - h - margin
+        tl = anchor.mapTo(self, anchor.rect().topLeft())
+        x = tl.x() + (anchor.width() - w) // 2
+        y = tl.y() + anchor.height() - h - margin
         btn.setGeometry(x, y, w, h)
