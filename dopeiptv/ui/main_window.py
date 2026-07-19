@@ -1341,8 +1341,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._pause_started = time.time()
             # Pausing a live stream means you're no longer at the live edge:
             # show the badge and flip the timeline to 'not live' immediately
-            # (don't wait for the 1 s timer or the offset to accrue).
-            if self.player and on_live and not self._playing_catchup:
+            # (don't wait for the 1 s timer or the offset to accrue). Only for
+            # channels that actually HAVE a provider archive - a plain live
+            # channel pauses on mpv's local buffer, and stamping it TIMESHIFT
+            # wrongly advertised an archive that doesn't exist.
+            it = (lp or {}).get("item")
+            try:
+                has_archive = it is not None and self._timeshift_days(it) > 0
+            except Exception:
+                has_archive = False
+            if (self.player and on_live and not self._playing_catchup
+                    and has_archive):
                 self.player.set_live_badge("timeshift")
                 self._update_ts_timeline()
             return
