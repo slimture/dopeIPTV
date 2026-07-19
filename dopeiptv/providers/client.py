@@ -136,6 +136,14 @@ class XtreamClient:
     # struggling server can't pin "Connecting to ..." at startup for a minute.
     _BIG_ACTIONS = ("get_live_streams", "get_vod_streams", "get_series")
 
+    # After a network-level failure, further calls fail IMMEDIATELY for this
+    # long instead of each waiting out its own full timeout. Without this, a
+    # degraded link (heavy packet loss) had every consumer (channels, movies,
+    # series, EPG) queue a fresh long wait behind the last one and the app
+    # felt dead for minutes; with it, failures surface in seconds, the cached
+    # lists take over, and one call re-probes the server every cooldown.
+    NET_COOLDOWN_SECS = 30
+
     def _api(self, **params: Any) -> Any:
         # Single choke point for every Xtream call, so log here for
         # troubleshooting: which action, to which server, the HTTP status and
@@ -145,15 +153,28 @@ class XtreamClient:
         base: dict[str, Any] = {"username": self.username, "password": self.password}
         base.update(params)
         action = params.get("action") or "authenticate"
+        now = time.monotonic()
+        if now < getattr(self, "_net_down_until", 0.0):
+            raise requests.ConnectionError(
+                f"provider unreachable - retrying in "
+                f"{self._net_down_until - now:.0f} s (cooldown)")
         t0 = time.monotonic()
         read_to = 60 if action in self._BIG_ACTIONS else 20
         try:
             r = self.session.get(url, params=base, timeout=(10, read_to))
+        except (requests.Timeout, requests.ConnectionError) as e:
+            self._net_down_until = time.monotonic() + self.NET_COOLDOWN_SECS
+            log.warning("xtream %s @ %s: request failed - %s: %s "
+                        "(failing fast for the next %d s)",
+                        action, self.server, type(e).__name__,
+                        self._redact(str(e)), self.NET_COOLDOWN_SECS)
+            raise
         except requests.RequestException as e:
             log.warning("xtream %s @ %s: request failed - %s: %s",
                         action, self.server, type(e).__name__,
                         self._redact(str(e)))
             raise
+        self._net_down_until = 0.0   # the server answered - lift any cooldown
         dt = (time.monotonic() - t0) * 1000
         if r.status_code != 200:
             log.warning("xtream %s @ %s: HTTP %s (%.0f ms)",
