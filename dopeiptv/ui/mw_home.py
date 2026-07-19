@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import time
 
-from PyQt6.QtCore import QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (
     QColor, QFont, QIcon, QPainter, QPainterPath, QPen, QPixmap,
 )
@@ -252,23 +252,26 @@ class HomePage(QWidget):
             if wdg is not None:
                 wdg.deleteLater()
 
-    _PILL_QSS = (
-        "QPushButton { background: %(pane)s; color: %(text)s;"
-        " border: 1px solid %(border)s; border-radius: 19px;"
-        " padding: 9px 20px 9px 15px; font-size: 13px; font-weight: 600;"
-        " text-align: left; }"
-        "QPushButton:hover { border-color: %(acc)s; color: %(text)s;"
-        " background: %(hover)s; }"
+    # One connected, pill-shaped nav group: a rounded container holds the
+    # buttons edge-to-edge, and each button gets a soft rounded highlight on
+    # hover (no hard borders) - so the row reads as a single smooth segment.
+    _SEG_QSS = (
+        "#HomeNavGroup { background: %(pane)s; border: 1px solid %(border)s;"
+        " border-radius: 21px; }"
+        "#HomeNavBtn { background: transparent; color: %(text)s; border: none;"
+        " border-radius: 15px; padding: 7px 18px; font-size: 13px;"
+        " font-weight: 600; }"
+        "#HomeNavBtn:hover { background: %(hover)s; }"
     )
 
     def _top_bar(self) -> QWidget:
-        """Quick-nav pills (like the reference apps' top bar) + a close X. Each
-        pill carries a small accent-coloured glyph so the row reads as a set of
-        icons, not a wall of text."""
-        qss = self._PILL_QSS % {
+        """Quick-nav segment (like the reference apps' top bar) + a close X.
+        Text-only labels sitting inside one rounded pill, each with a rounded
+        per-item hover highlight."""
+        qss = self._SEG_QSS % {
             "pane": QColor(P["pane"]).lighter(112).name(), "text": P["text"],
-            "border": QColor(P["pane"]).lighter(135).name(), "acc": ACCENT,
-            "hover": QColor(P["pane"]).lighter(125).name()}
+            "border": QColor(P["pane"]).lighter(135).name(),
+            "hover": QColor(P["pane"]).lighter(132).name()}
         bar = QWidget()
         h = QHBoxLayout(bar)
         h.setContentsMargins(0, 4, 0, 4)
@@ -276,26 +279,27 @@ class HomePage(QWidget):
         h.addStretch(1)
         w = self.window
 
-        def pill(text, kind, fn):
-            b = QPushButton("  " + text)
-            b.setCursor(Qt.CursorShape.PointingHandCursor)
-            b.setStyleSheet(qss)
-            try:
-                b.setIcon(QIcon(w._action_pixmap(kind, 16, ACCENT)))
-                b.setIconSize(QSize(16, 16))
-            except Exception:
-                pass
-            b.clicked.connect(fn)
-            h.addWidget(b)
+        group = QFrame(objectName="HomeNavGroup")
+        group.setStyleSheet(qss)
+        g = QHBoxLayout(group)
+        g.setContentsMargins(5, 4, 5, 4)
+        g.setSpacing(2)
 
-        pill(tr("nav_tv"), "tv",
+        def pill(text, fn):
+            b = QPushButton(text, objectName="HomeNavBtn")
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.clicked.connect(fn)
+            g.addWidget(b)
+
+        pill(tr("nav_tv"),
              lambda: self._leave_to(lambda: w.switch_mode("live")))
-        pill(tr("btn_epg_guide"), "grid", self._open_guide)
-        pill(tr("nav_movies"), "movie",
+        pill(tr("btn_epg_guide"), self._open_guide)
+        pill(tr("nav_movies"),
              lambda: self._leave_to(lambda: w.switch_mode("vod")))
-        pill(tr("nav_series"), "series",
+        pill(tr("nav_series"),
              lambda: self._leave_to(lambda: w.switch_mode("series")))
-        pill(tr("btn_settings"), "gear", w.open_settings)
+        pill(tr("btn_settings"), w.open_settings)
+        h.addWidget(group)
         h.addStretch(1)
         close = QPushButton()
         close.setIcon(_x_icon(16, P["text"]))
