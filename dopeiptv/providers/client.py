@@ -26,7 +26,8 @@ class XtreamClient:
     # always a real re-fetch.
     LIST_CACHE_SECS = 300
 
-    def __init__(self, server: str, username: str, password: str) -> None:
+    def __init__(self, server: str, username: str, password: str,
+                 cache_path: str | None = None) -> None:
         self.server = server.rstrip("/")
         if not self.server.startswith(("http://", "https://")):
             self.server = "http://" + self.server
@@ -36,16 +37,61 @@ class XtreamClient:
         self.session.headers["User-Agent"] = "dopeIPTV/1.0"
         self._list_cache: dict[tuple, tuple[float, list]] = {}
         self._list_lock = threading.Lock()
+        # Optional on-disk copy of the list cache (per playlist): lets the app
+        # start with the last session's channel lineup when the provider is
+        # down/overloaded, instead of empty lists and timeouts.
+        self._cache_path = cache_path
+        self._disk_loaded = cache_path is None
+
+    def _load_disk_lists(self) -> None:
+        """(under _list_lock) Lazily merge the previous session's lists in as
+        stale entries - fresh fetches still win, but the stale-fallback path
+        can serve them when the provider doesn't answer."""
+        if self._disk_loaded:
+            return
+        self._disk_loaded = True
+        try:
+            import json
+            with open(self._cache_path, encoding="utf-8") as fh:
+                raw = json.load(fh)
+            for k, (t, data) in raw.items():
+                key = tuple(None if p == "" else p for p in k.split("\x1f"))
+                self._list_cache.setdefault(key, (float(t), data))
+            log.info("xtream list cache: loaded %d lists from disk", len(raw))
+        except FileNotFoundError:
+            pass
+        except Exception as e:
+            log.warning("xtream list cache: could not read %s: %s",
+                        self._cache_path, e)
+
+    def _save_disk_lists(self) -> None:
+        """(worker thread, after a successful fetch) Persist the cache."""
+        if self._cache_path is None:
+            return
+        try:
+            import json
+            with self._list_lock:
+                raw = {"\x1f".join("" if p is None else str(p) for p in k):
+                       [t, data] for k, (t, data) in self._list_cache.items()}
+            tmp = f"{self._cache_path}.part"
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump(raw, fh)
+            import os
+            os.replace(tmp, self._cache_path)
+        except Exception as e:
+            log.warning("xtream list cache: could not write %s: %s",
+                        self._cache_path, e)
 
     def _cached_list(self, key: tuple, fetch) -> list:
         """Serve *key* from the short list cache, else *fetch* and store.
 
         On a network failure a STALE copy (older than the TTL) is served when
-        one exists: a momentary timeout on a lineup that was fine minutes ago
-        should degrade to slightly-old data, not to an error and an empty
-        list. Thread-safe - list loads run on the worker pool."""
+        one exists - including the previous session's disk copy - so a down
+        or overloaded provider degrades to slightly-old data, not to an error
+        and an empty list. Thread-safe - list loads run on the worker pool."""
         now = time.time()
         with self._list_lock:
+            self._load_disk_lists()
             hit = self._list_cache.get(key)
             if hit and now - hit[0] < self.LIST_CACHE_SECS:
                 return hit[1]
@@ -57,18 +103,23 @@ class XtreamClient:
             if hit is not None:
                 log.warning(
                     "xtream %s @ %s: network failure - serving the cached "
-                    "list from %.0f s ago instead", key[0], self.server,
-                    now - hit[0])
+                    "list from %.0f min ago instead", key[0], self.server,
+                    (now - hit[0]) / 60)
                 return hit[1]
             raise
         with self._list_lock:
             self._list_cache[key] = (now, data)
+        self._save_disk_lists()
         return data
 
     def clear_list_cache(self) -> None:
-        """Drop every cached list so the next call re-fetches (Refresh)."""
+        """Drop every cached list so the next call re-fetches (Refresh).
+        The disk copy is kept: it only ever serves as a last resort when the
+        provider doesn't answer at all, and Refresh overwrites it with fresh
+        data as soon as a fetch succeeds."""
         with self._list_lock:
             self._list_cache.clear()
+            self._disk_loaded = False   # re-mergeable if the fetch fails
 
     def _redact(self, text: str) -> str:
         """Strip the username/password from a string before logging it -
@@ -569,11 +620,23 @@ class M3UClient(OfflineClient):
 
 def make_client(playlist: dict):
     """Build the right provider client for a stored playlist: an M3U-backed
-    client when kind == 'm3u', otherwise the Xtream API client."""
+    client when kind == 'm3u', otherwise the Xtream API client (with a
+    per-playlist on-disk list cache so a down provider still shows the last
+    known lineup)."""
     if (playlist or {}).get("kind") == "m3u":
         return M3UClient(playlist.get("server", ""))
+    cache = None
+    pid = (playlist or {}).get("id")
+    if pid:
+        from .epg import _epg_cache_dir
+        try:
+            d = _epg_cache_dir()
+            d.mkdir(parents=True, exist_ok=True)
+            cache = str(d / f"lists_{pid}.json")
+        except Exception:
+            cache = None
     return XtreamClient(playlist["server"], playlist["username"],
-                        playlist["password"])
+                        playlist["password"], cache_path=cache)
 
 
 class DemoClient(OfflineClient):

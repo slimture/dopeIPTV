@@ -303,11 +303,23 @@ def main() -> int:
 
         t = threading.Thread(target=_do_auth, daemon=True)
         t.start()
+        # Bound the splash: a down/overloaded provider used to pin
+        # "Connecting to ..." for the full network timeout before the window
+        # appeared. After 8 s, open the window anyway - the auth thread keeps
+        # running in the background, lists load when the server answers (or
+        # come from the on-disk cache), and any real credential problem
+        # surfaces in-window exactly like the "start anyway" path.
+        import time as _time
+        _t0 = _time.monotonic()
         while t.is_alive():
             app.processEvents()
             t.join(0.05)
+            if _time.monotonic() - _t0 > 8:
+                log.warning("auth still pending after 8 s - opening the "
+                            "window without waiting")
+                break
 
-        if auth_err[0] is None:
+        if t.is_alive() or auth_err[0] is None:
             client = candidate
             settings.setValue("server", pl["server"])
             settings.setValue("username", pl["username"])
