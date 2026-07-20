@@ -72,6 +72,26 @@ app.processEvents()
 player._hide_fs_ui()
 assert player.cursor().shape() == Qt.CursorShape.BlankCursor
 
+# Render-context lifecycle: reparenting the player (docking in/out of the
+# pop-out window) recreates the GL context, which the video widget handles by
+# freeing and rebuilding ONLY the mpv render context. Freeing it must NEVER
+# touch the mpv instance - that is what keeps the stream and audio alive across
+# a pop-out toggle (the "audio but frozen video" bug).
+class _FakeCtx:
+    freed = False
+
+    def free(self):
+        _FakeCtx.freed = True
+
+vid = player.video
+sentinel_mpv = object()
+vid.mpv = sentinel_mpv
+vid._ctx = _FakeCtx()
+vid._free_render_context()
+assert vid._ctx is None, "render context must be cleared"
+assert _FakeCtx.freed is True, "old render context must be freed"
+assert vid.mpv is sentinel_mpv, "mpv instance must be untouched (audio lives)"
+
 print("EMBEDDED_OK")
 """
 

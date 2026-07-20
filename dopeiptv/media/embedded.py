@@ -260,17 +260,38 @@ class _MpvGLWidget(QOpenGLWidget):
             v = glctx.format().version()
             log.info("GL context: %s.%s profile=%s", v[0], v[1],
                      glctx.format().profile().name)
+            # Free the render context the moment THIS GL context dies. Qt
+            # recreates the context whenever the widget is reparented (docking
+            # in / out of the pop-out window, moving to another monitor); the
+            # MpvRenderContext is bound to the context it was made against, so
+            # reusing it across a recreation left the video frozen while audio
+            # kept playing. Freeing it here (the old context is still current
+            # when this fires) and rebuilding below keeps the video alive.
+            # UniqueConnection so re-entry can't stack duplicate handlers; any
+            # error must not escape initializeGL (that aborts the process).
+            try:
+                glctx.aboutToBeDestroyed.connect(
+                    self._free_render_context,
+                    Qt.ConnectionType.UniqueConnection)
+            except (TypeError, RuntimeError):
+                pass
         else:
             log.warning("no GL context in initializeGL")
-        # If mpv already exists, this is a *repeat* initializeGL - the window's
-        # GL context was recreated (e.g. the compositor reparented the window
-        # while dragging it, or it moved to another monitor). Do NOT rebuild:
-        # a fresh mpv instance would tear down the stream that's playing (which
-        # surfaced as "Stream error: loading failed" on a simple window move).
-        # Keep the existing instance; paintGL already tolerates a stale context
-        # by drawing a black frame until it settles.
+        # A *repeat* initializeGL means the GL context was recreated. Keep the
+        # mpv instance untouched - a fresh instance would tear down the playing
+        # stream ("Stream error: loading failed" on a window move) - and
+        # rebuild ONLY the render context against the new context, so the video
+        # re-binds without ever interrupting playback or audio.
         if self.mpv is not None:
-            log.info("initializeGL re-entered; keeping existing mpv")
+            if self._ctx is None:
+                try:
+                    self._create_render_context()
+                    log.info("render context rebuilt after GL recreation")
+                except Exception as e:
+                    self._ctx = None
+                    log.error("render context rebuild failed: %s", e)
+            else:
+                log.info("initializeGL re-entered; render context still live")
             return
         # Building the mpv render context can fail hard on a weak or
         # software-only GL stack (typically a VM with no GPU acceleration).
@@ -387,6 +408,14 @@ class _MpvGLWidget(QOpenGLWidget):
             except Exception as e:
                 log.debug("mpv option %r skipped: %s", key, e)
         log.info("mpv created, creating render context...")
+        self._create_render_context()
+        _register_error_callback(self.mpv, self.playback_error)
+
+    def _create_render_context(self) -> None:
+        """Build the mpv OpenGL render context against the CURRENT GL context.
+        Split out from _build_mpv_render so it can be rebuilt when the GL
+        context is recreated (widget reparent / monitor change) WITHOUT
+        recreating the mpv instance - the stream and audio never stop."""
         self._proc_address_fn = _libmpv.MpvGlGetProcAddressFn(
             self._get_proc_address)
         self._ctx = _libmpv.MpvRenderContext(
@@ -400,12 +429,27 @@ class _MpvGLWidget(QOpenGLWidget):
         # callback and instead drive repaints from a main-thread timer
         # (poll-render): slightly more GPU when idle, but rock-solid.
         if sys.platform == "win32":
-            self._render_timer = QTimer(self)
-            self._render_timer.timeout.connect(self.update)
+            if getattr(self, "_render_timer", None) is None:
+                self._render_timer = QTimer(self)
+                self._render_timer.timeout.connect(self.update)
             self._render_timer.start(16)          # ~60 fps
         else:
             self._ctx.update_cb = lambda: self.frame_ready.emit()
-        _register_error_callback(self.mpv, self.playback_error)
+
+    def _free_render_context(self) -> None:
+        """Free just the render context - called when its GL context is about
+        to be destroyed (reparent, close), and from shutdown. Never touches the
+        mpv instance, so playback/audio continue; paintGL paints black while
+        _ctx is None, and the next initializeGL rebuilds it."""
+        ctx = self._ctx
+        self._ctx = None
+        if getattr(self, "_render_timer", None) is not None:
+            self._render_timer.stop()
+        if ctx is not None:
+            try:
+                ctx.free()
+            except Exception:
+                pass
 
     def paintGL(self) -> None:
         # Blank branch first so a repaint that arrives mid-stop (when mpv has
@@ -446,12 +490,7 @@ class _MpvGLWidget(QOpenGLWidget):
             self._blank = True
 
     def shutdown(self) -> None:
-        if self._ctx:
-            try:
-                self._ctx.free()
-            except Exception:
-                pass
-            self._ctx = None
+        self._free_render_context()
         if self.mpv:
             try:
                 self.mpv.terminate()
