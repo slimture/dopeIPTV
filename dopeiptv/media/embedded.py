@@ -280,18 +280,19 @@ class _MpvGLWidget(QOpenGLWidget):
         # A *repeat* initializeGL means the GL context was recreated. Keep the
         # mpv instance untouched - a fresh instance would tear down the playing
         # stream ("Stream error: loading failed" on a window move) - and
-        # rebuild ONLY the render context against the new context, so the video
-        # re-binds without ever interrupting playback or audio.
+        # ALWAYS rebuild the render context against the new context, so the
+        # video re-binds without ever interrupting playback or audio.
+        # aboutToBeDestroyed normally freed the old context cleanly (while it
+        # was still current); free best-effort here too so that if it didn't
+        # fire, a stale render context can't wedge the video black.
         if self.mpv is not None:
-            if self._ctx is None:
-                try:
-                    self._create_render_context()
-                    log.info("render context rebuilt after GL recreation")
-                except Exception as e:
-                    self._ctx = None
-                    log.error("render context rebuild failed: %s", e)
-            else:
-                log.info("initializeGL re-entered; render context still live")
+            self._free_render_context()
+            try:
+                self._create_render_context()
+                log.info("render context rebuilt after GL recreation")
+            except Exception as e:
+                self._ctx = None
+                log.error("render context rebuild failed: %s", e)
             return
         # Building the mpv render context can fail hard on a weak or
         # software-only GL stack (typically a VM with no GPU acceleration).
@@ -486,8 +487,15 @@ class _MpvGLWidget(QOpenGLWidget):
             except Exception:
                 pass
         except Exception as e:
-            log.debug("paintGL render failed: %s", e)
-            self._blank = True
+            # Skip just THIS frame - never latch _blank here. A transient
+            # render failure during a reparent (the render context being torn
+            # down / rebuilt as the player docks in and out of the pop-out
+            # window) would otherwise blank the video permanently: it stayed
+            # black through channel changes and stops, and only a fullscreen
+            # round-trip (which clears the flag) brought it back. The next
+            # paint just retries against the rebuilt context; the framebuffer
+            # keeps the last good frame until then.
+            log.debug("paintGL render failed (frame skipped): %s", e)
 
     def shutdown(self) -> None:
         self._free_render_context()
