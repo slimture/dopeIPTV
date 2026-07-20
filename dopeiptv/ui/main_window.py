@@ -1589,18 +1589,24 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.menuBar().hide()
             self.player.set_fullscreen_ui(True)
             self._update_provider_hint()   # tuck the '+ Add provider' hint away
+            self._was_fullscreen = self.isFullScreen()
+            # Remember if the window was maximized/zoomed and its exact
+            # geometry, so leaving video-fullscreen restores that state instead
+            # of shrinking to the pre-maximize size. showNormal() alone drops
+            # the maximized state (reported on macOS: a maximized window shrinks
+            # after video fullscreen).
+            self._was_maximized = self.isMaximized()
+            if not self._was_fullscreen:
+                self._pre_fs_geo = self.geometry()
+            # Go fullscreen INSIDE the paint-suspend: when updates re-enable the
+            # window is already fullscreen-sized, so it's one clean cut. Left
+            # outside, the re-enabled paint landed first and showed the video
+            # filling the still-normal-sized window for a frame - the "half,
+            # then max" flash on macOS.
+            self.showFullScreen()
         finally:
             if cw is not None:
                 cw.setUpdatesEnabled(True)
-        self._was_fullscreen = self.isFullScreen()
-        # Remember if the window was maximized/zoomed and its exact geometry, so
-        # leaving video-fullscreen restores that state instead of shrinking to
-        # the pre-maximize size. showNormal() alone drops the maximized state
-        # (reported on macOS: a maximized window shrinks after video fullscreen).
-        self._was_maximized = self.isMaximized()
-        if not self._was_fullscreen:
-            self._pre_fs_geo = self.geometry()
-        self.showFullScreen()
 
     def _on_escape(self) -> None:
         """Single Escape handler so the key is never ambiguous: dismiss the
