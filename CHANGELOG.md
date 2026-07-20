@@ -5,6 +5,19 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
+## [1.0.2]
+
+Settings usability fix.
+
+- **Fixed: the language list wouldn't scroll in Settings.** The wheel guard
+  that stops the mouse wheel from accidentally changing a setting while you
+  scroll the page also swallowed the wheel on the 27-entry language picker -
+  the one control you *do* want to scroll. The language picker is now exempt
+  from the guard, its popup scrolls per pixel (so a trackpad's small deltas
+  register instead of being swallowed), and an overflowing popup keeps a
+  permanently visible scrollbar as a drag handle. Every other control still
+  swallows the wheel so scrolling the page can't nudge a setting.
+
 ## [1.0.1]
 
 Packaging fix for the 1.0 release.
