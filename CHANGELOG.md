@@ -21,6 +21,15 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   server / username / password fields for you. Typing the three fields by
   hand still works exactly as before, and the language picker in the welcome
   screen now lists all 27 languages.
+- **Smart provider detection** — a pasted link is recognised automatically as
+  Xtream or M3U and the wizard/dialog switches mode for you. Xtream is always
+  preferred (its API also serves movies, series and EPG), so even a `get.php`
+  M3U-export link configures a full Xtream provider.
+- **Snappier lists** — channel/movie/series logos and posters are now scaled
+  once and cached instead of being re-scaled on every repaint, which removed
+  the main source of scroll lag with large lineups. Lists also use smooth
+  pixel-granular scrolling and lay huge lineups out in background batches.
+  None of this touches the video pipeline.
 
 ## [0.9.0]
 

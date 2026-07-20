@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QAbstractListModel, QModelIndex, QRect, QRectF, QSize, Qt
-from PyQt6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
+from PyQt6.QtGui import (
+    QColor, QFont, QPainter, QPainterPath, QPen, QPixmap, QPixmapCache,
+)
 from PyQt6.QtWidgets import (
     QListView, QStyle, QStyledItemDelegate,
 )
@@ -48,6 +50,15 @@ class ChannelListView(QListView):
         self.setSpacing(0)
         self.setContentsMargins(0, 0, 0, 0)
         self.setViewportMargins(0, 0, 0, 0)
+        # Smooth, pixel-granular wheel/trackpad scrolling instead of the default
+        # jump-a-whole-row - reads as far snappier with thousands of rows.
+        self.setVerticalScrollMode(QListView.ScrollMode.ScrollPerPixel)
+        self.setHorizontalScrollMode(QListView.ScrollMode.ScrollPerPixel)
+        # Lay a huge lineup out in background batches so populating it never
+        # blocks the UI thread for a beat; uniform item sizes (set by the
+        # window) keep the geometry cheap.
+        self.setLayoutMode(QListView.LayoutMode.Batched)
+        self.setBatchSize(200)
 
     def keyPressEvent(self, e) -> None:
         # Type a channel number to jump straight to it (classic TV zapping).
@@ -237,6 +248,23 @@ class ChannelDelegate(QStyledItemDelegate):
 
     def set_grid(self, grid: bool) -> None:
         self.grid = grid
+
+    @staticmethod
+    def _scaled_logo(pm: QPixmap, url: str, size: int) -> QPixmap:
+        """A smooth-scaled copy of *pm* at *size*, memoised in the global
+        QPixmapCache. The raw logo/poster and target size are stable across
+        repaints, so scaling it fresh on every paint (the old behaviour) was
+        pure per-frame cost during scrolling — the dominant source of list lag.
+        Keyed by url+size so the same logo shared by many rows scales once."""
+        key = f"chlogo:{size}:{url}"
+        cached = QPixmapCache.find(key)
+        if cached is not None and not cached.isNull():
+            return cached
+        scaled = pm.scaled(
+            size, size, Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation)
+        QPixmapCache.insert(key, scaled)
+        return scaled
 
     def grid_size(self) -> QSize:
         return QSize(self.cell_w, self.cell_h)
@@ -435,10 +463,7 @@ class ChannelDelegate(QStyledItemDelegate):
             path = QPainterPath()
             path.addRoundedRect(QRectF(logo_rect), radius, radius)
             painter.setClipPath(path)
-            scaled = pm.scaled(
-                logo_sz, logo_sz,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation)
+            scaled = self._scaled_logo(pm, url, logo_sz)
             painter.drawPixmap(
                 logo_x + (logo_sz - scaled.width()) // 2,
                 logo_y + (logo_sz - scaled.height()) // 2, scaled)
@@ -533,10 +558,7 @@ class ChannelDelegate(QStyledItemDelegate):
             path = QPainterPath()
             path.addRoundedRect(QRectF(logo_rect), radius, radius)
             painter.setClipPath(path)
-            scaled = pm.scaled(
-                logo_sz, logo_sz,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation)
+            scaled = self._scaled_logo(pm, url, logo_sz)
             x = logo_rect.x() + (logo_sz - scaled.width()) // 2
             y = logo_rect.y() + (logo_sz - scaled.height()) // 2
             painter.drawPixmap(x, y, scaled)

@@ -294,6 +294,12 @@ def main() -> int:
     app.setOrganizationName(ORG)
     app.setApplicationDisplayName(APP_NAME)
     app.setDesktopFileName("dopeiptv")
+    # Roomier global pixmap cache: the list/grid delegates memoise their
+    # smooth-scaled logos and posters here (see ChannelDelegate._scaled_logo),
+    # and the default 10 MB evicts them constantly with thousands of channels.
+    # 64 MB keeps a large visible working set scaled exactly once.
+    from PyQt6.QtGui import QPixmapCache
+    QPixmapCache.setCacheLimit(64 * 1024)   # KB
     icon = make_app_icon()
     app.setWindowIcon(icon)
     install_icon(icon)
