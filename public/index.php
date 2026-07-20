@@ -139,14 +139,12 @@ unset($g);
       <a class="navlink" href="#download"><?= h(t('nav_download')) ?></a>
       <a class="navlink" href="<?= h($REPO) ?>"><?= h(t('nav_github')) ?></a>
 <?php $avail = i18n_available(); if (count($avail) > 1): ?>
-      <details class="langpick">
-        <summary title="<?= h(t('lang_label')) ?>">🌐 <?= h(I18N_NAMES[lang_code()] ?? lang_code()) ?></summary>
-        <div class="langmenu">
+      <select id="langSelect" class="langsel" aria-label="<?= h(t('lang_label')) ?>">
 <?php foreach ($avail as $code): ?>
-          <a href="/?lang=<?= h($code) ?>"<?= $code === lang_code() ? ' class="on"' : '' ?>><?= h(I18N_NAMES[$code] ?? $code) ?></a>
+        <option value="<?= h($code) ?>"<?= $code === lang_code() ? ' selected' : '' ?>><?= h(I18N_NAMES[$code] ?? $code) ?></option>
 <?php endforeach; ?>
-        </div>
-      </details>
+      </select>
+      <noscript><a class="navlink" href="/?lang=<?= h(lang_code() === 'en' ? ($avail[1] ?? 'en') : 'en') ?>">🌐</a></noscript>
 <?php endif; ?>
       <a class="btn primary" href="#download"><?= h(t('nav_download_btn')) ?></a>
     </nav>

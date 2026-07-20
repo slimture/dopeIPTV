@@ -189,26 +189,13 @@ footer nav a:hover { color: var(--accent); }
 .lb-close:hover { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .lb-overlay { transition: none; } }
 
-/* ---- language switcher (header) ------------------------------------------ */
-.langpick { position: relative; }
-.langpick > summary {
-  list-style: none; cursor: pointer; color: var(--muted, #aeb6c2);
-  font-size: 14px; padding: 6px 10px; border-radius: 8px; white-space: nowrap;
+/* ---- language switcher (native roll-list) -------------------------------- */
+.langsel {
+  background: #12151c; color: #cfd6e0;
+  border: 1px solid rgba(255,255,255,.14); border-radius: 8px;
+  padding: 6px 10px; font-size: 14px; line-height: 1.2; cursor: pointer;
+  max-width: 200px;
 }
-.langpick > summary::-webkit-details-marker { display: none; }
-.langpick > summary:hover { color: #fff; background: rgba(255,255,255,.06); }
-.langpick[open] > summary { color: #fff; }
-.langpick .langmenu {
-  position: absolute; right: 0; top: calc(100% + 6px); z-index: 60;
-  display: grid; gap: 2px; min-width: 190px; max-height: 60vh; overflow: auto;
-  padding: 6px; border-radius: 12px;
-  background: #12151c; border: 1px solid rgba(255,255,255,.10);
-  box-shadow: 0 18px 50px rgba(0,0,0,.5);
-}
-html[dir="rtl"] .langpick .langmenu { right: auto; left: 0; }
-.langpick .langmenu a {
-  display: block; padding: 8px 12px; border-radius: 8px;
-  color: #cfd6e0; font-size: 14px; text-decoration: none;
-}
-.langpick .langmenu a:hover { background: rgba(255,255,255,.07); color: #fff; }
-.langpick .langmenu a.on { color: var(--accent, #4ea1ff); font-weight: 600; }
+.langsel:hover  { border-color: rgba(255,255,255,.30); color: #fff; }
+.langsel:focus  { outline: none; border-color: var(--accent, #4ea1ff); }
+.langsel option { background: #12151c; color: #cfd6e0; }

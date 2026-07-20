@@ -58,3 +58,13 @@
     if (e.key === "Escape" && overlay.classList.contains("open")) { hide(); }
   });
 })();
+
+/* Language switcher: navigate to the chosen language (adds ?lang=xx, which
+   the server persists in a cookie). The native <select> is the roll-list. */
+(function () {
+  var sel = document.getElementById("langSelect");
+  if (!sel) { return; }
+  sel.addEventListener("change", function () {
+    if (sel.value) { window.location.href = "/?lang=" + encodeURIComponent(sel.value); }
+  });
+})();
