@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QAbstractItemView, QAbstractSlider, QAbstractSpinBox, QApplication,
     QCheckBox, QComboBox, QDialog,
     QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout, QInputDialog,
-    QLabel, QLineEdit, QListView, QListWidget, QListWidgetItem, QMessageBox,
+    QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox,
     QPushButton, QScrollArea, QSizePolicy, QSpinBox, QTabBar, QTabWidget,
     QTextBrowser, QVBoxLayout, QWidget,
 )
@@ -401,14 +401,6 @@ class _SettingsMixin:
     @staticmethod
     def _combo(items, current) -> QComboBox:
         box = QComboBox()
-        # Force an explicit QListView popup. On macOS the native (NSMenu) combo
-        # popup shows every item full-height and ignores maxVisibleItems, so a
-        # 27-entry list can't be scrolled - it just runs off the screen edge.
-        # An item-view popup is scrollable on every platform and honours the
-        # maxVisibleItems cap below (combobox-popup:0 in the theme is what lets
-        # that cap apply; the explicit view guarantees it even when the native
-        # style tries to override the stylesheet).
-        box.setView(QListView())
         for value, label in items:
             box.addItem(label, value)
         idx = box.findData(current)
@@ -417,11 +409,17 @@ class _SettingsMixin:
         # Cap the popup height so a long list (the 27-language picker) becomes a
         # scrollable dropdown instead of a wall taller than the dialog that the
         # bottom entries fall off of. The theme sets `combobox-popup: 0`, which
-        # is what makes maxVisibleItems take effect under a stylesheet; forcing
-        # the popup view's scrollbar to AsNeeded guarantees it appears on every
-        # platform style rather than defaulting off.
+        # is what makes maxVisibleItems take effect under a stylesheet.
         box.setMaxVisibleItems(14)
-        box.view().setVerticalScrollBarPolicy(
+        view = box.view()
+        # Scroll per pixel, not per item. A trackpad (macOS, and Linux laptops
+        # under libinput) sends many small scroll deltas; in the default
+        # per-item mode Qt swallows them until they add up to a whole row, so
+        # the popup feels frozen - "can't scroll". Per-pixel moves on every
+        # delta. Force the scrollbar visible so there's always a drag handle too.
+        view.setVerticalScrollMode(
+            QAbstractItemView.ScrollMode.ScrollPerPixel)
+        view.setVerticalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         if sys.platform == "darwin":
             # On macOS the styled combo doesn't grow to fit its text, so the
