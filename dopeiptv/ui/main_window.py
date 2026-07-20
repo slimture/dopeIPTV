@@ -1629,6 +1629,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # fullscreen it's always icons"). Cleared - and the edge baseline
         # resynced - once the restored geometry has settled (_end_fs_exit).
         self._fs_exiting = True
+        # macOS animates the fullscreen -> window resize and scales the last
+        # video frame through it (the horizontal stretch). Blank the video and
+        # force it painted NOW - before showNormal below - so the OS grabs a
+        # black frame for that animation, not the stretched video. No-op off
+        # macOS. mpv keeps running.
+        if self.player is not None:
+            self.player.arm_fs_exit_blank()
         # Batch the synchronous reflow (panes reappearing, style + window state
         # restore) into one paint instead of a visible multi-step rebuild -
         # painting only, mpv untouched, re-enabled in finally so it can never

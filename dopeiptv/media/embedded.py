@@ -1838,18 +1838,6 @@ class EmbeddedPlayer(QWidget):
             self.unsetCursor()
             self.video.unsetCursor()
             self._mac_show_cursor()
-            if sys.platform == "darwin":
-                # macOS scales the last video frame while the window resizes out
-                # of fullscreen, which reads as a horizontal stretch across the
-                # top. Paint black ONLY for as long as the window is actually
-                # resizing: the timer is restarted on every resizeEvent and
-                # fires ~60 ms after the last one, so the black lasts exactly
-                # the transition and the frame is back the instant it settles -
-                # no fixed overshoot. mpv keeps running throughout (this only
-                # changes what paintGL draws), so playback is untouched.
-                self.video.set_blank(True)
-                self._fs_exit_blanking = True
-                self._fs_exit_timer.start()
             # The docked height is now a constant, not derived from
             # self.height(), so restoring it doesn't depend on the window
             # having finished its async resize back from fullscreen - it
@@ -1857,6 +1845,20 @@ class EmbeddedPlayer(QWidget):
             # next tick to be robust against the transition ordering.
             self._lock_video_box()
             QTimer.singleShot(0, self._lock_video_box)
+
+    def arm_fs_exit_blank(self) -> None:
+        """macOS: paint the video black and force it out NOW, then track the
+        window resize. Called by the main window BEFORE it leaves fullscreen so
+        the OS captures a black frame for its resize animation instead of the
+        last video frame (which it scales -> the horizontal stretch). The
+        synchronous repaint is the crucial part: set_blank alone only schedules
+        an async update that the animation can beat. mpv is untouched."""
+        if sys.platform != "darwin" or self.current_url is None:
+            return
+        self.video.set_blank(True)
+        self.video.repaint()   # black on screen before the OS grabs the layer
+        self._fs_exit_blanking = True
+        self._fs_exit_timer.start()
 
     def _unblank_after_fs_exit(self) -> None:
         # Fired ~60 ms after the last resize of the exit transition. Only
