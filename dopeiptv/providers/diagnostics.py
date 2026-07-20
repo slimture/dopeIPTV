@@ -40,7 +40,7 @@ def _account_reason(client) -> str | None:
         return tr("diag_account_status", status=status.capitalize())
     exp = info.get("exp_date")
     try:
-        if exp not in (None, "", "0", 0) and int(exp) < time.time():
+        if exp not in (None, "", "0", 0) and int(exp or 0) < time.time():
             return tr("diag_expired")
     except (TypeError, ValueError):
         pass
