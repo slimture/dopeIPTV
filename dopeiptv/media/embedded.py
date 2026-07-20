@@ -825,6 +825,15 @@ class EmbeddedPlayer(QWidget):
         self._fs_ui = False
         self._popout_mode = False
         self._popout_drag_from = None
+        # Drives the "paint black through the fullscreen-exit resize" mitigation
+        # (macOS): armed on exit, restarted on every resize while the window
+        # animates back, and fires shortly after the LAST resize so the black
+        # lasts exactly the resize and no longer.
+        self._fs_exit_blanking = False
+        self._fs_exit_timer = QTimer(self)
+        self._fs_exit_timer.setSingleShot(True)
+        self._fs_exit_timer.setInterval(60)
+        self._fs_exit_timer.timeout.connect(self._unblank_after_fs_exit)
         self._popout_autohide = False
         self._popout_bar_timer = QTimer(self)
         self._popout_bar_timer.setSingleShot(True)
@@ -1830,15 +1839,17 @@ class EmbeddedPlayer(QWidget):
             self.video.unsetCursor()
             self._mac_show_cursor()
             if sys.platform == "darwin":
-                # macOS animates the fullscreen -> window transition and scales
-                # the last video frame through it, which reads as a horizontal
-                # stretch across the top until the resize lands. Paint black for
-                # the length of that animation, then restore. mpv keeps running
-                # the whole time (this only changes what paintGL draws), so
-                # playback is untouched - the frame is back the instant the
-                # window has settled.
+                # macOS scales the last video frame while the window resizes out
+                # of fullscreen, which reads as a horizontal stretch across the
+                # top. Paint black ONLY for as long as the window is actually
+                # resizing: the timer is restarted on every resizeEvent and
+                # fires ~60 ms after the last one, so the black lasts exactly
+                # the transition and the frame is back the instant it settles -
+                # no fixed overshoot. mpv keeps running throughout (this only
+                # changes what paintGL draws), so playback is untouched.
                 self.video.set_blank(True)
-                QTimer.singleShot(280, self._unblank_after_fs_exit)
+                self._fs_exit_blanking = True
+                self._fs_exit_timer.start()
             # The docked height is now a constant, not derived from
             # self.height(), so restoring it doesn't depend on the window
             # having finished its async resize back from fullscreen - it
@@ -1848,8 +1859,10 @@ class EmbeddedPlayer(QWidget):
             QTimer.singleShot(0, self._lock_video_box)
 
     def _unblank_after_fs_exit(self) -> None:
-        # Only restore the picture if we're still docked with a live stream -
-        # never un-blank a stopped video or one that re-entered fullscreen.
+        # Fired ~60 ms after the last resize of the exit transition. Only
+        # restore the picture if we're still docked with a live stream - never
+        # un-blank a stopped video or one that re-entered fullscreen.
+        self._fs_exit_blanking = False
         if not self._fs_ui and self.current_url is not None:
             self.video.set_blank(False)
 
@@ -1943,6 +1956,11 @@ class EmbeddedPlayer(QWidget):
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
+        # While blacked out for the fullscreen-exit transition, keep pushing the
+        # un-blank out as long as the window is still resizing; it fires once
+        # the resizes stop, so the black tracks the transition exactly.
+        if self._fs_exit_blanking:
+            self._fs_exit_timer.start()
         self._lock_video_box()
         self._relayout_controls()
         if self._blackout.isVisible():
