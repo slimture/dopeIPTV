@@ -2615,8 +2615,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return False
         for row in range(self.list_model.rowCount()):
             item = self.list_model.item_at(row)
+            # str() both sides: providers mix int and str ids, and a key that
+            # passed through JSON storage (resume/history) may come back as a
+            # string while the freshly fetched list carries ints - an == on
+            # raw values then never matches and the row is never selected.
             if (item and not item.get("_header")
-                    and self._item_key(item) == key):
+                    and self._item_key(item) is not None
+                    and str(self._item_key(item)) == str(key)):
                 idx = self.list_model.index(row)
                 self.listw.setCurrentIndex(idx)
                 self.listw.scrollTo(
@@ -2645,8 +2650,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._pending_jump_key = self._playing_key
             QTimer.singleShot(8000, self._clear_pending_jump)
             if self.mode != "series":
+                # Switching modes reloads the Series categories asynchronously;
+                # an immediate _enter_series would be undone when that load
+                # lands and resets the list to "all series" (the same race
+                # Home's series cards hit). Hand the drill to the category-load
+                # callback instead, which enters the series once the categories
+                # are in - the pending-jump key then selects the episode.
+                self._pending_series_drill = lp["series_ctx"]
                 self.switch_mode("series")
-            self._enter_series(lp["series_ctx"])
+            else:
+                self._enter_series(lp["series_ctx"])
             return
         # Not in the current (possibly category-filtered) list: remember the
         # target and navigate to a view that contains it, then select once it
