@@ -19,7 +19,8 @@ from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QDialog,
     QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout, QInputDialog,
     QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox,
-    QPushButton, QScrollArea, QSizePolicy, QSpinBox, QTabBar, QTabWidget,
+    QPushButton, QScrollArea, QScrollBar, QSizePolicy, QSpinBox, QTabBar,
+    QTabWidget,
     QTextBrowser, QVBoxLayout, QWidget,
 )
 
@@ -399,6 +400,32 @@ class _SettingsMixin:
     # -- settings dialog -----------------------------------------------------------
 
     _MAX_VISIBLE = 14
+
+    @staticmethod
+    def _install_wheel_guard(d) -> None:
+        """Guard every value control in the dialog so scrolling the page can't
+        change a setting under the cursor - you click to change, not scroll
+        past.
+
+        CRUCIAL exception: QScrollBar (which IS-A QAbstractSlider, so
+        findChildren picks every scrollbar up too) must never be guarded.
+        QAbstractScrollArea delivers wheel events by forwarding them to its own
+        scrollbar - guarding scrollbars therefore froze every scrollable child
+        in Settings, most visibly the language list, which ignored the wheel
+        entirely no matter how the widget itself was configured. Scrollbars ARE
+        the scrolling mechanism; the guard is only for value controls.
+
+        The guard object is parented to the dialog: a module-level singleton
+        QObject could have its C++ side torn down under some app lifetimes
+        (seen in the test suite), leaving installEventFilter a dangling
+        wrapper."""
+        wheel_guard = _WheelGuard(d)
+        for cls in (QComboBox, QAbstractSpinBox, QAbstractSlider):
+            for w in d.findChildren(cls):
+                if isinstance(w, QScrollBar):
+                    continue
+                w.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+                w.installEventFilter(wheel_guard)
 
     @staticmethod
     def _combo(items, current) -> QComboBox:
@@ -1558,18 +1585,7 @@ class _SettingsMixin:
         buttons.rejected.connect(d.reject)
         outer.addWidget(buttons)
 
-        # Guard every value control so scrolling the page doesn't change a
-        # setting under the cursor - you click to change, not scroll past.
-        # Parented to the dialog: a module-level singleton QObject could
-        # have its C++ side torn down under some app lifetimes (seen in
-        # the test suite), leaving installEventFilter a dangling wrapper.
-        # The language picker is a QListWidget, not one of these classes, so it
-        # stays wheel-scrollable by construction - the one box that should.
-        wheel_guard = _WheelGuard(d)
-        for cls in (QComboBox, QAbstractSpinBox, QAbstractSlider):
-            for w in d.findChildren(cls):
-                w.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-                w.installEventFilter(wheel_guard)
+        self._install_wheel_guard(d)
 
         if d.exec():
             self.settings.setValue(
