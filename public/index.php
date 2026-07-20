@@ -139,12 +139,17 @@ unset($g);
       <a class="navlink" href="#download"><?= h(t('nav_download')) ?></a>
       <a class="navlink" href="<?= h($REPO) ?>"><?= h(t('nav_github')) ?></a>
 <?php $avail = i18n_available(); if (count($avail) > 1): ?>
-      <select id="langSelect" class="langsel" aria-label="<?= h(t('lang_label')) ?>">
-<?php foreach ($avail as $code): ?>
-        <option value="<?= h($code) ?>"<?= $code === lang_code() ? ' selected' : '' ?>><?= h(I18N_NAMES[$code] ?? $code) ?></option>
+      <details class="langpick" id="langPick">
+        <summary aria-label="<?= h(t('lang_label')) ?>">
+          <span class="langpick-cur">🌐 <?= h(I18N_NAMES[lang_code()] ?? lang_code()) ?></span>
+          <span class="langpick-caret" aria-hidden="true">▾</span>
+        </summary>
+        <div class="langpick-menu" role="menu">
+<?php foreach ($avail as $code): $href = $code === 'en' ? '/' : '/?lang=' . rawurlencode($code); ?>
+          <a role="menuitem" class="langpick-item<?= $code === lang_code() ? ' is-current' : '' ?>" href="<?= h($href) ?>"<?= $code === lang_code() ? ' aria-current="true"' : '' ?>><?= h(I18N_NAMES[$code] ?? $code) ?></a>
 <?php endforeach; ?>
-      </select>
-      <noscript><a class="navlink" href="/?lang=<?= h(lang_code() === 'en' ? ($avail[1] ?? 'en') : 'en') ?>">🌐</a></noscript>
+        </div>
+      </details>
 <?php endif; ?>
       <a class="btn primary" href="#download"><?= h(t('nav_download_btn')) ?></a>
     </nav>

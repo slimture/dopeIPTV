@@ -189,17 +189,37 @@ footer nav a:hover { color: var(--accent); }
 .lb-close:hover { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .lb-overlay { transition: none; } }
 
-/* ---- language switcher (native roll-list) -------------------------------- */
-.langsel {
-  /* Pin the native popup to a dark scheme so the OS/browser can't paint a
-     pale highlight over pale text when the user's system is in light mode. */
-  color-scheme: dark;
-  background: #12151c; color: #cfd6e0;
-  border: 1px solid rgba(255,255,255,.14); border-radius: 8px;
-  padding: 6px 10px; font-size: 14px; line-height: 1.2; cursor: pointer;
-  max-width: 200px;
+/* ---- language switcher (custom roll-down, theme-aware) ------------------- */
+/* A styled <details> instead of a native <select>: the OS pop-up button looks
+   clunky and its popup highlight was unreadable in light mode. This one is
+   fully themed, so the colours always read and it matches the site. Works with
+   no JS (native disclosure); app.js only adds close-on-outside-click. */
+.langpick { position: relative; }
+.langpick summary {
+  list-style: none; cursor: pointer; user-select: none;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 7px 12px; border-radius: 10px;
+  border: 1px solid var(--line-2); background: var(--surface-2);
+  color: var(--text); font-size: 14px; line-height: 1;
+  transition: border-color .2s ease, background .2s ease;
 }
-.langsel:hover  { border-color: rgba(255,255,255,.30); color: #fff; }
-.langsel:focus  { outline: none; border-color: var(--accent, #4ea1ff); }
-.langsel option         { background: #12151c; color: #cfd6e0; }
-.langsel option:checked { background: #1c2230; color: #fff; }
+.langpick summary::-webkit-details-marker { display: none; }
+.langpick summary::marker { content: ""; }
+.langpick summary:hover { border-color: var(--accent); }
+.langpick[open] summary { border-color: var(--accent); }
+.langpick-caret { color: var(--muted); font-size: 11px; transition: transform .2s ease; }
+.langpick[open] .langpick-caret { transform: rotate(180deg); }
+.langpick-menu {
+  position: absolute; top: calc(100% + 8px); inset-inline-end: 0; z-index: 40;
+  min-width: 190px; max-height: 62vh; overflow-y: auto;
+  padding: 6px; border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--line-2);
+  box-shadow: 0 18px 44px -18px rgba(0,0,0,.6);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.langpick-item {
+  display: block; padding: 8px 12px; border-radius: 8px;
+  color: var(--text); font-size: 14px; white-space: nowrap;
+}
+.langpick-item:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.langpick-item.is-current { color: var(--accent); font-weight: 600; }

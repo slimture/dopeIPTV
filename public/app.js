@@ -59,12 +59,16 @@
   });
 })();
 
-/* Language switcher: navigate to the chosen language (adds ?lang=xx, which
-   the server persists in a cookie). The native <select> is the roll-list. */
+/* Language switcher: a styled <details> roll-down of language links. It works
+   with no JS (native disclosure + plain <a> links); JS only closes it when you
+   click away or press Escape. No inline handlers, so it stays CSP-safe. */
 (function () {
-  var sel = document.getElementById("langSelect");
-  if (!sel) { return; }
-  sel.addEventListener("change", function () {
-    if (sel.value) { window.location.href = "/?lang=" + encodeURIComponent(sel.value); }
+  var pick = document.getElementById("langPick");
+  if (!pick) { return; }
+  document.addEventListener("click", function (e) {
+    if (pick.open && !pick.contains(e.target)) { pick.open = false; }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && pick.open) { pick.open = false; }
   });
 })();

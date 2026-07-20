@@ -36,7 +36,7 @@ return [
     "feat_c1_h" => "Timeshift &amp; catch-up",
     "feat_c1_p" => "Retrocede en el archivo de un canal sobre una línea de tiempo en directo, o salta directamente a un programa anterior desde la guía.",
     "feat_mv_h" => "Multiview",
-    "feat_mv_p" => "Mira hasta nueve canales en directo a la vez en una cuadrícula — mezcla distintas listas, haz clic en uno para el audio, con timeshift y subtítulos por ventana.",
+    "feat_mv_p" => "Mira hasta nueve canales en directo a la vez en una cuadrícula — mezcla distintas listas, haz clic en cualquiera para el audio, con timeshift y subtítulos por ventana.",
     "feat_c2_h" => "Pausa la TV en directo",
     "feat_c2_p" => "Pausa y reanuda al estilo DVR por detrás del directo — el reproductor muestra exactamente cuánto vas por detrás.",
     "feat_c3_h" => "Guía EPG completa",

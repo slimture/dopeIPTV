@@ -37,7 +37,7 @@ return [
     "feat_c1_h" => "Timeshift &amp; catch-up",
     "feat_c1_p" => "Scrub back into a channel's archive on a live timeline, or jump straight to a past programme from the guide.",
     "feat_mv_h" => "Multiview",
-    "feat_mv_p" => "Watch up to nine live channels at once in a grid — mix different playlists, click one for audio, with per-window timeshift and subtitles.",
+    "feat_mv_p" => "Watch up to nine live channels at once in a grid — mix different playlists, click any one for audio, with per-window timeshift and subtitles.",
     "feat_c2_h" => "Pause live TV",
     "feat_c2_p" => "DVR-style pause and resume behind live — the player shows exactly how far behind you are.",
     "feat_c3_h" => "Full EPG guide",
@@ -46,7 +46,7 @@ return [
     "feat_c4_p" => "Record the stream you're watching over a single connection, with timers, size caps and a Recordings library.",
     "feat_c5_h" => "Multi-provider",
     "feat_c5_p" => "Several Xtream or M3U playlists side by side, each with its own EPG, auto-refresh and custom guide URL.",
-    "feat_c6_h" => "Buttery playback",
+    "feat_c6_h" => "Smooth playback",
     "feat_c6_p" => "A built-in mpv engine, with Chromecast, Trakt sync, themes and full keyboard control.",
 
     // screenshots
