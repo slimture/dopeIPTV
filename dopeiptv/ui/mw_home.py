@@ -843,7 +843,9 @@ class HomePage(QWidget):
 
     def _open_guide(self) -> None:
         self.window._leave_home()
-        self.window._open_epg_guide()
+        # Global scope: from Home the guide must not inherit whatever
+        # category the hidden classic view had auto-selected.
+        self.window._open_epg_guide(global_scope=True)
 
     def _play_channel(self, it: dict) -> None:
         # Tune the channel, then land the classic list under TV *in this

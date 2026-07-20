@@ -180,9 +180,13 @@ class _SettingsMixin:
 
     # -- EPG guide -----------------------------------------------------------------
 
-    def _open_epg_guide(self) -> None:
+    def _open_epg_guide(self, global_scope: bool = False) -> None:
+        """Open the TV guide. Scoped to the current list in TV / Favorites
+        mode; *global_scope* (Home's guide button) skips those - whatever
+        category the hidden classic view happens to have selected is not a
+        choice the user made from Home."""
         self._ensure_xmltv_loaded()
-        if self.mode == "live" and self.all_items:
+        if not global_scope and self.mode == "live" and self.all_items:
             cat = self.cat_list.currentItem()
             cat_name = cat.text() if cat else "All"
             EpgGridDialog(self, list(self.all_items), cat_name).exec()
@@ -190,12 +194,26 @@ class _SettingsMixin:
         # In Favorites, scope the guide to the favorite CHANNELS shown (a
         # folder, or all of them) - movies/series have no EPG. Other Trakt/
         # media sections simply have no live channels to guide.
-        if self.mode == "fav":
+        if not global_scope and self.mode == "fav":
             chans = self._favorite_channels_for_guide()
             cat = self.cat_list.currentItem()
             EpgGridDialog(self, chans,
                           cat.text().strip() if cat else tr("nav_favorites")
                           ).exec()
+            return
+        # No meaningful live scope (Home, Movies, Series, ...). The guide
+        # used to cover an arbitrary slice here: an auto-selected first
+        # category, or the first 300 of the provider's full dump. Favorite
+        # channels are the lineup the user actually curated - guide those
+        # when any exist; the full lineup stays the fallback.
+        try:
+            exclude = (() if self.parental.session_unlocked
+                       else self.favs.locked_groups())
+            favs = self.favs.items(None, exclude_groups=exclude)
+        except Exception:
+            favs = []
+        if favs:
+            EpgGridDialog(self, favs, tr("nav_favorites")).exec()
             return
         dlg = QDialog(self)
         dlg.setWindowTitle(tr("btn_epg_guide"))

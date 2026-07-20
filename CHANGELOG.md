@@ -60,6 +60,12 @@ faster app all around.
 - **Continue watching and Recently viewed no longer overlap.** A partly-
   watched title lives on Continue watching; Recently viewed shows the rest
   (turn Continue watching off and it shows everything again).
+- **The TV guide from Home (or Movies/Series) covers your favorites.** It
+  used to open over an arbitrary slice - whatever category the hidden TV
+  view had auto-selected, or the first 300 channels of the provider's full
+  dump. Now it guides your favorite channels (the lineup you actually
+  curated) and falls back to the full lineup when you have none. Opened
+  from TV or Favorites it is scoped to the current list, as before.
 - **Removed the Featured row.** It was the top 12 of the same recently-added
   movies already shown directly below it - pure duplication, and its oversized
   posters were the slowest part of the page.
