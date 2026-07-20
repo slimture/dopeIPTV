@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QAbstractListModel, QModelIndex, QRect, QRectF, QSize, Qt
+from PyQt6.QtCore import (
+    QAbstractListModel, QModelIndex, QRect, QRectF, QSize, Qt, QTimer,
+)
 from PyQt6.QtGui import (
     QColor, QFont, QPainter, QPainterPath, QPen, QPixmap, QPixmapCache,
 )
@@ -44,6 +46,8 @@ class ChannelListView(QListView):
     def __init__(self, *a, **kw) -> None:
         super().__init__(*a, **kw)
         self._grid_cell: QSize | None = None
+        self._justify_timer: QTimer | None = None
+        self._justify_pending = False
         # Kill IconMode's default 4-6 px padding around every item and any
         # frame inset - our justified slots already fill the viewport, so any
         # extra spacing just adds a visible gap on the right.
@@ -103,7 +107,32 @@ class ChannelListView(QListView):
 
     def resizeEvent(self, e) -> None:
         super().resizeEvent(e)
+        # Coalesce reflow storms. A splitter drag resizes the view on every
+        # mouse move, and a full grid relayout (setGridSize+setViewportMargins
+        # over thousands of items) per pixel starves the GUI thread - felt as
+        # video stutter while dragging the divider. Leading edge reflows
+        # immediately (instant feedback), followers within the window collapse
+        # into one trailing pass, so a drag reflows at ~20 Hz and the final
+        # width always lands exactly.
+        t = self._justify_timer
+        if t is None:
+            t = self._justify_timer = QTimer(self)
+            t.setSingleShot(True)
+            t.setInterval(50)
+            t.timeout.connect(self._justify_trailing)
+        if t.isActive():
+            self._justify_pending = True
+            return
         self._justify_grid()
+        t.start()
+
+    def _justify_trailing(self) -> None:
+        if self._justify_pending:
+            self._justify_pending = False
+            self._justify_grid()
+            # Keep throttling while the storm lasts (a long drag), so bursts
+            # never degenerate back into per-pixel relayouts.
+            self._justify_timer.start()
 
     def _justify_grid(self) -> None:
         cell = self._grid_cell

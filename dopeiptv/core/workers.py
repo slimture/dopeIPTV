@@ -243,7 +243,8 @@ class LogoLoader(QObject):
     def __init__(self, pool: QThreadPool, max_size: int = 96,
                  max_entries: int = 2000,
                  cache_dir: Path | str | None = None,
-                 max_bytes: int = 64 * 1024 * 1024) -> None:
+                 max_bytes: int = 64 * 1024 * 1024,
+                 disk_budget: int = 512 * 1024 * 1024) -> None:
         super().__init__()
         self.pool = pool
         self.max_size = max_size
@@ -284,6 +285,48 @@ class LogoLoader(QObject):
         # of re-hitting the network.
         self.disk_dir: Path | None = (
             Path(cache_dir) if cache_dir is not None else None)
+        # The disk cache had NO automatic bound - it grew for every image
+        # ever fetched until the user found the manual clear button in
+        # Settings. Prune it back under budget once per session, off the
+        # GUI thread. 0 disables (tests drive _prune_disk_cache directly).
+        self.disk_budget = int(disk_budget)
+        if self.disk_dir is not None and self.disk_budget > 0:
+            run_async(self.pool, self._prune_disk_cache, lambda _r: None)
+
+    def _prune_disk_cache(self) -> int:
+        """Delete the oldest cached image files until the disk cache fits
+        the budget again. Runs on a pool thread (pure filesystem work, no
+        Qt objects). Returns the number of bytes freed, for the tests."""
+        d = self.disk_dir
+        if d is None or not d.exists():
+            return 0
+        files: list[tuple[float, int, Path]] = []
+        total = 0
+        for p in d.rglob("*"):
+            try:
+                if not p.is_file():
+                    continue
+                st = p.stat()
+            except OSError:
+                continue
+            files.append((st.st_mtime, st.st_size, p))
+            total += st.st_size
+        if total <= self.disk_budget:
+            return 0
+        freed = 0
+        # Oldest first, and stop at 90% of the budget so the next session
+        # doesn't immediately have to prune again.
+        target = int(self.disk_budget * 0.9)
+        for _mtime, size, p in sorted(files):
+            try:
+                p.unlink()
+            except OSError:
+                continue
+            total -= size
+            freed += size
+            if total <= target:
+                break
+        return freed
 
     @staticmethod
     def _host_of(url: str) -> str:
@@ -293,8 +336,23 @@ class LogoLoader(QObject):
         except IndexError:
             return url
 
+    #: Hard cap on the dead-URL tombstone map. Entries are only ever removed
+    #: when the SAME url is re-requested after expiry - never for urls you
+    #: scrolled past once - so a long browse over providers with many broken
+    #: image links grew it without bound.
+    DEAD_CAP = 4096
+
     def _mark_dead(self, url: str, ttl: float) -> None:
         self.dead[url] = time.monotonic() + ttl
+        if len(self.dead) > self.DEAD_CAP:
+            now = time.monotonic()
+            self.dead = {u: t for u, t in self.dead.items() if t > now}
+            if len(self.dead) > self.DEAD_CAP:
+                # Still over after dropping expired ones: keep the entries
+                # with the longest remaining cooldown (permanent 404s), the
+                # short transient cooldowns are the cheapest to re-learn.
+                keep = sorted(self.dead.items(), key=lambda kv: kv[1])
+                self.dead = dict(keep[-self.DEAD_CAP:])
 
     def _strike_host(self, url: str) -> None:
         host = self._host_of(url)
