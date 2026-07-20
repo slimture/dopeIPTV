@@ -30,6 +30,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   the main source of scroll lag with large lineups. Lists also use smooth
   pixel-granular scrolling and lay huge lineups out in background batches.
   None of this touches the video pipeline.
+- **Translator workflow** — a `docs/TRANSLATING.md` guide, a "Translation
+  fix" issue template, and a `tools/i18n_status.py` health report (coverage,
+  stray keys and placeholder mismatches per language) make it easy for native
+  speakers to correct the machine-translated locales.
 
 ## [0.9.0]
 

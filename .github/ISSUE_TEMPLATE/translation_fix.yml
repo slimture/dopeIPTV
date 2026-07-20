@@ -1,0 +1,54 @@
+name: Translation fix
+description: Correct or improve a translation in your language
+labels: ["i18n"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping polish dopeIPTV in your language! Most non-English
+        strings started as machine translation, so native-speaker corrections
+        are very welcome. You don't need to touch code — just tell us the key,
+        the current text and your suggested wording, and we'll update the
+        locale file. (Prefer opening a pull request? See
+        [`docs/TRANSLATING.md`](../blob/main/docs/TRANSLATING.md).)
+  - type: input
+    id: language
+    attributes:
+      label: Language
+      description: The language and its code, e.g. "German (de)".
+      placeholder: "German (de)"
+    validations:
+      required: true
+  - type: textarea
+    id: corrections
+    attributes:
+      label: Corrections
+      description: >
+        One block per string. Include the translation key if you know it (run
+        `python tools/i18n_status.py <code>` or look in
+        `dopeiptv/locale/<code>.json`), the current text, and your suggestion.
+      placeholder: |
+        key: onb_xtream_link_hint
+        current: <the wording you see now>
+        suggested: <your improved wording>
+
+        key: btn_connect
+        current: …
+        suggested: …
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Where in the app
+      description: Optional — the screen/menu where you saw it, so we can double-check context.
+      placeholder: "Welcome screen, connect step"
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: My suggestions keep any `{placeholders}` (like `{days}`, `{title}`) exactly as they appear in the original.
+          required: true
+        - label: I searched existing issues and this hasn't already been reported.
+          required: true

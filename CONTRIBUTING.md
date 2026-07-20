@@ -46,7 +46,10 @@ python3 dopeiptv.py --self-check       # libmpv loads, GL player constructs
   placeholder consistency across languages and full coverage for the core
   locales; machine translation for the non-English entries is acceptable.
   Right-to-left languages (`ar`, `fa`, `he`, `ur`) are listed in
-  `RTL_LANGUAGES` so the UI mirrors its layout.
+  `RTL_LANGUAGES` so the UI mirrors its layout. `python tools/i18n_status.py`
+  reports every language's health; see
+  [`docs/TRANSLATING.md`](docs/TRANSLATING.md) for the full translator
+  workflow (native-speaker corrections are especially welcome).
 - **Icons are drawn in code** (QPainter vector art), never emoji glyphs —
   emoji render differently (or invisibly) per platform.
 - **Platform-specific code** lives behind `sys.platform` checks or in

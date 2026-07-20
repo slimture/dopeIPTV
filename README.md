@@ -237,7 +237,10 @@ notifications switch immediately.
 
 English is the source language, inline in `dopeiptv/i18n.py`; every other
 language is a single reviewable file under `dopeiptv/locale/<code>.json`, so
-a native speaker can correct one language in isolation.
+a native speaker can correct one language in isolation. Many of the
+non-English strings started as machine translation — **corrections in your
+language are very welcome**; see [`docs/TRANSLATING.md`](docs/TRANSLATING.md)
+(no coding required).
 
 ## License
 

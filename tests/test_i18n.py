@@ -57,3 +57,18 @@ def test_unknown_language_falls_back_to_english():
     i18n.set_language("xx")
     assert i18n.tr("nav_tv") == "TV"
     i18n.set_language("en")
+
+
+def test_i18n_status_tool_reports_all_locales_healthy():
+    # The contributor-facing health tool must stay runnable and, with the
+    # shipped locales, report a clean bill (exit 0 = no incomplete/stray/
+    # placeholder issues). This doubles as a guard that every locale is sound.
+    import importlib.util
+    import os
+
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "tools", "i18n_status.py")
+    spec = importlib.util.spec_from_file_location("i18n_status", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert mod._table(i18n.base_string_keys()) == 0
