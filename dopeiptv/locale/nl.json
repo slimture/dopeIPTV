@@ -158,6 +158,7 @@
   "rec_earlier": "Eerder",
   "fav_empty_all": "Nog geen favorieten — klik met rechts op een kanaal, film of serie om er een toe te voegen.",
   "onb_fill_all": "Vul server, gebruikersnaam en wachtwoord in.",
+  "onb_xtream_link_hint": "Tip: plak je volledige Xtream-link en wij vullen deze velden voor je in.",
   "onb_add_provider": "+ Provider toevoegen",
   "welcome_add_hint": "Nog geen provider — voeg er op elk moment een toe in Instellingen.",
   "btn_use": "Gebruiken",

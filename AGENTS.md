@@ -13,7 +13,7 @@ map and the one-way import rule.
 | Module | What it owns |
 |--------|--------------|
 | `app.py` | Entry point, QApplication, login loop |
-| `i18n.py` | Translation tables, `set_language`, `tr()` |
+| `i18n.py` | English source strings, `set_language`, `tr()` (other 26 languages in `locale/*.json`) |
 | `providers/client.py` | Xtream Codes API client |
 | `providers/epg.py` | EPG/XMLTV parser, cache and compact index |
 | `providers/metadata.py` | TMDB client, PosterResolver |

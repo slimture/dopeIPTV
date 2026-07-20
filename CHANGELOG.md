@@ -5,6 +5,23 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
+## [Unreleased]
+
+- **27 interface languages** — the whole UI is now translated into 27
+  languages (up from 8): added Português, Italiano, Nederlands, Polski,
+  Hrvatski, Srpski, Ελληνικά, Türkçe, Українська, Bahasa Indonesia, Tiếng
+  Việt, हिन्दी, 日本語, 한국어, Kiswahili, العربية, فارسی, עברית and اردو.
+  The four right-to-left languages (Arabic, Persian, Hebrew, Urdu) mirror the
+  layout. English is the inline source; every other language is a single
+  reviewable `dopeiptv/locale/<code>.json` file, so a native speaker can
+  correct one language in isolation.
+- **Paste a whole Xtream link** — the onboarding wizard and the Add/Edit
+  playlist dialog now accept a full Xtream URL (`get.php`, `player_api.php`,
+  or a direct stream URL) pasted into the server field and split it into the
+  server / username / password fields for you. Typing the three fields by
+  hand still works exactly as before, and the language picker in the welcome
+  screen now lists all 27 languages.
+
 ## [0.9.0]
 
 **Home** — a full-window start page with a Featured hero row and shelves — plus an

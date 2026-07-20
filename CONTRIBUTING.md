@@ -38,10 +38,15 @@ python3 dopeiptv.py --self-check       # libmpv loads, GL player constructs
 - **Never regress video playback.** The embedded mpv/OpenGL pipeline is the
   heart of the app; changes that touch it need a clear explanation of why
   they're safe. When in doubt, don't touch the render path.
-- **Every user-visible string goes through `tr()`** and needs entries for
-  all 8 languages (`en`, `sv`, `es`, `de`, `fr`, `zh`, `ru`, `th`) in
-  `dopeiptv/i18n.py`. A test enforces placeholder consistency across
-  languages; machine translation for the non-English entries is acceptable.
+- **Every user-visible string goes through `tr()`.** Add the English source
+  to `_STRINGS` in `dopeiptv/i18n.py` (English is the only language inline);
+  each of the other 26 languages lives in its own `dopeiptv/locale/<code>.json`
+  file. A new key falls back to English until a locale file covers it, so you
+  can add the string and translate the locales in follow-up. Tests enforce
+  placeholder consistency across languages and full coverage for the core
+  locales; machine translation for the non-English entries is acceptable.
+  Right-to-left languages (`ar`, `fa`, `he`, `ur`) are listed in
+  `RTL_LANGUAGES` so the UI mirrors its layout.
 - **Icons are drawn in code** (QPainter vector art), never emoji glyphs —
   emoji render differently (or invisibly) per platform.
 - **Platform-specific code** lives behind `sys.platform` checks or in

@@ -158,6 +158,7 @@
   "rec_earlier": "更早",
   "fav_empty_all": "还没有收藏 — 右键点击任意频道、电影或剧集即可添加。",
   "onb_fill_all": "请填写服务器、用户名和密码。",
+  "onb_xtream_link_hint": "提示：粘贴完整的 Xtream 链接，我们会为你自动填写这些字段。",
   "onb_add_provider": "+ 添加提供商",
   "welcome_add_hint": "尚无提供商 — 可随时在设置中添加。",
   "btn_use": "使用",

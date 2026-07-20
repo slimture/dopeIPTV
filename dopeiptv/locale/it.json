@@ -158,6 +158,7 @@
   "rec_earlier": "Prima",
   "fav_empty_all": "Ancora nessun preferito — fai clic destro su un canale, film o serie per aggiungerlo.",
   "onb_fill_all": "Compila server, nome utente e password.",
+  "onb_xtream_link_hint": "Suggerimento: incolla il tuo link Xtream completo e compileremo questi campi per te.",
   "onb_add_provider": "+ Aggiungi fornitore",
   "welcome_add_hint": "Ancora nessun fornitore — aggiungine uno quando vuoi nelle Impostazioni.",
   "btn_use": "Usa",

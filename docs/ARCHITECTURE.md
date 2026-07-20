@@ -14,7 +14,8 @@ dopeiptv.py            Thin launcher (calls dopeiptv.app.main)
 dopeiptv/
   __init__.py          Package metadata (APP_NAME, ORG, VERSION)
   app.py               QApplication bootstrap, login flow, icon generation
-  i18n.py              Translation tables + set_language / tr()
+  i18n.py              English source strings + set_language / tr()
+  locale/              One <code>.json per non-English language (26 files)
 
   providers/           Data sources (the network / provider edge)
     client.py          XtreamClient, OfflineClient/M3UClient/DemoClient

@@ -158,6 +158,7 @@
   "rec_earlier": "Tidigare",
   "fav_empty_all": "Inga favoriter än – högerklicka en kanal, film eller serie för att lägga till.",
   "onb_fill_all": "Fyll i server, användarnamn och lösenord.",
+  "onb_xtream_link_hint": "Tips: klistra in hela din Xtream-länk så fyller vi i fälten åt dig.",
   "onb_add_provider": "+ Lägg till leverantör",
   "welcome_add_hint": "Ingen leverantör än – lägg till en när som helst i Inställningar.",
   "btn_use": "Använd",

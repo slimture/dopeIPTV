@@ -3,7 +3,7 @@
 - **Runs on Linux, macOS and Windows** from one codebase — the same embedded libmpv player on all three (Linux is the primary target; macOS and Windows builds ship as a `.dmg` and a portable `.zip`)
 - Log in with Xtream Codes credentials (server, username, password) — settings are saved
 - TV, Movies, and Series with seasons and episodes, plus Favorites and History
-- **Multiple languages**: the whole interface is translated into English, Svenska, Español, Deutsch, Français, 中文, Русский and ไทย — pick your language under Settings → Interface and the menus switch **live**, no restart
+- **27 languages**: the whole interface is translated into English, Svenska, Español, Deutsch, Français, 中文, Русский, ไทย, Português, Italiano, Nederlands, Polski, Hrvatski, Srpski, Ελληνικά, Türkçe, Українська, Bahasa Indonesia, Tiếng Việt, हिन्दी, 日本語, 한국어, Kiswahili, العربية, فارسی, עברית and اردو — pick your language under Settings → Interface and the menus switch **live**, no restart. The four right-to-left languages (Arabic, Persian, Hebrew, Urdu) mirror the layout automatically. English is the inline source; every other language ships as a reviewable `dopeiptv/locale/<code>.json` file
 - Categories in the sidebar and fast, debounced search — no cap on the number of channels, and no freeze even with thousands of them (the channel list is virtualized, so only visible rows are ever rendered)
 - EPG shown immediately for every visible live channel (not just the one you click), using a "now playing" line and progress bar
 - EPG Guide dialog: browse now/next info for every channel in one searchable list

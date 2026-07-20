@@ -158,6 +158,7 @@
   "rec_earlier": "Wcześniej",
   "fav_empty_all": "Brak ulubionych — kliknij prawym przyciskiem dowolny kanał, film lub serial, aby dodać.",
   "onb_fill_all": "Wypełnij serwer, nazwę użytkownika i hasło.",
+  "onb_xtream_link_hint": "Wskazówka: wklej pełny link Xtream, a wypełnimy te pola za Ciebie.",
   "onb_add_provider": "+ Dodaj dostawcę",
   "welcome_add_hint": "Brak dostawcy — dodaj go w dowolnej chwili w Ustawieniach.",
   "btn_use": "Użyj",

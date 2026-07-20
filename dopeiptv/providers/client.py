@@ -708,6 +708,54 @@ class DemoClient(OfflineClient):
             return ""
 
 
+def parse_xtream_url(text: str) -> tuple[str, str, str] | None:
+    """Pull ``(server, username, password)`` out of a pasted Xtream link.
+
+    Many providers hand out a single ready-made URL rather than three separate
+    fields, e.g. ``http://host:port/get.php?username=U&password=P&type=m3u_plus``
+    or the API form ``http://host:port/player_api.php?username=U&password=P``.
+    Some instead give a direct stream path ``http://host:port/live/U/P/1.ts``
+    (or ``/U/P/1.ts``). This teases the three parts out of any of those so the
+    onboarding/playlist form can be filled from a single paste, while manual
+    server/username/password entry keeps working untouched.
+
+    ``server`` is normalised to ``scheme://host[:port]`` (no trailing path or
+    query). Returns ``None`` when *text* isn't a URL carrying credentials, so
+    the caller can leave a plain hostname or a half-typed value alone.
+    """
+    from urllib.parse import parse_qs, urlparse
+
+    s = (text or "").strip()
+    if not s or "://" not in s:
+        return None
+    try:
+        u = urlparse(s)
+    except ValueError:
+        return None
+    if not u.scheme or not u.netloc:
+        return None
+    server = f"{u.scheme}://{u.netloc}"
+
+    # Preferred form: credentials in the query string (get.php / player_api.php
+    # and most panel exports). parse_qs lower-cases nothing, so accept the exact
+    # Xtream keys.
+    q = parse_qs(u.query)
+    user = (q.get("username") or [""])[0].strip()
+    pw = (q.get("password") or [""])[0].strip()
+    if user and pw:
+        return server, user, pw
+
+    # Fallback: path-based stream URLs embed the credentials as the first two
+    # path segments — /live/USER/PASS/ID.ext, /movie/..., /series/..., or the
+    # bare /USER/PASS/ID form. Skip a leading media-type segment when present.
+    parts = [p for p in u.path.split("/") if p]
+    if parts and parts[0] in ("live", "movie", "series", "timeshift"):
+        parts = parts[1:]
+    if len(parts) >= 2 and parts[0] and parts[1]:
+        return server, parts[0], parts[1]
+    return None
+
+
 def b64(text: str | None) -> str:
     """Decode Xtream's base64-encoded EPG text fields."""
     if not text:

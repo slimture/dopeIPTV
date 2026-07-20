@@ -237,6 +237,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "rec_earlier": {"en": "Earlier"},
     "fav_empty_all": {"en": "No favorites yet — right-click any channel, movie or series to add one."},
     "onb_fill_all": {"en": "Please fill in server, username and password."},
+    "onb_xtream_link_hint": {"en": "Tip: paste your full Xtream link and we'll fill these in for you."},
     "onb_add_provider": {"en": "+ Add provider"},
     "welcome_add_hint": {"en": "No provider yet — add one any time in Settings."},
     "btn_use": {"en": "Use"},
@@ -1046,8 +1047,9 @@ def tr(key: str, **kwargs: object) -> str:
 import json as _json
 import os as _os
 
-#: Right-to-left languages. Arabic and Persian ship as add-on locales; the UI
-#: mirrors its layout direction for these (see is_rtl / apply in the window).
+#: Right-to-left languages (Arabic, Persian, Hebrew, Urdu). They ship as add-on
+#: locales; the UI mirrors its layout direction for these (see is_rtl / apply in
+#: the window).
 RTL_LANGUAGES = frozenset({"ar", "fa", "he", "ur"})
 
 #: Native names for every non-English language, in picker order (English is

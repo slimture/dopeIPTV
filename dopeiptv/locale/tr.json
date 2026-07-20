@@ -158,6 +158,7 @@
  "rec_earlier": "Daha önce",
  "fav_empty_all": "Henüz favori yok — eklemek için herhangi bir kanala, filme veya diziye sağ tıklayın.",
  "onb_fill_all": "Lütfen sunucu, kullanıcı adı ve şifreyi doldurun.",
+ "onb_xtream_link_hint": "İpucu: tam Xtream bağlantınızı yapıştırın, bu alanları sizin için dolduralım.",
  "onb_add_provider": "+ Sağlayıcı ekle",
  "welcome_add_hint": "Henüz sağlayıcı yok — Ayarlar'da istediğiniz zaman bir tane ekleyin.",
  "btn_use": "Kullan",

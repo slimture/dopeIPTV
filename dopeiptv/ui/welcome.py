@@ -5,8 +5,10 @@ child widget, not a modal dialog, so it feels part of the app):
 
   1. Welcome - a greeting that flashes through languages, plus a language
                picker for the whole app.
-  2. Connect - Xtream Codes server / username / password, with a short
-               tour of what the app does right below it.
+  2. Connect - Xtream Codes server / username / password (or an M3U URL),
+               with a short tour of what the app does right below it. A whole
+               Xtream link pasted into the server field auto-fills the three
+               credential fields.
   3. Trakt   - optional Trakt.tv sync.
 
 At any point the user can "Skip for now" and explore the empty app; a
@@ -29,11 +31,15 @@ from .theme import P
 
 
 class WelcomeOverlay(QWidget):
-    # Decorative greetings that flash on the first page.
+    # Decorative greetings that flash on the first page - one per shipped
+    # language, so the rotation mirrors how many languages the app speaks.
     _GREETINGS = (
-        "Welcome", "Bienvenue", "Bienvenido", "Willkommen", "Benvenuto",
-        "Bem-vindo", "Välkommen", "Witaj", "欢迎", "ようこそ",
-        "Добро пожаловать", "환영합니다", "ยินดีต้อนรับ", "مرحبا", "Hoş geldiniz",
+        "Welcome", "Välkommen", "Bienvenido", "Willkommen", "Bienvenue",
+        "欢迎", "Добро пожаловать", "ยินดีต้อนรับ", "Bem-vindo", "Benvenuto",
+        "Welkom", "Witaj", "Dobrodošli", "Добродошли", "Καλώς ήρθατε",
+        "Hoş geldiniz", "Вітаємо", "Selamat datang", "Chào mừng", "स्वागत है",
+        "ようこそ", "환영합니다", "Karibu", "مرحبا", "خوش آمدید",
+        "ברוכים הבאים", "خوش آمدید",
     )
 
     def __init__(self, parent: QWidget, *, settings,
@@ -161,6 +167,10 @@ class WelcomeOverlay(QWidget):
         self._name.setPlaceholderText(tr("playlist_name_hint"))
         self._server = QLineEdit(s.value("server", "") if s else "")
         self._server.setPlaceholderText("http://server:port")
+        # Let a single pasted Xtream link (get.php / player_api / stream URL)
+        # fan out into the server/username/password fields; manual entry is
+        # untouched. editingFinished fires on paste-then-Tab/Enter or focus-out.
+        self._server.editingFinished.connect(self._maybe_split_xtream_link)
         self._user = QLineEdit(s.value("username", "") if s else "")
         self._pw = QLineEdit(s.value("password", "") if s else "")
         self._pw.setEchoMode(QLineEdit.EchoMode.Password)
@@ -174,6 +184,11 @@ class WelcomeOverlay(QWidget):
         form.addRow(self._lbl_server, self._server)
         form.addRow(self._lbl_user, self._user)
         form.addRow(self._lbl_pw, self._pw)
+
+        # Discoverability hint that a whole Xtream link can be pasted; sits
+        # under the form in the Xtream mode and hides for M3U.
+        self._c_hint = QLabel(tr("onb_xtream_link_hint"), objectName="OnbSub")
+        self._c_hint.setWordWrap(True)
 
         self._c_err = QLabel("", objectName="OnbErr")
         self._c_err.setWordWrap(True)
@@ -192,6 +207,7 @@ class WelcomeOverlay(QWidget):
 
         lay.addWidget(self._c_title)
         lay.addLayout(form)
+        lay.addWidget(self._c_hint)
         # Connect sits directly under the Password field; the error line
         # (hidden until needed) lives just below the button.
         lay.addWidget(self._c_connect)
@@ -280,7 +296,24 @@ class WelcomeOverlay(QWidget):
             "https://example.com/playlist.m3u" if m3u else "http://server:port")
         for w in (self._lbl_user, self._user, self._lbl_pw, self._pw):
             w.setVisible(not m3u)
+        # The paste-a-link tip only applies to Xtream (M3U already is one URL).
+        self._c_hint.setVisible(not m3u)
         self._fit_card(self._stack.currentIndex())
+
+    def _maybe_split_xtream_link(self) -> None:
+        """If the server field holds a full Xtream link, split it into the
+        server/username/password fields. Only runs in Xtream mode and only when
+        the paste actually carried credentials, so a plain host is left alone."""
+        if self._conn_kind.currentData() == "m3u":
+            return
+        from ..providers.client import parse_xtream_url
+        parsed = parse_xtream_url(self._server.text())
+        if not parsed:
+            return
+        server, user, pw = parsed
+        self._server.setText(server)
+        self._user.setText(user)
+        self._pw.setText(pw)
 
     def _do_connect(self) -> None:
         kind = self._conn_kind.currentData()
@@ -334,6 +367,7 @@ class WelcomeOverlay(QWidget):
         self._name.setPlaceholderText(tr("playlist_name_hint"))
         self._lbl_user.setText(tr("login_username"))
         self._lbl_pw.setText(tr("login_password"))
+        self._c_hint.setText(tr("onb_xtream_link_hint"))
         self._update_conn_kind()   # re-labels the server row for the mode
         self._c_connect.setText(tr("btn_connect"))
         self._f_title.setText(tr("onb_features_title"))

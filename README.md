@@ -28,7 +28,7 @@ external mpv/VLC playback).
 - **Embedded video** via libmpv's OpenGL render API — plays right inside the app on any compositor (GNOME, KDE, Hyprland, ...), with fullscreen, a pop-out window (detach to a second screen, optionally always-on-top), a hover scrubber and arrow-key seeking
 - **Multiview** — watch 2/4/6/9 live channels at once in a separate grid, each an independent stream (even from different playlists), with per-window audio/subtitles, click-to-focus audio and a real timeshift timeline on catch-up channels
 - **TV, Movies & Series** with seasons/episodes, favorites, history, and instant search across thousands of channels
-- **8 languages** — English, Svenska, Español, Deutsch, Français, 中文, Русский, ไทย — switchable live in Settings
+- **27 languages** — from English, Svenska and Español to 中文, 日本語, हिन्दी and العربية, with full right-to-left support (Arabic, Persian, Hebrew, Urdu) — switchable live in Settings
 - **Resume playback** — movies/series/recordings remember where you stopped and offer to continue
 - **Full EPG** with now/next progress bars, a searchable guide, and a persistent disk cache that shows instantly on startup
 - **TMDB metadata** — posters, ratings (linked to IMDb), and a clickable cast list that finds an actor's other titles in your playlist
@@ -226,10 +226,18 @@ while you're typing in the search box.
 
 ## Language
 
-dopeIPTV ships with translations for **English, Svenska, Español, Deutsch,
-Français, 中文, Русский and ไทย**. Pick your language under
+dopeIPTV ships with translations for **27 languages**: English, Svenska,
+Español, Deutsch, Français, 中文, Русский, ไทย, Português, Italiano,
+Nederlands, Polski, Hrvatski, Srpski, Ελληνικά, Türkçe, Українська, Bahasa
+Indonesia, Tiếng Việt, हिन्दी, 日本語, 한국어, Kiswahili, العربية, فارسی,
+עברית and اردو. The four right-to-left languages (Arabic, Persian, Hebrew,
+Urdu) mirror the whole layout. Pick your language under
 **Settings → Interface → Language**. Menus, the sidebar, settings and
 notifications switch immediately.
+
+English is the source language, inline in `dopeiptv/i18n.py`; every other
+language is a single reviewable file under `dopeiptv/locale/<code>.json`, so
+a native speaker can correct one language in isolation.
 
 ## License
 
