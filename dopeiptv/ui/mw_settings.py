@@ -699,6 +699,12 @@ class _SettingsMixin:
         lang_box = self._combo(
             [(code, name) for code, name in LANGUAGES.items()],
             current_language())
+        # The language picker is the one combo that is deliberately exempt from
+        # the wheel guard below: with 27 entries, users expect the wheel to move
+        # through the languages. Every other control still swallows the wheel so
+        # scrolling the page can't nudge a setting. Marked by object name so the
+        # guard loop can skip it.
+        lang_box.setObjectName("LanguagePicker")
         lang_box.currentIndexChanged.connect(
             lambda _i: self._set_language(lang_box.currentData()))
         epg_count_box = QSpinBox()
@@ -1531,6 +1537,8 @@ class _SettingsMixin:
         wheel_guard = _WheelGuard(d)
         for cls in (QComboBox, QAbstractSpinBox, QAbstractSlider):
             for w in d.findChildren(cls):
+                if w.objectName() == "LanguagePicker":
+                    continue   # language list stays wheel-scrollable
                 w.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
                 w.installEventFilter(wheel_guard)
 
