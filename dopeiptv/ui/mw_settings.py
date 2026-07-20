@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QAbstractItemView, QAbstractSlider, QAbstractSpinBox, QApplication,
     QCheckBox, QComboBox, QDialog,
     QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout, QInputDialog,
-    QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox,
+    QLabel, QLineEdit, QListView, QListWidget, QListWidgetItem, QMessageBox,
     QPushButton, QScrollArea, QSizePolicy, QSpinBox, QTabBar, QTabWidget,
     QTextBrowser, QVBoxLayout, QWidget,
 )
@@ -401,6 +401,14 @@ class _SettingsMixin:
     @staticmethod
     def _combo(items, current) -> QComboBox:
         box = QComboBox()
+        # Force an explicit QListView popup. On macOS the native (NSMenu) combo
+        # popup shows every item full-height and ignores maxVisibleItems, so a
+        # 27-entry list can't be scrolled - it just runs off the screen edge.
+        # An item-view popup is scrollable on every platform and honours the
+        # maxVisibleItems cap below (combobox-popup:0 in the theme is what lets
+        # that cap apply; the explicit view guarantees it even when the native
+        # style tries to override the stylesheet).
+        box.setView(QListView())
         for value, label in items:
             box.addItem(label, value)
         idx = box.findData(current)
