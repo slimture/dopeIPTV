@@ -1533,14 +1533,24 @@ class EmbeddedPlayer(QWidget):
         self.pop_btn.setToolTip(
             tr("tooltip_popout_exit") if enabled else tr("tooltip_popout"))
         self._lock_video_box()
-        # Re-lock once the layout has settled. Docking back measures the
-        # control bar's height for the fixed video box, but right after the
-        # reparent the bar isn't laid out yet, so the first measure was stale
-        # and the seek bar sat over the toolbar until a stray event nudged a
-        # relayout ("jumps up a notch when you touch the video"). The deferred
-        # pass re-measures against the settled layout - same belt-and-suspenders
-        # as leaving fullscreen.
-        QTimer.singleShot(0, self._lock_video_box)
+        # Re-settle once the layout is final. A pop-out toggle reparents the
+        # player, so right after it the video geometry isn't settled: the fixed
+        # video box measured a not-yet-laid-out control bar (seek bar sat over
+        # the toolbar on dock-back), and the timeshift timeline / seek bar,
+        # placed against the stale geometry, sat in the middle of the video on
+        # pop-out until a stray event nudged them. The deferred pass re-measures
+        # and re-places against the settled geometry - both directions.
+        QTimer.singleShot(0, self._settle_after_reparent)
+
+    def _settle_after_reparent(self) -> None:
+        """Re-lock the video box and re-place any visible overlay against the
+        geometry once it has settled after a pop-out dock/undock reparent."""
+        self._lock_video_box()
+        if self.ts_timeline.isVisible():
+            self._place_ts_timeline()
+        if (self.seek_overlay is not None
+                and self.seek_overlay.isVisible()):
+            self._place_seek_overlay()
 
     def set_popout_autohide(self, enabled: bool) -> None:
         """When on, the pop-out control bar fades after a few seconds of no
@@ -1811,6 +1821,16 @@ class EmbeddedPlayer(QWidget):
             self.unsetCursor()
             self.video.unsetCursor()
             self._mac_show_cursor()
+            if sys.platform == "darwin":
+                # macOS animates the fullscreen -> window transition and scales
+                # the last video frame through it, which reads as a horizontal
+                # stretch across the top until the resize lands. Paint black for
+                # the length of that animation, then restore. mpv keeps running
+                # the whole time (this only changes what paintGL draws), so
+                # playback is untouched - the frame is back the instant the
+                # window has settled.
+                self.video.set_blank(True)
+                QTimer.singleShot(280, self._unblank_after_fs_exit)
             # The docked height is now a constant, not derived from
             # self.height(), so restoring it doesn't depend on the window
             # having finished its async resize back from fullscreen - it
@@ -1818,6 +1838,12 @@ class EmbeddedPlayer(QWidget):
             # next tick to be robust against the transition ordering.
             self._lock_video_box()
             QTimer.singleShot(0, self._lock_video_box)
+
+    def _unblank_after_fs_exit(self) -> None:
+        # Only restore the picture if we're still docked with a live stream -
+        # never un-blank a stopped video or one that re-entered fullscreen.
+        if not self._fs_ui and self.current_url is not None:
+            self.video.set_blank(False)
 
     def _hide_fs_ui(self) -> None:
         # Never take the controls and cursor away under an open menu or
