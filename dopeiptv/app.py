@@ -245,6 +245,18 @@ def main() -> int:
             log.error("self-check: embedded playback DISABLED: %s", reason)
             return 1
         log.info("self-check: embedded playback OK (bundled libmpv loaded)")
+        # Every shipped language must actually load from THIS bundle. The
+        # locale JSONs live outside the code archive in frozen builds, so a
+        # packaging slip silently collapses the picker to English-only (the
+        # 1.0.0 regression) - fail the build loudly instead.
+        from .i18n import LANGUAGES, _NATIVE_NAMES
+        missing = [c for c in _NATIVE_NAMES if c not in LANGUAGES]
+        if missing:
+            log.error(
+                "self-check: %d language(s) did not load from the bundle: %s",
+                len(missing), ", ".join(missing))
+            return 1
+        log.info("self-check: all %d languages loaded", len(LANGUAGES))
         return 0
 
     _install_crash_hooks()

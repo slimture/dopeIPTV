@@ -50,6 +50,9 @@ jobs:
           /tmp/smoke/bin/pip install --upgrade pip
           /tmp/smoke/bin/pip install dist/*.whl
           /tmp/smoke/bin/python -c 'import dopeiptv, dopeiptv.app, dopeiptv.i18n, dopeiptv.ui.main_window; print("wheel imports OK, VERSION =", dopeiptv.VERSION)'
+          # Every shipped language must load from the installed wheel - a
+          # packaging slip here silently collapses the picker to English.
+          /tmp/smoke/bin/python -c 'from dopeiptv.i18n import LANGUAGES, _NATIVE_NAMES; missing=[c for c in _NATIVE_NAMES if c not in LANGUAGES]; assert not missing, f"languages missing from wheel: {missing}"; print(f"wheel languages OK: {len(LANGUAGES)} loaded")'
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
@@ -449,6 +452,23 @@ jobs:
           test -f "$APP/Contents/Resources/dopeiptv.icns" \
             && echo "icon: present" \
             || echo "::warning::icon missing (Info.plist references it but file not found)"
+          # All locale files must be inside the bundle (a slip here shipped a
+          # 1.0.0 .dmg whose language picker was English-only).
+          NLOC=$(find "$APP/Contents" -path '*dopeiptv/locale/*.json' | wc -l | tr -d ' ')
+          echo "bundled locale files: $NLOC"
+          if [ "$NLOC" -lt 26 ]; then
+            echo "::error::only $NLOC locale JSONs inside the .app (expected 26) - the language picker would be English-only"
+            hdiutil detach "$MOUNT" || true; exit 1
+          fi
+          # And they must actually LOAD from the frozen bundle: --self-check
+          # runs GUI-less (no window server needed) and verifies both the
+          # bundled libmpv and that every shipped language registers.
+          echo "::group::--self-check (bundled libmpv + languages)"
+          if ! "$BIN" --self-check; then
+            echo "::error::--self-check failed on the mounted .app (libmpv or languages)"
+            hdiutil detach "$MOUNT" || true; exit 1
+          fi
+          echo "::endgroup::"
           hdiutil detach "$MOUNT"
           echo "::endgroup::"
           # As a final sanity check try to launch the .app briefly. On a
@@ -531,6 +551,19 @@ jobs:
         env:
           LIBMPV_DIR: ${{ github.workspace }}/libmpv
         run: pyinstaller --noconfirm dopeiptv-win.spec   # -> dist/dopeiptv/
+      - name: Smoke test - self-check the frozen exe (libmpv + languages)
+        shell: pwsh
+        run: |
+          # The exe is a windowed app, so PowerShell won't wait on its own -
+          # Start-Process -Wait does. Exit code 0 = bundled libmpv loads AND
+          # every shipped language registers from the bundle.
+          $p = Start-Process -FilePath "dist\dopeiptv\dopeiptv.exe" `
+                 -ArgumentList "--self-check" -Wait -PassThru
+          if ($p.ExitCode -ne 0) {
+            Write-Error "self-check failed (exit $($p.ExitCode)) - libmpv or languages missing from the bundle"
+            exit 1
+          }
+          Write-Output "self-check OK"
       - name: Package portable zip
         shell: bash
         run: |
