@@ -116,6 +116,12 @@ class ResumeStore:
                 ep = row.get("name") or ""
                 if sname:
                     row["name"] = f"{sname} · {ep}" if ep else sname
+                    # The cover pipeline resolves an episode's poster from the
+                    # SERIES title (searching TMDB for "Show · S1 * E2 - ..."
+                    # never matches). Drilled episode lists stamp this in
+                    # _enter_series; stamp it here too so a Continue-watching
+                    # row resolves the same stable series poster.
+                    row.setdefault("_series_title", sname)
             out.append(row)
         out.sort(key=lambda r: r.get("_ts", 0), reverse=True)
         return out

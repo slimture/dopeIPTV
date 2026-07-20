@@ -418,7 +418,15 @@ class HomePage(QWidget):
                                  progress=int(it.get("_progress_pct") or 0))
                     card.clicked.connect(
                         lambda it=it: self._play_media(it))
-                    self._set_art(card, self._media_art(it), w.poster_art)
+                    # Ask the cover pipeline with the row's REAL kind: an
+                    # episode requested as "vod" TMDB-searches its mangled
+                    # name as a movie - an async wrong/dead candidate that
+                    # raced the provider art and left the card blank at
+                    # random. As "episode" it resolves the series' poster
+                    # (via _series_title), the same stable art the episode
+                    # list shows.
+                    k = ("episode" if it.get("_kind") == "episode" else "vod")
+                    self._set_art(card, self._media_art(it, k), w.poster_art)
                     shelf.add(card)
                 shelf.finish(POSTER_H)
                 self._v.addWidget(shelf)

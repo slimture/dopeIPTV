@@ -92,6 +92,11 @@ def test_continue_watching_includes_episodes_with_context():
     assert ep["_kind"] == "episode"
     assert ep["_series_ctx"]["series_id"] == 88
     assert ep["id"] == 5
+    # The cover pipeline resolves episode art from the SERIES title; without
+    # this stamp the Home shelf TMDB-searched the mangled row name and the
+    # poster came and went at random.
+    assert ep["_series_title"] == "Severance"
+    assert ep["name"] == "Severance · S1 E2"
 
 
 def test_continue_watching_drops_near_start():
