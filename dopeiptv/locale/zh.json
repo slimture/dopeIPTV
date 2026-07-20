@@ -67,6 +67,7 @@
   "setting_theme": "主题",
   "setting_accent_color": "强调色",
   "setting_language": "语言",
+  "setting_language_restart_hint": "界面会立即切换语言——如果个别文字仍显示上一种语言，请重启 dopeIPTV。",
   "option_compact": "紧凑",
   "option_medium": "中等",
   "option_large": "大",

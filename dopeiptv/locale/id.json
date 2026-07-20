@@ -67,6 +67,7 @@
  "setting_theme": "Tema",
  "setting_accent_color": "Warna aksen",
  "setting_language": "Bahasa",
+ "setting_language_restart_hint": "Antarmuka langsung berganti bahasa – mulai ulang dopeIPTV jika sebagian teks masih tampil dalam bahasa sebelumnya.",
  "option_compact": "Ringkas",
  "option_medium": "Sedang",
  "option_large": "Besar",

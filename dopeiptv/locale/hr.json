@@ -67,6 +67,7 @@
   "setting_theme": "Tema",
   "setting_accent_color": "Boja isticanja",
   "setting_language": "Jezik",
+  "setting_language_restart_hint": "Sučelje odmah mijenja jezik – ponovno pokrenite dopeIPTV ako je dio teksta i dalje na prethodnom jeziku.",
   "option_compact": "Kompaktno",
   "option_medium": "Srednje",
   "option_large": "Veliko",

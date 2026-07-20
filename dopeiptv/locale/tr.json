@@ -67,6 +67,7 @@
  "setting_theme": "Tema",
  "setting_accent_color": "Vurgu rengi",
  "setting_language": "Dil",
+ "setting_language_restart_hint": "Arayüz dili hemen değişir; bazı metinler hâlâ önceki dilde görünüyorsa dopeIPTV'yi yeniden başlatın.",
  "option_compact": "Sıkışık",
  "option_medium": "Orta",
  "option_large": "Büyük",

@@ -67,6 +67,7 @@
  "setting_theme": "زمینه",
  "setting_accent_color": "رنگ تأکید",
  "setting_language": "زبان",
+ "setting_language_restart_hint": "زبان رابط کاربری بلافاصله عوض می‌شود — اگر برخی متن‌ها هنوز به زبان قبلی نمایش داده می‌شوند، dopeIPTV را دوباره راه‌اندازی کنید.",
  "option_compact": "فشرده",
  "option_medium": "متوسط",
  "option_large": "بزرگ",

@@ -67,6 +67,7 @@
  "setting_theme": "Θέμα",
  "setting_accent_color": "Χρώμα τονισμού",
  "setting_language": "Γλώσσα",
+ "setting_language_restart_hint": "Η διεπαφή αλλάζει γλώσσα αμέσως – επανεκκινήστε το dopeIPTV αν κάποια κείμενα εμφανίζονται ακόμη στην προηγούμενη γλώσσα.",
  "option_compact": "Συμπαγές",
  "option_medium": "Μεσαίο",
  "option_large": "Μεγάλο",

@@ -67,6 +67,7 @@
  "setting_theme": "Giao diện",
  "setting_accent_color": "Màu nhấn",
  "setting_language": "Ngôn ngữ",
+ "setting_language_restart_hint": "Giao diện đổi ngôn ngữ ngay lập tức – khởi động lại dopeIPTV nếu một số chữ vẫn hiển thị ngôn ngữ trước.",
  "option_compact": "Nhỏ gọn",
  "option_medium": "Vừa",
  "option_large": "Lớn",

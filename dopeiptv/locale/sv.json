@@ -67,6 +67,7 @@
   "setting_theme": "Tema",
   "setting_accent_color": "Accentfärg",
   "setting_language": "Språk",
+  "setting_language_restart_hint": "Gränssnittet byter språk direkt – starta om dopeIPTV om någon text fortfarande visas på det förra språket.",
   "option_compact": "Kompakt",
   "option_medium": "Mellan",
   "option_large": "Stor",

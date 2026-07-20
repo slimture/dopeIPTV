@@ -140,6 +140,9 @@ _STRINGS: dict[str, dict[str, str]] = {
     "setting_theme": {"en": "Theme"},
     "setting_accent_color": {"en": "Accent color"},
     "setting_language": {"en": "Language"},
+    "setting_language_restart_hint": {
+        "en": "The interface switches right away — restart dopeIPTV if some"
+              " texts still show the previous language."},
 
     # ── Combo box option labels ───────────────────────────────────────────
 

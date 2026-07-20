@@ -67,6 +67,7 @@
  "setting_theme": "السمة",
  "setting_accent_color": "لون التمييز",
  "setting_language": "اللغة",
+ "setting_language_restart_hint": "تتبدّل لغة الواجهة فورًا — أعد تشغيل dopeIPTV إذا بقيت بعض النصوص باللغة السابقة.",
  "option_compact": "مضغوط",
  "option_medium": "متوسط",
  "option_large": "كبير",

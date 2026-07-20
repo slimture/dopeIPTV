@@ -67,6 +67,7 @@
   "setting_theme": "Тема",
   "setting_accent_color": "Цвет акцента",
   "setting_language": "Язык",
+  "setting_language_restart_hint": "Интерфейс переключается сразу — перезапустите dopeIPTV, если часть текста осталась на прежнем языке.",
   "option_compact": "Компактный",
   "option_medium": "Средний",
   "option_large": "Крупный",

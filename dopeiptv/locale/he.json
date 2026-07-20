@@ -67,6 +67,7 @@
  "setting_theme": "ערכת נושא",
  "setting_accent_color": "צבע הדגשה",
  "setting_language": "שפה",
+ "setting_language_restart_hint": "שפת הממשק מתחלפת מיד — הפעל מחדש את dopeIPTV אם חלק מהטקסטים עדיין מוצגים בשפה הקודמת.",
  "option_compact": "קומפקטי",
  "option_medium": "בינוני",
  "option_large": "גדול",

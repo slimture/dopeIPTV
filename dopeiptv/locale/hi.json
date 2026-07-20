@@ -67,6 +67,7 @@
  "setting_theme": "थीम",
  "setting_accent_color": "एक्सेंट रंग",
  "setting_language": "भाषा",
+ "setting_language_restart_hint": "इंटरफ़ेस तुरंत भाषा बदल देता है – यदि कुछ पाठ अब भी पिछली भाषा में दिखें तो dopeIPTV को फिर से शुरू करें।",
  "option_compact": "संक्षिप्त",
  "option_medium": "मध्यम",
  "option_large": "बड़ा",
