@@ -28,7 +28,7 @@ return [
 
     // feature strip chips
     "chip_timeshift" => "Timeshift / catch-up",
-    "chip_languages" => "8 языков",
+    "chip_languages" => "26 языков",
 
     // features
     "feat_eyebrow" => "Всё на одном экране",

@@ -27,7 +27,7 @@ return [
 
     // feature strip chips
     "chip_timeshift" => "타임시프트 / catch-up",
-    "chip_languages" => "8개 언어",
+    "chip_languages" => "26개 언어",
 
     // features
     "feat_eyebrow" => "모든 것을 한 화면에",

@@ -11,7 +11,7 @@ Key facts:
 - **Guide & timeshift:** full XMLTV EPG with now/next, live timeshift, and catch-up (scrub back into a channel's archive).
 - **Recording:** record the watched stream over a single connection, with timers, size limits and a Recordings library.
 - **Multiview:** watch up to nine live channels at once in a grid, with per-window timeshift and subtitles.
-- **Extras:** built-in mpv player, Chromecast casting, Trakt watched-history sync, TMDB metadata and artwork, themes, full keyboard control, and a UI available in many languages.
+- **Extras:** built-in mpv player, Chromecast casting, Trakt watched-history sync, TMDB metadata and artwork, themes, full keyboard control, and an interface available in 26 languages besides English (with right-to-left support for Arabic, Hebrew, Persian and Urdu).
 - **Developer / owner:** the slimture/dopeIPTV project on GitHub.
 
 ## Main pages

@@ -27,7 +27,7 @@ return [
 
     // feature strip chips
     "chip_timeshift" => "Timeshift / xem lại",
-    "chip_languages" => "8 ngôn ngữ",
+    "chip_languages" => "26 ngôn ngữ",
 
     // features
     "feat_eyebrow" => "Mọi thứ trên một màn hình",

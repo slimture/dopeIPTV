@@ -119,7 +119,7 @@ unset($g);
 // search engines AND LLMs can resolve the entity, its owner and the Q&A. The
 // FAQ mirrors the visible #faq section below (Google requires the match).
 $faq = [];
-for ($i = 1; $i <= 9; $i++) {
+for ($i = 1; $i <= 10; $i++) {
     $faq[] = ["@type" => "Question", "name" => t("faq_q$i"),
               "acceptedAnswer" => ["@type" => "Answer", "text" => t("faq_a$i")]];
 }
@@ -334,7 +334,7 @@ foreach ($shots as [$file, $alt, $title, $cap]):
         <h2><?= h(t('faq_h2')) ?></h2>
       </div>
       <div class="faq">
-<?php for ($i = 1; $i <= 9; $i++): ?>
+<?php for ($i = 1; $i <= 10; $i++): ?>
         <details class="faq-item">
           <summary><?= h(t("faq_q$i")) ?></summary>
           <p><?= h(t("faq_a$i")) ?></p>

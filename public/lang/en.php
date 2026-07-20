@@ -28,7 +28,7 @@ return [
 
     // feature strip chips (proper nouns stay untranslated in the template)
     "chip_timeshift" => "Timeshift / catch-up",
-    "chip_languages" => "8 languages",
+    "chip_languages" => "26 languages",
 
     // features
     "feat_eyebrow" => "Everything on one screen",
@@ -139,6 +139,8 @@ return [
     "faq_a8" => "No. dopeIPTV has no ads, no tracking and no accounts. Metadata and artwork come from TMDB and optional watched-history sync uses Trakt — both only if you choose to use them.",
     "faq_q9" => "Does dopeIPTV provide IPTV channels or a subscription?",
     "faq_a9" => "No. dopeIPTV is only a player — it does not provide, sell or host any channels or content. You connect your own Xtream Codes or M3U provider.",
+    "faq_q10" => "What languages is dopeIPTV available in?",
+    "faq_a10" => "dopeIPTV is available in 26 languages besides English — including Spanish, German, French, Italian, Portuguese, Dutch, Polish, Russian, Ukrainian, Turkish, Greek, Arabic, Hebrew, Persian, Urdu, Hindi, Chinese, Japanese, Korean, Vietnamese, Indonesian, Thai and Swahili — with right-to-left support for Arabic, Hebrew, Persian and Urdu.",
 
     // footer
     "footer_releases" => "Releases",

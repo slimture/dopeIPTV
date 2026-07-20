@@ -27,7 +27,7 @@ return [
 
     // feature strip chips
     "chip_timeshift" => "ไทม์ชิฟต์ / ดูย้อนหลัง",
-    "chip_languages" => "8 ภาษา",
+    "chip_languages" => "26 ภาษา",
 
     // features
     "feat_eyebrow" => "ทุกอย่างบนหน้าจอเดียว",

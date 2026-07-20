@@ -28,7 +28,7 @@ return [
 
     // feature strip chips
     "chip_timeshift" => "Timeshift / catch-up",
-    "chip_languages" => "Lugha 8",
+    "chip_languages" => "Lugha 26",
 
     // features
     "feat_eyebrow" => "Kila kitu kwenye skrini moja",
