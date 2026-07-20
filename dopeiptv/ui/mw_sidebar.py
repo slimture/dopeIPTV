@@ -140,6 +140,11 @@ class _SidebarMixin:
 
     @staticmethod
     def _set_rail(btn, on: bool) -> None:
+        # No-op when already in the requested state: repolishing a dozen nav
+        # buttons on every (idempotent) chrome pass - fullscreen exits, resize
+        # auto-collapse checks - is pure waste and adds up.
+        if bool(btn.property("rail")) == on:
+            return
         btn.setProperty("rail", on)
         btn.style().unpolish(btn)
         btn.style().polish(btn)

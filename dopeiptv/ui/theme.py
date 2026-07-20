@@ -371,6 +371,12 @@ QSlider::handle:horizontal:hover {{ background: {p['accent_hi']}; }}
 
 /* Detail panel */
 #DetailPane {{ background: {p['pane']}; border-left: 1px solid {p['border']}; }}
+/* Video fullscreen: flipped via a dynamic property + single-widget repolish.
+   Calling setStyleSheet() on the pane instead forced a style recompute of its
+   ENTIRE subtree on every fullscreen toggle - the pane has grown (cast strip,
+   EPG panel, controls), so that recompute is what made entering/leaving
+   fullscreen feel slower with every release. */
+#DetailPane[videofs="true"] {{ background: #000000; border: none; }}
 #DetailTitle {{ font-size: 20px; font-weight: 700; }}
 #DetailMeta  {{ color: {p['muted']}; font-size: 12px; }}
 #NowTitle    {{ font-size: 15px; font-weight: 600; }}

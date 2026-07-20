@@ -638,6 +638,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cat_list = QListWidget(objectName="CatList")
         self.cat_list.setItemDelegate(CategoryColorDelegate(self.cat_list))
         self.cat_list.setMinimumWidth(0)
+        # Pixel-granular scrolling like the channel list - the default
+        # jump-a-whole-row mode reads as laggy on a trackpad, especially with
+        # hundreds of provider categories.
+        self.cat_list.setVerticalScrollMode(
+            QAbstractItemView.ScrollMode.ScrollPerPixel)
         # Give the list a real minimum height so, on a short sidebar, the OUTER
         # scroll area shows a scrollbar (keeping the bottom actions - Guide,
         # Settings - reachable) instead of the QVBoxLayout compressing the
@@ -1528,6 +1533,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         pt.end()
         return QIcon(pm)
 
+    def _set_det_fs_style(self, on: bool) -> None:
+        """Flip the detail pane between its normal chrome and the pure-black
+        fullscreen backdrop via a dynamic property (rule in theme.py). This
+        repolishes ONE widget; the setStyleSheet() call it replaces forced a
+        style recompute of the pane's entire subtree on every fullscreen
+        toggle, which grew slower with every widget the pane gained."""
+        self._det.setProperty("videofs", on)
+        st = self._det.style()
+        st.unpolish(self._det)
+        st.polish(self._det)
+        self._det.update()
+
     def _toggle_player_fullscreen(self) -> None:
         if not self.player or not self.player.isVisible():
             return
@@ -1559,8 +1576,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         det_lay = self._det.layout()
         self._det_margins = det_lay.contentsMargins()
         det_lay.setContentsMargins(0, 0, 0, 0)
-        self._det.setStyleSheet(
-            "#DetailPane { background:#000000; border:none; }")
+        self._set_det_fs_style(True)
         self.menuBar().hide()
         self.player.set_fullscreen_ui(True)
         self._update_provider_hint()   # tuck the '+ Add provider' hint away
@@ -1611,7 +1627,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if m is not None:
             self._det.layout().setContentsMargins(
                 m.left(), m.top(), m.right(), m.bottom())
-        self._det.setStyleSheet("")
+        self._set_det_fs_style(False)
         self.menuBar().show()
         if not getattr(self, "_was_fullscreen", False):
             if getattr(self, "_was_maximized", False):

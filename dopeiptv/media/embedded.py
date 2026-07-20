@@ -654,12 +654,23 @@ class _MacInputFilter(QObject):
         if self._over_video():
             set_cursor_hidden(True)
 
+    # Application-level filter = called for EVERY event in the app, so the
+    # dispatch must be as close to free as possible. Module-level frozensets
+    # beat rebuilding enum tuples per call (profiled: the enum lookups alone
+    # showed up in the fullscreen-toggle trace).
+    _MOUSE_EVS = frozenset({
+        QEvent.Type.MouseMove, QEvent.Type.MouseButtonPress,
+        QEvent.Type.MouseButtonRelease,
+    })
+    _KEY_EVS = frozenset({QEvent.Type.KeyPress, QEvent.Type.KeyRelease})
+    _IS_MAC = sys.platform == "darwin"
+
     def eventFilter(self, obj, event):
         et = event.type()
-        if (sys.platform == "darwin"
-                and et in (QEvent.Type.MouseMove,
-                           QEvent.Type.MouseButtonPress,
-                           QEvent.Type.MouseButtonRelease)):
+        if et in self._KEY_EVS:
+            if self._handle_seek_key(event, et == QEvent.Type.KeyPress):
+                return True
+        elif self._IS_MAC and et in self._MOUSE_EVS:
             # Any mouse activity un-hides - including the click that opens
             # a context menu, so the menu never comes up with an invisible
             # pointer. Only idle time over the bare video re-hides.
@@ -678,9 +689,6 @@ class _MacInputFilter(QObject):
                     pass
             else:
                 self._cursor_timer.stop()
-        elif et in (QEvent.Type.KeyPress, QEvent.Type.KeyRelease):
-            if self._handle_seek_key(event, et == QEvent.Type.KeyPress):
-                return True
         return False
 
     def _handle_seek_key(self, event, pressed: bool) -> bool:
