@@ -28,7 +28,6 @@ from ..i18n import tr
 from .theme import P
 
 # Card geometry (image area; the card adds a text strip underneath).
-HERO_W, HERO_H = 300, 420          # big hero posters
 POSTER_W, POSTER_H = 160, 240      # shelf posters
 CHAN_W, CHAN_H = 250, 130          # landscape live-channel tiles
 
@@ -405,13 +404,6 @@ class HomePage(QWidget):
         def on(key):
             return s.value(key, "true") == "true"
 
-        # Hero shelf fills in when the async provider fetch lands; hidden
-        # until then so it doesn't reserve an empty gap (or linger on a
-        # provider with no VOD).
-        self._hero_shelf = _Shelf(tr("home_featured"))
-        self._hero_shelf.hide()
-        self._v.addWidget(self._hero_shelf)
-
         if on("home_sh_resume"):
             rows = []
             try:
@@ -687,27 +679,6 @@ class HomePage(QWidget):
         w = self.window
         s = w.settings
 
-        # Hero: the freshest movies as oversized posters with rating, in a
-        # horizontally scrolling row (not a fixed four).
-        for it in vod[:12]:
-            rating = str(it.get("rating") or "").strip()
-            card = _Card(HERO_W, HERO_H, it.get("name") or "?",
-                         (f"★ {rating}" if rating else ""))
-            card.clicked.connect(lambda it=it: self._play_media(it))
-            self._set_art(card, self._media_art(it), w.poster_art)
-            self._hero_shelf.add(card)
-        if vod:
-            hero_was_hidden = self._hero_shelf.isHidden()
-            self._hero_shelf.finish(HERO_H)
-            self._hero_shelf.show()
-            # Showing the previously-hidden hero grows the page and pushes the
-            # shelves below it down. On macOS that move can leave the shelves'
-            # pre-reflow pixels painted *behind* the hero ("stuff behind
-            # featured"). Force the canvas + scroll viewport to fully repaint
-            # once the layout has settled so no ghost frame survives.
-            if hero_was_hidden:
-                self._repaint_after_reflow()
-
         if s.value("home_sh_movies", "true") == "true" and vod:
             shelf = _Shelf(tr("home_new_movies"))
             for it in vod:
@@ -727,12 +698,17 @@ class HomePage(QWidget):
                 shelf.add(card)
             shelf.finish(POSTER_H)
             self._movies_box.addWidget(shelf)
+        if vod or ser:
+            # Adding the movie/series shelves grows the page; on macOS a layout
+            # reflow can leave the shelves below painted behind their old
+            # position. Force a clean repaint once the layout has settled.
+            self._repaint_after_reflow()
 
     def _repaint_after_reflow(self) -> None:
         """Force a clean repaint after a layout change that moved shelves.
 
         Qt on macOS doesn't always repaint widgets that a layout reflow shifts,
-        so a grown hero row can leave the shelves below it ghosted behind it -
+        so a grown shelf row can leave the shelves below it ghosted behind it -
         and filling/showing shelves while the page is hidden (returning to Home
         while a stream plays) settles the geometry off-screen where a plain
         update() never lands. Settle the layout, then repaint the canvas and
