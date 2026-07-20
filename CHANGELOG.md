@@ -68,6 +68,13 @@ faster app all around.
 
 ### Settings
 
+- **A pasted provider link survives messy input.** Pasting an Xtream/M3U
+  link into a server field that already held text (or copying it along with
+  a text prefix) used to silently fail the auto-fill; the link is now found
+  in the pasted text and the fields fill cleanly.
+- **Removed the one-time 0.9.0 settings migration.** Every install that
+  needed it has run it; it no longer lurks in the background re-pruning
+  settings after a manual reset.
 - **Fixed: the language dropdown wouldn't scroll in Settings.** The wheel
   guard that stops the mouse wheel from accidentally changing a setting was
   unknowingly installed on every *scrollbar* too (a scrollbar is a slider to
