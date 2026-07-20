@@ -1565,21 +1565,33 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # detail pane take the whole window, and without this the splitter
         # wouldn't get its proportions back on the way out of fullscreen.
         self._fs_splitter_sizes = self._root.sizes()
-        self._side.hide()
-        self._mid.hide()
-        self._det_hidden: list[QWidget] = []
-        for w in self._det.children():
-            if (isinstance(w, QWidget) and w is not self.player
-                    and w.isVisible()):
-                self._det_hidden.append(w)
-                w.hide()
-        det_lay = self._det.layout()
-        self._det_margins = det_lay.contentsMargins()
-        det_lay.setContentsMargins(0, 0, 0, 0)
-        self._set_det_fs_style(True)
-        self.menuBar().hide()
-        self.player.set_fullscreen_ui(True)
-        self._update_provider_hint()   # tuck the '+ Add provider' hint away
+        # Suspend painting for the whole transition so the intermediate states
+        # (panes vanishing one by one, the pane reflow) aren't drawn - the user
+        # sees one clean cut to fullscreen instead of it "building" step by
+        # step. This only pauses painting, never mpv, so playback is untouched;
+        # re-enabled in finally so it can never get stuck off.
+        cw = self.centralWidget()
+        if cw is not None:
+            cw.setUpdatesEnabled(False)
+        try:
+            self._side.hide()
+            self._mid.hide()
+            self._det_hidden: list[QWidget] = []
+            for w in self._det.children():
+                if (isinstance(w, QWidget) and w is not self.player
+                        and w.isVisible()):
+                    self._det_hidden.append(w)
+                    w.hide()
+            det_lay = self._det.layout()
+            self._det_margins = det_lay.contentsMargins()
+            det_lay.setContentsMargins(0, 0, 0, 0)
+            self._set_det_fs_style(True)
+            self.menuBar().hide()
+            self.player.set_fullscreen_ui(True)
+            self._update_provider_hint()   # tuck the '+ Add provider' hint away
+        finally:
+            if cw is not None:
+                cw.setUpdatesEnabled(True)
         self._was_fullscreen = self.isFullScreen()
         # Remember if the window was maximized/zoomed and its exact geometry, so
         # leaving video-fullscreen restores that state instead of shrinking to
@@ -1617,35 +1629,49 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # fullscreen it's always icons"). Cleared - and the edge baseline
         # resynced - once the restored geometry has settled (_end_fs_exit).
         self._fs_exiting = True
-        self._side.show()
-        self._apply_sidebar_collapsed()   # keep the rail/expanded choice
-        self._mid.show()
-        for w in getattr(self, "_det_hidden", []):
-            w.show()
-        self._det_hidden = []
-        m = getattr(self, "_det_margins", None)
-        if m is not None:
-            self._det.layout().setContentsMargins(
-                m.left(), m.top(), m.right(), m.bottom())
-        self._set_det_fs_style(False)
-        self.menuBar().show()
-        if not getattr(self, "_was_fullscreen", False):
-            if getattr(self, "_was_maximized", False):
-                # Re-zoom to the maximized state it had before going fullscreen.
-                self.showMaximized()
-            else:
-                self.showNormal()
-                # Deterministically restore the exact windowed size/position -
-                # a manually-enlarged window otherwise comes back smaller.
-                geo = getattr(self, "_pre_fs_geo", None)
-                if geo is not None:
-                    self.setGeometry(geo)
-        # Restore the window geometry *before* unlocking the video's
-        # fixed height - _lock_video_box() reads the player's current
-        # size, and computing it while the window is still fullscreen-
-        # sized bakes in a wrong height that a later resize doesn't
-        # reliably clear (the same class of bug as the PiP letterboxing).
-        self.player.set_fullscreen_ui(False)
+        # Batch the synchronous reflow (panes reappearing, style + window state
+        # restore) into one paint instead of a visible multi-step rebuild -
+        # painting only, mpv untouched, re-enabled in finally so it can never
+        # stay off. The deferred size restore below repaints once more as the
+        # final settle; suspending across that async gap is deliberately
+        # avoided so a stuck update state can never freeze the video.
+        cw = self.centralWidget()
+        if cw is not None:
+            cw.setUpdatesEnabled(False)
+        try:
+            self._side.show()
+            self._apply_sidebar_collapsed()   # keep the rail/expanded choice
+            self._mid.show()
+            for w in getattr(self, "_det_hidden", []):
+                w.show()
+            self._det_hidden = []
+            m = getattr(self, "_det_margins", None)
+            if m is not None:
+                self._det.layout().setContentsMargins(
+                    m.left(), m.top(), m.right(), m.bottom())
+            self._set_det_fs_style(False)
+            self.menuBar().show()
+            if not getattr(self, "_was_fullscreen", False):
+                if getattr(self, "_was_maximized", False):
+                    # Re-zoom to the maximized state it had before fullscreen.
+                    self.showMaximized()
+                else:
+                    self.showNormal()
+                    # Deterministically restore the exact windowed
+                    # size/position - a manually-enlarged window otherwise
+                    # comes back smaller.
+                    geo = getattr(self, "_pre_fs_geo", None)
+                    if geo is not None:
+                        self.setGeometry(geo)
+            # Restore the window geometry *before* unlocking the video's
+            # fixed height - _lock_video_box() reads the player's current
+            # size, and computing it while the window is still fullscreen-
+            # sized bakes in a wrong height that a later resize doesn't
+            # reliably clear (the same class of bug as the PiP letterboxing).
+            self.player.set_fullscreen_ui(False)
+        finally:
+            if cw is not None:
+                cw.setUpdatesEnabled(True)
         # Put the panel widths back (deferred so it lands after the window has
         # returned to its normal geometry, otherwise the still-fullscreen-sized
         # window bakes in the wrong proportions).

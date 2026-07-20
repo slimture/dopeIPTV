@@ -1533,6 +1533,14 @@ class EmbeddedPlayer(QWidget):
         self.pop_btn.setToolTip(
             tr("tooltip_popout_exit") if enabled else tr("tooltip_popout"))
         self._lock_video_box()
+        # Re-lock once the layout has settled. Docking back measures the
+        # control bar's height for the fixed video box, but right after the
+        # reparent the bar isn't laid out yet, so the first measure was stale
+        # and the seek bar sat over the toolbar until a stray event nudged a
+        # relayout ("jumps up a notch when you touch the video"). The deferred
+        # pass re-measures against the settled layout - same belt-and-suspenders
+        # as leaving fullscreen.
+        QTimer.singleShot(0, self._lock_video_box)
 
     def set_popout_autohide(self, enabled: bool) -> None:
         """When on, the pop-out control bar fades after a few seconds of no
