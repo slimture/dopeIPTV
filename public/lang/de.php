@@ -7,8 +7,8 @@
  */
 return [
     // <head>
-    "meta_title"   => "dopeIPTV — der Linux-IPTV-Player mit EPG, Timeshift, Aufnahme & Multiview",
-    "meta_desc"    => "dopeIPTV ist ein schneller, quelloffener Desktop-IPTV-Player für Xtream Codes und M3U mit vollständigem EPG, Live-Timeshift, Catch-up-TV, Aufnahme und Multiview — bis zu neun Kanäle gleichzeitig. Für Linux entwickelt — auch für macOS und Windows.",
+    "meta_title"   => "dopeIPTV — der Linux-IPTV-Player mit EPG & Timeshift",
+    "meta_desc"    => "Schneller, quelloffener IPTV-Player für Xtream Codes & M3U — volles EPG, Timeshift, Catch-up, Aufnahme und Multiview. Für Linux, macOS & Windows.",
     "meta_keywords"=> "IPTV-Player, Linux-IPTV-Player, Xtream Codes, M3U, EPG, XMLTV, Timeshift, Catch-up-TV, IPTV-Aufnahme, IPTV-Multiview, mehrere Kanäle ansehen, Multiscreen-IPTV, IPTV-Player Linux, macOS IPTV, Windows IPTV, dopeIPTV",
 
     // header nav

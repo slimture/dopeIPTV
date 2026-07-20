@@ -6,8 +6,8 @@
  */
 return [
     // <head>
-    "meta_title"   => "dopeIPTV — 适用于 Linux 的 IPTV 播放器，支持 EPG、时移、录制和多画面",
-    "meta_desc"    => "dopeIPTV 是一款快速、开源的桌面 IPTV 播放器，支持 Xtream Codes 和 M3U，具有完整的 EPG 节目指南、实时时移、回看电视、录制和多画面——同时观看多达九个频道。为 Linux 打造——同样支持 macOS 和 Windows。",
+    "meta_title"   => "dopeIPTV — 适用于 Linux 的 IPTV 播放器，支持 EPG 与时移",
+    "meta_desc"    => "快速、开源的 IPTV 播放器，支持 Xtream Codes 与 M3U——完整 EPG 指南、时移、回看、录制和多画面。支持 Linux、macOS 与 Windows。",
     "meta_keywords"=> "IPTV 播放器, Linux IPTV 播放器, Xtream Codes, M3U, EPG, XMLTV, 时移, 回看电视, IPTV 录制, IPTV 多画面, 观看多个频道, 多屏 IPTV, IPTV Linux, IPTV macOS, IPTV Windows, dopeIPTV",
 
     // header nav

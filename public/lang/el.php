@@ -7,8 +7,8 @@
  */
 return [
     // <head>
-    "meta_title"   => "dopeIPTV — το πρόγραμμα αναπαραγωγής IPTV για Linux με EPG, timeshift, εγγραφή & multiview",
-    "meta_desc"    => "Το dopeIPTV είναι ένα γρήγορο, ανοιχτού κώδικα πρόγραμμα αναπαραγωγής IPTV για υπολογιστή, για Xtream Codes και M3U, με πλήρη οδηγό EPG, ζωντανό timeshift, τηλεόραση catch-up, εγγραφή και multiview — παρακολουθήστε έως εννέα κανάλια ταυτόχρονα. Φτιαγμένο για Linux — και σε macOS και Windows.",
+    "meta_title"   => "dopeIPTV — πρόγραμμα IPTV για Linux με EPG & timeshift",
+    "meta_desc"    => "Γρήγορο, ανοιχτού κώδικα πρόγραμμα IPTV για Xtream Codes & M3U — πλήρης οδηγός EPG, timeshift, catch-up, εγγραφή και multiview. Linux, macOS & Windows.",
     "meta_keywords"=> "πρόγραμμα IPTV, IPTV Linux, Xtream Codes, M3U, EPG, XMLTV, timeshift, τηλεόραση catch-up, εγγραφή IPTV, multiview IPTV, παρακολούθηση πολλών καναλιών, IPTV πολλαπλής οθόνης, IPTV Linux, IPTV macOS, IPTV Windows, dopeIPTV",
 
     // header nav

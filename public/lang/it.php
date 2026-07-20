@@ -7,8 +7,8 @@
  */
 return [
     // <head>
-    "meta_title"   => "dopeIPTV — il lettore IPTV per Linux con EPG, timeshift, registrazione & multiview",
-    "meta_desc"    => "dopeIPTV è un lettore IPTV desktop veloce e open source per Xtream Codes e M3U, con guida EPG completa, timeshift in diretta, TV catch-up, registrazione e multiview — guarda fino a nove canali insieme. Pensato per Linux — anche su macOS e Windows.",
+    "meta_title"   => "dopeIPTV — il lettore IPTV per Linux con EPG & timeshift",
+    "meta_desc"    => "Lettore IPTV veloce e open source per Xtream Codes & M3U — guida EPG completa, timeshift, catch-up, registrazione e multiview. Linux, macOS & Windows.",
     "meta_keywords"=> "lettore IPTV, lettore IPTV Linux, Xtream Codes, M3U, EPG, XMLTV, timeshift, TV catch-up, registrazione IPTV, multiview IPTV, guardare più canali, IPTV multischermo, IPTV Linux, IPTV macOS, IPTV Windows, dopeIPTV",
 
     // header nav

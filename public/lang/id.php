@@ -7,8 +7,8 @@
  */
 return [
     // <head>
-    "meta_title"   => "dopeIPTV — pemutar IPTV Linux dengan EPG, timeshift, perekaman & multiview",
-    "meta_desc"    => "dopeIPTV adalah pemutar IPTV desktop yang cepat dan open source untuk Xtream Codes dan M3U, dengan panduan EPG lengkap, timeshift langsung, TV catch-up, perekaman, dan multiview — tonton hingga sembilan saluran sekaligus. Dibuat untuk Linux — juga di macOS dan Windows.",
+    "meta_title"   => "dopeIPTV — pemutar IPTV Linux dengan EPG & timeshift",
+    "meta_desc"    => "Pemutar IPTV cepat dan open source untuk Xtream Codes & M3U — panduan EPG lengkap, timeshift, catch-up, perekaman, dan multiview. Linux, macOS & Windows.",
     "meta_keywords"=> "pemutar IPTV, pemutar IPTV Linux, Xtream Codes, M3U, EPG, XMLTV, timeshift, TV catch-up, perekaman IPTV, multiview IPTV, menonton banyak saluran, IPTV multi-layar, IPTV Linux, IPTV macOS, IPTV Windows, dopeIPTV",
 
     // header nav

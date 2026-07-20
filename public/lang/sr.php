@@ -7,8 +7,8 @@
  */
 return [
     // <head>
-    "meta_title"   => "dopeIPTV — IPTV plejer za Linux sa EPG-om, timeshiftom, snimanjem & multiview",
-    "meta_desc"    => "dopeIPTV je brz IPTV plejer otvorenog koda za stone računare za Xtream Codes i M3U, sa potpunim EPG vodičem, live timeshiftom, catch-up TV-om, snimanjem i multiview — gledajte do devet kanala istovremeno. Napravljen za Linux — i na macOS-u i Windowsu.",
+    "meta_title"   => "dopeIPTV — IPTV plejer za Linux sa EPG-om i timeshiftom",
+    "meta_desc"    => "Brz IPTV plejer otvorenog koda za Xtream Codes & M3U — potpun EPG vodič, timeshift, catch-up, snimanje i multiview. Linux, macOS & Windows.",
     "meta_keywords"=> "IPTV plejer, IPTV plejer Linux, Xtream Codes, M3U, EPG, XMLTV, timeshift, catch-up TV, IPTV snimanje, IPTV multiview, gledanje više kanala, višeekranski IPTV, IPTV Linux, IPTV macOS, IPTV Windows, dopeIPTV",
 
     // header nav

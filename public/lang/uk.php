@@ -7,8 +7,8 @@
  */
 return [
     // <head>
-    "meta_title"   => "dopeIPTV — IPTV-плеєр для Linux з EPG, timeshift, записом & multiview",
-    "meta_desc"    => "dopeIPTV — швидкий IPTV-плеєр з відкритим кодом для Xtream Codes і M3U, із повним телегідом EPG, живим timeshift, catch-up-ТБ, записом і multiview — дивіться до дев'яти каналів одночасно. Створений для Linux — також на macOS і Windows.",
+    "meta_title"   => "dopeIPTV — IPTV-плеєр для Linux з EPG і timeshift",
+    "meta_desc"    => "Швидкий IPTV-плеєр з відкритим кодом для Xtream Codes & M3U — повний телегід EPG, timeshift, catch-up, запис і multiview. Linux, macOS & Windows.",
     "meta_keywords"=> "IPTV-плеєр, IPTV-плеєр Linux, Xtream Codes, M3U, EPG, XMLTV, timeshift, catch-up ТБ, запис IPTV, multiview IPTV, перегляд кількох каналів, багатоекранне IPTV, IPTV Linux, IPTV macOS, IPTV Windows, dopeIPTV",
 
     // header nav

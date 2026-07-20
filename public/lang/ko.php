@@ -6,8 +6,8 @@
  */
 return [
     // <head>
-    "meta_title"   => "dopeIPTV — EPG, 타임시프트, 녹화, 멀티뷰를 갖춘 Linux용 IPTV 플레이어",
-    "meta_desc"    => "dopeIPTV는 Xtream Codes 및 M3U를 위한 빠르고 오픈 소스인 데스크톱 IPTV 플레이어로, 전체 EPG 가이드, 라이브 타임시프트, catch-up TV, 녹화, 멀티뷰를 제공하여 최대 9개 채널을 동시에 시청할 수 있습니다. Linux용으로 제작되었으며 macOS와 Windows에서도 작동합니다.",
+    "meta_title"   => "dopeIPTV — EPG와 타임시프트를 갖춘 Linux IPTV 플레이어",
+    "meta_desc"    => "Xtream Codes와 M3U를 위한 빠른 오픈 소스 IPTV 플레이어 — 전체 EPG 가이드, 타임시프트, catch-up, 녹화, 멀티뷰. Linux, macOS, Windows 지원.",
     "meta_keywords"=> "IPTV 플레이어, Linux IPTV 플레이어, Xtream Codes, M3U, EPG, XMLTV, 타임시프트, catch-up TV, IPTV 녹화, IPTV 멀티뷰, 여러 채널 시청, 멀티스크린 IPTV, IPTV Linux, IPTV macOS, IPTV Windows, dopeIPTV",
 
     // header nav

@@ -7,8 +7,8 @@
  */
 return [
     // <head>
-    "meta_title"   => "dopeIPTV — مشغّل IPTV للينكس مع EPG وtimeshift وتسجيل & multiview",
-    "meta_desc"    => "dopeIPTV هو مشغّل IPTV سطح مكتب سريع ومفتوح المصدر لـ Xtream Codes وM3U، مع دليل EPG كامل، وtimeshift مباشر، وتلفزيون catch-up، وتسجيل، وmultiview — شاهد حتى تسع قنوات في وقت واحد. صُمم للينكس — ويعمل أيضًا على macOS وWindows.",
+    "meta_title"   => "dopeIPTV — مشغّل IPTV للينكس مع EPG وtimeshift",
+    "meta_desc"    => "مشغّل IPTV سريع ومفتوح المصدر لـ Xtream Codes وM3U — دليل EPG كامل، timeshift، catch-up، تسجيل، وmultiview. للينكس وmacOS وWindows.",
     "meta_keywords"=> "مشغل IPTV, مشغل IPTV لينكس, Xtream Codes, M3U, EPG, XMLTV, timeshift, تلفزيون catch-up, تسجيل IPTV, multiview IPTV, مشاهدة عدة قنوات, IPTV متعدد الشاشات, IPTV لينكس, IPTV macOS, IPTV Windows, dopeIPTV",
 
     // header nav

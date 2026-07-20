@@ -7,8 +7,8 @@
  */
 return [
     // <head>
-    "meta_title"   => "dopeIPTV — de IPTV-speler voor Linux met EPG, timeshift, opname & multiview",
-    "meta_desc"    => "dopeIPTV is een snelle, open-source desktop-IPTV-speler voor Xtream Codes en M3U met een volledige EPG-gids, live timeshift, catch-up-tv, opname en multiview — bekijk tot negen kanalen tegelijk. Gemaakt voor Linux — ook op macOS en Windows.",
+    "meta_title"   => "dopeIPTV — de IPTV-speler voor Linux met EPG & timeshift",
+    "meta_desc"    => "Snelle, open-source IPTV-speler voor Xtream Codes & M3U — volledige EPG-gids, timeshift, catch-up, opname en multiview. Voor Linux, macOS & Windows.",
     "meta_keywords"=> "IPTV-speler, IPTV-speler Linux, Xtream Codes, M3U, EPG, XMLTV, timeshift, catch-up-tv, IPTV-opname, IPTV-multiview, meerdere kanalen bekijken, multiscreen-IPTV, IPTV Linux, IPTV macOS, IPTV Windows, dopeIPTV",
 
     // header nav

@@ -7,8 +7,8 @@
  */
 return [
     // <head>
-    "meta_title"   => "dopeIPTV — Linux के लिए IPTV प्लेयर, EPG, टाइमशिफ्ट, रिकॉर्डिंग और मल्टीव्यू के साथ",
-    "meta_desc"    => "dopeIPTV, Xtream Codes और M3U के लिए एक तेज़, ओपन-सोर्स डेस्कटॉप IPTV प्लेयर है, जिसमें पूरा EPG गाइड, लाइव टाइमशिफ्ट, कैच-अप टीवी, रिकॉर्डिंग और मल्टीव्यू है — एक साथ नौ चैनल तक देखें। Linux के लिए बनाया गया — macOS और Windows पर भी।",
+    "meta_title"   => "dopeIPTV — EPG और टाइमशिफ्ट वाला Linux IPTV प्लेयर",
+    "meta_desc"    => "Xtream Codes & M3U के लिए तेज़, ओपन-सोर्स IPTV प्लेयर — पूरा EPG गाइड, टाइमशिफ्ट, कैच-अप, रिकॉर्डिंग और मल्टीव्यू। Linux, macOS & Windows।",
     "meta_keywords"=> "IPTV प्लेयर, IPTV प्लेयर Linux, Xtream Codes, M3U, EPG, XMLTV, टाइमशिफ्ट, कैच-अप टीवी, IPTV रिकॉर्डिंग, IPTV मल्टीव्यू, कई चैनल देखें, मल्टी-स्क्रीन IPTV, IPTV Linux, IPTV macOS, IPTV Windows, dopeIPTV",
 
     // header nav

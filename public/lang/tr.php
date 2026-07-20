@@ -7,8 +7,8 @@
  */
 return [
     // <head>
-    "meta_title"   => "dopeIPTV — EPG, timeshift, kayıt & multiview özellikli Linux IPTV oynatıcı",
-    "meta_desc"    => "dopeIPTV, Xtream Codes ve M3U için hızlı, açık kaynaklı bir masaüstü IPTV oynatıcısıdır; tam EPG rehberi, canlı timeshift, catch-up TV, kayıt ve multiview ile — aynı anda dokuz kanala kadar izleyin. Linux için tasarlandı — macOS ve Windows'ta da çalışır.",
+    "meta_title"   => "dopeIPTV — Linux için EPG & timeshift'li IPTV oynatıcı",
+    "meta_desc"    => "Xtream Codes & M3U için hızlı, açık kaynaklı IPTV oynatıcı — tam EPG rehberi, timeshift, catch-up, kayıt ve multiview. Linux, macOS & Windows.",
     "meta_keywords"=> "IPTV oynatıcı, Linux IPTV oynatıcı, Xtream Codes, M3U, EPG, XMLTV, timeshift, catch-up TV, IPTV kayıt, IPTV multiview, birden fazla kanal izleme, çoklu ekran IPTV, IPTV Linux, IPTV macOS, IPTV Windows, dopeIPTV",
 
     // header nav

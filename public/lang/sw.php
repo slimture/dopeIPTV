@@ -7,8 +7,8 @@
  */
 return [
     // <head>
-    "meta_title"   => "dopeIPTV — kicheza IPTV cha Linux chenye EPG, timeshift, kurekodi & multiview",
-    "meta_desc"    => "dopeIPTV ni kicheza IPTV cha eneo-kazi chenye kasi na chanzo huria kwa Xtream Codes na M3U, chenye mwongozo kamili wa EPG, timeshift ya moja kwa moja, TV ya catch-up, kurekodi na multiview — tazama hadi chaneli tisa kwa wakati mmoja. Kimeundwa kwa Linux — pia kwenye macOS na Windows.",
+    "meta_title"   => "dopeIPTV — kicheza IPTV cha Linux chenye EPG & timeshift",
+    "meta_desc"    => "Kicheza IPTV chenye kasi na chanzo huria kwa Xtream Codes & M3U — mwongozo kamili wa EPG, timeshift, catch-up, kurekodi na multiview. Linux, macOS & Windows.",
     "meta_keywords"=> "kicheza IPTV, kicheza IPTV Linux, Xtream Codes, M3U, EPG, XMLTV, timeshift, TV ya catch-up, kurekodi IPTV, multiview IPTV, kutazama chaneli nyingi, IPTV ya skrini nyingi, IPTV Linux, IPTV macOS, IPTV Windows, dopeIPTV",
 
     // header nav

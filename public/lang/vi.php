@@ -6,8 +6,8 @@
  */
 return [
     // <head>
-    "meta_title"   => "dopeIPTV — trình phát IPTV cho Linux với EPG, timeshift, ghi hình & multiview",
-    "meta_desc"    => "dopeIPTV là trình phát IPTV máy tính để bàn nhanh, mã nguồn mở cho Xtream Codes và M3U, với hướng dẫn EPG đầy đủ, timeshift trực tiếp, TV xem lại (catch-up), ghi hình và multiview — xem tối đa chín kênh cùng lúc. Được tạo cho Linux — cũng có trên macOS và Windows.",
+    "meta_title"   => "dopeIPTV — trình phát IPTV cho Linux với EPG & timeshift",
+    "meta_desc"    => "Trình phát IPTV nhanh, mã nguồn mở cho Xtream Codes & M3U — hướng dẫn EPG đầy đủ, timeshift, catch-up, ghi hình và multiview. Linux, macOS & Windows.",
     "meta_keywords"=> "trình phát IPTV, trình phát IPTV Linux, Xtream Codes, M3U, EPG, XMLTV, timeshift, TV xem lại, ghi hình IPTV, multiview IPTV, xem nhiều kênh, IPTV nhiều màn hình, IPTV Linux, IPTV macOS, IPTV Windows, dopeIPTV",
 
     // header nav

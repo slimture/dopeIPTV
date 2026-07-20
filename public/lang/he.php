@@ -7,8 +7,8 @@
  */
 return [
     // <head>
-    "meta_title"   => "dopeIPTV — נגן IPTV ל-Linux עם EPG, טיימשיפט, הקלטה & multiview",
-    "meta_desc"    => "dopeIPTV הוא נגן IPTV מהיר בקוד פתוח למחשב שולחני עבור Xtream Codes ו-M3U, עם מדריך EPG מלא, טיימשיפט חי, טלוויזיה בcatch-up, הקלטה ו-multiview — צפו בעד תשעה ערוצים בו-זמנית. נבנה עבור Linux — גם ב-macOS וב-Windows.",
+    "meta_title"   => "dopeIPTV — נגן IPTV ל-Linux עם EPG וטיימשיפט",
+    "meta_desc"    => "נגן IPTV מהיר בקוד פתוח ל-Xtream Codes ו-M3U — מדריך EPG מלא, טיימשיפט, catch-up, הקלטה ו-multiview. ל-Linux, macOS ו-Windows.",
     "meta_keywords"=> "נגן IPTV, נגן IPTV Linux, Xtream Codes, M3U, EPG, XMLTV, טיימשיפט, טלוויזיה catch-up, הקלטת IPTV, IPTV multiview, צפייה בכמה ערוצים, IPTV מרובה מסכים, IPTV Linux, IPTV macOS, IPTV Windows, dopeIPTV",
 
     // header nav

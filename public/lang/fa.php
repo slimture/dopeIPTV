@@ -7,8 +7,8 @@
  */
 return [
     // <head>
-    "meta_title"   => "dopeIPTV — پخش‌کننده IPTV برای لینوکس با EPG، timeshift، ضبط & multiview",
-    "meta_desc"    => "dopeIPTV یک پخش‌کننده IPTV دسکتاپ سریع و متن‌باز برای Xtream Codes و M3U است، با راهنمای کامل EPG، timeshift زنده، تلویزیون catch-up، ضبط و multiview — تا نه کانال را همزمان تماشا کنید. ساخته‌شده برای لینوکس — همچنین روی macOS و Windows.",
+    "meta_title"   => "dopeIPTV — پخش‌کننده IPTV لینوکس با EPG و timeshift",
+    "meta_desc"    => "پخش‌کننده IPTV سریع و متن‌باز برای Xtream Codes و M3U — راهنمای کامل EPG، timeshift، catch-up، ضبط و multiview. برای لینوکس، macOS و Windows.",
     "meta_keywords"=> "پخش‌کننده IPTV, پخش‌کننده IPTV لینوکس, Xtream Codes, M3U, EPG, XMLTV, timeshift, تلویزیون catch-up, ضبط IPTV, multiview IPTV, تماشای چند کانال, IPTV چندصفحه‌ای, IPTV لینوکس, IPTV macOS, IPTV Windows, dopeIPTV",
 
     // header nav

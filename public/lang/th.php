@@ -6,8 +6,8 @@
  */
 return [
     // <head>
-    "meta_title"   => "dopeIPTV — โปรแกรมเล่น IPTV สำหรับ Linux พร้อม EPG ไทม์ชิฟต์ บันทึก และ multiview",
-    "meta_desc"    => "dopeIPTV คือโปรแกรมเล่น IPTV บนเดสก์ท็อปที่รวดเร็วและโอเพนซอร์สสำหรับ Xtream Codes และ M3U พร้อมผังรายการ EPG แบบเต็ม ไทม์ชิฟต์สด ทีวีย้อนหลัง (catch-up) การบันทึก และ multiview — ดูได้สูงสุดเก้าช่องพร้อมกัน สร้างมาเพื่อ Linux — และใช้ได้บน macOS และ Windows ด้วย",
+    "meta_title"   => "dopeIPTV — โปรแกรมเล่น IPTV บน Linux พร้อม EPG, ไทม์ชิฟต์",
+    "meta_desc"    => "โปรแกรมเล่น IPTV ที่รวดเร็วและโอเพนซอร์สสำหรับ Xtream Codes & M3U — EPG เต็มรูปแบบ ไทม์ชิฟต์ ดูย้อนหลัง บันทึก และ multiview สำหรับ Linux, macOS & Windows",
     "meta_keywords"=> "โปรแกรมเล่น IPTV, โปรแกรมเล่น IPTV Linux, Xtream Codes, M3U, EPG, XMLTV, ไทม์ชิฟต์, ทีวีย้อนหลัง, บันทึก IPTV, IPTV multiview, ดูหลายช่อง, IPTV หลายจอ, IPTV Linux, IPTV macOS, IPTV Windows, dopeIPTV",
 
     // header nav
