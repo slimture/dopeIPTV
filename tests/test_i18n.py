@@ -20,10 +20,16 @@ def test_every_tr_key_used_in_code_is_defined():
     assert not missing, f"tr() keys used but not defined: {missing}"
 
 
-def test_all_keys_cover_all_languages():
-    langs = set(i18n.LANGUAGES)
+def test_every_key_has_english_source_and_no_stray_langs():
+    """English is the inline source, so every key must carry an "en" string.
+    Add-on locales may cover only part of the keys (they fall back to English by
+    design), so we don't require every language on every key - but no entry may
+    carry a language code we don't declare (a typo'd locale filename, say)."""
+    known = {"en"} | set(i18n._NATIVE_NAMES)
     for key, translations in i18n._STRINGS.items():
-        assert set(translations) == langs, f"{key} missing {langs - set(translations)}"
+        assert translations.get("en"), f"{key} has no English source"
+        stray = set(translations) - known
+        assert not stray, f"{key} has undeclared language(s) {stray}"
 
 
 def test_placeholders_match_across_languages():

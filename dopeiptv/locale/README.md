@@ -1,8 +1,11 @@
 # Add-on UI locales
 
-Each `<code>.json` here translates dopeIPTV's interface into one more language.
-The eight core languages (English, Swedish, Spanish, German, French, Chinese,
-Russian, Thai) live inline in `../i18n.py`; everything else is a file here.
+Each `<code>.json` here translates dopeIPTV's interface into one language.
+**English is the only language that lives in code** (`../i18n.py`, as the source
+of truth); every other language — Swedish, Spanish, German, French, Chinese,
+Russian, Thai and all the rest — is a file here. A language joins the in-app
+picker once its file covers ~90 % of the keys (English fallback covers the
+rest); the seven listed above ship 100 % complete.
 
 ## Format
 

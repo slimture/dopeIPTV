@@ -5,7 +5,6 @@ crashes only in the field (a missing {placeholder} in one language, a store
 choking on corrupt QSettings JSON, a UI string that formats badly in Thai).
 They are cheap to run and turn those field crashes into red tests.
 """
-import ast
 import json
 import re
 from pathlib import Path
@@ -17,43 +16,33 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # -- i18n ---------------------------------------------------------------------
 
-def _i18n_entries():
-    """(key, {lang: text}) pairs parsed straight from i18n.py's literal dict,
-    so the test sees exactly what ships (no import-order surprises)."""
-    tree = ast.parse((_REPO_ROOT / "dopeiptv" / "i18n.py").read_text())
-    out = []
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Dict):
-            continue
-        for k, v in zip(node.keys, node.values, strict=False):
-            if (isinstance(k, ast.Constant) and isinstance(k.value, str)
-                    and isinstance(v, ast.Dict)):
-                langs = {}
-                for lk, lv in zip(v.keys, v.values, strict=False):
-                    if not (isinstance(lk, ast.Constant)
-                            and isinstance(lv, ast.Constant)
-                            and isinstance(lv.value, str)):
-                        langs = None
-                        break
-                    langs[lk.value] = lv.value
-                if langs and "en" in langs and len(langs) > 1:
-                    out.append((k.value, langs))
-    return out
+# English lives inline in i18n.py; every other language (the former "core"
+# seven included) ships as dopeiptv/locale/<code>.json and is merged onto each
+# _STRINGS entry at import. These are the languages that must be 100% complete —
+# they are always offered and must never fall back to English.
+_CORE_LANGUAGES = ("sv", "es", "de", "fr", "zh", "ru", "th")
 
 
-_CORE_LANGUAGES = ("en", "sv", "es", "de", "fr", "zh", "ru", "th")
+def _locale_data(code):
+    """The parsed dopeiptv/locale/<code>.json ({key: "text"})."""
+    path = _REPO_ROOT / "dopeiptv" / "locale" / f"{code}.json"
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def test_every_key_covers_every_core_language():
-    """Every string must be translated (non-empty) into all eight core
-    languages. A missing or blank one silently falls back to English for that
-    language's users - the app then looks half-finished in, say, German only,
-    which no screenshot in English ever reveals. Add-on locales (locale/*.json)
-    are exempt: they fall back by design and are gated by coverage."""
+    """Each core language must translate EVERY base key (non-empty). English is
+    the inline source; the core languages ship as locale JSON and are always
+    offered in the picker, so a missing/blank one would silently fall back to
+    English and the app would look half-finished in, say, German only - which no
+    English screenshot ever reveals. Add-on locales are exempt (gated by
+    coverage), and are still structurally checked by test_locale_files_are_valid."""
+    from dopeiptv.i18n import base_string_keys
+    keys = base_string_keys()
     gaps = []
-    for key, langs in _i18n_entries():
-        for code in _CORE_LANGUAGES:
-            if not str(langs.get(code, "")).strip():
+    for code in _CORE_LANGUAGES:
+        data = _locale_data(code)
+        for key in keys:
+            if not str(data.get(key, "")).strip():
                 gaps.append(f"{key} → {code}")
     assert not gaps, (
         f"{len(gaps)} core-language translation gaps:\n"
@@ -61,13 +50,15 @@ def test_every_key_covers_every_core_language():
 
 
 def test_i18n_placeholders_match_across_languages():
-    """Every translation of a key must use exactly the English placeholders.
-    A language missing {n} (or inventing {m}) renders a broken string - or
-    nothing - only for users of that language, which no other test sees."""
+    """Every language's text for a key must use exactly the English
+    placeholders. A language missing {n} (or inventing {m}) renders a broken
+    string - or nothing - only for users of that language, which no other test
+    sees. Checks the merged runtime table (English inline + every locale JSON)."""
+    from dopeiptv import i18n
     bad = []
-    for key, langs in _i18n_entries():
-        ref = set(re.findall(r"\{(\w+)\}", langs["en"]))
-        for lang, text in langs.items():
+    for key, entry in i18n._STRINGS.items():
+        ref = set(re.findall(r"\{(\w+)\}", entry.get("en", "")))
+        for lang, text in entry.items():
             if set(re.findall(r"\{(\w+)\}", text)) != ref:
                 bad.append((key, lang, sorted(ref)))
     assert not bad, f"placeholder mismatches: {bad}"
