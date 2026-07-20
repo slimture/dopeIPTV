@@ -92,6 +92,17 @@ assert vid._ctx is None, "render context must be cleared"
 assert _FakeCtx.freed is True, "old render context must be freed"
 assert vid.mpv is sentinel_mpv, "mpv instance must be untouched (audio lives)"
 
+# The post-reparent settle (geometry re-lock + framebuffer nudge) must be
+# pure widget work: it must never touch the mpv instance or the render
+# context - freeing/recreating the render context outside the paint cycle
+# is what wedged libmpv into a black-for-the-session state.
+vid._ctx = _FakeCtx()
+_FakeCtx.freed = False
+player._settle_after_reparent()
+assert vid.mpv is sentinel_mpv, "settle must not touch mpv"
+assert vid._ctx is not None and _FakeCtx.freed is False, \
+    "settle must not free/recreate the render context"
+
 print("EMBEDDED_OK")
 """
 
