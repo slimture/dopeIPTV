@@ -102,8 +102,12 @@ QT_QPA_PLATFORM=offscreen pytest -q
   `from ..core.log import log` then `log.info/warning/error/debug(...)`.
   `DOPEIPTV_LOG=debug` shows debug traces; `DOPEIPTV_LOG_FILE=/path` tees
   to a rotating file.
-- `mypy` currently type-checks `providers/client.py`, `providers/epg.py`
-  and `core/stores.py` (see `[tool.mypy] files` in `pyproject.toml`);
-  grow that list as modules gain type hints.
+- `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
+  metadata, diagnostics, oauth_loopback), `core/` (stores, updates, log,
+  player_exec, wakelock) and `services/` (resume, coverart, reminders); see
+  `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
+  scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
+  which mypy reads in isolation as false `attr-defined` errors). Grow the list
+  as more non-UI modules gain type hints.
 - Bump the version in **both** `dopeiptv/__init__.py` and `pyproject.toml`
   on a release - `tests/test_version.py` fails the build if they drift.

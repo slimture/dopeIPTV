@@ -57,6 +57,7 @@ class _PopoutWindow(QWidget):
 
 
 class _PopoutMixin:
+    """MainWindow mixin: detaching the player into a separate always-on-top window."""
     def _toggle_popout(self) -> None:
         """Move the embedded player into its own window, or back if it's already
         detached."""

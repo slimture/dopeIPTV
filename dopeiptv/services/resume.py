@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import time
+from typing import Any
 
 # Fields worth keeping in a resume snapshot so the "Continue watching" list
 # can render a row (and replay it) without re-fetching the provider.
@@ -25,6 +26,7 @@ _CTX_FIELDS = ("series_id", "name", "title", "cover", "stream_icon",
 
 
 class ResumeStore:
+    """Persisted resume points backing 'Continue watching' (JSON on disk)."""
     # Playback kinds whose position is worth remembering, mapped to the
     # storage group prefix used in the persisted keys.
     _KIND_TO_GROUP = {"movie": "vod", "episode": "episode", "recording": "rec"}
@@ -49,8 +51,8 @@ class ResumeStore:
         'Continue watching' list can render and replay it."""
         rkey = f"{group}:{key}"
         if dur > 0 and 60 < pos < dur * 0.95:
-            entry = {"pos": round(pos), "dur": round(dur),
-                     "ts": int(time.time())}
+            entry: dict[str, Any] = {"pos": round(pos), "dur": round(dur),
+                                     "ts": int(time.time())}
             if group in ("vod", "episode") and item:
                 snap = {k: item[k] for k in _SNAP_FIELDS
                         if item.get(k) is not None}

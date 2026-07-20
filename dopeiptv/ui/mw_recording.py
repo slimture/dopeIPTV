@@ -22,6 +22,7 @@ from datetime import datetime, timedelta
 
 
 class _RecordingMixin:
+    """MainWindow mixin: recording, scheduling and timeshift/catch-up controls."""
     def _job_item(self, j: dict) -> dict:
         label = {"recording": "● REC", "scheduled": "Scheduled",
                  "done": "Done", "failed": "Failed",

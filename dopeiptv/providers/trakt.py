@@ -29,6 +29,7 @@ DEFAULT_CLIENT_SECRET = (
 
 
 class TraktAuthError(Exception):
+    """Raised when Trakt authentication fails, times out, or is declined."""
     pass
 
 

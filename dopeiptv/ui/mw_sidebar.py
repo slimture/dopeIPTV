@@ -14,6 +14,7 @@ from ..i18n import tr
 
 
 class _SidebarMixin:
+    """MainWindow mixin: the category sidebar and the library section."""
     def _on_side_toggle(self, checked: bool) -> None:
         """Collapse the left column to a narrow icon rail (or expand it back).
         The rail keeps the TV/Movies/Series nav as icons, so you reclaim the

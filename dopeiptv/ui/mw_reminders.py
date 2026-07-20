@@ -14,6 +14,7 @@ from ..i18n import tr
 
 
 class _RemindersMixin:
+    """MainWindow mixin: the reminders menu and firing a reminder when a programme starts."""
     def _add_reminder(self, ch: dict, p: dict) -> None:
         """Set an EPG reminder for a future programme."""
         self.reminders.add(ch, p.get("title"), p.get("start_timestamp"))

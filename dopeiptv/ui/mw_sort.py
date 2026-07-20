@@ -10,6 +10,7 @@ from datetime import datetime
 
 
 class _SortMixin:
+    """MainWindow mixin: per-category and global list sort order."""
     @staticmethod
     def _sort_key_name(it):
         return (it.get("name") or it.get("title") or "").lower()

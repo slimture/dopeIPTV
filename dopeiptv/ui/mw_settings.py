@@ -153,6 +153,7 @@ from ..core.workers import (
 
 
 class _SettingsMixin:
+    """MainWindow mixin: the Settings dialog, its tabs and persistence."""
     def _choose_rec_dir(self) -> None:
         d = QFileDialog.getExistingDirectory(
             self, "Choose recordings folder", self.rec.directory(),

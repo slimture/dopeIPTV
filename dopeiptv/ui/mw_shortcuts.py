@@ -18,6 +18,7 @@ from ..media.embedded import _is_bare_arrow, _is_shift_arrow
 
 
 class _ShortcutsMixin:
+    """MainWindow mixin: the keyboard-shortcuts editor and dispatch."""
     def _toggle_pause_shortcut(self) -> None:
         if self.player and self.player.isVisible():
             self.player.toggle_pause()

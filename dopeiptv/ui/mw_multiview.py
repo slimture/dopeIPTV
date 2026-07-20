@@ -1121,6 +1121,7 @@ class _MultiviewWindow(QWidget):
 
 
 class _MultiviewMixin:
+    """MainWindow mixin: the multiview grid of independent live streams."""
     def _add_channel_to_multiview(self, it, cell: int | None = None) -> None:
         """Build the live stream URL for a channel item (using the currently
         active playlist's client) and drop it into multiview cell *cell*

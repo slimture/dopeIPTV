@@ -26,6 +26,7 @@ the app.</p></body></html>"""
 
 
 class _Handler(BaseHTTPRequestHandler):
+    """Handles the single loopback OAuth redirect: captures the ?code / ?error query and returns a small self-closing done page."""
     def do_GET(self) -> None:  # noqa: N802 (http.server API)
         parsed = urlparse(self.path)
         # Ignore favicon and any stray requests - only the callback carries

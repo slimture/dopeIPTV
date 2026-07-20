@@ -20,6 +20,7 @@ from .theme import P
 
 
 class _NavMixin:
+    """MainWindow mixin: the top navigation bar and switching between TV/Movies/Series/... modes."""
     def _set_focus_mode(self, on: bool) -> None:
         """Focus mode hides the whole content list so the player pane gets the
         room. The reopen arrow strip on the detail pane's left edge is the way

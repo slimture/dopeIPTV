@@ -19,6 +19,7 @@ from datetime import datetime
 
 
 class _DetailMixin:
+    """MainWindow mixin: the detail panel (poster, metadata, cast) and the EPG now/next panel."""
     def _on_current_changed(self, current, _previous=None) -> None:
         it = (self.list_model.item_at(current.row())
               if current.isValid() else None)

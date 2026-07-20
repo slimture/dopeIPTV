@@ -45,8 +45,8 @@ def _account_reason(client) -> str | None:
     except (TypeError, ValueError):
         pass
     try:
-        active = int(info.get("active_cons"))
-        maxc = int(info.get("max_connections"))
+        active = int(info.get("active_cons") or 0)
+        maxc = int(info.get("max_connections") or 0)
         if maxc > 0 and active >= maxc:
             return tr("diag_conn_limit", active=active, maxc=maxc)
     except (TypeError, ValueError):

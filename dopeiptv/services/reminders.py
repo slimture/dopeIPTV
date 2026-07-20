@@ -19,6 +19,7 @@ _GRACE_SECS = 300
 
 
 class ReminderStore:
+    """Persisted set of programme reminders (JSON-backed on disk)."""
     def __init__(self, settings, playlist_id: str | None = None) -> None:
         self._settings = settings
         self._key = (f"epg_reminders_{playlist_id}" if playlist_id

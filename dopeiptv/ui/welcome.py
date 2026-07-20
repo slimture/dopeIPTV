@@ -31,6 +31,7 @@ from .theme import P
 
 
 class WelcomeOverlay(QWidget):
+    """First-run onboarding overlay: a multi-step welcome/connect/Trakt wizard drawn over the main content."""
     # Decorative greetings that flash on the first page - one per shipped
     # language, so the rotation mirrors how many languages the app speaks.
     _GREETINGS = (

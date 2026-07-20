@@ -15,6 +15,7 @@ from .theme import P
 
 
 class _BusyMixin:
+    """MainWindow mixin: the centred busy/loading spinner overlay and status-line hints."""
     _SPIN = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
     def _show_busy(self, message: str | None = None) -> None:

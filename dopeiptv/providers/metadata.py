@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 import os
 import re
-from typing import Callable
+from typing import Any, Callable
 
 import requests
 from PyQt6.QtCore import QObject, QSettings, QThreadPool, QTimer
@@ -98,8 +98,8 @@ class TmdbClient:
         poster/rating/IMDb id/cast in one combined request
         (append_to_response) for the best match."""
         endpoint = "movie" if kind == "vod" else "tv"
-        params = {"api_key": self.api_key, "query": title,
-                  "include_adult": "false"}
+        params: dict[str, Any] = {"api_key": self.api_key, "query": title,
+                                  "include_adult": "false"}
         if year is not None:
             params["year" if endpoint == "movie"
                    else "first_air_date_year"] = year
@@ -176,8 +176,8 @@ class TmdbClient:
         'Match on TMDB...' dialog so the user can pick the correct one when
         auto-match fails (dirty provider titles, ambiguous names, ...)."""
         endpoint = "movie" if kind == "vod" else "tv"
-        params = {"api_key": self.api_key, "query": title,
-                  "include_adult": "false"}
+        params: dict[str, Any] = {"api_key": self.api_key, "query": title,
+                                  "include_adult": "false"}
         if year is not None:
             params["year" if endpoint == "movie" else "first_air_date_year"] = year
         r = requests.get(f"{self.BASE}/search/{endpoint}", params=params,

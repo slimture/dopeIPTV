@@ -36,10 +36,16 @@ include = ["dopeiptv*"]
 dopeiptv = ["locale/*.json"]
 
 [tool.mypy]
-# Gradual typing: check the pure-logic modules first (the highest-value, most-
-# tested code, no PyQt/UI noise). follow_imports=silent means imported modules
-# are resolved for types but their own errors aren't reported, so the gate
-# stays scoped to these files. Expand `files` as more modules get typed.
+# Type gate scoped to the pure-logic layer (data, network, services) — the
+# highest-value, most-tested code. The Qt-heavy UI is deliberately NOT gated:
+# main_window.py is assembled from many mw_* mixins that reference shared
+# `self.<attr>` defined across sibling mixins, which mypy (seeing each class in
+# isolation) reports as ~1200 false `attr-defined` errors; plus PyQt6's stubs
+# mark most accessors Optional, producing union-attr/call-overload noise that
+# would need a wall of asserts and `# type: ignore` to silence. Gating those
+# would lower signal, not raise it. follow_imports=silent resolves imported
+# modules for types without reporting their own errors, so this stays scoped.
+# Expand `files` as more pure-logic modules get typed.
 python_version = "3.11"
 ignore_missing_imports = true
 # Untyped third-party libs (requests, PyQt6, python-mpv, ...) become Any rather
@@ -50,7 +56,17 @@ follow_imports = "silent"
 files = [
     "dopeiptv/providers/client.py",
     "dopeiptv/providers/epg.py",
+    "dopeiptv/providers/metadata.py",
+    "dopeiptv/providers/diagnostics.py",
+    "dopeiptv/providers/oauth_loopback.py",
     "dopeiptv/core/stores.py",
+    "dopeiptv/core/updates.py",
+    "dopeiptv/core/log.py",
+    "dopeiptv/core/player_exec.py",
+    "dopeiptv/core/wakelock.py",
+    "dopeiptv/services/resume.py",
+    "dopeiptv/services/coverart.py",
+    "dopeiptv/services/reminders.py",
 ]
 
 [tool.pytest.ini_options]

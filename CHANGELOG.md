@@ -34,6 +34,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   fix" issue template, and a `tools/i18n_status.py` health report (coverage,
   stray keys and placeholder mismatches per language) make it easy for native
   speakers to correct the machine-translated locales.
+- **Stricter type gate & docs** (internal) — the mypy type-check now covers
+  the whole pure-logic layer (13 modules across `providers/`, `core/` and
+  `services/`, up from 3), a few latent type issues were fixed, and every
+  module and class now carries a docstring.
 
 ## [0.9.0]
 

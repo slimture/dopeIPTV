@@ -19,6 +19,7 @@ from ..i18n import tr
 
 
 class _UpdatesMixin:
+    """MainWindow mixin: the startup update check and its status-row link."""
     def _maybe_check_updates(self) -> None:
         """Once-a-day background check for a newer release; on a hit, light the
         badge on the Settings button. Cached in QSettings so it doesn't hit

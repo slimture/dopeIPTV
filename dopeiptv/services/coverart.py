@@ -18,6 +18,7 @@ from ..providers.metadata import PosterResolver, TmdbClient, bundled_tmdb_key
 
 
 class CoverArtService:
+    """Owns the TMDB poster-resolver lifecycle and the ordered cover-candidate logic shared by the list and detail views."""
     def __init__(self, settings, logos,
                  on_poster_ready: Callable[[], None]) -> None:
         self._settings = settings
@@ -143,7 +144,7 @@ class CoverArtService:
         if kind in ("watchlist", "watched", "fav", "history"):
             hk = it.get("_kind")
             return {"movie": "vod", "vod": "vod", "series": "series",
-                    "episode": "series"}.get(hk, kind)
+                    "episode": "series"}.get(hk or "", kind)
         # An episode row (drilled into a series) borrows the series' poster.
         if kind == "episode":
             return "series"

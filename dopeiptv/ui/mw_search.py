@@ -17,6 +17,7 @@ from ..i18n import tr
 
 
 class _SearchMixin:
+    """MainWindow mixin: the search box and debounced result filtering."""
     def _toggle_cat_search(self, on: bool) -> None:
         self.cat_search.setVisible(on)
         if on:

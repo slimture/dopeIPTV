@@ -70,6 +70,7 @@ class _GridView(QGraphicsView):
 
 
 class EpgGridDialog(QDialog):
+    """The full EPG guide: a scrollable channel x time grid with now/next, day jumps, search and playable rows."""
     ROW_H = 60
     HEADER_H = 34
     CH_COL_W = 224

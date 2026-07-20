@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import QApplication, QInputDialog, QLineEdit, QMenu, QMessa
 
 
 class _ContextMenuMixin:
+    """MainWindow mixin: the right-click context menus for the channel/category lists."""
     def _context_menu(self, pos) -> None:
         idx = self.listw.indexAt(pos)
         if not idx.isValid():

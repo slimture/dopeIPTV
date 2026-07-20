@@ -23,6 +23,7 @@ from datetime import datetime
 
 
 class _TraktMixin:
+    """MainWindow mixin: Trakt sign-in, watched-history sync and the watchlist/history view."""
     def _trakt_start_for_item(self, kind: str, item) -> None:
         if not item or not self.trakt.is_connected():
             return

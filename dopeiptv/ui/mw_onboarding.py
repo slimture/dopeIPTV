@@ -15,6 +15,7 @@ from .welcome import WelcomeOverlay
 
 
 class _OnboardingMixin:
+    """MainWindow mixin: the first-run welcome wizard and the '+ Add provider' hint."""
     def show_welcome(self) -> None:
         """Show the first-run onboarding wizard (no provider configured)."""
         if self._welcome is None:
