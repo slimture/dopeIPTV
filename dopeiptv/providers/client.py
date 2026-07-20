@@ -756,6 +756,43 @@ def parse_xtream_url(text: str) -> tuple[str, str, str] | None:
     return None
 
 
+def detect_provider_link(text: str) -> tuple[str, str, str, str] | None:
+    """Classify a pasted provider link for the onboarding/playlist form.
+
+    Returns ``(kind, server, username, password)`` where *kind* is:
+
+    * ``"xtream"`` — the link carried credentials (``get.php`` / ``player_api``
+      / a direct stream URL). Xtream is always preferred over M3U because the
+      API also serves movies, series and EPG, so even a ``get.php`` *M3U*
+      export URL configures an Xtream provider (same host/user/pass drive
+      ``player_api.php``). ``username``/``password`` are filled.
+    * ``"m3u"`` — a plain playlist URL with no credentials (path ends in
+      ``.m3u``/``.m3u8`` or a ``type=m3u`` query). ``username``/``password``
+      are empty.
+
+    Returns ``None`` when *text* isn't a recognisable link (a bare hostname or
+    half-typed value), so manually typed server/username/password entry is
+    never disturbed.
+    """
+    parsed = parse_xtream_url(text)
+    if parsed:
+        return ("xtream", *parsed)
+    from urllib.parse import urlparse
+
+    s = (text or "").strip()
+    if "://" not in s:
+        return None
+    try:
+        u = urlparse(s)
+    except ValueError:
+        return None
+    if u.scheme and u.netloc and (
+            u.path.lower().endswith((".m3u", ".m3u8"))
+            or "type=m3u" in u.query.lower()):
+        return "m3u", s, "", ""
+    return None
+
+
 def b64(text: str | None) -> str:
     """Decode Xtream's base64-encoded EPG text fields."""
     if not text:

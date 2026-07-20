@@ -167,10 +167,11 @@ class WelcomeOverlay(QWidget):
         self._name.setPlaceholderText(tr("playlist_name_hint"))
         self._server = QLineEdit(s.value("server", "") if s else "")
         self._server.setPlaceholderText("http://server:port")
-        # Let a single pasted Xtream link (get.php / player_api / stream URL)
-        # fan out into the server/username/password fields; manual entry is
-        # untouched. editingFinished fires on paste-then-Tab/Enter or focus-out.
-        self._server.editingFinished.connect(self._maybe_split_xtream_link)
+        # A single pasted link is recognised as Xtream (fans out into
+        # server/username/password) or M3U (a plain playlist URL) and the mode
+        # dropdown follows automatically; manual entry is untouched.
+        # editingFinished fires on paste-then-Tab/Enter or focus-out.
+        self._server.editingFinished.connect(self._maybe_autodetect_link)
         self._user = QLineEdit(s.value("username", "") if s else "")
         self._pw = QLineEdit(s.value("password", "") if s else "")
         self._pw.setEchoMode(QLineEdit.EchoMode.Password)
@@ -300,20 +301,26 @@ class WelcomeOverlay(QWidget):
         self._c_hint.setVisible(not m3u)
         self._fit_card(self._stack.currentIndex())
 
-    def _maybe_split_xtream_link(self) -> None:
-        """If the server field holds a full Xtream link, split it into the
-        server/username/password fields. Only runs in Xtream mode and only when
-        the paste actually carried credentials, so a plain host is left alone."""
-        if self._conn_kind.currentData() == "m3u":
+    def _set_kind(self, kind: str) -> None:
+        idx = self._conn_kind.findData(kind)
+        if idx >= 0 and idx != self._conn_kind.currentIndex():
+            self._conn_kind.setCurrentIndex(idx)   # fires _update_conn_kind
+
+    def _maybe_autodetect_link(self) -> None:
+        """Recognise a pasted provider link in the server field and configure
+        the form for it: Xtream (split into server/username/password, the
+        preferred mode) or M3U (a plain playlist URL). A bare host with no link
+        shape is left alone so manual entry keeps working."""
+        from ..providers.client import detect_provider_link
+        detected = detect_provider_link(self._server.text())
+        if not detected:
             return
-        from ..providers.client import parse_xtream_url
-        parsed = parse_xtream_url(self._server.text())
-        if not parsed:
-            return
-        server, user, pw = parsed
+        kind, server, user, pw = detected
+        self._set_kind(kind)
         self._server.setText(server)
-        self._user.setText(user)
-        self._pw.setText(pw)
+        if kind == "xtream":
+            self._user.setText(user)
+            self._pw.setText(pw)
 
     def _do_connect(self) -> None:
         kind = self._conn_kind.currentData()

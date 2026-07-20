@@ -1,6 +1,8 @@
 """Unit tests for dopeiptv.providers.client utilities."""
 
-from dopeiptv.providers.client import b64, parse_xtream_url
+from dopeiptv.providers.client import (
+    b64, detect_provider_link, parse_xtream_url,
+)
 
 
 def test_b64_decodes_valid():
@@ -44,3 +46,27 @@ def test_parse_xtream_url_rejects_non_links():
     for bad in ("", "   ", "host.tv:8080", "http://host.tv:8080",
                 "https://example.com/playlist.m3u", "not a url at all"):
         assert parse_xtream_url(bad) is None
+
+
+def test_detect_provider_link_prefers_xtream():
+    # A link carrying credentials always classifies as Xtream (even a get.php
+    # M3U export URL), because the API also serves movies/series/EPG.
+    assert detect_provider_link(
+        "http://h.tv:8080/get.php?username=u&password=p&type=m3u_plus"
+    ) == ("xtream", "http://h.tv:8080", "u", "p")
+    assert detect_provider_link(
+        "http://h.tv:8080/player_api.php?username=u&password=p"
+    ) == ("xtream", "http://h.tv:8080", "u", "p")
+
+
+def test_detect_provider_link_plain_m3u():
+    # A credential-less playlist URL classifies as M3U.
+    assert detect_provider_link(
+        "https://example.com/list.m3u8") == ("m3u", "https://example.com/list.m3u8", "", "")
+    assert detect_provider_link(
+        "https://example.com/playlist.m3u") == ("m3u", "https://example.com/playlist.m3u", "", "")
+
+
+def test_detect_provider_link_rejects_bare_input():
+    for bad in ("", "host.tv:8080", "http://host.tv:8080", "just text"):
+        assert detect_provider_link(bad) is None

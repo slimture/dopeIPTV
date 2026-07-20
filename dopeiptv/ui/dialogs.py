@@ -100,9 +100,10 @@ class PlaylistDialog(QDialog):
         if kidx >= 0:
             self.kind.setCurrentIndex(kidx)
         self.server = QLineEdit(playlist.get("server", ""))
-        # A pasted Xtream link (get.php / player_api / stream URL) auto-fills
-        # the three fields; manual entry is unaffected.
-        self.server.editingFinished.connect(self._maybe_split_xtream_link)
+        # A pasted link is recognised as Xtream (fans out into the three
+        # fields) or M3U (a plain playlist URL) and the mode follows; manual
+        # entry is unaffected.
+        self.server.editingFinished.connect(self._maybe_autodetect_link)
         self.user = QLineEdit(playlist.get("username", ""))
         self.pw = QLineEdit(playlist.get("password", ""))
         self.pw.setEchoMode(QLineEdit.EchoMode.Password)
@@ -147,19 +148,22 @@ class PlaylistDialog(QDialog):
         for w in (self._user_lbl, self.user, self._pw_lbl, self.pw):
             w.setVisible(not m3u)
 
-    def _maybe_split_xtream_link(self) -> None:
-        """Split a pasted full Xtream link into server/username/password. Only
-        in Xtream mode, only when the link actually carried credentials."""
-        if self.kind.currentData() == "m3u":
+    def _maybe_autodetect_link(self) -> None:
+        """Recognise a pasted provider link and configure the dialog: Xtream
+        (split into server/username/password, preferred) or M3U (a plain
+        playlist URL). A bare host is left alone so manual entry keeps working."""
+        from ..providers.client import detect_provider_link
+        detected = detect_provider_link(self.server.text())
+        if not detected:
             return
-        from ..providers.client import parse_xtream_url
-        parsed = parse_xtream_url(self.server.text())
-        if not parsed:
-            return
-        server, user, pw = parsed
+        kind, server, user, pw = detected
+        idx = self.kind.findData(kind)
+        if idx >= 0:
+            self.kind.setCurrentIndex(idx)   # fires _update_kind
         self.server.setText(server)
-        self.user.setText(user)
-        self.pw.setText(pw)
+        if kind == "xtream":
+            self.user.setText(user)
+            self.pw.setText(pw)
 
     def _validate(self) -> None:
         if self.kind.currentData() == "m3u":
