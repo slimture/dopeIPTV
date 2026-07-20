@@ -1,0 +1,123 @@
+<?php
+/**
+ * ไทย (th) — คำแปลฉบับสมบูรณ์ของ iptv.dope.rs ชื่อเฉพาะและศัพท์เทคนิค
+ * (Xtream Codes, M3U, AppImage, mpv, GitHub …) คงไว้เป็นภาษาอังกฤษ แอตทริบิวต์
+ * HTML ใช้อัญประกาศเดี่ยวเพื่อให้ค่ายังเป็นสตริง PHP อัญประกาศคู่.
+ */
+return [
+    // <head>
+    "meta_title"   => "dopeIPTV — โปรแกรมเล่น IPTV สำหรับ Linux พร้อม EPG ไทม์ชิฟต์ บันทึก และ multiview",
+    "meta_desc"    => "dopeIPTV คือโปรแกรมเล่น IPTV บนเดสก์ท็อปที่รวดเร็วและโอเพนซอร์สสำหรับ Xtream Codes และ M3U พร้อมผังรายการ EPG แบบเต็ม ไทม์ชิฟต์สด ทีวีย้อนหลัง (catch-up) การบันทึก และ multiview — ดูได้สูงสุดเก้าช่องพร้อมกัน สร้างมาเพื่อ Linux — และใช้ได้บน macOS และ Windows ด้วย",
+    "meta_keywords"=> "โปรแกรมเล่น IPTV, โปรแกรมเล่น IPTV Linux, Xtream Codes, M3U, EPG, XMLTV, ไทม์ชิฟต์, ทีวีย้อนหลัง, บันทึก IPTV, IPTV multiview, ดูหลายช่อง, IPTV หลายจอ, IPTV Linux, IPTV macOS, IPTV Windows, dopeIPTV",
+
+    // header nav
+    "nav_features"    => "คุณสมบัติ",
+    "nav_screenshots" => "ภาพหน้าจอ",
+    "nav_download"    => "ดาวน์โหลด",
+    "nav_github"      => "GitHub",
+    "nav_download_btn"=> "ดาวน์โหลด",
+
+    // hero
+    "hero_eyebrow" => "กำลังออกอากาศ · เวอร์ชัน",
+    "hero_h1"      => "ทีวีสด, ดูย้อนหลัง และการบันทึก — ในแอป <span class='hl'>เดสก์ท็อปเนทีฟ</span> เดียว",
+    "hero_lede"    => "โปรแกรมเล่น IPTV ที่รวดเร็วและทันสมัยสำหรับ Xtream Codes &amp; M3U — พร้อมผังรายการ EPG แบบเต็ม ไทม์ชิฟต์และดูย้อนหลังแบบสด การบันทึกในคลิกเดียว และ multiview สำหรับสูงสุดเก้าช่องพร้อมกัน สร้างบน mpv ทำมาเพื่อ Linux — และใช้งานได้บน macOS &amp; Windows ด้วย",
+    "hero_cta"     => "ดาวน์โหลดสำหรับระบบของคุณ",
+    "hero_source"  => "ดูซอร์สโค้ด",
+    "hero_free"    => "ฟรี &amp; โอเพนซอร์ส",
+
+    // feature strip chips
+    "chip_timeshift" => "ไทม์ชิฟต์ / ดูย้อนหลัง",
+    "chip_languages" => "8 ภาษา",
+
+    // features
+    "feat_eyebrow" => "ทุกอย่างบนหน้าจอเดียว",
+    "feat_h2"      => "สร้างมาเพื่อวิธีที่ผู้คนดูทีวีจริง ๆ",
+    "feat_intro"   => "ไม่ใช่คลังสื่อที่นำมาดัดแปลง — แต่เป็นไคลเอนต์ทีวี พร้อมไทม์ไลน์ ผังรายการ และตัวบันทึกในที่ที่คุณคาดหวัง",
+    "feat_c1_h" => "ไทม์ชิฟต์ &amp; ดูย้อนหลัง",
+    "feat_c1_p" => "ย้อนกลับเข้าไปในคลังของช่องบนไทม์ไลน์แบบสด หรือกระโดดตรงไปยังรายการที่ผ่านมาจากผังรายการ",
+    "feat_mv_h" => "Multiview",
+    "feat_mv_p" => "ดูได้สูงสุดเก้าช่องสดพร้อมกันในตาราง — ผสมเพลย์ลิสต์ต่าง ๆ คลิกช่องใดช่องหนึ่งเพื่อเลือกเสียง พร้อมไทม์ชิฟต์และคำบรรยายแยกแต่ละหน้าต่าง",
+    "feat_c2_h" => "หยุดทีวีสดชั่วคราว",
+    "feat_c2_p" => "หยุดชั่วคราวและเล่นต่อแบบ DVR ด้านหลังการถ่ายทอดสด — โปรแกรมจะแสดงว่าคุณตามหลังอยู่เท่าไร",
+    "feat_c3_h" => "ผังรายการ EPG แบบเต็ม",
+    "feat_c3_p" => "ตารางรายการจริงพร้อมการค้นหา การเตือน และรายการที่กำหนดค่าได้ว่าจะมีอะไรต่อไป",
+    "feat_c4_h" => "บันทึกในคลิกเดียว",
+    "feat_c4_p" => "บันทึกสตรีมที่คุณกำลังดูผ่านการเชื่อมต่อเดียว พร้อมตัวตั้งเวลา ขีดจำกัดขนาด และคลังการบันทึก",
+    "feat_c5_h" => "หลายผู้ให้บริการ",
+    "feat_c5_p" => "เพลย์ลิสต์ Xtream หรือ M3U หลายรายการเคียงข้างกัน แต่ละรายการมี EPG ของตัวเอง การรีเฟรชอัตโนมัติ และ URL ผังรายการที่กำหนดเอง",
+    "feat_c6_h" => "เล่นลื่นไหล",
+    "feat_c6_p" => "เอนจิน mpv ในตัว พร้อม Chromecast การซิงก์ Trakt ธีม และการควบคุมด้วยแป้นพิมพ์เต็มรูปแบบ",
+
+    // screenshots
+    "shots_eyebrow" => "มองข้างใน",
+    "shots_h2"      => "สะอาด มืด และไม่เกะกะ",
+    "shot_ph"       => "ภาพหน้าจอ",
+    "shot_main_alt" => "หน้าต่างหลักของ dopeIPTV พร้อมรายการช่อง ผังรายการ และวิดีโอ",
+    "shot_main_t"   => "ช่อง &amp; โปรแกรมเล่น",
+    "shot_main_c"   => "รายการ ผังรายการ และวิดีโอในเลย์เอาต์เดียว",
+    "shot_epg_alt"  => "ตารางผังรายการ EPG ของ dopeIPTV",
+    "shot_epg_t"    => "ผังรายการ",
+    "shot_epg_c"    => "มุมมองตารางพร้อมเครื่องหมายดูย้อนหลัง",
+    "shot_ts_alt"   => "ไทม์ไลน์ไทม์ชิฟต์ของ dopeIPTV กำลังเลื่อนดูคลังของช่อง",
+    "shot_ts_t"     => "ไทม์ไลน์ไทม์ชิฟต์",
+    "shot_ts_c"     => "เลื่อนดูคลัง โดยมีการทำเครื่องหมายขอบสด",
+    "shot_rec_alt"  => "คลังการบันทึกของ dopeIPTV พร้อมตัวตั้งเวลา",
+    "shot_rec_t"    => "การบันทึก",
+    "shot_rec_c"    => "ตัวตั้งเวลา ขีดจำกัดพื้นที่ และการเล่น",
+
+    // download
+    "dl_eyebrow" => "รับ dopeIPTV",
+    "dl_h2"      => "ดาวน์โหลดเวอร์ชันล่าสุด",
+    "dl_latest"  => "ล่าสุด",
+    "os_help_linux"   => "ไม่แน่ใจ? เลือก <b>AppImage</b> — ใช้งานได้บนทุกดิสทริบิวชันโดยไม่ต้องติดตั้ง เลือก <b>.deb</b> บน Debian/Ubuntu เลือก <b>Intel / AMD</b> เว้นแต่คุณจะใช้เครื่อง ARM (Raspberry Pi, เซิร์ฟเวอร์ ARM)",
+    "os_help_macos"   => "อิมเมจเดียวใช้ได้ทั้งบน Apple Silicon (ซีรีส์ M) และ Mac ที่ใช้ Intel",
+    "os_help_windows" => "รุ่นพกพา — แตกไฟล์แล้วเรียกใช้ ไม่มีอะไรต้องติดตั้ง แพลตฟอร์มใหม่ล่าสุด ยังอยู่ระหว่างการปรับแต่ง",
+    "os_install_linux"   => "🐧 <b>AppImage:</b> ทำให้รันได้แล้วเปิดใช้งาน — ไม่มีอะไรต้องติดตั้ง: <code>chmod +x dopeIPTV-*.AppImage &amp;&amp; ./dopeIPTV-*.AppImage</code>. <b>.deb</b> (Debian/Ubuntu): <code>sudo apt install ./dopeIPTV-*.deb</code>. <b>.rpm</b> (Fedora/RHEL): <code>sudo dnf install ./dopeIPTV-*.rpm</code>.",
+    "os_install_macos"   => "🍎 เปิด <code>.dmg</code> แล้วลาก dopeIPTV ไปที่ Applications เนื่องจากแอปยังไม่ได้รับการรับรอง (notarized) จาก Apple การเปิดครั้งแรกอาจถูกบล็อก — <b>คลิกขวาที่แอป → Open</b> แล้ว <b>Open</b> ในกล่องโต้ตอบ (หรืออนุญาตใน <b>System Settings → Privacy &amp; Security → Open Anyway</b>) หากแทนที่จะเป็นเช่นนั้น macOS บอกว่าแอป <b>“เสียหาย” (damaged)</b> ให้ลบเครื่องหมายดาวน์โหลดใน Terminal: <code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code> ปลอดภัย — คำเตือนหมายความเพียงว่าบิลด์ยังไม่ได้เซ็นชื่อ",
+    "os_install_windows" => "🪟 แตกไฟล์โฟลเดอร์แล้วเรียกใช้ <code>dopeiptv.exe</code> เนื่องจากแอปยังไม่ได้เซ็นชื่อ SmartScreen อาจแสดง <b>“Windows protected your PC”</b> — คลิก <b>More info → Run anyway</b> เป็นเพียงคำเตือน ไม่มีอะไรถูกบล็อกหรือลบ",
+    "arch_apple"     => "Apple Silicon & Intel",
+    "arch_x86"       => "Intel / AMD (64 บิต)",
+    "arch_arm"       => "ARM (64 บิต)",
+    "arch_universal" => "สากล",
+    "dl_t_dmg"      => "ดิสก์อิมเมจ macOS",
+    "dl_f_dmg"      => ".dmg — ลากไปที่ Applications",
+    "dl_t_pkg"      => "ตัวติดตั้ง macOS",
+    "dl_f_pkg"      => ".pkg",
+    "dl_t_exe"      => "ตัวติดตั้ง Windows",
+    "dl_f_exe"      => ".exe",
+    "dl_t_winzip"   => "Windows แบบพกพา",
+    "dl_f_winzip"   => ".zip — แตกไฟล์ &amp; เรียกใช้ ไม่ต้องติดตั้ง",
+    "dl_t_appimage" => "AppImage",
+    "dl_f_appimage" => "ใช้งานได้บนทุกดิสโทร — ไม่ต้องติดตั้ง",
+    "dl_t_deb"      => "แพ็กเกจ .deb",
+    "dl_f_deb"      => "สำหรับ Debian / Ubuntu",
+    "dl_t_rpm"      => "แพ็กเกจ .rpm",
+    "dl_f_rpm"      => "สำหรับ Fedora / RHEL",
+    "dl_t_flatpak"  => "Flatpak",
+    "dl_f_flatpak"  => "ทุกดิสโทร",
+    "dl_recommended"=> "แนะนำ",
+    "dl_go"         => "ดาวน์โหลด →",
+    "dl_all_name"   => "แพ็กเกจทั้งหมดบน GitHub",
+    "dl_all_sub"    => "รุ่นล่าสุด",
+    "dl_open"       => "เปิด →",
+    "note_generated" => "↻ สร้างบนเซิร์ฟเวอร์จากรีลีส GitHub ของ <code>slimture/dopeIPTV</code> — บิลด์ใหม่จะปรากฏโดยอัตโนมัติ",
+    "note_verify"    => "🔒 ตรวจสอบไฟล์ที่ดาวน์โหลด — <a class='verify-link' href='/files/SHA256SUMS'>เช็กซัม SHA-256</a> · <code>sha256sum -c SHA256SUMS</code>",
+
+    // credits
+    "cred_eyebrow" => "โอเพนซอร์ส",
+    "cred_h2"      => "ซอฟต์แวร์เสรี ยืนอยู่บนบ่าของยักษ์",
+    "cred_intro"   => "dopeIPTV เป็น<b>ซอฟต์แวร์เสรีและโอเพนซอร์ส</b>ภายใต้สัญญาอนุญาต GPL-3.0 — ไม่มีโฆษณา ไม่มีการติดตาม ไม่มีบัญชี สร้างขึ้นด้วยและขอบคุณโครงการและบริการเหล่านี้:",
+    "cred_playback"      => "การเล่น",
+    "cred_interface"     => "อินเทอร์เฟซ",
+    "cred_casting"       => "การแคสต์",
+    "cred_metadata"      => "เมทาดาทา &amp; ภาพ",
+    "cred_watched"       => "ซิงก์รายการที่ดูแล้ว",
+    "cred_licences"      => "สัญญาอนุญาต",
+    "cred_licences_link" => "GPL-3.0 &amp; บุคคลที่สาม",
+    "disclaimer" => "ผลิตภัณฑ์นี้ใช้ TMDB API แต่ไม่ได้รับการรับรองหรือรับรองโดย TMDB ผลิตภัณฑ์นี้ใช้ Trakt API แต่ไม่ได้รับการรับรองหรือรับรองโดย Trakt เครื่องหมายการค้าทั้งหมดเป็นทรัพย์สินของเจ้าของที่เกี่ยวข้อง",
+
+    // footer
+    "footer_releases" => "รุ่นที่เผยแพร่",
+    "footer_docs"     => "เอกสาร",
+    "lang_label"      => "ภาษา",
+];

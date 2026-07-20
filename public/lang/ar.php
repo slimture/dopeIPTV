@@ -1,0 +1,124 @@
+<?php
+/**
+ * العربية (ar) — ترجمة كاملة لـ iptv.dope.rs (لغة من اليمين إلى اليسار).
+ * تبقى أسماء العلم والمصطلحات التقنية (Xtream Codes, M3U, AppImage, mpv,
+ * GitHub …) بالإنجليزية. تستخدم سمات HTML علامات اقتباس مفردة كي تبقى القيم
+ * سلاسل PHP بعلامات اقتباس مزدوجة.
+ */
+return [
+    // <head>
+    "meta_title"   => "dopeIPTV — مشغّل IPTV للينكس مع EPG وtimeshift وتسجيل & multiview",
+    "meta_desc"    => "dopeIPTV هو مشغّل IPTV سطح مكتب سريع ومفتوح المصدر لـ Xtream Codes وM3U، مع دليل EPG كامل، وtimeshift مباشر، وتلفزيون catch-up، وتسجيل، وmultiview — شاهد حتى تسع قنوات في وقت واحد. صُمم للينكس — ويعمل أيضًا على macOS وWindows.",
+    "meta_keywords"=> "مشغل IPTV, مشغل IPTV لينكس, Xtream Codes, M3U, EPG, XMLTV, timeshift, تلفزيون catch-up, تسجيل IPTV, multiview IPTV, مشاهدة عدة قنوات, IPTV متعدد الشاشات, IPTV لينكس, IPTV macOS, IPTV Windows, dopeIPTV",
+
+    // header nav
+    "nav_features"    => "الميزات",
+    "nav_screenshots" => "لقطات الشاشة",
+    "nav_download"    => "تنزيل",
+    "nav_github"      => "GitHub",
+    "nav_download_btn"=> "تنزيل",
+
+    // hero
+    "hero_eyebrow" => "على الهواء · الإصدار",
+    "hero_h1"      => "تلفزيون مباشر وcatch-up وتسجيلات — في تطبيق <span class='hl'>سطح مكتب أصلي</span> واحد.",
+    "hero_lede"    => "مشغّل IPTV سريع وعصري لـ Xtream Codes &amp; M3U — مع دليل EPG كامل، وtimeshift وcatch-up مباشر، وتسجيل بنقرة واحدة، وmultiview لما يصل إلى تسع قنوات في وقت واحد. مبني على mpv، ومصمم للينكس — ويعمل أيضًا على macOS &amp; Windows.",
+    "hero_cta"     => "التنزيل لنظامك",
+    "hero_source"  => "عرض المصدر",
+    "hero_free"    => "مجاني &amp; مفتوح المصدر",
+
+    // feature strip chips
+    "chip_timeshift" => "Timeshift / catch-up",
+    "chip_languages" => "8 لغات",
+
+    // features
+    "feat_eyebrow" => "كل شيء على شاشة واحدة",
+    "feat_h2"      => "مبني على طريقة مشاهدة الناس للتلفزيون فعليًا.",
+    "feat_intro"   => "ليست مكتبة وسائط معاد استخدامها — بل عميل تلفزيون، مع الخط الزمني والدليل والمسجّل حيث تتوقعها.",
+    "feat_c1_h" => "Timeshift &amp; catch-up",
+    "feat_c1_p" => "ارجع إلى أرشيف قناة على خط زمني مباشر، أو انتقل مباشرة إلى برنامج سابق من الدليل.",
+    "feat_mv_h" => "Multiview",
+    "feat_mv_p" => "شاهد حتى تسع قنوات مباشرة في وقت واحد ضمن شبكة — امزج قوائم تشغيل مختلفة، وانقر على إحداها للصوت، مع timeshift وترجمات لكل نافذة.",
+    "feat_c2_h" => "إيقاف البث المباشر مؤقتًا",
+    "feat_c2_p" => "إيقاف مؤقت واستئناف بأسلوب DVR خلف البث المباشر — يعرض المشغّل بالضبط مقدار تأخرك.",
+    "feat_c3_h" => "دليل EPG كامل",
+    "feat_c3_p" => "شبكة برامج حقيقية مع بحث وتذكيرات وقائمة قابلة للتخصيص بما هو قادم.",
+    "feat_c4_h" => "تسجيل بنقرة واحدة",
+    "feat_c4_p" => "سجّل البث الذي تشاهده عبر اتصال واحد، مع مؤقتات وحدود للحجم ومكتبة تسجيلات.",
+    "feat_c5_h" => "متعدد المزودين",
+    "feat_c5_p" => "عدة قوائم تشغيل Xtream أو M3U جنبًا إلى جنب، لكل منها EPG خاص بها، وتحديث تلقائي، وعنوان URL مخصص للدليل.",
+    "feat_c6_h" => "تشغيل سلس",
+    "feat_c6_p" => "محرك mpv مدمج، مع Chromecast ومزامنة Trakt وسمات وتحكم كامل بلوحة المفاتيح.",
+
+    // screenshots
+    "shots_eyebrow" => "نظرة من الداخل",
+    "shots_h2"      => "نظيف وداكن ولا يعترض طريقك.",
+    "shot_ph"       => "لقطة شاشة",
+    "shot_main_alt" => "النافذة الرئيسية لـ dopeIPTV مع قائمة القنوات والدليل والفيديو",
+    "shot_main_t"   => "القنوات &amp; المشغّل",
+    "shot_main_c"   => "القائمة والدليل والفيديو في تخطيط واحد.",
+    "shot_epg_alt"  => "شبكة دليل برامج EPG في dopeIPTV",
+    "shot_epg_t"    => "دليل البرامج",
+    "shot_epg_c"    => "عرض شبكي مع علامات catch-up.",
+    "shot_ts_alt"   => "الخط الزمني لـ timeshift في dopeIPTV يتصفح أرشيف قناة",
+    "shot_ts_t"     => "الخط الزمني لـ timeshift",
+    "shot_ts_c"     => "تصفّح الأرشيف، مع تحديد حافة البث المباشر.",
+    "shot_rec_alt"  => "مكتبة تسجيلات dopeIPTV مع مؤقتات",
+    "shot_rec_t"    => "التسجيلات",
+    "shot_rec_c"    => "مؤقتات وحدود تخزين وتشغيل.",
+
+    // download
+    "dl_eyebrow" => "احصل على dopeIPTV",
+    "dl_h2"      => "نزّل أحدث إصدار.",
+    "dl_latest"  => "الأحدث",
+    "os_help_linux"   => "لست متأكدًا؟ خذ <b>AppImage</b> — يعمل على أي توزيعة دون تثبيت. اختر <b>.deb</b> على Debian/Ubuntu. اختر <b>Intel / AMD</b> ما لم تكن على جهاز ARM (Raspberry Pi، خادم ARM).",
+    "os_help_macos"   => "صورة واحدة تعمل على كل من Apple Silicon (سلسلة M) وأجهزة Mac بمعالج Intel.",
+    "os_help_windows" => "نسخة محمولة — فك الضغط وشغّل، لا شيء للتثبيت. أحدث منصة، وما زالت قيد الصقل.",
+    "os_install_linux"   => "🐧 <b>AppImage:</b> اجعله قابلاً للتنفيذ وشغّله — لا شيء للتثبيت: <code>chmod +x dopeIPTV-*.AppImage &amp;&amp; ./dopeIPTV-*.AppImage</code>. <b>.deb</b> (Debian/Ubuntu): <code>sudo apt install ./dopeIPTV-*.deb</code>. <b>.rpm</b> (Fedora/RHEL): <code>sudo dnf install ./dopeIPTV-*.rpm</code>.",
+    "os_install_macos"   => "🍎 افتح <code>.dmg</code> واسحب dopeIPTV إلى Applications. بما أن التطبيق لم يوثَّق بعد (notarized) من Apple، قد يُحظر التشغيل الأول — <b>انقر بزر الفأرة الأيمن على التطبيق ← Open</b>، ثم <b>Open</b> في مربع الحوار (أو اسمح به من <b>System Settings ← Privacy &amp; Security ← Open Anyway</b>). وإذا قال macOS بدلاً من ذلك إن التطبيق <b>«تالف» (damaged)</b>، فأزل علامة التنزيل في Terminal: <code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code>. إنه آمن — التحذير يعني فقط أن النسخة غير موقّعة.",
+    "os_install_windows" => "🪟 فك ضغط المجلد وشغّل <code>dopeiptv.exe</code>. بما أن التطبيق غير موقّع بعد، قد يعرض SmartScreen <b>«Windows protected your PC»</b> — انقر <b>More info ← Run anyway</b>. إنه مجرد تحذير، لا شيء يُحظر أو يُحذف.",
+    "arch_apple"     => "Apple Silicon & Intel",
+    "arch_x86"       => "Intel / AMD (64-bit)",
+    "arch_arm"       => "ARM (64-bit)",
+    "arch_universal" => "عالمي",
+    "dl_t_dmg"      => "صورة قرص macOS",
+    "dl_f_dmg"      => ".dmg — اسحب إلى Applications",
+    "dl_t_pkg"      => "مثبّت macOS",
+    "dl_f_pkg"      => ".pkg",
+    "dl_t_exe"      => "مثبّت Windows",
+    "dl_f_exe"      => ".exe",
+    "dl_t_winzip"   => "Windows محمول",
+    "dl_f_winzip"   => ".zip — فك الضغط &amp; شغّل، دون تثبيت",
+    "dl_t_appimage" => "AppImage",
+    "dl_f_appimage" => "يعمل على أي توزيعة — دون تثبيت",
+    "dl_t_deb"      => "حزمة .deb",
+    "dl_f_deb"      => "لـ Debian / Ubuntu",
+    "dl_t_rpm"      => "حزمة .rpm",
+    "dl_f_rpm"      => "لـ Fedora / RHEL",
+    "dl_t_flatpak"  => "Flatpak",
+    "dl_f_flatpak"  => "كل التوزيعات",
+    "dl_recommended"=> "موصى به",
+    "dl_go"         => "تنزيل →",
+    "dl_all_name"   => "كل الحزم على GitHub",
+    "dl_all_sub"    => "أحدث إصدار",
+    "dl_open"       => "فتح →",
+    "note_generated" => "↻ يُنشأ على الخادم من إصدارات GitHub الخاصة بـ <code>slimture/dopeIPTV</code> — تظهر الإصدارات الجديدة تلقائيًا.",
+    "note_verify"    => "🔒 تحقق من تنزيلك — <a class='verify-link' href='/files/SHA256SUMS'>مجاميع تحقق SHA-256</a> · <code>sha256sum -c SHA256SUMS</code>",
+
+    // credits
+    "cred_eyebrow" => "مفتوح المصدر",
+    "cred_h2"      => "برمجيات حرة، على أكتاف العمالقة.",
+    "cred_intro"   => "dopeIPTV هو <b>برنامج حر ومفتوح المصدر</b> بموجب رخصة GPL-3.0 — دون إعلانات، دون تتبع، دون حسابات. إنه مبني بمساعدة هذه المشاريع والخدمات، وممتن لها:",
+    "cred_playback"      => "التشغيل",
+    "cred_interface"     => "الواجهة",
+    "cred_casting"       => "البث",
+    "cred_metadata"      => "البيانات الوصفية &amp; الصور",
+    "cred_watched"       => "مزامنة المُشاهَد",
+    "cred_licences"      => "التراخيص",
+    "cred_licences_link" => "GPL-3.0 &amp; أطراف ثالثة",
+    "disclaimer" => "يستخدم هذا المنتج واجهة TMDB البرمجية لكنه غير معتمد أو مصدَّق من TMDB. يستخدم هذا المنتج واجهة Trakt البرمجية لكنه غير معتمد أو مصدَّق من Trakt. جميع العلامات التجارية ملك لأصحابها المعنيين.",
+
+    // footer
+    "footer_releases" => "الإصدارات",
+    "footer_docs"     => "الوثائق",
+    "lang_label"      => "اللغة",
+];
