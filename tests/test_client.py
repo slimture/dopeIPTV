@@ -70,3 +70,31 @@ def test_detect_provider_link_plain_m3u():
 def test_detect_provider_link_rejects_bare_input():
     for bad in ("", "host.tv:8080", "http://host.tv:8080", "just text"):
         assert detect_provider_link(bad) is None
+
+
+def test_detect_provider_link_rescues_paste_into_prefilled_field():
+    # Pasting into a server field that already held text concatenates the old
+    # content and the link; urlparse "parses" that into a garbage host
+    # ("old:1234http:"). The pasted link is the LAST url-shaped run - it must
+    # be found and returned clean, for both Xtream and M3U shapes.
+    assert detect_provider_link(
+        "http://old-server:1234"
+        "http://h.tv:8080/get.php?username=u&password=p&type=m3u_plus"
+    ) == ("xtream", "http://h.tv:8080", "u", "p")
+    assert detect_provider_link(
+        "http://old-server:1234https://example.com/list.m3u8"
+    ) == ("m3u", "https://example.com/list.m3u8", "", "")
+    # Leading junk that isn't even a URL start.
+    assert detect_provider_link(
+        "mina uppgifter: http://h.tv:8080/get.php?username=u&password=p"
+    ) == ("xtream", "http://h.tv:8080", "u", "p")
+
+
+def test_detect_provider_link_embedded_url_in_query_stays_whole():
+    # A second http:// INSIDE the query (an epg= parameter) must not trick the
+    # rescue into classifying just the embedded URL - the full link parses
+    # cleanly as Xtream and wins.
+    assert detect_provider_link(
+        "http://h.tv:8080/get.php?username=u&password=p"
+        "&epg=http://h.tv/epg.xml"
+    ) == ("xtream", "http://h.tv:8080", "u", "p")

@@ -774,14 +774,35 @@ def detect_provider_link(text: str) -> tuple[str, str, str, str] | None:
     half-typed value), so manually typed server/username/password entry is
     never disturbed.
     """
-    parsed = parse_xtream_url(text)
+    s = (text or "").strip()
+    if "://" not in s:
+        return None
+    got = _detect_provider_link_once(s)
+    if got is not None and _sane_link_netloc(got[1]):
+        return got
+    # Pasting a link into a server field that already held text concatenates
+    # the old content and the link ("http://old-hosthttp://real-host/get.php?
+    # ...", or "my creds: http://real-host/..."), which either "parses" into a
+    # garbage host or not at all. The pasted link is the LAST url-shaped run
+    # in the text - retry from there (unless that IS the whole text, already
+    # tried above), so the paste still auto-fills and the clean server
+    # replaces the garbage.
+    starts = [m.start() for m in re.finditer(r"https?://", s, re.IGNORECASE)]
+    if starts and starts[-1] > 0:
+        got = _detect_provider_link_once(s[starts[-1]:])
+        if got is not None and _sane_link_netloc(got[1]):
+            return got
+    return None
+
+
+def _detect_provider_link_once(s: str) -> tuple[str, str, str, str] | None:
+    """One classification pass over exactly the given text (no substring
+    rescue) - see detect_provider_link for the semantics."""
+    parsed = parse_xtream_url(s)
     if parsed:
         return ("xtream", *parsed)
     from urllib.parse import urlparse
 
-    s = (text or "").strip()
-    if "://" not in s:
-        return None
     try:
         u = urlparse(s)
     except ValueError:
@@ -791,6 +812,19 @@ def detect_provider_link(text: str) -> tuple[str, str, str, str] | None:
             or "type=m3u" in u.query.lower()):
         return "m3u", s, "", ""
     return None
+
+
+def _sane_link_netloc(url: str) -> bool:
+    """False for the host artifact of a paste-into-prefilled-field concat: a
+    netloc with a second scheme inside ("old-server:1234http:") is never a
+    real host, so the caller should retry from the last url start instead."""
+    from urllib.parse import urlparse
+
+    try:
+        n = urlparse(url).netloc.lower()
+    except ValueError:
+        return False
+    return bool(n) and "http:" not in n and "https:" not in n
 
 
 def b64(text: str | None) -> str:
