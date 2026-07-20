@@ -1046,6 +1046,7 @@ def tr(key: str, **kwargs: object) -> str:
 
 import json as _json
 import os as _os
+import sys as _sys
 
 #: Right-to-left languages (Arabic, Persian, Hebrew, Urdu). They ship as add-on
 #: locales; the UI mirrors its layout direction for these (see is_rtl / apply in
@@ -1093,7 +1094,31 @@ _LOCALE_READY_RATIO = 0.9
 
 
 def _locale_dir() -> str:
-    return _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "locale")
+    """Directory holding the add-on locale JSONs.
+
+    Running from source (or a wheel) it sits right next to this module. In a
+    frozen build (PyInstaller .app / .exe) the pure-Python modules live inside
+    an archive, so ``__file__`` can point at a virtual path with no ``locale/``
+    beside it; there the data files are unpacked under the bundle root
+    (``sys._MEIPASS``), and on a macOS .app the code lives in
+    ``Contents/Frameworks`` while data may sit in ``Contents/Resources``. Try
+    every layout so the languages load no matter how the app was packaged - a
+    missing locale dir silently collapses the picker to English-only."""
+    here = _os.path.dirname(_os.path.abspath(__file__))
+    candidates = [_os.path.join(here, "locale")]
+    base = getattr(_sys, "_MEIPASS", None)
+    if base:
+        candidates.append(_os.path.join(base, "dopeiptv", "locale"))
+        candidates.append(_os.path.join(base, "locale"))
+    if f"{_os.sep}Contents{_os.sep}Frameworks" in here:
+        res = here.replace(
+            f"{_os.sep}Contents{_os.sep}Frameworks",
+            f"{_os.sep}Contents{_os.sep}Resources")
+        candidates.append(_os.path.join(res, "locale"))
+    for cand in candidates:
+        if _os.path.isdir(cand):
+            return cand
+    return candidates[0]
 
 
 def _load_locale_files() -> None:

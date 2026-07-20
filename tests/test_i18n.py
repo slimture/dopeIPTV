@@ -72,3 +72,21 @@ def test_i18n_status_tool_reports_all_locales_healthy():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     assert mod._table(i18n.base_string_keys()) == 0
+
+
+def test_locale_dir_found_under_frozen_bundle_root(tmp_path, monkeypatch):
+    """In a PyInstaller build the modules live in an archive, so __file__ has
+    no locale/ beside it; the files are unpacked under sys._MEIPASS instead.
+    _locale_dir must fall back there or the picker collapses to English-only
+    (the 1.0.0 packaging regression this guards against)."""
+    import os
+
+    # A bundle root that holds dopeiptv/locale/, and a bogus module path with
+    # nothing beside it (mimics __file__ pointing into the frozen archive).
+    (tmp_path / "dopeiptv" / "locale").mkdir(parents=True)
+    (tmp_path / "dopeiptv" / "locale" / "sv.json").write_text("{}")
+    monkeypatch.setattr(i18n, "__file__", str(tmp_path / "nope" / "i18n.py"))
+    monkeypatch.setattr(i18n._sys, "_MEIPASS", str(tmp_path), raising=False)
+
+    assert i18n._locale_dir() == os.path.join(
+        str(tmp_path), "dopeiptv", "locale")

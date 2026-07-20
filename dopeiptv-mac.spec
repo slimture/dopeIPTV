@@ -72,6 +72,10 @@ binaries = _find_libmpv() + _find_ffmpeg()
 datas = []
 # Our own package data: the add-on locale JSONs (i18n loads them at import).
 datas += collect_data_files('dopeiptv')
+# Belt-and-suspenders: add the locale JSONs explicitly too, so the languages
+# ship even if collect_data_files misses them. Without these the picker
+# silently collapses to English-only in the frozen app.
+datas += [(f, 'dopeiptv/locale') for f in glob.glob('dopeiptv/locale/*.json')]
 hiddenimports = ["mpv"]
 
 for pkg in ("pychromecast", "zeroconf"):
