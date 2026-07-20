@@ -9,14 +9,14 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 Settings usability fix.
 
-- **Fixed: the language list wouldn't scroll in Settings.** The wheel guard
-  that stops the mouse wheel from accidentally changing a setting while you
-  scroll the page also swallowed the wheel on the 27-entry language picker -
-  the one control you *do* want to scroll. The language picker is now exempt
-  from the guard, its popup scrolls per pixel (so a trackpad's small deltas
-  register instead of being swallowed), and an overflowing popup keeps a
-  permanently visible scrollbar as a drag handle. Every other control still
-  swallows the wheel so scrolling the page can't nudge a setting.
+- **Fixed: the language list wouldn't scroll in Settings.** The 27-language
+  picker was a dropdown whose popup kept mis-scrolling per platform (the
+  native macOS popup ignores the height cap; the wheel guard that protects
+  the other boxes swallowed wheel input on it). It is now a plain embedded
+  list, always visible in the page with its own scrollbar - it scrolls with
+  the wheel or trackpad like any list, with no popup involved. Every other
+  box still swallows the wheel, so scrolling the page can't nudge a setting;
+  the language list is deliberately the one scrollable box.
 
 ## [1.0.1]
 
