@@ -5,9 +5,68 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
-## [1.0.2]
+## [1.1.0]
 
-Settings usability fix.
+Video stability on macOS, smarter series navigation, a leaner Home, and a
+faster app all around.
+
+### Video
+
+- **Fixed: pop-out froze or blanked the video (audio kept playing).** Docking
+  the player in or out of the pop-out window reparents the video widget. On
+  macOS (shared OpenGL contexts) Qt *preserves* the GL context across that
+  reparent, so none of the usual rebuild hooks fire - the widget's backing
+  framebuffer was still composed against the old window and the screen froze
+  on the last frame while mpv kept playing. Only a window resize (e.g.
+  fullscreen) recovered it. The player now does the equivalent automatically:
+  after every dock/undock the video surface gets a 1-pixel resize nudge that
+  rebuilds the backing framebuffer against the new window. Pure widget
+  geometry - mpv and the stream are never touched. Where the GL context
+  genuinely is recreated (Linux), the render context is rebuilt as before,
+  plus a throttled self-heal in the paint path as a safety net.
+- **Fixed: entering video fullscreen flashed a half-sized frame.** The window
+  went fullscreen *after* painting had resumed, so one frame showed the video
+  filling the still-normal-sized window. The whole transition is now painted
+  as a single clean cut.
+
+### Series navigation
+
+- **"Now playing" jumps into the right episode.** Clicking the sidebar logo
+  while an episode plays now lands inside that series' episode list with the
+  playing episode selected - previously an async category reload could bounce
+  the view back to "all series" before the drill finished.
+- **Home's Continue watching opens the series too.** Clicking a partly-watched
+  episode on Home plays it *and* drills the middle column into the series'
+  episode list with that episode selected.
+- **Back from an episode list lands in the series' own category.** Backing out
+  now selects the category the series actually lives in (with the series row
+  selected), instead of whatever category happened to be selected before.
+- **Stable episode posters on Home.** Continue-watching episode cards resolve
+  the series' poster (the same art the episode list shows) instead of
+  title-searching the mangled episode name as a movie, which made the poster
+  appear and disappear at random.
+
+### Home
+
+- **Removed the Featured row.** It was the top 12 of the same recently-added
+  movies already shown directly below it - pure duplication, and its oversized
+  posters were the slowest part of the page.
+
+### Performance
+
+- **Faster startup**: heavy modules load lazily (~40% off import time), and an
+  optional custom allocator (jemalloc/mimalloc) can be enabled with the
+  `DOPEIPTV_JEMALLOC` environment variable - off by default, a strict no-op
+  unless the library exists.
+- **Snappier UI**: fullscreen toggles batch their relayout into one paint,
+  the Settings dialog builds ~30% faster, list scrolling and divider drags are
+  smoother, and the image caches are bounded (2.5 GB disk budget with
+  automatic pruning).
+- **Sidebar and layout state survive fullscreen**: the sidebar's expanded/rail
+  choice and the middle column's full form are kept across video fullscreen
+  round-trips.
+
+### Settings
 
 - **Fixed: the language dropdown wouldn't scroll in Settings.** The wheel
   guard that stops the mouse wheel from accidentally changing a setting was
@@ -15,12 +74,13 @@ Settings usability fix.
   Qt), including the one inside the language dropdown's popup - and Qt
   delivers wheel scrolling *through* the scrollbar, so the open list ignored
   the wheel entirely on every platform. Scrollbars are now exempt from the
-  guard: click the language dropdown and the popup (capped at 14 rows, with
-  a visible scrollbar) scrolls normally with wheel or trackpad. Every other
-  box still swallows the wheel, so scrolling the page can't nudge a setting.
-  Release builds now also verify that all 27 languages load from each
-  packaged artifact (.dmg, Windows zip, AppImage/.deb, wheel), so a
-  packaging slip can never silently ship an English-only picker again.
+  guard: the popup (capped at 14 rows, with a visible scrollbar) scrolls
+  normally with wheel or trackpad, and every other box still swallows the
+  wheel so scrolling the page can't nudge a setting. A restart hint under the
+  picker says a language change needs a restart. Release builds also verify
+  that all 27 languages load from each packaged artifact (.dmg, Windows zip,
+  AppImage/.deb, wheel), so a packaging slip can never silently ship an
+  English-only picker again.
 
 ## [1.0.1]
 
