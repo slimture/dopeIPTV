@@ -41,6 +41,25 @@ def _i18n_entries():
     return out
 
 
+_CORE_LANGUAGES = ("en", "sv", "es", "de", "fr", "zh", "ru", "th")
+
+
+def test_every_key_covers_every_core_language():
+    """Every string must be translated (non-empty) into all eight core
+    languages. A missing or blank one silently falls back to English for that
+    language's users - the app then looks half-finished in, say, German only,
+    which no screenshot in English ever reveals. Add-on locales (locale/*.json)
+    are exempt: they fall back by design and are gated by coverage."""
+    gaps = []
+    for key, langs in _i18n_entries():
+        for code in _CORE_LANGUAGES:
+            if not str(langs.get(code, "")).strip():
+                gaps.append(f"{key} → {code}")
+    assert not gaps, (
+        f"{len(gaps)} core-language translation gaps:\n"
+        + "\n".join(gaps[:50]))
+
+
 def test_i18n_placeholders_match_across_languages():
     """Every translation of a key must use exactly the English placeholders.
     A language missing {n} (or inventing {m}) renders a broken string - or
