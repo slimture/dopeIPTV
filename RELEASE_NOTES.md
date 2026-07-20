@@ -1,60 +1,34 @@
-## dopeIPTV 1.0.0
+## dopeIPTV 1.1.0
 
-The 1.0 milestone — dopeIPTV now speaks your language, sets up from a single
-pasted link, and scrolls large lineups without a stutter.
+Video stability on macOS, smarter series navigation, a leaner Home and a
+faster app all around.
 
-- **27 languages**: the whole interface is translated into English, Svenska,
-  Español, Deutsch, Français, 中文, Русский, ไทย, Português, Italiano,
-  Nederlands, Polski, Hrvatski, Srpski, Ελληνικά, Türkçe, Українська, Bahasa
-  Indonesia, Tiếng Việt, हिन्दी, 日本語, 한국어, Kiswahili, العربية, فارسی,
-  עברית and اردو — switchable live in Settings, with full right-to-left
-  layout for Arabic, Persian, Hebrew and Urdu.
-- **One-paste setup**: paste your whole Xtream link (or an M3U URL) into the
-  welcome screen and dopeIPTV recognises the type and fills in the
-  server / username / password for you. Typing the three fields by hand still
-  works exactly as before.
-- **Snappier lists**: channel/movie/series logos and posters are scaled once
-  and cached instead of on every repaint, removing the main source of scroll
-  lag with large lineups — with smooth pixel-granular scrolling. The video
-  pipeline is untouched.
-- **For contributors**: native-speaker translation fixes are welcome (see
-  `docs/TRANSLATING.md` and the new "Translation fix" issue template); the
-  pure-logic core is now strictly type-checked, and every module and class is
-  documented.
-
-Everything from the 0.9.0 release — Home, the interactive EPG guide,
-reminders & recording, timeshift, recording, multiview, themes and instant
-outage-proof startup — is here too.
-
-- **Home**: a Featured hero row and shelves for Continue watching,
-  Favourites now, favourite movies & series, Recently viewed and Recently
-  added movies, series *and* TV channels. Instant cold-start posters via a
-  per-playlist disk cache. Right-click a channel tile to set a reminder or
-  record. Every shelf is configurable in Settings.
-- **EPG guide, interactive**: logos, descriptions, progress, day-jumps,
-  arrow-key navigation, sticky titles — and it follows your accent colour.
-- **Upcoming programmes**: when a stream hasn't started, get the answer at
-  once and set a **reminder** or a **recording** (until it ends, or a custom
-  length) — from the prompt, the channel list, Home or the programme guide.
-- **Player**: click the video to pause/play with a centred play/pause disc
-  (docked, fullscreen, pop-out); complete right-click menus everywhere;
-  the timeshift timeline shows the target time on hover.
-- **Artwork**: episode posters via the show's TMDB art, junk cover URLs
-  skipped, recordings show the channel logo.
-- **Snappier**: definitive stream errors (forbidden / not found / not
-  started) surface in about a second; "Recently added" is cached; many
-  macOS repaint fixes and 246 tests green.
-- **Instant startup, outage-proof**: the app opens immediately (credentials
-  verify in the background), lists are cached to disk per playlist so a
-  down provider still shows the last known lineup, and after a network
-  failure the client fails fast for 30 s instead of hanging for minutes.
-- **Timeshift you can trust**: only a proven provider answer can hide a
-  channel's catch-up - transient errors and early not-seekable readings
-  no longer silently strip timeshift off working channels.
-
-**Note:** the first launch of 0.9.0 resets stored settings to the new
-defaults (too much changed to carry the old ones). Playlists, favorites,
-history, reminders, recordings and your Trakt account are all kept.
+- **Pop-out video fixed for real**: docking the player in or out of the
+  pop-out window could leave a frozen frame (or black) while audio kept
+  playing — the video surface now rebuilds its framebuffer on every
+  dock/undock, with the stream untouched. Entering video fullscreen is one
+  clean cut, with no half-size flash.
+- **Series navigation that lands right**: *Now playing* jumps to the playing
+  episode inside its series; a Continue-watching card on Home plays the
+  episode *and* opens the series' episode list; backing out of an episode
+  list lands in the series' own category with the series selected.
+- **Recently viewed treats episodes as episodes**: replays resume where you
+  left off (no more restarting from zero), rows read "Series · S1 E2 -
+  Title", duplicates are gone, and cards reliably show the series' poster.
+- **Home, decluttered**: the redundant Featured row is removed, a new
+  **Watch Later shelf** shows your saved movies and shows, and Continue
+  watching / Recently viewed no longer overlap.
+- **The TV guide from Home or Movies covers your favourite channels** (the
+  lineup you curated) instead of an arbitrary first category — the full
+  lineup if you have no favourites. TV and Favorites scoping is unchanged.
+- **Faster**: quicker startup (lazy imports), Settings opens ~30% faster,
+  fullscreen toggles paint in one clean cut, image caches are bounded
+  (2.5 GB disk budget with automatic pruning), and an optional custom
+  allocator can be enabled with `DOPEIPTV_JEMALLOC` (off by default).
+- **Settings**: the language picker scrolls properly on every platform
+  (with a restart hint), a pasted provider link now survives messy input
+  (pre-filled fields, text prefixes), and the old one-time 0.9.0 settings
+  migration is fully removed.
 
 Full details in the [changelog](https://github.com/slimture/dopeIPTV/blob/main/CHANGELOG.md).
 

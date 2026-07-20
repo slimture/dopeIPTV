@@ -19,6 +19,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - name: Guard - release notes must match this version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          # The GitHub release body comes from RELEASE_NOTES.md (body_path
+          # below). v1.1.0 shipped with 1.0.0's notes because nothing checked
+          # the file was updated - fail the build immediately instead.
+          VER=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' dopeiptv/__init__.py)
+          if ! grep -q "dopeIPTV ${VER}" RELEASE_NOTES.md; then
+            echo "::error::RELEASE_NOTES.md is stale: no 'dopeIPTV ${VER}' heading. Update it before tagging."
+            exit 1
+          fi
+          echo "RELEASE_NOTES.md matches version ${VER}."
       - name: Bake built-in TMDB key
         env:
           DOPEIPTV_TMDB_KEY: ${{ secrets.DOPEIPTV_TMDB_KEY }}
@@ -86,6 +99,19 @@ jobs:
     runs-on: ${{ matrix.runs_on }}
     steps:
       - uses: actions/checkout@v5
+      - name: Guard - release notes must match this version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          # The GitHub release body comes from RELEASE_NOTES.md (body_path
+          # below). v1.1.0 shipped with 1.0.0's notes because nothing checked
+          # the file was updated - fail the build immediately instead.
+          VER=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' dopeiptv/__init__.py)
+          if ! grep -q "dopeIPTV ${VER}" RELEASE_NOTES.md; then
+            echo "::error::RELEASE_NOTES.md is stale: no 'dopeIPTV ${VER}' heading. Update it before tagging."
+            exit 1
+          fi
+          echo "RELEASE_NOTES.md matches version ${VER}."
       - name: Bake built-in TMDB key
         env:
           DOPEIPTV_TMDB_KEY: ${{ secrets.DOPEIPTV_TMDB_KEY }}
@@ -342,6 +368,19 @@ jobs:
     continue-on-error: true   # matches Flatpak - failure here shouldn't block the other formats
     steps:
       - uses: actions/checkout@v5
+      - name: Guard - release notes must match this version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          # The GitHub release body comes from RELEASE_NOTES.md (body_path
+          # below). v1.1.0 shipped with 1.0.0's notes because nothing checked
+          # the file was updated - fail the build immediately instead.
+          VER=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' dopeiptv/__init__.py)
+          if ! grep -q "dopeIPTV ${VER}" RELEASE_NOTES.md; then
+            echo "::error::RELEASE_NOTES.md is stale: no 'dopeIPTV ${VER}' heading. Update it before tagging."
+            exit 1
+          fi
+          echo "RELEASE_NOTES.md matches version ${VER}."
       - name: Bake built-in TMDB key
         env:
           DOPEIPTV_TMDB_KEY: ${{ secrets.DOPEIPTV_TMDB_KEY }}
@@ -507,6 +546,19 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v5
+      - name: Guard - release notes must match this version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          # The GitHub release body comes from RELEASE_NOTES.md (body_path
+          # below). v1.1.0 shipped with 1.0.0's notes because nothing checked
+          # the file was updated - fail the build immediately instead.
+          VER=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' dopeiptv/__init__.py)
+          if ! grep -q "dopeIPTV ${VER}" RELEASE_NOTES.md; then
+            echo "::error::RELEASE_NOTES.md is stale: no 'dopeIPTV ${VER}' heading. Update it before tagging."
+            exit 1
+          fi
+          echo "RELEASE_NOTES.md matches version ${VER}."
       - name: Bake built-in TMDB key
         shell: bash
         env:
@@ -605,6 +657,19 @@ jobs:
       options: --privileged
     steps:
       - uses: actions/checkout@v5
+      - name: Guard - release notes must match this version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          # The GitHub release body comes from RELEASE_NOTES.md (body_path
+          # below). v1.1.0 shipped with 1.0.0's notes because nothing checked
+          # the file was updated - fail the build immediately instead.
+          VER=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' dopeiptv/__init__.py)
+          if ! grep -q "dopeIPTV ${VER}" RELEASE_NOTES.md; then
+            echo "::error::RELEASE_NOTES.md is stale: no 'dopeIPTV ${VER}' heading. Update it before tagging."
+            exit 1
+          fi
+          echo "RELEASE_NOTES.md matches version ${VER}."
       - name: Bake built-in TMDB key
         env:
           DOPEIPTV_TMDB_KEY: ${{ secrets.DOPEIPTV_TMDB_KEY }}
