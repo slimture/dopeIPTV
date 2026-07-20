@@ -10,19 +10,36 @@
 
 const I18N_DEFAULT = 'en';
 
-// Native names, shown in the switcher (also the display order).
+// Native names, shown in the switcher. Display order: English first, then the
+// rest alphabetically by their English language name (matches the desktop app).
 const I18N_NAMES = [
-    'en' => 'English',    'sv' => 'Svenska',   'es' => 'Español',
-    'de' => 'Deutsch',    'nl' => 'Nederlands','fr' => 'Français',
-    'it' => 'Italiano',   'pt' => 'Português (BR)',
-    'pl' => 'Polski',     'hr' => 'Hrvatski',  'sr' => 'Srpski',
-    'el' => 'Ελληνικά',   'tr' => 'Türkçe',    'uk' => 'Українська',
-    'ru' => 'Русский',
-    'hi' => 'हिन्दी',       'zh' => '中文',       'ja' => '日本語',
-    'ko' => '한국어',      'vi' => 'Tiếng Việt','id' => 'Bahasa Indonesia',
-    'th' => 'ไทย',        'sw' => 'Kiswahili',
-    'he' => 'עברית',      'ar' => 'العربية',   'fa' => 'فارسی',
-    'ur' => 'اردو',
+    'en' => 'English',
+    'ar' => 'العربية',           // Arabic
+    'zh' => '中文',               // Chinese
+    'hr' => 'Hrvatski',          // Croatian
+    'nl' => 'Nederlands',        // Dutch
+    'fr' => 'Français',          // French
+    'de' => 'Deutsch',           // German
+    'el' => 'Ελληνικά',          // Greek
+    'he' => 'עברית',             // Hebrew
+    'hi' => 'हिन्दी',              // Hindi
+    'id' => 'Bahasa Indonesia',  // Indonesian
+    'it' => 'Italiano',          // Italian
+    'ja' => '日本語',             // Japanese
+    'ko' => '한국어',             // Korean
+    'fa' => 'فارسی',             // Persian
+    'pl' => 'Polski',            // Polish
+    'pt' => 'Português (BR)',    // Portuguese
+    'ru' => 'Русский',           // Russian
+    'sr' => 'Srpski',            // Serbian
+    'es' => 'Español',           // Spanish
+    'sw' => 'Kiswahili',         // Swahili
+    'sv' => 'Svenska',           // Swedish
+    'th' => 'ไทย',                // Thai
+    'tr' => 'Türkçe',            // Turkish
+    'uk' => 'Українська',        // Ukrainian
+    'ur' => 'اردو',              // Urdu
+    'vi' => 'Tiếng Việt',        // Vietnamese
 ];
 
 // Right-to-left languages mirror the whole page.
