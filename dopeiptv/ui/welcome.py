@@ -171,8 +171,10 @@ class WelcomeOverlay(QWidget):
         # A single pasted link is recognised as Xtream (fans out into
         # server/username/password) or M3U (a plain playlist URL) and the mode
         # dropdown follows automatically; manual entry is untouched.
-        # editingFinished fires on paste-then-Tab/Enter or focus-out.
-        self._server.editingFinished.connect(self._maybe_autodetect_link)
+        # textEdited fires on every user edit (incl. paste) but NOT on our own
+        # setText, so the fields fill the instant the link is pasted - no need
+        # to tab away first - while a half-typed URL simply doesn't match yet.
+        self._server.textEdited.connect(lambda _t: self._maybe_autodetect_link())
         self._user = QLineEdit(s.value("username", "") if s else "")
         self._pw = QLineEdit(s.value("password", "") if s else "")
         self._pw.setEchoMode(QLineEdit.EchoMode.Password)

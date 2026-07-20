@@ -406,6 +406,11 @@ class _SettingsMixin:
         idx = box.findData(current)
         if idx >= 0:
             box.setCurrentIndex(idx)
+        # Cap the popup height so a long list (the 27-language picker) becomes a
+        # scrollable dropdown instead of a wall taller than the dialog that the
+        # bottom entries fall off of. The theme sets `combobox-popup: 0`, which
+        # is what makes maxVisibleItems take effect under a stylesheet.
+        box.setMaxVisibleItems(14)
         if sys.platform == "darwin":
             # On macOS the styled combo doesn't grow to fit its text, so the
             # closed box clips ("Playba…", "Sven…"). Size it to the widest

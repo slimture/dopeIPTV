@@ -102,8 +102,9 @@ class PlaylistDialog(QDialog):
         self.server = QLineEdit(playlist.get("server", ""))
         # A pasted link is recognised as Xtream (fans out into the three
         # fields) or M3U (a plain playlist URL) and the mode follows; manual
-        # entry is unaffected.
-        self.server.editingFinished.connect(self._maybe_autodetect_link)
+        # entry is unaffected. textEdited fires on paste (but not on our own
+        # setText), so the credentials fill the moment the link is pasted.
+        self.server.textEdited.connect(lambda _t: self._maybe_autodetect_link())
         self.user = QLineEdit(playlist.get("username", ""))
         self.pw = QLineEdit(playlist.get("password", ""))
         self.pw.setEchoMode(QLineEdit.EchoMode.Password)

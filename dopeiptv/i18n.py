@@ -1052,37 +1052,39 @@ import os as _os
 #: the window).
 RTL_LANGUAGES = frozenset({"ar", "fa", "he", "ur"})
 
-#: Native names for every non-English language, in picker order (English is
-#: seeded separately, first). A code is offered in the picker once its locale
-#: file covers _LOCALE_READY_RATIO of the base keys. The first seven are the
-#: former "core" languages, now shipped as locale JSON like all the rest.
+#: Native names for every non-English language, in picker order: English is
+#: seeded separately (always first), then the rest are ordered alphabetically
+#: by their English language name (shown in the trailing comment on each line),
+#: which is deterministic and easy to keep sorted when a language is added.
+#: A code is offered in the picker once its locale file covers
+#: _LOCALE_READY_RATIO of the base keys.
 _NATIVE_NAMES = {
-    "sv": "Svenska",
-    "es": "Español",
-    "de": "Deutsch",
-    "fr": "Français",
-    "zh": "中文",
-    "ru": "Русский",
-    "th": "ไทย",
-    "pt": "Português (BR)",
-    "it": "Italiano",
-    "nl": "Nederlands",
-    "pl": "Polski",
-    "hr": "Hrvatski",
-    "sr": "Srpski",
-    "el": "Ελληνικά",
-    "tr": "Türkçe",
-    "uk": "Українська",
-    "id": "Bahasa Indonesia",
-    "vi": "Tiếng Việt",
-    "hi": "हिन्दी",
-    "ja": "日本語",
-    "ko": "한국어",
-    "sw": "Kiswahili",
-    "ar": "العربية",
-    "fa": "فارسی",
-    "he": "עברית",
-    "ur": "اردو",
+    "ar": "العربية",           # Arabic
+    "zh": "中文",               # Chinese
+    "hr": "Hrvatski",          # Croatian
+    "nl": "Nederlands",        # Dutch
+    "fr": "Français",          # French
+    "de": "Deutsch",           # German
+    "el": "Ελληνικά",          # Greek
+    "he": "עברית",             # Hebrew
+    "hi": "हिन्दी",              # Hindi
+    "id": "Bahasa Indonesia",  # Indonesian
+    "it": "Italiano",          # Italian
+    "ja": "日本語",             # Japanese
+    "ko": "한국어",             # Korean
+    "fa": "فارسی",             # Persian
+    "pl": "Polski",            # Polish
+    "pt": "Português (BR)",    # Portuguese
+    "ru": "Русский",           # Russian
+    "sr": "Srpski",            # Serbian
+    "es": "Español",           # Spanish
+    "sw": "Kiswahili",         # Swahili
+    "sv": "Svenska",           # Swedish
+    "th": "ไทย",                # Thai
+    "tr": "Türkçe",            # Turkish
+    "uk": "Українська",        # Ukrainian
+    "ur": "اردو",              # Urdu
+    "vi": "Tiếng Việt",        # Vietnamese
 }
 
 #: A locale must translate at least this fraction of the base keys before it

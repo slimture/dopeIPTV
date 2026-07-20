@@ -71,11 +71,11 @@ def test_pasted_xtream_link_splits_into_fields():
         pytest.skip("PyQt6 not available")
     _app, _win, ov, captured = _overlay()
     ov._stack.setCurrentIndex(1)
-    # Simulate pasting a full Xtream link into the server field; the
-    # editingFinished handler fans it out into server/username/password.
-    ov._server.setText(
+    # Simulate pasting a full Xtream link: insert() emits textEdited just like
+    # a real paste, so the fields must fill immediately - no focus change.
+    ov._server.clear()
+    ov._server.insert(
         "http://prov.tv:8080/get.php?username=joe&password=secret&type=m3u_plus")
-    ov._maybe_autodetect_link()
     assert ov._conn_kind.currentData() == "xtream"   # preferred mode selected
     assert ov._server.text() == "http://prov.tv:8080"
     assert ov._user.text() == "joe"
@@ -96,9 +96,9 @@ def test_plain_host_is_left_untouched():
     ov._stack.setCurrentIndex(1)
     # A manually typed host with no credentials must not be rewritten, so
     # server/username/password entry keeps working the old way.
-    ov._server.setText("http://server:80")
     ov._user.setText("me")
-    ov._maybe_autodetect_link()
+    ov._server.clear()
+    ov._server.insert("http://server:80")   # partial host, no credentials
     assert ov._server.text() == "http://server:80"
     assert ov._user.text() == "me"
 
@@ -111,8 +111,8 @@ def test_pasted_m3u_link_switches_mode():
     _app, _win, ov, _captured = _overlay()
     ov._stack.setCurrentIndex(1)
     # A plain playlist URL flips the mode to M3U (no credentials to fill).
-    ov._server.setText("https://host.tv/playlist.m3u8")
-    ov._maybe_autodetect_link()
+    ov._server.clear()
+    ov._server.insert("https://host.tv/playlist.m3u8")
     assert ov._conn_kind.currentData() == "m3u"
     assert ov._server.text() == "https://host.tv/playlist.m3u8"
 
