@@ -54,6 +54,44 @@ def test_i18n_placeholders_match_across_languages():
     assert not bad, f"placeholder mismatches: {bad}"
 
 
+def test_locale_files_are_valid():
+    """Every add-on locale file (dopeiptv/locale/*.json) must: parse, use only
+    real string keys, and keep each English placeholder. A stray key is dead
+    weight; a dropped/invented {placeholder} renders a broken string for that
+    language only - exactly the kind of defect that ships unnoticed."""
+    import json
+    from dopeiptv.i18n import base_string_keys, english
+
+    locale_dir = _REPO_ROOT / "dopeiptv" / "locale"
+    valid_keys = set(base_string_keys())
+    problems: list[str] = []
+    for path in sorted(locale_dir.glob("*.json")):
+        if path.name.startswith(("_",)) or path.name.endswith(".template.json"):
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except ValueError as e:
+            problems.append(f"{path.name}: invalid JSON ({e})")
+            continue
+        if not isinstance(data, dict):
+            problems.append(f"{path.name}: top level is not an object")
+            continue
+        for key, value in data.items():
+            if key not in valid_keys:
+                problems.append(f"{path.name}: unknown key {key!r}")
+                continue
+            if not isinstance(value, str):
+                problems.append(f"{path.name}: {key!r} is not a string")
+                continue
+            ref = set(re.findall(r"\{(\w+)\}", english(key)))
+            got = set(re.findall(r"\{(\w+)\}", value))
+            if got != ref:
+                problems.append(
+                    f"{path.name}: {key!r} placeholders {sorted(got)} "
+                    f"!= English {sorted(ref)}")
+    assert not problems, "locale file problems:\n" + "\n".join(problems)
+
+
 def test_tr_never_raises():
     """tr() must degrade, not crash the UI thread: unknown keys are marked,
     missing/extra format kwargs fall back to the raw string - in every

@@ -14,7 +14,7 @@ import shutil
 import sys
 import tempfile
 
-from PyInstaller.utils.hooks import collect_all
+from PyInstaller.utils.hooks import collect_all, collect_data_files
 
 
 def _find_ffmpeg():
@@ -172,6 +172,8 @@ def _libmpv_dep_binaries(libmpv_path):
 
 binaries = _find_libmpv() + _find_ffmpeg()
 datas = []
+# Our own package data: the add-on locale JSONs (i18n loads them at import).
+datas += collect_data_files('dopeiptv')
 hiddenimports = ["mpv"]
 
 # pychromecast (and its zeroconf/protobuf deps) ship data files and submodules

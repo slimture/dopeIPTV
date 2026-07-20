@@ -7318,3 +7318,95 @@ def tr(key: str, **kwargs: object) -> str:
         except (KeyError, IndexError):
             return text
     return text
+
+
+# --------------------------------------------------------------------------
+# Add-on locales (dopeIPTV 0.9.x)
+#
+# The eight "core" languages above live inline. Additional languages ship as
+# JSON files under dopeiptv/locale/<code>.json ({key: "translation"}) so the
+# huge English/Swedish source stays readable and each new language is a
+# single, reviewable file that a native speaker can correct in isolation.
+# A locale is merged into _STRINGS at import; any key it doesn't cover simply
+# falls back to English (see tr()). A code only joins the language PICKER once
+# its file translates most of the base strings, so a half-finished locale
+# never ships a half-English UI.
+# --------------------------------------------------------------------------
+
+import json as _json
+import os as _os
+
+#: Right-to-left languages. Arabic and Persian ship as add-on locales; the UI
+#: mirrors its layout direction for these (see is_rtl / apply in the window).
+RTL_LANGUAGES = frozenset({"ar", "fa", "he", "ur"})
+
+#: Native names for the add-on locales, shown in the language picker once the
+#: matching locale file is complete enough to register (see below).
+_ADDON_NATIVE_NAMES = {
+    "pt": "Português (BR)",
+    "tr": "Türkçe",
+    "ar": "العربية",
+    "it": "Italiano",
+    "fa": "فارسی",
+    "id": "Bahasa Indonesia",
+    "pl": "Polski",
+    "el": "Ελληνικά",
+}
+
+#: A locale must translate at least this fraction of the base keys before it
+#: is offered in the picker (English fallback covers the rest).
+_LOCALE_READY_RATIO = 0.9
+
+
+def _locale_dir() -> str:
+    return _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "locale")
+
+
+def _load_locale_files() -> None:
+    """Merge every dopeiptv/locale/<code>.json into _STRINGS, and register a
+    code in LANGUAGES once its file covers _LOCALE_READY_RATIO of the base
+    keys. Malformed files are skipped, never fatal."""
+    base_total = len(_STRINGS)
+    try:
+        files = sorted(_os.listdir(_locale_dir()))
+    except OSError:
+        return
+    for fn in files:
+        if not fn.endswith(".json") or fn.startswith("_"):
+            continue
+        code = fn[:-5]
+        try:
+            with open(_os.path.join(_locale_dir(), fn), encoding="utf-8") as fh:
+                data = _json.load(fh)
+        except (OSError, ValueError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        translated = 0
+        for key, value in data.items():
+            entry = _STRINGS.get(key)
+            if entry is None or not isinstance(value, str) or not value.strip():
+                continue
+            entry[code] = value
+            translated += 1
+        if (code in _ADDON_NATIVE_NAMES and base_total
+                and translated / base_total >= _LOCALE_READY_RATIO):
+            LANGUAGES[code] = _ADDON_NATIVE_NAMES[code]
+
+
+def is_rtl(code: str | None = None) -> bool:
+    """Whether *code* (default: the active language) reads right-to-left."""
+    return (code or _current_language) in RTL_LANGUAGES
+
+
+def base_string_keys() -> list[str]:
+    """Every translatable key, for the locale-template tool and tests."""
+    return list(_STRINGS.keys())
+
+
+def english(key: str) -> str:
+    """The English source string for *key* (the translator's reference)."""
+    return _STRINGS.get(key, {}).get("en", "")
+
+
+_load_locale_files()

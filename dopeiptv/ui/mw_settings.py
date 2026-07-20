@@ -325,11 +325,20 @@ class _SettingsMixin:
         self.close()
 
     def _set_language(self, code: str) -> None:
-        from ..i18n import set_language, current_language
+        from ..i18n import current_language, is_rtl, set_language
         if code == current_language():
             return
         self.settings.setValue("language", code)
         set_language(code)
+        # Mirror the whole UI live for right-to-left languages (Arabic,
+        # Persian) and back for LTR - no restart needed.
+        from PyQt6.QtCore import Qt
+        from PyQt6.QtWidgets import QApplication
+        app = QApplication.instance()
+        if app is not None:
+            app.setLayoutDirection(
+                Qt.LayoutDirection.RightToLeft if is_rtl(code)
+                else Qt.LayoutDirection.LeftToRight)
         self.retranslate_ui()
 
     def retranslate_ui(self) -> None:

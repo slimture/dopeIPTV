@@ -14,7 +14,7 @@ import os
 import shutil
 import tempfile
 
-from PyInstaller.utils.hooks import collect_all
+from PyInstaller.utils.hooks import collect_all, collect_data_files
 
 
 APP_NAME = "dopeIPTV"
@@ -70,6 +70,8 @@ def _find_libmpv():
 
 binaries = _find_libmpv() + _find_ffmpeg()
 datas = []
+# Our own package data: the add-on locale JSONs (i18n loads them at import).
+datas += collect_data_files('dopeiptv')
 hiddenimports = ["mpv"]
 
 for pkg in ("pychromecast", "zeroconf"):

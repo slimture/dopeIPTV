@@ -299,8 +299,12 @@ def main() -> int:
     install_icon(icon)
     settings = QSettings(ORG, ORG)
     settings_were_reset = _maybe_reset_settings(settings)
-    from .i18n import set_language
+    from .i18n import is_rtl, set_language
     set_language(settings.value("language", "en"))
+    # Right-to-left languages (Arabic, Persian) mirror the whole UI.
+    app.setLayoutDirection(
+        Qt.LayoutDirection.RightToLeft if is_rtl()
+        else Qt.LayoutDirection.LeftToRight)
     apply_theme(settings)
     app.setStyleSheet(build_style())
     log.info("Qt platform: %s", app.platformName())

@@ -30,6 +30,11 @@ dopeiptv = "dopeiptv.app:main"
 [tool.setuptools.packages.find]
 include = ["dopeiptv*"]
 
+[tool.setuptools.package-data]
+# Ship the add-on locale JSONs (Turkish, Portuguese, Arabic, …) inside the
+# wheel/sdist; i18n.py loads them at import from dopeiptv/locale/.
+dopeiptv = ["locale/*.json"]
+
 [tool.mypy]
 # Gradual typing: check the pure-logic modules first (the highest-value, most-
 # tested code, no PyQt/UI noise). follow_imports=silent means imported modules
