@@ -191,6 +191,9 @@ footer nav a:hover { color: var(--accent); }
 
 /* ---- language switcher (native roll-list) -------------------------------- */
 .langsel {
+  /* Pin the native popup to a dark scheme so the OS/browser can't paint a
+     pale highlight over pale text when the user's system is in light mode. */
+  color-scheme: dark;
   background: #12151c; color: #cfd6e0;
   border: 1px solid rgba(255,255,255,.14); border-radius: 8px;
   padding: 6px 10px; font-size: 14px; line-height: 1.2; cursor: pointer;
@@ -198,4 +201,5 @@ footer nav a:hover { color: var(--accent); }
 }
 .langsel:hover  { border-color: rgba(255,255,255,.30); color: #fff; }
 .langsel:focus  { outline: none; border-color: var(--accent, #4ea1ff); }
-.langsel option { background: #12151c; color: #cfd6e0; }
+.langsel option         { background: #12151c; color: #cfd6e0; }
+.langsel option:checked { background: #1c2230; color: #fff; }
