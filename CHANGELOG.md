@@ -5,6 +5,21 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
+## [1.0.1]
+
+Packaging fix for the 1.0 release.
+
+- **Fixed: only English available in the installed apps.** 1.0.0 was the first
+  release to ship translations as external `dopeiptv/locale/*.json` files
+  rather than inline in the code. In the frozen builds (macOS `.dmg`, Windows
+  `.exe`, Linux AppImage/`.deb`) those files weren't located at runtime — on a
+  macOS `.app` the code lives in `Contents/Frameworks` while the data lands in
+  `Contents/Resources` — so the language picker silently collapsed to English
+  only. The locale directory is now found across every packaging layout
+  (source, wheel, PyInstaller bundle root, macOS `.app`), and the locale files
+  are bundled explicitly in all three PyInstaller specs. The pip/pipx install
+  was unaffected. A regression test covers the frozen-bundle lookup.
+
 ## [1.0.0]
 
 The 1.0 milestone: dopeIPTV now speaks **27 languages**, sets up from a single
