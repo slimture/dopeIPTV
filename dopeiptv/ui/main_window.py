@@ -2610,7 +2610,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _try_select_playing(self) -> bool:
         """Select + scroll to the playing item if it's in the current list."""
-        key = self._playing_key
+        return self._try_select_key(self._playing_key)
+
+    def _try_select_key(self, key) -> bool:
+        """Select + scroll to the row with this item key, if it's in the
+        current list. The playing-item jump and the back-from-episodes landing
+        (which targets the SERIES row, not what's playing) share this."""
         if key is None:
             return False
         for row in range(self.list_model.rowCount()):
@@ -2779,7 +2784,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         filtered = self._sorted(filtered)
         self.list_model.set_items(filtered, kind)
         if getattr(self, "_pending_jump_key", None) is not None:
-            if self._try_select_playing():
+            # Match the armed key itself (for every playing-item jump it equals
+            # the playing key, so this is the same select - but the back-from-
+            # episodes landing arms the SERIES row, which isn't what's playing).
+            if self._try_select_key(self._pending_jump_key):
                 self._pending_jump_key = None
         # The list is populated now, so clear any loading strip/overlay - a
         # gen-discarded async load (e.g. rapid Home<->TV toggling) could leave
@@ -2870,7 +2878,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     # each episode (its own name never matches TMDB).
                     ep["_series_title"] = series_title
                     episodes.append(ep)
-            self.series_ctx = series
+            # A series entered from a slim snapshot (resume ctx) doesn't know
+            # its category; series_info usually does. Backfill it so backing
+            # out of the episodes can land in the series' own category.
+            sctx = series
+            if sctx.get("category_id") is None:
+                cid = (info.get("info") or {}).get("category_id")
+                if cid is not None:
+                    sctx = dict(sctx)
+                    sctx["category_id"] = cid
+            self.series_ctx = sctx
             self.all_items = episodes
             self.back_btn.show()
             self.search.clear()
@@ -2885,11 +2902,30 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                   done, failed)
 
     def _leave_series(self) -> None:
+        ctx = self.series_ctx or {}
         self.series_ctx = None
         self.back_btn.hide()
+        # Land in the series' OWN category with the series row selected - not
+        # whatever category happened to be selected in the sidebar. After a
+        # now-playing jump / Home drill entered the episodes from elsewhere,
+        # the sidebar still shows the old selection (e.g. "All"), and backing
+        # out to that instead of e.g. "Nordic" read as landing in the wrong
+        # place. Unknown category (old snapshot ctx) keeps the old behaviour.
+        sid = ctx.get("series_id")
+        if sid is not None:
+            self._pending_jump_key = sid
+            QTimer.singleShot(8000, self._clear_pending_jump)
         cur = self.cat_list.currentItem()
-        self._load_items(
-            cur.data(Qt.ItemDataRole.UserRole) if cur else None)
+        cur_cat = cur.data(Qt.ItemDataRole.UserRole) if cur else None
+        cat = ctx.get("category_id")
+        if cat is not None and str(cat) != str(cur_cat):
+            for i in range(self.cat_list.count()):
+                d = self.cat_list.item(i).data(Qt.ItemDataRole.UserRole)
+                # str() both sides: providers mix int and str category ids.
+                if d is not None and str(d) == str(cat):
+                    self.cat_list.setCurrentRow(i)   # triggers the list load
+                    return
+        self._load_items(cur_cat)
 
     # -- playback ------------------------------------------------------------------
 

@@ -21,8 +21,10 @@ _SNAP_FIELDS = ("name", "title", "stream_id", "series_id", "id",
 # Series-context fields kept for an episode so it can be replayed from the
 # flat Continue-watching list (episode_url needs the series id) and so the row
 # can show the series' name + artwork instead of a bare episode title.
+# category_id lets backing out of the episode list land in the series' own
+# category after a continue-watching drill.
 _CTX_FIELDS = ("series_id", "name", "title", "cover", "stream_icon",
-               "_tmdb_id")
+               "category_id", "_tmdb_id")
 
 
 class ResumeStore:
