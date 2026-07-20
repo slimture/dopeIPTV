@@ -452,6 +452,43 @@ class _MpvGLWidget(QOpenGLWidget):
             except Exception:
                 pass
 
+    def reinit_render_context(self) -> None:
+        """Rebuild the mpv render context against this widget's CURRENT GL
+        context, explicitly - the reliable fix for a pop-out dock/undock.
+
+        Reparenting can rebind the widget to a different GL context / default
+        framebuffer. On Linux that destroys the old GL context, so
+        aboutToBeDestroyed frees the render context and the next initializeGL
+        rebuilds it. On macOS with shared GL contexts the old context is NOT
+        destroyed: aboutToBeDestroyed never fires, initializeGL is not
+        re-entered, and the stale render context is left bound to the previous
+        framebuffer - so render() quietly fails or draws the last frame and the
+        video FREEZES while audio keeps playing. The only reliable signal that
+        a reparent happened is the caller (set_popout_mode), so rebuild here
+        rather than trusting the GL lifecycle. makeCurrent() gives us a valid
+        current context to free and recreate against; mpv is never touched, so
+        the stream and audio continue."""
+        if self.mpv is None:
+            return
+        try:
+            self.makeCurrent()
+        except Exception as e:
+            log.debug("reinit_render_context: makeCurrent failed: %s", e)
+            return
+        try:
+            self._free_render_context()
+            self._create_render_context()
+            log.info("render context rebuilt after reparent (explicit)")
+        except Exception as e:
+            self._ctx = None
+            log.error("reinit_render_context rebuild failed: %s", e)
+        finally:
+            try:
+                self.doneCurrent()
+            except Exception:
+                pass
+        self.update()
+
     def paintGL(self) -> None:
         # Blank branch first so a repaint that arrives mid-stop (when mpv has
         # already been told to stop but our _ctx is still around) doesn't try
@@ -1574,6 +1611,12 @@ class EmbeddedPlayer(QWidget):
     def _settle_after_reparent(self) -> None:
         """Re-lock the video box and re-place any visible overlay against the
         geometry once it has settled after a pop-out dock/undock reparent."""
+        # Explicitly rebuild the render context against the (possibly new) GL
+        # context/framebuffer this reparent bound us to. Doesn't rely on the GL
+        # destroy/initializeGL cycle, which doesn't fire on macOS shared
+        # contexts and left the video frozen (audio only) after a pop-out
+        # toggle. mpv is untouched, so playback continues.
+        self.video.reinit_render_context()
         self._lock_video_box()
         if self.ts_timeline.isVisible():
             self._place_ts_timeline()
