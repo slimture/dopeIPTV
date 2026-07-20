@@ -7,8 +7,8 @@
  */
 return [
     // <head>
-    "meta_title"   => "dopeIPTV — the Linux IPTV player with EPG, timeshift, recording & multiview",
-    "meta_desc"    => "dopeIPTV is a fast, open-source desktop IPTV player for Xtream Codes & M3U with a full EPG guide, live timeshift, catch-up TV, recording and multiview — watch up to nine channels at once. Built for Linux — also on macOS and Windows.",
+    "meta_title"   => "dopeIPTV — the Linux IPTV player with EPG & timeshift",
+    "meta_desc"    => "A fast, open-source IPTV player for Xtream Codes & M3U — full EPG guide, live timeshift, catch-up, recording and multiview. For Linux, macOS & Windows.",
     "meta_keywords"=> "IPTV player, Linux IPTV player, Xtream Codes, M3U, EPG, XMLTV, timeshift, catch-up TV, IPTV recording, IPTV multiview, watch multiple channels, multi-screen IPTV, IPTV player Linux, macOS IPTV, Windows IPTV, dopeIPTV",
 
     // header nav
@@ -116,6 +116,29 @@ return [
     "cred_licences"      => "Licences",
     "cred_licences_link" => "GPL-3.0 &amp; third-party",
     "disclaimer" => "This product uses the TMDB API but is not endorsed or certified by TMDB. This product uses the Trakt API but is not endorsed or certified by Trakt. All trademarks are the property of their respective owners.",
+
+    // FAQ (also feeds the FAQPage structured data — keep answers plain text so
+    // the visible text and the schema stay identical)
+    "faq_eyebrow" => "Good to know",
+    "faq_h2"      => "Frequently asked questions",
+    "faq_q1" => "What is dopeIPTV?",
+    "faq_a1" => "dopeIPTV is a free, open-source desktop IPTV player for Xtream Codes and M3U playlists. It gives you a full EPG guide, live timeshift and catch-up TV, one-click recording, and multiview for up to nine channels at once — all in one native app built on the mpv engine.",
+    "faq_q2" => "Is dopeIPTV free?",
+    "faq_a2" => "Yes. dopeIPTV is completely free and open source under the GPL-3.0 licence, with no ads, no tracking and no account required.",
+    "faq_q3" => "Which operating systems does dopeIPTV support?",
+    "faq_a3" => "dopeIPTV is built for Linux and also runs on macOS and Windows. Linux ships as an AppImage, .deb and .rpm; macOS as a .dmg; and Windows as a portable build.",
+    "faq_q4" => "Does dopeIPTV work with Xtream Codes and M3U?",
+    "faq_a4" => "Yes. You can add Xtream Codes logins (server, username and password) and M3U/M3U8 playlist URLs. Several providers can run side by side, each with its own EPG and auto-refresh.",
+    "faq_q5" => "Does dopeIPTV have an EPG, timeshift and catch-up?",
+    "faq_a5" => "Yes. dopeIPTV shows a full XMLTV programme guide with now/next, and supports live timeshift and catch-up, so you can pause live TV or scrub back into a channel's archive.",
+    "faq_q6" => "Can dopeIPTV record live TV?",
+    "faq_a6" => "Yes. You can record the stream you're watching over a single connection, with timers, size limits and a Recordings library.",
+    "faq_q7" => "What is multiview?",
+    "faq_a7" => "Multiview lets you watch up to nine live channels at once in a grid, mixing different playlists, each with per-window timeshift and subtitles.",
+    "faq_q8" => "Does dopeIPTV show ads or track me?",
+    "faq_a8" => "No. dopeIPTV has no ads, no tracking and no accounts. Metadata and artwork come from TMDB and optional watched-history sync uses Trakt — both only if you choose to use them.",
+    "faq_q9" => "Does dopeIPTV provide IPTV channels or a subscription?",
+    "faq_a9" => "No. dopeIPTV is only a player — it does not provide, sell or host any channels or content. You connect your own Xtream Codes or M3U provider.",
 
     // footer
     "footer_releases" => "Releases",

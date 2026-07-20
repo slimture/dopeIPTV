@@ -114,19 +114,42 @@ unset($g);
 <link rel="manifest" href="/site.webmanifest">
 <link rel="stylesheet" href="/style.css">
 <script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  "name": "dopeIPTV",
-  "operatingSystem": "Linux, macOS, Windows",
-  "applicationCategory": "MultimediaApplication",
-  "description": <?= json_encode($DESC) ?>,
-  "softwareVersion": "<?= h($version) ?>",
-  "url": "<?= h($SITE) ?>/",
-  "downloadUrl": "<?= h($SITE) ?>/#download",
-  "license": "<?= h($REPO) ?>/blob/main/LICENSE",
-  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+<?php
+// A linked @graph (Organization + WebSite + SoftwareApplication + FAQPage) so
+// search engines AND LLMs can resolve the entity, its owner and the Q&A. The
+// FAQ mirrors the visible #faq section below (Google requires the match).
+$faq = [];
+for ($i = 1; $i <= 9; $i++) {
+    $faq[] = ["@type" => "Question", "name" => t("faq_q$i"),
+              "acceptedAnswer" => ["@type" => "Answer", "text" => t("faq_a$i")]];
 }
+echo json_encode([
+  "@context" => "https://schema.org",
+  "@graph" => [
+    ["@type" => "Organization", "@id" => "$SITE/#org", "name" => "dopeIPTV",
+     "url" => "$SITE/", "logo" => "$SITE/favicon.png", "sameAs" => [$REPO]],
+    ["@type" => "WebSite", "@id" => "$SITE/#website", "name" => "dopeIPTV",
+     "url" => "$SITE/", "inLanguage" => lang_code(),
+     "publisher" => ["@id" => "$SITE/#org"]],
+    ["@type" => "SoftwareApplication", "@id" => "$SITE/#app", "name" => "dopeIPTV",
+     "operatingSystem" => "Linux, macOS, Windows",
+     "applicationCategory" => "MultimediaApplication",
+     "applicationSubCategory" => "IPTV player", "description" => $DESC,
+     "softwareVersion" => $version, "url" => "$SITE/",
+     "downloadUrl" => "$SITE/#download", "installUrl" => "$SITE/#download",
+     "screenshot" => "$SITE/screenshots/main.png",
+     "featureList" => ["Xtream Codes and M3U playlists", "Full XMLTV EPG guide",
+       "Live timeshift and catch-up TV", "One-click recording",
+       "Multiview — up to nine channels at once", "Built-in mpv player",
+       "Chromecast and Trakt support"],
+     "license" => "$REPO/blob/main/LICENSE", "isAccessibleForFree" => true,
+     "author" => ["@id" => "$SITE/#org"], "publisher" => ["@id" => "$SITE/#org"],
+     "sameAs" => [$REPO],
+     "offers" => ["@type" => "Offer", "price" => "0", "priceCurrency" => "USD"]],
+    ["@type" => "FAQPage", "@id" => "$SITE/#faq", "mainEntity" => $faq],
+  ],
+], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+?>
 </script>
 </head>
 <body>
@@ -219,7 +242,7 @@ unset($g);
     </div>
   </section>
 
-  <section id="shots" style="padding-top:0;">
+  <section id="shots" class="pt0">
     <div class="wrap">
       <div class="sec-head">
         <span class="eyebrow"><?= h(t('shots_eyebrow')) ?></span>
@@ -249,10 +272,10 @@ foreach ($shots as [$file, $alt, $title, $cap]):
     </div>
   </section>
 
-  <section id="download" style="padding-top:0;">
+  <section id="download" class="pt0">
     <div class="wrap">
       <div class="dl-head">
-        <div class="sec-head" style="margin-bottom:0;">
+        <div class="sec-head mb0">
           <span class="eyebrow"><?= h(t('dl_eyebrow')) ?></span>
           <h2><?= h(t('dl_h2')) ?></h2>
         </div>
@@ -304,7 +327,24 @@ foreach ($shots as [$file, $alt, $title, $cap]):
     </div>
   </section>
 
-  <section id="credits" style="padding-top:0;">
+  <section id="faq" class="pt0">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow"><?= h(t('faq_eyebrow')) ?></span>
+        <h2><?= h(t('faq_h2')) ?></h2>
+      </div>
+      <div class="faq">
+<?php for ($i = 1; $i <= 9; $i++): ?>
+        <details class="faq-item">
+          <summary><?= h(t("faq_q$i")) ?></summary>
+          <p><?= h(t("faq_a$i")) ?></p>
+        </details>
+<?php endfor; ?>
+      </div>
+    </div>
+  </section>
+
+  <section id="credits" class="pt0">
     <div class="wrap">
       <div class="sec-head">
         <span class="eyebrow"><?= h(t('cred_eyebrow')) ?></span>

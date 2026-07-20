@@ -1,0 +1,37 @@
+# dopeIPTV
+
+> dopeIPTV is a free, open-source desktop IPTV player for Xtream Codes and M3U playlists. It has a full EPG (XMLTV) guide, live timeshift and catch-up TV, one-click recording, and multiview for up to nine channels at once — all in one native app built on the mpv engine. It is made for Linux and also runs on macOS and Windows.
+
+Key facts:
+
+- **What it is:** a desktop IPTV *player* (client), not an IPTV provider. It does not supply, sell or host any channels or content — the user connects their own Xtream Codes or M3U provider.
+- **Licence & price:** free and open source under GPL-3.0. No ads, no tracking, no accounts.
+- **Platforms:** Linux (primary; AppImage, .deb, .rpm), macOS (.dmg), Windows (portable build).
+- **Playlists:** Xtream Codes (server + username + password) and M3U / M3U8 URLs; multiple providers side by side.
+- **Guide & timeshift:** full XMLTV EPG with now/next, live timeshift, and catch-up (scrub back into a channel's archive).
+- **Recording:** record the watched stream over a single connection, with timers, size limits and a Recordings library.
+- **Multiview:** watch up to nine live channels at once in a grid, with per-window timeshift and subtitles.
+- **Extras:** built-in mpv player, Chromecast casting, Trakt watched-history sync, TMDB metadata and artwork, themes, full keyboard control, and a UI available in many languages.
+- **Developer / owner:** the slimture/dopeIPTV project on GitHub.
+
+## Main pages
+
+- [Home / overview](https://iptv.dope.rs/): features, screenshots and downloads.
+- [Features](https://iptv.dope.rs/#features): EPG, timeshift & catch-up, pause live TV, recording, multiview, multi-provider, playback.
+- [Download](https://iptv.dope.rs/#download): latest builds for Linux, macOS and Windows, generated from the GitHub releases.
+- [FAQ](https://iptv.dope.rs/#faq): short answers to common questions about dopeIPTV.
+
+## Source & documentation
+
+- [GitHub repository](https://github.com/slimture/dopeIPTV): source code, issues and releases.
+- [Releases](https://github.com/slimture/dopeIPTV/releases): all downloadable builds and changelogs.
+- [Readme / docs](https://github.com/slimture/dopeIPTV#readme): documentation and setup.
+- [Licence (GPL-3.0)](https://github.com/slimture/dopeIPTV/blob/main/LICENSE): licence text.
+
+## Credits (third-party projects)
+
+- Playback: [mpv](https://mpv.io) and [FFmpeg](https://ffmpeg.org).
+- Interface: Qt and [PyQt6](https://www.riverbankcomputing.com/software/pyqt/).
+- Casting: [PyChromecast](https://github.com/home-assistant-libs/pychromecast) (Google Cast).
+- Metadata & artwork: [The Movie Database (TMDB)](https://www.themoviedb.org).
+- Watched sync: [Trakt](https://trakt.tv).

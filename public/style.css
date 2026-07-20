@@ -223,3 +223,22 @@ footer nav a:hover { color: var(--accent); }
 }
 .langpick-item:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .langpick-item.is-current { color: var(--accent); font-weight: 600; }
+
+/* ---- utilities (replace former inline styles) --------------------------- */
+.pt0 { padding-top: 0; }
+.mb0 { margin-bottom: 0; }
+
+/* ---- FAQ (accordion; feeds the FAQPage structured data) ----------------- */
+.faq { display: flex; flex-direction: column; gap: 10px; max-width: 840px; }
+.faq-item { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.faq-item summary {
+  list-style: none; cursor: pointer; font-weight: 600; color: var(--text);
+  padding: 15px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px;
+}
+.faq-item summary::-webkit-details-marker { display: none; }
+.faq-item summary::after {
+  content: "+"; color: var(--accent); font-size: 20px; line-height: 1; flex: none;
+}
+.faq-item[open] summary::after { content: "\2212"; }
+.faq-item summary:hover { color: var(--accent); }
+.faq-item p { margin: 0 18px 16px; color: var(--muted); line-height: 1.65; max-width: 72ch; }
