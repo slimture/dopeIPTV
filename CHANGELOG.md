@@ -5,7 +5,11 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
-## [Unreleased]
+## [1.0.0]
+
+The 1.0 milestone: dopeIPTV now speaks **27 languages**, sets up from a single
+pasted link, scrolls large lineups without lag, and ships a strictly
+type-checked logic core with a translator-contribution workflow.
 
 - **27 interface languages** — the whole UI is now translated into 27
   languages (up from 8): added Português, Italiano, Nederlands, Polski,

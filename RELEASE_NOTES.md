@@ -1,8 +1,30 @@
-## dopeIPTV 0.9.0
+## dopeIPTV 1.0.0
 
-**Home** — a full-window start page — plus an interactive EPG guide,
-reminders & recording for upcoming programmes, and a big round of player,
-artwork and stability work.
+The 1.0 milestone — dopeIPTV now speaks your language, sets up from a single
+pasted link, and scrolls large lineups without a stutter.
+
+- **27 languages**: the whole interface is translated into English, Svenska,
+  Español, Deutsch, Français, 中文, Русский, ไทย, Português, Italiano,
+  Nederlands, Polski, Hrvatski, Srpski, Ελληνικά, Türkçe, Українська, Bahasa
+  Indonesia, Tiếng Việt, हिन्दी, 日本語, 한국어, Kiswahili, العربية, فارسی,
+  עברית and اردو — switchable live in Settings, with full right-to-left
+  layout for Arabic, Persian, Hebrew and Urdu.
+- **One-paste setup**: paste your whole Xtream link (or an M3U URL) into the
+  welcome screen and dopeIPTV recognises the type and fills in the
+  server / username / password for you. Typing the three fields by hand still
+  works exactly as before.
+- **Snappier lists**: channel/movie/series logos and posters are scaled once
+  and cached instead of on every repaint, removing the main source of scroll
+  lag with large lineups — with smooth pixel-granular scrolling. The video
+  pipeline is untouched.
+- **For contributors**: native-speaker translation fixes are welcome (see
+  `docs/TRANSLATING.md` and the new "Translation fix" issue template); the
+  pure-logic core is now strictly type-checked, and every module and class is
+  documented.
+
+Everything from the 0.9.0 release — Home, the interactive EPG guide,
+reminders & recording, timeshift, recording, multiview, themes and instant
+outage-proof startup — is here too.
 
 - **Home**: a Featured hero row and shelves for Continue watching,
   Favourites now, favourite movies & series, Recently viewed and Recently
