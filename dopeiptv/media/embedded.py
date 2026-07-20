@@ -460,15 +460,36 @@ class _MpvGLWidget(QOpenGLWidget):
         # a null current GL context, or an exception bubbling out of libmpv,
         # so any transient race becomes a black frame instead of a segfault.
         if self._blank or self._ctx is None:
-            glctx = QOpenGLContext.currentContext()
-            if glctx is not None:
+            # Self-heal a lost render context. It's freed when this widget's GL
+            # context is destroyed on a reparent (pop-out dock/undock); normally
+            # the following initializeGL rebuilds it, but on macOS (shared GL
+            # contexts) initializeGL doesn't always re-fire, so _ctx stays None
+            # and the video is stuck black while audio keeps playing - only a
+            # fullscreen round-trip brought it back. Rebuild it here against the
+            # now-current context instead. Throttled so a genuinely broken GL
+            # stack can't spin, and only while actually playing (mpv alive, not
+            # a deliberate stop-blank). mpv is never touched.
+            if (not self._blank and self._ctx is None and self.mpv is not None
+                    and QOpenGLContext.currentContext() is not None
+                    and time.monotonic() - getattr(self, "_ctx_heal_at", 0.0)
+                    > 0.5):
+                self._ctx_heal_at = time.monotonic()
                 try:
-                    f = glctx.functions()
-                    f.glClearColor(0.0, 0.0, 0.0, 1.0)
-                    f.glClear(0x00004000)  # GL_COLOR_BUFFER_BIT
-                except Exception:
-                    pass
-            return
+                    self._create_render_context()
+                    log.info("render context self-healed in paintGL")
+                except Exception as e:
+                    self._ctx = None
+                    log.debug("paintGL render-context heal failed: %s", e)
+            if self._blank or self._ctx is None:
+                glctx = QOpenGLContext.currentContext()
+                if glctx is not None:
+                    try:
+                        f = glctx.functions()
+                        f.glClearColor(0.0, 0.0, 0.0, 1.0)
+                        f.glClear(0x00004000)  # GL_COLOR_BUFFER_BIT
+                    except Exception:
+                        pass
+                return
         try:
             ratio = (self.devicePixelRatioF()
                      if hasattr(self, "devicePixelRatioF") else 1)
