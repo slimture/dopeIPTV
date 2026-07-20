@@ -420,12 +420,13 @@ class _SettingsMixin:
         (seen in the test suite), leaving installEventFilter a dangling
         wrapper."""
         wheel_guard = _WheelGuard(d)
-        for cls in (QComboBox, QAbstractSpinBox, QAbstractSlider):
-            for w in d.findChildren(cls):
-                if isinstance(w, QScrollBar):
-                    continue
-                w.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-                w.installEventFilter(wheel_guard)
+        # One tree walk over all three control types (a tuple arg), not three.
+        for w in d.findChildren(
+                (QComboBox, QAbstractSpinBox, QAbstractSlider)):
+            if isinstance(w, QScrollBar):
+                continue
+            w.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+            w.installEventFilter(wheel_guard)
 
     @staticmethod
     def _combo(items, current) -> QComboBox:
@@ -441,20 +442,19 @@ class _SettingsMixin:
         # bottom entries fall off of. The theme sets `combobox-popup: 0`, which
         # is what makes maxVisibleItems take effect under a stylesheet.
         box.setMaxVisibleItems(_SettingsMixin._MAX_VISIBLE)
-        view = box.view()
-        # Scroll per pixel, not per item. A trackpad (macOS, and Linux laptops
-        # under libinput) sends many small scroll deltas; in the default
-        # per-item mode Qt swallows them until they add up to a whole row, so
-        # the popup feels frozen - "can't scroll". Per-pixel moves on every delta.
-        view.setVerticalScrollMode(
-            QAbstractItemView.ScrollMode.ScrollPerPixel)
-        # For a list that overflows the cap (the language picker), keep the
-        # scrollbar permanently visible: it's the obvious drag handle and the
-        # "there's more below" cue. Short lists keep it as-needed.
-        view.setVerticalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOn
-            if len(items) > _SettingsMixin._MAX_VISIBLE
-            else Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        # Only the lists that actually overflow the cap (the 27-language
+        # picker) need the scrollable-popup treatment; a 2-5 item combo never
+        # scrolls, so touching its view just costs layout on every settings
+        # open for no visible effect. For the overflowing ones: scroll per
+        # pixel (a trackpad's small deltas register instead of being swallowed
+        # by per-item mode) and keep the scrollbar always visible as the drag
+        # handle / "more below" cue.
+        if len(items) > _SettingsMixin._MAX_VISIBLE:
+            view = box.view()
+            view.setVerticalScrollMode(
+                QAbstractItemView.ScrollMode.ScrollPerPixel)
+            view.setVerticalScrollBarPolicy(
+                Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         if sys.platform == "darwin":
             # On macOS the styled combo doesn't grow to fit its text, so the
             # closed box clips ("Playba…", "Sven…"). Size it to the widest
@@ -507,6 +507,11 @@ class _SettingsMixin:
         geo = self.geometry()
         d.resize(min(geo.width(), 960),
                  min(geo.height(), max(700, int(geo.height() * 0.85))))
+        # Build the whole dialog with painting suspended, re-enabled just
+        # before exec(): the tabs, forms and combos would otherwise each
+        # trigger their own paint/polish pass during construction. One pass
+        # at the end instead.
+        d.setUpdatesEnabled(False)
         outer = QVBoxLayout(d)
         outer.setContentsMargins(18, 18, 18, 18)
         # Custom tab bar with code-computed tab widths (see _TightTabBar):
@@ -1568,6 +1573,7 @@ class _SettingsMixin:
         buttons.rejected.connect(d.reject)
         outer.addWidget(buttons)
 
+        d.setUpdatesEnabled(True)
         self._install_wheel_guard(d)
 
         if d.exec():

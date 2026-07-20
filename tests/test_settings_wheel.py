@@ -95,6 +95,30 @@ def test_language_dropdown_popup_scrolls_with_guard_installed():
         app.setStyleSheet("")
 
 
+def test_combo_scroll_setup_only_for_overflowing_lists():
+    """The per-pixel + always-on-scrollbar popup treatment is applied only to
+    combos that overflow the visible cap (the language picker). A short combo
+    never scrolls, so touching its view is pure layout cost on every settings
+    open - the optimisation skips it. Guards both sides."""
+    app = _app()
+    assert app is not None
+    from PyQt6.QtCore import Qt
+    from dopeiptv.ui.mw_settings import _SettingsMixin
+
+    short = _SettingsMixin._combo([("a", "One"), ("b", "Two")], "a")
+    assert (short.view().verticalScrollBarPolicy()
+            != Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+
+    n = _SettingsMixin._MAX_VISIBLE + 5
+    long = _SettingsMixin._combo(
+        [(str(i), f"L{i}") for i in range(n)], "0")
+    assert (long.view().verticalScrollBarPolicy()
+            == Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+    from PyQt6.QtWidgets import QAbstractItemView
+    assert (long.view().verticalScrollMode()
+            == QAbstractItemView.ScrollMode.ScrollPerPixel)
+
+
 def test_wheel_guard_still_protects_value_controls():
     app = _app()
     assert app is not None
