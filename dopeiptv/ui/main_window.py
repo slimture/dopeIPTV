@@ -1245,6 +1245,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._playback_max_pct = 0.0
         self._current_epg = None
         self._player_fs = False
+        self._fs_exiting = False
 
         # Escape and Delete are structural/context-sensitive, so they stay
         # fixed; everything else is user-rebindable (see _install_shortcuts).
@@ -1593,6 +1594,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self.showNormal()
             return
         self._player_fs = False
+        # Mute the narrow-width auto-collapse for the whole exit transition:
+        # the window resizing from fullscreen width back to normal looks like
+        # a "just got narrow" edge to _maybe_auto_collapse_sidebar, which then
+        # re-collapsed a sidebar the user had deliberately expanded ("after
+        # fullscreen it's always icons"). Cleared - and the edge baseline
+        # resynced - once the restored geometry has settled (_end_fs_exit).
+        self._fs_exiting = True
         self._side.show()
         self._apply_sidebar_collapsed()   # keep the rail/expanded choice
         self._mid.show()
@@ -1628,6 +1636,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         saved = getattr(self, "_fs_splitter_sizes", None)
         if saved:
             QTimer.singleShot(0, lambda s=saved: self._root.setSizes(s))
+        # After the deferred size restore has landed: stop muting the
+        # auto-collapse and resync its edge baseline to the restored
+        # geometry WITHOUT acting on it, so the user's rail/expanded choice
+        # survives fullscreen and the next genuine resize still auto-adapts.
+        QTimer.singleShot(0, self._end_fs_exit)
         idx = getattr(self, "_fs_return_index", None)
         scroll = getattr(self, "_fs_return_scroll", None)
         if idx is not None and idx.isValid():

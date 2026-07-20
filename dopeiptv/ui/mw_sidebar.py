@@ -246,20 +246,39 @@ class _SidebarMixin:
             act.triggered.connect(
                 lambda _c, i=i, box=box: box.setCurrentIndex(i))
 
+    def _sidebar_narrow(self) -> bool:
+        """Whether the window is currently too narrow for the expanded sidebar
+        plus the middle and detail columns to breathe."""
+        expanded = getattr(self, "_sidebar_expanded_w", 200)
+        threshold = (expanded + self._mid.minimumWidth()
+                     + self._det.minimumWidth() + 40)
+        return self.width() < threshold
+
+    def _end_fs_exit(self) -> None:
+        """Close out a fullscreen exit: stop muting the auto-collapse and
+        resync its edge baseline to the restored geometry without acting on
+        it - the user's pre-fullscreen rail/expanded choice (just re-applied)
+        stands, and only the next genuine crossing of the width threshold
+        auto-adapts again."""
+        self._fs_exiting = False
+        if hasattr(self, "_det"):
+            self._last_narrow = self._sidebar_narrow()
+
     def _maybe_auto_collapse_sidebar(self) -> None:
         """Collapse the sidebar to the icon rail automatically when the whole
         window gets too narrow for the three columns to breathe, and expand it
         again when there's room - but only if WE auto-collapsed it (a manual
         collapse/expand is left alone). Edge-triggered on the width threshold so
-        it never fights a manual toggle within the narrow band."""
+        it never fights a manual toggle within the narrow band. Muted during a
+        fullscreen exit (_fs_exiting): the fullscreen-to-normal resize is not a
+        real edge, and acting on it re-collapsed a deliberately expanded
+        sidebar every time you left fullscreen."""
         if (getattr(self, "_player_fs", False)
+                or getattr(self, "_fs_exiting", False)
                 or getattr(self, "_side_dragging", False)
                 or not hasattr(self, "_det")):
             return
-        expanded = getattr(self, "_sidebar_expanded_w", 200)
-        threshold = (expanded + self._mid.minimumWidth()
-                     + self._det.minimumWidth() + 40)
-        narrow = self.width() < threshold
+        narrow = self._sidebar_narrow()
         if narrow == getattr(self, "_last_narrow", False):
             return
         self._last_narrow = narrow
