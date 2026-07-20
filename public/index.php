@@ -4,19 +4,21 @@
  * Server-renders the download list from releases.json (written by
  * sync-releases.php via cron). Zero client-side GitHub calls, so it stays
  * comfortably inside a strict same-origin CSP.
+ *
+ * Multilingual: the interface strings live in lang/<code>.php and the language
+ * is chosen from ?lang=, a cookie or the browser (see i18n.php). Only languages
+ * with a translation file advertise themselves via hreflang / the switcher.
  */
+require __DIR__ . '/i18n.php';   // defines h(), t(), lang_*(), i18n_*()
+
 $SITE   = 'https://iptv.dope.rs';
 $REPO   = 'https://github.com/slimture/dopeIPTV';
-$DESC   = 'dopeIPTV is a fast, open-source desktop IPTV player for Xtream Codes '
-        . '& M3U with a full EPG guide, live timeshift, catch-up TV, recording '
-        . 'and multiview — watch up to nine channels at once. '
-        . 'For Linux, macOS and Windows.';
+$DESC   = t('meta_desc');
 
 $rel = @json_decode(@file_get_contents(__DIR__ . '/releases.json'), true);
 $version = $rel['version'] ?? '0.7.0';
 $assets  = $rel['assets'] ?? [];
 $relDate = !empty($rel['published_at']) ? date('M j, Y', strtotime($rel['published_at'])) : '';
-function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
 // Per-file download tallies, written by dl.php (the /dl.php?f=NAME redirector
 // every download link goes through). Kept one level above the web root so it's
@@ -29,57 +31,46 @@ function dl_count(array $counts, string $name): int {
 }
 
 /**
- * Plain-language download metadata derived from the asset filename, so the
- * page can group by OS and say clearly what each file is and which CPU it's
- * for (the raw "x86_64" / two-.deb listing confused people). Returns:
- *   os    - group key: 'Windows' | 'macOS' | 'Linux' | 'Other'
- *   icon  - group emoji
- *   title - what the file is ("AppImage", ".deb package", ...)
- *   fmt   - one-line "what/when" hint
- *   arch  - human CPU label ("Intel / AMD (64-bit)" vs "ARM64")
- *   rank  - sort order within the OS group (recommended first)
- *   rec   - true for the option most people should pick
+ * Plain-language download metadata derived from the asset filename, grouped by
+ * OS. The human labels are localized via t(); the OS group key stays a fixed
+ * ASCII token ('Linux'/'macOS'/'Windows'/'Other') used for grouping + icons.
  */
 function dl_meta(string $name): array {
     $n = strtolower($name);
     $arm = (strpos($n, 'arm') !== false || strpos($n, 'aarch64') !== false);
-    $cpu = $arm ? 'ARM (64-bit)' : 'Intel / AMD (64-bit)';
+    $cpu = $arm ? t('arch_arm') : t('arch_x86');
     if (str_ends_with($n, '.dmg'))
-        return ['os'=>'macOS','icon'=>'🍎','title'=>'macOS disk image','fmt'=>'.dmg — drag to Applications','arch'=>'Apple Silicon & Intel','rank'=>10,'rec'=>true];
+        return ['os'=>'macOS','icon'=>'🍎','title'=>t('dl_t_dmg'),'fmt'=>t('dl_f_dmg'),'arch'=>t('arch_apple'),'rank'=>10,'rec'=>true];
     if (str_ends_with($n, '.pkg'))
-        return ['os'=>'macOS','icon'=>'🍎','title'=>'macOS installer','fmt'=>'.pkg','arch'=>'Apple Silicon & Intel','rank'=>20,'rec'=>false];
+        return ['os'=>'macOS','icon'=>'🍎','title'=>t('dl_t_pkg'),'fmt'=>t('dl_f_pkg'),'arch'=>t('arch_apple'),'rank'=>20,'rec'=>false];
     if (str_ends_with($n, '.exe') || str_ends_with($n, '.msi'))
-        return ['os'=>'Windows','icon'=>'🪟','title'=>'Windows installer','fmt'=>'.exe','arch'=>$cpu,'rank'=>10,'rec'=>true];
+        return ['os'=>'Windows','icon'=>'🪟','title'=>t('dl_t_exe'),'fmt'=>t('dl_f_exe'),'arch'=>$cpu,'rank'=>10,'rec'=>true];
     if (str_ends_with($n, '.zip') && strpos($n, 'win') !== false)
-        return ['os'=>'Windows','icon'=>'🪟','title'=>'Windows portable','fmt'=>'.zip — unzip &amp; run, no install','arch'=>$cpu,'rank'=>10,'rec'=>true];
+        return ['os'=>'Windows','icon'=>'🪟','title'=>t('dl_t_winzip'),'fmt'=>t('dl_f_winzip'),'arch'=>$cpu,'rank'=>10,'rec'=>true];
     if (str_ends_with($n, '.appimage'))
-        return ['os'=>'Linux','icon'=>'🐧','title'=>'AppImage','fmt'=>'runs on any distro — no install','arch'=>$cpu,'rank'=>($arm?12:10),'rec'=>!$arm];
+        return ['os'=>'Linux','icon'=>'🐧','title'=>t('dl_t_appimage'),'fmt'=>t('dl_f_appimage'),'arch'=>$cpu,'rank'=>($arm?12:10),'rec'=>!$arm];
     if (str_ends_with($n, '.deb'))
-        return ['os'=>'Linux','icon'=>'🐧','title'=>'.deb package','fmt'=>'for Debian / Ubuntu','arch'=>$cpu,'rank'=>($arm?22:20),'rec'=>false];
+        return ['os'=>'Linux','icon'=>'🐧','title'=>t('dl_t_deb'),'fmt'=>t('dl_f_deb'),'arch'=>$cpu,'rank'=>($arm?22:20),'rec'=>false];
     if (str_ends_with($n, '.rpm'))
-        return ['os'=>'Linux','icon'=>'🐧','title'=>'.rpm package','fmt'=>'for Fedora / RHEL','arch'=>$cpu,'rank'=>30,'rec'=>false];
+        return ['os'=>'Linux','icon'=>'🐧','title'=>t('dl_t_rpm'),'fmt'=>t('dl_f_rpm'),'arch'=>$cpu,'rank'=>30,'rec'=>false];
     if (str_ends_with($n, '.flatpak'))
-        return ['os'=>'Linux','icon'=>'📦','title'=>'Flatpak','fmt'=>'all distros','arch'=>'Universal','rank'=>40,'rec'=>false];
+        return ['os'=>'Linux','icon'=>'📦','title'=>t('dl_t_flatpak'),'fmt'=>t('dl_f_flatpak'),'arch'=>t('arch_universal'),'rank'=>40,'rec'=>false];
     return ['os'=>'Other','icon'=>'📦','title'=>$name,'fmt'=>'','arch'=>'','rank'=>99,'rec'=>false];
 }
 
-// Group the release assets by OS so the list reads as "pick your system,
-// then your CPU" instead of a flat jumble of two .debs and two AppImages.
-// Linux first - it's the focus of this release; Windows last (newest, still
-// finding its feet).
+// Group the release assets by OS. Linux first - it's the focus.
 $osOrder = ['Linux', 'macOS', 'Windows', 'Other'];
 $osHelp  = [
-    'Linux'   => 'Not sure? Get the <b>AppImage</b> — it runs on any distribution with no install. Choose <b>.deb</b> on Debian/Ubuntu. Pick <b>Intel / AMD</b> unless you\'re on an ARM machine (Raspberry Pi, ARM server).',
-    'macOS'   => 'One image works on both Apple Silicon (M-series) and Intel Macs.',
-    'Windows' => 'Portable build — unzip and run, nothing to install. Newest platform, still being polished.',
+    'Linux'   => t('os_help_linux'),
+    'macOS'   => t('os_help_macos'),
+    'Windows' => t('os_help_windows'),
 ];
 // Per-OS "how to install" note, shown right under each OS's downloads so the
-// steps sit with the files they apply to (instead of one detached block at
-// the bottom of the section).
+// steps sit with the files they apply to.
 $osInstall = [
-    'Linux'   => '🐧 <b>AppImage:</b> make it executable and run it — nothing to install: <code>chmod +x dopeIPTV-*.AppImage &amp;&amp; ./dopeIPTV-*.AppImage</code>. <b>.deb</b> (Debian/Ubuntu): <code>sudo apt install ./dopeIPTV-*.deb</code>. <b>.rpm</b> (Fedora/RHEL): <code>sudo dnf install ./dopeIPTV-*.rpm</code>.',
-    'macOS'   => '🍎 Open the <code>.dmg</code> and drag dopeIPTV to Applications. Because the app isn\'t notarized by Apple yet, the first launch may be blocked — <b>right-click the app → Open</b>, then <b>Open</b> in the dialog (or allow it under <b>System Settings → Privacy &amp; Security → Open Anyway</b>). If macOS instead says the app is <b>“damaged”</b>, clear the download flag in Terminal: <code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code>. It\'s safe — the warning only means the build isn\'t code-signed.',
-    'Windows' => '🪟 Unzip the folder and run <code>dopeiptv.exe</code>. Because the app isn\'t code-signed yet, SmartScreen may show <b>“Windows protected your PC”</b> — click <b>More info → Run anyway</b>. It\'s only a warning, nothing is blocked or removed.',
+    'Linux'   => t('os_install_linux'),
+    'macOS'   => t('os_install_macos'),
+    'Windows' => t('os_install_windows'),
 ];
 $groups = [];
 foreach ($assets as $a) {
@@ -91,28 +82,30 @@ foreach ($groups as &$g) {
 }
 unset($g);
 ?><!DOCTYPE html>
-<html lang="en">
+<html lang="<?= h(lang_code()) ?>" dir="<?= h(lang_dir()) ?>">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>dopeIPTV — Desktop IPTV player with EPG, timeshift &amp; recording</title>
+<title><?= h(t('meta_title')) ?></title>
 <meta name="description" content="<?= h($DESC) ?>">
-<link rel="canonical" href="<?= h($SITE) ?>/">
+<link rel="canonical" href="<?= h(i18n_canonical($SITE)) ?>">
+<?= i18n_hreflang($SITE) ?>
 <meta name="theme-color" content="#0f1218">
 <meta name="robots" content="index,follow">
-<meta name="keywords" content="IPTV player, Xtream Codes, M3U, EPG, XMLTV, timeshift, catch-up TV, IPTV recording, IPTV multiview, watch multiple channels, multi-screen IPTV, Linux IPTV, macOS IPTV, Windows IPTV, dopeIPTV">
+<meta name="keywords" content="<?= h(t('meta_keywords')) ?>">
 <!-- Open Graph -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="dopeIPTV">
-<meta property="og:title" content="dopeIPTV — Desktop IPTV player with EPG, timeshift &amp; recording">
+<meta property="og:locale" content="<?= h(lang_locale()) ?>">
+<meta property="og:title" content="<?= h(t('meta_title')) ?>">
 <meta property="og:description" content="<?= h($DESC) ?>">
-<meta property="og:url" content="<?= h($SITE) ?>/">
+<meta property="og:url" content="<?= h(i18n_canonical($SITE)) ?>">
 <meta property="og:image" content="<?= h($SITE) ?>/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <!-- Twitter -->
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="dopeIPTV — Desktop IPTV player with EPG, timeshift &amp; recording">
+<meta name="twitter:title" content="<?= h(t('meta_title')) ?>">
 <meta name="twitter:description" content="<?= h($DESC) ?>">
 <meta name="twitter:image" content="<?= h($SITE) ?>/og-image.png">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -141,11 +134,21 @@ unset($g);
   <div class="wrap">
     <a class="brand" href="#top"><span class="glyph">◉</span><b>dopeIPTV</b></a>
     <nav class="links">
-      <a class="navlink" href="#features">Features</a>
-      <a class="navlink" href="#shots">Screenshots</a>
-      <a class="navlink" href="#download">Download</a>
-      <a class="navlink" href="<?= h($REPO) ?>">GitHub</a>
-      <a class="btn primary" href="#download">Download</a>
+      <a class="navlink" href="#features"><?= h(t('nav_features')) ?></a>
+      <a class="navlink" href="#shots"><?= h(t('nav_screenshots')) ?></a>
+      <a class="navlink" href="#download"><?= h(t('nav_download')) ?></a>
+      <a class="navlink" href="<?= h($REPO) ?>"><?= h(t('nav_github')) ?></a>
+<?php $avail = i18n_available(); if (count($avail) > 1): ?>
+      <details class="langpick">
+        <summary title="<?= h(t('lang_label')) ?>">🌐 <?= h(I18N_NAMES[lang_code()] ?? lang_code()) ?></summary>
+        <div class="langmenu">
+<?php foreach ($avail as $code): ?>
+          <a href="/?lang=<?= h($code) ?>"<?= $code === lang_code() ? ' class="on"' : '' ?>><?= h(I18N_NAMES[$code] ?? $code) ?></a>
+<?php endforeach; ?>
+        </div>
+      </details>
+<?php endif; ?>
+      <a class="btn primary" href="#download"><?= h(t('nav_download_btn')) ?></a>
     </nav>
   </div>
 </header>
@@ -154,14 +157,14 @@ unset($g);
   <section class="hero">
     <div class="wrap hero-grid">
       <div>
-        <span class="eyebrow"><span class="dot"></span> On air · version <?= h($version) ?></span>
-        <h1>Live TV, catch-up and recordings — in one <span class="hl">native desktop</span> app.</h1>
-        <p class="lede">A fast, keyboard-driven IPTV client for Xtream Codes &amp; M3U. Scrub back into a channel's archive, pause live TV, browse the full EPG, record, and watch up to nine channels at once in multiview — with a built-in mpv player. For Linux, macOS &amp; Windows.</p>
+        <span class="eyebrow"><span class="dot"></span> <?= h(t('hero_eyebrow')) ?> <?= h($version) ?></span>
+        <h1><?= t('hero_h1') ?></h1>
+        <p class="lede"><?= t('hero_lede') ?></p>
         <div class="cta-row">
-          <a class="btn primary" id="heroDownload" href="#download">Download for your system</a>
-          <a class="btn ghost" href="<?= h($REPO) ?>">View source</a>
+          <a class="btn primary" id="heroDownload" href="#download"><?= h(t('hero_cta')) ?></a>
+          <a class="btn ghost" href="<?= h($REPO) ?>"><?= h(t('hero_source')) ?></a>
         </div>
-        <p class="platnote"><b id="osLabel">Linux · macOS · Windows</b> — free &amp; open source</p>
+        <p class="platnote"><b id="osLabel">Linux · macOS · Windows</b> — <?= t('hero_free') ?></p>
       </div>
       <div class="mock" aria-hidden="true">
         <div class="titlebar"><span class="tl-dot"></span><span class="tl-dot"></span><span class="tl-dot"></span></div>
@@ -178,7 +181,7 @@ unset($g);
             <div class="screen"><span class="scan"></span></div>
             <div class="timeline">
               <div class="tl-track"><span class="tl-fill"></span><span class="tl-head"></span></div>
-              <div class="tl-meta"><span>19:24 · Evening News</span><span class="behind">− 12 min behind live</span></div>
+              <div class="tl-meta"><span>19:24 · Evening News</span><span class="behind">− 12 min</span></div>
             </div>
           </div>
         </div>
@@ -189,26 +192,26 @@ unset($g);
   <div class="strip">
     <div class="wrap">
       <span class="chip">Xtream Codes</span><span class="chip">M3U / M3U8</span>
-      <span class="chip">XMLTV EPG</span><span class="chip">Timeshift / catch-up</span>
-      <span class="chip">Multiview</span><span class="chip">Chromecast</span><span class="chip">Trakt</span><span class="chip">8 languages</span>
+      <span class="chip">XMLTV EPG</span><span class="chip"><?= h(t('chip_timeshift')) ?></span>
+      <span class="chip">Multiview</span><span class="chip">Chromecast</span><span class="chip">Trakt</span><span class="chip"><?= h(t('chip_languages')) ?></span>
     </div>
   </div>
 
   <section id="features">
     <div class="wrap">
       <div class="sec-head">
-        <span class="eyebrow">Everything on one screen</span>
-        <h2>Built for how people actually watch TV.</h2>
-        <p>Not a repurposed media library — a TV client, with the timeline, the guide and the recorder where you expect them.</p>
+        <span class="eyebrow"><?= h(t('feat_eyebrow')) ?></span>
+        <h2><?= h(t('feat_h2')) ?></h2>
+        <p><?= t('feat_intro') ?></p>
       </div>
       <div class="grid">
-        <div class="card"><div class="ic">⏱</div><h3>Timeshift &amp; catch-up</h3><p>Scrub back into a channel's archive on a live timeline, or jump straight to a past programme from the guide.</p></div>
-        <div class="card"><div class="ic">⊞</div><h3>Multiview</h3><p>Watch up to nine live channels at once in a grid — mix different playlists, click one for audio, with per-window timeshift and subtitles.</p></div>
-        <div class="card"><div class="ic">⏸</div><h3>Pause live TV</h3><p>DVR-style pause and resume behind live — the player shows exactly how far behind you are.</p></div>
-        <div class="card"><div class="ic">▦</div><h3>Full EPG guide</h3><p>A real programme grid with search, reminders and a configurable list of what's coming up next.</p></div>
-        <div class="card"><div class="ic">⏺</div><h3>One-click recording</h3><p>Record the stream you're watching over a single connection, with timers, size caps and a Recordings library.</p></div>
-        <div class="card"><div class="ic">◉</div><h3>Multi-provider</h3><p>Several Xtream or M3U playlists side by side, each with its own EPG, auto-refresh and custom guide URL.</p></div>
-        <div class="card"><div class="ic">▶</div><h3>Buttery playback</h3><p>A built-in mpv engine, with Chromecast, Trakt sync, themes and full keyboard control.</p></div>
+        <div class="card"><div class="ic">⏱</div><h3><?= t('feat_c1_h') ?></h3><p><?= t('feat_c1_p') ?></p></div>
+        <div class="card"><div class="ic">⊞</div><h3><?= t('feat_mv_h') ?></h3><p><?= t('feat_mv_p') ?></p></div>
+        <div class="card"><div class="ic">⏸</div><h3><?= t('feat_c2_h') ?></h3><p><?= t('feat_c2_p') ?></p></div>
+        <div class="card"><div class="ic">▦</div><h3><?= t('feat_c3_h') ?></h3><p><?= t('feat_c3_p') ?></p></div>
+        <div class="card"><div class="ic">⏺</div><h3><?= t('feat_c4_h') ?></h3><p><?= t('feat_c4_p') ?></p></div>
+        <div class="card"><div class="ic">◉</div><h3><?= t('feat_c5_h') ?></h3><p><?= t('feat_c5_p') ?></p></div>
+        <div class="card"><div class="ic">▶</div><h3><?= t('feat_c6_h') ?></h3><p><?= t('feat_c6_p') ?></p></div>
       </div>
     </div>
   </section>
@@ -216,19 +219,16 @@ unset($g);
   <section id="shots" style="padding-top:0;">
     <div class="wrap">
       <div class="sec-head">
-        <span class="eyebrow">A look inside</span>
-        <h2>Clean, dark, and out of your way.</h2>
+        <span class="eyebrow"><?= h(t('shots_eyebrow')) ?></span>
+        <h2><?= h(t('shots_h2')) ?></h2>
       </div>
       <div class="shots">
 <?php
-// Each row lights up automatically the moment the PNG exists in screenshots/ -
-// drop in main.png / epg.png / timeshift.png / recordings.png and they appear,
-// no code change. Until then the placeholder is shown.
 $shots = [
-    ['main.png',       'dopeIPTV main window with the channel list, guide and video', 'Channels &amp; player', 'the list, the guide and the video in one layout.'],
-    ['epg.png',        'dopeIPTV EPG programme guide grid',                            'Programme guide',       'grid view with catch-up markers.'],
-    ['timeshift.png',  'dopeIPTV timeshift timeline scrubbing a channel archive',      'Timeshift timeline',    'scrub the archive, live edge marked.'],
-    ['recordings.png', 'dopeIPTV recordings library with timers',                      'Recordings',            'timers, storage caps and playback.'],
+    ['main.png',       t('shot_main_alt'), t('shot_main_t'), t('shot_main_c')],
+    ['epg.png',        t('shot_epg_alt'),  t('shot_epg_t'),  t('shot_epg_c')],
+    ['timeshift.png',  t('shot_ts_alt'),   t('shot_ts_t'),   t('shot_ts_c')],
+    ['recordings.png', t('shot_rec_alt'),  t('shot_rec_t'),  t('shot_rec_c')],
 ];
 foreach ($shots as [$file, $alt, $title, $cap]):
     $exists = is_file(__DIR__ . '/screenshots/' . $file);
@@ -237,7 +237,7 @@ foreach ($shots as [$file, $alt, $title, $cap]):
 <?php if ($exists): ?>
           <img src="/screenshots/<?= h($file) ?>" alt="<?= h($alt) ?>" width="1280" height="800" loading="lazy">
 <?php else: ?>
-          <div class="ph">screenshot · <?= $title ?></div>
+          <div class="ph"><?= h(t('shot_ph')) ?> · <?= $title ?></div>
 <?php endif; ?>
           <div class="cap"><b><?= $title ?></b> — <?= $cap ?></div>
         </div>
@@ -250,10 +250,10 @@ foreach ($shots as [$file, $alt, $title, $cap]):
     <div class="wrap">
       <div class="dl-head">
         <div class="sec-head" style="margin-bottom:0;">
-          <span class="eyebrow">Get dopeIPTV</span>
-          <h2>Download the latest release.</h2>
+          <span class="eyebrow"><?= h(t('dl_eyebrow')) ?></span>
+          <h2><?= h(t('dl_h2')) ?></h2>
         </div>
-        <span class="release-tag"><b>v<?= h($version) ?></b><?= $relDate ? ' · ' . h($relDate) : ' · latest' ?></span>
+        <span class="release-tag"><b>v<?= h($version) ?></b><?= $relDate ? ' · ' . h($relDate) : ' · ' . h(t('dl_latest')) ?></span>
       </div>
 <?php if ($assets): foreach ($osOrder as $os): if (empty($groups[$os])) continue; ?>
       <div class="dl-group">
@@ -275,10 +275,10 @@ foreach ($shots as [$file, $alt, $title, $cap]):
 ?>
           <a class="dl<?= $m['rec'] ? ' rec' : '' ?>" href="<?= h($dlHref) ?>" rel="nofollow"<?= !empty($a['sha256']) ? ' title="SHA-256: ' . h($a['sha256']) . '"' : '' ?>>
             <span class="meta">
-              <span class="name"><?= h($m['title']) ?><?php if ($m['rec']): ?> <span class="badge">Recommended</span><?php endif; ?></span>
+              <span class="name"><?= h($m['title']) ?><?php if ($m['rec']): ?> <span class="badge"><?= h(t('dl_recommended')) ?></span><?php endif; ?></span>
               <span class="sub"><span class="arch"><?= h($m['arch']) ?></span><?= $m['fmt'] ? ' · ' . $m['fmt'] : '' ?><?= $size ? ' · ' . h($size) : '' ?><?php if ($dlN > 0): ?> · <span class="dl-count" title="downloads">↓ <?= number_format($dlN) ?></span><?php endif; ?></span>
             </span>
-            <span class="go">Download →</span>
+            <span class="go"><?= h(t('dl_go')) ?></span>
           </a>
 <?php endforeach; ?>
         </div>
@@ -289,14 +289,14 @@ foreach ($shots as [$file, $alt, $title, $cap]):
 <?php endforeach; else: ?>
       <div class="dls">
         <a class="dl" href="<?= h($REPO) ?>/releases/latest" rel="nofollow">
-          <span class="meta"><span class="name">All packages on GitHub</span><span class="sub">latest release</span></span>
-          <span class="go">Open →</span>
+          <span class="meta"><span class="name"><?= h(t('dl_all_name')) ?></span><span class="sub"><?= h(t('dl_all_sub')) ?></span></span>
+          <span class="go"><?= h(t('dl_open')) ?></span>
         </a>
       </div>
 <?php endif; ?>
-      <p class="autonote">↻ Generated on the server from the <code>slimture/dopeIPTV</code> GitHub releases — new builds appear automatically.</p>
+      <p class="autonote"><?= t('note_generated') ?></p>
 <?php if (is_file(__DIR__ . '/files/SHA256SUMS')): ?>
-      <p class="autonote">🔒 Verify your download — <a class="verify-link" href="/files/SHA256SUMS">SHA-256 checksums</a> · <code>sha256sum -c SHA256SUMS</code></p>
+      <p class="autonote"><?= t('note_verify') ?></p>
 <?php endif; ?>
     </div>
   </section>
@@ -304,19 +304,19 @@ foreach ($shots as [$file, $alt, $title, $cap]):
   <section id="credits" style="padding-top:0;">
     <div class="wrap">
       <div class="sec-head">
-        <span class="eyebrow">Open source</span>
-        <h2>Free software, standing on giants.</h2>
-        <p>dopeIPTV is <b>free and open source</b> under the GPL-3.0 licence — no ads, no tracking, no accounts. It's built with, and grateful to, these projects and services:</p>
+        <span class="eyebrow"><?= h(t('cred_eyebrow')) ?></span>
+        <h2><?= h(t('cred_h2')) ?></h2>
+        <p><?= t('cred_intro') ?></p>
       </div>
       <div class="credits-grid">
-        <div class="credit"><h3>Playback</h3><p><a href="https://mpv.io" rel="noopener">mpv</a> &amp; <a href="https://ffmpeg.org" rel="noopener">FFmpeg</a>, via python-mpv</p></div>
-        <div class="credit"><h3>Interface</h3><p>Qt &amp; <a href="https://www.riverbankcomputing.com/software/pyqt/" rel="noopener">PyQt6</a></p></div>
-        <div class="credit"><h3>Casting</h3><p><a href="https://github.com/home-assistant-libs/pychromecast" rel="noopener">PyChromecast</a> — Google Cast</p></div>
-        <div class="credit"><h3>Metadata &amp; artwork</h3><p><a href="https://www.themoviedb.org" rel="noopener">The Movie Database (TMDB)</a></p></div>
-        <div class="credit"><h3>Watched sync</h3><p><a href="https://trakt.tv" rel="noopener">Trakt</a></p></div>
-        <div class="credit"><h3>Licences</h3><p><a href="<?= h($REPO) ?>/blob/main/docs/THIRD-PARTY-LICENSES.md" rel="noopener">GPL-3.0 &amp; third-party</a></p></div>
+        <div class="credit"><h3><?= t('cred_playback') ?></h3><p><a href="https://mpv.io" rel="noopener">mpv</a> &amp; <a href="https://ffmpeg.org" rel="noopener">FFmpeg</a>, via python-mpv</p></div>
+        <div class="credit"><h3><?= t('cred_interface') ?></h3><p>Qt &amp; <a href="https://www.riverbankcomputing.com/software/pyqt/" rel="noopener">PyQt6</a></p></div>
+        <div class="credit"><h3><?= t('cred_casting') ?></h3><p><a href="https://github.com/home-assistant-libs/pychromecast" rel="noopener">PyChromecast</a> — Google Cast</p></div>
+        <div class="credit"><h3><?= t('cred_metadata') ?></h3><p><a href="https://www.themoviedb.org" rel="noopener">The Movie Database (TMDB)</a></p></div>
+        <div class="credit"><h3><?= t('cred_watched') ?></h3><p><a href="https://trakt.tv" rel="noopener">Trakt</a></p></div>
+        <div class="credit"><h3><?= t('cred_licences') ?></h3><p><a href="<?= h($REPO) ?>/blob/main/docs/THIRD-PARTY-LICENSES.md" rel="noopener"><?= t('cred_licences_link') ?></a></p></div>
       </div>
-      <p class="disclaimer">This product uses the TMDB API but is not endorsed or certified by TMDB. This product uses the Trakt API but is not endorsed or certified by Trakt. All trademarks are the property of their respective owners.</p>
+      <p class="disclaimer"><?= h(t('disclaimer')) ?></p>
     </div>
   </section>
 </main>
@@ -326,8 +326,8 @@ foreach ($shots as [$file, $alt, $title, $cap]):
     <span class="v">dopeIPTV <?= h($version) ?> · © <?= date('Y') ?></span>
     <nav>
       <a href="<?= h($REPO) ?>">GitHub</a>
-      <a href="<?= h($REPO) ?>/releases">Releases</a>
-      <a href="<?= h($REPO) ?>#readme">Docs</a>
+      <a href="<?= h($REPO) ?>/releases"><?= h(t('footer_releases')) ?></a>
+      <a href="<?= h($REPO) ?>#readme"><?= h(t('footer_docs')) ?></a>
     </nav>
   </div>
 </footer>
