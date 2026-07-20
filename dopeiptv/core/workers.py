@@ -109,7 +109,8 @@ def choose_cover_url(title_tmdb, raw_provider, kind, is_dead):
 
 import requests
 from PyQt6.QtCore import (
-    QObject, QRunnable, QStandardPaths, QThreadPool, Qt, pyqtSignal, pyqtSlot,
+    QObject, QRunnable, QStandardPaths, QThreadPool, QTimer, Qt, pyqtSignal,
+    pyqtSlot,
 )
 from PyQt6.QtGui import QImage, QPixmap
 
@@ -244,7 +245,7 @@ class LogoLoader(QObject):
                  max_entries: int = 2000,
                  cache_dir: Path | str | None = None,
                  max_bytes: int = 64 * 1024 * 1024,
-                 disk_budget: int = 512 * 1024 * 1024) -> None:
+                 disk_budget: int = 2560 * 1024 * 1024) -> None:
         super().__init__()
         self.pool = pool
         self.max_size = max_size
@@ -287,11 +288,23 @@ class LogoLoader(QObject):
             Path(cache_dir) if cache_dir is not None else None)
         # The disk cache had NO automatic bound - it grew for every image
         # ever fetched until the user found the manual clear button in
-        # Settings. Prune it back under budget once per session, off the
-        # GUI thread. 0 disables (tests drive _prune_disk_cache directly).
+        # Settings. Prune it back under budget (2.5 GB - generous, covers
+        # several full provider dumps; disk is cheap, re-downloads are not)
+        # once per session, off the GUI thread. 0 disables (tests drive
+        # _prune_disk_cache directly).
         self.disk_budget = int(disk_budget)
         if self.disk_dir is not None and self.disk_budget > 0:
-            run_async(self.pool, self._prune_disk_cache, lambda _r: None)
+            # Deferred a few seconds so the prune's directory walk never
+            # competes with the startup burst (EPG cache load, first list
+            # fetch) and short-lived sessions skip it entirely. Parented
+            # timer: dies with the loader, so it can never fire on a
+            # destroyed object.
+            t = QTimer(self)
+            t.setSingleShot(True)
+            t.setInterval(5000)
+            t.timeout.connect(lambda: run_async(
+                self.pool, self._prune_disk_cache, lambda _r: None))
+            t.start()
 
     def _prune_disk_cache(self) -> int:
         """Delete the oldest cached image files until the disk cache fits

@@ -643,12 +643,26 @@ class _MacInputFilter(QObject):
 
     def _maybe_hide_cursor(self) -> None:
         from ..core.platform_macos import set_cursor_hidden
+        # Never hide while a menu or dialog is up. The subtitle/audio menus
+        # and the right-click menu overlap the video, so the geometric
+        # over-video test held true while the user was mid-choice - the
+        # cursor vanished inside the open menu and (native menus swallow
+        # the mouse-move events that un-hide it) only came back on a click.
+        if (QApplication.activePopupWidget() is not None
+                or QApplication.activeModalWidget() is not None):
+            return
         if self._over_video():
             set_cursor_hidden(True)
 
     def eventFilter(self, obj, event):
         et = event.type()
-        if et == QEvent.Type.MouseMove and sys.platform == "darwin":
+        if (sys.platform == "darwin"
+                and et in (QEvent.Type.MouseMove,
+                           QEvent.Type.MouseButtonPress,
+                           QEvent.Type.MouseButtonRelease)):
+            # Any mouse activity un-hides - including the click that opens
+            # a context menu, so the menu never comes up with an invisible
+            # pointer. Only idle time over the bare video re-hides.
             from ..core.platform_macos import set_cursor_hidden
             set_cursor_hidden(False)
             if self._over_video():
@@ -1751,6 +1765,14 @@ class EmbeddedPlayer(QWidget):
             QTimer.singleShot(0, self._lock_video_box)
 
     def _hide_fs_ui(self) -> None:
+        # Never take the controls and cursor away under an open menu or
+        # dialog (subtitle/audio pickers, the right-click menu): the user is
+        # mid-choice, and blanking the cursor there strands them without a
+        # pointer. Re-arm and try again once the popup is gone.
+        if self._fs_ui and (QApplication.activePopupWidget() is not None
+                            or QApplication.activeModalWidget() is not None):
+            self._overlay_timer.start()
+            return
         self.overlay.hide()
         self.fs_controls.hide()
         if self._fs_ui:

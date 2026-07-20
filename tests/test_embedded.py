@@ -51,6 +51,27 @@ player._on_video_dbl_click()
 assert not player._click_timer.isActive()
 assert player._ignore_next_release is True
 
+# Fullscreen idle-hide must never blank the cursor (or pull the controls)
+# under an open menu - the subtitle/audio pickers and the right-click menu
+# overlap the video, and hiding mid-choice stranded the user without a
+# pointer until they clicked.
+from PyQt6.QtCore import QPoint, Qt
+from PyQt6.QtWidgets import QMenu
+
+player._fs_ui = True
+menu = QMenu()
+menu.addAction("Subtitles")
+menu.popup(QPoint(10, 10))
+app.processEvents()
+assert QApplication.activePopupWidget() is menu
+player._hide_fs_ui()
+assert player.cursor().shape() != Qt.CursorShape.BlankCursor
+assert player._overlay_timer.isActive()   # re-armed, not given up
+menu.close()
+app.processEvents()
+player._hide_fs_ui()
+assert player.cursor().shape() == Qt.CursorShape.BlankCursor
+
 print("EMBEDDED_OK")
 """
 
