@@ -10,7 +10,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-import requests
+from ..core._lazy_requests import requests
 
 from ..core.log import log
 

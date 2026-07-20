@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 
-import requests
+from ..core._lazy_requests import requests
 from PyQt6.QtCore import QSettings
 
 API = "https://api.trakt.tv"

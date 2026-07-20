@@ -14,7 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-import requests
+from ..core._lazy_requests import requests
 from PyQt6.QtCore import QStandardPaths
 
 from ..core.log import log

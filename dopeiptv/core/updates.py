@@ -3,7 +3,7 @@ thread; the UI marshals the result back itself."""
 
 from __future__ import annotations
 
-import requests
+from ._lazy_requests import requests
 
 GITHUB_REPO = "slimture/dopeIPTV"
 

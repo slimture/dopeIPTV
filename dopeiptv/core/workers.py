@@ -107,7 +107,7 @@ def choose_cover_url(title_tmdb, raw_provider, kind, is_dead):
         return raw_provider
     return None
 
-import requests
+from ._lazy_requests import requests
 from PyQt6.QtCore import (
     QObject, QRunnable, QStandardPaths, QThreadPool, QTimer, Qt, pyqtSignal,
     pyqtSlot,

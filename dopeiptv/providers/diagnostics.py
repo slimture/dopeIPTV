@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import time
 
-import requests
+from ..core._lazy_requests import requests
 
 from ..core.log import log
 from ..i18n import tr

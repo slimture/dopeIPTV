@@ -8,7 +8,7 @@ import os
 import re
 from typing import Any, Callable
 
-import requests
+from ..core._lazy_requests import requests
 from PyQt6.QtCore import QObject, QSettings, QThreadPool, QTimer
 
 
