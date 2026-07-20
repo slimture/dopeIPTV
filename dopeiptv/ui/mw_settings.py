@@ -398,8 +398,11 @@ class _SettingsMixin:
 
     # -- settings dialog -----------------------------------------------------------
 
+    _MAX_VISIBLE = 14
+
     @staticmethod
     def _combo(items, current) -> QComboBox:
+        items = list(items)
         box = QComboBox()
         for value, label in items:
             box.addItem(label, value)
@@ -410,17 +413,21 @@ class _SettingsMixin:
         # scrollable dropdown instead of a wall taller than the dialog that the
         # bottom entries fall off of. The theme sets `combobox-popup: 0`, which
         # is what makes maxVisibleItems take effect under a stylesheet.
-        box.setMaxVisibleItems(14)
+        box.setMaxVisibleItems(_SettingsMixin._MAX_VISIBLE)
         view = box.view()
         # Scroll per pixel, not per item. A trackpad (macOS, and Linux laptops
         # under libinput) sends many small scroll deltas; in the default
         # per-item mode Qt swallows them until they add up to a whole row, so
-        # the popup feels frozen - "can't scroll". Per-pixel moves on every
-        # delta. Force the scrollbar visible so there's always a drag handle too.
+        # the popup feels frozen - "can't scroll". Per-pixel moves on every delta.
         view.setVerticalScrollMode(
             QAbstractItemView.ScrollMode.ScrollPerPixel)
+        # For a list that overflows the cap (the language picker), keep the
+        # scrollbar permanently visible: it's the obvious drag handle and the
+        # "there's more below" cue. Short lists keep it as-needed.
         view.setVerticalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOn
+            if len(items) > _SettingsMixin._MAX_VISIBLE
+            else Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         if sys.platform == "darwin":
             # On macOS the styled combo doesn't grow to fit its text, so the
             # closed box clips ("Playba…", "Sven…"). Size it to the widest
