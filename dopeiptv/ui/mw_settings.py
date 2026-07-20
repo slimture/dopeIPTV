@@ -730,39 +730,18 @@ class _SettingsMixin:
             lambda _i: self._set_theme(
                 theme_box.currentData(), accent_box.currentData()))
         from ..i18n import LANGUAGES, current_language
-        # The language picker is a plain embedded list, NOT a combo popup.
-        # The popup route kept failing on real hardware (per-platform quirks:
-        # native macOS popups ignore the height cap; wheel deltas swallowed);
-        # an always-visible QListWidget scrolls with wheel/trackpad like any
-        # list, needs no popup at all, and is untouched by the wheel guard
-        # below (which only targets combos/spinboxes/sliders) - so this stays
-        # the ONE scrollable box in Settings, by design.
-        lang_list = QListWidget()
-        lang_list.setObjectName("LanguagePicker")
-        for code, name in LANGUAGES.items():
-            it = QListWidgetItem(name)
-            it.setData(Qt.ItemDataRole.UserRole, code)
-            lang_list.addItem(it)
-            if code == current_language():
-                lang_list.setCurrentItem(it)
-        lang_list.setVerticalScrollMode(
-            QAbstractItemView.ScrollMode.ScrollPerPixel)
-        lang_list.setVerticalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
-        lang_list.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        # ~7 visible rows: tall enough to browse, short enough not to dominate
-        # the form. The rest scroll into view.
-        row_h = max(lang_list.sizeHintForRow(0), 20)
-        lang_list.setFixedHeight(row_h * 7 + 2 * lang_list.frameWidth() + 6)
-        lang_list.setMinimumWidth(200)
-        if lang_list.currentItem() is not None:
-            lang_list.scrollToItem(
-                lang_list.currentItem(),
-                QAbstractItemView.ScrollHint.PositionAtCenter)
-        lang_list.currentItemChanged.connect(
-            lambda cur, _prev: cur is not None and self._set_language(
-                cur.data(Qt.ItemDataRole.UserRole)))
+        # A normal dropdown: click to open, scroll inside the popup. This
+        # works now that the wheel guard skips scrollbars - the popup's own
+        # scrollbar is created as a child of the combo, so the guard's
+        # findChildren sweep used to land on it and swallow every wheel event,
+        # which is why this list "couldn't scroll" no matter how the combo was
+        # configured. _combo() caps the popup at 14 rows, scrolls per pixel
+        # and keeps the scrollbar always visible for overflowing lists.
+        lang_box = self._combo(
+            [(code, name) for code, name in LANGUAGES.items()],
+            current_language())
+        lang_box.currentIndexChanged.connect(
+            lambda _i: self._set_language(lang_box.currentData()))
         epg_count_box = QSpinBox()
         epg_count_box.setRange(self.EPG_UPCOMING_MIN, self.EPG_UPCOMING_MAX)
         epg_count_box.setValue(self._epg_upcoming_count())
@@ -772,7 +751,7 @@ class _SettingsMixin:
         epg_count_row = QHBoxLayout()
         epg_count_row.addWidget(epg_count_box)
         epg_count_row.addStretch(1)
-        uf.addRow(tr("setting_language"), lang_list)
+        uf.addRow(tr("setting_language"), lang_box)
         uf.addRow(tr("setting_list_size"), density_box)
         uf.addRow(tr("setting_upcoming_count"), epg_count_row)
         uf.addRow(tr("setting_sort_by"), sort_box)

@@ -56,6 +56,45 @@ def test_wheel_guard_leaves_list_scrollbars_alone():
     d.close()
 
 
+def test_language_dropdown_popup_scrolls_with_guard_installed():
+    """The original bug, end to end: the combo popup's scrollbar is created as
+    a CHILD of the combo, so the guard sweep used to land on it and swallow
+    every wheel event - the open language dropdown couldn't scroll on any
+    platform. With the QScrollBar skip the popup must scroll."""
+    app = _app()
+    assert app is not None
+    from PyQt6.QtWidgets import QDialog, QVBoxLayout
+    from dopeiptv.ui.mw_settings import _SettingsMixin
+    from dopeiptv.ui.theme import build_style
+
+    # The theme's `combobox-popup: 0` is what caps the popup at
+    # maxVisibleItems rows (bare Fusion shows all 27 full-height with nothing
+    # to scroll), so apply it exactly like the app does - and restore after.
+    app.setStyleSheet(build_style())
+    try:
+        d = QDialog()
+        lay = QVBoxLayout(d)
+        box = _SettingsMixin._combo(
+            [(str(i), f"Language {i}") for i in range(27)], "0")
+        lay.addWidget(box)
+        d.show()
+        _SettingsMixin._install_wheel_guard(d)
+
+        box.showPopup()
+        view = box.view()
+        assert view.verticalScrollBar().maximum() > 0, (
+            "popup is not capped - combobox-popup:0 from the theme is not "
+            "in effect, so the 27-language dropdown would overflow the screen")
+        _wheel(app, view.viewport())
+        assert view.verticalScrollBar().value() > 0, (
+            "wheel inside the open language dropdown must scroll it - the "
+            "guard has landed on the popup's scrollbar again")
+        box.hidePopup()
+        d.close()
+    finally:
+        app.setStyleSheet("")
+
+
 def test_wheel_guard_still_protects_value_controls():
     app = _app()
     assert app is not None
