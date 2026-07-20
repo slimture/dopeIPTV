@@ -140,7 +140,7 @@ return [
     "faq_q9" => "Does dopeIPTV provide IPTV channels or a subscription?",
     "faq_a9" => "No. dopeIPTV is only a player — it does not provide, sell or host any channels or content. You connect your own Xtream Codes or M3U provider.",
     "faq_q10" => "What languages is dopeIPTV available in?",
-    "faq_a10" => "dopeIPTV is available in 26 languages besides English — including Spanish, German, French, Italian, Portuguese, Dutch, Polish, Russian, Ukrainian, Turkish, Greek, Arabic, Hebrew, Persian, Urdu, Hindi, Chinese, Japanese, Korean, Vietnamese, Indonesian, Thai and Swahili — with right-to-left support for Arabic, Hebrew, Persian and Urdu.",
+    "faq_a10" => "dopeIPTV is available in 26 languages besides English — including Spanish, German, French, Arabic, Hindi, Chinese, Japanese and more — with right-to-left support for Arabic, Hebrew, Persian and Urdu.",
 
     // footer
     "footer_releases" => "Releases",
