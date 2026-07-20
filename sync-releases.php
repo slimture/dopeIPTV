@@ -113,10 +113,44 @@ $rel = json_decode($raw, true);
 if (!is_array($rel) || empty($rel['tag_name'])) { fwrite(STDERR, "[sync] unexpected API payload\n"); exit(1); }
 
 $version = ltrim($rel['tag_name'], 'v');
+
+// --- Completeness gate ----------------------------------------------------
+// A finished release always carries all three desktop platforms (Linux is the
+// primary target; macOS and Windows are a bonus). GitHub attaches assets one
+// CI job at a time, so a cron tick that lands mid-build sees only the fast
+// jobs (macOS ~2 min, Windows ~2 min) and NOT the slower Linux ones (~5 min).
+// Publishing that partial set would replace a complete mirror with a
+// macOS+Windows-only list and prune the Linux downloads. Guard against it:
+// only assets GitHub reports as fully 'uploaded' count, and if any platform
+// group is still missing we keep the existing releases.json untouched and
+// retry on the next tick. (If this project ever intentionally drops a
+// platform, relax the required set below.)
+$hasLinux = $hasMac = $hasWin = false;
+foreach ($rel['assets'] ?? [] as $a) {
+    if (($a['state'] ?? 'uploaded') !== 'uploaded') { continue; }
+    $n = strtolower(basename($a['name'] ?? ''));
+    if (str_ends_with($n, '.appimage') || str_ends_with($n, '.deb')
+        || str_ends_with($n, '.rpm') || str_ends_with($n, '.flatpak')) { $hasLinux = true; }
+    if (str_ends_with($n, '.dmg') || str_ends_with($n, '.pkg')) { $hasMac = true; }
+    if (str_ends_with($n, '.exe') || str_ends_with($n, '.msi')
+        || (str_ends_with($n, '.zip') && strpos($n, 'win') !== false)) { $hasWin = true; }
+}
+if (!$hasLinux || !$hasMac || !$hasWin) {
+    $miss = [];
+    if (!$hasLinux) { $miss[] = 'Linux'; }
+    if (!$hasMac)   { $miss[] = 'macOS'; }
+    if (!$hasWin)   { $miss[] = 'Windows'; }
+    fwrite(STDERR, "[sync] v$version incomplete (missing " . implode('+', $miss)
+        . "); still building - keeping existing releases.json, retry next run\n");
+    exit(0);
+}
+
 $assets  = [];
 $keep    = [];   // filenames we want to retain in files/
 
 foreach (($rel['assets'] ?? []) as $a) {
+    // Never mirror an asset GitHub is still uploading.
+    if (($a['state'] ?? 'uploaded') !== 'uploaded') { continue; }
     $name = basename($a['name']);
     // Skip dev/source artifacts (.whl, .tar.gz, checksums, …) - end users only
     // want installers.
