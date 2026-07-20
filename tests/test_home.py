@@ -85,6 +85,21 @@ assert w._home_showing()
 w.switch_mode("live"); app.processEvents()
 assert not w._home_showing()
 
+# A continue-watching EPISODE card must play the episode AND drill the middle
+# column into its series' episode list: the drill rides the async category
+# load (a plain switch_mode landed on "all series" when that load reset the
+# list), and the pending-jump key selects the episode row once the list fills.
+played = []
+w.play_item = lambda it, *a, **k: played.append(it.get("id"))
+ctx = {"series_id": 12, "name": "Fav Series"}
+page._play_media({"_kind": "episode", "id": 42, "name": "S1 * E3 - Ep",
+                  "container_extension": "mp4", "_series_ctx": ctx})
+assert played == [42], played                 # played, before navigation
+assert w.mode == "series"
+assert w._pending_series_drill == ctx          # drill armed for the cat load
+assert w._pending_jump_key == 42, w._pending_jump_key
+app.processEvents()
+
 # Master toggle off: nav hidden, showing refused, page left if open.
 w.settings.setValue("home_enabled", "false")
 w._apply_home_settings()

@@ -840,9 +840,25 @@ class HomePage(QWidget):
         w._leave_home()
         # A continue-watching episode replays from its stored series context.
         if it.get("_kind") == "episode" and it.get("_series_ctx") is not None:
-            if w.mode != "series":
-                w.switch_mode("series")
+            # Play first: the continue-episode path builds its URL from the
+            # stored context, independent of whatever mode the list is in.
             w.play_item(it)
+            # Then land the middle column inside the series' episode list with
+            # this episode selected - the same drill + pending-jump dance as
+            # the now-playing jump. Just calling switch_mode left the user on
+            # "all series": its async category load resets the list when it
+            # lands, so the drill must ride the category-load callback.
+            ctx = it.get("_series_ctx") or {}
+            if ctx.get("series_id") is not None:
+                w._pending_jump_key = w._item_key(it)
+                QTimer.singleShot(8000, w._clear_pending_jump)
+                if w.mode != "series":
+                    w._pending_series_drill = ctx
+                    w.switch_mode("series")
+                else:
+                    w._enter_series(ctx)
+            elif w.mode != "series":
+                w.switch_mode("series")
             return
         sid = it.get("stream_id")
         if sid is None:
