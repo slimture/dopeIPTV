@@ -31,6 +31,10 @@ now = time.time()
 
 # Seed the stores the shelves read from.
 w.history.add("http://x/live/u/p/1.ts", "Chan One", None, 1, "live")
+# Same movie as the resume seed below, under its history identity: Continue
+# watching owns partly-watched titles, so Recently viewed must NOT repeat it.
+w.history.add("http://x/movie/7.mp4", "Halfway Movie HISTROW", None,
+              7, "movie")
 w.favs.add("Default", {"stream_id": 5, "name": "Fav Chan",
                        "stream_icon": None})
 w.movie_favs.add("Default", {"stream_id": 9, "name": "Fav Movie"})
@@ -56,6 +60,8 @@ def walk(widget):
 walk(page)
 joined = " | ".join(texts)
 assert "Halfway Movie" in joined, joined     # resume shelf
+# ...but its history twin is filtered out of Recently viewed (shelf sync).
+assert "Halfway Movie HISTROW" not in joined, joined
 assert "Fav Chan" in joined                  # favorites-now shelf (channel)
 assert "Fav Movie" in joined                 # favorites shelf (movie fav)
 assert "Fav Series" in joined                # favorites shelf (series fav)
@@ -99,6 +105,44 @@ assert w.mode == "series"
 assert w._pending_series_drill == ctx          # drill armed for the cat load
 assert w._pending_jump_key == 42, w._pending_jump_key
 app.processEvents()
+
+# A Recently-viewed EPISODE row (carrying the stored series snapshot) plays
+# as an EPISODE - so the resume prompt finds its saved position - and drills
+# into its series. The context-less fallback used to degrade it to a "movie":
+# restarted from zero, duplicated in History and posterless.
+w.switch_mode("live"); app.processEvents()
+hist_plays = []
+w._start_playback = (lambda url, title, icon, key, kind, *a, **kw:
+                     hist_plays.append((url, kind)))
+w._pending_series_drill = None
+page._play_history({"_kind": "episode", "_key": 77,
+                    "_url": "http://x/series/77.mp4",
+                    "name": "Show · S1 * E1 - Pilot",
+                    "_series_ctx": {"series_id": 12, "name": "Fav Series"}})
+assert hist_plays == [("http://x/series/77.mp4", "episode")], hist_plays
+assert w.mode == "series"
+assert w._pending_series_drill == {"series_id": 12, "name": "Fav Series"}
+assert w._pending_jump_key == 77, w._pending_jump_key
+app.processEvents()
+# ...while an OLD entry without the snapshot still replays (as a movie).
+w.switch_mode("live"); app.processEvents()
+hist_plays.clear()
+page._play_history({"_kind": "episode", "_key": 78,
+                    "_url": "http://x/series/78.mp4", "name": "S01 E02"})
+assert hist_plays == [("http://x/series/78.mp4", "movie")], hist_plays
+
+# The Watch Later shelf shows playable movies/shows from the watchlist store
+# (rows without a provider id are filtered out - no dead cards).
+w.watchlist.movies = [{"stream_id": 9, "name": "WL Movie"},
+                      {"name": "Trakt-only Movie"}]
+w.watchlist.shows = [{"series_id": 12, "name": "WL Show"}]
+w._show_home_page(); app.processEvents()
+texts.clear()
+walk(w._home_page)
+joined2 = " | ".join(texts)
+assert "WL Movie" in joined2
+assert "WL Show" in joined2
+assert "Trakt-only Movie" not in joined2
 
 # Master toggle off: nav hidden, showing refused, page left if open.
 w.settings.setValue("home_enabled", "false")

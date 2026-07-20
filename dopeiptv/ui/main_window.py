@@ -3564,6 +3564,28 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                          "num": item.get("num"),
                          "tv_archive": item.get("tv_archive"),
                          "tv_archive_duration": item.get("tv_archive_duration")}
+            elif kind == "episode":
+                # Remember the episode's series so a replay from History (or
+                # Home's Recently viewed) can resume as an EPISODE, land in
+                # the series' episode list, and resolve the series' poster -
+                # without it the row degraded to a context-less "movie":
+                # restarted from zero, duplicated in History (kind mismatch
+                # broke the dedup) and posterless. Same slim snapshot the
+                # resume store keeps.
+                sctx = self.series_ctx or {}
+                if sctx.get("series_id") is not None:
+                    slim = {k: sctx.get(k)
+                            for k in ("series_id", "name", "title", "cover",
+                                      "stream_icon", "category_id", "_tmdb_id")
+                            if sctx.get(k) is not None}
+                    sname = sctx.get("name") or sctx.get("title")
+                    extra = {"_series_ctx": slim, "_series_title": sname}
+                    # Store the row as "Series · S1 * E2 - ..." so History and
+                    # the Home shelf say WHICH show the episode belongs to -
+                    # a bare "S01 E01" told the user nothing. Skip when the
+                    # title already carries it (a continue-watching replay).
+                    if sname and not title.startswith(sname):
+                        extra["name"] = f"{sname} · {title}"
             self.history.add(url, title, icon_url, key, kind, extra=extra)
         if kind in ("movie", "episode"):
             self._trakt_start_for_item(kind, item)

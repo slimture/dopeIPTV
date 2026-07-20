@@ -45,9 +45,21 @@ faster app all around.
   the series' poster (the same art the episode list shows) instead of
   title-searching the mangled episode name as a movie, which made the poster
   appear and disappear at random.
+- **Recently viewed treats episodes as episodes.** History rows for episodes
+  now carry their series: replaying one resumes where you left off (it used
+  to restart from zero), drills into the series' episode list like Continue
+  watching, resolves the series' poster, and reads "Series · S1 E2 - Title"
+  instead of a bare "S01 E01". The duplicate rows the old context-less
+  fallback created are gone (History also dedupes across int/str id types).
 
 ### Home
 
+- **New: a Watch Later shelf.** Movies and shows from your Watch Later list,
+  with the same play/drill behaviour as everywhere else; rows the provider
+  can't act on are filtered out. Toggleable under Settings > Home.
+- **Continue watching and Recently viewed no longer overlap.** A partly-
+  watched title lives on Continue watching; Recently viewed shows the rest
+  (turn Continue watching off and it shows everything again).
 - **Removed the Featured row.** It was the top 12 of the same recently-added
   movies already shown directly below it - pure duplication, and its oversized
   posters were the slowest part of the page.

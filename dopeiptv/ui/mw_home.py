@@ -473,7 +473,25 @@ class HomePage(QWidget):
                 self._v.addWidget(shelf)
 
         if on("home_sh_history"):
-            rows = list(getattr(w.history, "entries", []))[:14]
+            rows = list(getattr(w.history, "entries", []))
+            # Keep the two shelves in sync: a partly-watched title already
+            # sits on Continue watching, repeating it under Recently viewed
+            # is pure redundancy. Only filtered while that shelf is shown -
+            # with it off, Recently viewed shows everything again. Keys are
+            # str()-compared (int/str id mix) and kinds mapped (resume says
+            # "vod", history says "movie").
+            if on("home_sh_resume"):
+                skip = set()
+                try:
+                    for r in w.resume.continue_watching():
+                        k = ("movie" if r.get("_kind") == "vod"
+                             else r.get("_kind"))
+                        skip.add((k, str(w._item_key(r))))
+                except Exception:
+                    pass
+                rows = [e for e in rows
+                        if (e.get("_kind"), str(e.get("_key"))) not in skip]
+            rows = rows[:14]
             if rows:
                 shelf = _Shelf(tr("home_recent"))
                 for it in rows:
@@ -494,6 +512,43 @@ class HomePage(QWidget):
                         k = "episode" if it.get("_kind") == "episode" else "vod"
                         self._set_art(card, self._media_art(it, k),
                                       w.poster_art)
+                    shelf.add(card)
+                shelf.finish(POSTER_H)
+                self._v.addWidget(shelf)
+
+        if on("home_sh_watchlist"):
+            wl = getattr(w, "watchlist", None)
+            rows = []
+            if wl is not None:
+                # Only rows this provider can act on: a movie needs its
+                # stream_id to play, a show its series_id to drill into.
+                # Trakt-only snapshots without them would make dead cards.
+                for it in list(getattr(wl, "movies", [])):
+                    if it.get("stream_id") is not None:
+                        r = dict(it)
+                        r["_kind"] = "movie"
+                        rows.append(r)
+                for it in list(getattr(wl, "shows", [])):
+                    if it.get("series_id") is not None:
+                        r = dict(it)
+                        r["_kind"] = "series"
+                        rows.append(r)
+            if rows:
+                shelf = _Shelf(tr("nav_watchlist"))
+                for it in rows[:20]:
+                    card = _Card(POSTER_W, POSTER_H,
+                                 it.get("name") or it.get("title") or "?")
+                    if it["_kind"] == "series":
+                        # Same drill path as a favorite show: land inside the
+                        # series' episode list (the pending-drill dance).
+                        card.clicked.connect(
+                            lambda it=it: self._open_series(it))
+                        art = self._media_art(it, "series")
+                    else:
+                        card.clicked.connect(
+                            lambda it=it: self._play_media(it))
+                        art = self._media_art(it, "vod")
+                    self._set_art(card, art, w.poster_art)
                     shelf.add(card)
                 shelf.finish(POSTER_H)
                 self._v.addWidget(shelf)
@@ -915,12 +970,28 @@ class HomePage(QWidget):
         if not url:
             return
         kind = it.get("_kind") or "live"
-        target = {"live": "live", "movie": "vod",
-                  "episode": "series"}.get(kind)
-        if target and w.mode != target:
-            w.switch_mode(target)
-        if kind == "episode" and it.get("_series_ctx") is None:
-            kind = "movie"   # no series context to autoplay-next; just play it
+        ctx = it.get("_series_ctx") or {}
+        if kind == "episode" and ctx.get("series_id") is None:
+            # An old entry recorded before the series snapshot existed: no
+            # context to resume/drill with, so it can only replay as a movie.
+            kind = "movie"
+        if kind == "episode":
+            # Same landing as a continue-watching card: play as an EPISODE
+            # (so the resume prompt finds its saved position) and drill the
+            # middle column into the series' episode list with this episode
+            # selected - the drill rides the async category load, a plain
+            # switch_mode landed on "all series".
+            w._pending_jump_key = it.get("_key")
+            QTimer.singleShot(8000, w._clear_pending_jump)
+            if w.mode != "series":
+                w._pending_series_drill = ctx
+                w.switch_mode("series")
+            else:
+                w._enter_series(ctx)
+        else:
+            target = {"live": "live", "movie": "vod"}.get(kind)
+            if target and w.mode != target:
+                w.switch_mode(target)
         try:
             w._current_key = it.get("_key")
             w._show_detail(it)   # panel follows this row, not the last selection

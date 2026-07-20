@@ -976,6 +976,7 @@ class _SettingsMixin:
         for skey, slabel in (("home_sh_resume", "home_resume"),
                              ("home_sh_fav", "home_fav_now"),
                              ("home_sh_history", "home_recent"),
+                             ("home_sh_watchlist", "nav_watchlist"),
                              ("home_sh_movies", "home_new_movies"),
                              ("home_sh_series", "home_new_series"),
                              ("home_sh_channels", "home_new_channels")):

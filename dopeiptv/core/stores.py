@@ -208,8 +208,12 @@ class HistoryStore:
             key: str, kind: str, extra: dict | None = None) -> None:
         if not url:
             return
+        # str() both sides: providers mix int and str ids, and a key that
+        # round-tripped through JSON elsewhere may come back the other type -
+        # a raw == then missed and the same title stacked up as duplicates.
         self.entries = [e for e in self.entries
-                        if not (e.get("_key") == key and e.get("_kind") == kind)]
+                        if not (str(e.get("_key")) == str(key)
+                                and e.get("_kind") == kind)]
         entry = {
             "name": title, "stream_icon": icon_url,
             "_url": url, "_key": key, "_kind": kind,

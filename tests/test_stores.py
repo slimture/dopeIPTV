@@ -189,3 +189,28 @@ def test_history_store_dedup():
     hist.add("http://example.com/1", "CNN", None, "k1", "live")
     hist.add("http://example.com/1", "CNN", None, "k1", "live")
     assert len(hist.entries) == 1
+
+
+def test_history_store_dedup_survives_key_type_mismatch():
+    # Providers mix int and str ids (and a key that round-tripped through
+    # JSON can flip type) - the same episode must never stack up twice.
+    s = _mock_settings()
+    hist = HistoryStore(s)
+    hist.add("http://x/series/5.mp4", "Ep", None, 5, "episode")
+    hist.add("http://x/series/5.mp4", "Ep", None, "5", "episode")
+    assert len(hist.entries) == 1
+
+
+def test_history_store_keeps_series_context_extra():
+    # The episode's series snapshot rides along via extra, and a name
+    # override there replaces the bare "S01 E01" with "Series · S01 E01".
+    s = _mock_settings()
+    hist = HistoryStore(s)
+    hist.add("http://x/series/5.mp4", "S1 * E1 - Pilot", None, 5, "episode",
+             extra={"_series_ctx": {"series_id": 88, "name": "Severance"},
+                    "_series_title": "Severance",
+                    "name": "Severance · S1 * E1 - Pilot"})
+    e = hist.entries[0]
+    assert e["_series_ctx"]["series_id"] == 88
+    assert e["_series_title"] == "Severance"
+    assert e["name"] == "Severance · S1 * E1 - Pilot"
