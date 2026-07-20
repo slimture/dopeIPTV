@@ -190,6 +190,14 @@ class _SidebarMixin:
         # it left the strip in the wrong form; _leave_home recomputes later.
         if not self._mid.isVisible():
             return
+        # Muted during a fullscreen exit: the pane is shown again BEFORE the
+        # deferred splitter-size restore, so its width is transiently tiny and
+        # the strip flipped to the glyph form - and setSizes() doesn't emit
+        # splitterMoved, so nothing flipped it back ("after fullscreen the
+        # middle column turns into icons"). _end_fs_exit recomputes from the
+        # restored geometry instead.
+        if getattr(self, "_fs_exiting", False):
+            return
         w = self._mid.width()
         # Hysteresis: enter compact under 400, leave only above 430, so the
         # strip doesn't flip between icons and captions right at the line.
@@ -263,6 +271,9 @@ class _SidebarMixin:
         self._fs_exiting = False
         if hasattr(self, "_det"):
             self._last_narrow = self._sidebar_narrow()
+        # Recompute the middle strip's compact/full form from the restored
+        # pane width (its updates were muted during the transition).
+        self._update_mid_compact()
 
     def _maybe_auto_collapse_sidebar(self) -> None:
         """Collapse the sidebar to the icon rail automatically when the whole
