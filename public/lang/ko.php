@@ -1,0 +1,123 @@
+<?php
+/**
+ * 한국어 (ko) — iptv.dope.rs의 전체 번역. 고유명사와 기술 용어(Xtream Codes,
+ * M3U, AppImage, mpv, GitHub …)는 영어로 유지합니다. 문자열 내 HTML 속성은
+ * 작은따옴표를 사용하여 값이 큰따옴표 PHP 문자열로 유지되도록 합니다.
+ */
+return [
+    // <head>
+    "meta_title"   => "dopeIPTV — EPG, 타임시프트, 녹화, 멀티뷰를 갖춘 Linux용 IPTV 플레이어",
+    "meta_desc"    => "dopeIPTV는 Xtream Codes 및 M3U를 위한 빠르고 오픈 소스인 데스크톱 IPTV 플레이어로, 전체 EPG 가이드, 라이브 타임시프트, catch-up TV, 녹화, 멀티뷰를 제공하여 최대 9개 채널을 동시에 시청할 수 있습니다. Linux용으로 제작되었으며 macOS와 Windows에서도 작동합니다.",
+    "meta_keywords"=> "IPTV 플레이어, Linux IPTV 플레이어, Xtream Codes, M3U, EPG, XMLTV, 타임시프트, catch-up TV, IPTV 녹화, IPTV 멀티뷰, 여러 채널 시청, 멀티스크린 IPTV, IPTV Linux, IPTV macOS, IPTV Windows, dopeIPTV",
+
+    // header nav
+    "nav_features"    => "기능",
+    "nav_screenshots" => "스크린샷",
+    "nav_download"    => "다운로드",
+    "nav_github"      => "GitHub",
+    "nav_download_btn"=> "다운로드",
+
+    // hero
+    "hero_eyebrow" => "방송 중 · 버전",
+    "hero_h1"      => "라이브 TV, catch-up, 녹화를 하나의 <span class='hl'>네이티브 데스크톱</span> 앱에서.",
+    "hero_lede"    => "Xtream Codes &amp; M3U를 위한 빠르고 현대적인 IPTV 플레이어 — 전체 EPG 가이드, 라이브 타임시프트와 catch-up, 원클릭 녹화, 최대 9개 채널 동시 멀티뷰를 제공합니다. mpv 기반으로 Linux용으로 제작되었으며 macOS &amp; Windows에서도 실행됩니다.",
+    "hero_cta"     => "내 시스템용 다운로드",
+    "hero_source"  => "소스 보기",
+    "hero_free"    => "무료 &amp; 오픈 소스",
+
+    // feature strip chips
+    "chip_timeshift" => "타임시프트 / catch-up",
+    "chip_languages" => "8개 언어",
+
+    // features
+    "feat_eyebrow" => "모든 것을 한 화면에",
+    "feat_h2"      => "사람들이 실제로 TV를 보는 방식에 맞춰 만들었습니다.",
+    "feat_intro"   => "용도를 바꾼 미디어 라이브러리가 아니라 — 타임라인, 가이드, 녹화기가 기대하는 자리에 있는 TV 클라이언트입니다.",
+    "feat_c1_h" => "타임시프트 &amp; catch-up",
+    "feat_c1_p" => "라이브 타임라인에서 채널 아카이브로 되감거나, 가이드에서 지난 방송으로 바로 이동하세요.",
+    "feat_mv_h" => "멀티뷰",
+    "feat_mv_p" => "그리드에서 최대 9개의 라이브 채널을 동시에 시청 — 서로 다른 재생목록을 섞고, 오디오는 하나를 클릭해 선택하며, 창마다 타임시프트와 자막을 지원합니다.",
+    "feat_c2_h" => "라이브 TV 일시정지",
+    "feat_c2_p" => "라이브 뒤에서 DVR 방식으로 일시정지 및 재개 — 플레이어가 얼마나 뒤처졌는지 정확히 표시합니다.",
+    "feat_c3_h" => "전체 EPG 가이드",
+    "feat_c3_p" => "검색, 알림, 다음에 방송될 내용의 구성 가능한 목록을 갖춘 진짜 편성표.",
+    "feat_c4_h" => "원클릭 녹화",
+    "feat_c4_p" => "시청 중인 스트림을 단일 연결로 녹화 — 타이머, 용량 제한, 녹화 라이브러리 포함.",
+    "feat_c5_h" => "다중 공급자",
+    "feat_c5_p" => "여러 Xtream 또는 M3U 재생목록을 나란히, 각각 자체 EPG, 자동 새로 고침, 사용자 지정 가이드 URL과 함께.",
+    "feat_c6_h" => "부드러운 재생",
+    "feat_c6_p" => "Chromecast, Trakt 동기화, 테마, 전체 키보드 제어를 지원하는 내장 mpv 엔진.",
+
+    // screenshots
+    "shots_eyebrow" => "내부 들여다보기",
+    "shots_h2"      => "깔끔하고, 어둡고, 방해되지 않게.",
+    "shot_ph"       => "스크린샷",
+    "shot_main_alt" => "채널 목록, 가이드, 비디오가 있는 dopeIPTV 메인 창",
+    "shot_main_t"   => "채널 &amp; 플레이어",
+    "shot_main_c"   => "목록, 가이드, 비디오를 하나의 레이아웃에.",
+    "shot_epg_alt"  => "dopeIPTV EPG 편성표 그리드",
+    "shot_epg_t"    => "편성표",
+    "shot_epg_c"    => "catch-up 표시가 있는 그리드 보기.",
+    "shot_ts_alt"   => "채널 아카이브를 탐색하는 dopeIPTV 타임시프트 타임라인",
+    "shot_ts_t"     => "타임시프트 타임라인",
+    "shot_ts_c"     => "아카이브를 탐색하세요. 라이브 경계 표시됨.",
+    "shot_rec_alt"  => "타이머가 있는 dopeIPTV 녹화 라이브러리",
+    "shot_rec_t"    => "녹화",
+    "shot_rec_c"    => "타이머, 저장 용량 제한, 재생.",
+
+    // download
+    "dl_eyebrow" => "dopeIPTV 받기",
+    "dl_h2"      => "최신 버전을 다운로드하세요.",
+    "dl_latest"  => "최신",
+    "os_help_linux"   => "잘 모르겠나요? <b>AppImage</b>를 받으세요 — 설치 없이 어떤 배포판에서도 실행됩니다. Debian/Ubuntu에서는 <b>.deb</b>를 선택하세요. ARM 머신(Raspberry Pi, ARM 서버)이 아니라면 <b>Intel / AMD</b>를 받으세요.",
+    "os_help_macos"   => "하나의 이미지가 Apple Silicon(M 시리즈)과 Intel Mac 모두에서 작동합니다.",
+    "os_help_windows" => "포터블 빌드 — 압축을 풀고 실행하면 되며 설치할 것이 없습니다. 가장 새로운 플랫폼으로 아직 다듬는 중입니다.",
+    "os_install_linux"   => "🐧 <b>AppImage:</b> 실행 권한을 부여하고 실행하세요 — 설치할 것이 없습니다: <code>chmod +x dopeIPTV-*.AppImage &amp;&amp; ./dopeIPTV-*.AppImage</code>. <b>.deb</b>(Debian/Ubuntu): <code>sudo apt install ./dopeIPTV-*.deb</code>. <b>.rpm</b>(Fedora/RHEL): <code>sudo dnf install ./dopeIPTV-*.rpm</code>.",
+    "os_install_macos"   => "🍎 <code>.dmg</code>를 열고 dopeIPTV를 응용 프로그램으로 드래그하세요. 앱이 아직 Apple의 공증(notarized)을 받지 않아 첫 실행이 차단될 수 있습니다 — <b>앱을 마우스 오른쪽 클릭 → 열기</b>, 그런 다음 대화상자에서 <b>열기</b>(또는 <b>시스템 설정 → 개인 정보 보호 및 보안 → 그래도 열기</b>에서 허용). 대신 macOS가 앱이 <b>“손상됨”(damaged)</b>이라고 하면 터미널에서 다운로드 표시를 제거하세요: <code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code>. 안전합니다 — 이 경고는 빌드에 서명이 없다는 뜻일 뿐입니다.",
+    "os_install_windows" => "🪟 폴더의 압축을 풀고 <code>dopeiptv.exe</code>를 실행하세요. 앱이 아직 서명되지 않아 SmartScreen이 <b>“Windows의 PC 보호”</b>를 표시할 수 있습니다 — <b>추가 정보 → 실행</b>을 클릭하세요. 경고일 뿐이며 아무것도 차단하거나 제거하지 않습니다.",
+    "arch_apple"     => "Apple Silicon & Intel",
+    "arch_x86"       => "Intel / AMD (64비트)",
+    "arch_arm"       => "ARM (64비트)",
+    "arch_universal" => "유니버설",
+    "dl_t_dmg"      => "macOS 디스크 이미지",
+    "dl_f_dmg"      => ".dmg — 응용 프로그램으로 드래그",
+    "dl_t_pkg"      => "macOS 설치 프로그램",
+    "dl_f_pkg"      => ".pkg",
+    "dl_t_exe"      => "Windows 설치 프로그램",
+    "dl_f_exe"      => ".exe",
+    "dl_t_winzip"   => "Windows 포터블",
+    "dl_f_winzip"   => ".zip — 압축 풀고 실행, 설치 불필요",
+    "dl_t_appimage" => "AppImage",
+    "dl_f_appimage" => "모든 배포판에서 실행 — 설치 불필요",
+    "dl_t_deb"      => ".deb 패키지",
+    "dl_f_deb"      => "Debian / Ubuntu용",
+    "dl_t_rpm"      => ".rpm 패키지",
+    "dl_f_rpm"      => "Fedora / RHEL용",
+    "dl_t_flatpak"  => "Flatpak",
+    "dl_f_flatpak"  => "모든 배포판",
+    "dl_recommended"=> "권장",
+    "dl_go"         => "다운로드 →",
+    "dl_all_name"   => "GitHub의 모든 패키지",
+    "dl_all_sub"    => "최신 릴리스",
+    "dl_open"       => "열기 →",
+    "note_generated" => "↻ 서버에서 <code>slimture/dopeIPTV</code>의 GitHub 릴리스로부터 생성 — 새 빌드가 자동으로 나타납니다.",
+    "note_verify"    => "🔒 다운로드를 검증하세요 — <a class='verify-link' href='/files/SHA256SUMS'>SHA-256 체크섬</a> · <code>sha256sum -c SHA256SUMS</code>",
+
+    // credits
+    "cred_eyebrow" => "오픈 소스",
+    "cred_h2"      => "거인의 어깨 위에 선 자유 소프트웨어.",
+    "cred_intro"   => "dopeIPTV는 GPL-3.0 라이선스 하의 <b>자유롭고 오픈 소스인</b> 소프트웨어입니다 — 광고 없음, 추적 없음, 계정 없음. 다음 프로젝트와 서비스로 만들어졌으며 이들에게 감사합니다:",
+    "cred_playback"      => "재생",
+    "cred_interface"     => "인터페이스",
+    "cred_casting"       => "캐스팅",
+    "cred_metadata"      => "메타데이터 &amp; 아트워크",
+    "cred_watched"       => "시청 기록 동기화",
+    "cred_licences"      => "라이선스",
+    "cred_licences_link" => "GPL-3.0 &amp; 서드파티",
+    "disclaimer" => "이 제품은 TMDB API를 사용하지만 TMDB의 보증이나 인증을 받지 않았습니다. 이 제품은 Trakt API를 사용하지만 Trakt의 보증이나 인증을 받지 않았습니다. 모든 상표는 해당 소유자의 재산입니다.",
+
+    // footer
+    "footer_releases" => "릴리스",
+    "footer_docs"     => "문서",
+    "lang_label"      => "언어",
+];

@@ -13,11 +13,16 @@ const I18N_DEFAULT = 'en';
 // Native names, shown in the switcher (also the display order).
 const I18N_NAMES = [
     'en' => 'English',    'sv' => 'Svenska',   'es' => 'Español',
-    'de' => 'Deutsch',    'fr' => 'Français',  'pt' => 'Português (BR)',
-    'it' => 'Italiano',   'tr' => 'Türkçe',    'pl' => 'Polski',
-    'el' => 'Ελληνικά',   'id' => 'Bahasa Indonesia',
-    'ru' => 'Русский',    'zh' => '中文',
-    'ar' => 'العربية',    'fa' => 'فارسی',     'th' => 'ไทย',
+    'de' => 'Deutsch',    'nl' => 'Nederlands','fr' => 'Français',
+    'it' => 'Italiano',   'pt' => 'Português (BR)',
+    'pl' => 'Polski',     'hr' => 'Hrvatski',  'sr' => 'Srpski',
+    'el' => 'Ελληνικά',   'tr' => 'Türkçe',    'uk' => 'Українська',
+    'ru' => 'Русский',
+    'hi' => 'हिन्दी',       'zh' => '中文',       'ja' => '日本語',
+    'ko' => '한국어',      'vi' => 'Tiếng Việt','id' => 'Bahasa Indonesia',
+    'th' => 'ไทย',        'sw' => 'Kiswahili',
+    'he' => 'עברית',      'ar' => 'العربية',   'fa' => 'فارسی',
+    'ur' => 'اردو',
 ];
 
 // Right-to-left languages mirror the whole page.
@@ -26,9 +31,12 @@ const I18N_RTL = ['ar', 'fa', 'he', 'ur'];
 // og:locale / <html lang> region hints.
 const I18N_LOCALE = [
     'en' => 'en_US', 'sv' => 'sv_SE', 'es' => 'es_ES', 'de' => 'de_DE',
-    'fr' => 'fr_FR', 'pt' => 'pt_BR', 'it' => 'it_IT', 'tr' => 'tr_TR',
-    'pl' => 'pl_PL', 'el' => 'el_GR', 'id' => 'id_ID', 'ru' => 'ru_RU',
-    'zh' => 'zh_CN', 'ar' => 'ar_AR', 'fa' => 'fa_IR', 'th' => 'th_TH',
+    'nl' => 'nl_NL', 'fr' => 'fr_FR', 'it' => 'it_IT', 'pt' => 'pt_BR',
+    'pl' => 'pl_PL', 'hr' => 'hr_HR', 'sr' => 'sr_RS', 'el' => 'el_GR',
+    'tr' => 'tr_TR', 'uk' => 'uk_UA', 'ru' => 'ru_RU', 'hi' => 'hi_IN',
+    'zh' => 'zh_CN', 'ja' => 'ja_JP', 'ko' => 'ko_KR', 'vi' => 'vi_VN',
+    'id' => 'id_ID', 'th' => 'th_TH', 'sw' => 'sw_KE', 'he' => 'he_IL',
+    'ar' => 'ar_AR', 'fa' => 'fa_IR', 'ur' => 'ur_PK',
 ];
 
 if (!function_exists('h')) {
