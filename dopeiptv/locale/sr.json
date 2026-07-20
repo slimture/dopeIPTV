@@ -748,7 +748,6 @@
  "rec_total_label": "Ukupno ograničenje fascikle snimaka",
  "rec_cap_title": "Dostignuto ograničenje skladišta",
  "rec_cap_reached": "Nije moguće započeti novo snimanje: fascikla snimaka je na vašem ograničenju ({used} od {cap}). Obrišite neke snimke ili povećajte ograničenje u Podešavanjima.",
- "settings_reset_090": "Veće ažuriranje vratilo je podešavanja aplikacije na nove podrazumevane vrednosti. Vaše plejliste, omiljeno, istorija, podsetnici, snimci i Trakt nalog su sačuvani.",
  "settings_reset_all": "Poništi sva podešavanja…",
  "settings_reset_confirm_1": "Ovo će izbrisati sve dopeIPTV podešavanja na ovom računaru: vaše plejliste, favorite, istoriju, temu, pozicije nastavljanja, PIN, Trakt/TMDB ključeve i raspored panela.\n\nNastaviti?",
  "settings_reset_confirm_2": "Da li ste zaista sigurni? Ovo se ne može poništiti.",

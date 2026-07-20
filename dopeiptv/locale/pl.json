@@ -748,7 +748,6 @@
   "rec_total_label": "Łączny limit folderu nagrań",
   "rec_cap_title": "Osiągnięto limit pamięci",
   "rec_cap_reached": "Nie można rozpocząć nowego nagrania: folder nagrań jest na Twoim limicie ({used} z {cap}). Usuń część nagrań lub zwiększ limit w Ustawieniach.",
-  "settings_reset_090": "Duża aktualizacja przywróciła preferencje aplikacji do nowych ustawień domyślnych. Twoje playlisty, ulubione, historia, przypomnienia, nagrania i konto Trakt zostały zachowane.",
   "settings_reset_all": "Resetuj wszystkie ustawienia…",
   "settings_reset_confirm_1": "To usunie wszystkie preferencje dopeIPTV na tym komputerze: playlisty, ulubione, historię, motyw, pozycje wznawiania, PIN, klucze Trakt/TMDB i układ paneli.\n\nKontynuować?",
   "settings_reset_confirm_2": "Czy na pewno? Tego nie można cofnąć.",

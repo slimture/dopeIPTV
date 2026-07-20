@@ -748,7 +748,6 @@
   "rec_total_label": "Limite totale du dossier d'enregistrements",
   "rec_cap_title": "Limite de stockage atteinte",
   "rec_cap_reached": "Impossible de démarrer un enregistrement : le dossier a atteint votre limite ({used} sur {cap}). Supprimez des enregistrements ou augmentez la limite dans les Réglages.",
-  "settings_reset_090": "Une mise à jour majeure a réinitialisé les préférences de l'application aux nouvelles valeurs par défaut. Vos playlists, favoris, historique, rappels, enregistrements et compte Trakt ont été conservés.",
   "settings_reset_all": "Réinitialiser tous les paramètres…",
   "settings_reset_confirm_1": "Cela effacera toutes les préférences dopeIPTV sur cet ordinateur : listes, favoris, historique, thème, positions de reprise, PIN, clés Trakt/TMDB et disposition des panneaux.\n\nContinuer ?",
   "settings_reset_confirm_2": "Êtes-vous vraiment sûr ? Cette action est irréversible.",

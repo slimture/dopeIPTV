@@ -165,54 +165,6 @@ def _install_crash_hooks() -> None:
             pass
 
 
-# One-time settings migration. Bumped to 2 for 0.9.0: so much of the UI and
-# behaviour changed since 0.8.x that stale stored settings (layout geometry,
-# view modes, tuned timeouts, old flags) caused more confusion than they
-# saved - upgrading resets them ONCE to the new defaults. Everything that is
-# user DATA rather than a preference survives via the keep-list below.
-_SETTINGS_VERSION = 2
-
-_RESET_KEEP_PREFIXES = (
-    "playlists", "active_playlist",              # providers + credentials
-    "favorites", "movie_favorites", "series_favorites",
-    "history", "epg_reminders",
-    "trakt_",                                    # tokens + watched/watchlist
-    "parental",                                  # PIN hash + enablement
-    "category_overrides", "channel_overrides",   # renames/hides/locks/icons
-    "rec_",                                      # recording folder + limits
-    "server", "username", "password",            # legacy mirrors
-    "language", "tmdb_api_key",
-    "settings_version",
-)
-
-
-def _maybe_reset_settings(settings: QSettings) -> bool:
-    """On first launch of a build with a newer settings version, drop every
-    stored setting EXCEPT user data (playlists, favorites, history, Trakt,
-    recordings, overrides, reminders, language). Returns True when a reset
-    actually happened (existing install upgrading), False on fresh installs
-    and already-migrated installs."""
-    try:
-        stored = int(settings.value("settings_version", 0))
-    except (TypeError, ValueError):
-        stored = 0
-    if stored >= _SETTINGS_VERSION:
-        return False
-    had_settings = bool(settings.allKeys())
-    removed = 0
-    if had_settings:
-        for k in list(settings.allKeys()):
-            if not any(k.startswith(p) for p in _RESET_KEEP_PREFIXES):
-                settings.remove(k)
-                removed += 1
-    settings.setValue("settings_version", _SETTINGS_VERSION)
-    settings.sync()
-    if removed:
-        log.info("settings migration: reset %d settings for version %d "
-                 "(user data kept)", removed, _SETTINGS_VERSION)
-    return removed > 0
-
-
 def main() -> int:
     """Launch the application."""
     # PyInstaller's windowed (no-console) build - our Windows release - leaves
@@ -316,7 +268,6 @@ def main() -> int:
     app.setWindowIcon(icon)
     install_icon(icon)
     settings = QSettings(ORG, ORG)
-    settings_were_reset = _maybe_reset_settings(settings)
     from .i18n import is_rtl, set_language
     set_language(settings.value("language", "en"))
     # Right-to-left languages (Arabic, Persian) mirror the whole UI.
@@ -358,11 +309,6 @@ def main() -> int:
         w.show_welcome()
     for _ in range(5):
         app.processEvents()
-
-    if settings_were_reset:
-        from .i18n import tr
-        QTimer.singleShot(400, lambda: QMessageBox.information(
-            w, APP_NAME, tr("settings_reset_090")))
 
     if not welcome:
         import threading

@@ -932,7 +932,6 @@ _STRINGS: dict[str, dict[str, str]] = {
     "rec_cap_reached": {"en": "Can't start a new recording: the recordings folder is at your limit ({used} of {cap}). Delete some recordings or raise the limit in Settings."},
 
     # ── Settings: reset-to-defaults ───────────────────────────────────────
-    "settings_reset_090": {"en": "A major update reset your app preferences to the new defaults. Your playlists, favorites, history, reminders, recordings and Trakt account were kept."},
     "settings_reset_all": {"en": "Reset all settings…"},
     "settings_reset_confirm_1": {"en": "This will erase every dopeIPTV preference on this computer: your playlists, favorites, history, theme, resume positions, PIN, Trakt/TMDB keys and the panel layout.\n\nContinue?"},
     "settings_reset_confirm_2": {"en": "Are you really sure? This can't be undone."},

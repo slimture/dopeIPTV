@@ -748,7 +748,6 @@
   "rec_total_label": "Totale limiet opnamemap",
   "rec_cap_title": "Opslaglimiet bereikt",
   "rec_cap_reached": "Kan geen nieuwe opname starten: de opnamemap zit aan je limiet ({used} van {cap}). Verwijder enkele opnames of verhoog de limiet in Instellingen.",
-  "settings_reset_090": "Een grote update heeft de app-voorkeuren teruggezet naar de nieuwe standaardwaarden. Je afspeellijsten, favorieten, geschiedenis, herinneringen, opnames en Trakt-account zijn behouden.",
   "settings_reset_all": "Alle instellingen resetten…",
   "settings_reset_confirm_1": "Dit wist elke dopeIPTV-voorkeur op deze computer: je afspeellijsten, favorieten, geschiedenis, thema, hervattingsposities, pincode, Trakt/TMDB-sleutels en de paneelindeling.\n\nDoorgaan?",
   "settings_reset_confirm_2": "Weet je het echt zeker? Dit kan niet ongedaan worden gemaakt.",

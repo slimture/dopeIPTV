@@ -748,7 +748,6 @@
   "rec_total_label": "Limite totale della cartella registrazioni",
   "rec_cap_title": "Limite di spazio raggiunto",
   "rec_cap_reached": "Impossibile avviare una nuova registrazione: la cartella delle registrazioni è al limite ({used} di {cap}). Elimina alcune registrazioni o aumenta il limite nelle Impostazioni.",
-  "settings_reset_090": "Un aggiornamento importante ha ripristinato le preferenze dell'app ai nuovi valori predefiniti. Le tue playlist, i preferiti, la cronologia, i promemoria, le registrazioni e l'account Trakt sono stati mantenuti.",
   "settings_reset_all": "Reimposta tutte le impostazioni…",
   "settings_reset_confirm_1": "Questo cancellerà ogni preferenza di dopeIPTV su questo computer: le tue playlist, i preferiti, la cronologia, il tema, le posizioni di ripresa, il PIN, le chiavi Trakt/TMDB e la disposizione dei pannelli.\n\nContinuare?",
   "settings_reset_confirm_2": "Sei davvero sicuro? Questo non può essere annullato.",

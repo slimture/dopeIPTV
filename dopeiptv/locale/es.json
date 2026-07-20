@@ -748,7 +748,6 @@
   "rec_total_label": "Límite total de la carpeta de grabaciones",
   "rec_cap_title": "Límite de almacenamiento alcanzado",
   "rec_cap_reached": "No se puede iniciar una grabación: la carpeta está en tu límite ({used} de {cap}). Borra grabaciones o sube el límite en Ajustes.",
-  "settings_reset_090": "Una actualización importante restableció las preferencias de la aplicación a los nuevos valores predeterminados. Se conservaron tus listas de reproducción, favoritos, historial, recordatorios, grabaciones y cuenta de Trakt.",
   "settings_reset_all": "Restablecer todos los ajustes…",
   "settings_reset_confirm_1": "Esto borrará todas las preferencias de dopeIPTV en este equipo: tus listas, favoritos, historial, tema, posiciones de reanudación, PIN y claves de Trakt/TMDB, y el diseño de paneles.\n\n¿Continuar?",
   "settings_reset_confirm_2": "¿Estás realmente seguro? Esto no se puede deshacer.",

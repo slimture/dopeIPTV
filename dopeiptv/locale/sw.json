@@ -748,7 +748,6 @@
  "rec_total_label": "Kikomo cha jumla cha folda ya rekodi",
  "rec_cap_title": "Kikomo cha hifadhi kimefikiwa",
  "rec_cap_reached": "Haiwezi kuanza rekodi mpya: folda ya rekodi iko kwenye kikomo chako ({used} kati ya {cap}). Futa baadhi ya rekodi au ongeza kikomo katika Mipangilio.",
- "settings_reset_090": "Sasisho kubwa lilirejesha mapendeleo ya programu kuwa chaguo-msingi mpya. Orodha zako za kucheza, vipendwa, historia, vikumbusho, rekodi na akaunti ya Trakt vilihifadhiwa.",
  "settings_reset_all": "Weka upya mipangilio yote…",
  "settings_reset_confirm_1": "Hii itafuta kila mapendeleo ya dopeIPTV kwenye kompyuta hii: orodha zako za kucheza, vipendwa, historia, mandhari, nafasi za kuendelea, PIN, funguo za Trakt/TMDB na mpangilio wa paneli.\n\nEndelea?",
  "settings_reset_confirm_2": "Una uhakika kweli? Hii haiwezi kutenduliwa.",

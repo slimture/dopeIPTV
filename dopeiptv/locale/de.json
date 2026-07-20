@@ -748,7 +748,6 @@
   "rec_total_label": "Gesamtlimit des Aufnahmeordners",
   "rec_cap_title": "Speicherlimit erreicht",
   "rec_cap_reached": "Neue Aufnahme nicht möglich: der Ordner hat dein Limit erreicht ({used} von {cap}). Lösche Aufnahmen oder erhöhe das Limit in den Einstellungen.",
-  "settings_reset_090": "Ein größeres Update hat die App-Einstellungen auf die neuen Standardwerte zurückgesetzt. Deine Playlists, Favoriten, der Verlauf, Erinnerungen, Aufnahmen und dein Trakt-Konto wurden beibehalten.",
   "settings_reset_all": "Alle Einstellungen zurücksetzen…",
   "settings_reset_confirm_1": "Dies löscht alle dopeIPTV-Einstellungen auf diesem Rechner: Playlists, Favoriten, Verlauf, Design, Fortsetzungspositionen, PIN, Trakt-/TMDB-Schlüssel und das Panel-Layout.\n\nFortfahren?",
   "settings_reset_confirm_2": "Bist du wirklich sicher? Das lässt sich nicht rückgängig machen.",

@@ -748,7 +748,6 @@
   "rec_total_label": "录制文件夹总容量上限",
   "rec_cap_title": "已达存储上限",
   "rec_cap_reached": "无法开始新录制：录制文件夹已达上限（{used} / {cap}）。请删除部分录制或在设置中提高上限。",
-  "settings_reset_090": "一次重大更新将应用偏好设置重置为新的默认值。您的播放列表、收藏、历史记录、提醒、录制和 Trakt 账户均已保留。",
   "settings_reset_all": "重置所有设置……",
   "settings_reset_confirm_1": "这将删除这台计算机上的所有 dopeIPTV 设置：播放列表、收藏、历史、主题、续播位置、PIN、Trakt/TMDB 密钥和面板布局。\n\n继续吗？",
   "settings_reset_confirm_2": "你真的确定吗？此操作无法撤销。",

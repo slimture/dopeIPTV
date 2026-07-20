@@ -748,7 +748,6 @@
   "rec_total_label": "Total gräns för inspelningsmappen",
   "rec_cap_title": "Lagringsgräns nådd",
   "rec_cap_reached": "Kan inte starta en ny inspelning: inspelningsmappen har nått din gräns ({used} av {cap}). Radera några inspelningar eller höj gränsen i Inställningar.",
-  "settings_reset_090": "En större uppdatering återställde appens inställningar till de nya standardvärdena. Dina spellistor, favoriter, historik, påminnelser, inspelningar och Trakt-konto behölls.",
   "settings_reset_all": "Återställ alla inställningar…",
   "settings_reset_confirm_1": "Detta raderar alla dopeIPTV-inställningar på den här datorn: dina spellistor, favoriter, historik, tema, återupptagnings-positioner, PIN, Trakt/TMDB-nycklar och panellayouten.\n\nFortsätt?",
   "settings_reset_confirm_2": "Är du verkligen säker? Detta kan inte ångras.",
