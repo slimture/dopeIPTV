@@ -825,15 +825,6 @@ class EmbeddedPlayer(QWidget):
         self._fs_ui = False
         self._popout_mode = False
         self._popout_drag_from = None
-        # Drives the "paint black through the fullscreen-exit resize" mitigation
-        # (macOS): armed on exit, restarted on every resize while the window
-        # animates back, and fires shortly after the LAST resize so the black
-        # lasts exactly the resize and no longer.
-        self._fs_exit_blanking = False
-        self._fs_exit_timer = QTimer(self)
-        self._fs_exit_timer.setSingleShot(True)
-        self._fs_exit_timer.setInterval(60)
-        self._fs_exit_timer.timeout.connect(self._unblank_after_fs_exit)
         self._popout_autohide = False
         self._popout_bar_timer = QTimer(self)
         self._popout_bar_timer.setSingleShot(True)
@@ -1846,28 +1837,6 @@ class EmbeddedPlayer(QWidget):
             self._lock_video_box()
             QTimer.singleShot(0, self._lock_video_box)
 
-    def arm_fs_exit_blank(self) -> None:
-        """macOS: paint the video black and force it out NOW, then track the
-        window resize. Called by the main window BEFORE it leaves fullscreen so
-        the OS captures a black frame for its resize animation instead of the
-        last video frame (which it scales -> the horizontal stretch). The
-        synchronous repaint is the crucial part: set_blank alone only schedules
-        an async update that the animation can beat. mpv is untouched."""
-        if sys.platform != "darwin" or self.current_url is None:
-            return
-        self.video.set_blank(True)
-        self.video.repaint()   # black on screen before the OS grabs the layer
-        self._fs_exit_blanking = True
-        self._fs_exit_timer.start()
-
-    def _unblank_after_fs_exit(self) -> None:
-        # Fired ~60 ms after the last resize of the exit transition. Only
-        # restore the picture if we're still docked with a live stream - never
-        # un-blank a stopped video or one that re-entered fullscreen.
-        self._fs_exit_blanking = False
-        if not self._fs_ui and self.current_url is not None:
-            self.video.set_blank(False)
-
     def _hide_fs_ui(self) -> None:
         # Never take the controls and cursor away under an open menu or
         # dialog (subtitle/audio pickers, the right-click menu): the user is
@@ -1958,11 +1927,6 @@ class EmbeddedPlayer(QWidget):
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
-        # While blacked out for the fullscreen-exit transition, keep pushing the
-        # un-blank out as long as the window is still resizing; it fires once
-        # the resizes stop, so the black tracks the transition exactly.
-        if self._fs_exit_blanking:
-            self._fs_exit_timer.start()
         self._lock_video_box()
         self._relayout_controls()
         if self._blackout.isVisible():
