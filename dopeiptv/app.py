@@ -350,7 +350,7 @@ def main() -> int:
     if settings_were_reset:
         from .i18n import tr
         QTimer.singleShot(400, lambda: QMessageBox.information(
-            w, "dopeIPTV 0.9.0", tr("settings_reset_090")))
+            w, APP_NAME, tr("settings_reset_090")))
 
     if not welcome:
         import threading

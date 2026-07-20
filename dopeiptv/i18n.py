@@ -237,7 +237,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "rec_earlier": {"en": "Earlier"},
     "fav_empty_all": {"en": "No favorites yet — right-click any channel, movie or series to add one."},
     "onb_fill_all": {"en": "Please fill in server, username and password."},
-    "onb_xtream_link_hint": {"en": "Tip: paste your full Xtream link and we'll fill these in for you."},
+    "onb_xtream_link_hint": {"en": "Have an Xtream or M3U link? Paste it into the Server field below and we'll fill in the rest — or enter the details by hand."},
     "onb_add_provider": {"en": "+ Add provider"},
     "welcome_add_hint": {"en": "No provider yet — add one any time in Settings."},
     "btn_use": {"en": "Use"},
@@ -929,7 +929,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "rec_cap_reached": {"en": "Can't start a new recording: the recordings folder is at your limit ({used} of {cap}). Delete some recordings or raise the limit in Settings."},
 
     # ── Settings: reset-to-defaults ───────────────────────────────────────
-    "settings_reset_090": {"en": "Welcome to 0.9.0! Because so much changed in this release, your settings were reset to the new defaults. Your playlists, favorites, history, reminders, recordings and Trakt account were kept."},
+    "settings_reset_090": {"en": "A major update reset your app preferences to the new defaults. Your playlists, favorites, history, reminders, recordings and Trakt account were kept."},
     "settings_reset_all": {"en": "Reset all settings…"},
     "settings_reset_confirm_1": {"en": "This will erase every dopeIPTV preference on this computer: your playlists, favorites, history, theme, resume positions, PIN, Trakt/TMDB keys and the panel layout.\n\nContinue?"},
     "settings_reset_confirm_2": {"en": "Are you really sure? This can't be undone."},

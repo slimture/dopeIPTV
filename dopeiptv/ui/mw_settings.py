@@ -409,8 +409,12 @@ class _SettingsMixin:
         # Cap the popup height so a long list (the 27-language picker) becomes a
         # scrollable dropdown instead of a wall taller than the dialog that the
         # bottom entries fall off of. The theme sets `combobox-popup: 0`, which
-        # is what makes maxVisibleItems take effect under a stylesheet.
+        # is what makes maxVisibleItems take effect under a stylesheet; forcing
+        # the popup view's scrollbar to AsNeeded guarantees it appears on every
+        # platform style rather than defaulting off.
         box.setMaxVisibleItems(14)
+        box.view().setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         if sys.platform == "darwin":
             # On macOS the styled combo doesn't grow to fit its text, so the
             # closed box clips ("Playba…", "Sven…"). Size it to the widest

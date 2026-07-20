@@ -52,13 +52,13 @@ class ChannelListView(QListView):
         self.setViewportMargins(0, 0, 0, 0)
         # Smooth, pixel-granular wheel/trackpad scrolling instead of the default
         # jump-a-whole-row - reads as far snappier with thousands of rows.
+        # NB: deliberately NOT LayoutMode.Batched - batched layout re-runs its
+        # passes asynchronously as posters stream in, which made a big list
+        # blank out and jump to the bottom then back to the top mid-scroll.
+        # SinglePass (the default) with uniform item sizes lays out in one go
+        # and stays put; the real scroll win is the cached scaled artwork.
         self.setVerticalScrollMode(QListView.ScrollMode.ScrollPerPixel)
         self.setHorizontalScrollMode(QListView.ScrollMode.ScrollPerPixel)
-        # Lay a huge lineup out in background batches so populating it never
-        # blocks the UI thread for a beat; uniform item sizes (set by the
-        # window) keep the geometry cheap.
-        self.setLayoutMode(QListView.LayoutMode.Batched)
-        self.setBatchSize(200)
 
     def keyPressEvent(self, e) -> None:
         # Type a channel number to jump straight to it (classic TV zapping).

@@ -72,7 +72,12 @@ class WelcomeOverlay(QWidget):
             f"#OnbFeat {{ font-size: 12px; color: {P['muted']}; }}"
             f"#OnbErr {{ font-size: 12px; color: {P['error']}; }}"
             f"#OnbOk {{ font-size: 12px; font-weight: 700;"
-            f" color: {P.get('ok', '#3fb950')}; }}")
+            f" color: {P.get('ok', '#3fb950')}; }}"
+            # A tinted "tip" band so the paste-a-link hint is the first thing
+            # read on the connect step, clearly set apart from the fields.
+            f"#OnbTip {{ font-size: 12px; color: {P['text']};"
+            f" background: {P['input']}; border: 1px solid {P['border']};"
+            f" border-radius: 8px; padding: 8px 10px; }}")
 
         # Stretches above and below keep the card at its natural (content)
         # height, centred - without them the card stretches to fill the whole
@@ -157,6 +162,10 @@ class WelcomeOverlay(QWidget):
         lay.setSpacing(6)
         self._c_title = QLabel(tr("login_subtitle"), objectName="OnbTitle")
         self._c_title.setWordWrap(True)
+        # Prominent tip at the very top of the step: you can paste a whole
+        # provider link, or fill the fields in by hand. Shown in both modes.
+        self._c_hint = QLabel(tr("onb_xtream_link_hint"), objectName="OnbTip")
+        self._c_hint.setWordWrap(True)
 
         form = QFormLayout()
         s = self._settings
@@ -189,11 +198,6 @@ class WelcomeOverlay(QWidget):
         form.addRow(self._lbl_user, self._user)
         form.addRow(self._lbl_pw, self._pw)
 
-        # Discoverability hint that a whole Xtream link can be pasted; sits
-        # under the form in the Xtream mode and hides for M3U.
-        self._c_hint = QLabel(tr("onb_xtream_link_hint"), objectName="OnbSub")
-        self._c_hint.setWordWrap(True)
-
         self._c_err = QLabel("", objectName="OnbErr")
         self._c_err.setWordWrap(True)
         # Hidden until there is an error, so the empty line doesn't push a
@@ -210,8 +214,8 @@ class WelcomeOverlay(QWidget):
                                  "onb_feat_3", "onb_feat_4")]
 
         lay.addWidget(self._c_title)
-        lay.addLayout(form)
         lay.addWidget(self._c_hint)
+        lay.addLayout(form)
         # Connect sits directly under the Password field; the error line
         # (hidden until needed) lives just below the button.
         lay.addWidget(self._c_connect)
@@ -300,8 +304,6 @@ class WelcomeOverlay(QWidget):
             "https://example.com/playlist.m3u" if m3u else "http://server:port")
         for w in (self._lbl_user, self._user, self._lbl_pw, self._pw):
             w.setVisible(not m3u)
-        # The paste-a-link tip only applies to Xtream (M3U already is one URL).
-        self._c_hint.setVisible(not m3u)
         self._fit_card(self._stack.currentIndex())
 
     def _set_kind(self, kind: str) -> None:

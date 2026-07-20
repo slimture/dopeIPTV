@@ -49,4 +49,6 @@ def test_channel_view_uses_smooth_scroll():
 
     v = ChannelListView()
     assert v.verticalScrollMode() == QAbstractItemView.ScrollMode.ScrollPerPixel
-    assert v.layoutMode() == QListView.LayoutMode.Batched
+    # SinglePass (default), NOT Batched: batched layout blanked/jumped the list
+    # while posters streamed in mid-scroll.
+    assert v.layoutMode() == QListView.LayoutMode.SinglePass
