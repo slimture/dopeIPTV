@@ -102,6 +102,11 @@ player._settle_after_reparent()
 assert vid.mpv is sentinel_mpv, "settle must not touch mpv"
 assert vid._ctx is not None and _FakeCtx.freed is False, \
     "settle must not free/recreate the render context"
+# The macOS stale-layer cure (hide/show re-attach) is widget-only too.
+player._reattach_video_layer(force=True)
+assert vid.mpv is sentinel_mpv, "re-attach must not touch mpv"
+assert vid._ctx is not None and _FakeCtx.freed is False, \
+    "re-attach must not free/recreate the render context"
 
 # The fullscreen-transition cover (macOS animated fullscreen) is pure
 # chrome: it shows, tracks resizes, uncovers via its timers or _end_fs_cover,

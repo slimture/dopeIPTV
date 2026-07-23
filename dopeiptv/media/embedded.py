@@ -1672,10 +1672,30 @@ class EmbeddedPlayer(QWidget):
         log.info("VID settle after reparent: video=%dx%d ctx=%s "
                  "(nudging framebuffer)", sz.width(), sz.height(),
                  v._ctx is not None)
+        self._reattach_video_layer()
         if sz.isValid() and sz.height() > 1:
             v.resize(sz.width(), sz.height() - 1)
             v.resize(sz)
         v.update()
+
+    def _reattach_video_layer(self, force: bool = False) -> None:
+        """macOS: force the video widget's presentation layer to detach and
+        re-attach after a reparent. PROVEN by the video trace + screenshot:
+        with the video frozen in the pop-out, paint heartbeats kept rolling
+        (#600..#3000, state=render - ~48 s of successfully rendered frames)
+        while the screen showed an OLD frame scaled to the new geometry,
+        complete with a baked-in stale play-disc under the live one. mpv and
+        the GL side were healthy; cocoa was presenting a stale layer, and the
+        1 px resize nudge did not always make it re-attach. hide()+show()
+        does. Darwin-only: Linux recreates the GL context on reparent and
+        never presented stale."""
+        if not force and sys.platform != "darwin":
+            return
+        v = self.video
+        v.hide()
+        v.show()
+        log.info("VID layer re-attach (hide/show): video=%dx%d ctx=%s",
+                 v.width(), v.height(), v._ctx is not None)
 
     def set_popout_autohide(self, enabled: bool) -> None:
         """When on, the pop-out control bar fades after a few seconds of no
