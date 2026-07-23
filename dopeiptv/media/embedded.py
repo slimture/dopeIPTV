@@ -1700,6 +1700,18 @@ class EmbeddedPlayer(QWidget):
             v.resize(sz.width(), sz.height() - 1)
             v.resize(sz)
         v.update()
+        # The reparent leaves a STALE snapshot of the whole player composition
+        # on the new window (proven by "double stats for nerds" in the pop-out:
+        # the stale copy plus the live overlay, and the picture frozen even
+        # with no overlay at all). An async update()/resize can lose the race
+        # with that stale layer. Force the host window to rebuild its entire
+        # backing store SYNCHRONOUSLY, now - the one presentation-level lever
+        # not yet tried. macOS only; mpv is untouched.
+        if sys.platform == "darwin":
+            win = self.window()
+            if win is not None:
+                win.repaint()
+                log.info("VID host-window repaint (rebuild stale backing store)")
 
     def set_popout_autohide(self, enabled: bool) -> None:
         """When on, the pop-out control bar fades after a few seconds of no
