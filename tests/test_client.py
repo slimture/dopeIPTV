@@ -98,3 +98,33 @@ def test_detect_provider_link_embedded_url_in_query_stays_whole():
         "http://h.tv:8080/get.php?username=u&password=p"
         "&epg=http://h.tv/epg.xml"
     ) == ("xtream", "http://h.tv:8080", "u", "p")
+
+
+def test_concurrent_disk_cache_saves_do_not_race(tmp_path):
+    # Several list fetches (live/vod/series) finish near-simultaneously on
+    # the worker pool and each persists the cache. With one shared ".part"
+    # temp name, writer A's os.replace consumed the file and writer B's hit
+    # "No such file or directory" (the log spam the user reported). Unique
+    # per-thread temps must leave a valid cache file and no .part crumbs.
+    import json
+    import threading
+
+    from dopeiptv.providers.client import XtreamClient
+
+    path = tmp_path / "sub" / "lists_test.json"   # dir created on demand
+    c = XtreamClient("http://h.tv", "u", "p", cache_path=str(path))
+    c._list_cache[("live", None)] = (1.0, [{"stream_id": 1}])
+
+    def hammer():
+        for _ in range(25):
+            c._save_disk_lists()
+
+    threads = [threading.Thread(target=hammer) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    with open(path, encoding="utf-8") as fh:
+        assert json.load(fh)                       # valid, complete JSON
+    crumbs = list(path.parent.glob("*.part"))
+    assert crumbs == [], crumbs

@@ -72,14 +72,31 @@ class XtreamClient:
             return
         try:
             import json
+            import os
             with self._list_lock:
                 raw = {"\x1f".join("" if p is None else str(p) for p in k):
                        [t, data] for k, (t, data) in self._list_cache.items()}
-            tmp = f"{self._cache_path}.part"
-            with open(tmp, "w", encoding="utf-8") as fh:
-                json.dump(raw, fh)
-            import os
-            os.replace(tmp, self._cache_path)
+            d = os.path.dirname(self._cache_path)
+            if d:
+                os.makedirs(d, exist_ok=True)
+            # Unique temp per writer: several list fetches (live/vod/series)
+            # finish near-simultaneously on the worker pool and each saves
+            # the cache. With one shared ".part" name, writer A's os.replace
+            # consumed the file and writer B's replace hit "No such file or
+            # directory". Per-thread temps + atomic replace = last writer
+            # wins, no window where the real file is missing or truncated.
+            tmp = (f"{self._cache_path}.{os.getpid()}"
+                   f".{threading.get_ident()}.part")
+            try:
+                with open(tmp, "w", encoding="utf-8") as fh:
+                    json.dump(raw, fh)
+                os.replace(tmp, self._cache_path)
+            finally:
+                # Never leave a crumb if the write or replace failed.
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
         except Exception as e:
             log.warning("xtream list cache: could not write %s: %s",
                         self._cache_path, e)
