@@ -1653,44 +1653,8 @@ class EmbeddedPlayer(QWidget):
         # and re-places against the settled geometry - both directions.
         QTimer.singleShot(0, self._settle_after_reparent)
 
-    def _settle_after_reparent(self) -> None:
-        """Re-lock the video box and re-place any visible overlay against the
-        geometry once it has settled after a pop-out dock/undock reparent."""
-        self._lock_video_box()
-        if self.ts_timeline.isVisible():
-            self._place_ts_timeline()
-        if (self.seek_overlay is not None
-                and self.seek_overlay.isVisible()):
-            self._place_seek_overlay()
-        # Kick the GL widget's backing framebuffer alive. On macOS
-        # (AA_ShareOpenGLContexts) Qt PRESERVES the GL context across the
-        # reparent: aboutToBeDestroyed / initializeGL never fire and the mpv
-        # render context stays perfectly valid - but the widget's backing
-        # framebuffer/composition still belongs to the OLD window, so the
-        # screen shows a frozen frame while mpv renders (and audio plays) into
-        # the void. A window resize was the one thing that recovered it (why
-        # fullscreen "fixed" it): resizing rebuilds the backing framebuffer.
-        # Do the equivalent automatically - a 1 px resize nudge and back -
-        # so every dock/undock lands with a live picture. Pure widget
-        # geometry: mpv and the render context are never touched. (Explicitly
-        # freeing/recreating the render context here instead was actively
-        # harmful: freeing outside the right current GL context can leave
-        # libmpv's context registered, after which every re-create fails and
-        # the video is black for the session.)
-        self._recreate_video_surface()
-        v = self.video
-        sz = v.size()
-        log.info("VID settle after reparent: video=%dx%d ctx=%s "
-                 "(nudging framebuffer)", sz.width(), sz.height(),
-                 v._ctx is not None)
-        if sz.isValid() and sz.height() > 1:
-            v.resize(sz.width(), sz.height() - 1)
-            v.resize(sz)
-        v.update()
-
     def _wire_video(self, w) -> None:
-        """Connect a video widget's signals/filters to the player - used for
-        the widget built in __init__ and for every replacement surface."""
+        """Connect a video widget's signals/filters to the player."""
         w.installEventFilter(self)
         w.setMouseTracking(True)
         w.playback_error.connect(self._on_playback_error)
@@ -1701,54 +1665,61 @@ class EmbeddedPlayer(QWidget):
         w.video_key_press.connect(self._on_seek_key_press)
         w.video_key_release.connect(self._on_seek_key_release)
 
-    def _recreate_video_surface(self, force: bool = False) -> None:
-        """macOS: replace the GL video widget with a FRESH one after a
-        pop-out reparent, instead of trying to revive the old one in place.
+    def _settle_after_reparent(self) -> None:
+        """Re-lock the video box and re-place any visible overlay against the
+        geometry once it has settled after a pop-out dock/undock reparent."""
+        self._lock_video_box()
+        if self.ts_timeline.isVisible():
+            self._place_ts_timeline()
+        if (self.seek_overlay is not None
+                and self.seek_overlay.isVisible()):
+            self._place_seek_overlay()
+        self._nudge_host_window()
 
-        The evidence ladder that leads here: with the video frozen in the
-        pop-out, paint heartbeats kept rolling (state=render, no GL errors)
-        while the screen showed an old frame scaled to the new geometry -
-        cocoa presenting a stale layer for the reparented QOpenGLWidget.
-        Neither a 1 px resize nudge nor a hide()/show() re-attach revived it
-        (and the re-attach could stack the video layer over the sibling
-        overlays - the "seek bar randomly missing" report). A brand-new
-        widget gets a brand-new native view, layer and framebuffer, so there
-        is nothing left to BE stale, deterministically.
+    def _nudge_host_window(self) -> None:
+        """macOS: force the TOP-LEVEL WINDOW to recomposite the reparented
+        video layer.
 
-        The mpv instance is borrowed across (the stream and audio are never
-        touched); paintGL's self-heal builds the render context against the
-        new widget's GL context on its first paint. Darwin-only: Linux
-        recreates the GL context on reparent and never presented stale."""
-        if not force and sys.platform != "darwin":
+        Everything the video trace showed: after a pop-out reparent the
+        QOpenGLWidget KEEPS its GL context and keeps rendering (state=render,
+        no errors) while cocoa presents a STALE layer - a frozen old frame
+        scaled to the new size. The only thing the user ever found that
+        recovered it was entering fullscreen, i.e. resizing the WINDOW.
+        Everything I tried at the WIDGET level failed the same way:
+
+          - a 1 px WIDGET resize (resizeGL fired, still stale),
+          - a hide()/show() re-attach (still stale, and it stacked the video
+            layer over the sibling overlays - the "seek bar/overlay randomly
+            missing" report),
+          - swapping in a whole fresh widget (went BLACK - recreating the mpv
+            render context mid-stream drops the live frame).
+
+        So do exactly, and only, what the working recovery does: nudge the
+        host window's height by 1 px and back. mpv, the GL context and the
+        render context are never touched - no black, no lost frame - and the
+        widget is not reparented or recreated, so the overlays stay put.
+        Skipped when the window is maximized/fullscreen (already composited
+        correctly, and a resize would drop those states)."""
+        if sys.platform != "darwin":
             return
-        old = self.video
-        mpv = old.mpv
-        old._free_render_context("surface swap")
-        old.mpv = None            # the old widget's teardown must not touch mpv
-        new = _MpvGLWidget(self)
-        new.hwdec_pref = getattr(old, "hwdec_pref", None)
-        new.mpv = mpv
-        new._blank = old._blank
-        self._wire_video(new)
-        lay = self.layout()
-        idx = lay.indexOf(old)
-        lay.insertWidget(idx, new, 1)
-        lay.removeWidget(old)
-        # The overlays that live INSIDE the video widget move to the new one
-        # (setParent hides them; restore what was showing).
-        for w in (self._blackout, self._stats_overlay):
-            was = not w.isHidden()
-            w.setParent(new)
-            if was:
-                w.setGeometry(new.rect())
-                w.show()
-        old.hide()
-        old.setParent(None)
-        old.deleteLater()
-        self.video = new
-        new.show()
-        new.update()      # first paint self-heals the render context
-        log.info("VID video surface recreated (fresh widget, mpv borrowed)")
+        win = self.window()
+        if win is None or win.isFullScreen() or win.isMaximized():
+            self.video.update()
+            return
+        g = win.geometry()
+        log.info("VID host-window nudge %dx%d (recomposite reparented layer)",
+                 g.width(), g.height())
+        win.resize(g.width(), g.height() + 1)
+
+        def _restore(w=win, gg=g):
+            try:
+                w.resize(gg.width(), gg.height())
+                self.video.update()
+            except RuntimeError:
+                pass
+        # Let the +1 take effect (the compositor recomposites) before
+        # restoring, so the round-trip actually forces a new layer.
+        QTimer.singleShot(0, _restore)
 
     def set_popout_autohide(self, enabled: bool) -> None:
         """When on, the pop-out control bar fades after a few seconds of no
