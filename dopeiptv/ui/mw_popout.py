@@ -130,7 +130,14 @@ class _PopoutMixin:
         win.setWindowFlags(self._popout_flags())
         mirror = self.player.start_mirror(win)
         self._popout_mirror = mirror
-        win.layout().addWidget(mirror)
+        win.layout().addWidget(mirror, 1)
+        # Bring the player's real control bar into the pop-out below the video
+        # (it's a plain widget row - safe to reparent, unlike the GL surface).
+        # Its buttons act on the shared stream; pop-out ⧉ docks back and ⛶
+        # already routes to the pop-out's own fullscreen when _popout_win is
+        # set, so nothing needs rewiring.
+        win.layout().addWidget(self.player.bar)
+        self.player.bar.show()
         mirror.video_dbl_click.connect(self._on_mirror_dbl_click)
         mirror.video_mouse_press.connect(self._on_mirror_press)
         mirror.video_mouse_move.connect(self._on_mirror_move)
@@ -298,6 +305,10 @@ class _PopoutMixin:
                 if t is not None:
                     t.stop()
             self._popout_center = None       # deleted with the window below
+            # Return the control bar to the docked player (bottom of its vbox,
+            # after the video) before the pop-out window is destroyed.
+            self.player.layout().addWidget(self.player.bar)
+            self.player.bar.show()
             self.player.stop_mirror()
             self._popout_mirror = None
             win.deleteLater()
