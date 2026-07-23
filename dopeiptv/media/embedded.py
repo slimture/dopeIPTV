@@ -482,9 +482,23 @@ class _MpvGLWidget(QOpenGLWidget):
         # One line per ~300 frames, debug level only.
         self._paint_n = getattr(self, "_paint_n", 0) + 1
         if self._paint_n % 300 == 0:
-            log.debug("VID paint alive #%d state=%s fbo=%s",
+            # video-pts is the decisive freeze diagnostic: it is the pts of
+            # the newest VIDEO frame mpv has produced. Advancing across
+            # heartbeats while the on-screen picture is frozen = mpv makes
+            # new frames and the freeze is presentation/compositing; stuck =
+            # the video track itself stalled (audio continues) and the
+            # decoder path (e.g. videotoolbox) is the suspect.
+            vp = fd = hw = None
+            try:
+                vp = self.mpv.video_pts
+                fd = self.mpv.frame_drop_count
+                hw = self.mpv.hwdec_current
+            except Exception:
+                pass
+            log.debug("VID paint alive #%d state=%s fbo=%s video-pts=%s "
+                      "drops=%s hwdec=%s",
                       self._paint_n, getattr(self, "_paint_state", "?"),
-                      self.defaultFramebufferObject())
+                      self.defaultFramebufferObject(), vp, fd, hw)
         # Blank branch first so a repaint that arrives mid-stop (when mpv has
         # already been told to stop but our _ctx is still around) doesn't try
         # to render an mpv frame with a half-torn-down context - which
