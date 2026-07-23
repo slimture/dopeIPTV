@@ -56,6 +56,12 @@ class _PopoutWindow(QWidget):
             return
         super().keyPressEvent(event)
 
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        # Keep the centre play/pause disc centred as the window is resized or
+        # maximised (macOS mirror pop-out).
+        self._owner._reposition_popout_center()
+
 
 class _PopoutMixin:
     """MainWindow mixin: detaching the player into a separate always-on-top window."""
@@ -125,10 +131,17 @@ class _PopoutMixin:
         mirror = self.player.start_mirror(win)
         self._popout_mirror = mirror
         win.layout().addWidget(mirror)
-        mirror.video_dbl_click.connect(self._toggle_popout_fullscreen)
+        mirror.video_dbl_click.connect(self._on_mirror_dbl_click)
         mirror.video_mouse_press.connect(self._on_mirror_press)
         mirror.video_mouse_move.connect(self._on_mirror_move)
         mirror.video_mouse_release.connect(self._on_mirror_release)
+        # A click toggles pause, but only after the double-click interval so a
+        # double-click (fullscreen) can cancel it - otherwise a double-click
+        # both paused AND maximised.
+        self._mirror_click_timer = QTimer(self)
+        self._mirror_click_timer.setSingleShot(True)
+        self._mirror_click_timer.setInterval(QApplication.doubleClickInterval())
+        self._mirror_click_timer.timeout.connect(self._popout_toggle_pause)
         # Visible control: a centre play/pause disc revealed on pointer
         # movement (matches the docked player); the right-click menu carries
         # the rest. A child of the pop-out window - the mirror surface is never
@@ -182,7 +195,19 @@ class _PopoutMixin:
         if btn is not None and not getattr(self.player, "_paused", False):
             btn.hide()
 
+    def _reposition_popout_center(self) -> None:
+        btn = getattr(self, "_popout_center", None)
+        win = self._popout_win
+        if btn is None or win is None or btn.isHidden():
+            return
+        btn.move((win.width() - btn.width()) // 2,
+                 (win.height() - btn.height()) // 2)
+        btn.raise_()
+
     def _on_mirror_press(self, event) -> None:
+        # Accept the event so a right-click can't leak through the frameless
+        # window to whatever sits behind it (the "bleed-through").
+        event.accept()
         if event.button() == Qt.MouseButton.RightButton:
             self._popout_context_menu(event.globalPosition().toPoint())
             return
@@ -203,11 +228,19 @@ class _PopoutMixin:
         self._reveal_popout_center()
 
     def _on_mirror_release(self, event) -> None:
-        # A plain click (no drag) toggles pause; a finished drag does nothing.
+        # A plain click (no drag) toggles pause - but deferred by the
+        # double-click interval so a double-click (fullscreen) cancels it.
         if (event.button() == Qt.MouseButton.LeftButton
                 and getattr(self, "_mirror_press_pos", None) is not None):
             self._mirror_press_pos = None
-            self.player.toggle_pause()
+            self._mirror_click_timer.start()
+
+    def _on_mirror_dbl_click(self) -> None:
+        # Cancel the pending single-click pause, then toggle fullscreen.
+        t = getattr(self, "_mirror_click_timer", None)
+        if t is not None:
+            t.stop()
+        self._toggle_popout_fullscreen()
 
     def _popout_flags(self) -> "Qt.WindowType":
         """Window flags from the saved right-click choices. Wayland can't pin a
@@ -260,9 +293,10 @@ class _PopoutMixin:
                 if win.isFullScreen() else win.geometry()
             self.settings.setValue(
                 "popout_geometry", f"{g.x()},{g.y()},{g.width()},{g.height()}")
-            t = getattr(self, "_popout_center_timer", None)
-            if t is not None:
-                t.stop()
+            for tname in ("_popout_center_timer", "_mirror_click_timer"):
+                t = getattr(self, tname, None)
+                if t is not None:
+                    t.stop()
             self._popout_center = None       # deleted with the window below
             self.player.stop_mirror()
             self._popout_mirror = None
