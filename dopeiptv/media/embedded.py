@@ -203,6 +203,11 @@ class _MpvGLWidget(QOpenGLWidget):
         # the one it was created against (AA_ShareOpenGLContexts guarantees
         # that here).
         self._mirror_of = mirror_of
+        # Set on the DOCKED surface while a macOS mirror pop-out is showing the
+        # stream: the docked surface then skips mpv rendering (the mirror is the
+        # sole renderer) so the GPU isn't doing the work twice - what made the
+        # pop-out laggy and drove mpv's frame-drop count up.
+        self._render_suspended = False
         self._gl_init_error: str | None = None
         self._blank = False
         self.frame_ready.connect(self.update)
@@ -518,10 +523,14 @@ class _MpvGLWidget(QOpenGLWidget):
                 "h": int(self.height() * ratio),
                 "fbo": self.defaultFramebufferObject(),
             })
-            # No report_swap here: the docked owner surface keeps rendering
-            # (hidden behind the pop-out placeholder) and reports mpv's frame
-            # timing. A second report per frame would double-count presents
-            # and skew mpv's fps estimate.
+            # The mirror is the SOLE renderer while popped out (the docked
+            # surface is suspended), so it reports frame timing to mpv. Its
+            # poll-render timer calls this at the display refresh, the standard
+            # present cadence.
+            try:
+                ctx.report_swap()
+            except Exception:
+                pass
             if getattr(self, "_paint_state", "") != "render":
                 self._paint_state = "render"
                 log.info("VID mirror paint -> render (glctx=%s fbo=%s "
@@ -538,6 +547,20 @@ class _MpvGLWidget(QOpenGLWidget):
     def paintGL(self) -> None:
         if self._mirror_of is not None:
             self._paint_mirror()
+            return
+        if self._render_suspended:
+            # A macOS mirror pop-out is presenting this stream; the docked
+            # surface (covered by a placeholder) skips the mpv render so the
+            # GPU isn't doing it twice. Clear to black and return - mpv is
+            # untouched.
+            glctx = QOpenGLContext.currentContext()
+            if glctx is not None:
+                try:
+                    f = glctx.functions()
+                    f.glClearColor(0.0, 0.0, 0.0, 1.0)
+                    f.glClear(0x00004000)
+                except Exception:
+                    pass
             return
         # Video-trace heartbeat: proves whether paints happen AT ALL while
         # the picture looks frozen (paints running but a stale image on
@@ -1724,22 +1747,27 @@ class EmbeddedPlayer(QWidget):
         m = _MpvGLWidget(parent, mirror_of=self.video)
         m.setMouseTracking(True)
         self._mirror = m
-        # Repaint the mirror on every new mpv frame (same signal that drives
-        # the docked surface).
-        self.video.frame_ready.connect(m.update)
+        # Drive the mirror with a steady poll-render timer, NOT mpv's frame
+        # callback: a timer can never stall on a window resize/maximize (the
+        # freeze reported when the pop-out was maximized), and while popped out
+        # the mirror is the only render loop, so it also paces mpv. Suspend the
+        # docked surface so the GPU renders the stream once, not twice (the lag).
+        self.video._render_suspended = True
+        self._mirror_timer = QTimer(self)
+        self._mirror_timer.timeout.connect(m.update)
+        self._mirror_timer.start(16)          # ~60 fps
         self._show_dock_placeholder(True)
         return m
 
     def stop_mirror(self) -> None:
         """Tear the mirror down and hand the picture back to the docked
         surface. Safe to call when no mirror is active."""
-        m = getattr(self, "_mirror", None)
-        if m is not None:
-            try:
-                self.video.frame_ready.disconnect(m.update)
-            except (TypeError, RuntimeError):
-                pass
-            self._mirror = None
+        t = getattr(self, "_mirror_timer", None)
+        if t is not None:
+            t.stop()
+            self._mirror_timer = None
+        self.video._render_suspended = False
+        self._mirror = None
         self._show_dock_placeholder(False)
         self.video.update()
 
