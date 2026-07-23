@@ -20,7 +20,7 @@ from __future__ import annotations
 import sys
 import time
 
-from PyQt6.QtCore import QRect, Qt
+from PyQt6.QtCore import QRect, QSize, Qt, QTimer
 from PyQt6.QtWidgets import (
     QApplication, QMenu, QPushButton, QVBoxLayout, QWidget)
 
@@ -129,10 +129,58 @@ class _PopoutMixin:
         mirror.video_mouse_press.connect(self._on_mirror_press)
         mirror.video_mouse_move.connect(self._on_mirror_move)
         mirror.video_mouse_release.connect(self._on_mirror_release)
+        # Visible control: a centre play/pause disc revealed on pointer
+        # movement (matches the docked player); the right-click menu carries
+        # the rest. A child of the pop-out window - the mirror surface is never
+        # reparented, so an overlay here is safe.
+        btn = QPushButton(win)
+        btn.setObjectName("CenterPlay")
+        btn.setFixedSize(72, 72)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setStyleSheet(
+            "#CenterPlay { background: rgba(16,16,20,140); border:none;"
+            " border-radius:36px; }"
+            "#CenterPlay:hover { background: rgba(16,16,20,200); }")
+        btn.clicked.connect(self._popout_toggle_pause)
+        btn.hide()
+        self._popout_center = btn
+        self._popout_center_timer = QTimer(self)
+        self._popout_center_timer.setSingleShot(True)
+        self._popout_center_timer.setInterval(2500)
+        self._popout_center_timer.timeout.connect(self._maybe_hide_popout_center)
         win.setGeometry(self._saved_popout_geometry())
         win.show()
         win.raise_()
         mirror.show()
+        self._reveal_popout_center()   # a first hint that it's interactive
+
+    def _popout_toggle_pause(self) -> None:
+        self.player.toggle_pause()
+        self._reveal_popout_center()
+
+    def _reveal_popout_center(self) -> None:
+        btn = getattr(self, "_popout_center", None)
+        win = self._popout_win
+        if btn is None or win is None:
+            return
+        from ..media.embedded import _control_icon
+        paused = getattr(self.player, "_paused", False)
+        btn.setIcon(_control_icon("play" if paused else "pause", "#FFFFFF", 30))
+        btn.setIconSize(QSize(30, 30))
+        btn.move((win.width() - btn.width()) // 2,
+                 (win.height() - btn.height()) // 2)
+        btn.show()
+        btn.raise_()
+        # While paused it stays up; while playing it fades after a short idle.
+        if paused:
+            self._popout_center_timer.stop()
+        else:
+            self._popout_center_timer.start()
+
+    def _maybe_hide_popout_center(self) -> None:
+        btn = getattr(self, "_popout_center", None)
+        if btn is not None and not getattr(self.player, "_paused", False):
+            btn.hide()
 
     def _on_mirror_press(self, event) -> None:
         if event.button() == Qt.MouseButton.RightButton:
@@ -150,6 +198,9 @@ class _PopoutMixin:
                 handle = win.windowHandle() if win is not None else None
                 if handle is not None:
                     handle.startSystemMove()
+            return
+        # Idle pointer over the video flashes the centre play/pause disc.
+        self._reveal_popout_center()
 
     def _on_mirror_release(self, event) -> None:
         # A plain click (no drag) toggles pause; a finished drag does nothing.
@@ -209,6 +260,10 @@ class _PopoutMixin:
                 if win.isFullScreen() else win.geometry()
             self.settings.setValue(
                 "popout_geometry", f"{g.x()},{g.y()},{g.width()},{g.height()}")
+            t = getattr(self, "_popout_center_timer", None)
+            if t is not None:
+                t.stop()
+            self._popout_center = None       # deleted with the window below
             self.player.stop_mirror()
             self._popout_mirror = None
             win.deleteLater()
