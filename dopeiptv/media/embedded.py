@@ -1407,10 +1407,15 @@ class EmbeddedPlayer(QWidget):
         self._overlay_timer.setInterval(self.OVERLAY_HIDE_MS)
         self._overlay_timer.timeout.connect(self._hide_fs_ui)
 
-        # Sleep timer: stop playback after a chosen number of minutes.
+        # Sleep timer: stop playback after a chosen number of minutes. A
+        # second timer ticks once a second to count the badge down.
         self._sleep_timer = QTimer(self)
         self._sleep_timer.setSingleShot(True)
         self._sleep_timer.timeout.connect(self._on_sleep_elapsed)
+        self._sleep_deadline = 0.0
+        self._sleep_tick = QTimer(self)
+        self._sleep_tick.setInterval(1000)
+        self._sleep_tick.timeout.connect(self._update_sleep_badge)
 
         # Black cover widget that sits over the mpv render surface when we
         # want the pane to be visibly black. Painted with a plain QPalette
@@ -1457,6 +1462,13 @@ class EmbeddedPlayer(QWidget):
         # on a pop-out reparent. Anchored to the video's top-left corner.
         self.live_badge = QLabel("", self)
         self.live_badge.hide()
+
+        # Sleep-timer badge: a top-right pill counting down the time left until
+        # playback stops, so an armed sleep timer is always visible. Like the
+        # live badge it's the player's child (never a child of the GL surface),
+        # anchored to the video's top-right corner.
+        self.sleep_badge = QLabel("", self)
+        self.sleep_badge.hide()
 
         # Live timeline for timeshift channels: a floating bar at the bottom of
         # the video with LIVE at the right edge. Drag left to scrub back into
@@ -1784,7 +1796,13 @@ class EmbeddedPlayer(QWidget):
             if ov is not None:
                 ov.setParent(parent)
                 ov.hide()
+        # The sleep-timer badge is persistent (not hover-driven): move it into
+        # the pop-out too and re-show it there if a timer is armed.
+        self.sleep_badge.setParent(parent)
+        self.sleep_badge.hide()
         self._show_dock_placeholder(True)
+        if self._sleep_timer.isActive():
+            self._update_sleep_badge()
         return m
 
     def stop_mirror(self) -> None:
@@ -1801,9 +1819,13 @@ class EmbeddedPlayer(QWidget):
             if ov is not None:
                 ov.setParent(self)
                 ov.hide()
+        self.sleep_badge.setParent(self)
+        self.sleep_badge.hide()
         self._mirror = None
         self._show_dock_placeholder(False)
         self.video.update()
+        if self._sleep_timer.isActive():
+            self._update_sleep_badge()
 
     def reveal_pop_overlays(self) -> None:
         """macOS/Windows pop-out hover: bring back the auto-hidden control bar
@@ -2294,6 +2316,8 @@ class EmbeddedPlayer(QWidget):
         if self.live_badge.isVisible():
             tl = self.video.geometry().topLeft()
             self.live_badge.move(tl.x() + 12, tl.y() + 12)
+        if self.sleep_badge.isVisible():
+            self._place_sleep_badge()
         if self.center_btn.isVisible():
             self._position_center_btn()
         if self.overlay.isVisible() or self.fs_controls.isVisible():
@@ -2737,10 +2761,43 @@ class EmbeddedPlayer(QWidget):
         if minutes <= 0:
             if self._sleep_timer.isActive():
                 self._sleep_timer.stop()
+                self._sleep_tick.stop()
+                self.sleep_badge.hide()
                 self.set_overlay_info(tr("sleep_cancelled"))
             return
         self._sleep_timer.start(minutes * 60 * 1000)
+        self._sleep_deadline = time.monotonic() + minutes * 60
+        self._sleep_tick.start()
+        self._update_sleep_badge()
         self.set_overlay_info(tr("sleep_set", n=minutes))
+
+    def _update_sleep_badge(self) -> None:
+        """Refresh the countdown pill; called every second while armed."""
+        b = self.sleep_badge
+        remaining = int(round(self._sleep_deadline - time.monotonic()))
+        if remaining <= 0 or not self._sleep_timer.isActive():
+            self._sleep_tick.stop()
+            b.hide()
+            return
+        h, rem = divmod(remaining, 3600)
+        m, s = divmod(rem, 60)
+        txt = f"{h}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
+        b.setText(f"\U0001F319 {txt}")
+        b.setStyleSheet(
+            "background: rgba(0,0,0,150); color: #FFFFFF;"
+            "border-radius: 9px; padding: 3px 9px;"
+            "font-size: 11px; font-weight: 700;")
+        b.adjustSize()
+        self._place_sleep_badge()
+        b.show()
+        b.raise_()
+
+    def _place_sleep_badge(self) -> None:
+        # Anchor to the overlay surface (the docked video, or the mirror while
+        # popped out) so the badge rides along into the pop-out window.
+        g = self._ov_surface.geometry()
+        b = self.sleep_badge
+        b.move(g.right() - b.width() - 12, g.top() + 12)
 
     def _ask_sleep_minutes(self) -> None:
         from PyQt6.QtWidgets import QInputDialog
@@ -2751,6 +2808,8 @@ class EmbeddedPlayer(QWidget):
             self._start_sleep_timer(int(mins))
 
     def _on_sleep_elapsed(self) -> None:
+        self._sleep_tick.stop()
+        self.sleep_badge.hide()
         self.set_overlay_info(tr("sleep_stopping"))
         self.stop()
 

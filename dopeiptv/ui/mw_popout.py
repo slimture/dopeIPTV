@@ -190,11 +190,19 @@ class _PopoutMixin:
         self._popout_center_timer.setSingleShot(True)
         self._popout_center_timer.setInterval(2500)
         self._popout_center_timer.timeout.connect(self._maybe_hide_popout_center)
+        # Blank the mouse cursor after a short idle over the video (windowed or
+        # fullscreen), like a real player. Re-armed on every mirror move.
+        self._popout_cursor_hidden = False
+        self._popout_cursor_timer = QTimer(self)
+        self._popout_cursor_timer.setSingleShot(True)
+        self._popout_cursor_timer.setInterval(2000)
+        self._popout_cursor_timer.timeout.connect(self._hide_popout_cursor)
         win.setGeometry(self._saved_popout_geometry())
         win.show()
         win.raise_()
         mirror.show()
         self._reveal_popout_center()   # a first hint that it's interactive
+        self._popout_cursor_timer.start()
 
     def _popout_toggle_pause(self) -> None:
         self.player.toggle_pause()
@@ -223,6 +231,43 @@ class _PopoutMixin:
         btn = getattr(self, "_popout_center", None)
         if btn is not None and not getattr(self.player, "_paused", False):
             btn.hide()
+
+    def _popout_cursor_activity(self) -> None:
+        """A mirror move: restore the cursor and re-arm the idle-hide."""
+        self._show_popout_cursor()
+        t = getattr(self, "_popout_cursor_timer", None)
+        if t is not None:
+            t.start()
+
+    def _hide_popout_cursor(self) -> None:
+        """Blank the cursor after the idle timeout - but only while it rests
+        over the video, so it never vanishes over the control bar."""
+        m = getattr(self, "_popout_mirror", None)
+        win = self._popout_win
+        if m is None or win is None or not m.underMouse():
+            return
+        if sys.platform == "darwin":
+            from ..core.platform_macos import set_cursor_hidden
+            set_cursor_hidden(True)
+        else:
+            win.setCursor(Qt.CursorShape.BlankCursor)
+            m.setCursor(Qt.CursorShape.BlankCursor)
+        self._popout_cursor_hidden = True
+
+    def _show_popout_cursor(self) -> None:
+        if not getattr(self, "_popout_cursor_hidden", False):
+            return
+        if sys.platform == "darwin":
+            from ..core.platform_macos import set_cursor_hidden
+            set_cursor_hidden(False)
+        else:
+            win = self._popout_win
+            m = getattr(self, "_popout_mirror", None)
+            if win is not None:
+                win.unsetCursor()
+            if m is not None:
+                m.unsetCursor()
+        self._popout_cursor_hidden = False
 
     def _reposition_popout_center(self) -> None:
         btn = getattr(self, "_popout_center", None)
@@ -267,7 +312,9 @@ class _PopoutMixin:
                     handle.startSystemMove()
             return
         # Idle pointer over the video flashes the centre play/pause disc and
-        # the seek bar / timeshift timeline (whichever applies).
+        # the seek bar / timeshift timeline (whichever applies), and brings the
+        # cursor back.
+        self._popout_cursor_activity()
         self._reveal_popout_center()
         self.player.reveal_pop_overlays()
 
@@ -337,10 +384,12 @@ class _PopoutMixin:
                 if win.isFullScreen() else win.geometry()
             self.settings.setValue(
                 "popout_geometry", f"{g.x()},{g.y()},{g.width()},{g.height()}")
-            for tname in ("_popout_center_timer", "_mirror_click_timer"):
+            for tname in ("_popout_center_timer", "_mirror_click_timer",
+                          "_popout_cursor_timer"):
                 t = getattr(self, tname, None)
                 if t is not None:
                     t.stop()
+            self._show_popout_cursor()   # never leave the cursor hidden
             self._popout_center = None       # deleted with the window below
             # Return the control bar to the docked player (bottom of its vbox,
             # after the video) before the pop-out window is destroyed.
@@ -405,6 +454,10 @@ class _PopoutMixin:
             if not mac_mirror:
                 self.player.set_fullscreen_ui(True)
             win.showFullScreen()
+        # Reset the cursor visible and re-arm the idle-hide across the
+        # transition, so it neither sticks hidden nor stays up forever.
+        if mac_mirror:
+            self._popout_cursor_activity()
 
     def _popout_escape(self) -> None:
         """Escape in the pop-out window leaves its fullscreen (does not dock)."""

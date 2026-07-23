@@ -86,12 +86,13 @@ def _contain_pixmap(pm: QPixmap, w: int, h: int, radius: int = 10) -> QPixmap:
     path = QPainterPath()
     path.addRoundedRect(0.0, 0.0, float(w), float(h), radius, radius)
     p.fillPath(path, QColor(P["pane"]).lighter(118))
-    scaled = pm.scaled(int(w * 0.55), int(h * 0.62),
+    scaled = pm.scaled(int(w * 0.62), int(h * 0.66),
                        Qt.AspectRatioMode.KeepAspectRatio,
                        Qt.TransformationMode.SmoothTransformation)
     p.setClipPath(path)
+    # Centre the logo in both axes (the old -8 bias parked it high in the tile).
     p.drawPixmap((w - scaled.width()) // 2,
-                 (h - scaled.height()) // 2 - 8, scaled)
+                 (h - scaled.height()) // 2, scaled)
     p.end()
     return out
 
