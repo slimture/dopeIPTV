@@ -185,9 +185,6 @@ class _PopoutMixin:
             return
         self._popout_fs_toggled_at = now
         if win.isFullScreen():
-            # Cover the video across macOS's animated exit (see
-            # begin_fs_transition_cover) - no-op elsewhere.
-            self.player.begin_fs_transition_cover()
             self.player.set_fullscreen_ui(False)
             win.showNormal()
             geo = getattr(self, "_popout_fs_geo", None)
@@ -195,7 +192,6 @@ class _PopoutMixin:
                 win.setGeometry(geo)
         else:
             self._popout_fs_geo = win.geometry()
-            self.player.begin_fs_transition_cover()
             self.player.set_fullscreen_ui(True)
             win.showFullScreen()
 

@@ -1674,52 +1674,16 @@ class EmbeddedPlayer(QWidget):
         if (self.seek_overlay is not None
                 and self.seek_overlay.isVisible()):
             self._place_seek_overlay()
-        self._nudge_host_window()
-
-    def _nudge_host_window(self) -> None:
-        """macOS: force the TOP-LEVEL WINDOW to recomposite the reparented
-        video layer.
-
-        Everything the video trace showed: after a pop-out reparent the
-        QOpenGLWidget KEEPS its GL context and keeps rendering (state=render,
-        no errors) while cocoa presents a STALE layer - a frozen old frame
-        scaled to the new size. The only thing the user ever found that
-        recovered it was entering fullscreen, i.e. resizing the WINDOW.
-        Everything I tried at the WIDGET level failed the same way:
-
-          - a 1 px WIDGET resize (resizeGL fired, still stale),
-          - a hide()/show() re-attach (still stale, and it stacked the video
-            layer over the sibling overlays - the "seek bar/overlay randomly
-            missing" report),
-          - swapping in a whole fresh widget (went BLACK - recreating the mpv
-            render context mid-stream drops the live frame).
-
-        So do exactly, and only, what the working recovery does: nudge the
-        host window's height by 1 px and back. mpv, the GL context and the
-        render context are never touched - no black, no lost frame - and the
-        widget is not reparented or recreated, so the overlays stay put.
-        Skipped when the window is maximized/fullscreen (already composited
-        correctly, and a resize would drop those states)."""
-        if sys.platform != "darwin":
-            return
-        win = self.window()
-        if win is None or win.isFullScreen() or win.isMaximized():
-            self.video.update()
-            return
-        g = win.geometry()
-        log.info("VID host-window nudge %dx%d (recomposite reparented layer)",
-                 g.width(), g.height())
-        win.resize(g.width(), g.height() + 1)
-
-        def _restore(w=win, gg=g):
-            try:
-                w.resize(gg.width(), gg.height())
-                self.video.update()
-            except RuntimeError:
-                pass
-        # Let the +1 take effect (the compositor recomposites) before
-        # restoring, so the round-trip actually forces a new layer.
-        QTimer.singleShot(0, _restore)
+        # macOS keeps the GL context across the reparent, so the widget's
+        # backing framebuffer can stay bound to the old window and show a
+        # frozen frame. A 1 px resize and back rebuilds it. Pure widget
+        # geometry - mpv and the render context are never touched.
+        v = self.video
+        sz = v.size()
+        if sz.isValid() and sz.height() > 1:
+            v.resize(sz.width(), sz.height() - 1)
+            v.resize(sz)
+        v.update()
 
     def set_popout_autohide(self, enabled: bool) -> None:
         """When on, the pop-out control bar fades after a few seconds of no
@@ -2089,71 +2053,10 @@ class EmbeddedPlayer(QWidget):
             spacing = self.layout().spacing() if bar_h else 0
             self.setFixedHeight(self.VIDEO_BOX_HEIGHT + bar_h + spacing)
 
-    # -- fullscreen-transition cover (macOS animated fullscreen) --------------
-
-    def begin_fs_transition_cover(self, force: bool = False) -> None:
-        """Cover the video with plain black for the duration of macOS's
-        ANIMATED fullscreen transition. The video trace proved the animation
-        renders the window LIVE through a stream of intermediate sizes
-        (580x257 -> 620x839 -> 1500x949 -> 1512x949 on enter, the same
-        staircase backwards on exit), so the video visibly "builds"/stretches
-        while the OS scales the window. A black cover over the video for
-        exactly that resize stream turns the artifact into a clean black
-        sweep. Pure widget chrome - mpv keeps rendering underneath and is
-        never touched. Uncovered ~150 ms after the LAST resize (the animation
-        delivers one per frame; resizeEvent keeps pushing the timer), with a
-        1.5 s failsafe so the video can never stay hidden."""
-        if not force and sys.platform != "darwin":
-            return
-        if self.current_url is None:
-            return
-        c = getattr(self, "_fs_cover", None)
-        if c is None:
-            c = self._fs_cover = QWidget(self)
-            c.setStyleSheet("background:#000000;")
-            c.setAttribute(
-                Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-            self._fs_cover_timer = QTimer(self)
-            self._fs_cover_timer.setSingleShot(True)
-            self._fs_cover_timer.setInterval(150)
-            self._fs_cover_timer.timeout.connect(self._end_fs_cover)
-            self._fs_cover_fail = QTimer(self)
-            self._fs_cover_fail.setSingleShot(True)
-            self._fs_cover_fail.setInterval(1500)
-            self._fs_cover_fail.timeout.connect(self._end_fs_cover)
-        c.setGeometry(self.rect())
-        c.show()
-        c.raise_()
-        # Painted synchronously so the black is on screen BEFORE the caller
-        # triggers the OS transition - an async update could lose the race
-        # and let the first animation frames show the video.
-        c.repaint()
-        self._fs_cover_timer.start()
-        self._fs_cover_fail.start()
-        log.info("VID fs-transition cover ON (%dx%d)",
-                 self.width(), self.height())
-
-    def _end_fs_cover(self) -> None:
-        c = getattr(self, "_fs_cover", None)
-        if c is not None and not c.isHidden():
-            c.hide()
-            self._fs_cover_timer.stop()
-            self._fs_cover_fail.stop()
-            log.info("VID fs-transition cover OFF (%dx%d)",
-                     self.width(), self.height())
-
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         self._lock_video_box()
         self._relayout_controls()
-        cov = getattr(self, "_fs_cover", None)
-        if cov is not None and not cov.isHidden():
-            # Track the animated window and push the uncover past this
-            # resize - it fires ~150 ms after the LAST one, i.e. once the
-            # transition has settled.
-            cov.setGeometry(self.rect())
-            cov.raise_()
-            self._fs_cover_timer.start()
         if self._blackout.isVisible():
             self._blackout.setGeometry(self.video.rect())
         if self.center_btn.isVisible():
