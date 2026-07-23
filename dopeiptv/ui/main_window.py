@@ -1559,6 +1559,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._exit_player_fullscreen()
             return
         self._player_fs = True
+        # macOS animates the window into fullscreen and renders it LIVE
+        # through the intermediate sizes, so the video visibly "builds"
+        # during the transition. Black out the video area for exactly the
+        # animation (the cover lifts itself ~150 ms after the last resize).
+        # No-op off macOS; mpv is never touched.
+        self.player.begin_fs_transition_cover()
         self._fs_return_index = self.listw.currentIndex()
         self._fs_return_scroll = self.listw.verticalScrollBar().value()
         # Remember the panel widths: hiding the side/middle panes lets the
@@ -1628,6 +1634,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self.showNormal()
             return
         self._player_fs = False
+        # Same live-animated transition on the way out (the "stretch"):
+        # cover the video for the duration of the exit animation too.
+        self.player.begin_fs_transition_cover()
         # Mute the narrow-width auto-collapse for the whole exit transition:
         # the window resizing from fullscreen width back to normal looks like
         # a "just got narrow" edge to _maybe_auto_collapse_sidebar, which then

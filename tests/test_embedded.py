@@ -103,6 +103,21 @@ assert vid.mpv is sentinel_mpv, "settle must not touch mpv"
 assert vid._ctx is not None and _FakeCtx.freed is False, \
     "settle must not free/recreate the render context"
 
+# The fullscreen-transition cover (macOS animated fullscreen) is pure
+# chrome: it shows, tracks resizes, uncovers via its timers or _end_fs_cover,
+# and never touches mpv or the render context. force=True bypasses the
+# darwin gate so the wiring is exercised on any platform.
+player.begin_fs_transition_cover(force=True)
+assert not player._fs_cover.isHidden(), "cover must be up"
+assert player._fs_cover_fail.isActive(), "failsafe must be armed"
+player.resize(player.width() + 4, player.height())   # animation resize
+assert not player._fs_cover.isHidden(), "cover survives the resize stream"
+player._end_fs_cover()
+assert player._fs_cover.isHidden(), "cover must lift"
+assert not player._fs_cover_fail.isActive(), "timers stopped with the cover"
+assert vid.mpv is sentinel_mpv and vid._ctx is not None \
+    and _FakeCtx.freed is False, "cover must never touch mpv/render context"
+
 print("EMBEDDED_OK")
 """
 

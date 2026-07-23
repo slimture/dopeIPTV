@@ -2045,10 +2045,71 @@ class EmbeddedPlayer(QWidget):
             spacing = self.layout().spacing() if bar_h else 0
             self.setFixedHeight(self.VIDEO_BOX_HEIGHT + bar_h + spacing)
 
+    # -- fullscreen-transition cover (macOS animated fullscreen) --------------
+
+    def begin_fs_transition_cover(self, force: bool = False) -> None:
+        """Cover the video with plain black for the duration of macOS's
+        ANIMATED fullscreen transition. The video trace proved the animation
+        renders the window LIVE through a stream of intermediate sizes
+        (580x257 -> 620x839 -> 1500x949 -> 1512x949 on enter, the same
+        staircase backwards on exit), so the video visibly "builds"/stretches
+        while the OS scales the window. A black cover over the video for
+        exactly that resize stream turns the artifact into a clean black
+        sweep. Pure widget chrome - mpv keeps rendering underneath and is
+        never touched. Uncovered ~150 ms after the LAST resize (the animation
+        delivers one per frame; resizeEvent keeps pushing the timer), with a
+        1.5 s failsafe so the video can never stay hidden."""
+        if not force and sys.platform != "darwin":
+            return
+        if self.current_url is None:
+            return
+        c = getattr(self, "_fs_cover", None)
+        if c is None:
+            c = self._fs_cover = QWidget(self)
+            c.setStyleSheet("background:#000000;")
+            c.setAttribute(
+                Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+            self._fs_cover_timer = QTimer(self)
+            self._fs_cover_timer.setSingleShot(True)
+            self._fs_cover_timer.setInterval(150)
+            self._fs_cover_timer.timeout.connect(self._end_fs_cover)
+            self._fs_cover_fail = QTimer(self)
+            self._fs_cover_fail.setSingleShot(True)
+            self._fs_cover_fail.setInterval(1500)
+            self._fs_cover_fail.timeout.connect(self._end_fs_cover)
+        c.setGeometry(self.rect())
+        c.show()
+        c.raise_()
+        # Painted synchronously so the black is on screen BEFORE the caller
+        # triggers the OS transition - an async update could lose the race
+        # and let the first animation frames show the video.
+        c.repaint()
+        self._fs_cover_timer.start()
+        self._fs_cover_fail.start()
+        log.info("VID fs-transition cover ON (%dx%d)",
+                 self.width(), self.height())
+
+    def _end_fs_cover(self) -> None:
+        c = getattr(self, "_fs_cover", None)
+        if c is not None and not c.isHidden():
+            c.hide()
+            self._fs_cover_timer.stop()
+            self._fs_cover_fail.stop()
+            log.info("VID fs-transition cover OFF (%dx%d)",
+                     self.width(), self.height())
+
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         self._lock_video_box()
         self._relayout_controls()
+        cov = getattr(self, "_fs_cover", None)
+        if cov is not None and not cov.isHidden():
+            # Track the animated window and push the uncover past this
+            # resize - it fires ~150 ms after the LAST one, i.e. once the
+            # transition has settled.
+            cov.setGeometry(self.rect())
+            cov.raise_()
+            self._fs_cover_timer.start()
         if self._blackout.isVisible():
             self._blackout.setGeometry(self.video.rect())
         if self.center_btn.isVisible():
