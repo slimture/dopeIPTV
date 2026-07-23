@@ -15,7 +15,7 @@ from ..core.recording import format_size, safe_filename
 from .theme import P
 from .widgets import confirm
 from ..core.workers import run_async
-from PyQt6.QtCore import QDateTime, Qt
+from PyQt6.QtCore import QDateTime, Qt, QTimer
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QComboBox, QDateTimeEdit, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu, QMessageBox, QPushButton, QVBoxLayout
 from datetime import datetime, timedelta
@@ -177,15 +177,25 @@ class _RecordingMixin:
             return True
         return False
 
-    def _watch_recording_file(self, j: dict) -> None:
+    def _watch_recording_file(self, j: dict, _tries: int = 0) -> None:
+        # A just-started recording's file is created a beat after the job flips
+        # to "recording": ffmpeg has to open the output and write the first
+        # bytes. Picking "Watch the recorded channel" right then found no file
+        # and silently gave up (the "doesn't start playing" report). Poll
+        # briefly for the file to gain some data, then start playback - j is the
+        # live job dict, so j["path"] fills in as the recorder sets it.
         path = j.get("path")
-        if not path or not os.path.exists(path):
-            QMessageBox.information(
-                self, tr("rec_status_recording"),
-                tr("msg_rec_file_not_ready"))
+        if path and os.path.exists(path) and os.path.getsize(path) > 0:
+            self._start_playback(path, f"{j['title']} (recording)", None,
+                                 path, "recording", record=False)
             return
-        self._start_playback(path, f"{j['title']} (recording)", None,
-                             path, "recording", record=False)
+        if _tries < 20:                       # ~10 s at 500 ms steps
+            QTimer.singleShot(
+                500, lambda: self._watch_recording_file(j, _tries + 1))
+            return
+        QMessageBox.information(
+            self, tr("rec_status_recording"),
+            tr("msg_rec_file_not_ready"))
 
     def _rec_indicator_menu(self) -> None:
         m = QMenu(self)
