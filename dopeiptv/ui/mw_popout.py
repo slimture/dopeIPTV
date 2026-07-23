@@ -17,6 +17,7 @@ Kept out of main_window.py to keep that file lean.
 """
 from __future__ import annotations
 
+import sys
 import time
 
 from PyQt6.QtCore import QRect, Qt
@@ -71,6 +72,13 @@ class _PopoutMixin:
         if self._player_fs:
             self._exit_player_fullscreen()
 
+        if sys.platform == "darwin":
+            # macOS cannot reparent a QOpenGLWidget between windows without the
+            # picture freezing (cocoa presents a stale layer). Mirror the
+            # stream into the pop-out window instead of moving the player.
+            self._popout_macos()
+            return
+
         win = _PopoutWindow(self)
         win.setWindowTitle(tr("popout_title"))
         self._popout_win = win
@@ -103,6 +111,52 @@ class _PopoutMixin:
         win.setGeometry(self._saved_popout_geometry())
         win.show()
         win.raise_()
+
+    def _popout_macos(self) -> None:
+        """macOS pop-out via a mirror surface (no reparent). The pop-out window
+        hosts a second GL surface that renders the same live mpv stream; the
+        real player stays docked, its video covered by a placeholder. Controls
+        come from the video itself: click = pause, double-click = fullscreen,
+        drag = move the window, right-click = the full options menu."""
+        win = _PopoutWindow(self)
+        win.setWindowTitle(tr("popout_title"))
+        self._popout_win = win
+        win.setWindowFlags(self._popout_flags())
+        mirror = self.player.start_mirror(win)
+        self._popout_mirror = mirror
+        win.layout().addWidget(mirror)
+        mirror.video_dbl_click.connect(self._toggle_popout_fullscreen)
+        mirror.video_mouse_press.connect(self._on_mirror_press)
+        mirror.video_mouse_move.connect(self._on_mirror_move)
+        mirror.video_mouse_release.connect(self._on_mirror_release)
+        win.setGeometry(self._saved_popout_geometry())
+        win.show()
+        win.raise_()
+        mirror.show()
+
+    def _on_mirror_press(self, event) -> None:
+        if event.button() == Qt.MouseButton.RightButton:
+            self._popout_context_menu(event.globalPosition().toPoint())
+            return
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._mirror_press_pos = event.position().toPoint()
+
+    def _on_mirror_move(self, event) -> None:
+        frm = getattr(self, "_mirror_press_pos", None)
+        if frm is not None and (event.buttons() & Qt.MouseButton.LeftButton):
+            if (event.position().toPoint() - frm).manhattanLength() > 6:
+                self._mirror_press_pos = None   # became a drag, not a click
+                win = self._popout_win
+                handle = win.windowHandle() if win is not None else None
+                if handle is not None:
+                    handle.startSystemMove()
+
+    def _on_mirror_release(self, event) -> None:
+        # A plain click (no drag) toggles pause; a finished drag does nothing.
+        if (event.button() == Qt.MouseButton.LeftButton
+                and getattr(self, "_mirror_press_pos", None) is not None):
+            self._mirror_press_pos = None
+            self.player.toggle_pause()
 
     def _popout_flags(self) -> "Qt.WindowType":
         """Window flags from the saved right-click choices. Wayland can't pin a
@@ -147,6 +201,19 @@ class _PopoutMixin:
         if win is None:
             return
         self._popout_win = None
+
+        if getattr(self, "_popout_mirror", None) is not None:
+            # macOS mirror path: no reparent to undo - just tear down the
+            # mirror surface and hand the picture back to the docked player.
+            g = (getattr(self, "_popout_fs_geo", None) or win.geometry()) \
+                if win.isFullScreen() else win.geometry()
+            self.settings.setValue(
+                "popout_geometry", f"{g.x()},{g.y()},{g.width()},{g.height()}")
+            self.player.stop_mirror()
+            self._popout_mirror = None
+            win.deleteLater()
+            return
+
         if win.isFullScreen():
             # Leave the pop-out's own fullscreen first, then measure geometry.
             self.player.set_fullscreen_ui(False)
@@ -184,15 +251,21 @@ class _PopoutMixin:
         if now - getattr(self, "_popout_fs_toggled_at", 0.0) < 0.4:
             return
         self._popout_fs_toggled_at = now
+        # macOS mirror pop-out: the mirror just fills the window, so fullscreen
+        # is only a window-state change - don't touch the DOCKED player's
+        # fullscreen UI (that hides its bar and would fight the docked view).
+        mac_mirror = getattr(self, "_popout_mirror", None) is not None
         if win.isFullScreen():
-            self.player.set_fullscreen_ui(False)
+            if not mac_mirror:
+                self.player.set_fullscreen_ui(False)
             win.showNormal()
             geo = getattr(self, "_popout_fs_geo", None)
             if geo:
                 win.setGeometry(geo)
         else:
             self._popout_fs_geo = win.geometry()
-            self.player.set_fullscreen_ui(True)
+            if not mac_mirror:
+                self.player.set_fullscreen_ui(True)
             win.showFullScreen()
 
     def _popout_escape(self) -> None:

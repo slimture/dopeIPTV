@@ -244,6 +244,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._last_stream_error_ts = 0.0
         self._popout_win = None
         self._popout_placeholder = None
+        self._popout_mirror = None   # macOS mirror surface (see mw_popout)
         self._multiview_win = None
         self._last_player = None
         self._last_playlist_refresh = time.time()

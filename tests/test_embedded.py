@@ -115,6 +115,24 @@ assert child_widgets == [], f"video widget must have no child widgets: {child_wi
 assert player._stats_overlay.parent() is player, "stats overlay is the player's child"
 assert player._blackout.parent() is player, "black cover is the player's child"
 
+# macOS mirror pop-out wiring: start_mirror builds a MIRROR surface bound to
+# the docked video (renders its render context, owns no mpv/ctx of its own),
+# covers the docked video with a placeholder, and routes frame updates;
+# stop_mirror tears it all down. The docked mpv/render context are never
+# touched - the whole point is that the real GL surface is not reparented.
+host = _QW()
+mirror = player.start_mirror(host)
+assert mirror._mirror_of is player.video, "mirror renders the docked video ctx"
+assert mirror.mpv is None and mirror._ctx is None, "mirror owns no mpv/ctx"
+assert player._mirror is mirror
+assert player._dock_ph is not None and not player._dock_ph.isHidden(), \
+    "docked video is covered while mirrored"
+assert player.video.mpv is sentinel_mpv, "docked mpv untouched by start_mirror"
+player.stop_mirror()
+assert player._mirror is None
+assert player._dock_ph.isHidden(), "placeholder lifts on dock-back"
+assert player.video.mpv is sentinel_mpv, "docked mpv still untouched"
+
 print("EMBEDDED_OK")
 """
 

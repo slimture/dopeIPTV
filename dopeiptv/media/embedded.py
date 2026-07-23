@@ -182,7 +182,8 @@ class _MpvGLWidget(QOpenGLWidget):
 
     EXTRA_OPTS: dict = {}
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None,
+                 mirror_of: "_MpvGLWidget | None" = None) -> None:
         super().__init__(parent)
         if sys.platform == "darwin":
             from ..core.platform_macos import apply_widget_surface_format
@@ -194,6 +195,14 @@ class _MpvGLWidget(QOpenGLWidget):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.mpv = None
         self._ctx = None
+        # A MIRROR surface (macOS pop-out) owns no mpv and no render context:
+        # it renders the OWNER widget's render context into its own FBO, so the
+        # same stream shows in a second window without ever reparenting (and
+        # freezing) the real GL surface. mpv only allows one render context per
+        # stream, and it renders in any context that shares GL resources with
+        # the one it was created against (AA_ShareOpenGLContexts guarantees
+        # that here).
+        self._mirror_of = mirror_of
         self._gl_init_error: str | None = None
         self._blank = False
         self.frame_ready.connect(self.update)
@@ -270,6 +279,14 @@ class _MpvGLWidget(QOpenGLWidget):
     def initializeGL(self) -> None:
         self.makeCurrent()
         glctx = QOpenGLContext.currentContext()
+        if self._mirror_of is not None:
+            # Mirror surface: nothing to build. It renders the owner's render
+            # context (see paintGL). No mpv, no own render context, so no
+            # aboutToBeDestroyed cleanup - closing the pop-out window just
+            # drops this GL context, the owner's is untouched.
+            log.info("VID mirror initializeGL glctx=%s size=%dx%d",
+                     self._ctx_id(glctx), self.width(), self.height())
+            return
         log.info("VID initializeGL glctx=%s re_entry=%s size=%dx%d",
                  self._ctx_id(glctx), self.mpv is not None,
                  self.width(), self.height())
@@ -475,7 +492,53 @@ class _MpvGLWidget(QOpenGLWidget):
                 log.info("VID render context free (%s): ctx.free failed: %s",
                          reason, e)
 
+    def _paint_mirror(self) -> None:
+        """Render the OWNER's mpv render context into this mirror's own FBO
+        (macOS pop-out). Only one of the two surfaces is on screen at a time
+        (the docked one is hidden while popped out), so mpv still sees one
+        present per frame. Never touches mpv or the owner's context - if the
+        owner is between streams (ctx None) or blanked, paint black."""
+        owner = self._mirror_of
+        ctx = owner._ctx if owner is not None else None
+        if self._blank or ctx is None:
+            glctx = QOpenGLContext.currentContext()
+            if glctx is not None:
+                try:
+                    f = glctx.functions()
+                    f.glClearColor(0.0, 0.0, 0.0, 1.0)
+                    f.glClear(0x00004000)  # GL_COLOR_BUFFER_BIT
+                except Exception:
+                    pass
+            return
+        try:
+            ratio = (self.devicePixelRatioF()
+                     if hasattr(self, "devicePixelRatioF") else 1)
+            ctx.render(flip_y=True, opengl_fbo={
+                "w": int(self.width() * ratio),
+                "h": int(self.height() * ratio),
+                "fbo": self.defaultFramebufferObject(),
+            })
+            # No report_swap here: the docked owner surface keeps rendering
+            # (hidden behind the pop-out placeholder) and reports mpv's frame
+            # timing. A second report per frame would double-count presents
+            # and skew mpv's fps estimate.
+            if getattr(self, "_paint_state", "") != "render":
+                self._paint_state = "render"
+                log.info("VID mirror paint -> render (glctx=%s fbo=%s "
+                         "size=%dx%d)",
+                         self._ctx_id(QOpenGLContext.currentContext()),
+                         self.defaultFramebufferObject(),
+                         self.width(), self.height())
+        except Exception as e:
+            if getattr(self, "_paint_state", "") != "fail":
+                self._paint_state = "fail"
+                log.info("VID mirror paint -> FAIL: %s (glctx=%s)", e,
+                         self._ctx_id(QOpenGLContext.currentContext()))
+
     def paintGL(self) -> None:
+        if self._mirror_of is not None:
+            self._paint_mirror()
+            return
         # Video-trace heartbeat: proves whether paints happen AT ALL while
         # the picture looks frozen (paints running but a stale image on
         # screen = compositing problem; no paints = dead repaint loop).
@@ -932,6 +995,8 @@ class EmbeddedPlayer(QWidget):
         # on the control bar) while the rest of __init__ is still running.
         self._fs_ui = False
         self._popout_mode = False
+        self._mirror = None          # macOS pop-out mirror surface (if any)
+        self._dock_ph = None         # 'playing in pop-out' cover, docked side
         self._popout_drag_from = None
         self._popout_autohide = False
         self._popout_bar_timer = QTimer(self)
@@ -1645,6 +1710,60 @@ class EmbeddedPlayer(QWidget):
 
     # -- detached pop-out window -----------------------------------------------
 
+    # -- macOS mirror pop-out (no reparent) ----------------------------------
+
+    def start_mirror(self, parent: QWidget) -> "_MpvGLWidget":
+        """macOS pop-out: build a MIRROR GL surface in *parent* (the pop-out
+        window) that renders this player's live mpv stream. The real video
+        widget is never moved - reparenting a QOpenGLWidget between windows on
+        macOS leaves cocoa presenting a stale (frozen) layer. Instead the mpv
+        render context is drawn into a second surface that shares GL resources,
+        and the docked video (still rendering, behind a placeholder) keeps
+        driving mpv's frame timing. Returns the mirror widget for the caller to
+        place in the window."""
+        m = _MpvGLWidget(parent, mirror_of=self.video)
+        m.setMouseTracking(True)
+        self._mirror = m
+        # Repaint the mirror on every new mpv frame (same signal that drives
+        # the docked surface).
+        self.video.frame_ready.connect(m.update)
+        self._show_dock_placeholder(True)
+        return m
+
+    def stop_mirror(self) -> None:
+        """Tear the mirror down and hand the picture back to the docked
+        surface. Safe to call when no mirror is active."""
+        m = getattr(self, "_mirror", None)
+        if m is not None:
+            try:
+                self.video.frame_ready.disconnect(m.update)
+            except (TypeError, RuntimeError):
+                pass
+            self._mirror = None
+        self._show_dock_placeholder(False)
+        self.video.update()
+
+    def _show_dock_placeholder(self, on: bool) -> None:
+        """Cover (not hide) the docked video with a 'playing in pop-out' panel
+        while mirrored, so the detail pane doesn't show the same picture twice.
+        Covering rather than hiding keeps the docked surface rendering, which
+        is what keeps mpv's timing and the shared render context healthy."""
+        ph = getattr(self, "_dock_ph", None)
+        if on:
+            if ph is None:
+                ph = self._dock_ph = QPushButton(tr("popout_placeholder"), self)
+                ph.setCursor(Qt.CursorShape.PointingHandCursor)
+                ph.setStyleSheet(
+                    "QPushButton { background:#000000; color:#B8B8C0;"
+                    " border:none; font-size:13px; font-weight:600; }"
+                    "QPushButton:hover { color:#FFFFFF; }")
+                ph.clicked.connect(lambda: self.popout_requested.emit())
+            ph.setGeometry(self.video.geometry())
+            ph.show()
+            ph.raise_()
+        elif ph is not None:
+            ph.hide()
+
     def set_popout_mode(self, enabled: bool) -> None:
         """Detached-window mode: the pop-out window drives the size, so release
         the docked fixed height and let the video fill the window."""
@@ -2088,6 +2207,9 @@ class EmbeddedPlayer(QWidget):
         self._relayout_controls()
         if self._blackout.isVisible():
             self._blackout.setGeometry(self.video.geometry())
+        if self._dock_ph is not None and not self._dock_ph.isHidden():
+            self._dock_ph.setGeometry(self.video.geometry())
+            self._dock_ph.raise_()
         if self._stats_overlay.isVisible():
             self._place_stats()
         if self.live_badge.isVisible():
