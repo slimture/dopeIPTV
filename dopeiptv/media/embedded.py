@@ -253,9 +253,26 @@ class _MpvGLWidget(QOpenGLWidget):
             return gl_get_proc_address_fallback(name)
         return 0
 
+    @staticmethod
+    def _ctx_id(glctx) -> str:
+        """Stable identity of a QOpenGLContext for the video trace ("VID"
+        log lines): id() of the PyQt wrapper changes between calls even for
+        the same underlying context, the sip pointer does not. This is what
+        lets a log show whether a reparent kept or replaced the GL context."""
+        if glctx is None:
+            return "none"
+        try:
+            from PyQt6 import sip
+            return hex(sip.unwrapinstance(glctx))
+        except Exception:
+            return f"py-{id(glctx):#x}"
+
     def initializeGL(self) -> None:
         self.makeCurrent()
         glctx = QOpenGLContext.currentContext()
+        log.info("VID initializeGL glctx=%s re_entry=%s size=%dx%d",
+                 self._ctx_id(glctx), self.mpv is not None,
+                 self.width(), self.height())
         if glctx is not None:
             v = glctx.format().version()
             log.info("GL context: %s.%s profile=%s", v[0], v[1],
@@ -286,13 +303,14 @@ class _MpvGLWidget(QOpenGLWidget):
         # was still current); free best-effort here too so that if it didn't
         # fire, a stale render context can't wedge the video black.
         if self.mpv is not None:
-            self._free_render_context()
+            self._free_render_context("initializeGL re-entry")
             try:
                 self._create_render_context()
-                log.info("render context rebuilt after GL recreation")
+                log.info("VID render context rebuilt after GL recreation "
+                         "glctx=%s", self._ctx_id(glctx))
             except Exception as e:
                 self._ctx = None
-                log.error("render context rebuild failed: %s", e)
+                log.error("VID render context rebuild FAILED: %s", e)
             return
         # Building the mpv render context can fail hard on a weak or
         # software-only GL stack (typically a VM with no GPU acceleration).
@@ -437,22 +455,36 @@ class _MpvGLWidget(QOpenGLWidget):
         else:
             self._ctx.update_cb = lambda: self.frame_ready.emit()
 
-    def _free_render_context(self) -> None:
+    def _free_render_context(self, reason: str = "aboutToBeDestroyed") -> None:
         """Free just the render context - called when its GL context is about
         to be destroyed (reparent, close), and from shutdown. Never touches the
         mpv instance, so playback/audio continue; paintGL paints black while
         _ctx is None, and the next initializeGL rebuilds it."""
         ctx = self._ctx
         self._ctx = None
+        if ctx is not None or self.mpv is not None:
+            log.info("VID render context free (%s): had_ctx=%s glctx=%s",
+                     reason, ctx is not None,
+                     self._ctx_id(QOpenGLContext.currentContext()))
         if getattr(self, "_render_timer", None) is not None:
             self._render_timer.stop()
         if ctx is not None:
             try:
                 ctx.free()
-            except Exception:
-                pass
+            except Exception as e:
+                log.info("VID render context free (%s): ctx.free failed: %s",
+                         reason, e)
 
     def paintGL(self) -> None:
+        # Video-trace heartbeat: proves whether paints happen AT ALL while
+        # the picture looks frozen (paints running but a stale image on
+        # screen = compositing problem; no paints = dead repaint loop).
+        # One line per ~300 frames, debug level only.
+        self._paint_n = getattr(self, "_paint_n", 0) + 1
+        if self._paint_n % 300 == 0:
+            log.debug("VID paint alive #%d state=%s fbo=%s",
+                      self._paint_n, getattr(self, "_paint_state", "?"),
+                      self.defaultFramebufferObject())
         # Blank branch first so a repaint that arrives mid-stop (when mpv has
         # already been told to stop but our _ctx is still around) doesn't try
         # to render an mpv frame with a half-torn-down context - which
@@ -481,6 +513,14 @@ class _MpvGLWidget(QOpenGLWidget):
                     self._ctx = None
                     log.debug("paintGL render-context heal failed: %s", e)
             if self._blank or self._ctx is None:
+                st = "blank" if self._blank else "no-ctx"
+                if getattr(self, "_paint_state", "") != st:
+                    self._paint_state = st
+                    log.info("VID paint -> %s (blank=%s mpv=%s glctx=%s "
+                             "size=%dx%d)", st, self._blank,
+                             self.mpv is not None,
+                             self._ctx_id(QOpenGLContext.currentContext()),
+                             self.width(), self.height())
                 glctx = QOpenGLContext.currentContext()
                 if glctx is not None:
                     try:
@@ -498,6 +538,17 @@ class _MpvGLWidget(QOpenGLWidget):
                 "h": int(self.height() * ratio),
                 "fbo": self.defaultFramebufferObject(),
             })
+            if getattr(self, "_paint_state", "") != "render":
+                # First successful mpv render after blank/failure/startup:
+                # the glctx + fbo identities here are the trace's ground
+                # truth for what the video is actually being drawn into.
+                self._paint_state = "render"
+                self._paint_fail_n = 0
+                log.info("VID paint -> render (glctx=%s fbo=%s size=%dx%d "
+                         "dpr=%.1f)",
+                         self._ctx_id(QOpenGLContext.currentContext()),
+                         self.defaultFramebufferObject(),
+                         self.width(), self.height(), ratio)
             # Tell mpv a frame was just presented. Without this it can't
             # measure the real display refresh, so its frame-timing estimate
             # drifts and high-fps / 4K content judders and drops frames. The
@@ -516,10 +567,28 @@ class _MpvGLWidget(QOpenGLWidget):
             # round-trip (which clears the flag) brought it back. The next
             # paint just retries against the rebuilt context; the framebuffer
             # keeps the last good frame until then.
-            log.debug("paintGL render failed (frame skipped): %s", e)
+            self._paint_fail_n = getattr(self, "_paint_fail_n", 0) + 1
+            if (getattr(self, "_paint_state", "") != "fail"
+                    or self._paint_fail_n % 120 == 0):
+                self._paint_state = "fail"
+                log.info("VID paint -> fail #%d: %s (glctx=%s fbo=%s)",
+                         self._paint_fail_n, e,
+                         self._ctx_id(QOpenGLContext.currentContext()),
+                         self.defaultFramebufferObject())
+            else:
+                log.debug("paintGL render failed (frame skipped): %s", e)
+
+    def resizeGL(self, w: int, h: int) -> None:
+        # Part of the video trace: shows whether a maximize/reparent actually
+        # reaches the GL widget as a resize, and which framebuffer it lands
+        # in. Debug level - a few lines per window transition.
+        super().resizeGL(w, h)
+        log.debug("VID resizeGL %dx%d fbo=%s glctx=%s", w, h,
+                  self.defaultFramebufferObject(),
+                  self._ctx_id(QOpenGLContext.currentContext()))
 
     def shutdown(self) -> None:
-        self._free_render_context()
+        self._free_render_context("shutdown")
         if self.mpv:
             try:
                 self.mpv.terminate()
@@ -1553,6 +1622,9 @@ class EmbeddedPlayer(QWidget):
     def set_popout_mode(self, enabled: bool) -> None:
         """Detached-window mode: the pop-out window drives the size, so release
         the docked fixed height and let the video fill the window."""
+        log.info("VID set_popout_mode(%s): video=%dx%d ctx=%s mpv=%s",
+                 enabled, self.video.width(), self.video.height(),
+                 self.video._ctx is not None, self.video.mpv is not None)
         self._popout_mode = enabled
         if not enabled:
             # Back to docked: the bar is always visible there.
@@ -1597,6 +1669,9 @@ class EmbeddedPlayer(QWidget):
         # the video is black for the session.)
         v = self.video
         sz = v.size()
+        log.info("VID settle after reparent: video=%dx%d ctx=%s "
+                 "(nudging framebuffer)", sz.width(), sz.height(),
+                 v._ctx is not None)
         if sz.isValid() and sz.height() > 1:
             v.resize(sz.width(), sz.height() - 1)
             v.resize(sz)
@@ -1858,6 +1933,9 @@ class EmbeddedPlayer(QWidget):
                 b.setVisible(available)
 
     def set_fullscreen_ui(self, fullscreen: bool) -> None:
+        log.info("VID set_fullscreen_ui(%s): video=%dx%d ctx=%s popout=%s",
+                 fullscreen, self.video.width(), self.video.height(),
+                 self.video._ctx is not None, self._popout_mode)
         self._fs_ui = fullscreen
         self.bar.setVisible(not fullscreen)
         if fullscreen:
