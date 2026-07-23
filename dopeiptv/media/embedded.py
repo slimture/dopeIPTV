@@ -1021,6 +1021,9 @@ class EmbeddedPlayer(QWidget):
     SEEK_BACK = 10
     SEEK_FWD = 30
     MINIBTN = 28
+    # Sleep-timer countdown pill: pinned on (never fades) once this little time
+    # is left, so the imminent stop is unmissable.
+    SLEEP_PIN_SECS = 30
     ICON_PX = 15  # drawn control-icon size inside the 28px buttons
 
     def __init__(self, parent: QWidget | None = None,
@@ -1416,6 +1419,12 @@ class EmbeddedPlayer(QWidget):
         self._sleep_tick = QTimer(self)
         self._sleep_tick.setInterval(1000)
         self._sleep_tick.timeout.connect(self._update_sleep_badge)
+        # The countdown pill fades like the controls, but is pinned on for the
+        # final SLEEP_PIN_SECS as a "about to stop" warning.
+        self._sleep_badge_timer = QTimer(self)
+        self._sleep_badge_timer.setSingleShot(True)
+        self._sleep_badge_timer.setInterval(2500)
+        self._sleep_badge_timer.timeout.connect(self._maybe_hide_sleep_badge)
 
         # Black cover widget that sits over the mpv render surface when we
         # want the pane to be visibly black. Painted with a plain QPalette
@@ -1667,6 +1676,7 @@ class EmbeddedPlayer(QWidget):
         # fullscreen and pop-out) so the affordance is consistent everywhere:
         # while playing it fades after a short idle, while paused it stays up.
         self._reveal_center()
+        self._reveal_sleep_badge()      # no-op unless a sleep timer is armed
         if not self._fs_ui and self._seekable:
             # Docked / pop-out, seekable content: reveal the floating scrubber.
             self._show_seek_overlay()
@@ -1796,13 +1806,12 @@ class EmbeddedPlayer(QWidget):
             if ov is not None:
                 ov.setParent(parent)
                 ov.hide()
-        # The sleep-timer badge is persistent (not hover-driven): move it into
-        # the pop-out too and re-show it there if a timer is armed.
+        # The sleep-timer badge follows into the pop-out too; flash it there if
+        # a timer is armed (then it fades / stays pinned per the countdown).
         self.sleep_badge.setParent(parent)
         self.sleep_badge.hide()
         self._show_dock_placeholder(True)
-        if self._sleep_timer.isActive():
-            self._update_sleep_badge()
+        self._reveal_sleep_badge()
         return m
 
     def stop_mirror(self) -> None:
@@ -1824,8 +1833,7 @@ class EmbeddedPlayer(QWidget):
         self._mirror = None
         self._show_dock_placeholder(False)
         self.video.update()
-        if self._sleep_timer.isActive():
-            self._update_sleep_badge()
+        self._reveal_sleep_badge()
 
     def reveal_pop_overlays(self) -> None:
         """macOS/Windows pop-out hover: bring back the auto-hidden control bar
@@ -1833,6 +1841,7 @@ class EmbeddedPlayer(QWidget):
         whichever applies. The mirror forwards its pointer movement here; the
         overlays are already reparented over it."""
         self._reveal_popout_bar()       # no-op unless auto-hide is on
+        self._reveal_sleep_badge()      # no-op unless a sleep timer is armed
         if self._seek_mode == "timeline":
             self._show_ts_timeline()
         else:
@@ -2762,35 +2771,55 @@ class EmbeddedPlayer(QWidget):
             if self._sleep_timer.isActive():
                 self._sleep_timer.stop()
                 self._sleep_tick.stop()
+                self._sleep_badge_timer.stop()
                 self.sleep_badge.hide()
                 self.set_overlay_info(tr("sleep_cancelled"))
             return
         self._sleep_timer.start(minutes * 60 * 1000)
         self._sleep_deadline = time.monotonic() + minutes * 60
         self._sleep_tick.start()
-        self._update_sleep_badge()
+        self._reveal_sleep_badge()
         self.set_overlay_info(tr("sleep_set", n=minutes))
 
-    def _update_sleep_badge(self) -> None:
-        """Refresh the countdown pill; called every second while armed."""
+    def _reveal_sleep_badge(self) -> None:
+        """Flash the countdown pill on activity and re-arm its idle fade. In
+        the final SLEEP_PIN_SECS the tick keeps it pinned regardless."""
+        if not self._sleep_timer.isActive():
+            return
+        self._update_sleep_badge(show=True)
+        self._sleep_badge_timer.start()
+
+    def _maybe_hide_sleep_badge(self) -> None:
+        # Fade like the controls, but never inside the pinned final window.
+        if self._sleep_deadline - time.monotonic() > self.SLEEP_PIN_SECS:
+            self.sleep_badge.hide()
+
+    def _update_sleep_badge(self, show: bool = False) -> None:
+        """Refresh the countdown pill; called every second while armed. Only
+        (re)shows it when asked (a reveal), when already visible, or when
+        pinned - so an idle fade stays faded between ticks."""
         b = self.sleep_badge
         remaining = int(round(self._sleep_deadline - time.monotonic()))
         if remaining <= 0 or not self._sleep_timer.isActive():
             self._sleep_tick.stop()
             b.hide()
             return
+        pinned = remaining <= self.SLEEP_PIN_SECS
         h, rem = divmod(remaining, 3600)
         m, s = divmod(rem, 60)
         txt = f"{h}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
         b.setText(f"\U0001F319 {txt}")
+        # A warmer pill in the pinned window makes the imminent stop obvious.
+        bg = "rgba(200,60,50,220)" if pinned else "rgba(0,0,0,150)"
         b.setStyleSheet(
-            "background: rgba(0,0,0,150); color: #FFFFFF;"
+            f"background: {bg}; color: #FFFFFF;"
             "border-radius: 9px; padding: 3px 9px;"
             "font-size: 11px; font-weight: 700;")
         b.adjustSize()
         self._place_sleep_badge()
-        b.show()
-        b.raise_()
+        if show or pinned or b.isVisible():
+            b.show()
+            b.raise_()
 
     def _place_sleep_badge(self) -> None:
         # Anchor to the overlay surface (the docked video, or the mirror while
@@ -2809,6 +2838,7 @@ class EmbeddedPlayer(QWidget):
 
     def _on_sleep_elapsed(self) -> None:
         self._sleep_tick.stop()
+        self._sleep_badge_timer.stop()
         self.sleep_badge.hide()
         self.set_overlay_info(tr("sleep_stopping"))
         self.stop()

@@ -155,6 +155,25 @@ assert player.ts_timeline.parent() is player and \
 assert player._dock_ph.isHidden(), "placeholder lifts on dock-back"
 assert player.video.mpv is sentinel_mpv, "docked mpv still untouched"
 
+# Sleep-timer badge: fades like the controls, but is pinned on in the final
+# SLEEP_PIN_SECS so the imminent stop is unmissable.
+import time as _time
+player._start_sleep_timer(45)                 # arms the timer, flashes the pill
+assert not player.sleep_badge.isHidden(), "pill shown when the timer is set"
+player._maybe_hide_sleep_badge()              # idle fade, plenty of time left
+assert player.sleep_badge.isHidden(), "pill fades while > pin window remains"
+player._update_sleep_badge()                  # a tick must not un-fade it
+assert player.sleep_badge.isHidden(), "an idle tick keeps it faded"
+# Inside the pinned window it shows on the next tick and never fades.
+player._sleep_deadline = _time.monotonic() + player.SLEEP_PIN_SECS - 5
+player._update_sleep_badge()
+assert not player.sleep_badge.isHidden(), "pill pinned on in the final seconds"
+player._maybe_hide_sleep_badge()
+assert not player.sleep_badge.isHidden(), "pinned pill never fades"
+player._start_sleep_timer(0)                  # cancel
+assert player.sleep_badge.isHidden(), "cancel hides the pill"
+assert not player._sleep_tick.isActive() and not player._sleep_badge_timer.isActive()
+
 print("EMBEDDED_OK")
 """
 
