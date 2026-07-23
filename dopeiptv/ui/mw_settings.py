@@ -325,10 +325,16 @@ class _SettingsMixin:
         if not confirm(parent_dialog, tr("settings_reset_all"),
                        tr("settings_reset_confirm_2"), default_yes=False):
             return
-        # Clear() drops every key from this QSettings scope; sync() flushes
-        # it to disk before we tell the user to restart.
-        self.settings.clear()
-        self.settings.sync()
+        # Clear() drops every key from a QSettings scope; sync() flushes it to
+        # disk before we tell the user to restart. Watched and Watch Later live
+        # in the separate cache-settings file, and resume positions in the
+        # resume file - clear all three or those survive a "reset all".
+        for st in (self.settings,
+                   getattr(self, "_resume_settings", None),
+                   getattr(self, "_cache_settings", None)):
+            if st is not None:
+                st.clear()
+                st.sync()
         # closeEvent persists layout/resume/watched on the way out - skip
         # that during a reset, or the freshly cleared config gets seeded
         # with those keys again.
