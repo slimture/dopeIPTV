@@ -135,8 +135,19 @@ assert player.seek_overlay.parent() is host, "seek bar moved to the pop-out"
 assert player.ts_timeline.parent() is host, "timeshift timeline moved"
 assert player._stats_overlay.parent() is host, "stats moved"
 assert player.video.parent() is player, "the GL surface is NOT reparented"
+# Auto-hide: the mirror path counts as a pop-out context, so the control bar
+# fades on idle and returns on a mirror hover (the guards used to key off
+# _popout_mode, which the mirror path never sets - the bar stayed pinned).
+assert player._in_popout() is True, "mirror is a pop-out context"
+player._fs_ui = False               # left True by the fullscreen checks above
+player.set_popout_autohide(True)
+player._hide_popout_bar()
+assert player.bar.isHidden(), "auto-hide must fade the bar while mirrored"
+player.reveal_pop_overlays()
+assert not player.bar.isHidden(), "a mirror hover brings the bar back"
 player.stop_mirror()
 assert player._mirror is None
+assert player._in_popout() is False, "docked again: not a pop-out context"
 assert player._ov_surface is player.video, "overlays anchor back to the video"
 assert player.seek_overlay.parent() is player, "seek bar back on the player"
 assert player.ts_timeline.parent() is player and \

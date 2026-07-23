@@ -154,6 +154,12 @@ class _PopoutMixin:
         # set, so nothing needs rewiring.
         win.layout().addWidget(self.player.bar)
         self.player.bar.show()
+        # Auto-hide the bar after a few idle seconds (revealed again on pointer
+        # movement over the mirror), per the same setting the docked pop-out
+        # uses. The mirror path now counts as a pop-out context, so the timer
+        # actually runs.
+        self.player.set_popout_autohide(
+            self.settings.value("popout_autohide", "true") == "true")
         mirror.video_dbl_click.connect(self._on_mirror_dbl_click)
         mirror.video_mouse_press.connect(self._on_mirror_press)
         mirror.video_mouse_move.connect(self._on_mirror_move)
@@ -339,6 +345,7 @@ class _PopoutMixin:
             # Return the control bar to the docked player (bottom of its vbox,
             # after the video) before the pop-out window is destroyed.
             self.player.layout().addWidget(self.player.bar)
+            self.player.set_popout_autohide(False)   # docked: always visible
             self.player.bar.show()
             self.player.stop_mirror()
             self._popout_mirror = None

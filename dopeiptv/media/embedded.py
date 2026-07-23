@@ -1806,9 +1806,11 @@ class EmbeddedPlayer(QWidget):
         self.video.update()
 
     def reveal_pop_overlays(self) -> None:
-        """macOS pop-out hover: flash the seek bar (VOD / catch-up) or the
-        timeshift timeline, whichever applies. The mirror forwards its pointer
-        movement here; the overlays are already reparented over it."""
+        """macOS/Windows pop-out hover: bring back the auto-hidden control bar
+        and flash the seek bar (VOD / catch-up) or the timeshift timeline,
+        whichever applies. The mirror forwards its pointer movement here; the
+        overlays are already reparented over it."""
+        self._reveal_popout_bar()       # no-op unless auto-hide is on
         if self._seek_mode == "timeline":
             self._show_ts_timeline()
         else:
@@ -1903,23 +1905,29 @@ class EmbeddedPlayer(QWidget):
                 win.repaint()
                 log.info("VID host-window repaint (rebuild stale backing store)")
 
+    def _in_popout(self) -> bool:
+        """True whenever the control bar lives in a pop-out window - either the
+        reparent path (Linux, `_popout_mode`) or the mirror path (macOS/Windows,
+        a live `_mirror`). Docked, the bar is always visible."""
+        return self._popout_mode or getattr(self, "_mirror", None) is not None
+
     def set_popout_autohide(self, enabled: bool) -> None:
         """When on, the pop-out control bar fades after a few seconds of no
         pointer activity and reappears on mouse movement over the video (like a
         video player). Off keeps it permanently visible."""
         self._popout_autohide = enabled
         self.bar.show()
-        if enabled and self._popout_mode:
+        if enabled and self._in_popout():
             self._popout_bar_timer.start()
         else:
             self._popout_bar_timer.stop()
 
     def _hide_popout_bar(self) -> None:
-        if self._popout_mode and self._popout_autohide and not self._fs_ui:
+        if self._in_popout() and self._popout_autohide and not self._fs_ui:
             self.bar.hide()
 
     def _reveal_popout_bar(self) -> None:
-        if self._popout_mode and self._popout_autohide:
+        if self._in_popout() and self._popout_autohide:
             self.bar.show()
             self._popout_bar_timer.start()
 
