@@ -1946,9 +1946,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.list_model.set_items([], self.mode)
         if self.mode == "rec":
             self.cat_list.blockSignals(True)
-            for label, data in [("All recordings", None),
-                                ("Active & scheduled", "__jobs__"),
-                                ("Upcoming", "__upcoming__")]:
+            for label, data in [(tr("rec_all_recordings"), None),
+                                (tr("rec_active_scheduled"), "__jobs__"),
+                                (tr("rec_upcoming"), "__upcoming__")]:
                 item = QListWidgetItem(label)
                 item.setData(Qt.ItemDataRole.UserRole, data)
                 self.cat_list.addItem(item)
@@ -2499,6 +2499,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             else:
                 buckets["earlier"].append(f)
         grouped: list[dict] = []
+        # Surface the pending recordings (recording now + scheduled) at the very
+        # top of the default view, soonest first, so upcoming recordings are
+        # visible and manageable (right-click → edit / cancel) the moment the
+        # Recordings section opens - not hidden behind a sub-category.
+        pending = sorted(
+            (j for j in self.rec.jobs
+             if j["status"] in ("recording", "scheduled")),
+            key=lambda j: j.get("start") or 0)
+        if pending:
+            grouped.append({"_header": tr("rec_upcoming")})
+            grouped += [self._job_item(j) for j in pending]
         for key, hk in (("today", "rec_today"), ("yesterday", "rec_yesterday"),
                         ("week", "rec_this_week"), ("earlier", "rec_earlier")):
             if buckets[key]:

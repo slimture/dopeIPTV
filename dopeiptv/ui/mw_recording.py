@@ -24,9 +24,12 @@ from datetime import datetime, timedelta
 class _RecordingMixin:
     """MainWindow mixin: recording, scheduling and timeshift/catch-up controls."""
     def _job_item(self, j: dict) -> dict:
-        label = {"recording": "● REC", "scheduled": "Scheduled",
-                 "done": "Done", "failed": "Failed",
-                 "cancelled": "Cancelled"}.get(j["status"], j["status"])
+        label = {"recording": "● REC",
+                 "scheduled": tr("rec_status_scheduled"),
+                 "done": tr("rec_status_done"),
+                 "failed": tr("rec_status_failed"),
+                 "cancelled": tr("rec_status_cancelled")}.get(
+                     j["status"], j["status"])
         start = datetime.fromtimestamp(
             j["start"]).strftime("%a %d %b %H:%M")
         stop = ("until stopped" if j.get("stop") is None
