@@ -786,7 +786,13 @@ class _SeekSlider(QSlider):
         exact placement. Recreated if the slider was reparented (pop-out)."""
         win = self.window()
         lbl = getattr(self, "_hover_tip", None)
-        if lbl is None or lbl.parent() is not win:
+        try:
+            stale = lbl is None or lbl.parent() is not win
+        except RuntimeError:
+            # The old tip's C++ object went away with a destroyed window
+            # (pop-out reparent); treat it as gone and make a fresh one.
+            lbl, stale = None, True
+        if stale:
             if lbl is not None:
                 lbl.deleteLater()
             lbl = QLabel(win)
@@ -802,7 +808,14 @@ class _SeekSlider(QSlider):
     def _hide_hover_tip(self) -> None:
         lbl = getattr(self, "_hover_tip", None)
         if lbl is not None:
-            lbl.hide()
+            try:
+                lbl.hide()
+            except RuntimeError:
+                # The tip is parented to the top-level window; when the slider
+                # is reparented (pop-out) the old window is destroyed and takes
+                # the C++ QLabel with it, leaving a dangling Python wrapper.
+                # Drop the stale reference - a fresh tip is made on next hover.
+                self._hover_tip = None
 
     def leaveEvent(self, event) -> None:
         self._hide_hover_tip()

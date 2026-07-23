@@ -28,6 +28,20 @@ from ..i18n import tr
 from .widgets import exec_menu_over_video
 
 
+def _use_mirror_popout() -> bool:
+    """Whether to render the pop-out via a MIRROR surface instead of
+    reparenting the real GL widget.
+
+    macOS and Windows both share GL contexts across top-levels
+    (AA_ShareOpenGLContexts, required by the mpv render API). On macOS this
+    makes reparenting a QOpenGLWidget between windows present a stale layer
+    (frozen picture); Windows shares contexts the same way and is expected to
+    behave the same, so both take the mirror path. Linux destroys and rebuilds
+    the context on reparent, so the plain reparent path stays there.
+    """
+    return sys.platform in ("darwin", "win32")
+
+
 class _PopoutWindow(QWidget):
     """Top-level host for the detached player.
 
@@ -79,10 +93,11 @@ class _PopoutMixin:
         if self._player_fs:
             self._exit_player_fullscreen()
 
-        if sys.platform == "darwin":
-            # macOS cannot reparent a QOpenGLWidget between windows without the
-            # picture freezing (cocoa presents a stale layer). Mirror the
-            # stream into the pop-out window instead of moving the player.
+        if _use_mirror_popout():
+            # macOS/Windows cannot reparent a QOpenGLWidget between windows
+            # without the picture freezing (a stale shared-context layer).
+            # Mirror the stream into the pop-out window instead of moving the
+            # player. (Named _popout_macos for its origin; also used on win32.)
             self._popout_macos()
             return
 
