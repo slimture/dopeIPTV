@@ -327,11 +327,16 @@ class _PopoutMixin:
             self._mirror_click_timer.start()
 
     def _on_mirror_dbl_click(self) -> None:
-        # Cancel the pending single-click pause, then toggle fullscreen.
+        # Cancel the pending single-click pause, then toggle fullscreen. When
+        # this window IS the mini-player's maximize (fs-via-popout), a
+        # double-click leaves fullscreen by docking straight back.
         t = getattr(self, "_mirror_click_timer", None)
         if t is not None:
             t.stop()
-        self._toggle_popout_fullscreen()
+        if getattr(self, "_fs_via_popout", False):
+            self._exit_player_fullscreen()
+        else:
+            self._toggle_popout_fullscreen()
 
     def _popout_flags(self) -> "Qt.WindowType":
         """Window flags from the saved right-click choices. Wayland can't pin a
@@ -376,6 +381,9 @@ class _PopoutMixin:
         if win is None:
             return
         self._popout_win = None
+        # Any dock-back clears the mini-maximize flag (dock via context menu /
+        # placeholder click too), so a later maximize starts clean.
+        self._fs_via_popout = False
 
         if getattr(self, "_popout_mirror", None) is not None:
             # macOS mirror path: no reparent to undo - just tear down the
@@ -460,8 +468,14 @@ class _PopoutMixin:
             self._popout_cursor_activity()
 
     def _popout_escape(self) -> None:
-        """Escape in the pop-out window leaves its fullscreen (does not dock)."""
-        if self._popout_win is not None and self._popout_win.isFullScreen():
+        """Escape in the pop-out window leaves its fullscreen. For a real
+        pop-out that just un-fullscreens (stays floating); for the macOS mini
+        maximize (fs-via-popout) it docks straight back to the mini player."""
+        if self._popout_win is None:
+            return
+        if getattr(self, "_fs_via_popout", False):
+            self._exit_player_fullscreen()
+        elif self._popout_win.isFullScreen():
             self._toggle_popout_fullscreen()
 
     def _exit_popout_if_active(self) -> None:

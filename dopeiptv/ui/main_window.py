@@ -1251,6 +1251,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._playback_max_pct = 0.0
         self._current_epg = None
         self._player_fs = False
+        # macOS: mini-player "maximize" goes fullscreen through the mirror
+        # pop-out (a frameless window covers the screen instantly, no native
+        # fullscreen Space animation - the reason the pop-out felt smoother).
+        self._fs_via_popout = False
         self._fs_exiting = False
 
         # Escape and Delete are structural/context-sensitive, so they stay
@@ -1554,10 +1558,24 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         self._fs_toggled_at = now
         if self._popout_win is not None:
-            self._toggle_popout_fullscreen()
+            # Already detached. If we opened that pop-out purely to go
+            # fullscreen (macOS mini maximize), toggling off docks back;
+            # otherwise it's a real pop-out and we just leave its fullscreen.
+            if self._fs_via_popout:
+                self._exit_player_fullscreen()
+            else:
+                self._toggle_popout_fullscreen()
             return
         if self._player_fs:
             self._exit_player_fullscreen()
+            return
+        # macOS: reuse the smooth mirror pop-out for maximize - a frameless
+        # window covers the screen at once, skipping the slow native
+        # fullscreen transition the decorated main window would trigger.
+        if sys.platform == "darwin":
+            self._fs_via_popout = True
+            self._popout_macos()
+            self._toggle_popout_fullscreen()
             return
         self._player_fs = True
         self._fs_return_index = self.listw.currentIndex()
@@ -1621,7 +1639,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # When the player is detached, its fullscreen belongs to the pop-out
         # window - route the exit there instead of the main window.
         if self._popout_win is not None:
-            if self._popout_win.isFullScreen():
+            if self._fs_via_popout:
+                # macOS mini maximize: leaving fullscreen docks straight back
+                # to the mini player (never leaves a floating pop-out behind).
+                self._fs_via_popout = False
+                self._exit_popout()
+            elif self._popout_win.isFullScreen():
                 self._toggle_popout_fullscreen()
             return
         if not self._player_fs:
