@@ -271,6 +271,8 @@ class _RecordingMixin:
         rec_menu.addSeparator()
         rec_menu.addAction(tr("rec_schedule_recording"),
                            lambda: self._schedule_recording(it))
+        rec_menu.addAction(tr("rec_manage_scheduled"),
+                           lambda: self._show_scheduled_manager())
         cap_menu = rec_menu.addMenu(tr("rec_size_limit_session"))
         current = self.rec.session_cap
         presets = (("From Settings", None), ("No limit", 0),
@@ -539,6 +541,93 @@ class _RecordingMixin:
             if it.get("_status") == "scheduled":
                 self.rec.cancel(it["_job"])
             self.rec.remove_job(it["_job"])
+
+    def _show_scheduled_manager(self) -> None:
+        """A standalone panel listing the pending recordings (recording now +
+        scheduled), soonest first, with Edit-times and Cancel right there - so
+        upcoming recordings can be managed from the player or the EPG without
+        hunting through the Recordings section's columns."""
+        d = QDialog(self)
+        d.setWindowTitle(tr("rec_scheduled_title"))
+        d.setMinimumWidth(480)
+        lay = QVBoxLayout(d)
+        lay.setContentsMargins(16, 14, 16, 14)
+        lay.setSpacing(12)
+        lst = QListWidget()
+        lst.setStyleSheet("QListWidget { font-size: 13px; }")
+        lay.addWidget(lst)
+        empty = QLabel(tr("rec_no_upcoming"))
+        empty.setStyleSheet(f"color:{P['muted']}; font-size:13px;")
+        empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lay.addWidget(empty)
+        row = QHBoxLayout()
+        edit_btn = QPushButton(tr("rec_edit_times"))
+        cancel_btn = QPushButton(tr("rec_cancel_scheduled"))
+        cancel_btn.setStyleSheet(f"color:{P['rec']}; font-weight:600;")
+        close_btn = QPushButton(tr("common_close"))
+        row.addWidget(edit_btn)
+        row.addWidget(cancel_btn)
+        row.addStretch(1)
+        row.addWidget(close_btn)
+        lay.addLayout(row)
+
+        def selected_job():
+            it = lst.currentItem()
+            jid = it.data(Qt.ItemDataRole.UserRole) if it else None
+            if jid is None:
+                return None
+            return next((j for j in self.rec.jobs if j["id"] == jid), None)
+
+        def refresh():
+            lst.clear()
+            pending = sorted(
+                (j for j in self.rec.jobs
+                 if j["status"] in ("recording", "scheduled")),
+                key=lambda j: j.get("start") or 0)
+            for j in pending:
+                item = self._job_item(j)
+                li = QListWidgetItem(item["name"])
+                li.setData(Qt.ItemDataRole.UserRole, j["id"])
+                lst.addItem(li)
+            has = bool(pending)
+            lst.setVisible(has)
+            empty.setVisible(not has)
+            if has:
+                lst.setCurrentRow(0)
+            _sync_buttons()
+
+        def _sync_buttons():
+            job = selected_job()
+            # Times are only editable before it starts; cancel works for both a
+            # scheduled job and one recording right now.
+            edit_btn.setEnabled(bool(job) and job["status"] == "scheduled")
+            cancel_btn.setEnabled(bool(job))
+
+        def do_edit():
+            job = selected_job()
+            if job and job["status"] == "scheduled":
+                self._edit_job_times(job["id"])
+
+        def do_cancel():
+            job = selected_job()
+            if not job:
+                return
+            if confirm(d, tr("rec_scheduled_title"),
+                       tr("rec_cancel_scheduled") + f"\n\n{job['title']}",
+                       default_yes=False):
+                self.rec.cancel(job["id"])
+
+        lst.currentItemChanged.connect(lambda *_: _sync_buttons())
+        lst.itemDoubleClicked.connect(lambda *_: do_edit())
+        edit_btn.clicked.connect(do_edit)
+        cancel_btn.clicked.connect(do_cancel)
+        close_btn.clicked.connect(d.accept)
+        # Keep the panel live as jobs start / finish / get cancelled while open.
+        self.rec.jobs_changed.connect(refresh)
+        d.finished.connect(
+            lambda *_: self.rec.jobs_changed.disconnect(refresh))
+        refresh()
+        d.exec()
 
     def _delete_recordings_selected(self, clicked_item=None) -> None:
         cur = self.cat_list.currentItem()

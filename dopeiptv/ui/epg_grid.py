@@ -188,6 +188,11 @@ class EpgGridDialog(QDialog):
         self.reminders_btn = QPushButton("🔔 " + tr("reminders_title"))
         self.reminders_btn.clicked.connect(self.window._open_reminders)
         bar.addWidget(self.reminders_btn)
+        # Manage upcoming recordings without leaving the guide.
+        self.rec_sched_btn = QPushButton("⏺ " + tr("rec_scheduled_title"))
+        self.rec_sched_btn.setToolTip(tr("rec_manage_scheduled"))
+        self.rec_sched_btn.clicked.connect(self.window._show_scheduled_manager)
+        bar.addWidget(self.rec_sched_btn)
         # Jumps the board back up to the channel you're watching (handy after
         # scrolling far down a long line-up). Only shown when one is playing.
         self.playing_btn = QPushButton(tr("epg_jump_playing"))
