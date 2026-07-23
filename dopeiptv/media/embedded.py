@@ -488,17 +488,21 @@ class _MpvGLWidget(QOpenGLWidget):
             # new frames and the freeze is presentation/compositing; stuck =
             # the video track itself stalled (audio continues) and the
             # decoder path (e.g. videotoolbox) is the suspect.
-            vp = fd = hw = None
-            try:
-                vp = self.mpv.video_pts
-                fd = self.mpv.frame_drop_count
-                hw = self.mpv.hwdec_current
-            except Exception:
-                pass
+            def _prop(name: str):
+                # One property per try: a single unsupported name must not
+                # blank the whole probe (the first log run showed None for
+                # all three because the first read raised). err:<Type> in
+                # the log distinguishes "unsupported" from a None value.
+                try:
+                    v = getattr(self.mpv, name)
+                    return "none" if v is None else v
+                except Exception as e:
+                    return f"err:{type(e).__name__}"
             log.debug("VID paint alive #%d state=%s fbo=%s video-pts=%s "
                       "drops=%s hwdec=%s",
                       self._paint_n, getattr(self, "_paint_state", "?"),
-                      self.defaultFramebufferObject(), vp, fd, hw)
+                      self.defaultFramebufferObject(), _prop("video_pts"),
+                      _prop("frame_drop_count"), _prop("hwdec_current"))
         # Blank branch first so a repaint that arrives mid-stop (when mpv has
         # already been told to stop but our _ctx is still around) doesn't try
         # to render an mpv frame with a half-torn-down context - which
@@ -964,19 +968,11 @@ class EmbeddedPlayer(QWidget):
         if settings is not None:
             self.video.hwdec_pref = str(
                 settings.value("hwdec_mode", "") or "") or None
-        self.video.installEventFilter(self)
-        self.video.setMouseTracking(True)
         # Route mpv errors through a filter so a user-initiated stop doesn't
         # surface the "aborted / loading failed" mpv fires while it winds
         # the stream down as a "Stream error" toast.
         self._stopping = False
-        self.video.playback_error.connect(self._on_playback_error)
-        self.video.video_dbl_click.connect(self._on_video_dbl_click)
-        self.video.video_mouse_press.connect(self._on_video_press)
-        self.video.video_mouse_move.connect(self._on_video_move)
-        self.video.video_mouse_release.connect(self._on_video_release)
-        self.video.video_key_press.connect(self._on_seek_key_press)
-        self.video.video_key_release.connect(self._on_seek_key_release)
+        self._wire_video(self.video)
         # Continuous seek while an arrow key is held down.
         self._seek_hold_dir = 0
         self._seek_hold_timer = QTimer(self)
@@ -1681,35 +1677,78 @@ class EmbeddedPlayer(QWidget):
         # harmful: freeing outside the right current GL context can leave
         # libmpv's context registered, after which every re-create fails and
         # the video is black for the session.)
+        self._recreate_video_surface()
         v = self.video
         sz = v.size()
         log.info("VID settle after reparent: video=%dx%d ctx=%s "
                  "(nudging framebuffer)", sz.width(), sz.height(),
                  v._ctx is not None)
-        self._reattach_video_layer()
         if sz.isValid() and sz.height() > 1:
             v.resize(sz.width(), sz.height() - 1)
             v.resize(sz)
         v.update()
 
-    def _reattach_video_layer(self, force: bool = False) -> None:
-        """macOS: force the video widget's presentation layer to detach and
-        re-attach after a reparent. PROVEN by the video trace + screenshot:
-        with the video frozen in the pop-out, paint heartbeats kept rolling
-        (#600..#3000, state=render - ~48 s of successfully rendered frames)
-        while the screen showed an OLD frame scaled to the new geometry,
-        complete with a baked-in stale play-disc under the live one. mpv and
-        the GL side were healthy; cocoa was presenting a stale layer, and the
-        1 px resize nudge did not always make it re-attach. hide()+show()
-        does. Darwin-only: Linux recreates the GL context on reparent and
-        never presented stale."""
+    def _wire_video(self, w) -> None:
+        """Connect a video widget's signals/filters to the player - used for
+        the widget built in __init__ and for every replacement surface."""
+        w.installEventFilter(self)
+        w.setMouseTracking(True)
+        w.playback_error.connect(self._on_playback_error)
+        w.video_dbl_click.connect(self._on_video_dbl_click)
+        w.video_mouse_press.connect(self._on_video_press)
+        w.video_mouse_move.connect(self._on_video_move)
+        w.video_mouse_release.connect(self._on_video_release)
+        w.video_key_press.connect(self._on_seek_key_press)
+        w.video_key_release.connect(self._on_seek_key_release)
+
+    def _recreate_video_surface(self, force: bool = False) -> None:
+        """macOS: replace the GL video widget with a FRESH one after a
+        pop-out reparent, instead of trying to revive the old one in place.
+
+        The evidence ladder that leads here: with the video frozen in the
+        pop-out, paint heartbeats kept rolling (state=render, no GL errors)
+        while the screen showed an old frame scaled to the new geometry -
+        cocoa presenting a stale layer for the reparented QOpenGLWidget.
+        Neither a 1 px resize nudge nor a hide()/show() re-attach revived it
+        (and the re-attach could stack the video layer over the sibling
+        overlays - the "seek bar randomly missing" report). A brand-new
+        widget gets a brand-new native view, layer and framebuffer, so there
+        is nothing left to BE stale, deterministically.
+
+        The mpv instance is borrowed across (the stream and audio are never
+        touched); paintGL's self-heal builds the render context against the
+        new widget's GL context on its first paint. Darwin-only: Linux
+        recreates the GL context on reparent and never presented stale."""
         if not force and sys.platform != "darwin":
             return
-        v = self.video
-        v.hide()
-        v.show()
-        log.info("VID layer re-attach (hide/show): video=%dx%d ctx=%s",
-                 v.width(), v.height(), v._ctx is not None)
+        old = self.video
+        mpv = old.mpv
+        old._free_render_context("surface swap")
+        old.mpv = None            # the old widget's teardown must not touch mpv
+        new = _MpvGLWidget(self)
+        new.hwdec_pref = getattr(old, "hwdec_pref", None)
+        new.mpv = mpv
+        new._blank = old._blank
+        self._wire_video(new)
+        lay = self.layout()
+        idx = lay.indexOf(old)
+        lay.insertWidget(idx, new, 1)
+        lay.removeWidget(old)
+        # The overlays that live INSIDE the video widget move to the new one
+        # (setParent hides them; restore what was showing).
+        for w in (self._blackout, self._stats_overlay):
+            was = not w.isHidden()
+            w.setParent(new)
+            if was:
+                w.setGeometry(new.rect())
+                w.show()
+        old.hide()
+        old.setParent(None)
+        old.deleteLater()
+        self.video = new
+        new.show()
+        new.update()      # first paint self-heals the render context
+        log.info("VID video surface recreated (fresh widget, mpv borrowed)")
 
     def set_popout_autohide(self, enabled: bool) -> None:
         """When on, the pop-out control bar fades after a few seconds of no

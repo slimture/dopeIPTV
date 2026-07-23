@@ -102,11 +102,25 @@ player._settle_after_reparent()
 assert vid.mpv is sentinel_mpv, "settle must not touch mpv"
 assert vid._ctx is not None and _FakeCtx.freed is False, \
     "settle must not free/recreate the render context"
-# The macOS stale-layer cure (hide/show re-attach) is widget-only too.
-player._reattach_video_layer(force=True)
-assert vid.mpv is sentinel_mpv, "re-attach must not touch mpv"
-assert vid._ctx is not None and _FakeCtx.freed is False, \
-    "re-attach must not free/recreate the render context"
+# The macOS stale-presentation cure: a FRESH video widget replaces the old
+# one after a reparent. The mpv instance must be borrowed across unchanged
+# (stream/audio live), the old widget's render context freed, the in-video
+# overlays reparented, and the new widget fully wired.
+old_vid = player.video
+old_vid._ctx = _FakeCtx()
+_FakeCtx.freed = False
+player._recreate_video_surface(force=True)
+assert player.video is not old_vid, "a fresh widget must replace the old"
+assert player.video.mpv is sentinel_mpv, "mpv borrowed across, untouched"
+assert old_vid.mpv is None, "old widget must let go of mpv"
+assert _FakeCtx.freed is True, "old render context must be freed"
+assert player.video._ctx is None, "new ctx is built lazily by paint self-heal"
+assert player._blackout.parent() is player.video, "blackout moves along"
+assert player._stats_overlay.parent() is player.video, "stats moves along"
+assert player.layout().indexOf(player.video) != -1, "new widget in layout"
+vid = player.video   # later checks target the live widget
+vid._ctx = _FakeCtx()      # re-stage for the cover block below
+_FakeCtx.freed = False
 
 # The fullscreen-transition cover (macOS animated fullscreen) is pure
 # chrome: it shows, tracks resizes, uncovers via its timers or _end_fs_cover,
