@@ -2707,19 +2707,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._pending_jump_key = None
         self._pending_jump_cat = None
 
-    def _reveal_channel_in_list(self, it) -> None:
-        """Navigate the TV list to *it*'s own category and select it - used
-        when tuning a channel from Home so the classic list behind the player
-        reflects (and highlights) the channel, in its category, whether or not
-        we were already in Live mode."""
+    def _reveal_item_in_list(self, it, target: str) -> None:
+        """Navigate the *target* mode's list to *it*'s own category and select
+        it - used when playing from Home so the classic list behind the player
+        reflects (and highlights) the item, in its category, whether or not we
+        were already in that mode. Works for any mode (live channels, movies)."""
         self._pending_jump_key = self._item_key(it)
         self._pending_jump_cat = it.get("category_id")
         # Safety net only - long enough that a slow provider fetch of the
-        # category's channel list still lands inside the window (2.5 s wasn't:
-        # the key got cleared mid-load and the row was never selected).
+        # category's list still lands inside the window (2.5 s wasn't: the key
+        # got cleared mid-load and the row was never selected).
         QTimer.singleShot(8000, self._clear_pending_jump)
-        if self.mode != "live":
-            self.switch_mode("live")   # done() honours the pending jump
+        if self.mode != target:
+            self.switch_mode(target)   # done() honours the pending jump
             return
         if not self.cat_list.count():
             return
@@ -2736,6 +2736,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._apply_filter()   # same category: just (re)select the row
         else:
             self.cat_list.setCurrentRow(row)
+
+    def _reveal_channel_in_list(self, it) -> None:
+        """Reveal a live channel in the TV list (see _reveal_item_in_list)."""
+        self._reveal_item_in_list(it, "live")
 
     def tune_from_guide(self, ch) -> None:
         """Play a channel picked from the EPG guide, then jump the middle

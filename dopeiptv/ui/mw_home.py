@@ -929,8 +929,9 @@ class HomePage(QWidget):
         sid = it.get("stream_id")
         if sid is None:
             return
-        if w.mode != "vod":
-            w.switch_mode("vod")
+        # Land the Movies list in THIS movie's own category with it selected,
+        # instead of leaving the user in whatever category was last open.
+        w._reveal_item_in_list(it, "vod")
         url = w.client.vod_url(sid, it.get("container_extension"))
         if not url:
             return
