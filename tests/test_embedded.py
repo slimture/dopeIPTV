@@ -103,6 +103,18 @@ assert vid.mpv is sentinel_mpv, "settle must not touch mpv"
 assert vid._ctx is not None and _FakeCtx.freed is False, \
     "settle must not free/recreate the render context"
 
+# The GL video widget must stay CHILD-FREE: a widget on top of a
+# QOpenGLWidget forces Qt/macOS onto the render-to-texture composition
+# path, which goes stale (frozen picture) when the player is reparented
+# into the pop-out window - "stats for nerds" was the reproducible trigger.
+# The stats and black-cover overlays are the player's children, drawn over
+# the video as siblings.
+from PyQt6.QtWidgets import QWidget as _QW
+child_widgets = [c for c in vid.children() if isinstance(c, _QW)]
+assert child_widgets == [], f"video widget must have no child widgets: {child_widgets}"
+assert player._stats_overlay.parent() is player, "stats overlay is the player's child"
+assert player._blackout.parent() is player, "black cover is the player's child"
+
 print("EMBEDDED_OK")
 """
 

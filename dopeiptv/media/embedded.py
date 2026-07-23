@@ -1310,7 +1310,16 @@ class EmbeddedPlayer(QWidget):
         # user's compositor (Wayland's KDE/Hyprland stack sometimes still
         # shows the last mpv frame or tearing artefacts through paintGL's
         # glClear). setAutoFillBackground guarantees Qt fills it every paint.
-        self._blackout = QWidget(self.video)
+        #
+        # Parented to the PLAYER, not the video widget: a child widget on top
+        # of the QOpenGLWidget forces Qt/macOS onto the render-to-texture
+        # composition path instead of presenting the GL layer directly, and
+        # THAT composited path is what goes stale (frozen frame) when the
+        # player is reparented into the pop-out window. Keeping the GL widget
+        # child-free lets it present directly and survive the reparent. The
+        # overlay sits over the video as a sibling (like the centre button and
+        # seek bar already do), positioned to the video's geometry.
+        self._blackout = QWidget(self)
         self._blackout.setAutoFillBackground(True)
         pal = self._blackout.palette()
         pal.setColor(self._blackout.backgroundRole(), QColor(0, 0, 0))
@@ -1318,7 +1327,12 @@ class EmbeddedPlayer(QWidget):
         self._blackout.hide()
         self._blackout.installEventFilter(self)  # forward mouse to controls
 
-        self._stats_overlay = QLabel("", self.video)
+        # Also a sibling of the video (see _blackout): "stats for nerds" was
+        # THE reproducible pop-out freeze trigger - a translucent QLabel child
+        # over the GL widget kept the composited path alive, so a reparent
+        # froze the picture every time. As the player's child it no longer
+        # touches the GL widget's child list.
+        self._stats_overlay = QLabel("", self)
         self._stats_overlay.setStyleSheet(
             "background: rgba(0,0,0,180); color: #ECECF1;"
             "border-radius: 6px; padding: 8px 10px;"
@@ -1329,9 +1343,11 @@ class EmbeddedPlayer(QWidget):
         self._stats_timer.timeout.connect(self._update_stats_text)
 
         # Top-left "am I live?" badge: red LIVE at the live edge, a neutral
-        # TIMESHIFT pill when watching the catch-up archive. Child of the video
-        # so it floats over the picture; top-left anchor needs no reposition.
-        self.live_badge = QLabel("", self.video)
+        # TIMESHIFT pill when watching the catch-up archive. A sibling of the
+        # video (the player's child), NOT its child - see _blackout: any child
+        # on top of the QOpenGLWidget forces the composited path that freezes
+        # on a pop-out reparent. Anchored to the video's top-left corner.
+        self.live_badge = QLabel("", self)
         self.live_badge.hide()
 
         # Live timeline for timeshift channels: a floating bar at the bottom of
@@ -1750,7 +1766,8 @@ class EmbeddedPlayer(QWidget):
             "border-radius: 9px; padding: 3px 9px;"
             "font-size: 11px; font-weight: 700;")
         b.adjustSize()
-        b.move(12, 12)
+        tl = self.video.geometry().topLeft()
+        b.move(tl.x() + 12, tl.y() + 12)
         b.show()
         b.raise_()
 
@@ -2058,7 +2075,12 @@ class EmbeddedPlayer(QWidget):
         self._lock_video_box()
         self._relayout_controls()
         if self._blackout.isVisible():
-            self._blackout.setGeometry(self.video.rect())
+            self._blackout.setGeometry(self.video.geometry())
+        if self._stats_overlay.isVisible():
+            self._place_stats()
+        if self.live_badge.isVisible():
+            tl = self.video.geometry().topLeft()
+            self.live_badge.move(tl.x() + 12, tl.y() + 12)
         if self.center_btn.isVisible():
             self._position_center_btn()
         if self.overlay.isVisible() or self.fs_controls.isVisible():
@@ -2612,7 +2634,11 @@ class EmbeddedPlayer(QWidget):
 
     def _place_stats(self) -> None:
         self._stats_overlay.adjustSize()
-        self._stats_overlay.move(8, 8)
+        # 8 px inside the video's top-left. The overlay is a sibling of the
+        # video now (not its child), so anchor to the video's position within
+        # the player rather than to (0, 0).
+        tl = self.video.geometry().topLeft()
+        self._stats_overlay.move(tl.x() + 8, tl.y() + 8)
 
     def _pick_track(self, prop: str, tid) -> None:
         """User picked an audio/subtitle track from the options menu: apply
@@ -2901,7 +2927,7 @@ class EmbeddedPlayer(QWidget):
         # Show the raster-painted black cover on top of the GL surface. This
         # is what actually makes the pane genuinely black on compositors
         # where paintGL's glClear alone isn't enough.
-        self._blackout.setGeometry(self.video.rect())
+        self._blackout.setGeometry(self.video.geometry())
         self._blackout.show()
         self._blackout.raise_()
 
