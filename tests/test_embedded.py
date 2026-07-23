@@ -128,8 +128,19 @@ assert player._mirror is mirror
 assert player._dock_ph is not None and not player._dock_ph.isHidden(), \
     "docked video is covered while mirrored"
 assert player.video.mpv is sentinel_mpv, "docked mpv untouched by start_mirror"
+# The floating overlays follow the mirror into the pop-out window and anchor
+# to it; the docked GL surface itself never moves.
+assert player._ov_surface is mirror, "overlays anchor to the mirror"
+assert player.seek_overlay.parent() is host, "seek bar moved to the pop-out"
+assert player.ts_timeline.parent() is host, "timeshift timeline moved"
+assert player._stats_overlay.parent() is host, "stats moved"
+assert player.video.parent() is player, "the GL surface is NOT reparented"
 player.stop_mirror()
 assert player._mirror is None
+assert player._ov_surface is player.video, "overlays anchor back to the video"
+assert player.seek_overlay.parent() is player, "seek bar back on the player"
+assert player.ts_timeline.parent() is player and \
+    player._stats_overlay.parent() is player, "overlays back on the player"
 assert player._dock_ph.isHidden(), "placeholder lifts on dock-back"
 assert player.video.mpv is sentinel_mpv, "docked mpv still untouched"
 

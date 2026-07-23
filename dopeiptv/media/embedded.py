@@ -1020,6 +1020,12 @@ class EmbeddedPlayer(QWidget):
         self._popout_mode = False
         self._mirror = None          # macOS pop-out mirror surface (if any)
         self._dock_ph = None         # 'playing in pop-out' cover, docked side
+        # The surface the floating overlays (seek bar, timeshift timeline,
+        # stats) anchor to: the docked video normally, the pop-out mirror while
+        # popped out on macOS. Its .geometry() is in its parent's coords, and
+        # the overlays are reparented alongside, so placement is identical in
+        # either window.
+        self._ov_surface = None      # set to self.video once it's built
         self._popout_drag_from = None
         self._popout_autohide = False
         self._popout_bar_timer = QTimer(self)
@@ -1061,6 +1067,7 @@ class EmbeddedPlayer(QWidget):
         # the stream down as a "Stream error" toast.
         self._stopping = False
         self._wire_video(self.video)
+        self._ov_surface = self.video   # overlays anchor here (see __init__)
         # Continuous seek while an arrow key is held down.
         self._seek_hold_dir = 0
         self._seek_hold_timer = QTimer(self)
@@ -1756,6 +1763,14 @@ class EmbeddedPlayer(QWidget):
         self._mirror_timer = QTimer(self)
         self._mirror_timer.timeout.connect(m.update)
         self._mirror_timer.start(16)          # ~60 fps
+        # Float the seek bar, timeshift timeline and stats over the mirror:
+        # reparent them into the pop-out window and anchor placement to the
+        # mirror. They're plain widgets, so moving them is safe.
+        self._ov_surface = m
+        for ov in (self.seek_overlay, self.ts_timeline, self._stats_overlay):
+            if ov is not None:
+                ov.setParent(parent)
+                ov.hide()
         self._show_dock_placeholder(True)
         return m
 
@@ -1767,9 +1782,24 @@ class EmbeddedPlayer(QWidget):
             t.stop()
             self._mirror_timer = None
         self.video._render_suspended = False
+        # Overlays back onto the docked player.
+        self._ov_surface = self.video
+        for ov in (self.seek_overlay, self.ts_timeline, self._stats_overlay):
+            if ov is not None:
+                ov.setParent(self)
+                ov.hide()
         self._mirror = None
         self._show_dock_placeholder(False)
         self.video.update()
+
+    def reveal_pop_overlays(self) -> None:
+        """macOS pop-out hover: flash the seek bar (VOD / catch-up) or the
+        timeshift timeline, whichever applies. The mirror forwards its pointer
+        movement here; the overlays are already reparented over it."""
+        if self._seek_mode == "timeline":
+            self._show_ts_timeline()
+        else:
+            self._show_seek_overlay()   # a no-op on plain live
 
     def _show_dock_placeholder(self, on: bool) -> None:
         """Cover (not hide) the docked video with a 'playing in pop-out' panel
@@ -1902,7 +1932,7 @@ class EmbeddedPlayer(QWidget):
 
     def _place_seek_overlay(self) -> None:
         margin = 10
-        vg = self.video.geometry()
+        vg = self._ov_surface.geometry()
         self.seek_overlay.setFixedWidth(max(180, vg.width() - 2 * margin))
         self.seek_overlay.adjustSize()
         self.seek_overlay.move(
@@ -2088,7 +2118,7 @@ class EmbeddedPlayer(QWidget):
 
     def _place_ts_timeline(self) -> None:
         margin = 10
-        vg = self.video.geometry()
+        vg = self._ov_surface.geometry()
         self.ts_timeline.setFixedWidth(max(240, vg.width() - 2 * margin))
         self.ts_timeline.adjustSize()
         if self._fs_ui:
@@ -2796,10 +2826,9 @@ class EmbeddedPlayer(QWidget):
 
     def _place_stats(self) -> None:
         self._stats_overlay.adjustSize()
-        # 8 px inside the video's top-left. The overlay is a sibling of the
-        # video now (not its child), so anchor to the video's position within
-        # the player rather than to (0, 0).
-        tl = self.video.geometry().topLeft()
+        # 8 px inside the surface's top-left (the docked video, or the pop-out
+        # mirror while popped out).
+        tl = self._ov_surface.geometry().topLeft()
         self._stats_overlay.move(tl.x() + 8, tl.y() + 8)
 
     def _pick_track(self, prop: str, tid) -> None:

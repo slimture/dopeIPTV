@@ -58,9 +58,10 @@ class _PopoutWindow(QWidget):
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
-        # Keep the centre play/pause disc centred as the window is resized or
-        # maximised (macOS mirror pop-out).
+        # Keep the centre disc centred and the floating overlays anchored to
+        # the mirror as the window is resized or maximised.
         self._owner._reposition_popout_center()
+        self._owner._reposition_popout_overlays()
 
 
 class _PopoutMixin:
@@ -211,6 +212,19 @@ class _PopoutMixin:
                  (win.height() - btn.height()) // 2)
         btn.raise_()
 
+    def _reposition_popout_overlays(self) -> None:
+        """Re-anchor the floating overlays to the mirror after a pop-out window
+        resize (they're reparented into this window while popped out)."""
+        if getattr(self, "_popout_mirror", None) is None:
+            return
+        p = self.player
+        if p.seek_overlay is not None and p.seek_overlay.isVisible():
+            p._place_seek_overlay()
+        if p.ts_timeline.isVisible():
+            p._place_ts_timeline()
+        if p._stats_overlay.isVisible():
+            p._place_stats()
+
     def _on_mirror_press(self, event) -> None:
         # Accept the event so a right-click can't leak through the frameless
         # window to whatever sits behind it (the "bleed-through").
@@ -231,8 +245,10 @@ class _PopoutMixin:
                 if handle is not None:
                     handle.startSystemMove()
             return
-        # Idle pointer over the video flashes the centre play/pause disc.
+        # Idle pointer over the video flashes the centre play/pause disc and
+        # the seek bar / timeshift timeline (whichever applies).
         self._reveal_popout_center()
+        self.player.reveal_pop_overlays()
 
     def _on_mirror_release(self, event) -> None:
         # A plain click (no drag) toggles pause - but deferred by the
