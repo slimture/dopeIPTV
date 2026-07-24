@@ -5,6 +5,21 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
+## [1.2.1]
+
+Clearer update notices, a readable About dialog, and a calmer default startup.
+
+- **A clear "new version available" banner.** When a newer release is found, a
+  dismissible banner now appears across the top of the window - visible on every
+  view, including the full-window Home page where the old sidebar badge was easy
+  to miss. It shows once per version (and stays gone once dismissed).
+- **Download goes to the website.** The banner's and the About dialog's
+  **Download** buttons now open the website instead of the raw GitHub release.
+- **Fixed: the About dialog's release notes were unreadable** - an unthemed
+  white box with faint text. The notes panel now uses the app theme.
+- **The app starts on TV by default.** Home is now opt-in: turn on "Open Home on
+  startup" in Settings to land there instead. This applies to first run too.
+
 ## [1.2.0]
 
 A dedicated place to manage upcoming recordings, a smoother maximize on macOS,
@@ -48,18 +63,6 @@ and a batch of pop-out and Home polish.
 - **Windows: the pop-out now uses the same mirror approach as macOS.** This is
   **experimental and not yet sufficiently tested on Windows** - treat Windows
   pop-out as unstable for now. Linux keeps its existing (unchanged) pop-out.
-
-### Updates & startup
-
-- **A clear "new version available" banner.** When a newer release is found,
-  a dismissible banner now appears across the top of the window - visible on
-  every view, including the full-window Home page where the old sidebar badge
-  was easy to miss. Its **Download** button (and the About dialog's) now opens
-  the website rather than the raw GitHub release.
-- **Fixed: the About dialog's release notes were unreadable** (unthemed white
-  box with faint text); the notes panel now uses the app theme.
-- **The app starts on TV by default.** Home is now an opt-in - turn on
-  "Open Home on startup" in Settings to land there instead. (First run included.)
 
 ### Home
 
