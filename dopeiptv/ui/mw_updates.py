@@ -151,6 +151,15 @@ class _UpdatesMixin:
         self._reposition_update_banner(force=True)
         banner.show()
         banner.raise_()
+        # Fade it away on its own after a while so it doesn't linger forever;
+        # the sidebar badge stays as the quiet reminder, and it returns next
+        # launch unless the user dismissed it with the ✕.
+        QTimer.singleShot(30_000, self._autohide_update_banner)
+
+    def _autohide_update_banner(self) -> None:
+        b = getattr(self, "_update_banner", None)
+        if b is not None:
+            b.hide()
 
     def _dismiss_update_banner(self) -> None:
         tag = getattr(self, "_update_banner_tag", "")
@@ -161,7 +170,9 @@ class _UpdatesMixin:
             b.hide()
 
     def _reposition_update_banner(self, force: bool = False) -> None:
-        """Keep the banner centred at the top of the central widget on resize."""
+        """Keep the banner centred along the BOTTOM of the central widget on
+        resize - the top would collide with Home's own menu row (back button +
+        TV/Movies/Series pills)."""
         b = getattr(self, "_update_banner", None)
         parent = self.centralWidget()
         if b is None or parent is None or (not force and b.isHidden()):
@@ -169,5 +180,6 @@ class _UpdatesMixin:
         w = max(300, min(560, parent.width() - 40))
         b.setFixedWidth(w)
         b.adjustSize()
-        b.move((parent.width() - w) // 2, 10)
+        b.move((parent.width() - w) // 2,
+               max(10, parent.height() - b.height() - 16))
         b.raise_()
