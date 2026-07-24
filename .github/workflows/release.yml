@@ -578,13 +578,30 @@ jobs:
           python -m pip install -r requirements.txt
       - name: Fetch libmpv (mpv-2.dll)
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p libmpv
           # Latest self-contained libmpv dev build (ffmpeg is baked in).
-          url=$(curl -sSL https://api.github.com/repos/zhongfly/mpv-winbuild/releases/latest \
-                | python -c "import sys,json;a=json.load(sys.stdin)['assets'];print(next(x['browser_download_url'] for x in a if 'mpv-dev-x86_64' in x['name'] and x['name'].endswith('.7z')))")
+          # Authenticate the API call: unauthenticated GitHub API is 60 req/hr
+          # on the runner's shared IP and got rate-limited, returning a body
+          # with no "assets" key. That raised KeyError, and under this job's
+          # continue-on-error it silently shipped a release with NO Windows zip
+          # (v1.2.0). Auth lifts the limit to 1000/hr; empty URL now fails loud.
+          api() {
+            curl -sSL --retry 3 --retry-delay 5 \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              https://api.github.com/repos/zhongfly/mpv-winbuild/releases/latest
+          }
+          url=$(api | python -c "import sys,json;d=json.load(sys.stdin);a=d.get('assets') or [];print(next((x['browser_download_url'] for x in a if 'mpv-dev-x86_64' in x['name'] and x['name'].endswith('.7z')), ''))")
+          if [ -z "$url" ]; then
+            echo "::error::libmpv download URL not found (rate-limited, or the asset was renamed). API response:"
+            api | head -c 500; echo
+            exit 1
+          fi
           echo "mpv-dev: $url"
-          curl -sSL -o mpv-dev.7z "$url"
+          curl -sSL --retry 3 --retry-delay 5 -o mpv-dev.7z "$url"
           7z x mpv-dev.7z -ompv-dev
           dll=$(find mpv-dev -iname 'libmpv-2.dll' -o -iname 'mpv-2.dll' | head -1)
           echo "libmpv dll: $dll"
