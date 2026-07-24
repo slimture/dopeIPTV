@@ -2244,7 +2244,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     if j["status"] == "scheduled"]
                 self._apply_filter()
                 return
-            self._load_recordings_grouped(self.rec.files(category_id))
+            self._load_recordings_grouped(
+                self.rec.files(category_id), show_pending=category_id is None)
             return
         if self.mode == "fav":
             # category_id is a (section, group) tuple (or None as a
@@ -2497,7 +2498,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         headers in list mode, a flat poster wall in grid mode."""
         self._render_rows(self._grouped(sections), model_kind, empty_msg)
 
-    def _load_recordings_grouped(self, files: list) -> None:
+    def _load_recordings_grouped(self, files: list,
+                                 show_pending: bool = False) -> None:
         """Recordings grouped by when they were made: Today / Yesterday /
         This week / Earlier, newest first. Rows keep their recording nature
         (no _ekind/_kind retag) so they still play via the rec path."""
@@ -2523,16 +2525,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 buckets["earlier"].append(f)
         grouped: list[dict] = []
         # Surface the pending recordings (recording now + scheduled) at the very
-        # top of the default view, soonest first, so upcoming recordings are
-        # visible and manageable (right-click → edit / cancel) the moment the
-        # Recordings section opens - not hidden behind a sub-category.
-        pending = sorted(
-            (j for j in self.rec.jobs
-             if j["status"] in ("recording", "scheduled")),
-            key=lambda j: j.get("start") or 0)
-        if pending:
-            grouped.append({"_header": tr("rec_upcoming")})
-            grouped += [self._job_item(j) for j in pending]
+        # top of the default "All recordings" view, soonest first, so upcoming
+        # recordings are visible and manageable (right-click → edit / cancel)
+        # the moment the Recordings section opens - not hidden behind a
+        # sub-category. Only on the All view; a specific folder shows its files.
+        if show_pending:
+            pending = sorted(
+                (j for j in self.rec.jobs
+                 if j["status"] in ("recording", "scheduled")),
+                key=lambda j: j.get("start") or 0)
+            if pending:
+                grouped.append({"_header": tr("rec_upcoming")})
+                grouped += [self._job_item(j) for j in pending]
         for key, hk in (("today", "rec_today"), ("yesterday", "rec_yesterday"),
                         ("week", "rec_this_week"), ("earlier", "rec_earlier")):
             if buckets[key]:
