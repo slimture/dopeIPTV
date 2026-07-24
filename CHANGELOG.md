@@ -5,6 +5,62 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
+## [1.2.0]
+
+A dedicated place to manage upcoming recordings, a smoother maximize on macOS,
+and a batch of pop-out and Home polish.
+
+### Recordings
+
+- **New "Scheduled recordings" panel.** A dedicated window lists every pending
+  recording (recording now + scheduled), soonest first, with **Edit start/stop
+  time** and **Cancel** right there. Open it from the player's REC menu or a new
+  button in the EPG guide, so upcoming recordings are managed in one place
+  instead of hopping between the sidebar and the middle column. It refreshes
+  live as recordings start, finish or get cancelled.
+- **Upcoming recordings surface on the default Recordings view.** The
+  "All recordings" view now shows the pending recordings under an "Upcoming"
+  header at the top (they were previously only under the "Active & scheduled" /
+  "Upcoming" sub-categories). Folder views are unaffected.
+- **Fixed: "Watch the recorded channel" did nothing when picked the instant a
+  recording started.** ffmpeg creates the output file a beat after the job
+  begins, so the option found no file and gave up silently. It now waits
+  briefly for the file and starts playback automatically.
+- Recording status and category labels are now translated in every language.
+
+### Player & pop-out
+
+- **macOS: maximizing the mini player is now as smooth as the pop-out.** It goes
+  fullscreen through a frameless mirror window instead of the decorated main
+  window, skipping the slow native fullscreen animation and the pane teardown -
+  and you get the full control bar, auto-hiding controls and cursor-hide in
+  maximized mode. Every way out (button, Escape, double-click) docks straight
+  back to the mini player.
+- **The pop-out control bar auto-hides** after a few idle seconds and returns on
+  mouse movement, and **the mouse cursor now hides** over the video in the
+  pop-out - windowed and fullscreen.
+- **Sleep-timer countdown.** A top-right pill shows the time left before
+  playback stops. It auto-hides with the other controls but pins on - and turns
+  red - for the final 30 seconds, so the imminent stop is unmissable.
+- **Fixed: a crash when opening the pop-out.** The seek bar's hover tooltip
+  held a reference to a window that had been destroyed by the reparent; it is
+  now rebuilt on demand.
+- **Windows: the pop-out now uses the same mirror approach as macOS.** This is
+  **experimental and not yet sufficiently tested on Windows** - treat Windows
+  pop-out as unstable for now. Linux keeps its existing (unchanged) pop-out.
+
+### Home
+
+- **Resuming a movie from Home lands in its own category** with the movie
+  selected, instead of leaving you in whatever category was last open.
+- TV-channel logos on Home are centred in their tiles (and a touch larger).
+
+### Settings
+
+- **"Reset all settings" now really clears everything.** Watched, Watch Later
+  and resume positions live in separate config files and used to survive a
+  reset; all three are now cleared alongside the main settings.
+
 ## [1.1.0]
 
 Video stability on macOS, smarter series navigation, a leaner Home, and a

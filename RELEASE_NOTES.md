@@ -1,35 +1,37 @@
-## dopeIPTV 1.1.0
+## dopeIPTV 1.2.0
 
-Video stability on macOS, smarter series navigation, a leaner Home and a
-faster app all around.
+A dedicated place to manage upcoming recordings, a smoother maximize on macOS,
+and a batch of pop-out and Home polish.
 
-- **Pop-out video fixed for real**: docking the player in or out of the
-  pop-out window could leave a frozen frame (or black) while audio kept
-  playing — the video surface now rebuilds its framebuffer on every
-  dock/undock, with the stream untouched. Entering video fullscreen is one
-  clean cut, with no half-size flash.
-- **Series navigation that lands right**: *Now playing* jumps to the playing
-  episode inside its series; a Continue-watching card on Home plays the
-  episode *and* opens the series' episode list; backing out of an episode
-  list lands in the series' own category with the series selected.
-- **Recently viewed treats episodes as episodes**: replays resume where you
-  left off (no more restarting from zero), rows read "Series · S1 E2 -
-  Title", duplicates are gone, and cards reliably show the series' poster.
-- **Home, decluttered**: the redundant Featured row is removed, a new
-  **Watch Later shelf** shows your saved movies and shows, and Continue
-  watching / Recently viewed no longer overlap.
-- **The TV guide from Home or Movies covers your favourite channels** (the
-  lineup you curated) instead of an arbitrary first category — the full
-  lineup if you have no favourites. TV and Favorites scoping is unchanged.
-- **Faster**: quicker startup (lazy imports), Settings opens ~30% faster,
-  fullscreen toggles paint in one clean cut, image caches are bounded
-  (2.5 GB disk budget with automatic pruning), and an optional custom
-  allocator can be enabled with `DOPEIPTV_JEMALLOC` (off by default).
-- **Settings**: the language picker scrolls properly on every platform
-  (with a restart hint), a pasted provider link now survives messy input
-  (pre-filled fields, text prefixes), and the old one-time 0.9.0 settings
-  migration is fully removed.
+- **Manage your scheduled recordings in one place**: a new **Scheduled
+  recordings** panel lists every pending recording (recording now + scheduled),
+  soonest first, with *Edit start/stop time* and *Cancel* right there. Open it
+  from the player's REC menu or a new button in the EPG guide — no more hopping
+  between the sidebar and the middle column. Upcoming recordings also now show
+  at the top of the default Recordings view, and the list refreshes live.
+- **Smoother maximize on macOS**: maximizing the mini player now uses the same
+  frameless mirror window as the pop-out, so it snaps to fullscreen instantly
+  instead of the slow native fullscreen animation — with the full control bar,
+  auto-hiding controls and a hidden cursor while maximized. Every way out docks
+  straight back.
+- **Pop-out polish**: the control bar auto-hides after a few idle seconds
+  (returns on mouse movement), the mouse cursor hides over the video, and a
+  crash when opening the pop-out (a stale seek-bar tooltip) is fixed.
+- **Sleep-timer countdown**: a small pill shows how long is left before playback
+  stops. It auto-hides with the other controls but pins on — and turns red — for
+  the final 30 seconds.
+- **"Watch the recorded channel" now plays right away** even the instant a
+  recording starts (it waits for the file instead of silently giving up).
+- **Home**: resuming a movie lands in the movie's own category with it selected,
+  and TV-channel logos are centred in their tiles.
+- **Reset all settings really resets everything now**: Watched, Watch Later and
+  resume positions lived in separate files and used to survive a reset — all
+  three are cleared too.
+
+> **Windows pop-out is experimental** in this release: it now uses the macOS
+> mirror approach but has **not been sufficiently tested on Windows** — treat
+> Windows pop-out as unstable for now.
 
 Full details in the [changelog](https://github.com/slimture/dopeIPTV/blob/main/CHANGELOG.md).
 
-> Linux is and remains the primary target - Windows and macOS are a bonus.
+> Linux is and remains the primary target — Windows and macOS are a bonus.
