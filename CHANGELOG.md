@@ -49,6 +49,18 @@ and a batch of pop-out and Home polish.
   **experimental and not yet sufficiently tested on Windows** - treat Windows
   pop-out as unstable for now. Linux keeps its existing (unchanged) pop-out.
 
+### Updates & startup
+
+- **A clear "new version available" banner.** When a newer release is found,
+  a dismissible banner now appears across the top of the window - visible on
+  every view, including the full-window Home page where the old sidebar badge
+  was easy to miss. Its **Download** button (and the About dialog's) now opens
+  the website rather than the raw GitHub release.
+- **Fixed: the About dialog's release notes were unreadable** (unthemed white
+  box with faint text); the notes panel now uses the app theme.
+- **The app starts on TV by default.** Home is now an opt-in - turn on
+  "Open Home on startup" in Settings to land there instead. (First run included.)
+
 ### Home
 
 - **Resuming a movie from Home lands in its own category** with the movie

@@ -4337,6 +4337,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self._welcome is not None and self._welcome.isVisible():
             self._welcome.cover()
         self._position_provider_hint()
+        self._reposition_update_banner()
         if getattr(self, "_focus_mode", False):
             self._position_reopen()
         # The justified poster grid re-flows its columns from ChannelListView's

@@ -1060,5 +1060,5 @@ class _HomeMixin:
 
     def _maybe_open_home_at_start(self) -> None:
         if (self._home_enabled()
-                and self.settings.value("home_start", "true") == "true"):
+                and self.settings.value("home_start", "false") == "true"):
             QTimer.singleShot(0, self._show_home_page)

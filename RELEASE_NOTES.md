@@ -22,6 +22,12 @@ and a batch of pop-out and Home polish.
   the final 30 seconds.
 - **"Watch the recorded channel" now plays right away** even the instant a
   recording starts (it waits for the file instead of silently giving up).
+- **Clearer update notices**: a dismissible "new version available" banner now
+  shows across the top of the window (visible on Home too, not just a sidebar
+  badge), and Download opens the website. The About dialog's release notes are
+  readable again (they were an unthemed white box).
+- **Starts on TV by default now**: Home is an opt-in — turn on "Open Home on
+  startup" in Settings to land there instead.
 - **Home**: resuming a movie lands in the movie's own category with it selected,
   and TV-channel logos are centred in their tiles.
 - **Reset all settings really resets everything now**: Watched, Watch Later and

@@ -989,7 +989,7 @@ class _SettingsMixin:
         hv.addWidget(home_show_box)
         home_start_box = QCheckBox(tr("set_home_start"))
         home_start_box.setChecked(
-            self.settings.value("home_start", "true") == "true")
+            self.settings.value("home_start", "false") == "true")
         hv.addWidget(home_start_box)
         shelves_lbl = QLabel(tr("set_home_shelves"))
         shelves_lbl.setStyleSheet(
@@ -1785,7 +1785,8 @@ class _SettingsMixin:
         notes.setMinimumHeight(140)
         notes.setMaximumHeight(340)
         notes.setStyleSheet(
-            f"QTextBrowser {{ border:1px solid {P['border']};"
+            f"QTextBrowser {{ background:{P['input']}; color:{P['text']};"
+            f" border:1px solid {P['border']};"
             f" border-radius:8px; padding:4px 8px; font-size:12px; }}")
         notes.hide()
         lay.addWidget(notes)
@@ -1848,7 +1849,8 @@ class _SettingsMixin:
                     except TypeError:
                         pass
                     dl_btn.clicked.connect(
-                        lambda: QDesktopServices.openUrl(QUrl(rel["url"])))
+                        lambda: QDesktopServices.openUrl(
+                            QUrl("https://iptv.dope.rs")))
                     dl_btn.show()
             else:
                 status.setText("✓ " + tr("about_up_to_date"))

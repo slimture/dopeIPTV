@@ -10,12 +10,18 @@ from __future__ import annotations
 import os
 import time
 
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import Qt, QTimer, QUrl
+from PyQt6.QtGui import QDesktopServices
+from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton
 
 from .. import VERSION
 from ..core.updates import GITHUB_REPO, fetch_latest_release, is_newer
 from ..core.workers import run_async
 from ..i18n import tr
+from .theme import P
+
+# Where "Download" sends people - the website, not the raw GitHub release.
+_WEBSITE = "https://iptv.dope.rs"
 
 
 class _UpdatesMixin:
@@ -78,6 +84,10 @@ class _UpdatesMixin:
         if getattr(self, "_update_shown_tag", None) == latest_tag:
             return
         self._update_shown_tag = latest_tag
+        # A clear, dismissible banner over the whole window (visible on Home
+        # too, unlike the sidebar badge) - the main "a new version is out"
+        # notice. The status-row link and logo badge stay as quiet reminders.
+        self._show_update_banner(latest_tag)
         # Subtle, non-overlay link in the status row - shown for 30 s (as long
         # as the logo badge stays red) then hidden; the badge remains after.
         self.update_status_btn.setText(tr("update_status", version=latest_tag))
@@ -89,3 +99,75 @@ class _UpdatesMixin:
         # accent - in follow mode, so it keeps matching if the theme changes.
         QTimer.singleShot(30_000, lambda: logo.set_update(
             True, follow_accent=True))
+
+    # -- "new version" banner (visible over any view, Home included) ---------
+
+    def _show_update_banner(self, tag: str) -> None:
+        """A dismissible accent banner across the top of the window announcing a
+        new release, with a Download button (to the website). Overlays the
+        central widget so it shows even on the full-window Home page. Once
+        dismissed for a given version it stays gone for that version."""
+        if self.settings.value("update_banner_dismissed", "") == tag:
+            return
+        parent = self.centralWidget()
+        if parent is None:
+            return
+        banner = getattr(self, "_update_banner", None)
+        if banner is None:
+            banner = self._update_banner = QFrame(parent)
+            banner.setObjectName("UpdateBanner")
+            row = QHBoxLayout(banner)
+            row.setContentsMargins(14, 8, 8, 8)
+            row.setSpacing(12)
+            self._update_banner_lbl = QLabel("")
+            self._update_banner_lbl.setStyleSheet(
+                "color:#FFFFFF; font-size:12px; font-weight:600;"
+                " background:transparent;")
+            dl = QPushButton(tr("about_download"))
+            dl.setCursor(Qt.CursorShape.PointingHandCursor)
+            dl.setStyleSheet(
+                "QPushButton { background:rgba(255,255,255,0.18);"
+                " color:#FFFFFF; border:none; border-radius:6px;"
+                " padding:4px 12px; font-size:12px; font-weight:600; }"
+                "QPushButton:hover { background:rgba(255,255,255,0.30); }")
+            dl.clicked.connect(
+                lambda: QDesktopServices.openUrl(QUrl(_WEBSITE)))
+            close = QPushButton("✕")   # ✕
+            close.setCursor(Qt.CursorShape.PointingHandCursor)
+            close.setFixedSize(24, 24)
+            close.setStyleSheet(
+                "QPushButton { background:transparent; color:#FFFFFF;"
+                " border:none; font-size:13px; }"
+                "QPushButton:hover { color:#111111; }")
+            close.clicked.connect(self._dismiss_update_banner)
+            row.addWidget(self._update_banner_lbl, 1)
+            row.addWidget(dl)
+            row.addWidget(close)
+        banner.setStyleSheet(
+            f"#UpdateBanner {{ background:{P['accent']}; border-radius:10px; }}")
+        self._update_banner_lbl.setText(
+            "\U0001F389 " + tr("about_update_available", version=tag))
+        self._update_banner_tag = tag
+        self._reposition_update_banner(force=True)
+        banner.show()
+        banner.raise_()
+
+    def _dismiss_update_banner(self) -> None:
+        tag = getattr(self, "_update_banner_tag", "")
+        if tag:
+            self.settings.setValue("update_banner_dismissed", tag)
+        b = getattr(self, "_update_banner", None)
+        if b is not None:
+            b.hide()
+
+    def _reposition_update_banner(self, force: bool = False) -> None:
+        """Keep the banner centred at the top of the central widget on resize."""
+        b = getattr(self, "_update_banner", None)
+        parent = self.centralWidget()
+        if b is None or parent is None or (not force and b.isHidden()):
+            return
+        w = max(300, min(560, parent.width() - 40))
+        b.setFixedWidth(w)
+        b.adjustSize()
+        b.move((parent.width() - w) // 2, 10)
+        b.raise_()
