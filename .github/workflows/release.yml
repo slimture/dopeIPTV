@@ -537,13 +537,13 @@ jobs:
           path: '*.dmg'
 
   # --------------------------------------------------------------- Windows ---
-  # Produces a portable zip (unzip -> run dopeiptv.exe). New/experimental, so
-  # continue-on-error keeps it from blocking the other formats while the
-  # libmpv-fetch step settles on the first real run.
+  # Produces a portable zip (unzip -> run dopeiptv.exe). A failure now marks the
+  # release run red (no more silently shipping without the Windows zip, as
+  # v1.2.0 did); the Linux/macOS jobs run independently and still attach their
+  # own assets, so a Windows hiccup never removes those.
   windows-zip:
     name: Windows (x64)
     runs-on: windows-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v5
       - name: Guard - release notes must match this version
@@ -644,9 +644,9 @@ jobs:
           ls -la *.zip
       # Public release: attach the portable zip when a version tag is pushed.
       # (Unzip once -> a runnable dopeiptv\ folder; the README covers
-      # SmartScreen, the shortcut, and full removal.) The job keeps
-      # continue-on-error so a Windows-only hiccup never blocks the Linux/macOS
-      # assets - Linux stays the priority.
+      # SmartScreen, the shortcut, and full removal.) The Linux/macOS jobs run
+      # independently and attach their own assets, so a Windows failure marks
+      # the run red without removing those.
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
