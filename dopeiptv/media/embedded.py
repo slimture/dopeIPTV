@@ -2419,12 +2419,24 @@ class EmbeddedPlayer(QWidget):
             sharpen = 0.0
         set_opt("sharpen", max(0.0, min(sharpen, 3.0)))
         set_opt("tone-mapping", s.value("video_tonemapping", "auto") or "auto")
-        # Network buffer (demuxer cache seconds). Apply it live too, so a change
-        # in Settings takes effect on the CURRENT stream - not only the next one
-        # (this is why "the buffer time never changes" on a playing channel).
-        # Safe mid-playback: it's just a readahead target, no decoder reinit -
-        # the same property the in-player buffer menu already sets live.
-        set_opt("cache-secs", float(self._cache_secs()))
+        # Network buffer. Apply it live too, so a change in Settings takes
+        # effect on the CURRENT stream - not only the next one (this is why "the
+        # buffer time never changes" on a playing channel). Safe mid-playback:
+        # a readahead target, no decoder reinit - the same property the
+        # in-player buffer menu already sets live.
+        secs = self._cache_secs()
+        set_opt("cache-secs", float(secs))
+        # cache-secs is only a TIME target; the demuxer byte budget is what
+        # actually caps how many seconds of a high-bitrate live feed fit. Scale
+        # it (and the back-buffer) with the chosen buffer so a bigger setting
+        # really holds more and cushions the hitches on some live broadcasts,
+        # bounded so RAM stays sane. A user-pinned env value still wins.
+        max_bytes = max(150 * 1024 * 1024,
+                        min(512 * 1024 * 1024, secs * 16 * 1024 * 1024))
+        if not os.environ.get("DOPEIPTV_DEMUX_MAX"):
+            set_opt("demuxer-max-bytes", max_bytes)
+        if not os.environ.get("DOPEIPTV_DEMUX_MAX_BACK"):
+            set_opt("demuxer-max-back-bytes", max_bytes // 2)
 
     def playback_position(self) -> float:
         m = self.video.mpv
