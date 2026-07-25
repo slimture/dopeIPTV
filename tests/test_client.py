@@ -100,6 +100,32 @@ def test_detect_provider_link_embedded_url_in_query_stays_whole():
     ) == ("xtream", "http://h.tv:8080", "u", "p")
 
 
+def test_refresh_forces_refetch_even_with_a_fresh_cache(tmp_path):
+    # clear_list_cache() (the Refresh button + auto-refresh timer) must force a
+    # real re-fetch. The bug: it cleared memory and set _disk_loaded=False, so
+    # the next call re-merged the just-written disk copy and served it as a
+    # "fresh" hit (under the 5-min TTL) - Refresh never reached the provider,
+    # so a lineup that changed upstream never updated.
+    from dopeiptv.providers.client import XtreamClient
+
+    path = tmp_path / "lists.json"
+    c = XtreamClient("http://h.tv", "u", "p", cache_path=str(path))
+    calls = {"n": 0}
+
+    def fetch():
+        calls["n"] += 1
+        return [{"stream_id": calls["n"]}]
+
+    key = ("live", None)
+    assert c._cached_list(key, fetch) == [{"stream_id": 1}]   # first: fetch
+    assert calls["n"] == 1
+    assert c._cached_list(key, fetch) == [{"stream_id": 1}]   # fresh: no fetch
+    assert calls["n"] == 1
+    c.clear_list_cache()                                      # Refresh
+    assert c._cached_list(key, fetch) == [{"stream_id": 2}]   # must re-fetch
+    assert calls["n"] == 2
+
+
 def test_concurrent_disk_cache_saves_do_not_race(tmp_path):
     # Several list fetches (live/vod/series) finish near-simultaneously on
     # the worker pool and each persists the cache. With one shared ".part"

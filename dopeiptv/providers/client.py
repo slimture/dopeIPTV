@@ -42,6 +42,11 @@ class XtreamClient:
         # down/overloaded, instead of empty lists and timeouts.
         self._cache_path = cache_path
         self._disk_loaded = cache_path is None
+        # Wall-clock time of the last clear_list_cache(): a cached entry older
+        # than this (the re-merged disk copy) is NOT treated as a fresh hit, so
+        # Refresh forces a real re-fetch while the disk copy stays as a
+        # network-failure fallback.
+        self._refetch_after = 0.0
         # Monotonic deadline for the fail-fast cooldown after a network error.
         self._net_down_until = 0.0
 
@@ -112,7 +117,11 @@ class XtreamClient:
         with self._list_lock:
             self._load_disk_lists()
             hit = self._list_cache.get(key)
-            if hit and now - hit[0] < self.LIST_CACHE_SECS:
+            # A hit counts as fresh only if it is under the TTL AND was fetched
+            # since the last Refresh - otherwise the disk copy re-merged just
+            # above would be served as "fresh" and Refresh would never re-fetch.
+            if (hit and now - hit[0] < self.LIST_CACHE_SECS
+                    and hit[0] >= self._refetch_after):
                 return hit[1]
         try:
             data = fetch() or []
@@ -139,6 +148,9 @@ class XtreamClient:
         with self._list_lock:
             self._list_cache.clear()
             self._disk_loaded = False   # re-mergeable if the fetch fails
+            # Any entry older than now (incl. the re-merged disk copy) is no
+            # longer "fresh", so the next call actually re-fetches.
+            self._refetch_after = time.time()
 
     def _redact(self, text: str) -> str:
         """Strip the username/password from a string before logging it -
