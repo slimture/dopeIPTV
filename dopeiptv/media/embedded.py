@@ -2419,6 +2419,12 @@ class EmbeddedPlayer(QWidget):
             sharpen = 0.0
         set_opt("sharpen", max(0.0, min(sharpen, 3.0)))
         set_opt("tone-mapping", s.value("video_tonemapping", "auto") or "auto")
+        # Network buffer (demuxer cache seconds). Apply it live too, so a change
+        # in Settings takes effect on the CURRENT stream - not only the next one
+        # (this is why "the buffer time never changes" on a playing channel).
+        # Safe mid-playback: it's just a readahead target, no decoder reinit -
+        # the same property the in-player buffer menu already sets live.
+        set_opt("cache-secs", float(self._cache_secs()))
 
     def playback_position(self) -> float:
         m = self.video.mpv
