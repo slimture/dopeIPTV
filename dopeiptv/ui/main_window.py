@@ -3869,6 +3869,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._stream_retries = 0
         self._last_stream_error_ts = now
         lp = getattr(self, "_last_playback", None)
+        # A DIFFERENT stream than the one we were retrying is a fresh user play,
+        # so give it a fresh retry budget - which is what makes the fast
+        # definitive probe (gated on retries == 0) fire on its first failure.
+        # The retry loop re-fails the SAME stream, so this never loops. Without
+        # it, a 'not started' pinned retries at MAX and the very next channel
+        # skipped the fast probe, so the record/reminder prompt only came up via
+        # the slower account-aware diagnosis ("it takes too long now").
+        err_key = (lp or {}).get("key")
+        if err_key != getattr(self, "_err_last_key", None):
+            self._stream_retries = 0
+            self._err_last_key = err_key
         # On the first failure, probe the URL in parallel with the silent
         # reconnect. A *definitive* status (e.g. 407 = upcoming event, or a
         # forbidden/blocked/not-found) surfaces at once instead of after the
@@ -3938,19 +3949,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 return False
         except Exception:
             pass
-        # Burst guard: a genuine 'not started' is isolated to ONE upcoming-event
-        # channel. Several DIFFERENT channels answering 407 within a short
-        # window is the provider refusing connections (overload / limit), not a
-        # wave of scheduled events - so suppress the prompt for the later ones.
-        now = time.monotonic()
-        try:
-            key = self._item_key(item) if item is not None else None
-        except Exception:
-            key = None
-        last = getattr(self, "_last_not_started", None)   # (key, ts)
-        if last and last[0] != key and now - last[1] < 120:
-            return False
-        self._last_not_started = (key, now)
         return True
 
     def _early_probe_definitive(self, url, item) -> None:
@@ -3968,12 +3966,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if (gen != getattr(self, "_diag_gen", -1)
                     or getattr(self, "_diag_shown", False)
                     or (self.player and self.player.current_url)
-                    or code not in DEFINITIVE_CODES
-                    # 407 is ambiguous (upcoming event vs a connection
-                    # limit/overload). Don't shortcut it here - let the retry
-                    # loop hand it to the account-aware diagnosis, which reports
-                    # a real connection limit instead of "not started".
-                    or code == 407):
+                    or code not in DEFINITIVE_CODES):
                 return
             self._diag_shown = True
             self._stream_retries = self.MAX_STREAM_RETRIES   # stop retrying
