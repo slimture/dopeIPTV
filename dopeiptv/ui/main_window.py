@@ -3938,6 +3938,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 return False
         except Exception:
             pass
+        # Burst guard: a genuine 'not started' is isolated to ONE upcoming-event
+        # channel. Several DIFFERENT channels answering 407 within a short
+        # window is the provider refusing connections (overload / limit), not a
+        # wave of scheduled events - so suppress the prompt for the later ones.
+        now = time.monotonic()
+        try:
+            key = self._item_key(item) if item is not None else None
+        except Exception:
+            key = None
+        last = getattr(self, "_last_not_started", None)   # (key, ts)
+        if last and last[0] != key and now - last[1] < 120:
+            return False
+        self._last_not_started = (key, now)
         return True
 
     def _early_probe_definitive(self, url, item) -> None:
@@ -3955,7 +3968,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if (gen != getattr(self, "_diag_gen", -1)
                     or getattr(self, "_diag_shown", False)
                     or (self.player and self.player.current_url)
-                    or code not in DEFINITIVE_CODES):
+                    or code not in DEFINITIVE_CODES
+                    # 407 is ambiguous (upcoming event vs a connection
+                    # limit/overload). Don't shortcut it here - let the retry
+                    # loop hand it to the account-aware diagnosis, which reports
+                    # a real connection limit instead of "not started".
+                    or code == 407):
                 return
             self._diag_shown = True
             self._stream_retries = self.MAX_STREAM_RETRIES   # stop retrying
