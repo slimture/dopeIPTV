@@ -12,7 +12,7 @@ from __future__ import annotations
 import time
 from datetime import datetime
 
-from PyQt6.QtCore import QRectF, Qt, QTimer
+from PyQt6.QtCore import QPointF, QRectF, Qt, QTimer
 from PyQt6.QtGui import (
     QBrush, QColor, QFont, QGradient, QIcon, QLinearGradient, QPainter,
     QPainterPath, QPen, QPixmap,
@@ -164,7 +164,8 @@ class EpgGridDialog(QDialog):
         outer.addWidget(self.desc)
 
         bar = QHBoxLayout()
-        self.search_btn = QPushButton("🔍 " + tr("epg_search_btn"))
+        self.search_btn = QPushButton(tr("epg_search_btn"))
+        self.search_btn.setIcon(self._bar_icon("search"))
         self.search_btn.clicked.connect(self._open_search)
         bar.addWidget(self.search_btn)
         self.day_back_btn = QPushButton()
@@ -185,11 +186,13 @@ class EpgGridDialog(QDialog):
         self.day_fwd_btn.setFixedWidth(34)
         self.day_fwd_btn.clicked.connect(lambda: self._scroll_hours(24))
         bar.addWidget(self.day_fwd_btn)
-        self.reminders_btn = QPushButton("🔔 " + tr("reminders_title"))
+        self.reminders_btn = QPushButton(tr("reminders_title"))
+        self.reminders_btn.setIcon(self._bar_icon("bell"))
         self.reminders_btn.clicked.connect(self.window._open_reminders)
         bar.addWidget(self.reminders_btn)
         # Manage upcoming recordings without leaving the guide.
-        self.rec_sched_btn = QPushButton("⏺ " + tr("rec_scheduled_title"))
+        self.rec_sched_btn = QPushButton(tr("rec_scheduled_title"))
+        self.rec_sched_btn.setIcon(self._bar_icon("record"))
         self.rec_sched_btn.setToolTip(tr("rec_manage_scheduled"))
         self.rec_sched_btn.clicked.connect(self.window._show_scheduled_manager)
         bar.addWidget(self.rec_sched_btn)
@@ -335,6 +338,51 @@ class EpgGridDialog(QDialog):
     def _open_search(self) -> None:
         from .epg_search import EpgSearchDialog
         EpgSearchDialog(self.window).exec()
+
+    def _bar_icon(self, kind: str) -> QIcon:
+        """Drawn icons for the toolbar buttons (search / reminders / scheduled
+        recordings). They used to be emoji prefixes in the button text, which
+        the font stack resolves to a colour-emoji face whose glyphs are both
+        bigger than the label text and sit on a different baseline - so those
+        buttons grew taller than their neighbours and their text no longer
+        lined up. Drawn in the same 14 px box as the day-jump triangles, every
+        button in the row now has identical metrics on every platform."""
+        s, scale = 14, 3
+        pm = QPixmap(s * scale, s * scale)
+        pm.setDevicePixelRatio(float(scale))
+        pm.fill(Qt.GlobalColor.transparent)
+        pr = QPainter(pm)
+        pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        col = QColor(P["text"])
+        if kind == "search":
+            pen = QPen(col)
+            pen.setWidthF(s * 0.11)
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            pr.setPen(pen)
+            pr.setBrush(Qt.BrushStyle.NoBrush)
+            pr.drawEllipse(QRectF(s * 0.18, s * 0.18, s * 0.46, s * 0.46))
+            pr.drawLine(QPointF(s * 0.60, s * 0.60), QPointF(s * 0.82, s * 0.82))
+        elif kind == "bell":
+            pr.setPen(Qt.PenStyle.NoPen)
+            pr.setBrush(col)
+            body = QPainterPath()
+            # Dome with a flared skirt, then the clapper below it.
+            body.moveTo(s * 0.20, s * 0.68)
+            body.lineTo(s * 0.28, s * 0.58)
+            body.lineTo(s * 0.28, s * 0.44)
+            body.arcTo(QRectF(s * 0.28, s * 0.14, s * 0.44, s * 0.44),
+                       180.0, -180.0)
+            body.lineTo(s * 0.72, s * 0.58)
+            body.lineTo(s * 0.80, s * 0.68)
+            body.closeSubpath()
+            pr.drawPath(body)
+            pr.drawEllipse(QRectF(s * 0.42, s * 0.70, s * 0.16, s * 0.16))
+        else:                                   # "record": a plain filled dot
+            pr.setPen(Qt.PenStyle.NoPen)
+            pr.setBrush(col)
+            pr.drawEllipse(QRectF(s * 0.24, s * 0.24, s * 0.52, s * 0.52))
+        pr.end()
+        return QIcon(pm)
 
     def _tri_icon(self, left: bool) -> QIcon:
         """A drawn left/right triangle for the icon-only day-jump buttons.
@@ -580,10 +628,21 @@ class EpgGridDialog(QDialog):
                     Qt.AspectRatioMode.KeepAspectRatio,
                     Qt.TransformationMode.SmoothTransformation)
                 it_pm = QGraphicsPixmapItem(scaled)
+                # Group FIRST, then position. addToGroup preserves the item's
+                # SCENE position, and the channel column is pinned by shifting
+                # the group by the horizontal scroll offset (_pin) - which the
+                # guide applies right after building, to open on "now". A logo
+                # that arrived after that (i.e. every logo not already cached)
+                # was therefore pinned at scene x=10, hundreds to thousands of
+                # px left of the visible column: the reason logos only showed
+                # up the *second* time the guide was opened, when the cache
+                # made the callback run during the build. Positioning after the
+                # add makes the coordinates group-local, like every other item
+                # in the column, so the logo lands in its row whenever it
+                # arrives. No data(0): clicks fall through to the channel cell.
+                self._chan_group.addToGroup(it_pm)
                 it_pm.setPos(10 + (38 - scaled.width()) / 2,
                              y + (self.ROW_H - scaled.height()) / 2)
-                it_pm.setData(0, {"channel": ch, "prog": None})
-                self._chan_group.addToGroup(it_pm)
 
             self.window.logos.get(logo_url, _logo_cb)
         # ⏪ marks a channel with catch-up (timeshift), matching the main list.
@@ -598,7 +657,11 @@ class EpgGridDialog(QDialog):
         name.setBrush(QColor("#ffffff"))
         self._elide(name, self.CH_COL_W - text_x - 8)
         name.setPos(text_x, y + (self.ROW_H - name.boundingRect().height()) / 2)
-        name.setData(0, {"channel": ch, "prog": None})
+        # No data(0) on the text: hit-testing takes the topmost item carrying a
+        # payload, so a click on the name would select via the *text* item and
+        # the selection outline would be drawn tight around the letters instead
+        # of around the cell. Without a payload the click falls through to the
+        # cell underneath, which covers the whole row of the column.
         self._chan_group.addToGroup(name)
         if playing:
             # Tint the whole row across the timeline so the playing channel
@@ -656,7 +719,7 @@ class EpgGridDialog(QDialog):
             text = prefix + (p.get("title") or "?")
             faded = p["stop_timestamp"] <= now
             # No label on sliver cards (clipped overlaps): "…" alone is noise.
-            label = (self._block_label(text, x1, x2, y, data,
+            label = (self._block_label(text, x1, x2, y,
                                        QColor(P["muted"]) if faded
                                        else QColor("#ffffff"))
                      if x2 - x1 >= 26 else None)
@@ -673,7 +736,7 @@ class EpgGridDialog(QDialog):
             text = (tr("epg_no_guide_available") if self._epg_ready()
                     else tr("status_loading_programme_guide"))
             label = self._block_label(text, self.CH_COL_W, self.CH_COL_W
-                                      + self._grid_w, y, data,
+                                      + self._grid_w, y,
                                       QColor("#9aa3b2"))
             row_blocks.append({"item": block, "data": data, "label": label,
                                "x1": self.CH_COL_W,
@@ -721,16 +784,22 @@ class EpgGridDialog(QDialog):
         self.scene.addItem(item)
         return item
 
-    def _block_label(self, text, x1, x2, y, data, color) -> \
+    def _block_label(self, text, x1, x2, y, color) -> \
             QGraphicsSimpleTextItem:
         """A top-level (not block-child) programme title, so it can be
         re-anchored to the left visible edge as the timeline scrolls
         (_reflow_labels) - the title stays readable while the card slides
-        under the channel column."""
+        under the channel column.
+
+        Deliberately carries no data(0) payload: the title floats above its
+        card, and when it answered hit-tests itself a click on the text
+        selected through the *text* item - so the selection outline hugged the
+        letters rather than the card. Only the card is clickable; the title is
+        just paint on top of it."""
         label = QGraphicsSimpleTextItem(text)
         label.setBrush(color)
         label.setZValue(8)
-        label.setData(0, data)
+        label.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
         self._elide(label, x2 - x1 - 14)
         label.setPos(x1 + 8, y + self.LABEL_DY)
         self.scene.addItem(label)

@@ -22,7 +22,8 @@ _CHILD = r"""
 import os, time
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtCore import QPointF, QSettings
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtGui import QColor, QPixmap
+from PyQt6.QtWidgets import QApplication, QGraphicsPixmapItem
 
 from dopeiptv.providers.client import DemoClient
 from dopeiptv.ui.epg_grid import EpgGridDialog
@@ -152,6 +153,55 @@ assert not any(c.get("name") == "V Sport Premium SE"
 d.filter.setText("v sport")
 app.processEvents()
 assert any(c.get("name") == "V Sport Premium SE" for c, _b in d._rows)
+d.deleteLater(); app.processEvents()
+
+# ---- 5. A logo arriving after the board scrolled lands in its row ---------
+# Logos load async. The channel column is pinned by translating its group by
+# the scroll offset, so a logo added later must be positioned in GROUP
+# coordinates - positioning it in scene coordinates parked it hundreds of px
+# left of the visible column, which is why logos only appeared the second
+# time the guide was opened (cached -> callback ran during the build).
+pending_logos = []
+class _StubLogos:
+    def get(self, url, cb):
+        pending_logos.append(cb)
+w.logos = _StubLogos()
+w.xmltv.programmes_in = lambda ch, a, b: []
+d = EpgGridDialog(w, [{"name": "Logo", "stream_id": 7, "num": 1,
+                       "stream_icon": "http://example.invalid/logo.png"}])
+d.resize(900, 400)
+d.show()
+app.processEvents()
+d.view.horizontalScrollBar().setValue(600)     # pin the column away from x=0
+app.processEvents()
+assert pending_logos, "no logo was requested"
+pm = QPixmap(38, 24); pm.fill(QColor("#ff0000"))
+pending_logos[0](pm)
+logo_items = [i for i in d.scene.items() if isinstance(i, QGraphicsPixmapItem)]
+assert len(logo_items) == 1, logo_items
+lx = logo_items[0].sceneBoundingRect().x()
+col_left = d.view.mapToScene(0, 0).x()
+assert col_left > 100, col_left                # the view really did scroll
+assert col_left <= lx <= col_left + d.CH_COL_W, (lx, col_left)
+d.deleteLater(); app.processEvents()
+
+# ---- 6. Only the card is clickable - the title is paint on top of it ------
+w.logos = None
+w.xmltv.programmes_in = lambda ch, a, b: [
+    {"title": "Clickable Title", "description": "",
+     "start_timestamp": now - 1800, "stop_timestamp": now + 3600}]
+d = EpgGridDialog(w, [{"name": "One", "stream_id": 1, "num": 1}])
+d.resize(1200, 600)
+d.show()
+d.view.horizontalScrollBar().setValue(0)
+d.view.verticalScrollBar().setValue(0)
+app.processEvents()
+rb = d._rows[0][1][0]
+label_rect = rb["label"].sceneBoundingRect()
+assert rb["label"].data(0) is None             # carries no click payload
+item, data = d._hit(QPointF(label_rect.x() + 4, label_rect.center().y()))
+assert item is rb["item"], item                # the card, not the text item
+assert data["prog"]["title"] == "Clickable Title"
 d.deleteLater(); app.processEvents()
 
 print("EPG_GRID_OK")
