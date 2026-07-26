@@ -356,7 +356,8 @@ class _MultiviewCell(QWidget):
     # -- playback ------------------------------------------------------------
 
     def play(self, url: str, title: str, item: dict | None = None,
-             client=None, guide=None, playlist: str = "") -> bool:
+             client=None, guide=None, playlist: str = "",
+             start: float = 0.0) -> bool:
         self.url = url
         self.title = title
         self._live_url = url
@@ -389,12 +390,14 @@ class _MultiviewCell(QWidget):
         self._title.setText(title or "")
         self._title.adjustSize()
         self._empty.hide()
-        return self._mpv_play(url)
+        return self._mpv_play(url, start)
 
-    def _mpv_play(self, url: str) -> bool:
+    def _mpv_play(self, url: str, start: float = 0.0) -> bool:
         """Point this cell's mpv at *url* without disturbing the cell's channel
         / live-url / timeshift bookkeeping (used both for the initial play and
-        for archive-segment / go-live swaps)."""
+        for archive-segment / go-live swaps). *start* is an offset in seconds
+        to begin at - a film or episode handed over from the docked player
+        continues where it was, instead of restarting from zero."""
         if self.video.mpv is None:
             self.video.show()
             QApplication.instance().processEvents()
@@ -422,6 +425,10 @@ class _MultiviewCell(QWidget):
                 m["sid"] = self._want_sid
                 if self._want_sid != "no":
                     m["sub-visibility"] = True
+            # Start offset for the next file only - always assigned, so a
+            # handover position can't leak into a later load (a timeshift
+            # segment or a go-live swap through this same mpv).
+            m["start"] = str(float(start)) if start and start > 1 else "none"
             m.play(url)
             return True
         except Exception as e:
@@ -506,6 +513,20 @@ class _MultiviewCell(QWidget):
 
     def is_muted(self) -> bool:
         return self._muted
+
+    def resume_pos(self) -> float:
+        """Where finite content (a film / an episode) is right now, so a
+        reload can pick it up there. 0 for live and catch-up cells, whose
+        position is a point in a stream rather than in a file."""
+        m = self.video.mpv
+        if m is None or self.url is None or self._ts_capable:
+            return 0.0
+        try:
+            if not (m.duration and float(m.duration) > 1):
+                return 0.0
+            return max(0.0, float(m.playback_time or 0.0))
+        except Exception:
+            return 0.0
 
     def tracks(self) -> tuple[list, list]:
         """(audio, subtitle) track dicts from this cell's mpv, empty when
@@ -931,13 +952,13 @@ class _MultiviewWindow(QWidget):
 
     def add_stream(self, url: str, title: str, cell: int | None = None,
                    item: dict | None = None, client=None, guide=None,
-                   playlist: str = "") -> None:
+                   playlist: str = "", start: float = 0.0) -> None:
         if cell is not None and 0 <= cell < len(self.cells):
             target = self.cells[cell]
         else:
             target = next((c for c in self.cells if c.url is None),
                           self._focused or self.cells[0])
-        target.play(url, title, item, client, guide, playlist)
+        target.play(url, title, item, client, guide, playlist, start)
         # Settings: a newly added channel can either take audio focus (the
         # default) or start muted, leaving the current audio alone.
         unmute = (self._owner.settings.value("mv_new_unmuted", "true")
@@ -957,11 +978,12 @@ class _MultiviewWindow(QWidget):
 
     def _swap_cells(self, a: "_MultiviewCell", b: "_MultiviewCell") -> None:
         """Exchange the two cells' videos (swap places / move into an empty
-        cell), then re-apply audio focus."""
+        cell), then re-apply audio focus. Each stream is reloaded, so a film
+        carries its position across (live keeps starting at the live edge)."""
         sa = (a._live_url, a.title, a._item, a._client, a._guide,
-              a.playlist_name)
+              a.playlist_name, a.resume_pos())
         sb = (b._live_url, b.title, b._item, b._client, b._guide,
-              b.playlist_name)
+              b.playlist_name, b.resume_pos())
         a.play(*sb) if sb[0] else a.clear()
         b.play(*sa) if sa[0] else b.clear()
         self._focus_cell(self._focused if self._focused in self.cells else a)
@@ -1218,14 +1240,27 @@ class _MultiviewMixin:
         it = getattr(self, "_playing_item", None)
         title = ((it or {}).get("name") or (it or {}).get("title")
                  or getattr(self, "_base_title", "") or "")
+        # Hand the playhead over with the stream: a film or episode moved to a
+        # cell continues where you were watching instead of starting again.
+        # Read BEFORE add_to_multiview, which may stop the docked player to
+        # free the provider connection. Only finite content has a meaningful
+        # position - live has no duration and belongs at the live edge.
+        start = 0.0
+        try:
+            if p.playback_duration() > 1:
+                start = p.playback_position()
+        except Exception:
+            start = 0.0
         self.add_to_multiview(url, title, item=it,
                               client=getattr(self, "client", None),
                               guide=getattr(self, "xmltv", None),
-                              playlist=self._active_playlist_name())
+                              playlist=self._active_playlist_name(),
+                              start=start)
 
     def add_to_multiview(self, url: str, title: str,
                          cell: int | None = None, item: dict | None = None,
-                         client=None, guide=None, playlist: str = "") -> None:
+                         client=None, guide=None, playlist: str = "",
+                         start: float = 0.0) -> None:
         if not url:
             return
         # Free the docked player's connection: otherwise a single-connection
@@ -1237,7 +1272,7 @@ class _MultiviewMixin:
             self._stop_docked_for_multiview()
         self._ensure_multiview_window().add_stream(
             url, title, cell, item=item, client=client, guide=guide,
-            playlist=playlist)
+            playlist=playlist, start=start)
 
     def _maybe_show_multiview_info(self) -> None:
         """One-time notice that multiview needs enough provider connections,

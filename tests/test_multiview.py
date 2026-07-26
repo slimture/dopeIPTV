@@ -149,6 +149,40 @@ h.add_to_multiview("http://x/live/10.ts", "Ten")
 app.processEvents()
 assert all(c.url is not None for c in w.cells)
 
+# Sending the DOCKED player's film/episode to a cell hands the playhead over,
+# so it continues where you were instead of restarting from zero. Live has no
+# duration and belongs at the live edge, so it hands over nothing.
+h.settings.setValue("mv_stop_docked", "false")
+seen = []
+_orig_add = w.add_stream
+w.add_stream = lambda *a, **k: (seen.append(k), _orig_add(*a, **k))[1]
+
+class _Film:
+    current_url = "http://x/movie/1.mkv"
+    def playback_duration(self): return 5400.0
+    def playback_position(self): return 1234.5
+
+h.player = _Film()
+h._playing_item = {"name": "A Film"}
+h._send_docked_to_multiview()
+app.processEvents()
+assert seen and abs(seen[-1]["start"] - 1234.5) < 0.01, seen
+
+class _Live:
+    current_url = "http://x/live/99.ts"
+    def playback_duration(self): return 0.0
+    def playback_position(self): return 812.0
+
+h.player = _Live()
+h._playing_item = {"name": "A Channel"}
+h._send_docked_to_multiview()
+app.processEvents()
+assert seen[-1]["start"] == 0.0, seen
+w.add_stream = _orig_add
+
+# A live cell never reports a resume position (its mpv has no duration).
+assert w.cells[0].resume_pos() == 0.0
+
 # With streams running the button only re-raises - never closes the grid.
 h._show_multiview()
 app.processEvents()
