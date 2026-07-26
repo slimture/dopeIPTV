@@ -2085,6 +2085,11 @@ class EmbeddedPlayer(QWidget):
         # mirror is the only render loop, so it also paces mpv. Suspend the
         # docked surface so the GPU renders the stream once, not twice.
         self.video._render_suspended = True
+        # One forced repaint so the suspended surface CLEARS TO BLACK now.
+        # Without it the frame-driven repaints stop while the last video frame
+        # is still on the surface, and any gap around the placeholder shows it
+        # frozen - intermittently, depending on how the reflow interleaved.
+        self.video.update()
         self._mirror_timer = QTimer(self)
         # Precise, not coarse: Qt's default timer slack (~5%) is visible as
         # frame-pacing jitter at video rates.
@@ -2104,6 +2109,11 @@ class EmbeddedPlayer(QWidget):
         self.sleep_badge.setParent(parent)
         self.sleep_badge.hide()
         self._show_dock_placeholder(True)
+        # Re-place once the reflow has settled: the caller still has to move
+        # the control bar out and re-lock the height after this returns, and a
+        # placeholder sized against the pre-reflow rect left a strip uncovered
+        # (the intermittent "video over the control bar").
+        QTimer.singleShot(0, lambda: self._show_dock_placeholder(True))
         self._reveal_sleep_badge()
         return m
 
@@ -2282,7 +2292,13 @@ class EmbeddedPlayer(QWidget):
                     " border:none; font-size:13px; font-weight:600; }"
                     "QPushButton:hover { color:#FFFFFF; }")
                 ph.clicked.connect(lambda: self.popout_requested.emit())
-            ph.setGeometry(self.video.geometry())
+            # Cover the WHOLE player, not just the video rect: while mirrored
+            # the control bar has moved to the pop-out, so the player shrinks
+            # and the video stretches into the freed strip. Sizing to a rect
+            # measured before that reflow left the (suspended, so no longer
+            # repainting) GL surface visible there as a frozen frame - "video
+            # rendered over the control bar".
+            ph.setGeometry(self.rect())
             ph.show()
             ph.raise_()
         elif ph is not None:
@@ -2744,7 +2760,7 @@ class EmbeddedPlayer(QWidget):
         if self._blackout.isVisible():
             self._blackout.setGeometry(self.video.geometry())
         if self._dock_ph is not None and not self._dock_ph.isHidden():
-            self._dock_ph.setGeometry(self.video.geometry())
+            self._dock_ph.setGeometry(self.rect())   # see _show_dock_placeholder
             self._dock_ph.raise_()
         if self._stats_overlay.isVisible():
             self._place_stats()
