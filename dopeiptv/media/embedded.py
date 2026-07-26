@@ -2042,15 +2042,14 @@ class EmbeddedPlayer(QWidget):
             # presentation route in a second window shows black on modern
             # Qt/Mesa (X11 and Wayland alike), so all GL stays in the docked
             # widget's proven context and the pop-out gets plain images.
-            # Pacing is EVENT-DRIVEN: mpv's frame callback (frame_ready) fires
-            # the tick, so frames render the moment they exist - a fixed
-            # 30 fps poll against a 25 fps stream beat 33/66 ms (visible
-            # judder). The timer stays only as a slow fallback (resize
-            # refresh, safety); the tick itself skips when no frame is due.
+            # Pacing: a PRECISE 60 Hz poll whose tick renders ONLY when mpv
+            # reports a new frame pending - so readbacks run at the stream's
+            # real fps with <=16 ms cadence error. (A 30 fps coarse poll beat
+            # against 25 fps streams - judder; driving ticks from mpv's update
+            # callback flooded the main thread with readbacks - far worse.)
             m = _RasterMirror(parent, mirror_of=self.video)
             self._raster_state = ""
-            self.video.frame_ready.connect(self._tick_raster_mirror)
-            tick, interval = self._tick_raster_mirror, 200
+            tick, interval = self._tick_raster_mirror, 16
         else:
             m = _MpvGLWidget(parent, mirror_of=self.video)
             m.setMouseTracking(True)
@@ -2064,6 +2063,9 @@ class EmbeddedPlayer(QWidget):
         # docked surface so the GPU renders the stream once, not twice.
         self.video._render_suspended = True
         self._mirror_timer = QTimer(self)
+        # Precise, not coarse: Qt's default timer slack (~5%) is visible as
+        # frame-pacing jitter at video rates.
+        self._mirror_timer.setTimerType(Qt.TimerType.PreciseTimer)
         self._mirror_timer.timeout.connect(tick)
         self._mirror_timer.start(interval)
         # Float the seek bar, timeshift timeline and stats over the mirror:
@@ -2158,12 +2160,6 @@ class EmbeddedPlayer(QWidget):
         if glwin is not None:
             glwin._stopped = True
             glwin.free_render_context("stop_mirror hand-off")
-        # Raster mirror: stop the event-driven ticks (frame_ready keeps firing
-        # for the docked surface's own repaints).
-        try:
-            self.video.frame_ready.disconnect(self._tick_raster_mirror)
-        except (TypeError, RuntimeError):
-            pass
         # Raster mirror: release the offscreen FBO while the docked GL context
         # (its owner) is current. The render context itself was never moved.
         if getattr(self, "_mirror_fbo", None) is not None:

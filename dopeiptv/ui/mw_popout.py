@@ -332,6 +332,12 @@ class _PopoutMixin:
             return
         if event.button() == Qt.MouseButton.LeftButton:
             self._mirror_press_pos = event.position().toPoint()
+            # A click while the auto-hidden bar is away is a "wake the
+            # controls" gesture, not a pause: without this, revealing the bar
+            # also queued a deferred pause that landed ~when the user pressed
+            # dock-back - "docks back paused".
+            self._mirror_press_was_reveal = (
+                self.player is not None and self.player.bar.isHidden())
 
     def _on_mirror_move(self, event) -> None:
         frm = getattr(self, "_mirror_press_pos", None)
@@ -356,6 +362,9 @@ class _PopoutMixin:
         if (event.button() == Qt.MouseButton.LeftButton
                 and getattr(self, "_mirror_press_pos", None) is not None):
             self._mirror_press_pos = None
+            if getattr(self, "_mirror_press_was_reveal", False):
+                self._mirror_press_was_reveal = False
+                return          # the click only woke the controls - no pause
             self._mirror_click_timer.start()
 
     def _on_mirror_dbl_click(self) -> None:
