@@ -1,42 +1,31 @@
-## dopeIPTV 1.2.2
+## dopeIPTV 1.3.0
 
-The pop-out player works on Linux again, plus programme-guide, recording,
-playlist-refresh, buffer and Continue-watching fixes.
+Resizable video windows, sections that remember where you were, and a cast
+panel that finally lists the right films.
 
-- **Pop-out on Linux is fixed — and rewritten.** The pop-out window was black,
-  on Wayland *and* X11: on modern Qt/Mesa nothing OpenGL ever reaches the
-  screen in a second top-level window. It no longer tries — each frame is now
-  rendered offscreen in the docked player's own working context and drawn into
-  the pop-out as an image. The docked player's mpv instance is never moved or
-  freed, so popping out can't disturb playback and docking back is instant.
-- **No more stuttering in the pop-out.** mpv was blocking the interface until
-  each frame's display time (worst on 23.976 fps film). It no longer paces us,
-  frames are read back without waiting on the GPU, and only when there is
-  actually a new one.
-- **The docked mini player behaves while popped out**: no leftover strip where
-  the control bar used to be, no frozen frame showing through, and the bar's
-  menus (subtitles, record, timeshift) open properly over the pop-out. Docking
-  back no longer leaves the video paused.
-- **"Refresh playlist" really refreshes.** Within five minutes of the last
-  fetch it silently served the cached lists back, so new channels or films at
-  your provider never showed up.
-- **The network-buffer setting now bites.** It applies to the stream you're
-  watching (not just the next one), and a larger value also raises the memory
-  budget — so it genuinely helps against stuttery live channels.
-- **Continue watching / History**: a film first played from History could not
-  be resumed (stream error) and showed up twice in History with one copy
-  unplayable; the same titles did nothing when clicked on Home. Fixed, along
-  with a crash when clicking a Home card.
-- **The programme guide is tidier**: channel logos now show the first time you
-  open it (not only the second), a programme is selected by clicking its box
-  rather than its title, and the buttons along the bottom are finally all the
-  same size.
-- **Recordings start where you are.** With a large buffer the file used to
-  begin well before the frame on screen, because the already-played part of the
-  buffer was written out too.
-- **Smaller things**: the pop-out and volume buttons are drawn to match the
-  other controls on Linux, the collapsed sidebar is remembered between
-  sessions, and sending a film to multiview continues from where you were.
+- **Resize the pop-out and the multiview grid without the title bar.** Both are
+  title-bar-less by default, which left them with no resize grips at all — the
+  only way to change their size was to turn the title bar back on. The video's
+  own edges are the handles now, with the matching cursor when you hover one.
+- **The pointer no longer drags across a maximized video.** Every mouse report
+  was redrawing the centre play/pause glyph and re-placing the seek bar,
+  timeshift timeline and sleep pill — and each of those repaints the video
+  underneath. Measured on 300 pointer events: 299 repaints before, 1 after.
+- **Every section remembers the sub-category you were in.** Jumping between TV,
+  Movies, Series, Favorites and back dropped you at the top of the list every
+  time. Also for Watch Later, Watched, Recordings and History.
+- **Cast members are no longer credited with films they are not in.** Titles
+  were matched against your playlist with spaces stripped, so a credit like
+  "America" claimed every "American ..." title on it. "The Wall" is not "The
+  Wall Street Documentary" — while genuine release junk ("Inception REPACK")
+  still matches.
+- **The cast panel behaves like the rest of the app**: picking a title starts it
+  and lands the middle column on it in its own category with the detail panel
+  filled in (it used to just play, with nothing selected), shows drill into
+  their episode list, and missing posters are resolved the same way the middle
+  list resolves them.
+- **Unmuting a film that started muted gives sound back** without replaying it.
+- **Multiview keeps your place** when you send a film or episode to a cell.
 
 Full details in the [changelog](https://github.com/slimture/dopeIPTV/blob/main/CHANGELOG.md).
 

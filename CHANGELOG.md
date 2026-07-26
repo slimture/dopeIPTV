@@ -5,6 +5,63 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
+## [1.3.0]
+
+Resizable video windows, sections that remember where you were, and a cast
+panel that finally lists the right films.
+
+### Video windows
+
+- **The pop-out and the multiview grid can be resized without the title bar.**
+  Both are title-bar-less by default, which left them with no resize grips at
+  all - the only way to change their size was to turn the title bar back on.
+  The video's own edges are the handles now, with the matching resize cursor
+  when you hover one. A press on an edge resizes only; in multiview it does
+  not move the audio to that cell.
+- **The pointer no longer drags across a maximized video.** Moving it did real
+  work per mouse report - hundreds a second - redrawing the centre play/pause
+  glyph and re-placing the seek bar, timeshift timeline and sleep pill, each
+  of which repaints the video underneath. Measured on 300 pointer events: 299
+  surface repaints before, 1 after.
+
+### Browsing
+
+- **Each section remembers the sub-category you were in.** Jumping between TV,
+  Movies, Series, Favorites and back dropped you at the top of the category
+  list every time. Also for Watch Later, Watched, Recordings and History. A
+  category that no longer exists falls back to the usual starting row, and
+  explicit navigation - jumping to what's playing, drilling into a series -
+  still wins.
+
+### Cast
+
+- **Fixed: a cast member was credited with films they are not in.** Titles were
+  matched against your playlist with punctuation *and spaces* stripped, so the
+  rule allowing a provider title to match when it merely starts with a credit
+  had no word boundaries left - a credit like "America" claimed every
+  "American ..." title. "The Wall" is not "The Wall Street Documentary" and
+  "Frozen" is not "Frozen II"; genuine release junk ("Inception REPACK") still
+  matches.
+- **Fixed: picking a title there didn't land you on it.** It was navigated by a
+  fixed delay that almost always fired before the category list had loaded, so
+  it just played the film with nothing selected and an empty detail panel. It
+  now starts playing at once and the middle column follows, in the title's own
+  category. Shows drill into their episode list.
+- **Fixed: missing posters in the panel.** Artwork is resolved through the same
+  service and cache the middle list uses, so a title shows the poster it shows
+  there - including the ones whose provider artwork is a dead proxy, where the
+  list finds a TMDB poster embedded in that very URL.
+
+### Playback
+
+- **Fixed: unmuting a film that started muted stayed silent** until you replayed
+  it. Muting moves the volume slider to 0 with its signals blocked, so mpv was
+  handed that 0 as the stream's volume - and clearing the mute flag cannot undo
+  a zero volume.
+- **Multiview keeps your place**: sending a film or episode from the player to a
+  cell continues where you were (swapping two cells carries their positions
+  across too).
+
 ## [1.2.2]
 
 The pop-out player works on Linux again, plus programme-guide, recording,
