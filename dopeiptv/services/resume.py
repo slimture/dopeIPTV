@@ -15,9 +15,14 @@ from typing import Any
 
 # Fields worth keeping in a resume snapshot so the "Continue watching" list
 # can render a row (and replay it) without re-fetching the provider.
+# _key and _url matter for rows that came from History: those carry no
+# provider stream_id, so dropping them left a snapshot with NO identity (its
+# history entry then got key=None and stacked up as a DUPLICATE that could not
+# resume) and no way to build a URL (Continue watching played
+# /movie/user/pass/None.mp4 -> stream error).
 _SNAP_FIELDS = ("name", "title", "stream_id", "series_id", "id",
                 "container_extension", "stream_icon", "cover", "category_id",
-                "season", "episode_num", "_tmdb_id")
+                "season", "episode_num", "_tmdb_id", "_key", "_url")
 # Series-context fields kept for an episode so it can be replayed from the
 # flat Continue-watching list (episode_url needs the series id) and so the row
 # can show the series' name + artwork instead of a bare episode title.

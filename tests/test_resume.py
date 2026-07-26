@@ -112,3 +112,18 @@ def test_continue_watching_clear_removes_row():
     assert len(r.continue_watching()) == 1
     r.clear("vod", 42)
     assert r.continue_watching() == []
+
+
+def test_snapshot_keeps_identity_of_a_history_row():
+    # Playing a movie from History passes THAT row as the item: it carries
+    # _key and _url but no provider stream_id. Dropping those from the
+    # snapshot left the Continue-watching row with no identity (its history
+    # entry got key=None and stacked up as a duplicate that could not resume)
+    # and no URL to play (the view built /movie/user/pass/None.mp4).
+    r = ResumeStore(FakeSettings(), "p")
+    r.record("vod", 77, pos=900, dur=5400,
+             item={"name": "Dune", "_key": 77, "_kind": "movie",
+                   "_url": "http://h.tv/movie/u/p/77.mkv"})
+    row = r.continue_watching()[0]
+    assert row["_key"] == 77
+    assert row["_url"] == "http://h.tv/movie/u/p/77.mkv"

@@ -2994,10 +2994,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         elif self.mode == "fav":
             eff_mode = it.get("_kind") or (
                 "vod" if self._fav_section == "movie" else "series")
-        if eff_mode == "vod":
+        if eff_mode == "vod" and it.get("stream_id") is not None:
             return self.client.vod_url(
                 it.get("stream_id"), it.get("container_extension")), title
-        return None, title
+        # No provider id: a snapshot-derived row (e.g. Continue watching seeded
+        # by a play from History) still carries the URL it was played from, and
+        # that one is known-good. Building a URL from a missing id instead gave
+        # /movie/user/pass/None.<ext> and a stream error.
+        return it.get("_url"), title
 
     def play_live_channel(self, it) -> None:
         fmt = self.settings.value("stream_format", "ts")
