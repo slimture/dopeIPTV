@@ -14,7 +14,7 @@ from .widgets import _ClickableWidget
 from ..core.workers import run_async, tmdb_url_from_provider
 from PyQt6.QtCore import QSize, QTimer, Qt
 from PyQt6.QtGui import QIcon, QPainter, QPainterPath, QPixmap
-from PyQt6.QtWidgets import QAbstractItemView, QDialog, QDialogButtonBox, QFrame, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QMenu, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QFrame, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QMenu, QVBoxLayout, QWidget
 from datetime import datetime
 
 
@@ -346,13 +346,38 @@ class _DetailMixin:
         r"multi|dual|vostfr|truefrench)\b", re.IGNORECASE)
     _TITLE_PREFIX = re.compile(r"^\s*[a-z]{2,4}\s*[|:\-]\s*", re.IGNORECASE)
 
+    # Words a provider bolts onto the end of a title without changing WHICH
+    # title it is. Anything else after a title means it is a different title
+    # that merely starts the same way - "The Wall" is not "The Wall Street
+    # Documentary" - which is how an actor ended up credited on films they
+    # have nothing to do with.
+    _TITLE_TAIL_NOISE = frozenset({
+        "repack", "proper", "final", "extended", "theatrical", "remastered",
+        "restored", "uncut", "uncensored", "unrated", "director", "directors",
+        "cut", "edition", "version", "special", "collection", "complete",
+        "subbed", "dubbed", "sub", "subs", "dub", "dubb", "textad",
+        "swedish", "swe", "nordic", "danish", "norwegian", "finnish",
+        "english", "eng", "german", "french", "spanish", "italian",
+        "atmos", "dts", "ac3", "aac", "hdr", "hdr10", "sdr", "dv", "3d",
+    })
+
     @classmethod
     def _normalize_title(cls, s: str) -> str:
+        """A provider or TMDB title reduced to a comparable form: lowercased,
+        bracketed and release-tag noise removed, punctuation turned into
+        single spaces.
+
+        Those spaces matter. They used to be stripped along with the
+        punctuation, which turned the prefix rule in _find_playlist_matches
+        into a substring test with no word boundaries at all - so a credit
+        called "America" claimed every "American ..." title in the playlist,
+        and a Swedish actor turned up in American documentaries."""
         s = (s or "").lower()
         s = cls._TITLE_BRACKETS.sub(" ", s)
         s = cls._TITLE_PREFIX.sub("", s)
         s = cls._TITLE_NOISE.sub(" ", s)
-        return "".join(c for c in s if c.isalnum())
+        s = "".join(c if c.isalnum() else " " for c in s)
+        return " ".join(s.split())
 
     def _ensure_full_catalog(self, callback) -> None:
         if self._full_catalog is not None:
@@ -371,9 +396,27 @@ class _DetailMixin:
 
         run_async(self.pool, fetch, done, lambda _e: callback([]))
 
-    def _find_playlist_matches(self, titles: list[str], callback) -> None:
-        norm_titles = {self._normalize_title(t) for t in titles}
+    def _title_matches(self, cnorm: str, norm_titles: set,
+                       long_titles: list) -> bool:
+        """Is the normalised provider title *cnorm* one of this person's
+        credits? Exact match, or the credit followed only by junk the noise
+        regex didn't know about ("Inception REPACK SWEDISH") - never a title
+        that merely begins with the same words."""
+        if cnorm in norm_titles:
+            return True
+        for t in long_titles:
+            if not cnorm.startswith(t + " "):
+                continue
+            tail = cnorm[len(t):].split()
+            if all(w in self._TITLE_TAIL_NOISE for w in tail):
+                return True
+        return False
 
+    def _find_playlist_matches(self, titles: list[str], callback) -> None:
+        norm_titles = {n for n in (self._normalize_title(t) for t in titles)
+                       if n}
+        # Only a reasonably long credit may match by prefix at all - a short
+        # one carries too little signal to claim a longer provider title.
         long_titles = [t for t in norm_titles if len(t) >= 6]
 
         def with_catalog(catalog):
@@ -383,10 +426,7 @@ class _DetailMixin:
                     it.get("name") or it.get("title") or "")
                 if not cnorm:
                     continue
-                # Exact match, or the provider title begins with a (reasonably
-                # long) TMDB title — catches residual trailing noise.
-                if cnorm in norm_titles or any(
-                        cnorm.startswith(t) for t in long_titles):
+                if self._title_matches(cnorm, norm_titles, long_titles):
                     matches.append((it, kind))
             callback(matches)
 
@@ -516,47 +556,31 @@ class _DetailMixin:
                 self.poster_art.get(details["poster_url"], apply)
 
     def _play_cast_match(self, item, dialog) -> None:
+        """Open a title picked from a cast member's filmography exactly as if
+        it had been picked from its own section: the middle column lands in
+        the title's category with the row selected, so the detail panel on the
+        right fills in - and only then does it play."""
         it, kind = item.data(Qt.ItemDataRole.UserRole)
         dialog.hide()
-        if kind == "vod":
-            self.switch_mode("vod")
-            self._navigate_to_item(it, "vod")
-        else:
-            self.switch_mode("series")
-            self._navigate_to_item(it, "series")
-
-    def _navigate_to_item(self, target, mode: str) -> None:
-        """Switch to the right category and scroll/select a specific item."""
-        cat_id = str(target.get("category_id") or "")
-        for i in range(self.cat_list.count()):
-            ci = self.cat_list.item(i)
-            if ci and str(ci.data(Qt.ItemDataRole.UserRole) or "") == cat_id:
-                self.cat_list.setCurrentRow(i)
-                break
-        else:
-            self.cat_list.setCurrentRow(0)
-
-        target_key = self._item_key(target)
-
-        def after_load(target_key=target_key, target=target):
-            for row in range(self.list_model.rowCount()):
-                it = self.list_model.item_at(row)
-                if it and self._item_key(it) == target_key:
-                    idx = self.list_model.index(row)
-                    self.listw.setCurrentIndex(idx)
-                    self.listw.scrollTo(
-                        idx, QAbstractItemView.ScrollHint.PositionAtCenter)
-                    if mode == "series":
-                        self._enter_series(it)
-                    else:
-                        self.play_item(it, "mpv")
-                    return
-            if mode == "series":
-                self._enter_series(target)
+        if kind == "series":
+            # A show: drill into its episode list rather than "play" it. The
+            # drill has to ride the async category load (see mw_home), or the
+            # load lands afterwards and bounces back to "all series".
+            self._pending_jump_key = self._item_key(it)
+            QTimer.singleShot(8000, self._clear_pending_jump)
+            if self.mode != "series":
+                self._pending_series_drill = it
+                self.switch_mode("series")
             else:
-                self.play_item(target, "mpv")
-
-        QTimer.singleShot(300, after_load)
+                self._enter_series(it)
+            return
+        # A movie: select it where it lives, then play it. _reveal_item_in_list
+        # is the same path Home uses - it rides the category load instead of
+        # guessing at a fixed delay, which is why the old hand-rolled version
+        # usually landed before the list existed and just played the film with
+        # nothing selected and an empty detail panel.
+        self._reveal_item_in_list(it, "vod")
+        self.play_item(it, "mpv")
 
     def _clear_epg_rows(self) -> None:
         while self.epg_lay.count() > 1:
