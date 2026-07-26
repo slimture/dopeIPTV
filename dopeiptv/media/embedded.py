@@ -2689,15 +2689,19 @@ class EmbeddedPlayer(QWidget):
         set_opt("cache-secs", float(secs))
         # cache-secs is only a TIME target; the demuxer byte budget is what
         # actually caps how many seconds of a high-bitrate live feed fit. Scale
-        # it (and the back-buffer) with the chosen buffer so a bigger setting
-        # really holds more and cushions the hitches on some live broadcasts,
-        # bounded so RAM stays sane. A user-pinned env value still wins.
+        # the FORWARD budget with the chosen buffer so a bigger setting really
+        # holds more and cushions the hitches on some live broadcasts, bounded
+        # so RAM stays sane. A user-pinned env value still wins.
+        #
+        # The BACK buffer is deliberately left alone: it only serves seeking
+        # backwards, does nothing for smoothness, and mpv writes the whole
+        # demuxer cache (back buffer included) when stream-record starts - so
+        # inflating it made a recording begin well before the frame the user
+        # was actually watching when they pressed record.
         max_bytes = max(150 * 1024 * 1024,
                         min(512 * 1024 * 1024, secs * 16 * 1024 * 1024))
         if not os.environ.get("DOPEIPTV_DEMUX_MAX"):
             set_opt("demuxer-max-bytes", max_bytes)
-        if not os.environ.get("DOPEIPTV_DEMUX_MAX_BACK"):
-            set_opt("demuxer-max-back-bytes", max_bytes // 2)
 
     def playback_position(self) -> float:
         m = self.video.mpv
