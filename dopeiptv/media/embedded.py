@@ -154,25 +154,33 @@ def _control_icon(name: str, color: str, px: int = 28) -> QIcon:
             fill()
             p.drawEllipse(QPointF(kx, y), rad, rad)
     elif name in ("volume", "mute"):
+        # Like "popout", drawn in a WIDER box than the solid glyphs. A speaker
+        # is a slim shape - a small body, a cone and thin waves - so inside the
+        # box the filled icons use it covered barely a third of the button and
+        # looked like a different, much smaller icon set next to play/pause.
+        # These constants give it roughly the same optical weight as they have.
+        vl, vt = S * 0.20, S * 0.20
+        span = S - 2 * vl
+        vmid = S / 2
         fill()
-        body_w, body_h = w * 0.28, h * 0.42
-        bx = L - w * 0.04
-        p.drawRect(QRectF(bx, midy - body_h / 2, body_w, body_h))
-        cone_x = bx + body_w + w * 0.26
+        body_w, body_h = span * 0.24, span * 0.34
+        p.drawRect(QRectF(vl, vmid - body_h / 2, body_w, body_h))
+        cone_x = vl + span * 0.46
         p.drawPolygon(QPolygonF([
-            QPointF(bx + body_w, midy - body_h / 2), QPointF(cone_x, T),
-            QPointF(cone_x, B), QPointF(bx + body_w, midy + body_h / 2)]))
+            QPointF(vl + body_w, vmid - body_h / 2), QPointF(cone_x, vt),
+            QPointF(cone_x, vt + span), QPointF(vl + body_w, vmid + body_h / 2)]))
         if name == "volume":
-            stroke(S * 0.06)
-            for rad in (w * 0.16, w * 0.30):
-                p.drawArc(QRectF(cone_x - rad, midy - rad, rad * 2, rad * 2),
+            stroke(S * 0.062)
+            for rad in (span * 0.20, span * 0.38):
+                p.drawArc(QRectF(cone_x - rad, vmid - rad, rad * 2, rad * 2),
                           -55 * 16, 110 * 16)
         else:
-            stroke(S * 0.07)
-            xx = cone_x + w * 0.12
-            dy = h * 0.16
-            p.drawLine(QPointF(xx, midy - dy), QPointF(xx + w * 0.22, midy + dy))
-            p.drawLine(QPointF(xx + w * 0.22, midy - dy), QPointF(xx, midy + dy))
+            stroke(S * 0.072)
+            xx, dy = cone_x + span * 0.10, span * 0.15
+            p.drawLine(QPointF(xx, vmid - dy),
+                       QPointF(xx + span * 0.30, vmid + dy))
+            p.drawLine(QPointF(xx + span * 0.30, vmid - dy),
+                       QPointF(xx, vmid + dy))
     p.end()
     pm.setDevicePixelRatio(scale)
     return QIcon(pm)
