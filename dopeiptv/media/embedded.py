@@ -2093,7 +2093,10 @@ class EmbeddedPlayer(QWidget):
                 fbo = self._mirror_fbo
                 if fbo is None or fbo.width() != w or fbo.height() != h:
                     self._mirror_fbo = fbo = QOpenGLFramebufferObject(w, h)
-                v._ctx.render(flip_y=False, opengl_fbo={
+                # flip_y=True: fbo.toImage() already flips GL's bottom-up rows
+                # once; without mpv's flip too the picture came out upside
+                # down (confirmed on hardware).
+                v._ctx.render(flip_y=True, opengl_fbo={
                     "fbo": int(fbo.handle()), "w": w, "h": h})
                 try:
                     v._ctx.report_swap()
