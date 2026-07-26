@@ -141,9 +141,12 @@ class _SidebarLogo(QWidget):
         (instance attrs shadow the class constants; paintEvent reads self.*,
         so everything - pill, triangle, bars, badge - scales together)."""
         if on:
-            # Small enough to clear the 60 px rail's margins with room to
-            # spare (44 px wide sat flush against the edges and clipped).
-            self.LOGO_W, self.LOGO_H = 36, 16
+            # The 60 px rail minus the sidebar's 12 px side margins leaves
+            # exactly 36 px. At 36 the mark filled that to the pixel and the
+            # update badge - which overhangs the mark's right edge by half its
+            # radius - was cut off. Leave a few px of slack for the badge and
+            # for antialiasing on the edges.
+            self.LOGO_W, self.LOGO_H = 30, 15
         else:
             for a in ("LOGO_W", "LOGO_H"):
                 self.__dict__.pop(a, None)
@@ -167,6 +170,11 @@ class _SidebarLogo(QWidget):
         # Badge scales with the mark (10 px at full size, smaller on the rail).
         r = max(6.0, h * 0.25)
         cx, cy = x0 + w - r * 0.5, y0 + r * 0.5
+        # Keep the badge inside the widget: it deliberately overhangs the
+        # mark's corner, and on the narrow rail that overhang fell outside the
+        # widget and got clipped.
+        cx = min(cx, self.width() - r)
+        cy = max(cy, r)
         return QRectF(cx - r, cy - r, 2 * r, 2 * r)
 
     def bounce(self, hops: int = 4, period_ms: int = 4000) -> None:
