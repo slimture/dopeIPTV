@@ -238,6 +238,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._focus_mode = False
         self._fav_view_tint = ("", "")
         self._pending_cat_select = _UNSET
+        # Last sub-category visited per section, so TV -> Movies -> TV comes
+        # back to where you were instead of the top of the list. Per session,
+        # and per provider (switch_playlist clears it - another provider's
+        # category ids mean nothing here).
+        self._last_cat: dict = {}
         self._pending_jump_key = None
         self._pending_jump_cat = None
         self._stream_retries = 0
@@ -1825,6 +1830,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._hide_busy()
             self.playlist_store.set_active(pid)
             self.client = candidate
+            # Another provider's category ids say nothing about this one's.
+            self._last_cat = {}
             self.favs = FavoriteStore(self.settings, f"favorites_{pid}")
             self.movie_favs = FavoriteStore(
                 self.settings, f"movie_favorites_{pid}", id_key="stream_id")
@@ -1938,6 +1945,26 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     self.switch_mode(m)
                     break
 
+    def _remembered_cat_row(self, default_row: int = 0) -> int:
+        """The row holding the sub-category last visited in this section, or
+        *default_row* when there is none (first visit) or it is gone (the
+        provider dropped the category, a favourites group was renamed, a
+        recordings folder was deleted). Ids come back from the provider as
+        int or str interchangeably, so compare as strings as a fallback."""
+        want = self._last_cat.get(self.mode, _UNSET)
+        if want is _UNSET:
+            return default_row
+        for i in range(self.cat_list.count()):
+            d = self.cat_list.item(i).data(Qt.ItemDataRole.UserRole)
+            if d == want or (d is not None and want is not None
+                             and not isinstance(d, tuple)
+                             and str(d) == str(want)):
+                return i
+        return default_row
+
+    def _select_remembered_cat(self, default_row: int = 0) -> None:
+        self.cat_list.setCurrentRow(self._remembered_cat_row(default_row))
+
     def _load_categories(self) -> None:
         self._load_gen += 1
         gen = self._load_gen
@@ -1980,7 +2007,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 item.setData(Qt.ItemDataRole.UserRole, rel)
                 self.cat_list.addItem(item)
             self.cat_list.blockSignals(False)
-            self.cat_list.setCurrentRow(0)
+            self._select_remembered_cat()
             return
         if self.mode == "history":
             self.cat_list.blockSignals(True)
@@ -1992,7 +2019,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 it.setData(Qt.ItemDataRole.UserRole, data)
                 self.cat_list.addItem(it)
             self.cat_list.blockSignals(False)
-            self.cat_list.setCurrentRow(0)
+            self._select_remembered_cat()
             return
         if self.mode == "fav":
             # Split column: a Channels section (with its user-defined
@@ -2029,7 +2056,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 trakt_row.setData(Qt.ItemDataRole.UserRole, ("trakt", None))
                 self.cat_list.addItem(trakt_row)
             self.cat_list.blockSignals(False)
-            self.cat_list.setCurrentRow(0)
+            self._select_remembered_cat()
             return
         if self.mode == "watchlist":
             # Watch Later has two sub-categories - Movies and Series -
@@ -2044,7 +2071,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 it.setData(Qt.ItemDataRole.UserRole, data)
                 self.cat_list.addItem(it)
             self.cat_list.blockSignals(False)
-            self.cat_list.setCurrentRow(0)
+            self._select_remembered_cat()
             return
         if self.mode == "watched":
             # Split into Local and Trakt. The Trakt row (and the
@@ -2063,7 +2090,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 it.setData(Qt.ItemDataRole.UserRole, data)
                 self.cat_list.addItem(it)
             self.cat_list.blockSignals(False)
-            self.cat_list.setCurrentRow(0)
+            self._select_remembered_cat()
             return
         self._show_busy(tr("status_loading_categories"))
         fn = {"live": self.client.live_categories,
@@ -2136,6 +2163,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     continue
                 row = i
                 break
+            # ...unless this section has been visited before, in which case
+            # come back to the category that was open. The explicit overrides
+            # below (a jump to what's playing, a reload asked to keep the
+            # current category, a series drill-in) still win over it.
+            row = self._remembered_cat_row(row)
             # A pending "jump to now playing" wants every item visible, so land
             # on the "All" row (0) rather than the first category - unless we
             # know the target's category (e.g. tuning from the EPG guide), in
@@ -2204,6 +2236,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.series_ctx = None
         self.back_btn.hide()
         self._update_sync_btn()
+        # Remember where we are in this section, so coming back lands here
+        # (see _remembered_cat_row).
+        self._last_cat[self.mode] = cat
         self._load_items(cat)
         # In "solo" mode keep only the now-active category visible in the list.
         self._apply_cat_solo()
