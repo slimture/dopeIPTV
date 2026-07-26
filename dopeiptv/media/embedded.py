@@ -2042,9 +2042,15 @@ class EmbeddedPlayer(QWidget):
             # presentation route in a second window shows black on modern
             # Qt/Mesa (X11 and Wayland alike), so all GL stays in the docked
             # widget's proven context and the pop-out gets plain images.
+            # Pacing is EVENT-DRIVEN: mpv's frame callback (frame_ready) fires
+            # the tick, so frames render the moment they exist - a fixed
+            # 30 fps poll against a 25 fps stream beat 33/66 ms (visible
+            # judder). The timer stays only as a slow fallback (resize
+            # refresh, safety); the tick itself skips when no frame is due.
             m = _RasterMirror(parent, mirror_of=self.video)
             self._raster_state = ""
-            tick, interval = self._tick_raster_mirror, 33   # readback ~30 fps
+            self.video.frame_ready.connect(self._tick_raster_mirror)
+            tick, interval = self._tick_raster_mirror, 200
         else:
             m = _MpvGLWidget(parent, mirror_of=self.video)
             m.setMouseTracking(True)
@@ -2152,6 +2158,12 @@ class EmbeddedPlayer(QWidget):
         if glwin is not None:
             glwin._stopped = True
             glwin.free_render_context("stop_mirror hand-off")
+        # Raster mirror: stop the event-driven ticks (frame_ready keeps firing
+        # for the docked surface's own repaints).
+        try:
+            self.video.frame_ready.disconnect(self._tick_raster_mirror)
+        except (TypeError, RuntimeError):
+            pass
         # Raster mirror: release the offscreen FBO while the docked GL context
         # (its owner) is current. The render context itself was never moved.
         if getattr(self, "_mirror_fbo", None) is not None:
@@ -2172,6 +2184,10 @@ class EmbeddedPlayer(QWidget):
         self.sleep_badge.hide()
         self._mirror = None
         self._show_dock_placeholder(False)
+        # The control bar is back in the player by now (the caller re-adds it
+        # before stop_mirror) - re-pin the docked height WITH the bar again.
+        self._lock_video_box()
+        self._relayout_controls()
         self.video.update()
         self._reveal_sleep_badge()
 
@@ -2647,7 +2663,13 @@ class EmbeddedPlayer(QWidget):
             # resize and showed as unclearable letterbox bars until the app
             # was restarted. A constant player height has no such feedback,
             # so the bars can't get stuck.
-            bar_h = self.bar.sizeHint().height() if self.bar.isVisible() else 0
+            # Count the bar only while it actually lives IN this player: in
+            # the mirror pop-out the bar is reparented into the pop-out
+            # window, and still reserving its height here left a dead strip
+            # under the docked placeholder (the "broken control panel" in the
+            # main window while popped out).
+            bar_here = self.bar.isVisible() and self.bar.parent() is self
+            bar_h = self.bar.sizeHint().height() if bar_here else 0
             spacing = self.layout().spacing() if bar_h else 0
             self.setFixedHeight(self.VIDEO_BOX_HEIGHT + bar_h + spacing)
 
@@ -2687,8 +2709,14 @@ class EmbeddedPlayer(QWidget):
         # child width can still lag the layout pass). The detail pane's minimum
         # width (340) is sized so everything fits, so these only ever fire if
         # the player is used somewhere narrower than that - a safety net, not
-        # the normal path.
-        w = self.width()
+        # the normal path. When the bar lives in the POP-OUT window (mirror
+        # mode) size against that window instead - keying off the narrow
+        # docked pane hid the volume slider inside a wide pop-out.
+        if self.bar.parent() is self:
+            w = self.width()
+        else:
+            host = self.bar.parentWidget()
+            w = host.width() if host is not None else self.width()
         self.vol.setVisible(w >= 330)
         self.pop_btn.setVisible(w >= 315)
 

@@ -78,9 +78,13 @@ class _PopoutWindow(QWidget):
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         # Keep the centre disc centred and the floating overlays anchored to
-        # the mirror as the window is resized or maximised.
+        # the mirror as the window is resized or maximised, and let the
+        # control bar (living here in mirror mode) re-run its responsive
+        # rules against this window's width.
         self._owner._reposition_popout_center()
         self._owner._reposition_popout_overlays()
+        if getattr(self._owner, "player", None) is not None:
+            self._owner.player._relayout_controls()
 
 
 class _PopoutMixin:
@@ -165,6 +169,11 @@ class _PopoutMixin:
         # actually runs.
         self.player.set_popout_autohide(
             self.settings.value("popout_autohide", "true") == "true")
+        # The bar just left the docked player: re-pin its height without the
+        # bar (or a dead strip lingers under the placeholder) and re-run the
+        # bar's responsive rules against the pop-out's width, not the pane's.
+        self.player._lock_video_box()
+        self.player._relayout_controls()
         mirror.video_dbl_click.connect(self._on_mirror_dbl_click)
         mirror.video_mouse_press.connect(self._on_mirror_press)
         mirror.video_mouse_move.connect(self._on_mirror_move)
