@@ -129,6 +129,16 @@ def _control_icon(name: str, color: str, px: int = 28) -> QIcon:
                                   QPointF(L + seg, B)]))
         p.drawPolyline(QPolygonF([QPointF(R - seg, B), QPointF(R, B),
                                   QPointF(R, B - seg)]))
+    elif name == "popout":
+        # Two overlapping rounded rects (the ⧉ idea): a back panel and a
+        # detached one lifted to the top-right. Drawn rather than typed - the
+        # Unicode glyph rendered tiny next to the other buttons wherever the
+        # platform font lacked it (notably on Linux).
+        stroke(S * 0.09)
+        off = w * 0.22
+        rad = S * 0.05
+        p.drawRoundedRect(QRectF(L, T + off, w - off, h - off), rad, rad)
+        p.drawRoundedRect(QRectF(L + off, T, w - off, h - off), rad, rad)
     elif name == "options":
         rows = (T, midy, B)
         knobs = (R - w * 0.18, L + w * 0.22, R - w * 0.34)
@@ -1460,6 +1470,7 @@ class EmbeddedPlayer(QWidget):
             self.rec_btn: "record", self.opts_btn: "options",
             self.stop_btn: "stop", self.fs_btn: "fullscreen",
             self.mute_btn: "volume", self.nextep_btn: "nextep",
+            self.pop_btn: "popout",
             self.fs_prev_btn: "prev", self.fs_next_btn: "next",
             self.fs_pause_btn: "pause", self.fs_ts_btn: "rewind",
             self.fs_rec_btn: "record", self.fs_opts_btn: "options",
