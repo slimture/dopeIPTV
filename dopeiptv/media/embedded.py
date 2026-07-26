@@ -1708,21 +1708,35 @@ class EmbeddedPlayer(QWidget):
                (self.height() - b.height()) // 2)
 
     def _update_center_icon(self) -> None:
-        glyph = "play" if getattr(self, "_paused", False) else "pause"
+        paused = bool(getattr(self, "_paused", False))
+        # Single source of truth for "which glyph is on the button" - _reveal_
+        # center reads it to know whether the icon needs redrawing at all.
+        self._center_icon_paused = paused
+        glyph = "play" if paused else "pause"
         self.center_btn.setIcon(_control_icon(glyph, "#FFFFFF", 30))
         self.center_btn.setIconSize(QSize(30, 30))
 
     def _reveal_center(self) -> None:
         """Show the centre button and, while playing, arm its fade. While
-        paused it stays up until the user resumes."""
+        paused it stays up until the user resumes.
+
+        This runs on EVERY pointer event over the video, so it must do nothing
+        when nothing changed. Redrawing the glyph, re-placing and re-raising
+        the button on each event dirtied the region under it as fast as the
+        mouse reports - and every one of those repaints costs a slice of a
+        video blit, which is why dragging the pointer across a maximized
+        video felt sluggish. Placement is handled by the resize path."""
         if getattr(self, "current_url", None) is None:
             self.center_btn.hide()
             return
-        self._update_center_icon()
-        self._position_center_btn()
-        self.center_btn.show()
-        self.center_btn.raise_()
-        if getattr(self, "_paused", False):
+        paused = bool(getattr(self, "_paused", False))
+        if paused is not getattr(self, "_center_icon_paused", None):
+            self._update_center_icon()
+        if not self.center_btn.isVisible():
+            self._position_center_btn()
+            self.center_btn.show()
+            self.center_btn.raise_()
+        if paused:
             self._center_hide_timer.stop()
         else:
             self._center_hide_timer.start()
@@ -2242,11 +2256,15 @@ class EmbeddedPlayer(QWidget):
         # (the live timeline is the control) - avoids a second, useless bar.
         if self._seek_mode in ("live", "timeline"):
             return
-        for w in (self.back_btn, self.fwd_btn, self.seek, self.time_lbl):
-            w.show()
-        self._place_seek_overlay()
-        self.seek_overlay.show()
-        self.seek_overlay.raise_()
+        # Already up - the pointer is simply still moving. Only re-arm the
+        # fade: re-placing (a layout pass) and re-raising it on every pointer
+        # event repainted the video underneath hundreds of times a second.
+        if not self.seek_overlay.isVisible():
+            for w in (self.back_btn, self.fwd_btn, self.seek, self.time_lbl):
+                w.show()
+            self._place_seek_overlay()
+            self.seek_overlay.show()
+            self.seek_overlay.raise_()
         self._seek_overlay_timer.start()
 
     def _hide_seek_overlay(self, force: bool = False) -> None:
@@ -2334,9 +2352,12 @@ class EmbeddedPlayer(QWidget):
         summon it."""
         if self._seek_mode != "timeline":
             return
-        self._place_ts_timeline()
-        self.ts_timeline.show()
-        self.ts_timeline.raise_()
+        # Same as _show_seek_overlay: only the fade timer is re-armed while
+        # it's already on screen (this is called from the mouse-move path).
+        if not self.ts_timeline.isVisible():
+            self._place_ts_timeline()
+            self.ts_timeline.show()
+            self.ts_timeline.raise_()
         self._ts_hide_timer.start()
 
     def _hide_ts_timeline(self) -> None:
@@ -3097,7 +3118,11 @@ class EmbeddedPlayer(QWidget):
         the final SLEEP_PIN_SECS the tick keeps it pinned regardless."""
         if not self._sleep_timer.isActive():
             return
-        self._update_sleep_badge(show=True)
+        # Only when it isn't already up: the countdown's own 1 Hz tick keeps
+        # the text current, so a pointer event has nothing to add (and this
+        # runs on every one of them).
+        if not self.sleep_badge.isVisible():
+            self._update_sleep_badge(show=True)
         self._sleep_badge_timer.start()
 
     def _maybe_hide_sleep_badge(self) -> None:

@@ -208,6 +208,7 @@ class _PopoutMixin:
         btn.clicked.connect(self._popout_toggle_pause)
         btn.hide()
         self._popout_center = btn
+        self._popout_center_paused = None   # fresh button: no glyph on it yet
         self._popout_center_timer = QTimer(self)
         self._popout_center_timer.setSingleShot(True)
         self._popout_center_timer.setInterval(2500)
@@ -234,19 +235,37 @@ class _PopoutMixin:
         self.player.toggle_pause()
         self._reveal_popout_center()
 
+    def _popout_center_icon(self, paused: bool):
+        """The two centre glyphs, drawn once. They were redrawn from scratch on
+        every pointer event - a fresh antialiased pixmap per mouse report."""
+        icons = getattr(self, "_popout_center_icons", None)
+        if icons is None:
+            from ..media.embedded import _control_icon
+            icons = self._popout_center_icons = {
+                True: _control_icon("play", "#FFFFFF", 30),
+                False: _control_icon("pause", "#FFFFFF", 30)}
+        return icons[paused]
+
     def _reveal_popout_center(self) -> None:
+        """Flash the centre play/pause disc. Called from the pointer-move
+        handler, so - like the docked player's _reveal_center - it touches the
+        widget only when something actually changed: every setIcon, move and
+        raise_ here dirties the mirror underneath, and over a maximized video
+        each of those repaints costs a slice of a full-surface video blit."""
         btn = getattr(self, "_popout_center", None)
         win = self._popout_win
         if btn is None or win is None:
             return
-        from ..media.embedded import _control_icon
-        paused = getattr(self.player, "_paused", False)
-        btn.setIcon(_control_icon("play" if paused else "pause", "#FFFFFF", 30))
-        btn.setIconSize(QSize(30, 30))
-        btn.move((win.width() - btn.width()) // 2,
-                 (win.height() - btn.height()) // 2)
-        btn.show()
-        btn.raise_()
+        paused = bool(getattr(self.player, "_paused", False))
+        if paused is not getattr(self, "_popout_center_paused", None):
+            self._popout_center_paused = paused
+            btn.setIcon(self._popout_center_icon(paused))
+            btn.setIconSize(QSize(30, 30))
+        if not btn.isVisible():
+            btn.move((win.width() - btn.width()) // 2,
+                     (win.height() - btn.height()) // 2)
+            btn.show()
+            btn.raise_()
         # While paused it stays up; while playing it fades after a short idle.
         if paused:
             self._popout_center_timer.stop()
