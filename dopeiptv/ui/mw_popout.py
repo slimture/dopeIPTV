@@ -88,6 +88,13 @@ class _PopoutWindow(QWidget):
 
 class _PopoutMixin:
     """MainWindow mixin: detaching the player into a separate always-on-top window."""
+
+    # How close to an edge the pointer has to be to grab it for a resize, and
+    # how small the window may get by dragging.
+    RESIZE_MARGIN = 8
+    POPOUT_MIN_W = 320
+    POPOUT_MIN_H = 180
+
     def _toggle_popout(self) -> None:
         """Move the embedded player into its own window, or back if it's already
         detached."""
@@ -203,6 +210,10 @@ class _PopoutMixin:
         self._popout_center_timer.setSingleShot(True)
         self._popout_center_timer.setInterval(2500)
         self._popout_center_timer.timeout.connect(self._maybe_hide_popout_center)
+        # Frameless windows have no grips, so the video's own edges are the
+        # resize handles (see _popout_resize_edges).
+        self._popout_resize = None
+        self._popout_edge_cursor = False
         # Blank the mouse cursor after a short idle over the video (windowed or
         # fullscreen), like a real player. Re-armed on every mirror move.
         self._popout_cursor_hidden = False
@@ -259,6 +270,8 @@ class _PopoutMixin:
         win = self._popout_win
         if m is None or win is None or not m.underMouse():
             return
+        if getattr(self, "_popout_edge_cursor", False):
+            return      # resting on a resize edge: keep that cursor visible
         if sys.platform == "darwin":
             from ..core.platform_macos import set_cursor_hidden
             set_cursor_hidden(True)
@@ -304,6 +317,88 @@ class _PopoutMixin:
         if p._stats_overlay.isVisible():
             p._place_stats()
 
+    # -- resizing a frameless pop-out ---------------------------------------
+
+    def _popout_resize_edges(self, gpos) -> "Qt.Edge":
+        """Which window edges the pointer (global position) is close enough to
+        grab. Empty while the title bar is on - the system frame has its own
+        grips - and while maximised or fullscreen, where resizing is the
+        window manager's business."""
+        win = self._popout_win
+        if win is None or win.isMaximized() or win.isFullScreen():
+            return Qt.Edge(0)
+        if not (win.windowFlags() & Qt.WindowType.FramelessWindowHint):
+            return Qt.Edge(0)
+        g = win.frameGeometry()
+        m = self.RESIZE_MARGIN
+        edges = Qt.Edge(0)
+        if gpos.x() <= g.left() + m:
+            edges |= Qt.Edge.LeftEdge
+        elif gpos.x() >= g.right() - m:
+            edges |= Qt.Edge.RightEdge
+        if gpos.y() <= g.top() + m:
+            edges |= Qt.Edge.TopEdge
+        elif gpos.y() >= g.bottom() - m:
+            edges |= Qt.Edge.BottomEdge
+        return edges
+
+    @staticmethod
+    def _edge_cursor(edges) -> "Qt.CursorShape":
+        corner_f = ((Qt.Edge.LeftEdge in edges and Qt.Edge.TopEdge in edges)
+                    or (Qt.Edge.RightEdge in edges
+                        and Qt.Edge.BottomEdge in edges))
+        corner_b = ((Qt.Edge.RightEdge in edges and Qt.Edge.TopEdge in edges)
+                    or (Qt.Edge.LeftEdge in edges
+                        and Qt.Edge.BottomEdge in edges))
+        if corner_f:
+            return Qt.CursorShape.SizeFDiagCursor
+        if corner_b:
+            return Qt.CursorShape.SizeBDiagCursor
+        if Qt.Edge.LeftEdge in edges or Qt.Edge.RightEdge in edges:
+            return Qt.CursorShape.SizeHorCursor
+        return Qt.CursorShape.SizeVerCursor
+
+    def _apply_popout_edge_cursor(self, edges) -> None:
+        """Show the matching resize cursor while the pointer hovers an edge, so
+        the grab area is discoverable without a visible frame."""
+        m = getattr(self, "_popout_mirror", None)
+        if m is None:
+            return
+        if edges:
+            m.setCursor(self._edge_cursor(edges))
+            self._popout_edge_cursor = True
+        elif getattr(self, "_popout_edge_cursor", False):
+            m.unsetCursor()
+            self._popout_edge_cursor = False
+
+    def _start_popout_resize(self, edges, gpos) -> None:
+        """Hand the drag to the window manager where it can take it (X11,
+        Wayland, Windows); otherwise (macOS) drive the geometry ourselves."""
+        win = self._popout_win
+        handle = win.windowHandle() if win is not None else None
+        if handle is not None and handle.startSystemResize(edges):
+            return
+        self._popout_resize = {"edges": edges, "from": gpos,
+                               "geo": QRect(win.geometry())}
+
+    def _drag_popout_resize(self, gpos) -> None:
+        win = self._popout_win
+        rz = getattr(self, "_popout_resize", None)
+        if win is None or rz is None:
+            return
+        g = QRect(rz["geo"])
+        dx, dy = gpos.x() - rz["from"].x(), gpos.y() - rz["from"].y()
+        edges = rz["edges"]
+        if Qt.Edge.LeftEdge in edges:
+            g.setLeft(min(g.left() + dx, g.right() - self.POPOUT_MIN_W))
+        elif Qt.Edge.RightEdge in edges:
+            g.setRight(max(g.right() + dx, g.left() + self.POPOUT_MIN_W))
+        if Qt.Edge.TopEdge in edges:
+            g.setTop(min(g.top() + dy, g.bottom() - self.POPOUT_MIN_H))
+        elif Qt.Edge.BottomEdge in edges:
+            g.setBottom(max(g.bottom() + dy, g.top() + self.POPOUT_MIN_H))
+        win.setGeometry(g)
+
     def _on_mirror_press(self, event) -> None:
         # Accept the event so a right-click can't leak through the frameless
         # window to whatever sits behind it (the "bleed-through").
@@ -312,6 +407,13 @@ class _PopoutMixin:
             self._popout_context_menu(event.globalPosition().toPoint())
             return
         if event.button() == Qt.MouseButton.LeftButton:
+            # An edge press resizes; anywhere else the press means pause (on
+            # release) or move (once it turns into a drag).
+            gpos = event.globalPosition().toPoint()
+            edges = self._popout_resize_edges(gpos)
+            if edges:
+                self._start_popout_resize(edges, gpos)
+                return
             self._mirror_press_pos = event.position().toPoint()
             # A click while the auto-hidden bar is away is a "wake the
             # controls" gesture, not a pause: without this, revealing the bar
@@ -321,6 +423,14 @@ class _PopoutMixin:
                 self.player is not None and self.player.bar.isHidden())
 
     def _on_mirror_move(self, event) -> None:
+        gpos = event.globalPosition().toPoint()
+        # A resize we drive ourselves (only where the window manager wouldn't
+        # take it) runs until the button comes back up.
+        if getattr(self, "_popout_resize", None) is not None:
+            if event.buttons() & Qt.MouseButton.LeftButton:
+                self._drag_popout_resize(gpos)
+                return
+            self._popout_resize = None
         frm = getattr(self, "_mirror_press_pos", None)
         if frm is not None and (event.buttons() & Qt.MouseButton.LeftButton):
             if (event.position().toPoint() - frm).manhattanLength() > 6:
@@ -332,12 +442,17 @@ class _PopoutMixin:
             return
         # Idle pointer over the video flashes the centre play/pause disc and
         # the seek bar / timeshift timeline (whichever applies), and brings the
-        # cursor back.
+        # cursor back. The edge cursor is applied after that restore, which
+        # unsets whatever shape the mirror was carrying.
         self._popout_cursor_activity()
+        self._apply_popout_edge_cursor(self._popout_resize_edges(gpos))
         self._reveal_popout_center()
         self.player.reveal_pop_overlays()
 
     def _on_mirror_release(self, event) -> None:
+        if getattr(self, "_popout_resize", None) is not None:
+            self._popout_resize = None
+            return                    # the drag resized the window, not a click
         # A plain click (no drag) toggles pause - but deferred by the
         # double-click interval so a double-click (fullscreen) cancels it.
         if (event.button() == Qt.MouseButton.LeftButton

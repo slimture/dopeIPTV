@@ -123,6 +123,50 @@ assert h.player._popout_autohide is False
 h._set_popout_autohide(True)
 assert h.player._popout_autohide is True
 
+# A frameless window has no grips, so the video's own edges resize it.
+from PyQt6.QtCore import QPoint, QRect
+E = Qt.Edge
+win = h._popout_win
+win.setGeometry(QRect(100, 100, 800, 500))
+app.processEvents()
+g = win.frameGeometry()
+assert not h._popout_resize_edges(g.center())          # middle: plain click
+assert h._popout_resize_edges(
+    QPoint(g.left() + 1, g.top() + 1)) == (E.LeftEdge | E.TopEdge)
+assert h._popout_resize_edges(
+    QPoint(g.right() - 1, g.bottom() - 1)) == (E.RightEdge | E.BottomEdge)
+assert h._popout_resize_edges(
+    QPoint(g.right() - 1, g.center().y())) == E.RightEdge
+assert h._popout_resize_edges(
+    QPoint(g.center().x(), g.top() + 1)) == E.TopEdge
+
+# With the title bar on, the system frame owns resizing again.
+h._set_popout_frameless(False)
+app.processEvents()
+assert not h._popout_resize_edges(QPoint(g.left() + 1, g.top() + 1))
+h._set_popout_frameless(True)
+app.processEvents()
+
+# Dragging the bottom-right corner grows the window and leaves the opposite
+# corner where it was. Headless there is no window manager to hand the drag
+# to, so this exercises the fallback that also runs on macOS.
+win.setGeometry(QRect(100, 100, 800, 500))
+app.processEvents()
+g = QRect(win.geometry())
+h._start_popout_resize(E.RightEdge | E.BottomEdge,
+                       QPoint(g.right(), g.bottom()))
+assert h._popout_resize is not None, "expected the manual resize fallback"
+h._drag_popout_resize(QPoint(g.right() + 120, g.bottom() + 60))
+app.processEvents()
+ng = win.geometry()
+assert ng.topLeft() == g.topLeft(), (ng, g)
+assert (ng.width(), ng.height()) == (g.width() + 120, g.height() + 60), ng
+# It cannot be squeezed below the minimum size.
+h._drag_popout_resize(QPoint(g.left(), g.top()))
+app.processEvents()
+assert win.width() >= h.POPOUT_MIN_W and win.height() >= h.POPOUT_MIN_H
+h._popout_resize = None
+
 # Escape while not fullscreen must not dock or raise; it only leaves
 # fullscreen, so the window stays detached here.
 h._popout_escape()
