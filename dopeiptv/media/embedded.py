@@ -2055,7 +2055,12 @@ class EmbeddedPlayer(QWidget):
             m.setMouseTracking(True)
             tick, interval = m.update, 16
         self._mirror = m
-        self._mirror_fbo = None
+        # Raster mirror: double-buffered offscreen targets. The tick reads
+        # LAST tick's buffer (whose GPU work finished long ago - no stall)
+        # and submits this tick's render into the other one.
+        self._mirror_fbos = [None, None]
+        self._mirror_fbo_i = 0
+        self._mirror_pending = None
         # Drive the mirror with a steady poll timer, NOT mpv's frame callback:
         # a timer can never stall on a window resize/maximize (the freeze
         # reported when the pop-out was maximized), and while popped out the
@@ -2105,35 +2110,56 @@ class EmbeddedPlayer(QWidget):
             scale = min(1.0, 1920 / w, 1080 / h)
             w = max(2, int(w * scale))
             h = max(2, int(h * scale))
-            # Skip the whole render+readback when mpv has no new frame (live
-            # TV is 25 fps, the tick is ~30) - unless the size just changed
-            # and the current image no longer matches.
-            fbo = self._mirror_fbo
-            same_size = (fbo is not None and fbo.width() == w
-                         and fbo.height() == h)
+            # A resize drops the whole pipeline (both buffers + the pending
+            # frame) so no stale-size frame is ever shown.
+            fbos = self._mirror_fbos
+            if fbos[0] is not None and (fbos[0].width() != w
+                                        or fbos[0].height() != h):
+                self._mirror_pending = None
+                self._mirror_fbos = fbos = [None, None]
+                self._mirror_fbo_i = 0
+            # Render only when mpv actually has a new frame (live TV is
+            # 25 fps against the 60 Hz tick) - but always collect a finished
+            # pending frame.
             try:
                 upd = v._ctx.update()
             except Exception:
                 upd = True
-            if not upd and same_size and m._img is not None:
+            pend = self._mirror_pending
+            if not upd and pend is None:
                 return
+            img = None
             v.makeCurrent()
             try:
-                if not same_size:
-                    self._mirror_fbo = fbo = QOpenGLFramebufferObject(w, h)
-                # flip_y=True: fbo.toImage() already flips GL's bottom-up rows
-                # once; without mpv's flip too the picture came out upside
-                # down (confirmed on hardware).
-                v._ctx.render(flip_y=True, opengl_fbo={
-                    "fbo": int(fbo.handle()), "w": w, "h": h})
-                try:
-                    v._ctx.report_swap()
-                except Exception:
-                    pass
-                img = fbo.toImage()      # read back, already upright
+                # 1) Read LAST tick's frame first: its GPU work finished
+                #    during the ~40 ms since, so glReadPixels returns without
+                #    stalling. (Reading AFTER submitting this tick's render
+                #    would wait for that too - GL is in-order.) flipped=False
+                #    skips toImage's mirror pass - which is why the render
+                #    below drops mpv's flip_y too: upright needs the two
+                #    toggles to MATCH (flip_y=False+flipped=True was inverted
+                #    on hardware; True+True was upright).
+                if pend is not None:
+                    img = pend.toImage(False)
+                    self._mirror_pending = None
+                # 2) Submit this tick's render into the OTHER buffer; it is
+                #    read on the next tick.
+                if upd:
+                    i = self._mirror_fbo_i
+                    if fbos[i] is None:
+                        fbos[i] = QOpenGLFramebufferObject(w, h)
+                    v._ctx.render(flip_y=False, opengl_fbo={
+                        "fbo": int(fbos[i].handle()), "w": w, "h": h})
+                    try:
+                        v._ctx.report_swap()
+                    except Exception:
+                        pass
+                    self._mirror_pending = fbos[i]
+                    self._mirror_fbo_i = 1 - i
             finally:
                 v.doneCurrent()
-            m.set_image(img)   # painted stretched to the widget rect
+            if img is not None:
+                m.set_image(img)   # painted stretched to the widget rect
             if getattr(self, "_raster_state", "") != "render":
                 self._raster_state = "render"
                 log.info("VID raster-mirror -> render (%dx%d dpr=%.1f)",
@@ -2160,15 +2186,16 @@ class EmbeddedPlayer(QWidget):
         if glwin is not None:
             glwin._stopped = True
             glwin.free_render_context("stop_mirror hand-off")
-        # Raster mirror: release the offscreen FBO while the docked GL context
-        # (its owner) is current. The render context itself was never moved.
-        if getattr(self, "_mirror_fbo", None) is not None:
+        # Raster mirror: release the offscreen FBOs while the docked GL context
+        # (their owner) is current. The render context itself was never moved.
+        if any(getattr(self, "_mirror_fbos", [None, None])):
             try:
                 self.video.makeCurrent()
-                self._mirror_fbo = None
+                self._mirror_fbos = [None, None]
                 self.video.doneCurrent()
             except Exception:
-                self._mirror_fbo = None
+                self._mirror_fbos = [None, None]
+        self._mirror_pending = None
         self.video._render_suspended = False
         # Overlays back onto the docked player.
         self._ov_surface = self.video
