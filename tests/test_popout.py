@@ -1,21 +1,21 @@
-"""Reparent-path regression test for the detached ("pop out") player.
+"""Object-graph regression test for the detached ("pop out") player.
 
-The pop-out feature moves the *one* embedded player widget into its own
-top-level window and back. If that reparenting is wrong the shared player is
-orphaned or destroyed and playback breaks, so guard the object graph:
+On Linux the pop-out MIRRORS the stream into the new window (raster mirror by
+default - see _RasterMirror): the one real player widget is NEVER reparented,
+its control bar moves into the pop-out, and docking back must restore
+everything. If that graph is wrong the shared player is orphaned or destroyed
+and playback breaks, so guard it:
 
-- popping out reparents the player into the pop-out window and leaves a
-  placeholder in the detail pane;
-- popping in reparents it back and detaches the placeholder *synchronously*
-  (a leftover placeholder child crashed PiP entry, which scans the detail
-  pane's children - "wrapped C/C++ object ... has been deleted");
-- closing the pop-out window bounces the player home rather than destroying
-  it.
+- popping out creates the pop-out window with a mirror child; the player (and
+  its mpv/GL surface) stays docked in the detail pane;
+- the control bar moves into the pop-out and comes back on dock-in;
+- window toggles (fullscreen, on-top, frameless, auto-hide) neither raise nor
+  leak state;
+- closing the pop-out window docks back rather than destroying anything.
 
-The assertions run in a subprocess. Reparenting a QOpenGLWidget between
-top-level windows on the offscreen platform leaves GL/mpv state that aborts
-at Qt's interpreter-exit teardown (the app itself only sidesteps this via
-os._exit). That teardown abort is not a product fault, so we assert on the
+The assertions run in a subprocess. GL/mpv teardown on the offscreen platform
+can abort at Qt's interpreter-exit (the app itself sidesteps this via
+os._exit); that teardown abort is not a product fault, so we assert on the
 child's success marker and ignore its exit status. Runs headless: the GL
 render context can't build there, so this checks the widget graph and mode
 flags, not on-screen rendering.
@@ -75,14 +75,16 @@ if h.player is None:
 det, player = h._det, h.player
 assert player.parent() is det
 
-# Reparent out: player moves to the pop-out window, placeholder into the pane.
+# Pop out: a mirror child appears in the pop-out window; the player - and with
+# it the mpv instance and GL surface - is NEVER reparented out of the pane.
 h._toggle_popout()
 app.processEvents()
 assert h._popout_win is not None
-assert player.parent() is h._popout_win
-assert player._popout_mode is True
-assert h._popout_placeholder is not None
-assert len(buttons(h)) == 1
+assert player.parent() is det, "the real player must stay docked"
+assert getattr(h, "_popout_mirror", None) is not None
+assert h._popout_mirror.parent() is h._popout_win
+assert player.bar.parent() is not player, "control bar moves to the pop-out"
+assert buttons(h) == [], "no placeholder button in the pane (player stays)"
 
 # Pop-out fullscreen toggles must not raise.
 h._popout_fs_toggled_at = 0.0
@@ -127,16 +129,17 @@ h._popout_escape()
 app.processEvents()
 assert h._popout_win is not None
 
-# Reparent back in: player home, placeholder fully detached (the crash guard).
+# Dock back in: mirror torn down, bar home, nothing left behind.
 h._toggle_popout()
 app.processEvents()
 assert h._popout_win is None
+assert h._popout_mirror is None
 assert player.parent() is det
-assert player._popout_mode is False
-assert h._popout_placeholder is None
+assert player.bar.parent() is player, "control bar back on the player"
+assert player._mirror is None
 assert buttons(h) == []
 
-# Closing the window bounces the player home instead of destroying it.
+# Closing the window docks back instead of destroying anything.
 h._toggle_popout()
 app.processEvents()
 win = h._popout_win
@@ -144,12 +147,13 @@ win.close()
 app.processEvents()
 assert h._popout_win is None
 assert player.parent() is det
+assert player.bar.parent() is player
 
 print("POPOUT_OK")
 """
 
 
-def test_popout_reparent_paths():
+def test_popout_window_paths():
     try:
         import PyQt6  # noqa: F401
     except Exception:
@@ -160,8 +164,8 @@ def test_popout_reparent_paths():
         env=env, cwd=_REPO_ROOT, timeout=180)
     if "SKIP_NO_PLAYER" in proc.stdout:
         pytest.skip("embedded player unavailable (no libmpv)")
-    # Exit status is ignored on purpose: an offscreen QOpenGLWidget reparent
-    # aborts at Qt teardown after the checks have already run and printed.
+    # Exit status is ignored on purpose: offscreen GL/mpv teardown can abort
+    # at interpreter exit after the checks have already run and printed.
     assert "POPOUT_OK" in proc.stdout, (
-        f"pop-out reparent checks failed\n"
+        f"pop-out checks failed\n"
         f"stdout={proc.stdout!r}\nstderr={proc.stderr[-2000:]!r}")

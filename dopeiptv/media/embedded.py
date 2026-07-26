@@ -11,9 +11,10 @@ from PyQt6.QtCore import (
     QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QColor, QCursor, QIcon, QOpenGLContext, QPainter, QPen, QPixmap, QPolygonF,
+    QColor, QCursor, QIcon, QImage, QOpenGLContext, QPainter, QPen, QPixmap,
+    QPolygonF,
 )
-from PyQt6.QtOpenGL import QOpenGLWindow
+from PyQt6.QtOpenGL import QOpenGLFramebufferObject, QOpenGLWindow
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 from PyQt6.QtWidgets import (
     QApplication, QHBoxLayout, QLabel, QLineEdit, QMenu, QSizePolicy, QSlider,
@@ -709,6 +710,68 @@ class _MpvGLWidget(QOpenGLWidget):
             except Exception:
                 pass
             self.mpv = None
+
+
+class _RasterMirror(QWidget):
+    """Linux pop-out mirror: a PLAIN RASTER widget fed CPU images.
+
+    On this user's stack (modern Qt/Mesa, X11 and Wayland alike) every GL
+    presentation path in a SECOND top-level window shows black even though
+    rendering reports success: a reparented QOpenGLWidget, a second
+    QOpenGLWidget mirror, and a native QOpenGLWindow subsurface all failed
+    identically. Raster widgets, meanwhile, provably DO show there (the
+    control bar does). So the pop-out video is painted as images: each mirror
+    tick renders mpv into an offscreen FBO in the DOCKED widget's GL context
+    (the one context that demonstrably presents) and blits the readback here.
+    The docked mpv instance and render context are never touched, moved or
+    freed - nothing in the playback path can break. Cost: a GPU->CPU readback
+    per frame, capped at ~30 fps and sized to the pop-out."""
+
+    video_mouse_press = pyqtSignal(object)
+    video_mouse_move = pyqtSignal(object)
+    video_mouse_release = pyqtSignal(object)
+    video_dbl_click = pyqtSignal()
+
+    def __init__(self, parent: QWidget | None = None,
+                 mirror_of: "_MpvGLWidget | None" = None) -> None:
+        super().__init__(parent)
+        self._mirror_of = mirror_of
+        # Parity with the GL mirrors (tests + teardown code paths).
+        self.mpv = None
+        self._ctx = None
+        self._img: QImage | None = None
+        self.setMouseTracking(True)
+        self.setMinimumHeight(120)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding,
+                           QSizePolicy.Policy.Expanding)
+        self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
+
+    def set_image(self, img: "QImage") -> None:
+        self._img = img
+        self.update()
+
+    def paintEvent(self, _e) -> None:
+        p = QPainter(self)
+        p.fillRect(self.rect(), QColor(0, 0, 0))
+        img = self._img
+        if img is not None and not img.isNull():
+            # The tick renders at this widget's exact size, so normally a 1:1
+            # blit; between a resize and the next tick this scales to fit.
+            p.drawImage(self.rect(), img)
+        p.end()
+
+    # Same signal surface as the GL mirrors - identical pop-out wiring.
+    def mousePressEvent(self, e) -> None:
+        self.video_mouse_press.emit(e)
+
+    def mouseMoveEvent(self, e) -> None:
+        self.video_mouse_move.emit(e)
+
+    def mouseReleaseEvent(self, e) -> None:
+        self.video_mouse_release.emit(e)
+
+    def mouseDoubleClickEvent(self, _e) -> None:
+        self.video_dbl_click.emit()
 
 
 class _MpvMirrorWindow(QOpenGLWindow):
@@ -1947,15 +2010,14 @@ class EmbeddedPlayer(QWidget):
         and the docked video (still rendering, behind a placeholder) keeps
         driving mpv's frame timing. Returns the mirror widget for the caller to
         place in the window."""
-        wl_mirror = (
-            os.environ.get("DOPEIPTV_WAYLAND_MIRROR") == "1"
-            and "wayland" in (QApplication.platformName() or "").lower())
-        if wl_mirror:
-            # EXPERIMENTAL Wayland path (see _MpvMirrorWindow): a native GL
-            # window in a container, owning the render context. The docked
-            # context is freed here (with its GL context current) - mpv allows
-            # exactly one render context per instance - and the mirror window
-            # lazily builds its own in paintGL.
+        linux = sys.platform.startswith("linux")
+        glwin_flag = os.environ.get("DOPEIPTV_WAYLAND_MIRROR") == "1"
+        if linux and glwin_flag:
+            # EXPERIMENTAL native-GL-window path (see _MpvMirrorWindow): a
+            # container-embedded QOpenGLWindow owning the render context. The
+            # docked context is freed here (with its GL context current) - mpv
+            # allows exactly one render context per instance - and the mirror
+            # window lazily builds its own in paintGL.
             glwin = _MpvMirrorWindow(self.video)
             m = QWidget.createWindowContainer(glwin, parent)
             m.setMinimumHeight(120)
@@ -1973,21 +2035,30 @@ class EmbeddedPlayer(QWidget):
                 self.video.doneCurrent()
             except Exception:
                 pass
-            update_target = glwin
+            tick, interval = glwin.update, 16
+        elif linux:
+            # DEFAULT Linux path: raster mirror (see _RasterMirror). Every GL
+            # presentation route in a second window shows black on modern
+            # Qt/Mesa (X11 and Wayland alike), so all GL stays in the docked
+            # widget's proven context and the pop-out gets plain images.
+            m = _RasterMirror(parent, mirror_of=self.video)
+            self._raster_state = ""
+            tick, interval = self._tick_raster_mirror, 33   # readback ~30 fps
         else:
             m = _MpvGLWidget(parent, mirror_of=self.video)
             m.setMouseTracking(True)
-            update_target = m
+            tick, interval = m.update, 16
         self._mirror = m
-        # Drive the mirror with a steady poll-render timer, NOT mpv's frame
-        # callback: a timer can never stall on a window resize/maximize (the
-        # freeze reported when the pop-out was maximized), and while popped out
-        # the mirror is the only render loop, so it also paces mpv. Suspend the
-        # docked surface so the GPU renders the stream once, not twice (the lag).
+        self._mirror_fbo = None
+        # Drive the mirror with a steady poll timer, NOT mpv's frame callback:
+        # a timer can never stall on a window resize/maximize (the freeze
+        # reported when the pop-out was maximized), and while popped out the
+        # mirror is the only render loop, so it also paces mpv. Suspend the
+        # docked surface so the GPU renders the stream once, not twice.
         self.video._render_suspended = True
         self._mirror_timer = QTimer(self)
-        self._mirror_timer.timeout.connect(update_target.update)
-        self._mirror_timer.start(16)          # ~60 fps
+        self._mirror_timer.timeout.connect(tick)
+        self._mirror_timer.start(interval)
         # Float the seek bar, timeshift timeline and stats over the mirror:
         # reparent them into the pop-out window and anchor placement to the
         # mirror. They're plain widgets, so moving them is safe.
@@ -2003,6 +2074,44 @@ class EmbeddedPlayer(QWidget):
         self._show_dock_placeholder(True)
         self._reveal_sleep_badge()
         return m
+
+    def _tick_raster_mirror(self) -> None:
+        """One raster-mirror frame: render mpv into an offscreen FBO in the
+        DOCKED widget's GL context (the one that provably presents) and hand
+        the readback to the pop-out's raster widget. The docked mpv/render
+        context are never moved or freed."""
+        m = self._mirror
+        v = self.video
+        if m is None or v.mpv is None or v._ctx is None:
+            return
+        try:
+            ratio = float(m.devicePixelRatioF() or 1.0)
+            w = max(2, int(m.width() * ratio))
+            h = max(2, int(m.height() * ratio))
+            v.makeCurrent()
+            try:
+                fbo = self._mirror_fbo
+                if fbo is None or fbo.width() != w or fbo.height() != h:
+                    self._mirror_fbo = fbo = QOpenGLFramebufferObject(w, h)
+                v._ctx.render(flip_y=False, opengl_fbo={
+                    "fbo": int(fbo.handle()), "w": w, "h": h})
+                try:
+                    v._ctx.report_swap()
+                except Exception:
+                    pass
+                img = fbo.toImage()      # read back, already upright
+            finally:
+                v.doneCurrent()
+            img.setDevicePixelRatio(ratio)
+            m.set_image(img)
+            if getattr(self, "_raster_state", "") != "render":
+                self._raster_state = "render"
+                log.info("VID raster-mirror -> render (%dx%d dpr=%.1f)",
+                         w, h, ratio)
+        except Exception as e:
+            if getattr(self, "_raster_state", "") != "fail":
+                self._raster_state = "fail"
+                log.info("VID raster-mirror -> FAIL: %s", e)
 
     def stop_mirror(self) -> None:
         """Tear the mirror down and hand the picture back to the docked
@@ -2021,6 +2130,15 @@ class EmbeddedPlayer(QWidget):
         if glwin is not None:
             glwin._stopped = True
             glwin.free_render_context("stop_mirror hand-off")
+        # Raster mirror: release the offscreen FBO while the docked GL context
+        # (its owner) is current. The render context itself was never moved.
+        if getattr(self, "_mirror_fbo", None) is not None:
+            try:
+                self.video.makeCurrent()
+                self._mirror_fbo = None
+                self.video.doneCurrent()
+            except Exception:
+                self._mirror_fbo = None
         self.video._render_suspended = False
         # Overlays back onto the docked player.
         self._ov_surface = self.video

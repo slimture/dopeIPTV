@@ -17,7 +17,6 @@ Kept out of main_window.py to keep that file lean.
 """
 from __future__ import annotations
 
-import os
 import sys
 import time
 
@@ -35,19 +34,17 @@ def _use_mirror_popout() -> bool:
 
     macOS and Windows share GL contexts across top-levels and can't reparent a
     QOpenGLWidget between windows without the picture freezing/blanking, so both
-    take the mirror path. X11 CAN reparent the GL surface, so it keeps the plain
-    reparent path. Native Wayland can do neither reliably (both went black on
-    real hardware); an EXPERIMENTAL native-GL-window mirror is available behind
-    DOPEIPTV_WAYLAND_MIRROR=1 - by default Wayland keeps the reparent path
-    (black pop-out window, but the docked player always recovers), and "Run via
-    X11" in Settings gives a fully working pop-out.
+    take the (GL cross-context) mirror path. On Linux, modern Qt/Mesa never
+    presents GL content in a second top-level window AT ALL - a reparented
+    QOpenGLWidget (X11 and Wayland), a second QOpenGLWidget and a native
+    QOpenGLWindow subsurface all rendered "successfully" and showed black on
+    real hardware - so Linux mirrors too, by default via the RASTER mirror
+    (offscreen render in the docked context + CPU blit; see _RasterMirror).
+    DOPEIPTV_WAYLAND_MIRROR=1 selects the experimental native-GL-window mirror
+    instead. The reparent path remains only as the fallback for anything else.
     """
-    if sys.platform in ("darwin", "win32"):
-        return True
-    if os.environ.get("DOPEIPTV_WAYLAND_MIRROR") == "1":
-        from PyQt6.QtWidgets import QApplication
-        return "wayland" in (QApplication.platformName() or "").lower()
-    return False
+    return (sys.platform in ("darwin", "win32")
+            or sys.platform.startswith("linux"))
 
 
 class _PopoutWindow(QWidget):
