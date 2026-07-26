@@ -755,8 +755,9 @@ class _RasterMirror(QWidget):
         p.fillRect(self.rect(), QColor(0, 0, 0))
         img = self._img
         if img is not None and not img.isNull():
-            # The tick renders at this widget's exact size, so normally a 1:1
-            # blit; between a resize and the next tick this scales to fit.
+            # The frame is rendered at the widget size capped to 1080p, so
+            # large pop-outs upscale here - smooth, or video looks blocky.
+            p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
             p.drawImage(self.rect(), img)
         p.end()
 
@@ -2088,10 +2089,29 @@ class EmbeddedPlayer(QWidget):
             ratio = float(m.devicePixelRatioF() or 1.0)
             w = max(2, int(m.width() * ratio))
             h = max(2, int(m.height() * ratio))
+            # Cap the offscreen render (and so the readback) at 1080p: mpv
+            # downscales on the GPU for free, while an uncapped maximized
+            # pop-out meant a ~14 MB synchronous glReadPixels per frame - the
+            # "lags deluxe when maximized". The raster widget scales the frame
+            # up smoothly; for TV content the difference is invisible.
+            scale = min(1.0, 1920 / w, 1080 / h)
+            w = max(2, int(w * scale))
+            h = max(2, int(h * scale))
+            # Skip the whole render+readback when mpv has no new frame (live
+            # TV is 25 fps, the tick is ~30) - unless the size just changed
+            # and the current image no longer matches.
+            fbo = self._mirror_fbo
+            same_size = (fbo is not None and fbo.width() == w
+                         and fbo.height() == h)
+            try:
+                upd = v._ctx.update()
+            except Exception:
+                upd = True
+            if not upd and same_size and m._img is not None:
+                return
             v.makeCurrent()
             try:
-                fbo = self._mirror_fbo
-                if fbo is None or fbo.width() != w or fbo.height() != h:
+                if not same_size:
                     self._mirror_fbo = fbo = QOpenGLFramebufferObject(w, h)
                 # flip_y=True: fbo.toImage() already flips GL's bottom-up rows
                 # once; without mpv's flip too the picture came out upside
@@ -2105,8 +2125,7 @@ class EmbeddedPlayer(QWidget):
                 img = fbo.toImage()      # read back, already upright
             finally:
                 v.doneCurrent()
-            img.setDevicePixelRatio(ratio)
-            m.set_image(img)
+            m.set_image(img)   # painted stretched to the widget rect
             if getattr(self, "_raster_state", "") != "render":
                 self._raster_state = "render"
                 log.info("VID raster-mirror -> render (%dx%d dpr=%.1f)",
