@@ -25,7 +25,9 @@ from PyQt6.QtWidgets import (
     QApplication, QMenu, QPushButton, QVBoxLayout, QWidget)
 
 from ..i18n import tr
-from .widgets import exec_menu_over_video
+from .widgets import (
+    drag_frameless_resize, exec_menu_over_video, frameless_resize_edges,
+    resize_edge_cursor, start_frameless_resize)
 
 
 def _use_mirror_popout() -> bool:
@@ -320,43 +322,8 @@ class _PopoutMixin:
     # -- resizing a frameless pop-out ---------------------------------------
 
     def _popout_resize_edges(self, gpos) -> "Qt.Edge":
-        """Which window edges the pointer (global position) is close enough to
-        grab. Empty while the title bar is on - the system frame has its own
-        grips - and while maximised or fullscreen, where resizing is the
-        window manager's business."""
-        win = self._popout_win
-        if win is None or win.isMaximized() or win.isFullScreen():
-            return Qt.Edge(0)
-        if not (win.windowFlags() & Qt.WindowType.FramelessWindowHint):
-            return Qt.Edge(0)
-        g = win.frameGeometry()
-        m = self.RESIZE_MARGIN
-        edges = Qt.Edge(0)
-        if gpos.x() <= g.left() + m:
-            edges |= Qt.Edge.LeftEdge
-        elif gpos.x() >= g.right() - m:
-            edges |= Qt.Edge.RightEdge
-        if gpos.y() <= g.top() + m:
-            edges |= Qt.Edge.TopEdge
-        elif gpos.y() >= g.bottom() - m:
-            edges |= Qt.Edge.BottomEdge
-        return edges
-
-    @staticmethod
-    def _edge_cursor(edges) -> "Qt.CursorShape":
-        corner_f = ((Qt.Edge.LeftEdge in edges and Qt.Edge.TopEdge in edges)
-                    or (Qt.Edge.RightEdge in edges
-                        and Qt.Edge.BottomEdge in edges))
-        corner_b = ((Qt.Edge.RightEdge in edges and Qt.Edge.TopEdge in edges)
-                    or (Qt.Edge.LeftEdge in edges
-                        and Qt.Edge.BottomEdge in edges))
-        if corner_f:
-            return Qt.CursorShape.SizeFDiagCursor
-        if corner_b:
-            return Qt.CursorShape.SizeBDiagCursor
-        if Qt.Edge.LeftEdge in edges or Qt.Edge.RightEdge in edges:
-            return Qt.CursorShape.SizeHorCursor
-        return Qt.CursorShape.SizeVerCursor
+        return frameless_resize_edges(self._popout_win, gpos,
+                                      self.RESIZE_MARGIN)
 
     def _apply_popout_edge_cursor(self, edges) -> None:
         """Show the matching resize cursor while the pointer hovers an edge, so
@@ -365,39 +332,20 @@ class _PopoutMixin:
         if m is None:
             return
         if edges:
-            m.setCursor(self._edge_cursor(edges))
+            m.setCursor(resize_edge_cursor(edges))
             self._popout_edge_cursor = True
         elif getattr(self, "_popout_edge_cursor", False):
             m.unsetCursor()
             self._popout_edge_cursor = False
 
     def _start_popout_resize(self, edges, gpos) -> None:
-        """Hand the drag to the window manager where it can take it (X11,
-        Wayland, Windows); otherwise (macOS) drive the geometry ourselves."""
-        win = self._popout_win
-        handle = win.windowHandle() if win is not None else None
-        if handle is not None and handle.startSystemResize(edges):
-            return
-        self._popout_resize = {"edges": edges, "from": gpos,
-                               "geo": QRect(win.geometry())}
+        self._popout_resize = start_frameless_resize(
+            self._popout_win, edges, gpos)
 
     def _drag_popout_resize(self, gpos) -> None:
-        win = self._popout_win
-        rz = getattr(self, "_popout_resize", None)
-        if win is None or rz is None:
-            return
-        g = QRect(rz["geo"])
-        dx, dy = gpos.x() - rz["from"].x(), gpos.y() - rz["from"].y()
-        edges = rz["edges"]
-        if Qt.Edge.LeftEdge in edges:
-            g.setLeft(min(g.left() + dx, g.right() - self.POPOUT_MIN_W))
-        elif Qt.Edge.RightEdge in edges:
-            g.setRight(max(g.right() + dx, g.left() + self.POPOUT_MIN_W))
-        if Qt.Edge.TopEdge in edges:
-            g.setTop(min(g.top() + dy, g.bottom() - self.POPOUT_MIN_H))
-        elif Qt.Edge.BottomEdge in edges:
-            g.setBottom(max(g.bottom() + dy, g.top() + self.POPOUT_MIN_H))
-        win.setGeometry(g)
+        drag_frameless_resize(self._popout_win,
+                              getattr(self, "_popout_resize", None), gpos,
+                              self.POPOUT_MIN_W, self.POPOUT_MIN_H)
 
     def _on_mirror_press(self, event) -> None:
         # Accept the event so a right-click can't leak through the frameless

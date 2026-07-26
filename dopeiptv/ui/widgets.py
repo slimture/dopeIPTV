@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 
-from PyQt6.QtCore import QPointF, QRectF, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QPointF, QRect, QRectF, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import QLabel, QMessageBox, QPushButton, QWidget
 
@@ -23,6 +23,84 @@ def exec_menu_over_video(menu, global_pos) -> None:
         menu.setAttribute(Qt.WidgetAttribute.WA_NativeWindow, True)
         menu.winId()
     menu.exec(global_pos)
+
+
+RESIZE_MARGIN = 8          # grab band along a frameless window's edges
+RESIZE_MIN_W = 320
+RESIZE_MIN_H = 180
+
+
+def frameless_resize_edges(win, gpos, margin: int = RESIZE_MARGIN) -> "Qt.Edge":
+    """Which edges of *win* the pointer (a global QPoint) is close enough to
+    grab for a resize.
+
+    Our video windows (pop-out, multiview) are title-bar-less by default, which
+    leaves them without any resize grips - the video itself has to be the
+    handle. Returns no edges when the title bar is on (the system frame has its
+    own grips), and while maximised or fullscreen, where a click near the
+    screen edge must still reach the video."""
+    if win is None or win.isMaximized() or win.isFullScreen():
+        return Qt.Edge(0)
+    if not (win.windowFlags() & Qt.WindowType.FramelessWindowHint):
+        return Qt.Edge(0)
+    g = win.frameGeometry()
+    edges = Qt.Edge(0)
+    if gpos.x() <= g.left() + margin:
+        edges |= Qt.Edge.LeftEdge
+    elif gpos.x() >= g.right() - margin:
+        edges |= Qt.Edge.RightEdge
+    if gpos.y() <= g.top() + margin:
+        edges |= Qt.Edge.TopEdge
+    elif gpos.y() >= g.bottom() - margin:
+        edges |= Qt.Edge.BottomEdge
+    return edges
+
+
+def resize_edge_cursor(edges) -> "Qt.CursorShape":
+    """The pointer shape for a grab on *edges*, so the (invisible) grab band is
+    discoverable by hovering it."""
+    if ((Qt.Edge.LeftEdge in edges and Qt.Edge.TopEdge in edges)
+            or (Qt.Edge.RightEdge in edges and Qt.Edge.BottomEdge in edges)):
+        return Qt.CursorShape.SizeFDiagCursor
+    if ((Qt.Edge.RightEdge in edges and Qt.Edge.TopEdge in edges)
+            or (Qt.Edge.LeftEdge in edges and Qt.Edge.BottomEdge in edges)):
+        return Qt.CursorShape.SizeBDiagCursor
+    if Qt.Edge.LeftEdge in edges or Qt.Edge.RightEdge in edges:
+        return Qt.CursorShape.SizeHorCursor
+    return Qt.CursorShape.SizeVerCursor
+
+
+def start_frameless_resize(win, edges, gpos) -> dict | None:
+    """Begin a resize of *win*. Hands the drag to the window manager where that
+    exists (X11, Wayland, Windows) and returns None - it owns the drag from
+    there. Where it does not (macOS), returns the state to feed back into
+    ``drag_frameless_resize`` on every mouse move."""
+    handle = win.windowHandle() if win is not None else None
+    if handle is not None and handle.startSystemResize(edges):
+        return None
+    return {"edges": edges, "from": gpos, "geo": QRect(win.geometry())}
+
+
+def drag_frameless_resize(win, state, gpos, min_w: int = RESIZE_MIN_W,
+                          min_h: int = RESIZE_MIN_H) -> None:
+    """Apply one step of a self-driven resize (see start_frameless_resize).
+    The edges being dragged move; the opposite ones stay put, and the window
+    can't be squeezed below *min_w* x *min_h*."""
+    if win is None or state is None:
+        return
+    g = QRect(state["geo"])
+    dx = gpos.x() - state["from"].x()
+    dy = gpos.y() - state["from"].y()
+    edges = state["edges"]
+    if Qt.Edge.LeftEdge in edges:
+        g.setLeft(min(g.left() + dx, g.right() - min_w))
+    elif Qt.Edge.RightEdge in edges:
+        g.setRight(max(g.right() + dx, g.left() + min_w))
+    if Qt.Edge.TopEdge in edges:
+        g.setTop(min(g.top() + dy, g.bottom() - min_h))
+    elif Qt.Edge.BottomEdge in edges:
+        g.setBottom(max(g.bottom() + dy, g.top() + min_h))
+    win.setGeometry(g)
 
 
 def confirm(parent, title: str, text: str, *, default_yes: bool = True) -> bool:

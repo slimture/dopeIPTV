@@ -183,6 +183,52 @@ w.add_stream = _orig_add
 # A live cell never reports a resume position (its mpv has no duration).
 assert w.cells[0].resume_pos() == 0.0
 
+# Frameless: the cells' own edges resize the grid, so it can be sized without
+# turning the title bar on.
+from PyQt6.QtCore import QPoint, QRect
+E = _Qt.Edge
+w.setGeometry(QRect(120, 120, 900, 600))
+app.processEvents()
+g = w.frameGeometry()
+assert not w.resize_edges_at(g.center())            # middle of a cell: no grab
+assert w.resize_edges_at(
+    QPoint(g.left() + 1, g.top() + 1)) == (E.LeftEdge | E.TopEdge)
+assert w.resize_edges_at(
+    QPoint(g.right() - 1, g.bottom() - 1)) == (E.RightEdge | E.BottomEdge)
+assert w.resize_edges_at(QPoint(g.center().x(), g.bottom() - 1)) == E.BottomEdge
+
+# A press on an edge resizes instead of moving audio focus to that cell.
+w._focus_cell(w.cells[0])
+cell = w.cells[len(w.cells) - 1]        # bottom-right cell
+class _Pos:                              # the handlers call .toPoint() on both
+    def __init__(self, p): self._p = p
+    def toPoint(self): return self._p
+
+class _Ev:
+    def __init__(self, gp): self._g = gp
+    def button(self): return _Qt.MouseButton.LeftButton
+    def buttons(self): return _Qt.MouseButton.LeftButton
+    def globalPosition(self): return _Pos(self._g)
+    def position(self): return _Pos(QPoint(0, 0))
+cell._on_press(_Ev(QPoint(g.right() - 1, g.bottom() - 1)))
+assert w._focused is w.cells[0], "an edge grab must not steal audio focus"
+assert w.resizing is not None, "expected the manual resize fallback"
+
+# Dragging that corner grows the grid; the opposite corner stays put. The
+# press landed 1 px inside the corner, so the drag target is measured from
+# there - the delta is what moves the edge.
+geo = QRect(w.geometry())
+w.drag_resize(QPoint(g.right() - 1 + 140, g.bottom() - 1 + 90))
+app.processEvents()
+ng = w.geometry()
+assert ng.topLeft() == geo.topLeft(), (ng, geo)
+assert (ng.width(), ng.height()) == (geo.width() + 140, geo.height() + 90), ng
+w.drag_resize(QPoint(g.left(), g.top()))            # cannot go below the floor
+app.processEvents()
+assert w.width() >= w.MIN_W and w.height() >= w.MIN_H
+cell._on_release(_Ev(QPoint(0, 0)))
+assert w.resizing is None
+
 # With streams running the button only re-raises - never closes the grid.
 h._show_multiview()
 app.processEvents()

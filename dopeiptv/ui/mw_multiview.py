@@ -34,7 +34,9 @@ from PyQt6.QtWidgets import (
 from ..core.log import log
 from ..i18n import tr
 from ..media.embedded import _MpvGLWidget, _SeekSlider
-from .widgets import exec_menu_over_video
+from .widgets import (
+    drag_frameless_resize, exec_menu_over_video, frameless_resize_edges,
+    resize_edge_cursor, start_frameless_resize)
 
 
 def _fmt(secs: float) -> str:
@@ -819,12 +821,26 @@ class _MultiviewCell(QWidget):
         return bool(self.window().windowFlags()
                     & Qt.WindowType.FramelessWindowHint)
 
+    def _grid(self):
+        """The multiview window this cell sits in, when there is one (a cell
+        built standalone in a test has none)."""
+        win = self.window()
+        return win if hasattr(win, "resize_edges_at") else None
+
     def _on_press(self, event) -> None:
         if event.button() == Qt.MouseButton.RightButton:
             self.context_requested.emit(
                 self, event.globalPosition().toPoint())
             return
         if event.button() == Qt.MouseButton.LeftButton:
+            # On an edge of a frameless window the press resizes it - not a
+            # focus change, since grabbing the frame shouldn't move the audio.
+            gpos = event.globalPosition().toPoint()
+            grid = self._grid()
+            edges = grid.resize_edges_at(gpos) if grid is not None else None
+            if edges:
+                grid.start_resize(edges, gpos)
+                return
             # Focus only (audio). Mute lives on the right-click menu, so a
             # left-click - e.g. to grab and drag the frameless window - never
             # mutes by accident.
@@ -833,7 +849,16 @@ class _MultiviewCell(QWidget):
                 self._drag_from = event.position().toPoint()
 
     def _on_move(self, event) -> None:
+        # Reveals the overlays (and restores the cursor), so the edge shape
+        # below is applied after it, not before.
         self.hovered.emit(self)
+        gpos = event.globalPosition().toPoint()
+        grid = self._grid()
+        if grid is not None and grid.resizing is not None:
+            if event.buttons() & Qt.MouseButton.LeftButton:
+                grid.drag_resize(gpos)
+                return
+            grid.resizing = None
         d = self._drag_from
         if d is not None and (event.buttons() & Qt.MouseButton.LeftButton):
             if (event.position().toPoint() - d).manhattanLength() > 6:
@@ -841,15 +866,24 @@ class _MultiviewCell(QWidget):
                 handle = self.window().windowHandle()
                 if handle is not None:
                     handle.startSystemMove()
+            return
+        if grid is not None:
+            grid.apply_edge_cursor(self, grid.resize_edges_at(gpos))
 
     def _on_release(self, event) -> None:
         self._drag_from = None
+        grid = self._grid()
+        if grid is not None:
+            grid.resizing = None
 
 
 class _MultiviewWindow(QWidget):
     """Top-level 2x2 grid. Flags (frameless / always-on-top) come from the
     owner's settings; closing hands control back so every cell's mpv is torn
     down cleanly."""
+
+    MIN_W = 480      # a grid of cells needs more room than a single video
+    MIN_H = 300
 
     def __init__(self, owner) -> None:
         super().__init__()
@@ -882,6 +916,11 @@ class _MultiviewWindow(QWidget):
             self.cells.append(c)
         self._focused: _MultiviewCell | None = None
         self._cursor_hidden = False
+        # Frameless windows have no grips: the cells' edges are the handles
+        # (see resize_edges_at). `resizing` is only set where the window
+        # manager won't take the drag (macOS).
+        self.resizing: dict | None = None
+        self._edge_cursor_on = False
         # Floating close button (frameless has no title-bar X). Auto-hides with
         # the other overlays. Parented to the TOP-RIGHT cell's video surface,
         # not the window: a plain child of the window renders *behind* the
@@ -903,6 +942,33 @@ class _MultiviewWindow(QWidget):
         self.apply_settings()
         self.setWindowFlags(self._flags())
         self._focus_cell(self.cells[0])
+
+    # -- resizing a frameless grid ------------------------------------------
+
+    def resize_edges_at(self, gpos) -> "Qt.Edge":
+        """Which window edges the pointer can grab. The grid is title-bar-less
+        by default, so - exactly like the pop-out - the video's own edges are
+        the resize handles. Cells sit flush against the window edges, so
+        whichever cell the pointer is over answers for the edge it touches."""
+        return frameless_resize_edges(self, gpos)
+
+    def start_resize(self, edges, gpos) -> None:
+        self.resizing = start_frameless_resize(self, edges, gpos)
+
+    def drag_resize(self, gpos) -> None:
+        drag_frameless_resize(self, self.resizing, gpos,
+                              self.MIN_W, self.MIN_H)
+
+    def apply_edge_cursor(self, cell, edges) -> None:
+        """Resize cursor while hovering an edge, so the grab band can be found
+        without a visible frame."""
+        if edges:
+            cell.video.setCursor(resize_edge_cursor(edges))
+            self._edge_cursor_on = True
+        elif self._edge_cursor_on:
+            for c in self.cells:
+                c.video.unsetCursor()
+            self._edge_cursor_on = False
 
     def apply_settings(self) -> None:
         """Pull the tunable knobs (Settings → Multiview) into the live window:
@@ -1105,7 +1171,10 @@ class _MultiviewWindow(QWidget):
         self._close_btn.hide()
         # The pointer rests over the video whatever the window state - hide it
         # along with the overlays (any movement brings both back). Cursor
-        # shapes are per-widget, so this only blanks it over multiview.
+        # shapes are per-widget, so this only blanks it over multiview. A
+        # pointer resting on a resize edge keeps its handle shape instead.
+        if self._edge_cursor_on:
+            return
         if not self._cursor_hidden:
             self._cursor_hidden = True
             self.setCursor(Qt.CursorShape.BlankCursor)
