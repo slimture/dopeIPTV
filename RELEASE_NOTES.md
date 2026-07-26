@@ -1,17 +1,32 @@
-## dopeIPTV 1.2.1
+## dopeIPTV 1.2.2
 
-Clearer update notices, a readable About dialog, and a calmer default startup.
+The pop-out player works on Linux again, plus playlist-refresh, buffer and
+Continue-watching fixes.
 
-- **You'll actually see when an update is out**: a dismissible "new version
-  available" banner now shows across the top of the window — on every view,
-  including the full-window Home page where the old sidebar badge was easy to
-  miss. It appears once per version and stays gone once you dismiss it.
-- **Download goes to the website**: the banner's and the About dialog's
-  *Download* buttons now open the website instead of the raw GitHub release.
-- **The About dialog is readable again**: the release-notes panel was an
-  unthemed white box with faint text — it now uses the app theme.
-- **Starts on TV by default**: Home is now opt-in — turn on "Open Home on
-  startup" in Settings to land there instead (first run included).
+- **Pop-out on Linux is fixed — and rewritten.** The pop-out window was black,
+  on Wayland *and* X11: on modern Qt/Mesa nothing OpenGL ever reaches the
+  screen in a second top-level window. It no longer tries — each frame is now
+  rendered offscreen in the docked player's own working context and drawn into
+  the pop-out as an image. The docked player's mpv instance is never moved or
+  freed, so popping out can't disturb playback and docking back is instant.
+- **No more stuttering in the pop-out.** mpv was blocking the interface until
+  each frame's display time (worst on 23.976 fps film). It no longer paces us,
+  frames are read back without waiting on the GPU, and only when there is
+  actually a new one.
+- **The docked mini player behaves while popped out**: no leftover strip where
+  the control bar used to be, no frozen frame showing through, and the bar's
+  menus (subtitles, record, timeshift) open properly over the pop-out. Docking
+  back no longer leaves the video paused.
+- **"Refresh playlist" really refreshes.** Within five minutes of the last
+  fetch it silently served the cached lists back, so new channels or films at
+  your provider never showed up.
+- **The network-buffer setting now bites.** It applies to the stream you're
+  watching (not just the next one), and a larger value also raises the memory
+  budget — so it genuinely helps against stuttery live channels.
+- **Continue watching / History**: a film first played from History could not
+  be resumed (stream error) and showed up twice in History with one copy
+  unplayable; the same titles did nothing when clicked on Home. Fixed, along
+  with a crash when clicking a Home card.
 
 Full details in the [changelog](https://github.com/slimture/dopeIPTV/blob/main/CHANGELOG.md).
 

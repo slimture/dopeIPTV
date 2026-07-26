@@ -5,6 +5,60 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
+## [1.2.2]
+
+The pop-out player works on Linux again, plus playlist-refresh, buffer and
+Continue-watching fixes.
+
+### Pop-out on Linux (rewritten)
+
+- **Fixed: the pop-out window was black.** On modern Qt/Mesa nothing OpenGL
+  ever reaches the screen in a *second* top-level window - a reparented video
+  surface (on X11 *and* Wayland), a second GL surface, and a native GL child
+  window all reported successful rendering and showed black. The Linux pop-out
+  no longer puts OpenGL in that window at all: each frame is rendered offscreen
+  in the docked player's own (working) GL context and drawn into the pop-out as
+  an image. The docked player's mpv instance and render context are never
+  moved, freed or reparented, so playback cannot be disturbed by popping out,
+  and docking back is instant.
+- **Fixed: heavy stuttering in the pop-out.** mpv's render call blocks until
+  each frame's target display time by default; called from the UI thread that
+  stalled the interface for most of a frame interval (worst on 23.976 fps
+  film). We present through a readback rather than a display swap, so mpv no
+  longer paces the caller. Frames are also read one tick late (no GPU wait),
+  rendered only when mpv actually has a new frame, and capped at 1080p.
+- **Fixed: the docked mini player looked broken while popped out** - it still
+  reserved height for the control bar that had moved into the pop-out, its
+  responsive rules measured the wrong window (hiding the volume slider), and a
+  frozen video frame could show through above the "playing in pop-out" panel.
+- **Fixed: the control bar's menus (subtitles/options, record, timeshift) never
+  opened over the pop-out** on Wayland, and docking back could leave the video
+  paused.
+
+### Playback
+
+- **Fixed: "Refresh playlist" did nothing within five minutes of the last
+  fetch** - it cleared the memory cache but then served the same lists back
+  from the disk copy, so changes at the provider never appeared. Refresh now
+  always re-fetches; the disk copy stays as the offline fallback.
+- **The network-buffer setting applies to the stream you are watching**, not
+  just the next one, and a larger buffer now also raises the demuxer's memory
+  budget - so picking a bigger value genuinely cushions stuttery live channels.
+- The record/reminder prompt for a broadcast that has not started appears
+  immediately again on every channel.
+- "Watch the recorded channel" starts playing even when picked the instant a
+  recording began.
+
+### Continue watching & History
+
+- **Fixed: a film could not be resumed from Continue watching** (it failed with
+  a stream error) and **appeared twice in History**, one copy unplayable. A
+  title first played from History lost its identity when its resume point was
+  saved; it now keeps both its key and its playable URL.
+- **Fixed: Continue-watching cards on Home did nothing when clicked** for those
+  same titles.
+- **Fixed: a crash when clicking a card on Home.**
+
 ## [1.2.1]
 
 Clearer update notices, a readable About dialog, and a calmer default startup.

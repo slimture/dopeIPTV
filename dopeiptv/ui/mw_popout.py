@@ -40,8 +40,7 @@ def _use_mirror_popout() -> bool:
     QOpenGLWindow subsurface all rendered "successfully" and showed black on
     real hardware - so Linux mirrors too, by default via the RASTER mirror
     (offscreen render in the docked context + CPU blit; see _RasterMirror).
-    DOPEIPTV_WAYLAND_MIRROR=1 selects the experimental native-GL-window mirror
-    instead. The reparent path remains only as the fallback for anything else.
+    The reparent path remains only as the fallback for anything else.
     """
     return (sys.platform in ("darwin", "win32")
             or sys.platform.startswith("linux"))
@@ -178,11 +177,6 @@ class _PopoutMixin:
         mirror.video_mouse_press.connect(self._on_mirror_press)
         mirror.video_mouse_move.connect(self._on_mirror_move)
         mirror.video_mouse_release.connect(self._on_mirror_release)
-        # Experimental Wayland mirror: the native GL window keeps keyboard
-        # focus inside its container, so Escape must be forwarded to us.
-        glwin = getattr(mirror, "_glwin", None)
-        if glwin is not None:
-            glwin.escape_pressed.connect(self._popout_escape)
         # A click toggles pause, but only after the double-click interval so a
         # double-click (fullscreen) can cancel it - otherwise a double-click
         # both paused AND maximised.
@@ -220,19 +214,6 @@ class _PopoutMixin:
         win.show()
         win.raise_()
         mirror.show()
-        if glwin is not None:
-            # Wayland subsurface gotcha: the native GL window (a wl_subsurface
-            # of this pop-out) only reaches the screen after its PARENT surface
-            # commits again - and a static pop-out (painted once at show,
-            # before the GL window mapped) may never commit again, leaving the
-            # video invisible behind the parent's black background. Force a few
-            # parent repaints (= commits) while the subsurface maps.
-            for delay in (0, 100, 300, 700, 1500):
-                QTimer.singleShot(delay, win.update)
-                QTimer.singleShot(
-                    delay, lambda w=win: (
-                        w.windowHandle().requestUpdate()
-                        if w.windowHandle() is not None else None))
         self._reveal_popout_center()   # a first hint that it's interactive
         self._popout_cursor_timer.start()
 
