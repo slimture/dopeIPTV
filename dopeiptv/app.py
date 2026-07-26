@@ -245,19 +245,6 @@ def main() -> int:
         except Exception:
             pass
 
-    # Native Wayland can't reparent a QOpenGLWidget between top-level windows -
-    # the pop-out went black (the GL context rebuilds but never renders again).
-    # So on Wayland the pop-out MIRRORS the stream into the new window instead
-    # of moving the player, which needs shared GL contexts. Enable them for
-    # Wayland sessions only (X11 keeps its working reparent path untouched).
-    # Must be set before QApplication.
-    if (sys.platform.startswith("linux") and _libmpv is not None
-            and os.environ.get("QT_QPA_PLATFORM") != "xcb"
-            and os.environ.get("WAYLAND_DISPLAY")):
-        from PyQt6.QtCore import Qt as _QtCore
-        QApplication.setAttribute(
-            _QtCore.ApplicationAttribute.AA_ShareOpenGLContexts)
-
     app = QApplication(sys.argv)
     # Base the proxy on Fusion, not the native platform style: the app is
     # fully QSS-themed anyway, and the native macOS style ignores QSS

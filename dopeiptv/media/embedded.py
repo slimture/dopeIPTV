@@ -13,6 +13,7 @@ from PyQt6.QtCore import (
 from PyQt6.QtGui import (
     QColor, QCursor, QIcon, QOpenGLContext, QPainter, QPen, QPixmap, QPolygonF,
 )
+from PyQt6.QtOpenGL import QOpenGLWindow
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 from PyQt6.QtWidgets import (
     QApplication, QHBoxLayout, QLabel, QLineEdit, QMenu, QSizePolicy, QSlider,
@@ -513,30 +514,7 @@ class _MpvGLWidget(QOpenGLWidget):
         present per frame. Never touches mpv or the owner's context - if the
         owner is between streams (ctx None) or blanked, paint black."""
         owner = self._mirror_of
-        if getattr(self, "_mirror_owns_ctx", False):
-            # Wayland: FBOs/VAOs are never shared between GL contexts, so
-            # rendering the owner's context from here stayed black. Instead the
-            # render context is MOVED: start_mirror freed the docked one, and
-            # the mirror creates its own here (its GL context is current in
-            # paintGL) against the SAME mpv - the very rebuild every X11
-            # dock/undock already does mid-stream. No update callback: the
-            # mirror's poll-render timer drives frames.
-            if (self._ctx is None and owner is not None
-                    and owner.mpv is not None and not self._blank):
-                try:
-                    self._proc_address_fn = _libmpv.MpvGlGetProcAddressFn(
-                        self._get_proc_address)
-                    self._ctx = _libmpv.MpvRenderContext(
-                        owner.mpv, "opengl",
-                        opengl_init_params={
-                            "get_proc_address": self._proc_address_fn})
-                    log.info("VID mirror own render context created (wayland)")
-                except Exception as e:
-                    self._ctx = None
-                    log.error("VID mirror own render context FAILED: %s", e)
-            ctx = self._ctx
-        else:
-            ctx = owner._ctx if owner is not None else None
+        ctx = owner._ctx if owner is not None else None
         if self._blank or ctx is None:
             glctx = QOpenGLContext.currentContext()
             if glctx is not None:
@@ -731,6 +709,143 @@ class _MpvGLWidget(QOpenGLWidget):
             except Exception:
                 pass
             self.mpv = None
+
+
+class _MpvMirrorWindow(QOpenGLWindow):
+    """EXPERIMENTAL Wayland pop-out mirror (DOPEIPTV_WAYLAND_MIRROR=1): a
+    NATIVE GL window, embedded in the pop-out via createWindowContainer, that
+    OWNS the mpv render context while popped out.
+
+    Two facts - both observed on real Wayland hardware - force this design:
+    a QOpenGLWidget in a second top-level window never gets its FBO composited
+    there (mpv rendered fine, the screen stayed black), and GL objects
+    (FBOs/VAOs) are never shared between contexts, so the macOS-style
+    cross-context mirror cannot work on Mesa either. A QOpenGLWindow is a real
+    wl_surface with its own swapchain - what it renders is what the compositor
+    shows, no widget-composition step. The render context is MOVED here
+    (start_mirror frees the docked one first; mpv allows exactly one per
+    instance) and moved back on stop_mirror - the same free/rebuild every X11
+    dock/undock already performs mid-stream."""
+
+    video_mouse_press = pyqtSignal(object)
+    video_mouse_move = pyqtSignal(object)
+    video_mouse_release = pyqtSignal(object)
+    video_dbl_click = pyqtSignal()
+    escape_pressed = pyqtSignal()
+
+    def __init__(self, owner: "_MpvGLWidget") -> None:
+        super().__init__()
+        self._owner = owner
+        self._ctx = None
+        self._proc_fn = None
+        # Set by stop_mirror BEFORE the context is freed: a stray repaint on
+        # the dying window must paint black - never re-create the context and
+        # steal the one slot back from the docked surface (that starved its
+        # heal, blackened the main window, and aborted mpv at shutdown).
+        self._stopped = False
+        self._paint_state = ""
+
+    def _get_proc_address(self, _, name: bytes) -> int:
+        glctx = QOpenGLContext.currentContext()
+        if glctx is not None:
+            addr = glctx.getProcAddress(QByteArray(name))
+            if addr:
+                return int(addr) or 0
+        return 0
+
+    def initializeGL(self) -> None:
+        log.info("VID wl-mirror initializeGL size=%dx%d",
+                 self.width(), self.height())
+
+    def paintGL(self) -> None:
+        owner = self._owner
+        if (not self._stopped and self._ctx is None
+                and owner is not None and owner.mpv is not None):
+            # Lazily build our render context with THIS window's GL context
+            # current - the docked one was freed in start_mirror.
+            try:
+                self._proc_fn = _libmpv.MpvGlGetProcAddressFn(
+                    self._get_proc_address)
+                self._ctx = _libmpv.MpvRenderContext(
+                    owner.mpv, "opengl",
+                    opengl_init_params={"get_proc_address": self._proc_fn})
+                log.info("VID wl-mirror render context created")
+            except Exception as e:
+                self._ctx = None
+                log.error("VID wl-mirror render context FAILED: %s", e)
+        if self._stopped or self._ctx is None:
+            glctx = QOpenGLContext.currentContext()
+            if glctx is not None:
+                try:
+                    f = glctx.functions()
+                    f.glClearColor(0.0, 0.0, 0.0, 1.0)
+                    f.glClear(0x00004000)  # GL_COLOR_BUFFER_BIT
+                except Exception:
+                    pass
+            return
+        try:
+            ratio = float(self.devicePixelRatio() or 1.0)
+            self._ctx.render(flip_y=True, opengl_fbo={
+                "w": int(self.width() * ratio),
+                "h": int(self.height() * ratio),
+                "fbo": self.defaultFramebufferObject(),
+            })
+            try:
+                self._ctx.report_swap()
+            except Exception:
+                pass
+            if self._paint_state != "render":
+                self._paint_state = "render"
+                log.info("VID wl-mirror paint -> render (fbo=%s size=%dx%d "
+                         "dpr=%.1f)", self.defaultFramebufferObject(),
+                         self.width(), self.height(), ratio)
+        except Exception as e:
+            if self._paint_state != "fail":
+                self._paint_state = "fail"
+                log.info("VID wl-mirror paint -> FAIL: %s", e)
+
+    def free_render_context(self, reason: str = "stop") -> None:
+        """Free the owned render context (with this window's GL context
+        current) so the docked surface can rebuild its own."""
+        ctx, self._ctx = self._ctx, None
+        if ctx is None:
+            return
+        log.info("VID wl-mirror render context free (%s)", reason)
+        try:
+            self.makeCurrent()
+        except Exception:
+            pass
+        try:
+            ctx.free()
+        except Exception as e:
+            log.info("VID wl-mirror ctx.free failed: %s", e)
+        try:
+            self.doneCurrent()
+        except Exception:
+            pass
+
+    # Same signal surface as the widget mirror, so the pop-out wiring is
+    # identical for both mirror kinds.
+    def mousePressEvent(self, e) -> None:
+        self.video_mouse_press.emit(e)
+
+    def mouseMoveEvent(self, e) -> None:
+        self.video_mouse_move.emit(e)
+
+    def mouseReleaseEvent(self, e) -> None:
+        self.video_mouse_release.emit(e)
+
+    def mouseDoubleClickEvent(self, e) -> None:
+        self.video_dbl_click.emit()
+
+    def keyPressEvent(self, e) -> None:
+        # The native window keeps keyboard focus inside the container, so the
+        # pop-out's own Escape handler never sees the key - forward it.
+        if e.key() == Qt.Key.Key_Escape:
+            self.escape_pressed.emit()
+            e.accept()
+            return
+        super().keyPressEvent(e)
 
 
 class _SeekSlider(QSlider):
@@ -1818,17 +1933,23 @@ class EmbeddedPlayer(QWidget):
         and the docked video (still rendering, behind a placeholder) keeps
         driving mpv's frame timing. Returns the mirror widget for the caller to
         place in the window."""
-        m = _MpvGLWidget(parent, mirror_of=self.video)
-        m.setMouseTracking(True)
-        self._mirror = m
-        # Wayland can't render one context's mpv objects from another (FBOs/
-        # VAOs are per-context), so there the mirror OWNS the render context:
-        # free the docked one now (mpv allows exactly one per instance, freed
-        # with its own GL context current) and let the mirror lazily build its
-        # own in paintGL. macOS/Windows keep the proven cross-context render.
-        wayland = "wayland" in (QApplication.platformName() or "").lower()
-        m._mirror_owns_ctx = wayland
-        if wayland:
+        wl_mirror = (
+            os.environ.get("DOPEIPTV_WAYLAND_MIRROR") == "1"
+            and "wayland" in (QApplication.platformName() or "").lower())
+        if wl_mirror:
+            # EXPERIMENTAL Wayland path (see _MpvMirrorWindow): a native GL
+            # window in a container, owning the render context. The docked
+            # context is freed here (with its GL context current) - mpv allows
+            # exactly one render context per instance - and the mirror window
+            # lazily builds its own in paintGL.
+            glwin = _MpvMirrorWindow(self.video)
+            m = QWidget.createWindowContainer(glwin, parent)
+            m.setMinimumHeight(120)
+            m.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+            m._glwin = glwin
+            for sig in ("video_dbl_click", "video_mouse_press",
+                        "video_mouse_move", "video_mouse_release"):
+                setattr(m, sig, getattr(glwin, sig))
             try:
                 self.video.makeCurrent()
             except Exception:
@@ -1838,6 +1959,12 @@ class EmbeddedPlayer(QWidget):
                 self.video.doneCurrent()
             except Exception:
                 pass
+            update_target = glwin
+        else:
+            m = _MpvGLWidget(parent, mirror_of=self.video)
+            m.setMouseTracking(True)
+            update_target = m
+        self._mirror = m
         # Drive the mirror with a steady poll-render timer, NOT mpv's frame
         # callback: a timer can never stall on a window resize/maximize (the
         # freeze reported when the pop-out was maximized), and while popped out
@@ -1845,7 +1972,7 @@ class EmbeddedPlayer(QWidget):
         # docked surface so the GPU renders the stream once, not twice (the lag).
         self.video._render_suspended = True
         self._mirror_timer = QTimer(self)
-        self._mirror_timer.timeout.connect(m.update)
+        self._mirror_timer.timeout.connect(update_target.update)
         self._mirror_timer.start(16)          # ~60 fps
         # Float the seek bar, timeshift timeline and stats over the mirror:
         # reparent them into the pop-out window and anchor placement to the
@@ -1870,20 +1997,16 @@ class EmbeddedPlayer(QWidget):
         if t is not None:
             t.stop()
             self._mirror_timer = None
-        # Wayland hand-off back: free the mirror's own render context (with its
-        # GL context current) so the docked surface's paint self-heal can
-        # rebuild one against ITS context - mpv allows only one at a time.
+        # Wayland hand-off back: stop the mirror window FIRST (a stray repaint
+        # on the dying window must paint black, never re-create the context and
+        # steal the one slot back - that starved the docked heal, blackened the
+        # main window and aborted mpv at shutdown), then free its render
+        # context so the docked surface's paint self-heal can rebuild its own.
         m = self._mirror
-        if m is not None and getattr(m, "_mirror_owns_ctx", False):
-            try:
-                m.makeCurrent()
-            except Exception:
-                pass
-            m._free_render_context("stop_mirror hand-off")
-            try:
-                m.doneCurrent()
-            except Exception:
-                pass
+        glwin = getattr(m, "_glwin", None) if m is not None else None
+        if glwin is not None:
+            glwin._stopped = True
+            glwin.free_render_context("stop_mirror hand-off")
         self.video._render_suspended = False
         # Overlays back onto the docked player.
         self._ov_surface = self.video

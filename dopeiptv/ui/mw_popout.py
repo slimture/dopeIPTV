@@ -17,6 +17,7 @@ Kept out of main_window.py to keep that file lean.
 """
 from __future__ import annotations
 
+import os
 import sys
 import time
 
@@ -34,15 +35,19 @@ def _use_mirror_popout() -> bool:
 
     macOS and Windows share GL contexts across top-levels and can't reparent a
     QOpenGLWidget between windows without the picture freezing/blanking, so both
-    take the mirror path. Native Wayland is the same: reparenting rebuilds the
-    GL context but it never renders again (the pop-out went black), so Wayland
-    mirrors too - app.py enables shared contexts for Wayland sessions to make it
-    work. X11 CAN reparent the GL surface, so it keeps the plain reparent path.
+    take the mirror path. X11 CAN reparent the GL surface, so it keeps the plain
+    reparent path. Native Wayland can do neither reliably (both went black on
+    real hardware); an EXPERIMENTAL native-GL-window mirror is available behind
+    DOPEIPTV_WAYLAND_MIRROR=1 - by default Wayland keeps the reparent path
+    (black pop-out window, but the docked player always recovers), and "Run via
+    X11" in Settings gives a fully working pop-out.
     """
     if sys.platform in ("darwin", "win32"):
         return True
-    from PyQt6.QtWidgets import QApplication
-    return "wayland" in (QApplication.platformName() or "").lower()
+    if os.environ.get("DOPEIPTV_WAYLAND_MIRROR") == "1":
+        from PyQt6.QtWidgets import QApplication
+        return "wayland" in (QApplication.platformName() or "").lower()
+    return False
 
 
 class _PopoutWindow(QWidget):
@@ -167,6 +172,11 @@ class _PopoutMixin:
         mirror.video_mouse_press.connect(self._on_mirror_press)
         mirror.video_mouse_move.connect(self._on_mirror_move)
         mirror.video_mouse_release.connect(self._on_mirror_release)
+        # Experimental Wayland mirror: the native GL window keeps keyboard
+        # focus inside its container, so Escape must be forwarded to us.
+        glwin = getattr(mirror, "_glwin", None)
+        if glwin is not None:
+            glwin.escape_pressed.connect(self._popout_escape)
         # A click toggles pause, but only after the double-click interval so a
         # double-click (fullscreen) can cancel it - otherwise a double-click
         # both paused AND maximised.
