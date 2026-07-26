@@ -2172,13 +2172,24 @@ class EmbeddedPlayer(QWidget):
                     i = self._mirror_fbo_i
                     if fbos[i] is None:
                         fbos[i] = QOpenGLFramebufferObject(w, h)
-                    # No report_swap here: this is an OFFSCREEN render, not a
-                    # real display swap. Reporting fake, jittery "swaps" made
-                    # mpv chase a vsync that doesn't exist and judder; without
-                    # it mpv paces frames off the system clock, which is
-                    # exactly right for a readback pipeline.
-                    v._ctx.render(flip_y=False, opengl_fbo={
-                        "fbo": int(fbos[i].handle()), "w": w, "h": h})
+                    # block_for_target_time=False is THE fix for the pop-out
+                    # lag: mpv_render_context_render() defaults to BLOCKING
+                    # until the frame's target display time, so every tick
+                    # stalled the GUI thread for most of a frame interval -
+                    # independent of the pop-out's size (which is why capping
+                    # the resolution never helped), and worst on 23.976 fps
+                    # film against a 60 Hz tick. We present via a readback,
+                    # not a vsync'd swap, so mpv must never pace us.
+                    v._ctx.render(flip_y=False, block_for_target_time=False,
+                                  opengl_fbo={
+                                      "fbo": int(fbos[i].handle()),
+                                      "w": w, "h": h})
+                    # Keep reporting the present: dropping it degraded mpv's
+                    # timing estimate and made the judder worse.
+                    try:
+                        v._ctx.report_swap()
+                    except Exception:
+                        pass
                     self._mirror_pending = fbos[i]
                     self._mirror_fbo_i = 1 - i
             finally:
