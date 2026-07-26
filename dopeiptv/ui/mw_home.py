@@ -927,14 +927,17 @@ class HomePage(QWidget):
                 w.switch_mode("series")
             return
         sid = it.get("stream_id")
-        if sid is None:
+        # A snapshot-derived row (Continue watching seeded by a play from
+        # History) carries no provider id, but it does keep the URL it was
+        # played from - and that one is known-good. Without this fallback the
+        # card bailed out here and clicking it did nothing at all.
+        url = (w.client.vod_url(sid, it.get("container_extension"))
+               if sid is not None else it.get("_url"))
+        if not url:
             return
         # Land the Movies list in THIS movie's own category with it selected,
         # instead of leaving the user in whatever category was last open.
         w._reveal_item_in_list(it, "vod")
-        url = w.client.vod_url(sid, it.get("container_extension"))
-        if not url:
-            return
         # Populate the detail panel with THIS movie. Home plays straight from a
         # card without selecting a list row, so without this the panel under
         # the player keeps showing whatever was last selected in the classic
