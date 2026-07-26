@@ -1,7 +1,7 @@
 ## dopeIPTV 1.2.2
 
-The pop-out player works on Linux again, plus playlist-refresh, buffer and
-Continue-watching fixes.
+The pop-out player works on Linux again, plus programme-guide, recording,
+playlist-refresh, buffer and Continue-watching fixes.
 
 - **Pop-out on Linux is fixed — and rewritten.** The pop-out window was black,
   on Wayland *and* X11: on modern Qt/Mesa nothing OpenGL ever reaches the
@@ -27,6 +27,16 @@ Continue-watching fixes.
   be resumed (stream error) and showed up twice in History with one copy
   unplayable; the same titles did nothing when clicked on Home. Fixed, along
   with a crash when clicking a Home card.
+- **The programme guide is tidier**: channel logos now show the first time you
+  open it (not only the second), a programme is selected by clicking its box
+  rather than its title, and the buttons along the bottom are finally all the
+  same size.
+- **Recordings start where you are.** With a large buffer the file used to
+  begin well before the frame on screen, because the already-played part of the
+  buffer was written out too.
+- **Smaller things**: the pop-out and volume buttons are drawn to match the
+  other controls on Linux, the collapsed sidebar is remembered between
+  sessions, and sending a film to multiview continues from where you were.
 
 Full details in the [changelog](https://github.com/slimture/dopeIPTV/blob/main/CHANGELOG.md).
 

@@ -7,8 +7,8 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [1.2.2]
 
-The pop-out player works on Linux again, plus playlist-refresh, buffer and
-Continue-watching fixes.
+The pop-out player works on Linux again, plus programme-guide, recording,
+playlist-refresh, buffer and Continue-watching fixes.
 
 ### Pop-out on Linux (rewritten)
 
@@ -58,6 +58,42 @@ Continue-watching fixes.
 - **Fixed: Continue-watching cards on Home did nothing when clicked** for those
   same titles.
 - **Fixed: a crash when clicking a card on Home.**
+
+### Programme guide
+
+- **Fixed: channel logos only appeared the second time the guide was opened.**
+  They load in the background, and a logo arriving after the guide had scrolled
+  to "now" was placed far to the left of the channel column instead of in its
+  row. Only a logo already in the cache - i.e. one from a previous visit -
+  landed correctly.
+- **Fixed: clicking a programme's title did not select its box.** The title is
+  drawn on top of the card so it can stay readable while the card scrolls, but
+  it was answering clicks itself, which put the selection outline around the
+  text. Only the box is clickable now.
+- **Fixed: the buttons along the bottom were different sizes**, with the
+  scheduled-recordings frame taller than the rest and its text out of line.
+  Their symbols were emoji characters in the button text, rendered by whatever
+  font the system substituted; they are drawn icons now, so the row is even on
+  every platform.
+
+### Recording
+
+- **Fixed: a recording started behind the picture you were watching.** With a
+  larger buffer the file began up to that much earlier than the frame on
+  screen, because the whole buffer - including the part already played - was
+  written out.
+
+### Interface
+
+- **The pop-out and volume buttons look right on Linux.** The pop-out symbol
+  was a Unicode character that came out tiny outside macOS, and the speaker was
+  drawn much smaller than the controls around it. Both are drawn to match their
+  neighbours now.
+- **The collapsed sidebar is remembered between sessions**, and the app mark at
+  its top is no longer clipped on the narrow rail.
+- **Multiview keeps your place.** Sending a film or an episode from the player
+  to a multiview cell continues where you were instead of starting over
+  (swapping two cells carries their positions across as well).
 
 ## [1.2.1]
 
