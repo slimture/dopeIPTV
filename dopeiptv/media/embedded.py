@@ -2058,6 +2058,15 @@ class EmbeddedPlayer(QWidget):
             # callback flooded the main thread with readbacks - far worse.)
             m = _RasterMirror(parent, mirror_of=self.video)
             self._raster_state = ""
+            # New-frame gate: mpv's update callback sets a cheap flag (the
+            # slot must NOT render - the callback fires more often than the
+            # video fps, and rendering from it flooded the main thread); the
+            # 60 Hz tick consumes it. This replaces polling
+            # mpv_render_context_update, which silently gated nothing when
+            # the binding lacks update() (the try/except defaulted to
+            # "always render" = 60 readbacks/s for a 25 fps stream).
+            self._raster_pending_frame = True
+            self.video.frame_ready.connect(self._raster_mark_frame)
             tick, interval = self._tick_raster_mirror, 16
         else:
             m = _MpvGLWidget(parent, mirror_of=self.video)
@@ -2098,6 +2107,13 @@ class EmbeddedPlayer(QWidget):
         self._reveal_sleep_badge()
         return m
 
+    def _raster_mark_frame(self) -> None:
+        """mpv produced a new frame: set the flag the 60 Hz tick consumes.
+        This slot must stay this cheap - rendering directly from the update
+        callback flooded the main thread (it fires more often than the video
+        fps)."""
+        self._raster_pending_frame = True
+
     def _tick_raster_mirror(self) -> None:
         """One raster-mirror frame: render mpv into an offscreen FBO in the
         DOCKED widget's GL context (the one that provably presents) and hand
@@ -2127,13 +2143,11 @@ class EmbeddedPlayer(QWidget):
                 self._mirror_pending = None
                 self._mirror_fbos = fbos = [None, None]
                 self._mirror_fbo_i = 0
-            # Render only when mpv actually has a new frame (live TV is
-            # 25 fps against the 60 Hz tick) - but always collect a finished
-            # pending frame.
-            try:
-                upd = v._ctx.update()
-            except Exception:
-                upd = True
+            # Render only when mpv actually produced a new frame (live TV is
+            # 25 fps against the 60 Hz tick; the frame_ready flag is set by
+            # mpv's update callback) - but always collect a finished pending
+            # frame.
+            upd = getattr(self, "_raster_pending_frame", True)
             pend = self._mirror_pending
             if not upd and pend is None:
                 return
@@ -2154,15 +2168,17 @@ class EmbeddedPlayer(QWidget):
                 # 2) Submit this tick's render into the OTHER buffer; it is
                 #    read on the next tick.
                 if upd:
+                    self._raster_pending_frame = False
                     i = self._mirror_fbo_i
                     if fbos[i] is None:
                         fbos[i] = QOpenGLFramebufferObject(w, h)
+                    # No report_swap here: this is an OFFSCREEN render, not a
+                    # real display swap. Reporting fake, jittery "swaps" made
+                    # mpv chase a vsync that doesn't exist and judder; without
+                    # it mpv paces frames off the system clock, which is
+                    # exactly right for a readback pipeline.
                     v._ctx.render(flip_y=False, opengl_fbo={
                         "fbo": int(fbos[i].handle()), "w": w, "h": h})
-                    try:
-                        v._ctx.report_swap()
-                    except Exception:
-                        pass
                     self._mirror_pending = fbos[i]
                     self._mirror_fbo_i = 1 - i
             finally:
@@ -2195,6 +2211,11 @@ class EmbeddedPlayer(QWidget):
         if glwin is not None:
             glwin._stopped = True
             glwin.free_render_context("stop_mirror hand-off")
+        # Raster mirror: stop feeding the new-frame flag.
+        try:
+            self.video.frame_ready.disconnect(self._raster_mark_frame)
+        except (TypeError, RuntimeError):
+            pass
         # Raster mirror: release the offscreen FBOs while the docked GL context
         # (their owner) is current. The render context itself was never moved.
         if any(getattr(self, "_mirror_fbos", [None, None])):

@@ -155,6 +155,28 @@ assert player.ts_timeline.parent() is player and \
 assert player._dock_ph.isHidden(), "placeholder lifts on dock-back"
 assert player.video.mpv is sentinel_mpv, "docked mpv still untouched"
 
+# The macOS/Windows GL mirror wiring must stay intact even though CI runs the
+# Linux raster path above: fake the platform and run one mirror cycle through
+# the cross-context widget branch - the exact branch macOS uses.
+import sys as _sys
+_real_platform = _sys.platform
+_sys.platform = "darwin"
+try:
+    from dopeiptv.media.embedded import _MpvGLWidget as _GLW
+    host2 = _QW()
+    m2 = player.start_mirror(host2)
+    assert isinstance(m2, _GLW), "darwin branch must build the GL widget mirror"
+    assert m2._mirror_of is player.video, "mirror renders the docked video ctx"
+    assert m2.mpv is None and m2._ctx is None, "mirror owns no mpv/ctx"
+    assert player._ov_surface is m2
+    assert player.video.parent() is player, "GL surface still not reparented"
+    assert player.video.mpv is sentinel_mpv, "docked mpv untouched (darwin)"
+    player.stop_mirror()
+    assert player._mirror is None
+    assert player.video.mpv is sentinel_mpv
+finally:
+    _sys.platform = _real_platform
+
 # Sleep-timer badge: fades like the controls, but is pinned on in the final
 # SLEEP_PIN_SECS so the imminent stop is unmissable.
 import time as _time
