@@ -1,4 +1,4 @@
-## dopeIPTV 1.3.0
+## dopeIPTV 1.2.3
 
 Resizable video windows, sections that remember where you were, and a cast
 panel that finally lists the right films.

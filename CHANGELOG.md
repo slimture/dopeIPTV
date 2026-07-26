@@ -5,7 +5,7 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
-## [1.3.0]
+## [1.2.3]
 
 Resizable video windows, sections that remember where you were, and a cast
 panel that finally lists the right films.
