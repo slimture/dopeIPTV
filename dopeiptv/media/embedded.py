@@ -130,15 +130,20 @@ def _control_icon(name: str, color: str, px: int = 28) -> QIcon:
         p.drawPolyline(QPolygonF([QPointF(R - seg, B), QPointF(R, B),
                                   QPointF(R, B - seg)]))
     elif name == "popout":
-        # Two overlapping rounded rects (the ⧉ idea): a back panel and a
-        # detached one lifted to the top-right. Drawn rather than typed - the
-        # Unicode glyph rendered tiny next to the other buttons wherever the
-        # platform font lacked it (notably on Linux).
-        stroke(S * 0.09)
-        off = w * 0.22
-        rad = S * 0.05
-        p.drawRoundedRect(QRectF(L, T + off, w - off, h - off), rad, rad)
-        p.drawRoundedRect(QRectF(L + off, T, w - off, h - off), rad, rad)
+        # The ⧉ glyph, drawn: two equal squares offset diagonally. Drawn rather
+        # than typed because the Unicode character came out at whatever size
+        # the platform font happened to give it (fine on macOS, tiny on Linux).
+        # Uses a WIDER box than the other icons on purpose - the glyph it
+        # replaces fills the button, so the shared inner box looked shrunken.
+        pl, pt = S * 0.22, S * 0.22
+        span = S - 2 * pl                     # full drawing extent
+        off = span * 0.26                     # diagonal offset between squares
+        side = span - off                     # each square's size
+        stroke(S * 0.065)
+        rad = S * 0.045
+        # Back square (lower-left), then the detached one (upper-right).
+        p.drawRoundedRect(QRectF(pl, pt + off, side, side), rad, rad)
+        p.drawRoundedRect(QRectF(pl + off, pt, side, side), rad, rad)
     elif name == "options":
         rows = (T, midy, B)
         knobs = (R - w * 0.18, L + w * 0.22, R - w * 0.34)
