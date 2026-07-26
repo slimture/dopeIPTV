@@ -531,8 +531,17 @@ class _DetailMixin:
         d.activateWindow()
 
     def _load_cast_match_poster(self, it, kind, item) -> None:
-        """Fetch a poster thumbnail for a cast-filmography match and set it
-        as the list item's icon (provider artwork first, then TMDB)."""
+        """Fetch a poster thumbnail for a cast-filmography match and set it as
+        the list item's icon.
+
+        Resolved through the same cover service the middle list uses, and
+        through the same image cache, so a title shows here exactly the
+        artwork it shows there - and instantly when the list has already
+        fetched it. This panel used to reach straight for the provider's raw
+        icon URL instead. For titles whose provider artwork is a dead proxy
+        the list still finds a poster (it rewrites an embedded TMDB path out
+        of that URL, or uses the title-search poster) while this panel got
+        nothing: "some of them show, not all"."""
         def apply(pm) -> bool:
             """Set the thumbnail. Returns False when there was no usable
             artwork, so the caller can fall back to the next source."""
@@ -556,20 +565,20 @@ class _DetailMixin:
             def got(d) -> None:
                 poster = (d or {}).get("poster_url")
                 if poster:
-                    self.poster_art.get(poster, apply)
+                    self.logos.get(poster, apply)
 
             details = self.tmdb.get_full(title, tmdb_kind, got)
             if details is not None:
                 got(details)
 
-        url = it.get("stream_icon") or it.get("cover")
+        cover = getattr(self, "cover", None)
+        url = (cover.cover_url(it, kind) if cover is not None
+               else (it.get("stream_icon") or it.get("cover")))
         if url:
-            # Provider artwork first - but a lot of it 404s or points at a
-            # host that is down, and this used to stop there, leaving those
-            # rows blank for good. Fall through to TMDB when nothing usable
-            # came back, so a title gets a poster whether or not it happened
-            # to be in the cache already.
-            self.poster_art.get(url, lambda pm: apply(pm) or from_tmdb())
+            # ...and if even that comes back empty (a dead host, a 404),
+            # fall through to a TMDB title search rather than stopping at the
+            # failed URL and leaving the row blank for good.
+            self.logos.get(url, lambda pm: apply(pm) or from_tmdb())
             return
         from_tmdb()
 
