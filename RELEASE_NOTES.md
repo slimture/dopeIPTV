@@ -25,7 +25,6 @@ panel that finally lists the right films.
   their episode list, and missing posters are resolved the same way the middle
   list resolves them.
 - **Unmuting a film that started muted gives sound back** without replaying it.
-- **Multiview keeps your place** when you send a film or episode to a cell.
 
 Full details in the [changelog](https://github.com/slimture/dopeIPTV/blob/main/CHANGELOG.md).
 

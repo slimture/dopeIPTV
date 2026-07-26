@@ -58,9 +58,6 @@ panel that finally lists the right films.
   it. Muting moves the volume slider to 0 with its signals blocked, so mpv was
   handed that 0 as the stream's volume - and clearing the mute flag cannot undo
   a zero volume.
-- **Multiview keeps your place**: sending a film or episode from the player to a
-  cell continues where you were (swapping two cells carries their positions
-  across too).
 
 ## [1.2.2]
 
