@@ -32,14 +32,17 @@ def _use_mirror_popout() -> bool:
     """Whether to render the pop-out via a MIRROR surface instead of
     reparenting the real GL widget.
 
-    macOS and Windows both share GL contexts across top-levels
-    (AA_ShareOpenGLContexts, required by the mpv render API). On macOS this
-    makes reparenting a QOpenGLWidget between windows present a stale layer
-    (frozen picture); Windows shares contexts the same way and is expected to
-    behave the same, so both take the mirror path. Linux destroys and rebuilds
-    the context on reparent, so the plain reparent path stays there.
+    macOS and Windows share GL contexts across top-levels and can't reparent a
+    QOpenGLWidget between windows without the picture freezing/blanking, so both
+    take the mirror path. Native Wayland is the same: reparenting rebuilds the
+    GL context but it never renders again (the pop-out went black), so Wayland
+    mirrors too - app.py enables shared contexts for Wayland sessions to make it
+    work. X11 CAN reparent the GL surface, so it keeps the plain reparent path.
     """
-    return sys.platform in ("darwin", "win32")
+    if sys.platform in ("darwin", "win32"):
+        return True
+    from PyQt6.QtWidgets import QApplication
+    return "wayland" in (QApplication.platformName() or "").lower()
 
 
 class _PopoutWindow(QWidget):
