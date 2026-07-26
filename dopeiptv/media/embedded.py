@@ -285,10 +285,19 @@ class _MpvGLWidget(QOpenGLWidget):
         self.makeCurrent()
         glctx = QOpenGLContext.currentContext()
         if self._mirror_of is not None:
-            # Mirror surface: nothing to build. It renders the owner's render
-            # context (see paintGL). No mpv, no own render context, so no
-            # aboutToBeDestroyed cleanup - closing the pop-out window just
-            # drops this GL context, the owner's is untouched.
+            # Mirror surface: nothing to build up front. On macOS/Windows it
+            # renders the owner's render context (see paintGL); on Wayland it
+            # lazily creates its OWN render context in paintGL (cross-context
+            # GL is unreliable there). Hook the free for the own-ctx case so a
+            # destroyed pop-out window can never leak a live render context -
+            # a no-op when _ctx is None (the macOS/Windows mirror).
+            if glctx is not None:
+                try:
+                    glctx.aboutToBeDestroyed.connect(
+                        self._free_render_context,
+                        Qt.ConnectionType.UniqueConnection)
+                except (TypeError, RuntimeError):
+                    pass
             log.info("VID mirror initializeGL glctx=%s size=%dx%d",
                      self._ctx_id(glctx), self.width(), self.height())
             return
@@ -504,7 +513,30 @@ class _MpvGLWidget(QOpenGLWidget):
         present per frame. Never touches mpv or the owner's context - if the
         owner is between streams (ctx None) or blanked, paint black."""
         owner = self._mirror_of
-        ctx = owner._ctx if owner is not None else None
+        if getattr(self, "_mirror_owns_ctx", False):
+            # Wayland: FBOs/VAOs are never shared between GL contexts, so
+            # rendering the owner's context from here stayed black. Instead the
+            # render context is MOVED: start_mirror freed the docked one, and
+            # the mirror creates its own here (its GL context is current in
+            # paintGL) against the SAME mpv - the very rebuild every X11
+            # dock/undock already does mid-stream. No update callback: the
+            # mirror's poll-render timer drives frames.
+            if (self._ctx is None and owner is not None
+                    and owner.mpv is not None and not self._blank):
+                try:
+                    self._proc_address_fn = _libmpv.MpvGlGetProcAddressFn(
+                        self._get_proc_address)
+                    self._ctx = _libmpv.MpvRenderContext(
+                        owner.mpv, "opengl",
+                        opengl_init_params={
+                            "get_proc_address": self._proc_address_fn})
+                    log.info("VID mirror own render context created (wayland)")
+                except Exception as e:
+                    self._ctx = None
+                    log.error("VID mirror own render context FAILED: %s", e)
+            ctx = self._ctx
+        else:
+            ctx = owner._ctx if owner is not None else None
         if self._blank or ctx is None:
             glctx = QOpenGLContext.currentContext()
             if glctx is not None:
@@ -1789,6 +1821,23 @@ class EmbeddedPlayer(QWidget):
         m = _MpvGLWidget(parent, mirror_of=self.video)
         m.setMouseTracking(True)
         self._mirror = m
+        # Wayland can't render one context's mpv objects from another (FBOs/
+        # VAOs are per-context), so there the mirror OWNS the render context:
+        # free the docked one now (mpv allows exactly one per instance, freed
+        # with its own GL context current) and let the mirror lazily build its
+        # own in paintGL. macOS/Windows keep the proven cross-context render.
+        wayland = "wayland" in (QApplication.platformName() or "").lower()
+        m._mirror_owns_ctx = wayland
+        if wayland:
+            try:
+                self.video.makeCurrent()
+            except Exception:
+                pass
+            self.video._free_render_context("start_mirror hand-off")
+            try:
+                self.video.doneCurrent()
+            except Exception:
+                pass
         # Drive the mirror with a steady poll-render timer, NOT mpv's frame
         # callback: a timer can never stall on a window resize/maximize (the
         # freeze reported when the pop-out was maximized), and while popped out
@@ -1821,6 +1870,20 @@ class EmbeddedPlayer(QWidget):
         if t is not None:
             t.stop()
             self._mirror_timer = None
+        # Wayland hand-off back: free the mirror's own render context (with its
+        # GL context current) so the docked surface's paint self-heal can
+        # rebuild one against ITS context - mpv allows only one at a time.
+        m = self._mirror
+        if m is not None and getattr(m, "_mirror_owns_ctx", False):
+            try:
+                m.makeCurrent()
+            except Exception:
+                pass
+            m._free_render_context("stop_mirror hand-off")
+            try:
+                m.doneCurrent()
+            except Exception:
+                pass
         self.video._render_suspended = False
         # Overlays back onto the docked player.
         self._ov_surface = self.video
