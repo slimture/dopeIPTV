@@ -214,3 +214,56 @@ def test_embedded_player_constructs():
     assert "EMBEDDED_OK" in proc.stdout, (
         f"embedded checks failed\n"
         f"stdout={proc.stdout!r}\nstderr={proc.stderr[-2000:]!r}")
+
+
+def test_unmuting_a_stream_that_started_muted_restores_the_volume():
+    """Starting a film while muted and then unmuting must give sound back
+    without replaying it.
+
+    The sliders are moved with their signals blocked while muting (so the
+    user's real level isn't overwritten in settings), which means mpv is never
+    told the new level. play() then handed mpv the muted slider's 0 as the
+    volume, and clearing the mute flag can't undo a zero volume - the film
+    stayed silent until it was restarted.
+    """
+    import subprocess
+    import sys as _sys
+    child = r"""
+import os
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from PyQt6.QtWidgets import QApplication
+from dopeiptv.media.embedded import EmbeddedPlayer
+
+app = QApplication.instance() or QApplication([])
+p = EmbeddedPlayer()
+
+
+class FakeMpv(dict):
+    pause = False
+    def __getattr__(self, n): return None
+
+
+p.video.mpv = FakeMpv()
+p.vol.setValue(80)
+
+# Mute: the sliders drop to 0, the real level is remembered.
+p.toggle_mute()
+assert p._muted is True
+assert p.vol.value() == 0
+assert p.video.mpv["mute"] is True
+assert p.video.mpv["volume"] == 0.0, p.video.mpv
+
+# Unmute: mpv must hear the restored level, not just the cleared flag.
+p.toggle_mute()
+assert p._muted is False
+assert p.vol.value() == 80
+assert p.video.mpv["mute"] is False
+assert p.video.mpv["volume"] == 80.0, p.video.mpv
+print("MUTE_OK")
+"""
+    proc = subprocess.run([_sys.executable, "-c", child], capture_output=True,
+                          text=True, cwd=_REPO_ROOT, timeout=180,
+                          env=dict(os.environ, QT_QPA_PLATFORM="offscreen"))
+    assert "MUTE_OK" in proc.stdout, (
+        f"mute/volume check failed\nstdout={proc.stdout!r}\n"
+        f"stderr={proc.stderr[-1500:]!r}")

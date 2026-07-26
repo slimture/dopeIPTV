@@ -2838,7 +2838,14 @@ class EmbeddedPlayer(QWidget):
                 log.debug("track prefs (aid=%r sid=%r) failed: %s",
                           pref_aid, pref_sid, e)
             try:
-                m["volume"] = float(self.vol.value())
+                # While muted the slider reads 0. Sending that as the volume
+                # would leave the stream silent even after unmuting, since mute
+                # is a separate flag and clearing it can't restore a zero
+                # volume - so start from the real, pre-mute level.
+                level = (getattr(self, "_vol_before_mute", None)
+                         if self._muted else None)
+                m["volume"] = float(self.vol.value() if level is None
+                                    else level)
                 m["mute"] = self._muted
             except Exception:
                 pass
@@ -3483,6 +3490,13 @@ class EmbeddedPlayer(QWidget):
         if m is not None:
             try:
                 m["mute"] = self._muted
+                # The sliders moved with their signals blocked, so _set_volume
+                # never ran and mpv was never told the new level. Push it here:
+                # a stream that STARTED while muted was handed the muted
+                # slider's 0 as its volume, and clearing the mute flag does not
+                # undo a zero volume - it stayed silent until the film was
+                # restarted.
+                m["volume"] = float(shown)
             except Exception:
                 pass
         self._apply_mute_icon()

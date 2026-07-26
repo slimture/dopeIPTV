@@ -11,6 +11,7 @@ from ..providers.client import b64, epg_times
 from ..i18n import tr
 from .theme import ACCENT, P
 from .widgets import _ClickableWidget
+from ..core.log import log
 from ..core.workers import run_async, tmdb_url_from_provider
 from PyQt6.QtCore import QSize, QTimer, Qt
 from PyQt6.QtGui import QIcon, QPainter, QPainterPath, QPixmap
@@ -532,7 +533,11 @@ class _DetailMixin:
     def _load_cast_match_poster(self, it, kind, item) -> None:
         """Fetch a poster thumbnail for a cast-filmography match and set it
         as the list item's icon (provider artwork first, then TMDB)."""
-        def apply(pm) -> None:
+        def apply(pm) -> bool:
+            """Set the thumbnail. Returns False when there was no usable
+            artwork, so the caller can fall back to the next source."""
+            if pm is None or pm.isNull():
+                return False
             try:
                 icon_pm = pm.scaled(
                     46, 69, Qt.AspectRatioMode.KeepAspectRatio,
@@ -540,28 +545,73 @@ class _DetailMixin:
                 item.setIcon(QIcon(icon_pm))
             except RuntimeError:
                 pass  # the list item was cleared before the art arrived
+            return True
+
+        def from_tmdb() -> None:
+            if not self.tmdb:
+                return
+            title = it.get("name") or it.get("title") or ""
+            tmdb_kind = "vod" if kind == "vod" else "series"
+
+            def got(d) -> None:
+                poster = (d or {}).get("poster_url")
+                if poster:
+                    self.poster_art.get(poster, apply)
+
+            details = self.tmdb.get_full(title, tmdb_kind, got)
+            if details is not None:
+                got(details)
 
         url = it.get("stream_icon") or it.get("cover")
         if url:
-            self.poster_art.get(url, apply)
+            # Provider artwork first - but a lot of it 404s or points at a
+            # host that is down, and this used to stop there, leaving those
+            # rows blank for good. Fall through to TMDB when nothing usable
+            # came back, so a title gets a poster whether or not it happened
+            # to be in the cache already.
+            self.poster_art.get(url, lambda pm: apply(pm) or from_tmdb())
             return
-        if self.tmdb:
-            title = it.get("name") or it.get("title") or ""
-            tmdb_kind = "vod" if kind == "vod" else "series"
-            details = self.tmdb.get_full(
-                title, tmdb_kind,
-                lambda d: (d.get("poster_url")
-                           and self.poster_art.get(d["poster_url"], apply)))
-            if details and details.get("poster_url"):
-                self.poster_art.get(details["poster_url"], apply)
+        from_tmdb()
 
     def _play_cast_match(self, item, dialog) -> None:
         """Open a title picked from a cast member's filmography exactly as if
-        it had been picked from its own section: the middle column lands in
-        the title's category with the row selected, so the detail panel on the
-        right fills in - and only then does it play."""
+        it had been picked from its own section: it starts playing at once,
+        and the middle column lands on it in its category with the detail
+        panel filled in."""
         it, kind = item.data(Qt.ItemDataRole.UserRole)
         dialog.hide()
+        if kind == "vod":
+            # Start the stream FIRST. Landing the list on this title reloads
+            # its category from the provider, and doing that first left the
+            # stream waiting behind that fetch - "ten seconds instead of one"
+            # compared with picking the same film straight from a category,
+            # where the list is already loaded and nothing else is in flight.
+            #
+            # The URL is built here rather than through play_item, whose
+            # routing keys off whichever section the classic view happens to
+            # be in - the cast panel can be opened from any of them, and a
+            # movie must never be built as a live URL (same reason Home builds
+            # its own).
+            sid = it.get("stream_id")
+            url = (self.client.vod_url(sid, it.get("container_extension"))
+                   if sid is not None else it.get("_url"))
+            if not url:
+                return
+            title = it.get("name") or it.get("title") or "dopeIPTV"
+            log.info("cast pick: play %r -> %s", title, url)
+            self._start_playback(
+                url, title, it.get("stream_icon") or it.get("cover"),
+                self._item_key(it), "movie", item=it)
+            # Now catch the list up. The detail panel is filled straight away
+            # so the right-hand side shows THIS film even before the category
+            # finishes loading.
+            try:
+                self._current_key = self._item_key(it)
+                self._show_detail(it)
+            except Exception:
+                pass
+            self._reveal_item_in_list(it, "vod")
+            return
         if kind == "series":
             # A show: drill into its episode list rather than "play" it. The
             # drill has to ride the async category load (see mw_home), or the
