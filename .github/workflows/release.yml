@@ -23,15 +23,26 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         run: |
-          # The GitHub release body comes from RELEASE_NOTES.md (body_path
-          # below). v1.1.0 shipped with 1.0.0's notes because nothing checked
-          # the file was updated - fail the build immediately instead.
+          # The release body comes from RELEASE_NOTES.md and the artifacts are
+          # built from whatever the tag points at, so three things must agree
+          # or the release is a lie: the tag, the package version, the notes.
+          #
+          # v1.1.0 shipped with 1.0.0's notes because nothing checked the file.
+          # v1.2.3 then shipped 1.2.2's code AND notes, because the tag landed
+          # on a commit made before the version bump - and this guard only
+          # compared the notes against __version__, which agreed with itself
+          # perfectly at 1.2.2. Check the TAG too.
+          TAG=${GITHUB_REF#refs/tags/v}
           VER=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' dopeiptv/__init__.py)
+          if [ "${TAG}" != "${VER}" ]; then
+            echo "::error::Tag v${TAG} sits on a commit whose __version__ is ${VER} - wrong commit, or the bump was never committed."
+            exit 1
+          fi
           if ! grep -q "dopeIPTV ${VER}" RELEASE_NOTES.md; then
             echo "::error::RELEASE_NOTES.md is stale: no 'dopeIPTV ${VER}' heading. Update it before tagging."
             exit 1
           fi
-          echo "RELEASE_NOTES.md matches version ${VER}."
+          echo "Tag, version and release notes all agree on ${VER}."
       - name: Bake built-in TMDB key
         env:
           DOPEIPTV_TMDB_KEY: ${{ secrets.DOPEIPTV_TMDB_KEY }}
@@ -103,15 +114,26 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         run: |
-          # The GitHub release body comes from RELEASE_NOTES.md (body_path
-          # below). v1.1.0 shipped with 1.0.0's notes because nothing checked
-          # the file was updated - fail the build immediately instead.
+          # The release body comes from RELEASE_NOTES.md and the artifacts are
+          # built from whatever the tag points at, so three things must agree
+          # or the release is a lie: the tag, the package version, the notes.
+          #
+          # v1.1.0 shipped with 1.0.0's notes because nothing checked the file.
+          # v1.2.3 then shipped 1.2.2's code AND notes, because the tag landed
+          # on a commit made before the version bump - and this guard only
+          # compared the notes against __version__, which agreed with itself
+          # perfectly at 1.2.2. Check the TAG too.
+          TAG=${GITHUB_REF#refs/tags/v}
           VER=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' dopeiptv/__init__.py)
+          if [ "${TAG}" != "${VER}" ]; then
+            echo "::error::Tag v${TAG} sits on a commit whose __version__ is ${VER} - wrong commit, or the bump was never committed."
+            exit 1
+          fi
           if ! grep -q "dopeIPTV ${VER}" RELEASE_NOTES.md; then
             echo "::error::RELEASE_NOTES.md is stale: no 'dopeIPTV ${VER}' heading. Update it before tagging."
             exit 1
           fi
-          echo "RELEASE_NOTES.md matches version ${VER}."
+          echo "Tag, version and release notes all agree on ${VER}."
       - name: Bake built-in TMDB key
         env:
           DOPEIPTV_TMDB_KEY: ${{ secrets.DOPEIPTV_TMDB_KEY }}
@@ -372,15 +394,26 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         run: |
-          # The GitHub release body comes from RELEASE_NOTES.md (body_path
-          # below). v1.1.0 shipped with 1.0.0's notes because nothing checked
-          # the file was updated - fail the build immediately instead.
+          # The release body comes from RELEASE_NOTES.md and the artifacts are
+          # built from whatever the tag points at, so three things must agree
+          # or the release is a lie: the tag, the package version, the notes.
+          #
+          # v1.1.0 shipped with 1.0.0's notes because nothing checked the file.
+          # v1.2.3 then shipped 1.2.2's code AND notes, because the tag landed
+          # on a commit made before the version bump - and this guard only
+          # compared the notes against __version__, which agreed with itself
+          # perfectly at 1.2.2. Check the TAG too.
+          TAG=${GITHUB_REF#refs/tags/v}
           VER=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' dopeiptv/__init__.py)
+          if [ "${TAG}" != "${VER}" ]; then
+            echo "::error::Tag v${TAG} sits on a commit whose __version__ is ${VER} - wrong commit, or the bump was never committed."
+            exit 1
+          fi
           if ! grep -q "dopeIPTV ${VER}" RELEASE_NOTES.md; then
             echo "::error::RELEASE_NOTES.md is stale: no 'dopeIPTV ${VER}' heading. Update it before tagging."
             exit 1
           fi
-          echo "RELEASE_NOTES.md matches version ${VER}."
+          echo "Tag, version and release notes all agree on ${VER}."
       - name: Bake built-in TMDB key
         env:
           DOPEIPTV_TMDB_KEY: ${{ secrets.DOPEIPTV_TMDB_KEY }}
@@ -550,15 +583,26 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         run: |
-          # The GitHub release body comes from RELEASE_NOTES.md (body_path
-          # below). v1.1.0 shipped with 1.0.0's notes because nothing checked
-          # the file was updated - fail the build immediately instead.
+          # The release body comes from RELEASE_NOTES.md and the artifacts are
+          # built from whatever the tag points at, so three things must agree
+          # or the release is a lie: the tag, the package version, the notes.
+          #
+          # v1.1.0 shipped with 1.0.0's notes because nothing checked the file.
+          # v1.2.3 then shipped 1.2.2's code AND notes, because the tag landed
+          # on a commit made before the version bump - and this guard only
+          # compared the notes against __version__, which agreed with itself
+          # perfectly at 1.2.2. Check the TAG too.
+          TAG=${GITHUB_REF#refs/tags/v}
           VER=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' dopeiptv/__init__.py)
+          if [ "${TAG}" != "${VER}" ]; then
+            echo "::error::Tag v${TAG} sits on a commit whose __version__ is ${VER} - wrong commit, or the bump was never committed."
+            exit 1
+          fi
           if ! grep -q "dopeIPTV ${VER}" RELEASE_NOTES.md; then
             echo "::error::RELEASE_NOTES.md is stale: no 'dopeIPTV ${VER}' heading. Update it before tagging."
             exit 1
           fi
-          echo "RELEASE_NOTES.md matches version ${VER}."
+          echo "Tag, version and release notes all agree on ${VER}."
       - name: Bake built-in TMDB key
         shell: bash
         env:
@@ -678,15 +722,26 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         run: |
-          # The GitHub release body comes from RELEASE_NOTES.md (body_path
-          # below). v1.1.0 shipped with 1.0.0's notes because nothing checked
-          # the file was updated - fail the build immediately instead.
+          # The release body comes from RELEASE_NOTES.md and the artifacts are
+          # built from whatever the tag points at, so three things must agree
+          # or the release is a lie: the tag, the package version, the notes.
+          #
+          # v1.1.0 shipped with 1.0.0's notes because nothing checked the file.
+          # v1.2.3 then shipped 1.2.2's code AND notes, because the tag landed
+          # on a commit made before the version bump - and this guard only
+          # compared the notes against __version__, which agreed with itself
+          # perfectly at 1.2.2. Check the TAG too.
+          TAG=${GITHUB_REF#refs/tags/v}
           VER=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' dopeiptv/__init__.py)
+          if [ "${TAG}" != "${VER}" ]; then
+            echo "::error::Tag v${TAG} sits on a commit whose __version__ is ${VER} - wrong commit, or the bump was never committed."
+            exit 1
+          fi
           if ! grep -q "dopeIPTV ${VER}" RELEASE_NOTES.md; then
             echo "::error::RELEASE_NOTES.md is stale: no 'dopeIPTV ${VER}' heading. Update it before tagging."
             exit 1
           fi
-          echo "RELEASE_NOTES.md matches version ${VER}."
+          echo "Tag, version and release notes all agree on ${VER}."
       - name: Bake built-in TMDB key
         env:
           DOPEIPTV_TMDB_KEY: ${{ secrets.DOPEIPTV_TMDB_KEY }}
