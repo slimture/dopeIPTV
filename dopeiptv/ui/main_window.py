@@ -4307,6 +4307,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         st = self.settings.value("splitter_state")
         if isinstance(st, QByteArray) and st.size() > 0:
             self._root.restoreState(st)
+            # Re-apply the rail/expanded choice the state was saved with -
+            # restoreState brings back the 60 px width, and without the
+            # matching chrome the full-width content was crammed into it.
+            if self.settings.value("sidebar_collapsed", "false") == "true":
+                self._set_sidebar_collapsed(True)
             return
         # First run: give the video (right) column a share of the real width
         # so it's usefully large on a wide screen, instead of a fixed 380 px.
@@ -4338,6 +4343,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         self.settings.setValue("splitter_state", self._root.saveState())
         self.settings.setValue("window_geometry", self.saveGeometry())
+        # The rail/expanded choice must persist WITH the splitter state: the
+        # saved state restores the 60 px rail width, so without this the next
+        # launch drew full-width sidebar content (logo, labels) inside it.
+        self.settings.setValue(
+            "sidebar_collapsed",
+            "true" if getattr(self, "_sidebar_collapsed", False) else "false")
         self.settings.sync()
 
     def moveEvent(self, event) -> None:
