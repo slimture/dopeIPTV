@@ -203,11 +203,15 @@ class _Card(QFrame):
         super().leaveEvent(e)
 
     def mousePressEvent(self, e) -> None:
+        # Base class FIRST, then emit: the click handler leaves Home and
+        # rebuilds the shelves synchronously, which deletes this very card -
+        # touching self afterwards crashed with "wrapped C/C++ object of type
+        # _Card has been deleted".
+        super().mousePressEvent(e)
         if e.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit()
         elif e.button() == Qt.MouseButton.RightButton:
             self.right_clicked.emit()
-        super().mousePressEvent(e)
 
 
 class _Shelf(QWidget):
