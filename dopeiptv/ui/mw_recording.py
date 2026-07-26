@@ -227,7 +227,10 @@ class _RecordingMixin:
         it = self._playing_item
         if not it or not self._timeshift_days(it):
             return
-        m = QMenu(self)
+        # Parent to the anchor's window: in the mirror pop-out the control bar
+        # lives in another top-level window, and on Wayland a popup can't be
+        # placed over a window it doesn't belong to (the menu never showed).
+        m = QMenu(anchor.window())
         self._build_timeshift_menu(m, it)
         m.exec(anchor.mapToGlobal(anchor.rect().bottomLeft()))
 
@@ -235,7 +238,7 @@ class _RecordingMixin:
         it = self._playing_item
         if not it or it.get("stream_id") is None:
             return
-        m = QMenu(self)
+        m = QMenu(anchor.window())   # see _player_timeshift_menu
         self._build_record_menu(m, it)
         m.exec(anchor.mapToGlobal(anchor.rect().bottomLeft()))
 

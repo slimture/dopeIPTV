@@ -212,7 +212,16 @@ class _MpvGLWidget(QOpenGLWidget):
         self._render_suspended = False
         self._gl_init_error: str | None = None
         self._blank = False
-        self.frame_ready.connect(self.update)
+        self.frame_ready.connect(self._on_frame_ready)
+
+    def _on_frame_ready(self) -> None:
+        # While a mirror presents the stream, do NOT repaint the covered
+        # docked surface per frame: every QOpenGLWidget update recomposites
+        # the WHOLE main window (25x/s on Wayland) even though this paint
+        # only clears to black - the pop-out lag that didn't depend on the
+        # pop-out's size. The mirror tick is the render loop then.
+        if not self._render_suspended:
+            self.update()
 
     def set_blank(self, blank: bool) -> None:
         """When blanked, paint solid black instead of mpv's last frame. Used on
@@ -3048,7 +3057,11 @@ class EmbeddedPlayer(QWidget):
     # -- options menu ----------------------------------------------------------
 
     def _show_options_menu(self, anchor: QWidget) -> None:
-        menu = QMenu(self)
+        # Parent the menu to the ANCHOR's window, not the player: in the
+        # mirror pop-out the bar lives in another top-level window, and on
+        # Wayland a popup can't be placed over a window it doesn't belong to
+        # (the subtitles/options menu simply never appeared there).
+        menu = QMenu(anchor.window())
         self.populate_options_menu(menu)
         # On macOS a menu shown over the layer-backed GL video bleeds through
         # (the video keeps repainting behind the non-native popup); force it to
