@@ -785,6 +785,20 @@ class _MpvMirrorWindow(QOpenGLWindow):
             return
         try:
             ratio = float(self.devicePixelRatio() or 1.0)
+            # Diagnostic sentinel while this path is experimental: clear to a
+            # deep BLUE before mpv draws over the whole viewport. What the user
+            # sees pinpoints the failing stage - video = all good; blue = this
+            # window IS presented but mpv drew nothing (mpv-side problem);
+            # black = the subsurface never reached the screen (compositor /
+            # parent-commit problem). Swap to black once Wayland is verified.
+            glctx = QOpenGLContext.currentContext()
+            if glctx is not None:
+                try:
+                    f = glctx.functions()
+                    f.glClearColor(0.05, 0.10, 0.45, 1.0)
+                    f.glClear(0x00004000)  # GL_COLOR_BUFFER_BIT
+                except Exception:
+                    pass
             self._ctx.render(flip_y=True, opengl_fbo={
                 "w": int(self.width() * ratio),
                 "h": int(self.height() * ratio),

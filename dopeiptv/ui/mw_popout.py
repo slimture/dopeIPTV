@@ -214,6 +214,19 @@ class _PopoutMixin:
         win.show()
         win.raise_()
         mirror.show()
+        if glwin is not None:
+            # Wayland subsurface gotcha: the native GL window (a wl_subsurface
+            # of this pop-out) only reaches the screen after its PARENT surface
+            # commits again - and a static pop-out (painted once at show,
+            # before the GL window mapped) may never commit again, leaving the
+            # video invisible behind the parent's black background. Force a few
+            # parent repaints (= commits) while the subsurface maps.
+            for delay in (0, 100, 300, 700, 1500):
+                QTimer.singleShot(delay, win.update)
+                QTimer.singleShot(
+                    delay, lambda w=win: (
+                        w.windowHandle().requestUpdate()
+                        if w.windowHandle() is not None else None))
         self._reveal_popout_center()   # a first hint that it's interactive
         self._popout_cursor_timer.start()
 
