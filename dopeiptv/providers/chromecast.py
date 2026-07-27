@@ -211,13 +211,19 @@ class CastDialog(QDialog):
         name = item.text()
         self._set_status(tr("cast_starting", name=name))
 
+        # Free the provider connection BEFORE the receiver goes for the
+        # stream, not after it succeeds. On a single-connection account the
+        # old order could not work: the local player still held the one
+        # connection, the provider refused the Chromecast's request, and the
+        # receiver reported IDLE/ERROR - after which we dutifully stopped
+        # local playback, having already lost the cast. Stopping first costs
+        # nothing on an account with room to spare.
+        stop = getattr(self.window, "stop_local_playback_for_cast", None)
+        if callable(stop):
+            stop()
+
         def done(n):
             self._set_status(tr("cast_casting_to", name=n))
-            # Hand the single connection to the Chromecast: stop local playback
-            # so a single-connection account isn't asked for two streams.
-            stop = getattr(self.window, "stop_local_playback_for_cast", None)
-            if callable(stop):
-                stop()
 
         run_async(self.window.pool,
                   lambda: self.window.cast.cast(name, self.url,
