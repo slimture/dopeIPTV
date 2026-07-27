@@ -5,7 +5,75 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
-## [1.2.5]
+## [1.2.6]
+
+Casting works.
+
+### Added
+
+- **A cast strip above the player**, naming the device and what was sent
+  there, with a stop button, for as long as a cast runs. Casting stops local
+  playback - the receiver pulls the stream itself - so the player pane went
+  black with nothing anywhere saying why.
+- **A local converter for channels the receiver cannot decode.** ffmpeg runs
+  here and serves the result on the LAN, with the video copied through
+  untouched and only the part the receiver could not take re-encoded (almost
+  always just the audio; video only for HEVC, which is expensive and says so
+  in the log). It is reached only after the device has refused the stream
+  itself, so a receiver that decodes the channel never touches it, and what a
+  device refuses is remembered for the session so the same twenty seconds of
+  refusals are not spent again. ffmpeg is already required for recording, so
+  this adds no dependency.
+- **The log now says what a cast is doing** at every step: the address and
+  MIME type handed over, the receiver's state and the sender's own connection
+  for the whole life of the cast, the head of the playlist, the codecs inside
+  the stream, and which of the two paths - the provider's own stream or the
+  converted one - reached the TV.
+
+### Fixed
+
+- **Casting a live channel produced no picture.** The receiver was handed the
+  panel's address and left to resolve the redirect itself. It now gets the
+  address the stream really lives at, labelled with the Content-Type the
+  server reports rather than a guess from a file extension - a resolved
+  address usually has no extension at all, and the guess landed on
+  `video/mp4`, so an HLS playlist was announced as an MP4 and refused.
+- **Casting from History could never work.** It handed over the address the
+  channel was played from - a raw MPEG transport stream, which the Cast
+  platform does not support in any container. The rule is about the row, not
+  the section it is shown in, so a live channel is cast as HLS from Channels,
+  Favorites, History and Home alike.
+- **A refused address gets a second attempt** at the panel URL, letting the
+  receiver follow the redirect itself.
+- **A cast that was only slow to start was killed by the retry meant to save
+  it.** Loading media replaces whatever the receiver is doing, and silence was
+  being read as refusal. Only an explicit IDLE with reason ERROR or CANCELLED
+  starts another attempt now.
+- **Casting took two presses.** The device list offers the devices you cast to
+  last time before discovery has finished, so the first press could name a
+  device this run had not met yet and failed with "not found - rescan". It
+  discovers on demand instead, under a lock so a press during the opening scan
+  waits for it rather than starting a second one.
+- **Rescanning crashed inside pychromecast** with "Zeroconf instance loop must
+  be running, was it already stopped?". Every device holds the browser's
+  zeroconf instance and its socket thread reaches for it on reconnect, while
+  `stop_discovery()` closes that instance - so the devices were left holding a
+  closed one. Devices are disconnected first now, browser second, in both
+  rescan and shutdown.
+- **Playing something in the app now ends the cast**, which is the same
+  handover casting performs in reverse. Otherwise the account held two
+  connections at once and, on a tight limit, the new stream was refused - which
+  looked like the app being unable to play anything after a cast.
+- **Closing the app stops the cast** again. On close this runs in a daemon
+  thread racing `os._exit`; tearing the bridge down first spent that budget
+  waiting on ffmpeg and the HTTP server, and the stop never reached the
+  receiver.
+- **A stream the receiver has no decoder for is named** instead of failing
+  silently: mpv is decoding the same channel and its codec list is used, with
+  the transport stream's own PMT read as the fallback. Raw MPEG-TS and
+  Matroska are refused up front rather than cast into the void.
+
+
 
 The pop-out player works on Windows.
 
