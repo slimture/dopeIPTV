@@ -5,6 +5,37 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
+## [1.2.5]
+
+The pop-out player works on Windows.
+
+### Fixed
+
+- **Windows pop-out rendered wrong, then not at all.** Upside down, then black
+  on the GL mirror; a single frozen frame on the raster mirror. Both mirrors
+  exist for defects Windows does not have - macOS leaves a stale layer behind
+  after reparenting a QOpenGLWidget, and Qt/Mesa never presents GL in a second
+  top-level window on Linux. 1.2.0 put Windows on the macOS mirror anyway, in
+  the release that shipped calling Windows pop-out experimental and untested.
+  Windows reparents the real player again, as it did before 1.2.0. Guarded by a
+  test that fakes the platform, so it runs on any host.
+- **Popping out stopped playback on Windows.** Detaching reparents the control
+  bar while the originating click is still in flight; Windows delivers the
+  release to whatever widget ends up under the pointer, which is the poster's
+  play/stop button - stop, on a live channel. The overlay button now ignores a
+  click within 400 ms of a pop-out toggle. Armed on win32 only, so macOS and
+  Linux never reach the guard.
+- **The pointer did not hide over the Windows pop-out video.** The idle-hide
+  lived in the mirror path only; the reparent path arms the same timer now,
+  driven by the player's own pointer-move signal, and restores the pointer when
+  docking back.
+
+### Internal
+
+- The raster mirror logs a heartbeat (ticks per second, new frames, frames
+  shown) instead of only logging state changes - a mirror that ticks without
+  producing frames used to look identical to one that had stopped.
+
 ## [1.2.4]
 
 Live streams stay up again - 1.2.2 broke them, and this reverts the cause.

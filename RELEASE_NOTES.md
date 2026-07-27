@@ -1,26 +1,24 @@
-## dopeIPTV 1.2.4
+## dopeIPTV 1.2.5
 
-Live streams stay up again. 1.2.2 broke them, and this puts it back.
+The pop-out player works on Windows.
 
-- **Live channels no longer die after a few seconds.** 1.2.2 started applying
-  the network-buffer setting to the stream *already playing*, so a change in
-  Settings took effect at once. That turned out to reach into mpv's demuxer
-  while it was running, and on some accounts the stream dropped within
-  seconds, over and over. The buffer is applied once per stream again, the way
-  it was for months — so a change in Settings now takes effect on the next
-  channel you open, not the current one. That trade is deliberate: playback
-  staying up matters more.
-- **Auto-reconnect actually reconnects.** When a live stream did drop, the log
-  said it was retrying and then nothing happened — the retry hit an internal
-  guard and gave up silently, while clicking the same channel by hand started
-  it instantly. Both silent exits now say why they bailed.
-- **Trakt watched marks survive a restart.** A completed sync only ever
-  updated memory - the call that writes it to disk sat in unreachable code -
-  so everything Trakt knew you had watched was gone on the next start, and the
-  app re-synced from scratch every launch.
+- **Windows pop-out is fixed.** It drew the picture upside down, then black,
+  then - after a first attempt at a fix - a single frozen frame. All of it came
+  from the same mistake: 1.2.0 put Windows on the mirror rendering that macOS
+  and Linux need for their own platform defects, in a release that shipped
+  saying Windows pop-out was experimental and not sufficiently tested. It was
+  not. Windows has neither defect, and now simply moves the player into the
+  pop-out window - the ordinary way, and the only way it worked before 1.2.0.
+- **Popping out no longer stops the stream** on Windows. Detaching the player
+  reparents its control bar while the click that started it is still in flight,
+  and Windows then delivered the release to whatever ended up under the pointer
+  - the poster's play/stop button, which on a live channel means stop. The
+  stream died the moment you popped out.
+- **The pointer hides over the pop-out video** on Windows, after a couple of
+  idle seconds, like it already did elsewhere.
 
-If you are on 1.2.2 or 1.2.3 and your live channels have been dropping, this
-is why, and this fixes it.
+macOS and Linux are untouched by all of this - they keep the rendering path
+each of them needs.
 
 Full details in the [changelog](https://github.com/slimture/dopeIPTV/blob/main/CHANGELOG.md).
 
