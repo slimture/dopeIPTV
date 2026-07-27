@@ -289,12 +289,68 @@ def test_a_refused_address_falls_back_to_the_panel_url(monkeypatch):
     monkeypatch.setattr(cm, "_resolve_redirects",
                         lambda u: ("http://cdn/live/play/token/9851",
                                    "application/x-mpegURL"))
+    monkeypatch.setattr(cm, "_probe_codecs", lambda u: [])
     m.scan()
     m.devices[0].refuse()
-    m.cast("Alva TV", "http://panel/live/u/pw/9851.m3u8", "SVT1")
+    with pytest.raises(RuntimeError, match="refused"):
+        m.cast("Alva TV", "http://panel/live/u/pw/9851.m3u8", "SVT1")
     tried = [u for u, _c in m.devices[0].plays]
     assert tried == ["http://cdn/live/play/token/9851",
                      "http://panel/live/u/pw/9851.m3u8"], tried
+
+
+def test_silence_is_not_treated_as_a_refusal(monkeypatch):
+    """A second load replaces whatever the receiver is doing. A channel that
+    is merely slow to start would be killed by the retry meant to save it, so
+    only an explicit refusal may trigger one."""
+    from dopeiptv.providers import chromecast as cm
+    m = _manager(monkeypatch)
+    monkeypatch.setattr(cm, "_resolve_redirects",
+                        lambda u: ("http://cdn/x", "application/x-mpegURL"))
+    m.scan()
+    # IDLE with no reason: nothing has come back yet, one way or the other.
+    m.devices[0].media_controller.status.player_state = "IDLE"
+    m.devices[0].media_controller.status.idle_reason = None
+    m.VERDICT_WAIT = 0.4
+    m.cast("Alva TV", "http://panel/y.m3u8", "SVT1")
+    assert [u for u, _c in m.devices[0].plays] == ["http://cdn/x"]
+
+
+def test_the_codecs_are_read_out_of_the_transport_stream():
+    """A refusal names no reason and the playlist names no codecs - the PMT
+    inside the stream itself is the only place the answer exists."""
+    from dopeiptv.providers.chromecast import _ts_codecs
+
+    def packet(pid, section):
+        head = bytes([0x47, 0x40 | (pid >> 8), pid & 0xFF, 0x10, 0x00])
+        body = head + section
+        return body + b"\xFF" * (188 - len(body))
+
+    pat = bytes([0x00, 0xB0, 0x0D, 0x00, 0x01, 0xC1, 0x00, 0x00,
+                 0x00, 0x01, 0xE1, 0x00]) + b"\x00" * 4
+    pmt = bytes([0x02, 0xB0, 0x17, 0x00, 0x01, 0xC1, 0x00, 0x00,
+                 0xE1, 0x01, 0xF0, 0x00,
+                 0x24, 0xE1, 0x01, 0xF0, 0x00,        # HEVC video
+                 0x81, 0xE1, 0x02, 0xF0, 0x00]) + b"\x00" * 4
+    assert _ts_codecs(packet(0, pat) + packet(0x100, pmt)) == ["hevc", "ac3"]
+
+
+def test_unreadable_bytes_yield_no_codecs():
+    from dopeiptv.providers.chromecast import _ts_codecs
+    assert _ts_codecs(b"") == []
+    assert _ts_codecs(b"not a transport stream at all") == []
+
+
+def test_a_channel_the_receiver_cannot_decode_is_named(monkeypatch):
+    from dopeiptv.providers import chromecast as cm
+    m = _manager(monkeypatch)
+    monkeypatch.setattr(cm, "_resolve_redirects",
+                        lambda u: ("http://cdn/x", "application/x-mpegURL"))
+    monkeypatch.setattr(cm, "_probe_codecs", lambda u: ["hevc", "ac3"])
+    m.scan()
+    m.devices[0].refuse()
+    with pytest.raises(RuntimeError, match="hevc \\+ ac3"):
+        m.cast("Alva TV", "http://panel/y.m3u8", "SVT1")
 
 
 def test_a_stream_the_receiver_cannot_play_says_so(monkeypatch):

@@ -136,6 +136,91 @@ def _resolve_redirects(url: str) -> tuple[str, str | None]:
         return url, None
 
 
+# MPEG-TS stream_type -> codec, for the ones that decide whether a Chromecast
+# can play a channel at all. A transport stream carries this in its PMT, which
+# is why the answer is in the stream itself and nowhere else: an HLS media
+# playlist lists bare segment paths and names no codecs.
+_TS_TYPES = {
+    0x01: "mpeg1", 0x02: "mpeg2", 0x03: "mp2", 0x04: "mp3",
+    0x0F: "aac", 0x11: "aac-latm", 0x1B: "h264", 0x24: "hevc",
+    0x81: "ac3", 0x87: "eac3", 0x06: "private",
+}
+# What every Cast receiver decodes. Everything else is a refusal on the older
+# devices - HEVC has no decoder at all, and AC-3/E-AC-3 only pass through on
+# Ultra and Google TV.
+_CAST_CODECS = {"h264", "aac", "aac-latm", "mp3", "mpeg1"}
+
+
+def _ts_codecs(data: bytes) -> list[str]:
+    """Pull the codec list out of raw MPEG-TS bytes via PAT and PMT."""
+    found: list[str] = []
+    start = data.find(b"\x47")
+    if start < 0:
+        return found
+    pmt_pid = None
+    for i in range(start, len(data) - 187, 188):
+        pkt = data[i:i + 188]
+        if pkt[0] != 0x47 or not pkt[1] & 0x40:      # sync / payload start
+            continue
+        pid = ((pkt[1] & 0x1F) << 8) | pkt[2]
+        adaptation = (pkt[3] >> 4) & 0x3
+        if not adaptation & 0x1:                     # no payload
+            continue
+        off = 4 + (1 + pkt[4] if adaptation & 0x2 else 0)
+        body = pkt[off:]
+        if not body:
+            continue
+        body = body[1 + body[0]:]                    # skip pointer_field
+        if len(body) < 13:
+            continue
+        section = 3 + (((body[1] & 0x0F) << 8) | body[2]) - 4   # minus CRC
+        if pid == 0 and pmt_pid is None and body[0] == 0x00:
+            for j in range(8, min(section, len(body)) - 3, 4):
+                if (body[j] << 8) | body[j + 1]:     # program 0 is the NIT
+                    pmt_pid = ((body[j + 2] & 0x1F) << 8) | body[j + 3]
+                    break
+        elif pid == pmt_pid and body[0] == 0x02:
+            pos = 12 + (((body[10] & 0x0F) << 8) | body[11])
+            while pos + 4 < min(section, len(body)):
+                found.append(_TS_TYPES.get(body[pos], f"0x{body[pos]:02x}"))
+                pos += 5 + (((body[pos + 3] & 0x0F) << 8) | body[pos + 4])
+            break
+    return found
+
+
+def _probe_codecs(url: str) -> list[str]:
+    """Read enough of the stream to say what is inside it.
+
+    When a Chromecast refuses a channel it says IDLE/ERROR and nothing else -
+    never which part it could not decode - and the playlist cannot answer it
+    either. So fetch the first segment and read the transport stream's own
+    program map. Two short requests, only ever on a cast that has already
+    failed.
+    """
+    try:
+        from ..core._lazy_requests import requests
+        headers = {"User-Agent": "VLC/3.0.20 LibVLC/3.0.20"}
+        r = requests.get(url, headers=headers, timeout=(3.05, 8), stream=True)
+        head = next(r.iter_content(8192), b"") or b""
+        base = r.url
+        r.close()
+        if head.lstrip().startswith(b"#EXTM3U"):
+            seg = next((ln for ln in head.decode(
+                "utf-8", "replace").splitlines()
+                if ln.strip() and not ln.startswith("#")), None)
+            if not seg:
+                return []
+            seg = requests.compat.urljoin(base, seg.strip())
+            r = requests.get(seg, headers=headers, timeout=(3.05, 8),
+                             stream=True)
+            head = next(r.iter_content(65536), b"") or b""
+            r.close()
+        return _ts_codecs(head)
+    except Exception as e:
+        log.debug("cast: codec probe failed (%s)", e)
+        return []
+
+
 class _CastWatch:
     """Writes down what the receiver and the sender socket do, for the whole
     life of a cast.
@@ -276,49 +361,67 @@ class ChromecastManager:
                 f"this stream is {ctype}, which a Chromecast cannot play")
         log.info("cast -> %s: %s (%s)", device_name, resolved,
                  ctype if served else f"{ctype}, guessed")
-        if self._play_and_verify(mc, resolved, ctype, title):
-            return device_name
-        if resolved == url:
+        verdict = self._play_and_verify(mc, resolved, ctype, title)
+        # None means the receiver has not answered yet. Leave it alone: a
+        # second load would replace a cast that is merely slow to start, and
+        # that is a channel killed by the retry meant to save it.
+        if verdict is not False or resolved == url:
             return device_name
 
         # Second attempt: the panel's own address, letting the receiver follow
-        # the redirect itself. It has not worked with this provider yet, but
-        # it is a different request against a different host and costs only
-        # the wait - and by now the cast has failed anyway.
-        log.info("cast: %s would not take that address - trying the panel URL",
+        # the redirect itself. Only after a real refusal, never on silence.
+        log.info("cast: %s refused that address - trying the panel URL",
                  device_name)
         fallback = cast_content_type(url)
         log.info("cast -> %s: %s (%s, guessed)", device_name, url, fallback)
-        if fallback not in _UNPLAYABLE:
-            self._play_and_verify(mc, url, fallback, title)
-        return device_name
+        if fallback in _UNPLAYABLE or self._play_and_verify(
+                mc, url, fallback, title) is not False:
+            return device_name
 
-    @staticmethod
-    def _play_and_verify(mc, url: str, ctype: str, title: str,
-                         wait: float = 6.0) -> bool:
+        # Both addresses refused. Now - and only now - go and read what is
+        # actually inside the stream, so the dialog can say why.
+        codecs = _probe_codecs(resolved)
+        if codecs:
+            log.info("cast: the stream contains %s", ", ".join(codecs))
+            bad = [c for c in codecs if c not in _CAST_CODECS]
+            if bad:
+                raise RuntimeError(
+                    f"this channel is {' + '.join(bad)}, which this "
+                    f"Chromecast has no decoder for")
+        raise RuntimeError("the Chromecast refused this stream")
+
+    # How long to wait for the receiver's verdict before letting the cast be.
+    # Long enough for a slow provider to get going: the wait ends the moment
+    # the state turns, so it only ever costs time on a stream in trouble.
+    VERDICT_WAIT = 12.0
+
+    def _play_and_verify(self, mc, url: str, ctype: str, title: str,
+                         wait: float | None = None) -> bool | None:
         """Hand the stream over and wait for the receiver to pass judgement.
 
-        True when it took the stream, False when it refused it or never said
-        anything at all. The wait is what makes a second attempt possible: a
-        Chromecast reports a refusal only through its own status - no error
-        ever reaches the sender - so without looking there is nothing to act
-        on. It costs nothing when the cast works, which is the common case:
-        the state turns to BUFFERING within a second or two.
+        True when it took the stream, False when it REFUSED it, and None when
+        it said nothing either way. The difference between the last two is
+        what keeps a second attempt from doing harm: loading again replaces
+        whatever the receiver is doing, so a cast that was merely slow to
+        start would be killed by the retry. Only an explicit refusal is worth
+        acting on; silence means keep waiting, and the watcher will report
+        whatever happens next.
         """
         mc.play_media(url, ctype, title=title or "dopeIPTV")
         mc.block_until_active(timeout=10)
-        deadline = time.monotonic() + wait
+        deadline = time.monotonic() + (
+            self.VERDICT_WAIT if wait is None else wait)
         while time.monotonic() < deadline:
             time.sleep(0.3)
             state = getattr(mc.status, "player_state", "?")
             why = getattr(mc.status, "idle_reason", None)
             if state in ("PLAYING", "BUFFERING"):
                 return True
-            # INTERRUPTED is our own second load replacing the first - it says
+            # INTERRUPTED is our own load replacing an earlier one - it says
             # nothing about the stream, so it is not a refusal.
             if state == "IDLE" and why in ("ERROR", "CANCELLED"):
                 return False
-        return False
+        return None
 
     @staticmethod
     def _watch(cc, mc, device_name: str) -> None:
