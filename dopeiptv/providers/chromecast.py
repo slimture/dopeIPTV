@@ -233,12 +233,24 @@ class CastDialog(QDialog):
             pass
 
     def _scan(self) -> None:
+        # Fill the list from last time's result immediately. Discovery takes
+        # several seconds, and staring at an empty box while the device you
+        # cast to yesterday is right there is just waiting for nothing. The
+        # scan still runs and replaces this the moment it lands.
+        if self.list.count() == 0:
+            remembered = self.window.settings.value("cast_devices", "") or ""
+            for name in [n for n in remembered.split("\n") if n]:
+                self.list.addItem(name)
+            if self.list.count():
+                self.list.setCurrentRow(0)
         self._set_status(tr("cast_scanning"))
         self.rescan_btn.setEnabled(False)
 
         def done(names):
             try:
                 self.rescan_btn.setEnabled(True)
+                self.window.settings.setValue(
+                    "cast_devices", "\n".join(names or []))
                 self.list.clear()
                 for name in names or []:
                     self.list.addItem(name)
