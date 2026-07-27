@@ -8,18 +8,29 @@ refused, which looks like the app failing to play anything after a cast.
 
 The stop talks to the receiver over the network, so it must not run on the UI
 thread: playback can never wait for a TV to answer.
+
+Casting also blacks out the player pane, so the cast strip above it is the
+only thing left saying that anything is happening - it has to name both the
+device and what was sent there.
+
+The window methods are borrowed onto a stub: a real MainWindow needs a GL
+surface and a provider, and none of this touches either.
 """
 import threading
 
 import pytest
 
+_METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip")
 
-def _main_window():
+
+def _window():
     try:
         from dopeiptv.ui.main_window import MainWindow
     except Exception as e:                       # pragma: no cover - no PyQt6
         pytest.skip(f"main window unavailable ({e})")
-    return MainWindow
+    cls = type("_StubWindow", (),
+               {name: getattr(MainWindow, name) for name in _METHODS})
+    return cls()
 
 
 class _Cast:
@@ -34,25 +45,160 @@ class _Cast:
         self.stopped.set()
 
 
-class _Window:
-    """Only what the method touches - a real window needs a GL surface."""
+class _Bar:
+    def __init__(self) -> None:
+        self.shown = False
+
+    def show(self) -> None:
+        self.shown = True
+
+    def hide(self) -> None:
+        self.shown = False
+
+
+class _Lbl:
+    def __init__(self) -> None:
+        self.text = ""
+        self.visible = True
+
+    def setText(self, t) -> None:
+        self.text = t
+
+    def setVisible(self, v) -> None:
+        self.visible = bool(v)
+
+
+def _with_strip():
+    w = _window()
+    w.cast_bar, w.cast_bar_lbl, w.cast_bar_title = _Bar(), _Lbl(), _Lbl()
+    return w
 
 
 def test_local_playback_ends_a_running_cast():
-    w = _Window()
+    w = _window()
     w.cast = _Cast(active=True)
-    _main_window()._stop_cast_for_local_playback(w)
+    w._stop_cast_for_local_playback()
     assert w.cast.stopped.wait(10), "the cast was never stopped"
     assert w.cast.thread != threading.current_thread().name, (
         "stopping must not block the UI thread")
 
 
 def test_nothing_happens_when_no_cast_is_running():
-    w = _Window()
+    w = _window()
     w.cast = _Cast(active=False)
-    _main_window()._stop_cast_for_local_playback(w)
+    w._stop_cast_for_local_playback()
     assert not w.cast.stopped.wait(0.5)
 
 
 def test_a_window_without_a_cast_manager_is_fine():
-    _main_window()._stop_cast_for_local_playback(_Window())
+    _window()._stop_cast_for_local_playback()
+
+
+def test_the_strip_names_the_device_and_what_is_playing():
+    w = _with_strip()
+    w.show_cast_strip("Alva TV", "SVT1")
+    assert w.cast_bar.shown
+    assert "Alva TV" in w.cast_bar_lbl.text
+    assert w.cast_bar_title.text == "SVT1"
+    assert w._cast_device == "Alva TV"
+
+
+def test_the_strip_goes_away_when_the_cast_ends():
+    w = _with_strip()
+    w.show_cast_strip("Alva TV", "SVT1")
+    w.cast = _Cast(active=True)
+    w._stop_cast_for_local_playback()
+    assert not w.cast_bar.shown
+    assert w._cast_device is None
+    assert w.cast.stopped.wait(10)
+
+
+def test_an_untitled_cast_hides_the_second_line():
+    w = _with_strip()
+    w.show_cast_strip("Alva TV", "")
+    assert w.cast_bar.shown
+    assert w.cast_bar_title.visible is False
+
+
+# ── the manager itself, with a stand-in for pychromecast ──────────────────
+
+def _fake_pychromecast(order=None):
+    import types
+
+    class FakeMedia:
+        def __init__(self, dev):
+            self.dev = dev
+
+        def register_status_listener(self, listener):
+            pass
+
+        def play_media(self, url, ctype, title=None):
+            self.dev.played = (url, ctype, title)
+
+        def block_until_active(self, timeout=10):
+            pass
+
+    class FakeSocket:
+        def register_connection_listener(self, listener):
+            pass
+
+    class FakeDevice:
+        def __init__(self, name):
+            self.name = name
+            self.played = None
+            self.media_controller = FakeMedia(self)
+            self.socket_client = FakeSocket()
+
+        def wait(self, timeout=10):
+            pass
+
+        def disconnect(self, timeout=2):
+            if order is not None:
+                order.append("device")
+
+    class FakeBrowser:
+        def stop_discovery(self):
+            if order is not None:
+                order.append("browser")
+
+    def get_chromecasts(timeout=6):
+        return [FakeDevice("Alva TV")], FakeBrowser()
+
+    return types.SimpleNamespace(get_chromecasts=get_chromecasts)
+
+
+def _manager(monkeypatch, order=None):
+    from dopeiptv.providers import chromecast as cm
+    monkeypatch.setattr(cm, "_pychromecast", _fake_pychromecast(order))
+    monkeypatch.setattr(cm, "_pc_checked", True)
+    monkeypatch.setattr(cm, "_resolve_redirects",
+                        lambda u: (u, "application/x-mpegURL"))
+    return cm.ChromecastManager()
+
+
+def test_casting_a_device_from_last_time_discovers_it_first(monkeypatch):
+    """The dialog offers the devices you cast to last time straight away, so
+    the first press can name a device this run has not discovered yet. That
+    used to fail with 'not found - rescan', which meant every cast took two
+    presses."""
+    m = _manager(monkeypatch)
+    assert m.devices == []                       # nothing discovered yet
+    assert m.cast("Alva TV", "http://x/y.m3u8", "SVT1") == "Alva TV"
+    assert m.active is not None
+    assert m.active.played[0] == "http://x/y.m3u8"
+
+
+def test_a_rescan_drops_the_devices_before_the_browser(monkeypatch):
+    """Every device holds the browser's zeroconf instance and its socket
+    thread reaches for it on reconnect - and stop_discovery() closes that
+    instance. The other order crashed inside pychromecast's own thread:
+    'Zeroconf instance loop must be running, was it already stopped?'"""
+    order: list[str] = []
+    m = _manager(monkeypatch, order)
+    m.scan()
+    assert order == []                           # nothing to tear down yet
+    m.scan()
+    assert order == ["device", "browser"], order
+    order.clear()
+    m.shutdown()
+    assert order == ["device", "browser"], order

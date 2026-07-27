@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import time
-
+import threading
 
 from PyQt6.QtWidgets import (
     QDialog, QHBoxLayout, QLabel, QListWidget, QPushButton, QVBoxLayout,
@@ -93,8 +92,41 @@ def _resolve_redirects(url: str) -> tuple[str, str | None]:
             ctype = ""
         return final, (ctype or None)
     except Exception as e:
-        log.debug("cast: redirect resolve failed (%s); using original URL", e)
+        # Info, not debug: when this fails the receiver is handed a URL we
+        # already know it usually cannot play, and the log then has to say so -
+        # otherwise a failed cast looks identical to a dead channel.
+        log.info("cast: redirect resolve failed (%s); using original URL", e)
         return url, None
+
+
+class _CastWatch:
+    """Writes down what the receiver and the sender socket do, for the whole
+    life of a cast.
+
+    Casting is one-way from here: play_media returns and everything that
+    matters afterwards happens on the TV. When a cast dies minutes later there
+    is otherwise no way to tell a receiver-side error from our own socket
+    quietly going away - so both are logged as they happen.
+    """
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self._last = ""
+
+    def new_media_status(self, status) -> None:
+        cur = (f"{getattr(status, 'player_state', '?')}/"
+               f"{getattr(status, 'idle_reason', None)}")
+        if cur != self._last:
+            self._last = cur
+            log.info("cast %s: receiver %s", self.name, cur)
+
+    def load_media_failed(self, queue_item_id, error_code) -> None:
+        log.info("cast %s: receiver refused the stream (error %s)",
+                 self.name, error_code)
+
+    def new_connection_status(self, status) -> None:
+        log.info("cast %s: sender connection %s",
+                 self.name, getattr(status, "status", status))
 
 
 class ChromecastManager:
@@ -104,27 +136,79 @@ class ChromecastManager:
         self.devices: list = []
         self.active = None
         self._browser = None
+        # Discovery runs in the worker pool and so can a cast - and a cast may
+        # have to discover first (see cast()). Two of those at once would tear
+        # down each other's devices mid-flight.
+        self._lock = threading.RLock()
 
     @staticmethod
     def available() -> bool:
         return _pc() is not None
 
-    def scan(self) -> list[str]:
+    def _tear_down(self) -> None:
+        """Drop the previous round of devices, then the browser behind them.
+
+        The order is the whole point. Every Chromecast object keeps the
+        browser's zeroconf instance and its socket thread reaches for it
+        whenever it reconnects - and stop_discovery() CLOSES that instance,
+        even one it did not create. Stopping the browser while the devices
+        were still alive therefore blew up inside pychromecast's own thread:
+
+            AssertionError: Zeroconf instance loop must be running,
+                            was it already stopped?
+
+        Devices first, browser second, and nothing is left holding a closed
+        zeroconf.
+        """
+        for cc in self.devices:
+            try:
+                cc.disconnect(timeout=2)
+            except Exception:
+                pass
+        self.devices = []
+        self.active = None
         if self._browser is not None:
             try:
                 self._browser.stop_discovery()
             except Exception:
                 pass
             self._browser = None
-        devices, browser = _pc().get_chromecasts(timeout=6)
-        self._browser = browser
-        self.devices = devices
-        return sorted(cc.name for cc in devices)
+
+    def scan(self) -> list[str]:
+        with self._lock:
+            was_active = getattr(self.active, "name", None)
+            self._tear_down()
+            devices, browser = _pc().get_chromecasts(timeout=6)
+            self._browser = browser
+            self.devices = devices
+            # A running cast survives all this: the receiver plays the stream
+            # by itself, so dropping the sender socket does not stop the TV.
+            # Re-point 'active' at the freshly discovered object with the same
+            # name, or the stop button would have nothing left to talk to.
+            if was_active:
+                self.active = next(
+                    (c for c in devices if c.name == was_active), None)
+            return sorted(cc.name for cc in devices)
+
+    def _device(self, name: str):
+        return next((c for c in self.devices if c.name == name), None)
 
     def cast(self, device_name: str, url: str, title: str) -> str:
-        cc = next((c for c in self.devices if c.name == device_name), None)
-        if cc is None:
-            raise RuntimeError(f"device '{device_name}' not found - rescan")
+        with self._lock:
+            cc = self._device(device_name)
+            if cc is None:
+                # The dialog offers the devices you cast to last time before
+                # discovery has finished, so the first press can name a device
+                # this run has not met yet - and casting then always took two
+                # presses, the first one only to be told to rescan. Discover
+                # now instead. The lock means a press during the opening scan
+                # simply waits for it rather than starting a second one.
+                log.info("cast: %s not discovered yet - scanning first",
+                         device_name)
+                self.scan()
+                cc = self._device(device_name)
+            if cc is None:
+                raise RuntimeError(f"device '{device_name}' not found - rescan")
         cc.wait(timeout=10)
         mc = cc.media_controller
         original = url
@@ -140,53 +224,41 @@ class ChromecastManager:
         # Matroska: a .ts or .mkv URL can never produce a picture, whatever we
         # label it.
         log.info("cast -> %s: %s (%s)", device_name, url, ctype)
+        # Attach the watcher BEFORE handing over the stream, so the receiver's
+        # first verdict is caught too. It replaces the old six-second polling
+        # loop, which reported the same states while holding the cast up - and
+        # then went quiet exactly when a long-running cast starts to matter.
+        self._watch(cc, mc, device_name)
         mc.play_media(url, ctype, title=title or "dopeIPTV")
         mc.block_until_active(timeout=10)
-        # Sample the receiver for a few seconds, not once. Right after the
-        # session goes active it is always IDLE with no reason - it has not
-        # fetched the manifest yet - so a single read says nothing. The verdict
-        # arrives a second or two later: BUFFERING/PLAYING means it took the
-        # stream, IDLE with reason ERROR means it fetched and refused, and IDLE
-        # with no reason throughout means it never got anything back at all
-        # (unreachable host, blocked name).
-        try:
-            seen = ""
-            for _ in range(12):
-                time.sleep(0.5)
-                st = getattr(mc.status, "player_state", "?")
-                why = getattr(mc.status, "idle_reason", None)
-                cur = f"{st}/{why}"
-                if cur != seen:
-                    seen = cur
-                    log.info("cast receiver state: %s (idle reason: %s)",
-                             st, why)
-                if st in ("PLAYING", "BUFFERING") or why:
-                    break
-        except Exception as e:
-            log.debug("cast status poll failed: %s", e)
         self.active = cc
         return device_name
 
+    @staticmethod
+    def _watch(cc, mc, device_name: str) -> None:
+        if getattr(cc, "_dope_watch", None) is not None:
+            return
+        watch = _CastWatch(device_name)
+        try:
+            mc.register_status_listener(watch)
+            cc.socket_client.register_connection_listener(watch)
+            cc._dope_watch = watch
+        except Exception as e:
+            log.debug("cast: could not attach the watcher (%s)", e)
+
     def stop(self) -> None:
-        if self.active:
-            try:
-                self.active.media_controller.stop()
-            except Exception:
-                pass
-            self.active = None
+        with self._lock:
+            if self.active:
+                try:
+                    self.active.media_controller.stop()
+                except Exception:
+                    pass
+                self.active = None
 
     def shutdown(self) -> None:
         self.stop()
-        if self._browser is not None:
-            try:
-                self._browser.stop_discovery()
-            except Exception:
-                pass
-        for cc in self.devices:
-            try:
-                cc.disconnect(timeout=2)
-            except Exception:
-                pass
+        with self._lock:
+            self._tear_down()  # devices before browser - see _tear_down
 
 
 class CastDialog(QDialog):
@@ -289,16 +361,29 @@ class CastDialog(QDialog):
         if callable(stop):
             stop()
 
+        # The cast strip in the detail pane is the only thing that says a cast
+        # is running once this dialog is closed - local playback has stopped,
+        # so the player pane is just black.
         def done(n):
             self._set_status(tr("cast_casting_to", name=n))
+            self._banner(n, self.stream_title)
+
+        def failed(msg):
+            self._set_status(tr("cast_failed", msg=msg))
+            self._banner(None, "")
 
         run_async(self.window.pool,
                   lambda: self.window.cast.cast(name, self.url,
                                                  self.stream_title),
-                  done,
-                  lambda msg: self._set_status(tr("cast_failed", msg=msg)))
+                  done, failed)
+
+    def _banner(self, device: str | None, title: str) -> None:
+        show = getattr(self.window, "show_cast_strip", None)
+        if callable(show):
+            show(device, title)
 
     def _stop(self) -> None:
+        self._banner(None, "")
         run_async(self.window.pool, self.window.cast.stop,
                   lambda _: self._set_status(tr("cast_stopped")),
                   lambda msg: self._set_status(tr("cast_stop_failed", msg=msg)))

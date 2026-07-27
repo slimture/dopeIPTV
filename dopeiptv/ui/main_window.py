@@ -247,6 +247,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._pending_jump_cat = None
         self._stream_retries = 0
         self._last_stream_error_ts = 0.0
+        self._cast_device: str | None = None   # device a cast is running on
         self._popout_win = None
         self._popout_placeholder = None
         self._popout_mirror = None   # macOS mirror surface (see mw_popout)
@@ -938,6 +939,37 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._reopen_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._reopen_btn.clicked.connect(lambda: self._set_focus_mode(False))
         self._reopen_btn.hide()
+
+        # Casting takes the stream to the TV and stops local playback, which
+        # leaves the player pane black with nothing anywhere saying why. This
+        # strip sits directly above the video for as long as a cast runs: what
+        # is playing, which device it went to, and a way to end it.
+        self.cast_bar = QWidget(objectName="CastBar")
+        self.cast_bar.setStyleSheet(
+            f"QWidget#CastBar {{ background:{P['sel']}; border-radius:10px; }}")
+        _cast_row = QHBoxLayout(self.cast_bar)
+        _cast_row.setContentsMargins(12, 8, 8, 8)
+        _cast_row.setSpacing(10)
+        _cast_col = QVBoxLayout()
+        _cast_col.setSpacing(1)
+        self.cast_bar_lbl = QLabel("")
+        self.cast_bar_lbl.setWordWrap(True)
+        self.cast_bar_lbl.setStyleSheet(
+            f"color:{P['accent']}; font-size:12px; font-weight:700;")
+        _cast_col.addWidget(self.cast_bar_lbl)
+        self.cast_bar_title = QLabel("")
+        self.cast_bar_title.setWordWrap(True)
+        self.cast_bar_title.setStyleSheet(
+            f"color:{P['muted3']}; font-size:11px;")
+        _cast_col.addWidget(self.cast_bar_title)
+        _cast_row.addLayout(_cast_col, 1)
+        self.cast_bar_stop = QPushButton(tr("cast_stop"))
+        self.cast_bar_stop.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.cast_bar_stop.clicked.connect(
+            lambda: self._end_cast("stopped from the cast strip"))
+        _cast_row.addWidget(self.cast_bar_stop)
+        self.cast_bar.hide()
+        dl.addWidget(self.cast_bar)
 
         self.player: EmbeddedPlayer | None = None
         if embedded_playback_supported():
@@ -3167,13 +3199,41 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         and on a tight limit the new stream is simply refused, which looks
         like the app failing to play anything after a cast.
 
-        Stopping talks to the receiver over the network, so it runs off the
-        UI thread: playback must never wait for a TV to answer.
+        """
+        self._end_cast("local playback took over")
+
+    def show_cast_strip(self, device: str | None, title: str = "") -> None:
+        """Show - or take down - the "Casting to X" strip above the player.
+
+        Casting stops local playback (the receiver pulls the stream itself),
+        so the player pane goes black and without this nothing anywhere says
+        that anything is happening at all. The cast dialog calls it when a
+        cast starts, fails or is stopped.
+        """
+        self._cast_device = device
+        bar = getattr(self, "cast_bar", None)
+        if bar is None:
+            return
+        if not device:
+            bar.hide()
+            return
+        self.cast_bar_lbl.setText(tr("cast_casting_to", name=device))
+        self.cast_bar_title.setText(title or "")
+        self.cast_bar_title.setVisible(bool(title))
+        bar.show()
+
+    def _end_cast(self, why: str) -> None:
+        """Stop a running cast and take the strip down.
+
+        Stopping talks to the receiver over the network, so it runs off the UI
+        thread: nothing here - least of all starting playback - may wait for a
+        TV to answer.
         """
         cc = getattr(self, "cast", None)
+        self.show_cast_strip(None)
         if cc is None or getattr(cc, "active", None) is None:
             return
-        log.info("cast: stopping - local playback took over")
+        log.info("cast: stopping - %s", why)
         threading.Thread(target=cc.stop, daemon=True).start()
 
     def stop_local_playback_for_cast(self) -> None:
