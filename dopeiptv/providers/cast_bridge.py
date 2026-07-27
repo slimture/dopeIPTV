@@ -220,10 +220,14 @@ class CastBridge:
         with self._lock:
             if proc in self._procs:
                 self._procs.remove(proc)
-        for step in (proc.terminate, proc.kill):
+        # Short waits on purpose: this runs on the way out of the app, where
+        # every second spent here is a second the whole shutdown does not
+        # have. ffmpeg has nothing to flush - it writes to a pipe nobody is
+        # reading any more.
+        for step, grace in ((proc.terminate, 1.0), (proc.kill, 0.5)):
             try:
                 step()
-                proc.wait(timeout=3)
+                proc.wait(timeout=grace)
                 return
             except Exception:
                 continue

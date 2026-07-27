@@ -512,10 +512,13 @@ class ChromecastManager:
             log.debug("cast: could not attach the watcher (%s)", e)
 
     def stop(self) -> None:
-        # The bridge feeds the receiver, so it goes down with the cast -
-        # otherwise ffmpeg keeps reading the channel and holds a provider
-        # connection for a stream nobody is watching.
-        self.bridge.stop()
+        # Tell the TV first, tear our own machinery down afterwards.
+        #
+        # On app close this runs in a daemon thread racing os._exit, with
+        # about a second and a half before the process is gone. Stopping the
+        # bridge first spent that budget waiting on ffmpeg and on the HTTP
+        # server - so the STOP never reached the receiver and the cast simply
+        # carried on after the app had quit.
         with self._lock:
             if self.active:
                 try:
@@ -523,6 +526,10 @@ class ChromecastManager:
                 except Exception:
                     pass
                 self.active = None
+        # The bridge goes down with the cast either way - otherwise ffmpeg
+        # keeps reading the channel and holds a provider connection for a
+        # stream nobody is watching.
+        self.bridge.stop()
 
     def shutdown(self) -> None:
         self.stop()

@@ -440,6 +440,23 @@ def test_a_stream_the_receiver_cannot_play_says_so(monkeypatch):
         m.cast("Alva TV", "http://x/y.ts", "SVT1")
 
 
+def test_the_tv_is_told_to_stop_before_anything_else(monkeypatch):
+    """On app close this runs in a daemon thread racing os._exit, with about
+    a second and a half before the process is gone. Tearing the bridge down
+    first spent that budget waiting on ffmpeg and the HTTP server, and the
+    STOP never reached the receiver - the cast carried on after the app had
+    quit."""
+    order: list[str] = []
+    m = _manager(monkeypatch)
+    m.scan()
+    dev = m.devices[0]
+    dev.media_controller.stop = lambda: order.append("tv")
+    m.bridge.stop = lambda: order.append("bridge")
+    m.active = dev
+    m.stop()
+    assert order == ["tv", "bridge"], order
+
+
 def test_a_rescan_drops_the_devices_before_the_browser(monkeypatch):
     """Every device holds the browser's zeroconf instance and its socket
     thread reaches for it on reconnect - and stop_discovery() closes that
