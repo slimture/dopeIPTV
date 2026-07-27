@@ -3158,6 +3158,24 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         CastDialog(self, url, title).exec()
 
+    def _stop_cast_for_local_playback(self) -> None:
+        """End a running cast when something starts playing in the app.
+
+        Casting is a handover: the stream goes to the TV and local playback
+        stops. Starting a video here is the same handover in reverse, so the
+        cast has to end - otherwise the account holds two connections at once
+        and on a tight limit the new stream is simply refused, which looks
+        like the app failing to play anything after a cast.
+
+        Stopping talks to the receiver over the network, so it runs off the
+        UI thread: playback must never wait for a TV to answer.
+        """
+        cc = getattr(self, "cast", None)
+        if cc is None or getattr(cc, "active", None) is None:
+            return
+        log.info("cast: stopping - local playback took over")
+        threading.Thread(target=cc.stop, daemon=True).start()
+
     def stop_local_playback_for_cast(self) -> None:
         """Free the local stream when a cast starts. The Chromecast pulls the
         URL itself (one connection from the device), so on a single-connection
@@ -3227,6 +3245,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # same side effects itself: the multiview-conflict question (close it
         # and free its connections, or keep both) and the History entry -
         # with autoplay-preview on, this IS how channels get played.
+        self._stop_cast_for_local_playback()
         self._maybe_close_multiview_for_playback()
         if kind != "history":
             self.history.add(
@@ -3625,6 +3644,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # its streams run would be refused on a tight connection limit. Offer
         # (once per multiview window) to close it; keeping both is fine on
         # accounts with spare connections.
+        self._stop_cast_for_local_playback()
         self._maybe_close_multiview_for_playback()
         # Whether this is a catch-up/archive segment. Set here (not by callers)
         # so any normal play - including a live channel opened via play_item /
