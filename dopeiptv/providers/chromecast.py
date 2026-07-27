@@ -404,13 +404,15 @@ class ChromecastManager:
         # costs nothing. Reading the transport stream is the fallback for when
         # the channel is not playing locally.
         codecs = codecs or [c.lower() for c in _probe_codecs(resolved)]
-        if not codecs:
-            raise RuntimeError("the Chromecast refused this stream")
-        log.info("cast: the stream contains %s", ", ".join(codecs))
-        if not [c for c in codecs if c not in _CAST_CODECS]:
-            raise RuntimeError("the Chromecast refused this stream")
+        log.info("cast: the stream contains %s",
+                 ", ".join(codecs) if codecs else "something we could not "
+                 "identify - converting it anyway")
 
-        # Third attempt: give the receiver something it CAN decode.
+        # Third attempt: give the receiver something it CAN decode. This does
+        # not wait to be told what the problem is. Knowing the codecs only
+        # decides whether the video can be copied through; not knowing them is
+        # no reason to stop, because by here the device has refused the stream
+        # twice and converting is the only thing left to try.
         if self._bridge_cast(mc, device_name, url, codecs, title):
             return device_name
         raise RuntimeError(self._no_decoder(codecs))
@@ -418,6 +420,9 @@ class ChromecastManager:
     @staticmethod
     def _no_decoder(codecs: list[str]) -> str:
         bad = " + ".join(c for c in codecs if c not in _CAST_CODECS)
+        if not bad:
+            return ("the Chromecast refused this stream, and converting it "
+                    "here did not help either")
         return f"this channel is {bad}, and converting it here did not help"
 
     def _bridge_cast(self, mc, device_name: str, url: str,
@@ -438,10 +443,11 @@ class ChromecastManager:
         self._refused.setdefault(device_name, set()).update(bad)
         if not CastBridge.available():
             raise RuntimeError(
-                f"this channel is {' + '.join(bad)}, which this Chromecast "
-                f"has no decoder for - install ffmpeg to convert it here")
+                f"this Chromecast has no decoder for this channel "
+                f"({' + '.join(bad) or 'unknown codecs'}) - install ffmpeg "
+                f"to convert it here")
         log.info("cast: %s cannot decode %s - converting it here",
-                 device_name, " + ".join(bad))
+                 device_name, " + ".join(bad) or "this stream")
         bridged = self.bridge.start(url, codecs)
         if self._play_and_verify(mc, bridged, "video/mp4", title) is not False:
             return True

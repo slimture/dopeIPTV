@@ -186,13 +186,29 @@ class CastBridge:
         log.info("cast bridge: starting ffmpeg")
         try:
             proc = subprocess.Popen(
-                args, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except Exception as e:
             log.info("cast bridge: could not start ffmpeg (%s)", e)
             return None
+        # ffmpeg says why it failed on stderr and nowhere else. Throwing that
+        # away would leave exactly the kind of silent failure this whole
+        # feature exists to end, so it goes into the log (loglevel is 'error',
+        # so a working stream says nothing at all).
+        threading.Thread(target=self._drain_errors, args=(proc,),
+                         daemon=True).start()
         with self._lock:
             self._procs.append(proc)
         return proc
+
+    @staticmethod
+    def _drain_errors(proc: subprocess.Popen) -> None:
+        try:
+            for raw in iter(proc.stderr.readline, b""):
+                line = raw.decode("utf-8", "replace").strip()
+                if line:
+                    log.info("cast bridge: ffmpeg: %s", line)
+        except Exception:
+            pass
 
     def kill(self, proc: subprocess.Popen) -> None:
         with self._lock:

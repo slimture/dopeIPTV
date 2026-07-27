@@ -290,13 +290,15 @@ def test_a_refused_address_falls_back_to_the_panel_url(monkeypatch):
                         lambda u: ("http://cdn/live/play/token/9851",
                                    "application/x-mpegURL"))
     monkeypatch.setattr(cm, "_probe_codecs", lambda u: [])
+    monkeypatch.setattr(cm.CastBridge, "available", staticmethod(lambda: True))
+    monkeypatch.setattr(m.bridge, "start", lambda *a, **k: "http://me/s.mp4")
     m.scan()
     m.devices[0].refuse()
-    with pytest.raises(RuntimeError, match="refused"):
+    with pytest.raises(RuntimeError):
         m.cast("Alva TV", "http://panel/live/u/pw/9851.m3u8", "SVT1")
     tried = [u for u, _c in m.devices[0].plays]
-    assert tried == ["http://cdn/live/play/token/9851",
-                     "http://panel/live/u/pw/9851.m3u8"], tried
+    assert tried[:2] == ["http://cdn/live/play/token/9851",
+                         "http://panel/live/u/pw/9851.m3u8"], tried
 
 
 def test_silence_is_not_treated_as_a_refusal(monkeypatch):
@@ -378,6 +380,27 @@ def test_a_device_that_refused_once_goes_straight_to_the_converter(
     with pytest.raises(RuntimeError):
         m.cast("Alva TV", "http://panel/y.m3u8", "SVT1", ["h264", "eac3"])
     assert [u for u, _c in dev.plays] == ["http://me/s.mp4"], dev.plays
+
+
+def test_an_unidentified_stream_is_converted_anyway(monkeypatch):
+    """Knowing the codecs only decides whether the video can be copied
+    through. Not knowing them is no reason to give up: by then the device has
+    refused the stream twice and converting is the only thing left."""
+    from dopeiptv.providers import chromecast as cm
+    started = []
+    m = _manager(monkeypatch)
+    monkeypatch.setattr(cm, "_resolve_redirects",
+                        lambda u: ("http://cdn/x", "application/x-mpegURL"))
+    monkeypatch.setattr(cm, "_probe_codecs", lambda u: [])
+    monkeypatch.setattr(cm.CastBridge, "available", staticmethod(lambda: True))
+    monkeypatch.setattr(m.bridge, "start",
+                        lambda *a, **k: started.append(a) or "http://me/s.mp4")
+    m.scan()
+    m.devices[0].refuse()
+    with pytest.raises(RuntimeError, match="refused this stream"):
+        m.cast("Alva TV", "http://panel/y.m3u8", "SVT1")
+    assert started, "the converter must run even with no codec information"
+    assert [u for u, _c in m.devices[0].plays][-1] == "http://me/s.mp4"
 
 
 def test_a_channel_the_receiver_cannot_decode_is_named(monkeypatch):
