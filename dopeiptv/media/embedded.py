@@ -1916,11 +1916,17 @@ class EmbeddedPlayer(QWidget):
         and the docked video (still rendering, behind a placeholder) keeps
         driving mpv's frame timing. Returns the mirror widget for the caller to
         place in the window."""
-        if sys.platform.startswith("linux"):
-            # DEFAULT Linux path: raster mirror (see _RasterMirror). Every GL
-            # presentation route in a second window shows black on modern
-            # Qt/Mesa (X11 and Wayland alike), so all GL stays in the docked
-            # widget's proven context and the pop-out gets plain images.
+        if sys.platform.startswith("linux") or sys.platform == "win32":
+            # DEFAULT Linux and Windows path: raster mirror (see
+            # _RasterMirror). Every GL presentation route in a second window
+            # shows black on modern Qt/Mesa (X11 and Wayland alike), so all GL
+            # stays in the docked widget's proven context and the pop-out gets
+            # plain images.
+            #
+            # Windows joined this path after the GL mirror there rendered the
+            # picture upside down and then black - the same symptoms Linux had,
+            # and the same cause: a second top-level window's GL surface. macOS
+            # keeps the GL mirror, which is proven there.
             # Pacing: a PRECISE 60 Hz poll whose tick renders ONLY when mpv
             # reports a new frame pending - so readbacks run at the stream's
             # real fps with <=16 ms cadence error. (A 30 fps coarse poll beat
