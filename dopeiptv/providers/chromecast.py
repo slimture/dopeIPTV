@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 
 from PyQt6.QtWidgets import (
     QDialog, QHBoxLayout, QLabel, QListWidget, QPushButton, QVBoxLayout,
@@ -85,12 +87,28 @@ class ChromecastManager:
         log.info("cast -> %s: %s (%s)", device_name, url, ctype)
         mc.play_media(url, ctype, title=title or "dopeIPTV")
         mc.block_until_active(timeout=10)
+        # Sample the receiver for a few seconds, not once. Right after the
+        # session goes active it is always IDLE with no reason - it has not
+        # fetched the manifest yet - so a single read says nothing. The verdict
+        # arrives a second or two later: BUFFERING/PLAYING means it took the
+        # stream, IDLE with reason ERROR means it fetched and refused, and IDLE
+        # with no reason throughout means it never got anything back at all
+        # (unreachable host, blocked name).
         try:
-            log.info("cast receiver state: %s (idle reason: %s)",
-                     getattr(mc.status, "player_state", "?"),
-                     getattr(mc.status, "idle_reason", None))
-        except Exception:
-            pass
+            seen = ""
+            for _ in range(12):
+                time.sleep(0.5)
+                st = getattr(mc.status, "player_state", "?")
+                why = getattr(mc.status, "idle_reason", None)
+                cur = f"{st}/{why}"
+                if cur != seen:
+                    seen = cur
+                    log.info("cast receiver state: %s (idle reason: %s)",
+                             st, why)
+                if st in ("PLAYING", "BUFFERING") or why:
+                    break
+        except Exception as e:
+            log.debug("cast status poll failed: %s", e)
         self.active = cc
         return device_name
 
