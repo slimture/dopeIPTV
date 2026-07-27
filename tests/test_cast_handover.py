@@ -402,6 +402,19 @@ def test_an_unidentified_stream_is_converted_anyway(monkeypatch):
     assert started, "the converter must run even with no codec information"
     assert [u for u, _c in m.devices[0].plays][-1] == "http://me/s.mp4"
 
+    # ...and the channel is remembered, so the next cast of it does not spend
+    # twenty seconds being refused all over again. Remembered per channel,
+    # never per device: everything else this device plays natively still does.
+    m.devices[0].plays.clear()
+    with pytest.raises(RuntimeError):
+        m.cast("Alva TV", "http://panel/y.m3u8", "SVT1")
+    assert [u for u, _c in m.devices[0].plays] == ["http://me/s.mp4"]
+    m.devices[0].plays.clear()
+    with pytest.raises(RuntimeError):
+        m.cast("Alva TV", "http://panel/other.m3u8", "Another channel")
+    assert [u for u, _c in m.devices[0].plays][0] == "http://cdn/x", (
+        "a different channel must still be tried natively first")
+
 
 def test_a_channel_the_receiver_cannot_decode_is_named(monkeypatch):
     from dopeiptv.providers import chromecast as cm

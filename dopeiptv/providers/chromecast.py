@@ -218,7 +218,9 @@ def _probe_codecs(url: str) -> list[str]:
             r.close()
         return _ts_codecs(head)
     except Exception as e:
-        log.debug("cast: codec probe failed (%s)", e)
+        # Info, not debug: this is the step that decides whether the video can
+        # be copied through, and its failure has to be visible.
+        log.info("cast: could not read the stream's codecs (%s)", e)
         return []
 
 
@@ -267,6 +269,10 @@ class ChromecastManager:
         # reaches the converter at all. Deliberately per session - a new
         # device, or new firmware, gets to answer for itself again.
         self._refused: dict[str, set[str]] = {}
+        # And the same thing for a channel whose codecs we never identified:
+        # remembered per channel, never per device, so a device that plays
+        # most channels natively goes on doing exactly that.
+        self._needs_bridge: set[tuple[str, str]] = set()
         # Discovery runs in the worker pool and so can a cast - and a cast may
         # have to discover first (see cast()). Two of those at once would tear
         # down each other's devices mid-flight.
@@ -354,7 +360,8 @@ class ChromecastManager:
         # the twenty seconds of refusals are pure waiting.
         codecs = [c.lower() for c in (known_codecs or [])]
         seen_bad = self._refused.get(device_name, set())
-        if codecs and seen_bad.intersection(codecs):
+        if ((codecs and seen_bad.intersection(codecs))
+                or (device_name, url) in self._needs_bridge):
             if self._bridge_cast(mc, device_name, url, codecs, title):
                 return device_name
             raise RuntimeError(self._no_decoder(codecs))
@@ -441,6 +448,7 @@ class ChromecastManager:
         """
         bad = [c for c in codecs if c not in _CAST_CODECS]
         self._refused.setdefault(device_name, set()).update(bad)
+        self._needs_bridge.add((device_name, url))
         if not CastBridge.available():
             raise RuntimeError(
                 f"this Chromecast has no decoder for this channel "

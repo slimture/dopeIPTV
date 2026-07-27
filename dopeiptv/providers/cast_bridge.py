@@ -74,6 +74,12 @@ def ffmpeg_args(exe: str, source: str, copy_video: bool) -> list[str]:
     return [
         exe, "-hide_banner", "-loglevel", "error",
         "-user_agent", _UA,
+        # Live HTTP from an IPTV panel drops connections between segments as a
+        # matter of course ("Error reading HTTP response: End of file"). Left
+        # alone ffmpeg eventually gives up on one of them and the cast dies
+        # mid-programme; these let it pick the stream back up instead.
+        "-reconnect", "1", "-reconnect_streamed", "1",
+        "-reconnect_on_network_error", "1", "-reconnect_delay_max", "5",
         "-fflags", "+genpts", "-i", source,
         "-map", "0:v:0", "-map", "0:a:0",
         "-c:v", "copy" if copy_video else "libx264",
