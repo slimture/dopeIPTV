@@ -218,11 +218,15 @@ def test_popout_window_paths():
 _WIN32_CHILD = r"""
 import os, sys
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-sys.platform = "win32"          # decided before the mixin reads it
 from PyQt6.QtCore import QSettings
 from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
 from dopeiptv.media.embedded import EmbeddedPlayer
 from dopeiptv.ui.mw_popout import _PopoutMixin, _use_mirror_popout
+
+# Fake the platform only AFTER every import. Setting it first makes the
+# stdlib take its Windows branches on a Linux host - shutil reaches for
+# _winapi and the whole child dies before reaching the assertions.
+sys.platform = "win32"
 
 app = QApplication.instance() or QApplication([])
 assert _use_mirror_popout() is False, "win32 must take the reparent path"
