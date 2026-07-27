@@ -4100,6 +4100,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         log.info("live reconnect (%s) try %s/%s", reason, self._stream_retries,
                  self.MAX_STREAM_RETRIES)
         self.player.current_url = None
+        # Clearing current_url above is what tells the rest of the app "nothing
+        # is playing" - but it also removes the guard that stops the failure
+        # diagnosis from firing, so the drop we are already handling raced in
+        # and set _diag_shown. _retry_last_stream then bailed out on that flag
+        # and did nothing at all: the log said "live reconnect try 1/2" and the
+        # channel stayed dead, while clicking it by hand started it instantly
+        # (a manual play resets the flag). This IS a fresh attempt, so reset it
+        # here; the retry budget above is what stops a dead channel looping.
+        self._diag_shown = False
         self._set_status(tr("status_reconnecting"), emphasis=True)
         QTimer.singleShot(300, self._retry_last_stream)
 
@@ -4195,9 +4204,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # The early definitive probe already gave up on this stream (e.g. an
         # upcoming event) - don't replay it just to fail again.
         if getattr(self, "_diag_shown", False):
+            log.info("retry skipped: a failure diagnosis was already shown")
             return
         lp = getattr(self, "_last_playback", None)
         if not lp or lp.get("kind") != "live":
+            log.info("retry skipped: last playback is %r, not live",
+                     (lp or {}).get("kind"))
             return
         # A catch-up/archive segment must be replayed by its own archive URL.
         # Re-deriving a live URL (below) would silently yank the user to the

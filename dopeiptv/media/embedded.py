@@ -623,15 +623,32 @@ class _MpvGLWidget(QOpenGLWidget):
                 # all three because the first read raised). err:<Type> in
                 # the log distinguishes "unsupported" from a None value.
                 try:
-                    v = getattr(self.mpv, name)
+                    # Attribute access covers the properties python-mpv knows;
+                    # _get_property reaches the rest by their real mpv name
+                    # (video-pts is one of those - it read as
+                    # err:AttributeError, blanking the single most useful
+                    # number in this line).
+                    try:
+                        v = getattr(self.mpv, name)
+                    except AttributeError:
+                        v = self.mpv._get_property(name.replace("_", "-"))
                     return "none" if v is None else v
                 except Exception as e:
                     return f"err:{type(e).__name__}"
-            log.debug("VID paint alive #%d state=%s fbo=%s video-pts=%s "
-                      "drops=%s hwdec=%s",
-                      self._paint_n, getattr(self, "_paint_state", "?"),
+            # Paints per second matters as much as the count: a background
+            # window that macOS has throttled still paints, just far slower,
+            # and that is what separates "the OS is starving us" from "the
+            # provider dropped the stream".
+            now = time.monotonic()
+            since = now - getattr(self, "_paint_hb_at", now)
+            self._paint_hb_at = now
+            log.debug("VID paint alive #%d %.1f/s state=%s fbo=%s "
+                      "video-pts=%s drops=%s cache=%s hwdec=%s",
+                      self._paint_n, (300 / since if since > 0 else 0.0),
+                      getattr(self, "_paint_state", "?"),
                       self.defaultFramebufferObject(), _prop("video_pts"),
-                      _prop("frame_drop_count"), _prop("hwdec_current"))
+                      _prop("frame_drop_count"),
+                      _prop("demuxer_cache_time"), _prop("hwdec_current"))
         # Blank branch first so a repaint that arrives mid-stop (when mpv has
         # already been told to stop but our _ctx is still around) doesn't try
         # to render an mpv frame with a half-torn-down context - which
