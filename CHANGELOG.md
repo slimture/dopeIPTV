@@ -5,6 +5,34 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
+## [1.2.4]
+
+Live streams stay up again - 1.2.2 broke them, and this reverts the cause.
+
+### Fixed
+
+- **Live streams dropped within seconds, repeatedly.** 1.2.2 began pushing the
+  network-buffer setting (cache-secs, and a demuxer byte budget scaled from it)
+  onto the stream already playing, so a changed setting applied immediately.
+  It was reasoned to be safe - "a readahead target, no decoder reinit" - and it
+  was not: cache-secs is a floor rather than a ceiling, nothing bounded the
+  readahead, and reworking the demuxer's budget mid-stream is not free. The
+  buffer is applied once per stream in play() again, as it was before 1.2.2; a
+  change in Settings takes effect on the next stream. Playback stability
+  outranks the convenience of a live-applied setting.
+- **Auto-reconnect did nothing.** Recovering a dropped live stream clears the
+  player's current URL to mark "nothing is playing" - which is also the guard
+  that suppresses the failure diagnosis, so the drop being handled raced in and
+  set the "already diagnosed" flag. The retry 300 ms later took its early exit
+  and returned silently: the log read "live reconnect (eof) try 1/2" and the
+  channel stayed dead, while playing it by hand worked instantly. The flag is
+  reset when a reconnect is scheduled, and both silent exits now log why.
+
+### Internal
+
+- The paint heartbeat reports paints per second and the demuxer cache time -
+  the two numbers that identified both faults above.
+
 ## [1.2.3]
 
 Resizable video windows, sections that remember where you were, and a cast
