@@ -21,7 +21,7 @@ import threading
 import pytest
 
 _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
-            "_local_codecs")
+            "_local_codecs", "_toggle_cast_pause", "_cast_from_archive")
 
 
 def _window():
@@ -72,6 +72,7 @@ class _Lbl:
 def _with_strip():
     w = _window()
     w.cast_bar, w.cast_bar_lbl, w.cast_bar_title = _Bar(), _Lbl(), _Lbl()
+    w.cast_bar_pause = _Lbl()
     return w
 
 
@@ -145,6 +146,68 @@ def test_the_codecs_of_what_is_playing_are_written_down(monkeypatch):
 
 def test_no_player_no_codec_line():
     _window()._local_codecs()
+
+
+def test_pausing_a_film_is_the_receiver_s_own_pause():
+    w = _with_strip()
+    w.cast = _Cast(active=True)
+    w.cast.paused = threading.Event()
+    w.cast.pause = w.cast.paused.set
+    w.cast.resume = lambda: w.cast.paused.clear()
+    w._cast_ctx = {"archive": False}
+    w._cast_paused_at = None
+    w._toggle_cast_pause()
+    assert w.cast.paused.wait(5)
+    assert w.cast_bar_pause.text == "▶"
+    w._toggle_cast_pause()
+    assert w.cast_bar_pause.text == "⏸"
+
+
+def test_pausing_live_television_comes_back_from_the_archive():
+    """A receiver cannot pause a live stream - there is nothing buffered ahead
+    to come back to. The provider's archive answers instead: the moment you
+    pressed pause is remembered and play casts the channel again from there,
+    which is what a pause on live television has to mean."""
+    from datetime import datetime, timedelta
+    w = _with_strip()
+    w.cast = _Cast(active=True)
+    w.cast.pause = lambda: None
+    resumed = {}
+    w._cast_from_archive = lambda at: resumed.setdefault("at", at)
+    w._cast_ctx = {"archive": True, "sid": 9851, "title": "SVT1"}
+    w._cast_paused_at = None
+    w._toggle_cast_pause()
+    paused_at = w._cast_paused_at
+    assert paused_at is not None
+    w._cast_paused_at = paused_at - timedelta(minutes=3)
+    w._toggle_cast_pause()
+    assert resumed["at"] <= datetime.now()
+    assert w._cast_paused_at is None
+
+
+def test_the_archive_url_starts_where_you_paused(monkeypatch):
+    from datetime import datetime, timedelta
+    asked = {}
+
+    class Client:
+        def timeshift_url(self, sid, start, minutes):
+            asked.update(sid=sid, start=start, minutes=minutes)
+            return "http://p/timeshift/9851"
+
+    w = _with_strip()
+    w.client = Client()
+    w.pool = None
+    w._cast_device = "Alva TV"
+    w._cast_ctx = {"archive": True, "sid": 9851, "title": "SVT1"}
+    sent = {}
+    import dopeiptv.ui.main_window as mwmod
+    monkeypatch.setattr(mwmod, "run_async",
+                        lambda pool, work, ok, err: sent.update(work=work))
+    at = datetime.now() - timedelta(minutes=5)
+    w._cast_from_archive(at)
+    assert asked["sid"] == 9851 and asked["start"] == at
+    assert asked["minutes"] > 240, asked          # room to keep watching
+    assert sent, "the archive URL is cast"
 
 
 # ── the manager itself, with a stand-in for pychromecast ──────────────────

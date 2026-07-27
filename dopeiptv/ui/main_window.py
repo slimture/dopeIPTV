@@ -8,6 +8,7 @@ import os
 import sys
 import threading
 import time
+from datetime import datetime
 
 from PyQt6.QtCore import (
     QEvent, QPoint, QPointF, QSettings, QSize, Qt, QThreadPool,
@@ -248,6 +249,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._stream_retries = 0
         self._last_stream_error_ts = 0.0
         self._cast_device: str | None = None   # device a cast is running on
+        self._cast_paused_at = None            # when a live cast was paused
+        self._cast_ctx: dict = {}              # what is being cast
         self._popout_win = None
         self._popout_placeholder = None
         self._popout_mirror = None   # macOS mirror surface (see mw_popout)
@@ -963,6 +966,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             f"color:{P['muted3']}; font-size:11px;")
         _cast_col.addWidget(self.cast_bar_title)
         _cast_row.addLayout(_cast_col, 1)
+        self.cast_bar_pause = QPushButton("⏸")
+        self.cast_bar_pause.setToolTip(tr("tooltip_pause_resume"))
+        self.cast_bar_pause.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.cast_bar_pause.setFixedWidth(40)
+        self.cast_bar_pause.clicked.connect(self._toggle_cast_pause)
+        _cast_row.addWidget(self.cast_bar_pause)
         self.cast_bar_stop = QPushButton(tr("cast_stop"))
         self.cast_bar_stop.setCursor(Qt.CursorShape.PointingHandCursor)
         self.cast_bar_stop.clicked.connect(
@@ -3196,6 +3205,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             url = self.client.live_url(it["stream_id"], "m3u8")
         if not url:
             return
+        # Remember what is being cast, not just where to. Pausing a live
+        # channel is answered from the provider's archive, and that needs the
+        # channel's own id long after this dialog is gone.
+        self._cast_ctx = {
+            "sid": it.get("stream_id") if live else None,
+            "archive": bool(live and it.get("stream_id") is not None
+                            and it.get("tv_archive")),
+            "title": title,
+        }
         CastDialog(self, url, title, self._local_codecs(),
                    self._local_audio_index()).exec()
 
@@ -3268,9 +3286,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         cast starts, fails or is stopped.
         """
         self._cast_device = device
+        # A fresh cast is playing, whatever the last one was doing.
+        self._cast_paused_at = None
         bar = getattr(self, "cast_bar", None)
         if bar is None:
             return
+        self.cast_bar_pause.setText("⏸")
         if not device:
             bar.hide()
             return
@@ -3278,6 +3299,49 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cast_bar_title.setText(title or "")
         self.cast_bar_title.setVisible(bool(title))
         bar.show()
+
+    def _toggle_cast_pause(self) -> None:
+        """Pause and resume what is playing on the TV.
+
+        For a film the receiver does it itself. For a live channel it usually
+        cannot - there is nothing buffered ahead to come back to - so the
+        provider's archive answers instead: the moment you pressed pause is
+        remembered, and pressing play casts the channel again from exactly
+        there. Which is what a pause on live television has to mean.
+        """
+        if self._cast_paused_at is not None:
+            at, self._cast_paused_at = self._cast_paused_at, None
+            self.cast_bar_pause.setText("⏸")
+            if (self._cast_ctx or {}).get("archive"):
+                self._cast_from_archive(at)
+            else:
+                threading.Thread(target=self.cast.resume, daemon=True).start()
+            return
+        self._cast_paused_at = datetime.now()
+        self.cast_bar_pause.setText("▶")
+        threading.Thread(target=self.cast.pause, daemon=True).start()
+
+    def _cast_from_archive(self, paused_at) -> None:
+        """Resume a paused live cast from the provider's catch-up archive."""
+        ctx, device = self._cast_ctx or {}, self._cast_device
+        sid = ctx.get("sid")
+        if sid is None or not device:
+            return
+        # From the pause onwards. The window has to cover the gap that has
+        # opened up since, plus room to keep watching - providers cap it to
+        # whatever archive they actually hold.
+        behind = max(1, int((datetime.now() - paused_at).total_seconds() // 60))
+        url = self.client.timeshift_url(sid, paused_at, behind + 240)
+        if not url:
+            return
+        log.info("cast: resuming %s from the archive, %d min back",
+                 ctx.get("title") or "", behind)
+        title = ctx.get("title") or "dopeIPTV"
+        run_async(
+            self.pool,
+            lambda: self.cast.cast(device, url, title),
+            lambda _n: self.show_cast_strip(device, title),
+            lambda msg: self._error(tr("cast_failed", msg=msg)))
 
     def _end_cast(self, why: str) -> None:
         """Stop a running cast and take the strip down.

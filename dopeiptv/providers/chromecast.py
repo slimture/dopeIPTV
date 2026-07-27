@@ -545,6 +545,31 @@ class ChromecastManager:
         except Exception as e:
             log.debug("cast: could not attach the watcher (%s)", e)
 
+    def pause(self) -> None:
+        """Freeze the picture on the TV, if the receiver allows it at all.
+
+        A stream announced as live often refuses: there is nothing buffered
+        ahead to come back to. That refusal is not an error worth showing -
+        the app's own timeshift is what actually makes a live pause work, and
+        it does not depend on this succeeding.
+        """
+        cc = self.active
+        if cc is None:
+            return
+        try:
+            cc.media_controller.pause()
+        except Exception as e:
+            log.info("cast: the receiver would not pause (%s)", e)
+
+    def resume(self) -> None:
+        cc = self.active
+        if cc is None:
+            return
+        try:
+            cc.media_controller.play()
+        except Exception as e:
+            log.info("cast: the receiver would not resume (%s)", e)
+
     def stop(self) -> None:
         # Tell the TV first, tear our own machinery down afterwards.
         #
