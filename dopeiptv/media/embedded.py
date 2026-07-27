@@ -623,15 +623,7 @@ class _MpvGLWidget(QOpenGLWidget):
                 # all three because the first read raised). err:<Type> in
                 # the log distinguishes "unsupported" from a None value.
                 try:
-                    # Attribute access covers the properties python-mpv knows;
-                    # _get_property reaches the rest by their real mpv name
-                    # (video-pts is one of those - it read as
-                    # err:AttributeError, blanking the single most useful
-                    # number in this line).
-                    try:
-                        v = getattr(self.mpv, name)
-                    except AttributeError:
-                        v = self.mpv._get_property(name.replace("_", "-"))
+                    v = getattr(self.mpv, name)
                     return "none" if v is None else v
                 except Exception as e:
                     return f"err:{type(e).__name__}"
@@ -2742,35 +2734,23 @@ class EmbeddedPlayer(QWidget):
             sharpen = 0.0
         set_opt("sharpen", max(0.0, min(sharpen, 3.0)))
         set_opt("tone-mapping", s.value("video_tonemapping", "auto") or "auto")
-        # Network buffer. Apply it live too, so a change in Settings takes
-        # effect on the CURRENT stream - not only the next one (this is why "the
-        # buffer time never changes" on a playing channel). Safe mid-playback:
-        # a readahead target, no decoder reinit - the same property the
-        # in-player buffer menu already sets live.
-        secs = self._cache_secs()
-        set_opt("cache-secs", float(secs))
-        # cache-secs is a FLOOR, not a ceiling: mpv's docs say it overrides
-        # demuxer-readahead-secs when larger, i.e. "prefetch at least this
-        # much". Nothing then bounded how far ahead we pulled, so the demuxer
-        # raced on until the byte budget - a log with the buffer set to 10 s
-        # showed the cache 52 s deep and still climbing. Set the readahead
-        # target too, so the number in Settings is the number mpv uses.
-        set_opt("demuxer-readahead-secs", float(secs))
-        # cache-secs is only a TIME target; the demuxer byte budget is what
-        # actually caps how many seconds of a high-bitrate live feed fit. Scale
-        # the FORWARD budget with the chosen buffer so a bigger setting really
-        # holds more and cushions the hitches on some live broadcasts, bounded
-        # so RAM stays sane. A user-pinned env value still wins.
+        # The network buffer is deliberately NOT touched here.
         #
-        # The BACK buffer is deliberately left alone: it only serves seeking
-        # backwards, does nothing for smoothness, and mpv writes the whole
-        # demuxer cache (back buffer included) when stream-record starts - so
-        # inflating it made a recording begin well before the frame the user
-        # was actually watching when they pressed record.
-        max_bytes = max(150 * 1024 * 1024,
-                        min(512 * 1024 * 1024, secs * 16 * 1024 * 1024))
-        if not os.environ.get("DOPEIPTV_DEMUX_MAX"):
-            set_opt("demuxer-max-bytes", max_bytes)
+        # 1.2.2 started pushing cache-secs (and a scaled demuxer-max-bytes)
+        # onto the stream already playing, so a changed setting took effect at
+        # once. It read as harmless - "just a readahead target, no decoder
+        # reinit" - and it was wrong. cache-secs is a FLOOR, not a ceiling:
+        # mpv's docs say it overrides demuxer-readahead-secs when larger, i.e.
+        # "prefetch at least this much". Nothing bounded the readahead, so the
+        # demuxer pulled as hard as the server would serve. A debug log with
+        # the buffer set to 10 s showed the cache 52 s deep and still climbing,
+        # on an account with a single connection - and live streams started
+        # dropping constantly.
+        #
+        # The buffer is applied where it always was: once per stream, in
+        # play(). Changing it in Settings takes effect on the next stream.
+        # That is the behaviour that was stable for months, and playback
+        # stability outranks the convenience of a live-applied setting.
 
     def playback_position(self) -> float:
         m = self.video.mpv
