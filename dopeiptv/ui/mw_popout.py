@@ -128,10 +128,10 @@ class _PopoutMixin:
             self._exit_player_fullscreen()
 
         if _use_mirror_popout():
-            # macOS/Windows cannot reparent a QOpenGLWidget between windows
-            # without the picture freezing (a stale shared-context layer).
-            # Mirror the stream into the pop-out window instead of moving the
-            # player. (Named _popout_macos for its origin; also used on win32.)
+            # macOS cannot reparent a QOpenGLWidget between windows without the
+            # picture freezing on a stale shared-context layer, and Linux/Mesa
+            # never presents GL in a second window at all - both mirror the
+            # stream instead of moving the player. Windows reparents (below).
             self._popout_macos()
             return
 
@@ -163,6 +163,24 @@ class _PopoutMixin:
         self.player.set_popout_autohide(
             self.settings.value("popout_autohide", "true") == "true")
         self.player.show()
+
+        # Blank the pointer after a short idle over the video, like a real
+        # player. The mirror path sets this up in _popout_macos; the reparent
+        # path had nothing, so on Windows the cursor just sat there. The
+        # player's own pointer-move signal re-arms it - the video widget is
+        # the thing in this window, so its moves are the activity that counts.
+        self._popout_cursor_hidden = False
+        if getattr(self, "_popout_cursor_timer", None) is None:
+            self._popout_cursor_timer = QTimer(self)
+            self._popout_cursor_timer.setSingleShot(True)
+            self._popout_cursor_timer.setInterval(2000)
+            self._popout_cursor_timer.timeout.connect(self._hide_popout_cursor)
+        if not getattr(self, "_popout_cursor_wired", False):
+            self._popout_cursor_wired = True
+            self.player.video.video_mouse_move.connect(
+                lambda _e: self._popout_cursor_activity())
+        self.player.video.setMouseTracking(True)
+        self._popout_cursor_timer.start()
 
         win.setGeometry(self._saved_popout_geometry())
         win.show()
@@ -304,7 +322,13 @@ class _PopoutMixin:
     def _hide_popout_cursor(self) -> None:
         """Blank the cursor after the idle timeout - but only while it rests
         over the video, so it never vanishes over the control bar."""
+        # The surface the pointer rests on: the mirror where there is one
+        # (macOS, Linux), otherwise the real video widget - Windows reparents
+        # the player itself into the window, so there is no mirror to ask and
+        # the cursor simply never hid there.
         m = getattr(self, "_popout_mirror", None)
+        if m is None and self.player is not None:
+            m = self.player.video
         win = self._popout_win
         if m is None or win is None or not m.underMouse():
             return
@@ -327,6 +351,8 @@ class _PopoutMixin:
         else:
             win = self._popout_win
             m = getattr(self, "_popout_mirror", None)
+            if m is None and self.player is not None:
+                m = self.player.video      # reparent path (Windows)
             if win is not None:
                 win.unsetCursor()
             if m is not None:
@@ -539,6 +565,14 @@ class _PopoutMixin:
         self.settings.setValue(
             "popout_geometry", f"{g.x()},{g.y()},{g.width()},{g.height()}")
 
+        # Reparent path (Windows): stop the cursor timer and make sure the
+        # pointer is visible again before the window goes away - a blanked
+        # cursor left behind here would follow the widget back into the main
+        # window.
+        t = getattr(self, "_popout_cursor_timer", None)
+        if t is not None:
+            t.stop()
+        self._show_popout_cursor()
         self.player.set_popout_mode(False)
         # Reparent back to the top of the detail pane (stretch 1, as built).
         self._det.layout().insertWidget(0, self.player, 1)
