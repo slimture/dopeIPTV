@@ -382,10 +382,19 @@ class ChromecastManager:
         ctype = served or cast_content_type(
             resolved if "." in resolved.rsplit("/", 1)[-1] else url)
         if ctype in _UNPLAYABLE:
-            # Better a sentence in the dialog than a black TV: this ends in
-            # IDLE/ERROR every single time and the receiver never says why.
+            # Matroska and raw MPEG-TS are not on the Cast platform's list at
+            # all, so there is nothing to attempt natively - the receiver would
+            # sit at IDLE/ERROR and never say why. But the container is a
+            # separate question from the codecs inside it: ffmpeg repackages
+            # both into fragmented MP4 without touching a frame of video, and
+            # then it plays. Straight to the converter.
+            log.info("cast: %s is %s, which no Chromecast plays - "
+                     "repackaging it here", device_name, ctype)
+            if self._bridge_cast(mc, device_name, url, codecs, title):
+                return device_name
             raise RuntimeError(
-                f"this stream is {ctype}, which a Chromecast cannot play")
+                f"this stream is {ctype}, and repackaging it here did not "
+                f"help either")
         log.info("cast -> %s: %s (%s)", device_name, resolved,
                  ctype if served else f"{ctype}, guessed")
         verdict = self._play_and_verify(mc, resolved, ctype, title)
@@ -403,10 +412,11 @@ class ChromecastManager:
         log.info("cast: %s refused that address - trying the panel URL",
                  device_name)
         fallback = cast_content_type(url)
-        log.info("cast -> %s: %s (%s, guessed)", device_name, url, fallback)
-        if fallback in _UNPLAYABLE or self._play_and_verify(
-                mc, url, fallback, title) is not False:
-            return device_name
+        if fallback not in _UNPLAYABLE:
+            log.info("cast -> %s: %s (%s, guessed)", device_name, url,
+                     fallback)
+            if self._play_and_verify(mc, url, fallback, title) is not False:
+                return device_name
 
         # Both addresses refused. Now - and only now - work out what is
         # actually inside the stream. What mpv reports is worth more than our

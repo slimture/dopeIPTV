@@ -428,14 +428,33 @@ def test_a_channel_the_receiver_cannot_decode_is_named(monkeypatch):
         m.cast("Alva TV", "http://panel/y.m3u8", "SVT1")
 
 
-def test_a_stream_the_receiver_cannot_play_says_so(monkeypatch):
-    """Raw MPEG-TS and Matroska are not on the Cast platform's list at all.
-    Handing one over ends in a silent IDLE/ERROR every time, so a sentence in
-    the dialog beats a black TV."""
+def test_a_container_no_chromecast_plays_is_repackaged(monkeypatch):
+    """Matroska and raw MPEG-TS are not on the Cast platform's list at all, so
+    there is nothing to attempt natively. But the container is a separate
+    question from the codecs inside it: ffmpeg repackages both into fragmented
+    MP4 without touching a frame of video."""
+    from dopeiptv.providers import chromecast as cm
+    started = []
+    m = _manager(monkeypatch)
+    monkeypatch.setattr(cm, "_resolve_redirects", lambda u: (u, "video/mp2t"))
+    monkeypatch.setattr(cm.CastBridge, "available", staticmethod(lambda: True))
+    monkeypatch.setattr(m.bridge, "start",
+                        lambda *a, **k: started.append(a) or "http://me/s.mp4")
+    m.scan()
+    assert m.cast("Alva TV", "http://x/y.ts", "SVT1") == "Alva TV"
+    assert started, "an unplayable container must go to the converter"
+    # Never handed over as-is: that is a guaranteed silent IDLE/ERROR.
+    assert [u for u, _c in m.devices[0].plays] == ["http://me/s.mp4"]
+
+
+def test_a_container_that_cannot_be_repackaged_says_so(monkeypatch):
     from dopeiptv.providers import chromecast as cm
     m = _manager(monkeypatch)
-    monkeypatch.setattr(cm, "_resolve_redirects",
-                        lambda u: (u, "video/mp2t"))
+    monkeypatch.setattr(cm, "_resolve_redirects", lambda u: (u, "video/mp2t"))
+    monkeypatch.setattr(cm.CastBridge, "available", staticmethod(lambda: True))
+    monkeypatch.setattr(m.bridge, "start", lambda *a, **k: "http://me/s.mp4")
+    m.scan()
+    m.devices[0].refuse()
     with pytest.raises(RuntimeError, match="video/mp2t"):
         m.cast("Alva TV", "http://x/y.ts", "SVT1")
 
