@@ -341,6 +341,45 @@ def test_unreadable_bytes_yield_no_codecs():
     assert _ts_codecs(b"not a transport stream at all") == []
 
 
+def test_a_receiver_that_takes_the_stream_never_converts_it(monkeypatch):
+    """Converting is for the devices that need it. A receiver that decodes
+    E-AC-3 - an Ultra, a Google TV - gets the provider's own stream untouched
+    and ffmpeg is never started, whatever the codecs say."""
+    from dopeiptv.providers import chromecast as cm
+    started = []
+    m = _manager(monkeypatch)
+    monkeypatch.setattr(cm, "_resolve_redirects",
+                        lambda u: ("http://cdn/x", "application/x-mpegURL"))
+    monkeypatch.setattr(m.bridge, "start",
+                        lambda *a, **k: started.append(a) or "http://me/s.mp4")
+    m.scan()
+    m.cast("Alva TV", "http://panel/y.m3u8", "SVT1", ["h264", "eac3"])
+    assert started == [], "the stream played natively - nothing to convert"
+    assert [u for u, _c in m.devices[0].plays] == ["http://cdn/x"]
+
+
+def test_a_device_that_refused_once_goes_straight_to_the_converter(
+        monkeypatch):
+    """The second cast of an E-AC-3 channel to the same device does not spend
+    twenty seconds being refused all over again."""
+    from dopeiptv.providers import chromecast as cm
+    m = _manager(monkeypatch)
+    monkeypatch.setattr(cm, "_resolve_redirects",
+                        lambda u: ("http://cdn/x", "application/x-mpegURL"))
+    monkeypatch.setattr(cm.CastBridge, "available", staticmethod(lambda: True))
+    monkeypatch.setattr(m.bridge, "start", lambda *a, **k: "http://me/s.mp4")
+    m.scan()
+    dev = m.devices[0]
+    dev.refuse()
+    with pytest.raises(RuntimeError):
+        m.cast("Alva TV", "http://panel/y.m3u8", "SVT1", ["h264", "eac3"])
+    assert "eac3" in m._refused["Alva TV"]
+    dev.plays.clear()
+    with pytest.raises(RuntimeError):
+        m.cast("Alva TV", "http://panel/y.m3u8", "SVT1", ["h264", "eac3"])
+    assert [u for u, _c in dev.plays] == ["http://me/s.mp4"], dev.plays
+
+
 def test_a_channel_the_receiver_cannot_decode_is_named(monkeypatch):
     from dopeiptv.providers import chromecast as cm
     m = _manager(monkeypatch)

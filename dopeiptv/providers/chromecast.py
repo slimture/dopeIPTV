@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
 from ..core.log import log
 from ..i18n import tr
 from ..core.workers import run_async
+from .cast_bridge import SAFE_AUDIO, SAFE_VIDEO, CastBridge
 
 # pychromecast drags in zeroconf + ifaddr (~130 ms of the app's startup),
 # and this module sits on the main window's import chain - so the import is
@@ -148,7 +149,7 @@ _TS_TYPES = {
 # What every Cast receiver decodes. Everything else is a refusal on the older
 # devices - HEVC has no decoder at all, and AC-3/E-AC-3 only pass through on
 # Ultra and Google TV.
-_CAST_CODECS = {"h264", "aac", "aac-latm", "mp3", "mpeg1"}
+_CAST_CODECS = SAFE_VIDEO | SAFE_AUDIO
 
 
 def _ts_codecs(data: bytes) -> list[str]:
@@ -258,6 +259,14 @@ class ChromecastManager:
         self.devices: list = []
         self.active = None
         self._browser = None
+        self.bridge = CastBridge()
+        # Codecs a given device has been seen to refuse, so the same twenty
+        # seconds of refusals are not spent on every cast. Learned from the
+        # device itself and never assumed: a receiver that plays E-AC-3 keeps
+        # getting the stream straight from the provider, untouched, and never
+        # reaches the converter at all. Deliberately per session - a new
+        # device, or new firmware, gets to answer for itself again.
+        self._refused: dict[str, set[str]] = {}
         # Discovery runs in the worker pool and so can a cast - and a cast may
         # have to discover first (see cast()). Two of those at once would tear
         # down each other's devices mid-flight.
@@ -340,6 +349,16 @@ class ChromecastManager:
         self._watch(cc, mc, device_name)
         self.active = cc
 
+        # Straight to the converter when this device has already refused these
+        # codecs once - the answer is not going to be different this time, and
+        # the twenty seconds of refusals are pure waiting.
+        codecs = [c.lower() for c in (known_codecs or [])]
+        seen_bad = self._refused.get(device_name, set())
+        if codecs and seen_bad.intersection(codecs):
+            if self._bridge_cast(mc, device_name, url, codecs, title):
+                return device_name
+            raise RuntimeError(self._no_decoder(codecs))
+
         # First attempt: the address the stream really lives at.
         #
         # This is the one that works. Side-by-side logs of a channel that
@@ -380,20 +399,54 @@ class ChromecastManager:
             return device_name
 
         # Both addresses refused. Now - and only now - work out what is
-        # actually inside the stream, so the dialog can say why rather than
-        # leaving a black TV. What mpv reports is worth more than our own
-        # parsing: it is decoding the very same channel, and its answer costs
-        # nothing. Reading the transport stream is the fallback for when the
-        # channel is not playing locally.
-        codecs = known_codecs or _probe_codecs(resolved)
-        if codecs:
-            log.info("cast: the stream contains %s", ", ".join(codecs))
-            bad = [c for c in codecs if c not in _CAST_CODECS]
-            if bad:
-                raise RuntimeError(
-                    f"this channel is {' + '.join(bad)}, which this "
-                    f"Chromecast has no decoder for")
-        raise RuntimeError("the Chromecast refused this stream")
+        # actually inside the stream. What mpv reports is worth more than our
+        # own parsing: it is decoding the very same channel, and its answer
+        # costs nothing. Reading the transport stream is the fallback for when
+        # the channel is not playing locally.
+        codecs = codecs or [c.lower() for c in _probe_codecs(resolved)]
+        if not codecs:
+            raise RuntimeError("the Chromecast refused this stream")
+        log.info("cast: the stream contains %s", ", ".join(codecs))
+        if not [c for c in codecs if c not in _CAST_CODECS]:
+            raise RuntimeError("the Chromecast refused this stream")
+
+        # Third attempt: give the receiver something it CAN decode.
+        if self._bridge_cast(mc, device_name, url, codecs, title):
+            return device_name
+        raise RuntimeError(self._no_decoder(codecs))
+
+    @staticmethod
+    def _no_decoder(codecs: list[str]) -> str:
+        bad = " + ".join(c for c in codecs if c not in _CAST_CODECS)
+        return f"this channel is {bad}, and converting it here did not help"
+
+    def _bridge_cast(self, mc, device_name: str, url: str,
+                     codecs: list[str], title: str) -> bool:
+        """Convert the stream here and cast that instead.
+
+        ffmpeg copies the video through untouched and re-encodes only what the
+        receiver could not take - almost always just the audio - and the
+        result is served on the LAN. The panel address is the source, not the
+        resolved one: it is the address that plays reliably in every other
+        player, ffmpeg included.
+
+        Only ever reached after the device itself has refused the stream, so a
+        receiver that decodes E-AC-3 keeps getting it straight from the
+        provider and never touches this.
+        """
+        bad = [c for c in codecs if c not in _CAST_CODECS]
+        self._refused.setdefault(device_name, set()).update(bad)
+        if not CastBridge.available():
+            raise RuntimeError(
+                f"this channel is {' + '.join(bad)}, which this Chromecast "
+                f"has no decoder for - install ffmpeg to convert it here")
+        log.info("cast: %s cannot decode %s - converting it here",
+                 device_name, " + ".join(bad))
+        bridged = self.bridge.start(url, codecs)
+        if self._play_and_verify(mc, bridged, "video/mp4", title) is not False:
+            return True
+        self.bridge.stop()
+        return False
 
     # How long to wait for the receiver's verdict before letting the cast be.
     # Long enough for a slow provider to get going: the wait ends the moment
@@ -441,6 +494,10 @@ class ChromecastManager:
             log.debug("cast: could not attach the watcher (%s)", e)
 
     def stop(self) -> None:
+        # The bridge feeds the receiver, so it goes down with the cast -
+        # otherwise ffmpeg keeps reading the channel and holds a provider
+        # connection for a stream nobody is watching.
+        self.bridge.stop()
         with self._lock:
             if self.active:
                 try:
