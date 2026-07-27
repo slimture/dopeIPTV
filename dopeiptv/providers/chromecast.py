@@ -47,6 +47,35 @@ def cast_content_type(url: str | None) -> str:
     return "video/mp4"
 
 
+def _resolve_redirects(url: str) -> str:
+    """Follow the provider's redirects here, so the receiver is handed the
+    address the stream actually lives at.
+
+    Xtream panels redirect a channel URL to a CDN host, and the HLS playlist
+    they serve there lists its segments as absolute PATHS ("/hls/.../x.ts")
+    with no host. Those resolve against the playlist's own base URL - so a
+    player that fetched the playlist through a redirect but keeps the original
+    base looks for the segments on the wrong host and finds nothing. That is
+    exactly what the Chromecast did: it loaded the manifest fine and then sat
+    at IDLE/ERROR without ever showing a frame.
+
+    Best effort: on any failure the original URL is used unchanged, which is
+    no worse than before.
+    """
+    try:
+        from ..core._lazy_requests import requests
+        r = requests.get(url, stream=True, timeout=(3.05, 8),
+                         allow_redirects=True)
+        final = r.url or url
+        r.close()
+        if final != url:
+            log.info("cast: resolved redirect -> %s", final)
+        return final
+    except Exception as e:
+        log.debug("cast: redirect resolve failed (%s); using original URL", e)
+        return url
+
+
 class ChromecastManager:
     """Discovers Chromecast devices on the LAN and casts streams."""
 
@@ -77,6 +106,7 @@ class ChromecastManager:
             raise RuntimeError(f"device '{device_name}' not found - rescan")
         cc.wait(timeout=10)
         mc = cc.media_controller
+        url = _resolve_redirects(url)
         ctype = cast_content_type(url)
         # Log what we hand the receiver. A Chromecast that rejects a stream
         # simply shows nothing - no error reaches us - so without this line
