@@ -3196,7 +3196,30 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             url = self.client.live_url(it["stream_id"], "m3u8")
         if not url:
             return
+        self._log_local_codecs()
         CastDialog(self, url, title).exec()
+
+    def _log_local_codecs(self) -> None:
+        """Write down what the stream actually is, while we still know.
+
+        A Chromecast refuses a stream it cannot decode without ever saying
+        which part it choked on, and an HLS media playlist carries no codec
+        information at all - the segments are just paths. The one place the
+        answer exists is mpv, which may be decoding the very same stream right
+        now, so ask it before handing the channel to a TV. HEVC video or AC-3
+        audio on an older receiver is a refusal no address can fix.
+        """
+        m = getattr(getattr(getattr(self, "player", None), "video", None),
+                    "mpv", None)
+        if m is None:
+            return
+        try:
+            for t in (m.track_list or []):
+                if t.get("selected") and t.get("type") in ("video", "audio"):
+                    log.info("cast: what is playing here - %s %s",
+                             t.get("type"), t.get("codec") or "?")
+        except Exception as e:
+            log.debug("cast: could not read the local codecs (%s)", e)
 
     def _stop_cast_for_local_playback(self) -> None:
         """End a running cast when something starts playing in the app.

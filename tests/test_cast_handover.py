@@ -20,7 +20,8 @@ import threading
 
 import pytest
 
-_METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip")
+_METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
+            "_log_local_codecs")
 
 
 def _window():
@@ -118,6 +119,32 @@ def test_an_untitled_cast_hides_the_second_line():
     w.show_cast_strip("Alva TV", "")
     assert w.cast_bar.shown
     assert w.cast_bar_title.visible is False
+
+
+def test_the_codecs_of_what_is_playing_are_written_down(monkeypatch):
+    """An HLS media playlist carries no codec information at all, and the
+    receiver never says which part it choked on - mpv, decoding the very same
+    stream, is the only place the answer exists."""
+    import types
+
+    import dopeiptv.ui.main_window as mwmod
+    rec = _Log()
+    monkeypatch.setattr(mwmod, "log", rec)
+    w = _window()
+    w.player = types.SimpleNamespace(video=types.SimpleNamespace(
+        mpv=types.SimpleNamespace(track_list=[
+            {"type": "video", "selected": True, "codec": "hevc"},
+            {"type": "audio", "selected": True, "codec": "ac3"},
+            {"type": "audio", "selected": False, "codec": "aac"},
+        ])))
+    w._log_local_codecs()
+    assert any("video hevc" in ln for ln in rec.lines), rec.lines
+    assert any("audio ac3" in ln for ln in rec.lines), rec.lines
+    assert not any("aac" in ln for ln in rec.lines)
+
+
+def test_no_player_no_codec_line():
+    _window()._log_local_codecs()
 
 
 # ── the manager itself, with a stand-in for pychromecast ──────────────────
