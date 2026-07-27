@@ -2035,6 +2035,26 @@ class EmbeddedPlayer(QWidget):
             # frame.
             upd = getattr(self, "_raster_pending_frame", True)
             pend = self._mirror_pending
+            # Heartbeat: this path only logged on a state CHANGE, so a mirror
+            # that ticks but never produces a frame looked identical to one
+            # that had stopped ticking altogether - which is exactly the
+            # question a frozen pop-out asks. Report the gate itself: how often
+            # we tick, how many of those ticks mpv had a new frame for, and how
+            # many images actually reached the widget.
+            self._raster_n = getattr(self, "_raster_n", 0) + 1
+            if upd:
+                self._raster_upd_n = getattr(self, "_raster_upd_n", 0) + 1
+            if self._raster_n % 120 == 0:
+                now_t = time.monotonic()
+                since_t = now_t - getattr(self, "_raster_hb_at", now_t)
+                self._raster_hb_at = now_t
+                log.debug("VID raster tick #%d %.1f/s new-frame=%d shown=%d "
+                          "size=%dx%d pending=%s",
+                          self._raster_n,
+                          (120 / since_t if since_t > 0 else 0.0),
+                          getattr(self, "_raster_upd_n", 0),
+                          getattr(self, "_raster_shown_n", 0),
+                          w, h, pend is not None)
             if not upd and pend is None:
                 return
             img = None
@@ -2081,6 +2101,7 @@ class EmbeddedPlayer(QWidget):
             finally:
                 v.doneCurrent()
             if img is not None:
+                self._raster_shown_n = getattr(self, "_raster_shown_n", 0) + 1
                 m.set_image(img)   # painted stretched to the widget rect
             if getattr(self, "_raster_state", "") != "render":
                 self._raster_state = "render"
