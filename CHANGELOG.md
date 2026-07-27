@@ -27,11 +27,18 @@ Live streams stay up again - 1.2.2 broke them, and this reverts the cause.
   and returned silently: the log read "live reconnect (eof) try 1/2" and the
   channel stayed dead, while playing it by hand worked instantly. The flag is
   reset when a reconnect is scheduled, and both silent exits now log why.
+- **Trakt watched marks were never written to disk.** WatchedStore.replace()
+  rebuilds the whole Trakt layer from a sync payload, and its _save() had
+  drifted below the return of the method under it, where it could never run. A
+  completed sync updated memory only: the marks were gone on the next start,
+  and last_sync_at never stuck either, so the app re-synced on every launch.
 
 ### Internal
 
 - The paint heartbeat reports paints per second and the demuxer cache time -
-  the two numbers that identified both faults above.
+  the two numbers that identified the faults above.
+- Dead code removed: two superseded dialogs (316 lines) and two unused
+  methods, found by a dead-code scan over the package.
 
 ## [1.2.3]
 

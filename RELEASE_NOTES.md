@@ -14,6 +14,10 @@ Live streams stay up again. 1.2.2 broke them, and this puts it back.
   said it was retrying and then nothing happened — the retry hit an internal
   guard and gave up silently, while clicking the same channel by hand started
   it instantly. Both silent exits now say why they bailed.
+- **Trakt watched marks survive a restart.** A completed sync only ever
+  updated memory - the call that writes it to disk sat in unreachable code -
+  so everything Trakt knew you had watched was gone on the next start, and the
+  app re-synced from scratch every launch.
 
 If you are on 1.2.2 or 1.2.3 and your live channels have been dropping, this
 is why, and this fixes it.
