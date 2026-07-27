@@ -34,18 +34,25 @@ def _use_mirror_popout() -> bool:
     """Whether to render the pop-out via a MIRROR surface instead of
     reparenting the real GL widget.
 
-    macOS and Windows share GL contexts across top-levels and can't reparent a
-    QOpenGLWidget between windows without the picture freezing/blanking, so both
-    take the (GL cross-context) mirror path. On Linux, modern Qt/Mesa never
-    presents GL content in a second top-level window AT ALL - a reparented
-    QOpenGLWidget (X11 and Wayland), a second QOpenGLWidget and a native
-    QOpenGLWindow subsurface all rendered "successfully" and showed black on
-    real hardware - so Linux mirrors too, by default via the RASTER mirror
-    (offscreen render in the docked context + CPU blit; see _RasterMirror).
-    The reparent path remains only as the fallback for anything else.
+    macOS shares GL contexts across top-levels and cannot reparent a
+    QOpenGLWidget between windows without the picture freezing on a stale
+    layer, so it takes the (GL cross-context) mirror path. On Linux, modern
+    Qt/Mesa never presents GL content in a second top-level window AT ALL - a
+    reparented QOpenGLWidget (X11 and Wayland), a second QOpenGLWidget and a
+    native QOpenGLWindow subsurface all rendered "successfully" and showed
+    black on real hardware - so Linux mirrors too, by default via the RASTER
+    mirror (offscreen render in the docked context + CPU blit; see
+    _RasterMirror).
+
+    Windows is deliberately NOT here, and reparents instead. It has neither
+    defect: moving a QOpenGLWidget between windows is ordinary there, and that
+    was the only path Windows used until 1.2.0 put it on the macOS mirror - a
+    release that shipped saying Windows pop-out was experimental and not
+    sufficiently tested. It was not: the GL mirror drew the picture upside down
+    and then black, and the raster mirror managed one frame and froze. Both are
+    workarounds for problems Windows does not have.
     """
-    return (sys.platform in ("darwin", "win32")
-            or sys.platform.startswith("linux"))
+    return sys.platform == "darwin" or sys.platform.startswith("linux")
 
 
 class _PopoutWindow(QWidget):

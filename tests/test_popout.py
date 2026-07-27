@@ -213,3 +213,70 @@ def test_popout_window_paths():
     assert "POPOUT_OK" in proc.stdout, (
         f"pop-out checks failed\n"
         f"stdout={proc.stdout!r}\nstderr={proc.stderr[-2000:]!r}")
+
+
+_WIN32_CHILD = r"""
+import os, sys
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+sys.platform = "win32"          # decided before the mixin reads it
+from PyQt6.QtCore import QSettings
+from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
+from dopeiptv.media.embedded import EmbeddedPlayer
+from dopeiptv.ui.mw_popout import _PopoutMixin, _use_mirror_popout
+
+app = QApplication.instance() or QApplication([])
+assert _use_mirror_popout() is False, "win32 must take the reparent path"
+
+
+class Host(QMainWindow, _PopoutMixin):
+    def __init__(self):
+        super().__init__()
+        self.settings = QSettings("dopeiptv-test", "popout-win32")
+        self.settings.clear()
+        self._popout_win = None
+        self._popout_placeholder = None
+        self._player_fs = False
+        self._det = QWidget()
+        QVBoxLayout(self._det).setContentsMargins(0, 0, 0, 0)
+        self.player = EmbeddedPlayer()
+        self._det.layout().addWidget(self.player, 1)
+        self.setCentralWidget(self._det)
+
+    def _exit_player_fullscreen(self):
+        pass
+
+
+h = Host()
+det, player = h._det, h.player
+h._toggle_popout(); app.processEvents()
+assert h._popout_win is not None
+assert player.parent() is h._popout_win, "the player itself moves to the window"
+assert getattr(h, "_popout_mirror", None) is None, "no mirror is built on win32"
+assert player._popout_mode is True
+h._toggle_popout(); app.processEvents()
+assert h._popout_win is None
+assert player.parent() is det, "and comes back on dock-in"
+assert player._popout_mode is False
+print("WIN32_POPOUT_OK")
+"""
+
+
+def test_windows_pops_out_by_reparenting():
+    """Windows moves the real player into the pop-out window.
+
+    It was put on the macOS mirror path in 1.2.0 and shipped as "experimental,
+    not sufficiently tested" - it wasn't: the GL mirror drew upside down and
+    then black, the raster mirror managed one frame and froze. Both work around
+    defects Windows does not have. Platform is faked, so this runs anywhere.
+    """
+    try:
+        import PyQt6  # noqa: F401
+    except Exception:
+        pytest.skip("PyQt6 not available")
+    proc = subprocess.run(
+        [sys.executable, "-c", _WIN32_CHILD], capture_output=True, text=True,
+        env=dict(os.environ, QT_QPA_PLATFORM="offscreen"),
+        cwd=_REPO_ROOT, timeout=180)
+    assert "WIN32_POPOUT_OK" in proc.stdout, (
+        f"win32 pop-out checks failed\nstdout={proc.stdout!r}\n"
+        f"stderr={proc.stderr[-1500:]!r}")
