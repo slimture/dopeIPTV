@@ -64,10 +64,21 @@ def _resolve_redirects(url: str) -> str:
     """
     try:
         from ..core._lazy_requests import requests
-        r = requests.get(url, stream=True, timeout=(3.05, 8),
-                         allow_redirects=True)
-        final = r.url or url
-        r.close()
+        # Ask for the redirect only - never open the stream itself. Fetching
+        # it (allow_redirects=True) made the panel reset the connection: it
+        # costs one of the account's simultaneous connections, and this runs
+        # while the receiver is about to take the very same slot. A player
+        # User-Agent matters too - panels routinely refuse python-requests.
+        headers = {"User-Agent": "VLC/3.0.20 LibVLC/3.0.20"}
+        final = url
+        for _ in range(4):          # follow a short chain, never a loop
+            r = requests.get(final, headers=headers, timeout=(3.05, 8),
+                             allow_redirects=False, stream=True)
+            loc = r.headers.get("Location")
+            r.close()
+            if not loc:
+                break
+            final = requests.compat.urljoin(final, loc)
         if final != url:
             log.info("cast: resolved redirect -> %s", final)
         return final
