@@ -133,10 +133,12 @@ def libmpv_install_hint() -> str:
 
 
 class WakeLockMacOS:
-    """Keeps the screen awake via a caffeinate child process."""
+    """Keeps the screen awake via a caffeinate child process, and keeps the app
+    itself out of App Nap for as long as it is held."""
 
     def __init__(self) -> None:
         self._proc: subprocess.Popen | None = None
+        self._activity = None
 
     @property
     def held(self) -> bool:
@@ -159,8 +161,44 @@ class WakeLockMacOS:
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception:
             pass
+        self._begin_activity(reason)
+
+    def _begin_activity(self, reason: str) -> None:
+        """Declare user-initiated, latency-critical work to macOS.
+
+        caffeinate keeps the *display* awake but says nothing about App Nap.
+        Once our window is in the background or occluded, macOS throttles the
+        app: timers are coalesced and wake-ups deferred. Playback then stops
+        draining the decoder, the provider drops what looks like an idle
+        connection, and the stall watchdog that would reconnect is throttled
+        too - so a channel left playing in a background window simply dies and
+        never comes back. An activity assertion suspends both App Nap and
+        timer coalescing while it is held.
+
+        Best-effort: any failure here (no pyobjc, a future API change) leaves
+        playback exactly as it was."""
+        try:
+            import objc
+            info = objc.lookUpClass("NSProcessInfo").processInfo()
+            # NSActivityUserInitiated | NSActivityLatencyCritical
+            self._activity = info.beginActivityWithOptions_reason_(
+                0x00FFFFFF | 0xFF00000000, reason)
+        except Exception:
+            self._activity = None
+
+    def _end_activity(self) -> None:
+        if self._activity is None:
+            return
+        try:
+            import objc
+            objc.lookUpClass("NSProcessInfo").processInfo().endActivity_(
+                self._activity)
+        except Exception:
+            pass
+        self._activity = None
 
     def release(self) -> None:
+        self._end_activity()
         if self._proc:
             try:
                 self._proc.terminate()
