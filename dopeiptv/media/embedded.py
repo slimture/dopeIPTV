@@ -2749,6 +2749,13 @@ class EmbeddedPlayer(QWidget):
         # in-player buffer menu already sets live.
         secs = self._cache_secs()
         set_opt("cache-secs", float(secs))
+        # cache-secs is a FLOOR, not a ceiling: mpv's docs say it overrides
+        # demuxer-readahead-secs when larger, i.e. "prefetch at least this
+        # much". Nothing then bounded how far ahead we pulled, so the demuxer
+        # raced on until the byte budget - a log with the buffer set to 10 s
+        # showed the cache 52 s deep and still climbing. Set the readahead
+        # target too, so the number in Settings is the number mpv uses.
+        set_opt("demuxer-readahead-secs", float(secs))
         # cache-secs is only a TIME target; the demuxer byte budget is what
         # actually caps how many seconds of a high-bitrate live feed fit. Scale
         # the FORWARD budget with the chosen buffer so a bigger setting really
