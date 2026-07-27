@@ -254,43 +254,43 @@ class ChromecastManager:
         self._watch(cc, mc, device_name)
         self.active = cc
 
-        # First attempt: the panel's own address, with no probing at all.
+        # First attempt: the address the stream really lives at.
         #
-        # Probing costs a connection, and these accounts are sold with very
-        # few - this one allows exactly ONE at a time. Asking the panel where
-        # the stream lives therefore takes the only slot at the very moment
-        # the Chromecast is about to ask for it, and the provider then refuses
-        # the receiver. That is what the log showed: the resolved address came
-        # back IDLE with no reason at all, meaning nothing ever arrived.
+        # This is the one that works. Side-by-side logs of a channel that
+        # casts and one that does not both show the panel's own address being
+        # refused outright - only the resolved CDN address ever reaches
+        # BUFFERING. So resolve first and go straight to it, rather than
+        # spending six seconds proving again that the panel URL is no good.
         #
-        # The receiver follows redirects perfectly well by itself, and an HLS
-        # playlist's segment paths resolve against the address the playlist
-        # was finally fetched from - so letting it do the whole thing is not
-        # only cheaper, it is also how every other player does it.
-        ctype = cast_content_type(url)
+        # The connection this costs is not what stops a cast either: the same
+        # logs show a channel starting to play immediately after the probe.
+        resolved, served = _resolve_redirects(url)
+        # The server's own type wins; otherwise guess from whichever address
+        # still HAS an extension - the resolved one usually does not.
+        ctype = served or cast_content_type(
+            resolved if "." in resolved.rsplit("/", 1)[-1] else url)
         if ctype in _UNPLAYABLE:
             # Better a sentence in the dialog than a black TV: this ends in
             # IDLE/ERROR every single time and the receiver never says why.
             raise RuntimeError(
                 f"this stream is {ctype}, which a Chromecast cannot play")
-        log.info("cast -> %s: %s (%s, guessed)", device_name, url, ctype)
-        if self._play_and_verify(mc, url, ctype, title):
-            return device_name
-
-        # Second attempt: resolve the redirect ourselves and hand over the
-        # address the stream really lives at, labelled with the type the
-        # server itself reports. By now the receiver has already given up, so
-        # the connection this costs is no longer being fought over.
-        log.info("cast: %s would not take that address - resolving the "
-                 "redirect and trying again", device_name)
-        resolved, served = _resolve_redirects(url)
-        if resolved == url:
-            return device_name
-        ctype = served or cast_content_type(resolved)
         log.info("cast -> %s: %s (%s)", device_name, resolved,
                  ctype if served else f"{ctype}, guessed")
-        if ctype not in _UNPLAYABLE:
-            self._play_and_verify(mc, resolved, ctype, title)
+        if self._play_and_verify(mc, resolved, ctype, title):
+            return device_name
+        if resolved == url:
+            return device_name
+
+        # Second attempt: the panel's own address, letting the receiver follow
+        # the redirect itself. It has not worked with this provider yet, but
+        # it is a different request against a different host and costs only
+        # the wait - and by now the cast has failed anyway.
+        log.info("cast: %s would not take that address - trying the panel URL",
+                 device_name)
+        fallback = cast_content_type(url)
+        log.info("cast -> %s: %s (%s, guessed)", device_name, url, fallback)
+        if fallback not in _UNPLAYABLE:
+            self._play_and_verify(mc, url, fallback, title)
         return device_name
 
     @staticmethod
