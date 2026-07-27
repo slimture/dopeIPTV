@@ -4581,7 +4581,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 st.sync()
             except Exception:
                 pass
-        threading.Thread(target=self.cast.shutdown, daemon=True).start()
+        # A cast has to be told to stop before this process is gone, and the
+        # thread doing it is a daemon racing os._exit below. Started here so
+        # it overlaps with draining the pools, and waited for further down -
+        # unwaited it lost that race in the packaged build and the TV simply
+        # kept playing after the app had quit.
+        casting = getattr(self.cast, "active", None) is not None
+        cast_stop = threading.Thread(target=self.cast.shutdown, daemon=True)
+        cast_stop.start()
         # Cancel every queued background download. Wait a moderate
         # amount of time for in-flight workers to finish so libmpv,
         # Wayland handles and file descriptors have a chance to
@@ -4593,6 +4600,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 pool.waitForDone(1500)
             except Exception:
                 pass
+        # Only wait when something is actually casting: on an idle manager
+        # this same call disconnects every discovered device, and nobody
+        # should sit through that just to close the window.
+        if casting:
+            cast_stop.join(2.0)
         super().closeEvent(event)
         # Only fall back to os._exit if workers are still active - at
         # that point the interpreter would segfault emitting Qt
