@@ -389,6 +389,9 @@ class ChromecastManager:
         log.info("cast -> %s: %s (%s)", device_name, resolved,
                  ctype if served else f"{ctype}, guessed")
         verdict = self._play_and_verify(mc, resolved, ctype, title)
+        if verdict:
+            log.info("cast: %s is playing the provider's own stream - "
+                     "nothing converted", device_name)
         # None means the receiver has not answered yet. Leave it alone: a
         # second load would replace a cast that is merely slow to start, and
         # that is a channel killed by the retry meant to save it.
@@ -458,6 +461,7 @@ class ChromecastManager:
                  device_name, " + ".join(bad) or "this stream")
         bridged = self.bridge.start(url, codecs)
         if self._play_and_verify(mc, bridged, "video/mp4", title) is not False:
+            log.info("cast: %s is playing the converted stream", device_name)
             return True
         self.bridge.stop()
         return False
