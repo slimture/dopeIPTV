@@ -47,7 +47,7 @@ def cast_content_type(url: str | None) -> str:
     return "video/mp4"
 
 
-def _resolve_redirects(url: str) -> str:
+def _resolve_redirects(url: str) -> tuple[str, str | None]:
     """Follow the provider's redirects here, so the receiver is handed the
     address the stream actually lives at.
 
@@ -58,6 +58,12 @@ def _resolve_redirects(url: str) -> str:
     base looks for the segments on the wrong host and finds nothing. That is
     exactly what the Chromecast did: it loaded the manifest fine and then sat
     at IDLE/ERROR without ever showing a frame.
+
+    Returns (url, content_type). The server's own Content-Type is kept
+    because the resolved address usually has no file extension at all
+    ("/live/play/<token>/26592"), and guessing from the extension then landed
+    on the mp4 default - so the receiver was told an HLS playlist was an MP4,
+    fetched it, found #EXTM3U and refused.
 
     Best effort: on any failure the original URL is used unchanged, which is
     no worse than before.
@@ -70,21 +76,25 @@ def _resolve_redirects(url: str) -> str:
         # while the receiver is about to take the very same slot. A player
         # User-Agent matters too - panels routinely refuse python-requests.
         headers = {"User-Agent": "VLC/3.0.20 LibVLC/3.0.20"}
-        final = url
+        final, ctype = url, ""
         for _ in range(4):          # follow a short chain, never a loop
             r = requests.get(final, headers=headers, timeout=(3.05, 8),
                              allow_redirects=False, stream=True)
             loc = r.headers.get("Location")
+            ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip()
             r.close()
             if not loc:
                 break
             final = requests.compat.urljoin(final, loc)
         if final != url:
             log.info("cast: resolved redirect -> %s", final)
-        return final
+        # text/html is the panel's error page, never a media type - ignore it.
+        if ctype.startswith("text/"):
+            ctype = ""
+        return final, (ctype or None)
     except Exception as e:
         log.debug("cast: redirect resolve failed (%s); using original URL", e)
-        return url
+        return url, None
 
 
 class ChromecastManager:
@@ -117,8 +127,12 @@ class ChromecastManager:
             raise RuntimeError(f"device '{device_name}' not found - rescan")
         cc.wait(timeout=10)
         mc = cc.media_controller
-        url = _resolve_redirects(url)
-        ctype = cast_content_type(url)
+        original = url
+        url, served = _resolve_redirects(url)
+        # The server's own type wins; otherwise guess from the address that
+        # still HAS an extension - the resolved one usually does not.
+        ctype = served or cast_content_type(
+            url if "." in url.rsplit("/", 1)[-1] else original)
         # Log what we hand the receiver. A Chromecast that rejects a stream
         # simply shows nothing - no error reaches us - so without this line
         # there is no way to tell "we sent the wrong thing" from "the receiver
