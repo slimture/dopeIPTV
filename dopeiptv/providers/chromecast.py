@@ -532,6 +532,13 @@ class ChromecastManager:
         self.bridge.stop()
 
     def shutdown(self) -> None:
+        # Say so. This is the one stop nobody can see happen - the window is
+        # already gone and the process is about to be - so without a line here
+        # a cast still playing on the TV afterwards cannot be told from one
+        # the app never tried to stop.
+        if self.active is not None:
+            log.info("cast: the app is closing - stopping the cast on %s",
+                     getattr(self.active, "name", "?"))
         self.stop()
         with self._lock:
             self._tear_down()  # devices before browser - see _tear_down
