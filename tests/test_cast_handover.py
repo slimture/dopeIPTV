@@ -125,14 +125,21 @@ def test_an_untitled_cast_hides_the_second_line():
 def _fake_pychromecast(order=None):
     import types
 
+    class FakeStatus:
+        def __init__(self, state="PLAYING", why=None):
+            self.player_state = state
+            self.idle_reason = why
+
     class FakeMedia:
         def __init__(self, dev):
             self.dev = dev
+            self.status = FakeStatus()
 
         def register_status_listener(self, listener):
             pass
 
         def play_media(self, url, ctype, title=None):
+            self.dev.plays.append((url, ctype))
             self.dev.played = (url, ctype, title)
 
         def block_until_active(self, timeout=10):
@@ -146,8 +153,12 @@ def _fake_pychromecast(order=None):
         def __init__(self, name):
             self.name = name
             self.played = None
+            self.plays = []
             self.media_controller = FakeMedia(self)
             self.socket_client = FakeSocket()
+
+        def refuse(self):
+            self.media_controller.status = FakeStatus("IDLE", "ERROR")
 
         def wait(self, timeout=10):
             pass
@@ -227,6 +238,35 @@ def test_casting_a_device_from_last_time_discovers_it_first(monkeypatch):
     assert m.cast("Alva TV", "http://x/y.m3u8", "SVT1") == "Alva TV"
     assert m.active is not None
     assert m.active.played[0] == "http://x/y.m3u8"
+
+
+def test_a_refused_address_falls_back_to_the_panel_url(monkeypatch):
+    """The panel hands out a fresh single-use token on every redirect, and on
+    some nodes it is not valid from another machine - which is exactly when a
+    channel plays in the app and not on the TV. The two addresses are
+    different things, so if the resolved one is refused the receiver gets the
+    panel URL and follows the redirect itself."""
+    from dopeiptv.providers import chromecast as cm
+    m = _manager(monkeypatch)
+    monkeypatch.setattr(cm, "_resolve_redirects",
+                        lambda u: ("http://cdn/live/play/token/9851",
+                                   "application/x-mpegURL"))
+    m.scan()
+    m.devices[0].refuse()
+    m.cast("Alva TV", "http://panel/live/u/pw/9851.m3u8", "SVT1")
+    tried = [u for u, _c in m.devices[0].plays]
+    assert tried == ["http://cdn/live/play/token/9851",
+                     "http://panel/live/u/pw/9851.m3u8"], tried
+
+
+def test_an_accepted_address_is_not_cast_twice(monkeypatch):
+    from dopeiptv.providers import chromecast as cm
+    m = _manager(monkeypatch)
+    monkeypatch.setattr(cm, "_resolve_redirects",
+                        lambda u: ("http://cdn/x", "application/x-mpegURL"))
+    m.scan()
+    m.cast("Alva TV", "http://panel/y.m3u8", "SVT1")
+    assert [u for u, _c in m.devices[0].plays] == ["http://cdn/x"]
 
 
 def test_a_stream_the_receiver_cannot_play_says_so(monkeypatch):

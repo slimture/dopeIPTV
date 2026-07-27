@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import time
 
 from PyQt6.QtWidgets import (
     QDialog, QHBoxLayout, QLabel, QListWidget, QPushButton, QVBoxLayout,
@@ -265,14 +266,54 @@ class ChromecastManager:
             raise RuntimeError(
                 f"this stream is {ctype}, which a Chromecast cannot play")
         # Attach the watcher BEFORE handing over the stream, so the receiver's
-        # first verdict is caught too. It replaces the old six-second polling
-        # loop, which reported the same states while holding the cast up - and
-        # then went quiet exactly when a long-running cast starts to matter.
+        # first verdict is caught too - and it keeps reporting for the whole
+        # life of the cast, which the old six-second poll did not.
         self._watch(cc, mc, device_name)
+        self.active = cc
+        if self._play_and_verify(mc, url, ctype, title):
+            return device_name
+        if url != original:
+            # The resolved address was refused. Hand over the panel URL
+            # instead and let the receiver follow the redirect itself: that
+            # address is a different thing entirely, not a retry of the same
+            # one. Which of the two works depends on the provider's node - the
+            # panel hands out a fresh single-use token on every redirect, and
+            # some of them are not valid from another machine, which is
+            # exactly the case where a channel plays in the app and not here.
+            log.info("cast: %s refused that address - trying the panel URL",
+                     device_name)
+            fallback = cast_content_type(original)
+            log.info("cast -> %s: %s (%s, guessed)",
+                     device_name, original, fallback)
+            self._play_and_verify(mc, original, fallback, title)
+        return device_name
+
+    @staticmethod
+    def _play_and_verify(mc, url: str, ctype: str, title: str,
+                         wait: float = 6.0) -> bool:
+        """Hand the stream over and wait for the receiver to pass judgement.
+
+        True when it took the stream, False when it refused it or never said
+        anything at all. The wait is what makes a second attempt possible: a
+        Chromecast reports a refusal only through its own status - no error
+        ever reaches the sender - so without looking there is nothing to act
+        on. It costs nothing when the cast works, which is the common case:
+        the state turns to BUFFERING within a second or two.
+        """
         mc.play_media(url, ctype, title=title or "dopeIPTV")
         mc.block_until_active(timeout=10)
-        self.active = cc
-        return device_name
+        deadline = time.monotonic() + wait
+        while time.monotonic() < deadline:
+            time.sleep(0.3)
+            state = getattr(mc.status, "player_state", "?")
+            why = getattr(mc.status, "idle_reason", None)
+            if state in ("PLAYING", "BUFFERING"):
+                return True
+            # INTERRUPTED is our own second load replacing the first - it says
+            # nothing about the stream, so it is not a refusal.
+            if state == "IDLE" and why in ("ERROR", "CANCELLED"):
+                return False
+        return False
 
     @staticmethod
     def _watch(cc, mc, device_name: str) -> None:
