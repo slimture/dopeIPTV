@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
     QDialog, QHBoxLayout, QLabel, QListWidget, QPushButton, QVBoxLayout,
 )
 
+from ..core.log import log
 from ..i18n import tr
 from ..core.workers import run_async
 
@@ -74,8 +75,22 @@ class ChromecastManager:
             raise RuntimeError(f"device '{device_name}' not found - rescan")
         cc.wait(timeout=10)
         mc = cc.media_controller
-        mc.play_media(url, cast_content_type(url), title=title or "dopeIPTV")
+        ctype = cast_content_type(url)
+        # Log what we hand the receiver. A Chromecast that rejects a stream
+        # simply shows nothing - no error reaches us - so without this line
+        # there is no way to tell "we sent the wrong thing" from "the receiver
+        # refused it". Note the receiver supports neither raw MPEG-TS nor
+        # Matroska: a .ts or .mkv URL can never produce a picture, whatever we
+        # label it.
+        log.info("cast -> %s: %s (%s)", device_name, url, ctype)
+        mc.play_media(url, ctype, title=title or "dopeIPTV")
         mc.block_until_active(timeout=10)
+        try:
+            log.info("cast receiver state: %s (idle reason: %s)",
+                     getattr(mc.status, "player_state", "?"),
+                     getattr(mc.status, "idle_reason", None))
+        except Exception:
+            pass
         self.active = cc
         return device_name
 
