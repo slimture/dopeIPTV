@@ -248,44 +248,49 @@ class ChromecastManager:
                 raise RuntimeError(f"device '{device_name}' not found - rescan")
         cc.wait(timeout=10)
         mc = cc.media_controller
-        original = url
-        url, served = _resolve_redirects(url)
-        # The server's own type wins; otherwise guess from the address that
-        # still HAS an extension - the resolved one usually does not.
-        ctype = served or cast_content_type(
-            url if "." in url.rsplit("/", 1)[-1] else original)
-        # Log what we hand the receiver. A Chromecast that rejects a stream
-        # simply shows nothing - no error reaches us - so without this line
-        # there is no way to tell "we sent the wrong thing" from "the receiver
-        # refused it".
-        log.info("cast -> %s: %s (%s)", device_name, url,
-                 ctype if served else f"{ctype}, guessed")
+        # Attach the watcher BEFORE handing anything over, so the receiver's
+        # first verdict is caught too - and it keeps reporting for the whole
+        # life of the cast, which the old six-second poll did not.
+        self._watch(cc, mc, device_name)
+        self.active = cc
+
+        # First attempt: the panel's own address, with no probing at all.
+        #
+        # Probing costs a connection, and these accounts are sold with very
+        # few - this one allows exactly ONE at a time. Asking the panel where
+        # the stream lives therefore takes the only slot at the very moment
+        # the Chromecast is about to ask for it, and the provider then refuses
+        # the receiver. That is what the log showed: the resolved address came
+        # back IDLE with no reason at all, meaning nothing ever arrived.
+        #
+        # The receiver follows redirects perfectly well by itself, and an HLS
+        # playlist's segment paths resolve against the address the playlist
+        # was finally fetched from - so letting it do the whole thing is not
+        # only cheaper, it is also how every other player does it.
+        ctype = cast_content_type(url)
         if ctype in _UNPLAYABLE:
             # Better a sentence in the dialog than a black TV: this ends in
             # IDLE/ERROR every single time and the receiver never says why.
             raise RuntimeError(
                 f"this stream is {ctype}, which a Chromecast cannot play")
-        # Attach the watcher BEFORE handing over the stream, so the receiver's
-        # first verdict is caught too - and it keeps reporting for the whole
-        # life of the cast, which the old six-second poll did not.
-        self._watch(cc, mc, device_name)
-        self.active = cc
+        log.info("cast -> %s: %s (%s, guessed)", device_name, url, ctype)
         if self._play_and_verify(mc, url, ctype, title):
             return device_name
-        if url != original:
-            # The resolved address was refused. Hand over the panel URL
-            # instead and let the receiver follow the redirect itself: that
-            # address is a different thing entirely, not a retry of the same
-            # one. Which of the two works depends on the provider's node - the
-            # panel hands out a fresh single-use token on every redirect, and
-            # some of them are not valid from another machine, which is
-            # exactly the case where a channel plays in the app and not here.
-            log.info("cast: %s refused that address - trying the panel URL",
-                     device_name)
-            fallback = cast_content_type(original)
-            log.info("cast -> %s: %s (%s, guessed)",
-                     device_name, original, fallback)
-            self._play_and_verify(mc, original, fallback, title)
+
+        # Second attempt: resolve the redirect ourselves and hand over the
+        # address the stream really lives at, labelled with the type the
+        # server itself reports. By now the receiver has already given up, so
+        # the connection this costs is no longer being fought over.
+        log.info("cast: %s would not take that address - resolving the "
+                 "redirect and trying again", device_name)
+        resolved, served = _resolve_redirects(url)
+        if resolved == url:
+            return device_name
+        ctype = served or cast_content_type(resolved)
+        log.info("cast -> %s: %s (%s)", device_name, resolved,
+                 ctype if served else f"{ctype}, guessed")
+        if ctype not in _UNPLAYABLE:
+            self._play_and_verify(mc, resolved, ctype, title)
         return device_name
 
     @staticmethod
