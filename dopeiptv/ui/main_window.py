@@ -3179,13 +3179,21 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self, "Chromecast",
                 tr("msg_cast_needs_package"))
             return
-        if self.mode == "history":
-            url, title = it.get("_url"), it.get("name") or "dopeIPTV"
-        else:
-            url, title = self._stream_for(it)
-            if (self._content_kind() in ("live", "fav")
-                    and it.get("stream_id") is not None):
-                url = self.client.live_url(it["stream_id"], "m3u8")
+        url, title = self._stream_for(it)
+        if not url:
+            url = it.get("_url")
+            title = it.get("name") or it.get("title") or "dopeIPTV"
+        # A live channel has to go as HLS: the receiver cannot decode a raw
+        # MPEG transport stream at all, whatever we label it. Every section
+        # can show a live row - Channels, Favorites, History, Home - so the
+        # rule belongs here and not inside one section's branch. History used
+        # to hand over its stored .ts address verbatim, which is why casting
+        # worked from the channel list and never from History.
+        live = (self._content_kind() in ("live", "fav")
+                or it.get("_kind") == "live"
+                or (self.mode == "fav" and self._fav_section == "chan"))
+        if live and it.get("stream_id") is not None:
+            url = self.client.live_url(it["stream_id"], "m3u8")
         if not url:
             return
         CastDialog(self, url, title).exec()

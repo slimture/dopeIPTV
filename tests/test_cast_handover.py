@@ -167,6 +167,47 @@ def _fake_pychromecast(order=None):
     return types.SimpleNamespace(get_chromecasts=get_chromecasts)
 
 
+class _Log:
+    def __init__(self) -> None:
+        self.lines: list[str] = []
+
+    def info(self, msg, *args) -> None:
+        self.lines.append(msg % args if args else msg)
+
+    def debug(self, *a, **k) -> None:
+        pass
+
+
+class _Response:
+    def __init__(self, body: bytes) -> None:
+        self.body = body
+
+    def iter_content(self, n):
+        yield self.body[:n]
+
+
+def test_the_playlist_we_hand_over_is_written_down(monkeypatch):
+    """A Chromecast that refuses a stream says only IDLE/ERROR, never why -
+    so the manifest itself has to be in the log."""
+    from dopeiptv.providers import chromecast as cm
+    rec = _Log()
+    monkeypatch.setattr(cm, "log", rec)
+    cm._log_playlist_head(_Response(
+        b"#EXTM3U\n#EXT-X-TARGETDURATION:6\n/hls/x/1.ts\n"))
+    assert "playlist head" in rec.lines[0]
+    assert "/hls/x/1.ts" in rec.lines[0]
+
+
+def test_a_stream_that_is_not_a_playlist_is_called_out(monkeypatch):
+    """Some panels answer an .m3u8 request with the raw TS stream, which the
+    receiver can never play whatever we label it."""
+    from dopeiptv.providers import chromecast as cm
+    rec = _Log()
+    monkeypatch.setattr(cm, "log", rec)
+    cm._log_playlist_head(_Response(b"\x47\x40\x00\x10" * 8))
+    assert "not a playlist" in rec.lines[0]
+
+
 def _manager(monkeypatch, order=None):
     from dopeiptv.providers import chromecast as cm
     monkeypatch.setattr(cm, "_pychromecast", _fake_pychromecast(order))
@@ -186,6 +227,18 @@ def test_casting_a_device_from_last_time_discovers_it_first(monkeypatch):
     assert m.cast("Alva TV", "http://x/y.m3u8", "SVT1") == "Alva TV"
     assert m.active is not None
     assert m.active.played[0] == "http://x/y.m3u8"
+
+
+def test_a_stream_the_receiver_cannot_play_says_so(monkeypatch):
+    """Raw MPEG-TS and Matroska are not on the Cast platform's list at all.
+    Handing one over ends in a silent IDLE/ERROR every time, so a sentence in
+    the dialog beats a black TV."""
+    from dopeiptv.providers import chromecast as cm
+    m = _manager(monkeypatch)
+    monkeypatch.setattr(cm, "_resolve_redirects",
+                        lambda u: (u, "video/mp2t"))
+    with pytest.raises(RuntimeError, match="video/mp2t"):
+        m.cast("Alva TV", "http://x/y.ts", "SVT1")
 
 
 def test_a_rescan_drops_the_devices_before_the_browser(monkeypatch):

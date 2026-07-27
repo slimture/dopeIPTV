@@ -46,6 +46,40 @@ def cast_content_type(url: str | None) -> str:
     return "video/mp4"
 
 
+# The receiver decodes none of these, whatever they are labelled: raw MPEG
+# transport streams and Matroska are simply not on the Cast platform's list.
+# Handing one over produces a silent IDLE/ERROR and nothing else, so say so
+# instead of casting into the void.
+_UNPLAYABLE = {"video/mp2t", "video/x-matroska", "video/mpeg",
+               "video/x-msvideo", "video/x-flv"}
+
+
+def _log_playlist_head(response) -> None:
+    """Write the first few lines of the playlist we are about to hand over.
+
+    A Chromecast that refuses a stream says only IDLE/ERROR - never why - and
+    channels that play perfectly well in the app do get refused. This is the
+    only place we ever see what the receiver is actually being pointed at, and
+    it costs nothing: the connection is already open for the redirect check
+    and closes right after.
+
+    It answers, in one line, the questions that otherwise take a whole evening:
+    is this really a playlist or a raw TS stream mislabelled as one, are the
+    segments absolute URLs or paths, and does the manifest name codecs the
+    receiver cannot decode.
+    """
+    try:
+        head = next(response.iter_content(2048), b"") or b""
+        text = head.decode("utf-8", "replace")
+        if not text.lstrip().startswith("#EXTM3U"):
+            log.info("cast: not a playlist (starts %r)", text[:24])
+            return
+        lines = [ln.strip() for ln in text.splitlines() if ln.strip()][:8]
+        log.info("cast: playlist head %s", " | ".join(lines))
+    except Exception as e:
+        log.debug("cast: playlist peek failed (%s)", e)
+
+
 def _resolve_redirects(url: str) -> tuple[str, str | None]:
     """Follow the provider's redirects here, so the receiver is handed the
     address the stream actually lives at.
@@ -81,9 +115,11 @@ def _resolve_redirects(url: str) -> tuple[str, str | None]:
                              allow_redirects=False, stream=True)
             loc = r.headers.get("Location")
             ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip()
-            r.close()
             if not loc:
+                _log_playlist_head(r)
+                r.close()
                 break
+            r.close()
             final = requests.compat.urljoin(final, loc)
         if final != url:
             log.info("cast: resolved redirect -> %s", final)
@@ -220,10 +256,14 @@ class ChromecastManager:
         # Log what we hand the receiver. A Chromecast that rejects a stream
         # simply shows nothing - no error reaches us - so without this line
         # there is no way to tell "we sent the wrong thing" from "the receiver
-        # refused it". Note the receiver supports neither raw MPEG-TS nor
-        # Matroska: a .ts or .mkv URL can never produce a picture, whatever we
-        # label it.
-        log.info("cast -> %s: %s (%s)", device_name, url, ctype)
+        # refused it".
+        log.info("cast -> %s: %s (%s)", device_name, url,
+                 ctype if served else f"{ctype}, guessed")
+        if ctype in _UNPLAYABLE:
+            # Better a sentence in the dialog than a black TV: this ends in
+            # IDLE/ERROR every single time and the receiver never says why.
+            raise RuntimeError(
+                f"this stream is {ctype}, which a Chromecast cannot play")
         # Attach the watcher BEFORE handing over the stream, so the receiver's
         # first verdict is caught too. It replaces the old six-second polling
         # loop, which reported the same states while holding the cast up - and
