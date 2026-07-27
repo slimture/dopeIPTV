@@ -599,13 +599,17 @@ class WatchedStore:
         if show_titles is not None:
             self.trakt_show_titles = dict(show_titles)
         self.last_sync_at = int(datetime.now().timestamp())
+        # Persist it. This call had drifted below the return of the next
+        # method, where it could never run - so a completed Trakt sync
+        # updated memory only and was lost on restart, and last_sync_at
+        # never stuck either (re-syncing on every start).
+        self._save()
 
     def trakt_title(self, tmdb_id: int, kind: str) -> str | None:
         """The Trakt-provided title for a watched tmdb id, if we have it."""
         src = (self.trakt_show_titles if kind == "series"
                else self.trakt_movie_titles)
         return src.get(int(tmdb_id))
-        self._save()
 
     # -- local layer (right-click 'Mark as watched (local)') -----------------
 
@@ -926,9 +930,6 @@ class WatchlistStore:
         }
         return {k: v for k, v in snap.items() if v is not None}
 
-    def _dedup_key(self, item: dict, tmdb_id: int | None,
-                   stream_id: int | None) -> None:
-        pass
 
     def add_movie_local(self, item: dict, tmdb_id: int | None) -> None:
         if self.has_movie(tmdb_id, item.get("stream_id")):

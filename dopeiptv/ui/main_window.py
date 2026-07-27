@@ -3808,10 +3808,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.set_seek_mode("live")
             self.player.set_live_badge(None)
 
-    def _player_missing(self, name: str) -> None:
-        QMessageBox.warning(
-            self, tr("status_player_not_found"),
-            tr("status_player_not_found_msg", name=name))
 
     def _show_toast(self, text: str, duration_ms: int = 0) -> None:
         self._toast.show_message(text, duration_ms)

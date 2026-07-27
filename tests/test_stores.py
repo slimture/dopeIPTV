@@ -214,3 +214,32 @@ def test_history_store_keeps_series_context_extra():
     assert e["_series_ctx"]["series_id"] == 88
     assert e["_series_title"] == "Severance"
     assert e["name"] == "Severance · S1 * E1 - Pilot"
+
+
+def test_a_trakt_sync_survives_a_restart(tmp_path):
+    """A completed Trakt sync must reach disk.
+
+    WatchedStore.replace() rebuilds the whole Trakt layer from a fresh sync
+    payload - and its _save() had drifted below the `return` of the method
+    underneath it, where it could never run. The sync updated memory only:
+    every watched mark from Trakt was gone on the next start, and last_sync_at
+    never stuck either, so the app re-synced on every launch.
+    """
+    from PyQt6.QtCore import QSettings
+
+    from dopeiptv.core.stores import WatchedStore
+
+    s = QSettings("dopeiptv-test", "watched-persist")
+    s.clear()
+    store = WatchedStore(s)
+    store.replace([11, 22], {77: [[1, 2], [1, 3]]},
+                  movie_titles={11: "A Film"}, show_titles={77: "A Show"})
+    assert store.last_sync_at > 0
+    s.sync()
+
+    fresh = WatchedStore(QSettings("dopeiptv-test", "watched-persist"))
+    assert 11 in fresh.trakt_movies and 22 in fresh.trakt_movies
+    assert fresh.trakt_episodes.get(77) == {(1, 2), (1, 3)}
+    assert fresh.trakt_title(11, "movie") == "A Film"
+    assert fresh.trakt_title(77, "series") == "A Show"
+    assert fresh.last_sync_at == store.last_sync_at
