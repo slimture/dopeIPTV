@@ -21,7 +21,7 @@ import threading
 import pytest
 
 _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
-            "_log_local_codecs")
+            "_local_codecs")
 
 
 def _window():
@@ -137,14 +137,14 @@ def test_the_codecs_of_what_is_playing_are_written_down(monkeypatch):
             {"type": "audio", "selected": True, "codec": "ac3"},
             {"type": "audio", "selected": False, "codec": "aac"},
         ])))
-    w._log_local_codecs()
+    w._local_codecs()
     assert any("video hevc" in ln for ln in rec.lines), rec.lines
     assert any("audio ac3" in ln for ln in rec.lines), rec.lines
     assert not any("aac" in ln for ln in rec.lines)
 
 
 def test_no_player_no_codec_line():
-    _window()._log_local_codecs()
+    _window()._local_codecs()
 
 
 # ── the manager itself, with a stand-in for pychromecast ──────────────────

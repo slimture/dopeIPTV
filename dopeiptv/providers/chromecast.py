@@ -315,7 +315,8 @@ class ChromecastManager:
     def _device(self, name: str):
         return next((c for c in self.devices if c.name == name), None)
 
-    def cast(self, device_name: str, url: str, title: str) -> str:
+    def cast(self, device_name: str, url: str, title: str,
+             known_codecs: list[str] | None = None) -> str:
         with self._lock:
             cc = self._device(device_name)
             if cc is None:
@@ -378,9 +379,13 @@ class ChromecastManager:
                 mc, url, fallback, title) is not False:
             return device_name
 
-        # Both addresses refused. Now - and only now - go and read what is
-        # actually inside the stream, so the dialog can say why.
-        codecs = _probe_codecs(resolved)
+        # Both addresses refused. Now - and only now - work out what is
+        # actually inside the stream, so the dialog can say why rather than
+        # leaving a black TV. What mpv reports is worth more than our own
+        # parsing: it is decoding the very same channel, and its answer costs
+        # nothing. Reading the transport stream is the fallback for when the
+        # channel is not playing locally.
+        codecs = known_codecs or _probe_codecs(resolved)
         if codecs:
             log.info("cast: the stream contains %s", ", ".join(codecs))
             bad = [c for c in codecs if c not in _CAST_CODECS]
@@ -453,11 +458,16 @@ class ChromecastManager:
 class CastDialog(QDialog):
     """Scan for Chromecast devices and cast a stream to one."""
 
-    def __init__(self, window: object, url: str, title: str) -> None:
+    def __init__(self, window: object, url: str, title: str,
+                 codecs: list[str] | None = None) -> None:
         super().__init__(window)
         self.window = window
         self.url = url
         self.stream_title = title
+        # What mpv says the channel is, when it happens to be playing here.
+        # Only ever used to explain a refusal - never to refuse in advance:
+        # AC-3 plays fine on an Ultra or a Google TV.
+        self.codecs = codecs or []
         self.setWindowTitle(tr("cast_title"))
         self.setMinimumWidth(400)
         lay = QVBoxLayout(self)
@@ -563,7 +573,8 @@ class CastDialog(QDialog):
 
         run_async(self.window.pool,
                   lambda: self.window.cast.cast(name, self.url,
-                                                 self.stream_title),
+                                                 self.stream_title,
+                                                 self.codecs),
                   done, failed)
 
     def _banner(self, device: str | None, title: str) -> None:

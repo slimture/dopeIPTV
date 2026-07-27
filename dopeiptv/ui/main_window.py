@@ -3196,10 +3196,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             url = self.client.live_url(it["stream_id"], "m3u8")
         if not url:
             return
-        self._log_local_codecs()
-        CastDialog(self, url, title).exec()
+        CastDialog(self, url, title, self._local_codecs()).exec()
 
-    def _log_local_codecs(self) -> None:
+    def _local_codecs(self) -> list[str]:
         """Write down what the stream actually is, while we still know.
 
         A Chromecast refuses a stream it cannot decode without ever saying
@@ -3212,14 +3211,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         m = getattr(getattr(getattr(self, "player", None), "video", None),
                     "mpv", None)
         if m is None:
-            return
+            return []
+        found = []
         try:
             for t in (m.track_list or []):
                 if t.get("selected") and t.get("type") in ("video", "audio"):
+                    codec = t.get("codec") or "?"
                     log.info("cast: what is playing here - %s %s",
-                             t.get("type"), t.get("codec") or "?")
+                             t.get("type"), codec)
+                    found.append(codec)
         except Exception as e:
             log.debug("cast: could not read the local codecs (%s)", e)
+        return found
 
     def _stop_cast_for_local_playback(self) -> None:
         """End a running cast when something starts playing in the app.
