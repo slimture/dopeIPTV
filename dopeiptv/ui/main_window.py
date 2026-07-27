@@ -3196,7 +3196,30 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             url = self.client.live_url(it["stream_id"], "m3u8")
         if not url:
             return
-        CastDialog(self, url, title, self._local_codecs()).exec()
+        CastDialog(self, url, title, self._local_codecs(),
+                   self._local_audio_index()).exec()
+
+    def _local_audio_index(self) -> int:
+        """Which audio track the app itself is playing, counted the way
+        ffmpeg counts them.
+
+        If you switched to the Swedish track here, that is the one you meant
+        to send to the TV - the cast dialog opens on it rather than on
+        whatever the stream calls its default. Zero means the default, and
+        the default is what keeps a cast native.
+        """
+        m = getattr(getattr(getattr(self, "player", None), "video", None),
+                    "mpv", None)
+        if m is None:
+            return 0
+        try:
+            audio = [t for t in (m.track_list or []) if t.get("type") == "audio"]
+            for i, t in enumerate(audio):
+                if t.get("selected"):
+                    return i
+        except Exception as e:
+            log.debug("cast: could not read the local audio track (%s)", e)
+        return 0
 
     def _local_codecs(self) -> list[str]:
         """Write down what the stream actually is, while we still know.

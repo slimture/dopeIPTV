@@ -712,6 +712,13 @@ _STRINGS: dict[str, dict[str, str]] = {
     "cast_failed": {"en": "Cast failed: {msg}"},
     "cast_stopped": {"en": "Casting stopped."},
     "cast_stop_failed": {"en": "Stop failed: {msg}"},
+    "cast_audio": {"en": "Audio"},
+    "cast_subtitles": {"en": "Subtitles"},
+    "cast_track_default": {"en": "Default"},
+    "cast_subs_off": {"en": "Off"},
+    "cast_reading_tracks": {"en": "Reading tracks…"},
+    "cast_track_note": {
+        "en": "Choosing a track converts the stream on this computer."},
 
     # ── Playlist dialog extras ────────────────────────────────────────────
     "playlist_msg_title": {"en": "Playlist"},

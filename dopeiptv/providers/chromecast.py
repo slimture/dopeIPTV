@@ -6,13 +6,14 @@ import threading
 import time
 
 from PyQt6.QtWidgets import (
-    QDialog, QHBoxLayout, QLabel, QListWidget, QPushButton, QVBoxLayout,
+    QComboBox, QDialog, QHBoxLayout, QLabel, QListWidget, QPushButton,
+    QVBoxLayout,
 )
 
 from ..core.log import log
 from ..i18n import tr
 from ..core.workers import run_async
-from .cast_bridge import SAFE_AUDIO, SAFE_VIDEO, CastBridge
+from .cast_bridge import SAFE_AUDIO, SAFE_VIDEO, CastBridge, probe_tracks
 
 # pychromecast drags in zeroconf + ifaddr (~130 ms of the app's startup),
 # and this module sits on the main window's import chain - so the import is
@@ -331,7 +332,8 @@ class ChromecastManager:
         return next((c for c in self.devices if c.name == name), None)
 
     def cast(self, device_name: str, url: str, title: str,
-             known_codecs: list[str] | None = None) -> str:
+             known_codecs: list[str] | None = None,
+             audio: dict | None = None, subs: dict | None = None) -> str:
         with self._lock:
             cc = self._device(device_name)
             if cc is None:
@@ -360,6 +362,16 @@ class ChromecastManager:
         # the twenty seconds of refusals are pure waiting.
         codecs = [c.lower() for c in (known_codecs or [])]
         seen_bad = self._refused.get(device_name, set())
+        # A chosen audio or subtitle track can only be honoured by converting:
+        # the receiver plays whatever the stream hands it and renders no
+        # subtitle carried inside one. Leaving both on their default is what
+        # keeps a cast native, which is why the default is a default.
+        if audio is not None or subs is not None:
+            log.info("cast: a track was chosen - converting so it can be used")
+            if self._bridge_cast(mc, device_name, url, codecs, title,
+                                 audio, subs):
+                return device_name
+            raise RuntimeError("the chosen track could not be cast")
         if ((codecs and seen_bad.intersection(codecs))
                 or (device_name, url) in self._needs_bridge):
             if self._bridge_cast(mc, device_name, url, codecs, title):
@@ -446,7 +458,9 @@ class ChromecastManager:
         return f"this channel is {bad}, and converting it here did not help"
 
     def _bridge_cast(self, mc, device_name: str, url: str,
-                     codecs: list[str], title: str) -> bool:
+                     codecs: list[str], title: str,
+                     audio: dict | None = None,
+                     subs: dict | None = None) -> bool:
         """Convert the stream here and cast that instead.
 
         ffmpeg copies the video through untouched and re-encodes only what the
@@ -460,16 +474,26 @@ class ChromecastManager:
         provider and never touches this.
         """
         bad = [c for c in codecs if c not in _CAST_CODECS]
-        self._refused.setdefault(device_name, set()).update(bad)
-        self._needs_bridge.add((device_name, url))
+        # Only a refusal teaches the memory. Converting because a track was
+        # chosen says nothing about what the device can decode, and recording
+        # it would send every later cast of this channel through ffmpeg for no
+        # reason at all.
+        if audio is None and subs is None:
+            self._refused.setdefault(device_name, set()).update(bad)
+            self._needs_bridge.add((device_name, url))
         if not CastBridge.available():
             raise RuntimeError(
                 f"this Chromecast has no decoder for this channel "
                 f"({' + '.join(bad) or 'unknown codecs'}) - install ffmpeg "
                 f"to convert it here")
-        log.info("cast: %s cannot decode %s - converting it here",
-                 device_name, " + ".join(bad) or "this stream")
-        bridged = self.bridge.start(url, codecs)
+        if audio is None and subs is None:
+            log.info("cast: %s cannot decode %s - converting it here",
+                     device_name, " + ".join(bad) or "this stream")
+        bridged = self.bridge.start(
+            url, codecs,
+            audio=(audio or {}).get("index", 0),
+            subs=None if subs is None else subs.get("index"),
+            sub_codec=(subs or {}).get("codec", ""))
         if self._play_and_verify(mc, bridged, "video/mp4", title) is not False:
             log.info("cast: %s is playing the converted stream", device_name)
             return True
@@ -558,7 +582,8 @@ class CastDialog(QDialog):
     """Scan for Chromecast devices and cast a stream to one."""
 
     def __init__(self, window: object, url: str, title: str,
-                 codecs: list[str] | None = None) -> None:
+                 codecs: list[str] | None = None,
+                 audio_index: int = 0) -> None:
         super().__init__(window)
         self.window = window
         self.url = url
@@ -567,6 +592,11 @@ class CastDialog(QDialog):
         # Only ever used to explain a refusal - never to refuse in advance:
         # AC-3 plays fine on an Ultra or a Google TV.
         self.codecs = codecs or []
+        # The audio track the app is playing. If you switched language here,
+        # that is the one you meant to send - so the dialog opens on it. Zero
+        # is the stream's own default, and leaving it there is what keeps the
+        # cast native.
+        self.audio_index = audio_index
         self.setWindowTitle(tr("cast_title"))
         self.setMinimumWidth(400)
         lay = QVBoxLayout(self)
@@ -580,6 +610,30 @@ class CastDialog(QDialog):
         self.list = QListWidget()
         self.list.itemDoubleClicked.connect(lambda _i: self._cast())
         lay.addWidget(self.list, 1)
+
+        # Audio and subtitle choice. Both are honoured by converting the
+        # stream here, because the receiver plays whatever the stream hands it
+        # and renders no subtitle that is carried inside one - so leaving both
+        # on their default is what keeps a cast native.
+        self.audio_box = QComboBox()
+        self.subs_box = QComboBox()
+        for box, label in ((self.audio_box, tr("cast_audio")),
+                           (self.subs_box, tr("cast_subtitles"))):
+            row = QHBoxLayout()
+            cap = QLabel(label)
+            cap.setMinimumWidth(80)
+            row.addWidget(cap)
+            box.addItem(tr("cast_reading_tracks"), None)
+            box.setEnabled(False)
+            row.addWidget(box, 1)
+            lay.addLayout(row)
+        self.track_note = QLabel(tr("cast_track_note"))
+        self.track_note.setWordWrap(True)
+        self.track_note.setStyleSheet("font-size:11px; opacity:0.7;")
+        self.track_note.hide()
+        lay.addWidget(self.track_note)
+        self.audio_box.currentIndexChanged.connect(self._track_changed)
+        self.subs_box.currentIndexChanged.connect(self._track_changed)
 
         btns = QHBoxLayout()
         self.rescan_btn = QPushButton(tr("cast_rescan"))
@@ -595,6 +649,58 @@ class CastDialog(QDialog):
         self.stop_btn.clicked.connect(self._stop)
         close_btn.clicked.connect(self.accept)
         self._scan()
+        self._load_tracks()
+
+    # -- audio / subtitle tracks -------------------------------------------
+
+    def _load_tracks(self) -> None:
+        """Ask ffprobe what is in the stream, off the UI thread."""
+        def done(tracks):
+            try:
+                self._fill_tracks(tracks)
+            except RuntimeError:
+                pass                       # dialog closed while probing
+
+        run_async(self.window.pool, lambda: probe_tracks(self.url), done,
+                  lambda _msg: self._fill_tracks({}))
+
+    @staticmethod
+    def _track_label(t: dict) -> str:
+        bits = [b for b in (t.get("lang"), t.get("title")) if b]
+        bits.append(t.get("codec") or "?")
+        return " · ".join(bits)
+
+    def _fill_tracks(self, tracks: dict) -> None:
+        audio = (tracks or {}).get("audio") or []
+        subs = (tracks or {}).get("subtitle") or []
+        self.audio_box.blockSignals(True)
+        self.subs_box.blockSignals(True)
+        self.audio_box.clear()
+        self.subs_box.clear()
+        self.audio_box.addItem(tr("cast_track_default"), None)
+        self.subs_box.addItem(tr("cast_subs_off"), None)
+        for t in audio:
+            self.audio_box.addItem(self._track_label(t), t)
+        for t in subs:
+            self.subs_box.addItem(self._track_label(t), t)
+        # Open on the track the app is playing. Row 0 is "Default", so track
+        # N sits at N+1 - and track 0 IS the default, which is left alone so
+        # that a cast nobody changed anything about stays native.
+        if 0 < self.audio_index < len(audio):
+            self.audio_box.setCurrentIndex(self.audio_index + 1)
+        self.audio_box.blockSignals(False)
+        self.subs_box.blockSignals(False)
+        self._track_changed()
+        # A single audio track is no choice at all, and no subtitles means
+        # nothing to pick from - leave those boxes out of the way.
+        self.audio_box.setEnabled(len(audio) > 1)
+        self.subs_box.setEnabled(bool(subs))
+
+    def _track_changed(self) -> None:
+        self.track_note.setVisible(self._chosen() != (None, None))
+
+    def _chosen(self) -> tuple[dict | None, dict | None]:
+        return self.audio_box.currentData(), self.subs_box.currentData()
 
     def _set_status(self, text: str) -> None:
         try:
@@ -670,10 +776,11 @@ class CastDialog(QDialog):
             self._set_status(tr("cast_failed", msg=msg))
             self._banner(None, "")
 
+        audio, subs = self._chosen()
         run_async(self.window.pool,
                   lambda: self.window.cast.cast(name, self.url,
                                                  self.stream_title,
-                                                 self.codecs),
+                                                 self.codecs, audio, subs),
                   done, failed)
 
     def _banner(self, device: str | None, title: str) -> None:

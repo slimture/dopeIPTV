@@ -23,6 +23,7 @@ server and ffmpeg.
 
 from __future__ import annotations
 
+import json
 import secrets
 import shutil
 import socket
@@ -64,24 +65,108 @@ def lan_address() -> str:
         s.close()
 
 
-def ffmpeg_args(exe: str, source: str, copy_video: bool) -> list[str]:
+# Subtitle codecs that are pictures rather than text. They are laid over the
+# video with the overlay filter; text ones go through the subtitles filter,
+# which has to re-read the source and therefore needs its path escaped.
+BITMAP_SUBS = {"dvb_subtitle", "dvd_subtitle", "hdmv_pgs_subtitle", "xsub"}
+
+
+def probe_tracks(source: str, exe: str | None = None) -> dict:
+    """List the audio and subtitle tracks in *source* with ffprobe.
+
+    Returns {"audio": [...], "subtitle": [...]}, each entry carrying the index
+    within its own kind (which is what -map 0:a:N counts), the codec, the
+    language and any title. Empty on any failure: not being able to list the
+    tracks is a reason to offer no choice, never a reason to block a cast.
+    """
+    exe = exe or (shutil.which("ffprobe") or "")
+    out: dict[str, list[dict]] = {"audio": [], "subtitle": []}
+    if not exe:
+        return out
+    try:
+        raw = subprocess.run(
+            [exe, "-v", "error", *(["-user_agent", _UA]
+                                   if "://" in source else []),
+             "-print_format", "json", "-show_streams", source],
+            capture_output=True, timeout=25).stdout
+        streams = json.loads(raw or b"{}").get("streams", [])
+    except Exception as e:
+        log.info("cast bridge: could not list the tracks (%s)", e)
+        return out
+    for s in streams:
+        kind = s.get("codec_type")
+        if kind not in out:
+            continue
+        tags = s.get("tags") or {}
+        out[kind].append({
+            "index": len(out[kind]),          # what -map 0:a:N / 0:s:N counts
+            "codec": s.get("codec_name") or "?",
+            "lang": (tags.get("language") or "").strip(),
+            "title": (tags.get("title") or "").strip(),
+        })
+    log.info("cast bridge: %d audio track(s), %d subtitle track(s)",
+             len(out["audio"]), len(out["subtitle"]))
+    return out
+
+
+def _input_options(source: str) -> list[str]:
+    """Input options for *source* - only the ones its protocol accepts.
+
+    A player User-Agent and the reconnect flags belong to ffmpeg's HTTP
+    reader. Passing them for a local file is not merely useless: ffmpeg exits
+    with "Option user_agent not found" before it opens anything, which is
+    every recording on disk failing to cast.
+
+    The reconnects matter for the streams that do use them: an IPTV panel
+    drops HTTP connections between segments as a matter of course, and left
+    alone ffmpeg eventually gives up on one and the cast dies mid-programme.
+    """
+    if "://" not in source:
+        return []
+    return ["-user_agent", _UA,
+            "-reconnect", "1", "-reconnect_streamed", "1",
+            "-reconnect_on_network_error", "1", "-reconnect_delay_max", "5"]
+
+
+def _filter_escape(source: str) -> str:
+    """Escape a source path for use inside a filtergraph argument."""
+    for ch in ("\\", "'", ":", ",", "[", "]"):
+        source = source.replace(ch, "\\" + ch)
+    return source
+
+
+def ffmpeg_args(exe: str, source: str, copy_video: bool,
+                audio: int = 0, subs: int | None = None,
+                sub_codec: str = "") -> list[str]:
     """The command line, kept separate so it can be read and tested.
 
     Fragmented MP4 down a single HTTP response: the receiver is a Chrome
     engine and plays it as it arrives, and unlike HLS there are no segment
     files to write, name, serve and clean up.
+
+    A chosen subtitle is burned into the picture. The receiver only renders
+    subtitles it was handed as a separate WebVTT file, which cannot be made
+    from a live stream - nothing carried inside the stream is ever offered to
+    it. Burning them in always works, at the cost of re-encoding the video,
+    which is why it happens only when a subtitle is actually chosen.
     """
+    burn: list[str] = []
+    if subs is not None:
+        copy_video = False                    # a picture that changes must be
+        if sub_codec in BITMAP_SUBS:          # re-encoded, whatever it held
+            burn = ["-filter_complex",
+                    f"[0:v:0][0:s:{subs}]overlay[v]", "-map", "[v]"]
+        else:
+            burn = ["-vf",
+                    f"subtitles='{_filter_escape(source)}':si={subs}",
+                    "-map", "0:v:0"]
+    else:
+        burn = ["-map", "0:v:0"]
     return [
         exe, "-hide_banner", "-loglevel", "error",
-        "-user_agent", _UA,
-        # Live HTTP from an IPTV panel drops connections between segments as a
-        # matter of course ("Error reading HTTP response: End of file"). Left
-        # alone ffmpeg eventually gives up on one of them and the cast dies
-        # mid-programme; these let it pick the stream back up instead.
-        "-reconnect", "1", "-reconnect_streamed", "1",
-        "-reconnect_on_network_error", "1", "-reconnect_delay_max", "5",
+        *_input_options(source),
         "-fflags", "+genpts", "-i", source,
-        "-map", "0:v:0", "-map", "0:a:0",
+        *burn, "-map", f"0:a:{audio}",
         "-c:v", "copy" if copy_video else "libx264",
         *([] if copy_video else
           ["-preset", "veryfast", "-crf", "23",
@@ -143,6 +228,9 @@ class CastBridge:
         self.path: str | None = None
         self.source: str | None = None
         self.copy_video = True
+        self.audio = 0
+        self.subs: int | None = None
+        self.sub_codec = ""
         self.exe: str | None = None          # overridable, for tests
         self._server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
@@ -153,7 +241,9 @@ class CastBridge:
     def available() -> bool:
         return ffmpeg_path() is not None
 
-    def start(self, source: str, codecs: list[str] | None = None) -> str:
+    def start(self, source: str, codecs: list[str] | None = None,
+              audio: int = 0, subs: int | None = None,
+              sub_codec: str = "") -> str:
         """Begin serving *source* re-muxed for the receiver; returns the URL.
 
         ffmpeg is not started here - it starts when the Chromecast actually
@@ -170,6 +260,9 @@ class CastBridge:
             ("hevc", "h265", "vp9", "av1", "mpeg2", "mpeg2video")
             for c in codecs)
         self.source = source
+        self.audio, self.subs, self.sub_codec = audio, subs, sub_codec
+        if subs is not None:
+            self.copy_video = False   # burning subtitles in redraws every frame
         self.path = f"/{secrets.token_urlsafe(12)}/stream.mp4"
         self._server = ThreadingHTTPServer(("0.0.0.0", 0), _Handler)
         self._server.bridge = self            # type: ignore[attr-defined]
@@ -180,15 +273,19 @@ class CastBridge:
         self._thread.start()
         url = (f"http://{lan_address()}:{self._server.server_address[1]}"
                f"{self.path}")
-        log.info("cast bridge: serving %s (video %s, audio -> aac)",
-                 url, "copied" if self.copy_video else "re-encoded")
+        log.info("cast bridge: serving %s (video %s, audio track %d -> aac%s)",
+                 url, "copied" if self.copy_video else "re-encoded",
+                 self.audio,
+                 f", subtitle track {subs} burned in" if subs is not None
+                 else "")
         return url
 
     def spawn(self) -> subprocess.Popen | None:
         exe = self.exe or ffmpeg_path()
         if not exe or not self.source:
             return None
-        args = ffmpeg_args(exe, self.source, self.copy_video)
+        args = ffmpeg_args(exe, self.source, self.copy_video,
+                           self.audio, self.subs, self.sub_codec)
         log.info("cast bridge: starting ffmpeg")
         try:
             proc = subprocess.Popen(
