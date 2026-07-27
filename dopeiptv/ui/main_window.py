@@ -1494,6 +1494,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.player.update_timeshift_position(offset, title, paused=paused)
 
     def _play_overlay_clicked(self) -> None:
+        # WINDOWS ONLY: swallow a click that arrives in the same breath as a
+        # pop-out toggle. Reparenting the control bar mid-click makes Windows
+        # deliver the release to whatever is under the pointer - this button,
+        # whose action on a plain live channel is stop, which killed the stream
+        # the moment you popped out. The stamp is only ever set on win32 (see
+        # _toggle_popout), so this is inert on macOS and Linux.
+        since = time.monotonic() - getattr(self, "_popout_toggled_at", 0.0)
+        if getattr(self, "_popout_toggled_at", 0.0) and since < 0.4:
+            return
         state = self._overlay_state()
         if state == "play":
             self.play("mpv")

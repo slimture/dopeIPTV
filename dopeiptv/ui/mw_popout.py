@@ -102,6 +102,16 @@ class _PopoutMixin:
         detached."""
         if not self.player:
             return
+        # WINDOWS ONLY. Popping out reparents the control bar into the new
+        # window mid-click, and on Windows the button release is then delivered
+        # to whatever widget ends up under the pointer instead - the poster's
+        # play/stop button, which for a plain live channel means STOP. The
+        # stream was killed a second after popping out and the pop-out sat on a
+        # frozen frame. _play_overlay_clicked ignores a click this close to the
+        # transition. Not armed on macOS or Linux, where the release lands
+        # where it should and nothing needs guarding.
+        if sys.platform == "win32":
+            self._popout_toggled_at = time.monotonic()
         if self._popout_win is not None:
             self._exit_popout()
             return
