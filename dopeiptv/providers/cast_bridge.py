@@ -484,6 +484,25 @@ def ffmpeg_args(exe: str, source: str, copy_video: bool,
     ]
 
 
+class _Server(ThreadingHTTPServer):
+    """The bridge's own HTTP server, with the shouting turned off.
+
+    A Chromecast opens connections, probes them and drops them as a matter
+    of course, and socketserver prints a full traceback for every one -
+    pages of "Connection reset by peer" that look like the app falling over
+    and say nothing about the cast.
+    """
+
+    daemon_threads = True
+
+    def handle_error(self, request, client_address) -> None:
+        exc = sys.exc_info()[1]
+        if isinstance(exc, (ConnectionResetError, BrokenPipeError,
+                            TimeoutError, ConnectionAbortedError)):
+            return                      # the receiver hung up; not our news
+        log.info("cast bridge: a request failed (%s)", exc)
+
+
 class _Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
@@ -544,7 +563,7 @@ class _Handler(BaseHTTPRequestHandler):
             log.info("cast bridge: the receiver closed the connection "
                      "after %d s", time.monotonic() - began)
         finally:
-            bridge.kill(proc)
+            bridge.reader_gone(proc)
 
 
 class CastBridge:
@@ -572,6 +591,9 @@ class CastBridge:
         self._procs: list[subprocess.Popen] = []
         # The thread draining each ffmpeg into its spool file.
         self._spools: dict[subprocess.Popen, threading.Thread] = {}
+        # The stream now being served, and how many are reading it.
+        self._current: tuple[subprocess.Popen, str, int] | None = None
+        self._readers: dict[subprocess.Popen, int] = {}
         self._tmp: str | None = None
         self._lock = threading.Lock()
 
@@ -633,7 +655,7 @@ class CastBridge:
         if subs is not None:
             self.copy_video = False   # burning subtitles in redraws every frame
         self.path = f"/{secrets.token_urlsafe(12)}/stream.mp4"
-        self._server = ThreadingHTTPServer(("0.0.0.0", 0), _Handler)
+        self._server = _Server(("0.0.0.0", 0), _Handler)
         self._server.bridge = self            # type: ignore[attr-defined]
         self._server.daemon_threads = True
         self._thread = threading.Thread(
@@ -687,6 +709,22 @@ class CastBridge:
         except Exception as e:
             log.info("cast bridge: the spool stopped (%s)", e)
 
+    def reader_gone(self, proc: subprocess.Popen) -> None:
+        """A reader finished. Keep ffmpeg for whoever else is still reading.
+
+        Killing it on the first disconnect is what turned a Chromecast's
+        ordinary reconnect into a fresh ffmpeg, a fresh request to the panel
+        and a stretch played from its beginning again - on an account with
+        one connection, the previous one still counted, so the new one was
+        cut short as well.
+        """
+        with self._lock:
+            self._readers[proc] = self._readers.get(proc, 1) - 1
+            if self._readers[proc] > 0:
+                return
+            self._readers.pop(proc, None)
+        self.kill(proc)
+
     def first_frames(self) -> tuple[subprocess.Popen | None, str]:
         """Start ffmpeg and hold the opening back until it is plainly going.
 
@@ -706,6 +744,17 @@ class CastBridge:
         it to be sure, and until then a failure costs nothing but a wait.
         """
         mine = self.generation
+        # Already running for this stretch? Then this is the same stream
+        # asked for twice - a receiver reconnecting, or checking - and it
+        # reads the spool that is already filling. Starting a second ffmpeg
+        # for it is what "it keeps restarting" was made of.
+        with self._lock:
+            live = self._current
+            if (live and live[2] == mine and live[0].poll() is None):
+                self._readers[live[0]] = self._readers.get(live[0], 0) + 1
+                log.info("cast bridge: another reader joined the stream "
+                         "already running")
+                return live[0], live[1]
         for wait in (0, 6, 10):
             if wait:
                 log.info("cast bridge: the stream stopped short - trying "
@@ -745,6 +794,9 @@ class CastBridge:
                     log.info("cast bridge: the stream is going (%.1f s to "
                              "the first %d kB)", time.monotonic() - began,
                              size // 1000)
+                    with self._lock:
+                        self._current = (proc, path, mine)
+                        self._readers[proc] = 1
                     return proc, path
             self.kill(proc)
         log.info("cast bridge: the stream would not start")
@@ -847,6 +899,9 @@ class CastBridge:
             if proc in self._procs:
                 self._procs.remove(proc)
             self._spools.pop(proc, None)
+            self._readers.pop(proc, None)
+            if self._current and self._current[0] is proc:
+                self._current = None
         # Short waits on purpose: this runs on the way out of the app, where
         # every second spent here is a second the whole shutdown does not
         # have. ffmpeg has nothing to flush - it writes to a pipe nobody is

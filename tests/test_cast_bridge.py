@@ -635,3 +635,43 @@ def test_a_slow_receiver_never_stalls_the_panel(tmp_path):
     finally:
         cb.ffmpeg_args = real
         b.stop()
+
+
+def test_a_reconnecting_receiver_does_not_start_a_second_ffmpeg():
+    """A Chromecast opens, probes and reopens connections as a matter of
+    course. Spawning ffmpeg for each one meant a fresh request to the panel
+    and the stretch played from its beginning again - and on an account with
+    one connection, the previous request still counted, so the new one was
+    cut short too. One ffmpeg per run of the bridge; everyone reads the same
+    spool."""
+    import dopeiptv.providers.cast_bridge as cb
+
+    runs = []
+
+    def fake_args(exe, source, copy_video, *a, **k):
+        runs.append(source)
+        return [exe, "-c", "import sys,time;"
+                "sys.stdout.buffer.write(b'y' * 200000);"
+                "sys.stdout.flush();time.sleep(30)"]
+
+    b = CastBridge()
+    b.exe = sys.executable
+    url = b.start("http://p/timeshift/x.ts", ["h264"])
+    real = cb.ffmpeg_args
+    cb.ffmpeg_args = fake_args
+    try:
+        first = urllib.request.urlopen(url, timeout=30)
+        assert first.read(4096)
+        assert len(runs) == 1
+
+        second = urllib.request.urlopen(url, timeout=30)
+        assert second.read(4096)
+        assert len(runs) == 1, "the second reader joined the running stream"
+
+        # One reader leaving does not take the stream with it.
+        first.close()
+        time.sleep(0.5)
+        assert second.read(4096)
+    finally:
+        cb.ffmpeg_args = real
+        b.stop()
