@@ -1801,8 +1801,13 @@ def test_the_subtitle_is_turned_on_when_the_receiver_has_found_it():
     tracks = [{"trackId": 1, "type": "AUDIO"},
               {"trackId": 2, "type": "TEXT", "language": "swe"}]
     w.new_media_status(Status(tracks))
+    for _ in range(50):
+        if mc.enabled:
+            break
+        threading.Event().wait(0.02)
     assert mc.enabled == [2]
     w.new_media_status(Status(tracks))
+    threading.Event().wait(0.1)
     assert mc.enabled == [2], "asked once, not once a second"
 
     # A receiver that already has it on is left alone.
@@ -1957,10 +1962,15 @@ def test_only_a_text_track_counts_as_the_subtitle_being_on():
 
     mc = MC()
     _CastWatch("Alva TV", Manager(), mc).new_media_status(Status([1]))
+    for _ in range(50):
+        if mc.enabled:
+            break
+        threading.Event().wait(0.02)
     assert mc.enabled == [2], "the audio track being on is not the subtitle"
 
     mc2 = MC()
     _CastWatch("Alva TV", Manager(), mc2).new_media_status(Status([1, 2]))
+    threading.Event().wait(0.1)
     assert mc2.enabled == [], "a text track that is on is left alone"
 
 
@@ -2037,3 +2047,42 @@ def test_the_clock_keeps_counting_between_the_receiver_s_reports(monkeypatch):
     m2 = cm.ChromecastManager()
     m2.state = "PLAYING/None"
     assert m2.position() == 0.0
+
+
+def test_turning_the_subtitle_on_does_not_block_the_receive_thread():
+    """It ran on pychromecast's own receive thread and then waited there for
+    an answer that could only arrive on that same thread. It locked itself
+    out and gave up ten seconds later, every time:
+
+        could not turn the subtitle on (Execution of enable subtitle timed
+        out after 10.0 s.)
+    """
+    from dopeiptv.providers.chromecast import _CastWatch
+
+    class Bridge:
+        hls, subs = True, 0
+
+    class Manager:
+        bridge = Bridge()
+        last_position = 0.0
+        state = ""
+
+    done = threading.Event()
+
+    class Blocking:
+        def enable_subtitle(self, track_id, timeout=10.0):
+            done.wait(2)                # as slow as the real one, blocking
+
+    class Status:
+        player_state, idle_reason, current_time = "PLAYING", None, 1.0
+        subtitle_tracks = [{"trackId": 2, "type": "TEXT"}]
+        current_subtitle_tracks: list = []
+
+    import time as _t
+    began = _t.monotonic()
+    _CastWatch("Alva TV", Manager(), Blocking()).new_media_status(Status())
+    took = _t.monotonic() - began
+    done.set()
+    assert took < 0.5, (
+        f"the status callback was held for {took:.1f} s - on the real "
+        "receive thread that is the whole cast held with it")

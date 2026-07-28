@@ -333,13 +333,24 @@ class _CastWatch:
             log.info("cast %s: the subtitle is already on (%s)",
                      self.name, sorted(active & set(ids)))
             return
-        try:
-            self.mc.enable_subtitle(ids[0])
-            log.info("cast %s: turned the subtitle on (track %s of %s)",
-                     self.name, ids[0], ids)
-        except Exception as e:
-            log.info("cast %s: could not turn the subtitle on (%s)",
-                     self.name, e)
+        # Off this thread. This runs on pychromecast's own receive thread,
+        # and enable_subtitle sends a message and then waits for the answer
+        # - which can only arrive on the thread it is blocking. It locked
+        # itself out and gave up ten seconds later, every time:
+        #   could not turn the subtitle on (Execution of enable subtitle
+        #   timed out after 10.0 s.)
+        mc, name, track = self.mc, self.name, ids[0]
+
+        def ask():
+            try:
+                mc.enable_subtitle(track)
+                log.info("cast %s: turned the subtitle on (track %s of %s)",
+                         name, track, ids)
+            except Exception as e:
+                log.info("cast %s: could not turn the subtitle on (%s)",
+                         name, e)
+
+        threading.Thread(target=ask, daemon=True).start()
 
     def load_media_failed(self, queue_item_id, error_code) -> None:
         log.info("cast %s: receiver refused the stream (error %s)",
