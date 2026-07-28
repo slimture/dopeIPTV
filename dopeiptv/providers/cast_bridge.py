@@ -1060,6 +1060,21 @@ class CastBridge:
             daemon=True)
         self._thread.start()
         port = self._server.server_address[1]
+        # Anything still running belongs to the run just torn down. A
+        # receiver request can land between stop() and here, and it starts
+        # ffmpeg against a directory that has just been deleted:
+        #   Could not write header (incorrect codec parameters ?): No such
+        #   file or directory
+        # - and worse, its entry then counts as "this run already has a
+        # converter", so the real one never starts and the cast dies with
+        # no playlist at all. Kill the straggler and forget it; it is also
+        # holding a provider connection this account cannot spare.
+        with self._lock:
+            strays, self._procs = list(self._procs), []
+        for old in strays:
+            log.info("cast bridge: a converter from the last run was still "
+                     "starting - stopping it")
+            self.kill(old)
         url = f"http://{lan_address()}:{port}{self.path}"
         log.info("cast bridge: serving %s (video %s, audio track %d -> aac%s)",
                  url, "copied" if self.copy_video else "re-encoded",

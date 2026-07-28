@@ -1071,3 +1071,31 @@ def test_a_new_run_waits_for_the_provider_to_forget_the_last_one():
         assert time.monotonic() - began < 0.5
     finally:
         b3.stop()
+
+
+def test_a_converter_started_during_the_handover_is_not_left_behind():
+    """A receiver request can land between one run being torn down and the
+    next being set up, and it starts ffmpeg against a directory that has
+    just been deleted:
+
+        Could not write header (incorrect codec parameters ?): No such file
+        or directory
+
+    Worse, its entry then counted as "this run already has a converter", so
+    the real one never started and the cast died with no playlist at all -
+    which is what changing subtitle did.
+    """
+    b = CastBridge()
+    b.exe = "/bin/sleep"
+    killed = []
+    b.kill = lambda p: killed.append(p)
+    try:
+        b.start("http://p/movie/u/pw/5.mkv", subs=0, sub_codec="subrip")
+        # A straggler from the run that is being replaced.
+        stray = object()
+        b._procs.append(stray)
+        b.start("http://p/movie/u/pw/5.mkv", subs=0, sub_codec="subrip")
+        assert killed == [stray], "it holds a connection this account needs"
+        assert b._procs == [], "and it must not count as this run's converter"
+    finally:
+        b.stop()
