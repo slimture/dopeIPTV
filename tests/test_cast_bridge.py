@@ -1219,3 +1219,60 @@ def test_the_source_is_offered_as_something_that_cannot_be_seeked():
     finally:
         b.stop()
         prov.close()
+
+
+def test_the_filter_reads_the_whole_file_before_it_draws_anything():
+    """Written down because it is the shape of the problem, not a choice.
+
+    Measured on a server that counts what each open consumed, with the
+    bridge's own command line and a real ffmpeg: when the first byte of
+    output appeared, the picture's own read had got 55% of the way through
+    the file - and the subtitles filter's two opens had read ALL of it.
+
+        first 65536 bytes of output after 1.7 s
+        open 0: 5.4 MB (55% of the file)
+        open 1: 9.8 MB (100% of the file)
+        open 2: 9.8 MB (100% of the file)
+
+    The filter builds the whole subtitle track before it draws a line. So a
+    burned-in text subtitle on a remote film cannot start before the film
+    has been fetched, whatever the spool does - the spool only decides
+    whether that costs the account one connection or three, and three is
+    what the panel hangs up on.
+
+    This test guards the log line that makes the wait visible. Without it
+    the television is black and nothing anywhere says why.
+    """
+    from dopeiptv.providers.cast_bridge import _SourceSpool
+    said = []
+
+    class Watched(_SourceSpool):
+        pass
+
+    payload = b"Z" * 3_000_000
+    prov = _CountingProvider(payload, rate=300_000)
+    folder = os.path.join(os.path.dirname(__file__), "_src_progress")
+    import shutil as _sh
+    _sh.rmtree(folder, ignore_errors=True)
+    import dopeiptv.providers.cast_bridge as cb
+    real = cb.log.info
+
+    def spy(fmt, *a):
+        if "source %" in str(fmt):
+            said.append(fmt % a if a else fmt)
+        return real(fmt, *a)
+
+    cb.log.info = spy
+    try:
+        sp = Watched(folder, prov.url, cap=100_000_000).start()
+        for _ in range(400):
+            if sp.finished:
+                break
+            time.sleep(0.05)
+        assert sp.done == len(payload)
+    finally:
+        cb.log.info = real
+        prov.close()
+        _sh.rmtree(folder, ignore_errors=True)
+    assert said, "the wait has to say how far it has got"
+    assert "%" in said[0] and "MB" in said[0], said

@@ -592,6 +592,7 @@ class _SourceSpool:
                     self.size = int(r.headers.get("Content-Length") or 0)
                 except ValueError:
                     self.size = 0
+                said = 0.0
                 while not self._stop.is_set():
                     chunk = r.read(self.CHUNK)
                     if not chunk:
@@ -599,6 +600,20 @@ class _SourceSpool:
                     f.write(chunk)
                     f.flush()
                     self.done += len(chunk)
+                    # Say how far it has got, because for a burned-in text
+                    # subtitle this IS the wait. The subtitles filter builds
+                    # the whole track before it draws a single line - it read
+                    # 100% of the file before the first frame came out, on a
+                    # counting server - so nothing appears on the television
+                    # until this reaches the end. Without this line that is
+                    # indistinguishable from the app having died.
+                    if time.monotonic() - said > 5:
+                        said = time.monotonic()
+                        log.info(
+                            "cast bridge: source %.0f MB%s", self.done / 1e6,
+                            f" of {self.size / 1e6:.0f} "
+                            f"({100 * self.done / self.size:.0f} %)"
+                            if self.size else "")
                     if self.done >= self.cap:
                         log.info("cast bridge: the source reached %d GB - "
                                  "not taking any more of it",
