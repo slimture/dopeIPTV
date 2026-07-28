@@ -41,7 +41,8 @@ _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_local_tracks", "_cast_continue_archive", "_cast_time_at",
             "_cast_timeline", "_show_cast_timeline", "_cast_programme_at",
             "_effective_ts_minutes", "_show_cast_edge",
-            "_set_cast_quality", "_toggle_cast_mute", "_show_cast_volume")
+            "_set_cast_quality", "_toggle_cast_mute", "_show_cast_volume",
+            "_cast_tracks_menu", "manage_cast")
 
 
 class _Resume0:
@@ -1860,3 +1861,133 @@ def test_the_player_pane_goes_when_a_cast_starts():
     w.player = None
     w._cast_ctx = {"title": "Film", "kind": "movie"}
     w.show_cast_strip("Alva TV", "Film")
+
+
+def test_the_tracks_menu_can_actually_be_opened():
+    """It could not: it imported a function that had been deleted, and the
+    strip's tracks button crashed the app every time it was pressed. Every
+    other test drove the cast logic directly, so nothing ever built this
+    menu - the same hole the cast dialog fell through once already."""
+    w = _with_strip()
+    w.cast = _CastAt(0.0, 0.0)
+    w._cast_device = "Alva TV"
+    w.settings = _Settings()
+    w._cast_ctx = {"tracks": {"audio": [{"index": 0, "lang": "swe",
+                                         "codec": "aac"},
+                                        {"index": 1, "lang": "eng",
+                                         "codec": "ac3"}],
+                              "subtitle": [{"index": 0, "lang": "swe",
+                                            "codec": "subrip"},
+                                           {"index": 1, "lang": "eng",
+                                            "codec": "dvb_subtitle"}]},
+                   "audio": None, "subs": None}
+    w.cast_bar_tracks = _Lbl()
+    w.cast_bar_tracks.mapToGlobal = lambda p: p
+    w.cast_bar_tracks.rect = lambda: type("R", (), {
+        "bottomLeft": lambda self: None})()
+
+    class FakeMenu:
+        opened = []
+
+        def __init__(self, *a):
+            self.items = []
+
+        def addAction(self, label, slot=None):
+            act = type("A", (), {"setCheckable": lambda s, b: None,
+                                 "setChecked": lambda s, b: None,
+                                 "triggered": type("T", (), {
+                                     "connect": lambda s, f: None})()})()
+            self.items.append(label)
+            return act
+
+        def addMenu(self, label):
+            self.items.append(label)
+            return FakeMenu()
+
+        def addSeparator(self):
+            pass
+
+        def exec(self, *a):
+            FakeMenu.opened.append(list(self.items))
+
+    import dopeiptv.ui.main_window as mwmod
+    real = mwmod.QMenu
+    mwmod.QMenu = FakeMenu
+    try:
+        w._cast_tracks_menu()
+    finally:
+        mwmod.QMenu = real
+    assert FakeMenu.opened, "the menu was never opened"
+    # Every subtitle in the stream is offered - text and picture-based
+    # alike. The libass question that used to filter this list is gone.
+    assert w._last_menu_subs == 2
+
+
+def test_only_a_text_track_counts_as_the_subtitle_being_on():
+    """activeTrackIds lists EVERY active track, audio included.
+
+    So a cast whose audio happened to be track 1 reported "the subtitle is
+    already on ([1])" and left it off - and the log agreed with itself while
+    the television showed nothing.
+    """
+    from dopeiptv.providers.chromecast import _CastWatch
+
+    class Bridge:
+        hls, subs = True, 0
+
+    class Manager:
+        bridge = Bridge()
+        last_position = 0.0
+        state = ""
+
+    class MC:
+        def __init__(self):
+            self.enabled = []
+
+        def enable_subtitle(self, track_id, timeout=10.0):
+            self.enabled.append(track_id)
+
+    class Status:
+        player_state, idle_reason, current_time = "PLAYING", None, 1.0
+
+        def __init__(self, active):
+            self.subtitle_tracks = [{"trackId": 1, "type": "AUDIO"},
+                                    {"trackId": 2, "type": "TEXT"}]
+            self.current_subtitle_tracks = active
+
+    mc = MC()
+    _CastWatch("Alva TV", Manager(), mc).new_media_status(Status([1]))
+    assert mc.enabled == [2], "the audio track being on is not the subtitle"
+
+    mc2 = MC()
+    _CastWatch("Alva TV", Manager(), mc2).new_media_status(Status([1, 2]))
+    assert mc2.enabled == [], "a text track that is on is left alone"
+
+
+def test_a_playlist_is_seeked_rather_than_rebuilt():
+    """Every segment is still there and named, so the receiver jumps within
+    it by itself. Rebuilding the stream for that started the film over,
+    which is what dragging the bar appeared to do."""
+    w = _with_strip()
+    w._cast_device = "Alva TV"
+    again = []
+    w._recast_with = lambda a, s, start=None: again.append(start)
+
+    class Bridge:
+        hls = True
+
+    w.cast = _CastSeek(0.0, 6000.0, bridged=True)
+    w.cast.bridge = Bridge()
+    w._cast_seek(1800.0)
+    for _ in range(50):
+        if w.cast.sought is not None:
+            break
+        threading.Event().wait(0.02)
+    assert w.cast.sought == 1800.0, "the receiver does its own seeking"
+    assert again == [], "and the stream is not built again"
+
+    # A single long response cannot be seeked, so that one still is.
+    w.cast = _CastSeek(0.0, 6000.0, bridged=True)
+    w.cast.bridge = type("B", (), {"hls": False})()
+    w._cast_seek(1800.0)
+    assert again == [1800.0]

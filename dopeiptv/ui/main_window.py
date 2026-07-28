@@ -3808,21 +3808,22 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _cast_tracks_menu(self) -> None:
         """Offer another audio track or subtitle while the cast runs.
 
-        A subtitle is burned into the picture, so there is no switching it in
-        place - the stream has to be built again. It is built again from where
-        the TV has got to, which is the difference between changing the
-        subtitles and starting the film over.
+        There is no switching a track in place - the stream is built again,
+        from where the TV has got to, which is the difference between
+        changing the subtitles and starting the film over.
+
+        Every subtitle in the stream is offered. There used to be a libass
+        question here, because a text subtitle had to be drawn into the
+        picture; it now travels beside it as WebVTT, which any ffmpeg
+        writes.
         """
         ctx = self._cast_ctx or {}
         tracks = ctx.get("tracks") or {}
         audio = tracks.get("audio") or []
         subs = tracks.get("subtitle") or []
-        # Only the ones this ffmpeg can actually draw into the picture. A text
-        # subtitle needs the subtitles filter, and a build without libass has
-        # none - choosing one there simply ends the cast.
-        from ..providers.cast_bridge import BITMAP_SUBS, can_burn_subtitles
-        if subs and not can_burn_subtitles():
-            subs = [t for t in subs if t.get("codec") in BITMAP_SUBS]
+        # Kept for the test that opens this menu: how many subtitles were
+        # actually offered, which is the thing that used to be filtered.
+        self._last_menu_subs = len(subs)
         menu = QMenu(self)
         menu.addAction(tr("cast_title"), self.manage_cast)
         menu.addSeparator()
@@ -4196,7 +4197,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         """
         log.info("cast: moving to %s", self._fmt_hms(to))
         ctx = self._cast_ctx or {}
-        if self.cast.bridged():
+        # A playlist can be seeked where a single long response cannot: every
+        # segment is still there and named, so the receiver jumps within it
+        # by itself. Rebuilding the stream for that started the film over,
+        # which is what dragging the bar appeared to do.
+        playlist = getattr(getattr(self.cast, "bridge", None), "hls", False)
+        if self.cast.bridged() and not playlist:
             self._recast_with(ctx.get("audio"), ctx.get("subs"), start=to)
         else:
             threading.Thread(target=lambda: self.cast.seek(to),

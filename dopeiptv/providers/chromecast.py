@@ -317,10 +317,14 @@ class _CastWatch:
         if not ids:
             return                      # not parsed yet; asked again next time
         self._subs_done = True
-        already = list(getattr(status, "current_subtitle_tracks", None) or [])
-        if already:
+        # activeTrackIds lists EVERY active track, audio included - so a
+        # cast whose audio was track 1 reported "already on" and the
+        # subtitle stayed off, with the log cheerfully agreeing. Only a
+        # TEXT track counts as the subtitle being on.
+        active = set(getattr(status, "current_subtitle_tracks", None) or [])
+        if active & set(ids):
             log.info("cast %s: the subtitle is already on (%s)",
-                     self.name, already)
+                     self.name, sorted(active & set(ids)))
             return
         try:
             self.mc.enable_subtitle(ids[0])
