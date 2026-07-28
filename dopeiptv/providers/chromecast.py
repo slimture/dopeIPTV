@@ -815,7 +815,6 @@ class CastDialog(QDialog):
         # receiver tops out below fifty frames a second", they think "it
         # stutters on the TV". Remembered per device, and it is a ceiling -
         # an SD or HD channel is already below it and goes over untouched.
-        self.older_box.setWordWrap(True)
         lay.addWidget(self.older_box)
         self.quality_note = QLabel(tr("cast_quality_note"))
         self.quality_note.setStyleSheet("font-size:11px; opacity:0.7;")
