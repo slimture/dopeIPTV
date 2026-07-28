@@ -849,3 +849,255 @@ def test_a_television_that_dropped_out_rejoins_the_recording(tmp_path):
     first.close()
     again.close()
     sp.close()
+
+
+# ---------------------------------------------------------------------------
+# The source spool: one connection to the provider, however many opens ffmpeg
+# wants.
+# ---------------------------------------------------------------------------
+
+class _CountingProvider:
+    """A provider that serves one file and counts how many times it is asked.
+
+    The account under test allows a single connection. The point of the
+    source spool is that this number stays at one no matter what the
+    filtergraph does, so counting it is the whole test.
+    """
+
+    def __init__(self, payload: bytes):
+        import http.server
+        import socketserver
+        import threading as _th
+        self.payload = payload
+        self.opens = []
+        outer = self
+
+        class H(http.server.BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1"
+
+            def log_message(self, *a):
+                pass
+
+            def do_GET(self):                    # noqa: N802 (stdlib hook)
+                rng = self.headers.get("Range") or ""
+                outer.opens.append(rng or "-")
+                at = 0
+                if rng.startswith("bytes="):
+                    at = int(rng.split("=", 1)[1].split("-", 1)[0] or 0)
+                body = outer.payload[at:]
+                self.send_response(206 if at else 200)
+                self.send_header("Content-Type", "video/x-matroska")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Accept-Ranges", "bytes")
+                self.end_headers()
+                try:
+                    self.wfile.write(body)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+
+        self.srv = socketserver.TCPServer(("127.0.0.1", 0), H)
+        self.srv.daemon_threads = True
+        _th.Thread(target=self.srv.serve_forever,
+                   kwargs={"poll_interval": 0.05}, daemon=True).start()
+
+    @property
+    def url(self):
+        return f"http://127.0.0.1:{self.srv.server_address[1]}/film.mkv"
+
+    def close(self):
+        self.srv.shutdown()
+        self.srv.server_close()
+
+
+def test_the_source_is_taken_once_however_often_ffmpeg_opens_it():
+    """Measured on a counting server, because this was measured wrong twice.
+
+    The subtitles filter takes a filename, not a subtitle stream, so it
+    opens the source itself: three opens where an ordinary cast makes one.
+    On an account that allows one connection the panel hung up on the main
+    one and the film stopped a minute in -
+
+        Stream ends prematurely at 49211312, should be 4785883508
+
+    - which is the same illness the pause had, and gets the same cure.
+    """
+    from dopeiptv.providers.cast_bridge import _SourceSpool
+
+    payload = bytes(range(256)) * 4000            # ~1 MB, recognisable
+    prov = _CountingProvider(payload)
+    try:
+        folder = os.path.join(os.path.dirname(__file__), "_src_spool")
+        import shutil as _sh
+        _sh.rmtree(folder, ignore_errors=True)
+        src = _SourceSpool(folder, prov.url, cap=10_000_000).start()
+        for _ in range(200):
+            if src.finished:
+                break
+            time.sleep(0.02)
+        assert src.done == len(payload), "the whole thing was taken"
+
+        # Three readers, exactly as the filtergraph would: the picture and
+        # the filter's own two opens. None of them reaches the provider.
+        readers = [src.reader(), src.reader(), src.reader(500_000)]
+        got = []
+        for r in readers:
+            buf = b""
+            while True:
+                part = r.read(65536)
+                if not part:
+                    break
+                buf += part
+            got.append(buf)
+            r.close()
+        assert got[0] == payload
+        assert got[1] == payload, "a second open sees the whole thing too"
+        assert got[2] == payload[500_000:], "and a seek lands where it asked"
+        assert len(prov.opens) == 1, (
+            f"the provider was opened {len(prov.opens)} times: {prov.opens}")
+        _sh.rmtree(folder, ignore_errors=True)
+    finally:
+        prov.close()
+
+
+def test_a_reader_waits_at_the_write_head_instead_of_reporting_the_end():
+    """ffmpeg reading a file that is still growing STOPS at the end of it -
+    measured, 1.8 seconds of a 20-second clip. So the spool's reader has to
+    wait there rather than answer nothing, or a film would end wherever the
+    download happened to be when it started."""
+    from dopeiptv.providers.cast_bridge import _SourceSpool
+
+    class Slow(_SourceSpool):
+        def _fetch(self):
+            for _ in range(5):
+                with open(self.path, "ab") as f:
+                    f.write(b"X" * 1000)
+                self.done += 1000
+                time.sleep(0.05)
+            self.finished = True
+
+    folder = os.path.join(os.path.dirname(__file__), "_src_slow")
+    import shutil as _sh
+    _sh.rmtree(folder, ignore_errors=True)
+    os.makedirs(folder, exist_ok=True)
+    open(os.path.join(folder, "source.bin"), "wb").close()
+    sp = Slow(folder, "http://unused/", cap=10_000_000).start()
+
+    r = sp.reader()
+    got = b""
+    began = time.monotonic()
+    while True:
+        part = r.read(4096)
+        if not part:
+            break
+        got += part
+    # It stayed with the download to the end rather than stopping at the
+    # first pause in it.
+    assert len(got) == 5000, f"got {len(got)} bytes"
+    assert time.monotonic() - began > 0.15, "it really did wait"
+    r.close()
+    _sh.rmtree(folder, ignore_errors=True)
+
+
+def test_only_a_text_subtitle_on_a_remote_source_needs_the_spool():
+    """It is a cost - a whole film on disk - so it is paid only where the
+    double open actually happens. A bitmap subtitle is drawn with overlay
+    from the same input, and a file on disk can be opened as often as anyone
+    likes."""
+    import shutil as _sh
+
+    exe = _sh.which("true") or "/bin/true"
+    for subs, codec, source, want in (
+            (0, "subrip", "http://p/movie/u/pw/5.mkv", True),
+            (0, "dvb_subtitle", "http://p/movie/u/pw/5.mkv", False),
+            (0, "subrip", "/rec/film.mkv", False),
+            (None, "", "http://p/movie/u/pw/5.mkv", False)):
+        b = CastBridge()
+        b.exe = exe
+        try:
+            b.start(source, subs=subs, sub_codec=codec)
+            assert (b.src is not None) is want, (subs, codec, source)
+            if want:
+                assert b.source.startswith("http://127.0.0.1:")
+                assert b.src_path and b.src_path in b.source
+            else:
+                assert b.src_path is None
+        finally:
+            b.stop()
+
+
+@pytest.mark.filterwarnings("ignore")
+def test_a_real_burn_in_reaches_the_provider_exactly_once(tmp_path):
+    """The whole thing, end to end, with a real ffmpeg and a real filter.
+
+    Everything above tests a piece. This tests the claim: that choosing a
+    subtitle no longer costs the account more connections than it has. It
+    counts them at the provider, which is where the failure actually
+    happened.
+    """
+    import shutil as _sh
+    import subprocess
+
+    exe = _sh.which("ffmpeg")
+    if not exe:
+        pytest.skip("no ffmpeg")
+    if b"Unknown filter" in subprocess.run(
+            [exe, "-hide_banner", "-h", "filter=subtitles"],
+            capture_output=True).stderr:
+        pytest.skip("this ffmpeg has no libass")
+
+    srt = tmp_path / "s.srt"
+    srt.write_text("1\n00:00:00,500 --> 00:00:14,000\nWWWWWWWW\n")
+    mkv = tmp_path / "film.mkv"
+    # Big enough that the converted stream passes the bridge's own opening
+    # threshold - a postage stamp of black compresses to less than that and
+    # the run is written off as one that never started.
+    subprocess.run(
+        [exe, "-hide_banner", "-loglevel", "error",
+         "-f", "lavfi", "-i", "testsrc=size=640x360:rate=25:duration=40",
+         "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo:d=40",
+         "-i", str(srt), "-c:v", "libx264", "-preset", "ultrafast",
+         "-c:a", "aac", "-c:s", "copy", "-y", str(mkv)], check=True)
+
+    prov = _CountingProvider(mkv.read_bytes())
+    b = CastBridge()
+    try:
+        url = b.start(prov.url, subs=0, sub_codec="subrip")
+        assert b.src is not None, "a text subtitle on a URL uses the spool"
+        # Ask for the stream the way the receiver does, and read enough of
+        # it to know ffmpeg really ran the filtergraph.
+        got = 0
+        with urllib.request.urlopen(url, timeout=60) as r:
+            while got < 200_000:
+                chunk = r.read(65536)
+                if not chunk:
+                    break
+                got += len(chunk)
+        assert got > 0, "nothing came out of the converter"
+        assert len(prov.opens) == 1, (
+            f"the provider was opened {len(prov.opens)} times: {prov.opens} "
+            "- an account that allows one connection loses the stream")
+    finally:
+        b.stop()
+        prov.close()
+
+    # And resuming part way in, which is the case that has to seek. The
+    # spool answers a Range out of what it holds and waits for the rest, so
+    # a jump is bounded by the link rather than refused.
+    prov = _CountingProvider(mkv.read_bytes())
+    b = CastBridge()
+    try:
+        url = b.start(prov.url, subs=0, sub_codec="subrip", start_at=8.0)
+        got = 0
+        with urllib.request.urlopen(url, timeout=60) as r:
+            while got < 200_000:
+                chunk = r.read(65536)
+                if not chunk:
+                    break
+                got += len(chunk)
+        assert got > 0, "a resumed cast produced nothing"
+        assert len(prov.opens) == 1, (
+            f"resuming opened the provider {len(prov.opens)} times: "
+            f"{prov.opens}")
+    finally:
+        b.stop()
+        prov.close()

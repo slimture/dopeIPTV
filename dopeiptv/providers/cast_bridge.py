@@ -381,6 +381,12 @@ def _input_options(source: str) -> list[str]:
     """
     if "://" not in source:
         return []
+    if _local_url(source):
+        # Our own source spool. Nothing to reconnect to and nothing to
+        # pretend to be - and a reconnect here would be actively harmful,
+        # because the spool is served from the beginning and ffmpeg would
+        # restart the film rather than carry on.
+        return []
     if _timeshift(source):
         # No reconnects for an archive window. The panel closes the stream
         # at its write head - that is the END of the stretch, and the app
@@ -392,6 +398,11 @@ def _input_options(source: str) -> list[str]:
     return ["-user_agent", _UA,
             "-reconnect", "1", "-reconnect_streamed", "1",
             "-reconnect_on_network_error", "1", "-reconnect_delay_max", "5"]
+
+
+def _local_url(source: str) -> bool:
+    """Whether *source* is served by this machine - our own source spool."""
+    return source.startswith(("http://127.0.0.1:", "http://localhost:"))
 
 
 def _timeshift(source: str) -> bool:
@@ -511,6 +522,141 @@ def ffmpeg_args(exe: str, source: str, copy_video: bool,
         "-movflags", "frag_keyframe+empty_moov+default_base_moof",
         "pipe:1",
     ]
+
+
+class _SourceSpool:
+    """One connection to the provider, drained to disk, so that ffmpeg may
+    open the source as many times as it likes.
+
+    The subtitles filter does not take a subtitle stream. It takes a
+    FILENAME, and opens it itself - so burning a text subtitle into the
+    picture cost three opens of the source where an ordinary cast costs one.
+    Measured, on a counting server:
+
+        without a subtitle . . . 1 open
+        with the filter  . . . . 3 opens
+
+    An Xtream account allows one. The panel hung up on the main connection
+    the moment the second arrived, and the film stopped a minute in:
+
+        Stream ends prematurely at 49211312, should be 4785883508
+
+    This is the same illness the pause had, and the same cure: stop asking
+    the provider for it. One connection is drained here at full speed into a
+    file, and ffmpeg is pointed at a local address instead - all three opens
+    land on this machine and the provider sees exactly one.
+
+    Two more things were measured before building it. The subtitles filter
+    is happy with a file that is not finished - it renders identically
+    against half of one - but ffmpeg reading a file that is still growing
+    STOPS at the end of it, and got 1.8 seconds of a 20-second clip. So the
+    spool is served over HTTP by something that waits at the write head
+    rather than answering EOF, which is what the reader below is for.
+    """
+
+    CHUNK = 262_144
+
+    def __init__(self, folder: str, url: str, cap: int) -> None:
+        os.makedirs(folder, exist_ok=True)
+        self.path = os.path.join(folder, "source.bin")
+        self.url, self.cap = url, cap
+        self.done = 0               # bytes on disk, and therefore readable
+        # How long the whole thing is, when the provider says so. Passed on
+        # to ffmpeg, because without it a clean end of file is read as a
+        # truncation and the demuxer stops with an I/O error:
+        #   Stream ends prematurely at 7968, should be 18446744073709551615
+        # (that second number is "unknown"). A live stream has no length and
+        # none is sent, which is the same as the provider's own answer.
+        self.size = 0
+        self.finished = False
+        self.error = ""
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._fetch, daemon=True)
+
+    def start(self) -> "_SourceSpool":
+        self._thread.start()
+        return self
+
+    def _fetch(self) -> None:
+        """Take the stream as fast as it will come. Never at the pace of
+        anything downstream - a panel closes a connection nobody is
+        reading, and that is the failure this whole class exists to avoid."""
+        import urllib.request
+        began = time.monotonic()
+        try:
+            req = urllib.request.Request(
+                self.url, headers={"User-Agent": _UA})
+            with urllib.request.urlopen(req, timeout=30) as r, \
+                    open(self.path, "wb") as f:
+                try:
+                    self.size = int(r.headers.get("Content-Length") or 0)
+                except ValueError:
+                    self.size = 0
+                while not self._stop.is_set():
+                    chunk = r.read(self.CHUNK)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    f.flush()
+                    self.done += len(chunk)
+                    if self.done >= self.cap:
+                        log.info("cast bridge: the source reached %d GB - "
+                                 "not taking any more of it",
+                                 self.cap // 10**9)
+                        break
+        except Exception as e:
+            # Not fatal by itself: what has already arrived still plays, and
+            # the reader below will simply run out where the download did.
+            self.error = str(e)
+            log.info("cast bridge: the source stopped coming (%s)", e)
+        finally:
+            self.finished = True
+            log.info("cast bridge: source spool holds %.1f MB after %d s",
+                     self.done / 1e6, time.monotonic() - began)
+
+    def stop(self) -> None:
+        self._stop.set()
+
+    def reader(self, at: int = 0) -> "_SourceReader":
+        return _SourceReader(self, at)
+
+
+class _SourceReader:
+    """One of ffmpeg's opens of the source, read from the spool.
+
+    Always from the beginning, always forwards, and it waits at the write
+    head instead of reporting the end - which is the difference between a
+    film that plays and 1.8 seconds of one.
+    """
+
+    def __init__(self, spool: _SourceSpool, at: int = 0) -> None:
+        self.spool = spool
+        self.pos = at
+        self._f = None
+
+    def read(self, n: int) -> bytes:
+        while True:
+            if self.spool.size and self.pos >= self.spool.size:
+                return b""              # the whole thing has been handed on
+            ready = self.spool.done - self.pos
+            if ready > 0:
+                if self._f is None:
+                    self._f = open(self.spool.path, "rb")
+                self._f.seek(self.pos)
+                data = self._f.read(min(n, ready))
+                self.pos += len(data)
+                return data
+            if self.spool.finished:
+                return b""              # the download really has ended
+            time.sleep(0.05)
+
+    def close(self) -> None:
+        if self._f is not None:
+            try:
+                self._f.close()
+            except OSError:
+                pass
+            self._f = None
 
 
 class _Spool:
@@ -714,8 +860,62 @@ class _Handler(BaseHTTPRequestHandler):
             return
         self._headers()
 
+    def _serve_source(self) -> None:
+        """Hand ffmpeg the source out of the spool.
+
+        Ranges are honoured, because resuming a film part way in is a seek
+        before -i and ffmpeg needs to jump in the container to do it. A jump
+        to a place the download has not reached yet WAITS - the alternative
+        is answering short and having ffmpeg conclude the file ends there.
+
+        That waiting is the honest cost of one connection: the filter reads
+        the subtitles from the beginning while the picture comes from the
+        middle, and one stream cannot be in two places at once. It is
+        bounded by the link's speed rather than by playback, so it passes.
+        """
+        src = self.server.bridge.src
+        if src is None:
+            self.send_error(404)
+            return
+        at = 0
+        rng = self.headers.get("Range") or ""
+        if rng.startswith("bytes="):
+            try:
+                at = int(rng.split("=", 1)[1].split("-", 1)[0] or 0)
+            except ValueError:
+                at = 0
+        size = src.size
+        self.send_response(206 if (at and size) else 200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Accept-Ranges", "bytes")
+        if size:
+            self.send_header("Content-Length", str(max(0, size - at)))
+            if at:
+                self.send_header("Content-Range",
+                                 f"bytes {at}-{size - 1}/{size}")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if at and at > src.done:
+            log.info("cast bridge: waiting for the source to reach %.0f MB "
+                     "(it holds %.0f MB) - a resume has to be downloaded to",
+                     at / 1e6, src.done / 1e6)
+        reader = src.reader(at)
+        try:
+            while True:
+                chunk = reader.read(65536)
+                if not chunk:
+                    break
+                self.wfile.write(chunk)
+        except (BrokenPipeError, ConnectionResetError):
+            pass                    # ffmpeg closed one of its opens; normal
+        finally:
+            reader.close()
+
     def do_GET(self) -> None:
         bridge = self.server.bridge
+        if bridge.src_path and self.path == bridge.src_path:
+            self._serve_source()
+            return
         if self.path != bridge.path:
             self.send_error(404)
             return
@@ -765,6 +965,10 @@ class CastBridge:
     def __init__(self) -> None:
         self.path: str | None = None
         self.source: str | None = None
+        # The provider's stream, taken once and kept here, for the cast that
+        # needs to open it more than once. None for every other cast.
+        self.src: "_SourceSpool | None" = None
+        self.src_path: str | None = None
         self.copy_video = True
         self.audio = 0
         self.subs: int | None = None
@@ -858,8 +1062,20 @@ class CastBridge:
             target=self._server.serve_forever, kwargs={"poll_interval": 0.2},
             daemon=True)
         self._thread.start()
-        url = (f"http://{lan_address()}:{self._server.server_address[1]}"
-               f"{self.path}")
+        port = self._server.server_address[1]
+        # Burning a text subtitle in means ffmpeg opens the source three
+        # times over, and an account that allows one connection loses the
+        # stream to the second. Take it once, here, and let all three opens
+        # land on this machine. Only for a remote source: a file on disk can
+        # already be opened as often as anyone likes.
+        if (subs is not None and sub_codec not in BITMAP_SUBS
+                and "://" in source):
+            self.src_path = f"/{secrets.token_urlsafe(12)}/source"
+            self.src = _SourceSpool(self._tmpdir(), source, self.cap).start()
+            self.source = source = f"http://127.0.0.1:{port}{self.src_path}"
+            log.info("cast bridge: taking the source once into a spool - "
+                     "the subtitles filter opens it again by itself")
+        url = f"http://{lan_address()}:{port}{self.path}"
         log.info("cast bridge: serving %s (video %s, audio track %d -> aac%s)",
                  url, "copied" if self.copy_video else "re-encoded",
                  self.audio,
@@ -1129,6 +1345,13 @@ class CastBridge:
             procs, self._procs = list(self._procs), []
         for p in procs:
             self.kill(p)
+        if self.src is not None:
+            # Before the server goes: the download holds a provider
+            # connection, and leaving it running would keep the account
+            # busy for a cast nobody is watching any more.
+            self.src.stop()
+            self.src = None
+        self.src_path = None
         if self._server is not None:
             try:
                 self._server.shutdown()
