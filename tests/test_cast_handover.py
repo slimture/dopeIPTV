@@ -22,7 +22,7 @@ import pytest
 
 _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_local_codecs", "_toggle_cast_pause", "_cast_from_archive",
-            "_save_cast_position")
+            "_save_cast_position", "_recast_with", "_track_label")
 
 
 def _window():
@@ -76,6 +76,43 @@ def _with_strip():
     w.cast_bar_pause = _Lbl()
     w._cast_ctx = {}
     return w
+
+
+def test_switching_tracks_picks_up_where_the_tv_is(monkeypatch):
+    """A subtitle is burned into the picture, so there is no switching it in
+    place - the stream is built again. From where the TV got to, which is the
+    difference between changing the subtitles and starting the film over."""
+    sent = {}
+    w = _with_strip()
+    w.pool = None
+    w.player = None
+    w._cast_device = "Alva TV"
+    w.cast = _CastAt(1830.0, 6000.0)
+    swede = {"index": 2, "lang": "swe", "codec": "subrip"}
+    w._cast_ctx = {"url": "http://p/film.mkv", "source": "http://p/film.mkv",
+                   "title": "Film", "duration": 6000.0, "audio": None,
+                   "subs": None}
+    import dopeiptv.ui.main_window as mwmod
+    monkeypatch.setattr(mwmod, "run_async",
+                        lambda pool, work, ok, err: sent.update(work=work))
+    w._recast_with(None, swede)
+    assert sent, "the cast is made again"
+    assert w._cast_ctx["subs"] is swede
+
+    # It is cast from the position the TV reported, not from the beginning.
+    class Cast:
+        def __init__(self):
+            self.args = None
+
+        def cast(self, *a, **k):
+            self.args = a
+
+    w.cast_manager = Cast()
+    w.cast = _CastAt(1830.0, 6000.0)
+    w.cast.cast = lambda *a, **k: sent.update(start=a[6])
+    w._recast_with(None, swede)
+    sent["work"]()
+    assert sent["start"] == 1830.0, sent
 
 
 def test_local_playback_ends_a_running_cast():

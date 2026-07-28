@@ -974,6 +974,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             f"color:{P['muted3']}; font-size:11px;")
         _cast_col.addWidget(self.cast_bar_title)
         _cast_row.addLayout(_cast_col, 1)
+        self.cast_bar_tracks = QPushButton("⚙")
+        self.cast_bar_tracks.setToolTip(
+            tr("cast_audio") + " / " + tr("cast_subtitles"))
+        self.cast_bar_tracks.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.cast_bar_tracks.setFixedWidth(40)
+        self.cast_bar_tracks.clicked.connect(self._cast_tracks_menu)
+        _cast_row.addWidget(self.cast_bar_tracks)
         self.cast_bar_pause = QPushButton("⏸")
         self.cast_bar_pause.setToolTip(tr("tooltip_pause_resume"))
         self.cast_bar_pause.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -3418,6 +3425,75 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cast_bar_title.setText(title or "")
         self.cast_bar_title.setVisible(bool(title))
         bar.show()
+
+    def _cast_tracks_menu(self) -> None:
+        """Offer another audio track or subtitle while the cast runs.
+
+        A subtitle is burned into the picture, so there is no switching it in
+        place - the stream has to be built again. It is built again from where
+        the TV has got to, which is the difference between changing the
+        subtitles and starting the film over.
+        """
+        ctx = self._cast_ctx or {}
+        tracks = ctx.get("tracks") or {}
+        audio = tracks.get("audio") or []
+        subs = tracks.get("subtitle") or []
+        if not audio and not subs:
+            return
+        menu = QMenu(self)
+        cur_a = (ctx.get("audio") or {}).get("index")
+        cur_s = (ctx.get("subs") or {}).get("index")
+
+        def entry(parent, label, checked, chooser):
+            act = parent.addAction(label)
+            act.setCheckable(True)
+            act.setChecked(checked)
+            act.triggered.connect(chooser)
+
+        if audio:
+            am = menu.addMenu(tr("cast_audio"))
+            entry(am, tr("cast_track_default"), cur_a is None,
+                  lambda: self._recast_with(None, ctx.get("subs")))
+            for t in audio:
+                entry(am, self._track_label(t), t["index"] == cur_a,
+                      lambda _c=False, t=t: self._recast_with(t,
+                                                              ctx.get("subs")))
+        if subs:
+            sm = menu.addMenu(tr("cast_subtitles"))
+            entry(sm, tr("cast_subs_off"), cur_s is None,
+                  lambda: self._recast_with(ctx.get("audio"), None))
+            for t in subs:
+                entry(sm, self._track_label(t), t["index"] == cur_s,
+                      lambda _c=False, t=t: self._recast_with(ctx.get("audio"),
+                                                              t))
+        menu.exec(self.cast_bar_tracks.mapToGlobal(
+            self.cast_bar_tracks.rect().bottomLeft()))
+
+    @staticmethod
+    def _track_label(t: dict) -> str:
+        bits = [b for b in (t.get("lang"), t.get("title")) if b]
+        bits.append(t.get("codec") or "?")
+        return " · ".join(bits)
+
+    def _recast_with(self, audio, subs) -> None:
+        """Cast the same title again with different tracks, from where the TV
+        is now."""
+        ctx, device = self._cast_ctx or {}, self._cast_device
+        url = ctx.get("url")
+        if not device or not url:
+            return
+        at = self.cast.position()
+        ctx.update(audio=audio, subs=subs)
+        log.info("cast: switching tracks and picking up at %d s", at)
+        title = ctx.get("title") or "dopeIPTV"
+        run_async(
+            self.pool,
+            lambda: self.cast.cast(device, url, title, self._local_codecs(),
+                                   audio, subs, at,
+                                   ctx.get("duration") or 0.0,
+                                   False, ctx.get("source")),
+            lambda _n: self.show_cast_strip(device, title),
+            lambda msg: self._error(tr("cast_failed", msg=msg)))
 
     def _toggle_cast_pause(self) -> None:
         """Pause and resume what is playing on the TV.

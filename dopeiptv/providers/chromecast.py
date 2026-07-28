@@ -686,6 +686,8 @@ class CastDialog(QDialog):
         # What the converter should read. The same stream in the format the
         # player uses, which is not always the one the receiver is offered.
         self.source = source or url
+        self.audio_list: list[dict] = []
+        self.subs_list: list[dict] = []
         self.setWindowTitle(tr("cast_title"))
         self.setMinimumWidth(400)
         lay = QVBoxLayout(self)
@@ -767,6 +769,7 @@ class CastDialog(QDialog):
         self.duration = float((tracks or {}).get("duration") or 0.0)
         audio = (tracks or {}).get("audio") or []
         subs = (tracks or {}).get("subtitle") or []
+        self.audio_list, self.subs_list = audio, subs
         self.audio_box.blockSignals(True)
         self.subs_box.blockSignals(True)
         self.audio_box.clear()
@@ -874,6 +877,14 @@ class CastDialog(QDialog):
             self._banner(None, "")
 
         audio, subs = self._chosen()
+        # Leave everything the strip needs to offer another track later
+        # without asking the provider again.
+        ctx = getattr(self.window, "_cast_ctx", None)
+        if isinstance(ctx, dict):
+            ctx.update(url=self.url, source=self.source, codecs=self.codecs,
+                       audio=audio, subs=subs, duration=self.duration,
+                       tracks={"audio": self.audio_list,
+                               "subtitle": self.subs_list})
         run_async(self.window.pool,
                   lambda: self.window.cast.cast(name, self.url,
                                                  self.stream_title,
