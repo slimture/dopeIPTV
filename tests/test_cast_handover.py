@@ -300,11 +300,18 @@ def test_the_volume_slider_starts_where_the_television_is():
     remote changes, and it is the only one that is true."""
     w = _with_strip()
     w.cast = _Cast(active=True)
-    w.cast.volume = lambda: (0.35, True)
+    w.cast.volume = lambda: (0.35, False)
     w._show_cast_volume()
     assert w.cast_bar_vol.value_ == 35
-    assert w._cast_muted is True
+    assert w._cast_muted is False
     assert w.cast_bar_mute.icon is not None
+
+    # A television that is already muted shows a slider at zero, whatever
+    # level it would go back to - the two have to say the same thing.
+    w.cast.volume = lambda: (0.35, True)
+    w._show_cast_volume()
+    assert w.cast_bar_vol.value_ == 0
+    assert w._cast_muted is True
 
 
 def test_mute_is_a_toggle_and_reaches_the_tv():
@@ -1225,3 +1232,44 @@ def test_a_film_handed_over_from_the_player_knows_how_long_it_is():
 
     # Any other row is left to ffprobe, which answers for what is not playing.
     assert w._local_tracks({"stream_id": 6}) == {}
+
+
+def test_the_picture_question_names_the_device_in_the_strip_menu_too():
+    """The string carries the receiver's name, and the strip's own menu was
+    handing it none - so it read out the placeholder instead of a device."""
+    from dopeiptv.i18n import tr
+    w = _with_strip()
+    w._cast_device = "Alva TV"
+    label = tr("cast_older_device", name=w._cast_device)
+    assert "Alva TV" in label
+    assert "{name}" not in label
+
+
+def test_muting_the_tv_takes_the_slider_with_it():
+    """A slider sitting at half while nothing comes out of the television is
+    the control disagreeing with itself."""
+    w = _with_strip()
+    w.cast = _Cast(active=True)
+    w.cast.muted = None
+    w.cast.set_muted = lambda on: setattr(w.cast, "muted", on)
+    w.cast.set_volume = lambda lvl: setattr(w.cast, "level", lvl)
+    w.cast_bar_vol.setValue(70)
+
+    w._toggle_cast_mute()
+    assert w.cast_bar_vol.value() == 0
+    for _ in range(50):
+        if w.cast.muted is True:
+            break
+        threading.Event().wait(0.02)
+    assert w.cast.muted is True
+
+    # And back to where it was, not to a guess: the level was never changed.
+    w._toggle_cast_mute()
+    assert w.cast_bar_vol.value() == 70
+
+    # Reaching for the volume while muted means you want to hear it.
+    w._toggle_cast_mute()
+    assert w.cast_bar_vol.value() == 0
+    w._cast_volume(0.4)
+    assert w._cast_muted is False
+    assert w.cast_bar_vol.value() == 40

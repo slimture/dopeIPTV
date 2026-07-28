@@ -62,7 +62,10 @@ def _dialog(burn=True, **kw):
 def test_dialog_builds_from_a_row():
     win, dlg = _dialog()
     assert dlg.windowTitle()
-    assert dlg.older_box is not None
+    # No device picked yet, so there is nothing to ask the question about -
+    # and an unfilled "{name} is an older Chromecast" is worse than nothing.
+    assert dlg.older_box.isHidden() is True
+    assert dlg.quality_note.isHidden() is True
     win.deleteLater()
 
 
@@ -90,8 +93,12 @@ def test_the_picture_question_is_remembered_per_device():
                      probe=False, managing=True)
     assert dlg.quality() == "original"
     assert dlg.older_box.isChecked() is False
-    # Which receivers the question is for is what you need in order to answer
-    # it, so it is not hidden until after the box is ticked.
+    # It names the device it is about - the dialog is opened once per thing
+    # you cast, so a bare "Older Chromecast" in it reads as a question about
+    # this broadcast rather than a standing property of the receiver.
+    assert "Living room" in dlg.older_box.text()
+    # And the note saying which receivers it is for shows with the question,
+    # not after it is answered.
     assert dlg.quality_note.isHidden() is False
 
     dlg.older_box.setChecked(True)              # Living room

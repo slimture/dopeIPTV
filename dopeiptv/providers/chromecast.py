@@ -836,7 +836,11 @@ class CastDialog(QDialog):
         # thing you cast, so a bare "Older Chromecast" sitting in it reads as
         # a question about this broadcast - something to answer every time -
         # when it is a standing property of the receiver.
-        self.older_box = QCheckBox(tr("cast_older_device", name=""))
+        # Named once a device is picked, and not shown before then: it is a
+        # question about a particular receiver, and there is no answering it
+        # while none is selected.
+        self.older_box = QCheckBox()
+        self.older_box.hide()
         for box, label in ((self.audio_box, tr("cast_audio")),
                            (self.subs_box, tr("cast_subtitles"))):
             row = QHBoxLayout()
@@ -860,10 +864,11 @@ class CastDialog(QDialog):
         self.quality_note = QLabel(tr("cast_quality_note"))
         self.quality_note.setWordWrap(True)
         self.quality_note.setStyleSheet("font-size:11px; opacity:0.7;")
-        # Always shown, unlike the note about tracks: which receivers this is
-        # for is what you need in order to answer the question, so hiding it
-        # until after the box is ticked shows it to the only person who no
-        # longer needs it.
+        # Shown with the question, not after it is answered: which receivers
+        # this is for is what you need in order to answer it, so hiding it
+        # until the box is ticked shows it to the only person who no longer
+        # needs it.
+        self.quality_note.hide()
         lay.addWidget(self.quality_note)
         self.older_box.toggled.connect(self._quality_changed)
         self.list.currentItemChanged.connect(

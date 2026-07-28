@@ -3679,15 +3679,35 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         on the network, and nothing here should wait for it."""
         if getattr(self.cast, "active", None) is None:
             return
+        self._cast_level = int(round(level * 100))
+        if getattr(self, "_cast_muted", False) and level > 0:
+            # Reaching for the volume while it is muted means you want to
+            # hear it - leaving the mute on would make the slider do nothing.
+            self._toggle_cast_mute()
         threading.Thread(target=self.cast.set_volume, args=(level,),
                          daemon=True).start()
 
     def _toggle_cast_mute(self) -> None:
+        """Silence the TV, and say so on the slider.
+
+        A slider still sitting at half while nothing comes out of the
+        television is the control disagreeing with itself. It goes to zero
+        with the mute and comes back to where it was when the sound does -
+        the level itself is never changed, so unmuting needs no guess.
+        """
         if getattr(self.cast, "active", None) is None:
             return
         self._cast_muted = not getattr(self, "_cast_muted", False)
+        if self._cast_muted:
+            self._cast_level = self.cast_bar_vol.value()
         self.cast_bar_mute.setIcon(cast_strip_icon(
             "muted" if self._cast_muted else "volume", P["text"]))
+        # Without the guard the move would be read as someone setting the
+        # volume to zero, which is a different thing and would lose the level.
+        self.cast_bar_vol.blockSignals(True)
+        self.cast_bar_vol.setValue(
+            0 if self._cast_muted else getattr(self, "_cast_level", 50))
+        self.cast_bar_vol.blockSignals(False)
         threading.Thread(target=self.cast.set_muted,
                          args=(self._cast_muted,), daemon=True).start()
 
@@ -3699,8 +3719,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         except Exception:
             return
         self._cast_muted = muted
+        self._cast_level = int(round(level * 100))
         self.cast_bar_vol.blockSignals(True)
-        self.cast_bar_vol.setValue(int(round(level * 100)))
+        self.cast_bar_vol.setValue(0 if muted else self._cast_level)
         self.cast_bar_vol.blockSignals(False)
         self.cast_bar_mute.setIcon(cast_strip_icon(
             "muted" if muted else "volume", P["text"]))
@@ -3760,7 +3781,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # or HD channel passes untouched while the ceiling still reads 720p -
         # and a menu that only shows the setting looks like it is scaling
         # everything.
-        older = menu.addAction(tr("cast_older_device"))
+        older = menu.addAction(
+            tr("cast_older_device", name=self._cast_device or ""))
         older.setCheckable(True)
         older.setChecked(current != "original")
         older.triggered.connect(
