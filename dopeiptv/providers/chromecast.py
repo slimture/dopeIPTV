@@ -14,8 +14,8 @@ from ..core.log import log
 from ..i18n import tr
 from ..core.workers import run_async
 from .cast_bridge import (
-    BITMAP_SUBS, QUALITY, SAFE_AUDIO, SAFE_VIDEO, CastBridge,
-    can_burn_subtitles, normalise_quality, probe_tracks,
+    QUALITY, SAFE_AUDIO, SAFE_VIDEO, CastBridge,
+    normalise_quality, probe_tracks,
 )
 
 # pychromecast drags in zeroconf + ifaddr (~130 ms of the app's startup),
@@ -650,7 +650,12 @@ class ChromecastManager:
         # ffmpeg does the seeking, so the converted stream starts at zero and
         # the offset is added back when the position is read.
         self.position_offset = start
-        if self._play_and_verify(mc, bridged, "video/mp4", title) is not False:
+        # A text subtitle travels beside the picture as a WebVTT rendition,
+        # which means the bridge hands over a playlist rather than one long
+        # response - and a receiver told "video/mp4" about a playlist plays
+        # nothing at all.
+        ctype = ("application/x-mpegURL" if self.bridge.hls else "video/mp4")
+        if self._play_and_verify(mc, bridged, ctype, title) is not False:
             log.info("cast: %s is playing the converted stream", device_name)
             return True
         self.bridge.stop()
@@ -703,6 +708,24 @@ class ChromecastManager:
                       media_info={"duration": float(self.duration)}
                       if buffered else None)
         mc.block_until_active(timeout=10)
+        # Turn the subtitle on. It rides in the playlist as its own
+        # rendition, and the receiver lists it as a track but does not
+        # necessarily show it - a subtitle nobody asked to be optional
+        # would otherwise arrive switched off.
+        if getattr(self.bridge, "hls", False) and self.bridge.subs is not None:
+            for _ in range(20):
+                ids = [t.get("trackId") for t in
+                       (getattr(mc.status, "subtitle_tracks", None) or [])
+                       if t.get("trackId") is not None]
+                if ids:
+                    try:
+                        mc.enable_subtitle(ids[0])
+                        log.info("cast: the subtitle track is on")
+                    except Exception as e:
+                        log.info("cast: could not turn the subtitle on (%s)",
+                                 e)
+                    break
+                time.sleep(0.3)
         deadline = time.monotonic() + (
             self.VERDICT_WAIT if wait is None else wait)
         while time.monotonic() < deadline:
@@ -1011,14 +1034,11 @@ class CastDialog(QDialog):
         self.fps = float((tracks or {}).get("fps") or 0.0)
         audio = (tracks or {}).get("audio") or []
         subs = (tracks or {}).get("subtitle") or []
-        # A subtitle reaches a Chromecast only by being drawn into the
-        # picture, and a text one needs ffmpeg's subtitles filter - which
-        # plenty of builds ship without. Offering a choice that cannot be
-        # honoured is worse than not offering it at all: picking it took the
-        # picture away and said "No such filter" only in the log.
-        no_burn = bool(subs) and not can_burn_subtitles()
-        if no_burn:
-            subs = [t for t in subs if t.get("codec") in BITMAP_SUBS]
+        # Every subtitle can be offered now. A text one is handed to the
+        # receiver as a WebVTT rendition beside the picture, which needs no
+        # libass and nothing drawn into the frames; a picture-based one is
+        # still drawn in with overlay, which every ffmpeg has.
+        no_burn = False
         self.audio_list, self.subs_list = audio, subs
         self.audio_box.blockSignals(True)
         self.subs_box.blockSignals(True)

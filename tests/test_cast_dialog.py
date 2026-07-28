@@ -43,19 +43,14 @@ def _window():
     return w
 
 
-def _dialog(burn=True, **kw):
-    """Build the dialog. *burn* stands in for the machine's ffmpeg: whether
-    this one was built with libass decides whether a text subtitle can be
-    offered at all, and the CI runner's build and a developer's differ."""
+def _dialog(**kw):
+    """Build the dialog. No libass question any more: a text subtitle is
+    handed to the receiver as WebVTT beside the picture, which any ffmpeg
+    can write, so every subtitle in the stream can be offered."""
     import dopeiptv.providers.chromecast as cc
     win = _window()
     kw.setdefault("probe", False)       # never open the stream from a test
-    real = cc.can_burn_subtitles
-    cc.can_burn_subtitles = lambda exe=None: burn
-    try:
-        dlg = cc.CastDialog(win, "http://p/live/u/pw/1.m3u8", "SVT1", **kw)
-    finally:
-        cc.can_burn_subtitles = real
+    dlg = cc.CastDialog(win, "http://p/live/u/pw/1.m3u8", "SVT1", **kw)
     return win, dlg
 
 
@@ -136,24 +131,17 @@ def test_tracks_fill_the_boxes_without_a_probe():
     win.deleteLater()
 
 
-def test_an_ffmpeg_without_libass_offers_no_subtitle_it_cannot_send():
-    """A text subtitle reaches a Chromecast only by being drawn into the
-    picture, which needs libass. Offering the choice anyway took the picture
-    away and said "No such filter" in the log - so where the choice would
-    have been, say why there is none."""
+def test_every_subtitle_in_the_stream_can_be_offered():
+    """There used to be a libass question here: a text subtitle had to be
+    drawn into the picture, and builds without libass could not. It is gone.
+    A text subtitle now rides beside the picture as a WebVTT rendition,
+    which needs no libass - so the choice is always real."""
     tracks = {"audio": [{"index": 0, "lang": "swe", "codec": "aac"}],
-              "subtitle": [{"index": 0, "lang": "swe", "codec": "subrip"}]}
-    win, dlg = _dialog(burn=False, tracks=tracks, managing=True)
-    assert dlg.subs_box.isEnabled() is False
-    assert dlg.subs_box.count() == 1
-    assert "libass" in dlg.subs_box.itemText(0)
-    win.deleteLater()
-
-    # A picture-based subtitle is drawn with overlay, which every build has.
-    tracks["subtitle"] = [{"index": 0, "lang": "swe", "codec": "dvb_subtitle"}]
-    win, dlg = _dialog(burn=False, tracks=tracks, managing=True)
+              "subtitle": [{"index": 0, "lang": "swe", "codec": "subrip"},
+                           {"index": 1, "lang": "eng", "codec": "dvb_subtitle"}]}
+    win, dlg = _dialog(tracks=tracks, managing=True)
     assert dlg.subs_box.isEnabled() is True
-    assert dlg.subs_box.count() == 2           # off + the one
+    assert dlg.subs_box.count() == 3            # off + both
     win.deleteLater()
 
 

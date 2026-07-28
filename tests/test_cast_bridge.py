@@ -58,25 +58,6 @@ def test_the_chosen_audio_track_is_the_one_mapped():
     assert "0:v:0" in args
 
 
-def test_a_text_subtitle_is_burned_in_through_the_subtitles_filter():
-    """The receiver renders no subtitle carried inside a stream - it only
-    shows ones handed to it as a separate WebVTT file, which cannot be made
-    from a live channel. Burning them into the picture always works, at the
-    cost of re-encoding the video."""
-    args = ffmpeg_args("ffmpeg", "http://p/x.mkv", copy_video=True,
-                       audio=0, subs=1, sub_codec="subrip")
-    vf = args[args.index("-vf") + 1]
-    # Doubled backslashes: a filtergraph is parsed twice and the colon has to
-    # survive both. Quoting instead is what broke it - newer ffmpeg takes a
-    # backslash inside quotes literally and the filename kept them.
-    # yadif comes first: no Chromecast deinterlaces, and burning subtitles in
-    # re-encodes the video anyway. deint=1 leaves progressive frames alone.
-    assert vf == ("yadif=deint=1,"
-                  "subtitles=filename=http\\\\://p/x.mkv:si=1"), vf
-    # copy_video is overridden: a picture that changes cannot be copied.
-    assert args[args.index("-c:v") + 1] == "libx264"
-
-
 def test_a_bitmap_subtitle_is_overlaid_instead():
     """DVB and PGS subtitles are pictures, and the subtitles filter cannot
     draw them - they are composited over the video."""
@@ -86,14 +67,6 @@ def test_a_bitmap_subtitle_is_overlaid_instead():
     assert args[args.index("-filter_complex") + 1] == \
         "[0:v:0][0:s:0]overlay[v]"
     assert "[v]" in args
-
-
-def test_a_url_with_a_port_survives_the_filtergraph():
-    args = ffmpeg_args("ffmpeg", "http://h:8080/a.mkv", copy_video=False,
-                       subs=0, sub_codec="ass")
-    vf = args[args.index("-vf") + 1]
-    assert vf == ("yadif=deint=1,"
-                  "subtitles=filename=http\\\\://h\\\\:8080/a.mkv:si=0"), vf
 
 
 def test_a_local_file_is_linked_under_a_name_nothing_can_misread(tmp_path):
@@ -292,94 +265,6 @@ def test_a_failure_that_cannot_change_is_not_tried_twice_more():
         b.stop()
 
 
-def test_a_subtitle_choice_is_only_offered_when_it_can_be_honoured():
-    """A Chromecast renders no subtitle carried inside a stream, so the only
-    way to show one is to draw it into the picture - and a text subtitle needs
-    ffmpeg's subtitles filter, which plenty of builds ship without. The
-    capability is read from ffmpeg itself, once."""
-    import dopeiptv.providers.cast_bridge as cb
-
-    listed = []
-
-    class Result:
-        stdout = "Unknown filter 'subtitles'.\n"
-        stderr = ""
-
-    def fake_run(args, **kw):
-        listed.append(args)
-        return Result()
-
-    cb._can_burn = None
-    old = cb.subprocess.run
-    cb.subprocess.run = fake_run
-    try:
-        # Asked about the one filter, so a build that lays its filter
-        # table out differently is not misread as having no libass.
-        assert cb.can_burn_subtitles("ffmpeg") is False
-        assert "filter=subtitles" in listed[0]
-        Result.stdout = ("Filter subtitles\n  Render text subtitles.\n"
-                         "    Inputs: video\n")
-        assert cb.can_burn_subtitles("ffmpeg") is True
-    finally:
-        cb.subprocess.run = old
-        cb._can_burn = None
-
-
-def test_the_ffmpeg_that_can_send_subtitles_is_the_one_chosen():
-    """Machines carry more than one ffmpeg - a slim one on PATH and a full one
-    from Homebrew, or a bundled one inside the app - and whether a build has
-    libass decides whether a subtitle can be sent at all. Picking the first on
-    PATH meant the choice was made by accident."""
-    import dopeiptv.providers.cast_bridge as cb
-
-    asked = []
-
-    def fake_run(args, **kw):
-        asked.append(args[0])
-
-        class R:
-            # Only the Homebrew one was built with libass.
-            stdout = ("Filter subtitles\n  Render text subtitles.\n"
-                      if args[0] == "/opt/homebrew/bin/ffmpeg"
-                      else "Unknown filter 'subtitles'.\n")
-            stderr = ""
-        return R()
-
-    old_run, old_which, old_access = cb.subprocess.run, cb.shutil.which, \
-        cb.os.access
-    cb._ffmpeg, cb._can_burn = False, None
-    cb.subprocess.run = fake_run
-    cb.shutil.which = lambda n: "/usr/bin/" + n
-    cb.os.access = lambda p, m: p in ("/usr/bin/ffmpeg",
-                                      "/opt/homebrew/bin/ffmpeg")
-    try:
-        assert cb.ffmpeg_path() == "/opt/homebrew/bin/ffmpeg"
-        assert cb.can_burn_subtitles() is True
-        assert asked == ["/usr/bin/ffmpeg", "/opt/homebrew/bin/ffmpeg"]
-        # Asked once - spawn() calls this for every run.
-        asked.clear()
-        cb.ffmpeg_path()
-        assert asked == []
-
-        # With only the slim one present it is still used: converting a
-        # channel the receiver cannot decode matters more than subtitles.
-        cb._ffmpeg, cb._can_burn = False, None
-        cb.os.access = lambda p, m: p == "/usr/bin/ffmpeg"
-        assert cb.ffmpeg_path() == "/usr/bin/ffmpeg"
-        assert cb.can_burn_subtitles() is False
-
-        # And none at all is not a crash.
-        cb._ffmpeg, cb._can_burn = False, None
-        cb.os.access = lambda p, m: False
-        cb.shutil.which = lambda n: None
-        assert cb.ffmpeg_path() is None
-        assert cb.can_burn_subtitles() is False
-    finally:
-        cb.subprocess.run, cb.shutil.which = old_run, old_which
-        cb.os.access = old_access
-        cb._ffmpeg, cb._can_burn = False, None
-
-
 def test_a_local_recording_takes_none_of_the_http_options():
     """ffmpeg exits outright on an HTTP option it was handed for a file:
     "Option user_agent not found", before it opens anything - which is every
@@ -492,101 +377,6 @@ def test_a_request_never_spawns_into_a_stream_that_replaced_it():
     finally:
         cb.ffmpeg_args, cb.time.sleep = real_args, real_sleep
         b.stop()
-
-
-def test_a_burned_subtitle_survives_a_film_resumed_part_way_in():
-    """The subtitles filter reads the file from its own copy, and that copy
-    knows nothing of a seek made before -i: the video arrives with timestamps
-    starting at zero, the filter looks for a line to show at zero seconds,
-    and nothing is drawn at all. Not a line out of step - none.
-
-    The fix is to hand the filter the timeline it expects and take it back
-    afterwards, which keeps both the cheap seek and a stream that starts at
-    zero.
-    """
-    args = ffmpeg_args("ffmpeg", "/rec/film.mkv", copy_video=False,
-                       subs=2, sub_codec="subrip", start=1608.0)
-    vf = args[args.index("-vf") + 1]
-    assert "setpts=PTS+1608.000/TB,subtitles=" in vf, vf
-    assert vf.endswith("setpts=PTS-1608.000/TB"), vf
-    # Not by keeping the original timestamps: that renders the subtitle but
-    # hands the receiver a stream that begins twenty-six minutes in.
-    assert "-copyts" not in args and "-start_at_zero" not in args
-
-    # From the beginning there is no shift to make.
-    plain = ffmpeg_args("ffmpeg", "/rec/film.mkv", copy_video=False,
-                        subs=2, sub_codec="subrip")
-    assert "setpts" not in plain[plain.index("-vf") + 1]
-
-    # A picture-based subtitle is drawn from the same input and moves with
-    # the seek on its own.
-    bitmap = ffmpeg_args("ffmpeg", "/rec/film.mkv", copy_video=False,
-                         subs=2, sub_codec="dvb_subtitle", start=1608.0)
-    assert not any("setpts" in a for a in bitmap)
-
-
-@pytest.mark.filterwarnings("ignore")
-def test_ffmpeg_really_draws_the_subtitle_after_a_seek(tmp_path):
-    """Against a real ffmpeg, because this is not a thing that can be read
-    off the command line.
-
-    Every check above says what the arguments look like. The bug they exist
-    for was invisible there: the command was well formed, ffmpeg ran happily,
-    exited zero, and drew no subtitle whatsoever. Only a frame counts.
-    """
-    import shutil
-    import subprocess
-
-    exe = shutil.which("ffmpeg")
-    if not exe:
-        pytest.skip("no ffmpeg")
-    if b"Unknown filter" in subprocess.run(
-            [exe, "-hide_banner", "-h", "filter=subtitles"],
-            capture_output=True).stderr:
-        pytest.skip("this ffmpeg has no libass")
-
-    srt = tmp_path / "s.srt"
-    srt.write_text("1\n00:00:05,000 --> 00:00:08,000\nWWWWWWWWWWWW\n")
-    src = tmp_path / "src.mkv"
-    subprocess.run(
-        [exe, "-hide_banner", "-loglevel", "error",
-         "-f", "lavfi", "-i", "color=black:size=160x90:rate=10:duration=12",
-         "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo:d=12",
-         "-i", str(srt), "-c:v", "libx264", "-c:a", "aac", "-c:s", "copy",
-         "-y", str(src)], check=True)   # longer than the subtitle, on purpose
-
-    W, H, FPS = 160, 90, 10
-
-    def frames(start: float) -> list[int]:
-        """Lit pixels per frame of the bridge's own command, run for real.
-        The subtitle is the only thing in the picture that is not black."""
-        out = tmp_path / f"out{start}.mp4"
-        args = ffmpeg_args(exe, str(src), copy_video=False, subs=0,
-                           sub_codec="subrip", start=start)
-        # Exactly what the bridge would run, written where it can be read
-        # back instead of piped to a receiver.
-        assert args[-1] == "pipe:1"
-        r = subprocess.run(args[:-1] + [str(out)], capture_output=True)
-        assert out.exists(), r.stderr.decode()[-500:]
-        raw = subprocess.run(
-            [exe, "-hide_banner", "-loglevel", "error", "-i", str(out),
-             "-f", "rawvideo", "-pix_fmt", "gray", "-"],
-            capture_output=True).stdout
-        size = W * H
-        return [sum(1 for b in raw[i:i + size] if b > 60)
-                for i in range(0, len(raw) - size + 1, size)]
-
-    # Started five seconds in, the line is on screen at once and gone three
-    # seconds later - it runs to 0:08 and the film began at 0:05.
-    part_way = frames(5.0)
-    assert len(part_way) > FPS * 5, len(part_way)
-    assert part_way[FPS // 2] > 100, "the subtitle is drawn after a seek"
-    assert part_way[FPS * 4] == 0, "and only while it should be"
-
-    # And from the beginning, where nothing needs shifting.
-    whole = frames(0.0)
-    assert whole[FPS * 6] > 100
-    assert whole[FPS * 1] == 0
 
 
 def test_a_slow_receiver_never_stalls_the_panel(tmp_path):
@@ -923,356 +713,156 @@ class _CountingProvider:
         self.srv.server_close()
 
 
-def test_the_source_is_taken_once_however_often_ffmpeg_opens_it():
-    """Measured on a counting server, because this was measured wrong twice.
 
-    The subtitles filter takes a filename, not a subtitle stream, so it
-    opens the source itself: three opens where an ordinary cast makes one.
-    On an account that allows one connection the panel hung up on the main
-    one and the film stopped a minute in -
+# ---------------------------------------------------------------------------
+# A text subtitle travels beside the picture, as HLS with a WebVTT rendition.
+# ---------------------------------------------------------------------------
 
-        Stream ends prematurely at 49211312, should be 4785883508
+def test_a_text_subtitle_switches_the_delivery_to_hls():
+    """It decides the whole shape of the cast, so it is decided in one place.
 
-    - which is the same illness the pause had, and gets the same cure.
+    A picture-based subtitle is still drawn into the frames with overlay -
+    there is no WebVTT to make of a bitmap - and everything else is the
+    single long response it always was.
     """
-    from dopeiptv.providers.cast_bridge import _SourceSpool
-
-    payload = bytes(range(256)) * 4000            # ~1 MB, recognisable
-    prov = _CountingProvider(payload)
-    try:
-        folder = os.path.join(os.path.dirname(__file__), "_src_spool")
-        import shutil as _sh
-        _sh.rmtree(folder, ignore_errors=True)
-        src = _SourceSpool(folder, prov.url, cap=10_000_000).start()
-        for _ in range(200):
-            if src.finished:
-                break
-            time.sleep(0.02)
-        assert src.done == len(payload), "the whole thing was taken"
-
-        # Three readers, exactly as the filtergraph would: the picture and
-        # the filter's own two opens. None of them reaches the provider.
-        readers = [src.reader(), src.reader(), src.reader(500_000)]
-        got = []
-        for r in readers:
-            buf = b""
-            while True:
-                part = r.read(65536)
-                if not part:
-                    break
-                buf += part
-            got.append(buf)
-            r.close()
-        assert got[0] == payload
-        assert got[1] == payload, "a second open sees the whole thing too"
-        assert got[2] == payload[500_000:], "and a seek lands where it asked"
-        assert len(prov.opens) == 1, (
-            f"the provider was opened {len(prov.opens)} times: {prov.opens}")
-        _sh.rmtree(folder, ignore_errors=True)
-    finally:
-        prov.close()
-
-
-def test_a_reader_waits_at_the_write_head_instead_of_reporting_the_end():
-    """ffmpeg reading a file that is still growing STOPS at the end of it -
-    measured, 1.8 seconds of a 20-second clip. So the spool's reader has to
-    wait there rather than answer nothing, or a film would end wherever the
-    download happened to be when it started."""
-    from dopeiptv.providers.cast_bridge import _SourceSpool
-
-    class Slow(_SourceSpool):
-        def _fetch(self):
-            for _ in range(5):
-                with open(self.path, "ab") as f:
-                    f.write(b"X" * 1000)
-                self.done += 1000
-                time.sleep(0.05)
-            self.finished = True
-
-    folder = os.path.join(os.path.dirname(__file__), "_src_slow")
-    import shutil as _sh
-    _sh.rmtree(folder, ignore_errors=True)
-    os.makedirs(folder, exist_ok=True)
-    open(os.path.join(folder, "source.bin"), "wb").close()
-    sp = Slow(folder, "http://unused/", cap=10_000_000).start()
-
-    r = sp.reader()
-    got = b""
-    began = time.monotonic()
-    while True:
-        part = r.read(4096)
-        if not part:
-            break
-        got += part
-    # It stayed with the download to the end rather than stopping at the
-    # first pause in it.
-    assert len(got) == 5000, f"got {len(got)} bytes"
-    assert time.monotonic() - began > 0.15, "it really did wait"
-    r.close()
-    _sh.rmtree(folder, ignore_errors=True)
-
-
-def test_only_a_text_subtitle_on_a_remote_source_needs_the_spool():
-    """It is a cost - a whole film on disk - so it is paid only where the
-    double open actually happens. A bitmap subtitle is drawn with overlay
-    from the same input, and a file on disk can be opened as often as anyone
-    likes."""
-    import shutil as _sh
-
-    exe = _sh.which("true") or "/bin/true"
-    for subs, codec, source, want in (
-            (0, "subrip", "http://p/movie/u/pw/5.mkv", True),
-            (0, "dvb_subtitle", "http://p/movie/u/pw/5.mkv", False),
-            (0, "subrip", "/rec/film.mkv", False),
-            (None, "", "http://p/movie/u/pw/5.mkv", False)):
+    from dopeiptv.providers.cast_bridge import hls_args
+    for subs, codec, want in ((0, "subrip", True), (0, "ass", True),
+                              (0, "dvb_subtitle", False),
+                              (0, "hdmv_pgs_subtitle", False),
+                              (None, "", False)):
         b = CastBridge()
-        b.exe = exe
+        b.exe = "/bin/true"
         try:
-            b.start(source, subs=subs, sub_codec=codec)
-            assert (b.src is not None) is want, (subs, codec, source)
+            url = b.start("http://p/movie/u/pw/5.mkv", subs=subs,
+                          sub_codec=codec)
+            assert b.hls is want, (subs, codec)
+            assert url.endswith("master.m3u8" if want else "stream.mp4")
             if want:
-                assert b.source.startswith("http://127.0.0.1:")
-                assert b.src_path and b.src_path in b.source
-            else:
-                assert b.src_path is None
+                assert b.hls_dir and os.path.isdir(b.hls_dir)
         finally:
             b.stop()
 
-
-@pytest.mark.filterwarnings("ignore")
-def test_a_real_burn_in_reaches_the_provider_exactly_once(tmp_path):
-    """The whole thing, end to end, with a real ffmpeg and a real filter.
-
-    Everything above tests a piece. This tests the claim: that choosing a
-    subtitle no longer costs the account more connections than it has. It
-    counts them at the provider, which is where the failure actually
-    happened.
-    """
-    import shutil as _sh
-    import subprocess
-
-    exe = _sh.which("ffmpeg")
-    if not exe:
-        pytest.skip("no ffmpeg")
-    if b"Unknown filter" in subprocess.run(
-            [exe, "-hide_banner", "-h", "filter=subtitles"],
-            capture_output=True).stderr:
-        pytest.skip("this ffmpeg has no libass")
-
-    srt = tmp_path / "s.srt"
-    srt.write_text("1\n00:00:00,500 --> 00:00:14,000\nWWWWWWWW\n")
-    mkv = tmp_path / "film.mkv"
-    # Big enough that the converted stream passes the bridge's own opening
-    # threshold - a postage stamp of black compresses to less than that and
-    # the run is written off as one that never started.
-    subprocess.run(
-        [exe, "-hide_banner", "-loglevel", "error",
-         "-f", "lavfi", "-i", "testsrc=size=640x360:rate=25:duration=40",
-         "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo:d=40",
-         "-i", str(srt), "-c:v", "libx264", "-preset", "ultrafast",
-         "-c:a", "aac", "-c:s", "copy", "-y", str(mkv)], check=True)
-
-    prov = _CountingProvider(mkv.read_bytes())
-    b = CastBridge()
-    try:
-        url = b.start(prov.url, subs=0, sub_codec="subrip")
-        assert b.src is not None, "a text subtitle on a URL uses the spool"
-        # Ask for the stream the way the receiver does, and read enough of
-        # it to know ffmpeg really ran the filtergraph.
-        got = 0
-        with urllib.request.urlopen(url, timeout=60) as r:
-            while got < 200_000:
-                chunk = r.read(65536)
-                if not chunk:
-                    break
-                got += len(chunk)
-        assert got > 0, "nothing came out of the converter"
-        assert len(prov.opens) == 1, (
-            f"the provider was opened {len(prov.opens)} times: {prov.opens} "
-            "- an account that allows one connection loses the stream")
-    finally:
-        b.stop()
-        prov.close()
-
-    # And resuming part way in, which is the case that has to seek. The
-    # spool answers a Range out of what it holds and waits for the rest, so
-    # a jump is bounded by the link rather than refused.
-    prov = _CountingProvider(mkv.read_bytes())
-    b = CastBridge()
-    try:
-        url = b.start(prov.url, subs=0, sub_codec="subrip", start_at=8.0)
-        got = 0
-        with urllib.request.urlopen(url, timeout=60) as r:
-            while got < 200_000:
-                chunk = r.read(65536)
-                if not chunk:
-                    break
-                got += len(chunk)
-        assert got > 0, "a resumed cast produced nothing"
-        assert len(prov.opens) == 1, (
-            f"resuming opened the provider {len(prov.opens)} times: "
-            f"{prov.opens}")
-    finally:
-        b.stop()
-        prov.close()
+    args = hls_args("ffmpeg", "http://p/f.mkv", copy_video=True,
+                    folder="/tmp/x", audio=1, subs=3)
+    # The subtitle is mapped and converted, not drawn: no filter, and so no
+    # second open of the source and no libass anywhere.
+    assert "-map" in args and "0:s:3" in args
+    assert args[args.index("-c:s") + 1] == "webvtt"
+    assert not any("subtitles=" in a for a in args)
+    # And the picture is left alone. A subtitle used to force a re-encode of
+    # every frame; beside the picture it costs nothing.
+    assert args[args.index("-c:v") + 1] == "copy"
+    assert "-var_stream_map" in args
 
 
-@pytest.mark.filterwarnings("ignore")
-def test_a_slow_provider_does_not_leave_the_television_black(tmp_path):
-    """The picture starts while the source is still arriving.
-
-    A smoke test, and honest about being one: it says the converter runs
-    against a source that is still coming in. What it does NOT prove is the
-    seek question below - it passed against the broken code too, because a
-    file this small finishes downloading before any wait for its far end
-    could matter.
-    """
-    import shutil as _sh
-    import subprocess
-
-    exe = _sh.which("ffmpeg")
-    if not exe:
-        pytest.skip("no ffmpeg")
-    if b"Unknown filter" in subprocess.run(
-            [exe, "-hide_banner", "-h", "filter=subtitles"],
-            capture_output=True).stderr:
-        pytest.skip("this ffmpeg has no libass")
-
-    srt = tmp_path / "s.srt"
-    srt.write_text("1\n00:00:00,500 --> 00:00:20,000\nWWWWWWWW\n")
-    mkv = tmp_path / "slow.mkv"
-    subprocess.run(
-        [exe, "-hide_banner", "-loglevel", "error",
-         "-f", "lavfi", "-i", "testsrc=size=640x360:rate=25:duration=40",
-         "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo:d=40",
-         "-i", str(srt), "-c:v", "libx264", "-preset", "ultrafast",
-         "-c:a", "aac", "-c:s", "copy", "-y", str(mkv)], check=True)
-
-    body = mkv.read_bytes()
-    # Slow enough that waiting for the end of the file would take far longer
-    # than this test is allowed, and fast enough that reading it straight
-    # through does not.
-    prov = _CountingProvider(body, rate=max(1, len(body) // 20))
-    b = CastBridge()
-    try:
-        url = b.start(prov.url, subs=0, sub_codec="subrip")
-        began = time.monotonic()
-        with urllib.request.urlopen(url, timeout=30) as r:
-            first = r.read(65536)
-        waited = time.monotonic() - began
-        assert first, "nothing came out while the source was still arriving"
-        assert waited < 20, (
-            f"the picture took {waited:.0f} s - it waited for the whole "
-            "download rather than reading straight through")
-        assert len(prov.opens) == 1, prov.opens
-    finally:
-        b.stop()
-        prov.close()
+def test_a_broadcast_rolls_its_window_and_a_film_keeps_everything():
+    """A film keeps every segment, which is what lets the television's own
+    remote scrub it - and what makes a pause free, because the segments go
+    on being written while the receiver sits still. A channel would fill the
+    disk doing that, so it deletes behind itself."""
+    from dopeiptv.providers.cast_bridge import hls_args
+    film = hls_args("ffmpeg", "http://p/movie/u/pw/5.mkv", True, "/tmp/x",
+                    subs=0, live=False)
+    assert film[film.index("-hls_list_size") + 1] == "0"
+    assert "event" in film
+    chan = hls_args("ffmpeg", "http://p/live/u/pw/9851.ts", True, "/tmp/x",
+                    subs=0, live=True)
+    assert chan[chan.index("-hls_list_size") + 1] == "6"
+    assert "delete_segments" in chan[chan.index("-hls_flags") + 1]
+    # Half-written playlists are the other way this dies: a receiver that
+    # asks at the wrong moment gets a parse error and nothing says why.
+    for args in (film, chan):
+        assert "temp_file" in args[args.index("-hls_flags") + 1]
 
 
-def test_the_source_is_offered_as_something_that_cannot_be_seeked():
-    """The contract, tested directly, because the end-to-end tests cannot.
-
-    Offered a seekable Matroska, ffmpeg's first move is to fetch the index -
-    and in Matroska the index lives at the END of the file. It asked for
-    byte 4785867699 of 4785883508 before decoding a single frame. A spool is
-    filled from the front, so honouring that meant waiting for a 4.7 GB
-    download, and the television sat black through all of it:
-
-        cast bridge: waiting for the source to reach 4786 MB (it holds 0 MB)
-
-    No Accept-Ranges and a 200 to every Range is how ffmpeg is told a stream
-    cannot be jumped around in - after which the demuxer reads it straight
-    through, which is what all three of the filtergraph's opens want anyway.
-
-    A whole film had to download before anything appeared, and every test
-    above passed while it did, because they serve the far end of the file in
-    the same instant as the near end. This one asks the endpoint itself.
-    """
-    payload = bytes(range(256)) * 400              # 102400 bytes
-    prov = _CountingProvider(payload)
+def test_the_hls_files_are_served_with_the_types_the_receiver_needs():
+    """A Cast receiver fetches the WebVTT rendition cross-origin and drops it
+    silently without the CORS header, which looks exactly like a stream that
+    has no subtitles at all. And a playlist served as video/mp4 plays
+    nothing."""
     b = CastBridge()
     b.exe = "/bin/true"
     try:
-        b.start(prov.url, subs=0, sub_codec="subrip")
-        for _ in range(200):
-            if b.src.finished:
-                break
-            time.sleep(0.02)
+        url = b.start("http://p/movie/u/pw/5.mkv", subs=0, sub_codec="subrip")
+        folder = b.hls_dir
+        open(os.path.join(folder, "master.m3u8"), "w").write("#EXTM3U\n")
+        open(os.path.join(folder, "v0.ts"), "wb").write(b"\x47" * 188)
+        open(os.path.join(folder, "s0.vtt"), "w").write("WEBVTT\n")
+        base = url.rsplit("/", 1)[0]
+        for name, ctype in (("master.m3u8", "application/vnd.apple.mpegurl"),
+                            ("v0.ts", "video/mp2t"),
+                            ("s0.vtt", "text/vtt")):
+            with urllib.request.urlopen(f"{base}/{name}", timeout=10) as r:
+                assert r.headers["Content-Type"] == ctype, name
+                assert r.headers["Access-Control-Allow-Origin"] == "*", name
+                assert r.read()
+        # Only a plain name inside our own folder is ever answered.
+        for bad in ("../secret", "sub/dir.ts", ".hidden"):
+            try:
+                urllib.request.urlopen(f"{base}/{bad}", timeout=5)
+                raise AssertionError(f"{bad} was served")
+            except urllib.error.HTTPError as e:
+                assert e.code == 404, (bad, e.code)
+    finally:
+        b.stop()
 
-        # Exactly what ffmpeg does when it wants the Matroska index.
-        req = urllib.request.Request(
-            b.source, headers={"Range": f"bytes={len(payload) - 4096}-"})
-        with urllib.request.urlopen(req, timeout=10) as r:
-            assert r.status == 200, (
-                "a 206 tells ffmpeg it may seek, and the next thing it asks "
-                "for is the far end of a film that is not downloaded yet")
-            assert not r.headers.get("Accept-Ranges")
-            body = r.read()
-        assert body == payload, "the answer starts at the beginning"
 
-        # And a plain request is the same answer, with the length on it -
-        # without which a clean end of file reads as a truncation.
-        with urllib.request.urlopen(b.source, timeout=10) as r:
-            assert int(r.headers["Content-Length"]) == len(payload)
-            assert r.read() == payload
+@pytest.mark.filterwarnings("ignore")
+def test_a_real_cast_with_a_subtitle_needs_one_connection_and_starts_at_once():
+    """The claim, end to end, with a real ffmpeg.
+
+    Burning a text subtitle in used to cost three opens of the source - the
+    filter takes a filename, not a stream - and the panel hung up on the
+    main one. It also read 100% of the file before the first frame, because
+    the filter builds the whole track before drawing a line.
+
+    Beside the picture there is nothing to preload and nothing to open
+    twice: measured against a source fed at a thirtieth of real speed, the
+    first WebVTT segment was written after 0.1 s and 3% of the file.
+    """
+    import shutil as _sh
+    import subprocess
+
+    exe = _sh.which("ffmpeg")
+    if not exe:
+        pytest.skip("no ffmpeg")
+
+    srt = os.path.join(os.path.dirname(__file__), "_hls_s.srt")
+    open(srt, "w").write("1\n00:00:00,500 --> 00:00:30,000\nHEJ\n")
+    mkv = os.path.join(os.path.dirname(__file__), "_hls_film.mkv")
+    subprocess.run(
+        [exe, "-hide_banner", "-loglevel", "error",
+         "-f", "lavfi", "-i", "testsrc=size=640x360:rate=25:duration=30",
+         "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo:d=30",
+         "-i", srt, "-c:v", "libx264", "-preset", "ultrafast",
+         "-c:a", "aac", "-c:s", "copy", "-y", mkv], check=True)
+
+    prov = _CountingProvider(open(mkv, "rb").read())
+    b = CastBridge()
+    try:
+        url = b.start(prov.url, subs=0, sub_codec="subrip")
+        assert b.hls is True
+        with urllib.request.urlopen(url, timeout=60) as r:
+            master = r.read().decode()
+        assert "#EXTM3U" in master
+        # The subtitle is announced as its own rendition - which is what the
+        # receiver renders, rather than anything drawn into the picture.
+        assert "TYPE=SUBTITLES" in master, master
+        # A media playlist and a subtitle playlist, both fetchable.
+        base = url.rsplit("/", 1)[0]
+        names = [ln.strip() for ln in master.splitlines()
+                 if ln.strip() and not ln.startswith("#")]
+        assert names, master
+        with urllib.request.urlopen(f"{base}/{names[0]}", timeout=30) as r:
+            media = r.read().decode()
+        assert "#EXTINF" in media, media
+        assert len(prov.opens) == 1, (
+            f"the provider was opened {len(prov.opens)} times: {prov.opens}")
     finally:
         b.stop()
         prov.close()
-
-
-def test_the_filter_reads_the_whole_file_before_it_draws_anything():
-    """Written down because it is the shape of the problem, not a choice.
-
-    Measured on a server that counts what each open consumed, with the
-    bridge's own command line and a real ffmpeg: when the first byte of
-    output appeared, the picture's own read had got 55% of the way through
-    the file - and the subtitles filter's two opens had read ALL of it.
-
-        first 65536 bytes of output after 1.7 s
-        open 0: 5.4 MB (55% of the file)
-        open 1: 9.8 MB (100% of the file)
-        open 2: 9.8 MB (100% of the file)
-
-    The filter builds the whole subtitle track before it draws a line. So a
-    burned-in text subtitle on a remote film cannot start before the film
-    has been fetched, whatever the spool does - the spool only decides
-    whether that costs the account one connection or three, and three is
-    what the panel hangs up on.
-
-    This test guards the log line that makes the wait visible. Without it
-    the television is black and nothing anywhere says why.
-    """
-    from dopeiptv.providers.cast_bridge import _SourceSpool
-    said = []
-
-    class Watched(_SourceSpool):
-        pass
-
-    payload = b"Z" * 3_000_000
-    prov = _CountingProvider(payload, rate=300_000)
-    folder = os.path.join(os.path.dirname(__file__), "_src_progress")
-    import shutil as _sh
-    _sh.rmtree(folder, ignore_errors=True)
-    import dopeiptv.providers.cast_bridge as cb
-    real = cb.log.info
-
-    def spy(fmt, *a):
-        if "source %" in str(fmt):
-            said.append(fmt % a if a else fmt)
-        return real(fmt, *a)
-
-    cb.log.info = spy
-    try:
-        sp = Watched(folder, prov.url, cap=100_000_000).start()
-        for _ in range(400):
-            if sp.finished:
-                break
-            time.sleep(0.05)
-        assert sp.done == len(payload)
-    finally:
-        cb.log.info = real
-        prov.close()
-        _sh.rmtree(folder, ignore_errors=True)
-    assert said, "the wait has to say how far it has got"
-    assert "%" in said[0] and "MB" in said[0], said
+        for f in (srt, mkv):
+            try:
+                os.remove(f)
+            except OSError:
+                pass

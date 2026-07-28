@@ -107,26 +107,7 @@ def _fatal_error(line: str) -> bool:
 
 
 _hw_encoder: str | None = None
-_can_burn: bool | None = None
 _ffmpeg: str | None | bool = False       # False = not looked for yet
-
-
-def _has_subtitles_filter(exe: str) -> bool:
-    """Whether this particular ffmpeg was built with libass.
-
-    Asked about the one filter rather than read out of the whole table: the
-    table's columns are a display format, and a build that lays them out
-    differently would be misread as having no libass while it does.
-    """
-    try:
-        r = subprocess.run([exe, "-hide_banner", "-h", "filter=subtitles"],
-                           capture_output=True, text=True, timeout=15)
-    except Exception as e:
-        log.info("cast bridge: could not ask %s about its filters (%s)",
-                 exe, e)
-        return False
-    said = (r.stdout or "") + (r.stderr or "")
-    return "unknown filter" not in said.lower() and "subtitles" in said
 
 
 def _ffmpeg_candidates() -> list[str]:
@@ -158,34 +139,6 @@ def _bundled() -> str | None:
         if os.path.isfile(cand) and os.access(cand, os.X_OK):
             return cand
     return None
-
-
-def can_burn_subtitles(exe: str | None = None) -> bool:
-    """Whether this ffmpeg can burn a text subtitle into the picture.
-
-    The subtitles filter is built on libass, and plenty of ffmpeg builds ship
-    without it - "No such filter: 'subtitles'", said once per attempt.
-
-    There is no way round it on the receiver's side. A Chromecast renders one
-    kind of subtitle only: a WebVTT file handed to it alongside the media. For
-    a live channel there is nothing to hand over. For a film there is, in
-    principle - but making it means demuxing the whole file first, which over
-    a provider link is minutes of waiting before anything appears on the TV,
-    and the receiver additionally requires CORS headers on the media itself,
-    which the provider does not send. So burning it into the picture is the
-    only route either way, and this decides whether the choice is offered at
-    all rather than being discovered after the picture has already gone.
-
-    Bitmap subtitles are a different matter - they are drawn with overlay,
-    which every build has.
-    """
-    global _can_burn
-    if exe is not None:                  # a named build, asked about directly
-        return _has_subtitles_filter(exe)
-    if _can_burn is None:
-        chosen = ffmpeg_path()
-        _can_burn = bool(chosen) and _has_subtitles_filter(chosen)
-    return _can_burn
 
 
 def video_encoder() -> str:
@@ -235,29 +188,24 @@ def cast_cache_dir() -> str:
 def ffmpeg_path() -> str | None:
     """Which ffmpeg to run, or None when there is none.
 
-    Not simply the first one on PATH. Whether a build has libass decides
-    whether a subtitle can be sent to the TV at all, and machines routinely
-    carry more than one ffmpeg - a slim one on PATH and a full one from
-    Homebrew, or a bundled one inside the app. So the ones that are here are
-    asked, and a build that can burn subtitles wins over one that cannot.
+    The first one found, in the order candidates are looked for. There used
+    to be a preference for a build with libass, because a text subtitle had
+    to be drawn into the picture and only libass could do it - that is gone.
+    A text subtitle now travels beside the picture as WebVTT, which any
+    ffmpeg can write, so no build is better than another for this.
+
     Asked once: it cannot change while the app is running.
     """
-    global _ffmpeg, _can_burn
+    global _ffmpeg
     if _ffmpeg is not False:
         return _ffmpeg                   # type: ignore[return-value]
     found = _ffmpeg_candidates()
-    _ffmpeg, _can_burn = (found[0] if found else None), False
-    for cand in found:
-        if _has_subtitles_filter(cand):
-            _ffmpeg, _can_burn = cand, True
-            break
+    _ffmpeg = found[0] if found else None
     if _ffmpeg is None:
         log.info("cast bridge: no ffmpeg found - streams the receiver "
                  "refuses cannot be converted")
     else:
-        log.info("cast bridge: using %s (subtitles %s)", _ffmpeg,
-                 "can be burned in" if _can_burn else
-                 "cannot be sent - this build has no libass")
+        log.info("cast bridge: using %s", _ffmpeg)
     return _ffmpeg                       # type: ignore[return-value]
 
 
@@ -381,12 +329,6 @@ def _input_options(source: str) -> list[str]:
     """
     if "://" not in source:
         return []
-    if _local_url(source):
-        # Our own source spool. Nothing to reconnect to and nothing to
-        # pretend to be - and a reconnect here would be actively harmful,
-        # because the spool is served from the beginning and ffmpeg would
-        # restart the film rather than carry on.
-        return []
     if _timeshift(source):
         # No reconnects for an archive window. The panel closes the stream
         # at its write head - that is the END of the stretch, and the app
@@ -400,9 +342,17 @@ def _input_options(source: str) -> list[str]:
             "-reconnect_on_network_error", "1", "-reconnect_delay_max", "5"]
 
 
-def _local_url(source: str) -> bool:
-    """Whether *source* is served by this machine - our own source spool."""
-    return source.startswith(("http://127.0.0.1:", "http://localhost:"))
+def _endless(source: str) -> bool:
+    """Whether this is a broadcast rather than something with an end.
+
+    Decides how much of an HLS set is kept: a channel rolls a short window
+    and deletes behind itself, a film keeps every segment so the
+    television's own remote can scrub it. Read off the address because that
+    is what the bridge is given - a panel's live and catch-up streams both
+    say so in their path, and everything else is a file with a length.
+    """
+    path = source.split("?", 1)[0].lower()
+    return "/live/" in path or _timeshift(source)
 
 
 def _timeshift(source: str) -> bool:
@@ -461,28 +411,14 @@ def ffmpeg_args(exe: str, source: str, copy_video: bool,
             burn = ["-filter_complex",
                     f"[0:v:0][0:s:{subs}]overlay[v]", "-map", "[v]"]
         else:
-            # The subtitles filter reads the file from its own copy, and that
-            # copy knows nothing of a seek made before -i: the video arrives
-            # with timestamps starting at zero, the filter looks for a line
-            # to show at zero seconds, and NOTHING is drawn at all. Not a
-            # line out of step - none.
-            #
-            # So hand the filter the timeline it expects and take it back
-            # afterwards: shift the frames up to where they really are in the
-            # film, render, shift them down again. The seek stays the cheap
-            # kind and the stream still starts at zero, which is what the
-            # receiver needs.
-            #
-            # "filename=" spelled out, not left positional. Newer ffmpeg
-            # refuses to take the first argument as a bare value once it has
-            # been escaped, and says so about the whole rest of the chain:
-            #   No option name near 'http\://lol.bz\:2095/....mkv:si=4'
-            if start > 0:
-                chain.append(f"setpts=PTS+{start:.3f}/TB")
-            chain.append(
-                f"subtitles=filename={_filter_escape(source)}:si={subs}")
-            if start > 0:
-                chain.append(f"setpts=PTS-{start:.3f}/TB")
+            # A text subtitle never reaches this branch any more: it goes to
+            # the receiver as a WebVTT rendition alongside the picture (see
+            # hls_args), which is how everything that streams does it. The
+            # subtitles filter built the WHOLE track before drawing a line -
+            # measured, it read 100% of the file before the first frame - so
+            # burning one in from a provider link meant fetching the film
+            # first. Only a picture-based subtitle is drawn here now.
+            burn = ["-map", "0:v:0"]
             burn = ["-map", "0:v:0"]
     else:
         burn = ["-map", "0:v:0"]
@@ -524,154 +460,77 @@ def ffmpeg_args(exe: str, source: str, copy_video: bool,
     ]
 
 
-class _SourceSpool:
-    """One connection to the provider, drained to disk, so that ffmpeg may
-    open the source as many times as it likes.
+HLS_SEGMENT = 4          # seconds per segment
 
-    The subtitles filter does not take a subtitle stream. It takes a
-    FILENAME, and opens it itself - so burning a text subtitle into the
-    picture cost three opens of the source where an ordinary cast costs one.
-    Measured, on a counting server:
 
-        without a subtitle . . . 1 open
-        with the filter  . . . . 3 opens
+def hls_args(exe: str, source: str, copy_video: bool, folder: str,
+             audio: int = 0, subs: int | None = None, start: float = 0.0,
+             quality: str = "original", live: bool = False) -> list[str]:
+    """The command for a cast that carries a text subtitle.
 
-    An Xtream account allows one. The panel hung up on the main connection
-    the moment the second arrived, and the film stopped a minute in:
+    Not burned into the picture: handed over beside it, as a WebVTT
+    rendition in an HLS playlist, which is how everything that streams does
+    subtitles and what the receiver renders natively.
 
-        Stream ends prematurely at 49211312, should be 4785883508
+    The reason is measured. ffmpeg's subtitles filter builds the WHOLE
+    subtitle track before it draws a single line - on a counting server its
+    two opens of the source had read 100% of the file when the first frame
+    came out, while the picture's own read had managed 55%. Burning a
+    subtitle into a film coming down a provider link therefore meant
+    fetching the entire film first, and the television sat black through it.
 
-    This is the same illness the pause had, and the same cure: stop asking
-    the provider for it. One connection is drained here at full speed into a
-    file, and ffmpeg is pointed at a local address instead - all three opens
-    land on this machine and the provider sees exactly one.
+    As a plain stream copy there is nothing to preload: the same measurement
+    against a source fed at a thirtieth of real speed had the first WebVTT
+    segment written after 0.1 seconds and 3% of the file. It also costs the
+    account exactly one connection, because nothing opens the source twice.
 
-    Two more things were measured before building it. The subtitles filter
-    is happy with a file that is not finished - it renders identically
-    against half of one - but ffmpeg reading a file that is still growing
-    STOPS at the end of it, and got 1.8 seconds of a 20-second clip. So the
-    spool is served over HTTP by something that waits at the write head
-    rather than answering EOF, which is what the reader below is for.
+    The picture is copied through where the receiver can take it, exactly as
+    it is for a cast without subtitles - a subtitle is no longer a reason to
+    re-encode anything.
     """
-
-    CHUNK = 262_144
-
-    def __init__(self, folder: str, url: str, cap: int) -> None:
-        os.makedirs(folder, exist_ok=True)
-        self.path = os.path.join(folder, "source.bin")
-        self.url, self.cap = url, cap
-        self.done = 0               # bytes on disk, and therefore readable
-        # How long the whole thing is, when the provider says so. Passed on
-        # to ffmpeg, because without it a clean end of file is read as a
-        # truncation and the demuxer stops with an I/O error:
-        #   Stream ends prematurely at 7968, should be 18446744073709551615
-        # (that second number is "unknown"). A live stream has no length and
-        # none is sent, which is the same as the provider's own answer.
-        self.size = 0
-        self.finished = False
-        self.error = ""
-        self._stop = threading.Event()
-        self._thread = threading.Thread(target=self._fetch, daemon=True)
-
-    def start(self) -> "_SourceSpool":
-        self._thread.start()
-        return self
-
-    def _fetch(self) -> None:
-        """Take the stream as fast as it will come. Never at the pace of
-        anything downstream - a panel closes a connection nobody is
-        reading, and that is the failure this whole class exists to avoid."""
-        import urllib.request
-        began = time.monotonic()
-        try:
-            req = urllib.request.Request(
-                self.url, headers={"User-Agent": _UA})
-            with urllib.request.urlopen(req, timeout=30) as r, \
-                    open(self.path, "wb") as f:
-                try:
-                    self.size = int(r.headers.get("Content-Length") or 0)
-                except ValueError:
-                    self.size = 0
-                said = 0.0
-                while not self._stop.is_set():
-                    chunk = r.read(self.CHUNK)
-                    if not chunk:
-                        break
-                    f.write(chunk)
-                    f.flush()
-                    self.done += len(chunk)
-                    # Say how far it has got, because for a burned-in text
-                    # subtitle this IS the wait. The subtitles filter builds
-                    # the whole track before it draws a single line - it read
-                    # 100% of the file before the first frame came out, on a
-                    # counting server - so nothing appears on the television
-                    # until this reaches the end. Without this line that is
-                    # indistinguishable from the app having died.
-                    if time.monotonic() - said > 5:
-                        said = time.monotonic()
-                        log.info(
-                            "cast bridge: source %.0f MB%s", self.done / 1e6,
-                            f" of {self.size / 1e6:.0f} "
-                            f"({100 * self.done / self.size:.0f} %)"
-                            if self.size else "")
-                    if self.done >= self.cap:
-                        log.info("cast bridge: the source reached %d GB - "
-                                 "not taking any more of it",
-                                 self.cap // 10**9)
-                        break
-        except Exception as e:
-            # Not fatal by itself: what has already arrived still plays, and
-            # the reader below will simply run out where the download did.
-            self.error = str(e)
-            log.info("cast bridge: the source stopped coming (%s)", e)
-        finally:
-            self.finished = True
-            log.info("cast bridge: source spool holds %.1f MB after %d s",
-                     self.done / 1e6, time.monotonic() - began)
-
-    def stop(self) -> None:
-        self._stop.set()
-
-    def reader(self, at: int = 0) -> "_SourceReader":
-        return _SourceReader(self, at)
-
-
-class _SourceReader:
-    """One of ffmpeg's opens of the source, read from the spool.
-
-    Always from the beginning, always forwards, and it waits at the write
-    head instead of reporting the end - which is the difference between a
-    film that plays and 1.8 seconds of one.
-    """
-
-    def __init__(self, spool: _SourceSpool, at: int = 0) -> None:
-        self.spool = spool
-        self.pos = at
-        self._f = None
-
-    def read(self, n: int) -> bytes:
-        while True:
-            if self.spool.size and self.pos >= self.spool.size:
-                return b""              # the whole thing has been handed on
-            ready = self.spool.done - self.pos
-            if ready > 0:
-                if self._f is None:
-                    self._f = open(self.spool.path, "rb")
-                self._f.seek(self.pos)
-                data = self._f.read(min(n, ready))
-                self.pos += len(data)
-                return data
-            if self.spool.finished:
-                return b""              # the download really has ended
-            time.sleep(0.05)
-
-    def close(self) -> None:
-        if self._f is not None:
-            try:
-                self._f.close()
-            except OSError:
-                pass
-            self._f = None
+    height, fps = QUALITY.get(quality, (0, 0))
+    if height or fps:
+        copy_video = False
+    chain: list[str] = []
+    if not copy_video:
+        chain.append("yadif=deint=1")
+    if height:
+        chain.append(f"scale=-2:{height}")
+    return [
+        exe, "-hide_banner", "-loglevel", "error",
+        "-analyzeduration", "1000000", "-probesize", "1000000",
+        *_input_options(source),
+        *(["-ss", f"{start:.3f}"] if start > 0 else []),
+        "-fflags", "+genpts", "-i", source,
+        "-map", "0:v:0", "-map", f"0:a:{audio}", "-map", f"0:s:{subs}",
+        *(["-vf", ",".join(chain)] if chain else []),
+        *(["-r", str(fps)] if fps else []),
+        "-c:v", "copy" if copy_video else video_encoder(),
+        *([] if copy_video else
+          (["-b:v", "4M"] if video_encoder() != "libx264" else
+           ["-preset", "veryfast", "-crf", "23",
+            "-maxrate", "6M", "-bufsize", "12M"])),
+        "-c:a", "aac", "-ac", "2", "-b:a", "192k",
+        # WebVTT is the one subtitle format a Cast receiver renders.
+        "-c:s", "webvtt",
+        "-f", "hls",
+        "-hls_time", str(HLS_SEGMENT),
+        # A broadcast keeps a rolling window; a film keeps everything, which
+        # is what lets the television's own remote scrub it - and what makes
+        # a pause cost nothing, because the segments go on being written
+        # while the receiver sits still.
+        *(["-hls_list_size", "6", "-hls_flags", "delete_segments+temp_file"]
+          if live else
+          ["-hls_list_size", "0", "-hls_playlist_type", "event",
+           "-hls_flags", "temp_file"]),
+        # temp_file above matters more than it looks: without it a playlist
+        # is served half-written to a receiver that asked at the wrong
+        # moment, and the cast dies on a parse error nobody can see.
+        "-hls_segment_filename", os.path.join(folder, "v%d.ts"),
+        "-master_pl_name", "master.m3u8",
+        "-var_stream_map", "v:0,a:0,s:0,sgroup:subs",
+        os.path.join(folder, "stream_%v.m3u8"),
+    ]
 
 
 class _Spool:
@@ -875,53 +734,55 @@ class _Handler(BaseHTTPRequestHandler):
             return
         self._headers()
 
-    def _serve_source(self) -> None:
-        """Hand ffmpeg the source out of the spool.
+    _TYPES = {".m3u8": "application/vnd.apple.mpegurl", ".ts": "video/mp2t",
+              ".vtt": "text/vtt"}
 
-        Deliberately not seekable. A Range is read and answered 200 from the
-        beginning, and no Accept-Ranges is offered - which is how ffmpeg
-        decides a stream cannot be jumped around in.
+    def _serve_hls(self) -> None:
+        """Hand over one file of the HLS set.
 
-        That is the whole difference between this working and not. Offered a
-        seekable Matroska, ffmpeg's first move is to fetch the index, which
-        lives at the END of the file: it asked for byte 4785867699 of
-        4785883508 before it had read a single frame. A spool is filled from
-        the front, so the answer was to wait for a 4.7 GB download, and the
-        television sat black through all of it. Told the stream cannot be
-        jumped around in, the demuxer reads it straight through instead -
-        exactly what it does with a live channel, and exactly what all three
-        of the filtergraph's opens want anyway.
+        Everything the receiver asks for is named in a playlist we wrote, so
+        only a plain name inside our own folder is ever answered - a path
+        with a directory in it is somebody else asking for something else.
 
-        The length is still sent, because without it a clean end of file
-        reads as a truncation and the demuxer stops with an I/O error.
+        The CORS header is not decoration here. A Cast receiver fetches the
+        WebVTT rendition with a cross-origin request and drops it silently
+        without one, which looks exactly like a stream that simply has no
+        subtitles.
         """
-        src = self.server.bridge.src
-        if src is None:
+        bridge = self.server.bridge
+        name = self.path[len(bridge.prefix or ""):]
+        # A plain name and nothing else. Everything the receiver asks for is
+        # named in a playlist we wrote, so anything with a slash or a dot
+        # path in it is somebody else asking for something else.
+        if not name or "/" in name or name.startswith("."):
             self.send_error(404)
             return
-        size = src.size
-        self.send_response(200)
-        self.send_header("Content-Type", "application/octet-stream")
-        if size:
-            self.send_header("Content-Length", str(size))
-        self.send_header("Connection", "close")
-        self.end_headers()
-        reader = src.reader()
+        if not bridge.hls_ready(name):
+            self.send_error(503)
+            return
+        path = os.path.join(bridge.hls_dir or "", name)
         try:
-            while True:
-                chunk = reader.read(65536)
-                if not chunk:
-                    break
-                self.wfile.write(chunk)
+            with open(path, "rb") as f:
+                body = f.read()
+        except OSError:
+            self.send_error(404)
+            return
+        self.send_response(200)
+        self.send_header(
+            "Content-Type",
+            self._TYPES.get(os.path.splitext(name)[1], "application/octet-stream"))
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        try:
+            self.wfile.write(body)
         except (BrokenPipeError, ConnectionResetError):
-            pass                    # ffmpeg closed one of its opens; normal
-        finally:
-            reader.close()
+            pass
 
     def do_GET(self) -> None:
         bridge = self.server.bridge
-        if bridge.src_path and self.path == bridge.src_path:
-            self._serve_source()
+        if bridge.hls and self.path.startswith(bridge.prefix or "\0"):
+            self._serve_hls()
             return
         if self.path != bridge.path:
             self.send_error(404)
@@ -971,11 +832,13 @@ class CastBridge:
 
     def __init__(self) -> None:
         self.path: str | None = None
+        self.prefix: str | None = None
         self.source: str | None = None
-        # The provider's stream, taken once and kept here, for the cast that
-        # needs to open it more than once. None for every other cast.
-        self.src: "_SourceSpool | None" = None
-        self.src_path: str | None = None
+        # Delivered as HLS instead of one long fragmented MP4. Only for a
+        # text subtitle, which travels beside the picture as a WebVTT
+        # rendition rather than being drawn into it.
+        self.hls = False
+        self.hls_dir: str | None = None
         self.copy_video = True
         self.audio = 0
         self.subs: int | None = None
@@ -1061,7 +924,16 @@ class CastBridge:
             self.copy_video = False
         if subs is not None:
             self.copy_video = False   # burning subtitles in redraws every frame
-        self.path = f"/{secrets.token_urlsafe(12)}/stream.mp4"
+        # A text subtitle goes beside the picture as a WebVTT rendition,
+        # which means HLS: a set of files rather than one long response.
+        self.hls = subs is not None and sub_codec not in BITMAP_SUBS
+        self.prefix = f"/{secrets.token_urlsafe(12)}/"
+        if self.hls:
+            self.hls_dir = os.path.join(self._tmpdir(), "hls")
+            os.makedirs(self.hls_dir, exist_ok=True)
+            self.path = self.prefix + "master.m3u8"
+        else:
+            self.path = self.prefix + "stream.mp4"
         self._server = _Server(("0.0.0.0", 0), _Handler)
         self._server.bridge = self            # type: ignore[attr-defined]
         self._server.daemon_threads = True
@@ -1070,23 +942,12 @@ class CastBridge:
             daemon=True)
         self._thread.start()
         port = self._server.server_address[1]
-        # Burning a text subtitle in means ffmpeg opens the source three
-        # times over, and an account that allows one connection loses the
-        # stream to the second. Take it once, here, and let all three opens
-        # land on this machine. Only for a remote source: a file on disk can
-        # already be opened as often as anyone likes.
-        if (subs is not None and sub_codec not in BITMAP_SUBS
-                and "://" in source):
-            self.src_path = f"/{secrets.token_urlsafe(12)}/source"
-            self.src = _SourceSpool(self._tmpdir(), source, self.cap).start()
-            self.source = source = f"http://127.0.0.1:{port}{self.src_path}"
-            log.info("cast bridge: taking the source once into a spool - "
-                     "the subtitles filter opens it again by itself")
         url = f"http://{lan_address()}:{port}{self.path}"
         log.info("cast bridge: serving %s (video %s, audio track %d -> aac%s)",
                  url, "copied" if self.copy_video else "re-encoded",
                  self.audio,
-                 (f", subtitle track {subs} burned in"
+                 (f", subtitle track {subs} as webvtt beside it" if self.hls
+                  else f", subtitle track {subs} drawn in"
                   if subs is not None else "")
                  + ("" if quality == "original" else f", {quality}"))
         return url
@@ -1115,6 +976,45 @@ class CastBridge:
         if not self._tmp:
             self._tmp = tempfile.mkdtemp(prefix="cast-", dir=cast_cache_dir())
         return self._tmp
+
+    # How long the receiver may be kept waiting for the first playlist.
+    # ffmpeg has to open the provider, find the streams and write a segment
+    # before there is anything to hand over, and over a slow link that is
+    # seconds rather than milliseconds.
+    HLS_WAIT = 25.0
+
+    def hls_ready(self, name: str) -> bool:
+        """Whether *name* can be served, starting ffmpeg if it has not been.
+
+        Nothing runs until the receiver actually asks, exactly as for a
+        single-response cast: a television that never connects costs the
+        provider nothing.
+
+        Only the first playlist is waited for. Everything after it is named
+        in a playlist we wrote, so by the time it is asked for it exists -
+        and waiting on a segment that ffmpeg has not reached yet would hold
+        a connection open for the whole of a live stream.
+        """
+        folder = self.hls_dir
+        if not folder:
+            return False
+        if not self._procs and not self.fatal and self.spawn() is None:
+            return False
+        if os.path.exists(os.path.join(folder, name)):
+            return True
+        if not name.endswith(".m3u8"):
+            return False
+        deadline = time.monotonic() + self.HLS_WAIT
+        while time.monotonic() < deadline:
+            if os.path.exists(os.path.join(folder, name)):
+                log.info("cast bridge: the playlist is ready")
+                return True
+            if self.fatal or not any(p.poll() is None for p in self._procs):
+                break               # ffmpeg gave up; nothing is coming
+            time.sleep(0.2)
+        log.info("cast bridge: no playlist after %.0f s - nothing to hand "
+                 "the receiver", self.HLS_WAIT)
+        return False
 
     def filling(self, proc: subprocess.Popen) -> bool:
         """Whether more is still on its way into the spool."""
@@ -1245,9 +1145,15 @@ class CastBridge:
         if self.fatal:
             log.info("cast bridge: not trying again - %s", self.fatal)
             return None
-        args = ffmpeg_args(exe, self.source, self.copy_video,
-                           self.audio, self.subs, self.sub_codec,
-                           self.start_at, self.quality)
+        if self.hls:
+            args = hls_args(exe, self.source, self.copy_video,
+                            self.hls_dir or "", self.audio, self.subs,
+                            self.start_at, self.quality,
+                            live=_endless(self.source))
+        else:
+            args = ffmpeg_args(exe, self.source, self.copy_video,
+                               self.audio, self.subs, self.sub_codec,
+                               self.start_at, self.quality)
         log.info("cast bridge: starting ffmpeg")
         try:
             proc = subprocess.Popen(
@@ -1352,13 +1258,6 @@ class CastBridge:
             procs, self._procs = list(self._procs), []
         for p in procs:
             self.kill(p)
-        if self.src is not None:
-            # Before the server goes: the download holds a provider
-            # connection, and leaving it running would keep the account
-            # busy for a cast nobody is watching any more.
-            self.src.stop()
-            self.src = None
-        self.src_path = None
         if self._server is not None:
             try:
                 self._server.shutdown()
@@ -1368,7 +1267,8 @@ class CastBridge:
             log.info("cast bridge: stopped")
         self._server = None
         self._thread = None
-        self.path = self.source = None
+        self.path = self.source = self.prefix = None
+        self.hls, self.hls_dir = False, None
         if self._tmp:
             shutil.rmtree(self._tmp, ignore_errors=True)
             self._tmp = None
