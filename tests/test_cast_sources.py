@@ -166,6 +166,13 @@ assert cast == {}, cast
 
 class FakePlayer:
     current_url = "http://p/live/u/pw/9851.ts"
+    visible = True
+
+    def isVisible(self):
+        return self.visible
+
+    def hide(self):
+        self.visible = False
 
 
 w.player = FakePlayer()
@@ -191,6 +198,9 @@ assert cast.get("url") == "http://p/live/u/pw/9851.ts", cast
 # drawn on top of one another. This is the real strip, not a rebuild of it,
 # because what has to hold is the window's own tree.
 w.show_cast_strip("Alva TV", "SVT1 HD")
+# Casting stops local playback, so the pane it leaves behind is black with a
+# toolbar under it that controls nothing. It goes with the stream.
+assert w.player is None or w.player.isVisible() is False
 from PyQt6.QtCore import QRect
 for width in (640, 420, 300, 220, 160):
     height = w.cast_bar.heightForWidth(width)

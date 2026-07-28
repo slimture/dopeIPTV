@@ -3653,6 +3653,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             ctx["_counted"] = True
             self._cast_behind = 0.0
             self._cast_paused_at = None
+        # The player pane goes with it. Casting stops local playback - the
+        # receiver pulls the stream itself, and on a one-connection account
+        # two readers is one too many - so what is left behind is a black
+        # rectangle with a toolbar under it that controls nothing. The strip
+        # above it is what is playing now.
+        #
+        # Not shown again from here: when the cast ends nothing is playing
+        # locally either, and every path that starts playback shows the
+        # player itself.
+        pl = getattr(self, "player", None)
+        if pl is not None and pl.isVisible():
+            pl.hide()
         self._record_cast_history()
         self._show_cast_progress()
         self.cast_bar_lbl.setText(tr("cast_casting_to", name=device))

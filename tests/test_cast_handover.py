@@ -1823,3 +1823,40 @@ def test_the_subtitle_is_turned_on_when_the_receiver_has_found_it():
     w3 = _CastWatch("Alva TV", M2(), mc3)
     w3.new_media_status(Status(tracks))
     assert mc3.enabled == []
+
+
+def test_the_player_pane_goes_when_a_cast_starts():
+    """Casting stops local playback, so what was left behind was a black
+    rectangle with a toolbar under it that controlled nothing."""
+    w = _with_strip()
+    w.cast = _CastAt(0.0, 0.0)
+    w.settings = _Settings()
+    w._record_cast_history = lambda: None
+    w._show_cast_volume = lambda: None
+    w._effective_ts_minutes = lambda it: 360
+    w.xmltv = _Xmltv([])
+
+    class Player:
+        def __init__(self):
+            self.shown = True
+
+        def isVisible(self):
+            return self.shown
+
+        def hide(self):
+            self.shown = False
+
+    w.player = Player()
+    w._cast_ctx = {"title": "Film", "kind": "movie"}
+    w.show_cast_strip("Alva TV", "Film")
+    assert w.player.shown is False
+
+    # Ending the cast does not bring it back: nothing is playing locally
+    # then either, and every path that starts playback shows it itself.
+    w.show_cast_strip(None)
+    assert w.player.shown is False
+
+    # And a window with no embedded player at all is not a special case.
+    w.player = None
+    w._cast_ctx = {"title": "Film", "kind": "movie"}
+    w.show_cast_strip("Alva TV", "Film")
