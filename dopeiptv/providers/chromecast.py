@@ -235,11 +235,22 @@ class _CastWatch:
     quietly going away - so both are logged as they happen.
     """
 
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str, manager=None) -> None:
         self.name = name
+        self.manager = manager
         self._last = ""
 
     def new_media_status(self, status) -> None:
+        # Where the TV has got to. It is the only place that number exists -
+        # the sender is not playing anything - and it is what a resume point
+        # is made of.
+        if self.manager is not None:
+            try:
+                pos = float(getattr(status, "current_time", 0) or 0)
+                if pos > 0:
+                    self.manager.last_position = pos
+            except (TypeError, ValueError):
+                pass
         cur = (f"{getattr(status, 'player_state', '?')}/"
                f"{getattr(status, 'idle_reason', None)}")
         if cur != self._last:
@@ -274,6 +285,12 @@ class ChromecastManager:
         # remembered per channel, never per device, so a device that plays
         # most channels natively goes on doing exactly that.
         self._needs_bridge: set[tuple[str, str]] = set()
+        # Where the current cast has got to, and how long the title is. The
+        # receiver reports its own position from zero, so a cast that started
+        # part way in has that offset added back before anything is stored.
+        self.last_position = 0.0
+        self.position_offset = 0.0
+        self.duration = 0.0
         # Discovery runs in the worker pool and so can a cast - and a cast may
         # have to discover first (see cast()). Two of those at once would tear
         # down each other's devices mid-flight.
@@ -331,9 +348,14 @@ class ChromecastManager:
     def _device(self, name: str):
         return next((c for c in self.devices if c.name == name), None)
 
+    def position(self) -> float:
+        """How far into the title the TV has got, in seconds."""
+        return self.position_offset + self.last_position
+
     def cast(self, device_name: str, url: str, title: str,
              known_codecs: list[str] | None = None,
-             audio: dict | None = None, subs: dict | None = None) -> str:
+             audio: dict | None = None, subs: dict | None = None,
+             start: float = 0.0, duration: float = 0.0) -> str:
         with self._lock:
             cc = self._device(device_name)
             if cc is None:
@@ -354,8 +376,12 @@ class ChromecastManager:
         # Attach the watcher BEFORE handing anything over, so the receiver's
         # first verdict is caught too - and it keeps reporting for the whole
         # life of the cast, which the old six-second poll did not.
-        self._watch(cc, mc, device_name)
+        self._watch(cc, mc, device_name, self)
         self.active = cc
+        # A fresh cast: nothing has been reported yet, and if it starts part
+        # way in that offset is what the receiver's own zero means.
+        self.last_position, self.position_offset = 0.0, 0.0
+        self.duration = duration
 
         # Straight to the converter when this device has already refused these
         # codecs once - the answer is not going to be different this time, and
@@ -369,12 +395,13 @@ class ChromecastManager:
         if audio is not None or subs is not None:
             log.info("cast: a track was chosen - converting so it can be used")
             if self._bridge_cast(mc, device_name, url, codecs, title,
-                                 audio, subs):
+                                 audio, subs, start):
                 return device_name
             raise RuntimeError("the chosen track could not be cast")
         if ((codecs and seen_bad.intersection(codecs))
                 or (device_name, url) in self._needs_bridge):
-            if self._bridge_cast(mc, device_name, url, codecs, title):
+            if self._bridge_cast(mc, device_name, url, codecs, title,
+                                 start=start):
                 return device_name
             raise RuntimeError(self._no_decoder(codecs))
 
@@ -402,14 +429,16 @@ class ChromecastManager:
             # then it plays. Straight to the converter.
             log.info("cast: %s is %s, which no Chromecast plays - "
                      "repackaging it here", device_name, ctype)
-            if self._bridge_cast(mc, device_name, url, codecs, title):
+            if self._bridge_cast(mc, device_name, url, codecs, title,
+                                 start=start):
                 return device_name
             raise RuntimeError(
                 f"this stream is {ctype}, and repackaging it here did not "
                 f"help either")
         log.info("cast -> %s: %s (%s)", device_name, resolved,
                  ctype if served else f"{ctype}, guessed")
-        verdict = self._play_and_verify(mc, resolved, ctype, title)
+        verdict = self._play_and_verify(mc, resolved, ctype, title,
+                                        start=start)
         if verdict:
             log.info("cast: %s is playing the provider's own stream - "
                      "nothing converted", device_name)
@@ -427,7 +456,8 @@ class ChromecastManager:
         if fallback not in _UNPLAYABLE:
             log.info("cast -> %s: %s (%s, guessed)", device_name, url,
                      fallback)
-            if self._play_and_verify(mc, url, fallback, title) is not False:
+            if self._play_and_verify(mc, url, fallback, title,
+                                     start=start) is not False:
                 return device_name
 
         # Both addresses refused. Now - and only now - work out what is
@@ -445,7 +475,8 @@ class ChromecastManager:
         # decides whether the video can be copied through; not knowing them is
         # no reason to stop, because by here the device has refused the stream
         # twice and converting is the only thing left to try.
-        if self._bridge_cast(mc, device_name, url, codecs, title):
+        if self._bridge_cast(mc, device_name, url, codecs, title,
+                             start=start):
             return device_name
         raise RuntimeError(self._no_decoder(codecs))
 
@@ -459,8 +490,8 @@ class ChromecastManager:
 
     def _bridge_cast(self, mc, device_name: str, url: str,
                      codecs: list[str], title: str,
-                     audio: dict | None = None,
-                     subs: dict | None = None) -> bool:
+                     audio: dict | None = None, subs: dict | None = None,
+                     start: float = 0.0) -> bool:
         """Convert the stream here and cast that instead.
 
         ffmpeg copies the video through untouched and re-encodes only what the
@@ -493,7 +524,10 @@ class ChromecastManager:
             url, codecs,
             audio=(audio or {}).get("index", 0),
             subs=None if subs is None else subs.get("index"),
-            sub_codec=(subs or {}).get("codec", ""))
+            sub_codec=(subs or {}).get("codec", ""), start_at=start)
+        # ffmpeg does the seeking, so the converted stream starts at zero and
+        # the offset is added back when the position is read.
+        self.position_offset = start
         if self._play_and_verify(mc, bridged, "video/mp4", title) is not False:
             log.info("cast: %s is playing the converted stream", device_name)
             return True
@@ -506,7 +540,8 @@ class ChromecastManager:
     VERDICT_WAIT = 12.0
 
     def _play_and_verify(self, mc, url: str, ctype: str, title: str,
-                         wait: float | None = None) -> bool | None:
+                         wait: float | None = None,
+                         start: float = 0.0) -> bool | None:
         """Hand the stream over and wait for the receiver to pass judgement.
 
         True when it took the stream, False when it REFUSED it, and None when
@@ -517,7 +552,8 @@ class ChromecastManager:
         acting on; silence means keep waiting, and the watcher will report
         whatever happens next.
         """
-        mc.play_media(url, ctype, title=title or "dopeIPTV")
+        mc.play_media(url, ctype, title=title or "dopeIPTV",
+                      current_time=start or None)
         mc.block_until_active(timeout=10)
         deadline = time.monotonic() + (
             self.VERDICT_WAIT if wait is None else wait)
@@ -534,10 +570,10 @@ class ChromecastManager:
         return None
 
     @staticmethod
-    def _watch(cc, mc, device_name: str) -> None:
+    def _watch(cc, mc, device_name: str, manager=None) -> None:
         if getattr(cc, "_dope_watch", None) is not None:
             return
-        watch = _CastWatch(device_name)
+        watch = _CastWatch(device_name, manager)
         try:
             mc.register_status_listener(watch)
             cc.socket_client.register_connection_listener(watch)
@@ -608,7 +644,7 @@ class CastDialog(QDialog):
 
     def __init__(self, window: object, url: str, title: str,
                  codecs: list[str] | None = None,
-                 audio_index: int = 0) -> None:
+                 audio_index: int = 0, start: float = 0.0) -> None:
         super().__init__(window)
         self.window = window
         self.url = url
@@ -622,6 +658,10 @@ class CastDialog(QDialog):
         # is the stream's own default, and leaving it there is what keeps the
         # cast native.
         self.audio_index = audio_index
+        # Where to start. The app already asked whether to resume, so this is
+        # a decision already made - the TV just has to honour it.
+        self.start = start
+        self.duration = 0.0
         self.setWindowTitle(tr("cast_title"))
         self.setMinimumWidth(400)
         lay = QVBoxLayout(self)
@@ -696,6 +736,7 @@ class CastDialog(QDialog):
         return " · ".join(bits)
 
     def _fill_tracks(self, tracks: dict) -> None:
+        self.duration = float((tracks or {}).get("duration") or 0.0)
         audio = (tracks or {}).get("audio") or []
         subs = (tracks or {}).get("subtitle") or []
         self.audio_box.blockSignals(True)
@@ -805,7 +846,8 @@ class CastDialog(QDialog):
         run_async(self.window.pool,
                   lambda: self.window.cast.cast(name, self.url,
                                                  self.stream_title,
-                                                 self.codecs, audio, subs),
+                                                 self.codecs, audio, subs,
+                                                 self.start, self.duration),
                   done, failed)
 
     def _banner(self, device: str | None, title: str) -> None:

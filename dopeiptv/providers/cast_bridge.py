@@ -82,16 +82,26 @@ def probe_tracks(source: str, exe: str | None = None) -> dict:
     tracks is a reason to offer no choice, never a reason to block a cast.
     """
     exe = exe or (shutil.which("ffprobe") or "")
-    out: dict[str, list[dict]] = {"audio": [], "subtitle": []}
+    out: dict = {"audio": [], "subtitle": [], "duration": 0.0}
     if not exe:
         return out
     try:
         raw = subprocess.run(
             [exe, "-v", "error", *(["-user_agent", _UA]
                                    if "://" in source else []),
-             "-print_format", "json", "-show_streams", source],
+             "-print_format", "json", "-show_streams", "-show_format",
+             source],
             capture_output=True, timeout=25).stdout
-        streams = json.loads(raw or b"{}").get("streams", [])
+        probed = json.loads(raw or b"{}")
+        streams = probed.get("streams", [])
+        # The runtime comes along for the ride: a resume point is only worth
+        # storing against a known length, and the receiver cannot report one
+        # for a converted stream - it arrives down a pipe with no end in it.
+        try:
+            out["duration"] = float((probed.get("format") or {})
+                                    .get("duration") or 0.0)
+        except (TypeError, ValueError):
+            out["duration"] = 0.0
     except Exception as e:
         log.info("cast bridge: could not list the tracks (%s)", e)
         return out
@@ -156,7 +166,7 @@ def _filter_escape(source: str) -> str:
 
 def ffmpeg_args(exe: str, source: str, copy_video: bool,
                 audio: int = 0, subs: int | None = None,
-                sub_codec: str = "") -> list[str]:
+                sub_codec: str = "", start: float = 0.0) -> list[str]:
     """The command line, kept separate so it can be read and tested.
 
     Fragmented MP4 down a single HTTP response: the receiver is a Chrome
@@ -188,6 +198,10 @@ def ffmpeg_args(exe: str, source: str, copy_video: bool,
     return [
         exe, "-hide_banner", "-loglevel", "error",
         *_input_options(source),
+        # Seeking before -i is the cheap kind: ffmpeg jumps in the container
+        # instead of decoding its way there, which is what makes resuming an
+        # hour into a film instant rather than a minute of waiting.
+        *(["-ss", f"{start:.3f}"] if start > 0 else []),
         "-fflags", "+genpts", "-i", source,
         *burn, "-map", f"0:a:{audio}",
         "-c:v", "copy" if copy_video else "libx264",
@@ -254,6 +268,7 @@ class CastBridge:
         self.audio = 0
         self.subs: int | None = None
         self.sub_codec = ""
+        self.start_at = 0.0
         self.exe: str | None = None          # overridable, for tests
         self._server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
@@ -290,7 +305,7 @@ class CastBridge:
 
     def start(self, source: str, codecs: list[str] | None = None,
               audio: int = 0, subs: int | None = None,
-              sub_codec: str = "") -> str:
+              sub_codec: str = "", start_at: float = 0.0) -> str:
         """Begin serving *source* re-muxed for the receiver; returns the URL.
 
         ffmpeg is not started here - it starts when the Chromecast actually
@@ -309,6 +324,7 @@ class CastBridge:
             for c in codecs)
         self.source = source
         self.audio, self.subs, self.sub_codec = audio, subs, sub_codec
+        self.start_at = start_at
         if subs is not None:
             self.copy_video = False   # burning subtitles in redraws every frame
         self.path = f"/{secrets.token_urlsafe(12)}/stream.mp4"
@@ -333,7 +349,8 @@ class CastBridge:
         if not exe or not self.source:
             return None
         args = ffmpeg_args(exe, self.source, self.copy_video,
-                           self.audio, self.subs, self.sub_codec)
+                           self.audio, self.subs, self.sub_codec,
+                           self.start_at)
         log.info("cast bridge: starting ffmpeg")
         try:
             proc = subprocess.Popen(

@@ -21,7 +21,8 @@ import threading
 import pytest
 
 _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
-            "_local_codecs", "_toggle_cast_pause", "_cast_from_archive")
+            "_local_codecs", "_toggle_cast_pause", "_cast_from_archive",
+            "_save_cast_position")
 
 
 def _window():
@@ -73,6 +74,7 @@ def _with_strip():
     w = _window()
     w.cast_bar, w.cast_bar_lbl, w.cast_bar_title = _Bar(), _Lbl(), _Lbl()
     w.cast_bar_pause = _Lbl()
+    w._cast_ctx = {}
     return w
 
 
@@ -210,6 +212,58 @@ def test_the_archive_url_starts_where_you_paused(monkeypatch):
     assert sent, "the archive URL is cast"
 
 
+class _Resume:
+    def __init__(self):
+        self.saved = []
+
+    def record(self, group, key, pos, dur, item=None, series_ctx=None):
+        self.saved.append((group, key, round(pos), round(dur)))
+
+
+class _CastAt:
+    """A manager stand-in that has got somewhere."""
+
+    def __init__(self, pos, dur):
+        self.active = object()
+        self.duration = dur
+        self._pos = pos
+
+    def position(self):
+        return self._pos
+
+
+def test_where_the_tv_got_to_is_kept_as_the_resume_point():
+    """The receiver is the only thing that knows where the film reached, and
+    it stops knowing the moment the cast ends."""
+    w = _with_strip()
+    w.resume = _Resume()
+    w.cast = _CastAt(1830.0, 6000.0)
+    w._cast_ctx = {"group": "vod", "key": "42", "item": {"name": "Film"}}
+    w._save_cast_position()
+    assert w.resume.saved == [("vod", "42", 1830, 6000)]
+
+
+def test_a_live_channel_has_no_resume_point_to_keep():
+    w = _with_strip()
+    w.resume = _Resume()
+    w.cast = _CastAt(1830.0, 0.0)
+    w._cast_ctx = {"group": None, "key": None}
+    w._save_cast_position()
+    assert w.resume.saved == []
+
+
+def test_nothing_is_kept_without_a_known_runtime():
+    """A position is only meaningful against a length - and a converted
+    stream arrives down a pipe with no end in it, so the receiver cannot
+    report one."""
+    w = _with_strip()
+    w.resume = _Resume()
+    w.cast = _CastAt(1830.0, 0.0)
+    w._cast_ctx = {"group": "vod", "key": "42"}
+    w._save_cast_position()
+    assert w.resume.saved == []
+
+
 # ── the manager itself, with a stand-in for pychromecast ──────────────────
 
 def _fake_pychromecast(order=None):
@@ -219,6 +273,7 @@ def _fake_pychromecast(order=None):
         def __init__(self, state="PLAYING", why=None):
             self.player_state = state
             self.idle_reason = why
+            self.current_time = 0.0
 
     class FakeMedia:
         def __init__(self, dev):
@@ -228,8 +283,9 @@ def _fake_pychromecast(order=None):
         def register_status_listener(self, listener):
             pass
 
-        def play_media(self, url, ctype, title=None):
+        def play_media(self, url, ctype, title=None, current_time=None):
             self.dev.plays.append((url, ctype))
+            self.dev.started_at = current_time
             self.dev.played = (url, ctype, title)
 
         def block_until_active(self, timeout=10):
@@ -244,6 +300,7 @@ def _fake_pychromecast(order=None):
             self.name = name
             self.played = None
             self.plays = []
+            self.started_at = None
             self.media_controller = FakeMedia(self)
             self.socket_client = FakeSocket()
 
@@ -328,6 +385,38 @@ def test_casting_a_device_from_last_time_discovers_it_first(monkeypatch):
     assert m.cast("Alva TV", "http://x/y.m3u8", "SVT1") == "Alva TV"
     assert m.active is not None
     assert m.active.played[0] == "http://x/y.m3u8"
+
+
+def test_a_native_cast_starts_where_you_left_off(monkeypatch):
+    """The receiver can be handed a start time; it does the seeking."""
+    from dopeiptv.providers import chromecast as cm
+    m = _manager(monkeypatch)
+    monkeypatch.setattr(cm, "_resolve_redirects",
+                        lambda u: ("http://cdn/x.mp4", "video/mp4"))
+    m.scan()
+    m.cast("Alva TV", "http://p/film.mp4", "Film", start=1830.0, duration=6000)
+    assert m.devices[0].started_at == 1830.0
+    assert m.duration == 6000
+    assert m.position_offset == 0.0, "the receiver reports absolute time"
+
+
+def test_a_converted_cast_is_seeked_by_ffmpeg(monkeypatch):
+    """A converted stream starts at zero whatever it was seeked to, so the
+    offset is added back before the position is read."""
+    from dopeiptv.providers import chromecast as cm
+    asked = {}
+    m = _manager(monkeypatch)
+    monkeypatch.setattr(cm, "_resolve_redirects", lambda u: (u, "video/mp2t"))
+    monkeypatch.setattr(cm.CastBridge, "available", staticmethod(lambda: True))
+    monkeypatch.setattr(
+        m.bridge, "start",
+        lambda *a, **k: asked.update(k) or "http://me/s.mp4")
+    m.scan()
+    m.cast("Alva TV", "http://p/film.ts", "Film", start=1830.0, duration=6000)
+    assert asked["start_at"] == 1830.0
+    assert m.position_offset == 1830.0
+    m.last_position = 42.0
+    assert m.position() == 1872.0
 
 
 def test_the_resolved_address_goes_first(monkeypatch):

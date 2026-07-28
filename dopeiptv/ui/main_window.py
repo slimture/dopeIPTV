@@ -3208,14 +3208,30 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # Remember what is being cast, not just where to. Pausing a live
         # channel is answered from the provider's archive, and that needs the
         # channel's own id long after this dialog is gone.
+        # A film or an episode picks up where you left off, exactly as it
+        # does here - the same stored point, and the same question about it.
+        rkind = self._CAST_RESUME_KIND.get(
+            it.get("_kind") or self._content_kind())
+        key = self._item_key(it)
+        start = self._resume_offset(key, rkind) if rkind else 0.0
         self._cast_ctx = {
             "sid": it.get("stream_id") if live else None,
             "archive": bool(live and it.get("stream_id") is not None
                             and it.get("tv_archive")),
             "title": title,
+            "group": self._RESUME_GROUP.get(rkind or ""),
+            "key": key,
+            "item": it,
         }
         CastDialog(self, url, title, self._local_codecs(),
-                   self._local_audio_index()).exec()
+                   self._local_audio_index(), start).exec()
+
+    # The list vocabulary and the resume store's do not match: a movie row is
+    # "vod" in one and "movie" in the other, and History rows carry their own.
+    _CAST_RESUME_KIND = {"vod": "movie", "movie": "movie",
+                         "episode": "episode",
+                         "rec": "recording", "recording": "recording"}
+    _RESUME_GROUP = {"movie": "vod", "episode": "episode", "recording": "rec"}
 
     def _local_audio_index(self) -> int:
         """Which audio track the app itself is playing, counted the way
@@ -3343,6 +3359,23 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             lambda _n: self.show_cast_strip(device, title),
             lambda msg: self._error(tr("cast_failed", msg=msg)))
 
+    def _save_cast_position(self) -> None:
+        """Keep the point the TV reached, so it resumes there next time.
+
+        The receiver is the only thing that knows where the film has got to,
+        and it stops knowing the moment the cast ends - so this has to happen
+        before anything is torn down.
+        """
+        ctx = getattr(self, "_cast_ctx", None) or {}
+        group, key = ctx.get("group"), ctx.get("key")
+        if not group or key is None:
+            return
+        pos, dur = self.cast.position(), self.cast.duration
+        if pos <= 0 or dur <= 0:
+            return
+        log.info("cast: keeping the position, %d s into %d", pos, dur)
+        self.resume.record(group, key, pos, dur, item=ctx.get("item"))
+
     def _end_cast(self, why: str) -> None:
         """Stop a running cast and take the strip down.
 
@@ -3351,6 +3384,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         TV to answer.
         """
         cc = getattr(self, "cast", None)
+        if cc is not None and getattr(cc, "active", None) is not None:
+            self._save_cast_position()
         self.show_cast_strip(None)
         if cc is None or getattr(cc, "active", None) is None:
             return
@@ -4674,6 +4709,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # unwaited it lost that race in the packaged build and the TV simply
         # kept playing after the app had quit.
         casting = getattr(self.cast, "active", None) is not None
+        if casting:
+            self._save_cast_position()
         cast_stop = threading.Thread(target=self.cast.shutdown, daemon=True)
         cast_stop.start()
         # Cancel every queued background download. Wait a moderate
