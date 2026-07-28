@@ -38,10 +38,10 @@ cast = {}
 class FakeDialog:
     def __init__(self, window, url, title, codecs=None,
                  audio_index=0, start=0.0, tracks=None,
-                 probe=True):
+                 probe=True, source=None):
         cast["url"], cast["title"] = url, title
         cast["codecs"], cast["audio_index"] = codecs, audio_index
-        cast["start"] = start
+        cast["start"], cast["source"] = start, source
 
     def exec(self):
         return 0
@@ -95,6 +95,19 @@ assert open_cast("vod", {"name": "Film", "stream_id": 5,
 
 # Nothing to cast: no dialog at all rather than one pointing nowhere.
 assert open_cast("history", {"name": "Ghost"}) is None
+
+# The converter reads the format the player uses: some channels are simply
+# not served as HLS, which is a 4XX to everything that asks for one.
+assert open_cast("live", chan) == "http://p/live/u/pw/9851.m3u8"
+assert cast["source"] == "http://p/live/u/pw/9851.ts", cast
+
+# A favourite FILM is not a channel. The row's own kind decides; letting the
+# Favorites section decide handed a movie a /live/ address built from its own
+# id, and the panel answers that with a 4XX to everything that asks.
+fav_movie = {"name": "Film", "_kind": "movie", "stream_id": 61155,
+             "container_extension": "mkv"}
+assert open_cast("fav", fav_movie) == "http://p/movie/u/pw/61155.mkv"
+assert open_cast("fav", fav_movie, "movie") == "http://p/movie/u/pw/61155.mkv"
 
 # The player's own right-click and the menu bar cast what is playing, so a
 # channel you started here can be moved to the TV without finding its row

@@ -3206,11 +3206,33 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # rule belongs here and not inside one section's branch. History used
         # to hand over its stored .ts address verbatim, which is why casting
         # worked from the channel list and never from History.
-        live = (self._content_kind() in ("live", "fav")
-                or it.get("_kind") == "live"
-                or (self.mode == "fav" and self._fav_section == "chan"))
-        if live and it.get("stream_id") is not None:
-            url = self.client.live_url(it["stream_id"], "m3u8")
+        # The ROW decides, and only when it says nothing does the section get
+        # a vote. Letting the section decide made a favourite film into a
+        # channel: a movie row in Favorites was handed a /live/ address built
+        # from its own id, which the panel answers with a 4XX - to the
+        # receiver, to the converter, to everything.
+        row_kind = it.get("_kind")
+        if row_kind:
+            live = row_kind == "live"
+        else:
+            live = (self._content_kind() in ("live", "fav")
+                    or (self.mode == "fav" and self._fav_section == "chan"))
+        # Two addresses for the same channel. HLS is the one a Chromecast can
+        # take directly; the plain stream is the one the player is watching -
+        # and some channels are not served as HLS at all, which is a 4XX to
+        # everything that asks. The converter reads that one, since ffmpeg has
+        # no trouble with a transport stream and the receiver never sees it.
+        source = url
+        sid = it.get("stream_id")
+        if live and sid is not None:
+            url = self.client.live_url(sid, "m3u8")
+        elif row_kind in ("movie", "vod") and sid is not None:
+            # Build the film's own address rather than trust what the section
+            # produced. In the Favorites channel folders _stream_for answers
+            # for the section, not the row, so a favourite film came back with
+            # a /live/ address built from its id - which the panel refuses.
+            url = source = self.client.vod_url(
+                sid, it.get("container_extension"))
         if not url:
             return
         # Remember what is being cast, not just where to. Pausing a live
@@ -3234,7 +3256,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         CastDialog(self, url, title, self._local_codecs(),
                    self._local_audio_index(), start,
                    self._local_tracks(it),
-                   probe=not self._busy_elsewhere(it)).exec()
+                   probe=not self._busy_elsewhere(it), source=source).exec()
 
     # The list vocabulary and the resume store's do not match: a movie row is
     # "vod" in one and "movie" in the other, and History rows carry their own.

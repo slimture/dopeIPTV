@@ -356,7 +356,7 @@ class ChromecastManager:
              known_codecs: list[str] | None = None,
              audio: dict | None = None, subs: dict | None = None,
              start: float = 0.0, duration: float = 0.0,
-             settle: bool = False) -> str:
+             settle: bool = False, source: str | None = None) -> str:
         with self._lock:
             cc = self._device(device_name)
             if cc is None:
@@ -402,14 +402,14 @@ class ChromecastManager:
         # keeps a cast native, which is why the default is a default.
         if audio is not None or subs is not None:
             log.info("cast: a track was chosen - converting so it can be used")
-            if self._bridge_cast(mc, device_name, url, codecs, title,
-                                 audio, subs, start):
+            if self._bridge_cast(mc, device_name, source or url, codecs,
+                                 title, audio, subs, start):
                 return device_name
             raise RuntimeError("the chosen track could not be cast")
         if ((codecs and seen_bad.intersection(codecs))
                 or (device_name, url) in self._needs_bridge):
-            if self._bridge_cast(mc, device_name, url, codecs, title,
-                                 start=start):
+            if self._bridge_cast(mc, device_name, source or url, codecs,
+                                 title, start=start):
                 return device_name
             raise RuntimeError(self._no_decoder(codecs))
 
@@ -437,8 +437,8 @@ class ChromecastManager:
             # then it plays. Straight to the converter.
             log.info("cast: %s is %s, which no Chromecast plays - "
                      "repackaging it here", device_name, ctype)
-            if self._bridge_cast(mc, device_name, url, codecs, title,
-                                 start=start):
+            if self._bridge_cast(mc, device_name, source or url, codecs,
+                                 title, start=start):
                 return device_name
             raise RuntimeError(
                 f"this stream is {ctype}, and repackaging it here did not "
@@ -478,7 +478,7 @@ class ChromecastManager:
         # decides whether the video can be copied through; not knowing them is
         # no reason to stop, because by here the device has refused the stream
         # twice and converting is the only thing left to try.
-        if self._bridge_cast(mc, device_name, url, codecs, title,
+        if self._bridge_cast(mc, device_name, source or url, codecs, title,
                              start=start):
             return device_name
 
@@ -659,7 +659,8 @@ class CastDialog(QDialog):
     def __init__(self, window: object, url: str, title: str,
                  codecs: list[str] | None = None,
                  audio_index: int = 0, start: float = 0.0,
-                 tracks: dict | None = None, probe: bool = True) -> None:
+                 tracks: dict | None = None, probe: bool = True,
+                 source: str | None = None) -> None:
         super().__init__(window)
         self.window = window
         self.url = url
@@ -682,6 +683,9 @@ class CastDialog(QDialog):
         self.tracks = tracks or {}
         # Whether asking the provider directly is worth anything right now.
         self.probe = probe
+        # What the converter should read. The same stream in the format the
+        # player uses, which is not always the one the receiver is offered.
+        self.source = source or url
         self.setWindowTitle(tr("cast_title"))
         self.setMinimumWidth(400)
         lay = QVBoxLayout(self)
@@ -871,7 +875,7 @@ class CastDialog(QDialog):
                                                  self.stream_title,
                                                  self.codecs, audio, subs,
                                                  self.start, self.duration,
-                                                 settle),
+                                                 settle, self.source),
                   done, failed)
 
     def _banner(self, device: str | None, title: str) -> None:
