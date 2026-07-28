@@ -743,10 +743,10 @@ def test_the_picture_setting_is_a_ceiling_not_an_instruction():
     assert need("older", 576, 25.0) == "original"
     assert need("older", 720, 50.0) == "original"
     assert need("older", 720, 25.0) == "original"
-    # It counts lines and nothing else. The frame rate used to be capped at
-    # 30 too, and that halved HD channels which played perfectly - Swedish HD
-    # is 720p50, and only FHD ever stuttered.
-    assert need("older", 1080, 25.0) == "older"
+    # Lines AND speed together - see the test below. 1080 at 25 is a film,
+    # and films always played; 1080 at 50 is broadcast, and that is the one
+    # thing that stutters.
+    assert need("older", 1080, 25.0) == "original"
     assert need("older", 1080, 50.0) == "older"
     assert M.quality_label("older", 1080, 50.0) == "720p50"
     assert M.quality_label("older", 1080, 0.0) == "720p"
@@ -2131,3 +2131,41 @@ def test_a_jump_forward_is_rebuilt_and_a_jump_back_is_not():
             break
         threading.Event().wait(0.02)
     assert w.cast.sought == 603.0
+
+
+def test_the_ceiling_is_lines_and_speed_together():
+    """Measured against a first-generation dongle, not reasoned about:
+
+        720p50   channels        fine
+        1080p24  films           fine
+        1080p50  FHD channels    stutters
+
+    So the thing it cannot keep up with is the two multiplied. Capping on
+    lines alone shrank every 1080p film for a fault it never had.
+    """
+    from dopeiptv.providers.chromecast import ChromecastManager as M
+    need = M._needed_quality
+
+    # A film: full size, and it stays that way.
+    assert need("older", 1080, 24.0) == "original"
+    assert need("older", 1080, 25.0) == "original"
+    assert need("older", 960, 24.0) == "original"
+
+    # Television: fifty a second is what broadcast is, and 1080 of them is
+    # the one thing that stutters.
+    assert need("older", 1080, 50.0) == "older"
+    assert need("older", 1080, 60.0) == "older"
+
+    # HD television is fine at fifty - it always was, and scaling it down
+    # threw away picture for nothing.
+    assert need("older", 720, 50.0) == "original"
+
+    # An unknown frame rate is treated as fast: a broadcast is the thing
+    # that does not say, and a broadcast is the thing that stutters.
+    assert need("older", 1080, 0.0) == "older"
+
+    # And a device with no ceiling set is never touched.
+    assert need("original", 1080, 50.0) == "original"
+    # Nor is a picture whose size we never found out - adapting on a guess
+    # re-encodes channels that were perfectly fine, and does it invisibly.
+    assert need("older", 0, 50.0) == "original"

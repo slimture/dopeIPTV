@@ -54,14 +54,24 @@ _UA = "VLC/3.0.20 LibVLC/3.0.20"
 # "older" is the only adaptation offered, under a name that describes the
 # problem rather than the mechanism.
 #
-# It caps the number of LINES and nothing else. The frame rate used to be
-# capped at 30 as well, on the reasoning that an older receiver would be
-# short of both - but measured against a first-generation dongle it is only
-# the lines: HD channels play perfectly there and Swedish HD is 720p50, so
-# fifty frames a second is plainly within reach. Only FHD stutters. Halving
-# the frame rate of a channel that never needed it made the picture visibly
-# worse to fix a problem it did not have.
+# It caps LINES, but only for a picture that also arrives fast. What an
+# older receiver is short of is neither on its own - it is the two
+# multiplied, which is what a decoder actually has to keep up with. Against
+# a first-generation dongle:
+#
+#   720 lines at 50 fps   channels     fine
+#   1080 lines at 24 fps  films        fine
+#   1080 lines at 50 fps  FHD channels stutters
+#
+# So capping on lines alone scaled down every 1080p film for a fault they
+# never had, while the one thing that does stutter is FHD television - which
+# is 50 fields a second because that is what broadcast is. A film is 24, and
+# 1080p24 is a third of the work of 1080p50.
 QUALITY = {"original": (0, 0), "older": (720, 0)}
+
+# Above this many frames a second, a full-size picture is more than an older
+# receiver keeps up with. Below it, the lines are not the problem.
+SMOOTH_FPS = 30
 
 
 def normalise_quality(value: str | None) -> str:
@@ -514,6 +524,16 @@ def hls_args(exe: str, source: str, copy_video: bool, folder: str,
         # WebVTT is the one subtitle format a Cast receiver renders.
         "-c:s", "webvtt",
         "-f", "hls",
+        # Do not hold the output waiting for a stream that has nothing to
+        # say. A subtitle track is silent for minutes at a time, and a
+        # chosen one can be silent exactly where the film was picked up:
+        #   Nothing was written into output file, because at least one of
+        #   its streams received no packets.
+        # - and the cast died on the spot with no playlist at all. This
+        # lets the muxer write what it has instead of interleaving
+        # perfectly, which for a subtitle beside the picture is the right
+        # trade every time.
+        "-max_interleave_delta", "0",
         "-hls_time", str(HLS_SEGMENT),
         # A broadcast keeps a rolling window; a film keeps everything, which
         # is what lets the television's own remote scrub it - and what makes

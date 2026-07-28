@@ -14,7 +14,7 @@ from ..core.log import log
 from ..i18n import tr
 from ..core.workers import run_async
 from .cast_bridge import (
-    QUALITY, SAFE_AUDIO, SAFE_VIDEO, CastBridge,
+    QUALITY, SAFE_AUDIO, SAFE_VIDEO, SMOOTH_FPS, CastBridge,
     normalise_quality, probe_tracks,
 )
 
@@ -645,6 +645,13 @@ class ChromecastManager:
         picture for nothing. A source already under the ceiling is left alone,
         at the frame rate it came with.
 
+        And the ceiling is lines AND speed together, not lines alone. A
+        first-generation dongle plays 720p50 channels and 1080p24 films
+        without blinking, and stutters on 1080p50 - the two multiplied is
+        what a decoder has to keep up with. Films are 24 frames a second
+        and broadcast is 50, so capping on lines alone shrank every 1080p
+        film for a fault it never had.
+
         So is one whose size we could not find out. Adapting on a guess is the
         worse mistake: it re-encodes HD channels that were perfectly fine, and
         does it invisibly. An older device that stutters can be helped on the
@@ -659,6 +666,13 @@ class ChromecastManager:
                      "is rather than converting on a guess")
             return "original"
         limit_h, limit_fps = QUALITY.get(want, (0, 0))
+        # Slow enough to carry its lines. An unknown frame rate is treated
+        # as fast: a broadcast is the thing that does not say, and a
+        # broadcast is the thing that stutters.
+        if fps and fps <= SMOOTH_FPS:
+            log.info("cast: %dp%g is slow enough for its size - sending it "
+                     "as it is", height, fps)
+            return "original"
         too_big = limit_h and height > limit_h
         too_fast = limit_fps and fps and fps > limit_fps + 1
         if not too_big and not too_fast:

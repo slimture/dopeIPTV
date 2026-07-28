@@ -967,3 +967,21 @@ def test_every_subtitle_segment_says_which_clock_it_is_on():
     assert abs(MPEGTS_START / 90000 - 1.421333) < 0.001
     # And nothing that is not a WebVTT file is touched.
     assert _timestamp_map(b"\x47\x40\x00") == b"\x47\x40\x00"
+
+
+def test_a_silent_subtitle_track_does_not_hold_up_the_picture():
+    """A subtitle stream says nothing for minutes at a time, and a chosen
+    one can be silent exactly where the film was picked up. The muxer waited
+    for it and wrote nothing at all:
+
+        Nothing was written into output file, because at least one of its
+        streams received no packets.
+
+    - and the cast died with no playlist, twenty-five seconds of waiting,
+    and IDLE/ERROR on the television.
+    """
+    from dopeiptv.providers.cast_bridge import hls_args
+    args = hls_args("ffmpeg", "http://p/f.mkv", True, "/tmp/x", subs=10,
+                    start=1183.0)
+    assert args[args.index("-max_interleave_delta") + 1] == "0"
+    assert args.index("-max_interleave_delta") > args.index("-f")
