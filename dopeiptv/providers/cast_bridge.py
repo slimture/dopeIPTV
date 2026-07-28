@@ -698,7 +698,12 @@ class CastBridge:
         reading, and reading ffmpeg at the receiver's pace made exactly that
         happen, a few seconds into every stretch.
         """
+        # A pause holds the television still while this goes on recording,
+        # which is the whole point - but a pause nobody ever ends must not
+        # fill the disk. Two hours of a copied broadcast is the limit.
+        cap = 4_000_000_000
         try:
+            written = 0
             with open(path, "wb") as f:
                 while True:
                     chunk = proc.stdout.read(65536)
@@ -706,6 +711,11 @@ class CastBridge:
                         break
                     f.write(chunk)
                     f.flush()
+                    written += len(chunk)
+                    if written >= cap:
+                        log.info("cast bridge: the recording has reached "
+                                 "%d GB - stopping there", cap // 10**9)
+                        break
         except Exception as e:
             log.info("cast bridge: the spool stopped (%s)", e)
 

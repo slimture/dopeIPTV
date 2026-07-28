@@ -3922,30 +3922,26 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         if getattr(self, "_cast_paused_at", None) is not None:
             return                      # paused on purpose, not run out
-        finished = str(getattr(self.cast, "state", "")
-                       ).startswith("IDLE/FINISHED")
-        # The end is not always announced. A stretch whose last segment the
-        # panel could not serve in full leaves the receiver BUFFERING on it
-        # for ever - picture frozen, spinner turning, and never a FINISHED
-        # for this ticker to see. A position that has stopped moving is the
-        # end too, whatever the receiver calls it.
-        pos = float(self.cast.position() or 0.0)
-        now = time.monotonic()
-        seen = getattr(self, "_cast_pos_seen", None)
-        if seen is None or abs(pos - seen[0]) > 0.5:
-            self._cast_pos_seen = seen = (pos, now)
-        stalled = now - seen[1] > 20
-        if not finished and not stalled:
+        # ONLY a stream the receiver says has ended. Buffering is not an
+        # ending, and treating it as one was doing the damage: a stretch
+        # that was playing, eleven seconds in and pausing to fill its
+        # buffer, got killed and asked for again - and the new one paid the
+        # whole start-up cost afresh, seek discard and all, only to buffer
+        # again a little later. The restarts were ours.
+        #
+        # A slow stretch is slow whoever asks for it. There is nothing to
+        # rescue it with, and the picture comes back on its own.
+        if not str(getattr(self.cast, "state", "")
+                   ).startswith("IDLE/FINISHED"):
             return
         # Once. Loading the next stretch takes a few seconds, during which
         # the receiver still reports the end of the last one.
+        now = time.monotonic()
         if now - getattr(self, "_cast_continued", 0.0) < 20:
             return
         self._cast_continued = now
-        self._cast_pos_seen = None
         at = self._cast_moment()
-        log.info("cast: the archive %s at %s - asking for the next of it",
-                 "ran out" if finished else "stalled",
+        log.info("cast: the archive ran out at %s - asking for the next of it",
                  at.strftime("%H:%M:%S"))
         self._cast_from_archive(at)
 
@@ -4184,11 +4180,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             at, self._cast_paused_at = self._cast_paused_at, None
             pos, self._cast_paused_pos = self._cast_paused_pos, 0.0
             self.cast_bar_pause.setIcon(cast_strip_icon("pause", P["text"]))
-            if ctx.get("archive"):
-                # The stream was let go of when the pause began, and the
-                # panel counts it for only a few seconds after. A pause long
-                # enough to fetch coffee needs no waiting at all - and those
-                # four seconds were most of why coming back felt slow.
+            if self.cast.bridged():
+                # Nothing to ask anyone. The converter kept recording the
+                # whole time, and the television simply carries on reading
+                # the spool where it stopped - the very next frame.
+                threading.Thread(target=self.cast.resume, daemon=True).start()
+            elif ctx.get("archive"):
+                # No converter behind this one, so the picture has to come
+                # from the provider's own catch-up. Slower and at the mercy
+                # of what the panel will serve.
                 recent = (datetime.now() - at).total_seconds() < 10
                 self._cast_from_archive(self._paused_moment(at, pos),
                                         settle=bool(ctx.get("sid")) and recent)
@@ -4200,14 +4200,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # are the same thing only on the first pause of a live channel.
         self._cast_paused_pos = float(self.cast.position() or 0.0)
         self.cast_bar_pause.setIcon(cast_strip_icon("play", P["text"]))
-        # A film the receiver fetched itself is simply paused - it can hold
-        # its place, and stopping would lose it. A broadcast cannot be held
-        # at all: what a pause on live television means is answered from the
-        # archive when you come back, and until then the stream is only
-        # costing the one connection this account has. Which is what made
-        # coming back fail - the archive was refused because the sending
-        # nobody was watching still held it.
-        live = bool(ctx.get("sid"))
+        # Anything coming through the converter is simply paused, broadcast
+        # or not. The converter goes on recording into its spool while the
+        # television sits still, so the pause costs nothing and loses
+        # nothing - and the provider is never asked for anything, which is
+        # what every other way of holding a broadcast foundered on.
+        #
+        # Only a channel going straight to the receiver has to let go: there
+        # is no recording behind it, and a paused stream still holds the one
+        # connection this account has.
+        live = bool(ctx.get("sid")) and not self.cast.bridged()
         threading.Thread(
             target=self.cast.release if live else self.cast.pause,
             daemon=True).start()

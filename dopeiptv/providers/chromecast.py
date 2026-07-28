@@ -391,7 +391,7 @@ class ChromecastManager:
              start: float = 0.0, duration: float = 0.0,
              settle: bool = False, source: str | None = None,
              quality: str = "original", height: int = 0,
-             fps: float = 0.0) -> str:
+             fps: float = 0.0, dvr: bool = False) -> str:
         with self._lock:
             cc = self._device(device_name)
             if cc is None:
@@ -442,14 +442,23 @@ class ChromecastManager:
         # the receiver plays whatever the stream hands it and renders no
         # subtitle carried inside one. Leaving both on their default is what
         # keeps a cast native, which is why the default is a default.
-        if audio is not None or subs is not None or quality != "original":
+        if audio is not None or subs is not None or quality != "original" \
+                or dvr:
             log.info("cast: converting - %s",
-                     "a track was chosen" if quality == "original"
-                     else f"this device is set to {quality}")
+                     "a track was chosen" if audio is not None
+                     or subs is not None else
+                     f"this device is set to {quality}" if quality != "original"
+                     else "so the picture can be held here")
             if self._bridge_cast(mc, device_name, source or url, codecs,
                                  title, audio, subs, start, quality):
                 return device_name
-            raise RuntimeError("the chosen track could not be cast")
+            if audio is not None or subs is not None or quality != "original":
+                raise RuntimeError("the chosen track could not be cast")
+            # Only the pause was riding on the converter. Casting the channel
+            # matters more than being able to hold it, so carry on the
+            # ordinary way rather than fail outright.
+            log.info("cast: the converter would not start - casting %s "
+                     "straight through instead", device_name)
         if ((codecs and seen_bad.intersection(codecs))
                 or (device_name, url) in self._needs_bridge):
             if self._bridge_cast(mc, device_name, source or url, codecs,
@@ -1165,6 +1174,15 @@ class CastDialog(QDialog):
             self._banner(None, "")
 
         audio, subs = self._chosen()
+        # A channel with catch-up goes through the converter on purpose, so
+        # that pausing it means something. The converter writes the stream to
+        # a spool on this machine as it goes; the receiver reads that spool at
+        # its own pace, so a pause is simply the television stopping reading
+        # while the recording carries on - and play continues on the very next
+        # frame. Nothing is asked of the provider at all, which is what every
+        # other way of pausing a broadcast foundered on.
+        dvr = bool((getattr(self.window, "_cast_ctx", None) or {})
+                   .get("archive"))
         # Leave everything the strip needs to offer another track later
         # without asking the provider again.
         ctx = getattr(self.window, "_cast_ctx", None)
@@ -1181,7 +1199,7 @@ class CastDialog(QDialog):
                                                  self.start, self.duration,
                                                  settle, self.source,
                                                  self.quality(), self.height,
-                                                 self.fps),
+                                                 self.fps, dvr),
                   done, failed)
 
     def _banner(self, device: str | None, title: str) -> None:

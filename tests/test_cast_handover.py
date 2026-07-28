@@ -83,6 +83,12 @@ def _window():
 
 
 class _Cast:
+    def bridged(self) -> bool:
+        return True
+
+    def resume(self) -> None:
+        self.resumed.set()
+
     def __init__(self, active: bool) -> None:
         self.active = object() if active else None
         self.stopped = threading.Event()
@@ -90,6 +96,7 @@ class _Cast:
         self.at = 0.0
         self.released = threading.Event()
         self.held = threading.Event()
+        self.resumed = threading.Event()
 
     def release(self) -> None:
         self.released.set()
@@ -444,6 +451,7 @@ def test_pausing_live_television_comes_back_from_the_archive():
     from datetime import datetime, timedelta
     w = _with_strip()
     w.cast = _Cast(active=True)
+    w.cast.bridged = lambda: False        # no recording behind this one
     w.cast.pause = lambda: None
     resumed = {}
     w._cast_from_archive = lambda at, settle=False: resumed.setdefault("at", at)
@@ -514,6 +522,7 @@ def test_pausing_the_archive_again_does_not_jump_back_to_now():
     from datetime import datetime, timedelta
     w = _with_strip()
     w.cast = _Cast(active=True)
+    w.cast.bridged = lambda: False
     w.cast.pause = lambda: None
     points = []
     w._cast_from_archive = lambda at, settle=False: points.append(at)
@@ -1432,6 +1441,7 @@ def test_pausing_live_television_lets_go_of_the_stream():
     """
     w = _with_strip()
     w.cast = _Cast(active=True)
+    w.cast.bridged = lambda: False        # straight to the receiver
     w._cast_from_archive = lambda at, settle=False: None
     w._cast_ctx = {"archive": True, "sid": 9851, "item": {}}
     w._cast_paused_at = None
@@ -1442,6 +1452,7 @@ def test_pausing_live_television_lets_go_of_the_stream():
     # A film: paused where it is, not stopped.
     w2 = _with_strip()
     w2.cast = _Cast(active=True)
+    w2.cast.bridged = lambda: False
     w2._cast_ctx = {"archive": False}
     w2._cast_paused_at = None
     w2._toggle_cast_pause()
@@ -1455,6 +1466,7 @@ def test_coming_back_from_a_pause_waits_for_the_panel_to_notice():
     from datetime import datetime, timedelta
     w = _with_strip()
     w.cast = _Cast(active=True)
+    w.cast.bridged = lambda: False
     asked = []
     w._cast_from_archive = lambda at, settle=False: asked.append(settle)
     w._cast_ctx = {"archive": True, "sid": 9851, "item": {}}
@@ -1624,16 +1636,17 @@ def test_an_unimportable_pychromecast_is_not_a_missing_one():
         cc._pychromecast, cc._pc_checked, cc._pc_error = saved
 
 
-def test_a_stretch_that_stalls_is_continued_not_left_frozen(monkeypatch):
-    """The end is not always announced. A stretch whose last segment the
-    panel could not serve in full leaves the receiver BUFFERING on it for
-    ever - picture frozen, spinner turning, and never an IDLE/FINISHED for
-    the ticker to see. A position that has stopped moving is the end too."""
+def test_buffering_is_not_an_ending(monkeypatch):
+    """The restarts were ours. A stretch that was playing, eleven seconds in
+    and pausing to fill its buffer, got killed and asked for again - and the
+    new one paid the whole start-up cost afresh, seek discard and all, only
+    to buffer again a little later.
+
+    A slow stretch is slow whoever asks for it. Only an ending is an ending.
+    """
     from datetime import datetime, timedelta
     w = _with_strip()
     w.cast = _Cast(active=True)
-    w.cast.state = "BUFFERING/None"
-    w.cast.at = 300.0
     w._cast_device = "Alva TV"
     began = datetime.now() - timedelta(minutes=10)
     w._cast_ctx = {"archive": True, "sid": 9851, "archive_from": began,
@@ -1646,25 +1659,18 @@ def test_a_stretch_that_stalls_is_continued_not_left_frozen(monkeypatch):
     import dopeiptv.ui.main_window as mwmod
     monkeypatch.setattr(mwmod.time, "monotonic", lambda: clock["now"])
 
-    w._cast_continue_archive()      # first sighting of this position
-    assert asked == []
-    clock["now"] += 10
-    w._cast_continue_archive()      # ten seconds frozen: patience
-    assert asked == []
-    clock["now"] += 15
-    w._cast_continue_archive()      # twenty-five seconds: that is a stall
+    # Buffering, for as long as it likes, at a position that does not move.
+    w.cast.state = "BUFFERING/None"
+    w.cast.at = 300.0
+    for _ in range(10):
+        w._cast_continue_archive()
+        clock["now"] += 30
+    assert asked == [], "a slow stretch is not rescued by asking again"
+
+    # An ending is an ending, and the next stretch starts where it stopped.
+    w.cast.state = "IDLE/FINISHED"
+    w._cast_continue_archive()
     assert asked == [began + timedelta(seconds=300)]
-
-    # A position that moves is not a stall, however long it plays.
-    asked.clear()
-    clock["now"] += 30
-    w.cast.at = 360.0
-    w._cast_continue_archive()
-    clock["now"] += 10
-    w.cast.at = 370.0
-    w._cast_continue_archive()
-    assert asked == []
-
 
 def test_the_tv_is_told_what_kind_of_thing_it_is_playing(monkeypatch):
     """pychromecast announces everything as LIVE unless told otherwise, so a
@@ -1683,3 +1689,24 @@ def test_the_tv_is_told_what_kind_of_thing_it_is_playing(monkeypatch):
     dev.announced.clear()
     m.cast("Alva TV", "http://p/live/u/pw/9851.m3u8", "SVT1")
     assert dev.announced[-1] == ("LIVE", None)
+
+
+def test_pausing_a_converted_broadcast_asks_the_provider_for_nothing():
+    """The one that finally works, and the reason it does: the converter
+    records into a spool as it goes, so a pause is the television stopping
+    reading and play carries on at the very next frame. Every earlier way
+    asked the provider for the missing minutes afterwards, and the provider
+    is exactly what could not be relied on."""
+    w = _with_strip()
+    w.cast = _Cast(active=True)          # bridged() is True
+    w._cast_ctx = {"archive": True, "sid": 9851, "item": {}}
+    w._cast_paused_at = None
+    w._cast_from_archive = lambda at, settle=False: pytest.fail(
+        "the provider must not be asked for anything")
+
+    w._toggle_cast_pause()
+    assert w.cast.held.wait(5), "held, not let go of - the recording goes on"
+    assert not w.cast.released.is_set()
+
+    w._toggle_cast_pause()
+    assert w.cast.resumed.wait(5), "and simply carries on"

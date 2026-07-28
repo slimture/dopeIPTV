@@ -675,3 +675,44 @@ def test_a_reconnecting_receiver_does_not_start_a_second_ffmpeg():
     finally:
         cb.ffmpeg_args = real
         b.stop()
+
+
+def test_a_paused_television_does_not_stop_the_recording():
+    """This is what makes pausing a broadcast work at all.
+
+    Every other way of holding a live cast asked the provider for the missing
+    minutes afterwards, and the provider is exactly what cannot be relied on:
+    it bursts, it cuts, it counts one connection. So do not ask it anything.
+    The converter records into a spool as it goes; a pause is the television
+    stopping reading, and play carries on at the very next frame - because
+    the recording never stopped.
+    """
+    import dopeiptv.providers.cast_bridge as cb
+
+    b = CastBridge()
+    b.exe = sys.executable
+    url = b.start("http://p/timeshift/x.ts", ["h264"])
+    real = cb.ffmpeg_args
+    cb.ffmpeg_args = lambda *a, **k: [
+        sys.executable, "-c",
+        "import sys,time\n"
+        "for i in range(120):\n"
+        "    sys.stdout.buffer.write(bytes([i % 251]) * 65536)\n"
+        "    sys.stdout.flush()\n"
+        "    time.sleep(0.05)\n"]
+    try:
+        r = urllib.request.urlopen(url, timeout=30)
+        spool = b._current[1]
+        assert set(r.read(65536)) == {0}, "the first frame"
+        was = os.path.getsize(spool)
+        # The television stops reading - a pause.
+        time.sleep(1.5)
+        # The recording carried on regardless, which is the whole point.
+        assert os.path.getsize(spool) > was + 65536 * 8, os.path.getsize(spool)
+        # And play picks up on the very next byte, not somewhere else.
+        rest = r.read(65536)
+        assert len(rest) == 65536
+        assert set(rest) == {1}, "the frame straight after the paused one"
+    finally:
+        cb.ffmpeg_args = real
+        b.stop()
