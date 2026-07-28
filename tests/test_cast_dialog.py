@@ -82,7 +82,9 @@ def test_the_picture_question_is_remembered_per_device():
                      probe=False, managing=True)
     assert dlg.quality() == "original"
     assert dlg.older_box.isChecked() is False
-    assert dlg.quality_note.isVisible() is False
+    # Which receivers the question is for is what you need in order to answer
+    # it, so it is not hidden until after the box is ticked.
+    assert dlg.quality_note.isHidden() is False
 
     dlg.older_box.setChecked(True)              # Living room
     assert dlg.quality() == "older"

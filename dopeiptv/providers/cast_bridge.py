@@ -56,6 +56,24 @@ _UA = "VLC/3.0.20 LibVLC/3.0.20"
 QUALITY = {"original": (0, 0), "older": (720, 30),
            "720p": (720, 0), "720p30": (720, 30)}
 
+# What ffmpeg says while it waits for the first keyframe of a broadcast that
+# was already running. None of it is a fault: a transport stream can be joined
+# at any byte, and everything before the next keyframe is genuinely
+# undecodable. It stops on its own within a second or two.
+_MID_STREAM_NOISE = (
+    "non-existing pps", "no frame!", "last message repeated",
+    "sps unavailable", "decode_slice_header error",
+    "error while decoding mb", "missing picture in access unit",
+    "co located pocs unavailable", "corrupt decoded frame",
+    "invalid nal unit size", "concealing",
+)
+
+
+def _mid_stream_noise(line: str) -> bool:
+    low = line.lower()
+    return any(bit in low for bit in _MID_STREAM_NOISE)
+
+
 _hw_encoder: str | None = None
 
 
@@ -464,22 +482,46 @@ class CastBridge:
         """ffmpeg's own words, with the repetition taken out.
 
         Picking a live transport stream up mid-broadcast means decoding
-        before the first keyframe, and ffmpeg says "non-existing PPS 0
-        referenced" about every frame until one arrives - hundreds of
-        identical lines that bury everything else in the log. Identical
-        consecutive lines are counted instead of repeated.
+        before the first keyframe, and ffmpeg complains about every frame
+        until one arrives. It does not complain in one voice: "non-existing
+        PPS 0 referenced", "no frame!" and its own "Last message repeated"
+        take turns, so no two consecutive lines are equal and counting equal
+        ones catches none of it - hundreds of lines bury everything else.
+
+        They are all the same event, and it is an expected one, so treat them
+        as such: say it once, in ffmpeg's own words so the words are still
+        searchable, then count the rest and report the total when the stream
+        finally gets going.
         """
         last, repeats = "", 0
+        noisy = 0
 
         def flush():
             if repeats:
                 log.info("cast bridge: ffmpeg: (last line ×%d)", repeats + 1)
+
+        def flush_noise():
+            nonlocal noisy
+            if noisy > 1:
+                log.info("cast bridge: ffmpeg: (%d more while waiting for "
+                         "the first keyframe)", noisy - 1)
+            noisy = 0
 
         try:
             for raw in iter(proc.stderr.readline, b""):
                 line = raw.decode("utf-8", "replace").strip()
                 if not line:
                     continue
+                if _mid_stream_noise(line):
+                    flush()
+                    last, repeats = "", 0
+                    noisy += 1
+                    if noisy == 1:
+                        log.info("cast bridge: ffmpeg: %s (joined mid-stream "
+                                 "- more of these until the first keyframe)",
+                                 line)
+                    continue
+                flush_noise()
                 if line == last:
                     repeats += 1
                     continue
@@ -487,6 +529,7 @@ class CastBridge:
                 last, repeats = line, 0
                 log.info("cast bridge: ffmpeg: %s", line)
             flush()
+            flush_noise()
         except Exception:
             pass
 

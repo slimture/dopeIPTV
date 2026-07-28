@@ -718,9 +718,11 @@ _STRINGS: dict[str, dict[str, str]] = {
     "cast_subs_off": {"en": "Off"},
     "cast_reading_tracks": {"en": "Reading tracks…"},
     "cast_older_device": {
-        "en": "Older TV device - smoother picture, a little less sharp"},
+        "en": "Older Chromecast - smoother picture, a little less sharp"},
     "cast_quality_note": {
-        "en": "Remembered for this device."},
+        "en": "For Chromecast 1-3 and TVs with Chromecast built-in. An Ultra, "
+              "Google TV or Android TV does not need it. Remembered for this "
+              "device."},
     "cast_track_note": {
         "en": "Choosing a track converts the stream on this computer."},
 

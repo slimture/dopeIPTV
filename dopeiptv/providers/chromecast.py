@@ -535,6 +535,14 @@ class ChromecastManager:
                      "sending it as it is", height,
                      f"{fps:g}" if fps else "")
             return "original"
+        # Say which half of the limit it broke. An HD channel at fifty frames
+        # a second is scaled by the frame rate alone, and a line that only
+        # named the setting read as if the size had been the problem.
+        log.info("cast: %dp%s is beyond this device's limit (%dp%d) - %s",
+                 height, f"{fps:g}" if fps else "", limit_h, limit_fps,
+                 "too many lines and too many frames a second"
+                 if too_big and too_fast else
+                 "too many lines" if too_big else "too many frames a second")
         return want
 
     @staticmethod
@@ -817,8 +825,12 @@ class CastDialog(QDialog):
         # an SD or HD channel is already below it and goes over untouched.
         lay.addWidget(self.older_box)
         self.quality_note = QLabel(tr("cast_quality_note"))
+        self.quality_note.setWordWrap(True)
         self.quality_note.setStyleSheet("font-size:11px; opacity:0.7;")
-        self.quality_note.hide()
+        # Always shown, unlike the note about tracks: which receivers this is
+        # for is what you need in order to answer the question, so hiding it
+        # until after the box is ticked shows it to the only person who no
+        # longer needs it.
         lay.addWidget(self.quality_note)
         self.older_box.toggled.connect(self._quality_changed)
         self.list.currentItemChanged.connect(
@@ -926,7 +938,6 @@ class CastDialog(QDialog):
         self.older_box.blockSignals(True)
         self.older_box.setChecked(want != "original")
         self.older_box.blockSignals(False)
-        self.quality_note.setVisible(want != "original")
 
     def _quality_changed(self) -> None:
         item = self.list.currentItem()
@@ -934,7 +945,6 @@ class CastDialog(QDialog):
             return
         want = "older" if self.older_box.isChecked() else "original"
         self.window.settings.setValue(self._quality_key(item.text()), want)
-        self.quality_note.setVisible(want != "original")
 
     def quality(self) -> str:
         item = self.list.currentItem()

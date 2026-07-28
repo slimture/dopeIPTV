@@ -199,3 +199,49 @@ def test_stopping_takes_the_server_down():
     assert b.path is None and b.source is None
     with pytest.raises(OSError):        # URLError is an OSError
         urllib.request.urlopen(url, timeout=5)
+
+
+def test_joining_a_broadcast_mid_stream_is_one_line_not_hundreds():
+    """A transport stream can be joined at any byte, so everything before the
+    next keyframe is undecodable and ffmpeg says so about every frame. It does
+    not say it in one voice - "non-existing PPS 0", "no frame!" and its own
+    "Last message repeated" take turns - so collapsing equal consecutive lines
+    caught none of it and the log filled with hundreds of them.
+    """
+    import io
+    import logging
+
+    class Proc:
+        stderr = io.BytesIO(
+            b"[h264] non-existing PPS 0 referenced\n"
+            b"Last message repeated 1 times\n"
+            b"[h264] no frame!\n" * 1 +
+            (b"[h264] non-existing PPS 0 referenced\n"
+             b"Last message repeated 1 times\n"
+             b"[h264] no frame!\n") * 60 +
+            b"Output #0, mp4, to 'pipe:1':\n")
+
+    lines = []
+
+    class Grab(logging.Handler):
+        def emit(self, record):
+            lines.append(record.getMessage())
+
+    from dopeiptv.core.log import log
+    h = Grab()
+    level = log.level
+    log.addHandler(h)
+    log.setLevel(logging.INFO)
+    try:
+        CastBridge._drain_errors(Proc())
+    finally:
+        log.removeHandler(h)
+        log.setLevel(level)
+
+    # Said once in ffmpeg's own words, counted after that, and the line that
+    # actually matters is still there.
+    assert len(lines) == 3, lines
+    assert "non-existing PPS 0 referenced" in lines[0]
+    assert "joined mid-stream" in lines[0]
+    assert "182 more" in lines[1], lines[1]
+    assert "Output #0" in lines[2]
