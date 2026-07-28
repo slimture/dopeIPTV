@@ -16,9 +16,20 @@ device and what was sent there.
 The window methods are borrowed onto a stub: a real MainWindow needs a GL
 surface and a provider, and none of this touches either.
 """
+import os
 import threading
 
 import pytest
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _qt_app():
+    """The strip's buttons carry drawn icons, and drawing needs a GUI
+    application to exist - a QPixmap without one aborts the interpreter."""
+    from PyQt6.QtWidgets import QApplication
+    yield QApplication.instance() or QApplication([])
 
 _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_local_codecs", "_toggle_cast_pause", "_cast_from_archive",
@@ -78,9 +89,15 @@ class _Lbl:
     def __init__(self) -> None:
         self.text = ""
         self.visible = True
+        self.icon = None
 
     def setText(self, t) -> None:
         self.text = t
+
+    def setIcon(self, i) -> None:
+        # The strip's buttons carry drawn icons, not characters: a font
+        # without a glyph draws an empty box, which is what they became.
+        self.icon = i
 
     def setVisible(self, v) -> None:
         self.visible = bool(v)
@@ -181,6 +198,18 @@ def test_the_picture_setting_can_be_put_back_from_the_strip():
     assert w._cast_quality() == "original"
 
 
+def test_every_strip_icon_actually_draws_something():
+    """They were characters - a gear, a pause bar, a minus sign - and a font
+    without the glyph draws an empty box, which is what the volume buttons
+    turned into on macOS."""
+    from dopeiptv.ui.widgets import cast_strip_icon
+    for kind in ("minus", "plus", "tracks", "pause", "play"):
+        img = cast_strip_icon(kind, "#ffffff").pixmap(42, 42).toImage()
+        ink = sum(1 for x in range(img.width()) for y in range(img.height())
+                  if img.pixelColor(x, y).alpha() > 20)
+        assert ink > 60, f"{kind} drew almost nothing ({ink} px)"
+
+
 def test_local_playback_ends_a_running_cast():
     w = _window()
     w.cast = _Cast(active=True)
@@ -263,9 +292,10 @@ def test_pausing_a_film_is_the_receiver_s_own_pause():
     w._cast_paused_at = None
     w._toggle_cast_pause()
     assert w.cast.paused.wait(5)
-    assert w.cast_bar_pause.text == "▶"
+    paused_icon = w.cast_bar_pause.icon
+    assert paused_icon is not None
     w._toggle_cast_pause()
-    assert w.cast_bar_pause.text == "⏸"
+    assert w.cast_bar_pause.icon is not paused_icon, "back to the pause icon"
 
 
 def test_pausing_live_television_comes_back_from_the_archive():

@@ -49,7 +49,9 @@ from ..core.stores import (
 from .theme import P
 from ..providers.trakt import TraktClient
 from ..core.wakelock import WakeLock
-from .widgets import _HoverTextButton, _SidebarLogo, _Toast
+from .widgets import (
+    _HoverTextButton, _SidebarLogo, _Toast, cast_strip_icon,
+)
 from .mw_settings import _SettingsMixin
 from .mw_trakt import _TraktMixin
 from .mw_recording import _RecordingMixin
@@ -974,26 +976,27 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             f"color:{P['muted3']}; font-size:11px;")
         _cast_col.addWidget(self.cast_bar_title)
         _cast_row.addLayout(_cast_col, 1)
-        for glyph, step in (("−", -0.1), ("+", 0.1)):
-            b = QPushButton(glyph)
-            b.setToolTip(tr("tooltip_volume"))
+        # Drawn, not typed. A gear, a pause bar and a minus sign are all
+        # characters a font stack can be missing, and a missing glyph is an
+        # empty box - which is what these buttons became.
+        def strip_button(kind, tip, slot):
+            b = QPushButton()
+            b.setIcon(cast_strip_icon(kind, P["text"]))
+            b.setToolTip(tip)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
-            b.setFixedWidth(34)
-            b.clicked.connect(lambda _c=False, s=step: self._cast_volume(s))
+            b.setFixedWidth(36)
+            b.clicked.connect(slot)
             _cast_row.addWidget(b)
-        self.cast_bar_tracks = QPushButton("⚙")
-        self.cast_bar_tracks.setToolTip(
-            tr("cast_audio") + " / " + tr("cast_subtitles"))
-        self.cast_bar_tracks.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.cast_bar_tracks.setFixedWidth(40)
-        self.cast_bar_tracks.clicked.connect(self._cast_tracks_menu)
-        _cast_row.addWidget(self.cast_bar_tracks)
-        self.cast_bar_pause = QPushButton("⏸")
-        self.cast_bar_pause.setToolTip(tr("tooltip_pause_resume"))
-        self.cast_bar_pause.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.cast_bar_pause.setFixedWidth(40)
-        self.cast_bar_pause.clicked.connect(self._toggle_cast_pause)
-        _cast_row.addWidget(self.cast_bar_pause)
+            return b
+
+        for kind, step in (("minus", -0.1), ("plus", 0.1)):
+            strip_button(kind, tr("tooltip_volume"),
+                         lambda _c=False, s=step: self._cast_volume(s))
+        self.cast_bar_tracks = strip_button(
+            "tracks", tr("cast_audio") + " / " + tr("cast_subtitles"),
+            self._cast_tracks_menu)
+        self.cast_bar_pause = strip_button(
+            "pause", tr("tooltip_pause_resume"), self._toggle_cast_pause)
         self.cast_bar_stop = QPushButton(tr("cast_stop"))
         self.cast_bar_stop.setCursor(Qt.CursorShape.PointingHandCursor)
         self.cast_bar_stop.clicked.connect(
@@ -3478,7 +3481,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         bar = getattr(self, "cast_bar", None)
         if bar is None:
             return
-        self.cast_bar_pause.setText("⏸")
+        self.cast_bar_pause.setIcon(cast_strip_icon("pause", P["text"]))
         if not device:
             bar.hide()
             return
@@ -3620,14 +3623,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         """
         if self._cast_paused_at is not None:
             at, self._cast_paused_at = self._cast_paused_at, None
-            self.cast_bar_pause.setText("⏸")
+            self.cast_bar_pause.setIcon(cast_strip_icon("pause", P["text"]))
             if (self._cast_ctx or {}).get("archive"):
                 self._cast_from_archive(at)
             else:
                 threading.Thread(target=self.cast.resume, daemon=True).start()
             return
         self._cast_paused_at = datetime.now()
-        self.cast_bar_pause.setText("▶")
+        self.cast_bar_pause.setIcon(cast_strip_icon("play", P["text"]))
         threading.Thread(target=self.cast.pause, daemon=True).start()
 
     def _cast_from_archive(self, paused_at) -> None:

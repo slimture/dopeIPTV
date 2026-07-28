@@ -5,7 +5,9 @@ from __future__ import annotations
 import sys
 
 from PyQt6.QtCore import QPointF, QRect, QRectF, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor, QPainter, QPainterPath, QPen
+from PyQt6.QtGui import (
+    QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap,
+)
 from PyQt6.QtWidgets import QLabel, QMessageBox, QPushButton, QWidget
 
 from .. import APP_NAME
@@ -364,3 +366,50 @@ class _SidebarLogo(QWidget):
             arrow.closeSubpath()
             painter.fillPath(arrow, QColor("white"))
         painter.end()
+
+def cast_strip_icon(kind: str, colour: str) -> QIcon:
+    """Drawn icons for the cast strip's buttons.
+
+    They were characters - a gear, a pause bar, a minus sign - and a font
+    stack that has no glyph for one of them draws an empty box instead. Which
+    is what the volume buttons turned into. Drawn in a 14 px box they look the
+    same on every machine and cannot go missing.
+    """
+    size, scale = 14, 3
+    pm = QPixmap(size * scale, size * scale)
+    pm.setDevicePixelRatio(float(scale))
+    pm.fill(Qt.GlobalColor.transparent)
+    pr = QPainter(pm)
+    pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    col = QColor(colour)
+    pen = QPen(col)
+    pen.setWidthF(size * 0.13)
+    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    pr.setPen(pen)
+    s = float(size)
+    if kind in ("minus", "plus"):
+        pr.drawLine(QPointF(s * 0.22, s * 0.5), QPointF(s * 0.78, s * 0.5))
+        if kind == "plus":
+            pr.drawLine(QPointF(s * 0.5, s * 0.22), QPointF(s * 0.5, s * 0.78))
+    elif kind == "pause":
+        pen.setWidthF(s * 0.18)
+        pr.setPen(pen)
+        pr.drawLine(QPointF(s * 0.36, s * 0.22), QPointF(s * 0.36, s * 0.78))
+        pr.drawLine(QPointF(s * 0.64, s * 0.22), QPointF(s * 0.64, s * 0.78))
+    elif kind == "play":
+        pr.setPen(Qt.PenStyle.NoPen)
+        pr.setBrush(col)
+        tri = QPainterPath()
+        tri.moveTo(s * 0.30, s * 0.20)
+        tri.lineTo(s * 0.80, s * 0.50)
+        tri.lineTo(s * 0.30, s * 0.80)
+        tri.closeSubpath()
+        pr.drawPath(tri)
+    else:                                   # "tracks": three sliders
+        for i, y in enumerate((0.28, 0.5, 0.72)):
+            pr.drawLine(QPointF(s * 0.18, s * y), QPointF(s * 0.82, s * y))
+            x = (0.62, 0.34, 0.70)[i]
+            pr.setBrush(col)
+            pr.drawEllipse(QPointF(s * x, s * y), s * 0.11, s * 0.11)
+    pr.end()
+    return QIcon(pm)
