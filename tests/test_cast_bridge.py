@@ -987,3 +987,39 @@ def test_a_text_subtitle_is_no_reason_to_re_encode_the_picture():
             assert b.copy_video is copied, codec
         finally:
             b.stop()
+
+
+def test_the_subtitle_log_says_it_once():
+    """It was one line per segment for the length of a film - forty a
+    minute, saying the same thing forty times. It is worth saying that the
+    receiver reads the subtitles at all, because nothing else on this side
+    can tell; it is not worth saying it again."""
+    b = CastBridge()
+    b.exe = "/bin/true"
+    said = []
+    import dopeiptv.providers.cast_bridge as cb
+    real = cb.log.info
+
+    def spy(fmt, *a):
+        if "reading the subtitles" in str(fmt):
+            said.append(fmt % a if a else fmt)
+        return real(fmt, *a)
+
+    cb.log.info = spy
+    try:
+        url = b.start("http://p/movie/u/pw/5.mkv", subs=0, sub_codec="subrip")
+        base = url.rsplit("/", 1)[0]
+        for n in range(4):
+            name = f"stream_0{n}.vtt"
+            open(os.path.join(b.hls_dir, name), "w").write("WEBVTT\n")
+            urllib.request.urlopen(f"{base}/{name}", timeout=10).read()
+        open(os.path.join(b.hls_dir, "master.m3u8"), "w").write("#EXTM3U\n")
+        urllib.request.urlopen(f"{base}/master.m3u8", timeout=10).read()
+    finally:
+        cb.log.info = real
+        b.stop()
+    assert len(said) == 1, said
+    assert "stream_00.vtt" in said[0]
+
+    # A new cast is a new question, and gets its own answer.
+    assert b.said_subs is False

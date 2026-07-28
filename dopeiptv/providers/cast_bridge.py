@@ -850,13 +850,16 @@ class _Handler(BaseHTTPRequestHandler):
             body = _autoselect_subtitles(body, bridge.sub_lang)
         elif name.endswith(".vtt"):
             body = _timestamp_map(body)
-        # Every subtitle piece the receiver takes, in the log. Whether it
-        # fetches them at all is the one thing the sender cannot otherwise
-        # know - a track can be present, switched on, and never read - and
-        # that difference is the difference between our bug and its.
-        if name.endswith((".vtt", "_vtt.m3u8")):
-            log.info("cast bridge: the receiver took %s (%d bytes)",
-                     name, len(body))
+        # Once, and then quiet. Whether the receiver fetches the subtitles
+        # at all is the one thing the sender cannot otherwise know - a
+        # track can be present, switched on, and never read - so it is
+        # worth a line. It is not worth one per segment for the length of a
+        # film, which is what it was: forty lines a minute, saying the same
+        # thing forty times.
+        if name.endswith(".vtt") and not bridge.said_subs:
+            bridge.said_subs = True
+            log.info("cast bridge: the receiver is reading the subtitles "
+                     "(%s, %d bytes)", name, len(body))
         self.send_response(200)
         self.send_header(
             "Content-Type",
@@ -929,6 +932,7 @@ class CastBridge:
         # rendition rather than being drawn into it.
         self.hls = False
         self.hls_dir: str | None = None
+        self.said_subs = False
         self.copy_video = True
         self.audio = 0
         self.subs: int | None = None
@@ -1368,6 +1372,7 @@ class CastBridge:
         self._thread = None
         self.path = self.source = self.prefix = None
         self.hls, self.hls_dir = False, None
+        self.said_subs = False
         if self._tmp:
             shutil.rmtree(self._tmp, ignore_errors=True)
             self._tmp = None
