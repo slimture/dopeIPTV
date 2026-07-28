@@ -49,7 +49,12 @@ _UA = "VLC/3.0.20 LibVLC/3.0.20"
 # Deinterlacing is not part of the choice: no Chromecast deinterlaces at all,
 # so it is applied whenever the video is re-encoded anyway - with deint=1,
 # which touches only frames actually marked as interlaced.
-QUALITY = {"original": (0, 0), "720p": (720, 0), "720p30": (720, 30)}
+# "older" is the only adaptation offered, under a name that describes the
+# problem rather than the mechanism: 720 lines at 30 frames is comfortably
+# inside what every Cast receiver ever made can decode. The older keys are
+# still understood so a setting made before this stays meaningful.
+QUALITY = {"original": (0, 0), "older": (720, 30),
+           "720p": (720, 0), "720p30": (720, 30)}
 
 _hw_encoder: str | None = None
 
@@ -429,7 +434,10 @@ class CastBridge:
 
     def spawn(self) -> subprocess.Popen | None:
         exe = self.exe or ffmpeg_path()
-        if not exe or not self.source:
+        # A stopped bridge has no source, and a retry that ignored that
+        # resurrected ffmpeg after the cast had already moved on - two of them
+        # then read the same channel and fought over the one connection.
+        if not exe or not self.source or self._server is None:
             return None
         args = ffmpeg_args(exe, self.source, self.copy_video,
                            self.audio, self.subs, self.sub_codec,

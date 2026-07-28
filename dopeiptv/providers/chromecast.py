@@ -6,8 +6,8 @@ import threading
 import time
 
 from PyQt6.QtWidgets import (
-    QComboBox, QDialog, QHBoxLayout, QLabel, QListWidget, QPushButton,
-    QVBoxLayout,
+    QCheckBox, QComboBox, QDialog, QHBoxLayout, QLabel, QListWidget,
+    QPushButton, QVBoxLayout,
 )
 
 from ..core.log import log
@@ -513,12 +513,20 @@ class ChromecastManager:
         The device setting is a ceiling, not an instruction. Most channels
         come in three versions - SD, HD and FHD - and only the last one is
         beyond an older receiver; scaling the HD one down would throw away
-        picture for nothing. A source already under the ceiling is left alone,
-        and a picture whose size we do not know is adapted as asked, since
-        that is the setting the device was given for a reason.
+        picture for nothing. A source already under the ceiling is left alone.
+
+        So is one whose size we could not find out. Adapting on a guess is the
+        worse mistake: it re-encodes HD channels that were perfectly fine, and
+        does it invisibly. An older device that stutters can be helped on the
+        next attempt, when the picture IS known - the player fills that in
+        within a frame or two of starting.
         """
-        if want == "original" or not height:
+        if want == "original":
             return want
+        if not height:
+            log.info("cast: the picture size is not known - sending it as it "
+                     "is rather than converting on a guess")
+            return "original"
         limit_h, limit_fps = QUALITY.get(want, (0, 0))
         too_big = limit_h and height > limit_h
         too_fast = limit_fps and fps and fps > limit_fps + 1
@@ -787,10 +795,9 @@ class CastDialog(QDialog):
         # on their default is what keeps a cast native.
         self.audio_box = QComboBox()
         self.subs_box = QComboBox()
-        self.quality_box = QComboBox()
+        self.older_box = QCheckBox(tr("cast_older_device"))
         for box, label in ((self.audio_box, tr("cast_audio")),
-                           (self.subs_box, tr("cast_subtitles")),
-                           (self.quality_box, tr("cast_quality"))):
+                           (self.subs_box, tr("cast_subtitles"))):
             row = QHBoxLayout()
             cap = QLabel(label)
             cap.setMinimumWidth(80)
@@ -804,21 +811,17 @@ class CastDialog(QDialog):
         self.track_note.setStyleSheet("font-size:11px; opacity:0.7;")
         self.track_note.hide()
         lay.addWidget(self.track_note)
-        # The picture setting is per device, not per title: an old receiver
-        # needs the same help every time, and every other device in the house
-        # is left alone. Filled in once the device is known.
-        self.quality_box.clear()
-        # Written as a ceiling, because that is what it is: an HD or SD
-        # channel is already below it and goes to the TV untouched.
-        for key, label in (("original", tr("cast_quality_original")),
-                           ("720p", "≤ 720p"), ("720p30", "≤ 720p · 30")):
-            self.quality_box.addItem(label, key)
-        self.quality_box.setEnabled(True)
+        # One question, in the words of the problem: nobody thinks "my
+        # receiver tops out below fifty frames a second", they think "it
+        # stutters on the TV". Remembered per device, and it is a ceiling -
+        # an SD or HD channel is already below it and goes over untouched.
+        self.older_box.setWordWrap(True)
+        lay.addWidget(self.older_box)
         self.quality_note = QLabel(tr("cast_quality_note"))
         self.quality_note.setStyleSheet("font-size:11px; opacity:0.7;")
         self.quality_note.hide()
         lay.addWidget(self.quality_note)
-        self.quality_box.currentIndexChanged.connect(self._quality_changed)
+        self.older_box.toggled.connect(self._quality_changed)
         self.list.currentItemChanged.connect(
             lambda *_a: self._show_device_quality())
         self.audio_box.currentIndexChanged.connect(self._track_changed)
@@ -921,17 +924,16 @@ class CastDialog(QDialog):
             return
         want = str(self.window.settings.value(
             self._quality_key(item.text()), "original") or "original")
-        idx = self.quality_box.findData(want)
-        self.quality_box.blockSignals(True)
-        self.quality_box.setCurrentIndex(max(0, idx))
-        self.quality_box.blockSignals(False)
+        self.older_box.blockSignals(True)
+        self.older_box.setChecked(want != "original")
+        self.older_box.blockSignals(False)
         self.quality_note.setVisible(want != "original")
 
     def _quality_changed(self) -> None:
         item = self.list.currentItem()
         if not item:
             return
-        want = self.quality_box.currentData() or "original"
+        want = "older" if self.older_box.isChecked() else "original"
         self.window.settings.setValue(self._quality_key(item.text()), want)
         self.quality_note.setVisible(want != "original")
 

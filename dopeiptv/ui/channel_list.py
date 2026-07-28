@@ -420,20 +420,29 @@ class ChannelDelegate(QStyledItemDelegate):
                          Qt.AlignmentFlag.AlignCenter, "★")
         painter.restore()
 
-    def _is_playing(self, it, kind: str) -> bool:
+    def _is_current(self, it, kind: str, key, in_group) -> bool:
+        """Is *it* the row that *key*/*in_group* refers to?"""
         group = {"live": "live", "fav": "live", "vod": "vod",
                  "episode": "episode", "history": "history",
                  "rec": "rec"}.get(kind)
-        w = self.window
-        if w._playing_key is None:
+        if key is None:
             return False
         if kind == "history":
-            return (it.get("_key") == w._playing_key
+            return (it.get("_key") == key
                     and {"live": "live", "movie": "vod",
                          "episode": "episode"}.get(it.get("_kind"))
-                    == w._playing_group)
-        return (group == w._playing_group
-                and w._item_key(it) == w._playing_key)
+                    == in_group)
+        return group == in_group and self.window._item_key(it) == key
+
+    def _is_playing(self, it, kind: str) -> bool:
+        """Playing here, or playing on a TV - the row is what is on, and a
+        list that only marks one of the two leaves you hunting for the other.
+        """
+        w = self.window
+        return (self._is_current(it, kind, w._playing_key, w._playing_group)
+                or self._is_current(it, kind,
+                                    getattr(w, "_cast_key", None),
+                                    getattr(w, "_cast_group", None)))
 
     @staticmethod
     def _hover_overlay(tint_hex: str) -> QColor:

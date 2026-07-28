@@ -223,6 +223,29 @@ def test_every_strip_icon_actually_draws_something():
         assert ink > 60, f"{kind} drew almost nothing ({ink} px)"
 
 
+def test_pause_is_hidden_where_pausing_cannot_work():
+    """A Chromecast cannot pause live television - there is nothing buffered
+    ahead to come back to - and the app answers that from the provider's
+    archive. On a channel with no archive there is no answer, and a button
+    that does nothing is worse than no button."""
+    w = _with_strip()
+    w.cast = _Cast(active=True)
+    w.cast.volume = lambda: (0.5, False)
+
+    w._cast_ctx = {"sid": 9851, "archive": True, "key": 9851}
+    w.show_cast_strip("Alva TV", "SVT1")
+    assert w.cast_bar_pause.visible is True
+
+    w._cast_ctx = {"sid": 9851, "archive": False, "key": 9851}
+    w.show_cast_strip("Alva TV", "SVT1")
+    assert w.cast_bar_pause.visible is False, "no archive, no pause"
+
+    # A film pauses on the receiver itself, so it keeps the button.
+    w._cast_ctx = {"sid": None, "archive": False, "key": "42"}
+    w.show_cast_strip("Alva TV", "Film")
+    assert w.cast_bar_pause.visible is True
+
+
 def test_the_volume_slider_starts_where_the_television_is():
     """Not where the app guessed: the receiver's own level is the one the TV
     remote changes, and it is the only one that is true."""
@@ -648,9 +671,9 @@ def test_the_picture_setting_is_a_ceiling_not_an_instruction():
     assert need("720p", 1080, 25.0) == "720p"
     assert need("720p30", 720, 50.0) == "720p30"
     assert need("720p30", 1080, 50.0) == "720p30"
-    # Nothing to compare against: the device was given that setting for a
-    # reason, so it stands.
-    assert need("720p", 0, 0.0) == "720p"
+    # Nothing to compare against: sent as it is. Converting on a guess
+    # re-encodes HD channels that were fine, and does it invisibly.
+    assert need("720p", 0, 0.0) == "original"
     # And a device with no setting never adapts anything.
     assert need("original", 1080, 50.0) == "original"
 

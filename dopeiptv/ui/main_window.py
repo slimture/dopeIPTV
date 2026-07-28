@@ -252,6 +252,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._last_stream_error_ts = 0.0
         self._cast_device: str | None = None   # device a cast is running on
         self._cast_paused_at = None            # when a live cast was paused
+        # What is on the TV, so the list can mark it exactly as it marks what
+        # is playing here. Nothing else should read these - they are not the
+        # app's own playback state.
+        self._cast_key = None
+        self._cast_group = None
         self._cast_ctx: dict = {}              # what is being cast
         self._popout_win = None
         self._popout_placeholder = None
@@ -1007,6 +1012,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cast_bar_tracks = strip_button(
             "tracks", tr("cast_audio") + " / " + tr("cast_subtitles"),
             self._cast_tracks_menu)
+        # Pause is only shown where pausing means something. A Chromecast
+        # cannot pause live television - there is nothing buffered ahead to
+        # come back to - and the app answers that from the provider's archive.
+        # On a channel with no archive there is no answer, and a button that
+        # does nothing is worse than no button.
         self.cast_bar_pause = strip_button(
             "pause", tr("tooltip_pause_resume"), self._toggle_cast_pause)
         self.cast_bar_stop = QPushButton(tr("cast_stop"))
@@ -3401,6 +3411,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 if kind == "video" and not out["height"]:
                     out["height"] = int(t.get("demux-h") or 0)
                     out["fps"] = float(t.get("demux-fps") or 0.0)
+                    if not out["height"]:
+                        # The track list fills demux-h in when the demuxer
+                        # gets round to it, and on a live stream that can be
+                        # after the cast has already been asked for. mpv's own
+                        # properties know as soon as the first frame is
+                        # decoded, which is always sooner.
+                        out["height"] = int(getattr(m, "height", 0) or 0)
+                        out["fps"] = float(
+                            getattr(m, "container_fps", 0) or 0.0)
                 if kind not in ("audio", "sub"):
                     continue
                 key = "audio" if kind == "audio" else "subtitle"
@@ -3490,10 +3509,25 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._cast_device = device
         # A fresh cast is playing, whatever the last one was doing.
         self._cast_paused_at = None
+        ctx = getattr(self, "_cast_ctx", None) or {}
+        self._cast_key = ctx.get("key") if device else None
+        self._cast_group = ctx.get("group") if device else None
+        if self._cast_group is None and device:
+            # A live channel has no resume group, but it still has a row.
+            self._cast_group = "live" if ctx.get("sid") else None
+            self._cast_key = ctx.get("key")
+        for name in ("listw", "grid"):
+            view = getattr(self, name, None)
+            try:
+                view.viewport().update()
+            except AttributeError:
+                pass
         bar = getattr(self, "cast_bar", None)
         if bar is None:
             return
         self.cast_bar_pause.setIcon(cast_strip_icon("pause", P["text"]))
+        self.cast_bar_pause.setVisible(
+            bool(device) and (not ctx.get("sid") or ctx.get("archive")))
         if not device:
             bar.hide()
             return
@@ -3599,26 +3633,24 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # so a channel that did need scaling leaves it set for everything
         # after it - and having to reopen the panel to put it back would be
         # the wrong place to keep it.
-        pm = menu.addMenu(tr("cast_quality"))
         current = self._cast_quality()
         # What the setting is doing to THIS stream. It is a ceiling, so an SD
         # or HD channel passes untouched while the ceiling still reads 720p -
         # and a menu that only shows the setting looks like it is scaling
         # everything.
+        older = menu.addAction(tr("cast_older_device"))
+        older.setCheckable(True)
+        older.setChecked(current != "original")
+        older.triggered.connect(
+            lambda on: self._set_cast_quality("older" if on else "original"))
         height = ctx.get("height") or 0
         fps = ctx.get("fps") or 0.0
         if height:
             from ..providers.chromecast import ChromecastManager as _CM
-            effective = _CM._needed_quality(current, height, fps)
+            adapted = _CM._needed_quality(current, height, fps) != "original"
             now = f"{height}p{fps:g}" if fps else f"{height}p"
-            shown = pm.addAction(
-                now if effective == "original" else f"{now} → {effective}")
+            shown = menu.addAction(f"{now} → 720p30" if adapted else now)
             shown.setEnabled(False)
-            pm.addSeparator()
-        for key, label in (("original", tr("cast_quality_original")),
-                           ("720p", "≤ 720p"), ("720p30", "≤ 720p · 30")):
-            entry(pm, label, key == current,
-                  lambda _c=False, k=key: self._set_cast_quality(k))
         menu.exec(self.cast_bar_tracks.mapToGlobal(
             self.cast_bar_tracks.rect().bottomLeft()))
 
