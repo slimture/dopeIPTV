@@ -131,9 +131,16 @@ def _resolve_redirects(url: str) -> tuple[str, str | None]:
         # while the receiver is about to take the very same slot. A player
         # User-Agent matters too - panels routinely refuse python-requests.
         headers = {"User-Agent": "VLC/3.0.20 LibVLC/3.0.20"}
+        # A catch-up playlist is BUILT by the request for it: one segment per
+        # minute asked for, assembled while the connection waits. A deep jump
+        # takes the panel well past a short timeout, and timing out handed
+        # the receiver a URL that was still baking - it followed it, waited
+        # its own few seconds, and gave up with IDLE/ERROR. Waiting here is
+        # what makes the receiver's own fetch afterwards instant.
+        read = 75 if ("/timeshift/" in url or "timeshift.php" in url) else 8
         final, ctype = url, ""
         for _ in range(4):          # follow a short chain, never a loop
-            r = requests.get(final, headers=headers, timeout=(3.05, 8),
+            r = requests.get(final, headers=headers, timeout=(3.05, read),
                              allow_redirects=False, stream=True)
             loc = r.headers.get("Location")
             ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip()

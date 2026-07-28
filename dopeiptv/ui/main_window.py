@@ -3922,16 +3922,30 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         if getattr(self, "_cast_paused_at", None) is not None:
             return                      # paused on purpose, not run out
-        if not str(getattr(self.cast, "state", "")).startswith("IDLE/FINISHED"):
+        finished = str(getattr(self.cast, "state", "")
+                       ).startswith("IDLE/FINISHED")
+        # The end is not always announced. A stretch whose last segment the
+        # panel could not serve in full leaves the receiver BUFFERING on it
+        # for ever - picture frozen, spinner turning, and never a FINISHED
+        # for this ticker to see. A position that has stopped moving is the
+        # end too, whatever the receiver calls it.
+        pos = float(self.cast.position() or 0.0)
+        now = time.monotonic()
+        seen = getattr(self, "_cast_pos_seen", None)
+        if seen is None or abs(pos - seen[0]) > 0.5:
+            self._cast_pos_seen = seen = (pos, now)
+        stalled = now - seen[1] > 20
+        if not finished and not stalled:
             return
         # Once. Loading the next stretch takes a few seconds, during which
         # the receiver still reports the end of the last one.
-        now = time.monotonic()
         if now - getattr(self, "_cast_continued", 0.0) < 20:
             return
         self._cast_continued = now
+        self._cast_pos_seen = None
         at = self._cast_moment()
-        log.info("cast: the archive ran out at %s - asking for the next of it",
+        log.info("cast: the archive %s at %s - asking for the next of it",
+                 "ran out" if finished else "stalled",
                  at.strftime("%H:%M:%S"))
         self._cast_from_archive(at)
 
@@ -4171,11 +4185,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             pos, self._cast_paused_pos = self._cast_paused_pos, 0.0
             self.cast_bar_pause.setIcon(cast_strip_icon("pause", P["text"]))
             if ctx.get("archive"):
-                # The stream was let go of when the pause began, so the panel
-                # is still counting it for a moment. Wait for that rather
-                # than be refused and show nothing.
+                # The stream was let go of when the pause began, and the
+                # panel counts it for only a few seconds after. A pause long
+                # enough to fetch coffee needs no waiting at all - and those
+                # four seconds were most of why coming back felt slow.
+                recent = (datetime.now() - at).total_seconds() < 10
                 self._cast_from_archive(self._paused_moment(at, pos),
-                                        settle=bool(ctx.get("sid")))
+                                        settle=bool(ctx.get("sid")) and recent)
             else:
                 threading.Thread(target=self.cast.resume, daemon=True).start()
             return
@@ -4243,7 +4259,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # watched, on every single pause.
         minute = paused_at.replace(second=0, microsecond=0)
         offset = (paused_at - minute).total_seconds()
-        behind = max(1, int((datetime.now() - minute).total_seconds() // 60))
+        # The window ENDS short of live by the same margin it starts behind
+        # it. Reaching for "now" put the minute still being broadcast at the
+        # end of every stretch - the panel lists it as a full segment it can
+        # only partly serve, so the receiver played up to the write head and
+        # sat BUFFERING for ever: picture frozen about a minute after every
+        # resume, with no IDLE/FINISHED for the ticker to act on.
+        end = (datetime.now() - self.ARCHIVE_LAG).replace(second=0,
+                                                          microsecond=0)
+        dur = max(1, int((end - minute).total_seconds() // 60))
         # The receiver is offered the archive as HLS, and the converter is
         # given the transport stream behind it.
         #
@@ -4268,7 +4292,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         #
         # Running out is no longer the end of anything - the next stretch is
         # asked for when this one is done.
-        cands = self.client.timeshift_urls(sid, minute, behind) or []
+        cands = self.client.timeshift_urls(sid, minute, dur) or []
         url = next((c for c in cands if ".m3u8" in c), "")
         source = next((c for c in cands if ".ts" in c), "") or url
         url = url or source
@@ -4278,7 +4302,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # that can be checked against what the picture actually shows.
         log.info("cast: resuming %s from %s (%d min of archive)",
                  ctx.get("title") or "", paused_at.strftime("%H:%M:%S"),
-                 behind)
+                 dur)
         title = ctx.get("title") or "dopeIPTV"
         # The session now lives at the archive address. Recording it keeps the
         # strip's own panel pointing at what is actually playing - it opened

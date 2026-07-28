@@ -485,10 +485,10 @@ def test_the_archive_url_starts_where_you_paused(monkeypatch):
     # rewatching up to a minute of television on every single pause.
     assert asked["sid"] == 9851
     assert asked["start"] == at.replace(second=0)
-    # Exactly what exists: a playlist that promises segments the panel
-    # cannot serve leaves the receiver buffering and playing a few seconds at
-    # a time, and has to be built before anything plays at all.
-    assert asked["minutes"] == 5, asked
+    # Exactly what exists - and ending a whole minute short of live, because
+    # the minute still being broadcast is a segment the panel can only partly
+    # serve: the receiver played up to the write head and froze on it.
+    assert asked["minutes"] in (3, 4), asked
     assert sent, "the archive URL is cast"
     assert w._cast_ctx["archive_from"] == at.replace(second=0)
     # The receiver is offered the playlist and the converter the transport
@@ -1448,15 +1448,24 @@ def test_coming_back_from_a_pause_waits_for_the_panel_to_notice():
     asked = []
     w._cast_from_archive = lambda at, settle=False: asked.append(settle)
     w._cast_ctx = {"archive": True, "sid": 9851, "item": {}}
-    w._cast_paused_at = datetime.now() - timedelta(minutes=5)
+    w._cast_paused_at = datetime.now() - timedelta(seconds=3)
     w._cast_paused_pos = 0.0
     w._toggle_cast_pause()
     assert asked == [True]
 
+    # A pause long enough to fetch coffee needs no waiting at all: the panel
+    # finished counting the released stream minutes ago, and those four
+    # seconds were most of why coming back felt slow.
+    w._cast_ctx = {"archive": True, "sid": 9851, "item": {}}
+    w._cast_paused_at = datetime.now() - timedelta(minutes=5)
+    asked.clear()
+    w._toggle_cast_pause()
+    assert asked == [False]
+
     # An archive cast of something that is not a broadcast never let go of
     # anything, so there is nothing to wait for.
     w._cast_ctx = {"archive": True, "sid": None, "item": {}}
-    w._cast_paused_at = datetime.now() - timedelta(minutes=5)
+    w._cast_paused_at = datetime.now() - timedelta(seconds=3)
     asked.clear()
     w._toggle_cast_pause()
     assert asked == [False]
@@ -1603,3 +1612,45 @@ def test_an_unimportable_pychromecast_is_not_a_missing_one():
         assert "libsomething" in cc.cast_import_error()
     finally:
         cc._pychromecast, cc._pc_checked, cc._pc_error = saved
+
+
+def test_a_stretch_that_stalls_is_continued_not_left_frozen(monkeypatch):
+    """The end is not always announced. A stretch whose last segment the
+    panel could not serve in full leaves the receiver BUFFERING on it for
+    ever - picture frozen, spinner turning, and never an IDLE/FINISHED for
+    the ticker to see. A position that has stopped moving is the end too."""
+    from datetime import datetime, timedelta
+    w = _with_strip()
+    w.cast = _Cast(active=True)
+    w.cast.state = "BUFFERING/None"
+    w.cast.at = 300.0
+    w._cast_device = "Alva TV"
+    began = datetime.now() - timedelta(minutes=10)
+    w._cast_ctx = {"archive": True, "sid": 9851, "archive_from": began,
+                   "item": {}}
+    w._cast_paused_at = None
+    asked = []
+    w._cast_from_archive = lambda at, settle=False: asked.append(at)
+
+    clock = {"now": 1000.0}
+    import dopeiptv.ui.main_window as mwmod
+    monkeypatch.setattr(mwmod.time, "monotonic", lambda: clock["now"])
+
+    w._cast_continue_archive()      # first sighting of this position
+    assert asked == []
+    clock["now"] += 10
+    w._cast_continue_archive()      # ten seconds frozen: patience
+    assert asked == []
+    clock["now"] += 15
+    w._cast_continue_archive()      # twenty-five seconds: that is a stall
+    assert asked == [began + timedelta(seconds=300)]
+
+    # A position that moves is not a stall, however long it plays.
+    asked.clear()
+    clock["now"] += 30
+    w.cast.at = 360.0
+    w._cast_continue_archive()
+    clock["now"] += 10
+    w.cast.at = 370.0
+    w._cast_continue_archive()
+    assert asked == []
