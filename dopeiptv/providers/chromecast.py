@@ -764,7 +764,8 @@ class ChromecastManager:
         # response - and a receiver told "video/mp4" about a playlist plays
         # nothing at all.
         ctype = ("application/x-mpegURL" if self.bridge.hls else "video/mp4")
-        if self._play_and_verify(mc, bridged, ctype, title) is not False:
+        if self._play_and_verify(mc, bridged, ctype, title,
+                                 pipe=not self.bridge.hls) is not False:
             log.info("cast: %s is playing the converted stream", device_name)
             return True
         self.bridge.stop()
@@ -776,8 +777,8 @@ class ChromecastManager:
     VERDICT_WAIT = 12.0
 
     def _play_and_verify(self, mc, url: str, ctype: str, title: str,
-                         wait: float | None = None,
-                         start: float = 0.0) -> bool | None:
+                         wait: float | None = None, start: float = 0.0,
+                         pipe: bool = False) -> bool | None:
         """Hand the stream over and wait for the receiver to pass judgement.
 
         True when it took the stream, False when it REFUSED it, and None when
@@ -788,38 +789,33 @@ class ChromecastManager:
         acting on; silence means keep waiting, and the watcher will report
         whatever happens next.
         """
-        # What the cast IS, said out loud. pychromecast announces everything
-        # as LIVE unless told otherwise, so a film got the live UI on the
-        # television: a LIVE badge, a counting bar, and a title that never
-        # faded. A thing with an end is BUFFERED - and telling the receiver
-        # how long it is is what turns the bar into a real one, because the
-        # converted stream is an endless pipe it cannot measure by itself.
-        # Which of the receiver's two UIs this stream gets. There are only
-        # two, and neither can be restyled from the sender:
+        # Announce what the receiver can actually DO with this stream,
+        # because the announcement is also the order for an on-screen UI,
+        # and this receiver never takes its UI down once drawn - measured
+        # on the television, five combinations, one round each.
         #
-        #   LIVE     - a counter, a LIVE badge, and a bar over the DVR
-        #              window. Shown for as long as the stream is live,
-        #              which for a live stream is always. WRONG for a film:
-        #              this is the fixed sign the last round shipped.
-        #   BUFFERED - ordinary VOD chrome: name, bar, times. It fades
-        #              after a few seconds of STABLE playback - and every
-        #              earlier round that judged it "never fades" was
-        #              watching a stream that rebuffered constantly, from
-        #              bugs since fixed (every frame re-encoded; a LIVE
-        #              start with no currentTime landing on the converter's
-        #              write head and starving there). The chrome redraws
-        #              on every state change, so a stream that never stops
-        #              buffering never puts it away - whatever the mode.
+        #   BUFFERED - VOD chrome: name, bar, times. Honest for a stream
+        #              the receiver can really seek (a native file, or an
+        #              HLS playlist whose segments are all there). On a
+        #              modern receiver it fades; on a first-generation
+        #              dongle nothing ever fades, but at least the bar
+        #              works.
+        #   LIVE     - with metadata: a counter and a LIVE badge. With
+        #              nothing: nothing. The one clean state that dongle
+        #              has, and how every channel already goes over.
         #
-        # So: a thing with an end is BUFFERED with its length and its
-        # title, like every VOD sender that uses the default receiver. A
-        # broadcast is LIVE with nothing at all - no metadata means no
-        # card, and a rolling window keeps the bar meaningless anyway.
-        has_end = self.duration > 0
+        # A converted film used to be announced BUFFERED with a length -
+        # about an endless fragmented-MP4 pipe the receiver can neither
+        # measure nor seek. The scrubber that drew could not scrub: pure
+        # decoration, permanent on the dongle. A pipe is a pipe, so it is
+        # handed over exactly like a channel: nothing to draw. The app's
+        # strip keeps the title, the clock and the seeking (self.duration
+        # is kept regardless of what is announced).
+        seekable = self.duration > 0 and not pipe
         log.info("cast: handing over as %s",
                  f"BUFFERED ({self.duration:.0f} s), from {start:.0f} s"
-                 if has_end else "LIVE, with nothing to draw")
-        if has_end:
+                 if seekable else "LIVE, with nothing to draw")
+        if seekable:
             mc.play_media(url, ctype, title=title or "dopeIPTV",
                           current_time=float(start),
                           stream_type="BUFFERED",

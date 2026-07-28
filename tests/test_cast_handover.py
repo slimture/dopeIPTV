@@ -2340,3 +2340,66 @@ def test_a_new_stream_is_not_judged_by_the_old_one_s_track_list():
     assert m.stale(Nameless()) is False
     # And a fresh manager has no old session to be confused by.
     assert cm.ChromecastManager().stale(S()) is False
+
+
+def test_every_path_announces_what_the_receiver_can_actually_do(monkeypatch):
+    """The full walk of every road to play_media, pinned.
+
+    The announcement is also the order for an on-screen UI, and the
+    first-generation receiver never takes its UI down once drawn - measured
+    on the television, five combinations, one round each. So each delivery
+    announces only what the receiver can really do with it:
+
+      native film (seekable file)      BUFFERED + title + length
+      converted film (fMP4 pipe)       LIVE, nothing - the receiver can
+                                       neither measure nor seek a pipe, and
+                                       the scrubber it drew could not scrub
+      converted film + text subtitle   BUFFERED (the playlist really is
+                                       seekable; its segments are all kept)
+      channel, converted or native     LIVE, nothing
+    """
+    from dopeiptv.providers import chromecast as cm
+
+    # Native film: a real file the receiver seeks itself.
+    m = _manager(monkeypatch)
+    monkeypatch.setattr(cm, "_resolve_redirects",
+                        lambda u: ("http://cdn/f.mp4", "video/mp4"))
+    m.scan()
+    m.cast("Alva TV", "http://p/movie/u/pw/5.mp4", "Film", duration=6000.0)
+    assert m.devices[0].announced[-1] == \
+        ("BUFFERED", {"duration": 6000.0}, "Film")
+
+    # Converted film, no subtitle: an endless pipe, handed over exactly
+    # like a channel. The strip keeps the length for its own bar.
+    m = _manager(monkeypatch)
+    monkeypatch.setattr(cm, "_resolve_redirects",
+                        lambda u: (u, "video/x-matroska"))
+    monkeypatch.setattr(cm.CastBridge, "available", staticmethod(lambda: True))
+    m.scan()
+    monkeypatch.setattr(m.bridge, "start", lambda *a, **k: "http://me/s.mp4")
+    m.bridge.hls = False
+    m.cast("Alva TV", "http://p/movie/u/pw/5.mkv", "Film", duration=6000.0)
+    assert m.devices[0].announced[-1] == ("LIVE", None, None)
+    assert m.duration == 6000.0, "the strip still knows how long it is"
+
+    # Converted film WITH a text subtitle: an HLS playlist whose segments
+    # are all kept - genuinely seekable, so BUFFERED is the truth.
+    m = _manager(monkeypatch)
+    monkeypatch.setattr(cm, "_resolve_redirects",
+                        lambda u: (u, "video/x-matroska"))
+    monkeypatch.setattr(cm.CastBridge, "available", staticmethod(lambda: True))
+    m.scan()
+    monkeypatch.setattr(m.bridge, "start",
+                        lambda *a, **k: "http://me/master.m3u8")
+    m.bridge.hls = True
+    m.bridge.subs = 0
+    m.cast("Alva TV", "http://p/movie/u/pw/5.mkv", "Film", duration=6000.0,
+           subs={"index": 0, "codec": "subrip", "lang": "swe"})
+    assert m.devices[0].announced[-1] == \
+        ("BUFFERED", {"duration": 6000.0}, "Film")
+
+    # A channel, native: nothing, as ever.
+    m = _manager(monkeypatch)
+    m.scan()
+    m.cast("Alva TV", "http://p/live/u/pw/9851.m3u8", "SVT1")
+    assert m.devices[0].announced[-1] == ("LIVE", None, None)
