@@ -3282,9 +3282,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _open_cast_dialog(self, it) -> None:
         if not ChromecastManager.available():
+            # Which of the two it is. Being told to install a package that is
+            # already installed is a wild goose chase, and the reason it
+            # would not import is the only thing that can end it.
+            from ..providers.chromecast import cast_import_error
+            why = cast_import_error()
             QMessageBox.information(
                 self, "Chromecast",
-                tr("msg_cast_needs_package"))
+                tr("msg_cast_package_broken", why=why) if why
+                else tr("msg_cast_needs_package"))
             return
         # Already casting this very title? Then this is not a new cast - it is
         # someone coming back to change the device or a track. Reopen the
@@ -3955,6 +3961,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._cast_continue_archive()
         if not on:
             return
+        self._show_cast_paused()
         if span is not None:
             self._show_cast_timeline(*span)
             return
@@ -4050,6 +4057,26 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         else:
             self.cast_bar_time.setText(
                 f"{when} · −{self._fmt_hms(behind)}")
+
+    def _show_cast_paused(self) -> None:
+        """Say that a pause has taken, where the strip already says what is
+        happening.
+
+        On a broadcast the television is no help: pausing lets go of the
+        stream, so the screen goes to the Chromecast's own backdrop and looks
+        exactly like a cast that died. The one place that knows better is
+        this line, so it says so - and names the moment play will come back
+        to, which is the thing you actually want to be sure of before walking
+        away from it.
+        """
+        at = getattr(self, "_cast_paused_at", None)
+        if at is None:
+            self.cast_bar_lbl.setText(
+                tr("cast_casting_to", name=self._cast_device or ""))
+            return
+        moment = self._paused_moment(at, getattr(self, "_cast_paused_pos", 0.0))
+        self.cast_bar_lbl.setText(
+            tr("cast_paused_from", time=moment.strftime("%H:%M:%S")))
 
     def _cast_seek_released(self) -> None:
         span = self._cast_timeline()

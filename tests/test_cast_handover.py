@@ -40,7 +40,7 @@ _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_fmt_hms", "_cast_moment", "_cast_to_moment", "_cast_go_live",
             "_local_tracks", "_cast_continue_archive", "_cast_time_at",
             "_cast_timeline", "_show_cast_timeline", "_cast_programme_at",
-            "_effective_ts_minutes",
+            "_effective_ts_minutes", "_show_cast_paused",
             "_set_cast_quality", "_toggle_cast_mute", "_show_cast_volume")
 
 
@@ -1562,3 +1562,44 @@ def test_clicking_the_timeline_moves_the_broadcast_not_a_film():
     w._cast_seek_released()
     assert moved, "the click moves the broadcast"
     assert abs(moved[0].timestamp() - (_t.time() - 3 * 3600)) < 30
+
+
+def test_a_pause_says_so_where_the_strip_says_what_is_happening():
+    """On a broadcast the television is no help: pausing lets go of the
+    stream, so the screen goes to the Chromecast's own backdrop and looks
+    exactly like a cast that died."""
+    from datetime import datetime, timedelta
+    w = _with_strip()
+    w.cast = _CastAt(0.0, 0.0)
+    w._cast_device = "Alva TV"
+    w.xmltv = _Xmltv()
+    w._effective_ts_minutes = lambda it: 360
+    w._cast_ctx = {"archive": True, "sid": 9851, "item": {}}
+    w._cast_paused_at = None
+
+    w._show_cast_progress()
+    assert "Alva TV" in w.cast_bar_lbl.text
+
+    # Paused: the line names the moment play will come back to, which is the
+    # thing you want to be sure of before walking away from it.
+    at = datetime.now() - timedelta(minutes=3)
+    w._cast_paused_at, w._cast_paused_pos = at, 0.0
+    w._show_cast_progress()
+    assert at.strftime("%H:%M:%S") in w.cast_bar_lbl.text
+    assert "Alva TV" not in w.cast_bar_lbl.text
+
+
+def test_an_unimportable_pychromecast_is_not_a_missing_one():
+    """Being told to install a package that is already installed is a wild
+    goose chase; the reason it would not import is the only thing that ends
+    it."""
+    import dopeiptv.providers.chromecast as cc
+
+    saved = (cc._pychromecast, cc._pc_checked, cc._pc_error)
+    try:
+        cc._pychromecast, cc._pc_checked, cc._pc_error = None, True, ""
+        assert cc.cast_import_error() == ""      # simply not installed
+        cc._pc_error = "ImportError: libsomething.so"
+        assert "libsomething" in cc.cast_import_error()
+    finally:
+        cc._pychromecast, cc._pc_checked, cc._pc_error = saved

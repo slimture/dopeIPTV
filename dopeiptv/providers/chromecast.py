@@ -23,19 +23,35 @@ from .cast_bridge import (
 # deferred until casting is actually used (the Cast menu action).
 _pychromecast = None
 _pc_checked = False
+_pc_error = ""
 
 
 def _pc():
-    """Import pychromecast on first use; None when it isn't installed."""
-    global _pychromecast, _pc_checked
+    """Import pychromecast on first use; None when it isn't usable."""
+    global _pychromecast, _pc_checked, _pc_error
     if not _pc_checked:
         _pc_checked = True
         try:
             import pychromecast
             _pychromecast = pychromecast
-        except Exception:
-            _pychromecast = None
+        except ModuleNotFoundError as e:
+            _pc_error = ""              # simply not installed
+            log.info("cast: pychromecast is not installed (%s)", e)
+        except Exception as e:
+            # Installed, but something underneath it is not: a zeroconf that
+            # does not match, a system library missing. Telling someone to
+            # install a package they already have sends them on the wrong
+            # errand entirely, so say what actually happened.
+            _pc_error = f"{type(e).__name__}: {e}"
+            log.warning("cast: pychromecast is installed but would not "
+                        "import - %s", _pc_error)
     return _pychromecast
+
+
+def cast_import_error() -> str:
+    """Why casting is unavailable, when the reason is not "not installed"."""
+    _pc()
+    return _pc_error
 
 
 def cast_content_type(url: str | None) -> str:

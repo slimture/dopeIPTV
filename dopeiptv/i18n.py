@@ -726,6 +726,7 @@ _STRINGS: dict[str, dict[str, str]] = {
               "with Chromecast built in need this; an Ultra or Google TV does "
               "not."},
     "cast_seek": {"en": "Move to another point"},
+    "cast_paused_from": {"en": "Paused - play resumes from {time}"},
     "cast_subs_unavailable": {
         "en": "This ffmpeg has no libass - subtitles cannot be sent"},
     "cast_track_note": {
@@ -880,7 +881,8 @@ _STRINGS: dict[str, dict[str, str]] = {
     # ── Message boxes ─────────────────────────────────────────────────────
     "msg_could_not_connect": {"en": "Could not connect to {name}: {msg}"},
     "msg_connect_trakt_first": {"en": "Connect to Trakt first."},
-    "msg_cast_needs_package": {"en": "Casting needs the pychromecast package:\n\n  pip install pychromecast"},
+    "msg_cast_needs_package": {"en": "Casting needs the pychromecast package:\n\n  pip install pychromecast\n\nIf pip refuses because the environment is externally managed (Arch, Debian), run the app from a virtual environment:\n\n  python -m venv .venv\n  .venv/bin/pip install -r requirements.txt\n  .venv/bin/python dopeiptv.py"},
+    "msg_cast_package_broken": {"en": "pychromecast is installed but would not load:\n\n  {why}"},
     "msg_restore_defaults_body": {"en": "Undo all channel renames and hides for this section and go back to the provider's original list?"},
     "msg_parental_title": {"en": "Parental control"},
     "msg_wrong_pin": {"en": "Wrong PIN."},
