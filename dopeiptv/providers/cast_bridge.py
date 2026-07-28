@@ -863,43 +863,35 @@ class _Handler(BaseHTTPRequestHandler):
     def _serve_source(self) -> None:
         """Hand ffmpeg the source out of the spool.
 
-        Ranges are honoured, because resuming a film part way in is a seek
-        before -i and ffmpeg needs to jump in the container to do it. A jump
-        to a place the download has not reached yet WAITS - the alternative
-        is answering short and having ffmpeg conclude the file ends there.
+        Deliberately not seekable. A Range is read and answered 200 from the
+        beginning, and no Accept-Ranges is offered - which is how ffmpeg
+        decides a stream cannot be jumped around in.
 
-        That waiting is the honest cost of one connection: the filter reads
-        the subtitles from the beginning while the picture comes from the
-        middle, and one stream cannot be in two places at once. It is
-        bounded by the link's speed rather than by playback, so it passes.
+        That is the whole difference between this working and not. Offered a
+        seekable Matroska, ffmpeg's first move is to fetch the index, which
+        lives at the END of the file: it asked for byte 4785867699 of
+        4785883508 before it had read a single frame. A spool is filled from
+        the front, so the answer was to wait for a 4.7 GB download, and the
+        television sat black through all of it. Told the stream cannot be
+        jumped around in, the demuxer reads it straight through instead -
+        exactly what it does with a live channel, and exactly what all three
+        of the filtergraph's opens want anyway.
+
+        The length is still sent, because without it a clean end of file
+        reads as a truncation and the demuxer stops with an I/O error.
         """
         src = self.server.bridge.src
         if src is None:
             self.send_error(404)
             return
-        at = 0
-        rng = self.headers.get("Range") or ""
-        if rng.startswith("bytes="):
-            try:
-                at = int(rng.split("=", 1)[1].split("-", 1)[0] or 0)
-            except ValueError:
-                at = 0
         size = src.size
-        self.send_response(206 if (at and size) else 200)
+        self.send_response(200)
         self.send_header("Content-Type", "application/octet-stream")
-        self.send_header("Accept-Ranges", "bytes")
         if size:
-            self.send_header("Content-Length", str(max(0, size - at)))
-            if at:
-                self.send_header("Content-Range",
-                                 f"bytes {at}-{size - 1}/{size}")
+            self.send_header("Content-Length", str(size))
         self.send_header("Connection", "close")
         self.end_headers()
-        if at and at > src.done:
-            log.info("cast bridge: waiting for the source to reach %.0f MB "
-                     "(it holds %.0f MB) - a resume has to be downloaded to",
-                     at / 1e6, src.done / 1e6)
-        reader = src.reader(at)
+        reader = src.reader()
         try:
             while True:
                 chunk = reader.read(65536)

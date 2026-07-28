@@ -864,11 +864,19 @@ class _CountingProvider:
     filtergraph does, so counting it is the whole test.
     """
 
-    def __init__(self, payload: bytes):
+    def __init__(self, payload: bytes, rate: int = 0):
+        """*rate* trickles the body at that many bytes per tenth of a second.
+
+        Zero delivers it instantly, which is what a test server does and a
+        provider never does - and that difference hid a real failure: a wait
+        for the far end of the file costs nothing when the far end arrives
+        in the same millisecond as the near one.
+        """
         import http.server
         import socketserver
         import threading as _th
         self.payload = payload
+        self.rate = rate
         self.opens = []
         outer = self
 
@@ -891,7 +899,13 @@ class _CountingProvider:
                 self.send_header("Accept-Ranges", "bytes")
                 self.end_headers()
                 try:
-                    self.wfile.write(body)
+                    if not outer.rate:
+                        self.wfile.write(body)
+                    else:
+                        while body:
+                            self.wfile.write(body[:outer.rate])
+                            body = body[outer.rate:]
+                            time.sleep(0.1)
                 except (BrokenPipeError, ConnectionResetError):
                     pass
 
@@ -1098,6 +1112,110 @@ def test_a_real_burn_in_reaches_the_provider_exactly_once(tmp_path):
         assert len(prov.opens) == 1, (
             f"resuming opened the provider {len(prov.opens)} times: "
             f"{prov.opens}")
+    finally:
+        b.stop()
+        prov.close()
+
+
+@pytest.mark.filterwarnings("ignore")
+def test_a_slow_provider_does_not_leave_the_television_black(tmp_path):
+    """The picture starts while the source is still arriving.
+
+    A smoke test, and honest about being one: it says the converter runs
+    against a source that is still coming in. What it does NOT prove is the
+    seek question below - it passed against the broken code too, because a
+    file this small finishes downloading before any wait for its far end
+    could matter.
+    """
+    import shutil as _sh
+    import subprocess
+
+    exe = _sh.which("ffmpeg")
+    if not exe:
+        pytest.skip("no ffmpeg")
+    if b"Unknown filter" in subprocess.run(
+            [exe, "-hide_banner", "-h", "filter=subtitles"],
+            capture_output=True).stderr:
+        pytest.skip("this ffmpeg has no libass")
+
+    srt = tmp_path / "s.srt"
+    srt.write_text("1\n00:00:00,500 --> 00:00:20,000\nWWWWWWWW\n")
+    mkv = tmp_path / "slow.mkv"
+    subprocess.run(
+        [exe, "-hide_banner", "-loglevel", "error",
+         "-f", "lavfi", "-i", "testsrc=size=640x360:rate=25:duration=40",
+         "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo:d=40",
+         "-i", str(srt), "-c:v", "libx264", "-preset", "ultrafast",
+         "-c:a", "aac", "-c:s", "copy", "-y", str(mkv)], check=True)
+
+    body = mkv.read_bytes()
+    # Slow enough that waiting for the end of the file would take far longer
+    # than this test is allowed, and fast enough that reading it straight
+    # through does not.
+    prov = _CountingProvider(body, rate=max(1, len(body) // 20))
+    b = CastBridge()
+    try:
+        url = b.start(prov.url, subs=0, sub_codec="subrip")
+        began = time.monotonic()
+        with urllib.request.urlopen(url, timeout=30) as r:
+            first = r.read(65536)
+        waited = time.monotonic() - began
+        assert first, "nothing came out while the source was still arriving"
+        assert waited < 20, (
+            f"the picture took {waited:.0f} s - it waited for the whole "
+            "download rather than reading straight through")
+        assert len(prov.opens) == 1, prov.opens
+    finally:
+        b.stop()
+        prov.close()
+
+
+def test_the_source_is_offered_as_something_that_cannot_be_seeked():
+    """The contract, tested directly, because the end-to-end tests cannot.
+
+    Offered a seekable Matroska, ffmpeg's first move is to fetch the index -
+    and in Matroska the index lives at the END of the file. It asked for
+    byte 4785867699 of 4785883508 before decoding a single frame. A spool is
+    filled from the front, so honouring that meant waiting for a 4.7 GB
+    download, and the television sat black through all of it:
+
+        cast bridge: waiting for the source to reach 4786 MB (it holds 0 MB)
+
+    No Accept-Ranges and a 200 to every Range is how ffmpeg is told a stream
+    cannot be jumped around in - after which the demuxer reads it straight
+    through, which is what all three of the filtergraph's opens want anyway.
+
+    A whole film had to download before anything appeared, and every test
+    above passed while it did, because they serve the far end of the file in
+    the same instant as the near end. This one asks the endpoint itself.
+    """
+    payload = bytes(range(256)) * 400              # 102400 bytes
+    prov = _CountingProvider(payload)
+    b = CastBridge()
+    b.exe = "/bin/true"
+    try:
+        b.start(prov.url, subs=0, sub_codec="subrip")
+        for _ in range(200):
+            if b.src.finished:
+                break
+            time.sleep(0.02)
+
+        # Exactly what ffmpeg does when it wants the Matroska index.
+        req = urllib.request.Request(
+            b.source, headers={"Range": f"bytes={len(payload) - 4096}-"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            assert r.status == 200, (
+                "a 206 tells ffmpeg it may seek, and the next thing it asks "
+                "for is the far end of a film that is not downloaded yet")
+            assert not r.headers.get("Accept-Ranges")
+            body = r.read()
+        assert body == payload, "the answer starts at the beginning"
+
+        # And a plain request is the same answer, with the length on it -
+        # without which a clean end of file reads as a truncation.
+        with urllib.request.urlopen(b.source, timeout=10) as r:
+            assert int(r.headers["Content-Length"]) == len(payload)
+            assert r.read() == payload
     finally:
         b.stop()
         prov.close()
