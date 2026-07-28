@@ -416,12 +416,28 @@ def ffmpeg_args(exe: str, source: str, copy_video: bool,
             burn = ["-filter_complex",
                     f"[0:v:0][0:s:{subs}]overlay[v]", "-map", "[v]"]
         else:
+            # The subtitles filter reads the file from its own copy, and that
+            # copy knows nothing of a seek made before -i: the video arrives
+            # with timestamps starting at zero, the filter looks for a line
+            # to show at zero seconds, and NOTHING is drawn at all. Not a
+            # line out of step - none.
+            #
+            # So hand the filter the timeline it expects and take it back
+            # afterwards: shift the frames up to where they really are in the
+            # film, render, shift them down again. The seek stays the cheap
+            # kind and the stream still starts at zero, which is what the
+            # receiver needs.
+            #
             # "filename=" spelled out, not left positional. Newer ffmpeg
             # refuses to take the first argument as a bare value once it has
             # been escaped, and says so about the whole rest of the chain:
             #   No option name near 'http\://lol.bz\:2095/....mkv:si=4'
+            if start > 0:
+                chain.append(f"setpts=PTS+{start:.3f}/TB")
             chain.append(
                 f"subtitles=filename={_filter_escape(source)}:si={subs}")
+            if start > 0:
+                chain.append(f"setpts=PTS-{start:.3f}/TB")
             burn = ["-map", "0:v:0"]
     else:
         burn = ["-map", "0:v:0"]
@@ -441,14 +457,6 @@ def ffmpeg_args(exe: str, source: str, copy_video: bool,
         # instead of decoding its way there, which is what makes resuming an
         # hour into a film instant rather than a minute of waiting.
         *(["-ss", f"{start:.3f}"] if start > 0 else []),
-        # A burned-in text subtitle is read by the filter from its own copy
-        # of the file, which knows nothing of the seek. Left alone the video
-        # restarts at zero and the subtitles do not, so a film resumed half
-        # an hour in shows the lines from the opening scene. Keeping the
-        # original timestamps lets the two agree, and the output is shifted
-        # back to zero afterwards.
-        *(["-copyts"] if (start > 0 and subs is not None
-                          and sub_codec not in BITMAP_SUBS) else []),
         "-fflags", "+genpts", "-i", source,
         *burn, "-map", f"0:a:{audio}",
         *(["-r", str(fps)] if fps else []),
@@ -458,8 +466,6 @@ def ffmpeg_args(exe: str, source: str, copy_video: bool,
            ["-preset", "veryfast", "-crf", "23",
             "-maxrate", "6M", "-bufsize", "12M"])),
         "-c:a", "aac", "-ac", "2", "-b:a", "192k",
-        *(["-start_at_zero"] if (start > 0 and subs is not None
-                                 and sub_codec not in BITMAP_SUBS) else []),
         "-f", "mp4",
         "-movflags", "frag_keyframe+empty_moov+default_base_moof",
         "pipe:1",

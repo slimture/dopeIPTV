@@ -479,28 +479,95 @@ def test_a_request_never_spawns_into_a_stream_that_replaced_it():
         b.stop()
 
 
-def test_a_burned_subtitle_stays_in_step_with_a_film_resumed_part_way_in():
-    """The subtitles filter reads the file from its own copy, which knows
-    nothing of the seek: left alone the video restarts at zero and the
-    subtitles do not, so a film picked up half an hour in shows the lines
-    from the opening scene."""
+def test_a_burned_subtitle_survives_a_film_resumed_part_way_in():
+    """The subtitles filter reads the file from its own copy, and that copy
+    knows nothing of a seek made before -i: the video arrives with timestamps
+    starting at zero, the filter looks for a line to show at zero seconds,
+    and nothing is drawn at all. Not a line out of step - none.
+
+    The fix is to hand the filter the timeline it expects and take it back
+    afterwards, which keeps both the cheap seek and a stream that starts at
+    zero.
+    """
     args = ffmpeg_args("ffmpeg", "/rec/film.mkv", copy_video=False,
                        subs=2, sub_codec="subrip", start=1608.0)
-    assert "-copyts" in args and "-start_at_zero" in args
-    assert args.index("-copyts") < args.index("-i"), "before the input"
+    vf = args[args.index("-vf") + 1]
+    assert "setpts=PTS+1608.000/TB,subtitles=" in vf, vf
+    assert vf.endswith("setpts=PTS-1608.000/TB"), vf
+    # Not by keeping the original timestamps: that renders the subtitle but
+    # hands the receiver a stream that begins twenty-six minutes in.
+    assert "-copyts" not in args and "-start_at_zero" not in args
 
-    # From the beginning there is nothing to keep in step.
+    # From the beginning there is no shift to make.
     plain = ffmpeg_args("ffmpeg", "/rec/film.mkv", copy_video=False,
                         subs=2, sub_codec="subrip")
-    assert "-copyts" not in plain
+    assert "setpts" not in plain[plain.index("-vf") + 1]
 
-    # A picture-based subtitle is drawn from the same input, so it moves with
+    # A picture-based subtitle is drawn from the same input and moves with
     # the seek on its own.
     bitmap = ffmpeg_args("ffmpeg", "/rec/film.mkv", copy_video=False,
                          subs=2, sub_codec="dvb_subtitle", start=1608.0)
-    assert "-copyts" not in bitmap
+    assert not any("setpts" in a for a in bitmap)
 
-    # And a film with no subtitle chosen is untouched by any of it.
-    none = ffmpeg_args("ffmpeg", "/rec/film.mkv", copy_video=True,
-                       start=1608.0)
-    assert "-copyts" not in none and "-start_at_zero" not in none
+
+def test_ffmpeg_really_draws_the_subtitle_after_a_seek(tmp_path):
+    """Against a real ffmpeg, because this is not a thing that can be read
+    off the command line.
+
+    Every check above says what the arguments look like. The bug they exist
+    for was invisible there: the command was well formed, ffmpeg ran happily,
+    exited zero, and drew no subtitle whatsoever. Only a frame counts.
+    """
+    import shutil
+    import subprocess
+
+    exe = shutil.which("ffmpeg")
+    if not exe:
+        pytest.skip("no ffmpeg")
+    if b"Unknown filter" in subprocess.run(
+            [exe, "-hide_banner", "-h", "filter=subtitles"],
+            capture_output=True).stderr:
+        pytest.skip("this ffmpeg has no libass")
+
+    srt = tmp_path / "s.srt"
+    srt.write_text("1\n00:00:05,000 --> 00:00:08,000\nWWWWWWWWWWWW\n")
+    src = tmp_path / "src.mkv"
+    subprocess.run(
+        [exe, "-hide_banner", "-loglevel", "error",
+         "-f", "lavfi", "-i", "color=black:size=320x180:rate=10:duration=12",
+         "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo:d=12",
+         "-i", str(srt), "-c:v", "libx264", "-c:a", "aac", "-c:s", "copy",
+         "-y", str(src)], check=True)   # longer than the subtitle, on purpose
+
+    W, H, FPS = 320, 180, 10
+
+    def frames(start: float) -> list[int]:
+        """Lit pixels per frame of the bridge's own command, run for real.
+        The subtitle is the only thing in the picture that is not black."""
+        out = tmp_path / f"out{start}.mp4"
+        args = ffmpeg_args(exe, str(src), copy_video=False, subs=0,
+                           sub_codec="subrip", start=start)
+        # Exactly what the bridge would run, written where it can be read
+        # back instead of piped to a receiver.
+        assert args[-1] == "pipe:1"
+        r = subprocess.run(args[:-1] + [str(out)], capture_output=True)
+        assert out.exists(), r.stderr.decode()[-500:]
+        raw = subprocess.run(
+            [exe, "-hide_banner", "-loglevel", "error", "-i", str(out),
+             "-f", "rawvideo", "-pix_fmt", "gray", "-"],
+            capture_output=True).stdout
+        size = W * H
+        return [sum(1 for b in raw[i:i + size] if b > 60)
+                for i in range(0, len(raw) - size + 1, size)]
+
+    # Started five seconds in, the line is on screen at once and gone three
+    # seconds later - it runs to 0:08 and the film began at 0:05.
+    part_way = frames(5.0)
+    assert len(part_way) > FPS * 5, len(part_way)
+    assert part_way[FPS // 2] > 100, "the subtitle is drawn after a seek"
+    assert part_way[FPS * 4] == 0, "and only while it should be"
+
+    # And from the beginning, where nothing needs shifting.
+    whole = frames(0.0)
+    assert whole[FPS * 6] > 100
+    assert whole[FPS * 1] == 0
