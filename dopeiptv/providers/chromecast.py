@@ -794,24 +794,32 @@ class ChromecastManager:
         # faded. A thing with an end is BUFFERED - and telling the receiver
         # how long it is is what turns the bar into a real one, because the
         # converted stream is an endless pipe it cannot measure by itself.
-        # What the receiver is told, and what it draws from it.
+        # Nothing for the receiver to draw. Measured on the television,
+        # every combination, before landing here: BUFFERED with a title,
+        # BUFFERED with none, LIVE with a title - all of them stay on
+        # screen for ever. This receiver never hides anything it has drawn;
+        # the apps whose bars fade run their OWN receiver software on the
+        # TV, and the default receiver the sender can reach has exactly one
+        # clean state, which is having been given nothing. Channels are
+        # already handed over this way and their picture is clean - so a
+        # film is too. The app's strip carries the title, the clock and
+        # the seeking.
         #
-        # The scrubber is the streamType, not the metadata. BUFFERED with a
-        # length draws a progress bar and keeps it there for the whole film
-        # - it is the receiver's idea of a thing you seek, so it never
-        # takes the controls away. LIVE draws no bar at all.
-        #
-        # So: LIVE, with the title. That is the ordinary card every other
-        # app puts up - a name and a thumbnail that fade after a few
-        # seconds - and nothing fixed across the picture. Taking the title
-        # away as well only replaced a bar with a blank, which was worse.
-        #
-        # The length is not sent to the receiver, because that is what asks
-        # for the bar. The app keeps it (self.duration) for its own strip,
-        # which is where the position, the clock and the seeking live.
-        log.info("cast: handing over as LIVE, with a title that fades")
-        mc.play_media(url, ctype, title=title or "dopeIPTV",
-                      current_time=start or None, stream_type="LIVE")
+        # LIVE rather than BUFFERED because BUFFERED is what asks for the
+        # fixed progress bar. But LIVE has a rule of its own: with no
+        # currentTime the receiver starts at the live edge, and for a film
+        # served as a growing playlist the live edge is the converter's
+        # write head - it began at the newest segment and starved there.
+        # A thing with a length is told where to start, zero included; only
+        # a broadcast is left to the edge, which for one is the truth.
+        has_end = self.duration > 0
+        log.info("cast: handing over as LIVE with nothing to draw%s",
+                 f", from {start:.0f} s" if start else
+                 (", from the top" if has_end else ", at the live edge"))
+        mc.play_media(url, ctype,
+                      current_time=(float(start) if (start or has_end)
+                                    else None),
+                      stream_type="LIVE")
         mc.block_until_active(timeout=10)
         self._ask_for_the_subtitle(mc)
         deadline = time.monotonic() + (
