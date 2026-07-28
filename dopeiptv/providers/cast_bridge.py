@@ -116,6 +116,7 @@ def probe_tracks(source: str, exe: str | None = None) -> dict:
             "codec": s.get("codec_name") or "?",
             "lang": (tags.get("language") or "").strip(),
             "title": (tags.get("title") or "").strip(),
+            "default": bool((s.get("disposition") or {}).get("default")),
         })
     log.info("cast bridge: %d audio track(s), %d subtitle track(s)",
              len(out["audio"]), len(out["subtitle"]))

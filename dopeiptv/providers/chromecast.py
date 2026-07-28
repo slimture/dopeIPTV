@@ -777,10 +777,14 @@ class CastDialog(QDialog):
             self.audio_box.addItem(self._track_label(t), t)
         for t in subs:
             self.subs_box.addItem(self._track_label(t), t)
-        # Open on the track the app is playing. Row 0 is "Default", so track
-        # N sits at N+1 - and track 0 IS the default, which is left alone so
-        # that a cast nobody changed anything about stays native.
-        if 0 < self.audio_index < len(audio):
+        # Open on the track the app is playing - but only when that is not
+        # the one the stream plays by default anyway. Choosing a track means
+        # converting, and a film with seven audio tracks where mpv landed on
+        # the default one would otherwise be converted for no reason at all,
+        # by a choice nobody made.
+        chosen = (audio[self.audio_index]
+                  if 0 <= self.audio_index < len(audio) else None)
+        if chosen and not chosen.get("default") and self.audio_index > 0:
             self.audio_box.setCurrentIndex(self.audio_index + 1)
         self.audio_box.blockSignals(False)
         self.subs_box.blockSignals(False)

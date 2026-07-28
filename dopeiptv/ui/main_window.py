@@ -3326,6 +3326,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     "codec": t.get("codec") or "?",
                     "lang": (t.get("lang") or "").strip(),
                     "title": (t.get("title") or "").strip(),
+                    "default": bool(t.get("default")),
                 })
             out["duration"] = float(getattr(m, "duration", 0) or 0)
         except Exception as e:
