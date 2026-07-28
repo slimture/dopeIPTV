@@ -558,6 +558,7 @@
  "cast_stop_failed": "Зупинка не вдалася: {msg}",
  "cast_older_device": "{name} — старіший Chromecast: зображення плавніше, трохи менш чітке",
  "cast_quality_note": "Задається один раз для цього пристрою, а не для кожного каналу. Змінюється лише FHD — SD і HD ідуть недоторканими. Це потрібно Chromecast 1–3 і телевізорам із вбудованим Chromecast; Ultra чи Google TV — ні.",
+ "cast_seek": "Перейти до іншого місця",
  "cast_subs_unavailable": "У цьому ffmpeg немає libass — субтитри надіслати не можна",
  "cast_audio": "Звук",
  "cast_subtitles": "Субтитри",

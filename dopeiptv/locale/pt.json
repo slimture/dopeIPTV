@@ -558,6 +558,7 @@
   "cast_stop_failed": "Falha ao parar: {msg}",
   "cast_older_device": "{name} é um Chromecast mais antigo – imagem mais fluida, um pouco menos nítida",
   "cast_quality_note": "Define-se uma vez para este dispositivo, não para cada canal. Só o FHD é adaptado – SD e HD seguem intactos. Chromecast 1-3 e TVs com Chromecast integrado precisam disto; um Ultra ou Google TV não.",
+  "cast_seek": "Ir para outro ponto",
   "cast_subs_unavailable": "Este ffmpeg não tem libass – não é possível enviar legendas",
   "cast_audio": "Áudio",
   "cast_subtitles": "Legendas",

@@ -558,6 +558,7 @@
   "cast_stop_failed": "Échec de l'arrêt : {msg}",
   "cast_older_device": "{name} est un Chromecast plus ancien – image plus fluide, un peu moins nette",
   "cast_quality_note": "Se règle une fois pour cet appareil, pas pour chaque chaîne. Seule la FHD est adaptée – la SD et la HD partent intactes. Les Chromecast 1 à 3 et les téléviseurs avec Chromecast intégré en ont besoin ; un Ultra ou un Google TV non.",
+  "cast_seek": "Aller à un autre endroit",
   "cast_subs_unavailable": "Cet ffmpeg n'a pas libass – impossible d'envoyer des sous-titres",
   "cast_audio": "Audio",
   "cast_subtitles": "Sous-titres",

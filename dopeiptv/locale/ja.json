@@ -558,6 +558,7 @@
  "cast_stop_failed": "停止に失敗しました：{msg}",
  "cast_older_device": "{name} は古い Chromecast – 動きは滑らかに、画質はやや控えめに",
  "cast_quality_note": "チャンネルごとではなく、この端末に一度だけ設定します。調整されるのは FHD だけで、SD と HD はそのまま送られます。必要なのは Chromecast 第1〜3世代と Chromecast 内蔵テレビで、Ultra や Google TV には不要です。",
+ "cast_seek": "別の位置へ移動",
  "cast_subs_unavailable": "この ffmpeg には libass がありません – 字幕は送れません",
  "cast_audio": "音声",
  "cast_subtitles": "字幕",

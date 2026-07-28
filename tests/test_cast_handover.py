@@ -36,6 +36,8 @@ _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_save_cast_position", "_recast_with", "_track_label",
             "_cast_volume", "_cast_quality", "_cast_quality_key",
             "_paused_moment", "_record_cast_history", "_history_extra",
+            "_show_cast_progress", "_cast_seek", "_cast_seek_released",
+            "_fmt_hms",
             "_set_cast_quality", "_toggle_cast_mute", "_show_cast_volume")
 
 
@@ -58,8 +60,15 @@ def _window():
         from dopeiptv.ui.main_window import MainWindow
     except Exception as e:                       # pragma: no cover - no PyQt6
         pytest.skip(f"main window unavailable ({e})")
-    cls = type("_StubWindow", (),
-               {name: getattr(MainWindow, name) for name in _METHODS})
+    # Borrowed as they are declared: a staticmethod put into a class dict as
+    # a plain function turns into an instance method and is handed a self it
+    # never asked for.
+    def borrow(name):
+        raw = MainWindow.__dict__.get(name)
+        return raw if isinstance(raw, staticmethod) else getattr(
+            MainWindow, name)
+
+    cls = type("_StubWindow", (), {name: borrow(name) for name in _METHODS})
     return cls()
 
 
@@ -77,6 +86,22 @@ class _Cast:
         self.thread = threading.current_thread().name
         self.active = None
         self.stopped.set()
+
+
+class _Ticker:
+    """The once-a-second ask for the receiver's position."""
+
+    def __init__(self):
+        self.running = False
+
+    def isActive(self):
+        return self.running
+
+    def start(self):
+        self.running = True
+
+    def stop(self):
+        self.running = False
 
 
 class _Bar:
@@ -111,6 +136,7 @@ class _Lbl:
 class _Slider:
     def __init__(self):
         self.value_ = 0
+        self.shown = None
 
     def blockSignals(self, _b):
         pass
@@ -118,12 +144,23 @@ class _Slider:
     def setValue(self, v):
         self.value_ = v
 
+    def value(self):
+        return self.value_
+
+    def isSliderDown(self):
+        return False
+
+    def setVisible(self, on):
+        self.shown = on
+
 
 def _with_strip():
     w = _window()
     w.cast_bar, w.cast_bar_lbl, w.cast_bar_title = _Bar(), _Lbl(), _Lbl()
     w.cast_bar_pause = _Lbl()
     w.cast_bar_mute, w.cast_bar_vol = _Lbl(), _Slider()
+    w.cast_bar_seek, w.cast_bar_time = _Slider(), _Lbl()
+    w._cast_tick = _Ticker()
     w.cast = _Cast(active=False)
     w._cast_ctx = {}
     return w
@@ -1023,3 +1060,62 @@ def test_an_episode_cast_remembers_which_series_it_belongs_to():
     extra = w.history.rows[0][-1]
     assert extra["_series_ctx"]["series_id"] == 77
     assert extra["name"] == "Bron · S01 E02"
+
+
+class _CastSeek(_CastAt):
+    def __init__(self, pos, dur, bridged):
+        super().__init__(pos, dur)
+        self.bridged_ = bridged
+        self.sought = None
+
+    def bridged(self):
+        return self.bridged_
+
+    def seek(self, to):
+        self.sought = to
+
+
+def test_a_film_on_the_tv_can_be_moved_to_another_point():
+    """A file the receiver fetched itself it can seek on its own. What the
+    converter serves it cannot - that is a pipe with no length and no index -
+    so moving inside it means building the stream again from the new point."""
+    w = _with_strip()
+    w.settings = _Settings()
+    w._cast_device = "Alva TV"
+    w._cast_ctx = {"url": "http://p/film.mp4", "audio": None, "subs": None}
+
+    # Fetched by the receiver: it does the seeking.
+    w.cast = _CastSeek(600.0, 6000.0, bridged=False)
+    w._cast_seek(1800.0)
+    for _ in range(50):
+        if w.cast.sought is not None:
+            break
+        threading.Event().wait(0.02)
+    assert w.cast.sought == 1800.0
+
+    # Coming through the converter: built again from there.
+    again = []
+    w.cast = _CastSeek(600.0, 6000.0, bridged=True)
+    w._recast_with = lambda a, s, start=None: again.append(start)
+    w._cast_seek(1800.0)
+    assert again == [1800.0]
+
+
+def test_the_progress_bar_is_for_things_with_an_end():
+    """A broadcast has no end to measure against, so a bar showing how far
+    through it you are would be showing nothing."""
+    w = _with_strip()
+    w._cast_device = "Alva TV"
+
+    w.cast = _CastAt(1830.0, 6000.0)
+    w._show_cast_progress()
+    assert w.cast_bar_seek.shown is True
+    assert w._cast_tick.isActive() is True
+    assert w.cast_bar_seek.value_ == 305        # 1830 of 6000, in thousandths
+    assert w.cast_bar_time.text == "30:30 / 1:40:00"
+
+    # A live channel: no length, no bar, and nothing to ask about each second.
+    w.cast = _CastAt(0.0, 0.0)
+    w._show_cast_progress()
+    assert w.cast_bar_seek.shown is False
+    assert w._cast_tick.isActive() is False

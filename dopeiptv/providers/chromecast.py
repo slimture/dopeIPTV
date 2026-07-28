@@ -671,6 +671,27 @@ class ChromecastManager:
         except Exception as e:
             log.info("cast: the receiver would not pause (%s)", e)
 
+    def seek(self, seconds: float) -> None:
+        """Move the picture on the TV to *seconds* into the title."""
+        cc = self.active
+        if cc is None:
+            return
+        try:
+            cc.media_controller.seek(max(0.0, seconds))
+            self.last_position = max(0.0, seconds) - self.position_offset
+        except Exception as e:
+            log.info("cast: the receiver would not seek (%s)", e)
+
+    def bridged(self) -> bool:
+        """Whether what is playing is coming through the converter.
+
+        It matters for seeking: the receiver can seek a file it fetched
+        itself, but what the converter serves has no length and no index -
+        it is a pipe - so moving inside it means building it again from the
+        new point.
+        """
+        return self.bridge.path is not None
+
     def resume(self) -> None:
         cc = self.active
         if cc is None:

@@ -558,6 +558,7 @@
  "cast_stop_failed": "Zaustavljanje nije uspelo: {msg}",
  "cast_older_device": "{name} je stariji Chromecast – glatkija slika, nešto manje oštra",
  "cast_quality_note": "Podešava se jednom za ovaj uređaj, ne za svaki kanal. Prilagođava se samo FHD – SD i HD idu netaknuti. To treba Chromecast 1-3 i televizorima sa ugrađenim Chromecastom; Ultra ili Google TV ne.",
+ "cast_seek": "Idi na drugo mesto",
  "cast_subs_unavailable": "Ovaj ffmpeg nema libass – titlovi ne mogu da se pošalju",
  "cast_audio": "Zvuk",
  "cast_subtitles": "Titlovi",

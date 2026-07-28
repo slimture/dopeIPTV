@@ -981,6 +981,21 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cast_bar_title.setStyleSheet(
             f"color:{P['muted3']}; font-size:11px;")
         _cast_col.addWidget(self.cast_bar_title)
+        # Where the film has got to, and a way to move it. Only films,
+        # episodes and recordings have a length to move within - a broadcast
+        # has no end to measure against, and its own "pause" is the archive.
+        _seek_row = QHBoxLayout()
+        _seek_row.setSpacing(8)
+        self.cast_bar_seek = QSlider(Qt.Orientation.Horizontal)
+        self.cast_bar_seek.setRange(0, 1000)
+        self.cast_bar_seek.setToolTip(tr("cast_seek"))
+        self.cast_bar_seek.sliderReleased.connect(self._cast_seek_released)
+        _seek_row.addWidget(self.cast_bar_seek, 1)
+        self.cast_bar_time = QLabel("")
+        self.cast_bar_time.setStyleSheet(
+            f"color:{P['muted3']}; font-size:11px;")
+        _seek_row.addWidget(self.cast_bar_time)
+        _cast_col.addLayout(_seek_row)
         _cast_row.addLayout(_cast_col, 1)
         # Drawn, not typed. A gear, a pause bar and a minus sign are all
         # characters a font stack can be missing, and a missing glyph is an
@@ -1025,6 +1040,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cast_bar_stop.clicked.connect(
             lambda: self._end_cast("stopped from the cast strip"))
         _cast_row.addWidget(self.cast_bar_stop)
+        # The receiver is the only thing that knows where the film is, and it
+        # only says so when asked - so ask, once a second, and only while
+        # something with a length is actually playing there.
+        self._cast_tick = QTimer(self)
+        self._cast_tick.setInterval(1000)
+        self._cast_tick.timeout.connect(self._show_cast_progress)
         self.cast_bar.hide()
         dl.addWidget(self.cast_bar)
 
@@ -3308,12 +3329,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # the one playing it. The stored point is only written when playback
         # switches or stops, so casting a film you are 22 minutes into asked
         # a store that knew nothing yet and offered to start it over.
+        # Only where there is something to resume. A live channel has no
+        # point to come back to - what a timeshift channel is a few minutes
+        # into is this session, not a place in a title - and being asked
+        # whether to carry on from 23 minutes in before casting the news was
+        # a question about nothing.
         start = 0.0
-        here = self._playing_position(it)
-        if here > 60:
-            start = self._ask_resume(here)
-        elif rkind:
-            start = self._resume_offset(key, rkind)
+        if rkind:
+            here = self._playing_position(it)
+            start = (self._ask_resume(here) if here > 60
+                     else self._resume_offset(key, rkind))
         self._cast_ctx = {
             "sid": it.get("stream_id") if live else None,
             "archive": bool(live and it.get("stream_id") is not None
@@ -3535,9 +3560,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cast_bar_pause.setVisible(
             bool(device) and (not ctx.get("sid") or ctx.get("archive")))
         if not device:
+            self._cast_tick.stop()
             bar.hide()
             return
         self._record_cast_history()
+        self._show_cast_progress()
         self.cast_bar_lbl.setText(tr("cast_casting_to", name=device))
         self.cast_bar_title.setText(title or "")
         self.cast_bar_title.setVisible(bool(title))
@@ -3727,6 +3754,54 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         menu.exec(self.cast_bar_tracks.mapToGlobal(
             self.cast_bar_tracks.rect().bottomLeft()))
 
+    def _show_cast_progress(self) -> None:
+        """Put the receiver's own position on the strip.
+
+        Hidden for a broadcast: there is no end to measure against, so a bar
+        showing how far through it you are would be showing nothing.
+        """
+        bar = getattr(self, "cast_bar_seek", None)
+        if bar is None:
+            return
+        dur = float(getattr(self.cast, "duration", 0.0) or 0.0)
+        on = bool(self._cast_device) and dur > 0
+        bar.setVisible(on)
+        self.cast_bar_time.setVisible(on)
+        if not on:
+            self._cast_tick.stop()
+            return
+        if not self._cast_tick.isActive():
+            self._cast_tick.start()
+        pos = min(float(self.cast.position() or 0.0), dur)
+        # Not while it is being dragged: the handle belongs to the hand
+        # holding it until it is let go.
+        if not bar.isSliderDown():
+            bar.setValue(int(pos / dur * 1000))
+        self.cast_bar_time.setText(
+            f"{self._fmt_hms(pos)} / {self._fmt_hms(dur)}")
+
+    def _cast_seek_released(self) -> None:
+        dur = float(getattr(self.cast, "duration", 0.0) or 0.0)
+        if dur > 0:
+            self._cast_seek(self.cast_bar_seek.value() / 1000 * dur)
+
+    def _cast_seek(self, to: float) -> None:
+        """Move to *to* seconds into what is playing on the TV.
+
+        A file the receiver fetched itself it can seek on its own. What the
+        converter serves it cannot: that is a pipe with no length and no
+        index, so moving inside it means building the stream again from the
+        new point - which is what the converter is already good at, and the
+        same thing changing a subtitle does.
+        """
+        log.info("cast: moving to %s", self._fmt_hms(to))
+        ctx = self._cast_ctx or {}
+        if self.cast.bridged():
+            self._recast_with(ctx.get("audio"), ctx.get("subs"), start=to)
+        else:
+            threading.Thread(target=lambda: self.cast.seek(to),
+                             daemon=True).start()
+
     def _cast_quality_key(self) -> str:
         return f"cast_quality_{self._cast_device or ''}"
 
@@ -3754,14 +3829,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         bits.append(t.get("codec") or "?")
         return " · ".join(bits)
 
-    def _recast_with(self, audio, subs) -> None:
+    def _recast_with(self, audio, subs, start: float | None = None) -> None:
         """Cast the same title again with different tracks, from where the TV
-        is now."""
+        is now - or from *start*, when it is being moved somewhere else."""
         ctx, device = self._cast_ctx or {}, self._cast_device
         url = ctx.get("url")
         if not device or not url:
             return
-        at = self.cast.position()
+        at = self.cast.position() if start is None else start
         ctx.update(audio=audio, subs=subs)
         log.info("cast: switching tracks and picking up at %d s", at)
         title = ctx.get("title") or "dopeIPTV"

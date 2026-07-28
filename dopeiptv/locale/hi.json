@@ -558,6 +558,7 @@
  "cast_stop_failed": "रोकना विफल: {msg}",
  "cast_older_device": "{name} एक पुराना Chromecast है – अधिक सहज चित्र, थोड़ा कम स्पष्ट",
  "cast_quality_note": "यह हर चैनल के लिए नहीं, इस डिवाइस के लिए एक बार सेट होता है। केवल FHD बदला जाता है – SD और HD ज्यों के त्यों भेजे जाते हैं। Chromecast 1-3 और बिल्ट-इन Chromecast वाले टीवी को इसकी ज़रूरत है; Ultra या Google TV को नहीं।",
+ "cast_seek": "किसी अन्य बिंदु पर जाएँ",
  "cast_subs_unavailable": "इस ffmpeg में libass नहीं है – उपशीर्षक नहीं भेजे जा सकते",
  "cast_audio": "ऑडियो",
  "cast_subtitles": "उपशीर्षक",

@@ -558,6 +558,7 @@
  "cast_stop_failed": "Η διακοπή απέτυχε: {msg}",
  "cast_older_device": "Το {name} είναι παλαιότερο Chromecast – πιο ομαλή εικόνα, λίγο λιγότερο ευκρινής",
  "cast_quality_note": "Ορίζεται μία φορά για αυτήν τη συσκευή, όχι για κάθε κανάλι. Προσαρμόζεται μόνο το FHD – SD και HD στέλνονται ανέπαφα. Το χρειάζονται τα Chromecast 1-3 και οι τηλεοράσεις με ενσωματωμένο Chromecast· ένα Ultra ή Google TV όχι.",
+ "cast_seek": "Μετάβαση σε άλλο σημείο",
  "cast_subs_unavailable": "Αυτό το ffmpeg δεν έχει libass – οι υπότιτλοι δεν μπορούν να σταλούν",
  "cast_audio": "Ήχος",
  "cast_subtitles": "Υπότιτλοι",

@@ -558,6 +558,7 @@
  "cast_stop_failed": "Dừng thất bại: {msg}",
  "cast_older_device": "{name} là Chromecast đời cũ – hình mượt hơn, hơi kém sắc nét",
  "cast_quality_note": "Đặt một lần cho thiết bị này, không phải cho từng kênh. Chỉ FHD được điều chỉnh – SD và HD gửi đi nguyên vẹn. Chromecast 1-3 và TV có sẵn Chromecast cần điều này; Ultra hay Google TV thì không.",
+ "cast_seek": "Chuyển đến vị trí khác",
  "cast_subs_unavailable": "Bản ffmpeg này không có libass – không thể gửi phụ đề",
  "cast_audio": "Âm thanh",
  "cast_subtitles": "Phụ đề",

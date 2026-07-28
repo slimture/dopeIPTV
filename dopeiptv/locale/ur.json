@@ -558,6 +558,7 @@
  "cast_stop_failed": "روکنا ناکام: {msg}",
  "cast_older_device": "‏{name} ایک پرانا Chromecast ہے – زیادہ ہموار تصویر، قدرے کم واضح",
  "cast_quality_note": "یہ ہر چینل کے لیے نہیں بلکہ اس ڈیوائس کے لیے ایک بار سیٹ ہوتا ہے۔ صرف FHD کو ڈھالا جاتا ہے، SD اور HD جوں کے توں بھیجے جاتے ہیں۔ ‏Chromecast 1-3 اور بلٹ اِن Chromecast والے ٹی وی کو اس کی ضرورت ہے، Ultra یا Google TV کو نہیں۔",
+ "cast_seek": "کسی اور مقام پر جائیں",
  "cast_subs_unavailable": "اس ffmpeg میں libass نہیں ہے – سب ٹائٹل نہیں بھیجے جا سکتے",
  "cast_audio": "آڈیو",
  "cast_subtitles": "سب ٹائٹلز",
