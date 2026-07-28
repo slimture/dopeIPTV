@@ -743,9 +743,9 @@ def test_the_picture_setting_is_a_ceiling_not_an_instruction():
     assert need("older", 576, 25.0) == "original"
     assert need("older", 720, 50.0) == "original"
     assert need("older", 720, 25.0) == "original"
-    # Lines, regardless of frame rate - see the neighbouring test for the
-    # round that briefly said otherwise, and what it cost.
-    assert need("older", 1080, 25.0) == "older"
+    # Lines and speed together - see the neighbouring test for the round
+    # that said lines alone, and what it cost.
+    assert need("older", 1080, 25.0) == "original"
     assert need("older", 1080, 50.0) == "older"
     assert M.quality_label("older", 1080, 50.0) == "720p50"
     assert M.quality_label("older", 1080, 0.0) == "720p"
@@ -2151,23 +2151,25 @@ def test_a_jump_forward_is_rebuilt_and_a_jump_back_is_not():
     assert w.cast.sought == 603.0
 
 
-def test_the_ceiling_is_lines_regardless_of_frame_rate():
-    """For one round, films at 30 fps or under were exempted - a dongle
-    that plays 1080p24 files natively was assumed to take a converted film
-    at full size. It could not: the moment films went over untouched, the
-    device marked "older" began rebuffering, the sound came seconds late,
-    and the receiver's overlay, redrawn at every stall, stopped ever
-    leaving the screen. Three complaints, one commit.
+def test_the_ceiling_is_lines_and_speed_together():
+    """Re-encoding 24 fps films was tried as a cure for the receiver's
+    stuck overlay. It cured nothing and cost the picture - measured in the
+    user's own log, one cast after the other on the same film:
 
-    The box means what it meant when everything worked: 720 lines.
+        video copied      -> the stream is going (3.8 s / 1638 kB), PLAYING
+        video re-encoded  -> BUFFERING/PLAYING, over and over
+
+    The overlay is ordered by the announcement, not by the decode load, so
+    the load is left alone. Against a first-generation dongle: 720p50
+    channels fine, 1080p24 films fine, 1080p50 FHD channels stutter.
     """
     from dopeiptv.providers.chromecast import ChromecastManager as M
     need = M._needed_quality
-    assert need("older", 1080, 24.0) == "older"
-    assert need("older", 960, 24.0) == "older"
-    assert need("older", 1080, 50.0) == "older"
+    assert need("older", 1080, 24.0) == "original"
+    assert need("older", 960, 24.0) == "original"
     assert need("older", 720, 50.0) == "original"
-    assert need("older", 576, 25.0) == "original"
+    assert need("older", 1080, 50.0) == "older"
+    assert need("older", 1080, 0.0) == "older", "unknown fps counts as fast"
     assert need("original", 1080, 50.0) == "original"
     assert need("older", 0, 50.0) == "original", "never adapt on a guess"
 

@@ -14,7 +14,7 @@ from ..core.log import log
 from ..i18n import tr
 from ..core.workers import run_async
 from .cast_bridge import (
-    QUALITY, SAFE_AUDIO, SAFE_VIDEO, CastBridge,
+    QUALITY, SAFE_AUDIO, SAFE_VIDEO, SMOOTH_FPS, CastBridge,
     normalise_quality, probe_tracks,
 )
 
@@ -660,16 +660,10 @@ class ChromecastManager:
         picture for nothing. A source already under the ceiling is left alone,
         at the frame rate it came with.
 
-        Lines, regardless of frame rate. There was a round where films at
-        24 fps were let through untouched, reasoning that a dongle which
-        plays 1080p24 files natively could take them - but that evidence
-        was from NATIVE playback, where the receiver fetches an ordinary
-        mp4 itself. A CONVERTED stream is another animal, and the moment
-        films started going over at original size, that dongle began
-        rebuffering, the sound arrived seconds late, and the receiver's
-        overlay - which redraws at every stall - stopped ever going away.
-        All three complaints were born in that commit. The box means what
-        it meant when everything worked: this device gets 720 lines.
+        And the ceiling is lines AND speed together. Re-encoding 24 fps
+        films was tried as a cure for the stuck overlay and cured nothing:
+        the picture lagged and the overlay stayed, because the overlay is
+        ordered by the announcement, not by the decode load.
 
         So is one whose size we could not find out. Adapting on a guess is the
         worse mistake: it re-encodes HD channels that were perfectly fine, and
@@ -685,6 +679,13 @@ class ChromecastManager:
                      "is rather than converting on a guess")
             return "original"
         limit_h, limit_fps = QUALITY.get(want, (0, 0))
+        # Slow enough to carry its lines. An unknown frame rate is treated
+        # as fast: a broadcast is the thing that does not say, and a
+        # broadcast is the thing that stutters.
+        if fps and fps <= SMOOTH_FPS:
+            log.info("cast: %dp%g is slow enough for its size - sending it "
+                     "as it is", height, fps)
+            return "original"
         too_big = limit_h and height > limit_h
         too_fast = limit_fps and fps and fps > limit_fps + 1
         if not too_big and not too_fast:
@@ -785,18 +786,14 @@ class ChromecastManager:
         acting on; silence means keep waiting, and the watcher will report
         whatever happens next.
         """
-        # BUFFERED with title and length for a thing that has them, LIVE
-        # with nothing for a broadcast. This is the exact announcement of
-        # the week when everything worked and the overlay faded by itself.
+        # BUFFERED with title and length for a thing that has one, LIVE
+        # with nothing for a broadcast.
         #
-        # The receiver's chrome DOES fade on this device - it faded for
-        # that whole week - but it redraws at every stall, so a stream
-        # that keeps rebuffering keeps it on screen for ever. Six rounds
-        # were spent turning this announcement's knobs while the actual
-        # fault was the playback under it (films going over at original
-        # size on a device marked as older - see _needed_quality). The
-        # announcement was never the problem, and it does not change
-        # again on a hunch.
+        # This has now been changed five times chasing an overlay that will
+        # not go away, and every single one of them was a guess. It is not
+        # changed again without evidence: _report_receiver_ui below writes
+        # down what the receiver says it is DOING with what we sent, and
+        # the next move waits for that.
         seekable = self.duration > 0
         log.info("cast: handing over as %s",
                  f"BUFFERED ({self.duration:.0f} s), from {start:.0f} s"
@@ -810,6 +807,7 @@ class ChromecastManager:
             mc.play_media(url, ctype, current_time=start or None,
                           stream_type="LIVE")
         mc.block_until_active(timeout=10)
+        self._report_receiver_ui(mc)
         self._ask_for_the_subtitle(mc)
         deadline = time.monotonic() + (
             self.VERDICT_WAIT if wait is None else wait)
@@ -824,6 +822,53 @@ class ChromecastManager:
             if state == "IDLE" and why in ("ERROR", "CANCELLED"):
                 return False
         return None
+
+    def _report_receiver_ui(self, mc) -> None:
+        """Write down what the receiver says it is doing with what we sent.
+
+        Five rounds have gone into guessing which announcement makes the
+        on-screen overlay go away, with the television as the only
+        instrument and a whole test cycle per guess. The receiver answers
+        this itself, in the status it sends back, and nobody has ever
+        looked:
+
+          streamType   what it decided this stream IS. It does NOT have to
+                       agree with what we asked for - a receiver that finds
+                       a duration where LIVE was claimed may reclassify,
+                       and if it does, no announcement of ours can win.
+          metadata     what it has to draw a card from. Empty means the
+                       card is not ours.
+          commands     the supportedMediaCommands bitmask. Bit 1 is PAUSE,
+                       bit 2 SEEK. A scrubber on screen with SEEK absent
+                       means the bar is decoration the receiver drew for
+                       its own reasons.
+
+        Off the calling thread: reading status waits for an answer.
+        """
+        name = getattr(self.active, "name", "")
+
+        def look():
+            # Not time.sleep: this is a diagnostic on its own thread, and
+            # borrowing the module's sleep makes it indistinguishable from
+            # the deliberate waits the cast path takes.
+            threading.Event().wait(2.0)   # let it settle on its decision
+            try:
+                mc.update_status()
+            except Exception as e:
+                log.info("cast %s: could not read the receiver back (%s)",
+                         name, e)
+                return
+            st = mc.status
+            cmds = getattr(st, "supported_media_commands", None)
+            log.info("cast %s: the receiver calls it %s, metadata=%r, "
+                     "duration=%s, commands=%s%s", name,
+                     getattr(st, "stream_type", "?"),
+                     getattr(st, "media_metadata", None) or {},
+                     getattr(st, "duration", None), cmds,
+                     "" if cmds is None else
+                     f" (pause={bool(cmds & 1)} seek={bool(cmds & 2)})")
+
+        threading.Thread(target=look, daemon=True).start()
 
     def _ask_for_the_subtitle(self, mc) -> None:
         """Go and find the subtitle track rather than waiting to be told.
