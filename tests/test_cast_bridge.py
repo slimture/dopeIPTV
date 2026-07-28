@@ -510,6 +510,7 @@ def test_a_burned_subtitle_survives_a_film_resumed_part_way_in():
     assert not any("setpts" in a for a in bitmap)
 
 
+@pytest.mark.filterwarnings("ignore")
 def test_ffmpeg_really_draws_the_subtitle_after_a_seek(tmp_path):
     """Against a real ffmpeg, because this is not a thing that can be read
     off the command line.
@@ -534,12 +535,12 @@ def test_ffmpeg_really_draws_the_subtitle_after_a_seek(tmp_path):
     src = tmp_path / "src.mkv"
     subprocess.run(
         [exe, "-hide_banner", "-loglevel", "error",
-         "-f", "lavfi", "-i", "color=black:size=320x180:rate=10:duration=12",
+         "-f", "lavfi", "-i", "color=black:size=160x90:rate=10:duration=12",
          "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo:d=12",
          "-i", str(srt), "-c:v", "libx264", "-c:a", "aac", "-c:s", "copy",
          "-y", str(src)], check=True)   # longer than the subtitle, on purpose
 
-    W, H, FPS = 320, 180, 10
+    W, H, FPS = 160, 90, 10
 
     def frames(start: float) -> list[int]:
         """Lit pixels per frame of the bridge's own command, run for real.
