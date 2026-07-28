@@ -321,6 +321,8 @@ class _CastWatch:
         if getattr(status, "player_state", "") not in (
                 "PLAYING", "BUFFERING", "PAUSED"):
             return
+        if self.manager is not None and self.manager.stale(status):
+            return                      # still the replaced stream talking
         bridge = getattr(self.manager, "bridge", None)
         if not getattr(bridge, "hls", False) or bridge.subs is None:
             self._subs_done = True
@@ -454,6 +456,11 @@ class ChromecastManager:
 
     def _device(self, name: str):
         return next((c for c in self.devices if c.name == name), None)
+
+    def stale(self, status) -> bool:
+        """Whether *status* is still talking about the stream we replaced."""
+        sid = getattr(status, "media_session_id", None)
+        return sid is not None and sid == getattr(self, "old_session", None)
 
     def position(self) -> float:
         """How far into the title the TV has got, in seconds.
@@ -800,6 +807,12 @@ class ChromecastManager:
         # In the log, because it is the one thing that decides whether the
         # television draws anything over the picture - and the only way to
         # tell afterwards which of the two a cast went out as.
+        # Which media session was here BEFORE this load. Everything the
+        # receiver says about that one is about the stream being replaced -
+        # including its track list, whose text track has the same number as
+        # the new one's, because ffmpeg builds both the same way. That is
+        # how "the subtitle is already on ([2])" was true and useless.
+        self.old_session = getattr(mc.status, "media_session_id", None)
         log.info("cast: handing over as %s%s",
                  "BUFFERED" if buffered else "LIVE, with no metadata",
                  f" ({self.duration:.0f} s)" if buffered else "")
@@ -851,6 +864,8 @@ class ChromecastManager:
                 except Exception:
                     continue
                 st = mc.status
+                if self.stale(st):
+                    continue            # the old stream's last word
                 tracks = getattr(st, "subtitle_tracks", None) or []
                 ids = [t.get("trackId") for t in tracks
                        if isinstance(t, dict) and t.get("type") == "TEXT"

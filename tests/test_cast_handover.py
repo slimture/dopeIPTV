@@ -1775,6 +1775,9 @@ def test_the_subtitle_is_turned_on_when_the_receiver_has_found_it():
         last_position = 0.0
         state = ""
 
+        def stale(self, status):
+            return False
+
     class MC:
         def __init__(self):
             self.enabled = []
@@ -1824,6 +1827,9 @@ def test_the_subtitle_is_turned_on_when_the_receiver_has_found_it():
         bridge = Plain()
         last_position = 0.0
         state = ""
+
+        def stale(self, status):
+            return False
 
     mc3 = MC()
     w3 = _CastWatch("Alva TV", M2(), mc3)
@@ -1944,6 +1950,9 @@ def test_only_a_text_track_counts_as_the_subtitle_being_on():
         bridge = Bridge()
         last_position = 0.0
         state = ""
+
+        def stale(self, status):
+            return False
 
     class MC:
         def __init__(self):
@@ -2066,6 +2075,9 @@ def test_turning_the_subtitle_on_does_not_block_the_receive_thread():
         bridge = Bridge()
         last_position = 0.0
         state = ""
+
+        def stale(self, status):
+            return False
 
     done = threading.Event()
 
@@ -2190,6 +2202,11 @@ def test_a_farewell_from_the_old_stream_is_not_an_answer_about_the_new_one():
         bridge = Bridge()
         last_position = 0.0
         state = ""
+        old_session = None
+
+        def stale(self, status):
+            sid = getattr(status, "media_session_id", None)
+            return sid is not None and sid == self.old_session
 
     class MC:
         def __init__(self):
@@ -2279,3 +2296,40 @@ def test_the_subtitle_is_asked_for_when_nobody_reports_it():
     m2._ask_for_the_subtitle(mc2)
     threading.Event().wait(0.2)
     assert mc2.asked == 0
+
+
+def test_a_new_stream_is_not_judged_by_the_old_one_s_track_list():
+    """ffmpeg builds every stream the same way, so the text track has the
+    same number in both - and the receiver goes on reporting the old one for
+    a moment after the new one is loaded. Both paths read it, both concluded
+    the subtitle was already on, and the one that had just been chosen never
+    was:
+
+        serving ... subtitle track 12 as webvtt beside it
+        receiver IDLE/INTERRUPTED
+        the subtitle is on ([2])
+        the subtitle is already on ([2])
+
+    The track number cannot tell them apart. The media session can.
+    """
+    from dopeiptv.providers import chromecast as cm
+
+    m = cm.ChromecastManager()
+    m.old_session = 7
+
+    class S:
+        media_session_id = 7
+
+    class New:
+        media_session_id = 8
+
+    class Nameless:
+        pass
+
+    assert m.stale(S()) is True, "the stream we just replaced"
+    assert m.stale(New()) is False, "the one we just loaded"
+    # A receiver that names no session is taken at its word - saying
+    # nothing is not the same as saying the old number.
+    assert m.stale(Nameless()) is False
+    # And a fresh manager has no old session to be confused by.
+    assert cm.ChromecastManager().stale(S()) is False
