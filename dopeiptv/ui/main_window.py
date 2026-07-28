@@ -50,7 +50,7 @@ from .theme import P
 from ..providers.trakt import TraktClient
 from ..core.wakelock import WakeLock
 from .widgets import (
-    _HoverTextButton, _SidebarLogo, _Toast, cast_strip_icon,
+    FlowRow, _HoverTextButton, _SidebarLogo, _Toast, cast_strip_icon,
 )
 from .mw_settings import _SettingsMixin
 from .mw_trakt import _TraktMixin
@@ -970,13 +970,26 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # whole width. Sharing a line with the buttons and the volume left the
         # seek bar a few pixels wide, squeezed into what the wrapped labels
         # did not take.
+        #
+        # Both rows wrap. This strip lives in the right-hand column, which is
+        # draggable and is narrow to begin with on a laptop - and a plain row
+        # handed less width than its contents need does not stop at their
+        # minimum, it goes on until the buttons sit on top of one another.
+        self.cast_bar.setSizePolicy(QSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred))
+        pol = self.cast_bar.sizePolicy()
+        pol.setHeightForWidth(True)      # or the extra lines get no room
+        self.cast_bar.setSizePolicy(pol)
         _cast_outer = QVBoxLayout(self.cast_bar)
         _cast_outer.setContentsMargins(12, 8, 8, 8)
         _cast_outer.setSpacing(6)
-        _cast_row = QHBoxLayout()
-        _cast_row.setSpacing(10)
+        _cast_row = FlowRow(spacing=10)
         _cast_outer.addLayout(_cast_row)
-        _cast_col = QVBoxLayout()
+        # The labels are a block of their own so they can wrap as one, and so
+        # the controls can drop below them rather than into them.
+        _cast_names = QWidget()
+        _cast_col = QVBoxLayout(_cast_names)
+        _cast_col.setContentsMargins(0, 0, 0, 0)
         _cast_col.setSpacing(1)
         self.cast_bar_lbl = QLabel("")
         self.cast_bar_lbl.setWordWrap(True)
@@ -988,7 +1001,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cast_bar_title.setStyleSheet(
             f"color:{P['muted3']}; font-size:11px;")
         _cast_col.addWidget(self.cast_bar_title)
-        _cast_row.addLayout(_cast_col, 1)
+        # It takes the slack, so with room to spare the strip still reads as
+        # the row it was: the name on the left, the controls at the far edge.
+        _cast_names.setMinimumWidth(90)
+        _cast_row.add(_cast_names, grow=True)
         # Drawn, not typed. A gear, a pause bar and a minus sign are all
         # characters a font stack can be missing, and a missing glyph is an
         # empty box - which is what these buttons became.
@@ -999,7 +1015,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setFixedWidth(36)
             b.clicked.connect(slot)
-            _cast_row.addWidget(b)
+            _cast_row.add(b)
             return b
 
         self.cast_bar_mute = strip_button(
@@ -1009,6 +1025,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cast_bar_vol = _SeekSlider()
         self.cast_bar_vol.setRange(0, 100)
         self.cast_bar_vol.setValue(50)
+        # Wide enough to be draggable, narrow enough to wrap as one piece.
         self.cast_bar_vol.setFixedWidth(110)
         self.cast_bar_vol.setToolTip(tr("tooltip_volume"))
         self.cast_bar_vol.set_time_provider(lambda f: f"{round(f * 100)} %")
@@ -1019,7 +1036,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cast_bar_vol.valueChanged.connect(
             lambda v: (self.cast_bar_vol.dragging or
                        self._cast_volume(v / 100)))
-        _cast_row.addWidget(self.cast_bar_vol)
+        _cast_row.add(self.cast_bar_vol)
         # The same timeshift the player has, for the same channels. A cast
         # channel with an archive can be paused, wound back and pointed at an
         # earlier programme exactly as it can here - it is the same archive,
@@ -1040,27 +1057,29 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cast_bar_stop.setCursor(Qt.CursorShape.PointingHandCursor)
         self.cast_bar_stop.clicked.connect(
             lambda: self._end_cast("stopped from the cast strip"))
-        _cast_row.addWidget(self.cast_bar_stop)
+        _cast_row.add(self.cast_bar_stop)
         # Where the film has got to, and a way to move it - its own row, the
         # full width of the strip. Only films, episodes and recordings have a
         # length to move within; a broadcast has no end to measure against,
         # and its own way back is the archive.
-        _seek_row = QHBoxLayout()
+        _seek_row = FlowRow(spacing=10)
         _seek_row.setContentsMargins(2, 0, 2, 0)
-        _seek_row.setSpacing(10)
         self.cast_bar_seek = _SeekSlider()
         self.cast_bar_seek.setRange(0, 1000)
-        self.cast_bar_seek.setMinimumWidth(160)
+        # Narrow enough that the strip can still be pulled in past it: below
+        # this the clock and the LIVE button go to a line of their own rather
+        # than climbing on top of the bar.
+        self.cast_bar_seek.setMinimumWidth(120)
         self.cast_bar_seek.setToolTip(tr("cast_seek"))
         # What the point under the cursor is, before clicking it.
         self.cast_bar_seek.set_time_provider(self._cast_time_at)
         self.cast_bar_seek.seek_requested.connect(
             lambda _v: self._cast_seek_released())
-        _seek_row.addWidget(self.cast_bar_seek, 1)
+        _seek_row.add(self.cast_bar_seek, grow=True)
         self.cast_bar_time = QLabel("")
         self.cast_bar_time.setStyleSheet(
             "font-size:11px; font-weight:700;")
-        _seek_row.addWidget(self.cast_bar_time)
+        _seek_row.add(self.cast_bar_time)
         # The same red button the player has, and it means the same thing:
         # you are not at the live edge, and this is the way back. It is the
         # only thing on the strip that is ever red, so it reads as a state
@@ -1074,7 +1093,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             "QPushButton:hover{background:#e14b4b;}")
         self.cast_bar_live.clicked.connect(self._cast_go_live)
         self.cast_bar_live.hide()
-        _seek_row.addWidget(self.cast_bar_live)
+        _seek_row.add(self.cast_bar_live)
         _cast_outer.addLayout(_seek_row)
 
         # The receiver is the only thing that knows where the film is, and it
@@ -3400,7 +3419,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         CastDialog(self, url, title, self._local_codecs(),
                    self._local_audio_index(), start,
                    self._local_tracks(it),
-                   probe=not self._busy_elsewhere(it), source=source).exec()
+                   probe=not self._busy_elsewhere(it), source=source,
+                   live=self._play_kind_for(it) == "live").exec()
 
     # The list vocabulary and the resume store's do not match: a movie row is
     # "vod" in one and "movie" in the other, and History rows carry their own.
@@ -3516,7 +3536,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     "title": (t.get("title") or "").strip(),
                     "default": bool(t.get("default")),
                 })
-            out["duration"] = float(getattr(m, "duration", 0) or 0)
         except Exception as e:
             log.debug("cast: could not read the local tracks (%s)", e)
             return {}
@@ -3711,7 +3730,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                    self._local_codecs(), 0, self.cast.position(),
                    ctx.get("tracks") or {}, probe=False,
                    source=ctx.get("source"), managing=True,
-                   chosen=(ctx.get("audio"), ctx.get("subs"))).exec()
+                   chosen=(ctx.get("audio"), ctx.get("subs")),
+                   live=ctx.get("kind") == "live").exec()
 
     def _cast_volume(self, level: float) -> None:
         """Set the TV's volume. Off the UI thread: it is a message to a device
@@ -4203,7 +4223,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                                    False, ctx.get("source"),
                                    self._cast_quality(),
                                    ctx.get("height") or 0,
-                                   ctx.get("fps") or 0.0),
+                                   ctx.get("fps") or 0.0,
+                                   # A channel with an archive stays
+                                   # recorded here. Changing the audio track
+                                   # is no reason to lose the pause button.
+                                   dvr=bool(ctx.get("archive"))),
             lambda _n: self.show_cast_strip(device, title),
             lambda msg: self._error(tr("cast_failed", msg=msg)))
 
@@ -4313,7 +4337,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                                    start=offset, source=source,
                                    quality=self._cast_quality(),
                                    height=ctx.get("height") or 0,
-                                   fps=ctx.get("fps") or 0.0),
+                                   fps=ctx.get("fps") or 0.0,
+                                   # Recorded here, so a programme picked out
+                                   # of the archive can be held too.
+                                   dvr=True),
             lambda _n: self.show_cast_strip(device, title),
             lambda msg: self._error(tr("cast_failed", msg=msg)))
 

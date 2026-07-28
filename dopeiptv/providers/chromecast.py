@@ -436,7 +436,10 @@ class ChromecastManager:
         # way in that offset is what the receiver's own zero means.
         self.last_position, self.position_offset = 0.0, 0.0
         self.state = ""
-        self.duration = duration
+        # A broadcast has no length, whatever was handed in. Being recorded
+        # here is what a dvr cast IS, and a length is what makes the receiver
+        # announce the thing as a title with a progress bar over the picture.
+        self.duration = 0.0 if dvr else duration
 
         # Straight to the converter when this device has already refused these
         # codecs once - the answer is not going to be different this time, and
@@ -687,6 +690,12 @@ class ChromecastManager:
         # it measures nothing, cannot be dragged, and sits on top of the
         # match. The app's own strip says what is casting and where, which is
         # the place to say it.
+        # In the log, because it is the one thing that decides whether the
+        # television draws anything over the picture - and the only way to
+        # tell afterwards which of the two a cast went out as.
+        log.info("cast: handing over as %s%s",
+                 "BUFFERED" if buffered else "LIVE, with no metadata",
+                 f" ({self.duration:.0f} s)" if buffered else "")
         mc.play_media(url, ctype,
                       title=(title or "dopeIPTV") if buffered else None,
                       current_time=start or None,
@@ -842,7 +851,7 @@ class CastDialog(QDialog):
                  audio_index: int = 0, start: float = 0.0,
                  tracks: dict | None = None, probe: bool = True,
                  source: str | None = None, managing: bool = False,
-                 chosen: tuple | None = None) -> None:
+                 chosen: tuple | None = None, live: bool = False) -> None:
         super().__init__(window)
         self.window = window
         self.url = url
@@ -860,6 +869,14 @@ class CastDialog(QDialog):
         # a decision already made - the TV just has to honour it.
         self.start = start
         self.duration = 0.0
+        # A channel, as against a thing with an end. Said outright by whoever
+        # opened the dialog, because it cannot be read off the stream: mpv
+        # answers with the seekable window for a live playlist, and ffprobe
+        # measures an archive .ts down to the second. Either number turned a
+        # broadcast into a "title" on the television - a name and a bar drawn
+        # over the picture, and the default receiver leaves those up for as
+        # long as it believes it is playing something with a length.
+        self.live = live
         # What the player already knows. Free, and it saves opening the
         # stream a second time on an account that has one connection.
         self.tracks = tracks or {}
@@ -988,7 +1005,8 @@ class CastDialog(QDialog):
         return " · ".join(bits)
 
     def _fill_tracks(self, tracks: dict) -> None:
-        self.duration = float((tracks or {}).get("duration") or 0.0)
+        self.duration = (0.0 if self.live
+                         else float((tracks or {}).get("duration") or 0.0))
         self.height = int((tracks or {}).get("height") or 0)
         self.fps = float((tracks or {}).get("fps") or 0.0)
         audio = (tracks or {}).get("audio") or []

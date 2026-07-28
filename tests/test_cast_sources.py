@@ -38,10 +38,11 @@ cast = {}
 class FakeDialog:
     def __init__(self, window, url, title, codecs=None,
                  audio_index=0, start=0.0, tracks=None,
-                 probe=True, source=None):
+                 probe=True, source=None, live=False):
         cast["url"], cast["title"] = url, title
         cast["codecs"], cast["audio_index"] = codecs, audio_index
         cast["start"], cast["source"] = start, source
+        cast["live"] = live
 
     def exec(self):
         return 0
@@ -100,6 +101,11 @@ assert open_cast("history", {"name": "Ghost"}) is None
 # not served as HLS, which is a 4XX to everything that asks for one.
 assert open_cast("live", chan) == "http://p/live/u/pw/9851.m3u8"
 assert cast["source"] == "http://p/live/u/pw/9851.ts", cast
+# And it is handed over as a channel. Nothing in the stream says so - mpv
+# answers with the seekable window and ffprobe measures a catch-up .ts to the
+# second - and a length is what makes the receiver draw a name and a progress
+# bar over the picture and leave them there.
+assert cast["live"] is True, cast
 
 # A favourite FILM is not a channel. The row's own kind decides; letting the
 # Favorites section decide handed a movie a /live/ address built from its own
@@ -107,6 +113,7 @@ assert cast["source"] == "http://p/live/u/pw/9851.ts", cast
 fav_movie = {"name": "Film", "_kind": "movie", "stream_id": 61155,
              "container_extension": "mkv"}
 assert open_cast("fav", fav_movie) == "http://p/movie/u/pw/61155.mkv"
+assert cast["live"] is False, cast
 assert open_cast("fav", fav_movie, "movie") == "http://p/movie/u/pw/61155.mkv"
 
 # Casting a film you are part way into asks about THAT position: the stored
@@ -177,6 +184,28 @@ cast.clear()
 assert w.can_cast_playing() is True
 w.cast_playing()
 assert cast.get("url") == "http://p/live/u/pw/9851.ts", cast
+
+# The cast strip lives in the right-hand column, and that column is
+# draggable - so its width is not ours to assume. Pull it in and a plain row
+# does not stop at its contents' minimum: it goes on until the buttons are
+# drawn on top of one another. This is the real strip, not a rebuild of it,
+# because what has to hold is the window's own tree.
+w.show_cast_strip("Alva TV", "SVT1 HD")
+from PyQt6.QtCore import QRect
+for width in (640, 420, 300, 220, 160):
+    height = w.cast_bar.heightForWidth(width)
+    w.cast_bar.resize(width, height)
+    # Straight at the layout: the strip is inside an unshown window here, so
+    # the resize event that would normally re-run it is still in the post.
+    w.cast_bar.layout().setGeometry(QRect(0, 0, width, height))
+    shown = [c for c in w.cast_bar.findChildren(mw.QWidget)
+             if not c.isHidden() and c.parent() is w.cast_bar]
+    for i, a in enumerate(shown):
+        assert w.cast_bar.rect().contains(a.geometry()), \
+            (width, a.objectName() or type(a).__name__, a.geometry())
+        for b in shown[i + 1:]:
+            assert not a.geometry().intersects(b.geometry()), \
+                (width, a.geometry(), b.geometry())
 
 print("CAST_SOURCES_OK")
 """

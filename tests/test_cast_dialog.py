@@ -157,6 +157,28 @@ def test_an_ffmpeg_without_libass_offers_no_subtitle_it_cannot_send():
     win.deleteLater()
 
 
+def test_a_channel_is_handed_over_with_no_length():
+    """What mpv answers for a live playlist is the seekable window - a minute
+    or so of buffer - and it arrived here as the length of the thing. The
+    manager reads a length as "this has an end", announces it to the
+    television as a title, and the receiver draws a name and a progress bar
+    over the picture and leaves them there.
+
+    So the row's own kind decides, not a number read off the stream."""
+    tracks = {"audio": [{"index": 0, "lang": "swe", "codec": "aac"}],
+              "subtitle": [], "duration": 68.0, "height": 1080, "fps": 50.0}
+    win, dlg = _dialog(tracks=tracks, managing=True, live=True)
+    assert dlg.duration == 0.0
+    assert dlg.height == 1080, "the rest of what mpv knows is still worth it"
+    win.deleteLater()
+
+    # A film keeps its length: on that the bar is real and can be dragged
+    # with the television's own remote.
+    win, dlg = _dialog(tracks=dict(tracks, duration=5400.0), managing=True)
+    assert dlg.duration == 5400.0
+    win.deleteLater()
+
+
 def test_a_single_audio_track_is_no_choice():
     tracks = {"audio": [{"index": 0, "lang": "swe", "codec": "aac"}],
               "subtitle": []}

@@ -1579,6 +1579,32 @@ def test_the_tv_is_told_what_kind_of_thing_it_is_playing(monkeypatch):
     assert dev.announced[-1] == ("LIVE", None, None)
 
 
+def test_a_recorded_broadcast_is_still_a_broadcast(monkeypatch):
+    """A length handed in with a channel does not make it a title.
+
+    This is how the overlay came back after it had been taken away. Nothing
+    in the sender says outright what a stream is, so it was worked out from
+    the length - and a length turns up for a channel from two directions:
+    mpv answers with the seekable window of a live playlist, and ffprobe
+    measures a catch-up .ts down to the second. Either one announced the
+    channel as BUFFERED with a title, and the television put a name and a
+    progress bar over the picture and left them there for the whole match.
+
+    Being recorded here is what a dvr cast IS, so it settles the question on
+    its own, whatever number came along.
+    """
+    from dopeiptv.providers import chromecast as cm
+    m = _manager(monkeypatch)
+    monkeypatch.setattr(cm, "_resolve_redirects", lambda u: (u, "video/mp2t"))
+    monkeypatch.setattr(cm.CastBridge, "available", staticmethod(lambda: True))
+    monkeypatch.setattr(m.bridge, "start", lambda *a, **k: "http://me/s.mp4")
+    m.scan()
+    m.cast("Alva TV", "http://p/timeshift/u/pw/240/1.ts", "SVT1",
+           duration=3600.0, dvr=True)
+    assert m.devices[0].announced[-1] == ("LIVE", None, None)
+    assert m.duration == 0.0, "a broadcast has no length for the strip either"
+
+
 def test_pausing_a_converted_broadcast_asks_the_provider_for_nothing():
     """The one that finally works, and the reason it does: the converter
     records into a spool as it goes, so a pause is the television stopping
