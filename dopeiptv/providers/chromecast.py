@@ -810,6 +810,7 @@ class ChromecastManager:
                       media_info={"duration": float(self.duration)}
                       if buffered else None)
         mc.block_until_active(timeout=10)
+        self._ask_for_the_subtitle(mc)
         deadline = time.monotonic() + (
             self.VERDICT_WAIT if wait is None else wait)
         while time.monotonic() < deadline:
@@ -823,6 +824,57 @@ class ChromecastManager:
             if state == "IDLE" and why in ("ERROR", "CANCELLED"):
                 return False
         return None
+
+    def _ask_for_the_subtitle(self, mc) -> None:
+        """Go and find the subtitle track rather than waiting to be told.
+
+        Waiting was not enough. A receiver reports when something happens
+        to it, and the report that carries the track list is one particular
+        one - pychromecast keeps the previous list when a status arrives
+        without media in it, so a cast that started without subtitles left
+        an empty list standing and the listener never saw a text track at
+        all. Nothing was switched on and nothing said why.
+
+        So ask. Off the calling thread, because update_status waits for an
+        answer, and for a bounded while, because a receiver that has no
+        text track is not going to grow one.
+        """
+        if not getattr(self.bridge, "hls", False) or self.bridge.subs is None:
+            return
+        name = getattr(self.active, "name", "")
+
+        def look():
+            for _ in range(20):
+                time.sleep(1.0)
+                try:
+                    mc.update_status()
+                except Exception:
+                    continue
+                st = mc.status
+                tracks = getattr(st, "subtitle_tracks", None) or []
+                ids = [t.get("trackId") for t in tracks
+                       if isinstance(t, dict) and t.get("type") == "TEXT"
+                       and t.get("trackId") is not None]
+                if not ids:
+                    continue
+                on = set(getattr(st, "current_subtitle_tracks", None) or [])
+                if on & set(ids):
+                    log.info("cast %s: the subtitle is on (%s)",
+                             name, sorted(on & set(ids)))
+                    return
+                try:
+                    mc.enable_subtitle(ids[0])
+                    log.info("cast %s: turned the subtitle on (track %s "
+                             "of %s)", name, ids[0], ids)
+                except Exception as e:
+                    log.info("cast %s: could not turn the subtitle on (%s)",
+                             name, e)
+                return
+            log.info("cast %s: the receiver never listed a text track - "
+                     "the subtitle is in the playlist but it is not "
+                     "showing it", name)
+
+        threading.Thread(target=look, daemon=True).start()
 
     @staticmethod
     def _watch(cc, mc, device_name: str, manager=None) -> None:

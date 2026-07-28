@@ -2222,3 +2222,60 @@ def test_a_farewell_from_the_old_stream_is_not_an_answer_about_the_new_one():
             break
         threading.Event().wait(0.02)
     assert mc.enabled == [3]
+
+
+def test_the_subtitle_is_asked_for_when_nobody_reports_it():
+    """Waiting to be told was not enough.
+
+    pychromecast keeps the previous track list when a status arrives with
+    no media in it, so a cast that began without subtitles left an empty
+    list standing - and the listener never saw a text track at all. Nothing
+    was switched on, and nothing in the log said why.
+    """
+    from dopeiptv.providers import chromecast as cm
+
+    class Bridge:
+        hls, subs = True, 0
+
+    class Status:
+        def __init__(self):
+            self.subtitle_tracks: list = []
+            self.current_subtitle_tracks: list = []
+
+    class MC:
+        def __init__(self):
+            self.status = Status()
+            self.asked = 0
+            self.enabled = []
+
+        def update_status(self):
+            self.asked += 1
+            if self.asked >= 2:          # it turns up on the second ask
+                self.status.subtitle_tracks = [
+                    {"trackId": 1, "type": "AUDIO"},
+                    {"trackId": 4, "type": "TEXT"}]
+
+        def enable_subtitle(self, track_id, timeout=10.0):
+            self.enabled.append(track_id)
+
+    m = cm.ChromecastManager()
+    m.bridge = Bridge()
+    m.active = type("D", (), {"name": "Alva TV"})()
+    mc = MC()
+    m._ask_for_the_subtitle(mc)
+    for _ in range(120):
+        if mc.enabled:
+            break
+        threading.Event().wait(0.05)
+    assert mc.enabled == [4], f"asked {mc.asked} times, enabled {mc.enabled}"
+
+    # A cast with no subtitle asks nothing at all.
+    class Plain:
+        hls, subs = False, None
+
+    m2 = cm.ChromecastManager()
+    m2.bridge = Plain()
+    mc2 = MC()
+    m2._ask_for_the_subtitle(mc2)
+    threading.Event().wait(0.2)
+    assert mc2.asked == 0
