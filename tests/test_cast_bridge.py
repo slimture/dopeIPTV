@@ -15,6 +15,7 @@ import urllib.request
 
 import pytest
 
+from dopeiptv.core.log import log as _blog
 from dopeiptv.providers.cast_bridge import CastBridge, ffmpeg_args, lan_address
 
 
@@ -127,14 +128,20 @@ def test_a_url_is_never_linked():
 
 
 def test_an_old_receiver_gets_a_picture_it_can_keep_up_with():
-    """A 1080i50 channel is two problems for an older Chromecast at once:
-    nothing on the Cast platform deinterlaces, and the decoder tops out below
-    fifty frames a second. Both are answered on this side."""
+    """An FHD channel is two problems for an older Chromecast at once:
+    nothing on the Cast platform deinterlaces, and 1080 lines are more than
+    the decoder keeps up with. Both are answered on this side.
+
+    The frame rate is NOT one of the problems, and touching it made the
+    picture worse for nothing: HD channels play perfectly on a
+    first-generation dongle and Swedish HD is 720p50, so fifty frames a
+    second is plainly within reach.
+    """
     args = ffmpeg_args("ffmpeg", "http://p/x.m3u8", copy_video=True,
-                       quality="720p30")
+                       quality="older")
     vf = args[args.index("-vf") + 1]
     assert vf == "yadif=deint=1,scale=-2:720", vf
-    assert args[args.index("-r") + 1] == "30"
+    assert "-r" not in args, args
     assert args[args.index("-c:v") + 1] != "copy", "adapting means re-encoding"
 
 
@@ -245,3 +252,67 @@ def test_joining_a_broadcast_mid_stream_is_one_line_not_hundreds():
     assert "joined mid-stream" in lines[0]
     assert "182 more" in lines[1], lines[1]
     assert "Output #0" in lines[2]
+
+
+def test_a_failure_that_cannot_change_is_not_tried_twice_more():
+    """The retry exists for a provider still counting a connection we closed a
+    moment ago, which frees up within seconds. A filter this ffmpeg does not
+    have never will - and the old code spent twenty seconds proving it three
+    times over while the TV sat waiting."""
+    import io
+    import logging
+
+    class Proc:
+        stderr = io.BytesIO(
+            b"[AVFilterGraph @ 0x1] No such filter: 'subtitles'\n"
+            b"Error opening output file pipe:1.\n")
+
+    b = CastBridge()
+    b.exe = sys.executable
+    b.start("http://p/x.m3u8", ["h264"])
+    try:
+        level = _blog.level
+        _blog.setLevel(logging.CRITICAL)
+        try:
+            CastBridge._drain_errors(Proc(), b)
+        finally:
+            _blog.setLevel(level)
+        assert "No such filter" in b.fatal
+        assert b.spawn() is None, "no second attempt at an impossible run"
+        # A fresh cast is allowed to fail on its own terms.
+        b.start("http://p/y.m3u8", ["h264"])
+        assert b.fatal == ""
+    finally:
+        b.stop()
+
+
+def test_a_subtitle_choice_is_only_offered_when_it_can_be_honoured():
+    """A Chromecast renders no subtitle carried inside a stream, so the only
+    way to show one is to draw it into the picture - and a text subtitle needs
+    ffmpeg's subtitles filter, which plenty of builds ship without. The
+    capability is read from ffmpeg itself, once."""
+    import dopeiptv.providers.cast_bridge as cb
+
+    listed = []
+
+    class Result:
+        stdout = " ..C scale     V->V  Scale.\n TS. overlay   VV->V  Overlay.\n"
+
+    def fake_run(args, **kw):
+        listed.append(args)
+        return Result()
+
+    cb._can_burn = None
+    old = cb.subprocess.run
+    cb.subprocess.run = fake_run
+    try:
+        assert cb.can_burn_subtitles("ffmpeg") is False
+        assert cb.can_burn_subtitles("ffmpeg") is False
+        assert len(listed) == 1, "asked once, not per cast"
+        assert "-filters" in listed[0]
+        cb._can_burn = None
+        Result.stdout = " T.. subtitles       V->V  Render text.\n"
+        assert cb.can_burn_subtitles("ffmpeg") is True
+    finally:
+        cb.subprocess.run = old
+        cb._can_burn = None

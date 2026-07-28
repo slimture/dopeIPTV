@@ -14,7 +14,8 @@ from ..core.log import log
 from ..i18n import tr
 from ..core.workers import run_async
 from .cast_bridge import (
-    QUALITY, SAFE_AUDIO, SAFE_VIDEO, CastBridge, probe_tracks,
+    BITMAP_SUBS, QUALITY, SAFE_AUDIO, SAFE_VIDEO, CastBridge,
+    can_burn_subtitles, normalise_quality, probe_tracks,
 )
 
 # pychromecast drags in zeroconf + ifaddr (~130 ms of the app's startup),
@@ -513,7 +514,8 @@ class ChromecastManager:
         The device setting is a ceiling, not an instruction. Most channels
         come in three versions - SD, HD and FHD - and only the last one is
         beyond an older receiver; scaling the HD one down would throw away
-        picture for nothing. A source already under the ceiling is left alone.
+        picture for nothing. A source already under the ceiling is left alone,
+        at the frame rate it came with.
 
         So is one whose size we could not find out. Adapting on a guess is the
         worse mistake: it re-encodes HD channels that were perfectly fine, and
@@ -521,6 +523,7 @@ class ChromecastManager:
         next attempt, when the picture IS known - the player fills that in
         within a frame or two of starting.
         """
+        want = normalise_quality(want)
         if want == "original":
             return want
         if not height:
@@ -535,15 +538,20 @@ class ChromecastManager:
                      "sending it as it is", height,
                      f"{fps:g}" if fps else "")
             return "original"
-        # Say which half of the limit it broke. An HD channel at fifty frames
-        # a second is scaled by the frame rate alone, and a line that only
-        # named the setting read as if the size had been the problem.
-        log.info("cast: %dp%s is beyond this device's limit (%dp%d) - %s",
-                 height, f"{fps:g}" if fps else "", limit_h, limit_fps,
-                 "too many lines and too many frames a second"
-                 if too_big and too_fast else
-                 "too many lines" if too_big else "too many frames a second")
+        log.info("cast: %dp%s is beyond this device's limit - sending it as "
+                 "%s", height, f"{fps:g}" if fps else "",
+                 ChromecastManager.quality_label(want, height, fps))
         return want
+
+    @staticmethod
+    def quality_label(want: str, height: int, fps: float) -> str:
+        """What a picture this size comes out as, in the same words the
+        picture itself is described in - so the menu can say 1080p50 -> 720p50
+        rather than naming a setting nobody chose by name."""
+        limit_h, limit_fps = QUALITY.get(normalise_quality(want), (0, 0))
+        out_h = min(height, limit_h) if limit_h and height else limit_h
+        out_fps = min(fps, limit_fps) if limit_fps and fps else fps
+        return f"{out_h}p{out_fps:g}" if out_fps else f"{out_h}p"
 
     @staticmethod
     def _no_decoder(codecs: list[str]) -> str:
@@ -803,7 +811,11 @@ class CastDialog(QDialog):
         # on their default is what keeps a cast native.
         self.audio_box = QComboBox()
         self.subs_box = QComboBox()
-        self.older_box = QCheckBox(tr("cast_older_device"))
+        # Named after the device it belongs to. The dialog is opened once per
+        # thing you cast, so a bare "Older Chromecast" sitting in it reads as
+        # a question about this broadcast - something to answer every time -
+        # when it is a standing property of the receiver.
+        self.older_box = QCheckBox(tr("cast_older_device", name=""))
         for box, label in ((self.audio_box, tr("cast_audio")),
                            (self.subs_box, tr("cast_subtitles"))):
             row = QHBoxLayout()
@@ -890,6 +902,14 @@ class CastDialog(QDialog):
         self.fps = float((tracks or {}).get("fps") or 0.0)
         audio = (tracks or {}).get("audio") or []
         subs = (tracks or {}).get("subtitle") or []
+        # A subtitle reaches a Chromecast only by being drawn into the
+        # picture, and a text one needs ffmpeg's subtitles filter - which
+        # plenty of builds ship without. Offering a choice that cannot be
+        # honoured is worse than not offering it at all: picking it took the
+        # picture away and said "No such filter" only in the log.
+        no_burn = bool(subs) and not can_burn_subtitles()
+        if no_burn:
+            subs = [t for t in subs if t.get("codec") in BITMAP_SUBS]
         self.audio_list, self.subs_list = audio, subs
         self.audio_box.blockSignals(True)
         self.subs_box.blockSignals(True)
@@ -924,6 +944,12 @@ class CastDialog(QDialog):
         # nothing to pick from - leave those boxes out of the way.
         self.audio_box.setEnabled(len(audio) > 1)
         self.subs_box.setEnabled(bool(subs))
+        if no_burn and not subs:
+            # Say why the row is empty, where the choice would have been.
+            self.subs_box.blockSignals(True)
+            self.subs_box.clear()
+            self.subs_box.addItem(tr("cast_subs_unavailable"), None)
+            self.subs_box.blockSignals(False)
 
     def _quality_key(self, device: str) -> str:
         return f"cast_quality_{device}"
@@ -931,10 +957,13 @@ class CastDialog(QDialog):
     def _show_device_quality(self) -> None:
         """Show what this device is remembered as needing."""
         item = self.list.currentItem()
+        self.older_box.setVisible(item is not None)
+        self.quality_note.setVisible(item is not None)
         if not item:
             return
-        want = str(self.window.settings.value(
-            self._quality_key(item.text()), "original") or "original")
+        want = normalise_quality(str(self.window.settings.value(
+            self._quality_key(item.text()), "original") or "original"))
+        self.older_box.setText(tr("cast_older_device", name=item.text()))
         self.older_box.blockSignals(True)
         self.older_box.setChecked(want != "original")
         self.older_box.blockSignals(False)
@@ -950,8 +979,8 @@ class CastDialog(QDialog):
         item = self.list.currentItem()
         if not item:
             return "original"
-        return str(self.window.settings.value(
-            self._quality_key(item.text()), "original") or "original")
+        return normalise_quality(str(self.window.settings.value(
+            self._quality_key(item.text()), "original") or "original"))
 
     def _track_changed(self) -> None:
         self.track_note.setVisible(self._chosen() != (None, None))

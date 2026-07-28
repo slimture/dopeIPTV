@@ -718,11 +718,15 @@ _STRINGS: dict[str, dict[str, str]] = {
     "cast_subs_off": {"en": "Off"},
     "cast_reading_tracks": {"en": "Reading tracks…"},
     "cast_older_device": {
-        "en": "Older Chromecast - smoother picture, a little less sharp"},
+        "en": "{name} is an older Chromecast - smoother picture, "
+              "a little less sharp"},
     "cast_quality_note": {
-        "en": "For Chromecast 1-3 and TVs with Chromecast built-in. An Ultra, "
-              "Google TV or Android TV does not need it. Remembered for this "
-              "device."},
+        "en": "Set once for this device, not for each channel. Only FHD is "
+              "adapted - SD and HD are sent untouched. Chromecast 1-3 and TVs "
+              "with Chromecast built in need this; an Ultra or Google TV does "
+              "not."},
+    "cast_subs_unavailable": {
+        "en": "This ffmpeg cannot burn subtitles in"},
     "cast_track_note": {
         "en": "Choosing a track converts the stream on this computer."},
 

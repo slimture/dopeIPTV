@@ -8,7 +8,7 @@ import os
 import sys
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from PyQt6.QtCore import (
     QEvent, QPoint, QPointF, QSettings, QSize, Qt, QThreadPool,
@@ -252,6 +252,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._last_stream_error_ts = 0.0
         self._cast_device: str | None = None   # device a cast is running on
         self._cast_paused_at = None            # when a live cast was paused
+        self._cast_paused_pos = 0.0            # and how far in it was then
         # What is on the TV, so the list can mark it exactly as it marks what
         # is playing here. Nothing else should read these - they are not the
         # app's own playback state.
@@ -3508,7 +3509,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         """
         self._cast_device = device
         # A fresh cast is playing, whatever the last one was doing.
-        self._cast_paused_at = None
+        self._cast_paused_at, self._cast_paused_pos = None, 0.0
         ctx = getattr(self, "_cast_ctx", None) or {}
         self._cast_key = ctx.get("key") if device else None
         self._cast_group = ctx.get("group") if device else None
@@ -3601,6 +3602,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         tracks = ctx.get("tracks") or {}
         audio = tracks.get("audio") or []
         subs = tracks.get("subtitle") or []
+        # Only the ones this ffmpeg can actually draw into the picture. A text
+        # subtitle needs the subtitles filter, and a build without libass has
+        # none - choosing one there simply ends the cast.
+        from ..providers.cast_bridge import BITMAP_SUBS, can_burn_subtitles
+        if subs and not can_burn_subtitles():
+            subs = [t for t in subs if t.get("codec") in BITMAP_SUBS]
         menu = QMenu(self)
         menu.addAction(tr("cast_title"), self.manage_cast)
         menu.addSeparator()
@@ -3649,7 +3656,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             from ..providers.chromecast import ChromecastManager as _CM
             adapted = _CM._needed_quality(current, height, fps) != "original"
             now = f"{height}p{fps:g}" if fps else f"{height}p"
-            shown = menu.addAction(f"{now} → 720p30" if adapted else now)
+            shown = menu.addAction(
+                f"{now} → {_CM.quality_label(current, height, fps)}"
+                if adapted else now)
             shown.setEnabled(False)
         menu.exec(self.cast_bar_tracks.mapToGlobal(
             self.cast_bar_tracks.rect().bottomLeft()))
@@ -3658,8 +3667,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         return f"cast_quality_{self._cast_device or ''}"
 
     def _cast_quality(self) -> str:
-        return str(self.settings.value(self._cast_quality_key(), "original")
-                   or "original")
+        # Through the normaliser: a device set before the question became one
+        # checkbox is still remembered as "720p30", which is no longer an
+        # answer that exists.
+        from ..providers.cast_bridge import normalise_quality
+        return normalise_quality(
+            str(self.settings.value(self._cast_quality_key(), "original")
+                or "original"))
 
     def _set_cast_quality(self, key: str) -> None:
         """Change what this device is allowed, and show it straight away."""
@@ -3708,17 +3722,34 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         remembered, and pressing play casts the channel again from exactly
         there. Which is what a pause on live television has to mean.
         """
+        ctx = self._cast_ctx or {}
         if self._cast_paused_at is not None:
             at, self._cast_paused_at = self._cast_paused_at, None
+            pos, self._cast_paused_pos = self._cast_paused_pos, 0.0
             self.cast_bar_pause.setIcon(cast_strip_icon("pause", P["text"]))
-            if (self._cast_ctx or {}).get("archive"):
-                self._cast_from_archive(at)
+            if ctx.get("archive"):
+                self._cast_from_archive(self._paused_moment(at, pos))
             else:
                 threading.Thread(target=self.cast.resume, daemon=True).start()
             return
         self._cast_paused_at = datetime.now()
+        # Where the picture is, not just when the button was pressed. The two
+        # are the same thing only on the first pause of a live channel.
+        self._cast_paused_pos = float(self.cast.position() or 0.0)
         self.cast_bar_pause.setIcon(cast_strip_icon("play", P["text"]))
         threading.Thread(target=self.cast.pause, daemon=True).start()
+
+    def _paused_moment(self, at, pos: float):
+        """The broadcast moment the picture was showing when you paused.
+
+        On live that is simply the clock. Once the archive is what is playing,
+        it is that stream's own starting point plus how far into it the
+        receiver had got - asking the clock a second time would throw away
+        everything you had already shifted and jump the picture forward to
+        now, which is the opposite of what pausing is for.
+        """
+        began = (self._cast_ctx or {}).get("archive_from")
+        return began + timedelta(seconds=pos) if began else at
 
     def _cast_from_archive(self, paused_at) -> None:
         """Resume a paused live cast from the provider's catch-up archive."""
@@ -3729,20 +3760,40 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # From the pause onwards. The window has to cover the gap that has
         # opened up since, plus room to keep watching - providers cap it to
         # whatever archive they actually hold.
-        behind = max(1, int((datetime.now() - paused_at).total_seconds() // 60))
-        url = self.client.timeshift_url(sid, paused_at, behind + 240)
+        # The archive is addressed by the minute. Asking for the minute the
+        # pause fell in and then starting that many seconds into it is the
+        # difference between resuming where you were and being thrown back to
+        # the last whole minute - up to a minute of television you just
+        # watched, on every single pause.
+        minute = paused_at.replace(second=0, microsecond=0)
+        offset = (paused_at - minute).total_seconds()
+        behind = max(1, int((datetime.now() - minute).total_seconds() // 60))
+        url = self.client.timeshift_url(sid, minute, behind + 240)
         if not url:
             return
-        log.info("cast: resuming %s from the archive, %d min back",
-                 ctx.get("title") or "", behind)
+        log.info("cast: resuming %s from the archive, %d min back%s",
+                 ctx.get("title") or "", behind,
+                 f" plus {offset:.0f} s" if offset else "")
         title = ctx.get("title") or "dopeIPTV"
         # The session now lives at the archive address. Recording it keeps the
         # strip's own panel pointing at what is actually playing - it opened
-        # on an empty address otherwise, and cast it.
-        ctx.update(url=url, source=url)
+        # on an empty address otherwise, and cast it. archive_from is what a
+        # later pause measures against, so this cast can be paused again
+        # without losing the shift it already has.
+        ctx.update(url=url, source=url, archive_from=minute)
+        # Everything the live cast was doing, the archive cast does too. It is
+        # the same channel at the same size, so the device's picture ceiling,
+        # the chosen tracks and the known codecs all still apply - dropping
+        # them here handed an older receiver the full-size picture it had just
+        # been spared, halfway through watching.
         run_async(
             self.pool,
-            lambda: self.cast.cast(device, url, title),
+            lambda: self.cast.cast(device, url, title, self._local_codecs(),
+                                   ctx.get("audio"), ctx.get("subs"),
+                                   start=offset, source=url,
+                                   quality=self._cast_quality(),
+                                   height=ctx.get("height") or 0,
+                                   fps=ctx.get("fps") or 0.0),
             lambda _n: self.show_cast_strip(device, title),
             lambda msg: self._error(tr("cast_failed", msg=msg)))
 

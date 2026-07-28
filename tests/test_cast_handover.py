@@ -35,6 +35,7 @@ _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_local_codecs", "_toggle_cast_pause", "_cast_from_archive",
             "_save_cast_position", "_recast_with", "_track_label",
             "_cast_volume", "_cast_quality", "_cast_quality_key",
+            "_paused_moment",
             "_set_cast_quality", "_toggle_cast_mute", "_show_cast_volume")
 
 
@@ -67,6 +68,10 @@ class _Cast:
         self.active = object() if active else None
         self.stopped = threading.Event()
         self.thread: str | None = None
+        self.at = 0.0
+
+    def position(self) -> float:
+        return self.at
 
     def stop(self) -> None:
         self.thread = threading.current_thread().name
@@ -197,18 +202,23 @@ def test_the_picture_setting_can_be_put_back_from_the_strip():
     w._cast_ctx = {"audio": None, "subs": None}
     w._recast_with = lambda a, s: recast.append((a, s))
     assert w._cast_quality() == "original"
-    w._set_cast_quality("720p30")
-    assert w._cast_quality() == "720p30"
+    w._set_cast_quality("older")
+    assert w._cast_quality() == "older"
     assert recast, "the change is shown straight away"
     # Setting the same thing again does nothing at all.
     recast.clear()
-    w._set_cast_quality("720p30")
+    w._set_cast_quality("older")
     assert recast == []
     w._set_cast_quality("original")
     assert w._cast_quality() == "original"
     # And it is per device: another one starts clean.
     w._cast_device = "Vardagsrummet"
     assert w._cast_quality() == "original"
+    # A device set while the question was still a three-way choice is
+    # remembered as "720p30", which is no longer an answer that exists. Read
+    # it as the answer it was rather than as nothing at all.
+    w.settings.setValue("cast_quality_Vardagsrummet", "720p30")
+    assert w._cast_quality() == "older"
 
 
 def test_every_strip_icon_actually_draws_something():
@@ -398,11 +408,46 @@ def test_the_archive_url_starts_where_you_paused(monkeypatch):
     import dopeiptv.ui.main_window as mwmod
     monkeypatch.setattr(mwmod, "run_async",
                         lambda pool, work, ok, err: sent.update(work=work))
-    at = datetime.now() - timedelta(minutes=5)
+    at = (datetime.now() - timedelta(minutes=5)).replace(microsecond=0)
     w._cast_from_archive(at)
-    assert asked["sid"] == 9851 and asked["start"] == at
+    # The archive is addressed by the minute, so the request is for the minute
+    # the pause fell in - and the seconds it cut off are handed to the
+    # receiver as a starting offset instead. Rounding them away meant
+    # rewatching up to a minute of television on every single pause.
+    assert asked["sid"] == 9851
+    assert asked["start"] == at.replace(second=0)
     assert asked["minutes"] > 240, asked          # room to keep watching
     assert sent, "the archive URL is cast"
+    assert w._cast_ctx["archive_from"] == at.replace(second=0)
+
+
+def test_pausing_the_archive_again_does_not_jump_back_to_now():
+    """Once the archive is what is playing, the clock is no longer where the
+    picture is. Deriving the resume point from it a second time threw away
+    everything you had shifted and jumped forward to live - which is the
+    opposite of what pressing pause is for."""
+    from datetime import datetime, timedelta
+    w = _with_strip()
+    w.cast = _Cast(active=True)
+    w.cast.pause = lambda: None
+    points = []
+    w._cast_from_archive = lambda at: points.append(at)
+    began = datetime.now() - timedelta(minutes=30)
+    w._cast_ctx = {"archive": True, "sid": 9851, "title": "SVT1",
+                   "archive_from": began}
+    w._cast_paused_at = None
+    w.cast.at = 600.0                     # ten minutes into the archive
+    w._toggle_cast_pause()                # pause
+    w._toggle_cast_pause()                # and play again
+    assert points == [began + timedelta(seconds=600)], points
+    # A live channel, with no archive playing yet, still measures by the
+    # clock - there is nothing else to measure by.
+    w._cast_ctx = {"archive": True, "sid": 9851, "title": "SVT1"}
+    points.clear()
+    w._toggle_cast_pause()
+    at = w._cast_paused_at
+    w._toggle_cast_pause()
+    assert points == [at], points
 
 
 class _Settings:
@@ -664,18 +709,25 @@ def test_the_picture_setting_is_a_ceiling_not_an_instruction():
     from dopeiptv.providers.chromecast import ChromecastManager as M
     need = M._needed_quality
     # Already under it: sent as it is.
-    assert need("720p", 576, 25.0) == "original"
-    assert need("720p", 720, 50.0) == "original"
-    assert need("720p30", 720, 25.0) == "original"
-    # Over it, one way or the other.
-    assert need("720p", 1080, 25.0) == "720p"
-    assert need("720p30", 720, 50.0) == "720p30"
-    assert need("720p30", 1080, 50.0) == "720p30"
+    assert need("older", 576, 25.0) == "original"
+    assert need("older", 720, 50.0) == "original"
+    assert need("older", 720, 25.0) == "original"
+    # It counts lines and nothing else. The frame rate used to be capped at
+    # 30 too, and that halved HD channels which played perfectly - Swedish HD
+    # is 720p50, and only FHD ever stuttered.
+    assert need("older", 1080, 25.0) == "older"
+    assert need("older", 1080, 50.0) == "older"
+    assert M.quality_label("older", 1080, 50.0) == "720p50"
+    assert M.quality_label("older", 1080, 0.0) == "720p"
     # Nothing to compare against: sent as it is. Converting on a guess
     # re-encodes HD channels that were fine, and does it invisibly.
-    assert need("720p", 0, 0.0) == "original"
+    assert need("older", 0, 0.0) == "original"
     # And a device with no setting never adapts anything.
     assert need("original", 1080, 50.0) == "original"
+    # A setting written down before the question became one checkbox still
+    # means what it meant.
+    assert need("720p30", 1080, 50.0) == "older"
+    assert need("720p", 720, 50.0) == "original"
 
 
 def test_an_empty_address_is_refused_rather_than_cast(monkeypatch):

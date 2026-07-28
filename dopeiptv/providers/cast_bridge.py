@@ -50,11 +50,27 @@ _UA = "VLC/3.0.20 LibVLC/3.0.20"
 # so it is applied whenever the video is re-encoded anyway - with deint=1,
 # which touches only frames actually marked as interlaced.
 # "older" is the only adaptation offered, under a name that describes the
-# problem rather than the mechanism: 720 lines at 30 frames is comfortably
-# inside what every Cast receiver ever made can decode. The older keys are
-# still understood so a setting made before this stays meaningful.
-QUALITY = {"original": (0, 0), "older": (720, 30),
-           "720p": (720, 0), "720p30": (720, 30)}
+# problem rather than the mechanism.
+#
+# It caps the number of LINES and nothing else. The frame rate used to be
+# capped at 30 as well, on the reasoning that an older receiver would be
+# short of both - but measured against a first-generation dongle it is only
+# the lines: HD channels play perfectly there and Swedish HD is 720p50, so
+# fifty frames a second is plainly within reach. Only FHD stutters. Halving
+# the frame rate of a channel that never needed it made the picture visibly
+# worse to fix a problem it did not have.
+QUALITY = {"original": (0, 0), "older": (720, 0)}
+
+
+def normalise_quality(value: str | None) -> str:
+    """A stored setting, in today's terms.
+
+    The question used to be a three-way choice and was written down as
+    "720p" or "720p30". Those devices are still set that way, and "720p30"
+    is no longer a thing that can be asked for - so read it as the answer it
+    was, which is yes.
+    """
+    return "original" if not value or value == "original" else "older"
 
 # What ffmpeg says while it waits for the first keyframe of a broadcast that
 # was already running. None of it is a fault: a transport stream can be joined
@@ -74,7 +90,54 @@ def _mid_stream_noise(line: str) -> bool:
     return any(bit in low for bit in _MID_STREAM_NOISE)
 
 
+# ffmpeg failures that will say exactly the same thing next time. The retry
+# is there for a provider still counting a connection we closed a moment ago,
+# which frees up within seconds - a filter this build does not have never
+# will, and trying twice more only spends twenty seconds proving it.
+_FATAL = ("no such filter", "unknown encoder", "unknown decoder",
+          "error opening output file", "option not found",
+          "invalid argument", "unrecognized option")
+
+
+def _fatal_error(line: str) -> bool:
+    low = line.lower()
+    return any(bit in low for bit in _FATAL)
+
+
 _hw_encoder: str | None = None
+_can_burn: bool | None = None
+
+
+def can_burn_subtitles(exe: str | None = None) -> bool:
+    """Whether this ffmpeg can burn a text subtitle into the picture.
+
+    The subtitles filter is built on libass, and plenty of ffmpeg builds ship
+    without it - "No such filter: 'subtitles'", said once per attempt. There
+    is no way round it on the receiver's side either: a Chromecast renders
+    only a WebVTT file handed to it separately, which cannot be made from a
+    live stream. So this decides whether the choice is offered at all, rather
+    than being discovered after the picture has already gone.
+
+    Bitmap subtitles are a different matter - they are drawn with overlay,
+    which every build has.
+    """
+    global _can_burn
+    if _can_burn is None:
+        _can_burn = False
+        exe = exe or ffmpeg_path()
+        if exe:
+            try:
+                out = subprocess.run([exe, "-hide_banner", "-filters"],
+                                     capture_output=True, text=True,
+                                     timeout=15).stdout
+                _can_burn = any(line.split()[1:2] == ["subtitles"]
+                                for line in out.splitlines() if line.strip())
+            except Exception as e:
+                log.info("cast bridge: could not list the filters (%s)", e)
+        if not _can_burn:
+            log.info("cast bridge: this ffmpeg has no subtitles filter - "
+                     "text subtitles cannot be burned in")
+    return _can_burn
 
 
 def video_encoder() -> str:
@@ -370,6 +433,10 @@ class CastBridge:
         self.sub_codec = ""
         self.start_at = 0.0
         self.quality = "original"
+        # Set to ffmpeg's own words when it fails in a way that will fail the
+        # same way every time. Read by spawn(), so a run that cannot work is
+        # not attempted twice more while the TV waits.
+        self.fatal: str = ""
         self.exe: str | None = None          # overridable, for tests
         self._server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
@@ -414,6 +481,7 @@ class CastBridge:
         asks for the stream, so a receiver that never connects costs nothing.
         """
         self.stop()
+        self.fatal = ""          # a new run gets to fail on its own terms
         source = self._safe_source(source)
         codecs = [c.lower() for c in (codecs or [])]
         # Copy the video unless it is something the receiver cannot decode.
@@ -457,6 +525,9 @@ class CastBridge:
         # then read the same channel and fought over the one connection.
         if not exe or not self.source or self._server is None:
             return None
+        if self.fatal:
+            log.info("cast bridge: not trying again - %s", self.fatal)
+            return None
         args = ffmpeg_args(exe, self.source, self.copy_video,
                            self.audio, self.subs, self.sub_codec,
                            self.start_at, self.quality)
@@ -471,14 +542,15 @@ class CastBridge:
         # away would leave exactly the kind of silent failure this whole
         # feature exists to end, so it goes into the log (loglevel is 'error',
         # so a working stream says nothing at all).
-        threading.Thread(target=self._drain_errors, args=(proc,),
+        threading.Thread(target=self._drain_errors, args=(proc, self),
                          daemon=True).start()
         with self._lock:
             self._procs.append(proc)
         return proc
 
     @staticmethod
-    def _drain_errors(proc: subprocess.Popen) -> None:
+    def _drain_errors(proc: subprocess.Popen, bridge: "CastBridge | None" = None
+                      ) -> None:
         """ffmpeg's own words, with the repetition taken out.
 
         Picking a live transport stream up mid-broadcast means decoding
@@ -522,6 +594,11 @@ class CastBridge:
                                  line)
                     continue
                 flush_noise()
+                # The FIRST one: "No such filter: 'subtitles'" is the reason,
+                # and "Error opening output file" is only its consequence.
+                if bridge is not None and not bridge.fatal \
+                        and _fatal_error(line):
+                    bridge.fatal = line
                 if line == last:
                     repeats += 1
                     continue
