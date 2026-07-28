@@ -890,3 +890,65 @@ def test_the_playlist_asks_for_the_subtitle_to_be_shown():
     assert b"AUTOSELECT" not in out.split(b"\n")[3]
     # And it is not doubled when it is served again.
     assert _autoselect_subtitles(out) == out
+
+
+def test_the_picture_and_the_subtitle_share_a_clock():
+    """They did not, and the subtitles ran a second and a third early.
+
+    ffmpeg preloads a transport stream's clock by 1.4 seconds by default,
+    and the WebVTT rendition carries no X-TIMESTAMP-MAP to say so - so the
+    picture began at 1.421333 s while the subtitles began at 0.043 s.
+    Measured on both, with ffprobe, before and after:
+
+        before   video 1.421333   subtitle 0.043
+        after    video 0.042333   subtitle 0.043
+    """
+    from dopeiptv.providers.cast_bridge import hls_args
+    args = hls_args("ffmpeg", "http://p/f.mkv", True, "/tmp/x", subs=0)
+    assert args[args.index("-muxpreload") + 1] == "0"
+    assert args[args.index("-muxdelay") + 1] == "0"
+    # Before the muxer, not after: they are output options for the format,
+    # and after the output filename they are not options at all.
+    assert args.index("-muxpreload") > args.index("-f")
+    assert args.index("-muxpreload") < len(args) - 1
+
+
+@pytest.mark.filterwarnings("ignore")
+def test_the_subtitle_really_lands_on_the_picture(tmp_path):
+    """Against a real ffmpeg, because a timestamp is not a thing that can be
+    read off a command line - the offset above was invisible there and
+    obvious the moment anything measured the two streams."""
+    import shutil as _sh
+    import subprocess
+    from dopeiptv.providers.cast_bridge import hls_args
+
+    exe = _sh.which("ffmpeg")
+    probe = _sh.which("ffprobe")
+    if not exe or not probe:
+        pytest.skip("no ffmpeg")
+
+    srt = tmp_path / "s.srt"
+    srt.write_text("1\n00:00:00,000 --> 00:00:20,000\nHEJ\n")
+    mkv = tmp_path / "f.mkv"
+    subprocess.run(
+        [exe, "-hide_banner", "-loglevel", "error",
+         "-f", "lavfi", "-i", "testsrc=size=320x180:rate=25:duration=20",
+         "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo:d=20",
+         "-i", str(srt), "-c:v", "libx264", "-preset", "ultrafast",
+         "-c:a", "aac", "-c:s", "copy", "-y", str(mkv)], check=True)
+
+    out = tmp_path / "hls"
+    out.mkdir()
+    subprocess.run(hls_args(exe, str(mkv), True, str(out), subs=0),
+                   capture_output=True, timeout=180)
+    seg = out / "v0.ts"
+    assert seg.exists(), sorted(p.name for p in out.iterdir())
+    first = subprocess.run(
+        [probe, "-v", "error", "-select_streams", "v",
+         "-show_entries", "packet=pts_time", "-of", "csv=p=0", str(seg)],
+        capture_output=True, text=True).stdout.splitlines()[0]
+    video = float(first.rstrip(","))
+    # The subtitle starts at zero in the source, so the picture must start
+    # there too. It used to start 1.4 seconds later, which is exactly how
+    # far ahead of the picture every line appeared.
+    assert video < 0.5, f"the picture starts at {video} s, the subtitle at 0"

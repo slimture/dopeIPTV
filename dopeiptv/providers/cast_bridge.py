@@ -514,6 +514,12 @@ def hls_args(exe: str, source: str, copy_video: bool, folder: str,
         # WebVTT is the one subtitle format a Cast receiver renders.
         "-c:s", "webvtt",
         "-f", "hls",
+        # Start the transport stream's clock at zero. ffmpeg preloads it by
+        # 1.4 seconds by default, and the WebVTT rendition carries no
+        # X-TIMESTAMP-MAP to say so - so the picture began at 1.42 s while
+        # the subtitles began at 0.04 s, and every line appeared a second
+        # and a third too early. Measured on both, not guessed at.
+        "-muxpreload", "0", "-muxdelay", "0",
         "-hls_time", str(HLS_SEGMENT),
         # A broadcast keeps a rolling window; a film keeps everything, which
         # is what lets the television's own remote scrub it - and what makes
