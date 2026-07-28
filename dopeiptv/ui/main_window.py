@@ -3271,7 +3271,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         rkind = self._CAST_RESUME_KIND.get(
             it.get("_kind") or self._content_kind())
         key = self._item_key(it)
-        start = self._resume_offset(key, rkind) if rkind else 0.0
+        # Where the film actually is, which is the player when the player is
+        # the one playing it. The stored point is only written when playback
+        # switches or stops, so casting a film you are 22 minutes into asked
+        # a store that knew nothing yet and offered to start it over.
+        start = 0.0
+        here = self._playing_position(it)
+        if here > 60:
+            start = self._ask_resume(here)
+        elif rkind:
+            start = self._resume_offset(key, rkind)
         self._cast_ctx = {
             "sid": it.get("stream_id") if live else None,
             "archive": bool(live and it.get("stream_id") is not None
@@ -3331,6 +3340,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def can_cast_playing(self) -> bool:
         p = getattr(self, "player", None)
         return bool(p is not None and getattr(p, "current_url", None))
+
+    def _playing_position(self, it) -> float:
+        """How far into *it* the app itself has got, or 0 when it is not the
+        thing playing (or has no length, as live has none)."""
+        p = getattr(self, "player", None)
+        if (p is None or self._playing_key is None
+                or self._item_key(it) != self._playing_key):
+            return 0.0
+        try:
+            return p.playback_position() if p.playback_duration() > 1 else 0.0
+        except Exception:
+            return 0.0
 
     def _local_tracks(self, it) -> dict:
         """The tracks mpv can already see, in the shape ffprobe would give.
@@ -3894,6 +3915,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # Nothing to offer: either never watched >1 min, watched past 95%
             # (counted as finished), or saved under another kind pre-fix.
             log.debug("resume: no saved position for %s (kind=%s)", key, kind)
+            return 0.0
+        return self._ask_resume(pos)
+
+    def _ask_resume(self, pos: float) -> float:
+        """Offer to continue from *pos*; returns it, or 0 to start over."""
+        if pos <= 0:
             return 0.0
         idx = self._choice_dialog(
             tr("resume_title"),

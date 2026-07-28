@@ -109,6 +109,35 @@ fav_movie = {"name": "Film", "_kind": "movie", "stream_id": 61155,
 assert open_cast("fav", fav_movie) == "http://p/movie/u/pw/61155.mkv"
 assert open_cast("fav", fav_movie, "movie") == "http://p/movie/u/pw/61155.mkv"
 
+# Casting a film you are part way into asks about THAT position: the stored
+# point is only written when playback switches or stops, so a film 22 minutes
+# in had nothing saved yet and was offered from the beginning.
+asked = []
+w._ask_resume = lambda pos: asked.append(pos) or pos
+w._playing_key = 5     # what _item_key returns for stream_id 5
+
+
+class PartWay:
+    current_url = "http://p/movie/u/pw/5.mp4"
+
+    def playback_position(self):
+        return 1320.0                      # 22 minutes
+
+    def playback_duration(self):
+        return 6000.0
+
+
+w.player = PartWay()
+film = {"name": "Film", "_kind": "movie", "stream_id": 5,
+        "container_extension": "mp4"}
+cast.clear()
+w.mode = "history"
+w._open_cast_dialog(film)
+assert asked == [1320.0], asked
+assert cast["start"] == 1320.0, cast
+w.player = None
+w._playing_key = None
+
 # ...and in the player's own options menu, next to the audio and subtitle
 # tracks - the natural place to look while watching. The player is handed a
 # label and an action; it never learns what a Chromecast is.
