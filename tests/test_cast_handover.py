@@ -39,6 +39,8 @@ _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_show_cast_progress", "_cast_seek", "_cast_seek_released",
             "_fmt_hms", "_cast_moment", "_cast_to_moment", "_cast_go_live",
             "_local_tracks", "_cast_continue_archive", "_cast_time_at",
+            "_cast_timeline", "_show_cast_timeline", "_cast_programme_at",
+            "_effective_ts_minutes",
             "_set_cast_quality", "_toggle_cast_mute", "_show_cast_volume")
 
 
@@ -74,6 +76,7 @@ def _window():
     # a borrowed method as its body is.
     ns.update({name: getattr(MainWindow, name)
                for name in ("ARCHIVE_LAG", "TIMESHIFT_STEPS",
+                            "CAST_TIMELINE_MIN",
                             "_CAST_RESUME_KIND", "_RESUME_GROUP")})
     cls = type("_StubWindow", (), ns)
     return cls()
@@ -152,6 +155,11 @@ class _Slider:
     def __init__(self):
         self.value_ = 0
         self.shown = None
+        self.dragging = False
+        self.segments = None
+
+    def set_segments(self, segs):
+        self.segments = list(segs)
 
     def blockSignals(self, _b):
         pass
@@ -1467,3 +1475,90 @@ def test_a_paused_cast_is_not_mistaken_for_one_that_ran_out():
     w._cast_paused_at = datetime.now()
     w._cast_continue_archive()
     assert asked == [], "a pause is not an archive running out"
+
+
+class _Xmltv:
+    def __init__(self, progs=()):
+        self.progs = list(progs)
+
+    def programmes_in(self, it, start, stop):
+        return [p for p in self.progs
+                if p["stop_timestamp"] > start and p["start_timestamp"] < stop]
+
+
+def test_a_broadcast_gets_a_timeline_rather_than_no_bar_at_all():
+    """A broadcast has no length to run a position bar against, so the strip
+    showed nothing for the very channels that can be moved around in most
+    freely. What it spans instead is time itself - and where in it the
+    picture is, is also what says a channel is paused."""
+    from datetime import datetime, timedelta
+    import time as _t
+    w = _with_strip()
+    w.cast = _CastAt(0.0, 0.0)
+    w._cast_device = "Alva TV"
+    w.xmltv = _Xmltv()
+    w._effective_ts_minutes = lambda it: 4320        # three days of archive
+    began = datetime.now() - timedelta(hours=1)
+    w._cast_ctx = {"archive": True, "sid": 9851, "item": {"stream_id": 9851},
+                   "archive_from": began}
+
+    # Six hours of it, not three days: a week across two hundred pixels is a
+    # bar where every click is half an hour out.
+    start, span = w._cast_timeline()
+    assert span == w.CAST_TIMELINE_MIN * 60
+    assert abs((_t.time() - span) - start) < 2
+
+    w._show_cast_progress()
+    assert w.cast_bar_seek.shown is True
+    # An hour back on a six-hour bar sits five sixths of the way along.
+    assert 820 < w.cast_bar_seek.value_ < 850, w.cast_bar_seek.value_
+    assert "−" in w.cast_bar_time.text and ":" in w.cast_bar_time.text
+
+    # Paused says so, in the one place that is looking at the time anyway.
+    w._cast_paused_at = datetime.now()
+    w._show_cast_progress()
+    assert w.cast_bar_time.text.startswith("❙❙")
+
+    # At the live edge it says LIVE rather than a hair's breadth behind it.
+    w._cast_paused_at = None
+    w._cast_ctx["archive_from"] = None
+    w._show_cast_progress()
+    assert w.cast_bar_time.text == "LIVE"
+
+    # And a film keeps its own bar: a length to measure against.
+    w._cast_ctx = {}
+    w.cast = _CastAt(1830.0, 6000.0)
+    w._show_cast_progress()
+    assert w.cast_bar_time.text == "30:30 / 1:40:00"
+
+
+def test_hovering_the_timeline_names_the_time_and_what_was_on():
+    import time as _t
+    w = _with_strip()
+    w.cast = _CastAt(0.0, 0.0)
+    w._cast_device = "Alva TV"
+    w._effective_ts_minutes = lambda it: 360
+    now = _t.time()
+    w.xmltv = _Xmltv([{"start_timestamp": now - 7200,
+                       "stop_timestamp": now - 3600,
+                       "title": "Rapport"}])
+    w._cast_ctx = {"archive": True, "sid": 9851, "item": {}}
+    # Two hours back is two thirds of the way along a six-hour bar.
+    label = w._cast_time_at(1 - 2 / 6)
+    assert "Rapport" in label and ":" in label
+
+
+def test_clicking_the_timeline_moves_the_broadcast_not_a_film():
+    import time as _t
+    w = _with_strip()
+    w.cast = _CastAt(0.0, 0.0)
+    w._cast_device = "Alva TV"
+    w.xmltv = _Xmltv()
+    w._effective_ts_minutes = lambda it: 360
+    w._cast_ctx = {"archive": True, "sid": 9851, "item": {}}
+    moved = []
+    w._cast_to_moment = lambda when: moved.append(when)
+    w.cast_bar_seek.setValue(500)                    # halfway: three hours back
+    w._cast_seek_released()
+    assert moved, "the click moves the broadcast"
+    assert abs(moved[0].timestamp() - (_t.time() - 3 * 3600)) < 30

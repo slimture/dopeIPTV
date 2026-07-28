@@ -3938,8 +3938,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         bar = getattr(self, "cast_bar_seek", None)
         if bar is None:
             return
+        span = self._cast_timeline()
         dur = float(getattr(self.cast, "duration", 0.0) or 0.0)
-        on = bool(self._cast_device) and dur > 0
+        on = bool(self._cast_device) and (span is not None or dur > 0)
         bar.setVisible(on)
         self.cast_bar_time.setVisible(on)
         # The ticker runs for the whole of a cast, not only where there is a
@@ -3947,11 +3948,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # the thing that needs watching for the end of its playlist.
         if not self._cast_device:
             self._cast_tick.stop()
+            bar.set_segments([])
             return
         if not self._cast_tick.isActive():
             self._cast_tick.start()
         self._cast_continue_archive()
         if not on:
+            return
+        if span is not None:
+            self._show_cast_timeline(*span)
             return
         pos = min(float(self.cast.position() or 0.0), dur)
         # Not while it is being dragged: the handle belongs to the hand
@@ -3961,12 +3966,98 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cast_bar_time.setText(
             f"{self._fmt_hms(pos)} / {self._fmt_hms(dur)}")
 
+    # How much of a channel's archive the strip's bar spans. The archive
+    # itself can be a week deep, and a week across two hundred pixels is a
+    # bar where every click is half an hour out. Longer jumps are what the
+    # menu's "go back a day" is for; this is for finding your way around the
+    # evening.
+    CAST_TIMELINE_MIN = 360
+
+    def _cast_timeline(self) -> tuple[float, float] | None:
+        """The stretch of broadcast the bar spans, as (start, span) seconds -
+        or None when what is playing is not a broadcast."""
+        ctx = self._cast_ctx or {}
+        if not ctx.get("archive") or not self._cast_device:
+            return None
+        try:
+            depth = self._effective_ts_minutes(ctx.get("item") or {}) or 0
+        except Exception:
+            return None
+        depth = min(depth, self.CAST_TIMELINE_MIN)
+        if depth <= 0:
+            return None
+        now = time.time()
+        return now - depth * 60, depth * 60.0
+
     def _cast_time_at(self, frac: float) -> str:
-        """The point *frac* of the way along the bar, as a time."""
+        """What is at *frac* of the way along the bar.
+
+        A film says how far in it is. A broadcast says the time of day, and
+        what was on then - which is the whole point of a timeshift bar, and
+        is answered before you click rather than after.
+        """
+        span = self._cast_timeline()
+        if span is not None:
+            start, width = span
+            when = start + frac * width
+            label = time.strftime("%H:%M", time.localtime(when))
+            prog = self._cast_programme_at(when)
+            return f"{label} · {prog}" if prog else label
         dur = float(getattr(self.cast, "duration", 0.0) or 0.0)
         return self._fmt_hms(frac * dur) if dur > 0 else ""
 
+    def _cast_programme_at(self, when: float) -> str:
+        ctx = self._cast_ctx or {}
+        item = ctx.get("item")
+        if item is None:
+            return ""
+        for p in self.xmltv.programmes_in(item, when - 1, when + 1) or []:
+            if p["start_timestamp"] <= when < p["stop_timestamp"]:
+                return p.get("title") or ""
+        return ""
+
+    def _show_cast_timeline(self, start: float, span: float) -> None:
+        """The archive, drawn as the evening it is.
+
+        A broadcast has no length to run a position bar against, so the strip
+        used to show nothing for the very channels that can be moved around
+        in most freely. What it spans instead is time itself: programme
+        boundaries along the groove, the moment being shown as the handle,
+        and how far behind live that is - which is also what says, without a
+        word, that a channel is paused.
+        """
+        at = self._cast_moment().timestamp()
+        now = time.time()
+        segs = []
+        for p in self.xmltv.programmes_in(
+                self._cast_ctx.get("item") or {}, start, now) or []:
+            a = max(0.0, (p["start_timestamp"] - start) / span)
+            b = min(1.0, (p["stop_timestamp"] - start) / span)
+            label = "%s–%s" % (
+                time.strftime("%H:%M", time.localtime(p["start_timestamp"])),
+                time.strftime("%H:%M", time.localtime(p["stop_timestamp"])))
+            segs.append((a, b, p.get("title") or "", label))
+        self.cast_bar_seek.set_segments(segs)
+        if not self.cast_bar_seek.dragging:
+            frac = max(0.0, min(1.0, (at - start) / span))
+            self.cast_bar_seek.setValue(int(frac * 1000))
+        behind = max(0.0, now - at)
+        when = time.strftime("%H:%M", time.localtime(at))
+        if getattr(self, "_cast_paused_at", None) is not None:
+            self.cast_bar_time.setText(f"❙❙ {when}")
+        elif behind < 45:
+            self.cast_bar_time.setText(tr("mv_live"))
+        else:
+            self.cast_bar_time.setText(
+                f"{when} · −{self._fmt_hms(behind)}")
+
     def _cast_seek_released(self) -> None:
+        span = self._cast_timeline()
+        if span is not None:
+            start, width = span
+            at = start + self.cast_bar_seek.value() / 1000 * width
+            self._cast_to_moment(datetime.fromtimestamp(at))
+            return
         dur = float(getattr(self.cast, "duration", 0.0) or 0.0)
         if dur > 0:
             self._cast_seek(self.cast_bar_seek.value() / 1000 * dur)
