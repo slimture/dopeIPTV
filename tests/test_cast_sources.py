@@ -139,6 +139,16 @@ assert w.can_cast_playing() is True
 w.cast_playing()
 assert cast.get("url") == "http://p/live/u/pw/9851.ts", cast
 
+# ...and in the player's own options menu, next to the audio and subtitle
+# tracks - the natural place to look while watching. The player is handed a
+# label and an action; it never learns what a Chromecast is.
+from PyQt6.QtWidgets import QMenu
+if w.player is not None:
+    om = QMenu()
+    w.player.populate_options_menu(om)
+    assert any("Chromecast" in a.text() for a in om.actions()), \
+        [a.text() for a in om.actions()]
+
 print("CAST_SOURCES_OK")
 """
 

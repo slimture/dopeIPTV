@@ -1031,6 +1031,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.track_selected.connect(self._on_track_selected)
             # Keep the player pane visible on stop - mpv clears to black -
             # instead of hiding it, so the window just goes black.
+            # Casting sits in the player's own options menu too, next to the
+            # audio and subtitle tracks - the natural place to look for it
+            # while watching. The player is handed a label and an action; it
+            # does not need to know what a Chromecast is.
+            self.player.extra_options = [
+                (lambda: tr("ctx_cast_to_chromecast"), self.cast_playing)]
             dl.addWidget(self.player, 1)
 
         # Everything below the video lives in ONE scroll column. This is the

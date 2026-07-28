@@ -1159,6 +1159,10 @@ class EmbeddedPlayer(QWidget):
         self._ov_surface = None      # set to self.video once it's built
         self._popout_drag_from = None
         self._popout_autohide = False
+        # Menu entries the app adds to the options menu (see
+        # populate_options_menu). Kept as (label_callable, action) so a
+        # language change is picked up when the menu is next opened.
+        self.extra_options: list = []
         self._popout_bar_timer = QTimer(self)
         self._popout_bar_timer.setSingleShot(True)
         self._popout_bar_timer.setInterval(2500)
@@ -3134,6 +3138,13 @@ class EmbeddedPlayer(QWidget):
         menu.addSeparator()
         stats_act = menu.addAction(tr("opt_stats_for_nerds"))
         stats_act.triggered.connect(self._show_stats)
+
+        # Anything the app wants on this menu that the player has no business
+        # knowing about - casting, today. A list of (label, callback) the
+        # window fills in, so the options button and the video right-click
+        # both get it without this module learning what a Chromecast is.
+        for label, action in (self.extra_options or []):
+            menu.addAction(label(), action)
 
     def _start_sleep_timer(self, minutes: int) -> None:
         """Stop playback after *minutes* (0 cancels a running timer)."""
