@@ -559,6 +559,8 @@
  "cast_older_device": "{name} là Chromecast đời cũ – hình mượt hơn, hơi kém sắc nét",
  "cast_quality_note": "Đặt một lần cho thiết bị này, không phải cho từng kênh. Chỉ FHD được điều chỉnh – SD và HD gửi đi nguyên vẹn. Chromecast 1-3 và TV có sẵn Chromecast cần điều này; Ultra hay Google TV thì không.",
  "cast_seek": "Chuyển đến vị trí khác",
+ "cast_pause_label": "Dung lượng để tạm dừng kênh đang truyền",
+ "cast_pause_hint": "Tạm dừng một kênh trên TV sẽ ghi lại nó ở đây cho đến khi bạn bấm phát, nên đây là thứ quyết định một lần tạm dừng có thể kéo dài bao lâu - khoảng một phút HD cho mỗi 150 MB, vậy 4,5 GB là khoảng nửa giờ. Phần đã xem được xoá dần, nên cả một buổi tối không tốn gì; chỉ bản thân lần tạm dừng mới chiếm chỗ, và tất cả biến mất khi kết thúc truyền.",
  "cast_paused_from": "Đã tạm dừng – phát tiếp từ {time}",
  "cast_subs_unavailable": "Bản ffmpeg này không có libass – không thể gửi phụ đề",
  "cast_audio": "Âm thanh",

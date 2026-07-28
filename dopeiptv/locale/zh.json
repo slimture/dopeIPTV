@@ -559,6 +559,8 @@
   "cast_older_device": "{name} 是较旧的 Chromecast – 画面更流畅，清晰度略低",
   "cast_quality_note": "为此设备设置一次即可，不必为每个频道设置。只有 FHD 会被调整，SD 和 HD 原样发送。Chromecast 1-3 代和内置 Chromecast 的电视需要，Ultra 或 Google TV 则不需要。",
   "cast_seek": "跳到其他位置",
+  "cast_pause_label": "暂停投放频道所需的空间",
+  "cast_pause_hint": "在电视上暂停频道会把它录在本机，直到你按下播放，因此这决定了一次暂停能有多久——HD 每 150 MB 约一分钟，所以 4.5 GB 大约是半小时。已经看过的部分会随看随删，因此看一整晚也不占空间；占地方的只有暂停本身，投放结束后全部清除。",
   "cast_paused_from": "已暂停 – 将从 {time} 继续播放",
   "cast_subs_unavailable": "此 ffmpeg 没有 libass – 无法发送字幕",
   "cast_audio": "音频",

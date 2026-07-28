@@ -40,7 +40,7 @@ _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_fmt_hms", "_cast_moment", "_cast_to_moment", "_cast_go_live",
             "_local_tracks", "_cast_continue_archive", "_cast_time_at",
             "_cast_timeline", "_show_cast_timeline", "_cast_programme_at",
-            "_effective_ts_minutes", "_show_cast_paused",
+            "_effective_ts_minutes", "_show_cast_edge",
             "_set_cast_quality", "_toggle_cast_mute", "_show_cast_volume")
 
 
@@ -82,6 +82,13 @@ def _window():
     return cls()
 
 
+class _Bridge:
+    """The converter's recording, and how much room a pause may take."""
+
+    def __init__(self) -> None:
+        self.cap = 4_500_000_000
+
+
 class _Cast:
     def bridged(self) -> bool:
         return True
@@ -97,6 +104,7 @@ class _Cast:
         self.released = threading.Event()
         self.held = threading.Event()
         self.resumed = threading.Event()
+        self.bridge = _Bridge()
 
     def release(self) -> None:
         self.released.set()
@@ -145,6 +153,10 @@ class _Lbl:
         self.text = ""
         self.visible = True
         self.icon = None
+        self.style = ""
+
+    def setStyleSheet(self, s) -> None:
+        self.style = s
 
     def setText(self, t) -> None:
         self.text = t
@@ -190,6 +202,7 @@ def _with_strip():
     w.cast_bar_pause = _Lbl()
     w.cast_bar_mute, w.cast_bar_vol = _Lbl(), _Slider()
     w.cast_bar_seek, w.cast_bar_time = _Slider(), _Lbl()
+    w.cast_bar_live = _Lbl()
     w.cast_bar_ts = _Lbl()
     w._cast_tick = _Ticker()
     w.cast = _Cast(active=False)
@@ -430,6 +443,7 @@ def test_no_player_no_codec_line():
 def test_pausing_a_film_is_the_receiver_s_own_pause():
     w = _with_strip()
     w.cast = _Cast(active=True)
+    w.settings = _Settings()
     w.cast.paused = threading.Event()
     w.cast.pause = w.cast.paused.set
     w.cast.resume = lambda: w.cast.paused.clear()
@@ -1030,6 +1044,8 @@ def test_what_you_watch_on_the_tv_lands_in_history_too():
     be picked up again from History the way anything played here can."""
     w = _with_strip()
     w.history = _History()
+    w.xmltv = _Xmltv()
+    w._effective_ts_minutes = lambda it: 0
     w.series_ctx = None
     w._cast_ctx = {
         "title": "SVT1 HD", "key": 9851, "kind": "live",
@@ -1063,6 +1079,8 @@ def test_an_episode_cast_remembers_which_series_it_belongs_to():
     zero, duplicated in History and posterless."""
     w = _with_strip()
     w.history = _History()
+    w.xmltv = _Xmltv()
+    w._effective_ts_minutes = lambda it: 0
     w.series_ctx = {"series_id": 77, "name": "Bron", "cover": "http://p/c.jpg"}
     w._cast_ctx = {"title": "S01 E02", "key": "77:1:2", "kind": "episode",
                    "row_url": "http://p/series/u/pw/5.mkv", "item": {}}
@@ -1435,13 +1453,15 @@ def test_a_broadcast_gets_a_timeline_rather_than_no_bar_at_all():
     # Paused says so, in the one place that is looking at the time anyway.
     w._cast_paused_at = datetime.now()
     w._show_cast_progress()
-    assert w.cast_bar_time.text.startswith("❙❙")
+    assert w.cast_bar_time.text.startswith("⏸")
+    assert w.cast_bar_live.visible is True, "the red way back to live"
 
     # At the live edge it says LIVE rather than a hair's breadth behind it.
     w._cast_paused_at = None
     w._cast_ctx["archive_from"] = None
     w._show_cast_progress()
-    assert w.cast_bar_time.text == "LIVE"
+    assert w.cast_bar_time.text == "● LIVE"
+    assert w.cast_bar_live.visible is False
 
     # And a film keeps its own bar: a length to measure against.
     w._cast_ctx = {}
@@ -1480,31 +1500,6 @@ def test_clicking_the_timeline_moves_the_broadcast_not_a_film():
     w._cast_seek_released()
     assert moved, "the click moves the broadcast"
     assert abs(moved[0].timestamp() - (_t.time() - 3 * 3600)) < 30
-
-
-def test_a_pause_says_so_where_the_strip_says_what_is_happening():
-    """On a broadcast the television is no help: pausing lets go of the
-    stream, so the screen goes to the Chromecast's own backdrop and looks
-    exactly like a cast that died."""
-    from datetime import datetime, timedelta
-    w = _with_strip()
-    w.cast = _CastAt(0.0, 0.0)
-    w._cast_device = "Alva TV"
-    w.xmltv = _Xmltv()
-    w._effective_ts_minutes = lambda it: 360
-    w._cast_ctx = {"archive": True, "sid": 9851, "item": {}}
-    w._cast_paused_at = None
-
-    w._show_cast_progress()
-    assert "Alva TV" in w.cast_bar_lbl.text
-
-    # Paused: the line names the moment play will come back to, which is the
-    # thing you want to be sure of before walking away from it.
-    at = datetime.now() - timedelta(minutes=3)
-    w._cast_paused_at, w._cast_paused_pos = at, 0.0
-    w._show_cast_progress()
-    assert at.strftime("%H:%M:%S") in w.cast_bar_lbl.text
-    assert "Alva TV" not in w.cast_bar_lbl.text
 
 
 def test_an_unimportable_pychromecast_is_not_a_missing_one():
@@ -1586,6 +1581,7 @@ def test_pausing_a_converted_broadcast_asks_the_provider_for_nothing():
     is exactly what could not be relied on."""
     w = _with_strip()
     w.cast = _Cast(active=True)          # bridged() is True
+    w.settings = _Settings()
     w._cast_ctx = {"archive": True, "sid": 9851, "item": {}}
     w._cast_paused_at = None
     w._cast_from_archive = lambda at, settle=False: pytest.fail(
@@ -1613,9 +1609,11 @@ def test_a_pause_leaves_the_picture_behind_live_and_the_strip_says_so():
     w._cast_ctx = {"archive": True, "sid": 9851, "item": {}}
     w._cast_paused_at, w._cast_behind = None, 0.0
 
-    # At the live edge, LIVE is the truth.
+    # At the live edge, LIVE is the truth - and there is nowhere to go back
+    # to, so the red button stays out of the way.
     w._show_cast_progress()
-    assert w.cast_bar_time.text == "LIVE"
+    assert w.cast_bar_time.text == "● LIVE"
+    assert w.cast_bar_live.visible is False
 
     # Paused ten minutes ago: the gap is growing while it is held.
     w._cast_paused_at = datetime.now() - timedelta(minutes=10)
@@ -1625,9 +1623,29 @@ def test_a_pause_leaves_the_picture_behind_live_and_the_strip_says_so():
     w._toggle_cast_pause()
     assert 595 < w._cast_behind < 605, w._cast_behind
     w._show_cast_progress()
-    assert w.cast_bar_time.text != "LIVE"
     assert "−" in w.cast_bar_time.text
+    assert w.cast_bar_live.visible is True, "the red way back appears"
 
     # A fresh cast starts at the live edge again.
     w.show_cast_strip("Alva TV", "SVT1")
     assert w._cast_behind == 0.0
+
+
+def test_how_much_room_a_pause_may_take_is_the_user_s_to_say():
+    """It is the one number that decides how long a pause can be, so it
+    belongs where the user can see it - and a nonsense answer falls back to
+    the default rather than to no pause at all."""
+    w = _with_strip()
+    w.cast = _Cast(active=True)
+    w.settings = _Settings()
+    w._cast_ctx = {"archive": True, "sid": 9851, "item": {}}
+    w._cast_paused_at = None
+
+    w.settings.setValue("cast_pause_gb", "12")
+    w._toggle_cast_pause()
+    assert w.cast.bridge.cap == 12 * 10**9
+
+    w._toggle_cast_pause()               # play again
+    w.settings.setValue("cast_pause_gb", "nonsense")
+    w._toggle_cast_pause()
+    assert w.cast.bridge.cap == int(4.5 * 10**9)

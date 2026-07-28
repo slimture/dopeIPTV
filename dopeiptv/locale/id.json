@@ -559,6 +559,8 @@
  "cast_older_device": "{name} adalah Chromecast lama – gambar lebih halus, sedikit kurang tajam",
  "cast_quality_note": "Diatur sekali untuk perangkat ini, bukan untuk tiap saluran. Hanya FHD yang disesuaikan – SD dan HD dikirim apa adanya. Chromecast 1-3 dan TV dengan Chromecast bawaan memerlukannya; Ultra atau Google TV tidak.",
  "cast_seek": "Pindah ke titik lain",
+ "cast_pause_label": "Ruang untuk menjeda saluran yang dikirim",
+ "cast_pause_hint": "Menjeda saluran di TV merekamnya di sini sampai Anda menekan putar, jadi inilah yang menentukan berapa lama jeda boleh berlangsung - sekitar satu menit HD per 150 MB, jadi 4,5 GB kira-kira setengah jam. Yang sudah ditonton dihapus sambil jalan, jadi satu malam penuh tidak memakan apa pun; hanya jedanya sendiri yang memakan ruang, dan semuanya hilang saat pengiriman berakhir.",
  "cast_paused_from": "Dijeda – pemutaran lanjut dari {time}",
  "cast_subs_unavailable": "ffmpeg ini tidak punya libass – subtitel tidak dapat dikirim",
  "cast_audio": "Audio",

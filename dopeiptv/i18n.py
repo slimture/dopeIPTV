@@ -726,6 +726,14 @@ _STRINGS: dict[str, dict[str, str]] = {
               "with Chromecast built in need this; an Ultra or Google TV does "
               "not."},
     "cast_seek": {"en": "Move to another point"},
+    "cast_pause_label": {"en": "Room for pausing a cast channel"},
+    "cast_pause_hint": {
+        "en": "Pausing a channel on the TV records it here until you press "
+              "play, so this is how long a pause may be - about a minute of "
+              "HD per 150 MB, so 4.5 GB is roughly half an hour. What you "
+              "have already watched is deleted as it goes, so an evening in "
+              "front of the TV costs nothing; only the pause itself takes "
+              "room, and all of it is gone when the cast ends."},
     "cast_paused_from": {"en": "Paused - play resumes from {time}"},
     "cast_subs_unavailable": {
         "en": "This ffmpeg has no libass - subtitles cannot be sent"},

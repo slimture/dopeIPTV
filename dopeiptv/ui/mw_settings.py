@@ -1127,6 +1127,22 @@ class _SettingsMixin:
         total_row.addWidget(rec_total_unit)
         total_row.addStretch()
         recv.addLayout(total_row)
+        # Pausing a cast channel records it here until you press play, so
+        # this is the one setting that decides how long a pause may be.
+        pause_row = QHBoxLayout()
+        pause_row.addWidget(QLabel(tr("cast_pause_label")))
+        cast_pause_edit = QLineEdit(
+            str(self.settings.value("cast_pause_gb", "4.5")))
+        cast_pause_edit.setMaximumWidth(90)
+        pause_row.addWidget(cast_pause_edit)
+        pause_row.addWidget(QLabel("GB"))
+        pause_row.addStretch()
+        recv.addLayout(pause_row)
+        cast_pause_hint = QLabel(tr("cast_pause_hint"))
+        cast_pause_hint.setStyleSheet(
+            f"color:{P['muted2']}; font-size:11px;")
+        cast_pause_hint.setWordWrap(True)
+        recv.addWidget(cast_pause_hint)
         rk, rexe = self.rec.recorder()
         rec_hint = QLabel(
             f"Recorder: {rk} ({rexe})" if rexe else
@@ -1683,6 +1699,13 @@ class _SettingsMixin:
                 "rec_total_value", tval if tval > 0 else "")
             self.settings.setValue(
                 "rec_total_unit", rec_total_unit.currentData())
+            try:
+                pgb = float(cast_pause_edit.text().replace(",", ".") or 0)
+            except ValueError:
+                pgb = 0
+            # A pause with no room at all is not a pause, so a nonsense
+            # answer goes back to the default rather than to nothing.
+            self.settings.setValue("cast_pause_gb", pgb if pgb > 0 else 4.5)
             self.settings.setValue(
                 "metadata_source", meta_source_box.currentData())
             self.settings.setValue(

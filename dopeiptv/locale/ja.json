@@ -559,6 +559,8 @@
  "cast_older_device": "{name} は古い Chromecast – 動きは滑らかに、画質はやや控えめに",
  "cast_quality_note": "チャンネルごとではなく、この端末に一度だけ設定します。調整されるのは FHD だけで、SD と HD はそのまま送られます。必要なのは Chromecast 第1〜3世代と Chromecast 内蔵テレビで、Ultra や Google TV には不要です。",
  "cast_seek": "別の位置へ移動",
+ "cast_pause_label": "キャスト中のチャンネルを一時停止するための容量",
+ "cast_pause_hint": "テレビでチャンネルを一時停止すると、再生を押すまでここに録画されます。つまり一時停止できる長さはこの設定で決まります - HD は 150 MB あたり約 1 分なので、4.5 GB でおよそ 30 分です。すでに見た分は順次削除されるので、一晩中見ても容量は増えません。場所を取るのは一時停止した分だけで、キャストを終えるとすべて消えます。",
  "cast_paused_from": "一時停止中 – 再生は {time} から再開します",
  "cast_subs_unavailable": "この ffmpeg には libass がありません – 字幕は送れません",
  "cast_audio": "音声",

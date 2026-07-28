@@ -1059,8 +1059,22 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         _seek_row.addWidget(self.cast_bar_seek, 1)
         self.cast_bar_time = QLabel("")
         self.cast_bar_time.setStyleSheet(
-            f"color:{P['muted3']}; font-size:11px;")
+            "font-size:11px; font-weight:700;")
         _seek_row.addWidget(self.cast_bar_time)
+        # The same red button the player has, and it means the same thing:
+        # you are not at the live edge, and this is the way back. It is the
+        # only thing on the strip that is ever red, so it reads as a state
+        # rather than as decoration.
+        self.cast_bar_live = QPushButton("⏭ LIVE")
+        self.cast_bar_live.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.cast_bar_live.setStyleSheet(
+            "QPushButton{background:#FF5C5C; color:#fff; border:none;"
+            "border-radius:8px; padding:2px 10px; font-size:11px;"
+            "font-weight:700;}"
+            "QPushButton:hover{background:#e14b4b;}")
+        self.cast_bar_live.clicked.connect(self._cast_go_live)
+        self.cast_bar_live.hide()
+        _seek_row.addWidget(self.cast_bar_live)
         _cast_outer.addLayout(_seek_row)
 
         # The receiver is the only thing that knows where the film is, and it
@@ -3969,9 +3983,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         span = self._cast_timeline()
         dur = float(getattr(self.cast, "duration", 0.0) or 0.0)
+        # A broadcast the converter is recording can be held even with no
+        # catch-up behind it, and then there is no timeline to scrub - but
+        # how far behind live it is still matters, and while it is paused
+        # that counter is the only thing saying so.
+        held = bool(self._cast_device) and dur <= 0 and self.cast.bridged()
         on = bool(self._cast_device) and (span is not None or dur > 0)
         bar.setVisible(on)
-        self.cast_bar_time.setVisible(on)
+        self.cast_bar_time.setVisible(on or held)
         # The ticker runs for the whole of a cast, not only where there is a
         # bar to move: a timeshifted channel has no length, and is exactly
         # the thing that needs watching for the end of its playlist.
@@ -3982,11 +4001,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not self._cast_tick.isActive():
             self._cast_tick.start()
         self._cast_continue_archive()
-        if not on:
-            return
-        self._show_cast_paused()
         if span is not None:
             self._show_cast_timeline(*span)
+            return
+        if held:
+            self._show_cast_edge(self._cast_moment().timestamp(), time.time())
+            return
+        self.cast_bar_live.setVisible(False)
+        if not on:
             return
         pos = min(float(self.cast.position() or 0.0), dur)
         # Not while it is being dragged: the handle belongs to the hand
@@ -4071,34 +4093,35 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not self.cast_bar_seek.dragging:
             frac = max(0.0, min(1.0, (at - start) / span))
             self.cast_bar_seek.setValue(int(frac * 1000))
-        behind = max(0.0, now - at)
-        when = time.strftime("%H:%M", time.localtime(at))
-        if getattr(self, "_cast_paused_at", None) is not None:
-            self.cast_bar_time.setText(f"❙❙ {when}")
-        elif behind < 45:
-            self.cast_bar_time.setText(tr("mv_live"))
-        else:
-            self.cast_bar_time.setText(
-                f"{when} · −{self._fmt_hms(behind)}")
+        self._show_cast_edge(at, now)
 
-    def _show_cast_paused(self) -> None:
-        """Say that a pause has taken, where the strip already says what is
-        happening.
+    def _show_cast_edge(self, at: float, now: float) -> None:
+        """How far behind the broadcast the picture is, in the words the
+        player already uses for it: a white dot at the live edge, a red
+        counter behind it, and the red button back.
 
-        On a broadcast the television is no help: pausing lets go of the
-        stream, so the screen goes to the Chromecast's own backdrop and looks
-        exactly like a cast that died. The one place that knows better is
-        this line, so it says so - and names the moment play will come back
-        to, which is the thing you actually want to be sure of before walking
-        away from it.
+        Anything else asked the user to learn a second vocabulary for the
+        same thing - and a grey "LIVE" that stayed put whether or not it was
+        true taught them nothing at all.
         """
-        at = getattr(self, "_cast_paused_at", None)
-        if at is None:
-            self.cast_bar_lbl.setText(
-                tr("cast_casting_to", name=self._cast_device or ""))
-            return
-        self.cast_bar_lbl.setText(
-            tr("cast_paused_from", time=at.strftime("%H:%M:%S")))
+        behind = max(0.0, now - at)
+        paused = getattr(self, "_cast_paused_at", None) is not None
+        live = not paused and behind < 5
+        held = "⏸ " if paused else ""
+        if live:
+            edge = "● LIVE"
+        elif paused and behind < 1:
+            edge = "⏸ PAUSED"
+        elif behind < 60:
+            edge = f"{held}−{int(behind)}s"
+        else:
+            edge = f"{held}−{self._fmt_hms(behind)}"
+        prog = self._cast_programme_at(at)
+        self.cast_bar_time.setText(f"{edge} · {prog}" if prog else edge)
+        self.cast_bar_time.setStyleSheet(
+            "font-size:11px; font-weight:700;" if live else
+            f"font-size:11px; font-weight:700; color:{P['rec']};")
+        self.cast_bar_live.setVisible(not live)
 
     def _cast_seek_released(self) -> None:
         span = self._cast_timeline()
@@ -4209,6 +4232,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         self._cast_paused_at = datetime.now()
         self.cast_bar_pause.setIcon(cast_strip_icon("play", P["text"]))
+        # However much room the user has allowed for it.
+        try:
+            gb = float(self.settings.value("cast_pause_gb", 4.5) or 4.5)
+        except (TypeError, ValueError):
+            gb = 4.5
+        self.cast.bridge.cap = int(max(0.1, gb) * 10**9)
         threading.Thread(target=self.cast.pause, daemon=True).start()
 
     def _cast_from_archive(self, paused_at) -> None:

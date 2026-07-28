@@ -559,6 +559,8 @@
   "cast_older_device": "{name} é um Chromecast mais antigo – imagem mais fluida, um pouco menos nítida",
   "cast_quality_note": "Define-se uma vez para este dispositivo, não para cada canal. Só o FHD é adaptado – SD e HD seguem intactos. Chromecast 1-3 e TVs com Chromecast integrado precisam disto; um Ultra ou Google TV não.",
   "cast_seek": "Ir para outro ponto",
+  "cast_pause_label": "Espaço para pausar um canal transmitido",
+  "cast_pause_hint": "Pausar um canal na TV grava-o aqui até carregar em reproduzir, por isso é isto que decide quanto pode durar uma pausa - cerca de um minuto de HD por cada 150 MB, ou seja, 4,5 GB são aproximadamente meia hora. O que já viu vai sendo apagado, por isso uma noite inteira não custa nada; só a pausa ocupa espaço, e tudo desaparece quando a transmissão termina.",
   "cast_paused_from": "Em pausa – a reprodução continua a partir de {time}",
   "cast_subs_unavailable": "Este ffmpeg não tem libass – não é possível enviar legendas",
   "cast_audio": "Áudio",

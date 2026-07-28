@@ -710,6 +710,9 @@ class CastBridge:
         # same way every time. Read by spawn(), so a run that cannot work is
         # not attempted twice more while the TV waits.
         self.fatal: str = ""
+        # How much room a pause may take. Set from Settings; the default is
+        # about half an hour of a paused HD channel.
+        self.cap = self.CAP
         # Which run of the bridge this is. A request that is still retrying
         # belongs to the run it began in - see first_frames().
         self.generation = 0
@@ -808,7 +811,7 @@ class CastBridge:
     # say, how long a pause may be. Not the length of the sending: what has
     # been watched is thrown away as it goes, so an evening's viewing costs
     # the same few seconds of disk as a minute of it.
-    CAP = 4_000_000_000      # about two hours of a copied broadcast
+    CAP = 4_500_000_000      # about half an hour of a paused HD channel
     OPENING = 64_000         # enough to know bytes are coming out at all
     SETTLE = 1.5             # and long enough for a doomed run to fall over
 
@@ -908,7 +911,8 @@ class CastBridge:
                 return None, None
             began = time.monotonic()
             spool = _Spool(os.path.join(self._tmpdir(),
-                                        f"spool{self.generation}"), self.CAP)
+                                        f"spool{self.generation}"),
+                           self.cap)
             th = threading.Thread(target=self._spool_out, args=(proc, spool),
                                   daemon=True)
             with self._lock:

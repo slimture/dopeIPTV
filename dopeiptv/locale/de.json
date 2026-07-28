@@ -559,6 +559,8 @@
   "cast_older_device": "{name} ist ein älterer Chromecast – ruhigeres Bild, etwas weniger scharf",
   "cast_quality_note": "Einmal für dieses Gerät eingestellt, nicht für jeden Sender. Nur FHD wird angepasst – SD und HD gehen unverändert raus. Chromecast 1–3 und Fernseher mit integriertem Chromecast brauchen das; ein Ultra oder Google TV nicht.",
   "cast_seek": "Zu einer anderen Stelle springen",
+  "cast_pause_label": "Platz zum Pausieren eines gecasteten Senders",
+  "cast_pause_hint": "Einen Sender am Fernseher zu pausieren nimmt ihn hier auf, bis Sie Play drücken - das bestimmt also, wie lang eine Pause sein darf: etwa eine Minute HD je 150 MB, 4,5 GB sind rund eine halbe Stunde. Bereits Gesehenes wird laufend gelöscht, ein ganzer Fernsehabend kostet also nichts; nur die Pause selbst braucht Platz, und alles verschwindet, wenn das Streaming endet.",
   "cast_paused_from": "Pausiert – Wiedergabe setzt bei {time} fort",
   "cast_subs_unavailable": "Diesem ffmpeg fehlt libass – Untertitel können nicht gesendet werden",
   "cast_audio": "Ton",

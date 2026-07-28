@@ -559,6 +559,8 @@
   "cast_older_device": "{name} är en äldre Chromecast – jämnare bild, något lägre skärpa",
   "cast_quality_note": "Ställs in en gång för den här enheten, inte för varje kanal. Bara FHD anpassas – SD och HD skickas orörda. Chromecast 1–3 och tv-apparater med inbyggd Chromecast behöver det; en Ultra eller Google TV gör det inte.",
   "cast_seek": "Flytta till ett annat ställe",
+  "cast_pause_label": "Utrymme för paus av castad kanal",
+  "cast_pause_hint": "Att pausa en kanal på tv:n spelar in den här tills du trycker play, så det här avgör hur lång en paus får vara – ungefär en minut HD per 150 MB, alltså är 4,5 GB drygt en halvtimme. Det du redan sett raderas efterhand, så en hel kväll framför tv:n kostar ingenting; bara själva pausen tar plats, och allt försvinner när castningen avslutas.",
   "cast_paused_from": "Pausad – play återupptar från {time}",
   "cast_subs_unavailable": "Den här ffmpeg saknar libass – undertexter kan inte skickas",
   "cast_audio": "Ljud",

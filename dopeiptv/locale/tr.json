@@ -559,6 +559,8 @@
  "cast_older_device": "{name} eski bir Chromecast – daha akıcı görüntü, biraz daha az keskin",
  "cast_quality_note": "Her kanal için değil, bu cihaz için bir kez ayarlanır. Yalnızca FHD uyarlanır; SD ve HD dokunulmadan gönderilir. Bunu Chromecast 1-3 ve Chromecast yerleşik TV'ler ister, Ultra veya Google TV istemez.",
  "cast_seek": "Başka bir noktaya git",
+ "cast_pause_label": "Yayınlanan kanalı duraklatmak için alan",
+ "cast_pause_hint": "Bir kanalı televizyonda duraklatmak onu siz oynat'a basana kadar burada kaydeder; yani bir duraklatmanın ne kadar sürebileceğini bu belirler - 150 MB başına yaklaşık bir dakika HD, dolayısıyla 4,5 GB kabaca yarım saat. İzlediğiniz kısım yol boyunca silinir, bu yüzden koca bir akşam hiçbir şeye mal olmaz; yer kaplayan yalnızca duraklatmanın kendisidir ve yayın bitince hepsi silinir.",
  "cast_paused_from": "Duraklatıldı – oynatma {time} noktasından devam eder",
  "cast_subs_unavailable": "Bu ffmpeg'de libass yok – altyazı gönderilemiyor",
  "cast_audio": "Ses",
