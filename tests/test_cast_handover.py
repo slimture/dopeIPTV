@@ -1604,7 +1604,11 @@ def test_the_tv_is_told_what_kind_of_thing_it_is_playing(monkeypatch):
     dev = m.devices[0]
 
     m.cast("Alva TV", "http://p/film.mp4", "Film", duration=5400.0)
-    assert dev.announced[-1] == ("BUFFERED", {"duration": 5400.0}, "Film")
+    # BUFFERED with a length, because that is what makes a seek land where
+    # it was asked to - and no title, because the receiver draws a name and
+    # a bar from one and never takes them away again, on a film or an
+    # episode alike. The app's own strip says what is playing.
+    assert dev.announced[-1] == ("BUFFERED", {"duration": 5400.0}, None)
 
     # A broadcast has no end, and saying LIVE is simply the truth.
     dev.announced.clear()

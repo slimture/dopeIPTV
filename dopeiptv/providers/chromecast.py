@@ -817,7 +817,22 @@ class ChromecastManager:
                  "BUFFERED" if buffered else "LIVE, with no metadata",
                  f" ({self.duration:.0f} s)" if buffered else "")
         mc.play_media(url, ctype,
-                      title=(title or "dopeIPTV") if buffered else None,
+                      # Nothing to draw an overlay from, for anything.
+                      #
+                      # A film was handed over with a title so the
+                      # receiver's own bar would be a real one, draggable
+                      # with the television's remote. It draws that bar and
+                      # the name over the picture and never takes them away
+                      # again - not on a film, not on an episode - so the
+                      # trade was a scrubber nobody asked for against a
+                      # sign across the middle of the film for its whole
+                      # length. The app's own strip says what is playing
+                      # and can seek it; the receiver needs to say nothing.
+                      #
+                      # The length still goes (see media_info): it is what
+                      # makes a seek land where it was asked to, and it
+                      # draws nothing by itself.
+                      title=None,
                       current_time=start or None,
                       stream_type="BUFFERED" if buffered else "LIVE",
                       media_info={"duration": float(self.duration)}
