@@ -4224,18 +4224,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         began = (self._cast_ctx or {}).get("archive_from")
         return began + timedelta(seconds=pos) if began else at
 
-    # How far behind live the archive actually reaches - MEASURED, not
-    # assumed. Ninety seconds was the assumption, and a minute that had ended
-    # fifty seconds earlier still served only its first twenty: this panel's
-    # archive writer runs a good two minutes behind the broadcast. Every
-    # quick resume then landed in the not-yet-written zone, froze, and the
-    # stall rescue clamped its restart straight back into the same minute -
-    # the same second of television, over and over.
-    #
-    # So three minutes, start and end alike. The cost is honest and small:
-    # resuming a pause shorter than this replays up to three minutes you have
-    # already seen. The alternative was a picture that never moved again.
-    ARCHIVE_LAG = timedelta(seconds=180)
+    # How far behind live the archive can actually be SERVED from -
+    # measured, twice, against this panel. Ninety seconds was the first
+    # guess: a minute that had ended fifty seconds earlier served only its
+    # first twenty. Three minutes was the second: a minute that had ended
+    # almost three minutes earlier still refused to start at its 51st
+    # second. Four, with the extra structural rule below, is where it holds.
+    ARCHIVE_LAG = timedelta(seconds=240)
 
     def _cast_from_archive(self, paused_at, settle: bool = False) -> None:
         """Resume a paused live cast from the provider's catch-up archive.
@@ -4250,7 +4245,21 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         sid = ctx.get("sid")
         if sid is None or not device:
             return
-        paused_at = min(paused_at, datetime.now() - self.ARCHIVE_LAG)
+        # Two rules, and the second is the one that was missing. The window
+        # may only contain minutes the panel can serve IN FULL - and the
+        # point must have at least one whole such minute AHEAD of it.
+        # Clamping the point to the same boundary the window ends at put
+        # every quick resume seconds from the end of its own window: a
+        # nine-second sliver the receiver never started in, which the stall
+        # rescue then reloaded, identically, every twenty seconds.
+        #
+        # The honest cost: resuming a short pause replays up to five minutes
+        # already seen - the last few minutes before live simply do not
+        # exist yet as far as this panel's archive can serve them. A pause
+        # long enough to fetch coffee resumes from the exact second.
+        end = (datetime.now() - self.ARCHIVE_LAG).replace(second=0,
+                                                          microsecond=0)
+        paused_at = min(paused_at, end - timedelta(seconds=60))
         # From the pause onwards. The window has to cover the gap that has
         # opened up since, plus room to keep watching - providers cap it to
         # whatever archive they actually hold.
@@ -4261,14 +4270,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # watched, on every single pause.
         minute = paused_at.replace(second=0, microsecond=0)
         offset = (paused_at - minute).total_seconds()
-        # The window ENDS short of live by the same margin it starts behind
-        # it. Reaching for "now" put the minute still being broadcast at the
-        # end of every stretch - the panel lists it as a full segment it can
-        # only partly serve, so the receiver played up to the write head and
-        # sat BUFFERING for ever: picture frozen about a minute after every
-        # resume, with no IDLE/FINISHED for the ticker to act on.
-        end = (datetime.now() - self.ARCHIVE_LAG).replace(second=0,
-                                                          microsecond=0)
         dur = max(1, int((end - minute).total_seconds() // 60))
         # The receiver is offered the archive as HLS, and the converter is
         # given the transport stream behind it.

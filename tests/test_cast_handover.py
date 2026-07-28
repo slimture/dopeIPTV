@@ -477,7 +477,7 @@ def test_the_archive_url_starts_where_you_paused(monkeypatch):
     import dopeiptv.ui.main_window as mwmod
     monkeypatch.setattr(mwmod, "run_async",
                         lambda pool, work, ok, err: sent.update(work=work))
-    at = (datetime.now() - timedelta(minutes=5)).replace(microsecond=0)
+    at = (datetime.now() - timedelta(minutes=10)).replace(microsecond=0)
     w._cast_from_archive(at)
     # The archive is addressed by the minute, so the request is for the minute
     # the pause fell in - and the seconds it cut off are handed to the
@@ -485,11 +485,9 @@ def test_the_archive_url_starts_where_you_paused(monkeypatch):
     # rewatching up to a minute of television on every single pause.
     assert asked["sid"] == 9851
     assert asked["start"] == at.replace(second=0)
-    # Exactly what exists - and ending well short of live, because the
-    # panel's archive writer runs about two minutes behind the broadcast: a
-    # window reaching closer than that ends in a segment the panel can only
-    # partly serve, and the receiver plays up to the write head and freezes.
-    assert asked["minutes"] == 2, asked
+    # The window only ever contains minutes the panel can serve in full -
+    # this one runs from the point to about four minutes short of live.
+    assert asked["minutes"] in (5, 6), asked
     assert sent, "the archive URL is cast"
     assert w._cast_ctx["archive_from"] == at.replace(second=0)
     # The receiver is offered the playlist and the converter the transport
@@ -498,6 +496,16 @@ def test_the_archive_url_starts_where_you_paused(monkeypatch):
     # rather than the end of everything.
     assert w._cast_ctx["url"].endswith(".m3u8")
     assert w._cast_ctx["source"].endswith(".ts")
+
+    # A point too close to live is pulled back until a whole written minute
+    # lies AHEAD of it. Clamping it to the same boundary the window ends at
+    # put every quick resume seconds from the end of its own window - a
+    # sliver the receiver never started in, reloaded identically for ever.
+    asked.clear()
+    w._cast_from_archive(datetime.now())
+    assert asked["start"] <= datetime.now() - w.ARCHIVE_LAG \
+        - timedelta(seconds=60)
+    assert asked["minutes"] >= 1
 
 
 def test_pausing_the_archive_again_does_not_jump_back_to_now():
