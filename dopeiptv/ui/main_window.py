@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QBoxLayout, QFrame, QHBoxLayout,
     QLabel, QLineEdit, QListWidget, QListWidgetItem,
     QMainWindow, QMenu, QMessageBox, QProgressBar, QPushButton, QScrollArea,
-    QSizePolicy, QSplitter, QToolButton, QVBoxLayout, QWidget,
+    QSizePolicy, QSlider, QSplitter, QToolButton, QVBoxLayout, QWidget,
 )
 
 from .. import APP_NAME, ORG
@@ -989,9 +989,21 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             _cast_row.addWidget(b)
             return b
 
-        for kind, step in (("minus", -0.1), ("plus", 0.1)):
-            strip_button(kind, tr("tooltip_volume"),
-                         lambda _c=False, s=step: self._cast_volume(s))
+        self.cast_bar_mute = strip_button(
+            "volume", tr("tooltip_mute_unmute"), self._toggle_cast_mute)
+        self.cast_bar_vol = QSlider(Qt.Orientation.Horizontal)
+        self.cast_bar_vol.setRange(0, 100)
+        self.cast_bar_vol.setValue(50)
+        self.cast_bar_vol.setFixedWidth(110)
+        self.cast_bar_vol.setToolTip(tr("tooltip_volume"))
+        # While the handle is being dragged the TV would get a message per
+        # pixel; it only needs the one that says where the drag ended.
+        self.cast_bar_vol.sliderReleased.connect(
+            lambda: self._cast_volume(self.cast_bar_vol.value() / 100))
+        self.cast_bar_vol.valueChanged.connect(
+            lambda v: (self.cast_bar_vol.isSliderDown() or
+                       self._cast_volume(v / 100)))
+        _cast_row.addWidget(self.cast_bar_vol)
         self.cast_bar_tracks = strip_button(
             "tracks", tr("cast_audio") + " / " + tr("cast_subtitles"),
             self._cast_tracks_menu)
@@ -3488,6 +3500,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cast_bar_lbl.setText(tr("cast_casting_to", name=device))
         self.cast_bar_title.setText(title or "")
         self.cast_bar_title.setVisible(bool(title))
+        self._show_cast_volume()
         bar.show()
 
     def manage_cast(self) -> None:
@@ -3506,13 +3519,36 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                    source=ctx.get("source"), managing=True,
                    chosen=(ctx.get("audio"), ctx.get("subs"))).exec()
 
-    def _cast_volume(self, step: float) -> None:
-        """Turn the TV up or down. Off the UI thread: it is a message to a
-        device on the network, and nothing here should wait for it."""
+    def _cast_volume(self, level: float) -> None:
+        """Set the TV's volume. Off the UI thread: it is a message to a device
+        on the network, and nothing here should wait for it."""
         if getattr(self.cast, "active", None) is None:
             return
-        threading.Thread(target=self.cast.set_volume, args=(step,),
+        threading.Thread(target=self.cast.set_volume, args=(level,),
                          daemon=True).start()
+
+    def _toggle_cast_mute(self) -> None:
+        if getattr(self.cast, "active", None) is None:
+            return
+        self._cast_muted = not getattr(self, "_cast_muted", False)
+        self.cast_bar_mute.setIcon(cast_strip_icon(
+            "muted" if self._cast_muted else "volume", P["text"]))
+        threading.Thread(target=self.cast.set_muted,
+                         args=(self._cast_muted,), daemon=True).start()
+
+    def _show_cast_volume(self) -> None:
+        """Put the TV's own level on the slider, so it starts where the
+        television actually is rather than where the app guessed."""
+        try:
+            level, muted = self.cast.volume()
+        except Exception:
+            return
+        self._cast_muted = muted
+        self.cast_bar_vol.blockSignals(True)
+        self.cast_bar_vol.setValue(int(round(level * 100)))
+        self.cast_bar_vol.blockSignals(False)
+        self.cast_bar_mute.setIcon(cast_strip_icon(
+            "muted" if muted else "volume", P["text"]))
 
     def _cast_tracks_menu(self) -> None:
         """Offer another audio track or subtitle while the cast runs.
@@ -3560,6 +3596,20 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # the wrong place to keep it.
         pm = menu.addMenu(tr("cast_quality"))
         current = self._cast_quality()
+        # What the setting is doing to THIS stream. It is a ceiling, so an SD
+        # or HD channel passes untouched while the ceiling still reads 720p -
+        # and a menu that only shows the setting looks like it is scaling
+        # everything.
+        height = ctx.get("height") or 0
+        fps = ctx.get("fps") or 0.0
+        if height:
+            from ..providers.chromecast import ChromecastManager as _CM
+            effective = _CM._needed_quality(current, height, fps)
+            now = f"{height}p{fps:g}" if fps else f"{height}p"
+            shown = pm.addAction(
+                now if effective == "original" else f"{now} → {effective}")
+            shown.setEnabled(False)
+            pm.addSeparator()
         for key, label in (("original", tr("cast_quality_original")),
                            ("720p", "≤ 720p"), ("720p30", "≤ 720p · 30")):
             entry(pm, label, key == current,

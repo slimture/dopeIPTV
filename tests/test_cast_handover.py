@@ -35,7 +35,7 @@ _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_local_codecs", "_toggle_cast_pause", "_cast_from_archive",
             "_save_cast_position", "_recast_with", "_track_label",
             "_cast_volume", "_cast_quality", "_cast_quality_key",
-            "_set_cast_quality")
+            "_set_cast_quality", "_toggle_cast_mute", "_show_cast_volume")
 
 
 class _Resume0:
@@ -103,10 +103,23 @@ class _Lbl:
         self.visible = bool(v)
 
 
+class _Slider:
+    def __init__(self):
+        self.value_ = 0
+
+    def blockSignals(self, _b):
+        pass
+
+    def setValue(self, v):
+        self.value_ = v
+
+
 def _with_strip():
     w = _window()
     w.cast_bar, w.cast_bar_lbl, w.cast_bar_title = _Bar(), _Lbl(), _Lbl()
     w.cast_bar_pause = _Lbl()
+    w.cast_bar_mute, w.cast_bar_vol = _Lbl(), _Slider()
+    w.cast = _Cast(active=False)
     w._cast_ctx = {}
     return w
 
@@ -208,6 +221,30 @@ def test_every_strip_icon_actually_draws_something():
         ink = sum(1 for x in range(img.width()) for y in range(img.height())
                   if img.pixelColor(x, y).alpha() > 20)
         assert ink > 60, f"{kind} drew almost nothing ({ink} px)"
+
+
+def test_the_volume_slider_starts_where_the_television_is():
+    """Not where the app guessed: the receiver's own level is the one the TV
+    remote changes, and it is the only one that is true."""
+    w = _with_strip()
+    w.cast = _Cast(active=True)
+    w.cast.volume = lambda: (0.35, True)
+    w._show_cast_volume()
+    assert w.cast_bar_vol.value_ == 35
+    assert w._cast_muted is True
+    assert w.cast_bar_mute.icon is not None
+
+
+def test_mute_is_a_toggle_and_reaches_the_tv():
+    done = threading.Event()
+    seen = {}
+    w = _with_strip()
+    w.cast = _Cast(active=True)
+    w.cast.set_muted = lambda m: (seen.update(muted=m), done.set())
+    w._cast_muted = False
+    w._toggle_cast_mute()
+    assert done.wait(5)
+    assert seen["muted"] is True and w._cast_muted is True
 
 
 def test_local_playback_ends_a_running_cast():

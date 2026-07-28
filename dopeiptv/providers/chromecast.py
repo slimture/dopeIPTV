@@ -651,8 +651,19 @@ class ChromecastManager:
         except Exception as e:
             log.info("cast: the receiver would not resume (%s)", e)
 
-    def set_volume(self, step: float) -> float:
-        """Nudge the TV's volume by *step* (-1.0 … 1.0); returns the new level.
+    def volume(self) -> tuple[float, bool]:
+        """The TV's volume as it stands: level 0-1, and whether it is muted."""
+        cc = self.active
+        if cc is None:
+            return 0.0, False
+        try:
+            return (float(getattr(cc.status, "volume_level", 0.0) or 0.0),
+                    bool(getattr(cc.status, "volume_muted", False)))
+        except Exception:
+            return 0.0, False
+
+    def set_volume(self, level: float) -> None:
+        """Set the TV's volume to *level* (0-1).
 
         This is the receiver's own volume, not the stream's - the same one the
         TV remote changes - so it survives a track switch and everything else
@@ -660,15 +671,20 @@ class ChromecastManager:
         """
         cc = self.active
         if cc is None:
-            return 0.0
+            return
         try:
-            now = float(getattr(cc.status, "volume_level", 0.0) or 0.0)
-            want = max(0.0, min(1.0, now + step))
-            cc.set_volume(want)
-            return want
+            cc.set_volume(max(0.0, min(1.0, level)))
         except Exception as e:
             log.info("cast: the receiver would not change volume (%s)", e)
-            return 0.0
+
+    def set_muted(self, muted: bool) -> None:
+        cc = self.active
+        if cc is None:
+            return
+        try:
+            cc.set_volume_muted(bool(muted))
+        except Exception as e:
+            log.info("cast: the receiver would not mute (%s)", e)
 
     def stop(self) -> None:
         # Tell the TV first, tear our own machinery down afterwards.

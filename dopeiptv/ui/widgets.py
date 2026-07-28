@@ -405,6 +405,31 @@ def cast_strip_icon(kind: str, colour: str) -> QIcon:
         tri.lineTo(s * 0.30, s * 0.80)
         tri.closeSubpath()
         pr.drawPath(tri)
+    elif kind in ("volume", "muted"):
+        pr.setPen(Qt.PenStyle.NoPen)
+        pr.setBrush(col)
+        cone = QPainterPath()               # a small speaker
+        cone.moveTo(s * 0.10, s * 0.38)
+        cone.lineTo(s * 0.28, s * 0.38)
+        cone.lineTo(s * 0.48, s * 0.20)
+        cone.lineTo(s * 0.48, s * 0.80)
+        cone.lineTo(s * 0.28, s * 0.62)
+        cone.lineTo(s * 0.10, s * 0.62)
+        cone.closeSubpath()
+        pr.drawPath(cone)
+        pen.setWidthF(s * 0.10)
+        pr.setPen(pen)
+        pr.setBrush(Qt.BrushStyle.NoBrush)
+        if kind == "muted":                 # struck through
+            pr.drawLine(QPointF(s * 0.60, s * 0.34),
+                        QPointF(s * 0.88, s * 0.66))
+            pr.drawLine(QPointF(s * 0.88, s * 0.34),
+                        QPointF(s * 0.60, s * 0.66))
+        else:                               # two waves
+            for r in (0.16, 0.28):
+                pr.drawArc(QRectF(s * (0.56 - r), s * (0.5 - r),
+                                  s * r * 2, s * r * 2),
+                           -60 * 16, 120 * 16)
     else:                                   # "tracks": three sliders
         for i, y in enumerate((0.28, 0.5, 0.72)):
             pr.drawLine(QPointF(s * 0.18, s * y), QPointF(s * 0.82, s * y))
