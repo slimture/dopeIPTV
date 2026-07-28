@@ -700,6 +700,30 @@ class _SpoolReader:
         self.spool._at.pop(id(self), None)
 
 
+def _timestamp_map(body: bytes) -> bytes:
+    """Tie the subtitle's clock to the picture's, in the words HLS wants.
+
+    A WebVTT segment carried in an HLS stream has to say how its own
+    timeline relates to the transport stream's, and it says it with
+    X-TIMESTAMP-MAP. ffmpeg writes none - its segments begin with a bare
+    WEBVTT line - and a receiver handed cues it cannot place against the
+    picture does not guess: it shows nothing at all, while reporting the
+    track as present and switched on. Which is exactly what it did.
+
+    MPEGTS:0 is the truth here because the transport stream is muxed with
+    no preload (see hls_args), so both clocks start at zero.
+    """
+    head = body[:64].lstrip()
+    if not head.startswith(b"WEBVTT") or b"X-TIMESTAMP-MAP" in body[:512]:
+        return body                     # not ours to touch, or already said
+    cut = body.index(b"WEBVTT") + len(b"WEBVTT")
+    # Whatever line ending this segment uses, keep using it.
+    eol = b"\r\n" if body[cut:cut + 2] == b"\r\n" else b"\n"
+    return (body[:cut] + eol
+            + b"X-TIMESTAMP-MAP=MPEGTS:0,LOCAL:00:00:00.000"
+            + body[cut:])
+
+
 def _autoselect_subtitles(body: bytes) -> bytes:
     """Ask the receiver to show the subtitle, not merely to have it.
 
@@ -799,6 +823,8 @@ class _Handler(BaseHTTPRequestHandler):
             return
         if name == "master.m3u8":
             body = _autoselect_subtitles(body)
+        elif name.endswith(".vtt"):
+            body = _timestamp_map(body)
         self.send_response(200)
         self.send_header(
             "Content-Type",

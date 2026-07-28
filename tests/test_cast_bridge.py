@@ -952,3 +952,28 @@ def test_the_subtitle_really_lands_on_the_picture(tmp_path):
     # there too. It used to start 1.4 seconds later, which is exactly how
     # far ahead of the picture every line appeared.
     assert video < 0.5, f"the picture starts at {video} s, the subtitle at 0"
+
+
+def test_every_subtitle_segment_says_which_clock_it_is_on():
+    """A WebVTT segment in an HLS stream has to relate its own timeline to
+    the transport stream's, and it says so with X-TIMESTAMP-MAP. ffmpeg
+    writes none - its segments begin with a bare WEBVTT line - and a
+    receiver handed cues it cannot place does not guess: it shows nothing,
+    while reporting the track as present and switched on."""
+    from dopeiptv.providers.cast_bridge import _timestamp_map
+    out = _timestamp_map(b"WEBVTT\n\n00:00.043 --> 00:30.043\nHEJ\n")
+    lines = out.split(b"\n")
+    assert lines[0] == b"WEBVTT"
+    assert lines[1] == b"X-TIMESTAMP-MAP=MPEGTS:0,LOCAL:00:00:00.000"
+    assert b"00:00.043 --> 00:30.043" in out
+    assert b"HEJ" in out
+    # Not doubled when the same segment is fetched twice.
+    assert _timestamp_map(out) == out
+    # Windows line endings are kept as they were found.
+    crlf = _timestamp_map(b"WEBVTT\r\n\r\n00:00.000 --> 00:01.000\r\nA\r\n")
+    assert crlf.split(b"\r\n")[1].startswith(b"X-TIMESTAMP-MAP")
+    # An empty segment is still a valid one; ffmpeg writes plenty of them.
+    assert _timestamp_map(b"WEBVTT\n").startswith(
+        b"WEBVTT\nX-TIMESTAMP-MAP=")
+    # And nothing that is not a WebVTT file is touched.
+    assert _timestamp_map(b"\x47\x40\x00") == b"\x47\x40\x00"
