@@ -3240,6 +3240,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # a /live/ address built from its id - which the panel refuses.
             url = source = self.client.vod_url(
                 sid, it.get("container_extension"))
+        # A row built from nothing but the address on screen (a play from
+        # Home, a resumed title) says so, and that address is used as it is -
+        # there is no provider id to build anything else from.
+        if it.get("_cast_url"):
+            url = source = it["_cast_url"]
         if not url:
             return
         # Remember what is being cast, not just where to. Pausing a live
@@ -3292,16 +3297,24 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         playing - so you can start watching here and move it to the TV
         without hunting for where the channel was in the list.
         """
-        it = getattr(self, "_playing_item", None)
         p = getattr(self, "player", None)
-        if not it or p is None or not getattr(p, "current_url", None):
+        if p is None or not getattr(p, "current_url", None):
             return
+        it = getattr(self, "_playing_item", None)
+        if not it:
+            it = (getattr(self, "_last_playback", None) or {}).get("item")
+        if not it:
+            # Not every way into the player leaves the row behind - a play
+            # from Home, a resumed title. The address on screen is enough to
+            # cast, and having the entry disappear for those would be the
+            # wrong half of the feature.
+            it = {"name": getattr(self, "_detail_name", "") or "dopeIPTV",
+                  "_url": p.current_url, "_cast_url": p.current_url}
         self._open_cast_dialog(it)
 
     def can_cast_playing(self) -> bool:
         p = getattr(self, "player", None)
-        return bool(getattr(self, "_playing_item", None) and p is not None
-                    and getattr(p, "current_url", None))
+        return bool(p is not None and getattr(p, "current_url", None))
 
     def _local_tracks(self, it) -> dict:
         """The tracks mpv can already see, in the shape ffprobe would give.

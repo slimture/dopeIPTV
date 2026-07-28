@@ -129,6 +129,16 @@ assert w.can_cast_playing() is True
 w.cast_playing()
 assert cast.get("url") == "http://p/live/u/pw/9851.m3u8", cast
 
+# Not every way into the player leaves the row behind - a play from Home, a
+# resumed title. The address on screen is enough, and the entry disappearing
+# for those would be the wrong half of the feature.
+w._playing_item = None
+w._last_playback = None
+cast.clear()
+assert w.can_cast_playing() is True
+w.cast_playing()
+assert cast.get("url") == "http://p/live/u/pw/9851.ts", cast
+
 print("CAST_SOURCES_OK")
 """
 
