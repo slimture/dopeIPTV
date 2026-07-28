@@ -35,7 +35,7 @@ _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_local_codecs", "_toggle_cast_pause", "_cast_from_archive",
             "_save_cast_position", "_recast_with", "_track_label",
             "_cast_volume", "_cast_quality", "_cast_quality_key",
-            "_paused_moment", "_record_cast_history", "_history_extra",
+            "_record_cast_history", "_history_extra",
             "_show_cast_progress", "_cast_seek", "_cast_seek_released",
             "_fmt_hms", "_cast_moment", "_cast_to_moment", "_cast_go_live",
             "_local_tracks", "_cast_continue_archive", "_cast_time_at",
@@ -302,21 +302,21 @@ def test_every_strip_icon_actually_draws_something():
 
 
 def test_pause_is_hidden_where_pausing_cannot_work():
-    """A Chromecast cannot pause live television - there is nothing buffered
-    ahead to come back to - and the app answers that from the provider's
-    archive. On a channel with no archive there is no answer, and a button
-    that does nothing is worse than no button."""
+    """A broadcast can only be held while the converter is recording it -
+    that recording IS the pause. A channel that went straight to the receiver
+    has nothing behind it, and a button that cannot do what it says is worse
+    than no button."""
     w = _with_strip()
-    w.cast = _Cast(active=True)
+    w.cast = _Cast(active=True)          # bridged() is True
     w.cast.volume = lambda: (0.5, False)
 
     w._cast_ctx = {"sid": 9851, "archive": True, "key": 9851}
     w.show_cast_strip("Alva TV", "SVT1")
     assert w.cast_bar_pause.visible is True
 
-    w._cast_ctx = {"sid": 9851, "archive": False, "key": 9851}
+    w.cast.bridged = lambda: False       # straight to the receiver
     w.show_cast_strip("Alva TV", "SVT1")
-    assert w.cast_bar_pause.visible is False, "no archive, no pause"
+    assert w.cast_bar_pause.visible is False, "no recording, no pause"
 
     # A film pauses on the receiver itself, so it keeps the button.
     w._cast_ctx = {"sid": None, "archive": False, "key": "42"}
@@ -443,29 +443,6 @@ def test_pausing_a_film_is_the_receiver_s_own_pause():
     assert w.cast_bar_pause.icon is not paused_icon, "back to the pause icon"
 
 
-def test_pausing_live_television_comes_back_from_the_archive():
-    """A receiver cannot pause a live stream - there is nothing buffered ahead
-    to come back to. The provider's archive answers instead: the moment you
-    pressed pause is remembered and play casts the channel again from there,
-    which is what a pause on live television has to mean."""
-    from datetime import datetime, timedelta
-    w = _with_strip()
-    w.cast = _Cast(active=True)
-    w.cast.bridged = lambda: False        # no recording behind this one
-    w.cast.pause = lambda: None
-    resumed = {}
-    w._cast_from_archive = lambda at, settle=False: resumed.setdefault("at", at)
-    w._cast_ctx = {"archive": True, "sid": 9851, "title": "SVT1"}
-    w._cast_paused_at = None
-    w._toggle_cast_pause()
-    paused_at = w._cast_paused_at
-    assert paused_at is not None
-    w._cast_paused_at = paused_at - timedelta(minutes=3)
-    w._toggle_cast_pause()
-    assert resumed["at"] <= datetime.now()
-    assert w._cast_paused_at is None
-
-
 def test_the_archive_url_starts_where_you_paused(monkeypatch):
     from datetime import datetime, timedelta
     asked = {}
@@ -512,67 +489,6 @@ def test_the_archive_url_starts_where_you_paused(monkeypatch):
     asked.clear()
     w._cast_from_archive(datetime.now())
     assert asked["start"] <= datetime.now() - w.ARCHIVE_LAG
-
-
-def test_pausing_the_archive_again_does_not_jump_back_to_now():
-    """Once the archive is what is playing, the clock is no longer where the
-    picture is. Deriving the resume point from it a second time threw away
-    everything you had shifted and jumped forward to live - which is the
-    opposite of what pressing pause is for."""
-    from datetime import datetime, timedelta
-    w = _with_strip()
-    w.cast = _Cast(active=True)
-    w.cast.bridged = lambda: False
-    w.cast.pause = lambda: None
-    points = []
-    w._cast_from_archive = lambda at, settle=False: points.append(at)
-    began = datetime.now() - timedelta(minutes=30)
-    w._cast_ctx = {"archive": True, "sid": 9851, "title": "SVT1",
-                   "archive_from": began}
-    w._cast_paused_at = None
-    w.cast.at = 600.0                     # ten minutes into the archive
-    w._toggle_cast_pause()                # pause
-    w._toggle_cast_pause()                # and play again
-    assert points == [began + timedelta(seconds=600)], points
-    # A live channel, with no archive playing yet, still measures by the
-    # clock - there is nothing else to measure by.
-    w._cast_ctx = {"archive": True, "sid": 9851, "title": "SVT1"}
-    points.clear()
-    w._toggle_cast_pause()
-    at = w._cast_paused_at
-    w._toggle_cast_pause()
-    assert points == [at], points
-
-
-class _Settings:
-    def __init__(self):
-        self.data = {}
-
-    def value(self, key, default=None):
-        return self.data.get(key, default)
-
-    def setValue(self, key, val):
-        self.data[key] = val
-
-
-class _Resume:
-    def __init__(self):
-        self.saved = []
-
-    def record(self, group, key, pos, dur, item=None, series_ctx=None):
-        self.saved.append((group, key, round(pos), round(dur)))
-
-
-class _CastAt:
-    """A manager stand-in that has got somewhere."""
-
-    def __init__(self, pos, dur):
-        self.active = object()
-        self.duration = dur
-        self._pos = pos
-
-    def position(self):
-        return self._pos
 
 
 def test_where_the_tv_got_to_is_kept_as_the_resume_point():
@@ -1065,6 +981,40 @@ def test_a_rescan_drops_the_devices_before_the_browser(monkeypatch):
     assert order == ["device", "browser"], order
 
 
+class _Settings:
+    def __init__(self):
+        self.data = {}
+
+    def value(self, key, default=None):
+        return self.data.get(key, default)
+
+    def setValue(self, key, val):
+        self.data[key] = val
+
+
+class _Resume:
+    def __init__(self):
+        self.saved = []
+
+    def record(self, group, key, pos, dur, item=None, series_ctx=None):
+        self.saved.append((group, key, round(pos), round(dur)))
+
+
+class _CastAt:
+    """A manager stand-in that has got somewhere."""
+
+    def __init__(self, pos, dur):
+        self.active = object()
+        self.duration = dur
+        self._pos = pos
+
+    def position(self):
+        return self._pos
+
+    def bridged(self):
+        return True
+
+
 class _History:
     def __init__(self):
         self.rows = []
@@ -1430,69 +1380,6 @@ def test_the_time_under_the_cursor_is_named():
     assert w._cast_time_at(0.5) == ""
 
 
-def test_pausing_live_television_lets_go_of_the_stream():
-    """A paused stream is still an OPEN stream, and these accounts are sold
-    with one connection. Pause, go and make coffee, press play - and the
-    archive was refused, because the one connection was still being spent on
-    the sending nobody was watching. The picture came back black.
-
-    A film is the opposite: the receiver fetched it itself, can hold its
-    place, and stopping it would lose that.
-    """
-    w = _with_strip()
-    w.cast = _Cast(active=True)
-    w.cast.bridged = lambda: False        # straight to the receiver
-    w._cast_from_archive = lambda at, settle=False: None
-    w._cast_ctx = {"archive": True, "sid": 9851, "item": {}}
-    w._cast_paused_at = None
-    w._toggle_cast_pause()
-    assert w.cast.released.wait(5), "the stream is let go of"
-    assert not w.cast.held.is_set()
-
-    # A film: paused where it is, not stopped.
-    w2 = _with_strip()
-    w2.cast = _Cast(active=True)
-    w2.cast.bridged = lambda: False
-    w2._cast_ctx = {"archive": False}
-    w2._cast_paused_at = None
-    w2._toggle_cast_pause()
-    assert w2.cast.held.wait(5)
-    assert not w2.cast.released.is_set()
-
-
-def test_coming_back_from_a_pause_waits_for_the_panel_to_notice():
-    """A panel goes on counting a closed session for a few seconds - long
-    enough to refuse the archive and leave the television black."""
-    from datetime import datetime, timedelta
-    w = _with_strip()
-    w.cast = _Cast(active=True)
-    w.cast.bridged = lambda: False
-    asked = []
-    w._cast_from_archive = lambda at, settle=False: asked.append(settle)
-    w._cast_ctx = {"archive": True, "sid": 9851, "item": {}}
-    w._cast_paused_at = datetime.now() - timedelta(seconds=3)
-    w._cast_paused_pos = 0.0
-    w._toggle_cast_pause()
-    assert asked == [True]
-
-    # A pause long enough to fetch coffee needs no waiting at all: the panel
-    # finished counting the released stream minutes ago, and those four
-    # seconds were most of why coming back felt slow.
-    w._cast_ctx = {"archive": True, "sid": 9851, "item": {}}
-    w._cast_paused_at = datetime.now() - timedelta(minutes=5)
-    asked.clear()
-    w._toggle_cast_pause()
-    assert asked == [False]
-
-    # An archive cast of something that is not a broadcast never let go of
-    # anything, so there is nothing to wait for.
-    w._cast_ctx = {"archive": True, "sid": None, "item": {}}
-    w._cast_paused_at = datetime.now() - timedelta(seconds=3)
-    asked.clear()
-    w._toggle_cast_pause()
-    assert asked == [False]
-
-
 def test_a_paused_cast_is_not_mistaken_for_one_that_ran_out():
     from datetime import datetime, timedelta
     w = _with_strip()
@@ -1710,3 +1597,37 @@ def test_pausing_a_converted_broadcast_asks_the_provider_for_nothing():
 
     w._toggle_cast_pause()
     assert w.cast.resumed.wait(5), "and simply carries on"
+
+
+def test_a_pause_leaves_the_picture_behind_live_and_the_strip_says_so():
+    """The recording carries on from where it was held, so every pause puts
+    the picture that much further behind the broadcast - and it never catches
+    up. The strip said LIVE while showing something ten minutes old."""
+    from datetime import datetime, timedelta
+    import time as _t
+    w = _with_strip()
+    w.cast = _Cast(active=True)
+    w._cast_device = "Alva TV"
+    w.xmltv = _Xmltv()
+    w._effective_ts_minutes = lambda it: 360
+    w._cast_ctx = {"archive": True, "sid": 9851, "item": {}}
+    w._cast_paused_at, w._cast_behind = None, 0.0
+
+    # At the live edge, LIVE is the truth.
+    w._show_cast_progress()
+    assert w.cast_bar_time.text == "LIVE"
+
+    # Paused ten minutes ago: the gap is growing while it is held.
+    w._cast_paused_at = datetime.now() - timedelta(minutes=10)
+    assert abs((_t.time() - 600) - w._cast_moment().timestamp()) < 5
+
+    # Play again, and the gap is kept - the recording resumes where it was.
+    w._toggle_cast_pause()
+    assert 595 < w._cast_behind < 605, w._cast_behind
+    w._show_cast_progress()
+    assert w.cast_bar_time.text != "LIVE"
+    assert "−" in w.cast_bar_time.text
+
+    # A fresh cast starts at the live edge again.
+    w.show_cast_strip("Alva TV", "SVT1")
+    assert w._cast_behind == 0.0

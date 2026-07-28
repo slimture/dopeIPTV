@@ -440,9 +440,10 @@ def test_a_stream_that_dies_at_once_never_reaches_the_receiver():
         assert proc is not None
         assert len(runs) == 2, "the short run was thrown away and retried"
         # The opening is on disk now: ffmpeg is drained at full speed into a
-        # spool so it never waits for the television, and the receiver is
+        # recording so it never waits for the television, and the receiver is
         # served from there.
-        head = open(spool, "rb").read()
+        rdr = spool.reader()
+        head = b"".join(iter(lambda: rdr.read(65536), b""))
         assert len(head) >= b.OPENING
         assert set(head) == {ord("x")}, "not a byte of the failed run"
         b.kill(proc)
@@ -452,7 +453,7 @@ def test_a_stream_that_dies_at_once_never_reaches_the_receiver():
         cb.ffmpeg_args = lambda *a, **k: [
             sys.executable, "-c", "import sys;sys.stdout.buffer.write(b'x')"]
         proc, spool = b.first_frames()
-        assert proc is None and spool == ""
+        assert proc is None and spool is None
     finally:
         cb.ffmpeg_args, cb.time.sleep = real_args, real_sleep
         b.stop()
@@ -704,11 +705,11 @@ def test_a_paused_television_does_not_stop_the_recording():
         r = urllib.request.urlopen(url, timeout=30)
         spool = b._current[1]
         assert set(r.read(65536)) == {0}, "the first frame"
-        was = os.path.getsize(spool)
+        was = spool.total
         # The television stops reading - a pause.
         time.sleep(1.5)
         # The recording carried on regardless, which is the whole point.
-        assert os.path.getsize(spool) > was + 65536 * 8, os.path.getsize(spool)
+        assert spool.total > was + 65536 * 8, spool.total
         # And play picks up on the very next byte, not somewhere else.
         rest = r.read(65536)
         assert len(rest) == 65536
@@ -716,3 +717,43 @@ def test_a_paused_television_does_not_stop_the_recording():
     finally:
         cb.ffmpeg_args = real
         b.stop()
+
+
+def test_the_recording_costs_a_pause_not_an_evening(tmp_path):
+    """What has to be kept is the stretch between the slowest reader and the
+    write head - seconds of it while the television plays, and exactly the
+    length of a pause while it does not. One growing file answered the wrong
+    question: it grew for the whole sending, so a football match would have
+    hit the limit around half time without anyone pausing at all.
+    """
+    from dopeiptv.providers.cast_bridge import _Spool
+
+    sp = _Spool(str(tmp_path / "rec"), cap=10 * _Spool.PIECE)
+    rdr = sp.reader()
+
+    def keep() -> int:
+        return sum(1 for n in os.listdir(tmp_path / "rec"))
+
+    # An evening's watching: written and read, over and over.
+    for _ in range(40):
+        assert sp.write(b"x" * _Spool.PIECE)
+        while rdr.read(1_000_000):
+            pass
+    assert sp.total == 40 * _Spool.PIECE, "everything was recorded"
+    assert keep() <= 3, f"but only the live end is kept ({keep()} pieces)"
+
+    # A pause: the television stops reading and the recording runs ahead.
+    for _ in range(6):
+        assert sp.write(b"y" * _Spool.PIECE)
+    assert keep() >= 6, "a pause is what actually takes room"
+
+    # Play again, and it comes back on the very next byte.
+    assert set(rdr.read(1_000_000)) == {ord("y")}
+
+    # A pause nobody ever ends stops at the cap rather than filling the disk.
+    for _ in range(40):
+        if not sp.write(b"z" * _Spool.PIECE):
+            break
+    else:
+        raise AssertionError("the cap never stopped it")
+    sp.close()

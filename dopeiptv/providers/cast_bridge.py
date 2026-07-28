@@ -484,6 +484,131 @@ def ffmpeg_args(exe: str, source: str, copy_video: bool,
     ]
 
 
+class _Spool:
+    """The recording behind a cast, in pieces, so what has been watched can
+    be thrown away while the rest keeps arriving.
+
+    One file would have answered just as well until the arithmetic was done:
+    it grows for the whole sending, not just for a pause, and a football
+    match is three hours. What actually has to be kept is the stretch between
+    the slowest reader and the write head - seconds of it while the
+    television is playing, and exactly the length of a pause while it is not.
+    Pieces make that possible: finish one, and once everybody is past it, it
+    is deleted.
+    """
+
+    PIECE = 16_000_000          # a few seconds of a copied broadcast
+
+    def __init__(self, folder: str, cap: int) -> None:
+        self.folder, self.cap = folder, cap
+        self.index = 0          # the piece being written
+        self.total = 0
+        self.full = False       # the cap was reached; nothing more is kept
+        self._w: object | None = None
+        self._wrote = 0
+        self._at: dict[int, int] = {}       # reader id -> piece it is on
+        self._lock = threading.Lock()
+        os.makedirs(folder, exist_ok=True)
+
+    def _path(self, i: int) -> str:
+        return os.path.join(self.folder, f"piece{i:05d}")
+
+    def write(self, data: bytes) -> bool:
+        """Take *data*; False when the cap says to stop recording."""
+        with self._lock:
+            if self.full:
+                return False
+            while data:
+                if self._w is None or self._wrote >= self.PIECE:
+                    self._roll()
+                room = self.PIECE - self._wrote
+                self._w.write(data[:room])          # type: ignore[union-attr]
+                self._w.flush()                     # type: ignore[union-attr]
+                self._wrote += len(data[:room])
+                self.total += len(data[:room])
+                data = data[room:]
+            self._prune()
+            # How far ahead of the slowest reader we have got. That, and not
+            # the length of the sending, is what a pause actually costs.
+            behind = self.index - (min(self._at.values()) if self._at else 0)
+            if behind * self.PIECE >= self.cap:
+                log.info("cast bridge: the pause has reached %d GB of "
+                         "recording - stopping there", self.cap // 10**9)
+                self.full = True
+                return False
+        return True
+
+    def _roll(self) -> None:
+        if self._w is not None:
+            self._w.close()                         # type: ignore[union-attr]
+            self.index += 1
+        self._w = open(self._path(self.index), "wb")
+        self._wrote = 0
+
+    def _prune(self) -> None:
+        keep = min(self._at.values()) if self._at else self.index
+        for i in range(max(0, keep - 1)):
+            try:
+                os.remove(self._path(i))
+            except OSError:
+                pass
+
+    def complete(self, i: int) -> bool:
+        """Whether piece *i* has been written in full."""
+        with self._lock:
+            return i < self.index
+
+    def reader(self) -> "_SpoolReader":
+        return _SpoolReader(self)
+
+    def close(self) -> None:
+        with self._lock:
+            if self._w is not None:
+                try:
+                    self._w.close()                 # type: ignore[union-attr]
+                except OSError:
+                    pass
+                self._w = None
+
+
+class _SpoolReader:
+    """One television's way through the recording."""
+
+    def __init__(self, spool: _Spool) -> None:
+        self.spool = spool
+        self.i = 0
+        self._f: object | None = None
+        spool._at[id(self)] = 0
+
+    def read(self, n: int) -> bytes:
+        """The next bytes, or b"" when there are none yet."""
+        while True:
+            if self._f is None:
+                path = self.spool._path(self.i)
+                if not os.path.exists(path):
+                    return b""
+                self._f = open(path, "rb")
+            chunk = self._f.read(n)                 # type: ignore[union-attr]
+            if chunk:
+                return chunk
+            # Nothing more in this piece. Move on only once it is finished -
+            # otherwise this is simply the write head, and more is coming.
+            if not self.spool.complete(self.i):
+                return b""
+            self._f.close()                         # type: ignore[union-attr]
+            self._f, self.i = None, self.i + 1
+            self.spool._at[id(self)] = self.i
+
+    def close(self) -> None:
+        if self._f is not None:
+            try:
+                self._f.close()                     # type: ignore[union-attr]
+            except OSError:
+                pass
+            self._f = None
+        self.spool._at.pop(id(self), None)
+
+
 class _Server(ThreadingHTTPServer):
     """The bridge's own HTTP server, with the shouting turned off.
 
@@ -545,9 +670,10 @@ class _Handler(BaseHTTPRequestHandler):
             # That was the whole failure. The spool absorbs the panel's burst
             # at full speed so the connection is always being drained, and
             # the receiver is served from disk at whatever pace suits it.
-            with open(spool, "rb") as f:
+            reader = spool.reader()
+            try:
                 while True:
-                    chunk = f.read(65536)
+                    chunk = reader.read(65536)
                     if chunk:
                         self.wfile.write(chunk)
                         sent += len(chunk)
@@ -555,6 +681,8 @@ class _Handler(BaseHTTPRequestHandler):
                     if not bridge.filling(proc):
                         break
                     time.sleep(0.2)     # caught up with ffmpeg; wait for more
+            finally:
+                reader.close()
             log.info("cast bridge: ffmpeg stopped after %d s and %.1f MB "
                      "(exit %s) - the receiver has nothing more to play",
                      time.monotonic() - began, sent / 1e6,
@@ -592,7 +720,7 @@ class CastBridge:
         # The thread draining each ffmpeg into its spool file.
         self._spools: dict[subprocess.Popen, threading.Thread] = {}
         # The stream now being served, and how many are reading it.
-        self._current: tuple[subprocess.Popen, str, int] | None = None
+        self._current: tuple[subprocess.Popen, "_Spool", int] | None = None
         self._readers: dict[subprocess.Popen, int] = {}
         self._tmp: str | None = None
         self._lock = threading.Lock()
@@ -676,6 +804,11 @@ class CastBridge:
     # the receiver. A run that dies before this never happened as far as the
     # TV is concerned, and can simply be tried again; one that dies after it
     # cannot, because a fragmented MP4 has no way to start over mid-response.
+    # How far the recording may run ahead of the television - which is to
+    # say, how long a pause may be. Not the length of the sending: what has
+    # been watched is thrown away as it goes, so an evening's viewing costs
+    # the same few seconds of disk as a minute of it.
+    CAP = 4_000_000_000      # about two hours of a copied broadcast
     OPENING = 64_000         # enough to know bytes are coming out at all
     SETTLE = 1.5             # and long enough for a doomed run to fall over
 
@@ -690,7 +823,7 @@ class CastBridge:
         th = self._spools.get(proc)
         return bool(th and th.is_alive())
 
-    def _spool_out(self, proc: subprocess.Popen, path: str) -> None:
+    def _spool_out(self, proc: subprocess.Popen, spool: "_Spool") -> None:
         """Drain ffmpeg into *path* as fast as it will come.
 
         This is the whole point of the spool: ffmpeg must never wait for the
@@ -698,26 +831,17 @@ class CastBridge:
         reading, and reading ffmpeg at the receiver's pace made exactly that
         happen, a few seconds into every stretch.
         """
-        # A pause holds the television still while this goes on recording,
-        # which is the whole point - but a pause nobody ever ends must not
-        # fill the disk. Two hours of a copied broadcast is the limit.
-        cap = 4_000_000_000
         try:
-            written = 0
-            with open(path, "wb") as f:
-                while True:
-                    chunk = proc.stdout.read(65536)
-                    if not chunk:
-                        break
-                    f.write(chunk)
-                    f.flush()
-                    written += len(chunk)
-                    if written >= cap:
-                        log.info("cast bridge: the recording has reached "
-                                 "%d GB - stopping there", cap // 10**9)
-                        break
+            while True:
+                chunk = proc.stdout.read(65536)
+                if not chunk:
+                    break
+                if not spool.write(chunk):
+                    break               # the pause has gone on long enough
         except Exception as e:
             log.info("cast bridge: the spool stopped (%s)", e)
+        finally:
+            spool.close()
 
     def reader_gone(self, proc: subprocess.Popen) -> None:
         """A reader finished. Keep ffmpeg for whoever else is still reading.
@@ -735,7 +859,7 @@ class CastBridge:
             self._readers.pop(proc, None)
         self.kill(proc)
 
-    def first_frames(self) -> tuple[subprocess.Popen | None, str]:
+    def first_frames(self) -> tuple[subprocess.Popen | None, "_Spool | None"]:
         """Start ffmpeg and hold the opening back until it is plainly going.
 
         These panels refuse a stream while they are still counting a
@@ -781,18 +905,18 @@ class CastBridge:
                 return None, b""
             proc = self.spawn()
             if proc is None:
-                return None, ""
+                return None, None
             began = time.monotonic()
-            path = os.path.join(self._tmpdir(), f"spool{self.generation}.mp4")
-            th = threading.Thread(target=self._spool_out, args=(proc, path),
+            spool = _Spool(os.path.join(self._tmpdir(),
+                                        f"spool{self.generation}"), self.CAP)
+            th = threading.Thread(target=self._spool_out, args=(proc, spool),
                                   daemon=True)
             with self._lock:
                 self._spools[proc] = th
             th.start()
-            while th.is_alive() and (not os.path.exists(path)
-                                     or os.path.getsize(path) < self.OPENING):
+            while th.is_alive() and spool.total < self.OPENING:
                 time.sleep(0.05)
-            size = os.path.getsize(path) if os.path.exists(path) else 0
+            size = spool.total
             # Not how much came out, but whether the run is sound. One the
             # panel refuses dies with almost nothing and a non-zero code; one
             # that is still going, or that finished cleanly with a stretch
@@ -805,12 +929,12 @@ class CastBridge:
                              "the first %d kB)", time.monotonic() - began,
                              size // 1000)
                     with self._lock:
-                        self._current = (proc, path, mine)
+                        self._current = (proc, spool, mine)
                         self._readers[proc] = 1
-                    return proc, path
+                    return proc, spool
             self.kill(proc)
         log.info("cast bridge: the stream would not start")
-        return None, ""
+        return None, None
 
     def spawn(self) -> subprocess.Popen | None:
         exe = self.exe or ffmpeg_path()
