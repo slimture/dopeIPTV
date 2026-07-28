@@ -772,12 +772,7 @@ def test_a_broadcast_rolls_its_window_and_a_film_keeps_everything():
     # Half-written playlists are the other way this dies: a receiver that
     # asks at the wrong moment gets a parse error and nothing says why.
     for args in (film, chan):
-        flags = args[args.index("-hls_flags") + 1]
-        assert "temp_file" in flags
-        # A declaration about the segments, not a change to them: a
-        # receiver that trusts it can start a decoder without waiting for
-        # the whole of the first one, which is the wait before the sound.
-        assert "independent_segments" in flags
+        assert "temp_file" in args[args.index("-hls_flags") + 1]
 
 
 def test_the_hls_files_are_served_with_the_types_the_receiver_needs():
@@ -1048,9 +1043,12 @@ def test_a_new_run_waits_for_the_provider_to_forget_the_last_one():
     assert b.stopped_at > 0
 
     # start() tears the last run down, so the clock starts there.
+    # A run that had something to tear down: the next one waits.
     b2 = CastBridge()
     b2.exe = "/bin/true"
     try:
+        b2.start("http://p/movie/u/pw/5.mkv")
+        b2.stop()
         b2.start("http://p/movie/u/pw/5.mkv")
         began = time.monotonic()
         b2.spawn()
@@ -1061,12 +1059,14 @@ def test_a_new_run_waits_for_the_provider_to_forget_the_last_one():
         b2.stop()
 
     # Nothing to wait for when nothing was just stopped.
+    # And a FIRST cast waits for nothing at all. start() tears down before
+    # it builds, always - so a blanket wait here put two seconds on every
+    # cast in the app for a connection that had never been opened.
     b3 = CastBridge()
     b3.exe = "/bin/true"
     try:
-        b3.start("http://p/movie/u/pw/5.mkv")
-        b3.stopped_at = time.monotonic() - 60    # long since forgotten
         began = time.monotonic()
+        b3.start("http://p/movie/u/pw/5.mkv")
         b3.spawn()
         assert time.monotonic() - began < 0.5
     finally:

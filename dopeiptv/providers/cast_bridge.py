@@ -529,19 +529,15 @@ def hls_args(exe: str, source: str, copy_video: bool, folder: str,
         # is what lets the television's own remote scrub it - and what makes
         # a pause cost nothing, because the segments go on being written
         # while the receiver sits still.
-        # independent_segments writes EXT-X-INDEPENDENT-SEGMENTS into the
-        # playlist: every segment can be decoded on its own. It is a
-        # declaration about the segments, not a change to them, so it
-        # cannot touch the picture - and a receiver that trusts it can
-        # start a decoder without waiting for the whole of the first one.
-        # Which is the five seconds before the sound arrives: the segments
-        # are as long as the film's keyframes are apart, and copied video
-        # can be cut nowhere else.
-        *(["-hls_list_size", "6",
-           "-hls_flags", "delete_segments+temp_file+independent_segments"]
+        # independent_segments was tried here and taken out again. It made
+        # no difference to the wait before the sound, and everything got
+        # slower and stalled more with it in - which may or may not have
+        # been its doing, and that is exactly the reason not to keep an
+        # unproven flag in the one path that works.
+        *(["-hls_list_size", "6", "-hls_flags", "delete_segments+temp_file"]
           if live else
           ["-hls_list_size", "0", "-hls_playlist_type", "event",
-           "-hls_flags", "temp_file+independent_segments"]),
+           "-hls_flags", "temp_file"]),
         # temp_file above matters more than it looks: without it a playlist
         # is served half-written to a receiver that asked at the wrong
         # moment, and the cast dies on a parse error nobody can see.
@@ -1404,6 +1400,7 @@ class CastBridge:
             procs, self._procs = list(self._procs), []
         for p in procs:
             self.kill(p)
+        ran = self._server is not None
         if self._server is not None:
             try:
                 self._server.shutdown()
@@ -1413,7 +1410,12 @@ class CastBridge:
             log.info("cast bridge: stopped")
         self._server = None
         self._thread = None
-        self.stopped_at = time.monotonic()
+        # Only when something was actually torn down. Setting it
+        # unconditionally made every cast wait two seconds for a connection
+        # that had never been opened - start() tears down first, always, so
+        # a fresh cast paid the price of a re-cast.
+        if procs or ran:
+            self.stopped_at = time.monotonic()
         self.path = self.source = self.prefix = None
         self.hls, self.hls_dir = False, None
         self.said_subs = False
