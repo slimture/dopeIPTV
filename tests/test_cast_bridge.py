@@ -1023,3 +1023,46 @@ def test_the_subtitle_log_says_it_once():
 
     # A new cast is a new question, and gets its own answer.
     assert b.said_subs is False
+
+
+def test_a_new_run_waits_for_the_provider_to_forget_the_last_one():
+    """A panel counts a session for a moment after the socket closes, and
+    this account allows one. Changing subtitle three times in a row does
+    three tear-downs in a few seconds, and the third found the panel still
+    counting the second:
+
+        Stream ends prematurely at 1500194040, should be 4785883508
+
+    - after which there is nothing to make segments from, and the picture
+    freezes between BUFFERING and PLAYING for ever.
+    """
+    b = CastBridge()
+    b.exe = "/bin/true"
+    b.start("http://p/movie/u/pw/5.mkv")
+    b.stop()
+    assert b.stopped_at > 0
+
+    # start() tears the last run down, so the clock starts there.
+    b2 = CastBridge()
+    b2.exe = "/bin/true"
+    try:
+        b2.start("http://p/movie/u/pw/5.mkv")
+        began = time.monotonic()
+        b2.spawn()
+        waited = time.monotonic() - began
+        assert waited > 1.0, f"it started after only {waited:.1f} s"
+        assert waited < b2.SETTLE_AFTER_STOP + 1
+    finally:
+        b2.stop()
+
+    # Nothing to wait for when nothing was just stopped.
+    b3 = CastBridge()
+    b3.exe = "/bin/true"
+    try:
+        b3.start("http://p/movie/u/pw/5.mkv")
+        b3.stopped_at = time.monotonic() - 60    # long since forgotten
+        began = time.monotonic()
+        b3.spawn()
+        assert time.monotonic() - began < 0.5
+    finally:
+        b3.stop()

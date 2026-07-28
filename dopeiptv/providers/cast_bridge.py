@@ -933,6 +933,12 @@ class CastBridge:
         self.hls = False
         self.hls_dir: str | None = None
         self.said_subs = False
+        # When the last run was torn down. A panel goes on counting a
+        # session for a moment after the socket closes, and this account
+        # allows one - so a new ffmpeg started too soon is a second
+        # connection as far as the provider is concerned, and it cuts one
+        # of them.
+        self.stopped_at = 0.0
         self.copy_video = True
         self.audio = 0
         self.subs: int | None = None
@@ -1065,7 +1071,9 @@ class CastBridge:
     # the same few seconds of disk as a minute of it.
     CAP = 4_500_000_000      # about half an hour of a paused HD channel
     OPENING = 64_000         # enough to know bytes are coming out at all
-    SETTLE = 0.7             # and long enough for a doomed run to fall over
+    SETTLE = 0.7
+    # How long a provider goes on counting a session after we close it.
+    SETTLE_AFTER_STOP = 2.0             # and long enough for a doomed run to fall over
 
     def _tmpdir(self) -> str:
         """The scratch directory this run of the bridge owns.
@@ -1257,6 +1265,17 @@ class CastBridge:
             args = ffmpeg_args(exe, self.source, self.copy_video,
                                self.audio, self.subs, self.sub_codec,
                                self.start_at, self.quality)
+        # Let the provider notice the last one has gone. Changing subtitle
+        # three times in a row does three of these in a few seconds, and
+        # the third found the panel still counting the second:
+        #   Stream ends prematurely at 1500194040, should be 4785883508
+        # - after which there is nothing to make segments from and the
+        # picture freezes between BUFFERING and PLAYING for ever.
+        wait = self.SETTLE_AFTER_STOP - (time.monotonic() - self.stopped_at)
+        if 0 < wait <= self.SETTLE_AFTER_STOP:
+            log.info("cast bridge: letting the provider release the last "
+                     "connection (%.1f s)", wait)
+            time.sleep(wait)
         log.info("cast bridge: starting ffmpeg")
         try:
             proc = subprocess.Popen(
@@ -1370,6 +1389,7 @@ class CastBridge:
             log.info("cast bridge: stopped")
         self._server = None
         self._thread = None
+        self.stopped_at = time.monotonic()
         self.path = self.source = self.prefix = None
         self.hls, self.hls_dir = False, None
         self.said_subs = False
