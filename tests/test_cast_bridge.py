@@ -67,7 +67,10 @@ def test_a_text_subtitle_is_burned_in_through_the_subtitles_filter():
     # Doubled backslashes: a filtergraph is parsed twice and the colon has to
     # survive both. Quoting instead is what broke it - newer ffmpeg takes a
     # backslash inside quotes literally and the filename kept them.
-    assert vf == "subtitles=filename=http\\\\://p/x.mkv:si=1", vf
+    # yadif comes first: no Chromecast deinterlaces, and burning subtitles in
+    # re-encodes the video anyway. deint=1 leaves progressive frames alone.
+    assert vf == ("yadif=deint=1,"
+                  "subtitles=filename=http\\\\://p/x.mkv:si=1"), vf
     # copy_video is overridden: a picture that changes cannot be copied.
     assert args[args.index("-c:v") + 1] == "libx264"
 
@@ -87,7 +90,8 @@ def test_a_url_with_a_port_survives_the_filtergraph():
     args = ffmpeg_args("ffmpeg", "http://h:8080/a.mkv", copy_video=False,
                        subs=0, sub_codec="ass")
     vf = args[args.index("-vf") + 1]
-    assert vf == "subtitles=filename=http\\\\://h\\\\:8080/a.mkv:si=0", vf
+    assert vf == ("yadif=deint=1,"
+                  "subtitles=filename=http\\\\://h\\\\:8080/a.mkv:si=0"), vf
 
 
 def test_a_local_file_is_linked_under_a_name_nothing_can_misread(tmp_path):
@@ -120,6 +124,25 @@ def test_a_url_is_never_linked():
         assert b._tmp is None
     finally:
         b.stop()
+
+
+def test_an_old_receiver_gets_a_picture_it_can_keep_up_with():
+    """A 1080i50 channel is two problems for an older Chromecast at once:
+    nothing on the Cast platform deinterlaces, and the decoder tops out below
+    fifty frames a second. Both are answered on this side."""
+    args = ffmpeg_args("ffmpeg", "http://p/x.m3u8", copy_video=True,
+                       quality="720p30")
+    vf = args[args.index("-vf") + 1]
+    assert vf == "yadif=deint=1,scale=-2:720", vf
+    assert args[args.index("-r") + 1] == "30"
+    assert args[args.index("-c:v") + 1] != "copy", "adapting means re-encoding"
+
+
+def test_the_original_picture_is_never_touched():
+    args = ffmpeg_args("ffmpeg", "http://p/x.m3u8", copy_video=True,
+                       quality="original")
+    assert "-vf" not in args and "-r" not in args
+    assert args[args.index("-c:v") + 1] == "copy"
 
 
 def test_the_address_is_one_the_chromecast_can_reach():

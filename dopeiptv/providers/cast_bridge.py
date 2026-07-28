@@ -45,6 +45,38 @@ SAFE_AUDIO = {"aac", "aac-latm", "mp3", "vorbis", "opus"}
 _UA = "VLC/3.0.20 LibVLC/3.0.20"
 
 
+# How the picture is adapted for a receiver that cannot keep up with it.
+# Deinterlacing is not part of the choice: no Chromecast deinterlaces at all,
+# so it is applied whenever the video is re-encoded anyway - with deint=1,
+# which touches only frames actually marked as interlaced.
+QUALITY = {"original": (0, 0), "720p": (720, 0), "720p30": (720, 30)}
+
+_hw_encoder: str | None = None
+
+
+def video_encoder() -> str:
+    """The h264 encoder to use - the hardware one where there is one.
+
+    Scaling a 1080i50 channel down in software is the kind of thing that
+    makes a laptop's fans audible; VideoToolbox does it on the media engine
+    for almost nothing. Asked once, since it cannot change while running.
+    """
+    global _hw_encoder
+    if _hw_encoder is None:
+        _hw_encoder = "libx264"
+        exe = ffmpeg_path()
+        if exe:
+            try:
+                out = subprocess.run([exe, "-hide_banner", "-encoders"],
+                                     capture_output=True, timeout=10).stdout
+                if b"h264_videotoolbox" in out:
+                    _hw_encoder = "h264_videotoolbox"
+            except Exception:
+                pass
+        log.info("cast bridge: video encoder is %s", _hw_encoder)
+    return _hw_encoder
+
+
 def ffmpeg_path() -> str | None:
     """Where ffmpeg is, or None when it is not installed."""
     return shutil.which("ffmpeg")
@@ -168,7 +200,8 @@ def _filter_escape(source: str) -> str:
 
 def ffmpeg_args(exe: str, source: str, copy_video: bool,
                 audio: int = 0, subs: int | None = None,
-                sub_codec: str = "", start: float = 0.0) -> list[str]:
+                sub_codec: str = "", start: float = 0.0,
+                quality: str = "original") -> list[str]:
     """The command line, kept separate so it can be read and tested.
 
     Fragmented MP4 down a single HTTP response: the receiver is a Chrome
@@ -181,6 +214,10 @@ def ffmpeg_args(exe: str, source: str, copy_video: bool,
     it. Burning them in always works, at the cost of re-encoding the video,
     which is why it happens only when a subtitle is actually chosen.
     """
+    height, fps = QUALITY.get(quality, (0, 0))
+    if height or fps:
+        copy_video = False                    # nothing to adapt in a copy
+    chain: list[str] = []
     burn: list[str] = []
     if subs is not None:
         copy_video = False                    # a picture that changes must be
@@ -192,11 +229,20 @@ def ffmpeg_args(exe: str, source: str, copy_video: bool,
             # refuses to take the first argument as a bare value once it has
             # been escaped, and says so about the whole rest of the chain:
             #   No option name near 'http\://lol.bz\:2095/....mkv:si=4'
-            burn = ["-vf",
-                    f"subtitles=filename={_filter_escape(source)}:si={subs}",
-                    "-map", "0:v:0"]
+            chain.append(
+                f"subtitles=filename={_filter_escape(source)}:si={subs}")
+            burn = ["-map", "0:v:0"]
     else:
         burn = ["-map", "0:v:0"]
+    if not copy_video:
+        # Only frames flagged interlaced are touched, so this is free on
+        # progressive video and the difference between a combed, stuttering
+        # picture and a clean one on everything a TV channel actually sends.
+        chain.insert(0, "yadif=deint=1")
+    if height:
+        chain.append(f"scale=-2:{height}")
+    if chain and "-filter_complex" not in burn:
+        burn = ["-vf", ",".join(chain)] + burn
     return [
         exe, "-hide_banner", "-loglevel", "error",
         *_input_options(source),
@@ -206,10 +252,12 @@ def ffmpeg_args(exe: str, source: str, copy_video: bool,
         *(["-ss", f"{start:.3f}"] if start > 0 else []),
         "-fflags", "+genpts", "-i", source,
         *burn, "-map", f"0:a:{audio}",
-        "-c:v", "copy" if copy_video else "libx264",
+        *(["-r", str(fps)] if fps else []),
+        "-c:v", "copy" if copy_video else video_encoder(),
         *([] if copy_video else
-          ["-preset", "veryfast", "-crf", "23",
-           "-maxrate", "6M", "-bufsize", "12M"]),
+          (["-b:v", "4M"] if video_encoder() != "libx264" else
+           ["-preset", "veryfast", "-crf", "23",
+            "-maxrate", "6M", "-bufsize", "12M"])),
         "-c:a", "aac", "-ac", "2", "-b:a", "192k",
         "-f", "mp4",
         "-movflags", "frag_keyframe+empty_moov+default_base_moof",
@@ -287,6 +335,7 @@ class CastBridge:
         self.subs: int | None = None
         self.sub_codec = ""
         self.start_at = 0.0
+        self.quality = "original"
         self.exe: str | None = None          # overridable, for tests
         self._server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
@@ -323,7 +372,8 @@ class CastBridge:
 
     def start(self, source: str, codecs: list[str] | None = None,
               audio: int = 0, subs: int | None = None,
-              sub_codec: str = "", start_at: float = 0.0) -> str:
+              sub_codec: str = "", start_at: float = 0.0,
+              quality: str = "original") -> str:
         """Begin serving *source* re-muxed for the receiver; returns the URL.
 
         ffmpeg is not started here - it starts when the Chromecast actually
@@ -343,6 +393,9 @@ class CastBridge:
         self.source = source
         self.audio, self.subs, self.sub_codec = audio, subs, sub_codec
         self.start_at = start_at
+        self.quality = quality
+        if QUALITY.get(quality, (0, 0)) != (0, 0):
+            self.copy_video = False
         if subs is not None:
             self.copy_video = False   # burning subtitles in redraws every frame
         self.path = f"/{secrets.token_urlsafe(12)}/stream.mp4"
@@ -358,8 +411,9 @@ class CastBridge:
         log.info("cast bridge: serving %s (video %s, audio track %d -> aac%s)",
                  url, "copied" if self.copy_video else "re-encoded",
                  self.audio,
-                 f", subtitle track {subs} burned in" if subs is not None
-                 else "")
+                 (f", subtitle track {subs} burned in"
+                  if subs is not None else "")
+                 + ("" if quality == "original" else f", {quality}"))
         return url
 
     def spawn(self) -> subprocess.Popen | None:
@@ -368,7 +422,7 @@ class CastBridge:
             return None
         args = ffmpeg_args(exe, self.source, self.copy_video,
                            self.audio, self.subs, self.sub_codec,
-                           self.start_at)
+                           self.start_at, self.quality)
         log.info("cast bridge: starting ffmpeg")
         try:
             proc = subprocess.Popen(

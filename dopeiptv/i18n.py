@@ -717,6 +717,10 @@ _STRINGS: dict[str, dict[str, str]] = {
     "cast_track_default": {"en": "Default"},
     "cast_subs_off": {"en": "Off"},
     "cast_reading_tracks": {"en": "Reading tracks…"},
+    "cast_quality": {"en": "Picture"},
+    "cast_quality_original": {"en": "Original"},
+    "cast_quality_note": {
+        "en": "Remembered for this device."},
     "cast_track_note": {
         "en": "Choosing a track converts the stream on this computer."},
 

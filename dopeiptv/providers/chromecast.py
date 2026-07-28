@@ -356,7 +356,8 @@ class ChromecastManager:
              known_codecs: list[str] | None = None,
              audio: dict | None = None, subs: dict | None = None,
              start: float = 0.0, duration: float = 0.0,
-             settle: bool = False, source: str | None = None) -> str:
+             settle: bool = False, source: str | None = None,
+             quality: str = "original") -> str:
         with self._lock:
             cc = self._device(device_name)
             if cc is None:
@@ -400,10 +401,12 @@ class ChromecastManager:
         # the receiver plays whatever the stream hands it and renders no
         # subtitle carried inside one. Leaving both on their default is what
         # keeps a cast native, which is why the default is a default.
-        if audio is not None or subs is not None:
-            log.info("cast: a track was chosen - converting so it can be used")
+        if audio is not None or subs is not None or quality != "original":
+            log.info("cast: converting - %s",
+                     "a track was chosen" if quality == "original"
+                     else f"this device is set to {quality}")
             if self._bridge_cast(mc, device_name, source or url, codecs,
-                                 title, audio, subs, start):
+                                 title, audio, subs, start, quality):
                 return device_name
             raise RuntimeError("the chosen track could not be cast")
         if ((codecs and seen_bad.intersection(codecs))
@@ -505,7 +508,7 @@ class ChromecastManager:
     def _bridge_cast(self, mc, device_name: str, url: str,
                      codecs: list[str], title: str,
                      audio: dict | None = None, subs: dict | None = None,
-                     start: float = 0.0) -> bool:
+                     start: float = 0.0, quality: str = "original") -> bool:
         """Convert the stream here and cast that instead.
 
         ffmpeg copies the video through untouched and re-encodes only what the
@@ -523,7 +526,7 @@ class ChromecastManager:
         # chosen says nothing about what the device can decode, and recording
         # it would send every later cast of this channel through ffmpeg for no
         # reason at all.
-        if audio is None and subs is None:
+        if audio is None and subs is None and quality == "original":
             self._refused.setdefault(device_name, set()).update(bad)
             self._needs_bridge.add((device_name, url))
         if not CastBridge.available():
@@ -531,14 +534,15 @@ class ChromecastManager:
                 f"this Chromecast has no decoder for this channel "
                 f"({' + '.join(bad) or 'unknown codecs'}) - install ffmpeg "
                 f"to convert it here")
-        if audio is None and subs is None:
+        if audio is None and subs is None and quality == "original":
             log.info("cast: %s cannot decode %s - converting it here",
                      device_name, " + ".join(bad) or "this stream")
         bridged = self.bridge.start(
             url, codecs,
             audio=(audio or {}).get("index", 0),
             subs=None if subs is None else subs.get("index"),
-            sub_codec=(subs or {}).get("codec", ""), start_at=start)
+            sub_codec=(subs or {}).get("codec", ""), start_at=start,
+            quality=quality)
         # ffmpeg does the seeking, so the converted stream starts at zero and
         # the offset is added back when the position is read.
         self.position_offset = start
@@ -715,8 +719,10 @@ class CastDialog(QDialog):
         # on their default is what keeps a cast native.
         self.audio_box = QComboBox()
         self.subs_box = QComboBox()
+        self.quality_box = QComboBox()
         for box, label in ((self.audio_box, tr("cast_audio")),
-                           (self.subs_box, tr("cast_subtitles"))):
+                           (self.subs_box, tr("cast_subtitles")),
+                           (self.quality_box, tr("cast_quality"))):
             row = QHBoxLayout()
             cap = QLabel(label)
             cap.setMinimumWidth(80)
@@ -730,6 +736,21 @@ class CastDialog(QDialog):
         self.track_note.setStyleSheet("font-size:11px; opacity:0.7;")
         self.track_note.hide()
         lay.addWidget(self.track_note)
+        # The picture setting is per device, not per title: an old receiver
+        # needs the same help every time, and every other device in the house
+        # is left alone. Filled in once the device is known.
+        self.quality_box.clear()
+        for key, label in (("original", tr("cast_quality_original")),
+                           ("720p", "720p"), ("720p30", "720p · 30")):
+            self.quality_box.addItem(label, key)
+        self.quality_box.setEnabled(True)
+        self.quality_note = QLabel(tr("cast_quality_note"))
+        self.quality_note.setStyleSheet("font-size:11px; opacity:0.7;")
+        self.quality_note.hide()
+        lay.addWidget(self.quality_note)
+        self.quality_box.currentIndexChanged.connect(self._quality_changed)
+        self.list.currentItemChanged.connect(
+            lambda *_a: self._show_device_quality())
         self.audio_box.currentIndexChanged.connect(self._track_changed)
         self.subs_box.currentIndexChanged.connect(self._track_changed)
 
@@ -817,6 +838,37 @@ class CastDialog(QDialog):
         # nothing to pick from - leave those boxes out of the way.
         self.audio_box.setEnabled(len(audio) > 1)
         self.subs_box.setEnabled(bool(subs))
+
+    def _quality_key(self, device: str) -> str:
+        return f"cast_quality_{device}"
+
+    def _show_device_quality(self) -> None:
+        """Show what this device is remembered as needing."""
+        item = self.list.currentItem()
+        if not item:
+            return
+        want = str(self.window.settings.value(
+            self._quality_key(item.text()), "original") or "original")
+        idx = self.quality_box.findData(want)
+        self.quality_box.blockSignals(True)
+        self.quality_box.setCurrentIndex(max(0, idx))
+        self.quality_box.blockSignals(False)
+        self.quality_note.setVisible(want != "original")
+
+    def _quality_changed(self) -> None:
+        item = self.list.currentItem()
+        if not item:
+            return
+        want = self.quality_box.currentData() or "original"
+        self.window.settings.setValue(self._quality_key(item.text()), want)
+        self.quality_note.setVisible(want != "original")
+
+    def quality(self) -> str:
+        item = self.list.currentItem()
+        if not item:
+            return "original"
+        return str(self.window.settings.value(
+            self._quality_key(item.text()), "original") or "original")
 
     def _track_changed(self) -> None:
         self.track_note.setVisible(self._chosen() != (None, None))
@@ -922,7 +974,8 @@ class CastDialog(QDialog):
                                                  self.stream_title,
                                                  self.codecs, audio, subs,
                                                  self.start, self.duration,
-                                                 settle, self.source),
+                                                 settle, self.source,
+                                                 self.quality()),
                   done, failed)
 
     def _banner(self, device: str | None, title: str) -> None:
