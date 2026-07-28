@@ -969,19 +969,21 @@ def test_every_subtitle_segment_says_which_clock_it_is_on():
     assert _timestamp_map(b"\x47\x40\x00") == b"\x47\x40\x00"
 
 
-def test_a_silent_subtitle_track_does_not_hold_up_the_picture():
-    """A subtitle stream says nothing for minutes at a time, and a chosen
-    one can be silent exactly where the film was picked up. The muxer waited
-    for it and wrote nothing at all:
+def test_a_text_subtitle_is_no_reason_to_re_encode_the_picture():
+    """It was, when it was drawn into the frames. Beside the picture it
+    costs nothing - and the leftover line made every subtitled cast
+    re-encode a whole film: hot, slow, and slow enough that the provider
+    hung up on a connection nobody was draining fast enough.
 
-        Nothing was written into output file, because at least one of its
-        streams received no packets.
-
-    - and the cast died with no playlist, twenty-five seconds of waiting,
-    and IDLE/ERROR on the television.
-    """
-    from dopeiptv.providers.cast_bridge import hls_args
-    args = hls_args("ffmpeg", "http://p/f.mkv", True, "/tmp/x", subs=10,
-                    start=1183.0)
-    assert args[args.index("-max_interleave_delta") + 1] == "0"
-    assert args.index("-max_interleave_delta") > args.index("-f")
+    A picture-based subtitle IS drawn in, with overlay, so that one still
+    redraws every frame."""
+    for codec, copied in (("subrip", True), ("ass", True),
+                          ("dvb_subtitle", False),
+                          ("hdmv_pgs_subtitle", False)):
+        b = CastBridge()
+        b.exe = "/bin/true"
+        try:
+            b.start("http://p/movie/u/pw/5.mkv", subs=0, sub_codec=codec)
+            assert b.copy_video is copied, codec
+        finally:
+            b.stop()

@@ -524,16 +524,6 @@ def hls_args(exe: str, source: str, copy_video: bool, folder: str,
         # WebVTT is the one subtitle format a Cast receiver renders.
         "-c:s", "webvtt",
         "-f", "hls",
-        # Do not hold the output waiting for a stream that has nothing to
-        # say. A subtitle track is silent for minutes at a time, and a
-        # chosen one can be silent exactly where the film was picked up:
-        #   Nothing was written into output file, because at least one of
-        #   its streams received no packets.
-        # - and the cast died on the spot with no playlist at all. This
-        # lets the muxer write what it has instead of interleaving
-        # perfectly, which for a subtitle beside the picture is the right
-        # trade every time.
-        "-max_interleave_delta", "0",
         "-hls_time", str(HLS_SEGMENT),
         # A broadcast keeps a rolling window; a film keeps everything, which
         # is what lets the television's own remote scrub it - and what makes
@@ -1025,8 +1015,14 @@ class CastBridge:
         self.quality = quality
         if QUALITY.get(quality, (0, 0)) != (0, 0):
             self.copy_video = False
-        if subs is not None:
-            self.copy_video = False   # burning subtitles in redraws every frame
+        # A subtitle is no longer drawn into the picture - it travels beside
+        # it as WebVTT - so choosing one is not a reason to re-encode a
+        # single frame. This line was left over from when it was, and it
+        # made every subtitled cast re-encode the whole film: hot, slow, and
+        # slow enough that the provider hung up on a connection nobody was
+        # draining fast enough.
+        if subs is not None and sub_codec in BITMAP_SUBS:
+            self.copy_video = False   # drawn in with overlay, so redrawn
         # A text subtitle goes beside the picture as a WebVTT rendition,
         # which means HLS: a set of files rather than one long response.
         self.hls = subs is not None and sub_codec not in BITMAP_SUBS
