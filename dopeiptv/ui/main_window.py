@@ -4201,7 +4201,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # segment is still there and named, so the receiver jumps within it
         # by itself. Rebuilding the stream for that started the film over,
         # which is what dragging the bar appeared to do.
+        # A playlist can be seeked, but only into what has been made. The
+        # converter runs a little ahead of the picture and no further, so a
+        # jump forward lands at the end of what exists - which on the
+        # television looks like it moved on by a minute and stopped. Going
+        # BACK is free, because those segments are all still there.
         playlist = getattr(getattr(self.cast, "bridge", None), "hls", False)
+        if playlist and to > self.cast.position() + 5:
+            playlist = False            # rebuild from there instead
         if self.cast.bridged() and not playlist:
             self._recast_with(ctx.get("audio"), ctx.get("subs"), start=to)
         else:

@@ -1986,9 +1986,9 @@ def test_a_playlist_is_seeked_rather_than_rebuilt():
     class Bridge:
         hls = True
 
-    w.cast = _CastSeek(0.0, 6000.0, bridged=True)
+    w.cast = _CastSeek(3600.0, 6000.0, bridged=True)
     w.cast.bridge = Bridge()
-    w._cast_seek(1800.0)
+    w._cast_seek(1800.0)                # back, into what has been made
     for _ in range(50):
         if w.cast.sought is not None:
             break
@@ -1996,8 +1996,8 @@ def test_a_playlist_is_seeked_rather_than_rebuilt():
     assert w.cast.sought == 1800.0, "the receiver does its own seeking"
     assert again == [], "and the stream is not built again"
 
-    # A single long response cannot be seeked, so that one still is.
-    w.cast = _CastSeek(0.0, 6000.0, bridged=True)
+    # A single long response cannot be seeked at all, so that one still is.
+    w.cast = _CastSeek(3600.0, 6000.0, bridged=True)
     w.cast.bridge = type("B", (), {"hls": False})()
     w._cast_seek(1800.0)
     assert again == [1800.0]
@@ -2086,3 +2086,48 @@ def test_turning_the_subtitle_on_does_not_block_the_receive_thread():
     assert took < 0.5, (
         f"the status callback was held for {took:.1f} s - on the real "
         "receive thread that is the whole cast held with it")
+
+
+def test_a_jump_forward_is_rebuilt_and_a_jump_back_is_not():
+    """A playlist can be seeked, but only into what has been made.
+
+    The converter runs a little ahead of the picture and no further, so
+    asking for thirteen minutes in landed at the end of what existed - on
+    the television, a jump of about a minute and then nothing. Going back is
+    free: those segments are all still there.
+    """
+    w = _with_strip()
+    w._cast_device = "Alva TV"
+    again = []
+    w._recast_with = lambda a, s, start=None: again.append(start)
+
+    class Bridge:
+        hls = True
+
+    # Backwards, into what has already been made: the receiver does it.
+    w.cast = _CastSeek(600.0, 6000.0, bridged=True)
+    w.cast.bridge = Bridge()
+    w._cast_seek(120.0)
+    for _ in range(50):
+        if w.cast.sought is not None:
+            break
+        threading.Event().wait(0.02)
+    assert w.cast.sought == 120.0 and again == []
+
+    # Forwards, past it: there is nothing there to seek into, so the stream
+    # is made again from that point.
+    w.cast = _CastSeek(600.0, 6000.0, bridged=True)
+    w.cast.bridge = Bridge()
+    w._cast_seek(1800.0)
+    assert again == [1800.0]
+    assert w.cast.sought is None
+
+    # A nudge forward is still a seek - the converter is that far ahead.
+    w.cast = _CastSeek(600.0, 6000.0, bridged=True)
+    w.cast.bridge = Bridge()
+    w._cast_seek(603.0)
+    for _ in range(50):
+        if w.cast.sought is not None:
+            break
+        threading.Event().wait(0.02)
+    assert w.cast.sought == 603.0

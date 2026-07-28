@@ -825,6 +825,13 @@ class _Handler(BaseHTTPRequestHandler):
             body = _autoselect_subtitles(body)
         elif name.endswith(".vtt"):
             body = _timestamp_map(body)
+        # Every subtitle piece the receiver takes, in the log. Whether it
+        # fetches them at all is the one thing the sender cannot otherwise
+        # know - a track can be present, switched on, and never read - and
+        # that difference is the difference between our bug and its.
+        if name.endswith((".vtt", "_vtt.m3u8")):
+            log.info("cast bridge: the receiver took %s (%d bytes)",
+                     name, len(body))
         self.send_response(200)
         self.send_header(
             "Content-Type",
