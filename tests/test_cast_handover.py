@@ -25,6 +25,20 @@ _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_save_cast_position", "_recast_with", "_track_label")
 
 
+class _Resume0:
+    """A store that answers like the real one: a position under a minute is
+    'at the start', and storing one DROPS whatever was there."""
+
+    def __init__(self):
+        self.saved = {"vod:42": 1830}
+
+    def record(self, group, key, pos, dur, item=None, series_ctx=None):
+        if 60 < pos < dur * 0.95:
+            self.saved[f"{group}:{key}"] = round(pos)
+        else:
+            self.saved.pop(f"{group}:{key}", None)
+
+
 def _window():
     try:
         from dopeiptv.ui.main_window import MainWindow
@@ -278,6 +292,18 @@ def test_where_the_tv_got_to_is_kept_as_the_resume_point():
     w._cast_ctx = {"group": "vod", "key": "42", "item": {"name": "Film"}}
     w._save_cast_position()
     assert w.resume.saved == [("vod", "42", 1830, 6000)]
+
+
+def test_a_cast_that_just_started_does_not_wipe_the_resume_point():
+    """A position too small to be worth keeping is a reason to leave the
+    store alone, not to write to it - writing one drops what was there, and
+    the film would lose the point it already had."""
+    w = _with_strip()
+    w.resume = _Resume0()
+    w.cast = _CastAt(12.0, 6000.0)
+    w._cast_ctx = {"group": "vod", "key": "42"}
+    w._save_cast_position()
+    assert w.resume.saved == {"vod:42": 1830}
 
 
 def test_a_live_channel_has_no_resume_point_to_keep():

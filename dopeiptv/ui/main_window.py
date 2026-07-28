@@ -3209,6 +3209,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self, "Chromecast",
                 tr("msg_cast_needs_package"))
             return
+        # Already casting this very title? Then this is not a new cast - it is
+        # someone coming back to change the device or a track. Reopen the
+        # panel on the running session: no question about resuming (that was
+        # answered when it started) and nothing touched if it is closed again.
+        ctx = self._cast_ctx or {}
+        if (getattr(self.cast, "active", None) is not None
+                and ctx.get("key") is not None
+                and ctx.get("key") == self._item_key(it)):
+            self.manage_cast()
+            return
         url, title = self._stream_for(it)
         if not url:
             url = it.get("_url")
@@ -3445,6 +3455,22 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cast_bar_title.setVisible(bool(title))
         bar.show()
 
+    def manage_cast(self) -> None:
+        """Reopen the cast panel on the session that is already running.
+
+        Same dialog, but it starts nothing and changes nothing by itself:
+        the device list is the remembered one (discovery disconnects every
+        device to start again, which is the last thing a running cast needs),
+        the tracks are the ones playing, and casting from here picks up where
+        the TV has got to rather than at the beginning.
+        """
+        ctx = self._cast_ctx or {}
+        CastDialog(self, ctx.get("url") or "", ctx.get("title") or "",
+                   self._local_codecs(), 0, self.cast.position(),
+                   ctx.get("tracks") or {}, probe=False,
+                   source=ctx.get("source"), managing=True,
+                   chosen=(ctx.get("audio"), ctx.get("subs"))).exec()
+
     def _cast_tracks_menu(self) -> None:
         """Offer another audio track or subtitle while the cast runs.
 
@@ -3460,6 +3486,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not audio and not subs:
             return
         menu = QMenu(self)
+        menu.addAction(tr("cast_title"), self.manage_cast)
+        menu.addSeparator()
         cur_a = (ctx.get("audio") or {}).get("index")
         cur_s = (ctx.get("subs") or {}).get("index")
 
@@ -3569,7 +3597,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not group or key is None:
             return
         pos, dur = self.cast.position(), self.cast.duration
-        if pos <= 0 or dur <= 0:
+        # Under a minute in, the store treats a position as "at the start" and
+        # DROPS whatever was saved before. A cast that had barely begun would
+        # therefore wipe the resume point the film already had - so a position
+        # too small to be worth keeping is a reason to leave the store alone,
+        # not to write to it.
+        if pos <= 60 or dur <= 0:
             return
         log.info("cast: keeping the position, %d s into %d", pos, dur)
         self.resume.record(group, key, pos, dur, item=ctx.get("item"))

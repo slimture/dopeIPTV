@@ -660,7 +660,8 @@ class CastDialog(QDialog):
                  codecs: list[str] | None = None,
                  audio_index: int = 0, start: float = 0.0,
                  tracks: dict | None = None, probe: bool = True,
-                 source: str | None = None) -> None:
+                 source: str | None = None, managing: bool = False,
+                 chosen: tuple | None = None) -> None:
         super().__init__(window)
         self.window = window
         self.url = url
@@ -688,6 +689,12 @@ class CastDialog(QDialog):
         self.source = source or url
         self.audio_list: list[dict] = []
         self.subs_list: list[dict] = []
+        # Opened on a cast that is already running: it is here to change
+        # something about it, not to start one. Nothing may disturb what is
+        # playing - not a rescan, and not a question about resuming, which
+        # was answered when the cast began.
+        self.managing = managing
+        self.chosen = chosen
         self.setWindowTitle(tr("cast_title"))
         self.setMinimumWidth(400)
         lay = QVBoxLayout(self)
@@ -739,7 +746,14 @@ class CastDialog(QDialog):
         self.cast_btn.clicked.connect(self._cast)
         self.stop_btn.clicked.connect(self._stop)
         close_btn.clicked.connect(self.accept)
-        self._scan()
+        if managing:
+            # No discovery: it disconnects every device to start again, and
+            # the one in the list is the one currently playing.
+            self._show_remembered()
+            self._set_status(tr("cast_casting_to",
+                                name=getattr(window, "_cast_device", "")))
+        else:
+            self._scan()
         self._load_tracks()
 
     # -- audio / subtitle tracks -------------------------------------------
@@ -789,6 +803,13 @@ class CastDialog(QDialog):
                   if 0 <= self.audio_index < len(audio) else None)
         if chosen and not chosen.get("default") and self.audio_index > 0:
             self.audio_box.setCurrentIndex(self.audio_index + 1)
+        # A running cast opens on what it is actually playing.
+        if self.chosen:
+            cur_a, cur_s = self.chosen
+            if cur_a is not None:
+                self.audio_box.setCurrentIndex(cur_a.get("index", 0) + 1)
+            if cur_s is not None:
+                self.subs_box.setCurrentIndex(cur_s.get("index", 0) + 1)
         self.audio_box.blockSignals(False)
         self.subs_box.blockSignals(False)
         self._track_changed()
@@ -809,17 +830,28 @@ class CastDialog(QDialog):
         except RuntimeError:
             pass
 
+    def _show_remembered(self) -> None:
+        """The devices from last time, without asking the network."""
+        if self.list.count():
+            return
+        remembered = self.window.settings.value("cast_devices", "") or ""
+        for name in [n for n in remembered.split("\n") if n]:
+            self.list.addItem(name)
+        # Land on the one that is playing, when there is one.
+        active = getattr(self.window, "_cast_device", None)
+        for i in range(self.list.count()):
+            if self.list.item(i).text() == active:
+                self.list.setCurrentRow(i)
+                return
+        if self.list.count():
+            self.list.setCurrentRow(0)
+
     def _scan(self) -> None:
         # Fill the list from last time's result immediately. Discovery takes
         # several seconds, and staring at an empty box while the device you
         # cast to yesterday is right there is just waiting for nothing. The
         # scan still runs and replaces this the moment it lands.
-        if self.list.count() == 0:
-            remembered = self.window.settings.value("cast_devices", "") or ""
-            for name in [n for n in remembered.split("\n") if n]:
-                self.list.addItem(name)
-            if self.list.count():
-                self.list.setCurrentRow(0)
+        self._show_remembered()
         self._set_status(tr("cast_scanning"))
         self.rescan_btn.setEnabled(False)
 
