@@ -3523,8 +3523,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         tracks = ctx.get("tracks") or {}
         audio = tracks.get("audio") or []
         subs = tracks.get("subtitle") or []
-        if not audio and not subs:
-            return
         menu = QMenu(self)
         menu.addAction(tr("cast_title"), self.manage_cast)
         menu.addSeparator()
@@ -3553,8 +3551,34 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 entry(sm, self._track_label(t), t["index"] == cur_s,
                       lambda _c=False, t=t: self._recast_with(ctx.get("audio"),
                                                               t))
+        # The picture setting belongs here too. It is remembered per device,
+        # so a channel that did need scaling leaves it set for everything
+        # after it - and having to reopen the panel to put it back would be
+        # the wrong place to keep it.
+        pm = menu.addMenu(tr("cast_quality"))
+        current = self._cast_quality()
+        for key, label in (("original", tr("cast_quality_original")),
+                           ("720p", "≤ 720p"), ("720p30", "≤ 720p · 30")):
+            entry(pm, label, key == current,
+                  lambda _c=False, k=key: self._set_cast_quality(k))
         menu.exec(self.cast_bar_tracks.mapToGlobal(
             self.cast_bar_tracks.rect().bottomLeft()))
+
+    def _cast_quality_key(self) -> str:
+        return f"cast_quality_{self._cast_device or ''}"
+
+    def _cast_quality(self) -> str:
+        return str(self.settings.value(self._cast_quality_key(), "original")
+                   or "original")
+
+    def _set_cast_quality(self, key: str) -> None:
+        """Change what this device is allowed, and show it straight away."""
+        if key == self._cast_quality():
+            return
+        self.settings.setValue(self._cast_quality_key(), key)
+        log.info("cast: %s is now set to %s", self._cast_device, key)
+        ctx = self._cast_ctx or {}
+        self._recast_with(ctx.get("audio"), ctx.get("subs"))
 
     @staticmethod
     def _track_label(t: dict) -> str:
@@ -3578,7 +3602,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             lambda: self.cast.cast(device, url, title, self._local_codecs(),
                                    audio, subs, at,
                                    ctx.get("duration") or 0.0,
-                                   False, ctx.get("source")),
+                                   False, ctx.get("source"),
+                                   self._cast_quality(),
+                                   ctx.get("height") or 0,
+                                   ctx.get("fps") or 0.0),
             lambda _n: self.show_cast_strip(device, title),
             lambda msg: self._error(tr("cast_failed", msg=msg)))
 

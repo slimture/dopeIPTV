@@ -23,7 +23,8 @@ import pytest
 _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_local_codecs", "_toggle_cast_pause", "_cast_from_archive",
             "_save_cast_position", "_recast_with", "_track_label",
-            "_cast_volume")
+            "_cast_volume", "_cast_quality", "_cast_quality_key",
+            "_set_cast_quality")
 
 
 class _Resume0:
@@ -102,6 +103,7 @@ def test_switching_tracks_picks_up_where_the_tv_is(monkeypatch):
     w.pool = None
     w.player = None
     w._cast_device = "Alva TV"
+    w.settings = _Settings()
     w.cast = _CastAt(1830.0, 6000.0)
     swede = {"index": 2, "lang": "swe", "codec": "subrip"}
     w._cast_ctx = {"url": "http://p/film.mkv", "source": "http://p/film.mkv",
@@ -152,6 +154,31 @@ def test_nothing_is_sent_when_no_cast_is_running():
     w.cast.set_volume = lambda step: (_ for _ in ()).throw(
         AssertionError("must not be called"))
     w._cast_volume(0.1)
+
+
+def test_the_picture_setting_can_be_put_back_from_the_strip():
+    """It is remembered per device, so a channel that did need scaling leaves
+    it set for everything cast after it. Having to reopen the panel to undo
+    that would be the wrong place to keep it."""
+    recast = []
+    w = _with_strip()
+    w.settings = _Settings()
+    w._cast_device = "Alva TV"
+    w._cast_ctx = {"audio": None, "subs": None}
+    w._recast_with = lambda a, s: recast.append((a, s))
+    assert w._cast_quality() == "original"
+    w._set_cast_quality("720p30")
+    assert w._cast_quality() == "720p30"
+    assert recast, "the change is shown straight away"
+    # Setting the same thing again does nothing at all.
+    recast.clear()
+    w._set_cast_quality("720p30")
+    assert recast == []
+    w._set_cast_quality("original")
+    assert w._cast_quality() == "original"
+    # And it is per device: another one starts clean.
+    w._cast_device = "Vardagsrummet"
+    assert w._cast_quality() == "original"
 
 
 def test_local_playback_ends_a_running_cast():
@@ -286,6 +313,17 @@ def test_the_archive_url_starts_where_you_paused(monkeypatch):
     assert asked["sid"] == 9851 and asked["start"] == at
     assert asked["minutes"] > 240, asked          # room to keep watching
     assert sent, "the archive URL is cast"
+
+
+class _Settings:
+    def __init__(self):
+        self.data = {}
+
+    def value(self, key, default=None):
+        return self.data.get(key, default)
+
+    def setValue(self, key, val):
+        self.data[key] = val
 
 
 class _Resume:
