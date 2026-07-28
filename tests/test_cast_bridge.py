@@ -757,3 +757,51 @@ def test_the_recording_costs_a_pause_not_an_evening(tmp_path):
     else:
         raise AssertionError("the cap never stopped it")
     sp.close()
+
+
+def test_a_pause_is_written_to_disk_and_never_left_behind(tmp_path,
+                                                          monkeypatch):
+    """Not the system temp folder: on many Linux systems /tmp is tmpfs, which
+    is RAM, and a paused broadcast runs to gigabytes. Not the recordings
+    folder either - nothing here is a recording anyone asked to keep.
+
+    And nothing survives. It goes when the cast ends, and anything a crash
+    left behind goes on the way in: four gigabytes of a fortnight-old pause
+    is not a thing to discover.
+    """
+    import dopeiptv.providers.cast_bridge as cb
+
+    cache = tmp_path / "cache" / "cast"
+    monkeypatch.setattr(cb, "default_image_cache_dir", None, raising=False)
+    monkeypatch.setattr(cb.Path, "home", staticmethod(lambda: tmp_path))
+    monkeypatch.setitem(sys.modules, "dopeiptv.core.workers", None)
+
+    # Something a previous run was killed in the middle of.
+    stale = tmp_path / ".cache" / "dopeiptv" / "cast" / "cast-oldrun"
+    stale.mkdir(parents=True)
+    (stale / "piece00000").write_bytes(b"x" * 1000)
+
+    folder = cb.cast_cache_dir()
+    assert not stale.exists(), "a killed run's leftovers are swept on the way in"
+    assert "cache" in folder.lower() or ".cache" in folder
+    assert "recording" not in folder.lower()
+
+    b = CastBridge()
+    b.exe = sys.executable
+    cb.ffmpeg_args_real = cb.ffmpeg_args
+    cb.ffmpeg_args = lambda *a, **k: [
+        sys.executable, "-c",
+        "import sys,time;sys.stdout.buffer.write(b'q'*200000);"
+        "sys.stdout.flush();time.sleep(20)"]
+    try:
+        url = b.start("http://p/timeshift/x.ts", ["h264"])
+        with urllib.request.urlopen(url, timeout=30) as r:
+            assert r.read(4096)
+        run = b._tmp
+        assert os.path.isdir(run)
+        b.stop()
+        assert not os.path.exists(run), "the recording goes with the cast"
+    finally:
+        cb.ffmpeg_args = cb.ffmpeg_args_real
+        b.stop()
+    _ = cache

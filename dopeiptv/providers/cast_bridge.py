@@ -33,6 +33,7 @@ import sys
 import tempfile
 import threading
 import time
+from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from ..core.log import log
@@ -208,6 +209,27 @@ def video_encoder() -> str:
                 pass
         log.info("cast bridge: video encoder is %s", _hw_encoder)
     return _hw_encoder
+
+
+def cast_cache_dir() -> str:
+    """Where a cast's working files live, swept clean of older runs.
+
+    The app's own cache directory, so it is on disk (a Linux /tmp is often
+    tmpfs, which is RAM, and a paused broadcast runs to gigabytes) and so a
+    user clearing the cache picks it up. Anything left behind by a run that
+    did not get to tidy up - a crash, a kill - goes on the way in, because
+    nobody wants to discover four gigabytes of a fortnight-old pause.
+    """
+    try:
+        from ..core.workers import default_image_cache_dir
+        base = default_image_cache_dir("cast")
+    except Exception:
+        base = Path.home() / ".cache" / "dopeiptv" / "cast"
+    base.mkdir(parents=True, exist_ok=True)
+    for stale in base.glob("cast-*"):
+        if stale.is_dir():
+            shutil.rmtree(stale, ignore_errors=True)
+    return str(base)
 
 
 def ffmpeg_path() -> str | None:
@@ -746,7 +768,7 @@ class CastBridge:
         if "://" in source:
             return source
         try:
-            self._tmp = tempfile.mkdtemp(prefix="dopeiptv-cast-")
+            self._tmp = tempfile.mkdtemp(prefix="cast-", dir=cast_cache_dir())
             link = os.path.join(
                 self._tmp, "source" + os.path.splitext(source)[1])
             os.symlink(os.path.abspath(source), link)
@@ -816,9 +838,16 @@ class CastBridge:
     SETTLE = 1.5             # and long enough for a doomed run to fall over
 
     def _tmpdir(self) -> str:
-        """The scratch directory this run of the bridge owns."""
+        """The scratch directory this run of the bridge owns.
+
+        Under the app's cache directory, never the system temp folder: on
+        many Linux systems /tmp is tmpfs, which is RAM - and a paused
+        broadcast can run to gigabytes. It is also never the recordings
+        folder: nothing here is a recording anyone asked to keep, and it is
+        all deleted the moment the cast ends.
+        """
         if not self._tmp:
-            self._tmp = tempfile.mkdtemp(prefix="dopeiptv-cast-")
+            self._tmp = tempfile.mkdtemp(prefix="cast-", dir=cast_cache_dir())
         return self._tmp
 
     def filling(self, proc: subprocess.Popen) -> bool:
