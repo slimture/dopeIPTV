@@ -441,6 +441,14 @@ def ffmpeg_args(exe: str, source: str, copy_video: bool,
         # instead of decoding its way there, which is what makes resuming an
         # hour into a film instant rather than a minute of waiting.
         *(["-ss", f"{start:.3f}"] if start > 0 else []),
+        # A burned-in text subtitle is read by the filter from its own copy
+        # of the file, which knows nothing of the seek. Left alone the video
+        # restarts at zero and the subtitles do not, so a film resumed half
+        # an hour in shows the lines from the opening scene. Keeping the
+        # original timestamps lets the two agree, and the output is shifted
+        # back to zero afterwards.
+        *(["-copyts"] if (start > 0 and subs is not None
+                          and sub_codec not in BITMAP_SUBS) else []),
         "-fflags", "+genpts", "-i", source,
         *burn, "-map", f"0:a:{audio}",
         *(["-r", str(fps)] if fps else []),
@@ -450,6 +458,8 @@ def ffmpeg_args(exe: str, source: str, copy_video: bool,
            ["-preset", "veryfast", "-crf", "23",
             "-maxrate", "6M", "-bufsize", "12M"])),
         "-c:a", "aac", "-ac", "2", "-b:a", "192k",
+        *(["-start_at_zero"] if (start > 0 and subs is not None
+                                 and sub_codec not in BITMAP_SUBS) else []),
         "-f", "mp4",
         "-movflags", "frag_keyframe+empty_moov+default_base_moof",
         "pipe:1",
@@ -525,6 +535,9 @@ class CastBridge:
         # same way every time. Read by spawn(), so a run that cannot work is
         # not attempted twice more while the TV waits.
         self.fatal: str = ""
+        # Which run of the bridge this is. A request that is still retrying
+        # belongs to the run it began in - see first_frames().
+        self.generation = 0
         self.exe: str | None = None          # overridable, for tests
         self._server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
@@ -570,6 +583,7 @@ class CastBridge:
         """
         self.stop()
         self.fatal = ""          # a new run gets to fail on its own terms
+        self.generation += 1
         source = self._safe_source(source)
         codecs = [c.lower() for c in (codecs or [])]
         # Copy the video unless it is something the receiver cannot decode.
@@ -610,7 +624,7 @@ class CastBridge:
     # the receiver. A run that dies before this never happened as far as the
     # TV is concerned, and can simply be tried again; one that dies after it
     # cannot, because a fragmented MP4 has no way to start over mid-response.
-    OPENING = 256_000        # enough to know bytes are coming out at all
+    OPENING = 64_000         # enough to know bytes are coming out at all
     SETTLE = 1.5             # and long enough for a doomed run to fall over
 
     def first_frames(self) -> tuple[subprocess.Popen | None, bytes]:
@@ -631,11 +645,21 @@ class CastBridge:
         up within seconds, so hold the opening back until there is enough of
         it to be sure, and until then a failure costs nothing but a wait.
         """
+        mine = self.generation
         for wait in (0, 6, 10):
             if wait:
                 log.info("cast bridge: the stream stopped short - trying "
                          "again in %d s", wait)
                 time.sleep(wait)
+            # The bridge may have been started again while this request was
+            # waiting - a track changed, a film moved to another point. That
+            # is a different stream with a different receiver behind it, and
+            # spawning into it put TWO ffmpeg on the same account: they took
+            # a connection each, cut each other off, and neither arrived.
+            if self.generation != mine:
+                log.info("cast bridge: this request belongs to a stream that "
+                         "has been replaced - letting it go")
+                return None, b""
             proc = self.spawn()
             if proc is None:
                 return None, b""
@@ -651,7 +675,7 @@ class CastBridge:
             # one simply fills the pipe and waits for it to be read.
             if size >= self.OPENING:
                 time.sleep(self.SETTLE)
-                if proc.poll() is None:
+                if proc.poll() is None and self.generation == mine:
                     log.info("cast bridge: the stream is going (%.1f s to "
                              "the first %d kB)", time.monotonic() - began,
                              size // 1000)

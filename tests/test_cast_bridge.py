@@ -415,7 +415,7 @@ def test_a_stream_that_dies_at_once_never_reaches_the_receiver():
     def fake_args(exe, source, copy_video, *a, **k):
         runs.append(source)
         # A short burst the first time, a real stream after that.
-        size = 100_000 if len(runs) == 1 else 2_000_000
+        size = 20_000 if len(runs) == 1 else 2_000_000
         return [exe, "-c",
                 "import sys;sys.stdout.buffer.write(b'x' * %d)" % size]
 
@@ -442,3 +442,65 @@ def test_a_stream_that_dies_at_once_never_reaches_the_receiver():
     finally:
         cb.ffmpeg_args, cb.time.sleep = real_args, real_sleep
         b.stop()
+
+
+def test_a_request_never_spawns_into_a_stream_that_replaced_it():
+    """A request that is still retrying belongs to the run it began in.
+
+    Changing a track or moving a film starts the bridge again, and the old
+    request's retry then spawned ffmpeg into the NEW stream - two of them on
+    one account, taking a connection each, cutting each other off, and
+    neither arriving. The log showed it plainly: two "starting ffmpeg" in a
+    row and three HTTP readers interleaved.
+    """
+    import dopeiptv.providers.cast_bridge as cb
+
+    runs = []
+
+    def fake_args(exe, source, copy_video, *a, **k):
+        runs.append(source)
+        return [exe, "-c", "import sys;sys.stdout.buffer.write(b'x' * 10)"]
+
+    b = CastBridge()
+    b.exe = sys.executable
+    b.start("http://p/film.mkv", ["h264"])
+
+    real_args, real_sleep = cb.ffmpeg_args, cb.time.sleep
+    cb.ffmpeg_args = fake_args
+    # The wait between attempts is where the other stream starts.
+    cb.time.sleep = lambda s: b.start("http://p/other.mkv", ["h264"])
+    try:
+        proc, head = b.first_frames()
+        assert proc is None and head == b""
+        # One attempt for the run it belongs to, and nothing for the new one.
+        assert runs == ["http://p/film.mkv"], runs
+    finally:
+        cb.ffmpeg_args, cb.time.sleep = real_args, real_sleep
+        b.stop()
+
+
+def test_a_burned_subtitle_stays_in_step_with_a_film_resumed_part_way_in():
+    """The subtitles filter reads the file from its own copy, which knows
+    nothing of the seek: left alone the video restarts at zero and the
+    subtitles do not, so a film picked up half an hour in shows the lines
+    from the opening scene."""
+    args = ffmpeg_args("ffmpeg", "/rec/film.mkv", copy_video=False,
+                       subs=2, sub_codec="subrip", start=1608.0)
+    assert "-copyts" in args and "-start_at_zero" in args
+    assert args.index("-copyts") < args.index("-i"), "before the input"
+
+    # From the beginning there is nothing to keep in step.
+    plain = ffmpeg_args("ffmpeg", "/rec/film.mkv", copy_video=False,
+                        subs=2, sub_codec="subrip")
+    assert "-copyts" not in plain
+
+    # A picture-based subtitle is drawn from the same input, so it moves with
+    # the seek on its own.
+    bitmap = ffmpeg_args("ffmpeg", "/rec/film.mkv", copy_video=False,
+                         subs=2, sub_codec="dvb_subtitle", start=1608.0)
+    assert "-copyts" not in bitmap
+
+    # And a film with no subtitle chosen is untouched by any of it.
+    none = ffmpeg_args("ffmpeg", "/rec/film.mkv", copy_video=True,
+                       start=1608.0)
+    assert "-copyts" not in none and "-start_at_zero" not in none
