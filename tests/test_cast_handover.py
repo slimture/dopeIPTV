@@ -35,7 +35,7 @@ _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_local_codecs", "_toggle_cast_pause", "_cast_from_archive",
             "_save_cast_position", "_recast_with", "_track_label",
             "_cast_volume", "_cast_quality", "_cast_quality_key",
-            "_paused_moment",
+            "_paused_moment", "_record_cast_history", "_history_extra",
             "_set_cast_quality", "_toggle_cast_mute", "_show_cast_volume")
 
 
@@ -966,3 +966,60 @@ def test_a_rescan_drops_the_devices_before_the_browser(monkeypatch):
     order.clear()
     m.shutdown()
     assert order == ["device", "browser"], order
+
+
+class _History:
+    def __init__(self):
+        self.rows = []
+
+    def add(self, url, title, icon, key, kind, extra=None):
+        self.rows.append((url, title, icon, key, kind, extra))
+
+
+def test_what_you_watch_on_the_tv_lands_in_history_too():
+    """Every other route into playback runs through _start_playback, which a
+    cast deliberately does not - the stream never touches this machine. So an
+    evening's television watched on the TV left no trace at all, and could not
+    be picked up again from History the way anything played here can."""
+    w = _with_strip()
+    w.history = _History()
+    w.series_ctx = None
+    w._cast_ctx = {
+        "title": "SVT1 HD", "key": 9851, "kind": "live",
+        "row_url": "http://p/live/u/pw/9851.m3u8", "sid": 9851,
+        "archive": True,
+        "item": {"stream_id": 9851, "num": 1, "tv_archive": 1,
+                 "tv_archive_duration": 7, "stream_icon": "http://p/1.png"}}
+    w.show_cast_strip("Alva TV", "SVT1 HD")
+    assert len(w.history.rows) == 1
+    url, title, icon, key, kind, extra = w.history.rows[0]
+    assert url == "http://p/live/u/pw/9851.m3u8"
+    assert (title, key, kind) == ("SVT1 HD", 9851, "live")
+    assert icon == "http://p/1.png"
+    # The archive depth comes along, so replaying it from History still has
+    # timeshift and catch-up - exactly as when it is played here.
+    assert extra["tv_archive"] == 1 and extra["tv_archive_duration"] == 7
+
+    # An archive resume replaces the address on the receiver with a timeshift
+    # URL good for a few minutes. History must not learn that one.
+    w._cast_ctx["url"] = "http://p/timeshift/u/pw/241/x/9851.ts?token=abc"
+    w.show_cast_strip("Alva TV", "SVT1 HD")
+    assert w.history.rows[-1][0] == "http://p/live/u/pw/9851.m3u8"
+
+    # Taking the strip down is not a play.
+    w.show_cast_strip(None)
+    assert len(w.history.rows) == 2
+
+
+def test_an_episode_cast_remembers_which_series_it_belongs_to():
+    """Without it the row degrades to a context-less "movie": restarted from
+    zero, duplicated in History and posterless."""
+    w = _with_strip()
+    w.history = _History()
+    w.series_ctx = {"series_id": 77, "name": "Bron", "cover": "http://p/c.jpg"}
+    w._cast_ctx = {"title": "S01 E02", "key": "77:1:2", "kind": "episode",
+                   "row_url": "http://p/series/u/pw/5.mkv", "item": {}}
+    w.show_cast_strip("Alva TV", "S01 E02")
+    extra = w.history.rows[0][-1]
+    assert extra["_series_ctx"]["series_id"] == 77
+    assert extra["name"] == "Bron · S01 E02"

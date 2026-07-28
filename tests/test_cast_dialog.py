@@ -43,11 +43,19 @@ def _window():
     return w
 
 
-def _dialog(**kw):
-    from dopeiptv.providers.chromecast import CastDialog
+def _dialog(burn=True, **kw):
+    """Build the dialog. *burn* stands in for the machine's ffmpeg: whether
+    this one was built with libass decides whether a text subtitle can be
+    offered at all, and the CI runner's build and a developer's differ."""
+    import dopeiptv.providers.chromecast as cc
     win = _window()
     kw.setdefault("probe", False)       # never open the stream from a test
-    dlg = CastDialog(win, "http://p/live/u/pw/1.m3u8", "SVT1", **kw)
+    real = cc.can_burn_subtitles
+    cc.can_burn_subtitles = lambda exe=None: burn
+    try:
+        dlg = cc.CastDialog(win, "http://p/live/u/pw/1.m3u8", "SVT1", **kw)
+    finally:
+        cc.can_burn_subtitles = real
     return win, dlg
 
 
@@ -118,6 +126,27 @@ def test_tracks_fill_the_boxes_without_a_probe():
     # about converting stays out of the way.
     assert dlg._chosen() == (None, None)
     assert dlg.track_note.isVisible() is False
+    win.deleteLater()
+
+
+def test_an_ffmpeg_without_libass_offers_no_subtitle_it_cannot_send():
+    """A text subtitle reaches a Chromecast only by being drawn into the
+    picture, which needs libass. Offering the choice anyway took the picture
+    away and said "No such filter" in the log - so where the choice would
+    have been, say why there is none."""
+    tracks = {"audio": [{"index": 0, "lang": "swe", "codec": "aac"}],
+              "subtitle": [{"index": 0, "lang": "swe", "codec": "subrip"}]}
+    win, dlg = _dialog(burn=False, tracks=tracks, managing=True)
+    assert dlg.subs_box.isEnabled() is False
+    assert dlg.subs_box.count() == 1
+    assert "libass" in dlg.subs_box.itemText(0)
+    win.deleteLater()
+
+    # A picture-based subtitle is drawn with overlay, which every build has.
+    tracks["subtitle"] = [{"index": 0, "lang": "swe", "codec": "dvb_subtitle"}]
+    win, dlg = _dialog(burn=False, tracks=tracks, managing=True)
+    assert dlg.subs_box.isEnabled() is True
+    assert dlg.subs_box.count() == 2           # off + the one
     win.deleteLater()
 
 

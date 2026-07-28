@@ -3322,6 +3322,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             "group": self._RESUME_GROUP.get(rkind or ""),
             "key": key,
             "item": it,
+            # For History: the row's own kind and address, kept apart from
+            # the address currently on the receiver, which an archive resume
+            # or a track change replaces.
+            "kind": self._play_kind_for(it),
+            "row_url": url,
         }
         CastDialog(self, url, title, self._local_codecs(),
                    self._local_audio_index(), start,
@@ -3532,11 +3537,70 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not device:
             bar.hide()
             return
+        self._record_cast_history()
         self.cast_bar_lbl.setText(tr("cast_casting_to", name=device))
         self.cast_bar_title.setText(title or "")
         self.cast_bar_title.setVisible(bool(title))
         self._show_cast_volume()
         bar.show()
+
+    def _history_extra(self, kind: str, item, title: str) -> dict | None:
+        """What a History row needs beyond its address, for this kind.
+
+        For a live channel, its stream_id and archive depth, so a later replay
+        from History still has timeshift and catch-up available.
+
+        For an episode, its series - so a replay from History (or Home's
+        Recently viewed) resumes as an EPISODE, lands in the series' episode
+        list and resolves the series' poster. Without it the row degraded to a
+        context-less "movie": restarted from zero, duplicated in History (the
+        kind mismatch broke the dedup) and posterless. Same slim snapshot the
+        resume store keeps.
+        """
+        if kind == "live" and item is not None:
+            return {"stream_id": item.get("stream_id"),
+                    "num": item.get("num"),
+                    "tv_archive": item.get("tv_archive"),
+                    "tv_archive_duration": item.get("tv_archive_duration")}
+        if kind != "episode":
+            return None
+        sctx = self.series_ctx or {}
+        if sctx.get("series_id") is None:
+            return None
+        slim = {k: sctx.get(k)
+                for k in ("series_id", "name", "title", "cover",
+                          "stream_icon", "category_id", "_tmdb_id")
+                if sctx.get(k) is not None}
+        sname = sctx.get("name") or sctx.get("title")
+        extra = {"_series_ctx": slim, "_series_title": sname}
+        # Store the row as "Series · S1 * E2 - ..." so History and the Home
+        # shelf say WHICH show the episode belongs to - a bare "S01 E01" told
+        # the user nothing. Skip when the title already carries it (a
+        # continue-watching replay).
+        if sname and not title.startswith(sname):
+            extra["name"] = f"{sname} · {title}"
+        return extra
+
+    def _record_cast_history(self) -> None:
+        """A cast is a play, and belongs in History like any other.
+
+        Nothing else recorded it. Every other route into playback goes through
+        _start_playback, which a cast deliberately does not - the stream never
+        touches this machine - so an evening's television watched on the TV
+        left no trace at all, and could not be picked up again from History
+        the way anything played here can.
+        """
+        ctx = getattr(self, "_cast_ctx", None) or {}
+        it = ctx.get("item") or {}
+        # The row's own address, not the one currently on the receiver: an
+        # archive resume replaces that with a timeshift URL good for minutes.
+        url, key, kind = ctx.get("row_url"), ctx.get("key"), ctx.get("kind")
+        if not url or key is None or not kind:
+            return
+        self.history.add(url, ctx.get("title") or "",
+                         it.get("stream_icon") or it.get("cover"), key, kind,
+                         extra=self._history_extra(kind, it,
+                                                   ctx.get("title") or ""))
 
     def manage_cast(self) -> None:
         """Reopen the cast panel on the session that is already running.
@@ -4339,37 +4403,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                      if kind in self._RESUMABLE else 0.0)
         self._trakt_stop_current()
         if record and kind:
-            # For a live channel, remember its stream_id + archive depth so a
-            # later replay from History still has timeshift/catch-up available.
-            extra = None
-            if kind == "live" and item is not None:
-                extra = {"stream_id": item.get("stream_id"),
-                         "num": item.get("num"),
-                         "tv_archive": item.get("tv_archive"),
-                         "tv_archive_duration": item.get("tv_archive_duration")}
-            elif kind == "episode":
-                # Remember the episode's series so a replay from History (or
-                # Home's Recently viewed) can resume as an EPISODE, land in
-                # the series' episode list, and resolve the series' poster -
-                # without it the row degraded to a context-less "movie":
-                # restarted from zero, duplicated in History (kind mismatch
-                # broke the dedup) and posterless. Same slim snapshot the
-                # resume store keeps.
-                sctx = self.series_ctx or {}
-                if sctx.get("series_id") is not None:
-                    slim = {k: sctx.get(k)
-                            for k in ("series_id", "name", "title", "cover",
-                                      "stream_icon", "category_id", "_tmdb_id")
-                            if sctx.get(k) is not None}
-                    sname = sctx.get("name") or sctx.get("title")
-                    extra = {"_series_ctx": slim, "_series_title": sname}
-                    # Store the row as "Series · S1 * E2 - ..." so History and
-                    # the Home shelf say WHICH show the episode belongs to -
-                    # a bare "S01 E01" told the user nothing. Skip when the
-                    # title already carries it (a continue-watching replay).
-                    if sname and not title.startswith(sname):
-                        extra["name"] = f"{sname} · {title}"
-            self.history.add(url, title, icon_url, key, kind, extra=extra)
+            self.history.add(url, title, icon_url, key, kind,
+                             extra=self._history_extra(kind, item, title))
         if kind in ("movie", "episode"):
             self._trakt_start_for_item(kind, item)
         self.stream_error.hide()

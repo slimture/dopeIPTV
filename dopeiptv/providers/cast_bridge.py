@@ -489,31 +489,14 @@ class _Handler(BaseHTTPRequestHandler):
         if self.path != bridge.path:
             self.send_error(404)
             return
-        proc = bridge.spawn()
+        proc, head = bridge.first_frames()
         if proc is None:
             self.send_error(503)
             return
-        chunk = proc.stdout.read(65536)
-        if not chunk:
-            # Nothing at all, which on these accounts usually means the
-            # provider is still counting a connection we closed a moment ago -
-            # the two refused attempts at the TV, or the redirect check. It
-            # frees up within seconds, so ask once more before giving up.
-            for wait in (6, 10):
-                bridge.kill(proc)
-                log.info("cast bridge: nothing came back - trying again "
-                         "in %d s", wait)
-                time.sleep(wait)
-                proc = bridge.spawn()
-                if proc is None:
-                    self.send_error(503)
-                    return
-                chunk = proc.stdout.read(65536)
-                if chunk:
-                    break
         self._headers()
         began, sent = time.monotonic(), 0
         try:
+            chunk = head
             while chunk:
                 self.wfile.write(chunk)
                 sent += len(chunk)
@@ -629,6 +612,51 @@ class CastBridge:
                   if subs is not None else "")
                  + ("" if quality == "original" else f", {quality}"))
         return url
+
+    # How much has to come out of ffmpeg before a byte of it is handed to
+    # the receiver. A run that dies before this never happened as far as the
+    # TV is concerned, and can simply be tried again; one that dies after it
+    # cannot, because a fragmented MP4 has no way to start over mid-response.
+    PRIMED = 1_500_000
+
+    def first_frames(self) -> tuple[subprocess.Popen | None, bytes]:
+        """Start ffmpeg and hold the opening back until it is plainly going.
+
+        These panels refuse a stream while they are still counting a
+        connection that has just been dropped - and on the pause-and-resume
+        path one is always dropped a moment earlier, because the receiver
+        only lets go of the live stream when the archive replaces it. ffmpeg
+        then reads a fraction of a second and stops:
+
+            Error during demuxing: Input/output error
+            ffmpeg stopped after 0 s and 0.9 MB (exit 0)
+
+        Those nine hundred kilobytes used to go straight to the TV, which
+        played them and reported IDLE/FINISHED - a black screen, from a cast
+        that had simply been asked a few seconds too early. The count frees
+        up within seconds, so hold the opening back until there is enough of
+        it to be sure, and until then a failure costs nothing but a wait.
+        """
+        for wait in (0, 6, 10):
+            if wait:
+                log.info("cast bridge: the stream stopped short - trying "
+                         "again in %d s", wait)
+                time.sleep(wait)
+            proc = self.spawn()
+            if proc is None:
+                return None, b""
+            head, size = [], 0
+            while size < self.PRIMED:
+                chunk = proc.stdout.read(65536)
+                if not chunk:
+                    break
+                head.append(chunk)
+                size += len(chunk)
+            if size >= self.PRIMED:
+                return proc, b"".join(head)
+            self.kill(proc)
+        log.info("cast bridge: the stream would not start")
+        return None, b""
 
     def spawn(self) -> subprocess.Popen | None:
         exe = self.exe or ffmpeg_path()

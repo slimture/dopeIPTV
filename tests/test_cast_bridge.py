@@ -167,11 +167,16 @@ def test_the_stream_is_served_over_http():
     url = b.start("http://p/x.m3u8", ["h264", "eac3"])
     try:
         import dopeiptv.providers.cast_bridge as cb
-        payload = b"MOOV" * 4096
+        # Big enough to be a stream the bridge will commit to. Anything
+        # shorter is read as a run that died before it started, and is
+        # deliberately never handed to the receiver.
+        payload = b"MOOV" * 512_000
 
         def fake_args(exe, source, copy_video, *a, **k):
-            return [exe, "-c",
-                    "import sys;sys.stdout.buffer.write(%r)" % payload]
+            # Written by the child, not passed on its command line: two
+            # megabytes of argument is past what a process may be given.
+            return [exe, "-c", "import sys;"
+                    "sys.stdout.buffer.write(b'MOOV' * 512_000)"]
 
         real, cb.ffmpeg_args = cb.ffmpeg_args, fake_args
         try:
@@ -394,3 +399,49 @@ def test_a_broadcast_does_not_end_when_the_panel_closes_the_connection():
     # A local recording takes none of them: ffmpeg exits outright on an HTTP
     # option it was handed for a file.
     assert _input_options("/home/me/Recordings/x.mkv") == []
+
+
+def test_a_stream_that_dies_at_once_never_reaches_the_receiver():
+    """These panels refuse a stream while they are still counting a connection
+    that has just been dropped - and on the pause-and-resume path one always
+    is, because the receiver only lets go of the live stream when the archive
+    replaces it. ffmpeg then reads a fraction of a second and stops.
+
+    Those bytes used to go straight to the TV, which played them and reported
+    IDLE/FINISHED: a black screen from a cast asked a few seconds too early.
+    Nothing is handed over until there is enough of it to be sure.
+    """
+    import dopeiptv.providers.cast_bridge as cb
+
+    runs = []
+
+    def fake_args(exe, source, copy_video, *a, **k):
+        runs.append(source)
+        # A short burst the first time, a real stream after that.
+        size = 300_000 if len(runs) == 1 else 2_000_000
+        return [exe, "-c",
+                "import sys;sys.stdout.buffer.write(b'x' * %d)" % size]
+
+    b = CastBridge()
+    b.exe = sys.executable
+    b.start("http://p/timeshift/x.ts", ["h264"])
+    real_args, real_sleep = cb.ffmpeg_args, cb.time.sleep
+    cb.ffmpeg_args = fake_args
+    cb.time.sleep = lambda s: None            # no waiting in a test
+    try:
+        proc, head = b.first_frames()
+        assert proc is not None
+        assert len(runs) == 2, "the short run was thrown away and retried"
+        assert len(head) >= b.PRIMED
+        assert set(head) == {ord("x")}, "not a byte of the failed run"
+        b.kill(proc)
+
+        # A stream that never starts is refused rather than half-served.
+        runs.clear()
+        cb.ffmpeg_args = lambda *a, **k: [
+            sys.executable, "-c", "import sys;sys.stdout.buffer.write(b'x')"]
+        proc, head = b.first_frames()
+        assert proc is None and head == b""
+    finally:
+        cb.ffmpeg_args, cb.time.sleep = real_args, real_sleep
+        b.stop()
