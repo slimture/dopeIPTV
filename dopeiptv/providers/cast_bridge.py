@@ -510,22 +510,32 @@ class _Handler(BaseHTTPRequestHandler):
         if self.path != bridge.path:
             self.send_error(404)
             return
-        proc, head = bridge.first_frames()
+        proc, spool = bridge.first_frames()
         if proc is None:
             self.send_error(503)
             return
         self._headers()
         began, sent = time.monotonic(), 0
         try:
-            chunk = head
-            while chunk:
-                self.wfile.write(chunk)
-                sent += len(chunk)
-                chunk = proc.stdout.read(65536)
-            # ffmpeg's output ran dry. This is the one way a cast dies without
-            # anything at all being said about it: the response simply ends,
-            # the receiver reaches what looks like the end of the file, and
-            # the picture goes black. Say so, with what it managed first.
+            # Read from the spool, never from ffmpeg. A television takes its
+            # stream at the speed it plays it, and reading ffmpeg directly
+            # passed that speed all the way back up the chain: ffmpeg blocked
+            # writing, stopped reading the panel, and the panel - which has
+            # no patience for a connection nobody is reading - closed it.
+            #   Stream ends prematurely at 29960221, should be 69423104
+            # That was the whole failure. The spool absorbs the panel's burst
+            # at full speed so the connection is always being drained, and
+            # the receiver is served from disk at whatever pace suits it.
+            with open(spool, "rb") as f:
+                while True:
+                    chunk = f.read(65536)
+                    if chunk:
+                        self.wfile.write(chunk)
+                        sent += len(chunk)
+                        continue
+                    if not bridge.filling(proc):
+                        break
+                    time.sleep(0.2)     # caught up with ffmpeg; wait for more
             log.info("cast bridge: ffmpeg stopped after %d s and %.1f MB "
                      "(exit %s) - the receiver has nothing more to play",
                      time.monotonic() - began, sent / 1e6,
@@ -560,6 +570,8 @@ class CastBridge:
         self._server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
         self._procs: list[subprocess.Popen] = []
+        # The thread draining each ffmpeg into its spool file.
+        self._spools: dict[subprocess.Popen, threading.Thread] = {}
         self._tmp: str | None = None
         self._lock = threading.Lock()
 
@@ -645,7 +657,37 @@ class CastBridge:
     OPENING = 64_000         # enough to know bytes are coming out at all
     SETTLE = 1.5             # and long enough for a doomed run to fall over
 
-    def first_frames(self) -> tuple[subprocess.Popen | None, bytes]:
+    def _tmpdir(self) -> str:
+        """The scratch directory this run of the bridge owns."""
+        if not self._tmp:
+            self._tmp = tempfile.mkdtemp(prefix="dopeiptv-cast-")
+        return self._tmp
+
+    def filling(self, proc: subprocess.Popen) -> bool:
+        """Whether more is still on its way into the spool."""
+        th = self._spools.get(proc)
+        return bool(th and th.is_alive())
+
+    def _spool_out(self, proc: subprocess.Popen, path: str) -> None:
+        """Drain ffmpeg into *path* as fast as it will come.
+
+        This is the whole point of the spool: ffmpeg must never wait for the
+        television. A panel closes an archive connection that nobody is
+        reading, and reading ffmpeg at the receiver's pace made exactly that
+        happen, a few seconds into every stretch.
+        """
+        try:
+            with open(path, "wb") as f:
+                while True:
+                    chunk = proc.stdout.read(65536)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    f.flush()
+        except Exception as e:
+            log.info("cast bridge: the spool stopped (%s)", e)
+
+    def first_frames(self) -> tuple[subprocess.Popen | None, str]:
         """Start ffmpeg and hold the opening back until it is plainly going.
 
         These panels refuse a stream while they are still counting a
@@ -680,27 +722,33 @@ class CastBridge:
                 return None, b""
             proc = self.spawn()
             if proc is None:
-                return None, b""
-            began, head, size = time.monotonic(), [], 0
-            while size < self.OPENING:
-                chunk = proc.stdout.read(65536)
-                if not chunk:
-                    break
-                head.append(chunk)
-                size += len(chunk)
-            # Not how much came out, but whether it is still coming. A run
-            # the panel refuses produces an opening and then stops; a healthy
-            # one simply fills the pipe and waits for it to be read.
+                return None, ""
+            began = time.monotonic()
+            path = os.path.join(self._tmpdir(), f"spool{self.generation}.mp4")
+            th = threading.Thread(target=self._spool_out, args=(proc, path),
+                                  daemon=True)
+            with self._lock:
+                self._spools[proc] = th
+            th.start()
+            while th.is_alive() and (not os.path.exists(path)
+                                     or os.path.getsize(path) < self.OPENING):
+                time.sleep(0.05)
+            size = os.path.getsize(path) if os.path.exists(path) else 0
+            # Not how much came out, but whether the run is sound. One the
+            # panel refuses dies with almost nothing and a non-zero code; one
+            # that is still going, or that finished cleanly with a stretch
+            # worth playing, is served either way - a stretch that simply
+            # ended is what the continuation is for.
             if size >= self.OPENING:
                 time.sleep(self.SETTLE)
-                if proc.poll() is None and self.generation == mine:
+                if proc.poll() in (None, 0) and self.generation == mine:
                     log.info("cast bridge: the stream is going (%.1f s to "
                              "the first %d kB)", time.monotonic() - began,
                              size // 1000)
-                    return proc, b"".join(head)
+                    return proc, path
             self.kill(proc)
         log.info("cast bridge: the stream would not start")
-        return None, b""
+        return None, ""
 
     def spawn(self) -> subprocess.Popen | None:
         exe = self.exe or ffmpeg_path()
@@ -798,6 +846,7 @@ class CastBridge:
         with self._lock:
             if proc in self._procs:
                 self._procs.remove(proc)
+            self._spools.pop(proc, None)
         # Short waits on purpose: this runs on the way out of the app, where
         # every second spent here is a second the whole shutdown does not
         # have. ffmpeg has nothing to flush - it writes to a pipe nobody is

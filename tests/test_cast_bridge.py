@@ -11,6 +11,7 @@ streaming path is exercised without needing a provider or a TV.
 """
 import os
 import sys
+import time
 import urllib.request
 
 import pytest
@@ -435,9 +436,13 @@ def test_a_stream_that_dies_at_once_never_reaches_the_receiver():
     cb.ffmpeg_args = fake_args
     cb.time.sleep = lambda s: None            # no waiting in a test
     try:
-        proc, head = b.first_frames()
+        proc, spool = b.first_frames()
         assert proc is not None
         assert len(runs) == 2, "the short run was thrown away and retried"
+        # The opening is on disk now: ffmpeg is drained at full speed into a
+        # spool so it never waits for the television, and the receiver is
+        # served from there.
+        head = open(spool, "rb").read()
         assert len(head) >= b.OPENING
         assert set(head) == {ord("x")}, "not a byte of the failed run"
         b.kill(proc)
@@ -446,8 +451,8 @@ def test_a_stream_that_dies_at_once_never_reaches_the_receiver():
         runs.clear()
         cb.ffmpeg_args = lambda *a, **k: [
             sys.executable, "-c", "import sys;sys.stdout.buffer.write(b'x')"]
-        proc, head = b.first_frames()
-        assert proc is None and head == b""
+        proc, spool = b.first_frames()
+        assert proc is None and spool == ""
     finally:
         cb.ffmpeg_args, cb.time.sleep = real_args, real_sleep
         b.stop()
@@ -581,3 +586,52 @@ def test_ffmpeg_really_draws_the_subtitle_after_a_seek(tmp_path):
     whole = frames(0.0)
     assert whole[FPS * 6] > 100
     assert whole[FPS * 1] == 0
+
+
+def test_a_slow_receiver_never_stalls_the_panel(tmp_path):
+    """The failure this whole spool exists for, reproduced end to end.
+
+    A television takes its stream at the speed it plays it. Reading ffmpeg
+    directly passed that speed back up the chain: ffmpeg blocked writing,
+    stopped reading the panel, and the panel - which has no patience for a
+    connection nobody is reading - closed it a few seconds in:
+
+        Stream ends prematurely at 29960221, should be 69423104
+        Error during demuxing: Input/output error
+
+    Here a stand-in for ffmpeg refuses to be throttled: it writes its whole
+    stream promptly and reports failure if made to wait. The receiver reads
+    slowly. Both must still get everything.
+    """
+    import dopeiptv.providers.cast_bridge as cb
+
+    marker = tmp_path / "was-throttled"
+    # Writes 1 MB in bursts and fails outright if any single write blocks for
+    # long - which is what being read at playback speed looks like.
+    child = (
+        "import sys,time;"
+        "w=sys.stdout.buffer;"
+        "[ (t0:=time.monotonic(), w.write(b'z'*65536), w.flush(),"
+        "   open(%r,'w').write('yes') if time.monotonic()-t0 > 1.5 else None)"
+        "  for _ in range(16) ]" % str(marker))
+
+    b = CastBridge()
+    b.exe = sys.executable
+    url = b.start("http://p/timeshift/x.ts", ["h264"])
+    real = cb.ffmpeg_args
+    cb.ffmpeg_args = lambda *a, **k: [sys.executable, "-c", child]
+    try:
+        got = bytearray()
+        with urllib.request.urlopen(url, timeout=30) as r:
+            while True:                       # a receiver, reading slowly
+                part = r.read(16384)
+                if not part:
+                    break
+                got += part
+                time.sleep(0.02)
+        assert len(got) == 16 * 65536, len(got)
+        assert set(got) == {ord("z")}
+        assert not marker.exists(), "ffmpeg was made to wait for the TV"
+    finally:
+        cb.ffmpeg_args = real
+        b.stop()
