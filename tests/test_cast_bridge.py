@@ -306,13 +306,91 @@ def test_a_subtitle_choice_is_only_offered_when_it_can_be_honoured():
     old = cb.subprocess.run
     cb.subprocess.run = fake_run
     try:
+        # ffmpeg lists its filters as "flags name in->out description", so the
+        # name is the second field - "scale" and "overlay" are not it.
         assert cb.can_burn_subtitles("ffmpeg") is False
-        assert cb.can_burn_subtitles("ffmpeg") is False
-        assert len(listed) == 1, "asked once, not per cast"
         assert "-filters" in listed[0]
-        cb._can_burn = None
         Result.stdout = " T.. subtitles       V->V  Render text.\n"
         assert cb.can_burn_subtitles("ffmpeg") is True
     finally:
         cb.subprocess.run = old
         cb._can_burn = None
+
+
+def test_the_ffmpeg_that_can_send_subtitles_is_the_one_chosen():
+    """Machines carry more than one ffmpeg - a slim one on PATH and a full one
+    from Homebrew, or a bundled one inside the app - and whether a build has
+    libass decides whether a subtitle can be sent at all. Picking the first on
+    PATH meant the choice was made by accident."""
+    import dopeiptv.providers.cast_bridge as cb
+
+    asked = []
+
+    def fake_run(args, **kw):
+        asked.append(args[0])
+
+        class R:
+            # Only the Homebrew one was built with libass.
+            stdout = (" T.. subtitles  V->V  Render text.\n"
+                      if args[0] == "/opt/homebrew/bin/ffmpeg"
+                      else " ..C scale  V->V  Scale.\n")
+        return R()
+
+    old_run, old_which, old_access = cb.subprocess.run, cb.shutil.which, \
+        cb.os.access
+    cb._ffmpeg, cb._can_burn = False, None
+    cb.subprocess.run = fake_run
+    cb.shutil.which = lambda n: "/usr/bin/" + n
+    cb.os.access = lambda p, m: p in ("/usr/bin/ffmpeg",
+                                      "/opt/homebrew/bin/ffmpeg")
+    try:
+        assert cb.ffmpeg_path() == "/opt/homebrew/bin/ffmpeg"
+        assert cb.can_burn_subtitles() is True
+        assert asked == ["/usr/bin/ffmpeg", "/opt/homebrew/bin/ffmpeg"]
+        # Asked once - spawn() calls this for every run.
+        asked.clear()
+        cb.ffmpeg_path()
+        assert asked == []
+
+        # With only the slim one present it is still used: converting a
+        # channel the receiver cannot decode matters more than subtitles.
+        cb._ffmpeg, cb._can_burn = False, None
+        cb.os.access = lambda p, m: p == "/usr/bin/ffmpeg"
+        assert cb.ffmpeg_path() == "/usr/bin/ffmpeg"
+        assert cb.can_burn_subtitles() is False
+
+        # And none at all is not a crash.
+        cb._ffmpeg, cb._can_burn = False, None
+        cb.os.access = lambda p, m: False
+        cb.shutil.which = lambda n: None
+        assert cb.ffmpeg_path() is None
+        assert cb.can_burn_subtitles() is False
+    finally:
+        cb.subprocess.run, cb.shutil.which = old_run, old_which
+        cb.os.access = old_access
+        cb._ffmpeg, cb._can_burn = False, None
+
+
+def test_a_broadcast_does_not_end_when_the_panel_closes_the_connection():
+    """These panels announce a length they then fail to deliver, mid-
+    programme: "Stream ends prematurely at 1923056, should be 19013632".
+    Without reconnecting at EOF ffmpeg treats that as the end of the stream
+    and stops, and the picture goes black with nothing to say why.
+
+    A film is the opposite case: the end of the file is exactly what it says
+    it is, and reconnecting there would restart the film for ever.
+    """
+    from dopeiptv.providers.cast_bridge import _input_options
+
+    live = _input_options("http://p/live/u/pw/9851.ts")
+    assert "-reconnect_at_eof" in live
+    assert _input_options("http://p/x.m3u8").count("-reconnect_at_eof") == 1
+    assert "-reconnect_at_eof" in _input_options(
+        "http://p/timeshift/u/pw/241/2026-07-28:10-44/9851.ts?token=abc")
+
+    film = _input_options("http://p/movie/u/pw/5.mkv")
+    assert "-reconnect_at_eof" not in film
+    assert "-reconnect" in film, "the ordinary reconnects still apply"
+    # A local recording takes none of them: ffmpeg exits outright on an HTTP
+    # option it was handed for a file.
+    assert _input_options("/home/me/Recordings/x.mkv") == []

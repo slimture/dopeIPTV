@@ -29,6 +29,7 @@ import secrets
 import shutil
 import socket
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -106,6 +107,51 @@ def _fatal_error(line: str) -> bool:
 
 _hw_encoder: str | None = None
 _can_burn: bool | None = None
+_ffmpeg: str | None | bool = False       # False = not looked for yet
+
+
+def _has_subtitles_filter(exe: str) -> bool:
+    """Whether this particular ffmpeg was built with libass."""
+    try:
+        out = subprocess.run([exe, "-hide_banner", "-filters"],
+                             capture_output=True, text=True,
+                             timeout=15).stdout
+    except Exception as e:
+        log.info("cast bridge: could not list %s's filters (%s)", exe, e)
+        return False
+    return any(line.split()[1:2] == ["subtitles"]
+               for line in out.splitlines() if line.strip())
+
+
+def _ffmpeg_candidates() -> list[str]:
+    """Every ffmpeg on this machine worth considering, best guess first.
+
+    The one shipped inside a frozen build comes first because it is the one
+    the app was tested with, then whatever PATH says, then the places package
+    managers actually put things - a Homebrew ffmpeg is invisible to a bundle
+    launched from Finder, whose PATH is the bare system one.
+    """
+    found: list[str] = []
+    for cand in (_bundled(), shutil.which("ffmpeg"),
+                 "/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg",
+                 "/opt/local/bin/ffmpeg", "/usr/bin/ffmpeg",
+                 "/snap/bin/ffmpeg", "/var/lib/flatpak/exports/bin/ffmpeg"):
+        if cand and cand not in found and os.access(cand, os.X_OK):
+            found.append(cand)
+    return found
+
+
+def _bundled() -> str | None:
+    """An ffmpeg shipped inside a frozen build, which is not on PATH."""
+    if not getattr(sys, "frozen", False):
+        return None
+    exe = "ffmpeg.exe" if sys.platform == "win32" else "ffmpeg"
+    base = getattr(sys, "_MEIPASS", None) or os.path.dirname(sys.executable)
+    for cand in (os.path.join(base, exe),
+                 os.path.join(os.path.dirname(sys.executable), exe)):
+        if os.path.isfile(cand) and os.access(cand, os.X_OK):
+            return cand
+    return None
 
 
 def can_burn_subtitles(exe: str | None = None) -> bool:
@@ -128,21 +174,11 @@ def can_burn_subtitles(exe: str | None = None) -> bool:
     which every build has.
     """
     global _can_burn
+    if exe is not None:                  # a named build, asked about directly
+        return _has_subtitles_filter(exe)
     if _can_burn is None:
-        _can_burn = False
-        exe = exe or ffmpeg_path()
-        if exe:
-            try:
-                out = subprocess.run([exe, "-hide_banner", "-filters"],
-                                     capture_output=True, text=True,
-                                     timeout=15).stdout
-                _can_burn = any(line.split()[1:2] == ["subtitles"]
-                                for line in out.splitlines() if line.strip())
-            except Exception as e:
-                log.info("cast bridge: could not list the filters (%s)", e)
-        if not _can_burn:
-            log.info("cast bridge: this ffmpeg has no subtitles filter - "
-                     "text subtitles cannot be burned in")
+        chosen = ffmpeg_path()
+        _can_burn = bool(chosen) and _has_subtitles_filter(chosen)
     return _can_burn
 
 
@@ -170,8 +206,44 @@ def video_encoder() -> str:
 
 
 def ffmpeg_path() -> str | None:
-    """Where ffmpeg is, or None when it is not installed."""
-    return shutil.which("ffmpeg")
+    """Which ffmpeg to run, or None when there is none.
+
+    Not simply the first one on PATH. Whether a build has libass decides
+    whether a subtitle can be sent to the TV at all, and machines routinely
+    carry more than one ffmpeg - a slim one on PATH and a full one from
+    Homebrew, or a bundled one inside the app. So the ones that are here are
+    asked, and a build that can burn subtitles wins over one that cannot.
+    Asked once: it cannot change while the app is running.
+    """
+    global _ffmpeg, _can_burn
+    if _ffmpeg is not False:
+        return _ffmpeg                   # type: ignore[return-value]
+    found = _ffmpeg_candidates()
+    _ffmpeg, _can_burn = (found[0] if found else None), False
+    for cand in found:
+        if _has_subtitles_filter(cand):
+            _ffmpeg, _can_burn = cand, True
+            break
+    if _ffmpeg is None:
+        log.info("cast bridge: no ffmpeg found - streams the receiver "
+                 "refuses cannot be converted")
+    else:
+        log.info("cast bridge: using %s (subtitles %s)", _ffmpeg,
+                 "can be burned in" if _can_burn else
+                 "cannot be sent - this build has no libass")
+    return _ffmpeg                       # type: ignore[return-value]
+
+
+def _ffprobe_path() -> str:
+    """The ffprobe belonging to the ffmpeg we settled on."""
+    ff = ffmpeg_path()
+    if ff:
+        cand = os.path.join(os.path.dirname(ff),
+                            "ffprobe.exe" if sys.platform == "win32"
+                            else "ffprobe")
+        if os.access(cand, os.X_OK):
+            return cand
+    return shutil.which("ffprobe") or ""
 
 
 def lan_address() -> str:
@@ -206,7 +278,10 @@ def probe_tracks(source: str, exe: str | None = None) -> dict:
     language and any title. Empty on any failure: not being able to list the
     tracks is a reason to offer no choice, never a reason to block a cast.
     """
-    exe = exe or (shutil.which("ffprobe") or "")
+    # The ffprobe next to the ffmpeg we chose, so both come from the same
+    # build - a Homebrew ffmpeg with a system ffprobe would report on one
+    # thing and convert with another.
+    exe = exe or _ffprobe_path()
     out: dict = {"audio": [], "subtitle": [], "duration": 0.0,
                  "height": 0, "fps": 0.0}
     if not exe:
@@ -272,9 +347,29 @@ def _input_options(source: str) -> list[str]:
     """
     if "://" not in source:
         return []
-    return ["-user_agent", _UA,
+    opts = ["-user_agent", _UA,
             "-reconnect", "1", "-reconnect_streamed", "1",
             "-reconnect_on_network_error", "1", "-reconnect_delay_max", "5"]
+    if _endless(source):
+        # A broadcast has no end, so the server closing the connection is
+        # never the end of it - and these panels do close it, mid-programme,
+        # announcing a length they then fail to deliver:
+        #   Stream ends prematurely at 1923056, should be 19013632
+        # Without this ffmpeg treats that as the end of the stream, stops,
+        # and the receiver has nothing more to play: the picture goes black
+        # with nothing in any log to say why. Deliberately NOT set for a film,
+        # where the end of the file is exactly what it says it is and
+        # reconnecting there would restart the film for ever.
+        opts += ["-reconnect_at_eof", "1"]
+    return opts
+
+
+def _endless(source: str) -> bool:
+    """Whether the source is a broadcast rather than a thing with an end."""
+    path = source.split("?", 1)[0].lower()
+    return (path.endswith((".ts", ".m3u8"))
+            or "/timeshift/" in path or "/live/" in path
+            or "timeshift.php" in path)
 
 
 def _filter_escape(source: str) -> str:
@@ -417,12 +512,23 @@ class _Handler(BaseHTTPRequestHandler):
                 if chunk:
                     break
         self._headers()
+        began, sent = time.monotonic(), 0
         try:
             while chunk:
                 self.wfile.write(chunk)
+                sent += len(chunk)
                 chunk = proc.stdout.read(65536)
+            # ffmpeg's output ran dry. This is the one way a cast dies without
+            # anything at all being said about it: the response simply ends,
+            # the receiver reaches what looks like the end of the file, and
+            # the picture goes black. Say so, with what it managed first.
+            log.info("cast bridge: ffmpeg stopped after %d s and %.1f MB "
+                     "(exit %s) - the receiver has nothing more to play",
+                     time.monotonic() - began, sent / 1e6,
+                     proc.poll())
         except (BrokenPipeError, ConnectionResetError):
-            log.info("cast bridge: the receiver closed the connection")
+            log.info("cast bridge: the receiver closed the connection "
+                     "after %d s", time.monotonic() - began)
         finally:
             bridge.kill(proc)
 
