@@ -38,6 +38,7 @@ _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_paused_moment", "_record_cast_history", "_history_extra",
             "_show_cast_progress", "_cast_seek", "_cast_seek_released",
             "_fmt_hms", "_cast_moment", "_cast_to_moment", "_cast_go_live",
+            "_local_tracks",
             "_set_cast_quality", "_toggle_cast_mute", "_show_cast_volume")
 
 
@@ -433,9 +434,10 @@ def test_the_archive_url_starts_where_you_paused(monkeypatch):
     asked = {}
 
     class Client:
-        def timeshift_url(self, sid, start, minutes):
+        def timeshift_urls(self, sid, start, minutes):
             asked.update(sid=sid, start=start, minutes=minutes)
-            return "http://p/timeshift/9851"
+            return ["http://p/timeshift/241/x/9851.ts",
+                    "http://p/timeshift/241/x/9851.m3u8"]
 
     w = _with_strip()
     w.client = Client()
@@ -454,9 +456,15 @@ def test_the_archive_url_starts_where_you_paused(monkeypatch):
     # rewatching up to a minute of television on every single pause.
     assert asked["sid"] == 9851
     assert asked["start"] == at.replace(second=0)
-    assert asked["minutes"] > 240, asked          # room to keep watching
+    assert asked["minutes"] > 60, asked           # room to keep watching
     assert sent, "the archive URL is cast"
     assert w._cast_ctx["archive_from"] == at.replace(second=0)
+    # The receiver is offered the playlist and the converter the transport
+    # stream behind it - the same split that decides a live cast, and the
+    # reason a panel cutting the stream short is a segment to fetch again
+    # rather than the end of everything.
+    assert w._cast_ctx["url"].endswith(".m3u8")
+    assert w._cast_ctx["source"].endswith(".ts")
 
 
 def test_pausing_the_archive_again_does_not_jump_back_to_now():
@@ -1184,3 +1192,36 @@ def test_going_live_leaves_the_archive_behind(monkeypatch):
     assert w._cast_ctx["url"] == "http://p/live/u/pw/9851.m3u8"
     assert w._cast_ctx["archive_from"] is None
     assert sent, "the live address is cast"
+
+
+def test_a_film_handed_over_from_the_player_knows_how_long_it_is():
+    """The ordinary way of casting a film is to be watching it here first,
+    and then the track list comes from mpv rather than from ffprobe - opening
+    the stream a second time costs a connection these accounts do not have.
+    Without the length coming along, the strip had nothing to measure a
+    position against and offered no way to move within the film at all."""
+    w = _window()
+    w._playing_key = 5
+    w._item_key = lambda it: it.get("stream_id")
+
+    class Mpv:
+        duration = 6000.0
+        height = 1080
+        container_fps = 25.0
+        track_list = [{"type": "video", "demux-h": 1080, "demux-fps": 25.0},
+                      {"type": "audio", "codec": "aac", "lang": "swe"}]
+
+    class Video:
+        mpv = Mpv()
+
+    class Player:
+        video = Video()
+
+    w.player = Player()
+    got = w._local_tracks({"stream_id": 5})
+    assert got["duration"] == 6000.0
+    assert got["height"] == 1080
+    assert len(got["audio"]) == 1
+
+    # Any other row is left to ffprobe, which answers for what is not playing.
+    assert w._local_tracks({"stream_id": 6}) == {}

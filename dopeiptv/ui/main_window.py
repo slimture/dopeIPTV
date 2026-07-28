@@ -3455,6 +3455,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         out: dict = {"audio": [], "subtitle": [], "duration": 0.0,
                      "height": 0, "fps": 0.0}
         try:
+            # How long the film is. mpv knows, and without it the cast strip
+            # has nothing to measure a position against - so a film handed
+            # over from the player, which is the ordinary way of casting one,
+            # arrived at the TV with no way to move within it.
+            out["duration"] = float(getattr(m, "duration", 0) or 0.0)
             for t in (m.track_list or []):
                 kind = t.get("type")
                 if kind == "video" and not out["height"]:
@@ -4013,21 +4018,36 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         minute = paused_at.replace(second=0, microsecond=0)
         offset = (paused_at - minute).total_seconds()
         behind = max(1, int((datetime.now() - minute).total_seconds() // 60))
-        url = self.client.timeshift_url(sid, minute, behind + 240)
+        # Enough to reach live and keep going for a while. A cast cannot ask
+        # for more later the way the player does - when this window runs out
+        # the stream ends - but asking for a day of it makes the panel
+        # prepare a day of it, and nothing plays until it has.
+        # The receiver is offered the archive as HLS, and the converter is
+        # given the transport stream behind it.
+        #
+        # This is the same difference that decides a LIVE cast: a Chromecast
+        # plays an HLS playlist by itself and cannot decode a raw transport
+        # stream at all. And it is the transport stream that these panels cut
+        # short mid-programme - a playlist is a list of segments, so a short
+        # one is a segment to fetch again rather than the end of everything.
+        cands = self.client.timeshift_urls(sid, minute, behind + 120) or []
+        url = next((c for c in cands if ".m3u8" in c), "")
+        source = next((c for c in cands if ".ts" in c), "") or url
+        url = url or source
         if not url:
             return
         # The moment itself, not how it was worked out - it is the one thing
         # that can be checked against what the picture actually shows.
-        log.info("cast: resuming %s from %s (%d min of archive held)",
-                 ctx.get("title") or "",
-                 paused_at.strftime("%H:%M:%S"), behind)
+        log.info("cast: resuming %s from %s (%d min back, asking for %d min)",
+                 ctx.get("title") or "", paused_at.strftime("%H:%M:%S"),
+                 behind, behind + 120)
         title = ctx.get("title") or "dopeIPTV"
         # The session now lives at the archive address. Recording it keeps the
         # strip's own panel pointing at what is actually playing - it opened
         # on an empty address otherwise, and cast it. archive_from is what a
         # later pause measures against, so this cast can be paused again
         # without losing the shift it already has.
-        ctx.update(url=url, source=url, archive_from=minute)
+        ctx.update(url=url, source=source, archive_from=minute)
         # Everything the live cast was doing, the archive cast does too. It is
         # the same channel at the same size, so the device's picture ceiling,
         # the chosen tracks and the known codecs all still apply - dropping
@@ -4037,7 +4057,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.pool,
             lambda: self.cast.cast(device, url, title, self._local_codecs(),
                                    ctx.get("audio"), ctx.get("subs"),
-                                   start=offset, source=url,
+                                   start=offset, source=source,
                                    quality=self._cast_quality(),
                                    height=ctx.get("height") or 0,
                                    fps=ctx.get("fps") or 0.0),

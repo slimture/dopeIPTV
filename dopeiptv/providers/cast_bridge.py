@@ -111,16 +111,21 @@ _ffmpeg: str | None | bool = False       # False = not looked for yet
 
 
 def _has_subtitles_filter(exe: str) -> bool:
-    """Whether this particular ffmpeg was built with libass."""
+    """Whether this particular ffmpeg was built with libass.
+
+    Asked about the one filter rather than read out of the whole table: the
+    table's columns are a display format, and a build that lays them out
+    differently would be misread as having no libass while it does.
+    """
     try:
-        out = subprocess.run([exe, "-hide_banner", "-filters"],
-                             capture_output=True, text=True,
-                             timeout=15).stdout
+        r = subprocess.run([exe, "-hide_banner", "-h", "filter=subtitles"],
+                           capture_output=True, text=True, timeout=15)
     except Exception as e:
-        log.info("cast bridge: could not list %s's filters (%s)", exe, e)
+        log.info("cast bridge: could not ask %s about its filters (%s)",
+                 exe, e)
         return False
-    return any(line.split()[1:2] == ["subtitles"]
-               for line in out.splitlines() if line.strip())
+    said = (r.stdout or "") + (r.stderr or "")
+    return "unknown filter" not in said.lower() and "subtitles" in said
 
 
 def _ffmpeg_candidates() -> list[str]:
@@ -344,32 +349,20 @@ def _input_options(source: str) -> list[str]:
     The reconnects matter for the streams that do use them: an IPTV panel
     drops HTTP connections between segments as a matter of course, and left
     alone ffmpeg eventually gives up on one and the cast dies mid-programme.
+
+    Reconnecting at EOF is deliberately NOT among them. These panels cut an
+    archive stream short - announcing ten megabytes and delivering one - and
+    a reconnect on a stream nobody can seek starts it again from the
+    beginning rather than continuing. The picture went back to where it had
+    started, over and over, which is worse than stopping: at least stopping
+    says something is wrong.
     """
     if "://" not in source:
         return []
     opts = ["-user_agent", _UA,
             "-reconnect", "1", "-reconnect_streamed", "1",
             "-reconnect_on_network_error", "1", "-reconnect_delay_max", "5"]
-    if _endless(source):
-        # A broadcast has no end, so the server closing the connection is
-        # never the end of it - and these panels do close it, mid-programme,
-        # announcing a length they then fail to deliver:
-        #   Stream ends prematurely at 1923056, should be 19013632
-        # Without this ffmpeg treats that as the end of the stream, stops,
-        # and the receiver has nothing more to play: the picture goes black
-        # with nothing in any log to say why. Deliberately NOT set for a film,
-        # where the end of the file is exactly what it says it is and
-        # reconnecting there would restart the film for ever.
-        opts += ["-reconnect_at_eof", "1"]
     return opts
-
-
-def _endless(source: str) -> bool:
-    """Whether the source is a broadcast rather than a thing with an end."""
-    path = source.split("?", 1)[0].lower()
-    return (path.endswith((".ts", ".m3u8"))
-            or "/timeshift/" in path or "/live/" in path
-            or "timeshift.php" in path)
 
 
 def _filter_escape(source: str) -> str:
@@ -617,7 +610,8 @@ class CastBridge:
     # the receiver. A run that dies before this never happened as far as the
     # TV is concerned, and can simply be tried again; one that dies after it
     # cannot, because a fragmented MP4 has no way to start over mid-response.
-    PRIMED = 1_500_000
+    OPENING = 256_000        # enough to know bytes are coming out at all
+    SETTLE = 1.5             # and long enough for a doomed run to fall over
 
     def first_frames(self) -> tuple[subprocess.Popen | None, bytes]:
         """Start ffmpeg and hold the opening back until it is plainly going.
@@ -645,15 +639,23 @@ class CastBridge:
             proc = self.spawn()
             if proc is None:
                 return None, b""
-            head, size = [], 0
-            while size < self.PRIMED:
+            began, head, size = time.monotonic(), [], 0
+            while size < self.OPENING:
                 chunk = proc.stdout.read(65536)
                 if not chunk:
                     break
                 head.append(chunk)
                 size += len(chunk)
-            if size >= self.PRIMED:
-                return proc, b"".join(head)
+            # Not how much came out, but whether it is still coming. A run
+            # the panel refuses produces an opening and then stops; a healthy
+            # one simply fills the pipe and waits for it to be read.
+            if size >= self.OPENING:
+                time.sleep(self.SETTLE)
+                if proc.poll() is None:
+                    log.info("cast bridge: the stream is going (%.1f s to "
+                             "the first %d kB)", time.monotonic() - began,
+                             size // 1000)
+                    return proc, b"".join(head)
             self.kill(proc)
         log.info("cast bridge: the stream would not start")
         return None, b""

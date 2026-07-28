@@ -301,7 +301,8 @@ def test_a_subtitle_choice_is_only_offered_when_it_can_be_honoured():
     listed = []
 
     class Result:
-        stdout = " ..C scale     V->V  Scale.\n TS. overlay   VV->V  Overlay.\n"
+        stdout = "Unknown filter 'subtitles'.\n"
+        stderr = ""
 
     def fake_run(args, **kw):
         listed.append(args)
@@ -311,11 +312,12 @@ def test_a_subtitle_choice_is_only_offered_when_it_can_be_honoured():
     old = cb.subprocess.run
     cb.subprocess.run = fake_run
     try:
-        # ffmpeg lists its filters as "flags name in->out description", so the
-        # name is the second field - "scale" and "overlay" are not it.
+        # Asked about the one filter, so a build that lays its filter
+        # table out differently is not misread as having no libass.
         assert cb.can_burn_subtitles("ffmpeg") is False
-        assert "-filters" in listed[0]
-        Result.stdout = " T.. subtitles       V->V  Render text.\n"
+        assert "filter=subtitles" in listed[0]
+        Result.stdout = ("Filter subtitles\n  Render text subtitles.\n"
+                         "    Inputs: video\n")
         assert cb.can_burn_subtitles("ffmpeg") is True
     finally:
         cb.subprocess.run = old
@@ -336,9 +338,10 @@ def test_the_ffmpeg_that_can_send_subtitles_is_the_one_chosen():
 
         class R:
             # Only the Homebrew one was built with libass.
-            stdout = (" T.. subtitles  V->V  Render text.\n"
+            stdout = ("Filter subtitles\n  Render text subtitles.\n"
                       if args[0] == "/opt/homebrew/bin/ffmpeg"
-                      else " ..C scale  V->V  Scale.\n")
+                      else "Unknown filter 'subtitles'.\n")
+            stderr = ""
         return R()
 
     old_run, old_which, old_access = cb.subprocess.run, cb.shutil.which, \
@@ -376,28 +379,22 @@ def test_the_ffmpeg_that_can_send_subtitles_is_the_one_chosen():
         cb._ffmpeg, cb._can_burn = False, None
 
 
-def test_a_broadcast_does_not_end_when_the_panel_closes_the_connection():
-    """These panels announce a length they then fail to deliver, mid-
-    programme: "Stream ends prematurely at 1923056, should be 19013632".
-    Without reconnecting at EOF ffmpeg treats that as the end of the stream
-    and stops, and the picture goes black with nothing to say why.
+def test_a_local_recording_takes_none_of_the_http_options():
+    """ffmpeg exits outright on an HTTP option it was handed for a file:
+    "Option user_agent not found", before it opens anything - which is every
+    recording on disk failing to cast.
 
-    A film is the opposite case: the end of the file is exactly what it says
-    it is, and reconnecting there would restart the film for ever.
+    Reconnecting at EOF is not among the options at all. These panels cut an
+    archive stream short, and a reconnect on a stream nobody can seek starts
+    it again from the beginning rather than continuing - the picture went
+    back to where it had started, over and over, which is worse than
+    stopping.
     """
     from dopeiptv.providers.cast_bridge import _input_options
 
     live = _input_options("http://p/live/u/pw/9851.ts")
-    assert "-reconnect_at_eof" in live
-    assert _input_options("http://p/x.m3u8").count("-reconnect_at_eof") == 1
-    assert "-reconnect_at_eof" in _input_options(
-        "http://p/timeshift/u/pw/241/2026-07-28:10-44/9851.ts?token=abc")
-
-    film = _input_options("http://p/movie/u/pw/5.mkv")
-    assert "-reconnect_at_eof" not in film
-    assert "-reconnect" in film, "the ordinary reconnects still apply"
-    # A local recording takes none of them: ffmpeg exits outright on an HTTP
-    # option it was handed for a file.
+    assert "-reconnect" in live and "-user_agent" in live
+    assert "-reconnect_at_eof" not in live
     assert _input_options("/home/me/Recordings/x.mkv") == []
 
 
@@ -418,7 +415,7 @@ def test_a_stream_that_dies_at_once_never_reaches_the_receiver():
     def fake_args(exe, source, copy_video, *a, **k):
         runs.append(source)
         # A short burst the first time, a real stream after that.
-        size = 300_000 if len(runs) == 1 else 2_000_000
+        size = 100_000 if len(runs) == 1 else 2_000_000
         return [exe, "-c",
                 "import sys;sys.stdout.buffer.write(b'x' * %d)" % size]
 
@@ -432,7 +429,7 @@ def test_a_stream_that_dies_at_once_never_reaches_the_receiver():
         proc, head = b.first_frames()
         assert proc is not None
         assert len(runs) == 2, "the short run was thrown away and retried"
-        assert len(head) >= b.PRIMED
+        assert len(head) >= b.OPENING
         assert set(head) == {ord("x")}, "not a byte of the failed run"
         b.kill(proc)
 
