@@ -67,7 +67,7 @@ def test_a_text_subtitle_is_burned_in_through_the_subtitles_filter():
     # Doubled backslashes: a filtergraph is parsed twice and the colon has to
     # survive both. Quoting instead is what broke it - newer ffmpeg takes a
     # backslash inside quotes literally and the filename kept them.
-    assert vf == "subtitles=http\\\\://p/x.mkv:si=1", vf
+    assert vf == "subtitles=filename=http\\\\://p/x.mkv:si=1", vf
     # copy_video is overridden: a picture that changes cannot be copied.
     assert args[args.index("-c:v") + 1] == "libx264"
 
@@ -87,7 +87,7 @@ def test_a_url_with_a_port_survives_the_filtergraph():
     args = ffmpeg_args("ffmpeg", "http://h:8080/a.mkv", copy_video=False,
                        subs=0, sub_codec="ass")
     vf = args[args.index("-vf") + 1]
-    assert vf == "subtitles=http\\\\://h\\\\:8080/a.mkv:si=0", vf
+    assert vf == "subtitles=filename=http\\\\://h\\\\:8080/a.mkv:si=0", vf
 
 
 def test_a_local_file_is_linked_under_a_name_nothing_can_misread(tmp_path):

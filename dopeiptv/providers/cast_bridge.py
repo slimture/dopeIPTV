@@ -176,8 +176,12 @@ def ffmpeg_args(exe: str, source: str, copy_video: bool,
             burn = ["-filter_complex",
                     f"[0:v:0][0:s:{subs}]overlay[v]", "-map", "[v]"]
         else:
+            # "filename=" spelled out, not left positional. Newer ffmpeg
+            # refuses to take the first argument as a bare value once it has
+            # been escaped, and says so about the whole rest of the chain:
+            #   No option name near 'http\://lol.bz\:2095/....mkv:si=4'
             burn = ["-vf",
-                    f"subtitles={_filter_escape(source)}:si={subs}",
+                    f"subtitles=filename={_filter_escape(source)}:si={subs}",
                     "-map", "0:v:0"]
     else:
         burn = ["-map", "0:v:0"]
