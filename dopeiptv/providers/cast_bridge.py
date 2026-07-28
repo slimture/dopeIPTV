@@ -514,12 +514,6 @@ def hls_args(exe: str, source: str, copy_video: bool, folder: str,
         # WebVTT is the one subtitle format a Cast receiver renders.
         "-c:s", "webvtt",
         "-f", "hls",
-        # Start the transport stream's clock at zero. ffmpeg preloads it by
-        # 1.4 seconds by default, and the WebVTT rendition carries no
-        # X-TIMESTAMP-MAP to say so - so the picture began at 1.42 s while
-        # the subtitles began at 0.04 s, and every line appeared a second
-        # and a third too early. Measured on both, not guessed at.
-        "-muxpreload", "0", "-muxdelay", "0",
         "-hls_time", str(HLS_SEGMENT),
         # A broadcast keeps a rolling window; a film keeps everything, which
         # is what lets the television's own remote scrub it - and what makes
@@ -700,6 +694,11 @@ class _SpoolReader:
         self.spool._at.pop(id(self), None)
 
 
+# Where ffmpeg's transport-stream clock starts, in 90 kHz ticks. Measured
+# with ffprobe on the first segment: 1.421333 s.
+MPEGTS_START = 127920
+
+
 def _timestamp_map(body: bytes) -> bytes:
     """Tie the subtitle's clock to the picture's, in the words HLS wants.
 
@@ -710,8 +709,16 @@ def _timestamp_map(body: bytes) -> bytes:
     picture does not guess: it shows nothing at all, while reporting the
     track as present and switched on. Which is exactly what it did.
 
-    MPEGTS:0 is the truth here because the transport stream is muxed with
-    no preload (see hls_args), so both clocks start at zero.
+    MPEGTS_START is where the transport stream's clock actually begins.
+    ffmpeg preloads it, measured at 1.421333 s - which is 90000 ticks a
+    second, so 127920 - and the cues are written from zero. Saying so is
+    what lines them up.
+
+    Zeroing the mux preload instead was the other way to line them up, and
+    it lined them up on nothing: the subtitles had been rendering, an
+    offset ahead of the picture, and stopped rendering altogether. So the
+    stream keeps the clock it had and this says where that clock starts,
+    which is the mechanism HLS provides for exactly this.
     """
     head = body[:64].lstrip()
     if not head.startswith(b"WEBVTT") or b"X-TIMESTAMP-MAP" in body[:512]:
@@ -720,11 +727,12 @@ def _timestamp_map(body: bytes) -> bytes:
     # Whatever line ending this segment uses, keep using it.
     eol = b"\r\n" if body[cut:cut + 2] == b"\r\n" else b"\n"
     return (body[:cut] + eol
-            + b"X-TIMESTAMP-MAP=MPEGTS:0,LOCAL:00:00:00.000"
+            + b"X-TIMESTAMP-MAP=MPEGTS:" + str(MPEGTS_START).encode()
+            + b",LOCAL:00:00:00.000"
             + body[cut:])
 
 
-def _autoselect_subtitles(body: bytes) -> bytes:
+def _autoselect_subtitles(body: bytes, lang: str = "") -> bytes:
     """Ask the receiver to show the subtitle, not merely to have it.
 
     ffmpeg writes the rendition as DEFAULT=YES and stops there. A receiver
@@ -744,6 +752,13 @@ def _autoselect_subtitles(body: bytes) -> bytes:
                 line += b",AUTOSELECT=YES"
             if b"FORCED=" not in line:
                 line += b",FORCED=NO"
+            # And which language it is. ffmpeg names the rendition
+            # "subtitle_0" and says nothing else about it; a Cast receiver
+            # will list a text track with no LANGUAGE and then decline to
+            # draw it, which is the state this arrived in - fetched,
+            # switched on, and invisible.
+            if b"LANGUAGE=" not in line and lang:
+                line += b',LANGUAGE="' + lang.encode() + b'"'
         out.append(line)
     return b"\n".join(out)
 
@@ -822,7 +837,7 @@ class _Handler(BaseHTTPRequestHandler):
             self.send_error(404)
             return
         if name == "master.m3u8":
-            body = _autoselect_subtitles(body)
+            body = _autoselect_subtitles(body, bridge.sub_lang)
         elif name.endswith(".vtt"):
             body = _timestamp_map(body)
         # Every subtitle piece the receiver takes, in the log. Whether it
@@ -908,6 +923,7 @@ class CastBridge:
         self.audio = 0
         self.subs: int | None = None
         self.sub_codec = ""
+        self.sub_lang = ""
         self.start_at = 0.0
         self.quality = "original"
         # Set to ffmpeg's own words when it fails in a way that will fail the
@@ -962,7 +978,7 @@ class CastBridge:
     def start(self, source: str, codecs: list[str] | None = None,
               audio: int = 0, subs: int | None = None,
               sub_codec: str = "", start_at: float = 0.0,
-              quality: str = "original") -> str:
+              quality: str = "original", sub_lang: str = "") -> str:
         """Begin serving *source* re-muxed for the receiver; returns the URL.
 
         ffmpeg is not started here - it starts when the Chromecast actually
@@ -983,6 +999,8 @@ class CastBridge:
             for c in codecs)
         self.source = source
         self.audio, self.subs, self.sub_codec = audio, subs, sub_codec
+        # Three letters, the way a playlist wants them: "swe", not "Swedish".
+        self.sub_lang = (sub_lang or "").strip()[:8]
         self.start_at = start_at
         self.quality = quality
         if QUALITY.get(quality, (0, 0)) != (0, 0):

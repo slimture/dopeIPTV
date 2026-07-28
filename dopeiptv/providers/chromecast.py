@@ -726,7 +726,7 @@ class ChromecastManager:
             audio=(audio or {}).get("index", 0),
             subs=None if subs is None else subs.get("index"),
             sub_codec=(subs or {}).get("codec", ""), start_at=start,
-            quality=quality)
+            quality=quality, sub_lang=(subs or {}).get("lang", ""))
         # ffmpeg does the seeking, so the converted stream starts at zero and
         # the offset is added back when the position is read.
         self.position_offset = start

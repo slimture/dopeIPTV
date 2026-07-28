@@ -880,40 +880,23 @@ def test_the_playlist_asks_for_the_subtitle_to_be_shown():
               b'DEFAULT=YES,URI="stream_0_vtt.m3u8"\n'
               b'#EXT-X-STREAM-INF:BANDWIDTH=1,SUBTITLES="subs"\n'
               b"stream_0.m3u8\n")
-    out = _autoselect_subtitles(master)
+    out = _autoselect_subtitles(master, "swe")
     assert b"AUTOSELECT=YES" in out
     assert b"FORCED=NO" in out
+    # A receiver lists a text track with no language and then declines to
+    # draw it - fetched, switched on, and invisible.
+    assert b'LANGUAGE="swe"' in out
     # Nothing else is touched - a playlist is parsed strictly and an extra
     # word on the wrong line loses the stream, not just the subtitle.
     assert out.count(b"\n") == master.count(b"\n")
     assert b"stream_0.m3u8\n" in out
     assert b"AUTOSELECT" not in out.split(b"\n")[3]
     # And it is not doubled when it is served again.
-    assert _autoselect_subtitles(out) == out
+    assert _autoselect_subtitles(out, "swe") == out
+    # A stream whose language nobody knows is still offered.
+    assert b"AUTOSELECT=YES" in _autoselect_subtitles(master, "")
 
 
-def test_the_picture_and_the_subtitle_share_a_clock():
-    """They did not, and the subtitles ran a second and a third early.
-
-    ffmpeg preloads a transport stream's clock by 1.4 seconds by default,
-    and the WebVTT rendition carries no X-TIMESTAMP-MAP to say so - so the
-    picture began at 1.421333 s while the subtitles began at 0.043 s.
-    Measured on both, with ffprobe, before and after:
-
-        before   video 1.421333   subtitle 0.043
-        after    video 0.042333   subtitle 0.043
-    """
-    from dopeiptv.providers.cast_bridge import hls_args
-    args = hls_args("ffmpeg", "http://p/f.mkv", True, "/tmp/x", subs=0)
-    assert args[args.index("-muxpreload") + 1] == "0"
-    assert args[args.index("-muxdelay") + 1] == "0"
-    # Before the muxer, not after: they are output options for the format,
-    # and after the output filename they are not options at all.
-    assert args.index("-muxpreload") > args.index("-f")
-    assert args.index("-muxpreload") < len(args) - 1
-
-
-@pytest.mark.filterwarnings("ignore")
 def test_the_subtitle_really_lands_on_the_picture(tmp_path):
     """Against a real ffmpeg, because a timestamp is not a thing that can be
     read off a command line - the offset above was invisible there and
@@ -948,10 +931,13 @@ def test_the_subtitle_really_lands_on_the_picture(tmp_path):
          "-show_entries", "packet=pts_time", "-of", "csv=p=0", str(seg)],
         capture_output=True, text=True).stdout.splitlines()[0]
     video = float(first.rstrip(","))
-    # The subtitle starts at zero in the source, so the picture must start
-    # there too. It used to start 1.4 seconds later, which is exactly how
-    # far ahead of the picture every line appeared.
-    assert video < 0.5, f"the picture starts at {video} s, the subtitle at 0"
+    # The number X-TIMESTAMP-MAP has to carry: where this build of ffmpeg
+    # actually starts the transport stream's clock. If it ever changes,
+    # the subtitles drift by the difference and this says so.
+    from dopeiptv.providers.cast_bridge import MPEGTS_START
+    assert abs(video - MPEGTS_START / 90000) < 0.1, (
+        f"the picture starts at {video} s but the subtitles are told "
+        f"{MPEGTS_START / 90000:.6f} s")
 
 
 def test_every_subtitle_segment_says_which_clock_it_is_on():
@@ -964,7 +950,7 @@ def test_every_subtitle_segment_says_which_clock_it_is_on():
     out = _timestamp_map(b"WEBVTT\n\n00:00.043 --> 00:30.043\nHEJ\n")
     lines = out.split(b"\n")
     assert lines[0] == b"WEBVTT"
-    assert lines[1] == b"X-TIMESTAMP-MAP=MPEGTS:0,LOCAL:00:00:00.000"
+    assert lines[1] == b"X-TIMESTAMP-MAP=MPEGTS:127920,LOCAL:00:00:00.000"
     assert b"00:00.043 --> 00:30.043" in out
     assert b"HEJ" in out
     # Not doubled when the same segment is fetched twice.
@@ -975,5 +961,9 @@ def test_every_subtitle_segment_says_which_clock_it_is_on():
     # An empty segment is still a valid one; ffmpeg writes plenty of them.
     assert _timestamp_map(b"WEBVTT\n").startswith(
         b"WEBVTT\nX-TIMESTAMP-MAP=")
+    # 1.421333 s at 90 kHz. The picture starts there; the cues start at
+    # zero, and this is what ties the two together.
+    from dopeiptv.providers.cast_bridge import MPEGTS_START
+    assert abs(MPEGTS_START / 90000 - 1.421333) < 0.001
     # And nothing that is not a WebVTT file is touched.
     assert _timestamp_map(b"\x47\x40\x00") == b"\x47\x40\x00"
