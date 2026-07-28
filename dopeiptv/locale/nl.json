@@ -558,7 +558,7 @@
   "cast_stop_failed": "Stoppen mislukt: {msg}",
   "cast_older_device": "{name} is een oudere Chromecast – vloeiender beeld, iets minder scherp",
   "cast_quality_note": "Wordt één keer voor dit apparaat ingesteld, niet per zender. Alleen FHD wordt aangepast – SD en HD gaan onbewerkt door. Chromecast 1-3 en tv's met ingebouwde Chromecast hebben dit nodig; een Ultra of Google TV niet.",
-  "cast_subs_unavailable": "Deze ffmpeg kan geen ondertitels inbranden",
+  "cast_subs_unavailable": "Deze ffmpeg heeft geen libass – ondertitels kunnen niet worden verzonden",
   "cast_audio": "Audio",
   "cast_subtitles": "Ondertiteling",
   "cast_track_default": "Standaard",

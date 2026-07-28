@@ -558,7 +558,7 @@
  "cast_stop_failed": "توقف ناموفق بود: {msg}",
  "cast_older_device": "‏{name} یک Chromecast قدیمی است – تصویر روان‌تر، کمی کم‌وضوح‌تر",
  "cast_quality_note": "یک بار برای این دستگاه تنظیم می‌شود، نه برای هر کانال. فقط FHD تغییر می‌کند؛ SD و HD دست‌نخورده ارسال می‌شوند. ‏Chromecast نسل ۱ تا ۳ و تلویزیون‌های دارای Chromecast داخلی به آن نیاز دارند، اما Ultra یا Google TV نه.",
- "cast_subs_unavailable": "این ffmpeg نمی‌تواند زیرنویس را روی تصویر بسوزاند",
+ "cast_subs_unavailable": "این ffmpeg بدون libass است – زیرنویس ارسال نمی‌شود",
  "cast_audio": "صدا",
  "cast_subtitles": "زیرنویس",
  "cast_track_default": "پیش‌فرض",

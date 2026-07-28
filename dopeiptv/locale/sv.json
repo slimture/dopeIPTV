@@ -558,7 +558,7 @@
   "cast_stop_failed": "Kunde inte stoppa: {msg}",
   "cast_older_device": "{name} är en äldre Chromecast – jämnare bild, något lägre skärpa",
   "cast_quality_note": "Ställs in en gång för den här enheten, inte för varje kanal. Bara FHD anpassas – SD och HD skickas orörda. Chromecast 1–3 och tv-apparater med inbyggd Chromecast behöver det; en Ultra eller Google TV gör det inte.",
-  "cast_subs_unavailable": "Den här ffmpeg kan inte bränna in undertexter",
+  "cast_subs_unavailable": "Den här ffmpeg saknar libass – undertexter kan inte skickas",
   "cast_audio": "Ljud",
   "cast_subtitles": "Undertexter",
   "cast_track_default": "Standard",

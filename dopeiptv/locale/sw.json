@@ -558,7 +558,7 @@
  "cast_stop_failed": "Kusimamisha kumeshindwa: {msg}",
  "cast_older_device": "{name} ni Chromecast ya zamani – picha laini zaidi, isiyo kali sana",
  "cast_quality_note": "Huwekwa mara moja kwa kifaa hiki, si kwa kila chaneli. FHD pekee hurekebishwa – SD na HD hutumwa bila kuguswa. Chromecast 1-3 na TV zenye Chromecast iliyojengwa ndani zinahitaji hii; Ultra au Google TV hazihitaji.",
- "cast_subs_unavailable": "ffmpeg hii haiwezi kuchoma manukuu kwenye picha",
+ "cast_subs_unavailable": "ffmpeg hii haina libass – manukuu hayawezi kutumwa",
  "cast_audio": "Sauti",
  "cast_subtitles": "Manukuu",
  "cast_track_default": "Chaguo-msingi",

@@ -558,7 +558,7 @@
  "cast_stop_failed": "정지 실패: {msg}",
  "cast_older_device": "{name}은(는) 구형 Chromecast – 더 부드러운 화면, 약간 낮은 선명도",
  "cast_quality_note": "채널마다가 아니라 이 기기에 한 번만 설정합니다. FHD만 조정되고 SD와 HD는 그대로 전송됩니다. Chromecast 1~3세대와 Chromecast 내장 TV에 필요하며, Ultra나 Google TV에는 필요하지 않습니다.",
- "cast_subs_unavailable": "이 ffmpeg은 자막을 화면에 입힐 수 없습니다",
+ "cast_subs_unavailable": "이 ffmpeg에는 libass가 없습니다 – 자막을 보낼 수 없습니다",
  "cast_audio": "오디오",
  "cast_subtitles": "자막",
  "cast_track_default": "기본값",

@@ -558,7 +558,7 @@
  "cast_stop_failed": "فشل الإيقاف: {msg}",
  "cast_older_device": "‏{name} جهاز Chromecast قديم – صورة أكثر سلاسة وأقل حدة قليلاً",
  "cast_quality_note": "يُضبط مرة واحدة لهذا الجهاز، وليس لكل قناة. تُعدَّل الجودة الفائقة FHD فقط، أما SD وHD فتُرسل كما هي. تحتاجه أجهزة Chromecast من الجيل 1-3 والتلفزيونات المزودة بـ Chromecast مدمج، ولا يحتاجه Ultra أو Google TV.",
- "cast_subs_unavailable": "لا يستطيع ffmpeg هذا طبع الترجمة على الصورة",
+ "cast_subs_unavailable": "‏ffmpeg هذا لا يحتوي على libass – لا يمكن إرسال الترجمة",
  "cast_audio": "الصوت",
  "cast_subtitles": "الترجمة",
  "cast_track_default": "الافتراضي",

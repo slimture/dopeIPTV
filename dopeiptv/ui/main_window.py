@@ -3771,9 +3771,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         url = self.client.timeshift_url(sid, minute, behind + 240)
         if not url:
             return
-        log.info("cast: resuming %s from the archive, %d min back%s",
-                 ctx.get("title") or "", behind,
-                 f" plus {offset:.0f} s" if offset else "")
+        # The moment itself, not how it was worked out - it is the one thing
+        # that can be checked against what the picture actually shows.
+        log.info("cast: resuming %s from %s (%d min of archive held)",
+                 ctx.get("title") or "",
+                 paused_at.strftime("%H:%M:%S"), behind)
         title = ctx.get("title") or "dopeIPTV"
         # The session now lives at the archive address. Recording it keeps the
         # strip's own panel pointing at what is actually playing - it opened

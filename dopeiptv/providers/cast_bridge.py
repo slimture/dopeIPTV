@@ -112,11 +112,17 @@ def can_burn_subtitles(exe: str | None = None) -> bool:
     """Whether this ffmpeg can burn a text subtitle into the picture.
 
     The subtitles filter is built on libass, and plenty of ffmpeg builds ship
-    without it - "No such filter: 'subtitles'", said once per attempt. There
-    is no way round it on the receiver's side either: a Chromecast renders
-    only a WebVTT file handed to it separately, which cannot be made from a
-    live stream. So this decides whether the choice is offered at all, rather
-    than being discovered after the picture has already gone.
+    without it - "No such filter: 'subtitles'", said once per attempt.
+
+    There is no way round it on the receiver's side. A Chromecast renders one
+    kind of subtitle only: a WebVTT file handed to it alongside the media. For
+    a live channel there is nothing to hand over. For a film there is, in
+    principle - but making it means demuxing the whole file first, which over
+    a provider link is minutes of waiting before anything appears on the TV,
+    and the receiver additionally requires CORS headers on the media itself,
+    which the provider does not send. So burning it into the picture is the
+    only route either way, and this decides whether the choice is offered at
+    all rather than being discovered after the picture has already gone.
 
     Bitmap subtitles are a different matter - they are drawn with overlay,
     which every build has.

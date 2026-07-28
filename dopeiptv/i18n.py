@@ -726,7 +726,7 @@ _STRINGS: dict[str, dict[str, str]] = {
               "with Chromecast built in need this; an Ultra or Google TV does "
               "not."},
     "cast_subs_unavailable": {
-        "en": "This ffmpeg cannot burn subtitles in"},
+        "en": "This ffmpeg has no libass - subtitles cannot be sent"},
     "cast_track_note": {
         "en": "Choosing a track converts the stream on this computer."},
 

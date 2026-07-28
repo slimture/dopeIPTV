@@ -558,7 +558,7 @@
   "cast_stop_failed": "Stoppen fehlgeschlagen: {msg}",
   "cast_older_device": "{name} ist ein älterer Chromecast – ruhigeres Bild, etwas weniger scharf",
   "cast_quality_note": "Einmal für dieses Gerät eingestellt, nicht für jeden Sender. Nur FHD wird angepasst – SD und HD gehen unverändert raus. Chromecast 1–3 und Fernseher mit integriertem Chromecast brauchen das; ein Ultra oder Google TV nicht.",
-  "cast_subs_unavailable": "Dieses ffmpeg kann keine Untertitel einbrennen",
+  "cast_subs_unavailable": "Diesem ffmpeg fehlt libass – Untertitel können nicht gesendet werden",
   "cast_audio": "Ton",
   "cast_subtitles": "Untertitel",
   "cast_track_default": "Standard",

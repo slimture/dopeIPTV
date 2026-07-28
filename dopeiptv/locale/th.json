@@ -558,7 +558,7 @@
   "cast_stop_failed": "หยุดล้มเหลว: {msg}",
   "cast_older_device": "{name} เป็น Chromecast รุ่นเก่า – ภาพลื่นขึ้น คมชัดน้อยลงเล็กน้อย",
   "cast_quality_note": "ตั้งครั้งเดียวสำหรับอุปกรณ์นี้ ไม่ใช่สำหรับแต่ละช่อง ปรับเฉพาะ FHD เท่านั้น ส่วน SD และ HD ส่งไปตามเดิม Chromecast 1-3 และทีวีที่มี Chromecast ในตัวต้องใช้ ส่วน Ultra หรือ Google TV ไม่ต้อง",
-  "cast_subs_unavailable": "ffmpeg นี้ฝังคำบรรยายลงในภาพไม่ได้",
+  "cast_subs_unavailable": "ffmpeg นี้ไม่มี libass – ส่งคำบรรยายไม่ได้",
   "cast_audio": "เสียง",
   "cast_subtitles": "คำบรรยาย",
   "cast_track_default": "ค่าเริ่มต้น",
