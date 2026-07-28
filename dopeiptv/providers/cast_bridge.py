@@ -252,14 +252,18 @@ class _Handler(BaseHTTPRequestHandler):
             # provider is still counting a connection we closed a moment ago -
             # the two refused attempts at the TV, or the redirect check. It
             # frees up within seconds, so ask once more before giving up.
-            bridge.kill(proc)
-            log.info("cast bridge: nothing came back - one more try")
-            time.sleep(4)
-            proc = bridge.spawn()
-            if proc is None:
-                self.send_error(503)
-                return
-            chunk = proc.stdout.read(65536)
+            for wait in (6, 10):
+                bridge.kill(proc)
+                log.info("cast bridge: nothing came back - trying again "
+                         "in %d s", wait)
+                time.sleep(wait)
+                proc = bridge.spawn()
+                if proc is None:
+                    self.send_error(503)
+                    return
+                chunk = proc.stdout.read(65536)
+                if chunk:
+                    break
         self._headers()
         try:
             while chunk:

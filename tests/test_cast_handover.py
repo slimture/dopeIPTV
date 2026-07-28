@@ -419,6 +419,28 @@ def test_a_converted_cast_is_seeked_by_ffmpeg(monkeypatch):
     assert m.position() == 1872.0
 
 
+def test_the_provider_is_given_a_moment_after_local_playback_stopped(
+        monkeypatch):
+    """These panels keep counting a session for a few seconds after the
+    socket closes, and the account allows one. Going straight for the stream
+    is refused for exactly that long - the receiver first, then the
+    converter."""
+    from dopeiptv.providers import chromecast as cm
+    slept = []
+    m = _manager(monkeypatch)
+    monkeypatch.setattr(cm, "_resolve_redirects", lambda u: ("http://cdn/x",
+                                                             "video/mp4"))
+    monkeypatch.setattr(cm.time, "sleep", lambda s: slept.append(s))
+    m.scan()
+    def long_waits():
+        return [s for s in slept if s >= 2]        # not the verdict polling
+
+    m.cast("Alva TV", "http://p/y.mp4", "Film")
+    assert long_waits() == [], "nothing was stopped, nothing to wait for"
+    m.cast("Alva TV", "http://p/y.mp4", "Film", settle=True)
+    assert long_waits(), slept
+
+
 def test_the_resolved_address_goes_first(monkeypatch):
     """Side-by-side logs of a channel that casts and one that does not both
     show the panel's own address refused outright - only the resolved CDN

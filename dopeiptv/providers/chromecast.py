@@ -355,7 +355,8 @@ class ChromecastManager:
     def cast(self, device_name: str, url: str, title: str,
              known_codecs: list[str] | None = None,
              audio: dict | None = None, subs: dict | None = None,
-             start: float = 0.0, duration: float = 0.0) -> str:
+             start: float = 0.0, duration: float = 0.0,
+             settle: bool = False) -> str:
         with self._lock:
             cc = self._device(device_name)
             if cc is None:
@@ -371,6 +372,13 @@ class ChromecastManager:
                 cc = self._device(device_name)
             if cc is None:
                 raise RuntimeError(f"device '{device_name}' not found - rescan")
+        if settle:
+            # The player was holding a connection a moment ago and this
+            # account has one. The panel goes on counting a closed session for
+            # a few seconds, and everything below - the receiver, then the
+            # converter - is refused for exactly that long. Let it notice.
+            log.info("cast: letting the provider release the connection")
+            time.sleep(4)
         cc.wait(timeout=10)
         mc = cc.media_controller
         # Attach the watcher BEFORE handing anything over, so the receiver's
@@ -645,7 +653,7 @@ class CastDialog(QDialog):
     def __init__(self, window: object, url: str, title: str,
                  codecs: list[str] | None = None,
                  audio_index: int = 0, start: float = 0.0,
-                 tracks: dict | None = None) -> None:
+                 tracks: dict | None = None, probe: bool = True) -> None:
         super().__init__(window)
         self.window = window
         self.url = url
@@ -666,6 +674,8 @@ class CastDialog(QDialog):
         # What the player already knows. Free, and it saves opening the
         # stream a second time on an account that has one connection.
         self.tracks = tracks or {}
+        # Whether asking the provider directly is worth anything right now.
+        self.probe = probe
         self.setWindowTitle(tr("cast_title"))
         self.setMinimumWidth(400)
         lay = QVBoxLayout(self)
@@ -725,7 +735,7 @@ class CastDialog(QDialog):
     def _load_tracks(self) -> None:
         """What is in the stream - from the player if it is playing it, and
         only otherwise from ffprobe, which costs a connection."""
-        if self.tracks:
+        if self.tracks or not self.probe:
             self._fill_tracks(self.tracks)
             return
         def done(tracks):
@@ -836,8 +846,7 @@ class CastDialog(QDialog):
         # local playback, having already lost the cast. Stopping first costs
         # nothing on an account with room to spare.
         stop = getattr(self.window, "stop_local_playback_for_cast", None)
-        if callable(stop):
-            stop()
+        settle = bool(callable(stop) and stop())
 
         # The cast strip in the detail pane is the only thing that says a cast
         # is running once this dialog is closed - local playback has stopped,
@@ -855,7 +864,8 @@ class CastDialog(QDialog):
                   lambda: self.window.cast.cast(name, self.url,
                                                  self.stream_title,
                                                  self.codecs, audio, subs,
-                                                 self.start, self.duration),
+                                                 self.start, self.duration,
+                                                 settle),
                   done, failed)
 
     def _banner(self, device: str | None, title: str) -> None:

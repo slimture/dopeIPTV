@@ -3225,7 +3225,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         }
         CastDialog(self, url, title, self._local_codecs(),
                    self._local_audio_index(), start,
-                   self._local_tracks(it)).exec()
+                   self._local_tracks(it),
+                   probe=not self._busy_elsewhere(it)).exec()
 
     # The list vocabulary and the resume store's do not match: a movie row is
     # "vod" in one and "movie" in the other, and History rows carry their own.
@@ -3233,6 +3234,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                          "episode": "episode",
                          "rec": "recording", "recording": "recording"}
     _RESUME_GROUP = {"movie": "vod", "episode": "episode", "recording": "rec"}
+
+    def _busy_elsewhere(self, it) -> bool:
+        """Is the app holding a provider connection for something else?
+
+        Listing tracks with ffprobe opens the stream again, and one of these
+        accounts allows a single connection at a time. While the player has
+        one for another title, that probe cannot succeed and asking anyway
+        just spends the seconds the panel then keeps counting.
+        """
+        p = getattr(self, "player", None)
+        if p is None or not getattr(p, "current_url", None):
+            return False
+        return self._item_key(it) != self._playing_key
 
     def _local_tracks(self, it) -> dict:
         """The tracks mpv can already see, in the shape ffprobe would give.
@@ -3437,13 +3451,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         URL itself (one connection from the device), so on a single-connection
         account leaving the embedded player running too would be a second
         connection the provider refuses. Called by the cast dialog on a
-        successful cast."""
+        successful cast. Returns whether anything was actually stopped, so
+        the caller can let the provider notice before asking for the stream
+        again - these panels keep counting a session for a few seconds after
+        the socket closes."""
         p = getattr(self, "player", None)
         if p is not None and getattr(p, "current_url", None):
             try:
                 p.stop()
+                return True
             except Exception:
                 pass
+        return False
 
     def _autoplay_preview(self) -> bool:
         # Default off: a live channel plays on double-click (the desktop
