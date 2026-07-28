@@ -772,7 +772,12 @@ def test_a_broadcast_rolls_its_window_and_a_film_keeps_everything():
     # Half-written playlists are the other way this dies: a receiver that
     # asks at the wrong moment gets a parse error and nothing says why.
     for args in (film, chan):
-        assert "temp_file" in args[args.index("-hls_flags") + 1]
+        flags = args[args.index("-hls_flags") + 1]
+        assert "temp_file" in flags
+        # A declaration about the segments, not a change to them: a
+        # receiver that trusts it can start a decoder without waiting for
+        # the whole of the first one, which is the wait before the sound.
+        assert "independent_segments" in flags
 
 
 def test_the_hls_files_are_served_with_the_types_the_receiver_needs():

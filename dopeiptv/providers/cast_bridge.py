@@ -529,10 +529,19 @@ def hls_args(exe: str, source: str, copy_video: bool, folder: str,
         # is what lets the television's own remote scrub it - and what makes
         # a pause cost nothing, because the segments go on being written
         # while the receiver sits still.
-        *(["-hls_list_size", "6", "-hls_flags", "delete_segments+temp_file"]
+        # independent_segments writes EXT-X-INDEPENDENT-SEGMENTS into the
+        # playlist: every segment can be decoded on its own. It is a
+        # declaration about the segments, not a change to them, so it
+        # cannot touch the picture - and a receiver that trusts it can
+        # start a decoder without waiting for the whole of the first one.
+        # Which is the five seconds before the sound arrives: the segments
+        # are as long as the film's keyframes are apart, and copied video
+        # can be cut nowhere else.
+        *(["-hls_list_size", "6",
+           "-hls_flags", "delete_segments+temp_file+independent_segments"]
           if live else
           ["-hls_list_size", "0", "-hls_playlist_type", "event",
-           "-hls_flags", "temp_file"]),
+           "-hls_flags", "temp_file+independent_segments"]),
         # temp_file above matters more than it looks: without it a playlist
         # is served half-written to a receiver that asked at the wrong
         # moment, and the cast dies on a parse error nobody can see.
