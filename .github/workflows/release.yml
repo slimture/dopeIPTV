@@ -430,7 +430,28 @@ jobs:
       - name: System deps (mpv, ffmpeg, create-dmg)
         run: |
           brew update
-          brew install mpv ffmpeg create-dmg
+          brew install mpv create-dmg
+          # ffmpeg WITH libass. Homebrew's own bottle is built without it -
+          # "configuration:" carries no --enable-libass - and libass is what
+          # draws a text subtitle into the picture. Casting has no other way
+          # to put one on a television: a Chromecast renders only a WebVTT
+          # file handed to it alongside the media, which cannot be made from
+          # a live stream. Without this the bundled ffmpeg simply answers
+          # "No such filter: 'subtitles'" and the choice is not offered.
+          #
+          # The tap builds from source, so this step takes a while. Cached by
+          # Homebrew between runs on the same runner image.
+          brew tap homebrew-ffmpeg/ffmpeg
+          brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libass
+      - name: Check the bundled ffmpeg can burn subtitles in
+        run: |
+          # A build without libass would ship silently and only show up as a
+          # missing subtitle menu on someone's TV.
+          ffmpeg -hide_banner -h filter=subtitles | head -2
+          ffmpeg -hide_banner -h filter=subtitles 2>&1 \
+            | grep -qi "unknown filter" && {
+              echo "::error::the ffmpeg being bundled has no libass"; exit 1; }
+          echo "ffmpeg has libass"
       - name: Python build deps
         run: |
           python -m pip install --upgrade pip pyinstaller pyobjc-core

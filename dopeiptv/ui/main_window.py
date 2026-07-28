@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QBoxLayout, QFrame, QHBoxLayout,
     QLabel, QLineEdit, QListWidget, QListWidgetItem,
     QMainWindow, QMenu, QMessageBox, QProgressBar, QPushButton, QScrollArea,
-    QSizePolicy, QSlider, QSplitter, QToolButton, QVBoxLayout, QWidget,
+    QSizePolicy, QSplitter, QToolButton, QVBoxLayout, QWidget,
 )
 
 from .. import APP_NAME, ORG
@@ -35,7 +35,7 @@ from ..providers.chromecast import CastDialog, ChromecastManager
 from ..providers.client import (
     DemoClient, XtreamClient, make_client,
 )
-from ..media.embedded import EmbeddedPlayer
+from ..media.embedded import EmbeddedPlayer, _SeekSlider
 from ..providers.epg import XmltvGuide, epg_cache_path, prune_epg_caches
 from ..services.coverart import CoverArtService
 from ..services.resume import ResumeStore
@@ -1004,17 +1004,20 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
         self.cast_bar_mute = strip_button(
             "volume", tr("tooltip_mute_unmute"), self._toggle_cast_mute)
-        self.cast_bar_vol = QSlider(Qt.Orientation.Horizontal)
+        # The player's own bar: a click lands where you clicked, and hovering
+        # says what is under the cursor before you commit to it.
+        self.cast_bar_vol = _SeekSlider()
         self.cast_bar_vol.setRange(0, 100)
         self.cast_bar_vol.setValue(50)
         self.cast_bar_vol.setFixedWidth(110)
         self.cast_bar_vol.setToolTip(tr("tooltip_volume"))
+        self.cast_bar_vol.set_time_provider(lambda f: f"{round(f * 100)} %")
         # While the handle is being dragged the TV would get a message per
         # pixel; it only needs the one that says where the drag ended.
-        self.cast_bar_vol.sliderReleased.connect(
-            lambda: self._cast_volume(self.cast_bar_vol.value() / 100))
+        self.cast_bar_vol.seek_requested.connect(
+            lambda v: self._cast_volume(v / 100))
         self.cast_bar_vol.valueChanged.connect(
-            lambda v: (self.cast_bar_vol.isSliderDown() or
+            lambda v: (self.cast_bar_vol.dragging or
                        self._cast_volume(v / 100)))
         _cast_row.addWidget(self.cast_bar_vol)
         # The same timeshift the player has, for the same channels. A cast
@@ -1045,11 +1048,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         _seek_row = QHBoxLayout()
         _seek_row.setContentsMargins(2, 0, 2, 0)
         _seek_row.setSpacing(10)
-        self.cast_bar_seek = QSlider(Qt.Orientation.Horizontal)
+        self.cast_bar_seek = _SeekSlider()
         self.cast_bar_seek.setRange(0, 1000)
         self.cast_bar_seek.setMinimumWidth(160)
         self.cast_bar_seek.setToolTip(tr("cast_seek"))
-        self.cast_bar_seek.sliderReleased.connect(self._cast_seek_released)
+        # What the point under the cursor is, before clicking it.
+        self.cast_bar_seek.set_time_provider(self._cast_time_at)
+        self.cast_bar_seek.seek_requested.connect(
+            lambda _v: self._cast_seek_released())
         _seek_row.addWidget(self.cast_bar_seek, 1)
         self.cast_bar_time = QLabel("")
         self.cast_bar_time.setStyleSheet(
@@ -3952,6 +3958,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             bar.setValue(int(pos / dur * 1000))
         self.cast_bar_time.setText(
             f"{self._fmt_hms(pos)} / {self._fmt_hms(dur)}")
+
+    def _cast_time_at(self, frac: float) -> str:
+        """The point *frac* of the way along the bar, as a time."""
+        dur = float(getattr(self.cast, "duration", 0.0) or 0.0)
+        return self._fmt_hms(frac * dur) if dur > 0 else ""
 
     def _cast_seek_released(self) -> None:
         dur = float(getattr(self.cast, "duration", 0.0) or 0.0)

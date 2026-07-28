@@ -817,12 +817,21 @@ class _RasterMirror(QWidget):
 
 
 class _SeekSlider(QSlider):
-    """Horizontal seek bar: click jumps to position, drag scrubs, seek on release."""
+    """Horizontal seek bar: click jumps to position, drag scrubs, seek on
+    release, and hovering says what is under the cursor.
+
+    Used by the player's own bar and by the cast strip - a slider you have to
+    drag, when every other bar of its kind takes a click, reads as broken.
+    """
 
     seek_requested = pyqtSignal(int)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(Qt.Orientation.Horizontal, parent)
+        # Hover without a button held: a widget only gets move events without
+        # one when it tracks the mouse itself, and the time under the cursor
+        # is exactly what you want BEFORE deciding where to click.
+        self.setMouseTracking(True)
         self.dragging = False
         self._markers: list[float] = []   # programme boundaries as 0..1 fractions
         self._segments: list = []         # (start_frac, end_frac, title, time)

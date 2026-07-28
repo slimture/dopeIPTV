@@ -38,7 +38,7 @@ _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_paused_moment", "_record_cast_history", "_history_extra",
             "_show_cast_progress", "_cast_seek", "_cast_seek_released",
             "_fmt_hms", "_cast_moment", "_cast_to_moment", "_cast_go_live",
-            "_local_tracks", "_cast_continue_archive",
+            "_local_tracks", "_cast_continue_archive", "_cast_time_at",
             "_set_cast_quality", "_toggle_cast_mute", "_show_cast_volume")
 
 
@@ -1356,3 +1356,36 @@ def test_a_timeshifted_cast_asks_for_the_next_stretch_when_one_runs_out():
     w._cast_continued = 0.0
     w._cast_continue_archive()
     assert len(asked) == 1
+
+
+def test_the_cast_bars_take_a_click_like_every_other_bar_of_their_kind():
+    """A slider you have to drag, when the player's own bar right below it
+    takes a click, reads as broken. Both cast bars are that same bar - so a
+    click lands where you clicked, and hovering says what is under the cursor
+    before you commit to it."""
+    from dopeiptv.media.embedded import _SeekSlider
+    import inspect
+
+    src = inspect.getsource(_SeekSlider)
+    assert "def mousePressEvent" in src, "a click has to jump, not page"
+    assert "setMouseTracking(True)" in src, "hover needs move events"
+    assert "set_time_provider" in src
+
+    # And the strip installs one for each, with something to say on hover.
+    import dopeiptv.ui.main_window as mwmod
+    build = inspect.getsource(mwmod)
+    assert "self.cast_bar_seek = _SeekSlider()" in build
+    assert "self.cast_bar_vol = _SeekSlider()" in build
+    assert "self.cast_bar_seek.set_time_provider" in build
+    assert "self.cast_bar_vol.set_time_provider" in build
+
+
+def test_the_time_under_the_cursor_is_named():
+    w = _with_strip()
+    w.cast = _CastAt(0.0, 6000.0)
+    assert w._cast_time_at(0.0) == "0:00"
+    assert w._cast_time_at(0.5) == "50:00"
+    assert w._cast_time_at(1.0) == "1:40:00"
+    # A broadcast has no length, so there is no time to name.
+    w.cast = _CastAt(0.0, 0.0)
+    assert w._cast_time_at(0.5) == ""
