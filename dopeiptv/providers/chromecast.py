@@ -678,7 +678,17 @@ class ChromecastManager:
         # how long it is is what turns the bar into a real one, because the
         # converted stream is an endless pipe it cannot measure by itself.
         buffered = self.duration > 0
-        mc.play_media(url, ctype, title=title or "dopeIPTV",
+        # A broadcast is handed over with no title and no metadata at all.
+        #
+        # The default receiver draws its overlay from exactly that: give it a
+        # title and it puts up a name and a progress bar over the picture and
+        # leaves them there. On a film that bar is worth having - it can be
+        # scrubbed with the television's own remote - but on live television
+        # it measures nothing, cannot be dragged, and sits on top of the
+        # match. The app's own strip says what is casting and where, which is
+        # the place to say it.
+        mc.play_media(url, ctype,
+                      title=(title or "dopeIPTV") if buffered else None,
                       current_time=start or None,
                       stream_type="BUFFERED" if buffered else "LIVE",
                       media_info={"duration": float(self.duration)}

@@ -571,7 +571,7 @@ def _fake_pychromecast(order=None):
         def play_media(self, url, ctype, title=None, current_time=None,
                        stream_type="LIVE", media_info=None):
             self.dev.plays.append((url, ctype))
-            self.dev.announced.append((stream_type, media_info))
+            self.dev.announced.append((stream_type, media_info, title))
             self.dev.started_at = current_time
             self.dev.played = (url, ctype, title)
 
@@ -1568,12 +1568,15 @@ def test_the_tv_is_told_what_kind_of_thing_it_is_playing(monkeypatch):
     dev = m.devices[0]
 
     m.cast("Alva TV", "http://p/film.mp4", "Film", duration=5400.0)
-    assert dev.announced[-1] == ("BUFFERED", {"duration": 5400.0})
+    assert dev.announced[-1] == ("BUFFERED", {"duration": 5400.0}, "Film")
 
     # A broadcast has no end, and saying LIVE is simply the truth.
     dev.announced.clear()
     m.cast("Alva TV", "http://p/live/u/pw/9851.m3u8", "SVT1")
-    assert dev.announced[-1] == ("LIVE", None)
+    # And with no title, so the receiver has nothing to draw an overlay
+    # from: a name and a progress bar sitting on top of the match, measuring
+    # nothing and refusing to be dragged.
+    assert dev.announced[-1] == ("LIVE", None, None)
 
 
 def test_pausing_a_converted_broadcast_asks_the_provider_for_nothing():
