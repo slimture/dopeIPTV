@@ -1751,3 +1751,75 @@ def test_going_live_keeps_the_channel_recorded_so_it_can_be_paused_again():
         mwmod.run_async = real
     assert sent.get("dvr") is True, "still recorded, so still pausable"
     assert w._cast_behind == 0.0, "and back at the live edge"
+
+
+def test_the_subtitle_is_turned_on_when_the_receiver_has_found_it():
+    """Asking straight after handing the stream over found nothing.
+
+    At that moment the receiver has not fetched the manifest and knows of
+    no tracks at all - so the subtitle was chosen in the dialog, sent in the
+    playlist, and arrived switched off, with the log saying nothing because
+    from the sender's side everything had gone perfectly.
+
+    So it is done when the receiver says it has tracks, which is exactly
+    what a media status is for.
+    """
+    from dopeiptv.providers.chromecast import _CastWatch
+
+    class Bridge:
+        hls, subs = True, 0
+
+    class Manager:
+        bridge = Bridge()
+        last_position = 0.0
+        state = ""
+
+    class MC:
+        def __init__(self):
+            self.enabled = []
+
+        def enable_subtitle(self, track_id, timeout=10.0):
+            self.enabled.append(track_id)
+
+    class Status:
+        def __init__(self, tracks=None, active=None):
+            self.player_state = "PLAYING"
+            self.idle_reason = None
+            self.current_time = 3.0
+            self.subtitle_tracks = tracks or []
+            self.current_subtitle_tracks = active or []
+
+    mc = MC()
+    w = _CastWatch("Alva TV", Manager(), mc)
+
+    # Nothing known yet: no guess, and no giving up either.
+    w.new_media_status(Status())
+    assert mc.enabled == []
+
+    # The manifest has been read. Only the text track, and only once.
+    tracks = [{"trackId": 1, "type": "AUDIO"},
+              {"trackId": 2, "type": "TEXT", "language": "swe"}]
+    w.new_media_status(Status(tracks))
+    assert mc.enabled == [2]
+    w.new_media_status(Status(tracks))
+    assert mc.enabled == [2], "asked once, not once a second"
+
+    # A receiver that already has it on is left alone.
+    mc2 = MC()
+    w2 = _CastWatch("Alva TV", Manager(), mc2)
+    w2.new_media_status(Status(tracks, active=[2]))
+    assert mc2.enabled == []
+
+    # And a cast with no subtitle never asks at all.
+    class Plain:
+        hls, subs = False, None
+
+    class M2:
+        bridge = Plain()
+        last_position = 0.0
+        state = ""
+
+    mc3 = MC()
+    w3 = _CastWatch("Alva TV", M2(), mc3)
+    w3.new_media_status(Status(tracks))
+    assert mc3.enabled == []

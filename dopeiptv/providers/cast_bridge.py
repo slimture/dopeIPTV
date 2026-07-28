@@ -694,6 +694,30 @@ class _SpoolReader:
         self.spool._at.pop(id(self), None)
 
 
+def _autoselect_subtitles(body: bytes) -> bytes:
+    """Ask the receiver to show the subtitle, not merely to have it.
+
+    ffmpeg writes the rendition as DEFAULT=YES and stops there. A receiver
+    reads DEFAULT as "use this one IF subtitles are on at all", and its own
+    answer to whether they are on is usually no - so a subtitle chosen in
+    the dialog arrived listed and switched off. AUTOSELECT is the word for
+    "turn it on to match", and FORCED=NO says it is an ordinary subtitle
+    rather than one for foreign dialogue only.
+
+    Done on the way out rather than by arguing with ffmpeg's muxer, which
+    has no option for either.
+    """
+    out = []
+    for line in body.split(b"\n"):
+        if line.startswith(b"#EXT-X-MEDIA:") and b"TYPE=SUBTITLES" in line:
+            if b"AUTOSELECT=" not in line:
+                line += b",AUTOSELECT=YES"
+            if b"FORCED=" not in line:
+                line += b",FORCED=NO"
+        out.append(line)
+    return b"\n".join(out)
+
+
 class _Server(ThreadingHTTPServer):
     """The bridge's own HTTP server, with the shouting turned off.
 
@@ -767,6 +791,8 @@ class _Handler(BaseHTTPRequestHandler):
         except OSError:
             self.send_error(404)
             return
+        if name == "master.m3u8":
+            body = _autoselect_subtitles(body)
         self.send_response(200)
         self.send_header(
             "Content-Type",

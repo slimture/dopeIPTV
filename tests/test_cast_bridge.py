@@ -866,3 +866,27 @@ def test_a_real_cast_with_a_subtitle_needs_one_connection_and_starts_at_once():
                 os.remove(f)
             except OSError:
                 pass
+
+
+def test_the_playlist_asks_for_the_subtitle_to_be_shown():
+    """ffmpeg writes the rendition as DEFAULT=YES and stops there, and a
+    receiver reads DEFAULT as "use this one IF subtitles are on at all" -
+    to which its own answer is usually no. So a subtitle chosen in the
+    dialog arrived listed and switched off, and the log said nothing,
+    because from the sender's side everything had gone perfectly."""
+    from dopeiptv.providers.cast_bridge import _autoselect_subtitles
+    master = (b"#EXTM3U\n"
+              b'#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="s",'
+              b'DEFAULT=YES,URI="stream_0_vtt.m3u8"\n'
+              b'#EXT-X-STREAM-INF:BANDWIDTH=1,SUBTITLES="subs"\n'
+              b"stream_0.m3u8\n")
+    out = _autoselect_subtitles(master)
+    assert b"AUTOSELECT=YES" in out
+    assert b"FORCED=NO" in out
+    # Nothing else is touched - a playlist is parsed strictly and an extra
+    # word on the wrong line loses the stream, not just the subtitle.
+    assert out.count(b"\n") == master.count(b"\n")
+    assert b"stream_0.m3u8\n" in out
+    assert b"AUTOSELECT" not in out.split(b"\n")[3]
+    # And it is not doubled when it is served again.
+    assert _autoselect_subtitles(out) == out

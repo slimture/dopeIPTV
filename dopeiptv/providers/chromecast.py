@@ -261,10 +261,12 @@ class _CastWatch:
     quietly going away - so both are logged as they happen.
     """
 
-    def __init__(self, name: str, manager=None) -> None:
+    def __init__(self, name: str, manager=None, mc=None) -> None:
         self.name = name
         self.manager = manager
+        self.mc = mc
         self._last = ""
+        self._subs_done = False
 
     def new_media_status(self, status) -> None:
         # Where the TV has got to. It is the only place that number exists -
@@ -288,6 +290,45 @@ class _CastWatch:
         if cur != self._last:
             self._last = cur
             log.info("cast %s: receiver %s", self.name, cur)
+        self._turn_the_subtitle_on(status)
+
+    def _turn_the_subtitle_on(self, status) -> None:
+        """Switch on the subtitle rendition once the receiver has found it.
+
+        It arrives in the playlist as its own track, and the receiver lists
+        it - but listing is not showing, and a subtitle somebody chose in
+        the dialog must not arrive switched off.
+
+        Done from here rather than straight after handing the stream over,
+        because at that moment the receiver has not fetched the manifest and
+        knows of no tracks at all: asking then found nothing, every time,
+        and said nothing about it either.
+        """
+        if self._subs_done or self.mc is None:
+            return
+        bridge = getattr(self.manager, "bridge", None)
+        if not getattr(bridge, "hls", False) or bridge.subs is None:
+            self._subs_done = True
+            return
+        tracks = getattr(status, "subtitle_tracks", None) or []
+        ids = [t.get("trackId") for t in tracks
+               if isinstance(t, dict) and t.get("type") == "TEXT"
+               and t.get("trackId") is not None]
+        if not ids:
+            return                      # not parsed yet; asked again next time
+        self._subs_done = True
+        already = list(getattr(status, "current_subtitle_tracks", None) or [])
+        if already:
+            log.info("cast %s: the subtitle is already on (%s)",
+                     self.name, already)
+            return
+        try:
+            self.mc.enable_subtitle(ids[0])
+            log.info("cast %s: turned the subtitle on (track %s of %s)",
+                     self.name, ids[0], ids)
+        except Exception as e:
+            log.info("cast %s: could not turn the subtitle on (%s)",
+                     self.name, e)
 
     def load_media_failed(self, queue_item_id, error_code) -> None:
         log.info("cast %s: receiver refused the stream (error %s)",
@@ -708,24 +749,6 @@ class ChromecastManager:
                       media_info={"duration": float(self.duration)}
                       if buffered else None)
         mc.block_until_active(timeout=10)
-        # Turn the subtitle on. It rides in the playlist as its own
-        # rendition, and the receiver lists it as a track but does not
-        # necessarily show it - a subtitle nobody asked to be optional
-        # would otherwise arrive switched off.
-        if getattr(self.bridge, "hls", False) and self.bridge.subs is not None:
-            for _ in range(20):
-                ids = [t.get("trackId") for t in
-                       (getattr(mc.status, "subtitle_tracks", None) or [])
-                       if t.get("trackId") is not None]
-                if ids:
-                    try:
-                        mc.enable_subtitle(ids[0])
-                        log.info("cast: the subtitle track is on")
-                    except Exception as e:
-                        log.info("cast: could not turn the subtitle on (%s)",
-                                 e)
-                    break
-                time.sleep(0.3)
         deadline = time.monotonic() + (
             self.VERDICT_WAIT if wait is None else wait)
         while time.monotonic() < deadline:
@@ -742,9 +765,15 @@ class ChromecastManager:
 
     @staticmethod
     def _watch(cc, mc, device_name: str, manager=None) -> None:
-        if getattr(cc, "_dope_watch", None) is not None:
+        old = getattr(cc, "_dope_watch", None)
+        if old is not None:
+            # The same device, cast to again: the listener is already
+            # attached and stays, but it must forget what the last stream
+            # was - not least that it had already turned a subtitle on.
+            old.manager, old.mc = manager, mc
+            old._subs_done = False
             return
-        watch = _CastWatch(device_name, manager)
+        watch = _CastWatch(device_name, manager, mc)
         try:
             mc.register_status_listener(watch)
             cc.socket_client.register_connection_listener(watch)
