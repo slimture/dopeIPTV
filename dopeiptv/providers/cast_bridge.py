@@ -31,6 +31,7 @@ import socket
 import subprocess
 import tempfile
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from ..core.log import log
@@ -245,13 +246,25 @@ class _Handler(BaseHTTPRequestHandler):
         if proc is None:
             self.send_error(503)
             return
+        chunk = proc.stdout.read(65536)
+        if not chunk:
+            # Nothing at all, which on these accounts usually means the
+            # provider is still counting a connection we closed a moment ago -
+            # the two refused attempts at the TV, or the redirect check. It
+            # frees up within seconds, so ask once more before giving up.
+            bridge.kill(proc)
+            log.info("cast bridge: nothing came back - one more try")
+            time.sleep(4)
+            proc = bridge.spawn()
+            if proc is None:
+                self.send_error(503)
+                return
+            chunk = proc.stdout.read(65536)
         self._headers()
         try:
-            while True:
-                chunk = proc.stdout.read(65536)
-                if not chunk:
-                    break
+            while chunk:
                 self.wfile.write(chunk)
+                chunk = proc.stdout.read(65536)
         except (BrokenPipeError, ConnectionResetError):
             log.info("cast bridge: the receiver closed the connection")
         finally:

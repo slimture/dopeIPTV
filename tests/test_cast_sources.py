@@ -37,7 +37,7 @@ cast = {}
 
 class FakeDialog:
     def __init__(self, window, url, title, codecs=None,
-                 audio_index=0, start=0.0):
+                 audio_index=0, start=0.0, tracks=None):
         cast["url"], cast["title"] = url, title
         cast["codecs"], cast["audio_index"] = codecs, audio_index
         cast["start"] = start

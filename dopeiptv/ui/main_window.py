@@ -3224,7 +3224,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             "item": it,
         }
         CastDialog(self, url, title, self._local_codecs(),
-                   self._local_audio_index(), start).exec()
+                   self._local_audio_index(), start,
+                   self._local_tracks(it)).exec()
 
     # The list vocabulary and the resume store's do not match: a movie row is
     # "vod" in one and "movie" in the other, and History rows carry their own.
@@ -3232,6 +3233,45 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                          "episode": "episode",
                          "rec": "recording", "recording": "recording"}
     _RESUME_GROUP = {"movie": "vod", "episode": "episode", "recording": "rec"}
+
+    def _local_tracks(self, it) -> dict:
+        """The tracks mpv can already see, in the shape ffprobe would give.
+
+        Asking ffprobe means opening the stream a second time, and these
+        accounts are sold with one connection: the probe's session was still
+        counted when the cast went for the same stream, and the panel answered
+        the converter with a 4XX. mpv is playing the very thing being cast and
+        has the whole track list in memory - free, instant, and correct.
+
+        Only when it IS the same thing: this returns nothing for any other row
+        and ffprobe answers for those instead.
+        """
+        if self._playing_key is None or self._item_key(it) != self._playing_key:
+            return {}
+        m = getattr(getattr(getattr(self, "player", None), "video", None),
+                    "mpv", None)
+        if m is None:
+            return {}
+        out: dict = {"audio": [], "subtitle": [], "duration": 0.0}
+        try:
+            for t in (m.track_list or []):
+                kind = t.get("type")
+                if kind not in ("audio", "sub"):
+                    continue
+                key = "audio" if kind == "audio" else "subtitle"
+                out[key].append({
+                    "index": len(out[key]),
+                    "codec": t.get("codec") or "?",
+                    "lang": (t.get("lang") or "").strip(),
+                    "title": (t.get("title") or "").strip(),
+                })
+            out["duration"] = float(getattr(m, "duration", 0) or 0)
+        except Exception as e:
+            log.debug("cast: could not read the local tracks (%s)", e)
+            return {}
+        log.info("cast: %d audio and %d subtitle track(s), from the player",
+                 len(out["audio"]), len(out["subtitle"]))
+        return out
 
     def _local_audio_index(self) -> int:
         """Which audio track the app itself is playing, counted the way

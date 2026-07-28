@@ -644,7 +644,8 @@ class CastDialog(QDialog):
 
     def __init__(self, window: object, url: str, title: str,
                  codecs: list[str] | None = None,
-                 audio_index: int = 0, start: float = 0.0) -> None:
+                 audio_index: int = 0, start: float = 0.0,
+                 tracks: dict | None = None) -> None:
         super().__init__(window)
         self.window = window
         self.url = url
@@ -662,6 +663,9 @@ class CastDialog(QDialog):
         # a decision already made - the TV just has to honour it.
         self.start = start
         self.duration = 0.0
+        # What the player already knows. Free, and it saves opening the
+        # stream a second time on an account that has one connection.
+        self.tracks = tracks or {}
         self.setWindowTitle(tr("cast_title"))
         self.setMinimumWidth(400)
         lay = QVBoxLayout(self)
@@ -719,7 +723,11 @@ class CastDialog(QDialog):
     # -- audio / subtitle tracks -------------------------------------------
 
     def _load_tracks(self) -> None:
-        """Ask ffprobe what is in the stream, off the UI thread."""
+        """What is in the stream - from the player if it is playing it, and
+        only otherwise from ffprobe, which costs a connection."""
+        if self.tracks:
+            self._fill_tracks(self.tracks)
+            return
         def done(tracks):
             try:
                 self._fill_tracks(tracks)
