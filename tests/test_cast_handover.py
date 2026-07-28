@@ -1991,3 +1991,49 @@ def test_a_playlist_is_seeked_rather_than_rebuilt():
     w.cast.bridge = type("B", (), {"hls": False})()
     w._cast_seek(1800.0)
     assert again == [1800.0]
+
+
+def test_the_clock_keeps_counting_between_the_receiver_s_reports(monkeypatch):
+    """A receiver sends a media status when something happens to it, not
+    once a second. A film that simply plays sends nothing at all, so the
+    counter stood completely still; a channel that reports now and then made
+    it jump five seconds and stop again.
+
+    So the seconds in between are counted here, and only while the picture
+    is actually moving.
+    """
+    from dopeiptv.providers import chromecast as cm
+    clock = {"now": 1000.0}
+    monkeypatch.setattr(cm.time, "monotonic", lambda: clock["now"])
+
+    m = cm.ChromecastManager()
+    m.state = "PLAYING/None"
+    m.last_position, m.position_at = 300.0, clock["now"]
+    assert m.position() == 300.0
+    clock["now"] += 5                       # five seconds, no report at all
+    assert m.position() == 305.0, "the clock has to carry itself"
+
+    # A report lands: it wins, and the counting starts again from there.
+    m.last_position, m.position_at = 306.0, clock["now"]
+    assert m.position() == 306.0
+    clock["now"] += 2
+    assert m.position() == 308.0
+
+    # A held picture is not getting any further in.
+    m.state = "PAUSED/None"
+    clock["now"] += 60
+    assert m.position() == 306.0
+    m.state = "IDLE/FINISHED"
+    assert m.position() == 306.0
+
+    # A converted stream starts at zero whatever it was seeked to, so the
+    # offset still comes first.
+    m.state, m.position_offset = "PLAYING/None", 1830.0
+    m.position_at = clock["now"]
+    clock["now"] += 3
+    assert m.position() == 1830.0 + 306.0 + 3.0
+
+    # Nothing reported yet: no invented seconds.
+    m2 = cm.ChromecastManager()
+    m2.state = "PLAYING/None"
+    assert m2.position() == 0.0

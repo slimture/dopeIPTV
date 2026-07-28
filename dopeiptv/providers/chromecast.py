@@ -277,6 +277,13 @@ class _CastWatch:
                 pos = float(getattr(status, "current_time", 0) or 0)
                 if pos > 0:
                     self.manager.last_position = pos
+                    # When it was true, so the seconds in between can be
+                    # counted here. The receiver reports when it feels like
+                    # it - on a state change, and otherwise every few
+                    # seconds or not at all - and reading only what it says
+                    # left the clock frozen on a film and jumping five
+                    # seconds at a time on a channel.
+                    self.manager.position_at = time.monotonic()
             except (TypeError, ValueError):
                 pass
         cur = (f"{getattr(status, 'player_state', '?')}/"
@@ -367,6 +374,9 @@ class ChromecastManager:
         # part way in has that offset added back before anything is stored.
         self.last_position = 0.0
         self.position_offset = 0.0
+        # When last_position was reported, and whether the picture has been
+        # moving since. Between two reports the clock is carried by this.
+        self.position_at = 0.0
         self.state = ""
         self.duration = 0.0
         # Discovery runs in the worker pool and so can a cast - and a cast may
@@ -427,8 +437,21 @@ class ChromecastManager:
         return next((c for c in self.devices if c.name == name), None)
 
     def position(self) -> float:
-        """How far into the title the TV has got, in seconds."""
-        return self.position_offset + self.last_position
+        """How far into the title the TV has got, in seconds.
+
+        Carried forward from the last report rather than left sitting on
+        it. A receiver sends a media status when something happens to it,
+        not once a second - so a film that simply plays sends nothing at
+        all and the counter stood still, while a channel that reports now
+        and then made it jump five seconds and stop again.
+
+        Only while it is actually playing: a paused picture is not getting
+        any further in, and neither is one that has stopped.
+        """
+        at = self.position_offset + self.last_position
+        if self.position_at and self.state.startswith("PLAYING"):
+            at += max(0.0, time.monotonic() - self.position_at)
+        return at
 
     def cast(self, device_name: str, url: str, title: str,
              known_codecs: list[str] | None = None,
@@ -480,6 +503,7 @@ class ChromecastManager:
         # A fresh cast: nothing has been reported yet, and if it starts part
         # way in that offset is what the receiver's own zero means.
         self.last_position, self.position_offset = 0.0, 0.0
+        self.position_at = 0.0
         self.state = ""
         # A broadcast has no length, whatever was handed in. Being recorded
         # here is what a dvr cast IS, and a length is what makes the receiver
