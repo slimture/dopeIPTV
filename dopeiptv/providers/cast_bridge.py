@@ -54,24 +54,16 @@ _UA = "VLC/3.0.20 LibVLC/3.0.20"
 # "older" is the only adaptation offered, under a name that describes the
 # problem rather than the mechanism.
 #
-# It caps LINES, but only for a picture that also arrives fast. What an
-# older receiver is short of is neither on its own - it is the two
-# multiplied, which is what a decoder actually has to keep up with. Against
-# a first-generation dongle:
-#
-#   720 lines at 50 fps   channels     fine
-#   1080 lines at 24 fps  films        fine
-#   1080 lines at 50 fps  FHD channels stutters
-#
-# So capping on lines alone scaled down every 1080p film for a fault they
-# never had, while the one thing that does stutter is FHD television - which
-# is 50 fields a second because that is what broadcast is. A film is 24, and
-# 1080p24 is a third of the work of 1080p50.
+# It caps LINES, full stop. For one round it exempted anything at 30 fps or
+# under, on the reasoning that a dongle which plays 1080p24 mp4 files
+# natively could take a converted film at full size too. It cannot: native
+# playback is the receiver fetching an ordinary file its player was built
+# around, and a converted stream is another animal. The moment films went
+# over untouched, the dongle marked "older" began rebuffering, the sound
+# came seconds late, and the receiver's overlay - redrawn at every stall -
+# stopped ever leaving the screen. Three complaints, one commit. The box
+# means what it meant when everything worked: this device gets 720 lines.
 QUALITY = {"original": (0, 0), "older": (720, 0)}
-
-# Above this many frames a second, a full-size picture is more than an older
-# receiver keeps up with. Below it, the lines are not the problem.
-SMOOTH_FPS = 30
 
 
 def normalise_quality(value: str | None) -> str:

@@ -743,10 +743,9 @@ def test_the_picture_setting_is_a_ceiling_not_an_instruction():
     assert need("older", 576, 25.0) == "original"
     assert need("older", 720, 50.0) == "original"
     assert need("older", 720, 25.0) == "original"
-    # Lines AND speed together - see the test below. 1080 at 25 is a film,
-    # and films always played; 1080 at 50 is broadcast, and that is the one
-    # thing that stutters.
-    assert need("older", 1080, 25.0) == "original"
+    # Lines, regardless of frame rate - see the neighbouring test for the
+    # round that briefly said otherwise, and what it cost.
+    assert need("older", 1080, 25.0) == "older"
     assert need("older", 1080, 50.0) == "older"
     assert M.quality_label("older", 1080, 50.0) == "720p50"
     assert M.quality_label("older", 1080, 0.0) == "720p"
@@ -2152,42 +2151,25 @@ def test_a_jump_forward_is_rebuilt_and_a_jump_back_is_not():
     assert w.cast.sought == 603.0
 
 
-def test_the_ceiling_is_lines_and_speed_together():
-    """Measured against a first-generation dongle, not reasoned about:
+def test_the_ceiling_is_lines_regardless_of_frame_rate():
+    """For one round, films at 30 fps or under were exempted - a dongle
+    that plays 1080p24 files natively was assumed to take a converted film
+    at full size. It could not: the moment films went over untouched, the
+    device marked "older" began rebuffering, the sound came seconds late,
+    and the receiver's overlay, redrawn at every stall, stopped ever
+    leaving the screen. Three complaints, one commit.
 
-        720p50   channels        fine
-        1080p24  films           fine
-        1080p50  FHD channels    stutters
-
-    So the thing it cannot keep up with is the two multiplied. Capping on
-    lines alone shrank every 1080p film for a fault it never had.
+    The box means what it meant when everything worked: 720 lines.
     """
     from dopeiptv.providers.chromecast import ChromecastManager as M
     need = M._needed_quality
-
-    # A film: full size, and it stays that way.
-    assert need("older", 1080, 24.0) == "original"
-    assert need("older", 1080, 25.0) == "original"
-    assert need("older", 960, 24.0) == "original"
-
-    # Television: fifty a second is what broadcast is, and 1080 of them is
-    # the one thing that stutters.
+    assert need("older", 1080, 24.0) == "older"
+    assert need("older", 960, 24.0) == "older"
     assert need("older", 1080, 50.0) == "older"
-    assert need("older", 1080, 60.0) == "older"
-
-    # HD television is fine at fifty - it always was, and scaling it down
-    # threw away picture for nothing.
     assert need("older", 720, 50.0) == "original"
-
-    # An unknown frame rate is treated as fast: a broadcast is the thing
-    # that does not say, and a broadcast is the thing that stutters.
-    assert need("older", 1080, 0.0) == "older"
-
-    # And a device with no ceiling set is never touched.
+    assert need("older", 576, 25.0) == "original"
     assert need("original", 1080, 50.0) == "original"
-    # Nor is a picture whose size we never found out - adapting on a guess
-    # re-encodes channels that were perfectly fine, and does it invisibly.
-    assert need("older", 0, 50.0) == "original"
+    assert need("older", 0, 50.0) == "original", "never adapt on a guess"
 
 
 def test_a_farewell_from_the_old_stream_is_not_an_answer_about_the_new_one():
@@ -2369,8 +2351,10 @@ def test_every_path_announces_what_the_receiver_can_actually_do(monkeypatch):
     assert m.devices[0].announced[-1] == \
         ("BUFFERED", {"duration": 6000.0}, "Film")
 
-    # Converted film, no subtitle: an endless pipe, handed over exactly
-    # like a channel. The strip keeps the length for its own bar.
+    # Converted film, no subtitle: announced exactly as it was in the week
+    # everything worked and the chrome faded on its own. One round announced
+    # this pipe as LIVE/bare mid-crisis; the announcement was never the
+    # problem (the playback under it was), so it went back.
     m = _manager(monkeypatch)
     monkeypatch.setattr(cm, "_resolve_redirects",
                         lambda u: (u, "video/x-matroska"))
@@ -2379,8 +2363,9 @@ def test_every_path_announces_what_the_receiver_can_actually_do(monkeypatch):
     monkeypatch.setattr(m.bridge, "start", lambda *a, **k: "http://me/s.mp4")
     m.bridge.hls = False
     m.cast("Alva TV", "http://p/movie/u/pw/5.mkv", "Film", duration=6000.0)
-    assert m.devices[0].announced[-1] == ("LIVE", None, None)
-    assert m.duration == 6000.0, "the strip still knows how long it is"
+    assert m.devices[0].announced[-1] == \
+        ("BUFFERED", {"duration": 6000.0}, "Film")
+    assert m.duration == 6000.0
 
     # Converted film WITH a text subtitle: an HLS playlist whose segments
     # are all kept - genuinely seekable, so BUFFERED is the truth.

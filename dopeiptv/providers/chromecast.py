@@ -14,7 +14,7 @@ from ..core.log import log
 from ..i18n import tr
 from ..core.workers import run_async
 from .cast_bridge import (
-    QUALITY, SAFE_AUDIO, SAFE_VIDEO, SMOOTH_FPS, CastBridge,
+    QUALITY, SAFE_AUDIO, SAFE_VIDEO, CastBridge,
     normalise_quality, probe_tracks,
 )
 
@@ -660,12 +660,16 @@ class ChromecastManager:
         picture for nothing. A source already under the ceiling is left alone,
         at the frame rate it came with.
 
-        And the ceiling is lines AND speed together, not lines alone. A
-        first-generation dongle plays 720p50 channels and 1080p24 films
-        without blinking, and stutters on 1080p50 - the two multiplied is
-        what a decoder has to keep up with. Films are 24 frames a second
-        and broadcast is 50, so capping on lines alone shrank every 1080p
-        film for a fault it never had.
+        Lines, regardless of frame rate. There was a round where films at
+        24 fps were let through untouched, reasoning that a dongle which
+        plays 1080p24 files natively could take them - but that evidence
+        was from NATIVE playback, where the receiver fetches an ordinary
+        mp4 itself. A CONVERTED stream is another animal, and the moment
+        films started going over at original size, that dongle began
+        rebuffering, the sound arrived seconds late, and the receiver's
+        overlay - which redraws at every stall - stopped ever going away.
+        All three complaints were born in that commit. The box means what
+        it meant when everything worked: this device gets 720 lines.
 
         So is one whose size we could not find out. Adapting on a guess is the
         worse mistake: it re-encodes HD channels that were perfectly fine, and
@@ -681,13 +685,6 @@ class ChromecastManager:
                      "is rather than converting on a guess")
             return "original"
         limit_h, limit_fps = QUALITY.get(want, (0, 0))
-        # Slow enough to carry its lines. An unknown frame rate is treated
-        # as fast: a broadcast is the thing that does not say, and a
-        # broadcast is the thing that stutters.
-        if fps and fps <= SMOOTH_FPS:
-            log.info("cast: %dp%g is slow enough for its size - sending it "
-                     "as it is", height, fps)
-            return "original"
         too_big = limit_h and height > limit_h
         too_fast = limit_fps and fps and fps > limit_fps + 1
         if not too_big and not too_fast:
@@ -764,8 +761,7 @@ class ChromecastManager:
         # response - and a receiver told "video/mp4" about a playlist plays
         # nothing at all.
         ctype = ("application/x-mpegURL" if self.bridge.hls else "video/mp4")
-        if self._play_and_verify(mc, bridged, ctype, title,
-                                 pipe=not self.bridge.hls) is not False:
+        if self._play_and_verify(mc, bridged, ctype, title) is not False:
             log.info("cast: %s is playing the converted stream", device_name)
             return True
         self.bridge.stop()
@@ -777,8 +773,8 @@ class ChromecastManager:
     VERDICT_WAIT = 12.0
 
     def _play_and_verify(self, mc, url: str, ctype: str, title: str,
-                         wait: float | None = None, start: float = 0.0,
-                         pipe: bool = False) -> bool | None:
+                         wait: float | None = None,
+                         start: float = 0.0) -> bool | None:
         """Hand the stream over and wait for the receiver to pass judgement.
 
         True when it took the stream, False when it REFUSED it, and None when
@@ -789,29 +785,19 @@ class ChromecastManager:
         acting on; silence means keep waiting, and the watcher will report
         whatever happens next.
         """
-        # Announce what the receiver can actually DO with this stream,
-        # because the announcement is also the order for an on-screen UI,
-        # and this receiver never takes its UI down once drawn - measured
-        # on the television, five combinations, one round each.
+        # BUFFERED with title and length for a thing that has them, LIVE
+        # with nothing for a broadcast. This is the exact announcement of
+        # the week when everything worked and the overlay faded by itself.
         #
-        #   BUFFERED - VOD chrome: name, bar, times. Honest for a stream
-        #              the receiver can really seek (a native file, or an
-        #              HLS playlist whose segments are all there). On a
-        #              modern receiver it fades; on a first-generation
-        #              dongle nothing ever fades, but at least the bar
-        #              works.
-        #   LIVE     - with metadata: a counter and a LIVE badge. With
-        #              nothing: nothing. The one clean state that dongle
-        #              has, and how every channel already goes over.
-        #
-        # A converted film used to be announced BUFFERED with a length -
-        # about an endless fragmented-MP4 pipe the receiver can neither
-        # measure nor seek. The scrubber that drew could not scrub: pure
-        # decoration, permanent on the dongle. A pipe is a pipe, so it is
-        # handed over exactly like a channel: nothing to draw. The app's
-        # strip keeps the title, the clock and the seeking (self.duration
-        # is kept regardless of what is announced).
-        seekable = self.duration > 0 and not pipe
+        # The receiver's chrome DOES fade on this device - it faded for
+        # that whole week - but it redraws at every stall, so a stream
+        # that keeps rebuffering keeps it on screen for ever. Six rounds
+        # were spent turning this announcement's knobs while the actual
+        # fault was the playback under it (films going over at original
+        # size on a device marked as older - see _needed_quality). The
+        # announcement was never the problem, and it does not change
+        # again on a hunch.
+        seekable = self.duration > 0
         log.info("cast: handing over as %s",
                  f"BUFFERED ({self.duration:.0f} s), from {start:.0f} s"
                  if seekable else "LIVE, with nothing to draw")
