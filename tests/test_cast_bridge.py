@@ -9,6 +9,7 @@ reaches the TV is to hand it something it can decode.
 These checks run the real HTTP server with a stand-in for ffmpeg, so the
 streaming path is exercised without needing a provider or a TV.
 """
+import os
 import sys
 import urllib.request
 
@@ -63,8 +64,10 @@ def test_a_text_subtitle_is_burned_in_through_the_subtitles_filter():
     args = ffmpeg_args("ffmpeg", "http://p/x.mkv", copy_video=True,
                        audio=0, subs=1, sub_codec="subrip")
     vf = args[args.index("-vf") + 1]
-    assert vf.startswith("subtitles='http\\://p/x.mkv'"), vf
-    assert vf.endswith(":si=1"), vf
+    # Doubled backslashes: a filtergraph is parsed twice and the colon has to
+    # survive both. Quoting instead is what broke it - newer ffmpeg takes a
+    # backslash inside quotes literally and the filename kept them.
+    assert vf == "subtitles=http\\\\://p/x.mkv:si=1", vf
     # copy_video is overridden: a picture that changes cannot be copied.
     assert args[args.index("-c:v") + 1] == "libx264"
 
@@ -80,11 +83,43 @@ def test_a_bitmap_subtitle_is_overlaid_instead():
     assert "[v]" in args
 
 
-def test_a_source_with_colons_and_quotes_is_escaped():
-    args = ffmpeg_args("ffmpeg", "http://h:8080/a'b.mkv", copy_video=False,
+def test_a_url_with_a_port_survives_the_filtergraph():
+    args = ffmpeg_args("ffmpeg", "http://h:8080/a.mkv", copy_video=False,
                        subs=0, sub_codec="ass")
     vf = args[args.index("-vf") + 1]
-    assert "h\\:8080" in vf and "a\\'b" in vf, vf
+    assert vf == "subtitles=http\\\\://h\\\\:8080/a.mkv:si=0", vf
+
+
+def test_a_local_file_is_linked_under_a_name_nothing_can_misread(tmp_path):
+    """A colon can be escaped through a filtergraph; an apostrophe cannot, not
+    in every ffmpeg version - and "Ocean's Eleven 2026-07-28.ts" is an
+    ordinary recording. Local files get a plain name instead of a quoting
+    argument."""
+    awkward = tmp_path / "Ocean's: Eleven.mkv"
+    awkward.write_bytes(b"not really a film")
+    b = CastBridge()
+    b.exe = sys.executable
+    try:
+        b.start(str(awkward), ["h264"])
+        assert b.source is not None
+        assert "'" not in b.source and ":" not in b.source, b.source
+        assert b.source.endswith(".mkv")
+        assert os.path.realpath(b.source) == os.path.realpath(awkward)
+    finally:
+        tmp = b._tmp
+        b.stop()
+        assert tmp and not os.path.exists(tmp), "the link is cleaned up"
+
+
+def test_a_url_is_never_linked():
+    b = CastBridge()
+    b.exe = sys.executable
+    try:
+        b.start("http://p/x.m3u8", ["h264"])
+        assert b.source == "http://p/x.m3u8"
+        assert b._tmp is None
+    finally:
+        b.stop()
 
 
 def test_the_address_is_one_the_chromecast_can_reach():

@@ -24,10 +24,12 @@ server and ffmpeg.
 from __future__ import annotations
 
 import json
+import os
 import secrets
 import shutil
 import socket
 import subprocess
+import tempfile
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -129,10 +131,27 @@ def _input_options(source: str) -> list[str]:
 
 
 def _filter_escape(source: str) -> str:
-    """Escape a source path for use inside a filtergraph argument."""
-    for ch in ("\\", "'", ":", ",", "[", "]"):
-        source = source.replace(ch, "\\" + ch)
-    return source
+    """Escape a source for use as a filter option value.
+
+    A filtergraph is parsed twice: the description splits on , ; [ ] and
+    honours \\ and quotes, then each filter splits its own arguments on :.
+    A colon therefore has to survive both, which takes a DOUBLED backslash -
+    the description eats one and the option parser sees the other. This is
+    the form ffmpeg's own documentation uses for a Windows drive letter.
+
+    Quoting instead of escaping is what broke it: newer ffmpeg takes a
+    backslash inside quotes literally, so 'http\\://host\\:2095/x.mkv' became
+    a filename with backslashes in it and the parse failed on the leftovers -
+
+        No option name near 'http\\://lol.bz\\:2095/movie/....mkv:si=4'
+
+    - while older builds accepted the very same string. Unquoted and doubled
+    is accepted by both.
+    """
+    out = source.replace("\\", "\\\\\\\\")
+    for ch in (":", ",", ";", "[", "]", "'"):
+        out = out.replace(ch, "\\\\" + ch)
+    return out
 
 
 def ffmpeg_args(exe: str, source: str, copy_video: bool,
@@ -158,7 +177,7 @@ def ffmpeg_args(exe: str, source: str, copy_video: bool,
                     f"[0:v:0][0:s:{subs}]overlay[v]", "-map", "[v]"]
         else:
             burn = ["-vf",
-                    f"subtitles='{_filter_escape(source)}':si={subs}",
+                    f"subtitles={_filter_escape(source)}:si={subs}",
                     "-map", "0:v:0"]
     else:
         burn = ["-map", "0:v:0"]
@@ -235,11 +254,35 @@ class CastBridge:
         self._server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
         self._procs: list[subprocess.Popen] = []
+        self._tmp: str | None = None
         self._lock = threading.Lock()
 
     @staticmethod
     def available() -> bool:
         return ffmpeg_path() is not None
+
+    def _safe_source(self, source: str) -> str:
+        """A name for *source* that a filtergraph cannot misread.
+
+        Escaping gets a colon through, but an apostrophe cannot be escaped
+        reliably in every ffmpeg version - and "Ocean's Eleven 2026-07-28.ts"
+        is an ordinary recording. A local file is therefore linked under a
+        plain name in a temporary directory and ffmpeg is pointed at that,
+        which sidesteps the whole quoting question. A URL is left alone: they
+        are percent-encoded, so the only troublesome character they can carry
+        is the colon in the port, which escaping handles.
+        """
+        if "://" in source:
+            return source
+        try:
+            self._tmp = tempfile.mkdtemp(prefix="dopeiptv-cast-")
+            link = os.path.join(
+                self._tmp, "source" + os.path.splitext(source)[1])
+            os.symlink(os.path.abspath(source), link)
+            return link
+        except Exception as e:
+            log.info("cast bridge: could not link the file (%s)", e)
+            return source
 
     def start(self, source: str, codecs: list[str] | None = None,
               audio: int = 0, subs: int | None = None,
@@ -250,6 +293,7 @@ class CastBridge:
         asks for the stream, so a receiver that never connects costs nothing.
         """
         self.stop()
+        source = self._safe_source(source)
         codecs = [c.lower() for c in (codecs or [])]
         # Copy the video unless it is something the receiver cannot decode.
         # Unknown codecs are assumed fine: re-encoding 1080p live on a laptop
@@ -344,3 +388,6 @@ class CastBridge:
         self._server = None
         self._thread = None
         self.path = self.source = None
+        if self._tmp:
+            shutil.rmtree(self._tmp, ignore_errors=True)
+            self._tmp = None
