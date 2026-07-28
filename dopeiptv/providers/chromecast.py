@@ -762,7 +762,8 @@ class ChromecastManager:
         # response - and a receiver told "video/mp4" about a playlist plays
         # nothing at all.
         ctype = ("application/x-mpegURL" if self.bridge.hls else "video/mp4")
-        if self._play_and_verify(mc, bridged, ctype, title) is not False:
+        if self._play_and_verify(mc, bridged, ctype, title,
+                                 converted=True) is not False:
             log.info("cast: %s is playing the converted stream", device_name)
             return True
         self.bridge.stop()
@@ -774,8 +775,8 @@ class ChromecastManager:
     VERDICT_WAIT = 12.0
 
     def _play_and_verify(self, mc, url: str, ctype: str, title: str,
-                         wait: float | None = None,
-                         start: float = 0.0) -> bool | None:
+                         wait: float | None = None, start: float = 0.0,
+                         converted: bool = False) -> bool | None:
         """Hand the stream over and wait for the receiver to pass judgement.
 
         True when it took the stream, False when it REFUSED it, and None when
@@ -786,35 +787,43 @@ class ChromecastManager:
         acting on; silence means keep waiting, and the watcher will report
         whatever happens next.
         """
-        # BUFFERED with title and length for a thing that has one, LIVE
-        # with nothing for a broadcast.
+        # The receiver settled this, in two answers on two runs:
         #
-        # This has now been changed five times chasing an overlay that will
-        # not go away, and every single one of them was a guess. It is not
-        # changed again without evidence: _report_receiver_ui below writes
-        # down what the receiver says it is DOING with what we sent, and
-        # the next move waits for that.
-        seekable = self.duration > 0
+        #   with a title  metadata={'title': 'Slumberland ...'}  bar shown
+        #   with none     metadata={}                            bar shown
+        #
+        # So the bar is not drawn from the metadata. It is drawn from
+        # BUFFERED plus a duration: that pair IS the receiver's request for
+        # VOD chrome, and it keeps it up. Channels go over the same
+        # converter as LIVE with no duration and their picture is clean -
+        # which leaves exactly one difference between the clean case and
+        # the dirty one, and it is this pair.
+        #
+        # A converted stream is therefore handed over like a channel. It
+        # loses nothing real: an endless fragmented-MP4 pipe cannot be
+        # seeked by the receiver anyway, so the bar it drew was a control
+        # for something that was not there. The strip here keeps the title,
+        # the clock and the seeking - self.duration is untouched by this.
+        #
+        # A NATIVE film is left alone: the receiver fetches that file
+        # itself and really can seek it, so BUFFERED with the length is
+        # true, and its chrome is the receiver's own business.
+        seekable = self.duration > 0 and not converted
         log.info("cast: handing over as %s",
                  f"BUFFERED ({self.duration:.0f} s), from {start:.0f} s"
                  if seekable else "LIVE, with nothing to draw")
         if seekable:
-            # No title. The receiver reported the card back to us as ours -
-            #   metadata={'title': 'Slumberland ...', 'metadataType': 0}
-            # - so this is the one change here that is known rather than
-            # guessed: no metadata, no card to draw. The length stays,
-            # because it is what makes seek=True, and the receiver reported
-            # that too.
-            #
-            # Tested first with no subtitle at all, so that nothing of ours
-            # was touching the receiver after playback began: the overlay
-            # stayed anyway. That ruled out the track polling and the
-            # enable-subtitle command, and left this.
-            mc.play_media(url, ctype, current_time=float(start),
+            mc.play_media(url, ctype, title=title or "dopeIPTV",
+                          current_time=float(start),
                           stream_type="BUFFERED",
                           media_info={"duration": float(self.duration)})
         else:
-            mc.play_media(url, ctype, current_time=start or None,
+            # Told where to start when there is a playlist: LIVE with no
+            # currentTime means the live edge, and for a growing playlist
+            # that is the converter's write head, which it starves at.
+            hls = converted and getattr(self.bridge, "hls", False)
+            mc.play_media(url, ctype,
+                          current_time=start or (0.0 if hls else None),
                           stream_type="LIVE")
         mc.block_until_active(timeout=10)
         self._report_receiver_ui(mc)
