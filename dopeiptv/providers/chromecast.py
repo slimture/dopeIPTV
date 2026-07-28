@@ -794,32 +794,39 @@ class ChromecastManager:
         # faded. A thing with an end is BUFFERED - and telling the receiver
         # how long it is is what turns the bar into a real one, because the
         # converted stream is an endless pipe it cannot measure by itself.
-        # Nothing for the receiver to draw. Measured on the television,
-        # every combination, before landing here: BUFFERED with a title,
-        # BUFFERED with none, LIVE with a title - all of them stay on
-        # screen for ever. This receiver never hides anything it has drawn;
-        # the apps whose bars fade run their OWN receiver software on the
-        # TV, and the default receiver the sender can reach has exactly one
-        # clean state, which is having been given nothing. Channels are
-        # already handed over this way and their picture is clean - so a
-        # film is too. The app's strip carries the title, the clock and
-        # the seeking.
+        # Which of the receiver's two UIs this stream gets. There are only
+        # two, and neither can be restyled from the sender:
         #
-        # LIVE rather than BUFFERED because BUFFERED is what asks for the
-        # fixed progress bar. But LIVE has a rule of its own: with no
-        # currentTime the receiver starts at the live edge, and for a film
-        # served as a growing playlist the live edge is the converter's
-        # write head - it began at the newest segment and starved there.
-        # A thing with a length is told where to start, zero included; only
-        # a broadcast is left to the edge, which for one is the truth.
+        #   LIVE     - a counter, a LIVE badge, and a bar over the DVR
+        #              window. Shown for as long as the stream is live,
+        #              which for a live stream is always. WRONG for a film:
+        #              this is the fixed sign the last round shipped.
+        #   BUFFERED - ordinary VOD chrome: name, bar, times. It fades
+        #              after a few seconds of STABLE playback - and every
+        #              earlier round that judged it "never fades" was
+        #              watching a stream that rebuffered constantly, from
+        #              bugs since fixed (every frame re-encoded; a LIVE
+        #              start with no currentTime landing on the converter's
+        #              write head and starving there). The chrome redraws
+        #              on every state change, so a stream that never stops
+        #              buffering never puts it away - whatever the mode.
+        #
+        # So: a thing with an end is BUFFERED with its length and its
+        # title, like every VOD sender that uses the default receiver. A
+        # broadcast is LIVE with nothing at all - no metadata means no
+        # card, and a rolling window keeps the bar meaningless anyway.
         has_end = self.duration > 0
-        log.info("cast: handing over as LIVE with nothing to draw%s",
-                 f", from {start:.0f} s" if start else
-                 (", from the top" if has_end else ", at the live edge"))
-        mc.play_media(url, ctype,
-                      current_time=(float(start) if (start or has_end)
-                                    else None),
-                      stream_type="LIVE")
+        log.info("cast: handing over as %s",
+                 f"BUFFERED ({self.duration:.0f} s), from {start:.0f} s"
+                 if has_end else "LIVE, with nothing to draw")
+        if has_end:
+            mc.play_media(url, ctype, title=title or "dopeIPTV",
+                          current_time=float(start),
+                          stream_type="BUFFERED",
+                          media_info={"duration": float(self.duration)})
+        else:
+            mc.play_media(url, ctype, current_time=start or None,
+                          stream_type="LIVE")
         mc.block_until_active(timeout=10)
         self._ask_for_the_subtitle(mc)
         deadline = time.monotonic() + (

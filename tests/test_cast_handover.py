@@ -1604,16 +1604,14 @@ def test_the_tv_is_told_what_kind_of_thing_it_is_playing(monkeypatch):
     dev = m.devices[0]
 
     m.cast("Alva TV", "http://p/film.mp4", "Film", duration=5400.0)
-    # LIVE with nothing at all. Measured on the television: this receiver
-    # never hides anything it has drawn - BUFFERED with a title, BUFFERED
-    # bare and LIVE with a title all stay up for ever - and its one clean
-    # state is having been given nothing. The strip carries the title.
-    assert dev.announced[-1] == ("LIVE", None, None)
-    assert m.duration == 5400.0, "the strip still knows how long it is"
-    # And a film starts at its beginning, said outright. LIVE with no
-    # currentTime means the live edge, and for a growing playlist that is
-    # the converter's write head - it began at the newest segment and
-    # starved there.
+    # BUFFERED with its length and its title: the receiver's ordinary VOD
+    # chrome, which fades on stable playback. LIVE was tried here and is
+    # never right for a film - LIVE IS the counter and the badge, drawn for
+    # as long as the stream is live, which for a live stream is always.
+    assert dev.announced[-1] == ("BUFFERED", {"duration": 5400.0}, "Film")
+    assert m.duration == 5400.0
+    # And it starts at its beginning, said outright, not at the newest
+    # segment of a growing playlist.
     assert dev.started_at == 0.0
 
     # A broadcast the same way - and it alone keeps the live edge, which
