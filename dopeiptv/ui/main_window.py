@@ -3914,6 +3914,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         ctx = self._cast_ctx or {}
         if not ctx.get("archive_from") or not self._cast_device:
             return
+        if getattr(self, "_cast_paused_at", None) is not None:
+            return                      # paused on purpose, not run out
         if not str(getattr(self.cast, "state", "")).startswith("IDLE/FINISHED"):
             return
         # Once. Loading the next stretch takes a few seconds, during which
@@ -4051,7 +4053,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             pos, self._cast_paused_pos = self._cast_paused_pos, 0.0
             self.cast_bar_pause.setIcon(cast_strip_icon("pause", P["text"]))
             if ctx.get("archive"):
-                self._cast_from_archive(self._paused_moment(at, pos))
+                # The stream was let go of when the pause began, so the panel
+                # is still counting it for a moment. Wait for that rather
+                # than be refused and show nothing.
+                self._cast_from_archive(self._paused_moment(at, pos),
+                                        settle=bool(ctx.get("sid")))
             else:
                 threading.Thread(target=self.cast.resume, daemon=True).start()
             return
@@ -4060,7 +4066,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # are the same thing only on the first pause of a live channel.
         self._cast_paused_pos = float(self.cast.position() or 0.0)
         self.cast_bar_pause.setIcon(cast_strip_icon("play", P["text"]))
-        threading.Thread(target=self.cast.pause, daemon=True).start()
+        # A film the receiver fetched itself is simply paused - it can hold
+        # its place, and stopping would lose it. A broadcast cannot be held
+        # at all: what a pause on live television means is answered from the
+        # archive when you come back, and until then the stream is only
+        # costing the one connection this account has. Which is what made
+        # coming back fail - the archive was refused because the sending
+        # nobody was watching still held it.
+        live = bool(ctx.get("sid"))
+        threading.Thread(
+            target=self.cast.release if live else self.cast.pause,
+            daemon=True).start()
 
     def _paused_moment(self, at, pos: float):
         """The broadcast moment the picture was showing when you paused.
@@ -4078,10 +4094,22 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     # the broadcast goes out, so the current minute is not there yet: asking
     # for it comes back as a single unfinished segment with #EXT-X-ENDLIST
     # after it, which the receiver shows as a frozen picture and a spinner.
-    ARCHIVE_LAG = timedelta(minutes=2)
+    #
+    # A minute plus a margin, and no more: the request is floored to a whole
+    # minute, and a minute that began less than sixty seconds ago has not
+    # finished being broadcast. Everything beyond that is television you did
+    # not ask to sit through again.
+    ARCHIVE_LAG = timedelta(seconds=90)
 
-    def _cast_from_archive(self, paused_at) -> None:
-        """Resume a paused live cast from the provider's catch-up archive."""
+    def _cast_from_archive(self, paused_at, settle: bool = False) -> None:
+        """Resume a paused live cast from the provider's catch-up archive.
+
+        *settle* waits for the provider to notice a connection we have just
+        let go of. Coming back from a pause is exactly that case: the stream
+        was released when the pause began, and a panel goes on counting a
+        closed session for a few seconds - long enough to refuse the archive
+        and leave the television black.
+        """
         ctx, device = self._cast_ctx or {}, self._cast_device
         sid = ctx.get("sid")
         if sid is None or not device:
@@ -4098,10 +4126,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         minute = paused_at.replace(second=0, microsecond=0)
         offset = (paused_at - minute).total_seconds()
         behind = max(1, int((datetime.now() - minute).total_seconds() // 60))
-        # Enough to reach live and keep going for a while. A cast cannot ask
-        # for more later the way the player does - when this window runs out
-        # the stream ends - but asking for a day of it makes the panel
-        # prepare a day of it, and nothing plays until it has.
         # The receiver is offered the archive as HLS, and the converter is
         # given the transport stream behind it.
         #
@@ -4110,7 +4134,23 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # stream at all. And it is the transport stream that these panels cut
         # short mid-programme - a playlist is a list of segments, so a short
         # one is a segment to fetch again rather than the end of everything.
-        cands = self.client.timeshift_urls(sid, minute, behind + 120) or []
+        # And for exactly as long as the archive actually holds - not a
+        # minute more.
+        #
+        # Asking for longer does not get you more television; the archive
+        # only has what has been broadcast. It gets you a playlist that
+        # PROMISES more, and the receiver works its way to a segment the
+        # panel cannot serve and sits there - buffering, playing, buffering,
+        # a few seconds at a time. Asking for two hours where two minutes
+        # existed is exactly that stutter.
+        #
+        # The whole list is also built before anything can play: a request an
+        # hour back listed a hundred and eighty segments where sixty were
+        # real, which was most of the wait before a picture appeared.
+        #
+        # Running out is no longer the end of anything - the next stretch is
+        # asked for when this one is done.
+        cands = self.client.timeshift_urls(sid, minute, behind) or []
         url = next((c for c in cands if ".m3u8" in c), "")
         source = next((c for c in cands if ".ts" in c), "") or url
         url = url or source
@@ -4118,9 +4158,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         # The moment itself, not how it was worked out - it is the one thing
         # that can be checked against what the picture actually shows.
-        log.info("cast: resuming %s from %s (%d min back, asking for %d min)",
+        log.info("cast: resuming %s from %s (%d min of archive)",
                  ctx.get("title") or "", paused_at.strftime("%H:%M:%S"),
-                 behind, behind + 120)
+                 behind)
         title = ctx.get("title") or "dopeIPTV"
         # The session now lives at the archive address. Recording it keeps the
         # strip's own panel pointing at what is actually playing - it opened
@@ -4138,6 +4178,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             lambda: self.cast.cast(device, url, title, self._local_codecs(),
                                    ctx.get("audio"), ctx.get("subs"),
                                    start=offset, source=source,
+                                   settle=settle,
                                    quality=self._cast_quality(),
                                    height=ctx.get("height") or 0,
                                    fps=ctx.get("fps") or 0.0),

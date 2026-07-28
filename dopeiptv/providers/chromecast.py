@@ -744,6 +744,31 @@ class ChromecastManager:
         except Exception as e:
             log.info("cast: the receiver would not mute (%s)", e)
 
+    def release(self) -> None:
+        """Stop what the receiver is playing, without ending the cast.
+
+        A paused stream is still an OPEN stream: the receiver goes on holding
+        the provider's connection for as long as the picture sits frozen, and
+        these accounts are sold with one. Come back from a coffee break, press
+        play, and the archive request is refused - the one connection is still
+        being spent on the sending nobody is watching.
+
+        So a pause lets go of the stream and keeps only the device. Nothing
+        else is torn down: the strip stays up, the device stays connected, and
+        pressing play casts again from the moment the pause began.
+        """
+        cc = self.active
+        if cc is None:
+            return
+        log.info("cast: letting go of the stream while paused")
+        try:
+            cc.media_controller.stop()
+        except Exception as e:
+            log.info("cast: could not stop the stream (%s)", e)
+        # ffmpeg is reading the channel too, when it is in the middle.
+        self.bridge.stop()
+        self.state = ""
+
     def stop(self) -> None:
         # Tell the TV first, tear our own machinery down afterwards.
         #
