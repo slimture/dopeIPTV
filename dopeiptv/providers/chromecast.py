@@ -313,6 +313,14 @@ class _CastWatch:
         """
         if self._subs_done or self.mc is None:
             return
+        # Not from a status that belongs to the stream we just replaced.
+        # Changing subtitle mid-film loads a new stream, and the report that
+        # arrives first is the old one's farewell - IDLE/INTERRUPTED, still
+        # carrying the old track list. Acting on it ticked the job off as
+        # done and the new subtitle was never switched on at all.
+        if getattr(status, "player_state", "") not in (
+                "PLAYING", "BUFFERING", "PAUSED"):
+            return
         bridge = getattr(self.manager, "bridge", None)
         if not getattr(bridge, "hls", False) or bridge.subs is None:
             self._subs_done = True

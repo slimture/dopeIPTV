@@ -2169,3 +2169,56 @@ def test_the_ceiling_is_lines_and_speed_together():
     # Nor is a picture whose size we never found out - adapting on a guess
     # re-encodes channels that were perfectly fine, and does it invisibly.
     assert need("older", 0, 50.0) == "original"
+
+
+def test_a_farewell_from_the_old_stream_is_not_an_answer_about_the_new_one():
+    """Changing subtitle mid-film loads a new stream, and the first report
+    to arrive is the old one's farewell - IDLE/INTERRUPTED, still carrying
+    the old track list. Acting on it ticked the job off as done, and the
+    subtitle that had just been chosen was never switched on:
+
+        serving ... subtitle track 11 as webvtt beside it
+        receiver IDLE/INTERRUPTED
+        the subtitle is already on ([2])
+    """
+    from dopeiptv.providers.chromecast import _CastWatch
+
+    class Bridge:
+        hls, subs = True, 11
+
+    class Manager:
+        bridge = Bridge()
+        last_position = 0.0
+        state = ""
+
+    class MC:
+        def __init__(self):
+            self.enabled = []
+
+        def enable_subtitle(self, track_id, timeout=10.0):
+            self.enabled.append(track_id)
+
+    class Status:
+        def __init__(self, state, tracks, active):
+            self.player_state, self.idle_reason = state, None
+            self.current_time = 0.0
+            self.subtitle_tracks = tracks
+            self.current_subtitle_tracks = active
+
+    old = [{"trackId": 2, "type": "TEXT"}]
+    new = [{"trackId": 1, "type": "AUDIO"}, {"trackId": 3, "type": "TEXT"}]
+    mc = MC()
+    w = _CastWatch("Alva TV", Manager(), mc)
+
+    # The old stream's last word, about the old stream's tracks.
+    w.new_media_status(Status("IDLE", old, [2]))
+    threading.Event().wait(0.1)
+    assert mc.enabled == [] and w._subs_done is False
+
+    # The new one, when it actually starts.
+    w.new_media_status(Status("PLAYING", new, []))
+    for _ in range(50):
+        if mc.enabled:
+            break
+        threading.Event().wait(0.02)
+    assert mc.enabled == [3]
