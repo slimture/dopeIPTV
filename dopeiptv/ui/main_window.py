@@ -966,9 +966,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cast_bar = QWidget(objectName="CastBar")
         self.cast_bar.setStyleSheet(
             f"QWidget#CastBar {{ background:{P['sel']}; border-radius:10px; }}")
-        _cast_row = QHBoxLayout(self.cast_bar)
-        _cast_row.setContentsMargins(12, 8, 8, 8)
+        # Two rows: the controls, and under them the position across the
+        # whole width. Sharing a line with the buttons and the volume left the
+        # seek bar a few pixels wide, squeezed into what the wrapped labels
+        # did not take.
+        _cast_outer = QVBoxLayout(self.cast_bar)
+        _cast_outer.setContentsMargins(12, 8, 8, 8)
+        _cast_outer.setSpacing(6)
+        _cast_row = QHBoxLayout()
         _cast_row.setSpacing(10)
+        _cast_outer.addLayout(_cast_row)
         _cast_col = QVBoxLayout()
         _cast_col.setSpacing(1)
         self.cast_bar_lbl = QLabel("")
@@ -981,21 +988,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cast_bar_title.setStyleSheet(
             f"color:{P['muted3']}; font-size:11px;")
         _cast_col.addWidget(self.cast_bar_title)
-        # Where the film has got to, and a way to move it. Only films,
-        # episodes and recordings have a length to move within - a broadcast
-        # has no end to measure against, and its own "pause" is the archive.
-        _seek_row = QHBoxLayout()
-        _seek_row.setSpacing(8)
-        self.cast_bar_seek = QSlider(Qt.Orientation.Horizontal)
-        self.cast_bar_seek.setRange(0, 1000)
-        self.cast_bar_seek.setToolTip(tr("cast_seek"))
-        self.cast_bar_seek.sliderReleased.connect(self._cast_seek_released)
-        _seek_row.addWidget(self.cast_bar_seek, 1)
-        self.cast_bar_time = QLabel("")
-        self.cast_bar_time.setStyleSheet(
-            f"color:{P['muted3']}; font-size:11px;")
-        _seek_row.addWidget(self.cast_bar_time)
-        _cast_col.addLayout(_seek_row)
         _cast_row.addLayout(_cast_col, 1)
         # Drawn, not typed. A gear, a pause bar and a minus sign are all
         # characters a font stack can be missing, and a missing glyph is an
@@ -1025,6 +1017,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             lambda v: (self.cast_bar_vol.isSliderDown() or
                        self._cast_volume(v / 100)))
         _cast_row.addWidget(self.cast_bar_vol)
+        # The same timeshift the player has, for the same channels. A cast
+        # channel with an archive can be paused, wound back and pointed at an
+        # earlier programme exactly as it can here - it is the same archive,
+        # asked the same way.
+        self.cast_bar_ts = strip_button(
+            "rewind", tr("tooltip_timeshift"), self._cast_timeshift_menu)
         self.cast_bar_tracks = strip_button(
             "tracks", tr("cast_audio") + " / " + tr("cast_subtitles"),
             self._cast_tracks_menu)
@@ -1040,6 +1038,25 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cast_bar_stop.clicked.connect(
             lambda: self._end_cast("stopped from the cast strip"))
         _cast_row.addWidget(self.cast_bar_stop)
+        # Where the film has got to, and a way to move it - its own row, the
+        # full width of the strip. Only films, episodes and recordings have a
+        # length to move within; a broadcast has no end to measure against,
+        # and its own way back is the archive.
+        _seek_row = QHBoxLayout()
+        _seek_row.setContentsMargins(2, 0, 2, 0)
+        _seek_row.setSpacing(10)
+        self.cast_bar_seek = QSlider(Qt.Orientation.Horizontal)
+        self.cast_bar_seek.setRange(0, 1000)
+        self.cast_bar_seek.setMinimumWidth(160)
+        self.cast_bar_seek.setToolTip(tr("cast_seek"))
+        self.cast_bar_seek.sliderReleased.connect(self._cast_seek_released)
+        _seek_row.addWidget(self.cast_bar_seek, 1)
+        self.cast_bar_time = QLabel("")
+        self.cast_bar_time.setStyleSheet(
+            f"color:{P['muted3']}; font-size:11px;")
+        _seek_row.addWidget(self.cast_bar_time)
+        _cast_outer.addLayout(_seek_row)
+
         # The receiver is the only thing that knows where the film is, and it
         # only says so when asked - so ask, once a second, and only while
         # something with a length is actually playing there.
@@ -3352,6 +3369,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # or a track change replaces.
             "kind": self._play_kind_for(it),
             "row_url": url,
+            "row_source": source,
         }
         CastDialog(self, url, title, self._local_codecs(),
                    self._local_audio_index(), start,
@@ -3559,6 +3577,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cast_bar_pause.setIcon(cast_strip_icon("pause", P["text"]))
         self.cast_bar_pause.setVisible(
             bool(device) and (not ctx.get("sid") or ctx.get("archive")))
+        self.cast_bar_ts.setVisible(bool(device) and bool(ctx.get("archive")))
         if not device:
             self._cast_tick.stop()
             bar.hide()
@@ -3753,6 +3772,93 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             shown.setEnabled(False)
         menu.exec(self.cast_bar_tracks.mapToGlobal(
             self.cast_bar_tracks.rect().bottomLeft()))
+
+    def _cast_timeshift_menu(self) -> None:
+        """The archive, for what is playing on the TV.
+
+        The player's own timeshift menu, pointed at the receiver instead of at
+        mpv: go back to live, start the programme that is on from its
+        beginning, browse what has been, or simply wind back a while. The
+        archive does not care who is watching it.
+        """
+        ctx = self._cast_ctx or {}
+        it = ctx.get("item")
+        if not ctx.get("archive") or not it:
+            return
+        m = QMenu(self)
+        m.addAction(tr("ts_go_live"), self._cast_go_live)
+        m.addSeparator()
+        # Where the picture is now, so a step back is a step back from THERE
+        # and not from live - winding back twice has to go twice as far.
+        at = self._cast_moment()
+        prog = self.xmltv.current_programme(it)
+        if prog:
+            m.addAction(
+                tr("ts_watch_from_start_named", title=prog["title"]),
+                lambda: self._cast_to_moment(
+                    datetime.fromtimestamp(prog["start_timestamp"])))
+        m.addAction(tr("ts_browse_past"),
+                    lambda: self._open_catchup_dialog(
+                        it, on_pick=lambda p: self._cast_to_moment(
+                            datetime.fromtimestamp(p["start_timestamp"]))))
+        m.addSeparator()
+        eff_min = self._effective_ts_minutes(it)
+        for mins, dur_key in self.TIMESHIFT_STEPS:
+            if mins > eff_min:
+                break
+            m.addAction(tr("ts_go_back", t=tr(dur_key)),
+                        lambda mins=mins: self._cast_to_moment(
+                            at - timedelta(minutes=mins)))
+        note = m.addAction(tr("ts_archive_depth", n=self._timeshift_days(it)))
+        note.setEnabled(False)
+        m.exec(self.cast_bar_ts.mapToGlobal(
+            self.cast_bar_ts.rect().bottomLeft()))
+
+    def _cast_moment(self):
+        """The broadcast moment the TV is showing.
+
+        Live until the archive takes over, and from then on that stream's own
+        start plus how far into it the receiver has got.
+        """
+        began = (self._cast_ctx or {}).get("archive_from")
+        if began is None:
+            return datetime.now()
+        return began + timedelta(seconds=float(self.cast.position() or 0.0))
+
+    def _cast_to_moment(self, when) -> None:
+        """Point the cast at *when*, within what the archive actually holds."""
+        ctx = self._cast_ctx or {}
+        it = ctx.get("item") or {}
+        now = datetime.now()
+        floor = now - timedelta(minutes=self._effective_ts_minutes(it))
+        # A minute inside the live edge: the archive is written as it goes and
+        # the newest minute is not there yet.
+        when = max(floor, min(when, now - timedelta(minutes=1)))
+        self._cast_paused_at, self._cast_paused_pos = None, 0.0
+        self.cast_bar_pause.setIcon(cast_strip_icon("pause", P["text"]))
+        self._cast_from_archive(when)
+
+    def _cast_go_live(self) -> None:
+        """Back to the live edge, off the archive."""
+        ctx, device = self._cast_ctx or {}, self._cast_device
+        url = ctx.get("row_url")
+        if not device or not url:
+            return
+        log.info("cast: back to the live edge")
+        ctx.update(url=url, source=ctx.get("row_source") or url,
+                   archive_from=None)
+        self._cast_paused_at, self._cast_paused_pos = None, 0.0
+        self.cast_bar_pause.setIcon(cast_strip_icon("pause", P["text"]))
+        title = ctx.get("title") or "dopeIPTV"
+        run_async(
+            self.pool,
+            lambda: self.cast.cast(device, url, title, self._local_codecs(),
+                                   source=ctx.get("row_source") or url,
+                                   quality=self._cast_quality(),
+                                   height=ctx.get("height") or 0,
+                                   fps=ctx.get("fps") or 0.0),
+            lambda _n: self.show_cast_strip(device, title),
+            lambda msg: self._error(tr("cast_failed", msg=msg)))
 
     def _show_cast_progress(self) -> None:
         """Put the receiver's own position on the strip.

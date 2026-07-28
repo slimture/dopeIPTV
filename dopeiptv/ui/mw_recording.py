@@ -1231,7 +1231,9 @@ class _RecordingMixin:
         note = ts_menu.addAction(tr("ts_archive_depth", n=days))
         note.setEnabled(False)
 
-    def _open_catchup_dialog(self, it) -> None:
+    def _open_catchup_dialog(self, it, on_pick=None) -> None:
+        """Pick a past programme. *on_pick* decides what happens to it - the
+        player by default, the Chromecast when a cast is what is running."""
         days = self._timeshift_days(it)
         if not days:
             return
@@ -1260,7 +1262,8 @@ class _RecordingMixin:
             cur = lst.currentItem()
             p = cur.data(Qt.ItemDataRole.UserRole) if cur else None
             if p:
-                self._play_timeshift(it, prog=p)
+                (on_pick or (lambda prog: self._play_timeshift(it,
+                                                               prog=prog)))(p)
                 d.accept()
 
         watch_btn.clicked.connect(watch)

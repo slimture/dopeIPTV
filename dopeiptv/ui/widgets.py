@@ -430,6 +430,25 @@ def cast_strip_icon(kind: str, colour: str) -> QIcon:
                 pr.drawArc(QRectF(s * (0.56 - r), s * (0.5 - r),
                                   s * r * 2, s * r * 2),
                            -60 * 16, 120 * 16)
+    elif kind == "rewind":                  # a clock wound back
+        pen.setWidthF(s * 0.10)
+        pr.setPen(pen)
+        pr.setBrush(Qt.BrushStyle.NoBrush)
+        # Most of a circle, with an arrowhead where the gap is - the shape
+        # every remote uses for going back in time.
+        pr.drawArc(QRectF(s * 0.16, s * 0.16, s * 0.68, s * 0.68),
+                   100 * 16, 300 * 16)
+        pr.setPen(Qt.PenStyle.NoPen)
+        pr.setBrush(col)
+        head = QPainterPath()
+        head.moveTo(s * 0.50, s * 0.04)
+        head.lineTo(s * 0.50, s * 0.30)
+        head.lineTo(s * 0.26, s * 0.17)
+        head.closeSubpath()
+        pr.drawPath(head)
+        pr.setPen(pen)                      # the hands
+        pr.drawLine(QPointF(s * 0.50, s * 0.50), QPointF(s * 0.50, s * 0.32))
+        pr.drawLine(QPointF(s * 0.50, s * 0.50), QPointF(s * 0.66, s * 0.58))
     else:                                   # "tracks": three sliders
         for i, y in enumerate((0.28, 0.5, 0.72)):
             pr.drawLine(QPointF(s * 0.18, s * y), QPointF(s * 0.82, s * y))

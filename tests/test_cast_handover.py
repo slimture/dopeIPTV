@@ -37,7 +37,7 @@ _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_cast_volume", "_cast_quality", "_cast_quality_key",
             "_paused_moment", "_record_cast_history", "_history_extra",
             "_show_cast_progress", "_cast_seek", "_cast_seek_released",
-            "_fmt_hms",
+            "_fmt_hms", "_cast_moment", "_cast_to_moment", "_cast_go_live",
             "_set_cast_quality", "_toggle_cast_mute", "_show_cast_volume")
 
 
@@ -160,6 +160,7 @@ def _with_strip():
     w.cast_bar_pause = _Lbl()
     w.cast_bar_mute, w.cast_bar_vol = _Lbl(), _Slider()
     w.cast_bar_seek, w.cast_bar_time = _Slider(), _Lbl()
+    w.cast_bar_ts = _Lbl()
     w._cast_tick = _Ticker()
     w.cast = _Cast(active=False)
     w._cast_ctx = {}
@@ -263,7 +264,7 @@ def test_every_strip_icon_actually_draws_something():
     without the glyph draws an empty box, which is what the volume buttons
     turned into on macOS."""
     from dopeiptv.ui.widgets import cast_strip_icon
-    for kind in ("minus", "plus", "tracks", "pause", "play"):
+    for kind in ("minus", "plus", "tracks", "pause", "play", "rewind"):
         img = cast_strip_icon(kind, "#ffffff").pixmap(42, 42).toImage()
         ink = sum(1 for x in range(img.width()) for y in range(img.height())
                   if img.pixelColor(x, y).alpha() > 20)
@@ -1119,3 +1120,67 @@ def test_the_progress_bar_is_for_things_with_an_end():
     w._show_cast_progress()
     assert w.cast_bar_seek.shown is False
     assert w._cast_tick.isActive() is False
+
+
+def test_the_archive_on_the_tv_answers_the_same_way_it_does_here():
+    """A cast channel with an archive can be wound back and pointed at an
+    earlier programme exactly as it can in the player - it is the same
+    archive, asked the same way. What differs is only where the picture
+    currently is: a step back has to be a step back from THERE, not from
+    live, or winding back twice would land in the same place twice."""
+    from datetime import datetime, timedelta
+    w = _with_strip()
+    w.cast = _Cast(active=True)
+    w._cast_device = "Alva TV"
+    points = []
+    w._cast_from_archive = lambda at: points.append(at)
+    w._effective_ts_minutes = lambda it: 2880          # two days of archive
+    w._cast_ctx = {"archive": True, "sid": 9851, "title": "SVT1",
+                   "item": {"stream_id": 9851}}
+
+    # Live: the moment is now, and a step back is a step back from now.
+    before = datetime.now()
+    w._cast_to_moment(w._cast_moment() - timedelta(minutes=30))
+    assert before - timedelta(minutes=31) < points[0] < before
+
+    # Already in the archive: from where the picture IS.
+    began = datetime.now() - timedelta(hours=3)
+    w._cast_ctx["archive_from"] = began
+    w.cast.at = 600.0                                  # ten minutes in
+    assert w._cast_moment() == began + timedelta(seconds=600)
+    points.clear()
+    w._cast_to_moment(w._cast_moment() - timedelta(minutes=30))
+    assert points == [began + timedelta(seconds=600) - timedelta(minutes=30)]
+
+    # Never past what the archive holds, and never into the minute that has
+    # not been written yet.
+    points.clear()
+    w._cast_to_moment(datetime.now() - timedelta(days=7))
+    assert points[0] > datetime.now() - timedelta(minutes=2881)
+    points.clear()
+    w._cast_to_moment(datetime.now() + timedelta(hours=1))
+    assert points[0] <= datetime.now() - timedelta(seconds=59)
+
+
+def test_going_live_leaves_the_archive_behind(monkeypatch):
+    """The row's own address, not the timeshift URL the session drifted to."""
+    from datetime import datetime
+    sent = {}
+    w = _with_strip()
+    w.pool = None
+    w.player = None
+    w.settings = _Settings()
+    w._cast_device = "Alva TV"
+    w.cast = _Cast(active=True)
+    w._cast_ctx = {"archive": True, "sid": 9851, "title": "SVT1",
+                   "row_url": "http://p/live/u/pw/9851.m3u8",
+                   "row_source": "http://p/live/u/pw/9851.ts",
+                   "url": "http://p/timeshift/u/pw/241/x/9851.ts",
+                   "archive_from": datetime.now(), "item": {}}
+    import dopeiptv.ui.main_window as mwmod
+    monkeypatch.setattr(mwmod, "run_async",
+                        lambda pool, work, ok, err: sent.update(work=work))
+    w._cast_go_live()
+    assert w._cast_ctx["url"] == "http://p/live/u/pw/9851.m3u8"
+    assert w._cast_ctx["archive_from"] is None
+    assert sent, "the live address is cast"
