@@ -441,8 +441,14 @@ jobs:
           #
           # The tap builds from source, so this step takes a while. Cached by
           # Homebrew between runs on the same runner image.
+          #
+          # No --with-libass: the tap has libass on by default and rejects the
+          # flag outright ("Error: invalid option"), which failed the whole
+          # step. The check below is what actually holds the guarantee, and it
+          # asks the binary rather than trusting the build line.
+          brew unlink ffmpeg || true
           brew tap homebrew-ffmpeg/ffmpeg
-          brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libass
+          brew install homebrew-ffmpeg/ffmpeg/ffmpeg
       - name: Check the bundled ffmpeg can burn subtitles in
         run: |
           # A build without libass would ship silently and only show up as a

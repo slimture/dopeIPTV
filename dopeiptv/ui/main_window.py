@@ -3612,10 +3612,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         cast starts, fails or is stopped.
         """
         self._cast_device = device
-        # A fresh cast is playing, whatever the last one was doing - and it
-        # starts at the live edge again.
-        self._cast_paused_at = None
-        self._cast_behind = 0.0
         ctx = getattr(self, "_cast_ctx", None) or {}
         self._cast_key = ctx.get("key") if device else None
         self._cast_group = ctx.get("group") if device else None
@@ -3645,6 +3641,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._cast_tick.stop()
             bar.hide()
             return
+        # A different thing is being cast now: how far behind live the last
+        # one was is not about this one. Left standing, a channel paused for
+        # ten minutes made the next cast open ten minutes behind itself.
+        #
+        # Marked in the context rather than reset on every call, because this
+        # runs again for a track change and for going back to live - and both
+        # of those are in the middle of managing this very counter. Only
+        # starting something new builds a new context, so the mark is gone.
+        if not ctx.get("_counted"):
+            ctx["_counted"] = True
+            self._cast_behind = 0.0
+            self._cast_paused_at = None
         self._record_cast_history()
         self._show_cast_progress()
         self.cast_bar_lbl.setText(tr("cast_casting_to", name=device))
@@ -4030,6 +4038,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if span is not None:
             self._show_cast_timeline(*span)
             return
+        # Not a broadcast, so nothing on the groove. The programme blocks were
+        # only ever cleared when the cast ENDED, so casting a film straight
+        # after a timeshifted channel left last night's evening drawn along a
+        # bar that is now measuring a film.
+        bar.set_segments([])
         if held:
             self._show_cast_edge(self._cast_moment().timestamp(), time.time())
             return

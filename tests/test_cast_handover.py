@@ -1471,6 +1471,41 @@ def test_a_broadcast_gets_a_timeline_rather_than_no_bar_at_all():
     w.cast = _CastAt(1830.0, 6000.0)
     w._show_cast_progress()
     assert w.cast_bar_time.text == "30:30 / 1:40:00"
+    # With nothing of last night's television left drawn along it. The
+    # programme blocks were only ever cleared when the cast ENDED, so a film
+    # cast straight after a timeshifted channel inherited its evening - on a
+    # bar that is now measuring the film.
+    assert w.cast_bar_seek.segments == []
+
+
+def test_a_new_cast_does_not_inherit_the_last_ones_pause(monkeypatch):
+    """How far behind live the last thing was is not about this one.
+
+    It used to be wiped on every call, which is wrong in the other
+    direction: changing the audio track shows the strip again, and that
+    would have declared a channel held ten minutes back to be live while the
+    picture stayed where it was. Only starting something new resets it, and
+    what says "new" is the context object, which only a new cast builds."""
+    w = _with_strip()
+    w.cast = _CastAt(0.0, 0.0)
+    w.settings = _Settings()
+    w._record_cast_history = lambda: None
+    w._show_cast_volume = lambda: None
+    w._effective_ts_minutes = lambda it: 360
+    w.xmltv = _Xmltv([])
+    w._cast_behind = 600.0
+
+    # A track change on the same cast: the same context, so the counter is
+    # left exactly where the pause put it.
+    w._cast_ctx = {"archive": True, "sid": 9851, "item": {}, "_counted": True}
+    w.show_cast_strip("Alva TV", "SVT1")
+    assert w._cast_behind == 600.0
+
+    # Something else entirely: a new context, and the counter goes with it.
+    w._cast_ctx = {"title": "Film", "kind": "movie"}
+    w.show_cast_strip("Alva TV", "Film")
+    assert w._cast_behind == 0.0
+    assert w._cast_paused_at is None
 
 
 def test_hovering_the_timeline_names_the_time_and_what_was_on():
