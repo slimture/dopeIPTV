@@ -1607,7 +1607,7 @@ def test_the_tv_is_told_what_kind_of_thing_it_is_playing(monkeypatch):
     # chrome, which fades on stable playback. LIVE was tried here and is
     # never right for a film - LIVE IS the counter and the badge, drawn for
     # as long as the stream is live, which for a live stream is always.
-    assert dev.announced[-1] == ("BUFFERED", {"duration": 5400.0}, "Film")
+    assert dev.announced[-1] == ("BUFFERED", {"duration": 5400.0}, None)
     assert m.duration == 5400.0
     # And it starts at its beginning, said outright, not at the newest
     # segment of a growing playlist.
@@ -2350,8 +2350,8 @@ def test_every_path_announces_what_the_receiver_can_actually_do(monkeypatch):
                         lambda u: ("http://cdn/f.mp4", "video/mp4"))
     m.scan()
     m.cast("Alva TV", "http://p/movie/u/pw/5.mp4", "Film", duration=6000.0)
-    assert m.devices[0].announced[-1] == \
-        ("BUFFERED", {"duration": 6000.0}, "Film")
+    assert m.devices[0].announced[-1] == ("BUFFERED", {"duration": 6000.0},
+                                          None)
 
     # Converted film, no subtitle: announced exactly as it was in the week
     # everything worked and the chrome faded on its own. One round announced
@@ -2365,8 +2365,8 @@ def test_every_path_announces_what_the_receiver_can_actually_do(monkeypatch):
     monkeypatch.setattr(m.bridge, "start", lambda *a, **k: "http://me/s.mp4")
     m.bridge.hls = False
     m.cast("Alva TV", "http://p/movie/u/pw/5.mkv", "Film", duration=6000.0)
-    assert m.devices[0].announced[-1] == \
-        ("BUFFERED", {"duration": 6000.0}, "Film")
+    assert m.devices[0].announced[-1] == ("BUFFERED", {"duration": 6000.0},
+                                          None)
     assert m.duration == 6000.0
 
     # Converted film WITH a text subtitle: an HLS playlist whose segments
@@ -2382,8 +2382,8 @@ def test_every_path_announces_what_the_receiver_can_actually_do(monkeypatch):
     m.bridge.subs = 0
     m.cast("Alva TV", "http://p/movie/u/pw/5.mkv", "Film", duration=6000.0,
            subs={"index": 0, "codec": "subrip", "lang": "swe"})
-    assert m.devices[0].announced[-1] == \
-        ("BUFFERED", {"duration": 6000.0}, "Film")
+    assert m.devices[0].announced[-1] == ("BUFFERED", {"duration": 6000.0},
+                                          None)
 
     # A channel, native: nothing, as ever.
     m = _manager(monkeypatch)

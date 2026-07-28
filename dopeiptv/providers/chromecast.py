@@ -799,8 +799,18 @@ class ChromecastManager:
                  f"BUFFERED ({self.duration:.0f} s), from {start:.0f} s"
                  if seekable else "LIVE, with nothing to draw")
         if seekable:
-            mc.play_media(url, ctype, title=title or "dopeIPTV",
-                          current_time=float(start),
+            # No title. The receiver reported the card back to us as ours -
+            #   metadata={'title': 'Slumberland ...', 'metadataType': 0}
+            # - so this is the one change here that is known rather than
+            # guessed: no metadata, no card to draw. The length stays,
+            # because it is what makes seek=True, and the receiver reported
+            # that too.
+            #
+            # Tested first with no subtitle at all, so that nothing of ours
+            # was touching the receiver after playback began: the overlay
+            # stayed anyway. That ruled out the track polling and the
+            # enable-subtitle command, and left this.
+            mc.play_media(url, ctype, current_time=float(start),
                           stream_type="BUFFERED",
                           media_info={"duration": float(self.duration)})
         else:
