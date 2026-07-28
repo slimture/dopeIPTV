@@ -794,49 +794,24 @@ class ChromecastManager:
         # faded. A thing with an end is BUFFERED - and telling the receiver
         # how long it is is what turns the bar into a real one, because the
         # converted stream is an endless pipe it cannot measure by itself.
-        buffered = self.duration > 0
-        # A broadcast is handed over with no title and no metadata at all.
+        # What the receiver is told, and what it draws from it.
         #
-        # The default receiver draws its overlay from exactly that: give it a
-        # title and it puts up a name and a progress bar over the picture and
-        # leaves them there. On a film that bar is worth having - it can be
-        # scrubbed with the television's own remote - but on live television
-        # it measures nothing, cannot be dragged, and sits on top of the
-        # match. The app's own strip says what is casting and where, which is
-        # the place to say it.
-        # In the log, because it is the one thing that decides whether the
-        # television draws anything over the picture - and the only way to
-        # tell afterwards which of the two a cast went out as.
-        # Which media session was here BEFORE this load. Everything the
-        # receiver says about that one is about the stream being replaced -
-        # including its track list, whose text track has the same number as
-        # the new one's, because ffmpeg builds both the same way. That is
-        # how "the subtitle is already on ([2])" was true and useless.
-        self.old_session = getattr(mc.status, "media_session_id", None)
-        log.info("cast: handing over as %s%s",
-                 "BUFFERED" if buffered else "LIVE, with no metadata",
-                 f" ({self.duration:.0f} s)" if buffered else "")
-        mc.play_media(url, ctype,
-                      # Nothing to draw an overlay from, for anything.
-                      #
-                      # A film was handed over with a title so the
-                      # receiver's own bar would be a real one, draggable
-                      # with the television's remote. It draws that bar and
-                      # the name over the picture and never takes them away
-                      # again - not on a film, not on an episode - so the
-                      # trade was a scrubber nobody asked for against a
-                      # sign across the middle of the film for its whole
-                      # length. The app's own strip says what is playing
-                      # and can seek it; the receiver needs to say nothing.
-                      #
-                      # The length still goes (see media_info): it is what
-                      # makes a seek land where it was asked to, and it
-                      # draws nothing by itself.
-                      title=None,
-                      current_time=start or None,
-                      stream_type="BUFFERED" if buffered else "LIVE",
-                      media_info={"duration": float(self.duration)}
-                      if buffered else None)
+        # The scrubber is the streamType, not the metadata. BUFFERED with a
+        # length draws a progress bar and keeps it there for the whole film
+        # - it is the receiver's idea of a thing you seek, so it never
+        # takes the controls away. LIVE draws no bar at all.
+        #
+        # So: LIVE, with the title. That is the ordinary card every other
+        # app puts up - a name and a thumbnail that fade after a few
+        # seconds - and nothing fixed across the picture. Taking the title
+        # away as well only replaced a bar with a blank, which was worse.
+        #
+        # The length is not sent to the receiver, because that is what asks
+        # for the bar. The app keeps it (self.duration) for its own strip,
+        # which is where the position, the clock and the seeking live.
+        log.info("cast: handing over as LIVE, with a title that fades")
+        mc.play_media(url, ctype, title=title or "dopeIPTV",
+                      current_time=start or None, stream_type="LIVE")
         mc.block_until_active(timeout=10)
         self._ask_for_the_subtitle(mc)
         deadline = time.monotonic() + (

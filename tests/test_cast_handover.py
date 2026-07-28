@@ -1604,19 +1604,18 @@ def test_the_tv_is_told_what_kind_of_thing_it_is_playing(monkeypatch):
     dev = m.devices[0]
 
     m.cast("Alva TV", "http://p/film.mp4", "Film", duration=5400.0)
-    # BUFFERED with a length, because that is what makes a seek land where
-    # it was asked to - and no title, because the receiver draws a name and
-    # a bar from one and never takes them away again, on a film or an
-    # episode alike. The app's own strip says what is playing.
-    assert dev.announced[-1] == ("BUFFERED", {"duration": 5400.0}, None)
+    # LIVE with a title: the ordinary card that fades after a few seconds.
+    # The scrubber is the streamType, not the metadata - BUFFERED with a
+    # length is the receiver's idea of a thing you seek, so it keeps the
+    # controls up for the whole film. The length stays on this side, for
+    # the app's own strip.
+    assert dev.announced[-1] == ("LIVE", None, "Film")
+    assert m.duration == 5400.0, "the strip still knows how long it is"
 
-    # A broadcast has no end, and saying LIVE is simply the truth.
+    # A broadcast the same way, and for it LIVE is simply the truth.
     dev.announced.clear()
     m.cast("Alva TV", "http://p/live/u/pw/9851.m3u8", "SVT1")
-    # And with no title, so the receiver has nothing to draw an overlay
-    # from: a name and a progress bar sitting on top of the match, measuring
-    # nothing and refusing to be dragged.
-    assert dev.announced[-1] == ("LIVE", None, None)
+    assert dev.announced[-1] == ("LIVE", None, "SVT1")
 
 
 def test_a_recorded_broadcast_is_still_a_broadcast(monkeypatch):
@@ -1641,7 +1640,7 @@ def test_a_recorded_broadcast_is_still_a_broadcast(monkeypatch):
     m.scan()
     m.cast("Alva TV", "http://p/timeshift/u/pw/240/1.ts", "SVT1",
            duration=3600.0, dvr=True)
-    assert m.devices[0].announced[-1] == ("LIVE", None, None)
+    assert m.devices[0].announced[-1] == ("LIVE", None, "SVT1")
     assert m.duration == 0.0, "a broadcast has no length for the strip either"
 
 
