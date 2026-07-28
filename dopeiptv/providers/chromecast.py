@@ -383,6 +383,11 @@ class ChromecastManager:
             # converter - is refused for exactly that long. Let it notice.
             log.info("cast: letting the provider release the connection")
             time.sleep(4)
+        if not url:
+            # Nothing to hand over. It has happened - a panel reopened on a
+            # session whose address had not been recorded - and casting an
+            # empty string just produces a mystified receiver.
+            raise RuntimeError("there is no address to cast")
         quality = self._needed_quality(quality, height, fps)
         cc.wait(timeout=10)
         mc = cc.media_controller

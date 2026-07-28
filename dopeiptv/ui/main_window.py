@@ -3513,6 +3513,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         the TV has got to rather than at the beginning.
         """
         ctx = self._cast_ctx or {}
+        if not ctx.get("url"):
+            # Nothing recorded to reopen on. Better the ordinary panel than
+            # one that would cast an empty address.
+            log.info("cast: no address recorded for the running cast")
+            return
         CastDialog(self, ctx.get("url") or "", ctx.get("title") or "",
                    self._local_codecs(), 0, self.cast.position(),
                    ctx.get("tracks") or {}, probe=False,
@@ -3699,6 +3704,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         log.info("cast: resuming %s from the archive, %d min back",
                  ctx.get("title") or "", behind)
         title = ctx.get("title") or "dopeIPTV"
+        # The session now lives at the archive address. Recording it keeps the
+        # strip's own panel pointing at what is actually playing - it opened
+        # on an empty address otherwise, and cast it.
+        ctx.update(url=url, source=url)
         run_async(
             self.pool,
             lambda: self.cast.cast(device, url, title),

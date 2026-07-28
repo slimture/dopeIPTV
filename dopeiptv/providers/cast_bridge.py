@@ -453,11 +453,32 @@ class CastBridge:
 
     @staticmethod
     def _drain_errors(proc: subprocess.Popen) -> None:
+        """ffmpeg's own words, with the repetition taken out.
+
+        Picking a live transport stream up mid-broadcast means decoding
+        before the first keyframe, and ffmpeg says "non-existing PPS 0
+        referenced" about every frame until one arrives - hundreds of
+        identical lines that bury everything else in the log. Identical
+        consecutive lines are counted instead of repeated.
+        """
+        last, repeats = "", 0
+
+        def flush():
+            if repeats:
+                log.info("cast bridge: ffmpeg: (last line ×%d)", repeats + 1)
+
         try:
             for raw in iter(proc.stderr.readline, b""):
                 line = raw.decode("utf-8", "replace").strip()
-                if line:
-                    log.info("cast bridge: ffmpeg: %s", line)
+                if not line:
+                    continue
+                if line == last:
+                    repeats += 1
+                    continue
+                flush()
+                last, repeats = line, 0
+                log.info("cast bridge: ffmpeg: %s", line)
+            flush()
         except Exception:
             pass
 

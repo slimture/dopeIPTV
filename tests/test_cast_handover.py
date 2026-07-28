@@ -655,6 +655,16 @@ def test_the_picture_setting_is_a_ceiling_not_an_instruction():
     assert need("original", 1080, 50.0) == "original"
 
 
+def test_an_empty_address_is_refused_rather_than_cast(monkeypatch):
+    """A panel reopened on a session whose address had not been recorded cast
+    an empty string, and the receiver was left mystified."""
+    m = _manager(monkeypatch)
+    m.scan()
+    with pytest.raises(RuntimeError, match="no address"):
+        m.cast("Alva TV", "", "SVT1")
+    assert m.devices[0].plays == []
+
+
 def test_the_resolved_address_goes_first(monkeypatch):
     """Side-by-side logs of a channel that casts and one that does not both
     show the panel's own address refused outright - only the resolved CDN
