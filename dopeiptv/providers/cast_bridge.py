@@ -115,7 +115,8 @@ def probe_tracks(source: str, exe: str | None = None) -> dict:
     tracks is a reason to offer no choice, never a reason to block a cast.
     """
     exe = exe or (shutil.which("ffprobe") or "")
-    out: dict = {"audio": [], "subtitle": [], "duration": 0.0}
+    out: dict = {"audio": [], "subtitle": [], "duration": 0.0,
+                 "height": 0, "fps": 0.0}
     if not exe:
         return out
     try:
@@ -140,7 +141,17 @@ def probe_tracks(source: str, exe: str | None = None) -> dict:
         return out
     for s in streams:
         kind = s.get("codec_type")
-        if kind not in out:
+        if kind == "video" and not out["height"]:
+            # What the picture actually is, so an adaptation meant for a
+            # 1080-line channel is not applied to the HD version of the same
+            # channel, which the receiver plays perfectly well.
+            out["height"] = int(s.get("height") or 0)
+            try:
+                num, _, den = (s.get("avg_frame_rate") or "0/1").partition("/")
+                out["fps"] = round(float(num) / float(den or 1), 3)
+            except (TypeError, ValueError, ZeroDivisionError):
+                out["fps"] = 0.0
+        if kind not in out or not isinstance(out.get(kind), list):
             continue
         tags = s.get("tags") or {}
         out[kind].append({

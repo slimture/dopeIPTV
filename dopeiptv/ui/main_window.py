@@ -974,6 +974,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             f"color:{P['muted3']}; font-size:11px;")
         _cast_col.addWidget(self.cast_bar_title)
         _cast_row.addLayout(_cast_col, 1)
+        for glyph, step in (("−", -0.1), ("+", 0.1)):
+            b = QPushButton(glyph)
+            b.setToolTip(tr("tooltip_volume"))
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setFixedWidth(34)
+            b.clicked.connect(lambda _c=False, s=step: self._cast_volume(s))
+            _cast_row.addWidget(b)
         self.cast_bar_tracks = QPushButton("⚙")
         self.cast_bar_tracks.setToolTip(
             tr("cast_audio") + " / " + tr("cast_subtitles"))
@@ -3371,10 +3378,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     "mpv", None)
         if m is None:
             return {}
-        out: dict = {"audio": [], "subtitle": [], "duration": 0.0}
+        out: dict = {"audio": [], "subtitle": [], "duration": 0.0,
+                     "height": 0, "fps": 0.0}
         try:
             for t in (m.track_list or []):
                 kind = t.get("type")
+                if kind == "video" and not out["height"]:
+                    out["height"] = int(t.get("demux-h") or 0)
+                    out["fps"] = float(t.get("demux-fps") or 0.0)
                 if kind not in ("audio", "sub"):
                     continue
                 key = "audio" if kind == "audio" else "subtitle"
@@ -3491,6 +3502,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                    ctx.get("tracks") or {}, probe=False,
                    source=ctx.get("source"), managing=True,
                    chosen=(ctx.get("audio"), ctx.get("subs"))).exec()
+
+    def _cast_volume(self, step: float) -> None:
+        """Turn the TV up or down. Off the UI thread: it is a message to a
+        device on the network, and nothing here should wait for it."""
+        if getattr(self.cast, "active", None) is None:
+            return
+        threading.Thread(target=self.cast.set_volume, args=(step,),
+                         daemon=True).start()
 
     def _cast_tracks_menu(self) -> None:
         """Offer another audio track or subtitle while the cast runs.

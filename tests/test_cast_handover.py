@@ -22,7 +22,8 @@ import pytest
 
 _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_local_codecs", "_toggle_cast_pause", "_cast_from_archive",
-            "_save_cast_position", "_recast_with", "_track_label")
+            "_save_cast_position", "_recast_with", "_track_label",
+            "_cast_volume")
 
 
 class _Resume0:
@@ -127,6 +128,30 @@ def test_switching_tracks_picks_up_where_the_tv_is(monkeypatch):
     w._recast_with(None, swede)
     sent["work"]()
     assert sent["start"] == 1830.0, sent
+
+
+def test_the_volume_buttons_reach_the_tv_off_the_ui_thread():
+    """It is a message to a device on the network; nothing in the window
+    should wait for it."""
+    done = threading.Event()
+    seen = {}
+    w = _with_strip()
+    w.cast = _Cast(active=True)
+    w.cast.set_volume = lambda step: (seen.update(step=step, thread=
+                                      threading.current_thread().name),
+                                      done.set())
+    w._cast_volume(0.1)
+    assert done.wait(5)
+    assert seen["step"] == 0.1
+    assert seen["thread"] != threading.current_thread().name
+
+
+def test_nothing_is_sent_when_no_cast_is_running():
+    w = _with_strip()
+    w.cast = _Cast(active=False)
+    w.cast.set_volume = lambda step: (_ for _ in ()).throw(
+        AssertionError("must not be called"))
+    w._cast_volume(0.1)
 
 
 def test_local_playback_ends_a_running_cast():
@@ -502,6 +527,27 @@ def test_the_provider_is_given_a_moment_after_local_playback_stopped(
     assert long_waits() == [], "nothing was stopped, nothing to wait for"
     m.cast("Alva TV", "http://p/y.mp4", "Film", settle=True)
     assert long_waits(), slept
+
+
+def test_the_picture_setting_is_a_ceiling_not_an_instruction():
+    """Most channels come in three versions - SD, HD and FHD - and only the
+    last is beyond an older receiver. Scaling the HD one down would throw
+    away picture for nothing."""
+    from dopeiptv.providers.chromecast import ChromecastManager as M
+    need = M._needed_quality
+    # Already under it: sent as it is.
+    assert need("720p", 576, 25.0) == "original"
+    assert need("720p", 720, 50.0) == "original"
+    assert need("720p30", 720, 25.0) == "original"
+    # Over it, one way or the other.
+    assert need("720p", 1080, 25.0) == "720p"
+    assert need("720p30", 720, 50.0) == "720p30"
+    assert need("720p30", 1080, 50.0) == "720p30"
+    # Nothing to compare against: the device was given that setting for a
+    # reason, so it stands.
+    assert need("720p", 0, 0.0) == "720p"
+    # And a device with no setting never adapts anything.
+    assert need("original", 1080, 50.0) == "original"
 
 
 def test_the_resolved_address_goes_first(monkeypatch):

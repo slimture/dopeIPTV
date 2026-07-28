@@ -70,13 +70,18 @@ d.deleteLater(); app.processEvents()
 def fake_programmes(ch, a, b):
     if ch.get("stream_id") != 1:
         return []
+    # Kept well inside the board's own window. It opens at the current half
+    # hour minus thirty minutes, so a programme placed an hour and a half back
+    # sits on that edge - and whether it lands inside depends on the seconds
+    # on the clock when the test runs. It passed here and failed on CI at
+    # 07:30 for no other reason.
     return [
         {"title": "Earlier", "description": "",
-         "start_timestamp": now - 5400, "stop_timestamp": now - 1800},
+         "start_timestamp": now - 1500, "stop_timestamp": now - 900},
         {"title": "On Air", "description": "A described programme.",
-         "start_timestamp": now - 1800, "stop_timestamp": now + 1800},
+         "start_timestamp": now - 900, "stop_timestamp": now + 900},
         {"title": "Later", "description": "",
-         "start_timestamp": now + 1800, "stop_timestamp": now + 5400},
+         "start_timestamp": now + 900, "stop_timestamp": now + 3600},
     ]
 
 w.xmltv.programmes_in = fake_programmes

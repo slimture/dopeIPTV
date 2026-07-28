@@ -13,7 +13,9 @@ from PyQt6.QtWidgets import (
 from ..core.log import log
 from ..i18n import tr
 from ..core.workers import run_async
-from .cast_bridge import SAFE_AUDIO, SAFE_VIDEO, CastBridge, probe_tracks
+from .cast_bridge import (
+    QUALITY, SAFE_AUDIO, SAFE_VIDEO, CastBridge, probe_tracks,
+)
 
 # pychromecast drags in zeroconf + ifaddr (~130 ms of the app's startup),
 # and this module sits on the main window's import chain - so the import is
@@ -357,7 +359,8 @@ class ChromecastManager:
              audio: dict | None = None, subs: dict | None = None,
              start: float = 0.0, duration: float = 0.0,
              settle: bool = False, source: str | None = None,
-             quality: str = "original") -> str:
+             quality: str = "original", height: int = 0,
+             fps: float = 0.0) -> str:
         with self._lock:
             cc = self._device(device_name)
             if cc is None:
@@ -380,6 +383,7 @@ class ChromecastManager:
             # converter - is refused for exactly that long. Let it notice.
             log.info("cast: letting the provider release the connection")
             time.sleep(4)
+        quality = self._needed_quality(quality, height, fps)
         cc.wait(timeout=10)
         mc = cc.media_controller
         # Attach the watcher BEFORE handing anything over, so the receiver's
@@ -496,6 +500,29 @@ class ChromecastManager:
                                      start=start) is not False:
                 return device_name
         raise RuntimeError(self._no_decoder(codecs))
+
+    @staticmethod
+    def _needed_quality(want: str, height: int, fps: float) -> str:
+        """What this particular picture actually needs.
+
+        The device setting is a ceiling, not an instruction. Most channels
+        come in three versions - SD, HD and FHD - and only the last one is
+        beyond an older receiver; scaling the HD one down would throw away
+        picture for nothing. A source already under the ceiling is left alone,
+        and a picture whose size we do not know is adapted as asked, since
+        that is the setting the device was given for a reason.
+        """
+        if want == "original" or not height:
+            return want
+        limit_h, limit_fps = QUALITY.get(want, (0, 0))
+        too_big = limit_h and height > limit_h
+        too_fast = limit_fps and fps and fps > limit_fps + 1
+        if not too_big and not too_fast:
+            log.info("cast: %dp%s is within this device's limit - "
+                     "sending it as it is", height,
+                     f"{fps:g}" if fps else "")
+            return "original"
+        return want
 
     @staticmethod
     def _no_decoder(codecs: list[str]) -> str:
@@ -624,6 +651,25 @@ class ChromecastManager:
         except Exception as e:
             log.info("cast: the receiver would not resume (%s)", e)
 
+    def set_volume(self, step: float) -> float:
+        """Nudge the TV's volume by *step* (-1.0 … 1.0); returns the new level.
+
+        This is the receiver's own volume, not the stream's - the same one the
+        TV remote changes - so it survives a track switch and everything else
+        that rebuilds the stream underneath it.
+        """
+        cc = self.active
+        if cc is None:
+            return 0.0
+        try:
+            now = float(getattr(cc.status, "volume_level", 0.0) or 0.0)
+            want = max(0.0, min(1.0, now + step))
+            cc.set_volume(want)
+            return want
+        except Exception as e:
+            log.info("cast: the receiver would not change volume (%s)", e)
+            return 0.0
+
     def stop(self) -> None:
         # Tell the TV first, tear our own machinery down afterwards.
         #
@@ -699,6 +745,7 @@ class CastDialog(QDialog):
         # was answered when the cast began.
         self.managing = managing
         self.chosen = chosen
+        self.height, self.fps = 0, 0.0
         self.setWindowTitle(tr("cast_title"))
         self.setMinimumWidth(400)
         lay = QVBoxLayout(self)
@@ -740,8 +787,10 @@ class CastDialog(QDialog):
         # needs the same help every time, and every other device in the house
         # is left alone. Filled in once the device is known.
         self.quality_box.clear()
+        # Written as a ceiling, because that is what it is: an HD or SD
+        # channel is already below it and goes to the TV untouched.
         for key, label in (("original", tr("cast_quality_original")),
-                           ("720p", "720p"), ("720p30", "720p · 30")):
+                           ("720p", "≤ 720p"), ("720p30", "≤ 720p · 30")):
             self.quality_box.addItem(label, key)
         self.quality_box.setEnabled(True)
         self.quality_note = QLabel(tr("cast_quality_note"))
@@ -802,6 +851,8 @@ class CastDialog(QDialog):
 
     def _fill_tracks(self, tracks: dict) -> None:
         self.duration = float((tracks or {}).get("duration") or 0.0)
+        self.height = int((tracks or {}).get("height") or 0)
+        self.fps = float((tracks or {}).get("fps") or 0.0)
         audio = (tracks or {}).get("audio") or []
         subs = (tracks or {}).get("subtitle") or []
         self.audio_list, self.subs_list = audio, subs
@@ -966,6 +1017,7 @@ class CastDialog(QDialog):
         ctx = getattr(self.window, "_cast_ctx", None)
         if isinstance(ctx, dict):
             ctx.update(url=self.url, source=self.source, codecs=self.codecs,
+                       height=self.height, fps=self.fps,
                        audio=audio, subs=subs, duration=self.duration,
                        tracks={"audio": self.audio_list,
                                "subtitle": self.subs_list})
@@ -975,7 +1027,8 @@ class CastDialog(QDialog):
                                                  self.codecs, audio, subs,
                                                  self.start, self.duration,
                                                  settle, self.source,
-                                                 self.quality()),
+                                                 self.quality(), self.height,
+                                                 self.fps),
                   done, failed)
 
     def _banner(self, device: str | None, title: str) -> None:
