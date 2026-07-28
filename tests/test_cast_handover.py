@@ -455,9 +455,11 @@ def test_the_resolved_address_goes_first(monkeypatch):
     assert [u for u, _c in m.devices[0].plays] == ["http://cdn/x"]
 
 
-def test_a_refused_address_falls_back_to_the_panel_url(monkeypatch):
-    """A different request against a different host, and by then the cast has
-    failed anyway - so it costs nothing but the wait."""
+def test_the_converter_comes_before_the_panel_url(monkeypatch):
+    """Every attempt opens the stream again, and an account with a single
+    connection is refused for as long as the panel keeps counting the last
+    one. The panel address has never worked with this provider, so it is
+    tried last - after the converter, which does."""
     from dopeiptv.providers import chromecast as cm
     m = _manager(monkeypatch)
     monkeypatch.setattr(cm, "_resolve_redirects",
@@ -471,8 +473,9 @@ def test_a_refused_address_falls_back_to_the_panel_url(monkeypatch):
     with pytest.raises(RuntimeError):
         m.cast("Alva TV", "http://panel/live/u/pw/9851.m3u8", "SVT1")
     tried = [u for u, _c in m.devices[0].plays]
-    assert tried[:2] == ["http://cdn/live/play/token/9851",
-                         "http://panel/live/u/pw/9851.m3u8"], tried
+    assert tried == ["http://cdn/live/play/token/9851",   # the real address
+                     "http://me/s.mp4",                   # then converted
+                     "http://panel/live/u/pw/9851.m3u8"], tried
 
 
 def test_silence_is_not_treated_as_a_refusal(monkeypatch):
@@ -574,7 +577,7 @@ def test_an_unidentified_stream_is_converted_anyway(monkeypatch):
     with pytest.raises(RuntimeError, match="refused this stream"):
         m.cast("Alva TV", "http://panel/y.m3u8", "SVT1")
     assert started, "the converter must run even with no codec information"
-    assert [u for u, _c in m.devices[0].plays][-1] == "http://me/s.mp4"
+    assert [u for u, _c in m.devices[0].plays][1] == "http://me/s.mp4"
 
     # ...and the channel is remembered, so the next cast of it does not spend
     # twenty seconds being refused all over again. Remembered per channel,
@@ -582,7 +585,7 @@ def test_an_unidentified_stream_is_converted_anyway(monkeypatch):
     m.devices[0].plays.clear()
     with pytest.raises(RuntimeError):
         m.cast("Alva TV", "http://panel/y.m3u8", "SVT1")
-    assert [u for u, _c in m.devices[0].plays] == ["http://me/s.mp4"]
+    assert [u for u, _c in m.devices[0].plays][0] == "http://me/s.mp4"
     m.devices[0].plays.clear()
     with pytest.raises(RuntimeError):
         m.cast("Alva TV", "http://panel/other.m3u8", "Another channel")

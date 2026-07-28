@@ -96,6 +96,26 @@ assert open_cast("vod", {"name": "Film", "stream_id": 5,
 # Nothing to cast: no dialog at all rather than one pointing nowhere.
 assert open_cast("history", {"name": "Ghost"}) is None
 
+# The player's own right-click and the menu bar cast what is playing, so a
+# channel you started here can be moved to the TV without finding its row
+# again. Neither offers it when nothing is playing.
+assert w.can_cast_playing() is False
+cast.clear()
+w.cast_playing()
+assert cast == {}, cast
+
+
+class FakePlayer:
+    current_url = "http://p/live/u/pw/9851.ts"
+
+
+w.player = FakePlayer()
+w._playing_item = chan
+w.mode = "live"
+assert w.can_cast_playing() is True
+w.cast_playing()
+assert cast.get("url") == "http://p/live/u/pw/9851.m3u8", cast
+
 print("CAST_SOURCES_OK")
 """
 

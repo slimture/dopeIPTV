@@ -678,6 +678,8 @@ class _PopoutMixin:
             m.addAction(tr("btn_stop"), p.stop)
             opts = m.addMenu(tr("tooltip_audio_subs_aspect"))
             p.populate_options_menu(opts)
+            if self.can_cast_playing():
+                m.addAction(tr("ctx_cast_to_chromecast"), self.cast_playing)
         m.addSeparator()
         m.addAction(tr("tooltip_popout_exit"), self._exit_popout)
         exec_menu_over_video(m, global_pos)

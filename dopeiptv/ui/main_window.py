@@ -362,6 +362,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         reminders_action.triggered.connect(self._open_reminders)
         multiview_action = app_menu.addAction(tr("menu_multiview"))
         multiview_action.triggered.connect(self._show_multiview)
+        cast_action = app_menu.addAction(tr("ctx_cast_to_chromecast"))
+        cast_action.triggered.connect(self.cast_playing)
+        # Only while something is playing - there is nothing to send
+        # otherwise, and a dead entry is worse than none.
+        app_menu.aboutToShow.connect(
+            lambda: cast_action.setEnabled(self.can_cast_playing()))
         if sys.platform != "darwin":
             app_menu.addSeparator()
         about_action = app_menu.addAction(tr("menu_about"))
@@ -386,12 +392,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 QAction.MenuRole.ApplicationSpecificRole)
             multiview_action.setMenuRole(
                 QAction.MenuRole.ApplicationSpecificRole)
+            cast_action.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
         # Kept for live language switching (see retranslate_ui).
         self._i18n_actions = {
             settings_action: lambda: tr("btn_settings") + "…",
             refresh_action: lambda: tr("menu_refresh_playlist"),
             reminders_action: lambda: tr("reminders_menu"),
             multiview_action: lambda: tr("menu_multiview"),
+            cast_action: lambda: tr("ctx_cast_to_chromecast"),
             about_action: lambda: tr("menu_about"),
             quit_action: lambda: tr("menu_quit"),
         }
@@ -3247,6 +3255,24 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if p is None or not getattr(p, "current_url", None):
             return False
         return self._item_key(it) != self._playing_key
+
+    def cast_playing(self) -> None:
+        """Send what the player is showing to a Chromecast.
+
+        The same dialog the list's right-click opens, on the row that is
+        playing - so you can start watching here and move it to the TV
+        without hunting for where the channel was in the list.
+        """
+        it = getattr(self, "_playing_item", None)
+        p = getattr(self, "player", None)
+        if not it or p is None or not getattr(p, "current_url", None):
+            return
+        self._open_cast_dialog(it)
+
+    def can_cast_playing(self) -> bool:
+        p = getattr(self, "player", None)
+        return bool(getattr(self, "_playing_item", None) and p is not None
+                    and getattr(p, "current_url", None))
 
     def _local_tracks(self, it) -> dict:
         """The tracks mpv can already see, in the shape ffprobe would give.

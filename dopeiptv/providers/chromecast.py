@@ -456,18 +456,13 @@ class ChromecastManager:
         if verdict is not False or resolved == url:
             return device_name
 
-        # Second attempt: the panel's own address, letting the receiver follow
-        # the redirect itself. Only after a real refusal, never on silence.
-        log.info("cast: %s refused that address - trying the panel URL",
-                 device_name)
-        fallback = cast_content_type(url)
-        if fallback not in _UNPLAYABLE:
-            log.info("cast -> %s: %s (%s, guessed)", device_name, url,
-                     fallback)
-            if self._play_and_verify(mc, url, fallback, title,
-                                     start=start) is not False:
-                return device_name
-
+        # Straight to the converter now. The panel's own address used to get
+        # its own attempt here, and with this provider it has never once
+        # worked - while every attempt opens the stream again, and an account
+        # with a single connection is refused for as long as the panel keeps
+        # counting the last one. Spending an open on something that has never
+        # worked is what left nothing for the converter.
+        log.info("cast: %s refused that address", device_name)
         # Both addresses refused. Now - and only now - work out what is
         # actually inside the stream. What mpv reports is worth more than our
         # own parsing: it is decoding the very same channel, and its answer
@@ -486,6 +481,17 @@ class ChromecastManager:
         if self._bridge_cast(mc, device_name, url, codecs, title,
                              start=start):
             return device_name
+
+        # Last resort: the panel's own address, letting the receiver follow
+        # the redirect itself. Kept for providers that behave the other way
+        # round, but tried only once everything else has failed.
+        fallback = cast_content_type(url)
+        if fallback not in _UNPLAYABLE:
+            log.info("cast -> %s: %s (%s, guessed)", device_name, url,
+                     fallback)
+            if self._play_and_verify(mc, url, fallback, title,
+                                     start=start) is not False:
+                return device_name
         raise RuntimeError(self._no_decoder(codecs))
 
     @staticmethod
