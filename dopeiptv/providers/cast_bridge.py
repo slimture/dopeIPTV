@@ -359,10 +359,22 @@ def _input_options(source: str) -> list[str]:
     """
     if "://" not in source:
         return []
-    opts = ["-user_agent", _UA,
+    if _timeshift(source):
+        # No reconnects for an archive window. The panel closes the stream
+        # at its write head - that is the END of the stretch, and the app
+        # asks for the next one from that exact moment. A reconnect instead
+        # re-requests the same window, which on a panel that ignores Range
+        # starts it over from the beginning: television replayed at random,
+        # mid-programme, which is what "it keeps restarting" was.
+        return ["-user_agent", _UA]
+    return ["-user_agent", _UA,
             "-reconnect", "1", "-reconnect_streamed", "1",
             "-reconnect_on_network_error", "1", "-reconnect_delay_max", "5"]
-    return opts
+
+
+def _timeshift(source: str) -> bool:
+    path = source.split("?", 1)[0].lower()
+    return "/timeshift/" in path or "timeshift.php" in path
 
 
 def _filter_escape(source: str) -> str:

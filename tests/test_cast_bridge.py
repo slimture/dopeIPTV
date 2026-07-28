@@ -397,6 +397,15 @@ def test_a_local_recording_takes_none_of_the_http_options():
     assert "-reconnect_at_eof" not in live
     assert _input_options("/home/me/Recordings/x.mkv") == []
 
+    # And none at all for an archive window. The panel closing the stream
+    # at its write head is the END of the stretch - the next one is asked
+    # for from that moment. A reconnect re-requests the same window, which
+    # on a panel that ignores Range starts it over from the beginning:
+    # television replayed at random, mid-programme.
+    ts = _input_options(
+        "http://p/timeshift/u/pw/300/2026-07-28:15-55/9851.ts?token=x")
+    assert "-user_agent" in ts and "-reconnect" not in ts
+
 
 def test_a_stream_that_dies_at_once_never_reaches_the_receiver():
     """These panels refuse a stream while they are still counting a connection

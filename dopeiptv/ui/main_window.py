@@ -4224,13 +4224,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         began = (self._cast_ctx or {}).get("archive_from")
         return began + timedelta(seconds=pos) if began else at
 
-    # How far behind live the archive can actually be SERVED from -
-    # measured, twice, against this panel. Ninety seconds was the first
-    # guess: a minute that had ended fifty seconds earlier served only its
-    # first twenty. Three minutes was the second: a minute that had ended
-    # almost three minutes earlier still refused to start at its 51st
-    # second. Four, with the extra structural rule below, is where it holds.
-    ARCHIVE_LAG = timedelta(seconds=240)
+    # How close to live the .ts archive can be read from. Small on purpose:
+    # the panel's transport-stream endpoint served a two-minute-old minute
+    # correctly, and it is the endpoint the app's own player uses every day.
+    # (The panel's HLS wrapper of the archive needed minutes of margin and
+    # froze anyway - it is not used for resuming any more.)
+    ARCHIVE_LAG = timedelta(seconds=75)
 
     def _cast_from_archive(self, paused_at, settle: bool = False) -> None:
         """Resume a paused live cast from the provider's catch-up archive.
@@ -4245,67 +4244,43 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         sid = ctx.get("sid")
         if sid is None or not device:
             return
-        # Two rules, and the second is the one that was missing. The window
-        # may only contain minutes the panel can serve IN FULL - and the
-        # point must have at least one whole such minute AHEAD of it.
-        # Clamping the point to the same boundary the window ends at put
-        # every quick resume seconds from the end of its own window: a
-        # nine-second sliver the receiver never started in, which the stall
-        # rescue then reloaded, identically, every twenty seconds.
+        # The TRANSPORT STREAM, through the converter - not the panel's HLS
+        # wrapper of the same archive. This is decided by the logs, not by
+        # preference: across every attempt, each cast that actually played
+        # the right content read the .ts (11:36 played a two-minute-old
+        # window correctly), and every freeze-after-one-second was the
+        # .m3u8 near live - including a minute over four minutes old, which
+        # sank the theory that age was the problem. The panel's HLS archive
+        # endpoint is simply broken for short windows; its .ts endpoint is
+        # not.
         #
-        # The honest cost: resuming a short pause replays up to five minutes
-        # already seen - the last few minutes before live simply do not
-        # exist yet as far as this panel's archive can serve them. A pause
-        # long enough to fetch coffee resumes from the exact second.
-        end = (datetime.now() - self.ARCHIVE_LAG).replace(second=0,
-                                                          microsecond=0)
-        paused_at = min(paused_at, end - timedelta(seconds=60))
-        # From the pause onwards. The window has to cover the gap that has
-        # opened up since, plus room to keep watching - providers cap it to
-        # whatever archive they actually hold.
-        # The archive is addressed by the minute. Asking for the minute the
-        # pause fell in and then starting that many seconds into it is the
-        # difference between resuming where you were and being thrown back to
-        # the last whole minute - up to a minute of television you just
-        # watched, on every single pause.
+        # The .ts is one stream, not a segment list, so no window arithmetic
+        # is needed: ask from the paused minute with generous room ahead,
+        # the panel serves what exists and closes at the write head, ffmpeg
+        # ends cleanly, and the continuation asks for the next stretch from
+        # the exact moment the picture stopped. What ruined this path before
+        # is fixed elsewhere: the retry no longer spawns a second ffmpeg,
+        # the bridge no longer holds half a megabyte back, and the reconnect
+        # flags - which re-request a closed window from its START on panels
+        # that ignore Range, replaying television at random - are off for
+        # timeshift input.
+        paused_at = min(paused_at, datetime.now() - self.ARCHIVE_LAG)
+        # Addressed by the minute; the seconds ride along as ffmpeg's own
+        # starting offset, so nothing already watched is replayed.
         minute = paused_at.replace(second=0, microsecond=0)
         offset = (paused_at - minute).total_seconds()
-        dur = max(1, int((end - minute).total_seconds() // 60))
-        # The receiver is offered the archive as HLS, and the converter is
-        # given the transport stream behind it.
-        #
-        # This is the same difference that decides a LIVE cast: a Chromecast
-        # plays an HLS playlist by itself and cannot decode a raw transport
-        # stream at all. And it is the transport stream that these panels cut
-        # short mid-programme - a playlist is a list of segments, so a short
-        # one is a segment to fetch again rather than the end of everything.
-        # And for exactly as long as the archive actually holds - not a
-        # minute more.
-        #
-        # Asking for longer does not get you more television; the archive
-        # only has what has been broadcast. It gets you a playlist that
-        # PROMISES more, and the receiver works its way to a segment the
-        # panel cannot serve and sits there - buffering, playing, buffering,
-        # a few seconds at a time. Asking for two hours where two minutes
-        # existed is exactly that stutter.
-        #
-        # The whole list is also built before anything can play: a request an
-        # hour back listed a hundred and eighty segments where sixty were
-        # real, which was most of the wait before a picture appeared.
-        #
-        # Running out is no longer the end of anything - the next stretch is
-        # asked for when this one is done.
-        cands = self.client.timeshift_urls(sid, minute, dur) or []
-        url = next((c for c in cands if ".m3u8" in c), "")
-        source = next((c for c in cands if ".ts" in c), "") or url
+        behind = max(1, int((datetime.now() - minute).total_seconds() // 60))
+        cands = self.client.timeshift_urls(sid, minute, behind + 240) or []
+        url = next((c for c in cands if ".ts" in c), "")
+        source = url or next(iter(cands), "")
         url = url or source
         if not url:
             return
         # The moment itself, not how it was worked out - it is the one thing
         # that can be checked against what the picture actually shows.
-        log.info("cast: resuming %s from %s (%d min of archive)",
+        log.info("cast: resuming %s from %s (%d min behind live)",
                  ctx.get("title") or "", paused_at.strftime("%H:%M:%S"),
-                 dur)
+                 behind)
         title = ctx.get("title") or "dopeIPTV"
         # The session now lives at the archive address. Recording it keeps the
         # strip's own panel pointing at what is actually playing - it opened

@@ -485,27 +485,25 @@ def test_the_archive_url_starts_where_you_paused(monkeypatch):
     # rewatching up to a minute of television on every single pause.
     assert asked["sid"] == 9851
     assert asked["start"] == at.replace(second=0)
-    # The window only ever contains minutes the panel can serve in full -
-    # this one runs from the point to about four minutes short of live.
-    assert asked["minutes"] in (5, 6), asked
+    # Generous room ahead: the .ts is one stream, not a segment list, so
+    # the panel serves what exists and the rest of the request costs
+    # nothing. Windowing it tightly is what built the sliver playlists.
+    assert asked["minutes"] > 240, asked
     assert sent, "the archive URL is cast"
     assert w._cast_ctx["archive_from"] == at.replace(second=0)
-    # The receiver is offered the playlist and the converter the transport
-    # stream behind it - the same split that decides a live cast, and the
-    # reason a panel cutting the stream short is a segment to fetch again
-    # rather than the end of everything.
-    assert w._cast_ctx["url"].endswith(".m3u8")
+    # The TRANSPORT STREAM, decided by the logs: every cast that actually
+    # played the right content read the .ts through the converter, and
+    # every freeze-after-one-second was the panel's HLS wrapper of the same
+    # archive - including a minute over four minutes old, which sank the
+    # theory that age was the problem.
+    assert w._cast_ctx["url"].endswith(".ts")
     assert w._cast_ctx["source"].endswith(".ts")
 
-    # A point too close to live is pulled back until a whole written minute
-    # lies AHEAD of it. Clamping it to the same boundary the window ends at
-    # put every quick resume seconds from the end of its own window - a
-    # sliver the receiver never started in, reloaded identically for ever.
+    # A point inside the minute still being written is pulled back to one
+    # the panel can serve.
     asked.clear()
     w._cast_from_archive(datetime.now())
-    assert asked["start"] <= datetime.now() - w.ARCHIVE_LAG \
-        - timedelta(seconds=60)
-    assert asked["minutes"] >= 1
+    assert asked["start"] <= datetime.now() - w.ARCHIVE_LAG
 
 
 def test_pausing_the_archive_again_does_not_jump_back_to_now():
