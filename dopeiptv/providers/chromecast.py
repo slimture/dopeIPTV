@@ -256,6 +256,12 @@ class _CastWatch:
                 pass
         cur = (f"{getattr(status, 'player_state', '?')}/"
                f"{getattr(status, 'idle_reason', None)}")
+        if self.manager is not None:
+            # Kept so the app can tell a cast that ENDED from one that is
+            # merely between fragments. An archive playlist is finite - it
+            # stops when it catches up with now - and something has to notice
+            # that and ask for the next stretch.
+            self.manager.state = cur
         if cur != self._last:
             self._last = cur
             log.info("cast %s: receiver %s", self.name, cur)
@@ -293,6 +299,7 @@ class ChromecastManager:
         # part way in has that offset added back before anything is stored.
         self.last_position = 0.0
         self.position_offset = 0.0
+        self.state = ""
         self.duration = 0.0
         # Discovery runs in the worker pool and so can a cast - and a cast may
         # have to discover first (see cast()). Two of those at once would tear
@@ -400,6 +407,7 @@ class ChromecastManager:
         # A fresh cast: nothing has been reported yet, and if it starts part
         # way in that offset is what the receiver's own zero means.
         self.last_position, self.position_offset = 0.0, 0.0
+        self.state = ""
         self.duration = duration
 
         # Straight to the converter when this device has already refused these

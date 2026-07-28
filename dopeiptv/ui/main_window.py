@@ -3459,7 +3459,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # has nothing to measure a position against - so a film handed
             # over from the player, which is the ordinary way of casting one,
             # arrived at the TV with no way to move within it.
-            out["duration"] = float(getattr(m, "duration", 0) or 0.0)
+            #
+            # A broadcast has no length, whatever mpv answers: for a live HLS
+            # stream that number is the seekable window, a minute or so of
+            # buffer, and putting a position bar on THAT turns the strip into
+            # a buffer gauge for a channel whose way back is the archive.
+            if self._play_kind_for(it) != "live":
+                out["duration"] = float(getattr(m, "duration", 0) or 0.0)
             for t in (m.track_list or []):
                 kind = t.get("type")
                 if kind == "video" and not out["height"]:
@@ -3887,6 +3893,34 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             lambda _n: self.show_cast_strip(device, title),
             lambda msg: self._error(tr("cast_failed", msg=msg)))
 
+    def _cast_continue_archive(self) -> None:
+        """Keep a timeshifted cast going past the end of its playlist.
+
+        The archive is served as a finite playlist - it stops where it caught
+        up with now, and the receiver reports the end of the media. In the
+        player that is invisible, because the player asks for more as it
+        goes; a cast cannot, so watching an hour behind live used to end
+        without warning whenever the requested stretch ran out.
+
+        So notice the end and ask for the next stretch, from exactly where
+        the last one stopped.
+        """
+        ctx = self._cast_ctx or {}
+        if not ctx.get("archive_from") or not self._cast_device:
+            return
+        if not str(getattr(self.cast, "state", "")).startswith("IDLE/FINISHED"):
+            return
+        # Once. Loading the next stretch takes a few seconds, during which
+        # the receiver still reports the end of the last one.
+        now = time.monotonic()
+        if now - getattr(self, "_cast_continued", 0.0) < 20:
+            return
+        self._cast_continued = now
+        at = self._cast_moment()
+        log.info("cast: the archive ran out at %s - asking for the next of it",
+                 at.strftime("%H:%M:%S"))
+        self._cast_from_archive(at)
+
     def _show_cast_progress(self) -> None:
         """Put the receiver's own position on the strip.
 
@@ -3900,11 +3934,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         on = bool(self._cast_device) and dur > 0
         bar.setVisible(on)
         self.cast_bar_time.setVisible(on)
-        if not on:
+        # The ticker runs for the whole of a cast, not only where there is a
+        # bar to move: a timeshifted channel has no length, and is exactly
+        # the thing that needs watching for the end of its playlist.
+        if not self._cast_device:
             self._cast_tick.stop()
             return
         if not self._cast_tick.isActive():
             self._cast_tick.start()
+        self._cast_continue_archive()
+        if not on:
+            return
         pos = min(float(self.cast.position() or 0.0), dur)
         # Not while it is being dragged: the handle belongs to the hand
         # holding it until it is let go.
@@ -4023,12 +4063,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         began = (self._cast_ctx or {}).get("archive_from")
         return began + timedelta(seconds=pos) if began else at
 
+    # How far behind live the archive actually reaches. A panel writes it as
+    # the broadcast goes out, so the current minute is not there yet: asking
+    # for it comes back as a single unfinished segment with #EXT-X-ENDLIST
+    # after it, which the receiver shows as a frozen picture and a spinner.
+    ARCHIVE_LAG = timedelta(minutes=2)
+
     def _cast_from_archive(self, paused_at) -> None:
         """Resume a paused live cast from the provider's catch-up archive."""
         ctx, device = self._cast_ctx or {}, self._cast_device
         sid = ctx.get("sid")
         if sid is None or not device:
             return
+        paused_at = min(paused_at, datetime.now() - self.ARCHIVE_LAG)
         # From the pause onwards. The window has to cover the gap that has
         # opened up since, plus room to keep watching - providers cap it to
         # whatever archive they actually hold.

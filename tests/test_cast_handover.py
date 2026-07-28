@@ -38,7 +38,7 @@ _METHODS = ("_stop_cast_for_local_playback", "_end_cast", "show_cast_strip",
             "_paused_moment", "_record_cast_history", "_history_extra",
             "_show_cast_progress", "_cast_seek", "_cast_seek_released",
             "_fmt_hms", "_cast_moment", "_cast_to_moment", "_cast_go_live",
-            "_local_tracks",
+            "_local_tracks", "_cast_continue_archive",
             "_set_cast_quality", "_toggle_cast_mute", "_show_cast_volume")
 
 
@@ -69,7 +69,13 @@ def _window():
         return raw if isinstance(raw, staticmethod) else getattr(
             MainWindow, name)
 
-    cls = type("_StubWindow", (), {name: borrow(name) for name in _METHODS})
+    ns = {name: borrow(name) for name in _METHODS}
+    # The constants those methods read - a class attribute is as much part of
+    # a borrowed method as its body is.
+    ns.update({name: getattr(MainWindow, name)
+               for name in ("ARCHIVE_LAG", "TIMESHIFT_STEPS",
+                            "_CAST_RESUME_KIND", "_RESUME_GROUP")})
+    cls = type("_StubWindow", (), ns)
     return cls()
 
 
@@ -1130,10 +1136,18 @@ def test_the_progress_bar_is_for_things_with_an_end():
     assert w.cast_bar_seek.value_ == 305        # 1830 of 6000, in thousandths
     assert w.cast_bar_time.text == "30:30 / 1:40:00"
 
-    # A live channel: no length, no bar, and nothing to ask about each second.
+    # A broadcast has no length and so no bar - but the ticker keeps going,
+    # because a timeshifted channel is exactly the thing that has to be
+    # watched for the end of its playlist.
     w.cast = _CastAt(0.0, 0.0)
+    w._cast_ctx = {}
     w._show_cast_progress()
     assert w.cast_bar_seek.shown is False
+    assert w._cast_tick.isActive() is True
+
+    # Nothing casting at all: nothing to ask about each second.
+    w._cast_device = None
+    w._show_cast_progress()
     assert w._cast_tick.isActive() is False
 
 
@@ -1210,6 +1224,7 @@ def test_a_film_handed_over_from_the_player_knows_how_long_it_is():
     w = _window()
     w._playing_key = 5
     w._item_key = lambda it: it.get("stream_id")
+    w._play_kind_for = lambda it: "movie"
 
     class Mpv:
         duration = 6000.0
@@ -1273,3 +1288,71 @@ def test_muting_the_tv_takes_the_slider_with_it():
     w._cast_volume(0.4)
     assert w._cast_muted is False
     assert w.cast_bar_vol.value() == 40
+
+
+def test_the_archive_is_never_asked_for_a_minute_it_has_not_written():
+    """A panel writes catch-up as the broadcast goes out, so the current
+    minute is not in it. Asking for it comes back as one unfinished segment
+    with #EXT-X-ENDLIST after it, which the receiver shows as a frozen
+    picture and a spinner - which is what pausing a channel and resuming it
+    a few seconds later did every time."""
+    from datetime import datetime, timedelta
+    asked = {}
+
+    class Client:
+        def timeshift_urls(self, sid, start, minutes):
+            asked.update(start=start, minutes=minutes)
+            return ["http://p/ts.ts", "http://p/ts.m3u8"]
+
+    w = _with_strip()
+    w.client = Client()
+    w.pool = None
+    w.player = None
+    w.settings = _Settings()
+    w._cast_device = "Alva TV"
+    w._local_codecs = lambda: []
+    w._cast_ctx = {"archive": True, "sid": 9851, "title": "SVT1", "item": {}}
+    import dopeiptv.ui.main_window as mwmod
+    real, mwmod.run_async = mwmod.run_async, lambda p, work, ok, err: None
+    try:
+        w._cast_from_archive(datetime.now() - timedelta(seconds=5))
+    finally:
+        mwmod.run_async = real
+    assert asked["start"] <= datetime.now() - w.ARCHIVE_LAG
+
+
+def test_a_timeshifted_cast_asks_for_the_next_stretch_when_one_runs_out():
+    """The archive comes as a finite playlist: it stops where it caught up
+    with now. The player asks for more as it goes and a cast cannot, so an
+    hour behind live used to simply end when the requested stretch ran out."""
+    from datetime import datetime, timedelta
+    w = _with_strip()
+    w.cast = _Cast(active=True)
+    w._cast_device = "Alva TV"
+    began = datetime.now() - timedelta(hours=1)
+    w._cast_ctx = {"archive": True, "sid": 9851, "archive_from": began,
+                   "item": {}}
+    w.cast.at = 1800.0                       # half an hour into it
+    asked = []
+    w._cast_from_archive = lambda at: asked.append(at)
+
+    # Still playing: nothing to do.
+    w.cast.state = "PLAYING/None"
+    w._cast_continue_archive()
+    assert asked == []
+
+    # The playlist ran out - carry on from exactly where it stopped.
+    w.cast.state = "IDLE/FINISHED"
+    w._cast_continue_archive()
+    assert asked == [began + timedelta(seconds=1800)]
+
+    # And only once: loading the next stretch takes a few seconds, during
+    # which the receiver still reports the end of the last one.
+    w._cast_continue_archive()
+    assert len(asked) == 1
+
+    # A live cast has no playlist to run out of.
+    w._cast_ctx = {"archive": True, "sid": 9851, "item": {}}
+    w._cast_continued = 0.0
+    w._cast_continue_archive()
+    assert len(asked) == 1
