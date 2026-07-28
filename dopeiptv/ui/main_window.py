@@ -4224,16 +4224,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         began = (self._cast_ctx or {}).get("archive_from")
         return began + timedelta(seconds=pos) if began else at
 
-    # How far behind live the archive actually reaches. A panel writes it as
-    # the broadcast goes out, so the current minute is not there yet: asking
-    # for it comes back as a single unfinished segment with #EXT-X-ENDLIST
-    # after it, which the receiver shows as a frozen picture and a spinner.
+    # How far behind live the archive actually reaches - MEASURED, not
+    # assumed. Ninety seconds was the assumption, and a minute that had ended
+    # fifty seconds earlier still served only its first twenty: this panel's
+    # archive writer runs a good two minutes behind the broadcast. Every
+    # quick resume then landed in the not-yet-written zone, froze, and the
+    # stall rescue clamped its restart straight back into the same minute -
+    # the same second of television, over and over.
     #
-    # A minute plus a margin, and no more: the request is floored to a whole
-    # minute, and a minute that began less than sixty seconds ago has not
-    # finished being broadcast. Everything beyond that is television you did
-    # not ask to sit through again.
-    ARCHIVE_LAG = timedelta(seconds=90)
+    # So three minutes, start and end alike. The cost is honest and small:
+    # resuming a pause shorter than this replays up to three minutes you have
+    # already seen. The alternative was a picture that never moved again.
+    ARCHIVE_LAG = timedelta(seconds=180)
 
     def _cast_from_archive(self, paused_at, settle: bool = False) -> None:
         """Resume a paused live cast from the provider's catch-up archive.

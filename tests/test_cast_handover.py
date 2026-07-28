@@ -485,10 +485,11 @@ def test_the_archive_url_starts_where_you_paused(monkeypatch):
     # rewatching up to a minute of television on every single pause.
     assert asked["sid"] == 9851
     assert asked["start"] == at.replace(second=0)
-    # Exactly what exists - and ending a whole minute short of live, because
-    # the minute still being broadcast is a segment the panel can only partly
-    # serve: the receiver played up to the write head and froze on it.
-    assert asked["minutes"] in (3, 4), asked
+    # Exactly what exists - and ending well short of live, because the
+    # panel's archive writer runs about two minutes behind the broadcast: a
+    # window reaching closer than that ends in a segment the panel can only
+    # partly serve, and the receiver plays up to the write head and freezes.
+    assert asked["minutes"] == 2, asked
     assert sent, "the archive URL is cast"
     assert w._cast_ctx["archive_from"] == at.replace(second=0)
     # The receiver is offered the playlist and the converter the transport
@@ -622,8 +623,10 @@ def _fake_pychromecast(order=None):
         def register_status_listener(self, listener):
             pass
 
-        def play_media(self, url, ctype, title=None, current_time=None):
+        def play_media(self, url, ctype, title=None, current_time=None,
+                       stream_type="LIVE", media_info=None):
             self.dev.plays.append((url, ctype))
+            self.dev.announced.append((stream_type, media_info))
             self.dev.started_at = current_time
             self.dev.played = (url, ctype, title)
 
@@ -639,6 +642,7 @@ def _fake_pychromecast(order=None):
             self.name = name
             self.played = None
             self.plays = []
+            self.announced = []
             self.started_at = None
             self.media_controller = FakeMedia(self)
             self.socket_client = FakeSocket()
@@ -1654,3 +1658,22 @@ def test_a_stretch_that_stalls_is_continued_not_left_frozen(monkeypatch):
     w.cast.at = 370.0
     w._cast_continue_archive()
     assert asked == []
+
+
+def test_the_tv_is_told_what_kind_of_thing_it_is_playing(monkeypatch):
+    """pychromecast announces everything as LIVE unless told otherwise, so a
+    film got the live UI on the television: a LIVE badge, a counting bar and
+    a title that never faded. A thing with an end is BUFFERED, and its length
+    goes along - the converted stream is an endless pipe the receiver cannot
+    measure by itself."""
+    m = _manager(monkeypatch)
+    m.scan()
+    dev = m.devices[0]
+
+    m.cast("Alva TV", "http://p/film.mp4", "Film", duration=5400.0)
+    assert dev.announced[-1] == ("BUFFERED", {"duration": 5400.0})
+
+    # A broadcast has no end, and saying LIVE is simply the truth.
+    dev.announced.clear()
+    m.cast("Alva TV", "http://p/live/u/pw/9851.m3u8", "SVT1")
+    assert dev.announced[-1] == ("LIVE", None)

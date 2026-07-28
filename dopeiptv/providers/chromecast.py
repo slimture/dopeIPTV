@@ -657,8 +657,18 @@ class ChromecastManager:
         acting on; silence means keep waiting, and the watcher will report
         whatever happens next.
         """
+        # What the cast IS, said out loud. pychromecast announces everything
+        # as LIVE unless told otherwise, so a film got the live UI on the
+        # television: a LIVE badge, a counting bar, and a title that never
+        # faded. A thing with an end is BUFFERED - and telling the receiver
+        # how long it is is what turns the bar into a real one, because the
+        # converted stream is an endless pipe it cannot measure by itself.
+        buffered = self.duration > 0
         mc.play_media(url, ctype, title=title or "dopeIPTV",
-                      current_time=start or None)
+                      current_time=start or None,
+                      stream_type="BUFFERED" if buffered else "LIVE",
+                      media_info={"duration": float(self.duration)}
+                      if buffered else None)
         mc.block_until_active(timeout=10)
         deadline = time.monotonic() + (
             self.VERDICT_WAIT if wait is None else wait)
