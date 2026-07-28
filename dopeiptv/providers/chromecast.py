@@ -410,10 +410,15 @@ class ChromecastManager:
         if settle:
             # The player was holding a connection a moment ago and this
             # account has one. The panel goes on counting a closed session for
-            # a few seconds, and everything below - the receiver, then the
+            # a moment, and everything below - the receiver, then the
             # converter - is refused for exactly that long. Let it notice.
+            #
+            # Kept short on purpose: this is four seconds of every cast that
+            # follows local playback, and a refusal is not fatal any more -
+            # the converter tries again by itself, so guessing low costs a
+            # retry at worst and saves the wait every other time.
             log.info("cast: letting the provider release the connection")
-            time.sleep(4)
+            time.sleep(1.5)
         if not url:
             # Nothing to hand over. It has happened - a panel reopened on a
             # session whose address had not been recorded - and casting an

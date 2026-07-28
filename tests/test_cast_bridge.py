@@ -805,3 +805,47 @@ def test_a_pause_is_written_to_disk_and_never_left_behind(tmp_path,
         cb.ffmpeg_args = cb.ffmpeg_args_real
         b.stop()
     _ = cache
+
+
+def test_a_television_that_dropped_out_rejoins_the_recording(tmp_path):
+    """Pause a minute, play, pause again - and nothing happened.
+
+    A receiver that lets its connection go during a pause opens a new one on
+    play, and every new reader started at the beginning of the recording.
+    By then the beginning had been thrown away as watched, so it waited for a
+    file that no longer existed, for ever. It has to pick up at the oldest
+    piece still on disk - with the fragmented MP4's opening in front of it,
+    and skipped forward to where a fragment actually starts.
+    """
+    from dopeiptv.providers.cast_bridge import _Spool
+
+    sp = _Spool(str(tmp_path / "rec"), cap=100 * _Spool.PIECE)
+    # An opening, then fragments - the shape ffmpeg's fragmented MP4 has.
+    sp.write(b"\x00\x00\x00\x18ftypiso5" + b"MOOV" * 100)
+    for i in range(6):
+        sp.write(b"\x00\x00\x00\x10moof" + bytes([65 + i]) * (_Spool.PIECE - 8))
+    assert sp.init.startswith(b"\x00\x00\x00\x18ftyp")
+    assert b"moof" not in sp.init, "the opening stops at the first fragment"
+
+    # Watch most of it, so the early pieces are thrown away.
+    first = sp.reader()
+    while first.read(1_000_000):
+        pass
+    sp.write(b"\x00\x00\x00\x10moof" + b"Z" * (_Spool.PIECE - 8))
+    assert sp.first_kept() > 0, "the watched beginning is gone"
+
+    # The television comes back. It must get the opening and then a fragment
+    # boundary - not silence, and not the middle of a fragment.
+    again = sp.reader()
+    got = b""
+    for _ in range(40):
+        part = again.read(1_000_000)
+        if not part:
+            break
+        got += part
+    assert got.startswith(b"\x00\x00\x00\x18ftyp"), "the opening comes first"
+    body = got[len(sp.init):]
+    assert body[:8].endswith(b"moof"), "then a fragment, from its start"
+    first.close()
+    again.close()
+    sp.close()

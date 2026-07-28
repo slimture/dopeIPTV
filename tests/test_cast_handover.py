@@ -721,12 +721,15 @@ def test_the_provider_is_given_a_moment_after_local_playback_stopped(
     monkeypatch.setattr(cm.time, "sleep", lambda s: slept.append(s))
     m.scan()
     def long_waits():
-        return [s for s in slept if s >= 2]        # not the verdict polling
+        return [s for s in slept if s >= 1]        # not the verdict polling
 
     m.cast("Alva TV", "http://p/y.mp4", "Film")
     assert long_waits() == [], "nothing was stopped, nothing to wait for"
     m.cast("Alva TV", "http://p/y.mp4", "Film", settle=True)
     assert long_waits(), slept
+    # Kept short: this is on every cast that follows local playback, and a
+    # refusal is no longer fatal - the converter tries again by itself.
+    assert max(long_waits()) <= 2, slept
 
 
 def test_the_picture_setting_is_a_ceiling_not_an_instruction():
@@ -1649,3 +1652,38 @@ def test_how_much_room_a_pause_may_take_is_the_user_s_to_say():
     w.settings.setValue("cast_pause_gb", "nonsense")
     w._toggle_cast_pause()
     assert w.cast.bridge.cap == int(4.5 * 10**9)
+
+
+def test_going_live_keeps_the_channel_recorded_so_it_can_be_paused_again():
+    """Going back to the live edge used to hand the channel straight to the
+    receiver, and the pause button quietly vanished with the recording behind
+    it - so the second pause of an evening was simply not offered."""
+    sent = {}
+    w = _with_strip()
+    w.pool = None
+    w.player = None
+    w.settings = _Settings()
+    w._cast_device = "Alva TV"
+    w.cast = _Cast(active=True)
+    w._local_codecs = lambda: []
+    w._cast_behind = 900.0
+    w._cast_ctx = {"archive": True, "sid": 9851, "title": "SVT1",
+                   "row_url": "http://p/live/u/pw/9851.m3u8",
+                   "row_source": "http://p/live/u/pw/9851.ts",
+                   "url": "http://p/timeshift/x.ts", "item": {}}
+
+    class Recorder:
+        def cast(self, *a, **kw):
+            sent.update(kw)
+            return "Alva TV"
+
+    w.cast = Recorder()
+    w.cast.bridged = lambda: True
+    import dopeiptv.ui.main_window as mwmod
+    real, mwmod.run_async = mwmod.run_async, lambda p, work, ok, err: work()
+    try:
+        w._cast_go_live()
+    finally:
+        mwmod.run_async = real
+    assert sent.get("dvr") is True, "still recorded, so still pausable"
+    assert w._cast_behind == 0.0, "and back at the live edge"

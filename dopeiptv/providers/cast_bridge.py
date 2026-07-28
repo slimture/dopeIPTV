@@ -486,6 +486,13 @@ def ffmpeg_args(exe: str, source: str, copy_video: bool,
         burn = ["-vf", ",".join(chain)] + burn
     return [
         exe, "-hide_banner", "-loglevel", "error",
+        # How much of the stream ffmpeg reads before it will emit anything.
+        # Left alone it takes up to five megabytes or five seconds of it,
+        # whichever comes first - which over a provider link is most of the
+        # wait before a picture appears, and it was measured at thirteen
+        # seconds for one and a half megabytes. A transport stream announces
+        # what it carries in its first PMT, so a megabyte is plenty.
+        "-analyzeduration", "1000000", "-probesize", "1000000",
         *_input_options(source),
         # Seeking before -i is the cheap kind: ffmpeg jumps in the container
         # instead of decoding its way there, which is what makes resuming an
@@ -525,10 +532,17 @@ class _Spool:
         self.folder, self.cap = folder, cap
         self.index = 0          # the piece being written
         self.total = 0
+        # The fragmented MP4's opening - everything before the first moof.
+        # A television that drops its connection during a pause and comes
+        # back needs this before anything else will decode, and by then the
+        # piece it was in has usually been thrown away.
+        self.init = b""
+        self._sniff: bytes | None = b""
         self.full = False       # the cap was reached; nothing more is kept
         self._w: object | None = None
         self._wrote = 0
         self._at: dict[int, int] = {}       # reader id -> piece it is on
+        self.oldest = 0                     # the first piece still on disk
         self._lock = threading.Lock()
         os.makedirs(folder, exist_ok=True)
 
@@ -540,6 +554,13 @@ class _Spool:
         with self._lock:
             if self.full:
                 return False
+            if self._sniff is not None:
+                self._sniff += data
+                cut = self._sniff.find(b"moof")
+                if cut >= 4:
+                    self.init, self._sniff = self._sniff[:cut - 4], None
+                elif len(self._sniff) > 4_000_000:
+                    self._sniff = None      # not fragmented; give up looking
             while data:
                 if self._w is None or self._wrote >= self.PIECE:
                     self._roll()
@@ -569,11 +590,20 @@ class _Spool:
 
     def _prune(self) -> None:
         keep = min(self._at.values()) if self._at else self.index
-        for i in range(max(0, keep - 1)):
+        for i in range(self.oldest, max(0, keep - 1)):
             try:
                 os.remove(self._path(i))
             except OSError:
                 pass
+            self.oldest = i + 1
+
+    def first_kept(self) -> int:
+        """The oldest piece still on disk. Where a television that dropped
+        its connection during a pause has to pick the recording up again -
+        starting at the beginning would be starting at a file that was
+        thrown away twenty minutes ago, and it simply waited for ever."""
+        with self._lock:
+            return self.oldest
 
     def complete(self, i: int) -> bool:
         """Whether piece *i* has been written in full."""
@@ -598,12 +628,20 @@ class _SpoolReader:
 
     def __init__(self, spool: _Spool) -> None:
         self.spool = spool
-        self.i = 0
+        self.i = spool.first_kept()
         self._f: object | None = None
-        spool._at[id(self)] = 0
+        # Coming in part way through means coming in without the opening the
+        # decoder needs, and in the middle of a fragment. Hand over the
+        # opening, then skip to where the next fragment starts.
+        self._head = spool.init if self.i else b""
+        self._align = self.i > 0
+        spool._at[id(self)] = self.i
 
     def read(self, n: int) -> bytes:
         """The next bytes, or b"" when there are none yet."""
+        if self._head:
+            head, self._head = self._head, b""
+            return head
         while True:
             if self._f is None:
                 path = self.spool._path(self.i)
@@ -612,6 +650,11 @@ class _SpoolReader:
                 self._f = open(path, "rb")
             chunk = self._f.read(n)                 # type: ignore[union-attr]
             if chunk:
+                if self._align:
+                    cut = chunk.find(b"moof")
+                    if cut < 4:
+                        continue            # still mid-fragment; keep looking
+                    self._align, chunk = False, chunk[cut - 4:]
                 return chunk
             # Nothing more in this piece. Move on only once it is finished -
             # otherwise this is simply the write head, and more is coming.
@@ -835,7 +878,7 @@ class CastBridge:
     # the same few seconds of disk as a minute of it.
     CAP = 4_500_000_000      # about half an hour of a paused HD channel
     OPENING = 64_000         # enough to know bytes are coming out at all
-    SETTLE = 1.5             # and long enough for a doomed run to fall over
+    SETTLE = 0.7             # and long enough for a doomed run to fall over
 
     def _tmpdir(self) -> str:
         """The scratch directory this run of the bridge owns.

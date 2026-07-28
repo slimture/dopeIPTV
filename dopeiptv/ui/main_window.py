@@ -3920,6 +3920,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         ctx.update(url=url, source=ctx.get("row_source") or url,
                    archive_from=None)
         self._cast_paused_at = None
+        self._cast_behind = 0.0
         self.cast_bar_pause.setIcon(cast_strip_icon("pause", P["text"]))
         title = ctx.get("title") or "dopeIPTV"
         run_async(
@@ -3928,7 +3929,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                                    source=ctx.get("row_source") or url,
                                    quality=self._cast_quality(),
                                    height=ctx.get("height") or 0,
-                                   fps=ctx.get("fps") or 0.0),
+                                   fps=ctx.get("fps") or 0.0,
+                                   # Still recorded, so it can still be
+                                   # paused. Going back to live used to hand
+                                   # the channel straight to the receiver,
+                                   # and the pause button quietly vanished.
+                                   dvr=bool(ctx.get("archive"))),
             lambda _n: self.show_cast_strip(device, title),
             lambda msg: self._error(tr("cast_failed", msg=msg)))
 
