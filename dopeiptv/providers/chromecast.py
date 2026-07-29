@@ -295,8 +295,20 @@ class _CastWatch:
             # that and ask for the next stretch.
             self.manager.state = cur
         if cur != self._last:
-            self._last = cur
-            log.info("cast %s: receiver %s", self.name, cur)
+            was, self._last = self._last, cur
+            # Every rebuffer, with the one number that says why. A receiver
+            # that keeps stalling also keeps redrawing its overlay, which
+            # is why the chrome never fades on a stream that cycles - and
+            # the cycling has been in every log of this all along.
+            bridge = getattr(self.manager, "bridge", None)
+            extra = ""
+            if cur.startswith("BUFFERING") and was.startswith("PLAYING") \
+                    and bridge is not None:
+                try:
+                    extra = f" - converter is {bridge.lead()}"
+                except Exception:
+                    extra = ""
+            log.info("cast %s: receiver %s%s", self.name, cur, extra)
         self._turn_the_subtitle_on(status)
 
     def _turn_the_subtitle_on(self, status) -> None:

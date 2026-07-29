@@ -1141,6 +1141,28 @@ class CastBridge:
                  "the receiver", self.HLS_WAIT)
         return False
 
+    def lead(self) -> str:
+        """How far ahead of the television the converter is, in words.
+
+        The one number that separates the two reasons a receiver
+        rebuffers, and it has never been in the log:
+
+          a small or shrinking lead - ffmpeg cannot keep up, and the TV is
+          catching it. The cure is upstream (the provider, the encoder).
+          a lead at the cap - the spool is full, so ffmpeg is BLOCKED
+          writing, so it stops reading the provider, so the panel hangs up
+          and the reconnect stalls the picture. The cure is the cap.
+
+        Both look identical on screen: BUFFERING, PLAYING, BUFFERING.
+        """
+        cur = self._current
+        if not cur:
+            return "nothing running"
+        _proc, spool, _n = cur
+        ahead = spool.total - spool.read_to
+        return (f"{ahead / 1e6:.0f} MB ahead"
+                + (" - SPOOL FULL, ffmpeg is blocked" if spool.full else ""))
+
     def filling(self, proc: subprocess.Popen) -> bool:
         """Whether more is still on its way into the spool."""
         th = self._spools.get(proc)
