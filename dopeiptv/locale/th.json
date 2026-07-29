@@ -557,7 +557,7 @@
   "cast_stopped": "หยุดแคสต์แล้ว",
   "cast_stop_failed": "หยุดล้มเหลว: {msg}",
   "cast_older_device": "{name} เป็น Chromecast รุ่นเก่า – ภาพลื่นขึ้น คมชัดน้อยลงเล็กน้อย",
-  "cast_quality_note": "ตั้งครั้งเดียวสำหรับอุปกรณ์นี้ ไม่ใช่สำหรับแต่ละช่อง ปรับเฉพาะ FHD เท่านั้น ส่วน SD และ HD ส่งไปตามเดิม Chromecast 1-3 และทีวีที่มี Chromecast ในตัวต้องใช้ ส่วน Ultra หรือ Google TV ไม่ต้อง",
+  "cast_quality_note": "Set once for this device, not for each thing you cast. Only what is beyond it is adapted - everything smaller is sent untouched.",
   "cast_seek": "ไปยังตำแหน่งอื่น",
   "cast_pause_label": "พื้นที่สำหรับการหยุดช่องที่กำลังส่งไปทีวี",
   "cast_pause_hint": "การหยุดช่องบนทีวีจะบันทึกไว้ที่นี่จนกว่าคุณจะกดเล่น จึงเป็นตัวกำหนดว่าหยุดได้นานแค่ไหน - ราวหนึ่งนาทีของ HD ต่อ 150 MB ดังนั้น 4.5 GB คือประมาณครึ่งชั่วโมง ส่วนที่ดูไปแล้วจะถูกลบไปเรื่อย ๆ ดูทั้งเย็นจึงไม่กินพื้นที่เลย มีเพียงช่วงที่หยุดเท่านั้นที่กินที่ และทั้งหมดจะหายไปเมื่อหยุดส่ง",
@@ -818,5 +818,9 @@
   "sc_epg_search": "ค้นหาผังรายการ",
   "sc_reminders": "การเตือน",
   "sc_sidebar": "สลับแถบข้าง",
-  "sc_focus_mode": "โหมดโฟกัส"
+  "sc_focus_mode": "โหมดโฟกัส",
+  "cast_device_kind": "What {name} is",
+  "cast_kind_original": "Newer - 4K (Ultra, Google TV, Streamer)",
+  "cast_kind_hd": "Ordinary - Full HD (Chromecast 2, 3, Google TV HD)",
+  "cast_kind_oldest": "Oldest - Full HD, 30 fps (Chromecast 1, TVs with Chromecast built in)"
 }

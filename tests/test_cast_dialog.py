@@ -59,7 +59,7 @@ def test_dialog_builds_from_a_row():
     assert dlg.windowTitle()
     # No device picked yet, so there is nothing to ask the question about -
     # and an unfilled "{name} is an older Chromecast" is worse than nothing.
-    assert dlg.older_box.isHidden() is True
+    assert dlg.kind_box.isHidden() is True
     assert dlg.quality_note.isHidden() is True
     win.deleteLater()
 
@@ -80,33 +80,39 @@ def test_dialog_builds_on_a_running_cast():
 
 def test_the_picture_question_is_remembered_per_device():
     """It is a per-device ceiling: an old receiver in one room says nothing
-    about the Google TV in the other."""
+    about the Google TV in the other. Three tiers, named after what the
+    device is - nobody knows their receiver's maximum profile level, and
+    everybody knows which one they bought."""
     win = _window()
     win.settings.setValue("cast_devices", "Living room\nBedroom")
     from dopeiptv.providers.chromecast import CastDialog
     dlg = CastDialog(win, "http://p/live/u/pw/1.m3u8", "SVT1",
                      probe=False, managing=True)
     assert dlg.quality() == "original"
-    assert dlg.older_box.isChecked() is False
+    assert dlg.kind_box.count() == 3
     # It names the device it is about - the dialog is opened once per thing
-    # you cast, so a bare "Older Chromecast" in it reads as a question about
-    # this broadcast rather than a standing property of the receiver.
-    assert "Living room" in dlg.older_box.text()
-    # And the note saying which receivers it is for shows with the question,
-    # not after it is answered.
+    # you cast, so an unattached question reads as being about this cast.
+    assert "Living room" in dlg.kind_label.text()
     assert dlg.quality_note.isHidden() is False
 
-    dlg.older_box.setChecked(True)              # Living room
-    assert dlg.quality() == "older"
-    assert win.settings.value("cast_quality_Living room") == "older"
+    dlg.kind_box.setCurrentIndex(dlg.kind_box.findData("oldest"))
+    assert dlg.quality() == "oldest"
+    assert win.settings.value("cast_quality_Living room") == "oldest"
 
     dlg.list.setCurrentRow(1)                   # Bedroom, untouched
-    assert dlg.older_box.isChecked() is False
     assert dlg.quality() == "original"
+    dlg.kind_box.setCurrentIndex(dlg.kind_box.findData("hd"))
+    assert dlg.quality() == "hd"
 
     dlg.list.setCurrentRow(0)                   # and back
-    assert dlg.older_box.isChecked() is True
-    assert dlg.quality() == "older"
+    assert dlg.kind_box.currentData() == "oldest"
+    assert dlg.quality() == "oldest"
+
+    # A device written down before this was three choices still means what
+    # its owner meant: an old receiver.
+    win.settings.setValue("cast_quality_Bedroom", "720p30")
+    dlg.list.setCurrentRow(1)
+    assert dlg.quality() == "oldest"
     win.deleteLater()
 
 

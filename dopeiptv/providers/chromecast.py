@@ -6,7 +6,7 @@ import threading
 import time
 
 from PyQt6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QHBoxLayout, QLabel, QListWidget,
+    QComboBox, QDialog, QHBoxLayout, QLabel, QListWidget,
     QPushButton, QVBoxLayout,
 )
 
@@ -14,7 +14,7 @@ from ..core.log import log
 from ..i18n import tr
 from ..core.workers import run_async
 from .cast_bridge import (
-    QUALITY, SAFE_AUDIO, SAFE_VIDEO, SLOW_CEILING, SMOOTH_FPS, CastBridge,
+    QUALITY, SAFE_AUDIO, SAFE_VIDEO, CastBridge,
     normalise_quality, probe_tracks,
 )
 
@@ -672,10 +672,10 @@ class ChromecastManager:
         picture for nothing. A source already under the ceiling is left alone,
         at the frame rate it came with.
 
-        And the ceiling is lines AND speed together. Re-encoding 24 fps
-        films was tried as a cure for the stuck overlay and cured nothing:
-        the picture lagged and the overlay stayed, because the overlay is
-        ordered by the announcement, not by the decode load.
+        The ceiling is what the device generation can decode, in lines and
+        frames a second - see QUALITY. Nothing under it is touched, so an
+        HD channel goes over untouched on every tier and only what is
+        genuinely beyond the decoder is adapted.
 
         So is one whose size we could not find out. Adapting on a guess is the
         worse mistake: it re-encodes HD channels that were perfectly fine, and
@@ -691,13 +691,6 @@ class ChromecastManager:
                      "is rather than converting on a guess")
             return "original"
         limit_h, limit_fps = QUALITY.get(want, (0, 0))
-        # Slow enough to carry its lines. An unknown frame rate is treated
-        # as fast: a broadcast is the thing that does not say, and a
-        # broadcast is the thing that stutters.
-        if fps and fps <= SMOOTH_FPS and height <= SLOW_CEILING:
-            log.info("cast: %dp%g is slow enough for its size - sending it "
-                     "as it is", height, fps)
-            return "original"
         too_big = limit_h and height > limit_h
         too_fast = limit_fps and fps and fps > limit_fps + 1
         if not too_big and not too_fast:
@@ -1164,8 +1157,18 @@ class CastDialog(QDialog):
         # Named once a device is picked, and not shown before then: it is a
         # question about a particular receiver, and there is no answering it
         # while none is selected.
-        self.older_box = QCheckBox()
-        self.older_box.hide()
+        # Three tiers, named after what the device IS. Nobody knows their
+        # receiver's maximum profile level; everybody knows which one they
+        # bought. A checkbox could only say "old or not", which was too
+        # blunt in both directions: it sent 720p to a first-generation
+        # dongle that decodes 1080p perfectly, and offered an Ultra a
+        # ceiling it does not need.
+        self.kind_label = QLabel("")
+        self.kind_box = QComboBox()
+        for key in ("original", "hd", "oldest"):
+            self.kind_box.addItem(tr(f"cast_kind_{key}"), key)
+        self.kind_label.hide()
+        self.kind_box.hide()
         for box, label in ((self.audio_box, tr("cast_audio")),
                            (self.subs_box, tr("cast_subtitles"))):
             row = QHBoxLayout()
@@ -1185,7 +1188,8 @@ class CastDialog(QDialog):
         # receiver tops out below fifty frames a second", they think "it
         # stutters on the TV". Remembered per device, and it is a ceiling -
         # an SD or HD channel is already below it and goes over untouched.
-        lay.addWidget(self.older_box)
+        lay.addWidget(self.kind_label)
+        lay.addWidget(self.kind_box)
         self.quality_note = QLabel(tr("cast_quality_note"))
         self.quality_note.setWordWrap(True)
         self.quality_note.setStyleSheet("font-size:11px; opacity:0.7;")
@@ -1195,7 +1199,7 @@ class CastDialog(QDialog):
         # needs it.
         self.quality_note.hide()
         lay.addWidget(self.quality_note)
-        self.older_box.toggled.connect(self._quality_changed)
+        self.kind_box.currentIndexChanged.connect(self._quality_changed)
         self.list.currentItemChanged.connect(
             lambda *_a: self._show_device_quality())
         self.audio_box.currentIndexChanged.connect(self._track_changed)
@@ -1304,24 +1308,26 @@ class CastDialog(QDialog):
         return f"cast_quality_{device}"
 
     def _show_device_quality(self) -> None:
-        """Show what this device is remembered as needing."""
+        """Show what this device is remembered as being."""
         item = self.list.currentItem()
-        self.older_box.setVisible(item is not None)
+        self.kind_label.setVisible(item is not None)
+        self.kind_box.setVisible(item is not None)
         self.quality_note.setVisible(item is not None)
         if not item:
             return
         want = normalise_quality(str(self.window.settings.value(
             self._quality_key(item.text()), "original") or "original"))
-        self.older_box.setText(tr("cast_older_device", name=item.text()))
-        self.older_box.blockSignals(True)
-        self.older_box.setChecked(want != "original")
-        self.older_box.blockSignals(False)
+        self.kind_label.setText(tr("cast_device_kind", name=item.text()))
+        self.kind_box.blockSignals(True)
+        at = self.kind_box.findData(want)
+        self.kind_box.setCurrentIndex(at if at >= 0 else 0)
+        self.kind_box.blockSignals(False)
 
     def _quality_changed(self) -> None:
         item = self.list.currentItem()
         if not item:
             return
-        want = "older" if self.older_box.isChecked() else "original"
+        want = self.kind_box.currentData() or "original"
         self.window.settings.setValue(self._quality_key(item.text()), want)
 
     def quality(self) -> str:

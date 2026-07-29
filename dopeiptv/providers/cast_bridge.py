@@ -47,40 +47,44 @@ SAFE_AUDIO = {"aac", "aac-latm", "mp3", "vorbis", "opus"}
 _UA = "VLC/3.0.20 LibVLC/3.0.20"
 
 
-# How the picture is adapted for a receiver that cannot keep up with it.
-# Deinterlacing is not part of the choice: no Chromecast deinterlaces at all,
-# so it is applied whenever the video is re-encoded anyway - with deint=1,
-# which touches only frames actually marked as interlaced.
-# "older" is the only adaptation offered, under a name that describes the
-# problem rather than the mechanism.
+# What each generation of receiver can take, as (max lines, max frames a
+# second). Zero means no limit. Deinterlacing is not part of the choice: no
+# Chromecast deinterlaces at all, so it is applied whenever the video is
+# re-encoded anyway - with deint=1, which touches only frames actually
+# marked as interlaced.
 #
-# It caps LINES, for pictures that also arrive fast. Films at 30 fps or
-# under pass untouched: re-encoding them was tried as a cure for the
-# receiver's stuck overlay and cured nothing - the picture lagged and the
-# overlay stayed, because the overlay was never a decoding problem (it is
-# what the ANNOUNCEMENT orders drawn, see _play_and_verify). Measured on a
-# first-generation dongle: 720p50 channels fine, 1080p24 films fine,
-# 1080p50 FHD channels stutter - the two multiplied is the load.
-QUALITY = {"original": (0, 0), "older": (720, 0)}
-
-# Above this many frames a second, a full-size picture is more than an older
-# receiver keeps up with. Below it, the lines are not the problem - up to a
-# point. That point is SLOW_CEILING: a first-generation dongle decodes
-# 1080p24 happily, and 2160p not at all, however slowly it arrives. Letting
-# the frame rate excuse ANY size sent a 4K film to one untouched.
-SMOOTH_FPS = 30
-SLOW_CEILING = 1080
-
+# Named after what the device IS, because nobody knows their receiver's
+# maximum profile level and everybody knows which one they bought:
+#
+#   Chromecast 1 (2013)                 1080p30   H.264 up to L4.1
+#   Chromecast 2, 3, Audio (2015-18)    1080p60
+#   Chromecast with Google TV HD (2022) 1080p60
+#   Ultra (2016), Google TV 4K (2020),
+#   Google TV Streamer (2024)           2160p60   HEVC/VP9, HDR
+#
+# The limit is the decoder and the size, not the bitrate - a 4K stream is
+# not slow on a first-generation dongle, it is undecodable.
+QUALITY = {
+    "original": (0, 0),        # newest: 4K and 60 fps, nothing adapted
+    "hd": (1080, 0),           # ordinary: 4K comes down to 1080, frame rate
+                               # left alone, because 1080p60 is within it
+    "oldest": (1080, 30),      # first generation: 1080p30 is its ceiling
+}
 
 def normalise_quality(value: str | None) -> str:
     """A stored setting, in today's terms.
 
-    The question used to be a three-way choice and was written down as
-    "720p" or "720p30". Those devices are still set that way, and "720p30"
-    is no longer a thing that can be asked for - so read it as the answer it
-    was, which is yes.
+    Devices have been written down as "720p", "720p30" and "older" as this
+    question changed shape. Every one of those was somebody saying "this is
+    an old receiver", so they all mean the oldest tier now - which is
+    kinder to them than they were: it caps a 4K film at 1080p30 instead of
+    720p, and a first-generation dongle decodes 1080p30 perfectly well.
     """
-    return "original" if not value or value == "original" else "older"
+    if not value or value == "original":
+        return "original"
+    if value in QUALITY:
+        return value
+    return "oldest"
 
 # What ffmpeg says while it waits for the first keyframe of a broadcast that
 # was already running. None of it is a fault: a transport stream can be joined

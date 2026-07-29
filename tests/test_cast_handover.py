@@ -284,12 +284,12 @@ def test_the_picture_setting_can_be_put_back_from_the_strip():
     w._cast_ctx = {"audio": None, "subs": None}
     w._recast_with = lambda a, s: recast.append((a, s))
     assert w._cast_quality() == "original"
-    w._set_cast_quality("older")
-    assert w._cast_quality() == "older"
+    w._set_cast_quality("oldest")
+    assert w._cast_quality() == "oldest"
     assert recast, "the change is shown straight away"
     # Setting the same thing again does nothing at all.
     recast.clear()
-    w._set_cast_quality("older")
+    w._set_cast_quality("oldest")
     assert recast == []
     w._set_cast_quality("original")
     assert w._cast_quality() == "original"
@@ -300,7 +300,7 @@ def test_the_picture_setting_can_be_put_back_from_the_strip():
     # remembered as "720p30", which is no longer an answer that exists. Read
     # it as the answer it was rather than as nothing at all.
     w.settings.setValue("cast_quality_Vardagsrummet", "720p30")
-    assert w._cast_quality() == "older"
+    assert w._cast_quality() == "oldest"
 
 
 def test_every_strip_icon_actually_draws_something():
@@ -731,33 +731,6 @@ def test_the_provider_is_given_a_moment_after_local_playback_stopped(
     # Kept short: this is on every cast that follows local playback, and a
     # refusal is no longer fatal - the converter tries again by itself.
     assert max(long_waits()) <= 2, slept
-
-
-def test_the_picture_setting_is_a_ceiling_not_an_instruction():
-    """Most channels come in three versions - SD, HD and FHD - and only the
-    last is beyond an older receiver. Scaling the HD one down would throw
-    away picture for nothing."""
-    from dopeiptv.providers.chromecast import ChromecastManager as M
-    need = M._needed_quality
-    # Already under it: sent as it is.
-    assert need("older", 576, 25.0) == "original"
-    assert need("older", 720, 50.0) == "original"
-    assert need("older", 720, 25.0) == "original"
-    # Lines and speed together - see the neighbouring test for the round
-    # that said lines alone, and what it cost.
-    assert need("older", 1080, 25.0) == "original"
-    assert need("older", 1080, 50.0) == "older"
-    assert M.quality_label("older", 1080, 50.0) == "720p50"
-    assert M.quality_label("older", 1080, 0.0) == "720p"
-    # Nothing to compare against: sent as it is. Converting on a guess
-    # re-encodes HD channels that were fine, and does it invisibly.
-    assert need("older", 0, 0.0) == "original"
-    # And a device with no setting never adapts anything.
-    assert need("original", 1080, 50.0) == "original"
-    # A setting written down before the question became one checkbox still
-    # means what it meant.
-    assert need("720p30", 1080, 50.0) == "older"
-    assert need("720p", 720, 50.0) == "original"
 
 
 def test_an_empty_address_is_refused_rather_than_cast(monkeypatch):
@@ -2151,29 +2124,6 @@ def test_a_jump_forward_is_rebuilt_and_a_jump_back_is_not():
     assert w.cast.sought == 603.0
 
 
-def test_the_ceiling_is_lines_and_speed_together():
-    """Re-encoding 24 fps films was tried as a cure for the receiver's
-    stuck overlay. It cured nothing and cost the picture - measured in the
-    user's own log, one cast after the other on the same film:
-
-        video copied      -> the stream is going (3.8 s / 1638 kB), PLAYING
-        video re-encoded  -> BUFFERING/PLAYING, over and over
-
-    The overlay is ordered by the announcement, not by the decode load, so
-    the load is left alone. Against a first-generation dongle: 720p50
-    channels fine, 1080p24 films fine, 1080p50 FHD channels stutter.
-    """
-    from dopeiptv.providers.chromecast import ChromecastManager as M
-    need = M._needed_quality
-    assert need("older", 1080, 24.0) == "original"
-    assert need("older", 960, 24.0) == "original"
-    assert need("older", 720, 50.0) == "original"
-    assert need("older", 1080, 50.0) == "older"
-    assert need("older", 1080, 0.0) == "older", "unknown fps counts as fast"
-    assert need("original", 1080, 50.0) == "original"
-    assert need("older", 0, 50.0) == "original", "never adapt on a guess"
-
-
 def test_a_farewell_from_the_old_stream_is_not_an_answer_about_the_new_one():
     """Changing subtitle mid-film loads a new stream, and the first report
     to arrive is the old one's farewell - IDLE/INTERRUPTED, still carrying
@@ -2395,15 +2345,3 @@ def test_every_path_announces_what_the_receiver_can_actually_do(monkeypatch):
     assert m.devices[0].announced[-1] == ("LIVE", None, None)
 
 
-def test_a_slow_picture_is_still_capped_when_it_is_enormous():
-    """The frame-rate exemption was written for 1080p films and let ANY
-    size through: a 4K film went to a first-generation dongle untouched -
-
-        cast: 2160p23.976 is slow enough for its size - sending it as it is
-
-    - which it cannot decode at any frame rate."""
-    from dopeiptv.providers.chromecast import ChromecastManager as M
-    need = M._needed_quality
-    assert need("older", 2160, 23.976) == "older"
-    assert need("older", 1440, 24.0) == "older"
-    assert need("older", 1080, 24.0) == "original", "the case it was for"

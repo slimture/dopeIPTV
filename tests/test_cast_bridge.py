@@ -112,10 +112,13 @@ def test_an_old_receiver_gets_a_picture_it_can_keep_up_with():
     second is plainly within reach.
     """
     args = ffmpeg_args("ffmpeg", "http://p/x.m3u8", copy_video=True,
-                       quality="older")
+                       quality="oldest")
     vf = args[args.index("-vf") + 1]
-    assert vf == "yadif=deint=1,scale=-2:720", vf
-    assert "-r" not in args, args
+    assert vf == "yadif=deint=1,scale=-2:1080", vf
+    # The oldest tier caps the frame rate too: a first-generation
+    # dongle is a 1080p30 decoder, so 1080p50 television is halved
+    # rather than sent at a speed it cannot hold.
+    assert args[args.index("-r") + 1] == "30"
     assert args[args.index("-c:v") + 1] != "copy", "adapting means re-encoding"
 
 

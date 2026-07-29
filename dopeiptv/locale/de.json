@@ -557,7 +557,7 @@
   "cast_stopped": "Streaming gestoppt.",
   "cast_stop_failed": "Stoppen fehlgeschlagen: {msg}",
   "cast_older_device": "{name} ist ein älterer Chromecast – ruhigeres Bild, etwas weniger scharf",
-  "cast_quality_note": "Einmal für dieses Gerät eingestellt, nicht für jeden Sender. Nur FHD wird angepasst – SD und HD gehen unverändert raus. Chromecast 1–3 und Fernseher mit integriertem Chromecast brauchen das; ein Ultra oder Google TV nicht.",
+  "cast_quality_note": "Set once for this device, not for each thing you cast. Only what is beyond it is adapted - everything smaller is sent untouched.",
   "cast_seek": "Zu einer anderen Stelle springen",
   "cast_pause_label": "Platz zum Pausieren eines gecasteten Senders",
   "cast_pause_hint": "Einen Sender am Fernseher zu pausieren nimmt ihn hier auf, bis Sie Play drücken - das bestimmt also, wie lang eine Pause sein darf: etwa eine Minute HD je 150 MB, 4,5 GB sind rund eine halbe Stunde. Bereits Gesehenes wird laufend gelöscht, ein ganzer Fernsehabend kostet also nichts; nur die Pause selbst braucht Platz, und alles verschwindet, wenn das Streaming endet.",
@@ -818,5 +818,9 @@
   "sc_epg_search": "Programm durchsuchen",
   "sc_reminders": "Erinnerungen",
   "sc_sidebar": "Seitenleiste umschalten",
-  "sc_focus_mode": "Fokusmodus"
+  "sc_focus_mode": "Fokusmodus",
+  "cast_device_kind": "What {name} is",
+  "cast_kind_original": "Newer - 4K (Ultra, Google TV, Streamer)",
+  "cast_kind_hd": "Ordinary - Full HD (Chromecast 2, 3, Google TV HD)",
+  "cast_kind_oldest": "Oldest - Full HD, 30 fps (Chromecast 1, TVs with Chromecast built in)"
 }

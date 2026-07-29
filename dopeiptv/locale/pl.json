@@ -557,7 +557,7 @@
   "cast_stopped": "Przesyłanie zatrzymane.",
   "cast_stop_failed": "Zatrzymanie nieudane: {msg}",
   "cast_older_device": "{name} to starszy Chromecast – płynniejszy obraz, nieco mniej ostry",
-  "cast_quality_note": "Ustawiane raz dla tego urządzenia, nie dla każdego kanału. Dostosowywane jest tylko FHD – SD i HD idą bez zmian. Potrzebują tego Chromecast 1-3 i telewizory z wbudowanym Chromecastem; Ultra ani Google TV nie.",
+  "cast_quality_note": "Set once for this device, not for each thing you cast. Only what is beyond it is adapted - everything smaller is sent untouched.",
   "cast_seek": "Przejdź do innego miejsca",
   "cast_pause_label": "Miejsce na wstrzymanie przesyłanego kanału",
   "cast_pause_hint": "Wstrzymanie kanału na telewizorze nagrywa go tutaj, dopóki nie naciśniesz odtwarzania - to decyduje, jak długa może być pauza: około minuty HD na 150 MB, czyli 4,5 GB to mniej więcej pół godziny. To, co już obejrzano, jest kasowane na bieżąco, więc cały wieczór nic nie kosztuje; miejsce zajmuje tylko sama pauza, a wszystko znika po zakończeniu przesyłania.",
@@ -818,5 +818,9 @@
   "sc_epg_search": "Szukaj w przewodniku",
   "sc_reminders": "Przypomnienia",
   "sc_sidebar": "Przełącz panel boczny",
-  "sc_focus_mode": "Tryb skupienia"
+  "sc_focus_mode": "Tryb skupienia",
+  "cast_device_kind": "What {name} is",
+  "cast_kind_original": "Newer - 4K (Ultra, Google TV, Streamer)",
+  "cast_kind_hd": "Ordinary - Full HD (Chromecast 2, 3, Google TV HD)",
+  "cast_kind_oldest": "Oldest - Full HD, 30 fps (Chromecast 1, TVs with Chromecast built in)"
 }

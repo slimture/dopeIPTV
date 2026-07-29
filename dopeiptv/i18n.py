@@ -720,11 +720,15 @@ _STRINGS: dict[str, dict[str, str]] = {
     "cast_older_device": {
         "en": "{name} is an older Chromecast - smoother picture, "
               "a little less sharp"},
+    "cast_device_kind": {"en": "What {name} is"},
+    "cast_kind_original": {"en": "Newer - 4K (Ultra, Google TV, Streamer)"},
+    "cast_kind_hd": {"en": "Ordinary - Full HD (Chromecast 2, 3, Google TV HD)"},
+    "cast_kind_oldest": {"en": "Oldest - Full HD, 30 fps (Chromecast 1, "
+                               "TVs with Chromecast built in)"},
     "cast_quality_note": {
-        "en": "Set once for this device, not for each channel. Only FHD is "
-              "adapted - SD and HD are sent untouched. Chromecast 1-3 and TVs "
-              "with Chromecast built in need this; an Ultra or Google TV does "
-              "not."},
+        "en": "Set once for this device, not for each thing you cast. Only "
+              "what is beyond it is adapted - everything smaller is sent "
+              "untouched."},
     "cast_seek": {"en": "Move to another point"},
     "cast_pause_label": {"en": "Room for pausing a cast channel"},
     "cast_pause_hint": {

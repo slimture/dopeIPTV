@@ -557,7 +557,7 @@
   "cast_stopped": "Casten gestopt.",
   "cast_stop_failed": "Stoppen mislukt: {msg}",
   "cast_older_device": "{name} is een oudere Chromecast – vloeiender beeld, iets minder scherp",
-  "cast_quality_note": "Wordt één keer voor dit apparaat ingesteld, niet per zender. Alleen FHD wordt aangepast – SD en HD gaan onbewerkt door. Chromecast 1-3 en tv's met ingebouwde Chromecast hebben dit nodig; een Ultra of Google TV niet.",
+  "cast_quality_note": "Set once for this device, not for each thing you cast. Only what is beyond it is adapted - everything smaller is sent untouched.",
   "cast_seek": "Naar een ander punt gaan",
   "cast_pause_label": "Ruimte voor het pauzeren van een gecast kanaal",
   "cast_pause_hint": "Een kanaal op de tv pauzeren neemt het hier op tot u op afspelen drukt, dus dit bepaalt hoe lang een pauze mag duren - ongeveer een minuut HD per 150 MB, dus 4,5 GB is ruwweg een half uur. Wat u al gezien hebt wordt gaandeweg gewist, een hele avond kost dus niets; alleen de pauze neemt ruimte in, en alles verdwijnt wanneer het casten stopt.",
@@ -818,5 +818,9 @@
   "sc_epg_search": "In gids zoeken",
   "sc_reminders": "Herinneringen",
   "sc_sidebar": "Zijbalk aan/uit",
-  "sc_focus_mode": "Focusmodus"
+  "sc_focus_mode": "Focusmodus",
+  "cast_device_kind": "What {name} is",
+  "cast_kind_original": "Newer - 4K (Ultra, Google TV, Streamer)",
+  "cast_kind_hd": "Ordinary - Full HD (Chromecast 2, 3, Google TV HD)",
+  "cast_kind_oldest": "Oldest - Full HD, 30 fps (Chromecast 1, TVs with Chromecast built in)"
 }

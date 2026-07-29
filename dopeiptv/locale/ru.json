@@ -557,7 +557,7 @@
   "cast_stopped": "Трансляция остановлена.",
   "cast_stop_failed": "Не удалось остановить: {msg}",
   "cast_older_device": "{name} — старый Chromecast: картинка плавнее, чуть менее чёткая",
-  "cast_quality_note": "Задаётся один раз для этого устройства, а не для каждого канала. Меняется только FHD — SD и HD уходят нетронутыми. Это нужно Chromecast 1–3 и телевизорам со встроенным Chromecast; Ultra или Google TV — нет.",
+  "cast_quality_note": "Set once for this device, not for each thing you cast. Only what is beyond it is adapted - everything smaller is sent untouched.",
   "cast_seek": "Перейти к другому месту",
   "cast_pause_label": "Место для паузы транслируемого канала",
   "cast_pause_hint": "Пауза канала на телевизоре записывает его здесь, пока вы не нажмёте воспроизведение, — этим и определяется, насколько длинной может быть пауза: примерно минута HD на 150 МБ, то есть 4,5 ГБ — около получаса. Уже просмотренное удаляется по ходу дела, поэтому целый вечер не стоит ничего; место занимает только сама пауза, и всё исчезает по окончании трансляции.",
@@ -818,5 +818,9 @@
   "sc_epg_search": "Поиск в телегиде",
   "sc_reminders": "Напоминания",
   "sc_sidebar": "Боковая панель",
-  "sc_focus_mode": "Режим фокуса"
+  "sc_focus_mode": "Режим фокуса",
+  "cast_device_kind": "What {name} is",
+  "cast_kind_original": "Newer - 4K (Ultra, Google TV, Streamer)",
+  "cast_kind_hd": "Ordinary - Full HD (Chromecast 2, 3, Google TV HD)",
+  "cast_kind_oldest": "Oldest - Full HD, 30 fps (Chromecast 1, TVs with Chromecast built in)"
 }
