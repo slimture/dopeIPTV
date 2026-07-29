@@ -14,7 +14,7 @@ from ..core.log import log
 from ..i18n import tr
 from ..core.workers import run_async
 from .cast_bridge import (
-    QUALITY, SAFE_AUDIO, SAFE_VIDEO, SMOOTH_FPS, CastBridge,
+    QUALITY, SAFE_AUDIO, SAFE_VIDEO, SLOW_CEILING, SMOOTH_FPS, CastBridge,
     normalise_quality, probe_tracks,
 )
 
@@ -694,7 +694,7 @@ class ChromecastManager:
         # Slow enough to carry its lines. An unknown frame rate is treated
         # as fast: a broadcast is the thing that does not say, and a
         # broadcast is the thing that stutters.
-        if fps and fps <= SMOOTH_FPS:
+        if fps and fps <= SMOOTH_FPS and height <= SLOW_CEILING:
             log.info("cast: %dp%g is slow enough for its size - sending it "
                      "as it is", height, fps)
             return "original"

@@ -64,8 +64,12 @@ _UA = "VLC/3.0.20 LibVLC/3.0.20"
 QUALITY = {"original": (0, 0), "older": (720, 0)}
 
 # Above this many frames a second, a full-size picture is more than an older
-# receiver keeps up with. Below it, the lines are not the problem.
+# receiver keeps up with. Below it, the lines are not the problem - up to a
+# point. That point is SLOW_CEILING: a first-generation dongle decodes
+# 1080p24 happily, and 2160p not at all, however slowly it arrives. Letting
+# the frame rate excuse ANY size sent a 4K film to one untouched.
 SMOOTH_FPS = 30
+SLOW_CEILING = 1080
 
 
 def normalise_quality(value: str | None) -> str:
@@ -346,6 +350,34 @@ def _input_options(source: str) -> list[str]:
             "-reconnect_on_network_error", "1", "-reconnect_delay_max", "5"]
 
 
+def _probe_limits(source: str) -> list[str]:
+    """How much ffmpeg may read before it decides what the stream contains.
+
+    A megabyte for a live channel: the default is five megabytes or five
+    seconds, whichever comes first, and over a provider link that is most
+    of the wait before a picture appears. A transport stream announces
+    itself in its first PMT, so a megabyte is plenty for one that is
+    already running.
+
+    An archive stretch is a different matter. It is joined at whatever byte
+    the panel starts sending, which is the middle of a GOP - there is no
+    SPS until the next keyframe, and at 720p50 that can be past a
+    megabyte. ffmpeg then never learns the picture size, and the mp4 muxer
+    refuses to write a header without it:
+
+        [mp4 @ ...] dimensions not set
+        Could not write header (incorrect codec parameters ?): Invalid
+        argument
+        Nothing was written into output file
+
+    - and "invalid argument" counts as fatal, so it did not even try
+    again. Which is exactly what winding a timeshift channel back did.
+    """
+    if _timeshift(source):
+        return ["-analyzeduration", "8000000", "-probesize", "8000000"]
+    return ["-analyzeduration", "1000000", "-probesize", "1000000"]
+
+
 def _endless(source: str) -> bool:
     """Whether this is a broadcast rather than something with an end.
 
@@ -443,7 +475,7 @@ def ffmpeg_args(exe: str, source: str, copy_video: bool,
         # wait before a picture appears, and it was measured at thirteen
         # seconds for one and a half megabytes. A transport stream announces
         # what it carries in its first PMT, so a megabyte is plenty.
-        "-analyzeduration", "1000000", "-probesize", "1000000",
+        *_probe_limits(source),
         *_input_options(source),
         # Seeking before -i is the cheap kind: ffmpeg jumps in the container
         # instead of decoding its way there, which is what makes resuming an
@@ -502,7 +534,7 @@ def hls_args(exe: str, source: str, copy_video: bool, folder: str,
         chain.append(f"scale=-2:{height}")
     return [
         exe, "-hide_banner", "-loglevel", "error",
-        "-analyzeduration", "1000000", "-probesize", "1000000",
+        *_probe_limits(source),
         *_input_options(source),
         *(["-ss", f"{start:.3f}"] if start > 0 else []),
         "-fflags", "+genpts", "-i", source,
@@ -1155,6 +1187,15 @@ class CastBridge:
 
         Both look identical on screen: BUFFERING, PLAYING, BUFFERING.
         """
+        if self.hls:
+            folder = self.hls_dir or ""
+            try:
+                segs = [f for f in os.listdir(folder) if f.endswith(".ts")]
+                mb = sum(os.path.getsize(os.path.join(folder, f))
+                         for f in segs) / 1e6
+            except OSError:
+                return "writing a playlist"
+            return f"{len(segs)} segments written, {mb:.0f} MB"
         cur = self._current
         if not cur:
             return "nothing running"

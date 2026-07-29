@@ -2393,3 +2393,17 @@ def test_every_path_announces_what_the_receiver_can_actually_do(monkeypatch):
     m.scan()
     m.cast("Alva TV", "http://p/live/u/pw/9851.m3u8", "SVT1")
     assert m.devices[0].announced[-1] == ("LIVE", None, None)
+
+
+def test_a_slow_picture_is_still_capped_when_it_is_enormous():
+    """The frame-rate exemption was written for 1080p films and let ANY
+    size through: a 4K film went to a first-generation dongle untouched -
+
+        cast: 2160p23.976 is slow enough for its size - sending it as it is
+
+    - which it cannot decode at any frame rate."""
+    from dopeiptv.providers.chromecast import ChromecastManager as M
+    need = M._needed_quality
+    assert need("older", 2160, 23.976) == "older"
+    assert need("older", 1440, 24.0) == "older"
+    assert need("older", 1080, 24.0) == "original", "the case it was for"
