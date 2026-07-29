@@ -190,3 +190,43 @@ def test_it_can_be_narrower_than_the_widest_control_asks_for():
     assert bar.minimumSizeHint().width() <= 160
     _settle(bar, 130)
     assert not _overlaps(controls)
+
+
+def test_a_click_lands_where_it_was_aimed():
+    """A click was mapped as x/width, which ignores that Qt insets the
+    groove by half a handle at each end - the handle is DRAWN centred on
+    its position. So a click went up to half a handle from where the handle
+    then landed, and on a strip a couple of hundred pixels wide that is
+    several per cent of a film. Dragging hid it, because the eye corrects
+    as the handle follows the pointer.
+    """
+    from PyQt6.QtCore import QPointF, Qt
+    from PyQt6.QtGui import QMouseEvent
+    from dopeiptv.media.embedded import _SeekSlider
+
+    s = _SeekSlider()
+    s.setRange(0, 1000)
+    s.resize(240, 18)
+    s.show()
+
+    def click_at(x):
+        ev = QMouseEvent(QMouseEvent.Type.MouseButtonPress,
+                         QPointF(x, 9.0), Qt.MouseButton.LeftButton,
+                         Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+        s.mousePressEvent(ev)
+        return s.value()
+
+    # The ends are exact: a click at the far left is the beginning, at the
+    # far right the end. x/width got the right end but not the left.
+    assert click_at(0) == 0
+    assert click_at(240) == 1000
+
+    # And the middle is the middle, within a pixel's worth of value.
+    mid = click_at(120)
+    assert abs(mid - 500) <= 1000 // 240 + 1, mid
+
+    # Monotonic all the way across - no dead zone at either end.
+    seen = [click_at(x) for x in range(0, 241, 10)]
+    assert seen == sorted(seen)
+    assert len(set(seen)) > 20, "the whole width has to be reachable"
+    s.hide()

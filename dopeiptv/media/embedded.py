@@ -18,7 +18,7 @@ from PyQt6.QtOpenGL import QOpenGLFramebufferObject
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 from PyQt6.QtWidgets import (
     QApplication, QHBoxLayout, QLabel, QLineEdit, QMenu, QSizePolicy, QSlider,
-    QVBoxLayout, QWidget, QPushButton,
+    QStyle, QStyleOptionSlider, QVBoxLayout, QWidget, QPushButton,
 )
 
 from ..core.log import log
@@ -882,9 +882,28 @@ class _SeekSlider(QSlider):
         painter.end()
 
     def _value_for(self, event) -> int:
-        ratio = event.position().x() / max(1, self.width())
-        span = self.maximum() - self.minimum()
-        return int(self.minimum() + max(0.0, min(1.0, ratio)) * span)
+        # Through the style, not a plain fraction of the width. Qt insets
+        # the groove by half a handle at each end, because the handle is
+        # DRAWN centred on its position - so x/width put a click up to half
+        # a handle away from where the handle then landed, which on a strip
+        # a couple of hundred pixels wide is several per cent. Dragging hid
+        # it: the eye corrects as the handle follows the pointer. Clicking
+        # had nothing to correct against, so it simply went to the wrong
+        # place, and 0:30 twice in a row was the same wrong place.
+        opt = QStyleOptionSlider()
+        self.initStyleOption(opt)
+        style = self.style()
+        groove = style.subControlRect(
+            QStyle.ComplexControl.CC_Slider, opt,
+            QStyle.SubControl.SC_SliderGroove, self)
+        handle = style.subControlRect(
+            QStyle.ComplexControl.CC_Slider, opt,
+            QStyle.SubControl.SC_SliderHandle, self)
+        span = groove.width() - handle.width()
+        pos = int(event.position().x()) - handle.width() // 2 - groove.x()
+        return style.sliderValueFromPosition(
+            self.minimum(), self.maximum(), pos, max(1, span),
+            opt.upsideDown)
 
     def mousePressEvent(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
@@ -954,7 +973,11 @@ class _SeekSlider(QSlider):
         can see roughly where a click lands) and, when programme data is known,
         name what was on at that point. Placed just BELOW the bar, centred on
         the cursor - close enough to read as attached, out of the click path."""
-        frac = max(0.0, min(1.0, event.position().x() / max(1, self.width())))
+        # The same scale the click uses, or the tip names one time and the
+        # click lands on another.
+        span = self.maximum() - self.minimum()
+        frac = ((self._value_for(event) - self.minimum()) / span
+                if span else 0.0)
         parts: list[str] = []
         if self._time_for_frac is not None:
             t = self._time_for_frac(frac)
