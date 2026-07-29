@@ -1102,3 +1102,46 @@ def test_a_converter_started_during_the_handover_is_not_left_behind():
         assert b._procs == [], "and it must not count as this run's converter"
     finally:
         b.stop()
+
+
+def test_the_television_is_given_a_head_start():
+    """Handing the playlist over at the first segment starts the receiver at
+    the very edge of what has been made, and it then races the converter for
+    the rest of the film. On anything expensive to convert it wins, and the
+    picture sits black behind a spinner:
+
+        receiver BUFFERING - converter is 1 segments written, 0 MB
+    """
+    b = CastBridge()
+    b.exe = "/bin/true"
+    try:
+        b.start("http://p/movie/u/pw/5.mkv", subs=0, sub_codec="subrip")
+        folder = b.hls_dir
+        open(os.path.join(folder, "master.m3u8"), "w").write("#EXTM3U\n")
+        b.spawn = lambda: object()          # a converter is "running"
+
+        # One segment is not enough to start on.
+        open(os.path.join(folder, "v0.ts"), "wb").write(b"\x47")
+        b.HLS_WAIT = 0.4
+        assert b.hls_ready("master.m3u8") is True, (
+            "out of time, so hand over what there is - a short lead is a "
+            "stutter, no playlist at all is a dead cast")
+
+        # With the lead, it goes straight over and says how far ahead.
+        b2 = CastBridge()
+        b2.exe = "/bin/true"
+        b2.start("http://p/movie/u/pw/5.mkv", subs=0, sub_codec="subrip")
+        f2 = b2.hls_dir
+        open(os.path.join(f2, "master.m3u8"), "w").write("#EXTM3U\n")
+        for n in range(b2.HLS_LEAD):
+            open(os.path.join(f2, f"v{n}.ts"), "wb").write(b"\x47")
+        b2.spawn = lambda: object()
+        assert b2.hls_ready("master.m3u8") is True
+        assert b2.hls_started is True
+        # And everything after the opening is served without waiting: it is
+        # named in a playlist we wrote, so by then it exists.
+        assert b2.hls_ready("v0.ts") is True
+        assert b2.hls_ready("v99.ts") is False
+        b2.stop()
+    finally:
+        b.stop()

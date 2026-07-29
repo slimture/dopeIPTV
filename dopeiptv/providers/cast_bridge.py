@@ -968,6 +968,9 @@ class CastBridge:
         self.hls = False
         self.hls_dir: str | None = None
         self.said_subs = False
+        # Whether the receiver has been handed the opening playlist yet.
+        # Only that first one waits for a head start.
+        self.hls_started = False
         # When the last run was torn down. A panel goes on counting a
         # session for a moment after the socket closes, and this account
         # allows one - so a new ffmpeg started too soon is a second
@@ -1144,6 +1147,15 @@ class CastBridge:
     # seconds rather than milliseconds.
     HLS_WAIT = 25.0
 
+    # How many segments must exist before the receiver is handed the
+    # playlist. Handing it over at the first one starts the television at
+    # the very edge of what has been made, and it then races the converter
+    # for the rest of the film - which on anything expensive to convert it
+    # wins, and the picture sits black behind a spinner:
+    #   receiver BUFFERING - converter is 1 segments written, 0 MB
+    # Three segments is about twelve seconds of head start, paid once.
+    HLS_LEAD = 3
+
     def hls_ready(self, name: str) -> bool:
         """Whether *name* can be served, starting ffmpeg if it has not been.
 
@@ -1161,21 +1173,40 @@ class CastBridge:
             return False
         if not self._procs and not self.fatal and self.spawn() is None:
             return False
-        if os.path.exists(os.path.join(folder, name)):
-            return True
-        if not name.endswith(".m3u8"):
-            return False
+        # A segment, or a playlist that is not the first one asked for:
+        # everything after the opening is named in a playlist we wrote, so
+        # by the time it is requested it exists.
+        if not name.endswith(".m3u8") or self.hls_started:
+            return os.path.exists(os.path.join(folder, name))
         deadline = time.monotonic() + self.HLS_WAIT
         while time.monotonic() < deadline:
-            if os.path.exists(os.path.join(folder, name)):
-                log.info("cast bridge: the playlist is ready")
+            if os.path.exists(os.path.join(folder, name)) and \
+                    self._segments_written() >= self.HLS_LEAD:
+                self.hls_started = True
+                log.info("cast bridge: the playlist is ready, %d segments "
+                         "ahead of the television", self._segments_written())
                 return True
             if self.fatal or not any(p.poll() is None for p in self._procs):
                 break               # ffmpeg gave up; nothing is coming
             time.sleep(0.2)
+        # Out of time. Hand over whatever exists rather than nothing: a
+        # short lead is a stutter, and no playlist at all is a dead cast.
+        if os.path.exists(os.path.join(folder, name)):
+            self.hls_started = True
+            log.info("cast bridge: handing the playlist over with only %d "
+                     "segments - the converter is slower than the film",
+                     self._segments_written())
+            return True
         log.info("cast bridge: no playlist after %.0f s - nothing to hand "
                  "the receiver", self.HLS_WAIT)
         return False
+
+    def _segments_written(self) -> int:
+        try:
+            return sum(1 for f in os.listdir(self.hls_dir or "")
+                       if f.endswith(".ts"))
+        except OSError:
+            return 0
 
     def lead(self) -> str:
         """How far ahead of the television the converter is, in words.
@@ -1479,7 +1510,7 @@ class CastBridge:
             self.stopped_at = time.monotonic()
         self.path = self.source = self.prefix = None
         self.hls, self.hls_dir = False, None
-        self.said_subs = False
+        self.said_subs = self.hls_started = False
         if self._tmp:
             shutil.rmtree(self._tmp, ignore_errors=True)
             self._tmp = None
