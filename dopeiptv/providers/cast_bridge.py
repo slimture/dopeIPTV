@@ -459,7 +459,6 @@ def ffmpeg_args(exe: str, source: str, copy_video: bool,
             # burning one in from a provider link meant fetching the film
             # first. Only a picture-based subtitle is drawn here now.
             burn = ["-map", "0:v:0"]
-            burn = ["-map", "0:v:0"]
     else:
         burn = ["-map", "0:v:0"]
     if not copy_video:
@@ -1235,7 +1234,10 @@ class CastBridge:
         if not cur:
             return "nothing running"
         _proc, spool, _n = cur
-        ahead = spool.total - spool.read_to
+        with spool._lock:
+            behind = spool.index - (min(spool._at.values())
+                                    if spool._at else spool.index)
+        ahead = behind * spool.PIECE
         return (f"{ahead / 1e6:.0f} MB ahead"
                 + (" - SPOOL FULL, ffmpeg is blocked" if spool.full else ""))
 

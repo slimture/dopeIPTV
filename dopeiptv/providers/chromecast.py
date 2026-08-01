@@ -813,6 +813,10 @@ class ChromecastManager:
         # A NATIVE film is left alone: the receiver fetches that file
         # itself and really can seek it, so BUFFERED with the length is
         # true, and its chrome is the receiver's own business.
+        try:
+            self.old_session = getattr(mc.status, "media_session_id", None)
+        except Exception:
+            self.old_session = None
         seekable = self.duration > 0 and not converted
         log.info("cast: handing over as %s",
                  f"BUFFERED ({self.duration:.0f} s), from {start:.0f} s"
@@ -1262,7 +1266,6 @@ class CastDialog(QDialog):
         # receiver as a WebVTT rendition beside the picture, which needs no
         # libass and nothing drawn into the frames; a picture-based one is
         # still drawn in with overlay, which every ffmpeg has.
-        no_burn = False
         self.audio_list, self.subs_list = audio, subs
         self.audio_box.blockSignals(True)
         self.subs_box.blockSignals(True)
@@ -1297,12 +1300,6 @@ class CastDialog(QDialog):
         # nothing to pick from - leave those boxes out of the way.
         self.audio_box.setEnabled(len(audio) > 1)
         self.subs_box.setEnabled(bool(subs))
-        if no_burn and not subs:
-            # Say why the row is empty, where the choice would have been.
-            self.subs_box.blockSignals(True)
-            self.subs_box.clear()
-            self.subs_box.addItem(tr("cast_subs_unavailable"), None)
-            self.subs_box.blockSignals(False)
 
     def _quality_key(self, device: str) -> str:
         return f"cast_quality_{device}"
