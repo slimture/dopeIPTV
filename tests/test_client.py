@@ -44,7 +44,9 @@ def test_parse_xtream_url_rejects_non_links():
     # No credentials, not a URL, empty, or a plain M3U link -> None, so a
     # manually-typed host/username/password is never disturbed.
     for bad in ("", "   ", "host.tv:8080", "http://host.tv:8080",
-                "https://example.com/playlist.m3u", "not a url at all"):
+                "https://example.com/playlist.m3u",
+                "https://raw.githubusercontent.com/josxha/german-tv-m3u/main/german-tv.m3u",
+                "not a url at all"):
         assert parse_xtream_url(bad) is None
 
 
@@ -65,6 +67,9 @@ def test_detect_provider_link_plain_m3u():
         "https://example.com/list.m3u8") == ("m3u", "https://example.com/list.m3u8", "", "")
     assert detect_provider_link(
         "https://example.com/playlist.m3u") == ("m3u", "https://example.com/playlist.m3u", "", "")
+    # Deep paths ending in .m3u must not be mistaken for Xtream stream URLs.
+    gh = "https://raw.githubusercontent.com/josxha/german-tv-m3u/main/german-tv.m3u"
+    assert detect_provider_link(gh) == ("m3u", gh, "", "")
 
 
 def test_detect_provider_link_rejects_bare_input():

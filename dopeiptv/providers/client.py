@@ -777,6 +777,9 @@ def parse_xtream_url(text: str) -> tuple[str, str, str] | None:
     # Fallback: path-based stream URLs embed the credentials as the first two
     # path segments — /live/USER/PASS/ID.ext, /movie/..., /series/..., or the
     # bare /USER/PASS/ID form. Skip a leading media-type segment when present.
+    # A path ending in .m3u/.m3u8 is a plain playlist, not an Xtream stream.
+    if u.path.lower().endswith((".m3u", ".m3u8")):
+        return None
     parts = [p for p in u.path.split("/") if p]
     if parts and parts[0] in ("live", "movie", "series", "timeshift"):
         parts = parts[1:]
