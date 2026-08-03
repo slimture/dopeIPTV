@@ -379,15 +379,22 @@ jobs:
             *.deb
 
   # -------------------------------------------------- macOS .app + .dmg ---
-  # Runs on Apple Silicon (macos-14 is arm64; GitHub gives it free for public
-  # repos). Produces an unsigned .dmg - users need to right-click -> Open
-  # once to get past Gatekeeper. Signing/notarising can be added later by
-  # putting DEVELOPER_ID / APPLE_ID secrets in the repo and calling
-  # codesign / notarytool.
+  # Builds on both Apple Silicon (macos-14, arm64) and Intel (macos-13, x86_64).
+  # Produces unsigned .dmgs - users need to right-click -> Open once to get past
+  # Gatekeeper. Signing/notarising can be added later by putting DEVELOPER_ID /
+  # APPLE_ID secrets in the repo and calling codesign / notarytool.
   macos-dmg:
-    name: macOS .dmg
-    runs-on: macos-14
-    continue-on-error: true   # matches Flatpak - failure here shouldn't block the other formats
+    name: macOS .dmg (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            arch: arm64
+          - runner: macos-13
+            arch: x86_64
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v5
       - name: Guard - release notes must match this version
@@ -490,7 +497,7 @@ jobs:
             --hide-extension "dopeIPTV.app" \
             --no-internet-enable \
             --skip-jenkins \
-            "dopeIPTV-${V}-macOS-arm64.dmg" \
+            "dopeIPTV-${V}-macOS-${{ matrix.arch }}.dmg" \
             "dist/dopeIPTV.app"
       - name: Smoke test - mount .dmg and inspect the bundle
         run: |
@@ -499,7 +506,7 @@ jobs:
           # instead: Info.plist keys, the main binary, libmpv and its rpath,
           # icon file, and that hdiutil can actually mount the .dmg.
           V=${{ steps.v.outputs.version }}
-          DMG="dopeIPTV-${V}-macOS-arm64.dmg"
+          DMG="dopeIPTV-${V}-macOS-${{ matrix.arch }}.dmg"
           echo "::group::Mount and inspect $DMG"
           MOUNT=$(hdiutil attach -readonly -mountrandom /tmp "$DMG" | tail -1 | awk '{print $NF}')
           APP="$MOUNT/dopeIPTV.app"
@@ -574,7 +581,7 @@ jobs:
           body_path: RELEASE_NOTES.md
       - uses: actions/upload-artifact@v4
         with:
-          name: macos-dmg
+          name: macos-dmg-${{ matrix.arch }}
           path: '*.dmg'
 
   # --------------------------------------------------------------- Windows ---
