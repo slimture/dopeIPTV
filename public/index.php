@@ -39,10 +39,14 @@ function dl_meta(string $name): array {
     $n = strtolower($name);
     $arm = (strpos($n, 'arm') !== false || strpos($n, 'aarch64') !== false);
     $cpu = $arm ? t('arch_arm') : t('arch_x86');
+    // A .dmg is built per architecture (…-macOS-arm64.dmg / …-macOS-x86_64.dmg)
+    // and an arm64 app cannot launch on an Intel Mac at all, so the label must
+    // name the one architecture the file actually runs on.
+    $mac = $arm ? t('arch_apple_arm') : t('arch_apple_intel');
     if (str_ends_with($n, '.dmg'))
-        return ['os'=>'macOS','icon'=>'🍎','title'=>t('dl_t_dmg'),'fmt'=>t('dl_f_dmg'),'arch'=>t('arch_apple'),'rank'=>10,'rec'=>true];
+        return ['os'=>'macOS','icon'=>'🍎','title'=>t('dl_t_dmg'),'fmt'=>t('dl_f_dmg'),'arch'=>$mac,'rank'=>($arm?10:12),'rec'=>$arm];
     if (str_ends_with($n, '.pkg'))
-        return ['os'=>'macOS','icon'=>'🍎','title'=>t('dl_t_pkg'),'fmt'=>t('dl_f_pkg'),'arch'=>t('arch_apple'),'rank'=>20,'rec'=>false];
+        return ['os'=>'macOS','icon'=>'🍎','title'=>t('dl_t_pkg'),'fmt'=>t('dl_f_pkg'),'arch'=>$mac,'rank'=>($arm?20:22),'rec'=>false];
     if (str_ends_with($n, '.exe') || str_ends_with($n, '.msi'))
         return ['os'=>'Windows','icon'=>'🪟','title'=>t('dl_t_exe'),'fmt'=>t('dl_f_exe'),'arch'=>$cpu,'rank'=>10,'rec'=>true];
     if (str_ends_with($n, '.zip') && strpos($n, 'win') !== false)
