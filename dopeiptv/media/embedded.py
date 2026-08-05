@@ -400,6 +400,22 @@ class _MpvGLWidget(QOpenGLWidget):
                 tr("embedded_gl_failed")))
 
     def _build_mpv_render(self) -> None:
+        # libmpv hard-requires LC_NUMERIC="C" and segfaults inside
+        # mpv_create() on anything else ("Non-C locale detected"). Qt's
+        # QApplication constructor calls setlocale(LC_ALL, "") on Unix, so on
+        # any system whose locale uses a decimal comma (de_DE, fr_FR, ...)
+        # the process arrives here with the wrong numeric locale - the env
+        # vars set at startup don't help when the user's LC_ALL overrides
+        # them, and native file dialogs can re-run setlocale long after
+        # startup. Resetting the one category libmpv cares about, right
+        # before the instance is created, is the fix python-mpv's own README
+        # prescribes; Qt and Python formatting don't read the C locale, so
+        # nothing else changes.
+        import locale
+        try:
+            locale.setlocale(locale.LC_NUMERIC, "C")
+        except locale.Error as e:
+            log.warning("could not set LC_NUMERIC=C: %s", e)
         # vo=libmpv is mandatory for the render API and exists in every
         # libmpv build - create the instance with just that (plus a quiet
         # terminal), then apply the rest tolerantly below.
