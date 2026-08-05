@@ -392,7 +392,11 @@ jobs:
         include:
           - runner: macos-14
             arch: arm64
-          - runner: macos-13
+          # macos-13 (the old Intel image) was retired in Dec 2025 - a job
+          # asking for it queues forever. macos-15-intel is its successor and
+          # the LAST x86_64 macOS runner GitHub will ever offer; it retires
+          # in Aug 2027, after which the Intel .dmg goes away with it.
+          - runner: macos-15-intel
             arch: x86_64
     continue-on-error: true
     steps:
