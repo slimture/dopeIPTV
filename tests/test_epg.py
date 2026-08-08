@@ -177,3 +177,71 @@ def test_download_no_epg_source_raises_for_m3u():
     g = XmltvGuide(m, custom_url=None)
     with pytest.raises(RuntimeError):
         g._download()
+
+
+# -- the guide load must end the busy indicator it drives --------------------
+
+def test_ensure_xmltv_loaded_ends_the_progress_indicator(monkeypatch):
+    """The guide download drives the "Loading programme guide" strip via
+    epg_progress. The load kicked off by _ensure_xmltv_loaded (the first
+    session's path: channel list done, guide not in yet) never ended that
+    indicator - its callback only refreshed the list, so the strip lingered
+    until the watchdog or a category switch happened to hide it. Both the
+    success and the failure callback must finish the progress indicator."""
+    import dopeiptv.ui.main_window as mw
+
+    class _Stub:
+        _ensure_xmltv_loaded = mw.MainWindow._ensure_xmltv_loaded
+
+        def __init__(self):
+            self.finished = 0
+            self.refreshed = 0
+            self.pool = None
+            self.xmltv = type("G", (), {"_loaded": False, "_failed": False,
+                                        "ensure_loaded": lambda: True})
+            self.list_model = type("M", (), {})()
+            self.list_model.refresh_all = lambda: self._bump("refreshed")
+
+        def _bump(self, what):
+            setattr(self, what, getattr(self, what) + 1)
+
+        def _epg_progress_finished(self):
+            self.finished += 1
+
+    def run_now(_pool, fn, done, err=None):
+        try:
+            done(fn())
+        except Exception as e:
+            if err:
+                err(e)
+
+    monkeypatch.setattr(mw, "run_async", run_now)
+
+    # Success: indicator finished AND the list refreshed.
+    w = _Stub()
+    w.xmltv.ensure_loaded = lambda: True
+    w._ensure_xmltv_loaded()
+    assert w.finished == 1
+    assert w.refreshed == 1
+
+    # The guide answered "no data" (ok=False): still finished, no refresh.
+    w = _Stub()
+    w.xmltv.ensure_loaded = lambda: False
+    w._ensure_xmltv_loaded()
+    assert w.finished == 1
+    assert w.refreshed == 0
+
+    # The load raised: the error path must finish the indicator too.
+    def boom():
+        raise RuntimeError("download exploded")
+    w = _Stub()
+    w.xmltv.ensure_loaded = boom
+    w._ensure_xmltv_loaded()
+    assert w.finished == 1
+    assert w.refreshed == 0
+
+    # Already loaded: nothing dispatched, nothing touched.
+    w = _Stub()
+    w.xmltv._loaded = True
+    w._ensure_xmltv_loaded()
+    assert w.finished == 0

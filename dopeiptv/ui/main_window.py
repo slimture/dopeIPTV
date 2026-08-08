@@ -2800,8 +2800,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _ensure_xmltv_loaded(self) -> None:
         if self.xmltv._loaded or self.xmltv._failed:
             return
+        # The guide download drives the "Loading programme guide" strip via
+        # epg_progress, so this load must END that indicator too - on both
+        # completion and failure, like refresh_playlist does. Without it the
+        # strip lingered after the download (until the watchdog, or until a
+        # category switch happened to hide it).
         run_async(self.pool, self.xmltv.ensure_loaded,
-                  lambda ok: self.list_model.refresh_all() if ok else None)
+                  lambda ok: (self._epg_progress_finished(),
+                              self.list_model.refresh_all() if ok else None),
+                  lambda _: self._epg_progress_finished())
 
     # -- metadata (TMDB artwork) -----------------------------------------------------
 
