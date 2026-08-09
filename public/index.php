@@ -26,20 +26,11 @@ $relDate = !empty($rel['published_at']) ? date('M j, Y', strtotime($rel['publish
 // counts shown and the page still works.
 $dlCounts = @json_decode(@file_get_contents(dirname(__DIR__) . '/downloads.json'), true);
 if (!is_array($dlCounts)) { $dlCounts = []; }
-// The file name carries the version (dopeIPTV-1.2.8-macOS-arm64.dmg), so a
-// count keyed on the exact name resets to zero at every release even though
-// downloads.json keeps the whole history. Strip the version out of the name
-// and sum every entry of the same kind, so the figure shown is all-time.
-function dl_kind(string $name): string {
-    return preg_replace('/\d+(?:\.\d+)+/', '*', $name);
-}
+// Each row shows ITS file's tally - the current version only, which is what
+// the exact-name key gives. The all-time figure lives in one place instead:
+// the release pill sums every entry downloads.json has ever recorded.
 function dl_count(array $counts, string $name): int {
-    $kind = dl_kind($name);
-    $n = 0;
-    foreach ($counts as $file => $c) {
-        if (dl_kind((string)$file) === $kind) { $n += (int)$c; }
-    }
-    return $n;
+    return (int)($counts[$name] ?? 0);
 }
 function dl_total(array $counts): int {
     return (int)array_sum(array_map('intval', $counts));
