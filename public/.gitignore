@@ -1,0 +1,3 @@
+# Written by sync-releases.php on the server - the repo must never carry one,
+# or a deploy copy overwrites the live file with a stale stub (v0.7.0 incident).
+releases.json

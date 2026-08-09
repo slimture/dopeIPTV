@@ -15,7 +15,7 @@ website/
 │   ├── site.webmanifest    PWA/icon metadata
 │   ├── robots.txt          allows all + sitemap
 │   ├── sitemap.xml         single URL
-│   ├── releases.json       written by the sync script (sample committed)
+│   ├── releases.json       written by the sync script on the server (never committed)
 │   ├── files/              mirrored release assets land here (git-ignored)
 │   └── screenshots/        drop real PNGs here (see below)
 ├── sync-releases.php       cron: pull latest release → files/ + releases.json
