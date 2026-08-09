@@ -70,7 +70,6 @@ return [
     "dl_eyebrow" => "השג את dopeIPTV",
     "dl_h2"      => "הורידו את הגרסה האחרונה.",
     "dl_latest"  => "אחרונה",
-    "dl_total_suffix" => "הורדות בסך הכול",
     "os_help_linux"   => "לא בטוחים? קחו את <b>AppImage</b> — הוא פועל בכל הפצה ללא התקנה. בחרו <b>.deb</b> ב-Debian/Ubuntu. קחו <b>Intel / AMD</b> אלא אם אתם על מכונת ARM (Raspberry Pi, שרת ARM).",
     "os_help_macos"   => "שתי תמונות: אחת ל‑Apple Silicon (סדרת M) ואחת ל‑Mac עם Intel. לא בטוחים? תפריט Apple ← אודות ה‑Mac הזה.",
     "os_help_windows" => "גרסה ניידת — חלצו והריצו, אין מה להתקין. הפלטפורמה החדשה ביותר, עדיין בליטוש.",

@@ -70,7 +70,6 @@ return [
     "dl_eyebrow" => "dopeIPTV'yi edinin",
     "dl_h2"      => "En son sürümü indirin.",
     "dl_latest"  => "en son",
-    "dl_total_suffix" => "toplam indirme",
     "os_help_linux"   => "Emin değil misiniz? <b>AppImage</b>'i alın — herhangi bir dağıtımda kurulum gerektirmeden çalışır. Debian/Ubuntu'da <b>.deb</b> seçin. ARM makineniz (Raspberry Pi, ARM sunucu) yoksa <b>Intel / AMD</b> alın.",
     "os_help_macos"   => "İki görüntü: biri Apple Silicon (M serisi), diğeri Intel Mac'ler için. Emin değil misiniz? Apple menüsü → Bu Mac Hakkında.",
     "os_help_windows" => "Taşınabilir sürüm — çıkarın ve çalıştırın, kurulacak bir şey yok. En yeni platform, hâlâ üzerinde çalışılıyor.",

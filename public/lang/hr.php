@@ -70,7 +70,6 @@ return [
     "dl_eyebrow" => "Nabavi dopeIPTV",
     "dl_h2"      => "Preuzmite najnoviju verziju.",
     "dl_latest"  => "najnovije",
-    "dl_total_suffix" => "preuzimanja ukupno",
     "os_help_linux"   => "Niste sigurni? Uzmite <b>AppImage</b> — radi na bilo kojoj distribuciji bez instalacije. Odaberite <b>.deb</b> na Debianu/Ubuntuu. Uzmite <b>Intel / AMD</b> osim ako imate ARM stroj (Raspberry Pi, ARM poslužitelj).",
     "os_help_macos"   => "Dvije slike: jedna za Apple Silicon (M serija), jedna za Intel Macove. Niste sigurni? Apple izbornik → O ovom Macu.",
     "os_help_windows" => "Prijenosna verzija — raspakirajte i pokrenite, ništa za instalirati. Najnovija platforma, još u doradi.",
