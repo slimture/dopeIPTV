@@ -70,7 +70,6 @@ return [
     "dl_eyebrow" => "احصل على dopeIPTV",
     "dl_h2"      => "نزّل أحدث إصدار.",
     "dl_latest"  => "الأحدث",
-    "dl_total_suffix" => "تنزيلات إجمالاً",
     "os_help_linux"   => "لست متأكدًا؟ خذ <b>AppImage</b> — يعمل على أي توزيعة دون تثبيت. اختر <b>.deb</b> على Debian/Ubuntu. اختر <b>Intel / AMD</b> ما لم تكن على جهاز ARM (Raspberry Pi، خادم ARM).",
     "os_help_macos"   => "صورتان: واحدة لأجهزة Apple Silicon (سلسلة M) وأخرى لأجهزة Mac بمعالج Intel. غير متأكد؟ قائمة Apple ← حول هذا الـ Mac.",
     "os_help_windows" => "نسخة محمولة — فك الضغط وشغّل، لا شيء للتثبيت. أحدث منصة، وما زالت قيد الصقل.",

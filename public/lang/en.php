@@ -70,7 +70,6 @@ return [
     "dl_eyebrow" => "Get dopeIPTV",
     "dl_h2"      => "Download the latest release.",
     "dl_latest"  => "latest",
-    "dl_total_suffix" => "downloads in total",
     "os_help_linux"   => "Not sure? Get the <b>AppImage</b> — it runs on any distribution with no install. Choose <b>.deb</b> on Debian/Ubuntu. Pick <b>Intel / AMD</b> unless you're on an ARM machine (Raspberry Pi, ARM server).",
     "os_help_macos"   => "Two images: one for Apple Silicon (M-series), one for Intel Macs. Not sure? Apple menu → About This Mac.",
     "os_help_windows" => "Portable build — unzip and run, nothing to install. Newest platform, still being polished.",

@@ -69,7 +69,6 @@ return [
     "dl_eyebrow" => "获取 dopeIPTV",
     "dl_h2"      => "下载最新版本。",
     "dl_latest"  => "最新",
-    "dl_total_suffix" => "次累计下载",
     "os_help_linux"   => "不确定？选 <b>AppImage</b>——它无需安装即可在任何发行版上运行。在 Debian/Ubuntu 上选 <b>.deb</b>。除非你用的是 ARM 机器（Raspberry Pi、ARM 服务器），否则选 <b>Intel / AMD</b>。",
     "os_help_macos"   => "提供两个镜像:一个用于 Apple Silicon(M 系列),一个用于 Intel Mac。不确定?点按苹果菜单 → 关于本机。",
     "os_help_windows" => "便携版——解压即用，无需安装。最新的平台，仍在打磨中。",

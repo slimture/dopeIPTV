@@ -69,7 +69,6 @@ return [
     "dl_eyebrow" => "dopeIPTV 받기",
     "dl_h2"      => "최신 버전을 다운로드하세요.",
     "dl_latest"  => "최신",
-    "dl_total_suffix" => "누적 다운로드",
     "os_help_linux"   => "잘 모르겠나요? <b>AppImage</b>를 받으세요 — 설치 없이 어떤 배포판에서도 실행됩니다. Debian/Ubuntu에서는 <b>.deb</b>를 선택하세요. ARM 머신(Raspberry Pi, ARM 서버)이 아니라면 <b>Intel / AMD</b>를 받으세요.",
     "os_help_macos"   => "이미지는 두 가지입니다: Apple Silicon(M 시리즈)용과 Intel Mac용. 확실하지 않다면 Apple 메뉴 → 이 Mac에 관하여에서 확인하세요.",
     "os_help_windows" => "포터블 빌드 — 압축을 풀고 실행하면 되며 설치할 것이 없습니다. 가장 새로운 플랫폼으로 아직 다듬는 중입니다.",
