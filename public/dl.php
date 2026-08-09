@@ -29,10 +29,20 @@ if ($name === '' || $name[0] === '.' || !is_file($path)) {
     exit;
 }
 
+// Crawlers and link previewers fetch these links too - a search bot walking
+// the page, or a chat app unfurling a shared link, is not a download. Count
+// only plain GETs from something that identifies itself and doesn't say it's
+// a bot. curl/wget stay counted: on Linux they ARE how people download.
+$ua = strtolower((string)($_SERVER['HTTP_USER_AGENT'] ?? ''));
+$counted = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET'
+    && $ua !== ''
+    && !preg_match('/bot|crawl|spider|slurp|preview|facebookexternalhit'
+                   . '|whatsapp|telegram|discord|skype|embed|monitor|scan/', $ua);
+
 // Bump the counter under an exclusive lock so concurrent downloads don't lose
 // increments. Any failure here is non-fatal - the download must still proceed.
 $countsFile = dirname(__DIR__) . '/downloads.json';
-$fp = @fopen($countsFile, 'c+');
+$fp = $counted ? @fopen($countsFile, 'c+') : false;
 if ($fp !== false) {
     if (flock($fp, LOCK_EX)) {
         $raw  = stream_get_contents($fp);
