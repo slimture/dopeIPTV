@@ -289,7 +289,7 @@ foreach ($shots as [$file, $alt, $title, $cap]):
           <span class="eyebrow"><?= h(t('dl_eyebrow')) ?></span>
           <h2><?= h(t('dl_h2')) ?></h2>
         </div>
-        <span class="release-tag"><b>v<?= h($version) ?></b><?= $relDate ? ' · ' . h($relDate) : ' · ' . h(t('dl_latest')) ?><?php $dlTotal = dl_total($dlCounts); if ($dlTotal > 0): ?> · <span class="dl-count" title="all versions">↓ <?= number_format($dlTotal) ?></span><?php endif; ?></span>
+        <span class="release-tag"><b>v<?= h($version) ?></b><?= $relDate ? ' · ' . h($relDate) : ' · ' . h(t('dl_latest')) ?><?php $dlTotal = dl_total($dlCounts); if ($dlTotal > 0): ?> · <span class="dl-count" title="all versions">↓ <?= number_format($dlTotal) ?> <?= h(t('dl_total_suffix')) ?></span><?php endif; ?></span>
       </div>
 <?php if ($assets): foreach ($osOrder as $os): if (empty($groups[$os])) continue; ?>
       <div class="dl-group">

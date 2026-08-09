@@ -70,6 +70,7 @@ return [
     "dl_eyebrow" => "Skaffa dopeIPTV",
     "dl_h2"      => "Ladda ner den senaste versionen.",
     "dl_latest"  => "senaste",
+    "dl_total_suffix" => "nedladdningar totalt",
     "os_help_linux"   => "Osäker? Ta <b>AppImage</b> — den körs på vilken distribution som helst utan installation. Välj <b>.deb</b> på Debian/Ubuntu. Ta <b>Intel / AMD</b> om du inte har en ARM-maskin (Raspberry Pi, ARM-server).",
     "os_help_macos"   => "Två avbildningar: en för Apple Silicon (M-serien), en för Intel-Mac. Osäker? Apple-menyn → Om den här datorn.",
     "os_help_windows" => "Portabelt bygge — packa upp och kör, inget att installera. Den nyaste plattformen, fortfarande under finslipning.",

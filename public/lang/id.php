@@ -70,6 +70,7 @@ return [
     "dl_eyebrow" => "Dapatkan dopeIPTV",
     "dl_h2"      => "Unduh versi terbaru.",
     "dl_latest"  => "terbaru",
+    "dl_total_suffix" => "unduhan total",
     "os_help_linux"   => "Tidak yakin? Ambil <b>AppImage</b> — berjalan di distribusi mana pun tanpa instalasi. Pilih <b>.deb</b> di Debian/Ubuntu. Pilih <b>Intel / AMD</b> kecuali Anda memakai mesin ARM (Raspberry Pi, server ARM).",
     "os_help_macos"   => "Dua image: satu untuk Apple Silicon (seri M), satu untuk Mac Intel. Tidak yakin? Menu Apple → Mengenai Mac Ini.",
     "os_help_windows" => "Versi portabel — ekstrak dan jalankan, tidak ada yang perlu diinstal. Platform terbaru, masih dipoles.",
