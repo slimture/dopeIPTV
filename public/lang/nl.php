@@ -70,6 +70,8 @@ return [
     "dl_eyebrow" => "Haal dopeIPTV",
     "dl_h2"      => "Download de nieuwste versie.",
     "dl_latest"  => "nieuwste",
+    "dl_tip_total"  => "downloads, alle versies",
+    "dl_tip_row"  => "downloads",
     "os_help_linux"   => "Niet zeker? Neem de <b>AppImage</b> — die draait op elke distributie zonder installatie. Kies <b>.deb</b> op Debian/Ubuntu. Neem <b>Intel / AMD</b> tenzij je een ARM-machine hebt (Raspberry Pi, ARM-server).",
     "os_help_macos"   => "Twee images: één voor Apple Silicon (M-serie), één voor Intel-Macs. Niet zeker? Apple-menu → Over deze Mac.",
     "os_help_windows" => "Draagbare build — uitpakken en uitvoeren, niets te installeren. Het nieuwste platform, nog volop in de afwerking.",

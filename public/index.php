@@ -289,7 +289,7 @@ foreach ($shots as [$file, $alt, $title, $cap]):
           <span class="eyebrow"><?= h(t('dl_eyebrow')) ?></span>
           <h2><?= h(t('dl_h2')) ?></h2>
         </div>
-        <span class="release-tag"><b>v<?= h($version) ?></b><?= $relDate ? ' · ' . h($relDate) : ' · ' . h(t('dl_latest')) ?><?php $dlTotal = dl_total($dlCounts); if ($dlTotal > 0): ?> · <span class="dl-count" title="all versions">↓ <?= number_format($dlTotal) ?></span><?php endif; ?></span>
+        <span class="release-tag"><b>v<?= h($version) ?></b><?= $relDate ? ' · ' . h($relDate) : ' · ' . h(t('dl_latest')) ?><?php $dlTotal = dl_total($dlCounts); if ($dlTotal > 0): ?> · <span class="dl-count" title="<?= h(t('dl_tip_total')) ?>">↓ <?= number_format($dlTotal) ?></span><?php endif; ?></span>
       </div>
 <?php if ($assets): foreach ($osOrder as $os): if (empty($groups[$os])) continue; ?>
       <div class="dl-group">
@@ -312,7 +312,7 @@ foreach ($shots as [$file, $alt, $title, $cap]):
           <a class="dl<?= $m['rec'] ? ' rec' : '' ?>" href="<?= h($dlHref) ?>" rel="nofollow"<?= !empty($a['sha256']) ? ' title="SHA-256: ' . h($a['sha256']) . '"' : '' ?>>
             <span class="meta">
               <span class="name"><?= h($m['title']) ?><?php if ($m['rec']): ?> <span class="badge"><?= h(t('dl_recommended')) ?></span><?php endif; ?></span>
-              <span class="sub"><span class="arch"><?= h($m['arch']) ?></span><?= $m['fmt'] ? ' · ' . $m['fmt'] : '' ?><?= $size ? ' · ' . h($size) : '' ?><?php if ($dlN > 0): ?> · <span class="dl-count" title="downloads">↓ <?= number_format($dlN) ?></span><?php endif; ?></span>
+              <span class="sub"><span class="arch"><?= h($m['arch']) ?></span><?= $m['fmt'] ? ' · ' . $m['fmt'] : '' ?><?= $size ? ' · ' . h($size) : '' ?><?php if ($dlN > 0): ?> · <span class="dl-count" title="<?= h(t('dl_tip_row')) ?>">↓ <?= number_format($dlN) ?></span><?php endif; ?></span>
             </span>
             <span class="go"><?= h(t('dl_go')) ?></span>
           </a>

@@ -70,6 +70,8 @@ return [
     "dl_eyebrow" => "Obtenir dopeIPTV",
     "dl_h2"      => "Téléchargez la dernière version.",
     "dl_latest"  => "dernière",
+    "dl_tip_total"  => "téléchargements, toutes versions",
+    "dl_tip_row"  => "téléchargements",
     "os_help_linux"   => "Pas sûr ? Prenez l'<b>AppImage</b> — elle fonctionne sur n'importe quelle distribution sans installation. Choisissez <b>.deb</b> sur Debian/Ubuntu. Prenez <b>Intel / AMD</b> sauf si vous avez une machine ARM (Raspberry Pi, serveur ARM).",
     "os_help_macos"   => "Deux images : une pour Apple Silicon (série M), une pour les Mac Intel. Pas sûr ? Menu Pomme → À propos de ce Mac.",
     "os_help_windows" => "Version portable — décompressez et lancez, rien à installer. La plateforme la plus récente, encore en cours de finition.",

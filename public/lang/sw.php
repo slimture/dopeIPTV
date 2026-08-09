@@ -70,6 +70,8 @@ return [
     "dl_eyebrow" => "Pata dopeIPTV",
     "dl_h2"      => "Pakua toleo jipya zaidi.",
     "dl_latest"  => "jipya zaidi",
+    "dl_tip_total"  => "vipakuliwa, matoleo yote",
+    "dl_tip_row"  => "vipakuliwa",
     "os_help_linux"   => "Huna uhakika? Chukua <b>AppImage</b> — hufanya kazi kwenye usambazaji wowote bila kusakinisha. Chagua <b>.deb</b> kwenye Debian/Ubuntu. Chukua <b>Intel / AMD</b> isipokuwa uko kwenye mashine ya ARM (Raspberry Pi, seva ya ARM).",
     "os_help_macos"   => "Picha mbili: moja kwa Apple Silicon (mfululizo wa M), moja kwa Mac za Intel. Huna uhakika? Menyu ya Apple → Kuhusu Mac Hii.",
     "os_help_windows" => "Toleo linalobebeka — fungua na uendeshe, hakuna cha kusakinisha. Jukwaa jipya zaidi, bado linaboreshwa.",

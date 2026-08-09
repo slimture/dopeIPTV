@@ -69,6 +69,8 @@ return [
     "dl_eyebrow" => "Nhận dopeIPTV",
     "dl_h2"      => "Tải xuống phiên bản mới nhất.",
     "dl_latest"  => "mới nhất",
+    "dl_tip_total"  => "lượt tải, tất cả phiên bản",
+    "dl_tip_row"  => "lượt tải",
     "os_help_linux"   => "Không chắc chắn? Lấy <b>AppImage</b> — nó chạy trên mọi bản phân phối mà không cần cài đặt. Chọn <b>.deb</b> trên Debian/Ubuntu. Lấy <b>Intel / AMD</b> trừ khi bạn dùng máy ARM (Raspberry Pi, máy chủ ARM).",
     "os_help_macos"   => "Hai bản image: một cho Apple Silicon (dòng M), một cho máy Mac Intel. Không chắc? Menu Apple → Giới thiệu về máy Mac này.",
     "os_help_windows" => "Bản di động — giải nén và chạy, không có gì để cài đặt. Nền tảng mới nhất, vẫn đang được hoàn thiện.",
