@@ -594,8 +594,22 @@ jobs:
   # v1.2.0 did); the Linux/macOS jobs run independently and still attach their
   # own assets, so a Windows hiccup never removes those.
   windows-zip:
-    name: Windows (x64)
-    runs-on: windows-latest
+    name: Windows (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            arch: x64
+            mpv_asset: mpv-dev-x86_64
+          # Native Windows-on-ARM (Snapdragon laptops). The x64 zip runs there
+          # under Prism emulation, but native means real battery life - and the
+          # whole supply chain exists now: PyQt6 ships win_arm64 wheels since
+          # 6.9.1 and zhongfly/mpv-winbuild publishes mpv-dev-aarch64.
+          - runner: windows-11-arm
+            arch: arm64
+            mpv_asset: mpv-dev-aarch64
     steps:
       - uses: actions/checkout@v5
       - name: Guard - release notes must match this version
@@ -657,7 +671,7 @@ jobs:
               -H "Accept: application/vnd.github+json" \
               https://api.github.com/repos/zhongfly/mpv-winbuild/releases/latest
           }
-          url=$(api | python -c "import sys,json;d=json.load(sys.stdin);a=d.get('assets') or [];print(next((x['browser_download_url'] for x in a if 'mpv-dev-x86_64' in x['name'] and x['name'].endswith('.7z')), ''))")
+          url=$(api | MPV_ASSET='${{ matrix.mpv_asset }}' python -c "import sys,os,json;d=json.load(sys.stdin);a=d.get('assets') or [];print(next((x['browser_download_url'] for x in a if os.environ['MPV_ASSET'] in x['name'] and x['name'].endswith('.7z')), ''))")
           if [ -z "$url" ]; then
             echo "::error::libmpv download URL not found (rate-limited, or the asset was renamed). API response:"
             api | head -c 500; echo
@@ -703,7 +717,7 @@ jobs:
           # Ship a plain-text README in the folder: how to run past SmartScreen,
           # make a shortcut, and remove every trace of the app.
           cp packaging/WINDOWS-README.txt "dist/dopeiptv/README.txt"
-          ( cd dist && 7z a "../dopeIPTV-${V}-windows-x64.zip" dopeiptv )
+          ( cd dist && 7z a "../dopeIPTV-${V}-windows-${{ matrix.arch }}.zip" dopeiptv )
           ls -la *.zip
       # Public release: attach the portable zip when a version tag is pushed.
       # (Unzip once -> a runnable dopeiptv\ folder; the README covers
@@ -722,7 +736,7 @@ jobs:
       # one unzip yields the runnable dopeiptv\ directory.
       - uses: actions/upload-artifact@v4
         with:
-          name: dopeIPTV-windows-x64
+          name: dopeIPTV-windows-${{ matrix.arch }}
           path: dist/dopeiptv
 
   # --------------------------------------------------------------- Flatpak ---
