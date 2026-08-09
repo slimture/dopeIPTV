@@ -26,8 +26,23 @@ $relDate = !empty($rel['published_at']) ? date('M j, Y', strtotime($rel['publish
 // counts shown and the page still works.
 $dlCounts = @json_decode(@file_get_contents(dirname(__DIR__) . '/downloads.json'), true);
 if (!is_array($dlCounts)) { $dlCounts = []; }
+// The file name carries the version (dopeIPTV-1.2.8-macOS-arm64.dmg), so a
+// count keyed on the exact name resets to zero at every release even though
+// downloads.json keeps the whole history. Strip the version out of the name
+// and sum every entry of the same kind, so the figure shown is all-time.
+function dl_kind(string $name): string {
+    return preg_replace('/\d+(?:\.\d+)+/', '*', $name);
+}
 function dl_count(array $counts, string $name): int {
-    return (int)($counts[$name] ?? 0);
+    $kind = dl_kind($name);
+    $n = 0;
+    foreach ($counts as $file => $c) {
+        if (dl_kind((string)$file) === $kind) { $n += (int)$c; }
+    }
+    return $n;
+}
+function dl_total(array $counts): int {
+    return (int)array_sum(array_map('intval', $counts));
 }
 
 /**
@@ -283,7 +298,7 @@ foreach ($shots as [$file, $alt, $title, $cap]):
           <span class="eyebrow"><?= h(t('dl_eyebrow')) ?></span>
           <h2><?= h(t('dl_h2')) ?></h2>
         </div>
-        <span class="release-tag"><b>v<?= h($version) ?></b><?= $relDate ? ' · ' . h($relDate) : ' · ' . h(t('dl_latest')) ?></span>
+        <span class="release-tag"><b>v<?= h($version) ?></b><?= $relDate ? ' · ' . h($relDate) : ' · ' . h(t('dl_latest')) ?><?php $dlTotal = dl_total($dlCounts); if ($dlTotal > 0): ?> · <span class="dl-count" title="all versions">↓ <?= number_format($dlTotal) ?> <?= h(t('dl_total_suffix')) ?></span><?php endif; ?></span>
       </div>
 <?php if ($assets): foreach ($osOrder as $os): if (empty($groups[$os])) continue; ?>
       <div class="dl-group">
