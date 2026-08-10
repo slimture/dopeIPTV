@@ -20,6 +20,9 @@ class _Settings:
     def setValue(self, k, v):
         self.d[k] = v
 
+    def remove(self, k):
+        self.d.pop(k, None)
+
 
 class _Btn:
     def __init__(self):

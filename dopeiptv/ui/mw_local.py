@@ -556,9 +556,13 @@ class _LocalFilesMixin:
     # -- TMDB artwork --------------------------------------------------------
 
     def _local_poster_cache(self) -> dict:
+        # v2: the v1 cache was poisoned by the vod/tv kind bug - every miss
+        # it recorded was a film searched among TV shows, and misses are
+        # cached for good. A new key makes every title ask again once.
+        self.settings.remove("local_tmdb_posters")
         try:
             v = json.loads(
-                self.settings.value("local_tmdb_posters", "") or "{}")
+                self.settings.value("local_tmdb_posters_v2", "") or "{}")
             return v if isinstance(v, dict) else {}
         except ValueError:
             return {}
@@ -571,6 +575,8 @@ class _LocalFilesMixin:
         if not files:
             return
         if tm is None:
+            log.info("tmdb: no resolver (no API key configured) - "
+                     "falling back to frame-grab thumbnails")
             self._local_make_thumbs(
                 [r for r in files if not r.get("stream_icon")])
             return
@@ -604,7 +610,8 @@ class _LocalFilesMixin:
                     out[f["_key"]] = url
             if changed:
                 self.settings.setValue(
-                    "local_tmdb_posters", json.dumps(cache))
+                    "local_tmdb_posters_v2", json.dumps(cache))
+            log.info("tmdb posters: %d/%d resolved", len(out), len(todo))
             return out
 
         def done(out):
