@@ -321,6 +321,7 @@ class _LocalFilesMixin:
             last = getattr(self, "_local_scan_done", {}).get(root, 0.0)
             if time.monotonic() - last < 120.0:
                 return   # scanned moments ago: the cache render is current
+        self._local_scan_active = True
         self._show_busy(tr("local_scanning"))
         self._local_pulse_start()
         log.info("library scan starting: %s", root)
@@ -386,6 +387,7 @@ class _LocalFilesMixin:
                 self._local_scan_step(root, state, token, cached)
                 return
             self._local_pulse_stop()
+            self._local_scan_active = False
             self._hide_busy()
             done_at = dict(getattr(self, "_local_scan_done", {}))
             done_at[root] = time.monotonic()
@@ -409,6 +411,7 @@ class _LocalFilesMixin:
         def fail(e):
             if token == getattr(self, "_local_scan_token", 0):
                 self._local_pulse_stop()
+                self._local_scan_active = False
                 self._hide_busy()
                 log.warning("library scan FAILED for %s: %r", root, e)
                 if cached is None:
@@ -486,6 +489,8 @@ class _LocalFilesMixin:
         rows = [r for r in rows if r.get("_header")
                 or self._search_filter([r])]
         self._render_rows(rows, "rec", tr("local_empty"))
+        if getattr(self, "_local_scan_active", False):
+            self._set_status(tr("local_scanning"))
         self._local_resolve_posters(
             [r for r in rows if r.get("_kind") in ("local", "localseries")])
 

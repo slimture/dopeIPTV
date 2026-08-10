@@ -55,6 +55,9 @@ class _Stub(_LocalFilesMixin):
     def _hide_busy(self):
         pass
 
+    def _set_status(self, *_a, **_k):
+        pass
+
     def __init__(self):
         self.settings = _Settings()
         self.mode = "local"
