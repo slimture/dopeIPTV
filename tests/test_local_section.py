@@ -330,7 +330,7 @@ def test_music_lands_as_an_album_not_a_folder_pile(tmp_path, monkeypatch):
     w._current_cat = str(root)
     w._load_local_items(str(root))
     assert [r["name"] for r in w.rendered
-            if r.get("_kind") == "localalbum"] == ["Album"]
+            if r.get("_kind") == "localalbum"] == ["Artist"]
     assert any(r.get("_kind") == "local" for r in w.rendered)
 
 
@@ -373,15 +373,35 @@ def test_music_shelves_as_albums_with_track_counts(tmp_path, monkeypatch):
     w._load_local_items(str(root))
 
     albums = [r for r in w.rendered if r.get("_kind") == "localalbum"]
-    assert len(albums) == 1
-    assert albums[0]["name"] == "Kanye West - Donda (2021)"
-    assert "3" in albums[0]["_desc"]                  # track count
-    assert albums[0]["stream_icon"].endswith("cover.jpg")
+    assert len(albums) == 1                           # ONE music shelf
+    assert albums[0]["name"] == "Musik"
+    assert "3" in albums[0]["_desc"]                  # tracks under it
     # Tracks are NOT loose rows in the library view.
     assert not any(r.get("_path", "").endswith(".flac")
                    for r in w.rendered if r.get("_kind") == "local")
 
-    # Opening the album browses its tracks.
-    w._local_descend(albums[0]["_path"], albums[0]["_key"])
+    # Opening it browses the tree down to the tracks.
+    w._local_descend(str(album), albums[0]["_key"])
     names = sorted(r["name"] for r in w.rendered)
     assert names == ["01. Donda Chant", "02. Jail", "03. God On"]
+
+
+def test_folder_structure_comes_before_the_cover_art(tmp_path, monkeypatch):
+    """Browsable folders (music, own folders) sit above the poster rows."""
+    import dopeiptv.ui.mw_local as ml
+    monkeypatch.setattr(ml, "run_async",
+                        lambda pool, fn, done, err=None: done(fn()))
+    root = tmp_path / "M"
+    (root / "Musik" / "A").mkdir(parents=True)
+    (root / "Musik" / "A" / "t.flac").write_bytes(b"x")
+    (root / "Serier").mkdir()
+    (root / "Serier" / "Show.S01E01.720p.mkv").write_bytes(b"x")
+    (root / "En.Film.2020.1080p.mkv").write_bytes(b"x")
+    w = _Stub()
+    w.settings.setValue("local_view", "series")
+    w._current_cat = str(root)
+    w._load_local_items(str(root))
+    kinds = [r.get("_kind") for r in w.rendered if not r.get("_header")]
+    assert kinds[0] == "localalbum"                # music shelf first
+    assert "localseries" in kinds and "local" in kinds
+    assert kinds.index("localalbum") < kinds.index("localseries")

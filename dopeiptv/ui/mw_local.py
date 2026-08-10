@@ -596,24 +596,35 @@ class _LocalFilesMixin:
             state["movies"].append(row)
 
     def _album_rows(self) -> list[dict]:
-        """One row per album - the folder that directly holds the tracks -
-        with its own cover art and track count, the way a music library
-        shelves things. Opening one browses that folder's tracks."""
+        """Music as ONE shelf per top-level folder that holds it - a row
+        per album buried the list under every CD1/CD2 and every artist.
+        Opening it browses the tree (artist -> album -> tracks)."""
         albums = getattr(self, "_local_album_index", {})
         if not albums:
             return []
-        dircover = getattr(self, "_local_dircover", {})
-        rows: list[dict] = [{"_header": tr("local_music")}]
-        for d in sorted(albums, key=lambda x: os.path.basename(x).lower()):
-            info = albums[d]
+        root = self._current_cat if isinstance(self._current_cat, str) else ""
+        shelves: dict[str, int] = {}
+        for d, info in albums.items():
             n = info.get("n", 0) if isinstance(info, dict) else int(info or 0)
-            name = os.path.basename(d.rstrip(os.sep)) or d
-            rows.append({"name": name, "_kind": "localalbum",
-                         "_path": d, "_key": f"localalbum::{d}",
-                         "stream_icon": dircover.get(d)
-                         or self._album_cover(d) or self._folder_tile(),
-                         "_desc": tr("local_tracks", n=n)})
-        return rows
+            try:
+                rel = os.path.relpath(os.path.normpath(d),
+                                      os.path.normpath(root))
+            except ValueError:
+                continue
+            top = rel.split(os.sep)[0]
+            if top in (".", ".."):
+                top = ""
+            shelves[top] = shelves.get(top, 0) + n
+        rows: list[dict] = []
+        for top in sorted(shelves, key=str.lower):
+            if not top:
+                continue        # loose tracks in the root: not a shelf
+            rows.append({"name": top, "_kind": "localalbum",
+                         "_path": os.path.join(root, top),
+                         "_key": f"localmusic::{top}",
+                         "stream_icon": self._folder_tile(),
+                         "_desc": tr("local_tracks", n=shelves[top])})
+        return [{"_header": tr("local_music")}] + rows if rows else []
 
     @staticmethod
     def _album_cover(d: str) -> str:
@@ -679,16 +690,15 @@ class _LocalFilesMixin:
                              "_desc": f"{len(seasons)} × {len(eps)}"})
         films = [m for m in movies if not m.get("_home")]
         home = [m for m in movies if m.get("_home")]
-        if films:
-            rows.append({"_header": tr("nav_movies")})
-            rows += films
-        rows += self._album_rows()
         covers = getattr(self, "_local_cover_index", {})
         root = self._current_cat if isinstance(self._current_cat, str) else ""
+        # Folders first (music, then your own), then the cover art -
+        # browsable structure at the top, posters below it.
+        head: list[dict] = self._album_rows()
         if collections:
-            rows.append({"_header": tr("local_collections")})
+            head.append({"_header": tr("local_collections")})
             for name in sorted(collections, key=str.lower):
-                rows.append({"name": name,
+                head.append({"name": name,
                              "_kind": "localcollection",
                              "_series_title": name,
                              "_path": os.path.join(root, name),
@@ -696,6 +706,10 @@ class _LocalFilesMixin:
                              "stream_icon": covers.get(name)
                              or self._folder_tile(),
                              "_desc": str(len(collections[name]))})
+        rows = head + rows
+        if films:
+            rows.append({"_header": tr("nav_movies")})
+            rows += films
         if home:
             rows.append({"_header": tr("local_home_videos")})
             rows += home
