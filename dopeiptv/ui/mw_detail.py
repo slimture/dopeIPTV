@@ -39,6 +39,16 @@ class _DetailMixin:
         self._current_epg = None
         self._tmdb_details = None
         if not it:
+            # Nothing selected, but music is playing: keep showing the track
+            # rather than an empty box. Browsing to another folder must not
+            # make what you are listening to disappear.
+            lp = getattr(self, "_last_playback", None) or {}
+            playing = lp.get("item")
+            if (playing and lp.get("kind") == "local"
+                    and str(lp.get("url") or "").lower().endswith(
+                        getattr(self, "AUDIO_EXTS", ()))):
+                self._show_detail(playing)
+                return
             # Nothing selected: leave the pane clean - no empty poster box and
             # no stray play button.
             self._detail_name = tr("detail_select_something")

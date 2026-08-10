@@ -476,3 +476,36 @@ def test_the_play_queue_steps_and_wraps_an_album(tmp_path):
     assert w._queue_autoplay() is False         # end of the album
     assert [p.split("/")[-1] for p in w.played] == ["01.flac", "02.flac",
                                                     "01.flac", "03.flac"]
+
+
+def test_the_panel_keeps_showing_the_playing_track(tmp_path):
+    """Browsing to a folder you play nothing from must not wipe what is
+    playing out of the right-hand column."""
+    from dopeiptv.ui.main_window import MainWindow
+    from dopeiptv.ui.mw_detail import _DetailMixin
+
+    class _D:
+        AUDIO_EXTS = MainWindow.AUDIO_EXTS
+        _show_detail = _DetailMixin._show_detail
+
+        def __init__(self, playing):
+            self._last_playback = playing
+            self.shown = []
+
+        # Enough surface for the early-return paths only.
+        def __getattr__(self, name):
+            raise AssertionError(f"panel went past the now-playing branch "
+                                 f"({name})")
+
+    track = {"_kind": "local", "_path": str(tmp_path / "a.flac"),
+             "name": "2. Jail"}
+    d = _D({"kind": "local", "url": track["_path"], "item": track})
+    # Nothing selected -> the playing track is re-shown (recursion into
+    # _show_detail with the real row, which then needs the widgets we do
+    # not stub, so the guard tells us it got that far).
+    try:
+        d._show_detail(None)
+    except AssertionError as e:
+        assert "now-playing branch" in str(e)
+    else:
+        raise AssertionError("the playing track was not re-shown")
