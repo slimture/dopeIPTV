@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 
 import re
 
@@ -256,7 +257,9 @@ class _LocalFilesMixin:
         if getattr(self, "_local_series", None):
             self._local_series = None
             self.back_btn.hide()
-            self._load_local_items(self._current_cat)
+            self._apply_library(getattr(self, "_local_series_index", {}),
+                                getattr(self, "_local_movies_rows", []),
+                                getattr(self, "_local_collection_index", {}))
             return
         root = self._current_cat if isinstance(self._current_cat, str) else ""
         cur = getattr(self, "_local_ctx", None)
@@ -315,6 +318,9 @@ class _LocalFilesMixin:
             self._apply_library(cached.get("series") or {},
                                 cached.get("movies") or [],
                                 cached.get("collections") or {})
+            last = getattr(self, "_local_scan_done", {}).get(root, 0.0)
+            if time.monotonic() - last < 120.0:
+                return   # scanned moments ago: the cache render is current
         self._show_busy(tr("local_scanning"))
         self._local_pulse_start()
         log.info("library scan starting: %s", root)
@@ -373,6 +379,9 @@ class _LocalFilesMixin:
                 return
             self._local_pulse_stop()
             self._hide_busy()
+            done_at = dict(getattr(self, "_local_scan_done", {}))
+            done_at[root] = time.monotonic()
+            self._local_scan_done = done_at
             log.info("library scan %s: %d series, %d collections, "
                      "%d movies%s", root, len(series), len(collections),
                      len(movies),
@@ -441,6 +450,7 @@ class _LocalFilesMixin:
                        collections: dict | None = None) -> None:
         self._local_series_index = series
         self._local_collection_index = collections or {}
+        self._local_movies_rows = movies
         rows: list[dict] = []
         if series:
             rows.append({"_header": tr("nav_series")})
