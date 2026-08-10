@@ -862,5 +862,12 @@
   "vis_off": "Mati",
   "vis_style_bars": "Batang",
   "vis_style_spectrum": "Spektrum",
-  "vis_style_wave": "Gelombang"
+  "vis_style_wave": "Gelombang",
+  "queue_title": "Antrean putar",
+  "queue_add": "Tambah ke antrean",
+  "queue_add_folder": "Antrekan semua di sini",
+  "queue_play_next": "Putar berikutnya",
+  "queue_show": "Tampilkan antrean…",
+  "queue_clear": "Kosongkan antrean",
+  "queue_added": "{n} ditambahkan"
 }

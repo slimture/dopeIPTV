@@ -862,5 +862,12 @@
   "vis_off": "オフ",
   "vis_style_bars": "バー",
   "vis_style_spectrum": "スペクトラム",
-  "vis_style_wave": "波形"
+  "vis_style_wave": "波形",
+  "queue_title": "再生キュー",
+  "queue_add": "キューに追加",
+  "queue_add_folder": "ここのすべてをキューへ",
+  "queue_play_next": "次に再生",
+  "queue_show": "キューを表示…",
+  "queue_clear": "キューを消去",
+  "queue_added": "{n} 件追加"
 }

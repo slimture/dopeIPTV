@@ -862,5 +862,12 @@
   "vis_off": "Désactivée",
   "vis_style_bars": "Barres",
   "vis_style_spectrum": "Spectre",
-  "vis_style_wave": "Forme d'onde"
+  "vis_style_wave": "Forme d'onde",
+  "queue_title": "File de lecture",
+  "queue_add": "Ajouter à la file",
+  "queue_add_folder": "Tout mettre en file",
+  "queue_play_next": "Lire ensuite",
+  "queue_show": "Afficher la file…",
+  "queue_clear": "Vider la file",
+  "queue_added": "{n} ajoutés"
 }

@@ -862,5 +862,12 @@
   "vis_off": "Вимк.",
   "vis_style_bars": "Смуги",
   "vis_style_spectrum": "Спектр",
-  "vis_style_wave": "Осцилограма"
+  "vis_style_wave": "Осцилограма",
+  "queue_title": "Черга",
+  "queue_add": "Додати в чергу",
+  "queue_add_folder": "Додати все звідси",
+  "queue_play_next": "Наступним",
+  "queue_show": "Показати чергу…",
+  "queue_clear": "Очистити чергу",
+  "queue_added": "Додано: {n}"
 }

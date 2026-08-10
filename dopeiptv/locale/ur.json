@@ -862,5 +862,12 @@
   "vis_off": "بند",
   "vis_style_bars": "بارز",
   "vis_style_spectrum": "اسپیکٹرم",
-  "vis_style_wave": "لہر"
+  "vis_style_wave": "لہر",
+  "queue_title": "پلے قطار",
+  "queue_add": "قطار میں شامل کریں",
+  "queue_add_folder": "یہاں کا سب قطار میں",
+  "queue_play_next": "اگلا چلائیں",
+  "queue_show": "قطار دکھائیں…",
+  "queue_clear": "قطار صاف کریں",
+  "queue_added": "{n} شامل ہوئے"
 }

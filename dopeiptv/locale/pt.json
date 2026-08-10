@@ -862,5 +862,12 @@
   "vis_off": "Desligada",
   "vis_style_bars": "Barras",
   "vis_style_spectrum": "Espectro",
-  "vis_style_wave": "Forma de onda"
+  "vis_style_wave": "Forma de onda",
+  "queue_title": "Fila de reprodução",
+  "queue_add": "Adicionar à fila",
+  "queue_add_folder": "Enfileirar tudo aqui",
+  "queue_play_next": "Reproduzir a seguir",
+  "queue_show": "Mostrar a fila…",
+  "queue_clear": "Limpar a fila",
+  "queue_added": "{n} adicionados"
 }

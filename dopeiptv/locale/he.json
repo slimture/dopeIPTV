@@ -862,5 +862,12 @@
   "vis_off": "כבוי",
   "vis_style_bars": "עמודות",
   "vis_style_spectrum": "ספקטרום",
-  "vis_style_wave": "צורת גל"
+  "vis_style_wave": "צורת גל",
+  "queue_title": "תור נגינה",
+  "queue_add": "הוספה לתור",
+  "queue_add_folder": "הוספת הכול מכאן",
+  "queue_play_next": "נגן אחר כך",
+  "queue_show": "הצגת התור…",
+  "queue_clear": "ניקוי התור",
+  "queue_added": "נוספו {n}"
 }

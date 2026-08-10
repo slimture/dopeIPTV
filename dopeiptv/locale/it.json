@@ -862,5 +862,12 @@
   "vis_off": "Disattivata",
   "vis_style_bars": "Barre",
   "vis_style_spectrum": "Spettro",
-  "vis_style_wave": "Forma d'onda"
+  "vis_style_wave": "Forma d'onda",
+  "queue_title": "Coda di riproduzione",
+  "queue_add": "Aggiungi alla coda",
+  "queue_add_folder": "Metti tutto in coda",
+  "queue_play_next": "Riproduci dopo",
+  "queue_show": "Mostra la coda…",
+  "queue_clear": "Svuota la coda",
+  "queue_added": "{n} aggiunti"
 }

@@ -862,5 +862,12 @@
   "vis_off": "Zima",
   "vis_style_bars": "Nguzo",
   "vis_style_spectrum": "Spektra",
-  "vis_style_wave": "Umbo la wimbi"
+  "vis_style_wave": "Umbo la wimbi",
+  "queue_title": "Foleni ya kucheza",
+  "queue_add": "Ongeza kwenye foleni",
+  "queue_add_folder": "Weka vyote hapa",
+  "queue_play_next": "Cheza baadaye",
+  "queue_show": "Onyesha foleni…",
+  "queue_clear": "Futa foleni",
+  "queue_added": "Vimeongezwa {n}"
 }

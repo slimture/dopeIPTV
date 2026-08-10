@@ -862,5 +862,12 @@
   "vis_off": "Kapalı",
   "vis_style_bars": "Çubuklar",
   "vis_style_spectrum": "Spektrum",
-  "vis_style_wave": "Dalga formu"
+  "vis_style_wave": "Dalga formu",
+  "queue_title": "Çalma sırası",
+  "queue_add": "Sıraya ekle",
+  "queue_add_folder": "Buradakilerin tümünü sıraya ekle",
+  "queue_play_next": "Sonra çal",
+  "queue_show": "Sırayı göster…",
+  "queue_clear": "Sırayı temizle",
+  "queue_added": "{n} eklendi"
 }

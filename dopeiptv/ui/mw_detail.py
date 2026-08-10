@@ -99,6 +99,23 @@ class _DetailMixin:
         self.d_logo.setText(name.strip()[:1].upper())
         self._load_detail_poster(it, is_media, media_kind)
 
+        if it.get("_kind") == "local" and str(
+                it.get("_path") or "").lower().endswith(
+                    getattr(self, "AUDIO_EXTS", ())):
+            # Music: TMDB is a film and TV database - it knows nothing about
+            # albums - so the panel is built from the folders the track sits
+            # in (…/Artist/Album/track) plus whatever cover art is there.
+            import os as _os
+            d = _os.path.dirname(it.get("_path") or "")
+            album = _os.path.basename(d)
+            artist = _os.path.basename(_os.path.dirname(d))
+            lines = [x for x in (artist, album) if x]
+            self.media_plot.setText("\n".join(lines))
+            self.media_plot.setVisible(bool(lines))
+            self.media_meta.setVisible(False)
+            self.media_info.setVisible(bool(lines))
+            return
+
         if self.mode == "rec":
             # Show the user-entered description (if any) in the info panel.
             desc = (it.get("_desc") or "").strip()

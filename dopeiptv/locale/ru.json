@@ -862,5 +862,12 @@
   "vis_off": "Выкл.",
   "vis_style_bars": "Полосы",
   "vis_style_spectrum": "Спектр",
-  "vis_style_wave": "Осциллограмма"
+  "vis_style_wave": "Осциллограмма",
+  "queue_title": "Очередь",
+  "queue_add": "Добавить в очередь",
+  "queue_add_folder": "Добавить всё отсюда",
+  "queue_play_next": "Следующим",
+  "queue_show": "Показать очередь…",
+  "queue_clear": "Очистить очередь",
+  "queue_added": "Добавлено: {n}"
 }

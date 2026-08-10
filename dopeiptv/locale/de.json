@@ -862,5 +862,12 @@
   "vis_off": "Aus",
   "vis_style_bars": "Balken",
   "vis_style_spectrum": "Spektrum",
-  "vis_style_wave": "Wellenform"
+  "vis_style_wave": "Wellenform",
+  "queue_title": "Wiedergabeliste",
+  "queue_add": "Zur Warteschlange",
+  "queue_add_folder": "Alles hier einreihen",
+  "queue_play_next": "Als Nächstes",
+  "queue_show": "Warteschlange…",
+  "queue_clear": "Liste leeren",
+  "queue_added": "{n} hinzugefügt"
 }

@@ -259,9 +259,13 @@ class _LocalFilesMixin:
                 continue
             p = os.path.join(base, n)
             if os.path.isdir(p):
+                # An artist/album folder shows its own artwork - a wall of
+                # identical folder glyphs is what a music library must not
+                # look like. Bounded so a huge listing stays cheap.
+                art = (self._album_cover(p)
+                       if len(dirs) < 300 else "") or self._folder_tile()
                 dirs.append({"name": n, "_kind": "localdir",
-                             "_path": p, "_key": p,
-                             "stream_icon": self._folder_tile()})
+                             "_path": p, "_key": p, "stream_icon": art})
             elif n.lower().endswith(self.MEDIA_EXTS):
                 try:
                     st = os.stat(p)
@@ -1088,12 +1092,66 @@ class _LocalFilesMixin:
 
     # -- context menus -------------------------------------------------------
 
+    def _local_reveal(self, path: str) -> None:
+        """Browse to the folder holding *path* and select the file - what
+        "jump to what is playing" means for a local file."""
+        d = os.path.dirname(path)
+        root = None
+        for cand in list(self._local_dirs()) + \
+                [p for _n, p in self._mounted_roots()]:
+            if os.path.normpath(d).startswith(os.path.normpath(cand)):
+                root = cand
+                break
+        if root and self._current_cat != root:
+            for i in range(self.cat_list.count()):
+                if self.cat_list.item(i).data(
+                        Qt.ItemDataRole.UserRole) == root:
+                    self.cat_list.setCurrentRow(i)
+                    break
+        self._local_series = None
+        self._local_ctx = d
+        self.back_btn.setText("<-  " + tr("btn_back"))
+        self.back_btn.show()
+        self._load_local_items(self._current_cat)
+        self._local_select_key(path)
+
+    def _local_selected_rows(self) -> list[dict]:
+        try:
+            rows = [self.list_model.item_at(ix.row())
+                    for ix in self.listw.selectionModel().selectedRows()]
+            return [r for r in rows if r and not r.get("_header")]
+        except Exception:
+            return []
+
+    def _audio_rows_under(self, path: str, limit: int = 500) -> list[dict]:
+        """Every track under *path*, in listening order."""
+        out: list[dict] = []
+        if not path or not os.path.isdir(path):
+            return out
+        for dirpath, dirnames, names in os.walk(path):
+            dirnames[:] = sorted(d for d in dirnames
+                                 if not d.startswith("."))
+            for n in sorted(names, key=str.lower):
+                if n.startswith(".") or not n.lower().endswith(
+                        self.AUDIO_EXTS):
+                    continue
+                row = self._local_file_row(os.path.join(dirpath, n),
+                                           stat=False)
+                if row:
+                    out.append(row)
+                if len(out) >= limit:
+                    return out
+        return out
+
     def _local_context_menu(self, pos, it) -> None:
         from PyQt6.QtWidgets import QMenu
         m = QMenu(self)
         if it.get("_kind") == "localdir":
             m.addAction(tr("ctx_open"),
                         lambda: self._local_descend(it.get("_path")))
+            m.addAction(tr("queue_add_folder"),
+                        lambda: self.queue_add(
+                            self._audio_rows_under(it.get("_path"))))
         elif it.get("_kind") == "localseries":
             m.addAction(tr("ctx_open"),
                         lambda: self._local_open_series(
@@ -1101,9 +1159,19 @@ class _LocalFilesMixin:
         elif it.get("_kind") in ("localcollection", "localalbum"):
             m.addAction(tr("ctx_open"),
                         lambda: self._local_descend(it.get("_path")))
+            m.addAction(tr("queue_add_folder"),
+                        lambda: self.queue_add(
+                            self._audio_rows_under(it.get("_path"))))
         else:
             m.addAction(tr("ctx_play_in_mpv"),
                         lambda: self.play_item(it, "mpv"))
+            if self._is_audio(it.get("_path")):
+                sel = self._local_selected_rows() or [it]
+                m.addAction(tr("queue_play_next"),
+                            lambda: self.queue_add(sel, play_next=True))
+                m.addAction(tr("queue_add"),
+                            lambda: self.queue_add(sel))
+                m.addAction(tr("queue_show"), self.open_queue)
             ext = m.addMenu(tr("ctx_open_externally"))
             ext.addAction("mpv",
                           lambda: self.play_item(it, "mpv", external=True))

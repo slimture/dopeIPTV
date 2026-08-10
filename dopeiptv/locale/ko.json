@@ -862,5 +862,12 @@
   "vis_off": "끄기",
   "vis_style_bars": "막대",
   "vis_style_spectrum": "스펙트럼",
-  "vis_style_wave": "파형"
+  "vis_style_wave": "파형",
+  "queue_title": "재생 대기열",
+  "queue_add": "대기열에 추가",
+  "queue_add_folder": "여기 전체를 대기열에",
+  "queue_play_next": "다음에 재생",
+  "queue_show": "대기열 보기…",
+  "queue_clear": "대기열 비우기",
+  "queue_added": "{n}개 추가됨"
 }

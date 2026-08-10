@@ -862,5 +862,12 @@
   "vis_off": "Wyłączona",
   "vis_style_bars": "Słupki",
   "vis_style_spectrum": "Widmo",
-  "vis_style_wave": "Fala"
+  "vis_style_wave": "Fala",
+  "queue_title": "Kolejka",
+  "queue_add": "Dodaj do kolejki",
+  "queue_add_folder": "Dodaj wszystko",
+  "queue_play_next": "Odtwórz jako następne",
+  "queue_show": "Pokaż kolejkę…",
+  "queue_clear": "Wyczyść kolejkę",
+  "queue_added": "Dodano {n}"
 }

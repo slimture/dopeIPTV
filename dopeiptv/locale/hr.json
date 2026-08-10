@@ -862,5 +862,12 @@
   "vis_off": "Isključena",
   "vis_style_bars": "Trake",
   "vis_style_spectrum": "Spektar",
-  "vis_style_wave": "Valni oblik"
+  "vis_style_wave": "Valni oblik",
+  "queue_title": "Red reprodukcije",
+  "queue_add": "Dodaj u red",
+  "queue_add_folder": "Dodaj sve odavde",
+  "queue_play_next": "Reproduciraj sljedeće",
+  "queue_show": "Prikaži red…",
+  "queue_clear": "Očisti red",
+  "queue_added": "Dodano: {n}"
 }

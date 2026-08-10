@@ -862,5 +862,12 @@
   "vis_off": "Uit",
   "vis_style_bars": "Balken",
   "vis_style_spectrum": "Spectrum",
-  "vis_style_wave": "Golfvorm"
+  "vis_style_wave": "Golfvorm",
+  "queue_title": "Wachtrij",
+  "queue_add": "Aan wachtrij toevoegen",
+  "queue_add_folder": "Alles hier in de rij",
+  "queue_play_next": "Hierna afspelen",
+  "queue_show": "Wachtrij tonen…",
+  "queue_clear": "Wachtrij wissen",
+  "queue_added": "{n} toegevoegd"
 }

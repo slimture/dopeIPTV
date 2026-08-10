@@ -862,5 +862,12 @@
   "vis_off": "إيقاف",
   "vis_style_bars": "أعمدة",
   "vis_style_spectrum": "طيف",
-  "vis_style_wave": "شكل موجي"
+  "vis_style_wave": "شكل موجي",
+  "queue_title": "قائمة التشغيل",
+  "queue_add": "إضافة إلى القائمة",
+  "queue_add_folder": "إضافة كل ما هنا",
+  "queue_play_next": "تشغيل التالي",
+  "queue_show": "عرض القائمة…",
+  "queue_clear": "مسح القائمة",
+  "queue_added": "تمت إضافة {n}"
 }

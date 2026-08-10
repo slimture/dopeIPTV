@@ -862,5 +862,12 @@
   "vis_off": "خاموش",
   "vis_style_bars": "میله‌ها",
   "vis_style_spectrum": "طیف",
-  "vis_style_wave": "شکل موج"
+  "vis_style_wave": "شکل موج",
+  "queue_title": "صف پخش",
+  "queue_add": "افزودن به صف",
+  "queue_add_folder": "افزودن همه اینجا",
+  "queue_play_next": "پخش بعدی",
+  "queue_show": "نمایش صف…",
+  "queue_clear": "پاک کردن صف",
+  "queue_added": "{n} افزوده شد"
 }

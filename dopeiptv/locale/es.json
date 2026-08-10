@@ -862,5 +862,12 @@
   "vis_off": "Desactivada",
   "vis_style_bars": "Barras",
   "vis_style_spectrum": "Espectro",
-  "vis_style_wave": "Forma de onda"
+  "vis_style_wave": "Forma de onda",
+  "queue_title": "Cola de reproducción",
+  "queue_add": "Añadir a la cola",
+  "queue_add_folder": "Poner todo en cola",
+  "queue_play_next": "Reproducir a continuación",
+  "queue_show": "Mostrar la cola…",
+  "queue_clear": "Vaciar la cola",
+  "queue_added": "{n} añadidos"
 }

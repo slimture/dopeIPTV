@@ -426,3 +426,53 @@ def test_a_mostly_video_folder_is_not_a_music_shelf(tmp_path, monkeypatch):
     w._load_local_items(str(root))
     music = [r["name"] for r in w.rendered if r.get("_kind") == "localalbum"]
     assert music == ["Musik"]                  # Film stayed out of Music
+
+
+def test_the_play_queue_steps_and_wraps_an_album(tmp_path):
+    """Prev/next step tracks, and the queue survives end-of-track."""
+    from dopeiptv.ui.main_window import MainWindow
+
+    class _Q:
+        AUDIO_EXTS = MainWindow.AUDIO_EXTS
+        _is_audio = MainWindow._is_audio
+        queue_add = MainWindow.queue_add
+        _queue_step = MainWindow._queue_step
+        _play_queued = MainWindow._play_queued
+        _queue_autoplay = MainWindow._queue_autoplay
+        player = None
+
+        def __init__(self):
+            self._track_queue, self._track_index = [], -1
+            self.played = []
+
+        def _sync_queue_buttons(self):
+            pass
+
+        def _set_status(self, *_a, **_k):
+            pass
+
+        def _start_playback(self, url, title, icon, key, kind, record=True,
+                            item=None):
+            self.played.append(url)
+
+    album = tmp_path / "Album"
+    album.mkdir()
+    rows = []
+    for n in ("01.flac", "02.flac", "03.flac"):
+        p = album / n
+        p.write_bytes(b"x")
+        rows.append({"_path": str(p), "name": n[:2]})
+
+    w = _Q()
+    w.queue_add(rows)
+    assert len(w._track_queue) == 3
+    w._play_queued(0)
+    assert w._queue_autoplay() is True          # album plays on
+    assert w._track_index == 1
+    assert w._queue_step(-1) is True            # and back
+    assert w._track_index == 0
+    assert w._queue_step(-1) is False           # nothing before the first
+    w._play_queued(2)
+    assert w._queue_autoplay() is False         # end of the album
+    assert [p.split("/")[-1] for p in w.played] == ["01.flac", "02.flac",
+                                                    "01.flac", "03.flac"]

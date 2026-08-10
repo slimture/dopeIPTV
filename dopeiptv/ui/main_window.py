@@ -2965,6 +2965,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # A playing episode lives inside its series' episode list - re-enter
         # the series (snapshot taken at playback start), and the pending-jump
         # hook in _apply_filter selects the episode once the list loads.
+        # A local file lives in its own folder - go to the Local files
+        # section and browse to the folder the file is in, then select it.
+        if self._playing_group == "local":
+            path = lp.get("url") or (playing or {}).get("_path")
+            if path and os.path.isfile(path):
+                self._pending_jump_key = path
+                QTimer.singleShot(8000, self._clear_pending_jump)
+                if self.mode != "local":
+                    self.switch_mode("local")
+                self._local_reveal(path)
+                return
         if self._playing_group == "episode" and lp.get("series_ctx"):
             self._pending_jump_key = self._playing_key
             QTimer.singleShot(8000, self._clear_pending_jump)
@@ -3445,6 +3456,107 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self._play_local_path(p)
                 e.acceptProposedAction()
                 return
+
+    # -- music: the play queue -------------------------------------------------
+
+    def _is_audio(self, path: str) -> bool:
+        return str(path or "").lower().endswith(self.AUDIO_EXTS)
+
+    def queue_add(self, items, play_next: bool = False) -> None:
+        """Put tracks in the queue - at the front (play next) or the end."""
+        rows = [it for it in (items or [])
+                if it and self._is_audio(it.get("_path"))]
+        if not rows:
+            return
+        q = list(getattr(self, "_track_queue", []) or [])
+        i = getattr(self, "_track_index", -1)
+        if play_next and 0 <= i < len(q):
+            q[i + 1:i + 1] = rows
+        else:
+            q += rows
+        self._track_queue = q
+        self._sync_queue_buttons()
+        self._set_status(tr("queue_added", n=len(rows)))
+
+    def queue_clear(self) -> None:
+        self._track_queue = []
+        self._track_index = -1
+        self._sync_queue_buttons()
+
+    def _sync_queue_buttons(self) -> None:
+        pl = getattr(self, "player", None)
+        if pl is None:
+            return
+        q = getattr(self, "_track_queue", []) or []
+        i = getattr(self, "_track_index", -1)
+        try:
+            pl.set_next_available(bool(q) and i + 1 < len(q))
+        except Exception:
+            pass
+
+    def _queue_step(self, direction: int) -> bool:
+        """Play the next/previous queued track. False when no queue is
+        running, so the caller falls back to its normal zap."""
+        q = getattr(self, "_track_queue", []) or []
+        i = getattr(self, "_track_index", -1)
+        if not q or i < 0:
+            return False
+        j = i + (1 if direction > 0 else -1)
+        if not (0 <= j < len(q)):
+            return False
+        self._play_queued(j)
+        return True
+
+    def _play_queued(self, index: int) -> None:
+        q = getattr(self, "_track_queue", []) or []
+        if not (0 <= index < len(q)):
+            return
+        it = q[index]
+        path = it.get("_path")
+        if not path or not os.path.isfile(path):
+            return
+        self._track_index = index
+        self._start_playback(path, it.get("name") or os.path.basename(path),
+                             it.get("stream_icon"), path, "local",
+                             record=True, item=it)
+        self._sync_queue_buttons()
+
+    def _queue_autoplay(self) -> bool:
+        """End of a track: roll on to the next queued one."""
+        return self._queue_step(1)
+
+    def open_queue(self) -> None:
+        """The queue, with what is playing marked; double-click to jump."""
+        from PyQt6.QtWidgets import (
+            QDialog, QDialogButtonBox, QListWidget, QListWidgetItem,
+            QVBoxLayout,
+        )
+        dlg = QDialog(self)
+        dlg.setWindowTitle(tr("queue_title"))
+        dlg.resize(460, 420)
+        v = QVBoxLayout(dlg)
+        lst = QListWidget()
+        q = getattr(self, "_track_queue", []) or []
+        cur = getattr(self, "_track_index", -1)
+        for n, it in enumerate(q):
+            row = QListWidgetItem(
+                ("▶  " if n == cur else "     ") + (it.get("name") or ""))
+            row.setData(Qt.ItemDataRole.UserRole, n)
+            lst.addItem(row)
+        v.addWidget(lst, 1)
+
+        def jump(item):
+            self._play_queued(item.data(Qt.ItemDataRole.UserRole))
+            dlg.accept()
+
+        lst.itemDoubleClicked.connect(jump)
+        bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        clear = bb.addButton(tr("queue_clear"),
+                             QDialogButtonBox.ButtonRole.ActionRole)
+        clear.clicked.connect(lambda: (self.queue_clear(), dlg.accept()))
+        bb.rejected.connect(dlg.reject)
+        v.addWidget(bb)
+        dlg.exec()
 
     # -- music: visualiser + equaliser -----------------------------------------
 
@@ -5130,6 +5242,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 return
             self._reconnect_live("eof")
             return
+        if last and last.get("kind") == "local" \
+                and self._is_audio(last.get("url")):
+            self._queue_autoplay()      # albums play through
+            return
         if not last or last.get("kind") != "episode":
             return
         # Give the just-finished episode its watched mark (it reached the end).
@@ -5139,8 +5255,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._advance_to_next_episode()
 
     def _play_next_episode(self) -> None:
-        """The player's 'next episode' button - skip straight to the next one
-        without waiting for the current episode to end."""
+        """The player's 'next' button - the next queued track while music is
+        playing, otherwise the next episode."""
+        if getattr(self, "_track_queue", None) and self._queue_step(1):
+            return
         self._advance_to_next_episode()
 
     def _resume_last(self) -> None:
@@ -5254,6 +5372,22 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.show()
             self.player.set_overlay_info(title)
             self._apply_audio_visuals(url)
+        if kind == "local" and self._is_audio(url):
+            q = getattr(self, "_track_queue", []) or []
+            here = next((n for n, t in enumerate(q)
+                         if t.get("_path") == url), -1)
+            if here < 0:
+                # Not a queued track: the surrounding listing becomes the
+                # queue, positioned on this track.
+                q = [r for r in (self.all_items or [])
+                     if not r.get("_header") and self._is_audio(r.get("_path"))]
+                here = next((n for n, t in enumerate(q)
+                             if t.get("_path") == url), -1)
+                if here < 0:
+                    q, here = [{"_path": url, "name": title}], 0
+                self._track_queue = q
+            self._track_index = here
+            self._sync_queue_buttons()
             # Replay with the same audio/subtitle tracks the user picked last
             # time for this title (one-shot; play() consumes them).
             if kind in self._RESUMABLE:
@@ -5796,8 +5930,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.play()
 
     def _zap(self, direction: int) -> None:
+        # Music: the buttons step the play queue, not the browsing list -
+        # what a listener means by previous/next track.
+        if self._queue_step(direction):
+            return
         if self.mode not in ("live", "fav", "vod", "series",
-                             "history", "rec"):
+                             "history", "rec", "local"):
             return
         if self.mode == "series" and not self.series_ctx:
             return

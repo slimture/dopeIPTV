@@ -862,5 +862,12 @@
   "vis_off": "Av",
   "vis_style_bars": "Staplar",
   "vis_style_spectrum": "Spektrum",
-  "vis_style_wave": "Vågform"
+  "vis_style_wave": "Vågform",
+  "queue_title": "Spelkö",
+  "queue_add": "Lägg i kön",
+  "queue_add_folder": "Köa allt här",
+  "queue_play_next": "Spela härnäst",
+  "queue_show": "Visa kön…",
+  "queue_clear": "Töm kön",
+  "queue_added": "{n} tillagda i kön"
 }

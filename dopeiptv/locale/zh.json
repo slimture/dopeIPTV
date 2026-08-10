@@ -862,5 +862,12 @@
   "vis_off": "关闭",
   "vis_style_bars": "柱状",
   "vis_style_spectrum": "频谱",
-  "vis_style_wave": "波形"
+  "vis_style_wave": "波形",
+  "queue_title": "播放队列",
+  "queue_add": "加入队列",
+  "queue_add_folder": "将此处全部加入队列",
+  "queue_play_next": "下一首播放",
+  "queue_show": "显示队列…",
+  "queue_clear": "清空队列",
+  "queue_added": "已加入 {n} 项"
 }

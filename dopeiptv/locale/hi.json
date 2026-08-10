@@ -862,5 +862,12 @@
   "vis_off": "बंद",
   "vis_style_bars": "बार",
   "vis_style_spectrum": "स्पेक्ट्रम",
-  "vis_style_wave": "तरंग"
+  "vis_style_wave": "तरंग",
+  "queue_title": "प्ले क्यू",
+  "queue_add": "क्यू में जोड़ें",
+  "queue_add_folder": "यहाँ का सब क्यू करें",
+  "queue_play_next": "अगला चलाएँ",
+  "queue_show": "क्यू दिखाएँ…",
+  "queue_clear": "क्यू साफ़ करें",
+  "queue_added": "{n} जोड़े गए"
 }

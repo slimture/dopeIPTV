@@ -862,5 +862,12 @@
   "vis_off": "ปิด",
   "vis_style_bars": "แท่ง",
   "vis_style_spectrum": "สเปกตรัม",
-  "vis_style_wave": "รูปคลื่น"
+  "vis_style_wave": "รูปคลื่น",
+  "queue_title": "คิวเล่น",
+  "queue_add": "เพิ่มลงคิว",
+  "queue_add_folder": "เพิ่มทั้งหมดที่นี่",
+  "queue_play_next": "เล่นถัดไป",
+  "queue_show": "แสดงคิว…",
+  "queue_clear": "ล้างคิว",
+  "queue_added": "เพิ่มแล้ว {n}"
 }

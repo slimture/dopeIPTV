@@ -862,5 +862,12 @@
   "vis_off": "Ανενεργή",
   "vis_style_bars": "Μπάρες",
   "vis_style_spectrum": "Φάσμα",
-  "vis_style_wave": "Κυματομορφή"
+  "vis_style_wave": "Κυματομορφή",
+  "queue_title": "Ουρά αναπαραγωγής",
+  "queue_add": "Προσθήκη στην ουρά",
+  "queue_add_folder": "Όλα στην ουρά",
+  "queue_play_next": "Επόμενο",
+  "queue_show": "Εμφάνιση ουράς…",
+  "queue_clear": "Εκκαθάριση ουράς",
+  "queue_added": "Προστέθηκαν {n}"
 }
