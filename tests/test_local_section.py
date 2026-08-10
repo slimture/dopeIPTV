@@ -37,6 +37,7 @@ class _Btn:
 
 class _Stub(_LocalFilesMixin):
     VIDEO_EXTS = MainWindow.VIDEO_EXTS
+    AUDIO_EXTS = MainWindow.AUDIO_EXTS
     MEDIA_EXTS = MainWindow.MEDIA_EXTS
 
     tmdb = None
@@ -310,3 +311,21 @@ def test_music_files_are_listed_and_playable(tmp_path):
     w._load_local_items(str(root))
     assert sorted(r["name"] for r in w.rendered) == ["låt", "spår"]
     assert all(r["_kind"] == "local" for r in w.rendered)
+
+
+def test_audio_is_deferred_but_lands_when_the_walk_completes(tmp_path,
+                                                             monkeypatch):
+    import dopeiptv.ui.mw_local as ml
+    monkeypatch.setattr(ml, "run_async",
+                        lambda pool, fn, done, err=None: done(fn()))
+    root = tmp_path / "M"
+    (root / "Artist" / "Album").mkdir(parents=True)
+    (root / "Artist" / "Album" / "spår.flac").write_bytes(b"x")
+    (root / "En.Film.2020.mkv").write_bytes(b"x")
+    w = _Stub()
+    w.settings.setValue("local_view", "series")
+    w._current_cat = str(root)
+    w._load_local_items(str(root))
+    colls = getattr(w, "_local_collection_index", {})
+    assert any("Album" in k for k in colls), colls
+    assert any(r.get("_kind") == "local" for r in w.rendered)

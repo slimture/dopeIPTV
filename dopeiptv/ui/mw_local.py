@@ -352,7 +352,7 @@ class _LocalFilesMixin:
         self._local_pulse_start()
         log.info("library scan starting: %s", root)
         state = {"walker": os.walk(root), "series": {}, "collections": {},
-                 "movies": [], "dirs": 0, "files": 0,
+                 "movies": [], "audio": [], "dirs": 0, "files": 0,
                  "root": os.path.normpath(root)}
         self._local_scan_step(root, state, token, cached)
 
@@ -368,6 +368,14 @@ class _LocalFilesMixin:
                 try:
                     dirpath, dirnames, names = next(walker)
                 except StopIteration:
+                    # Videos first - this is not primarily a music player.
+                    # The audio files set aside during the walk are shelved
+                    # only now, in one go, still on the worker thread: with
+                    # thousands of tracks, re-building their rows in every
+                    # progressive slice was most of the "import" time.
+                    for ap in state["audio"]:
+                        self._classify(state, ap, defer_audio=False)
+                    state["audio"] = []
                     return True, False
                 state["dirs"] += 1
                 dirnames[:] = [d for d in dirnames
@@ -445,7 +453,11 @@ class _LocalFilesMixin:
 
         run_async(self.pool, job, done, fail)
 
-    def _classify(self, state: dict, p: str) -> None:
+    def _classify(self, state: dict, p: str,
+                  defer_audio: bool = True) -> None:
+        if defer_audio and p.lower().endswith(self.AUDIO_EXTS):
+            state["audio"].append(p)
+            return
         stem = os.path.splitext(os.path.basename(p))[0]
         se = episode_info(stem)
         if se:
