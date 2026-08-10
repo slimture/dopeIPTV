@@ -459,7 +459,8 @@ class _LocalFilesMixin:
                 now = time.monotonic()
                 if now - getattr(self, "_local_cache_saved", 0.0) > 15.0:
                     self._local_cache_saved = now
-                    self._save_library_cache(root, ms, mm, mc)
+                    self._save_library_cache(root, series, movies,
+                                             collections)
                 self._local_scan_step(root, state, token, cached)
                 return
             self._local_pulse_stop()
@@ -582,11 +583,21 @@ class _LocalFilesMixin:
         from ..core.workers import default_image_cache_dir
         return str(default_image_cache_dir("meta") / "local_library.json")
 
+    # Bumped whenever classification changes shape (collections went from
+    # full paths to top-level shelves, movies stopped swallowing home
+    # videos, ...) - an old cache would re-import rows filed under the old
+    # rules forever, so it is discarded once instead.
+    _LIB_CACHE_VER = 2
+
     def _library_cache(self) -> dict:
         try:
             with open(self._library_cache_path(), encoding="utf-8") as fh:
                 v = json.load(fh)
-            return v if isinstance(v, dict) else {}
+            if not isinstance(v, dict) \
+                    or v.get("_v") != self._LIB_CACHE_VER:
+                return {}
+            roots = v.get("roots")
+            return roots if isinstance(roots, dict) else {}
         except (OSError, ValueError):
             return {}
 
@@ -604,7 +615,7 @@ class _LocalFilesMixin:
             path = self._library_cache_path()
             os.makedirs(os.path.dirname(path), exist_ok=True)
             with open(path, "w", encoding="utf-8") as fh:
-                json.dump(cache, fh)
+                json.dump({"_v": self._LIB_CACHE_VER, "roots": cache}, fh)
         except OSError as e:
             log.warning("library cache save failed: %s", e)
 
