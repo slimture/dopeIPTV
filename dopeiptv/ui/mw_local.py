@@ -298,52 +298,15 @@ class _LocalFilesMixin:
     _SCAN_JUNK = {"@eadir", "#recycle", "$recycle.bin", "lost+found",
                   "system volume information", "@__thumb", ".appledouble"}
 
-    def _local_scan(self, root: str, budget_s: float = 600.0,
-                    max_dirs: int = 50000,
-                    max_files: int = 20000) -> tuple[list[str], bool]:
-        """Video files under *root*, plus whether the walk was cut short.
-
-        Over SMB every directory listing is a network round trip, so the
-        walk is bounded three ways - wall time, directories visited, videos
-        found - and reports truncation instead of grinding forever on a
-        share full of small files (the torrent-share hang)."""
-        import time
-        out: list[str] = []
-        t0 = time.monotonic()
-        dirs = 0
-        for dirpath, dirnames, names in os.walk(root):
-            dirs += 1
-            if dirs > max_dirs or time.monotonic() - t0 > budget_s:
-                return out, True
-            dirnames[:] = [d for d in dirnames
-                           if not d.startswith(".")
-                           and d.lower() not in self._SCAN_JUNK]
-            for n in sorted(names, key=str.lower):
-                if n.startswith(".") or not n.lower().endswith(
-                        self.MEDIA_EXTS):
-                    continue
-                out.append(os.path.join(dirpath, n))
-                if len(out) >= max_files:
-                    return out, True
-        return out, False
-
     def _load_local_library(self, root: str) -> None:
-        """Series (episode-tagged files grouped by show, wherever they live
-        in the tree) first, then the remaining files as movies.
-
-        The scan walks the whole root and stats every video - over an SMB
-        mount that is seconds to minutes, so it runs on the worker pool with
-        the busy strip up. Doing it on the UI thread froze the app (the
-        macOS beachball) the moment the library view met a real share."""
+        """The library, built progressively: the walk runs in ~4 s slices on
+        the worker pool and every slice renders what has been found so far,
+        so a big SMB share fills the view as it goes instead of all at the
+        end. Bounded by directory/file caps rather than wall time - the
+        slices make time limits unnecessary."""
         self._local_scan_token = getattr(self, "_local_scan_token", 0) + 1
         token = self._local_scan_token
-        # Last scan's result renders instantly; the fresh walk then runs by
-        # itself in the background and re-renders only if something changed.
-        # First visit to a root has nothing to show, so the busy strip does.
         cached = self._library_cache().get(root)
-        # An EMPTY cached result must not warm-start: if the first scan came
-        # back empty (a share that wasn't mounted yet, a transient error),
-        # treating it as truth would pin the view empty forever.
         if cached is not None and not (cached.get("series")
                                        or cached.get("movies")
                                        or cached.get("collections")):
@@ -352,52 +315,59 @@ class _LocalFilesMixin:
             self._apply_library(cached.get("series") or {},
                                 cached.get("movies") or [],
                                 cached.get("collections") or {})
-        # The strip shows during the rescan too - silence read as "it never
-        # looks for new files". Re-armed every 15 s: the busy watchdog hides
-        # a stuck strip after 25 s, and a real share takes longer than that.
         self._show_busy(tr("local_scanning"))
         self._local_pulse_start()
-
         log.info("library scan starting: %s", root)
+        state = {"walker": os.walk(root), "series": {}, "collections": {},
+                 "movies": [], "dirs": 0, "files": 0,
+                 "root": os.path.normpath(root)}
+        self._local_scan_step(root, state, token, cached)
 
+    def _local_scan_step(self, root: str, state: dict, token: int,
+                         cached: dict | None) -> None:
         def job():
-            series: dict[str, list[tuple[int, int, str, str]]] = {}
-            collections: dict[str, list[str]] = {}
-            movies: list[dict] = []
-            paths, cut = self._local_scan(root)
-            rootn = os.path.normpath(root)
-            for p in paths:
-                stem = os.path.splitext(os.path.basename(p))[0]
-                se = episode_info(stem)
-                if se:
-                    sname = clean_title(stem[:se[2]])[0].strip(" -–")
-                    if not sname:
-                        sname = os.path.basename(os.path.dirname(p))
-                    series.setdefault(sname, []).append(
-                        [se[0], se[1], p, stem])
-                    continue
-                rel = os.path.relpath(os.path.normpath(p), rootn)
-                parts = rel.split(os.sep)
-                if len(parts) > 1:
-                    # Own videos keep their folder as the shelf they sit on.
-                    collections.setdefault(parts[0], []).append(p)
-                else:
-                    row = self._local_file_row(p, stem, stat=False)
-                    if row:
-                        movies.append(row)
-            log.info("library scan %s: %d series, %d collections, "
-                     "%d movies%s", root, len(series), len(collections),
-                     len(movies),
-                     " (walk cut short - dir/time budget hit)" if cut else "")
-            return series, collections, movies
+            import time
+            t0 = time.monotonic()
+            walker = state["walker"]
+            while time.monotonic() - t0 < 4.0:
+                if state["dirs"] >= 50000 or state["files"] >= 20000:
+                    return True, True          # done, and cut short
+                try:
+                    dirpath, dirnames, names = next(walker)
+                except StopIteration:
+                    return True, False
+                state["dirs"] += 1
+                dirnames[:] = [d for d in dirnames
+                               if not d.startswith(".")
+                               and d.lower() not in self._SCAN_JUNK]
+                for n in sorted(names, key=str.lower):
+                    if n.startswith(".") or not n.lower().endswith(
+                            self.MEDIA_EXTS):
+                        continue
+                    state["files"] += 1
+                    self._classify(state, os.path.join(dirpath, n))
+            return False, False                # slice over, more to walk
 
         def done(result):
             if token != getattr(self, "_local_scan_token", 0) \
                     or self.mode != "local":
-                return     # superseded by a newer selection / section switch
+                self._local_pulse_stop()
+                return
+            finished, cut = result
+            series = state["series"]
+            collections = state["collections"]
+            movies = state["movies"]
+            if not finished:
+                # Mid-walk: show what exists so far, keep walking.
+                self._apply_library(series, movies, collections)
+                self._local_scan_step(root, state, token, cached)
+                return
             self._local_pulse_stop()
             self._hide_busy()
-            series, collections, movies = result
+            log.info("library scan %s: %d series, %d collections, "
+                     "%d movies%s", root, len(series), len(collections),
+                     len(movies),
+                     " (walk cut short - dir/file cap hit)" if cut else "")
             self._save_library_cache(root, series, movies, collections)
             if cached is not None \
                     and cached.get("series") == series \
@@ -411,9 +381,29 @@ class _LocalFilesMixin:
                 self._local_pulse_stop()
                 self._hide_busy()
                 log.warning("library scan FAILED for %s: %r", root, e)
-                self._render_rows([], "rec", tr("local_empty"))
+                if cached is None:
+                    self._render_rows([], "rec", tr("local_empty"))
 
         run_async(self.pool, job, done, fail)
+
+    def _classify(self, state: dict, p: str) -> None:
+        stem = os.path.splitext(os.path.basename(p))[0]
+        se = episode_info(stem)
+        if se:
+            sname = clean_title(stem[:se[2]])[0].strip(" -–")
+            if not sname:
+                sname = os.path.basename(os.path.dirname(p))
+            state["series"].setdefault(sname, []).append(
+                [se[0], se[1], p, stem])
+            return
+        rel = os.path.relpath(os.path.normpath(p), state["root"])
+        parts = rel.split(os.sep)
+        if len(parts) > 1:
+            state["collections"].setdefault(parts[0], []).append(p)
+        else:
+            row = self._local_file_row(p, stem, stat=False)
+            if row:
+                state["movies"].append(row)
 
     def _local_pulse_start(self) -> None:
         try:

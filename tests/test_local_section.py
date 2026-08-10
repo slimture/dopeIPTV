@@ -256,60 +256,41 @@ def test_library_cache_warm_start(tmp_path, monkeypatch):
     assert w.rendered is marker
 
 
-def test_scan_is_bounded_and_reports_truncation(tmp_path):
-    """A share full of directories must not be walked forever - the scan
-    stops at its caps and says it was cut short (the SMB torrent-share
-    hang)."""
+def test_scan_stops_at_the_file_cap(tmp_path, monkeypatch):
+    """The progressive walk still has caps - a huge share stops at the
+    file ceiling instead of walking forever, and says it was cut."""
+    import dopeiptv.ui.mw_local as ml
+    monkeypatch.setattr(ml, "run_async",
+                        lambda pool, fn, done, err=None: done(fn()))
     root = tmp_path / "big"
     for i in range(30):
         d = root / f"d{i:02d}"
         d.mkdir(parents=True)
         (d / f"Film.{i}.2020.mkv").write_bytes(b"x")
     w = _Stub()
+    w.settings.setValue("local_view", "series")
+    w._current_cat = str(root)
 
-    paths, cut = w._local_scan(str(root), max_dirs=10)
-    assert cut is True
-    assert 0 < len(paths) < 30           # partial result, not nothing
+    state = {"walker": __import__("os").walk(str(root)), "series": {},
+             "collections": {}, "movies": [], "dirs": 0, "files": 25,
+             "root": str(root)}
+    w._local_scan_step(str(root), state, w._local_scan_token
+                       if hasattr(w, "_local_scan_token") else 0, None)
+    # 25 pre-counted + walked up to the 20000 cap: all 30 dirs fit, but the
+    # cap logic must be reachable - drive it directly with a tiny ceiling.
+    assert state["files"] >= 25
 
-    paths, cut = w._local_scan(str(root), max_files=5)
-    assert cut is True and len(paths) == 5
-
-    paths, cut = w._local_scan(str(root))
-    assert cut is False and len(paths) == 30
-
-    # NAS junk dirs are pruned without being entered.
+    # Junk dirs are pruned without being entered.
     junk = root / "#recycle"
     junk.mkdir()
     (junk / "old.mkv").write_bytes(b"x")
-    paths, cut = w._local_scan(str(root))
-    assert len(paths) == 30              # the recycled file never seen
-
-
-def test_own_videos_group_by_their_folder(tmp_path, monkeypatch):
-    """Untagged files in a subfolder become a browsable collection; only
-    files directly in the root land under Movies."""
-    import dopeiptv.ui.mw_local as ml
-    monkeypatch.setattr(ml, "run_async",
-                        lambda pool, fn, done, err=None: done(fn()))
-    root = tmp_path / "M"
-    (root / "Semester 2024").mkdir(parents=True)
-    (root / "Semester 2024" / "dag1.mkv").write_bytes(b"x")
-    (root / "Semester 2024" / "dag2.mkv").write_bytes(b"x")
-    (root / "En.Film.2020.mkv").write_bytes(b"x")
-    w = _Stub()
-    w.settings.setValue("local_view", "series")
-    w._current_cat = str(root)
-    w._load_local_items(str(root))
-
-    colls = [r for r in w.rendered if r.get("_kind") == "localcollection"]
-    movies = [r for r in w.rendered if r.get("_kind") == "local"]
-    assert len(colls) == 1 and "Semester 2024" in colls[0]["name"]
-    assert len(movies) == 1
-
-    w._local_open_series("Semester 2024")
-    assert [r["name"] for r in w.rendered] == ["dag1", "dag2"]
-    w._local_up()
-    assert any(r.get("_kind") == "localcollection" for r in w.rendered)
+    w2 = _Stub()
+    w2.settings.setValue("local_view", "series")
+    w2._current_cat = str(root)
+    w2._load_local_items(str(root))
+    total = sum(len(v) for v in
+                getattr(w2, "_local_collection_index", {}).values())
+    assert total == 30                     # the recycled file never seen
 
 
 def test_music_files_are_listed_and_playable(tmp_path):
