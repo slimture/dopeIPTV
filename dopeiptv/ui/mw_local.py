@@ -231,7 +231,8 @@ class _LocalFilesMixin:
     # -- the middle list (directory browsing) --------------------------------
 
     def _load_local_items(self, root) -> None:
-        if self._local_view() == "series" and isinstance(root, str):
+        if self._local_view() == "series" and isinstance(root, str) \
+                and not getattr(self, "_local_ctx", None):
             if getattr(self, "_local_series", None):
                 self._load_local_episodes()
             else:
@@ -248,6 +249,11 @@ class _LocalFilesMixin:
             names = []
         dirs: list[dict] = []
         files: list[dict] = []
+        cover = next((os.path.join(base, n) for n in names
+                      if n.lower() in ("cover.jpg", "cover.jpeg",
+                                       "cover.png", "folder.jpg",
+                                       "folder.png", "front.jpg",
+                                       "album.jpg")), "")
         for n in names:
             if n.startswith("."):
                 continue
@@ -267,7 +273,9 @@ class _LocalFilesMixin:
                               "_year": year, "_cast_url": p,
                               "_path": p, "_key": p, "_size": st.st_size,
                               "added": str(int(st.st_mtime)),
-                              "stream_icon": "", "_filename": stem})
+                              "stream_icon": cover if n.lower().endswith(
+                                  self.AUDIO_EXTS) else "",
+                              "_filename": stem})
         rows = self._search_filter(dirs) + self._search_filter(files)
         self._render_rows(rows, "rec", tr("local_empty"))
         self._local_resolve_posters([r for r in rows
@@ -373,14 +381,26 @@ class _LocalFilesMixin:
                     # only now, in one go, still on the worker thread: with
                     # thousands of tracks, re-building their rows in every
                     # progressive slice was most of the "import" time.
-                    for ap in state["audio"]:
+                    for ap in state.get("audio", []):
                         self._classify(state, ap, defer_audio=False)
                     state["audio"] = []
+                    state["covers"] = {
+                        name: cov for name in state["collections"]
+                        for d, cov in state.get("dircover", {}).items()
+                        if d.startswith(
+                            os.path.join(state["root"], name))}
                     return True, False
                 state["dirs"] += 1
                 dirnames[:] = [d for d in dirnames
                                if not d.startswith(".")
                                and d.lower() not in self._SCAN_JUNK]
+                for n in names:
+                    if n.lower() in ("cover.jpg", "cover.jpeg", "cover.png",
+                                     "folder.jpg", "folder.png", "front.jpg",
+                                     "album.jpg"):
+                        state.setdefault("dircover", {})[dirpath] = \
+                            os.path.join(dirpath, n)
+                        break
                 for n in sorted(names, key=str.lower):
                     if n.startswith(".") or not n.lower().endswith(
                             self.MEDIA_EXTS):
@@ -395,6 +415,7 @@ class _LocalFilesMixin:
                 self._local_pulse_stop()
                 return
             finished, cut = result
+            self._local_cover_index = state.get("covers", {})
             series = state["series"]
             collections = state["collections"]
             movies = state["movies"]
@@ -456,7 +477,7 @@ class _LocalFilesMixin:
     def _classify(self, state: dict, p: str,
                   defer_audio: bool = True) -> None:
         if defer_audio and p.lower().endswith(self.AUDIO_EXTS):
-            state["audio"].append(p)
+            state.setdefault("audio", []).append(p)
             return
         stem = os.path.splitext(os.path.basename(p))[0]
         se = episode_info(stem)
@@ -468,10 +489,9 @@ class _LocalFilesMixin:
                 [se[0], se[1], p, stem])
             return
         rel = os.path.relpath(os.path.normpath(p), state["root"])
-        d = os.path.dirname(rel)
-        if d:
-            state["collections"].setdefault(
-                d.replace(os.sep, " / "), []).append(p)
+        parts = rel.split(os.sep)
+        if len(parts) > 1:
+            state["collections"].setdefault(parts[0], []).append(p)
         else:
             row = self._local_file_row(p, stem, stat=False)
             if row:
@@ -514,13 +534,17 @@ class _LocalFilesMixin:
                              "stream_icon": "",
                              "_desc": f"{len(seasons)} × {len(eps)}"})
         if collections:
+            covers = getattr(self, "_local_cover_index", {})
+            root = self._current_cat if isinstance(self._current_cat, str) \
+                else ""
             rows.append({"_header": tr("local_collections")})
             for name in sorted(collections, key=str.lower):
                 rows.append({"name": "📁  " + name,
                              "_kind": "localcollection",
                              "_series_title": name,
+                             "_path": os.path.join(root, name),
                              "_key": f"localcollection::{name}",
-                             "stream_icon": "",
+                             "stream_icon": covers.get(name, ""),
                              "_desc": str(len(collections[name]))})
         if movies:
             rows.append({"_header": tr("nav_movies")})
@@ -623,7 +647,7 @@ class _LocalFilesMixin:
         """Fill file rows with TMDB poster art, resolved off the UI thread by
         cleaned title and cached in settings (a miss is cached too, so an
         unmatchable home video is asked about exactly once)."""
-        tm = self.tmdb
+        tm = getattr(self.tmdb, "client", self.tmdb)
         if not files:
             return
         if tm is None:
@@ -771,10 +795,13 @@ class _LocalFilesMixin:
         if it.get("_kind") == "localdir":
             m.addAction(tr("ctx_open"),
                         lambda: self._local_descend(it.get("_path")))
-        elif it.get("_kind") in ("localseries", "localcollection"):
+        elif it.get("_kind") == "localseries":
             m.addAction(tr("ctx_open"),
                         lambda: self._local_open_series(
                             it.get("_series_title") or ""))
+        elif it.get("_kind") == "localcollection":
+            m.addAction(tr("ctx_open"),
+                        lambda: self._local_descend(it.get("_path")))
         else:
             m.addAction(tr("ctx_play_in_mpv"),
                         lambda: self.play_item(it, "mpv"))

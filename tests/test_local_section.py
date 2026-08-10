@@ -327,5 +327,5 @@ def test_audio_is_deferred_but_lands_when_the_walk_completes(tmp_path,
     w._current_cat = str(root)
     w._load_local_items(str(root))
     colls = getattr(w, "_local_collection_index", {})
-    assert any("Album" in k for k in colls), colls
+    assert "Artist" in colls, colls
     assert any(r.get("_kind") == "local" for r in w.rendered)
