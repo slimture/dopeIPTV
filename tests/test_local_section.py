@@ -367,3 +367,24 @@ def test_anchored_films_in_subfolders_list_flat_under_movies(tmp_path,
              and not r.get("_home")]
     assert [f["name"] for f in films] == ["12 Years a Slave (2013)"]
     assert not any(r.get("_kind") == "localcollection" for r in w.rendered)
+
+
+def test_search_reaches_into_the_shelves(tmp_path, monkeypatch):
+    """Searching "kanye" must surface the artist's album folder and its
+    tracks even though the shelf is called Musik."""
+    import dopeiptv.ui.mw_local as ml
+    monkeypatch.setattr(ml, "run_async",
+                        lambda pool, fn, done, err=None: done(fn()))
+    root = tmp_path / "M"
+    album = root / "Musik" / "Kanye West - Donda (2021)"
+    album.mkdir(parents=True)
+    (album / "01. Donda Chant.flac").write_bytes(b"x")
+    w = _Stub()
+    w.settings.setValue("local_view", "series")
+    w._current_cat = str(root)
+    w.search_text = "kanye"
+    w._load_local_items(str(root))
+    kinds = {r["_kind"] for r in w.rendered}
+    names = " ".join(r["name"] for r in w.rendered)
+    assert "localdir" in kinds          # the album folder is openable
+    assert "Kanye West" in names

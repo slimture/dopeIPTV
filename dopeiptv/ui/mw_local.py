@@ -644,13 +644,53 @@ class _LocalFilesMixin:
         if home:
             rows.append({"_header": tr("local_home_videos")})
             rows += home
-        rows = [r for r in rows if r.get("_header")
-                or self._search_filter([r])]
+        q = self._local_search_text()
+        if q:
+            # A search reaches INTO the shelves: the query may name an
+            # artist or an album that lives inside "Musik", not the shelf
+            # itself. Matching folders anywhere in the tree come back as
+            # openable rows, matching files as playable ones.
+            rows = ([r for r in rows if not r.get("_header")
+                     and q in r.get("name", "").lower()]
+                    + self._local_deep_search(q, collections))
+        else:
+            rows = [r for r in rows if r.get("_header")
+                    or self._search_filter([r])]
         self._render_rows(rows, "rec", tr("local_empty"))
         if getattr(self, "_local_scan_active", False):
             self._set_status(tr("local_scanning"))
         self._local_resolve_posters(
             [r for r in rows if r.get("_kind") in ("local", "localseries")])
+
+    def _local_search_text(self) -> str:
+        sb = getattr(self, "search", None)
+        if sb is not None:
+            try:
+                return sb.text().strip().lower()
+            except Exception:
+                pass
+        return (getattr(self, "search_text", "") or "").strip().lower()
+
+    def _local_deep_search(self, q: str,
+                           collections: dict | None) -> list[dict]:
+        """Folder and file matches anywhere under the shelves, bounded."""
+        dirs_seen: dict[str, str] = {}
+        files: list[dict] = []
+        for paths in (collections or {}).values():
+            for p in paths:
+                d = os.path.dirname(p)
+                name = os.path.basename(d)
+                if q in name.lower() and d not in dirs_seen:
+                    dirs_seen[d] = name
+                if q in os.path.basename(p).lower() and len(files) < 200:
+                    row = self._local_file_row(p, stat=False)
+                    if row:
+                        files.append(row)
+        dir_rows = [{"name": n, "_kind": "localdir", "_path": d,
+                     "_key": d, "stream_icon": self._folder_tile()}
+                    for d, n in sorted(dirs_seen.items(),
+                                       key=lambda kv: kv[1].lower())[:100]]
+        return dir_rows + files
 
     def _library_cache_path(self) -> str:
         from ..core.workers import default_image_cache_dir

@@ -3838,6 +3838,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     "num": item.get("num"),
                     "tv_archive": item.get("tv_archive"),
                     "tv_archive_duration": item.get("tv_archive_duration")}
+        if kind == "local" and item is not None:
+            return {k: item.get(k)
+                    for k in ("_year", "_filename", "_clean_title", "_path")
+                    if item.get(k)}
         if kind != "episode":
             return None
         sctx = self.series_ctx or {}
@@ -5125,7 +5129,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._playing_key = key
         self._playing_group = {"live": "live", "movie": "vod",
                                "episode": "episode",
-                               "recording": "rec"}.get(kind)
+                               "recording": "rec",
+                               "local": "local"}.get(kind)
         self.listw.viewport().update()
         self.setWindowTitle(title or self._base_title)
         self._set_status(tr("status_playing", title=title))
