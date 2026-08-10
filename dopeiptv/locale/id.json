@@ -844,5 +844,6 @@
   "local_clear_lib_cache": "Bersihkan cache pustaka",
   "local_clear_posters": "Bersihkan cache poster TMDB",
   "local_clear_thumbs": "Bersihkan gambar mini video",
-  "local_cleared": "Dibersihkan."
+  "local_cleared": "Dibersihkan.",
+  "local_home_videos": "Video rumahan"
 }

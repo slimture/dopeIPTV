@@ -844,5 +844,6 @@
   "local_clear_lib_cache": "Očisti keš biblioteke",
   "local_clear_posters": "Očisti keš TMDB postera",
   "local_clear_thumbs": "Očisti sličice videa",
-  "local_cleared": "Očišćeno."
+  "local_cleared": "Očišćeno.",
+  "local_home_videos": "Kućni video snimci"
 }

@@ -844,5 +844,6 @@
   "local_clear_lib_cache": "مسح ذاكرة المكتبة",
   "local_clear_posters": "مسح ذاكرة ملصقات TMDB",
   "local_clear_thumbs": "مسح مصغرات الفيديو",
-  "local_cleared": "تم المسح."
+  "local_cleared": "تم المسح.",
+  "local_home_videos": "فيديوهات منزلية"
 }

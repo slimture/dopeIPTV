@@ -844,5 +844,6 @@
   "local_clear_lib_cache": "ライブラリキャッシュを消去",
   "local_clear_posters": "TMDBポスターキャッシュを消去",
   "local_clear_thumbs": "動画サムネイルを消去",
-  "local_cleared": "消去しました。"
+  "local_cleared": "消去しました。",
+  "local_home_videos": "ホームビデオ"
 }

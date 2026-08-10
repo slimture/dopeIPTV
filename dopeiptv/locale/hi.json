@@ -844,5 +844,6 @@
   "local_clear_lib_cache": "लाइब्रेरी कैश साफ़ करें",
   "local_clear_posters": "TMDB पोस्टर कैश साफ़ करें",
   "local_clear_thumbs": "वीडियो थंबनेल साफ़ करें",
-  "local_cleared": "साफ़ हो गया।"
+  "local_cleared": "साफ़ हो गया।",
+  "local_home_videos": "होम वीडियो"
 }

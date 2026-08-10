@@ -844,5 +844,6 @@
   "local_clear_lib_cache": "Vider le cache de la bibliothèque",
   "local_clear_posters": "Vider le cache d'affiches TMDB",
   "local_clear_thumbs": "Vider les vignettes vidéo",
-  "local_cleared": "Vidé."
+  "local_cleared": "Vidé.",
+  "local_home_videos": "Vidéos personnelles"
 }

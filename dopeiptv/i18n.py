@@ -108,6 +108,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "local_clear_thumbs": {"en": "Clear video thumbnails"},
     "local_cleared": {"en": "Cleared."},
     "local_collections": {"en": "My folders"},
+    "local_home_videos": {"en": "Home videos"},
     "sidebar_categories": {"en": "CATEGORIES"},
 
     "sidebar_library": {"en": "LIBRARY"},

@@ -844,5 +844,6 @@
   "local_clear_lib_cache": "라이브러리 캐시 지우기",
   "local_clear_posters": "TMDB 포스터 캐시 지우기",
   "local_clear_thumbs": "동영상 썸네일 지우기",
-  "local_cleared": "지워졌습니다."
+  "local_cleared": "지워졌습니다.",
+  "local_home_videos": "홈 비디오"
 }

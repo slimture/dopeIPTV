@@ -844,5 +844,6 @@
   "local_clear_lib_cache": "Bibliothekscache leeren",
   "local_clear_posters": "TMDB-Postercache leeren",
   "local_clear_thumbs": "Videominiaturen leeren",
-  "local_cleared": "Geleert."
+  "local_cleared": "Geleert.",
+  "local_home_videos": "Heimvideos"
 }

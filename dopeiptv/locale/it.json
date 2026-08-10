@@ -844,5 +844,6 @@
   "local_clear_lib_cache": "Svuota cache della libreria",
   "local_clear_posters": "Svuota cache dei poster TMDB",
   "local_clear_thumbs": "Svuota miniature video",
-  "local_cleared": "Svuotato."
+  "local_cleared": "Svuotato.",
+  "local_home_videos": "Video personali"
 }

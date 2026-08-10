@@ -844,5 +844,6 @@
   "local_clear_lib_cache": "清除媒体库缓存",
   "local_clear_posters": "清除 TMDB 海报缓存",
   "local_clear_thumbs": "清除视频缩略图",
-  "local_cleared": "已清除。"
+  "local_cleared": "已清除。",
+  "local_home_videos": "家庭视频"
 }

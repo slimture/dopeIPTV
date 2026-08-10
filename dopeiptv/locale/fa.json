@@ -844,5 +844,6 @@
   "local_clear_lib_cache": "پاک کردن حافظه نهان کتابخانه",
   "local_clear_posters": "پاک کردن حافظه نهان پوسترهای TMDB",
   "local_clear_thumbs": "پاک کردن بندانگشتی‌های ویدئو",
-  "local_cleared": "پاک شد."
+  "local_cleared": "پاک شد.",
+  "local_home_videos": "ویدئوهای خانگی"
 }

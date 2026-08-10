@@ -259,8 +259,9 @@ class _LocalFilesMixin:
                 continue
             p = os.path.join(base, n)
             if os.path.isdir(p):
-                dirs.append({"name": "📁  " + n, "_kind": "localdir",
-                             "_path": p, "_key": p, "stream_icon": ""})
+                dirs.append({"name": n, "_kind": "localdir",
+                             "_path": p, "_key": p,
+                             "stream_icon": self._folder_tile()})
             elif n.lower().endswith(self.MEDIA_EXTS):
                 try:
                     st = os.stat(p)
@@ -517,7 +518,26 @@ class _LocalFilesMixin:
         else:
             row = self._local_file_row(p, stem, stat=False)
             if row:
+                if not row.get("_year") and not _TAG.search(stem):
+                    row["_home"] = True   # rendered under its own header
                 state["movies"].append(row)
+
+    def _folder_tile(self) -> str:
+        """A drawn folder icon as an image file the row art loader can
+        serve - the delegate otherwise painted its letter placeholder AND
+        the name carried a folder emoji, which read as two ugly icons."""
+        try:
+            from ..core.workers import default_image_cache_dir
+            from .theme import P
+            color = P["text2"].lstrip("#")
+            path = default_image_cache_dir("thumbs") / f"folder-{color}.png"
+            if not path.exists():
+                os.makedirs(path.parent, exist_ok=True)
+                self._action_pixmap("folder", 128, P["text2"]).save(
+                    str(path), "PNG")
+            return str(path)
+        except Exception:
+            return ""
 
     def _local_pulse_start(self) -> None:
         try:
@@ -561,16 +581,22 @@ class _LocalFilesMixin:
                 else ""
             rows.append({"_header": tr("local_collections")})
             for name in sorted(collections, key=str.lower):
-                rows.append({"name": "📁  " + name,
+                rows.append({"name": name,
                              "_kind": "localcollection",
                              "_series_title": name,
                              "_path": os.path.join(root, name),
                              "_key": f"localcollection::{name}",
-                             "stream_icon": covers.get(name, ""),
+                             "stream_icon": covers.get(name)
+                             or self._folder_tile(),
                              "_desc": str(len(collections[name]))})
-        if movies:
+        films = [m for m in movies if not m.get("_home")]
+        home = [m for m in movies if m.get("_home")]
+        if films:
             rows.append({"_header": tr("nav_movies")})
-            rows += movies
+            rows += films
+        if home:
+            rows.append({"_header": tr("local_home_videos")})
+            rows += home
         rows = [r for r in rows if r.get("_header")
                 or self._search_filter([r])]
         self._render_rows(rows, "rec", tr("local_empty"))

@@ -844,5 +844,6 @@
   "local_clear_lib_cache": "Εκκαθάριση cache βιβλιοθήκης",
   "local_clear_posters": "Εκκαθάριση cache αφισών TMDB",
   "local_clear_thumbs": "Εκκαθάριση μικρογραφιών βίντεο",
-  "local_cleared": "Εκκαθαρίστηκε."
+  "local_cleared": "Εκκαθαρίστηκε.",
+  "local_home_videos": "Προσωπικά βίντεο"
 }

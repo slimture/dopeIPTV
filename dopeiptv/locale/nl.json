@@ -844,5 +844,6 @@
   "local_clear_lib_cache": "Bibliotheekcache wissen",
   "local_clear_posters": "TMDB-postercache wissen",
   "local_clear_thumbs": "Videominiaturen wissen",
-  "local_cleared": "Gewist."
+  "local_cleared": "Gewist.",
+  "local_home_videos": "Thuisvideo's"
 }

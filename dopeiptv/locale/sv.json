@@ -844,5 +844,6 @@
   "local_clear_lib_cache": "Rensa bibliotekscache",
   "local_clear_posters": "Rensa TMDB-postercache",
   "local_clear_thumbs": "Rensa videominiatyrer",
-  "local_cleared": "Rensat."
+  "local_cleared": "Rensat.",
+  "local_home_videos": "Hemvideor"
 }
