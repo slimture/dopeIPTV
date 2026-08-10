@@ -2086,6 +2086,24 @@ class EmbeddedPlayer(QWidget):
             # mpv's update callback) - but always collect a finished pending
             # frame.
             upd = getattr(self, "_raster_pending_frame", True)
+            # Watchdog: the gate only opens when mpv's update callback fires.
+            # If that signal is lost across a window transition - which is
+            # what a fullscreen switch is - the mirror keeps ticking but
+            # never renders again: the picture freezes on its last frame
+            # while the audio plays on, until some window event forces a
+            # repaint (the "tab out and back and it works" report). Force a
+            # frame through after a quarter second of silence so it can heal
+            # itself instead of waiting for the user.
+            now_m = time.monotonic()
+            if upd:
+                self._raster_frame_at = now_m
+            elif now_m - getattr(self, "_raster_frame_at", now_m) > 0.25:
+                self._raster_frame_at = now_m
+                self._raster_stalls = getattr(self, "_raster_stalls", 0) + 1
+                if self._raster_stalls in (1, 10, 100):
+                    log.info("VID raster mirror: no new frame for 250 ms - "
+                             "forcing one (stall #%d)", self._raster_stalls)
+                upd = True
             pend = self._mirror_pending
             # Heartbeat: this path only logged on a state CHANGE, so a mirror
             # that ticks but never produces a frame looked identical to one

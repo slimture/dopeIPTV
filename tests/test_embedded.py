@@ -339,3 +339,58 @@ def test_the_embedded_branch_reaches_player_play():
         assert len(line) - len(line.lstrip()) > indent + 8, (
             f"line escapes the embedded branch: {line!r}")
     assert re.search(r"else:\s*\n\s*# No embedded player", body)
+
+
+def test_the_raster_mirror_heals_a_lost_frame_signal():
+    """The mirror only renders when mpv's update callback opened the gate.
+    If that signal is lost across a window transition (going fullscreen on
+    macOS), the picture froze while the audio played on. After a quarter
+    second of silence the tick must force a frame through by itself."""
+    import time as _t
+
+    from dopeiptv.media.embedded import EmbeddedPlayer
+
+    class _P:
+        _tick = EmbeddedPlayer._tick_raster_mirror
+
+        def __init__(self):
+            self._raster_pending_frame = False
+            self._mirror_pending = None
+            self._mirror_fbos = [None, None]
+            self._mirror_fbo_i = 0
+            self.rendered = 0
+
+            class _M:
+                def devicePixelRatioF(self):
+                    return 1.0
+
+                def width(self):
+                    return 640
+
+                def height(self):
+                    return 360
+
+            class _V:
+                mpv = object()
+                _ctx = object()
+
+            self._mirror, self.video = _M(), _V()
+
+    p = _P()
+    # The gate is shut and no time has passed: nothing is forced.
+    p._raster_frame_at = _t.monotonic()
+    before = p._raster_frame_at
+    try:
+        p._tick()
+    except Exception:
+        pass                      # the GL work beyond the gate is not ours
+    assert p._raster_frame_at == before
+    assert getattr(p, "_raster_stalls", 0) == 0
+
+    # A quarter second of silence: the watchdog opens the gate itself.
+    p._raster_frame_at = _t.monotonic() - 0.3
+    try:
+        p._tick()
+    except Exception:
+        pass
+    assert p._raster_stalls == 1
