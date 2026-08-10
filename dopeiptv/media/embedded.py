@@ -2857,6 +2857,10 @@ class EmbeddedPlayer(QWidget):
         "rock":   (4, 3, 1, -1, -2, 0, 2, 3, 4, 4),
     }
     VIS_STYLES = ("bars", "spectrum", "wave")
+    # Enough to recognise a music file from its address alone; the window
+    # owns the full list, the player only needs to know "is this audio".
+    AUDIO_URL_EXTS = (".mp3", ".flac", ".m4a", ".aac", ".ogg", ".opus",
+                      ".wav", ".wma")
 
     def _vis_filter(self, style: str, w: int = 640, h: int = 360) -> str:
         """An mpv lavfi-complex graph that turns the audio into a picture -
@@ -2966,6 +2970,18 @@ class EmbeddedPlayer(QWidget):
             if self.video.mpv is None:
                 raise RuntimeError("OpenGL context not ready")
             m = self.video.mpv
+            # A visualiser graph belongs to the track it was drawn for. Any
+            # non-audio stream clears it BEFORE loading: leaving mpv's
+            # lavfi-complex pointing at [vo] from an audio graph made the
+            # next TV channel fail to open, and the window then fell back
+            # to an external player.
+            if not str(url or "").lower().endswith(self.AUDIO_URL_EXTS):
+                try:
+                    if m["lavfi-complex"]:
+                        m["lavfi-complex"] = ""
+                except Exception:
+                    pass
+                self._vis_now = (False, "")
             # Re-enable mpv's video output in case a previous stop() set it
             # to "no" - without this the stream would play with audio only.
             # Also reset the audio track to auto: picking a specific track

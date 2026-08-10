@@ -3571,18 +3571,23 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _apply_audio_visuals(self, url: str) -> None:
         """Music gets a visualiser in place of the black video pane, and
-        whatever equaliser the user set. Video is left completely alone."""
+        whatever equaliser the user set.
+
+        VIDEO IS NOT TOUCHED - not the filter graph, not the audio chain,
+        nothing. Writing mpv's lavfi-complex here (even to clear it) made
+        a clicked TV channel fail to open, so it fell back to an external
+        player; the auto-preview, which never came through here, played
+        fine and that is what gave the bug away. A stale visualiser graph
+        from previous music is cleared inside player.play() instead, which
+        only writes when one is actually set."""
         pl = getattr(self, "player", None)
-        if pl is None:
+        if pl is None or not str(url or "").lower().endswith(
+                self.AUDIO_EXTS):
             return
-        is_audio = str(url or "").lower().endswith(self.AUDIO_EXTS)
         try:
-            if is_audio:
-                style = self.settings.value("vis_style", "bars")
-                pl.set_visualiser(
-                    self.settings.value("vis_on", "true") == "true", style)
-            else:
-                pl.set_visualiser(False)
+            style = self.settings.value("vis_style", "bars")
+            pl.set_visualiser(
+                self.settings.value("vis_on", "true") == "true", style)
             gains, on = self._eq_settings()
             pl.set_equaliser(gains, on)
         except Exception as e:
