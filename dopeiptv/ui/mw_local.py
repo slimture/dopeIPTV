@@ -1134,7 +1134,14 @@ class _LocalFilesMixin:
         except ValueError:
             return {}
 
-    def _local_resolve_posters(self, files: list[dict]) -> None:
+    # One batch is a burst of TMDB round trips; 80 keeps the worker from
+    # holding the pool for a minute at a time. Batches chain until the
+    # shelf is done, so a 900-film folder is not "the first 80 only".
+    _POSTER_BATCH = 80
+    _POSTER_ROUNDS = 40
+
+    def _local_resolve_posters(self, files: list[dict],
+                               _round: int = 0) -> None:
         """Fill file rows with TMDB poster art, resolved off the UI thread by
         cleaned title and cached in settings (a miss is cached too, so an
         unmatchable home video is asked about exactly once)."""
@@ -1148,7 +1155,7 @@ class _LocalFilesMixin:
                 [r for r in files if not r.get("stream_icon")])
             return
         cache = self._local_poster_cache()
-        todo = []
+        cand: list[dict] = []
         for f in files:
             if f.get("stream_icon") and not self._is_folder_tile(
                     f["stream_icon"]):
@@ -1172,14 +1179,16 @@ class _LocalFilesMixin:
             ck = f"{t} {f.get('_year') or ''}".strip()
             if cache.get(ck) == "":
                 continue          # known miss must not hog the batch
-            todo.append({"_key": f["_key"], "t": t,
+            cand.append({"_key": f["_key"], "t": t,
                          "y": f.get("_year") or "",
                          "k": f.get("_poster_kind") or "vod"})
-            if len(todo) >= 80:
-                break
-        if not todo:
+        if not cand:
             return
+        todo = cand[:self._POSTER_BATCH]
+        more = len(cand) > len(todo)
         gen = self._load_gen
+        token = getattr(self, "_local_list_token", 0)
+        state: dict[str, bool] = {}
 
         def job():
             out, changed, errors = {}, False, 0
@@ -1204,12 +1213,17 @@ class _LocalFilesMixin:
             if changed:
                 self.settings.setValue(
                     "local_tmdb_posters_v2", json.dumps(cache))
-            log.info("tmdb posters: %d/%d resolved (%d errors)",
-                     len(out), len(todo), errors)
+            # Progress is either art to show or a miss written down -
+            # both shrink the next round. A round with neither (every
+            # lookup errored) must not chain, or a dead API key spins.
+            state["progressed"] = bool(changed or out)
+            log.info("tmdb posters: %d/%d resolved (%d errors, %d left)",
+                     len(out), len(todo), errors, len(cand) - len(todo))
             return out
 
         def done(out):
-            if gen != self._load_gen:
+            if gen != self._load_gen \
+                    or token != getattr(self, "_local_list_token", 0):
                 return
             hit = False
             for r in self.all_items:
@@ -1220,7 +1234,21 @@ class _LocalFilesMixin:
                     hit = True
             if hit:
                 self.list_model.refresh_all()
-            # Whatever TMDB could not name gets a frame grab instead.
+            if more and state.get("progressed") \
+                    and _round + 1 < self._POSTER_ROUNDS:
+                # The rest of the shelf. Resolved rows now carry art and
+                # misses are cached as "", so each round starts from a
+                # strictly smaller candidate set and this terminates.
+                self._local_resolve_posters(files, _round + 1)
+                return
+            if more:
+                log.info("tmdb posters: stopping with %d unresolved "
+                         "(round %d, progressed=%s)",
+                         len(cand) - len(todo), _round,
+                         state.get("progressed"))
+            # Whatever TMDB could not name gets a frame grab instead -
+            # but only once the lookups are done, or we would spend
+            # ffmpeg on files that were still queued for a poster.
             self._local_make_thumbs(
                 [r for r in self.all_items
                  if r.get("_kind") == "local"
@@ -1228,23 +1256,35 @@ class _LocalFilesMixin:
 
         run_async(self.pool, job, done, lambda _e: None)
 
-    def _local_make_thumbs(self, rows: list[dict]) -> None:
+    _THUMB_BATCH = 24
+    _THUMB_ROUNDS = 40
+
+    def _local_make_thumbs(self, rows: list[dict],
+                           _round: int = 0) -> None:
         """A real thumbnail for a file TMDB knows nothing about: grab one
         frame with ffmpeg into the image cache and point the row at the
-        file - the loader reads local paths directly. Bounded per batch,
-        30 s per file, misses just stay on the letter placeholder."""
+        file - the loader reads local paths directly. Bounded per batch and
+        chained until the shelf is done, 30 s per file; a file ffmpeg can
+        make nothing of is remembered so it is not tried again."""
         import hashlib
         import shutil
         import subprocess
         ff = shutil.which("ffmpeg")
-        todo = [(r["_key"], r["_path"]) for r in rows
-                if r.get("_path")
-                and r["_path"].lower().endswith(self.VIDEO_EXTS)][:24]
+        bad = getattr(self, "_local_thumb_fail", None)
+        if bad is None:
+            bad = self._local_thumb_fail = set()
+        cand = [(r["_key"], r["_path"]) for r in rows
+                if r.get("_path") and not r.get("stream_icon")
+                and r["_path"].lower().endswith(self.VIDEO_EXTS)
+                and r["_path"] not in bad]
+        todo = cand[:self._THUMB_BATCH]
+        more = len(cand) > len(todo)
         if not ff or not todo:
             return
         from ..core.workers import default_image_cache_dir
         tdir = str(default_image_cache_dir("thumbs"))
         gen = self._load_gen
+        token = getattr(self, "_local_list_token", 0)
 
         def job():
             os.makedirs(tdir, exist_ok=True)
@@ -1272,8 +1312,14 @@ class _LocalFilesMixin:
             return out
 
         def done(out):
-            if not out or gen != self._load_gen:
+            if gen != self._load_gen \
+                    or token != getattr(self, "_local_list_token", 0):
                 return
+            out = out or {}
+            # A file ffmpeg could not grab from stays iconless forever;
+            # without remembering it, the next round would pick the same
+            # 24 and never reach the rest of the folder.
+            bad.update(p for k, p in todo if k not in out)
             hit = False
             for r in self.all_items:
                 u = out.get(r.get("_key"))
@@ -1282,6 +1328,8 @@ class _LocalFilesMixin:
                     hit = True
             if hit:
                 self.list_model.refresh_all()
+            if more and _round + 1 < self._THUMB_ROUNDS:
+                self._local_make_thumbs(rows, _round + 1)
 
         run_async(self.pool, job, done, lambda _e: None)
 
@@ -1315,13 +1363,19 @@ class _LocalFilesMixin:
         artist, _, album = base.partition(" - ")
         return (artist, album) if album else ("", base)
 
-    def _local_fetch_album_art(self, rows: list[dict]) -> None:
+    _ART_BATCH = 40
+    _ART_ROUNDS = 40
+
+    def _local_fetch_album_art(self, rows: list[dict],
+                               _round: int = 0) -> None:
         """Cover art for albums that carry none of their own, looked up by
         artist and album on the iTunes search service - no API key, one
         request per album, and the answer (misses included) is remembered
-        so the same album is never asked about twice."""
+        so the same album is never asked about twice. Batched and chained,
+        so a big music shelf is not "the first forty albums only"."""
         if self.settings.value("music_art_online", "true") != "true":
             return
+        cache = self._music_art_cache()
         todo = []
         for r in rows:
             if r.get("_kind") not in ("localalbum", "localdir", "local"):
@@ -1331,14 +1385,22 @@ class _LocalFilesMixin:
                 continue          # already has real art
             d = (r.get("_path") if r.get("_kind") != "local"
                  else os.path.dirname(r.get("_path") or ""))
-            if d and all(x.get("_d") != d for x in todo):
-                todo.append({"_key": r.get("_key"), "_d": d})
-            if len(todo) >= 40:
-                break
+            if not d or any(x.get("_d") == d for x in todo):
+                continue
+            artist, album = self._album_id(d)
+            if cache.get(f"{artist}|{album}".lower()) == "":
+                # A known miss keeps its folder icon forever, so leaving
+                # it in would make every round pick the same forty and
+                # never reach the rest of the shelf.
+                continue
+            todo.append({"_key": r.get("_key"), "_d": d})
         if not todo or getattr(self, "pool", None) is None:
             return
-        cache = self._music_art_cache()
+        more = len(todo) > self._ART_BATCH
+        todo = todo[:self._ART_BATCH]
         gen = getattr(self, "_load_gen", 0)
+        token = getattr(self, "_local_list_token", 0)
+        state: dict[str, bool] = {}
 
         def job():
             import json as _json
@@ -1373,12 +1435,15 @@ class _LocalFilesMixin:
                     out[t["_d"]] = url
             if changed:
                 self.settings.setValue("music_art_v1", json.dumps(cache))
+            state["progressed"] = bool(changed or out)
             log.info("album art: %d/%d resolved online", len(out), len(todo))
             return out
 
         def done(out):
-            if not out or gen != self._load_gen:
+            if gen != self._load_gen \
+                    or token != getattr(self, "_local_list_token", 0):
                 return
+            out = out or {}
             hit = False
             for r in self.all_items:
                 d = (r.get("_path") if r.get("_kind") != "local"
@@ -1390,6 +1455,11 @@ class _LocalFilesMixin:
                     hit = True
             if hit:
                 self.list_model.refresh_all()
+            # The albums this round could not fill now carry a cached
+            # miss, so the next round starts on the ones after them.
+            if more and state.get("progressed") \
+                    and _round + 1 < self._ART_ROUNDS:
+                self._local_fetch_album_art(rows, _round + 1)
 
         run_async(getattr(self, "pool", None), job, done, lambda _e: None)
 

@@ -792,3 +792,101 @@ def test_a_film_folder_gets_a_poster_not_a_grey_glyph(tmp_path):
     # An ordinary folder is not guessed at, and keeps the glyph.
     assert "Semester" not in [t for t, _k in asked]
     assert w._is_folder_tile(plain["stream_icon"]) or not plain["stream_icon"]
+
+
+def test_the_whole_shelf_gets_posters_not_just_the_first_batch(tmp_path):
+    """One batch is 80 TMDB round trips; a folder of 200 films used to
+    stop there and leave the rest as glyphs. Batches must chain until the
+    shelf is done - and a dead API key must not make them chain forever."""
+    class _Tm:
+        def __init__(self):
+            self.asked = []
+
+        def poster_url(self, title, kind):
+            self.asked.append(title)
+            return f"http://img/{title}.jpg"
+
+    class _R:
+        def __init__(self, tm):
+            self.client = tm
+
+    tm = _Tm()
+    w = _Stub()
+    w.tmdb = _R(tm)
+    w._local_make_thumbs = lambda rows, _round=0: None
+    w.list_model = type("M", (), {"refresh_all": lambda self: None})()
+    w._load_gen = 0
+    rows = [{"_key": f"k{i}", "name": f"Film {i} (2011)",
+             "_clean_title": f"Film {i}", "_year": "2011",
+             "_kind": "local", "_path": f"/v/f{i}.mkv", "stream_icon": ""}
+            for i in range(200)]
+    w.all_items = rows
+
+    w._local_resolve_posters(rows)
+
+    assert len(tm.asked) == 200                    # every one, not 80
+    assert all(r["stream_icon"] for r in rows)
+
+    # A resolver that only ever errors caches nothing, so there is no
+    # progress to chain on: one batch is tried and that is the end of it.
+    class _Dead:
+        def __init__(self):
+            self.calls = 0
+
+        def poster_url(self, title, kind):
+            self.calls += 1
+            raise RuntimeError("401")
+
+    dead = _Dead()
+    w.tmdb = _R(dead)
+    for r in rows:
+        r["stream_icon"] = ""
+    w.settings.remove("local_tmdb_posters_v2")
+    w._local_resolve_posters(rows)
+    assert dead.calls == 80                        # one batch, then it stops
+
+
+def test_a_known_miss_never_hogs_the_album_art_batch(tmp_path, monkeypatch):
+    """An album iTunes has never heard of keeps its folder icon, so it
+    stays a candidate row forever - leaving it in the batch meant every
+    round asked about the same forty and the rest stayed blank."""
+    seen = []
+
+    class _Resp:
+        def __init__(self, term):
+            self.term = term
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_a):
+            return False
+
+        def read(self):
+            return b'{"results": []}'          # nothing matches: a miss
+
+    def _open(url, timeout=0):
+        seen.append(url)
+        return _Resp(url)
+
+    monkeypatch.setattr("urllib.request.urlopen", _open)
+
+    w = _Stub()
+    w.list_model = type("M", (), {"refresh_all": lambda self: None})()
+    w._load_gen = 0
+    folder = w._folder_tile()
+    rows = [{"_key": f"a{i}", "name": f"Album {i}", "_kind": "localalbum",
+             "_path": f"/m/Artist {i} - Album {i}", "stream_icon": folder}
+            for i in range(60)]
+    w.all_items = rows
+
+    w._local_fetch_album_art(rows)
+
+    # All sixty were asked about exactly once, across two chained rounds.
+    assert len(seen) == 60
+    assert len(set(seen)) == 60
+
+    # Asked again, the cached misses keep the batch empty - no re-asking.
+    before = len(seen)
+    w._local_fetch_album_art(rows)
+    assert len(seen) == before
