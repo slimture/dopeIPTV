@@ -825,5 +825,12 @@
   "cast_kind_oldest": "Oldest - Full HD, 30 fps (Chromecast 1, TVs with Chromecast built in)",
   "menu_open_video": "Buka berkas video…",
   "open_video_title": "Buka video",
-  "open_video_filter": "Berkas video"
+  "open_video_filter": "Berkas video",
+  "nav_local": "Berkas lokal",
+  "local_add_folder": "+ Tambah folder…",
+  "local_add_folder_title": "Tambah folder video",
+  "local_add_hint": "Tambahkan folder — atau pasang berbagi jaringan — untuk menelusuri video Anda di sini.",
+  "local_empty": "Tidak ada video di folder ini.",
+  "local_remove": "Hapus dari daftar",
+  "ctx_open": "Buka"
 }

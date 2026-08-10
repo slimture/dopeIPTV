@@ -61,6 +61,7 @@ from .mw_detail import _DetailMixin
 from .mw_nav import _NavMixin
 from .mw_multiview import _MultiviewMixin
 from .mw_home import _HomeMixin
+from .mw_local import _LocalFilesMixin
 from .mw_onboarding import _OnboardingMixin
 from .mw_popout import _PopoutMixin
 from .mw_reminders import _RemindersMixin
@@ -82,6 +83,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _ContextMenuMixin, _DetailMixin, _RemindersMixin,
                  _BusyMixin, _UpdatesMixin, _SearchMixin, _SidebarMixin,
                  _NavMixin, _ShortcutsMixin, _OnboardingMixin, _SortMixin,
+                 _LocalFilesMixin,
                  _PopoutMixin, _MultiviewMixin, _HomeMixin, QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
@@ -91,6 +93,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  playlists: PlaylistStore | None = None) -> None:
         super().__init__()
         self._welcome = None  # first-run onboarding overlay; created on demand
+        self._local_ctx = None  # current subdirectory in the Local files view
         self._add_provider_btn = None  # "+ Add provider" hint when offline
         self.client = client
         self.settings = settings
@@ -507,7 +510,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             "home": "home",
             "live": "tv", "vod": "movie", "series": "series", "fav": "star",
             "watchlist": "bookmark", "watched": "check", "rec": "rec",
-            "history": "clock",
+            "history": "clock", "local": "folder",
         }
         self._nav_texts: dict[str, str] = {}
         self.nav_btns: dict[str, QPushButton] = {}
@@ -594,6 +597,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                           ("watchlist", tr("nav_watchlist")),
                           ("watched", tr("nav_watched")),
                           ("rec", tr("nav_recordings")),
+                          ("local", tr("nav_local")),
                           ("history", tr("nav_history"))):
             _make_nav(key, text, lib_lay)
         # The box must not be stretchable: it holds fixed-height buttons, and a
@@ -2167,7 +2171,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # folder/list sections (Favorites, Watch Later, Watched, Recordings,
             # History) so the same 🔍 works everywhere, adapted to each.
             show = cat_mode or self.mode in (
-                "fav", "watchlist", "watched", "rec", "history")
+                "fav", "watchlist", "watched", "rec", "history", "local")
             self._cat_search_supported = show
             self.cat_search.setPlaceholderText(
                 tr("cat_search_placeholder") if cat_mode
@@ -2184,6 +2188,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 show and not getattr(self, "_sidebar_collapsed", False))
         self.cat_list.clear()
         self.list_model.set_items([], self.mode)
+        if self.mode == "local":
+            self._load_local_categories()
+            return
         if self.mode == "rec":
             self.cat_list.blockSignals(True)
             for label, data in [(tr("rec_all_recordings"), None),
@@ -2404,6 +2411,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not cur:
             return
         cat = cur.data(Qt.ItemDataRole.UserRole)
+        if self.mode == "local" and cat == "__add__":
+            # The "+ Add folder" row is a button, not a category: open the
+            # picker (it rebuilds the list and selects the new folder).
+            self._local_add_folder()
+            return
         locked = False
         if cat is not None:
             if self.mode == "fav":
@@ -2457,6 +2469,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._current_cat = category_id
         self._sync_sort_box()            # show THIS category's sort order
         self._apply_list_layout(False)   # honour the user's grid/list choice
+        if self.mode == "local":
+            # A fresh category selection always starts at the root of it.
+            self._local_ctx = None
+            self.back_btn.hide()
+            self._load_local_items(category_id)
+            return
         if self.mode == "rec":
             if category_id == "__jobs__":
                 self.all_items = [self._job_item(j)
@@ -2841,6 +2859,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         "episode": "episodes", "fav": "favorites",
         "history": "history items", "rec": "recordings",
         "watchlist": "on your list", "watched": "watched",
+        "local": "files",
     }
 
     # History left-category -> the stored _kind values it covers, for the
@@ -3177,6 +3196,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                   done, failed)
 
     def _leave_series(self) -> None:
+        # The back button is shared: in the Local files section it walks up
+        # one directory instead of leaving a series.
+        if self.mode == "local":
+            self._local_up()
+            return
         ctx = self.series_ctx or {}
         self.series_ctx = None
         self.back_btn.hide()
@@ -3281,6 +3305,20 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if not path or not os.path.exists(path):
                 return
             title = it.get("name") or "Recording"
+            if external or player == "vlc":
+                launch_player(player or "mpv", path, title, self)
+                return
+            self._start_playback(path, title, None, path, "recording",
+                                 record=False)
+            return
+        if self.mode == "local":
+            path = it.get("_path")
+            if it.get("_kind") == "localdir":
+                self._local_descend(path)      # a folder row drills in
+                return
+            if not path or not os.path.isfile(path):
+                return
+            title = it.get("name") or os.path.basename(path)
             if external or player == "vlc":
                 launch_player(player or "mpv", path, title, self)
                 return

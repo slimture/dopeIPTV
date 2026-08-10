@@ -825,5 +825,12 @@
   "cast_kind_oldest": "Oldest - Full HD, 30 fps (Chromecast 1, TVs with Chromecast built in)",
   "menu_open_video": "打开视频文件…",
   "open_video_title": "打开视频",
-  "open_video_filter": "视频文件"
+  "open_video_filter": "视频文件",
+  "nav_local": "本地文件",
+  "local_add_folder": "+ 添加文件夹…",
+  "local_add_folder_title": "添加视频文件夹",
+  "local_add_hint": "添加一个文件夹——或挂载网络共享——即可在此浏览你的视频。",
+  "local_empty": "此文件夹中没有视频。",
+  "local_remove": "从列表中移除",
+  "ctx_open": "打开"
 }

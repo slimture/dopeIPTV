@@ -825,5 +825,12 @@
   "cast_kind_oldest": "Oldest - Full HD, 30 fps (Chromecast 1, TVs with Chromecast built in)",
   "menu_open_video": "Videobestand openen…",
   "open_video_title": "Een video openen",
-  "open_video_filter": "Videobestanden"
+  "open_video_filter": "Videobestanden",
+  "nav_local": "Lokale bestanden",
+  "local_add_folder": "+ Map toevoegen…",
+  "local_add_folder_title": "Videomap toevoegen",
+  "local_add_hint": "Voeg een map toe — of koppel een netwerkshare — om hier je video's te bekijken.",
+  "local_empty": "Geen video's in deze map.",
+  "local_remove": "Uit de lijst verwijderen",
+  "ctx_open": "Openen"
 }

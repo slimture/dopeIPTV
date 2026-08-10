@@ -379,6 +379,7 @@ class _SettingsMixin:
             "fav": "nav_favorites", "watchlist": "nav_watchlist",
             "watched": "nav_watched",
             "rec": "nav_recordings", "history": "nav_history",
+            "local": "nav_local",
         }
         for key, btn in self.nav_btns.items():
             if key in nav_labels:

@@ -825,5 +825,12 @@
   "cast_kind_oldest": "Oldest - Full HD, 30 fps (Chromecast 1, TVs with Chromecast built in)",
   "menu_open_video": "פתיחת קובץ וידאו…",
   "open_video_title": "פתיחת וידאו",
-  "open_video_filter": "קובצי וידאו"
+  "open_video_filter": "קובצי וידאו",
+  "nav_local": "קבצים מקומיים",
+  "local_add_folder": "+ הוספת תיקייה…",
+  "local_add_folder_title": "הוספת תיקיית וידאו",
+  "local_add_hint": "הוסיפו תיקייה — או עגנו שיתוף רשת — כדי לעיין כאן בסרטונים שלכם.",
+  "local_empty": "אין סרטונים בתיקייה זו.",
+  "local_remove": "הסרה מהרשימה",
+  "ctx_open": "פתיחה"
 }

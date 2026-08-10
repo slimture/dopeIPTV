@@ -89,6 +89,13 @@ _STRINGS: dict[str, dict[str, str]] = {
     "fav_series": {"en": "Series"},
     "nav_recordings": {"en": "Recordings"},
     "nav_history": {"en": "History"},
+    "nav_local": {"en": "Local files"},
+    "local_add_folder": {"en": "+ Add folder…"},
+    "local_add_folder_title": {"en": "Add a video folder"},
+    "local_add_hint": {"en": "Add a folder — or mount a network share — to browse your videos here."},
+    "local_empty": {"en": "No videos in this folder."},
+    "local_remove": {"en": "Remove from the list"},
+    "ctx_open": {"en": "Open"},
     "sidebar_categories": {"en": "CATEGORIES"},
 
     "sidebar_library": {"en": "LIBRARY"},

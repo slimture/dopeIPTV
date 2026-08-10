@@ -34,6 +34,9 @@ class _ContextMenuMixin:
         if self.mode == "rec":
             self._rec_context_menu(pos, it)
             return
+        if self.mode == "local":
+            self._local_context_menu(pos, it)
+            return
         m = QMenu(self)
         m.addAction(tr("ctx_play_in_mpv"), lambda: self.play_item(it, "mpv"))
         # Continue-watching rows carry a resume point; offer to forget it.
@@ -502,6 +505,15 @@ class _ContextMenuMixin:
         it = self.cat_list.itemAt(pos)
         data = it.data(Qt.ItemDataRole.UserRole) if it else None
         m = QMenu(self)
+
+        if self.mode == "local":
+            # Only a REGISTERED folder can be forgotten - a mounted share is
+            # the OS's business and the "+" row manages nothing.
+            if isinstance(data, str) and data in self._local_dirs():
+                m.addAction(tr("local_remove"),
+                            lambda: self._local_remove_folder(data))
+                m.exec(self.cat_list.mapToGlobal(pos))
+            return
 
         if self.mode == "fav":
             if not data:

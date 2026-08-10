@@ -825,5 +825,12 @@
   "cast_kind_oldest": "Oldest - Full HD, 30 fps (Chromecast 1, TVs with Chromecast built in)",
   "menu_open_video": "Άνοιγμα αρχείου βίντεο…",
   "open_video_title": "Άνοιγμα βίντεο",
-  "open_video_filter": "Αρχεία βίντεο"
+  "open_video_filter": "Αρχεία βίντεο",
+  "nav_local": "Τοπικά αρχεία",
+  "local_add_folder": "+ Προσθήκη φακέλου…",
+  "local_add_folder_title": "Προσθήκη φακέλου βίντεο",
+  "local_add_hint": "Προσθέστε έναν φάκελο — ή προσαρτήστε έναν κοινόχρηστο δικτυακό πόρο — για να περιηγηθείτε εδώ στα βίντεό σας.",
+  "local_empty": "Δεν υπάρχουν βίντεο σε αυτόν τον φάκελο.",
+  "local_remove": "Αφαίρεση από τη λίστα",
+  "ctx_open": "Άνοιγμα"
 }

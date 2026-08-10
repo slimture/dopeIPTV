@@ -825,5 +825,12 @@
   "cast_kind_oldest": "Oldest - Full HD, 30 fps (Chromecast 1, TVs with Chromecast built in)",
   "menu_open_video": "Відкрити відеофайл…",
   "open_video_title": "Відкрити відео",
-  "open_video_filter": "Відеофайли"
+  "open_video_filter": "Відеофайли",
+  "nav_local": "Локальні файли",
+  "local_add_folder": "+ Додати теку…",
+  "local_add_folder_title": "Додати теку з відео",
+  "local_add_hint": "Додайте теку — або змонтуйте мережевий ресурс — щоб переглядати тут свої відео.",
+  "local_empty": "У цій теці немає відео.",
+  "local_remove": "Прибрати зі списку",
+  "ctx_open": "Відкрити"
 }

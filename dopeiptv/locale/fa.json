@@ -825,5 +825,12 @@
   "cast_kind_oldest": "Oldest - Full HD, 30 fps (Chromecast 1, TVs with Chromecast built in)",
   "menu_open_video": "باز کردن پرونده ویدئو…",
   "open_video_title": "باز کردن ویدئو",
-  "open_video_filter": "پرونده‌های ویدئویی"
+  "open_video_filter": "پرونده‌های ویدئویی",
+  "nav_local": "پرونده‌های محلی",
+  "local_add_folder": "+ افزودن پوشه…",
+  "local_add_folder_title": "افزودن پوشه ویدئو",
+  "local_add_hint": "پوشه‌ای اضافه کنید — یا یک اشتراک شبکه را متصل کنید — تا ویدئوهای خود را اینجا مرور کنید.",
+  "local_empty": "در این پوشه ویدئویی نیست.",
+  "local_remove": "حذف از فهرست",
+  "ctx_open": "باز کردن"
 }

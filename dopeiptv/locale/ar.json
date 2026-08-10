@@ -825,5 +825,12 @@
   "cast_kind_oldest": "Oldest - Full HD, 30 fps (Chromecast 1, TVs with Chromecast built in)",
   "menu_open_video": "فتح ملف فيديو…",
   "open_video_title": "فتح فيديو",
-  "open_video_filter": "ملفات الفيديو"
+  "open_video_filter": "ملفات الفيديو",
+  "nav_local": "الملفات المحلية",
+  "local_add_folder": "+ إضافة مجلد…",
+  "local_add_folder_title": "إضافة مجلد فيديو",
+  "local_add_hint": "أضف مجلدًا — أو قم بتحميل مشاركة شبكة — لتصفح مقاطع الفيديو هنا.",
+  "local_empty": "لا توجد مقاطع فيديو في هذا المجلد.",
+  "local_remove": "إزالة من القائمة",
+  "ctx_open": "فتح"
 }

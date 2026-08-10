@@ -329,6 +329,15 @@ class _NavMixin:
             pr.drawEllipse(QRectF(s * 0.12, s * 0.12, s * 0.76, s * 0.76))
             pr.drawLine(QPointF(s * 0.5, s * 0.5), QPointF(s * 0.5, s * 0.27))
             pr.drawLine(QPointF(s * 0.5, s * 0.5), QPointF(s * 0.67, s * 0.60))
+        elif kind == "folder":
+            # A folder: the tab, then the body drawn over it.
+            fill()
+            pr.drawPolygon(QPolygonF([
+                QPointF(s * 0.12, s * 0.20), QPointF(s * 0.42, s * 0.20),
+                QPointF(s * 0.50, s * 0.32), QPointF(s * 0.12, s * 0.32)]))
+            pr.drawRoundedRect(
+                QRectF(s * 0.12, s * 0.30, s * 0.76, s * 0.50),
+                s * 0.06, s * 0.06)
         elif kind == "gear":
             fill()
             cx = cy = s * 0.5

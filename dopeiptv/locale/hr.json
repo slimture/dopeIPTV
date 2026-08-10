@@ -825,5 +825,12 @@
   "cast_kind_oldest": "Oldest - Full HD, 30 fps (Chromecast 1, TVs with Chromecast built in)",
   "menu_open_video": "Otvori videodatoteku…",
   "open_video_title": "Otvori video",
-  "open_video_filter": "Videodatoteke"
+  "open_video_filter": "Videodatoteke",
+  "nav_local": "Lokalne datoteke",
+  "local_add_folder": "+ Dodaj mapu…",
+  "local_add_folder_title": "Dodaj mapu s videozapisima",
+  "local_add_hint": "Dodajte mapu — ili montirajte mrežni dijeljeni resurs — da biste ovdje pregledavali svoje videozapise.",
+  "local_empty": "Nema videozapisa u ovoj mapi.",
+  "local_remove": "Ukloni s popisa",
+  "ctx_open": "Otvori"
 }

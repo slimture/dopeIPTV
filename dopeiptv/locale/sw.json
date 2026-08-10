@@ -825,5 +825,12 @@
   "cast_kind_oldest": "Oldest - Full HD, 30 fps (Chromecast 1, TVs with Chromecast built in)",
   "menu_open_video": "Fungua faili ya video…",
   "open_video_title": "Fungua video",
-  "open_video_filter": "Faili za video"
+  "open_video_filter": "Faili za video",
+  "nav_local": "Faili za ndani",
+  "local_add_folder": "+ Ongeza folda…",
+  "local_add_folder_title": "Ongeza folda ya video",
+  "local_add_hint": "Ongeza folda — au unganisha hisa ya mtandao — ili kuvinjari video zako hapa.",
+  "local_empty": "Hakuna video katika folda hii.",
+  "local_remove": "Ondoa kwenye orodha",
+  "ctx_open": "Fungua"
 }

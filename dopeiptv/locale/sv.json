@@ -825,5 +825,12 @@
   "cast_kind_oldest": "Äldst – Full HD, 30 b/s (Chromecast 1, TV med inbyggd Chromecast)",
   "menu_open_video": "Öppna videofil…",
   "open_video_title": "Öppna en video",
-  "open_video_filter": "Videofiler"
+  "open_video_filter": "Videofiler",
+  "nav_local": "Lokala filer",
+  "local_add_folder": "+ Lägg till mapp…",
+  "local_add_folder_title": "Lägg till en videomapp",
+  "local_add_hint": "Lägg till en mapp — eller montera en nätverksutdelning — för att bläddra bland dina videor här.",
+  "local_empty": "Inga videor i den här mappen.",
+  "local_remove": "Ta bort från listan",
+  "ctx_open": "Öppna"
 }
