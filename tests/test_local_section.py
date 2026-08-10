@@ -6,8 +6,28 @@ while Qt widgets are stand-ins that just record what happened.
 """
 import json
 
+import pytest
+
 from dopeiptv.ui.main_window import MainWindow
 from dopeiptv.ui.mw_local import _LocalFilesMixin, _pretty_gvfs
+
+
+@pytest.fixture(autouse=True)
+def _inline_workers(monkeypatch):
+    """The section does its file work on the worker pool (a stat or a tag
+    read per row is a network round trip over SMB, and on the UI thread
+    that was the macOS beachball). Run those jobs inline here so the tests
+    can assert on the result."""
+    import dopeiptv.ui.mw_local as ml
+
+    def run_now(_pool, fn, done, err=None):
+        try:
+            done(fn())
+        except Exception as e:      # noqa: BLE001 - mirror run_async
+            if err:
+                err(e)
+
+    monkeypatch.setattr(ml, "run_async", run_now)
 
 
 class _Settings:
@@ -44,7 +64,7 @@ class _Stub(_LocalFilesMixin):
     MEDIA_EXTS = MainWindow.MEDIA_EXTS
 
     tmdb = None
-    pool = None
+    pool = object()          # only a handle; run_async is inline in tests
 
     def _show_busy(self, msg=None):
         pass
@@ -188,10 +208,6 @@ def test_episode_info_reads_both_tag_styles():
 def test_library_view_groups_episodes_into_series(tmp_path, monkeypatch):
     # The scan runs on the worker pool in the app (a UI-thread walk of an
     # SMB mount froze macOS); the test runs it inline.
-    import dopeiptv.ui.mw_local as ml
-    monkeypatch.setattr(
-        ml, "run_async",
-        lambda pool, fn, done, err=None: done(fn()))
     root = tmp_path / "Media"
     (root / "Serier").mkdir(parents=True)
     (root / "Serier" / "Show.Name.S01E02.720p.mkv").write_bytes(b"x")
@@ -269,9 +285,6 @@ def test_library_cache_warm_start(tmp_path, monkeypatch):
 def test_scan_stops_at_the_file_cap(tmp_path, monkeypatch):
     """The progressive walk still has caps - a huge share stops at the
     file ceiling instead of walking forever, and says it was cut."""
-    import dopeiptv.ui.mw_local as ml
-    monkeypatch.setattr(ml, "run_async",
-                        lambda pool, fn, done, err=None: done(fn()))
     root = tmp_path / "big"
     for i in range(30):
         d = root / f"d{i:02d}"
@@ -318,9 +331,6 @@ def test_music_files_are_listed_and_playable(tmp_path):
 
 
 def test_music_lands_as_an_album_not_a_folder_pile(tmp_path, monkeypatch):
-    import dopeiptv.ui.mw_local as ml
-    monkeypatch.setattr(ml, "run_async",
-                        lambda pool, fn, done, err=None: done(fn()))
     root = tmp_path / "M"
     (root / "Artist" / "Album").mkdir(parents=True)
     (root / "Artist" / "Album" / "spår.flac").write_bytes(b"x")
@@ -337,9 +347,6 @@ def test_music_lands_as_an_album_not_a_folder_pile(tmp_path, monkeypatch):
 def test_search_reaches_into_the_shelves(tmp_path, monkeypatch):
     """Searching "kanye" must surface the artist's album folder and its
     tracks even though the shelf is called Musik."""
-    import dopeiptv.ui.mw_local as ml
-    monkeypatch.setattr(ml, "run_async",
-                        lambda pool, fn, done, err=None: done(fn()))
     root = tmp_path / "M"
     album = root / "Musik" / "Kanye West - Donda (2021)"
     album.mkdir(parents=True)
@@ -358,9 +365,6 @@ def test_search_reaches_into_the_shelves(tmp_path, monkeypatch):
 def test_music_shelves_as_albums_with_track_counts(tmp_path, monkeypatch):
     """Music is albums - the folder holding the tracks - not thousands of
     loose files, and it survives a walk that stops at a cap."""
-    import dopeiptv.ui.mw_local as ml
-    monkeypatch.setattr(ml, "run_async",
-                        lambda pool, fn, done, err=None: done(fn()))
     root = tmp_path / "M"
     album = root / "Musik" / "Flac" / "Kanye West - Donda (2021)"
     album.mkdir(parents=True)
@@ -388,9 +392,6 @@ def test_music_shelves_as_albums_with_track_counts(tmp_path, monkeypatch):
 
 def test_folder_structure_comes_before_the_cover_art(tmp_path, monkeypatch):
     """Browsable folders (music, own folders) sit above the poster rows."""
-    import dopeiptv.ui.mw_local as ml
-    monkeypatch.setattr(ml, "run_async",
-                        lambda pool, fn, done, err=None: done(fn()))
     root = tmp_path / "M"
     (root / "Musik" / "A").mkdir(parents=True)
     (root / "Musik" / "A" / "t.flac").write_bytes(b"x")
@@ -409,9 +410,6 @@ def test_folder_structure_comes_before_the_cover_art(tmp_path, monkeypatch):
 
 def test_a_mostly_video_folder_is_not_a_music_shelf(tmp_path, monkeypatch):
     """A stray track inside a film folder must not turn it into Music."""
-    import dopeiptv.ui.mw_local as ml
-    monkeypatch.setattr(ml, "run_async",
-                        lambda pool, fn, done, err=None: done(fn()))
     root = tmp_path / "M"
     (root / "Musik" / "A").mkdir(parents=True)
     for t in ("a.flac", "b.flac", "c.flac"):

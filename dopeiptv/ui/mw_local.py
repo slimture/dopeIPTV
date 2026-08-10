@@ -241,64 +241,122 @@ class _LocalFilesMixin:
                 self._load_local_library(root)
             return
         base = getattr(self, "_local_ctx", None) or root
-        if not base or not isinstance(base, str) or not os.path.isdir(base):
+        if not base or not isinstance(base, str):
             self._render_rows([], "rec", tr("local_empty"))
             return
-        try:
-            names = sorted(os.listdir(base), key=str.lower)
-        except OSError as e:
-            log.warning("local browse failed for %s: %s", base, e)
-            names = []
-        dirs: list[dict] = []
-        files: list[dict] = []
-        cover = next((os.path.join(base, n) for n in names
-                      if n.lower() in ("cover.jpg", "cover.jpeg",
-                                       "cover.png", "folder.jpg",
-                                       "folder.png", "front.jpg",
-                                       "album.jpg")), "")
-        for n in names:
-            if n.startswith("."):
-                continue
-            p = os.path.join(base, n)
-            if os.path.isdir(p):
-                # An artist/album folder shows its own artwork - a wall of
-                # identical folder glyphs is what a music library must not
-                # look like. Bounded so a huge listing stays cheap.
-                art = (self._cover_in(p, depth=1)
-                       if len(dirs) < 300 else "") or self._folder_tile()
-                dirs.append({"name": n, "_kind": "localdir",
-                             "_path": p, "_key": p, "stream_icon": art})
-            elif n.lower().endswith(self.MEDIA_EXTS):
-                try:
-                    st = os.stat(p)
-                except OSError:
+        # Listing a folder means a stat per file, and labelling music means
+        # reading a tag header per track - both a network round trip each
+        # over SMB. Doing that on the UI thread is what made every click on
+        # macOS spin the beachball, so the whole listing happens on the
+        # worker pool and the rows arrive when they are ready.
+        self._local_list_token = getattr(self, "_local_list_token", 0) + 1
+        token = self._local_list_token
+        exts, aexts = self.MEDIA_EXTS, self.AUDIO_EXTS
+
+        def job():
+            if not os.path.isdir(base):
+                return []
+            try:
+                names = sorted(os.listdir(base), key=str.lower)
+            except OSError as e:
+                log.warning("local browse failed for %s: %s", base, e)
+                return []
+            dirs: list[dict] = []
+            files: list[dict] = []
+            for n in names:
+                if n.startswith("."):
                     continue
-                stem = os.path.splitext(n)[0]
-                if n.lower().endswith(self.AUDIO_EXTS):
-                    tags = read_tags(p)[0]
-                    files.append({
-                        "name": display_name(p, tags), "_kind": "local",
-                        "_clean_title": "",
-                        "_year": tags.get("date", "")[:4],
-                        "_cast_url": p, "_path": p, "_key": p,
-                        "_size": st.st_size, "added": str(int(st.st_mtime)),
-                        "stream_icon": cover or self._embedded_cover(p),
-                        "_artist": tags.get("artist")
-                        or tags.get("albumartist", ""),
-                        "_album": tags.get("album", ""),
-                        "_filename": stem})
+                p = os.path.join(base, n)
+                if os.path.isdir(p):
+                    dirs.append({"name": n, "_kind": "localdir",
+                                 "_path": p, "_key": p, "stream_icon": ""})
+                elif n.lower().endswith(exts):
+                    try:
+                        st = os.stat(p)
+                    except OSError:
+                        continue
+                    stem = os.path.splitext(n)[0]
+                    if n.lower().endswith(aexts):
+                        # The tags name it properly; that read happens in
+                        # the enrich pass so the list can appear first.
+                        row = {"name": stem, "_kind": "local",
+                               "_clean_title": "", "_year": "",
+                               "_needs_tags": True}
+                    else:
+                        title, year = clean_title(stem)
+                        row = {"name": f"{title} ({year})" if year else title,
+                               "_kind": "local", "_clean_title": title,
+                               "_year": year}
+                    row.update({"_cast_url": p, "_path": p, "_key": p,
+                                "_size": st.st_size,
+                                "added": str(int(st.st_mtime)),
+                                "stream_icon": "", "_filename": stem})
+                    files.append(row)
+            return dirs + files
+
+        def done(rows):
+            if token != getattr(self, "_local_list_token", 0):
+                return                      # a newer click won
+            rows = [r for r in rows if self._search_filter([r])]
+            self._render_rows(rows, "rec", tr("local_empty"))
+            self._local_enrich(rows)
+            self._local_fetch_album_art(rows)
+
+        run_async(getattr(self, "pool", None), job, done,
+                  lambda _e: done([]))
+
+    def _local_enrich(self, rows: list[dict]) -> None:
+        """Fill in what costs a file read - track names from the tags, and
+        artwork for folders and albums - off the UI thread, then repaint.
+        The list is already on screen by then; this only makes it better."""
+        todo = [r for r in rows
+                if r.get("_needs_tags") or (r.get("_kind") == "localdir"
+                                            and not r.get("stream_icon"))][:300]
+        if not todo or getattr(self, "pool", None) is None:
+            return
+        token = getattr(self, "_local_list_token", 0)
+        paths = [(r["_key"], r.get("_path", ""), bool(r.get("_needs_tags")),
+                  r.get("_kind")) for r in todo]
+
+        def job():
+            out = {}
+            for key, path, needs_tags, kind in paths:
+                info = {}
+                if needs_tags:
+                    tags = read_tags(path)[0]
+                    info["name"] = display_name(path, tags)
+                    info["_artist"] = (tags.get("artist")
+                                       or tags.get("albumartist", ""))
+                    info["_album"] = tags.get("album", "")
+                    info["_year"] = tags.get("date", "")[:4]
+                    info["stream_icon"] = self._cover_in(
+                        os.path.dirname(path))
+                elif kind == "localdir":
+                    info["stream_icon"] = self._cover_in(path, depth=1)
+                if info:
+                    out[key] = info
+            return out
+
+        def done(out):
+            if not out or token != getattr(self, "_local_list_token", 0):
+                return
+            folder = self._folder_tile()
+            hit = False
+            for r in self.all_items:
+                info = out.get(r.get("_key"))
+                if not info:
                     continue
-                title, year = clean_title(stem)
-                files.append({"name": f"{title} ({year})" if year else title,
-                              "_kind": "local", "_clean_title": title,
-                              "_year": year, "_cast_url": p,
-                              "_path": p, "_key": p, "_size": st.st_size,
-                              "added": str(int(st.st_mtime)),
-                              "stream_icon": "",
-                              "_filename": stem})
-        rows = self._search_filter(dirs) + self._search_filter(files)
-        self._render_rows(rows, "rec", tr("local_empty"))
-        self._local_fetch_album_art(rows)
+                for k, v in info.items():
+                    if k == "stream_icon" and not v:
+                        v = folder if r.get("_kind") == "localdir" else ""
+                    if v:
+                        r[k] = v
+                r.pop("_needs_tags", None)
+                hit = True
+            if hit:
+                self.list_model.refresh_all()
+
+        run_async(self.pool, job, done, lambda _e: None)
         self._local_resolve_posters([r for r in rows
                                      if r.get("_kind") == "local"])
 
