@@ -837,5 +837,6 @@
   "local_missing_remove": "Xóa khỏi lịch sử",
   "local_view_folders": "Chế độ xem: Thư mục",
   "local_view_series": "Chế độ xem: Thư viện",
-  "local_season": "Mùa {n}"
+  "local_season": "Mùa {n}",
+  "local_scanning": "Đang đọc thư viện…"
 }

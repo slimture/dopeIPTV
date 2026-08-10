@@ -837,5 +837,6 @@
   "local_missing_remove": "นำออกจากประวัติ",
   "local_view_folders": "มุมมอง: โฟลเดอร์",
   "local_view_series": "มุมมอง: คลัง",
-  "local_season": "ซีซัน {n}"
+  "local_season": "ซีซัน {n}",
+  "local_scanning": "กำลังอ่านคลัง…"
 }

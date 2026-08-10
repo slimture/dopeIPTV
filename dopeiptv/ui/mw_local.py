@@ -303,43 +303,70 @@ class _LocalFilesMixin:
 
     def _load_local_library(self, root: str) -> None:
         """Series (episode-tagged files grouped by show, wherever they live
-        in the tree) first, then the remaining files as movies."""
-        series: dict[str, list[tuple[int, int, str, str]]] = {}
-        movies: list[dict] = []
-        for p in self._local_scan(root):
-            stem = os.path.splitext(os.path.basename(p))[0]
-            se = episode_info(stem)
-            if se:
-                sname = clean_title(stem[:se[2]])[0].strip(" -–")
-                if not sname:
-                    sname = os.path.basename(os.path.dirname(p))
-                series.setdefault(sname, []).append(
-                    (se[0], se[1], p, stem))
-            else:
-                row = self._local_file_row(p, stem)
-                if row:
-                    movies.append(row)
-        self._local_series_index = series
-        rows: list[dict] = []
-        if series:
-            rows.append({"_header": tr("nav_series")})
-            for name in sorted(series, key=str.lower):
-                eps = series[name]
-                seasons = {s for s, _e, _p, _st in eps}
-                rows.append({"name": name, "_kind": "localseries",
-                             "_series_title": name,
-                             "_key": f"localseries::{name}",
-                             "_clean_title": name, "_poster_kind": "tv",
-                             "stream_icon": "",
-                             "_desc": f"{len(seasons)} × {len(eps)}"})
-        if movies:
-            rows.append({"_header": tr("nav_movies")})
-            rows += movies
-        rows = [r for r in rows if r.get("_header")
-                or self._search_filter([r])]
-        self._render_rows(rows, "rec", tr("local_empty"))
-        self._local_resolve_posters(
-            [r for r in rows if r.get("_kind") in ("local", "localseries")])
+        in the tree) first, then the remaining files as movies.
+
+        The scan walks the whole root and stats every video - over an SMB
+        mount that is seconds to minutes, so it runs on the worker pool with
+        the busy strip up. Doing it on the UI thread froze the app (the
+        macOS beachball) the moment the library view met a real share."""
+        self._local_scan_token = getattr(self, "_local_scan_token", 0) + 1
+        token = self._local_scan_token
+        self._show_busy(tr("local_scanning"))
+
+        def job():
+            series: dict[str, list[tuple[int, int, str, str]]] = {}
+            movies: list[dict] = []
+            for p in self._local_scan(root):
+                stem = os.path.splitext(os.path.basename(p))[0]
+                se = episode_info(stem)
+                if se:
+                    sname = clean_title(stem[:se[2]])[0].strip(" -–")
+                    if not sname:
+                        sname = os.path.basename(os.path.dirname(p))
+                    series.setdefault(sname, []).append(
+                        (se[0], se[1], p, stem))
+                else:
+                    row = self._local_file_row(p, stem)
+                    if row:
+                        movies.append(row)
+            return series, movies
+
+        def done(result):
+            if token != getattr(self, "_local_scan_token", 0) \
+                    or self.mode != "local":
+                return     # superseded by a newer selection / section switch
+            self._hide_busy()
+            series, movies = result
+            self._local_series_index = series
+            rows: list[dict] = []
+            if series:
+                rows.append({"_header": tr("nav_series")})
+                for name in sorted(series, key=str.lower):
+                    eps = series[name]
+                    seasons = {s for s, _e, _p, _st in eps}
+                    rows.append({"name": name, "_kind": "localseries",
+                                 "_series_title": name,
+                                 "_key": f"localseries::{name}",
+                                 "_clean_title": name, "_poster_kind": "tv",
+                                 "stream_icon": "",
+                                 "_desc": f"{len(seasons)} × {len(eps)}"})
+            if movies:
+                rows.append({"_header": tr("nav_movies")})
+                rows += movies
+            rows = [r for r in rows if r.get("_header")
+                    or self._search_filter([r])]
+            self._render_rows(rows, "rec", tr("local_empty"))
+            self._local_resolve_posters(
+                [r for r in rows
+                 if r.get("_kind") in ("local", "localseries")])
+
+        def fail(e):
+            if token == getattr(self, "_local_scan_token", 0):
+                self._hide_busy()
+                log.warning("library scan failed for %s: %s", root, e)
+                self._render_rows([], "rec", tr("local_empty"))
+
+        run_async(self.pool, job, done, fail)
 
     def _local_open_series(self, title: str) -> None:
         if not title:

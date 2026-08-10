@@ -837,5 +837,6 @@
   "local_missing_remove": "Ukloni iz povijesti",
   "local_view_folders": "Prikaz: Mape",
   "local_view_series": "Prikaz: Biblioteka",
-  "local_season": "Sezona {n}"
+  "local_season": "Sezona {n}",
+  "local_scanning": "Čitanje biblioteke…"
 }

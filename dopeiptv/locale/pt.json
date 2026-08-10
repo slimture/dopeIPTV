@@ -837,5 +837,6 @@
   "local_missing_remove": "Remover do histórico",
   "local_view_folders": "Exibição: Pastas",
   "local_view_series": "Exibição: Biblioteca",
-  "local_season": "Temporada {n}"
+  "local_season": "Temporada {n}",
+  "local_scanning": "Lendo a biblioteca…"
 }

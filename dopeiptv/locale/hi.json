@@ -837,5 +837,6 @@
   "local_missing_remove": "इतिहास से हटाएँ",
   "local_view_folders": "दृश्य: फ़ोल्डर",
   "local_view_series": "दृश्य: लाइब्रेरी",
-  "local_season": "सीज़न {n}"
+  "local_season": "सीज़न {n}",
+  "local_scanning": "लाइब्रेरी पढ़ी जा रही है…"
 }

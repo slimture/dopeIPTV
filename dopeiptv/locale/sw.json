@@ -837,5 +837,6 @@
   "local_missing_remove": "Ondoa kwenye historia",
   "local_view_folders": "Mwonekano: Folda",
   "local_view_series": "Mwonekano: Maktaba",
-  "local_season": "Msimu wa {n}"
+  "local_season": "Msimu wa {n}",
+  "local_scanning": "Inasoma maktaba…"
 }

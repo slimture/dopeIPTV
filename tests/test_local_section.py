@@ -36,6 +36,13 @@ class _Stub(_LocalFilesMixin):
     VIDEO_EXTS = MainWindow.VIDEO_EXTS
 
     tmdb = None
+    pool = None
+
+    def _show_busy(self, msg=None):
+        pass
+
+    def _hide_busy(self):
+        pass
 
     def __init__(self):
         self.settings = _Settings()
@@ -160,7 +167,13 @@ def test_episode_info_reads_both_tag_styles():
     assert episode_info("A.Movie.2019.1080p") is None
 
 
-def test_library_view_groups_episodes_into_series(tmp_path):
+def test_library_view_groups_episodes_into_series(tmp_path, monkeypatch):
+    # The scan runs on the worker pool in the app (a UI-thread walk of an
+    # SMB mount froze macOS); the test runs it inline.
+    import dopeiptv.ui.mw_local as ml
+    monkeypatch.setattr(
+        ml, "run_async",
+        lambda pool, fn, done, err=None: done(fn()))
     root = tmp_path / "Media"
     (root / "Serier").mkdir(parents=True)
     (root / "Serier" / "Show.Name.S01E02.720p.mkv").write_bytes(b"x")

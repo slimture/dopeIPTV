@@ -837,5 +837,6 @@
   "local_missing_remove": "حذف از تاریخچه",
   "local_view_folders": "نما: پوشه‌ها",
   "local_view_series": "نما: کتابخانه",
-  "local_season": "فصل {n}"
+  "local_season": "فصل {n}",
+  "local_scanning": "در حال خواندن کتابخانه…"
 }

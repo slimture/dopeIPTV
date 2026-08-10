@@ -837,5 +837,6 @@
   "local_missing_remove": "Aus dem Verlauf entfernen",
   "local_view_folders": "Ansicht: Ordner",
   "local_view_series": "Ansicht: Bibliothek",
-  "local_season": "Staffel {n}"
+  "local_season": "Staffel {n}",
+  "local_scanning": "Bibliothek wird eingelesen…"
 }

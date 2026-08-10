@@ -837,5 +837,6 @@
   "local_missing_remove": "Ta bort ur historiken",
   "local_view_folders": "Vy: Mappar",
   "local_view_series": "Vy: Bibliotek",
-  "local_season": "Säsong {n}"
+  "local_season": "Säsong {n}",
+  "local_scanning": "Läser in biblioteket…"
 }

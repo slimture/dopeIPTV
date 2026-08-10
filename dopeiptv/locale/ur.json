@@ -837,5 +837,6 @@
   "local_missing_remove": "تاریخ سے ہٹائیں",
   "local_view_folders": "منظر: فولڈرز",
   "local_view_series": "منظر: لائبریری",
-  "local_season": "سیزن {n}"
+  "local_season": "سیزن {n}",
+  "local_scanning": "لائبریری پڑھی جا رہی ہے…"
 }

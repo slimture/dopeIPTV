@@ -837,5 +837,6 @@
   "local_missing_remove": "הסרה מההיסטוריה",
   "local_view_folders": "תצוגה: תיקיות",
   "local_view_series": "תצוגה: ספרייה",
-  "local_season": "עונה {n}"
+  "local_season": "עונה {n}",
+  "local_scanning": "קורא את הספרייה…"
 }

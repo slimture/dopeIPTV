@@ -837,5 +837,6 @@
   "local_missing_remove": "Прибрати з історії",
   "local_view_folders": "Вигляд: Теки",
   "local_view_series": "Вигляд: Бібліотека",
-  "local_season": "Сезон {n}"
+  "local_season": "Сезон {n}",
+  "local_scanning": "Читання бібліотеки…"
 }

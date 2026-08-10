@@ -837,5 +837,6 @@
   "local_missing_remove": "إزالة من السجل",
   "local_view_folders": "العرض: مجلدات",
   "local_view_series": "العرض: المكتبة",
-  "local_season": "الموسم {n}"
+  "local_season": "الموسم {n}",
+  "local_scanning": "جارٍ قراءة المكتبة…"
 }

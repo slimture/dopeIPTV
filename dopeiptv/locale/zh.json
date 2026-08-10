@@ -837,5 +837,6 @@
   "local_missing_remove": "从历史记录中移除",
   "local_view_folders": "视图:文件夹",
   "local_view_series": "视图:媒体库",
-  "local_season": "第 {n} 季"
+  "local_season": "第 {n} 季",
+  "local_scanning": "正在读取媒体库…"
 }

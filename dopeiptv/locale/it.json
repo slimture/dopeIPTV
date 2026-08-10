@@ -837,5 +837,6 @@
   "local_missing_remove": "Rimuovi dalla cronologia",
   "local_view_folders": "Vista: Cartelle",
   "local_view_series": "Vista: Libreria",
-  "local_season": "Stagione {n}"
+  "local_season": "Stagione {n}",
+  "local_scanning": "Lettura della libreria…"
 }

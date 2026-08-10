@@ -837,5 +837,6 @@
   "local_missing_remove": "Αφαίρεση από το ιστορικό",
   "local_view_folders": "Προβολή: Φάκελοι",
   "local_view_series": "Προβολή: Βιβλιοθήκη",
-  "local_season": "Κύκλος {n}"
+  "local_season": "Κύκλος {n}",
+  "local_scanning": "Ανάγνωση της βιβλιοθήκης…"
 }

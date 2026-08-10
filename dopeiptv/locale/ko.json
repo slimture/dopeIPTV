@@ -837,5 +837,6 @@
   "local_missing_remove": "기록에서 제거",
   "local_view_folders": "보기: 폴더",
   "local_view_series": "보기: 라이브러리",
-  "local_season": "시즌 {n}"
+  "local_season": "시즌 {n}",
+  "local_scanning": "라이브러리 읽는 중…"
 }

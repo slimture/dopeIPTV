@@ -837,5 +837,6 @@
   "local_missing_remove": "Geçmişten kaldır",
   "local_view_folders": "Görünüm: Klasörler",
   "local_view_series": "Görünüm: Kitaplık",
-  "local_season": "Sezon {n}"
+  "local_season": "Sezon {n}",
+  "local_scanning": "Kitaplık okunuyor…"
 }
