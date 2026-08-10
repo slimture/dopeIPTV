@@ -839,5 +839,10 @@
   "local_view_series": "Weergave: Bibliotheek",
   "local_season": "Seizoen {n}",
   "local_scanning": "Bibliotheek wordt gelezen…",
-  "local_collections": "Mijn mappen"
+  "local_collections": "Mijn mappen",
+  "local_settings_hint": "Mappen die de sectie Lokale bestanden doorbladert. Gekoppelde netwerkshares verschijnen daar vanzelf.",
+  "local_clear_lib_cache": "Bibliotheekcache wissen",
+  "local_clear_posters": "TMDB-postercache wissen",
+  "local_clear_thumbs": "Videominiaturen wissen",
+  "local_cleared": "Gewist."
 }

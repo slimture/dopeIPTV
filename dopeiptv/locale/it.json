@@ -839,5 +839,10 @@
   "local_view_series": "Vista: Libreria",
   "local_season": "Stagione {n}",
   "local_scanning": "Lettura della libreria…",
-  "local_collections": "Le mie cartelle"
+  "local_collections": "Le mie cartelle",
+  "local_settings_hint": "Cartelle sfogliate dalla sezione File locali. Le condivisioni di rete montate vi compaiono da sole.",
+  "local_clear_lib_cache": "Svuota cache della libreria",
+  "local_clear_posters": "Svuota cache dei poster TMDB",
+  "local_clear_thumbs": "Svuota miniature video",
+  "local_cleared": "Svuotato."
 }

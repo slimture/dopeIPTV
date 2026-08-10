@@ -839,5 +839,10 @@
   "local_view_series": "Tampilan: Pustaka",
   "local_season": "Musim {n}",
   "local_scanning": "Membaca pustaka…",
-  "local_collections": "Folder saya"
+  "local_collections": "Folder saya",
+  "local_settings_hint": "Folder yang dijelajahi bagian Berkas lokal. Berbagi jaringan yang terpasang muncul di sana dengan sendirinya.",
+  "local_clear_lib_cache": "Bersihkan cache pustaka",
+  "local_clear_posters": "Bersihkan cache poster TMDB",
+  "local_clear_thumbs": "Bersihkan gambar mini video",
+  "local_cleared": "Dibersihkan."
 }

@@ -839,5 +839,10 @@
   "local_view_series": "منظر: لائبریری",
   "local_season": "سیزن {n}",
   "local_scanning": "لائبریری پڑھی جا رہی ہے…",
-  "local_collections": "میرے فولڈرز"
+  "local_collections": "میرے فولڈرز",
+  "local_settings_hint": "وہ فولڈرز جنہیں مقامی فائلوں کا حصہ براؤز کرتا ہے۔ ماؤنٹ شدہ نیٹ ورک شیئرز وہاں خود ظاہر ہوتے ہیں۔",
+  "local_clear_lib_cache": "لائبریری کیش صاف کریں",
+  "local_clear_posters": "TMDB پوسٹر کیش صاف کریں",
+  "local_clear_thumbs": "ویڈیو تھمب نیلز صاف کریں",
+  "local_cleared": "صاف ہو گیا۔"
 }

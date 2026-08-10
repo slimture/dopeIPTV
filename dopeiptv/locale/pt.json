@@ -839,5 +839,10 @@
   "local_view_series": "Exibição: Biblioteca",
   "local_season": "Temporada {n}",
   "local_scanning": "Lendo a biblioteca…",
-  "local_collections": "Minhas pastas"
+  "local_collections": "Minhas pastas",
+  "local_settings_hint": "Pastas navegadas pela seção Arquivos locais. Compartilhamentos de rede montados aparecem lá sozinhos.",
+  "local_clear_lib_cache": "Limpar cache da biblioteca",
+  "local_clear_posters": "Limpar cache de pôsteres TMDB",
+  "local_clear_thumbs": "Limpar miniaturas de vídeo",
+  "local_cleared": "Limpo."
 }

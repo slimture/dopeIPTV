@@ -839,5 +839,10 @@
   "local_view_series": "Προβολή: Βιβλιοθήκη",
   "local_season": "Κύκλος {n}",
   "local_scanning": "Ανάγνωση της βιβλιοθήκης…",
-  "local_collections": "Οι φάκελοί μου"
+  "local_collections": "Οι φάκελοί μου",
+  "local_settings_hint": "Φάκελοι που εξερευνά η ενότητα Τοπικά αρχεία. Οι προσαρτημένοι κοινόχρηστοι πόροι εμφανίζονται εκεί μόνοι τους.",
+  "local_clear_lib_cache": "Εκκαθάριση cache βιβλιοθήκης",
+  "local_clear_posters": "Εκκαθάριση cache αφισών TMDB",
+  "local_clear_thumbs": "Εκκαθάριση μικρογραφιών βίντεο",
+  "local_cleared": "Εκκαθαρίστηκε."
 }

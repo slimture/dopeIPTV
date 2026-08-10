@@ -839,5 +839,10 @@
   "local_view_series": "보기: 라이브러리",
   "local_season": "시즌 {n}",
   "local_scanning": "라이브러리 읽는 중…",
-  "local_collections": "내 폴더"
+  "local_collections": "내 폴더",
+  "local_settings_hint": "로컬 파일 섹션이 탐색하는 폴더입니다. 마운트된 네트워크 공유는 자동으로 나타납니다.",
+  "local_clear_lib_cache": "라이브러리 캐시 지우기",
+  "local_clear_posters": "TMDB 포스터 캐시 지우기",
+  "local_clear_thumbs": "동영상 썸네일 지우기",
+  "local_cleared": "지워졌습니다."
 }

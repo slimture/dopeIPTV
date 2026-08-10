@@ -839,5 +839,10 @@
   "local_view_series": "视图:媒体库",
   "local_season": "第 {n} 季",
   "local_scanning": "正在读取媒体库…",
-  "local_collections": "我的文件夹"
+  "local_collections": "我的文件夹",
+  "local_settings_hint": "本地文件部分浏览的文件夹。已挂载的网络共享会自动出现在那里。",
+  "local_clear_lib_cache": "清除媒体库缓存",
+  "local_clear_posters": "清除 TMDB 海报缓存",
+  "local_clear_thumbs": "清除视频缩略图",
+  "local_cleared": "已清除。"
 }

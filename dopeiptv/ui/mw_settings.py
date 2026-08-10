@@ -10,6 +10,8 @@ import re
 import sys
 from datetime import datetime
 
+import os
+
 from PyQt6.QtCore import QEvent, QObject, QRectF, QSize, Qt, QTimer, QUrl
 from PyQt6.QtGui import (
     QColor, QCursor, QDesktopServices, QFont, QFontMetrics, QIcon, QPainter,
@@ -1164,6 +1166,80 @@ class _SettingsMixin:
         recv.addWidget(rec_hint2)
         recv.addStretch()
         tabs.addTab(rec_tab, tr("tab_recording"))
+
+        # Local files tab: the section's folders and its three caches.
+        loc_tab = QWidget()
+        lv = QVBoxLayout(loc_tab)
+        lv.setSpacing(10)
+        loc_hint = QLabel(tr("local_settings_hint"))
+        loc_hint.setWordWrap(True)
+        loc_hint.setObjectName("DetailMeta")
+        lv.addWidget(loc_hint)
+        loc_list = QListWidget()
+        for d in self._local_dirs():
+            loc_list.addItem(d)
+        lv.addWidget(loc_list, 1)
+        loc_btns = QHBoxLayout()
+        loc_add = QPushButton(tr("btn_add"))
+        loc_del = QPushButton(tr("btn_remove"))
+        loc_btns.addWidget(loc_add)
+        loc_btns.addWidget(loc_del)
+        loc_btns.addStretch(1)
+        lv.addLayout(loc_btns)
+        loc_note = QLabel("")
+        loc_note.setObjectName("DetailMeta")
+        cache_btns = QHBoxLayout()
+        loc_clear_lib = QPushButton(tr("local_clear_lib_cache"))
+        loc_clear_post = QPushButton(tr("local_clear_posters"))
+        loc_clear_thumb = QPushButton(tr("local_clear_thumbs"))
+        for b in (loc_clear_lib, loc_clear_post, loc_clear_thumb):
+            cache_btns.addWidget(b)
+        cache_btns.addStretch(1)
+        lv.addLayout(cache_btns)
+        lv.addWidget(loc_note)
+
+        def loc_refresh_side():
+            # Reflect a folder change in the section immediately.
+            if self.mode == "local":
+                self.cat_list.blockSignals(True)
+                self.cat_list.clear()
+                self.cat_list.blockSignals(False)
+                self._load_local_categories()
+
+        def loc_add_dir():
+            start = (self.settings.value("local_open_dir", "")
+                     or os.path.expanduser("~"))
+            path = QFileDialog.getExistingDirectory(
+                d, tr("local_add_folder_title"), start,
+                QFileDialog.Option.DontUseNativeDialog
+                | QFileDialog.Option.ShowDirsOnly)
+            dirs = self._local_dirs()
+            if path and path not in dirs:
+                self._save_local_dirs(dirs + [path])
+                loc_list.addItem(path)
+                loc_refresh_side()
+
+        def loc_del_dir():
+            it = loc_list.currentItem()
+            if it is None:
+                return
+            self._save_local_dirs(
+                [d for d in self._local_dirs() if d != it.text()])
+            loc_list.takeItem(loc_list.row(it))
+            loc_refresh_side()
+
+        def loc_cleared():
+            loc_note.setText(tr("local_cleared"))
+
+        loc_add.clicked.connect(loc_add_dir)
+        loc_del.clicked.connect(loc_del_dir)
+        loc_clear_lib.clicked.connect(
+            lambda: (self._local_clear_library_cache(), loc_cleared()))
+        loc_clear_post.clicked.connect(
+            lambda: (self._local_clear_poster_cache(), loc_cleared()))
+        loc_clear_thumb.clicked.connect(
+            lambda: (self._local_clear_thumbs(), loc_cleared()))
+        tabs.addTab(loc_tab, tr("nav_local"))
 
         # Metadata tab (TMDB artwork)
         meta_tab = QWidget()

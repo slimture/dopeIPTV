@@ -839,5 +839,10 @@
   "local_view_series": "Görünüm: Kitaplık",
   "local_season": "Sezon {n}",
   "local_scanning": "Kitaplık okunuyor…",
-  "local_collections": "Klasörlerim"
+  "local_collections": "Klasörlerim",
+  "local_settings_hint": "Yerel dosyalar bölümünün göz attığı klasörler. Bağlı ağ paylaşımları orada kendiliğinden görünür.",
+  "local_clear_lib_cache": "Kitaplık önbelleğini temizle",
+  "local_clear_posters": "TMDB poster önbelleğini temizle",
+  "local_clear_thumbs": "Video küçük resimlerini temizle",
+  "local_cleared": "Temizlendi."
 }

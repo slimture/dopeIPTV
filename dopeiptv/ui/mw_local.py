@@ -144,13 +144,8 @@ class _LocalFilesMixin:
         add = QListWidgetItem(tr("local_add_folder"))
         add.setData(Qt.ItemDataRole.UserRole, "__add__")
         self.cat_list.addItem(add)
-        view = QListWidgetItem(
-            tr("local_view_series") if self._local_view() == "series"
-            else tr("local_view_folders"))
-        view.setData(Qt.ItemDataRole.UserRole, "__view__")
-        self.cat_list.addItem(view)
         self.cat_list.blockSignals(False)
-        if self.cat_list.count() > 2:
+        if self.cat_list.count() > 1:
             self._select_remembered_cat()
         else:
             # Nothing registered and nothing mounted: don't auto-select the
@@ -194,13 +189,44 @@ class _LocalFilesMixin:
         self.settings.setValue(
             "local_view",
             "series" if self._local_view() == "folders" else "folders")
+        self._sync_local_view_btn()
         self._local_ctx = None
         self._local_series = None
         self.back_btn.hide()
-        self.cat_list.blockSignals(True)
-        self.cat_list.clear()
-        self.cat_list.blockSignals(False)
-        self._load_local_categories()
+        self._load_local_items(self._current_cat)
+
+    def _sync_local_view_btn(self) -> None:
+        btn = getattr(self, "local_view_btn", None)
+        if btn is None:
+            return
+        series = self._local_view() == "series"
+        btn.setChecked(series)
+        btn.setText(tr("local_view_series") if series
+                    else tr("local_view_folders"))
+
+    # -- settings-tab helpers ------------------------------------------------
+
+    def _local_clear_library_cache(self) -> None:
+        """Forget every scanned library (the walk starts fresh next visit).
+        Nothing on disk beyond our own cache file is touched."""
+        try:
+            os.unlink(self._library_cache_path())
+        except OSError:
+            pass
+        self._local_scan_done = {}
+        self._local_series_index = {}
+        self._local_collection_index = {}
+        self._local_movies_rows = []
+
+    def _local_clear_poster_cache(self) -> None:
+        self.settings.remove("local_tmdb_posters_v2")
+
+    def _local_clear_thumbs(self) -> None:
+        from ..core.workers import clear_directory, default_image_cache_dir
+        try:
+            clear_directory(default_image_cache_dir("thumbs"))
+        except OSError as e:
+            log.warning("thumbs clear failed: %s", e)
 
     # -- the middle list (directory browsing) --------------------------------
 
@@ -430,9 +456,10 @@ class _LocalFilesMixin:
                 [se[0], se[1], p, stem])
             return
         rel = os.path.relpath(os.path.normpath(p), state["root"])
-        parts = rel.split(os.sep)
-        if len(parts) > 1:
-            state["collections"].setdefault(parts[0], []).append(p)
+        d = os.path.dirname(rel)
+        if d:
+            state["collections"].setdefault(
+                d.replace(os.sep, " / "), []).append(p)
         else:
             row = self._local_file_row(p, stem, stat=False)
             if row:
@@ -606,7 +633,7 @@ class _LocalFilesMixin:
         gen = self._load_gen
 
         def job():
-            out, changed = {}, False
+            out, changed, errors = {}, False, 0
             for f in todo:
                 ck = f"{f['t']} {f['y']}".strip()
                 if ck in cache:
@@ -615,8 +642,12 @@ class _LocalFilesMixin:
                     try:
                         url = tm.poster_url(ck, f["k"]) \
                             or tm.poster_url(f["t"], f["k"]) or ""
-                    except Exception:
-                        continue   # network hiccup: retry next visit
+                    except Exception as e:
+                        if not errors:
+                            log.warning("tmdb lookup failed (%r): %r",
+                                        ck, e)
+                        errors += 1
+                        continue   # not cached: retried next visit
                     cache[ck] = url
                     changed = True
                 if url:
@@ -624,7 +655,8 @@ class _LocalFilesMixin:
             if changed:
                 self.settings.setValue(
                     "local_tmdb_posters_v2", json.dumps(cache))
-            log.info("tmdb posters: %d/%d resolved", len(out), len(todo))
+            log.info("tmdb posters: %d/%d resolved (%d errors)",
+                     len(out), len(todo), errors)
             return out
 
         def done(out):

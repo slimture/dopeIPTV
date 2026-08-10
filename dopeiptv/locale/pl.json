@@ -839,5 +839,10 @@
   "local_view_series": "Widok: Biblioteka",
   "local_season": "Sezon {n}",
   "local_scanning": "Wczytywanie biblioteki…",
-  "local_collections": "Moje foldery"
+  "local_collections": "Moje foldery",
+  "local_settings_hint": "Foldery przeglądane przez sekcję Pliki lokalne. Zamontowane udziały sieciowe pojawiają się tam same.",
+  "local_clear_lib_cache": "Wyczyść pamięć podręczną biblioteki",
+  "local_clear_posters": "Wyczyść pamięć plakatów TMDB",
+  "local_clear_thumbs": "Wyczyść miniatury wideo",
+  "local_cleared": "Wyczyszczono."
 }

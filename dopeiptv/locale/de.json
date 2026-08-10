@@ -839,5 +839,10 @@
   "local_view_series": "Ansicht: Bibliothek",
   "local_season": "Staffel {n}",
   "local_scanning": "Bibliothek wird eingelesen…",
-  "local_collections": "Meine Ordner"
+  "local_collections": "Meine Ordner",
+  "local_settings_hint": "Ordner, die der Bereich Lokale Dateien durchsucht. Eingebundene Netzwerkfreigaben erscheinen dort von selbst.",
+  "local_clear_lib_cache": "Bibliothekscache leeren",
+  "local_clear_posters": "TMDB-Postercache leeren",
+  "local_clear_thumbs": "Videominiaturen leeren",
+  "local_cleared": "Geleert."
 }

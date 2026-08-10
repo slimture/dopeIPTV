@@ -839,5 +839,10 @@
   "local_view_series": "العرض: المكتبة",
   "local_season": "الموسم {n}",
   "local_scanning": "جارٍ قراءة المكتبة…",
-  "local_collections": "مجلداتي"
+  "local_collections": "مجلداتي",
+  "local_settings_hint": "المجلدات التي يتصفحها قسم الملفات المحلية. تظهر مشاركات الشبكة المحمّلة هناك تلقائيًا.",
+  "local_clear_lib_cache": "مسح ذاكرة المكتبة",
+  "local_clear_posters": "مسح ذاكرة ملصقات TMDB",
+  "local_clear_thumbs": "مسح مصغرات الفيديو",
+  "local_cleared": "تم المسح."
 }

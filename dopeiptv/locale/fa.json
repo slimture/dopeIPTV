@@ -839,5 +839,10 @@
   "local_view_series": "نما: کتابخانه",
   "local_season": "فصل {n}",
   "local_scanning": "در حال خواندن کتابخانه…",
-  "local_collections": "پوشه‌های من"
+  "local_collections": "پوشه‌های من",
+  "local_settings_hint": "پوشه‌هایی که بخش پرونده‌های محلی مرور می‌کند. اشتراک‌های شبکه متصل خودشان آنجا ظاهر می‌شوند.",
+  "local_clear_lib_cache": "پاک کردن حافظه نهان کتابخانه",
+  "local_clear_posters": "پاک کردن حافظه نهان پوسترهای TMDB",
+  "local_clear_thumbs": "پاک کردن بندانگشتی‌های ویدئو",
+  "local_cleared": "پاک شد."
 }

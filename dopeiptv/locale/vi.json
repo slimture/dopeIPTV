@@ -839,5 +839,10 @@
   "local_view_series": "Chế độ xem: Thư viện",
   "local_season": "Mùa {n}",
   "local_scanning": "Đang đọc thư viện…",
-  "local_collections": "Thư mục của tôi"
+  "local_collections": "Thư mục của tôi",
+  "local_settings_hint": "Các thư mục mà mục Tệp cục bộ duyệt. Chia sẻ mạng đã gắn kết tự xuất hiện ở đó.",
+  "local_clear_lib_cache": "Xóa bộ nhớ đệm thư viện",
+  "local_clear_posters": "Xóa bộ nhớ đệm áp phích TMDB",
+  "local_clear_thumbs": "Xóa hình thu nhỏ video",
+  "local_cleared": "Đã xóa."
 }

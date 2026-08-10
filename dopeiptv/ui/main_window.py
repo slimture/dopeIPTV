@@ -880,6 +880,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         ctl.addWidget(self.sort_box)
         ctl.addWidget(self._sort_menu_btn)
         ctl.addStretch()
+        # Folder/library switch for the Local files section - lives up here
+        # with the other view controls (it sat as a fake row in the category
+        # column first, which read as a folder, not a control).
+        self.local_view_btn = QPushButton(objectName="InlineToggle")
+        self.local_view_btn.setCheckable(True)
+        self.local_view_btn.hide()
+        self.local_view_btn.clicked.connect(self._local_toggle_view)
+        ctl.addWidget(self.local_view_btn)
         ctl.addWidget(self.grid_btn)
         ml.addLayout(ctl)
 
@@ -2075,6 +2083,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.series_ctx = None
         self.back_btn.hide()
         self.clear_history_btn.setVisible(mode == "history")
+        if hasattr(self, "local_view_btn"):
+            self.local_view_btn.setVisible(mode == "local")
+            self._sync_local_view_btn()
         self.listw.setSelectionMode(
             QAbstractItemView.SelectionMode.ExtendedSelection
             if mode in ("history", "rec")
@@ -2417,9 +2428,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # The "+ Add folder" row is a button, not a category: open the
             # picker (it rebuilds the list and selects the new folder).
             self._local_add_folder()
-            return
-        if self.mode == "local" and cat == "__view__":
-            self._local_toggle_view()
             return
         locked = False
         if cat is not None:

@@ -839,5 +839,10 @@
   "local_view_series": "Vy: Bibliotek",
   "local_season": "Säsong {n}",
   "local_scanning": "Läser in biblioteket…",
-  "local_collections": "Mina mappar"
+  "local_collections": "Mina mappar",
+  "local_settings_hint": "Mappar som sektionen Lokala filer bläddrar i. Monterade nätverksutdelningar dyker upp där av sig själva.",
+  "local_clear_lib_cache": "Rensa bibliotekscache",
+  "local_clear_posters": "Rensa TMDB-postercache",
+  "local_clear_thumbs": "Rensa videominiatyrer",
+  "local_cleared": "Rensat."
 }

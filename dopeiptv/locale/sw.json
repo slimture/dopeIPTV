@@ -839,5 +839,10 @@
   "local_view_series": "Mwonekano: Maktaba",
   "local_season": "Msimu wa {n}",
   "local_scanning": "Inasoma maktaba…",
-  "local_collections": "Folda zangu"
+  "local_collections": "Folda zangu",
+  "local_settings_hint": "Folda zinazovinjariwa na sehemu ya Faili za ndani. Hisa za mtandao zilizounganishwa huonekana huko zenyewe.",
+  "local_clear_lib_cache": "Futa akiba ya maktaba",
+  "local_clear_posters": "Futa akiba ya mabango ya TMDB",
+  "local_clear_thumbs": "Futa vijipicha vya video",
+  "local_cleared": "Imefutwa."
 }

@@ -839,5 +839,10 @@
   "local_view_series": "Prikaz: Biblioteka",
   "local_season": "Sezona {n}",
   "local_scanning": "Čitanje biblioteke…",
-  "local_collections": "Moje mape"
+  "local_collections": "Moje mape",
+  "local_settings_hint": "Mape koje pregledava odjeljak Lokalne datoteke. Montirani mrežni resursi pojavljuju se tamo sami.",
+  "local_clear_lib_cache": "Očisti predmemoriju biblioteke",
+  "local_clear_posters": "Očisti predmemoriju TMDB postera",
+  "local_clear_thumbs": "Očisti sličice videa",
+  "local_cleared": "Očišćeno."
 }

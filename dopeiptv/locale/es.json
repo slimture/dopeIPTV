@@ -839,5 +839,10 @@
   "local_view_series": "Vista: Biblioteca",
   "local_season": "Temporada {n}",
   "local_scanning": "Leyendo la biblioteca…",
-  "local_collections": "Mis carpetas"
+  "local_collections": "Mis carpetas",
+  "local_settings_hint": "Carpetas que explora la sección Archivos locales. Los recursos de red montados aparecen allí solos.",
+  "local_clear_lib_cache": "Borrar caché de la biblioteca",
+  "local_clear_posters": "Borrar caché de pósteres TMDB",
+  "local_clear_thumbs": "Borrar miniaturas de vídeo",
+  "local_cleared": "Borrado."
 }

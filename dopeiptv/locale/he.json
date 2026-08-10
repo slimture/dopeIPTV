@@ -839,5 +839,10 @@
   "local_view_series": "תצוגה: ספרייה",
   "local_season": "עונה {n}",
   "local_scanning": "קורא את הספרייה…",
-  "local_collections": "התיקיות שלי"
+  "local_collections": "התיקיות שלי",
+  "local_settings_hint": "תיקיות שמדור הקבצים המקומיים מעיין בהן. שיתופי רשת מעוגנים מופיעים שם מעצמם.",
+  "local_clear_lib_cache": "ניקוי מטמון הספרייה",
+  "local_clear_posters": "ניקוי מטמון כרזות TMDB",
+  "local_clear_thumbs": "ניקוי תמונות ממוזערות",
+  "local_cleared": "נוקה."
 }

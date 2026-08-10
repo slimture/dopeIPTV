@@ -839,5 +839,10 @@
   "local_view_series": "Вид: Библиотека",
   "local_season": "Сезон {n}",
   "local_scanning": "Чтение библиотеки…",
-  "local_collections": "Мои папки"
+  "local_collections": "Мои папки",
+  "local_settings_hint": "Папки, которые просматривает раздел Локальные файлы. Смонтированные сетевые ресурсы появляются там сами.",
+  "local_clear_lib_cache": "Очистить кэш библиотеки",
+  "local_clear_posters": "Очистить кэш постеров TMDB",
+  "local_clear_thumbs": "Очистить миниатюры видео",
+  "local_cleared": "Очищено."
 }
