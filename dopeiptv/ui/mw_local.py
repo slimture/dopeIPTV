@@ -364,17 +364,25 @@ class _LocalFilesMixin:
             collections = state["collections"]
             movies = state["movies"]
             if not finished:
-                # Mid-walk. With a cached view on screen, leave it alone -
-                # swapping a full library for a half-walked one made rows
-                # "disappear" until the walk found them again. Progressive
-                # fill is for the first visit, when there is nothing else
-                # to show - and even then never while the user is drilled
-                # into a series/collection.
-                if cached is None:
-                    self._local_series_index = series
-                    self._local_collection_index = collections
-                    if not getattr(self, "_local_series", None):
-                        self._apply_library(series, movies, collections)
+                # Mid-walk: render the UNION of the cached view and what the
+                # walk has found so far. Rows the walk hasn't re-reached yet
+                # stay (no vanishing), new files appear as they are found,
+                # and files deleted on disk are dropped only when the walk
+                # completes. Never re-render under a drilled-in user.
+                if cached is not None:
+                    ms = dict(cached.get("series") or {})
+                    ms.update(series)
+                    mc = dict(cached.get("collections") or {})
+                    mc.update(collections)
+                    seen = {r.get("_key") for r in movies}
+                    mm = movies + [r for r in (cached.get("movies") or [])
+                                   if r.get("_key") not in seen]
+                else:
+                    ms, mc, mm = series, collections, movies
+                self._local_series_index = ms
+                self._local_collection_index = mc
+                if not getattr(self, "_local_series", None):
+                    self._apply_library(ms, mm, mc)
                 self._local_scan_step(root, state, token, cached)
                 return
             self._local_pulse_stop()
