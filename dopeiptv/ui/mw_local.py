@@ -19,6 +19,7 @@ import re
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QListWidgetItem
 
+from ..core.audiotags import cover_bytes, display_name, read_tags
 from ..core.log import log
 from ..core.workers import run_async
 from ..i18n import tr
@@ -273,18 +274,26 @@ class _LocalFilesMixin:
                     continue
                 stem = os.path.splitext(n)[0]
                 if n.lower().endswith(self.AUDIO_EXTS):
-                    # A track keeps its name as written; the release-tag
-                    # cleaner is for film files and mangles numbering.
-                    title, year = stem, ""
-                else:
-                    title, year = clean_title(stem)
+                    tags = read_tags(p)[0]
+                    files.append({
+                        "name": display_name(p, tags), "_kind": "local",
+                        "_clean_title": "",
+                        "_year": tags.get("date", "")[:4],
+                        "_cast_url": p, "_path": p, "_key": p,
+                        "_size": st.st_size, "added": str(int(st.st_mtime)),
+                        "stream_icon": cover or self._embedded_cover(p),
+                        "_artist": tags.get("artist")
+                        or tags.get("albumartist", ""),
+                        "_album": tags.get("album", ""),
+                        "_filename": stem})
+                    continue
+                title, year = clean_title(stem)
                 files.append({"name": f"{title} ({year})" if year else title,
                               "_kind": "local", "_clean_title": title,
                               "_year": year, "_cast_url": p,
                               "_path": p, "_key": p, "_size": st.st_size,
                               "added": str(int(st.st_mtime)),
-                              "stream_icon": cover if n.lower().endswith(
-                                  self.AUDIO_EXTS) else "",
+                              "stream_icon": "",
                               "_filename": stem})
         rows = self._search_filter(dirs) + self._search_filter(files)
         self._render_rows(rows, "rec", tr("local_empty"))
@@ -375,11 +384,17 @@ class _LocalFilesMixin:
                 return None
         stem = stem or os.path.splitext(os.path.basename(p))[0]
         if p.lower().endswith(self.AUDIO_EXTS):
-            # A track name is already the title - cleaning it mangles
-            # numbering and punctuation ("01. Jail" -> "01 Jail").
-            return {"name": stem, "_kind": "local", "_clean_title": "",
-                    "_year": "", "_cast_url": p, "_path": p, "_key": p,
+            # The tags name the track properly ("2. Jail" by Kanye West);
+            # the file name is only the fallback. Reading them touches a
+            # few KB of the header, not the file.
+            tags = read_tags(p)[0]
+            return {"name": display_name(p, tags), "_kind": "local",
+                    "_clean_title": "", "_year": tags.get("date", "")[:4],
+                    "_cast_url": p, "_path": p, "_key": p,
                     "_size": 0, "added": "0", "stream_icon": "",
+                    "_artist": tags.get("artist")
+                    or tags.get("albumartist", ""),
+                    "_album": tags.get("album", ""),
                     "_filename": stem}
         title, year = clean_title(stem)
         return {"name": f"{title} ({year})" if year else title,
@@ -669,13 +684,42 @@ class _LocalFilesMixin:
                 break
         return best
 
-    @staticmethod
-    def _album_cover(d: str) -> str:
+    def _embedded_cover(self, track: str) -> str:
+        """Album art carried INSIDE the file - the usual case for a
+        properly tagged library with no cover.jpg lying about. Written to
+        the image cache once, keyed on the folder so a whole album shares
+        one extraction."""
+        d = os.path.dirname(track)
+        try:
+            import hashlib
+            from ..core.workers import default_image_cache_dir
+            tdir = default_image_cache_dir("thumbs")
+            out = str(tdir / ("art-" + hashlib.sha1(
+                d.encode("utf-8")).hexdigest() + ".img"))
+            if os.path.isfile(out):
+                return out if os.path.getsize(out) else ""
+            data = cover_bytes(track)
+            os.makedirs(tdir, exist_ok=True)
+            with open(out, "wb") as fh:
+                fh.write(data or b"")     # empty marks "asked, none there"
+            return out if data else ""
+        except OSError as e:
+            log.debug("embedded cover failed for %s: %s", track, e)
+            return ""
+
+    def _album_cover(self, d: str) -> str:
         for n in ("cover.jpg", "cover.jpeg", "cover.png", "folder.jpg",
                   "folder.png", "front.jpg", "album.jpg"):
             p = os.path.join(d, n)
             if os.path.isfile(p):
                 return p
+        # No cover file: borrow the art embedded in the first track.
+        try:
+            for n in sorted(os.listdir(d), key=str.lower)[:40]:
+                if n.lower().endswith(self.AUDIO_EXTS):
+                    return self._embedded_cover(os.path.join(d, n))
+        except OSError:
+            pass
         return ""
 
     def _folder_tile(self) -> str:

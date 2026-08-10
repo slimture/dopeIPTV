@@ -106,9 +106,18 @@ class _DetailMixin:
             # albums - so the panel is built from the folders the track sits
             # in (…/Artist/Album/track) plus whatever cover art is there.
             import os as _os
+
+            from ..core.audiotags import read_tags
+            tags = read_tags(it.get("_path") or "")[0]
             d = _os.path.dirname(it.get("_path") or "")
-            album = _os.path.basename(d)
-            artist = _os.path.basename(_os.path.dirname(d))
+            artist = (it.get("_artist") or tags.get("artist")
+                      or tags.get("albumartist")
+                      or _os.path.basename(_os.path.dirname(d)))
+            album = (it.get("_album") or tags.get("album")
+                     or _os.path.basename(d))
+            year = (tags.get("date") or "")[:4]
+            if year:
+                album = f"{album} ({year})"
             lines = [x for x in (artist, album) if x]
             self.media_plot.setText("\n".join(lines))
             self.media_plot.setVisible(bool(lines))

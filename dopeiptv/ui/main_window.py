@@ -5372,6 +5372,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.show()
             self.player.set_overlay_info(title)
             self._apply_audio_visuals(url)
+        if kind == "local" and self._is_audio(url) and item is not None:
+            # Show THIS track in the detail panel - a queue that rolls on
+            # by itself must not leave the panel on the first track.
+            try:
+                self._show_detail(item)
+            except Exception as e:
+                log.debug("music detail refresh failed: %s", e)
         if kind == "local" and self._is_audio(url):
             q = getattr(self, "_track_queue", []) or []
             here = next((n for n, t in enumerate(q)
