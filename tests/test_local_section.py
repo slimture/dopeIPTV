@@ -41,6 +41,12 @@ class _Stub(_LocalFilesMixin):
     def _show_busy(self, msg=None):
         pass
 
+    def _library_cache(self):
+        return getattr(self, "_libcache", {})
+
+    def _save_library_cache(self, root, series, movies):
+        self._libcache = {root: {"series": series, "movies": movies}}
+
     def _hide_busy(self):
         pass
 
@@ -216,3 +222,33 @@ def test_folder_view_is_untouched_by_the_library_setting(tmp_path):
     w._current_cat = str(root)
     w._load_local_items(str(root))
     assert [r["_kind"] for r in w.rendered] == ["local"]
+
+
+def test_library_cache_warm_start(tmp_path, monkeypatch):
+    """Second visit renders from the cache before the rescan lands, and an
+    unchanged rescan does not re-render."""
+    import dopeiptv.ui.mw_local as ml
+    calls = []
+    monkeypatch.setattr(ml, "run_async",
+                        lambda pool, fn, done, err=None: calls.append(
+                            (fn, done)))
+    root = tmp_path / "M"
+    root.mkdir()
+    (root / "Show.S01E01.mkv").write_bytes(b"x")
+    w = _Stub()
+    w.settings.setValue("local_view", "series")
+    w._current_cat = str(root)
+
+    w._load_local_items(str(root))     # cold: nothing rendered yet
+    assert w.rendered == []
+    fn, done = calls[-1]
+    done(fn())                          # the scan lands
+    assert any(r.get("_kind") == "localseries" for r in w.rendered)
+
+    w.rendered = []
+    w._load_local_items(str(root))     # warm: instant render from cache
+    assert any(r.get("_kind") == "localseries" for r in w.rendered)
+    marker = w.rendered
+    fn, done = calls[-1]
+    done(fn())                          # unchanged rescan: no re-render
+    assert w.rendered is marker

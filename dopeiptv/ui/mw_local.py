@@ -311,7 +311,15 @@ class _LocalFilesMixin:
         macOS beachball) the moment the library view met a real share."""
         self._local_scan_token = getattr(self, "_local_scan_token", 0) + 1
         token = self._local_scan_token
-        self._show_busy(tr("local_scanning"))
+        # Last scan's result renders instantly; the fresh walk then runs by
+        # itself in the background and re-renders only if something changed.
+        # First visit to a root has nothing to show, so the busy strip does.
+        cached = self._library_cache().get(root)
+        if cached is not None:
+            self._apply_library(cached.get("series") or {},
+                                cached.get("movies") or [])
+        else:
+            self._show_busy(tr("local_scanning"))
 
         def job():
             series: dict[str, list[tuple[int, int, str, str]]] = {}
@@ -324,7 +332,7 @@ class _LocalFilesMixin:
                     if not sname:
                         sname = os.path.basename(os.path.dirname(p))
                     series.setdefault(sname, []).append(
-                        (se[0], se[1], p, stem))
+                        [se[0], se[1], p, stem])
                 else:
                     row = self._local_file_row(p, stem)
                     if row:
@@ -337,28 +345,12 @@ class _LocalFilesMixin:
                 return     # superseded by a newer selection / section switch
             self._hide_busy()
             series, movies = result
-            self._local_series_index = series
-            rows: list[dict] = []
-            if series:
-                rows.append({"_header": tr("nav_series")})
-                for name in sorted(series, key=str.lower):
-                    eps = series[name]
-                    seasons = {s for s, _e, _p, _st in eps}
-                    rows.append({"name": name, "_kind": "localseries",
-                                 "_series_title": name,
-                                 "_key": f"localseries::{name}",
-                                 "_clean_title": name, "_poster_kind": "tv",
-                                 "stream_icon": "",
-                                 "_desc": f"{len(seasons)} × {len(eps)}"})
-            if movies:
-                rows.append({"_header": tr("nav_movies")})
-                rows += movies
-            rows = [r for r in rows if r.get("_header")
-                    or self._search_filter([r])]
-            self._render_rows(rows, "rec", tr("local_empty"))
-            self._local_resolve_posters(
-                [r for r in rows
-                 if r.get("_kind") in ("local", "localseries")])
+            self._save_library_cache(root, series, movies)
+            if cached is not None \
+                    and cached.get("series") == series \
+                    and cached.get("movies") == movies:
+                return     # nothing changed: the cache render stands
+            self._apply_library(series, movies)
 
         def fail(e):
             if token == getattr(self, "_local_scan_token", 0):
@@ -367,6 +359,57 @@ class _LocalFilesMixin:
                 self._render_rows([], "rec", tr("local_empty"))
 
         run_async(self.pool, job, done, fail)
+
+    def _apply_library(self, series: dict, movies: list[dict]) -> None:
+        self._local_series_index = series
+        rows: list[dict] = []
+        if series:
+            rows.append({"_header": tr("nav_series")})
+            for name in sorted(series, key=str.lower):
+                eps = series[name]
+                seasons = {e[0] for e in eps}
+                rows.append({"name": name, "_kind": "localseries",
+                             "_series_title": name,
+                             "_key": f"localseries::{name}",
+                             "_clean_title": name, "_poster_kind": "tv",
+                             "stream_icon": "",
+                             "_desc": f"{len(seasons)} × {len(eps)}"})
+        if movies:
+            rows.append({"_header": tr("nav_movies")})
+            rows += movies
+        rows = [r for r in rows if r.get("_header")
+                or self._search_filter([r])]
+        self._render_rows(rows, "rec", tr("local_empty"))
+        self._local_resolve_posters(
+            [r for r in rows if r.get("_kind") in ("local", "localseries")])
+
+    def _library_cache_path(self) -> str:
+        from ..core.workers import default_image_cache_dir
+        return str(default_image_cache_dir("meta") / "local_library.json")
+
+    def _library_cache(self) -> dict:
+        try:
+            with open(self._library_cache_path(), encoding="utf-8") as fh:
+                v = json.load(fh)
+            return v if isinstance(v, dict) else {}
+        except (OSError, ValueError):
+            return {}
+
+    def _save_library_cache(self, root: str, series: dict,
+                            movies: list[dict]) -> None:
+        try:
+            cache = self._library_cache()
+            cache[root] = {"series": series, "movies": movies}
+            # Only the latest handful of roots - this is a warm-start, not
+            # a database.
+            for k in list(cache)[:-8]:
+                cache.pop(k, None)
+            path = self._library_cache_path()
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump(cache, fh)
+        except OSError as e:
+            log.warning("library cache save failed: %s", e)
 
     def _local_open_series(self, title: str) -> None:
         if not title:
