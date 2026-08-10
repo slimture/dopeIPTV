@@ -3376,6 +3376,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     VIDEO_EXTS = (".mkv", ".mp4", ".m4v", ".avi", ".mov", ".webm", ".ts",
                   ".m2ts", ".mts", ".mpg", ".mpeg", ".wmv", ".flv", ".ogv",
                   ".3gp", ".vob")
+    # Music plays through the very same mpv path - the picture just stays
+    # dark. Kept apart from VIDEO_EXTS: frame-grab thumbnails make no sense
+    # for audio.
+    AUDIO_EXTS = (".mp3", ".flac", ".m4a", ".aac", ".ogg", ".opus", ".wav",
+                  ".wma")
+    MEDIA_EXTS = VIDEO_EXTS + AUDIO_EXTS
 
     def open_local_video(self) -> None:
         """Pick a video off the disk and play it. A mounted SMB/NFS share (or
@@ -3384,7 +3390,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         from PyQt6.QtWidgets import QFileDialog
         start = (self.settings.value("local_open_dir", "")
                  or os.path.expanduser("~"))
-        pattern = " ".join("*" + e for e in self.VIDEO_EXTS)
+        pattern = " ".join("*" + e for e in self.MEDIA_EXTS)
         path, _ = QFileDialog.getOpenFileName(
             self, tr("open_video_title"), start,
             f"{tr('open_video_filter')} ({pattern});;All files (*)",
@@ -3408,14 +3414,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def dragEnterEvent(self, e) -> None:
         if any(u.isLocalFile()
-               and u.toLocalFile().lower().endswith(self.VIDEO_EXTS)
+               and u.toLocalFile().lower().endswith(self.MEDIA_EXTS)
                for u in e.mimeData().urls()):
             e.acceptProposedAction()
 
     def dropEvent(self, e) -> None:
         for u in e.mimeData().urls():
             p = u.toLocalFile()
-            if p and p.lower().endswith(self.VIDEO_EXTS):
+            if p and p.lower().endswith(self.MEDIA_EXTS):
                 self._play_local_path(p)
                 e.acceptProposedAction()
                 return

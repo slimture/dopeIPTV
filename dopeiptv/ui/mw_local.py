@@ -228,7 +228,7 @@ class _LocalFilesMixin:
             if os.path.isdir(p):
                 dirs.append({"name": "📁  " + n, "_kind": "localdir",
                              "_path": p, "_key": p, "stream_icon": ""})
-            elif n.lower().endswith(self.VIDEO_EXTS):
+            elif n.lower().endswith(self.MEDIA_EXTS):
                 try:
                     st = os.stat(p)
                 except OSError:
@@ -320,7 +320,7 @@ class _LocalFilesMixin:
                            and d.lower() not in self._SCAN_JUNK]
             for n in sorted(names, key=str.lower):
                 if n.startswith(".") or not n.lower().endswith(
-                        self.VIDEO_EXTS):
+                        self.MEDIA_EXTS):
                     continue
                 out.append(os.path.join(dirpath, n))
                 if len(out) >= max_files:
@@ -352,8 +352,11 @@ class _LocalFilesMixin:
             self._apply_library(cached.get("series") or {},
                                 cached.get("movies") or [],
                                 cached.get("collections") or {})
-        else:
-            self._show_busy(tr("local_scanning"))
+        # The strip shows during the rescan too - silence read as "it never
+        # looks for new files". Re-armed every 15 s: the busy watchdog hides
+        # a stuck strip after 25 s, and a real share takes longer than that.
+        self._show_busy(tr("local_scanning"))
+        self._local_pulse_start()
 
         log.info("library scan starting: %s", root)
 
@@ -392,6 +395,7 @@ class _LocalFilesMixin:
             if token != getattr(self, "_local_scan_token", 0) \
                     or self.mode != "local":
                 return     # superseded by a newer selection / section switch
+            self._local_pulse_stop()
             self._hide_busy()
             series, collections, movies = result
             self._save_library_cache(root, series, movies, collections)
@@ -404,11 +408,31 @@ class _LocalFilesMixin:
 
         def fail(e):
             if token == getattr(self, "_local_scan_token", 0):
+                self._local_pulse_stop()
                 self._hide_busy()
                 log.warning("library scan FAILED for %s: %r", root, e)
                 self._render_rows([], "rec", tr("local_empty"))
 
         run_async(self.pool, job, done, fail)
+
+    def _local_pulse_start(self) -> None:
+        try:
+            from PyQt6.QtCore import QTimer
+            t = getattr(self, "_local_scan_pulse", None)
+            if t is None:
+                t = QTimer()
+                t.setInterval(15000)
+                t.timeout.connect(
+                    lambda: self._show_busy(tr("local_scanning")))
+                self._local_scan_pulse = t
+            t.start()
+        except Exception:
+            pass   # headless tests: no indicator, no harm
+
+    def _local_pulse_stop(self) -> None:
+        t = getattr(self, "_local_scan_pulse", None)
+        if t is not None:
+            t.stop()
 
     def _apply_library(self, series: dict, movies: list[dict],
                        collections: dict | None = None) -> None:
@@ -531,7 +555,11 @@ class _LocalFilesMixin:
         cleaned title and cached in settings (a miss is cached too, so an
         unmatchable home video is asked about exactly once)."""
         tm = self.tmdb
-        if tm is None or not files:
+        if not files:
+            return
+        if tm is None:
+            self._local_make_thumbs(
+                [r for r in files if not r.get("stream_icon")])
             return
         cache = self._local_poster_cache()
         todo = [{"_key": f["_key"],
@@ -564,6 +592,68 @@ class _LocalFilesMixin:
             if changed:
                 self.settings.setValue(
                     "local_tmdb_posters", json.dumps(cache))
+            return out
+
+        def done(out):
+            if gen != self._load_gen:
+                return
+            hit = False
+            for r in self.all_items:
+                u = (out or {}).get(r.get("_key"))
+                if u and not r.get("stream_icon"):
+                    r["stream_icon"] = u
+                    hit = True
+            if hit:
+                self.list_model.refresh_all()
+            # Whatever TMDB could not name gets a frame grab instead.
+            self._local_make_thumbs(
+                [r for r in self.all_items
+                 if r.get("_kind") == "local"
+                 and not r.get("stream_icon")])
+
+        run_async(self.pool, job, done, lambda _e: None)
+
+    def _local_make_thumbs(self, rows: list[dict]) -> None:
+        """A real thumbnail for a file TMDB knows nothing about: grab one
+        frame with ffmpeg into the image cache and point the row at the
+        file - the loader reads local paths directly. Bounded per batch,
+        30 s per file, misses just stay on the letter placeholder."""
+        import hashlib
+        import shutil
+        import subprocess
+        ff = shutil.which("ffmpeg")
+        todo = [(r["_key"], r["_path"]) for r in rows
+                if r.get("_path")
+                and r["_path"].lower().endswith(self.VIDEO_EXTS)][:24]
+        if not ff or not todo:
+            return
+        from ..core.workers import default_image_cache_dir
+        tdir = str(default_image_cache_dir("thumbs"))
+        gen = self._load_gen
+
+        def job():
+            os.makedirs(tdir, exist_ok=True)
+            out = {}
+            for key, path in todo:
+                tp = os.path.join(
+                    tdir,
+                    hashlib.sha1(path.encode("utf-8")).hexdigest() + ".jpg")
+                if not os.path.isfile(tp):
+                    for ss in ("120", "1"):   # short clips: retry from start
+                        try:
+                            subprocess.run(
+                                [ff, "-nostdin", "-v", "error", "-ss", ss,
+                                 "-i", path, "-frames:v", "1",
+                                 "-vf", "scale=480:-2", "-q:v", "4",
+                                 "-y", tp],
+                                timeout=30, check=True,
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL)
+                            break
+                        except Exception:
+                            continue
+                if os.path.isfile(tp) and os.path.getsize(tp) > 0:
+                    out[key] = tp
             return out
 
         def done(out):

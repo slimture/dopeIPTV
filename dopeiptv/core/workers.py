@@ -440,6 +440,18 @@ class LogoLoader(QObject):
         disk_path = self._disk_path(url)
 
         def fetch(u: str = url, dp: Path | None = disk_path) -> tuple[str, bytes]:
+            # A local absolute path (a generated video thumbnail, never a
+            # provider URL) is read straight off disk - no network machinery,
+            # no circuit breaker, no second disk cache.
+            if u.startswith("/") or u.startswith("file://"):
+                try:
+                    data = Path(u.removeprefix("file://")).read_bytes()
+                    probe = QImage()
+                    if data and probe.loadFromData(data):
+                        return u, data
+                except OSError:
+                    pass
+                return u, b""
             # Disk cache read: validate by attempting to decode. If a
             # previous session was killed mid-write (e.g. crash on
             # shutdown) the file is truncated and QPixmap.loadFromData

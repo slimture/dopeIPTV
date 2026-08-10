@@ -34,6 +34,7 @@ class _Btn:
 
 class _Stub(_LocalFilesMixin):
     VIDEO_EXTS = MainWindow.VIDEO_EXTS
+    MEDIA_EXTS = MainWindow.MEDIA_EXTS
 
     tmdb = None
     pool = None
@@ -309,3 +310,16 @@ def test_own_videos_group_by_their_folder(tmp_path, monkeypatch):
     assert [r["name"] for r in w.rendered] == ["dag1", "dag2"]
     w._local_up()
     assert any(r.get("_kind") == "localcollection" for r in w.rendered)
+
+
+def test_music_files_are_listed_and_playable(tmp_path):
+    root = tmp_path / "Musik"
+    root.mkdir()
+    (root / "spår.flac").write_bytes(b"x")
+    (root / "låt.mp3").write_bytes(b"x")
+    (root / "omslag.jpg").write_bytes(b"x")
+    w = _Stub()
+    w._current_cat = str(root)
+    w._load_local_items(str(root))
+    assert sorted(r["name"] for r in w.rendered) == ["låt", "spår"]
+    assert all(r["_kind"] == "local" for r in w.rendered)

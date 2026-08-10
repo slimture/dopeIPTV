@@ -41,6 +41,7 @@ class _Event:
 
 class _Stub:
     VIDEO_EXTS = MainWindow.VIDEO_EXTS
+    MEDIA_EXTS = MainWindow.MEDIA_EXTS
     dragEnterEvent = MainWindow.dragEnterEvent
     dropEvent = MainWindow.dropEvent
     _play_local_path = MainWindow._play_local_path
