@@ -5396,29 +5396,35 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.show()
             self.player.set_overlay_info(title)
             self._apply_audio_visuals(url)
-        if kind == "local" and self._is_audio(url) and item is not None:
-            # Show THIS track in the detail panel - a queue that rolls on
-            # by itself must not leave the panel on the first track.
-            try:
-                self._show_detail(item)
-            except Exception as e:
-                log.debug("music detail refresh failed: %s", e)
-        if kind == "local" and self._is_audio(url):
-            q = getattr(self, "_track_queue", []) or []
-            here = next((n for n, t in enumerate(q)
-                         if t.get("_path") == url), -1)
-            if here < 0:
-                # Not a queued track: the surrounding listing becomes the
-                # queue, positioned on this track.
-                q = [r for r in (self.all_items or [])
-                     if not r.get("_header") and self._is_audio(r.get("_path"))]
+            # Music bookkeeping - the detail panel and the play queue. This
+            # MUST stay inside the embedded branch: written as a top-level
+            # "if kind == local" it closed this block, so everything below
+            # (including player.play()) fell into the else and every stream
+            # opened in an external mpv window.
+            if kind == "local" and self._is_audio(url):
+                if item is not None:
+                    # Show THIS track - a queue rolling on by itself must
+                    # not leave the panel on the first one.
+                    try:
+                        self._show_detail(item)
+                    except Exception as e:
+                        log.debug("music detail refresh failed: %s", e)
+                q = getattr(self, "_track_queue", []) or []
                 here = next((n for n, t in enumerate(q)
                              if t.get("_path") == url), -1)
                 if here < 0:
-                    q, here = [{"_path": url, "name": title}], 0
-                self._track_queue = q
-            self._track_index = here
-            self._sync_queue_buttons()
+                    # Not a queued track: the surrounding listing becomes
+                    # the queue, positioned on this track.
+                    q = [r for r in (self.all_items or [])
+                         if not r.get("_header")
+                         and self._is_audio(r.get("_path"))]
+                    here = next((n for n, t in enumerate(q)
+                                 if t.get("_path") == url), -1)
+                    if here < 0:
+                        q, here = [{"_path": url, "name": title}], 0
+                    self._track_queue = q
+                self._track_index = here
+                self._sync_queue_buttons()
             # Replay with the same audio/subtitle tracks the user picked last
             # time for this title (one-shot; play() consumes them).
             if kind in self._RESUMABLE:

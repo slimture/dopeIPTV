@@ -311,3 +311,31 @@ def test_video_playback_is_never_touched_by_the_music_features():
     touched.clear()
     w._apply_audio_visuals("http://host/live/2.m3u8")
     assert touched == []
+
+
+def test_the_embedded_branch_reaches_player_play():
+    """The music bookkeeping once sat at top level inside _start_playback,
+    which CLOSED the `if self.player:` block - so player.play() landed in
+    the else and every stream opened in an external window. Pin the
+    structure: with a player present, play() is called and nothing is
+    launched externally."""
+    import inspect
+    import re
+
+    from dopeiptv.ui.main_window import MainWindow
+
+    src = inspect.getsource(MainWindow._start_playback)
+    # Find the embedded branch and the two calls that must sit inside it.
+    at = src.index("if self.player:\n")
+    indent = len(src[at:].split("if self.player:")[0])
+    body = src[at:]
+    play_at = body.index("self.player.play(url, title, start=resume_at)")
+    # Everything between must stay INSIDE the branch: no line may return to
+    # the branch's own indentation level (which would close it).
+    between = body[:play_at].splitlines()[1:]
+    for line in between:
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        assert len(line) - len(line.lstrip()) > indent + 8, (
+            f"line escapes the embedded branch: {line!r}")
+    assert re.search(r"else:\s*\n\s*# No embedded player", body)
