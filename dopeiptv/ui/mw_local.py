@@ -687,6 +687,13 @@ class _LocalFilesMixin:
             t = f.get("_clean_title") or f.get("name") or ""
             if not re.search(r"[A-Za-zÀ-ÿ]", t):
                 continue          # datestamp home videos: nothing to match
+            if (f.get("_poster_kind") or "vod") == "vod" \
+                    and not f.get("_year"):
+                # A film match without a year to anchor it is a guess, and
+                # the guesses landed movie posters on home videos ("Clip
+                # #1"). Real film files carry their year; anything without
+                # one gets an honest frame-grab thumbnail instead.
+                continue
             ck = f"{t} {f.get('_year') or ''}".strip()
             if cache.get(ck) == "":
                 continue          # known miss must not hog the batch
