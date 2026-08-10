@@ -688,11 +688,13 @@ class _LocalFilesMixin:
             if not re.search(r"[A-Za-zÀ-ÿ]", t):
                 continue          # datestamp home videos: nothing to match
             if (f.get("_poster_kind") or "vod") == "vod" \
-                    and not f.get("_year"):
-                # A film match without a year to anchor it is a guess, and
-                # the guesses landed movie posters on home videos ("Clip
-                # #1"). Real film files carry their year; anything without
-                # one gets an honest frame-grab thumbnail instead.
+                    and not f.get("_year") \
+                    and not _TAG.search(f.get("_filename") or ""):
+                # An unanchored film match is a guess, and the guesses put
+                # movie posters on home videos ("Clip #1"). A year or a
+                # release tag (1080p/BluRay/x265/...) in the file name says
+                # "this is a released film"; anything with neither gets an
+                # honest frame-grab thumbnail instead.
                 continue
             ck = f"{t} {f.get('_year') or ''}".strip()
             if cache.get(ck) == "":

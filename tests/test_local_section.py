@@ -329,3 +329,17 @@ def test_audio_is_deferred_but_lands_when_the_walk_completes(tmp_path,
     colls = getattr(w, "_local_collection_index", {})
     assert "Artist" in colls, colls
     assert any(r.get("_kind") == "local" for r in w.rendered)
+
+
+def test_movie_lookup_needs_an_anchor():
+    """A TMDB movie search runs only for files that look like released
+    films (year or release tag) - home videos must never get a film's
+    poster."""
+    from dopeiptv.ui.mw_local import _TAG, clean_title
+    # Anchored: year, or a release tag.
+    assert clean_title("12.Years.a.Slave.2013.1080p")[1] == "2013"
+    assert _TAG.search("Some.Film.720p.WEB-DL")
+    # Unanchored home videos: neither.
+    assert clean_title("Clip #1")[1] == ""
+    assert not _TAG.search("Clip #1")
+    assert not _TAG.search("Semester i fjällen")
