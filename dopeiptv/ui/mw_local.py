@@ -341,6 +341,19 @@ class _LocalFilesMixin:
         so a big SMB share fills the view as it goes instead of all at the
         end. Bounded by directory/file caps rather than wall time - the
         slices make time limits unnecessary."""
+        if getattr(self, "_local_scan_active", False) \
+                and getattr(self, "_local_scan_root", None) == root:
+            # This very root is mid-walk: show what it has and let it keep
+            # going. Restarting on every category click threw the progress
+            # away each time.
+            if not getattr(self, "_local_series", None):
+                self._apply_library(
+                    getattr(self, "_local_series_index", {}),
+                    getattr(self, "_local_movies_rows", []),
+                    getattr(self, "_local_collection_index", {}))
+                self._set_status(tr("local_scanning"))
+            return
+        self._local_scan_root = root
         self._local_scan_token = getattr(self, "_local_scan_token", 0) + 1
         token = self._local_scan_token
         cached = self._library_cache().get(root)
@@ -437,8 +450,16 @@ class _LocalFilesMixin:
                     ms, mc, mm = series, collections, movies
                 self._local_series_index = ms
                 self._local_collection_index = mc
+                self._local_movies_rows = mm
                 if not getattr(self, "_local_series", None):
                     self._apply_library(ms, mm, mc)
+                # Persist the merged partial view every ~15 s, so quitting
+                # or switching away mid-walk keeps everything found so far
+                # instead of starting over from nothing.
+                now = time.monotonic()
+                if now - getattr(self, "_local_cache_saved", 0.0) > 15.0:
+                    self._local_cache_saved = now
+                    self._save_library_cache(root, ms, mm, mc)
                 self._local_scan_step(root, state, token, cached)
                 return
             self._local_pulse_stop()
@@ -657,13 +678,23 @@ class _LocalFilesMixin:
                 [r for r in files if not r.get("stream_icon")])
             return
         cache = self._local_poster_cache()
-        todo = [{"_key": f["_key"],
-                 "t": f.get("_clean_title") or f["name"],
-                 "y": f.get("_year") or "",
-                 "k": f.get("_poster_kind") or "vod"}
-                for f in files
-                if not f.get("stream_icon") and (f.get("_clean_title")
-                                                 or f.get("name"))][:80]
+        todo = []
+        for f in files:
+            if f.get("stream_icon"):
+                continue
+            if (f.get("_path") or "").lower().endswith(self.AUDIO_EXTS):
+                continue          # music is covers/thumbs, never TMDB
+            t = f.get("_clean_title") or f.get("name") or ""
+            if not re.search(r"[A-Za-zÀ-ÿ]", t):
+                continue          # datestamp home videos: nothing to match
+            ck = f"{t} {f.get('_year') or ''}".strip()
+            if cache.get(ck) == "":
+                continue          # known miss must not hog the batch
+            todo.append({"_key": f["_key"], "t": t,
+                         "y": f.get("_year") or "",
+                         "k": f.get("_poster_kind") or "vod"})
+            if len(todo) >= 80:
+                break
         if not todo:
             return
         gen = self._load_gen
