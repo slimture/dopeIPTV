@@ -3392,6 +3392,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
 
         if external or player == "vlc":
+            # Which door playback went through - a silent external window
+            # left no way to tell a deliberate "open externally" from the
+            # embedded player refusing the stream.
+            log.info("play: external requested (player=%r external=%r) %s",
+                     player, external, title)
             if not self._confirm_external_while_playing():
                 return
             launch_player(player or "mpv", url, title, self)
@@ -5384,6 +5389,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.listw.viewport().update()
         self.setWindowTitle(title or self._base_title)
         self._set_status(tr("status_playing", title=title))
+        log.info("play: embedded path kind=%s player=%s %s",
+                 kind, "yes" if self.player else "NO", title)
         if self.player:
             self.rec.finish_all_inplayer("channel changed")
             self.player.show()
