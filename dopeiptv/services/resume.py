@@ -36,7 +36,12 @@ class ResumeStore:
     """Persisted resume points backing 'Continue watching' (JSON on disk)."""
     # Playback kinds whose position is worth remembering, mapped to the
     # storage group prefix used in the persisted keys.
-    _KIND_TO_GROUP = {"movie": "vod", "episode": "episode", "recording": "rec"}
+    # The play kind the window uses -> the group positions are filed under.
+    # "local" was missing here, so a local file recorded its position under
+    # group "local" and then looked it up under nothing: every play started
+    # from the beginning however well the rest of the chain worked.
+    _KIND_TO_GROUP = {"movie": "vod", "episode": "episode",
+                      "recording": "rec", "local": "local"}
 
     def __init__(self, settings, playlist_id: str | None) -> None:
         self._settings = settings

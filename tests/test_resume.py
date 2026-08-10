@@ -127,3 +127,33 @@ def test_snapshot_keeps_identity_of_a_history_row():
     row = r.continue_watching()[0]
     assert row["_key"] == 77
     assert row["_url"] == "http://h.tv/movie/u/p/77.mkv"
+
+
+def test_a_local_file_resumes_where_it_stopped(tmp_path):
+    """The window records a local file's position under group "local"; the
+    store must look it up under the same name. It did not - the kind map
+    had no "local" - so every local play started from zero no matter how
+    much of the rest of the chain was right."""
+    from dopeiptv.services.resume import ResumeStore
+
+    class _S:
+        def __init__(self):
+            self.d = {}
+
+        def value(self, k, default=None):
+            return self.d.get(k, default)
+
+        def setValue(self, k, v):
+            self.d[k] = v
+
+    path = "/Volumes/oden/Film/En.Film.2020.mkv"
+    r = ResumeStore(_S(), "pl1")
+    r.record("local", path, pos=600.0, dur=5400.0)
+    assert r.saved_position(path, "local") == 600.0
+
+    # Same rules as everything else: the first minute and the last 5% are
+    # not worth resuming.
+    r.record("local", path, pos=30.0, dur=5400.0)
+    assert r.saved_position(path, "local") == 0.0
+    r.record("local", path, pos=5300.0, dur=5400.0)
+    assert r.saved_position(path, "local") == 0.0
