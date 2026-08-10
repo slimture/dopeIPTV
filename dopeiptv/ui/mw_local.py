@@ -358,8 +358,14 @@ class _LocalFilesMixin:
             collections = state["collections"]
             movies = state["movies"]
             if not finished:
-                # Mid-walk: show what exists so far, keep walking.
-                self._apply_library(series, movies, collections)
+                # Mid-walk: refresh the top level with what exists so far -
+                # but never yank the user out of a series/collection they
+                # have drilled into; they get the fresh index on the way
+                # back instead.
+                self._local_series_index = series
+                self._local_collection_index = collections
+                if not getattr(self, "_local_series", None):
+                    self._apply_library(series, movies, collections)
                 self._local_scan_step(root, state, token, cached)
                 return
             self._local_pulse_stop()
@@ -369,6 +375,10 @@ class _LocalFilesMixin:
                      len(movies),
                      " (walk cut short - dir/file cap hit)" if cut else "")
             self._save_library_cache(root, series, movies, collections)
+            self._local_series_index = series
+            self._local_collection_index = collections
+            if getattr(self, "_local_series", None):
+                return     # drilled in: the fresh index serves the way back
             if cached is not None \
                     and cached.get("series") == series \
                     and cached.get("collections") == collections \
