@@ -282,20 +282,29 @@ class _LocalFilesMixin:
         self._local_resolve_posters([r for r in rows
                                      if r.get("_kind") == "local"])
 
-    def _local_descend(self, path: str) -> None:
+    def _local_descend(self, path: str, from_key=None) -> None:
+        self._local_push_nav(from_key or path)
+        self._local_clear_search()
         self._local_ctx = path
         self.back_btn.setText("<-  " + tr("btn_back"))
         self.back_btn.show()
         self._load_local_items(self._current_cat)
 
     def _local_up(self) -> None:
-        """One level up; at the category root the back button retires."""
+        """One level up; at the category root the back button retires. The
+        row that was drilled into is re-selected, so backing out lands where
+        the user was instead of at the top of the list."""
+        came_from = None
+        stack = getattr(self, "_local_nav_stack", None)
+        if stack:
+            came_from = stack.pop()
         if getattr(self, "_local_series", None):
             self._local_series = None
             self.back_btn.hide()
             self._apply_library(getattr(self, "_local_series_index", {}),
                                 getattr(self, "_local_movies_rows", []),
                                 getattr(self, "_local_collection_index", {}))
+            self._local_select_key(came_from)
             return
         root = self._current_cat if isinstance(self._current_cat, str) else ""
         cur = getattr(self, "_local_ctx", None)
@@ -309,6 +318,37 @@ class _LocalFilesMixin:
         if self._local_ctx is None:
             self.back_btn.hide()
         self._load_local_items(root)
+        self._local_select_key(came_from)
+
+    def _local_push_nav(self, key) -> None:
+        if not hasattr(self, "_local_nav_stack"):
+            self._local_nav_stack = []
+        self._local_nav_stack.append(key)
+
+    def _local_clear_search(self) -> None:
+        """Entering a folder drops an active search: the query matched the
+        SHELF (e.g. the artist), and filtering the album's tracks by it
+        rendered the folder empty."""
+        sb = getattr(self, "search", None)
+        if sb is not None and sb.text():
+            sb.blockSignals(True)
+            sb.clear()
+            sb.blockSignals(False)
+
+    def _local_select_key(self, key) -> None:
+        model = getattr(self, "list_model", None)
+        if not key or model is None:
+            return
+        try:
+            for row in range(model.rowCount()):
+                it = model.item_at(row)
+                if it and it.get("_key") == key:
+                    ix = model.index(row)
+                    self.listw.setCurrentIndex(ix)
+                    self.listw.scrollTo(ix)
+                    return
+        except Exception:
+            pass
 
     # -- the library view (Infuse-style series grouping) ----------------------
 
@@ -655,6 +695,8 @@ class _LocalFilesMixin:
     def _local_open_series(self, title: str) -> None:
         if not title:
             return
+        self._local_push_nav(f"localseries::{title}")
+        self._local_clear_search()
         self._local_series = title
         self.back_btn.setText("<-  " + tr("btn_back"))
         self.back_btn.show()

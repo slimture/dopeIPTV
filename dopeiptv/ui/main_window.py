@@ -2486,6 +2486,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # A fresh category selection always starts at the root of it.
             self._local_ctx = None
             self._local_series = None
+            self._local_nav_stack = []
             self.back_btn.hide()
             self._load_local_items(category_id)
             return
@@ -3331,13 +3332,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self.mode == "local":
             path = it.get("_path")
             if it.get("_kind") == "localdir":
-                self._local_descend(path)      # a folder row drills in
+                self._local_descend(path, it.get("_key"))
                 return
             if it.get("_kind") == "localseries":
                 self._local_open_series(it.get("_series_title") or "")
                 return
             if it.get("_kind") == "localcollection":
-                self._local_descend(path)      # a real folder: browse it
+                self._local_descend(path, it.get("_key"))
                 return
             if not path or not os.path.isfile(path):
                 return
@@ -4771,7 +4772,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         """Remember how far into the current title the user got, so it can be
         resumed later. Positions near the very start or end are dropped."""
         if not (self.player and self.player.current_url and self._playing_key
-                and self._playing_group in ("vod", "episode", "rec")):
+                and self._playing_group in ("vod", "episode", "rec",
+                                            "local")):
             return
         lp = self._last_playback or {}
         self.resume.record(self._playing_group, self._playing_key,
