@@ -1176,8 +1176,8 @@ class _SettingsMixin:
         loc_hint.setObjectName("DetailMeta")
         lv.addWidget(loc_hint)
         loc_list = QListWidget()
-        for d in self._local_dirs():
-            loc_list.addItem(d)
+        for folder in self._local_dirs():
+            loc_list.addItem(folder)
         lv.addWidget(loc_list, 1)
         loc_btns = QHBoxLayout()
         loc_add = QPushButton(tr("btn_add"))
