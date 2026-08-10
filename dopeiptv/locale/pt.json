@@ -849,5 +849,18 @@
   "btn_back": "Voltar",
   "local_scanning_n": "Lendo a biblioteca… {files} arquivos em {folders} pastas",
   "local_music": "Música",
-  "local_tracks": "{n} faixas"
+  "local_tracks": "{n} faixas",
+  "eq_title": "Equalizador…",
+  "eq_enable": "Equalizador ligado",
+  "eq_preset": "Predefinição",
+  "eq_preset_flat": "Plano",
+  "eq_preset_bass": "Reforço de graves",
+  "eq_preset_treble": "Reforço de agudos",
+  "eq_preset_vocal": "Vocais",
+  "eq_preset_rock": "Rock",
+  "vis_title": "Visualização",
+  "vis_off": "Desligada",
+  "vis_style_bars": "Barras",
+  "vis_style_spectrum": "Espectro",
+  "vis_style_wave": "Forma de onda"
 }

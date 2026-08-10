@@ -849,5 +849,18 @@
   "btn_back": "رجوع",
   "local_scanning_n": "جارٍ قراءة المكتبة… {files} ملفًا في {folders} مجلدًا",
   "local_music": "الموسيقى",
-  "local_tracks": "{n} مقطعًا"
+  "local_tracks": "{n} مقطعًا",
+  "eq_title": "المعادل…",
+  "eq_enable": "تشغيل المعادل",
+  "eq_preset": "إعداد مسبق",
+  "eq_preset_flat": "مسطح",
+  "eq_preset_bass": "تعزيز الجهير",
+  "eq_preset_treble": "تعزيز الحدة",
+  "eq_preset_vocal": "الغناء",
+  "eq_preset_rock": "روك",
+  "vis_title": "التمثيل المرئي",
+  "vis_off": "إيقاف",
+  "vis_style_bars": "أعمدة",
+  "vis_style_spectrum": "طيف",
+  "vis_style_wave": "شكل موجي"
 }

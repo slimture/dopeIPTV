@@ -849,5 +849,18 @@
   "btn_back": "Natrag",
   "local_scanning_n": "Čitanje biblioteke… {files} datoteka u {folders} mapa",
   "local_music": "Glazba",
-  "local_tracks": "{n} pjesama"
+  "local_tracks": "{n} pjesama",
+  "eq_title": "Ekvilizator…",
+  "eq_enable": "Ekvilizator uključen",
+  "eq_preset": "Postavka",
+  "eq_preset_flat": "Ravno",
+  "eq_preset_bass": "Pojačanje basa",
+  "eq_preset_treble": "Pojačanje visokih",
+  "eq_preset_vocal": "Vokali",
+  "eq_preset_rock": "Rock",
+  "vis_title": "Vizualizacija",
+  "vis_off": "Isključena",
+  "vis_style_bars": "Trake",
+  "vis_style_spectrum": "Spektar",
+  "vis_style_wave": "Valni oblik"
 }

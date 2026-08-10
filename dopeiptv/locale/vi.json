@@ -849,5 +849,18 @@
   "btn_back": "Quay lại",
   "local_scanning_n": "Đang đọc thư viện… {files} tệp trong {folders} thư mục",
   "local_music": "Nhạc",
-  "local_tracks": "{n} bản nhạc"
+  "local_tracks": "{n} bản nhạc",
+  "eq_title": "Bộ chỉnh âm…",
+  "eq_enable": "Bật bộ chỉnh âm",
+  "eq_preset": "Cài sẵn",
+  "eq_preset_flat": "Phẳng",
+  "eq_preset_bass": "Tăng bass",
+  "eq_preset_treble": "Tăng treble",
+  "eq_preset_vocal": "Giọng hát",
+  "eq_preset_rock": "Rock",
+  "vis_title": "Hình ảnh hoá",
+  "vis_off": "Tắt",
+  "vis_style_bars": "Thanh",
+  "vis_style_spectrum": "Phổ",
+  "vis_style_wave": "Dạng sóng"
 }

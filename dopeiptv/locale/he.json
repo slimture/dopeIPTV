@@ -849,5 +849,18 @@
   "btn_back": "חזרה",
   "local_scanning_n": "קורא את הספרייה… {files} קבצים ב-{folders} תיקיות",
   "local_music": "מוזיקה",
-  "local_tracks": "{n} רצועות"
+  "local_tracks": "{n} רצועות",
+  "eq_title": "אקולייזר…",
+  "eq_enable": "אקולייזר פעיל",
+  "eq_preset": "הגדרה",
+  "eq_preset_flat": "שטוח",
+  "eq_preset_bass": "הגברת בס",
+  "eq_preset_treble": "הגברת טרבל",
+  "eq_preset_vocal": "שירה",
+  "eq_preset_rock": "רוק",
+  "vis_title": "הדמיה",
+  "vis_off": "כבוי",
+  "vis_style_bars": "עמודות",
+  "vis_style_spectrum": "ספקטרום",
+  "vis_style_wave": "צורת גל"
 }

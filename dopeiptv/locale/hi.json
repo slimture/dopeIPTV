@@ -849,5 +849,18 @@
   "btn_back": "वापस",
   "local_scanning_n": "लाइब्रेरी पढ़ी जा रही है… {folders} फ़ोल्डरों में {files} फ़ाइलें",
   "local_music": "संगीत",
-  "local_tracks": "{n} ट्रैक"
+  "local_tracks": "{n} ट्रैक",
+  "eq_title": "इक्वलाइज़र…",
+  "eq_enable": "इक्वलाइज़र चालू",
+  "eq_preset": "प्रीसेट",
+  "eq_preset_flat": "सपाट",
+  "eq_preset_bass": "बास बूस्ट",
+  "eq_preset_treble": "ट्रेबल बूस्ट",
+  "eq_preset_vocal": "वोकल",
+  "eq_preset_rock": "रॉक",
+  "vis_title": "विज़ुअलाइज़ेशन",
+  "vis_off": "बंद",
+  "vis_style_bars": "बार",
+  "vis_style_spectrum": "स्पेक्ट्रम",
+  "vis_style_wave": "तरंग"
 }

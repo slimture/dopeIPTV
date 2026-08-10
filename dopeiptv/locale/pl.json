@@ -849,5 +849,18 @@
   "btn_back": "Wstecz",
   "local_scanning_n": "Wczytywanie biblioteki… {files} plików w {folders} folderach",
   "local_music": "Muzyka",
-  "local_tracks": "{n} utworów"
+  "local_tracks": "{n} utworów",
+  "eq_title": "Korektor…",
+  "eq_enable": "Korektor włączony",
+  "eq_preset": "Ustawienie",
+  "eq_preset_flat": "Płaski",
+  "eq_preset_bass": "Wzmocnienie basów",
+  "eq_preset_treble": "Wzmocnienie sopranów",
+  "eq_preset_vocal": "Wokal",
+  "eq_preset_rock": "Rock",
+  "vis_title": "Wizualizacja",
+  "vis_off": "Wyłączona",
+  "vis_style_bars": "Słupki",
+  "vis_style_spectrum": "Widmo",
+  "vis_style_wave": "Fala"
 }

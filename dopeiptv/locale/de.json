@@ -849,5 +849,18 @@
   "btn_back": "Zurück",
   "local_scanning_n": "Bibliothek wird eingelesen… {files} Dateien in {folders} Ordnern",
   "local_music": "Musik",
-  "local_tracks": "{n} Titel"
+  "local_tracks": "{n} Titel",
+  "eq_title": "Equalizer…",
+  "eq_enable": "Equalizer an",
+  "eq_preset": "Voreinstellung",
+  "eq_preset_flat": "Neutral",
+  "eq_preset_bass": "Bass-Boost",
+  "eq_preset_treble": "Höhen-Boost",
+  "eq_preset_vocal": "Gesang",
+  "eq_preset_rock": "Rock",
+  "vis_title": "Visualisierung",
+  "vis_off": "Aus",
+  "vis_style_bars": "Balken",
+  "vis_style_spectrum": "Spektrum",
+  "vis_style_wave": "Wellenform"
 }

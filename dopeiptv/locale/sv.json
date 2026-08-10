@@ -849,5 +849,18 @@
   "btn_back": "Tillbaka",
   "local_scanning_n": "Läser in biblioteket… {files} filer i {folders} mappar",
   "local_music": "Musik",
-  "local_tracks": "{n} spår"
+  "local_tracks": "{n} spår",
+  "eq_title": "Equalizer…",
+  "eq_enable": "Equalizer på",
+  "eq_preset": "Förinställning",
+  "eq_preset_flat": "Neutral",
+  "eq_preset_bass": "Basförstärkning",
+  "eq_preset_treble": "Diskantförstärkning",
+  "eq_preset_vocal": "Sång",
+  "eq_preset_rock": "Rock",
+  "vis_title": "Visualisering",
+  "vis_off": "Av",
+  "vis_style_bars": "Staplar",
+  "vis_style_spectrum": "Spektrum",
+  "vis_style_wave": "Vågform"
 }

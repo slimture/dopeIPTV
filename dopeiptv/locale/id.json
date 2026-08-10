@@ -849,5 +849,18 @@
   "btn_back": "Kembali",
   "local_scanning_n": "Membaca pustaka… {files} berkas di {folders} folder",
   "local_music": "Musik",
-  "local_tracks": "{n} lagu"
+  "local_tracks": "{n} lagu",
+  "eq_title": "Ekualiser…",
+  "eq_enable": "Ekualiser aktif",
+  "eq_preset": "Prasetel",
+  "eq_preset_flat": "Datar",
+  "eq_preset_bass": "Penguat bas",
+  "eq_preset_treble": "Penguat treble",
+  "eq_preset_vocal": "Vokal",
+  "eq_preset_rock": "Rock",
+  "vis_title": "Visualisasi",
+  "vis_off": "Mati",
+  "vis_style_bars": "Batang",
+  "vis_style_spectrum": "Spektrum",
+  "vis_style_wave": "Gelombang"
 }

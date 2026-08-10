@@ -849,5 +849,18 @@
   "btn_back": "返回",
   "local_scanning_n": "正在读取媒体库… {folders} 个文件夹中的 {files} 个文件",
   "local_music": "音乐",
-  "local_tracks": "{n} 首"
+  "local_tracks": "{n} 首",
+  "eq_title": "均衡器…",
+  "eq_enable": "启用均衡器",
+  "eq_preset": "预设",
+  "eq_preset_flat": "平坦",
+  "eq_preset_bass": "低音增强",
+  "eq_preset_treble": "高音增强",
+  "eq_preset_vocal": "人声",
+  "eq_preset_rock": "摇滚",
+  "vis_title": "可视化",
+  "vis_off": "关闭",
+  "vis_style_bars": "柱状",
+  "vis_style_spectrum": "频谱",
+  "vis_style_wave": "波形"
 }

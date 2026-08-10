@@ -849,5 +849,18 @@
   "btn_back": "Nazad",
   "local_scanning_n": "Čitanje biblioteke… {files} datoteka u {folders} fascikli",
   "local_music": "Muzika",
-  "local_tracks": "{n} pesama"
+  "local_tracks": "{n} pesama",
+  "eq_title": "Ekvilajzer…",
+  "eq_enable": "Ekvilajzer uključen",
+  "eq_preset": "Podešavanje",
+  "eq_preset_flat": "Ravno",
+  "eq_preset_bass": "Pojačanje basa",
+  "eq_preset_treble": "Pojačanje visokih",
+  "eq_preset_vocal": "Vokali",
+  "eq_preset_rock": "Rok",
+  "vis_title": "Vizuelizacija",
+  "vis_off": "Isključena",
+  "vis_style_bars": "Trake",
+  "vis_style_spectrum": "Spektar",
+  "vis_style_wave": "Talasni oblik"
 }

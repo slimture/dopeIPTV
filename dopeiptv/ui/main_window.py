@@ -1169,6 +1169,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # does not need to know what a Chromecast is.
             self.player.extra_options = [
                 (lambda: tr("ctx_cast_to_chromecast"), self.cast_playing)]
+            # The player draws the visualiser and applies the equaliser; the
+            # window owns the settings behind both.
+            self.player.open_equaliser = self.open_equaliser
+            self.player.vis_state = lambda: (
+                self.settings.value("vis_on", "true") == "true",
+                self.settings.value("vis_style", "bars"))
+            self.player.vis_choose = self._vis_choose
             dl.addWidget(self.player, 1)
 
         # Everything below the video lives in ONE scroll column. This is the
@@ -3439,6 +3446,114 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 e.acceptProposedAction()
                 return
 
+    # -- music: visualiser + equaliser -----------------------------------------
+
+    def _eq_settings(self) -> tuple[list[float], bool]:
+        raw = self.settings.value("eq_gains", "")
+        try:
+            gains = [float(x) for x in str(raw).split(",")] if raw else []
+        except ValueError:
+            gains = []
+        gains = (gains + [0.0] * 10)[:10]
+        return gains, self.settings.value("eq_on", "false") == "true"
+
+    def _apply_audio_visuals(self, url: str) -> None:
+        """Music gets a visualiser in place of the black video pane, and
+        whatever equaliser the user set. Video is left completely alone."""
+        pl = getattr(self, "player", None)
+        if pl is None:
+            return
+        is_audio = str(url or "").lower().endswith(self.AUDIO_EXTS)
+        try:
+            if is_audio:
+                style = self.settings.value("vis_style", "bars")
+                pl.set_visualiser(
+                    self.settings.value("vis_on", "true") == "true", style)
+            else:
+                pl.set_visualiser(False)
+            gains, on = self._eq_settings()
+            pl.set_equaliser(gains, on)
+        except Exception as e:
+            log.debug("audio visuals failed: %s", e)
+
+    def _vis_choose(self, on: bool, style: str) -> None:
+        """Remember the visualiser choice and apply it to what is playing."""
+        self.settings.setValue("vis_on", "true" if on else "false")
+        self.settings.setValue("vis_style", style)
+        pl = getattr(self, "player", None)
+        url = (getattr(self, "_last_playback", None) or {}).get("url", "")
+        if pl is not None and str(url).lower().endswith(self.AUDIO_EXTS):
+            pl.set_visualiser(on, style)
+
+    def open_equaliser(self) -> None:
+        """A ten-band graphic equaliser with the usual presets. Applies live
+        while playing and is remembered for the next track."""
+        from PyQt6.QtWidgets import (
+            QCheckBox, QComboBox, QDialog, QDialogButtonBox, QHBoxLayout,
+            QLabel, QSlider, QVBoxLayout,
+        )
+        pl = getattr(self, "player", None)
+        dlg = QDialog(self)
+        dlg.setWindowTitle(tr("eq_title"))
+        v = QVBoxLayout(dlg)
+        gains, on = self._eq_settings()
+        top = QHBoxLayout()
+        chk = QCheckBox(tr("eq_enable"))
+        chk.setChecked(on)
+        top.addWidget(chk)
+        top.addStretch(1)
+        top.addWidget(QLabel(tr("eq_preset")))
+        presets = QComboBox()
+        for key in ("flat", "bass", "treble", "vocal", "rock"):
+            presets.addItem(tr(f"eq_preset_{key}"), key)
+        top.addWidget(presets)
+        v.addLayout(top)
+
+        row = QHBoxLayout()
+        sliders = []
+        bands = (pl.EQ_BANDS if pl is not None
+                 else (31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000))
+        for i, f in enumerate(bands):
+            col = QVBoxLayout()
+            sl = QSlider(Qt.Orientation.Vertical)
+            sl.setRange(-12, 12)
+            sl.setValue(int(round(gains[i])))
+            sl.setMinimumHeight(120)
+            lab = QLabel(f"{f // 1000}k" if f >= 1000 else str(f))
+            lab.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+            col.addWidget(sl, 1, Qt.AlignmentFlag.AlignHCenter)
+            col.addWidget(lab)
+            row.addLayout(col)
+            sliders.append(sl)
+        v.addLayout(row)
+
+        def apply_now():
+            vals = [s.value() for s in sliders]
+            self.settings.setValue("eq_gains",
+                                   ",".join(str(x) for x in vals))
+            self.settings.setValue("eq_on",
+                                   "true" if chk.isChecked() else "false")
+            if pl is not None:
+                pl.set_equaliser(vals, chk.isChecked())
+
+        def use_preset():
+            key = presets.currentData()
+            vals = (pl.EQ_PRESETS if pl is not None
+                    else {}).get(key, (0,) * 10)
+            for sl, g in zip(sliders, vals, strict=False):
+                sl.setValue(int(g))
+            apply_now()
+
+        for sl in sliders:
+            sl.valueChanged.connect(lambda _v: apply_now())
+        chk.toggled.connect(lambda _v: apply_now())
+        presets.activated.connect(lambda _i: use_preset())
+        bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        bb.rejected.connect(dlg.reject)
+        bb.accepted.connect(dlg.accept)
+        v.addWidget(bb)
+        dlg.exec()
+
     def _confirm_external_while_playing(self) -> bool:
         """Opening an external player pulls a SECOND stream from the provider
         (many accounts allow only one). If the mini player is busy, ask first:
@@ -5138,6 +5253,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.rec.finish_all_inplayer("channel changed")
             self.player.show()
             self.player.set_overlay_info(title)
+            self._apply_audio_visuals(url)
             # Replay with the same audio/subtitle tracks the user picked last
             # time for this title (one-shot; play() consumes them).
             if kind in self._RESUMABLE:

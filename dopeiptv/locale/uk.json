@@ -849,5 +849,18 @@
   "btn_back": "Назад",
   "local_scanning_n": "Читання бібліотеки… {files} файлів у {folders} теках",
   "local_music": "Музика",
-  "local_tracks": "{n} треків"
+  "local_tracks": "{n} треків",
+  "eq_title": "Еквалайзер…",
+  "eq_enable": "Еквалайзер увімкнено",
+  "eq_preset": "Пресет",
+  "eq_preset_flat": "Рівно",
+  "eq_preset_bass": "Підсилення басів",
+  "eq_preset_treble": "Підсилення високих",
+  "eq_preset_vocal": "Вокал",
+  "eq_preset_rock": "Рок",
+  "vis_title": "Візуалізація",
+  "vis_off": "Вимк.",
+  "vis_style_bars": "Смуги",
+  "vis_style_spectrum": "Спектр",
+  "vis_style_wave": "Осцилограма"
 }

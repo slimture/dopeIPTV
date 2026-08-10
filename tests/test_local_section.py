@@ -405,3 +405,24 @@ def test_folder_structure_comes_before_the_cover_art(tmp_path, monkeypatch):
     assert kinds[0] == "localalbum"                # music shelf first
     assert "localseries" in kinds and "local" in kinds
     assert kinds.index("localalbum") < kinds.index("localseries")
+
+
+def test_a_mostly_video_folder_is_not_a_music_shelf(tmp_path, monkeypatch):
+    """A stray track inside a film folder must not turn it into Music."""
+    import dopeiptv.ui.mw_local as ml
+    monkeypatch.setattr(ml, "run_async",
+                        lambda pool, fn, done, err=None: done(fn()))
+    root = tmp_path / "M"
+    (root / "Musik" / "A").mkdir(parents=True)
+    for t in ("a.flac", "b.flac", "c.flac"):
+        (root / "Musik" / "A" / t).write_bytes(b"x")
+    (root / "Film").mkdir()
+    (root / "Film" / "En.Film.2020.1080p.mkv").write_bytes(b"x")
+    (root / "Film" / "Andra.Filmen.2021.1080p.mkv").write_bytes(b"x")
+    (root / "Film" / "stray.flac").write_bytes(b"x")
+    w = _Stub()
+    w.settings.setValue("local_view", "series")
+    w._current_cat = str(root)
+    w._load_local_items(str(root))
+    music = [r["name"] for r in w.rendered if r.get("_kind") == "localalbum"]
+    assert music == ["Musik"]                  # Film stayed out of Music

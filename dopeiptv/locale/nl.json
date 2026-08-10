@@ -849,5 +849,18 @@
   "btn_back": "Terug",
   "local_scanning_n": "Bibliotheek wordt gelezen… {files} bestanden in {folders} mappen",
   "local_music": "Muziek",
-  "local_tracks": "{n} nummers"
+  "local_tracks": "{n} nummers",
+  "eq_title": "Equalizer…",
+  "eq_enable": "Equalizer aan",
+  "eq_preset": "Voorinstelling",
+  "eq_preset_flat": "Vlak",
+  "eq_preset_bass": "Bass-boost",
+  "eq_preset_treble": "Treble-boost",
+  "eq_preset_vocal": "Zang",
+  "eq_preset_rock": "Rock",
+  "vis_title": "Visualisatie",
+  "vis_off": "Uit",
+  "vis_style_bars": "Balken",
+  "vis_style_spectrum": "Spectrum",
+  "vis_style_wave": "Golfvorm"
 }

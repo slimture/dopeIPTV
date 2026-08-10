@@ -615,16 +615,55 @@ class _LocalFilesMixin:
             if top in (".", ".."):
                 top = ""
             shelves[top] = shelves.get(top, 0) + n
+        # How much VIDEO each top-level folder holds, so a folder that is
+        # mostly films with a stray track in it is not called music.
+        vids: dict[str, int] = {}
+        for r in (getattr(self, "_local_movies_rows", []) or []):
+            p = r.get("_path") or ""
+            try:
+                rel = os.path.relpath(os.path.normpath(p),
+                                      os.path.normpath(root))
+            except ValueError:
+                continue
+            top = rel.split(os.sep)[0]
+            if top not in (".", ".."):
+                vids[top] = vids.get(top, 0) + 1
+        for name, paths in (getattr(self, "_local_collection_index", {})
+                            or {}).items():
+            vids[name] = vids.get(name, 0) + len(paths)
+
         rows: list[dict] = []
+        music_tops = []
         for top in sorted(shelves, key=str.lower):
             if not top:
                 continue        # loose tracks in the root: not a shelf
+            tracks = shelves[top]
+            if vids.get(top, 0) > tracks:
+                continue        # mostly video: it is not a music shelf
+            music_tops.append(top)
             rows.append({"name": top, "_kind": "localalbum",
                          "_path": os.path.join(root, top),
                          "_key": f"localmusic::{top}",
-                         "stream_icon": self._folder_tile(),
-                         "_desc": tr("local_tracks", n=shelves[top])})
+                         "stream_icon": self._music_shelf_cover(
+                             os.path.join(root, top)) or self._folder_tile(),
+                         "_desc": tr("local_tracks", n=tracks)})
+        self._local_music_tops = set(music_tops)
         return [{"_header": tr("local_music")}] + rows if rows else []
+
+    def _music_shelf_cover(self, top_path: str) -> str:
+        """Borrow an album cover from inside the shelf, so "Musik" shows
+        real artwork instead of a blank folder."""
+        albums = getattr(self, "_local_album_index", {})
+        best = ""
+        for d in sorted(albums, key=str.lower):
+            if not os.path.normpath(d).startswith(os.path.normpath(top_path)):
+                continue
+            cov = (getattr(self, "_local_dircover", {}).get(d)
+                   or self._album_cover(d))
+            if cov:
+                best = cov
+                break
+        return best
 
     @staticmethod
     def _album_cover(d: str) -> str:
@@ -695,6 +734,9 @@ class _LocalFilesMixin:
         # Folders first (music, then your own), then the cover art -
         # browsable structure at the top, posters below it.
         head: list[dict] = self._album_rows()
+        music_tops = getattr(self, "_local_music_tops", set())
+        collections = {k: v for k, v in (collections or {}).items()
+                       if k not in music_tops}
         if collections:
             head.append({"_header": tr("local_collections")})
             for name in sorted(collections, key=str.lower):

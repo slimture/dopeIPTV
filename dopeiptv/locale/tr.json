@@ -849,5 +849,18 @@
   "btn_back": "Geri",
   "local_scanning_n": "Kitaplık okunuyor… {folders} klasörde {files} dosya",
   "local_music": "Müzik",
-  "local_tracks": "{n} parça"
+  "local_tracks": "{n} parça",
+  "eq_title": "Ekolayzer…",
+  "eq_enable": "Ekolayzer açık",
+  "eq_preset": "Ön ayar",
+  "eq_preset_flat": "Düz",
+  "eq_preset_bass": "Bas artırma",
+  "eq_preset_treble": "Tiz artırma",
+  "eq_preset_vocal": "Vokal",
+  "eq_preset_rock": "Rock",
+  "vis_title": "Görselleştirme",
+  "vis_off": "Kapalı",
+  "vis_style_bars": "Çubuklar",
+  "vis_style_spectrum": "Spektrum",
+  "vis_style_wave": "Dalga formu"
 }

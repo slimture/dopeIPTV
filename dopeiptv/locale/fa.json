@@ -849,5 +849,18 @@
   "btn_back": "بازگشت",
   "local_scanning_n": "در حال خواندن کتابخانه… {files} پرونده در {folders} پوشه",
   "local_music": "موسیقی",
-  "local_tracks": "{n} قطعه"
+  "local_tracks": "{n} قطعه",
+  "eq_title": "اکولایزر…",
+  "eq_enable": "اکولایزر روشن",
+  "eq_preset": "پیش‌تنظیم",
+  "eq_preset_flat": "تخت",
+  "eq_preset_bass": "تقویت بم",
+  "eq_preset_treble": "تقویت زیر",
+  "eq_preset_vocal": "آواز",
+  "eq_preset_rock": "راک",
+  "vis_title": "بصری‌سازی",
+  "vis_off": "خاموش",
+  "vis_style_bars": "میله‌ها",
+  "vis_style_spectrum": "طیف",
+  "vis_style_wave": "شکل موج"
 }

@@ -849,5 +849,18 @@
   "btn_back": "Πίσω",
   "local_scanning_n": "Ανάγνωση της βιβλιοθήκης… {files} αρχεία σε {folders} φακέλους",
   "local_music": "Μουσική",
-  "local_tracks": "{n} κομμάτια"
+  "local_tracks": "{n} κομμάτια",
+  "eq_title": "Ισοσταθμιστής…",
+  "eq_enable": "Ισοσταθμιστής ενεργός",
+  "eq_preset": "Προεπιλογή",
+  "eq_preset_flat": "Επίπεδο",
+  "eq_preset_bass": "Ενίσχυση μπάσων",
+  "eq_preset_treble": "Ενίσχυση πρίμων",
+  "eq_preset_vocal": "Φωνητικά",
+  "eq_preset_rock": "Ροκ",
+  "vis_title": "Οπτικοποίηση",
+  "vis_off": "Ανενεργή",
+  "vis_style_bars": "Μπάρες",
+  "vis_style_spectrum": "Φάσμα",
+  "vis_style_wave": "Κυματομορφή"
 }

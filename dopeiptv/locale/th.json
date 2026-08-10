@@ -849,5 +849,18 @@
   "btn_back": "ย้อนกลับ",
   "local_scanning_n": "กำลังอ่านคลัง… {files} ไฟล์ใน {folders} โฟลเดอร์",
   "local_music": "เพลง",
-  "local_tracks": "{n} แทร็ก"
+  "local_tracks": "{n} แทร็ก",
+  "eq_title": "อีควอไลเซอร์…",
+  "eq_enable": "เปิดอีควอไลเซอร์",
+  "eq_preset": "พรีเซ็ต",
+  "eq_preset_flat": "แบน",
+  "eq_preset_bass": "เพิ่มเสียงเบส",
+  "eq_preset_treble": "เพิ่มเสียงแหลม",
+  "eq_preset_vocal": "เสียงร้อง",
+  "eq_preset_rock": "ร็อก",
+  "vis_title": "การแสดงภาพ",
+  "vis_off": "ปิด",
+  "vis_style_bars": "แท่ง",
+  "vis_style_spectrum": "สเปกตรัม",
+  "vis_style_wave": "รูปคลื่น"
 }

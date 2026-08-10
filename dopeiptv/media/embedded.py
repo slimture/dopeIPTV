@@ -2845,6 +2845,90 @@ class EmbeddedPlayer(QWidget):
         except Exception:
             return 0.0
 
+    # -- music: visualiser + equaliser ---------------------------------------
+
+    # Ten ISO bands, the shape every graphic equaliser uses.
+    EQ_BANDS = (31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000)
+    EQ_PRESETS = {
+        "flat":   (0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+        "bass":   (6, 5, 4, 2, 0, 0, 0, 0, 0, 0),
+        "treble": (0, 0, 0, 0, 0, 1, 3, 4, 5, 6),
+        "vocal":  (-2, -1, 0, 2, 4, 4, 3, 1, 0, -1),
+        "rock":   (4, 3, 1, -1, -2, 0, 2, 3, 4, 4),
+    }
+    VIS_STYLES = ("bars", "spectrum", "wave")
+
+    def _vis_filter(self, style: str, w: int = 640, h: int = 360) -> str:
+        """An mpv lavfi-complex graph that turns the audio into a picture -
+        what a music player shows instead of a black rectangle."""
+        if style == "spectrum":
+            draw = (f"showspectrum=s={w}x{h}:slide=scroll:mode=combined:"
+                    "color=intensity:scale=cbrt:legend=0")
+        elif style == "wave":
+            draw = (f"showwaves=s={w}x{h}:mode=cline:rate=30:colors=white")
+        else:
+            draw = (f"showcqt=s={w}x{h}:fps=30:count=2:bar_g=4:sono_g=4:"
+                    "axis=0:sono_h=0")
+        return f"[aid1]asplit=2[ao][a];[a]{draw}[vo]"
+
+    # Filled in by the window: reading/writing the user's choices lives
+    # there, the drawing lives here.
+    open_equaliser = None
+    vis_state = None          # () -> (on, style)
+    vis_choose = None         # (on, style) -> None
+
+    def _vis_on_get(self) -> bool:
+        try:
+            return bool(self.vis_state and self.vis_state()[0])
+        except Exception:
+            return False
+
+    def _vis_style_get(self) -> str:
+        try:
+            return (self.vis_state and self.vis_state()[1]) or "bars"
+        except Exception:
+            return "bars"
+
+    def _vis_pick(self, style: str | None) -> None:
+        if self.vis_choose:
+            self.vis_choose(style is not None, style or self._vis_style_get())
+
+    def set_visualiser(self, on: bool, style: str = "bars") -> None:
+        """Show/hide the audio visualiser. A file with real video never gets
+        one; mpv builds the graph from the audio track itself."""
+        m = self.video.mpv
+        if m is None:
+            return
+        try:
+            if on:
+                m["lavfi-complex"] = self._vis_filter(style)
+            else:
+                m["lavfi-complex"] = ""
+        except Exception as e:
+            log.debug("visualiser %s failed: %s", "on" if on else "off", e)
+
+    def set_equaliser(self, gains, enabled: bool = True) -> None:
+        """Apply a ten-band equaliser (gains in dB, -12..+12). Disabled or
+        all-flat means no filter at all, so the untouched path stays
+        bit-exact."""
+        m = self.video.mpv
+        if m is None:
+            return
+        try:
+            gains = [max(-12.0, min(12.0, float(g))) for g in gains][:10]
+            gains += [0.0] * (10 - len(gains))
+        except (TypeError, ValueError):
+            return
+        try:
+            if not enabled or not any(abs(g) > 0.05 for g in gains):
+                m["af"] = ""
+                return
+            parts = [f"equalizer=f={f}:width_type=o:width=1:g={g:.1f}"
+                     for f, g in zip(self.EQ_BANDS, gains, strict=True)]
+            m["af"] = "lavfi=[" + ",".join(parts) + "]"
+        except Exception as e:
+            log.debug("equaliser failed: %s", e)
+
     def set_track_prefs(self, aid=None, sid=None) -> None:
         """Arm one-shot audio/subtitle track ids for the next play() - the
         window passes a title's remembered choices here right before
@@ -3184,6 +3268,24 @@ class EmbeddedPlayer(QWidget):
         custom.triggered.connect(self._ask_sleep_minutes)
 
         menu.addSeparator()
+        # Audio shaping: the equaliser, and (for music, where the video pane
+        # is otherwise a black rectangle) which visualiser to draw.
+        eq_act = menu.addAction(tr("eq_title"))
+        eq_act.triggered.connect(
+            lambda: self.open_equaliser and self.open_equaliser())
+        vis = menu.addMenu(tr("vis_title"))
+        cur_style = self._vis_style_get()
+        off = vis.addAction(tr("vis_off"))
+        off.setCheckable(True)
+        off.setChecked(not self._vis_on_get())
+        off.triggered.connect(lambda: self._vis_pick(None))
+        vis.addSeparator()
+        for style in self.VIS_STYLES:
+            a = vis.addAction(tr(f"vis_style_{style}"))
+            a.setCheckable(True)
+            a.setChecked(self._vis_on_get() and cur_style == style)
+            a.triggered.connect(lambda _c=False, st=style: self._vis_pick(st))
+
         stats_act = menu.addAction(tr("opt_stats_for_nerds"))
         stats_act.triggered.connect(self._show_stats)
 

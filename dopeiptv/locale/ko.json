@@ -849,5 +849,18 @@
   "btn_back": "뒤로",
   "local_scanning_n": "라이브러리 읽는 중… 폴더 {folders}개에서 파일 {files}개",
   "local_music": "음악",
-  "local_tracks": "{n}곡"
+  "local_tracks": "{n}곡",
+  "eq_title": "이퀄라이저…",
+  "eq_enable": "이퀄라이저 켜기",
+  "eq_preset": "프리셋",
+  "eq_preset_flat": "플랫",
+  "eq_preset_bass": "저음 강화",
+  "eq_preset_treble": "고음 강화",
+  "eq_preset_vocal": "보컬",
+  "eq_preset_rock": "록",
+  "vis_title": "시각화",
+  "vis_off": "끄기",
+  "vis_style_bars": "막대",
+  "vis_style_spectrum": "스펙트럼",
+  "vis_style_wave": "파형"
 }
