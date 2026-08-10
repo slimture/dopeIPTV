@@ -845,5 +845,6 @@
   "local_clear_posters": "Rensa TMDB-postercache",
   "local_clear_thumbs": "Rensa videominiatyrer",
   "local_cleared": "Rensat.",
-  "local_home_videos": "Hemvideor"
+  "local_home_videos": "Hemvideor",
+  "btn_back": "Tillbaka"
 }

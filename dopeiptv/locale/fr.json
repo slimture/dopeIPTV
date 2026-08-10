@@ -845,5 +845,6 @@
   "local_clear_posters": "Vider le cache d'affiches TMDB",
   "local_clear_thumbs": "Vider les vignettes vidéo",
   "local_cleared": "Vidé.",
-  "local_home_videos": "Vidéos personnelles"
+  "local_home_videos": "Vidéos personnelles",
+  "btn_back": "Retour"
 }

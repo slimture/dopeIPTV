@@ -845,5 +845,6 @@
   "local_clear_posters": "Borrar caché de pósteres TMDB",
   "local_clear_thumbs": "Borrar miniaturas de vídeo",
   "local_cleared": "Borrado.",
-  "local_home_videos": "Vídeos caseros"
+  "local_home_videos": "Vídeos caseros",
+  "btn_back": "Atrás"
 }

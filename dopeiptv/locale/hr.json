@@ -845,5 +845,6 @@
   "local_clear_posters": "Očisti predmemoriju TMDB postera",
   "local_clear_thumbs": "Očisti sličice videa",
   "local_cleared": "Očišćeno.",
-  "local_home_videos": "Kućni videozapisi"
+  "local_home_videos": "Kućni videozapisi",
+  "btn_back": "Natrag"
 }

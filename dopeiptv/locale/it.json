@@ -845,5 +845,6 @@
   "local_clear_posters": "Svuota cache dei poster TMDB",
   "local_clear_thumbs": "Svuota miniature video",
   "local_cleared": "Svuotato.",
-  "local_home_videos": "Video personali"
+  "local_home_videos": "Video personali",
+  "btn_back": "Indietro"
 }

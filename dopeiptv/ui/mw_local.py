@@ -284,6 +284,7 @@ class _LocalFilesMixin:
 
     def _local_descend(self, path: str) -> None:
         self._local_ctx = path
+        self.back_btn.setText("<-  " + tr("btn_back"))
         self.back_btn.show()
         self._load_local_items(self._current_cat)
 
@@ -431,6 +432,8 @@ class _LocalFilesMixin:
             finished, cut = result
             self._local_cover_index = state.get("covers", {})
             series = state["series"]
+            drilled = (getattr(self, "_local_series", None)
+                       or getattr(self, "_local_ctx", None))
             collections = state["collections"]
             movies = state["movies"]
             if not finished:
@@ -452,7 +455,8 @@ class _LocalFilesMixin:
                 self._local_series_index = ms
                 self._local_collection_index = mc
                 self._local_movies_rows = mm
-                if not getattr(self, "_local_series", None):
+                if not getattr(self, "_local_series", None) \
+                        and not getattr(self, "_local_ctx", None):
                     self._apply_library(ms, mm, mc)
                 # Persist the merged partial view every ~15 s, so quitting
                 # or switching away mid-walk keeps everything found so far
@@ -477,7 +481,7 @@ class _LocalFilesMixin:
             self._save_library_cache(root, series, movies, collections)
             self._local_series_index = series
             self._local_collection_index = collections
-            if getattr(self, "_local_series", None):
+            if drilled:
                 return     # drilled in: the fresh index serves the way back
             if cached is not None \
                     and cached.get("series") == series \
@@ -513,14 +517,17 @@ class _LocalFilesMixin:
             return
         rel = os.path.relpath(os.path.normpath(p), state["root"])
         parts = rel.split(os.sep)
-        if len(parts) > 1:
+        row = self._local_file_row(p, stem, stat=False)
+        if row is None:
+            return
+        anchored = bool(row.get("_year")) or bool(_TAG.search(stem))
+        if anchored:
+            state["movies"].append(row)
+        elif len(parts) > 1:
             state["collections"].setdefault(parts[0], []).append(p)
         else:
-            row = self._local_file_row(p, stem, stat=False)
-            if row:
-                if not row.get("_year") and not _TAG.search(stem):
-                    row["_home"] = True   # rendered under its own header
-                state["movies"].append(row)
+            row["_home"] = True       # rendered under its own header
+            state["movies"].append(row)
 
     def _folder_tile(self) -> str:
         """A drawn folder icon as an image file the row art loader can
@@ -649,6 +656,7 @@ class _LocalFilesMixin:
         if not title:
             return
         self._local_series = title
+        self.back_btn.setText("<-  " + tr("btn_back"))
         self.back_btn.show()
         self._load_local_episodes()
 

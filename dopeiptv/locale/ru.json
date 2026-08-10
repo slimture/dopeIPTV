@@ -845,5 +845,6 @@
   "local_clear_posters": "Очистить кэш постеров TMDB",
   "local_clear_thumbs": "Очистить миниатюры видео",
   "local_cleared": "Очищено.",
-  "local_home_videos": "Домашнее видео"
+  "local_home_videos": "Домашнее видео",
+  "btn_back": "Назад"
 }

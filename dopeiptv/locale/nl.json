@@ -845,5 +845,6 @@
   "local_clear_posters": "TMDB-postercache wissen",
   "local_clear_thumbs": "Videominiaturen wissen",
   "local_cleared": "Gewist.",
-  "local_home_videos": "Thuisvideo's"
+  "local_home_videos": "Thuisvideo's",
+  "btn_back": "Terug"
 }

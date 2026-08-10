@@ -66,6 +66,12 @@ class _DetailMixin:
                      else None)
         snap_kind = {"movie": "vod", "episode": "series"}.get(
             snap_kind, snap_kind)
+        # A local file that anchors as a released film (year/release tag)
+        # gets the same TMDB-backed info panel as a streamed movie.
+        if self.mode == "local" and it.get("_kind") == "local":
+            from .mw_local import _TAG
+            if it.get("_year") or _TAG.search(it.get("_filename") or ""):
+                snap_kind = "vod"
         # In the Favorites view the content kind follows the selected
         # section, so a favourite movie/series gets the poster + info
         # panel just like it would in the Movies / Series views.

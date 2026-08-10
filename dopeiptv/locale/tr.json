@@ -845,5 +845,6 @@
   "local_clear_posters": "TMDB poster önbelleğini temizle",
   "local_clear_thumbs": "Video küçük resimlerini temizle",
   "local_cleared": "Temizlendi.",
-  "local_home_videos": "Ev videoları"
+  "local_home_videos": "Ev videoları",
+  "btn_back": "Geri"
 }

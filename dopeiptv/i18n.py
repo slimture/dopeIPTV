@@ -267,6 +267,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "btn_watch": {"en": "Watch"},
     "btn_play_channel": {"en": "Play channel"},
     "btn_back_to_series": {"en": "Back to series"},
+    "btn_back": {"en": "Back"},
     "btn_clear_history": {"en": "Clear history"},
     "btn_grid": {"en": "Grid"},
 

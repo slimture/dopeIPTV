@@ -845,5 +845,6 @@
   "local_clear_posters": "پاک کردن حافظه نهان پوسترهای TMDB",
   "local_clear_thumbs": "پاک کردن بندانگشتی‌های ویدئو",
   "local_cleared": "پاک شد.",
-  "local_home_videos": "ویدئوهای خانگی"
+  "local_home_videos": "ویدئوهای خانگی",
+  "btn_back": "بازگشت"
 }

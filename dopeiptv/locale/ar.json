@@ -845,5 +845,6 @@
   "local_clear_posters": "مسح ذاكرة ملصقات TMDB",
   "local_clear_thumbs": "مسح مصغرات الفيديو",
   "local_cleared": "تم المسح.",
-  "local_home_videos": "فيديوهات منزلية"
+  "local_home_videos": "فيديوهات منزلية",
+  "btn_back": "رجوع"
 }

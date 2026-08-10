@@ -891,7 +891,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         ctl.addWidget(self.grid_btn)
         ml.addLayout(ctl)
 
-        self.back_btn = QPushButton("<-  Back to series")
+        self.back_btn = QPushButton("<-  " + tr("btn_back_to_series"))
         self.back_btn.hide()
         self.back_btn.clicked.connect(self._leave_series)
         ml.addWidget(self.back_btn)
@@ -3199,6 +3199,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     sctx["category_id"] = cid
             self.series_ctx = sctx
             self.all_items = episodes
+            self.back_btn.setText("<-  " + tr("btn_back_to_series"))
             self.back_btn.show()
             self.search.clear()
             self._apply_filter()

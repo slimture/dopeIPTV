@@ -845,5 +845,6 @@
   "local_clear_posters": "Bersihkan cache poster TMDB",
   "local_clear_thumbs": "Bersihkan gambar mini video",
   "local_cleared": "Dibersihkan.",
-  "local_home_videos": "Video rumahan"
+  "local_home_videos": "Video rumahan",
+  "btn_back": "Kembali"
 }

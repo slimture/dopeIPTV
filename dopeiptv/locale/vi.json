@@ -845,5 +845,6 @@
   "local_clear_posters": "Xóa bộ nhớ đệm áp phích TMDB",
   "local_clear_thumbs": "Xóa hình thu nhỏ video",
   "local_cleared": "Đã xóa.",
-  "local_home_videos": "Video gia đình"
+  "local_home_videos": "Video gia đình",
+  "btn_back": "Quay lại"
 }

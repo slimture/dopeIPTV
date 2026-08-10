@@ -845,5 +845,6 @@
   "local_clear_posters": "Εκκαθάριση cache αφισών TMDB",
   "local_clear_thumbs": "Εκκαθάριση μικρογραφιών βίντεο",
   "local_cleared": "Εκκαθαρίστηκε.",
-  "local_home_videos": "Προσωπικά βίντεο"
+  "local_home_videos": "Προσωπικά βίντεο",
+  "btn_back": "Πίσω"
 }

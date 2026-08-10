@@ -28,6 +28,9 @@ class _Btn:
     def __init__(self):
         self.visible = False
 
+    def setText(self, *_a):
+        pass
+
     def show(self):
         self.visible = True
 
@@ -295,9 +298,10 @@ def test_scan_stops_at_the_file_cap(tmp_path, monkeypatch):
     w2.settings.setValue("local_view", "series")
     w2._current_cat = str(root)
     w2._load_local_items(str(root))
-    total = sum(len(v) for v in
-                getattr(w2, "_local_collection_index", {}).values())
-    assert total == 30                     # the recycled file never seen
+    films = [r for r in w2.rendered if r.get("_kind") == "local"]
+    assert len(films) == 30                # anchored films, listed flat
+    # The junk dir was pruned: its unanchored file never became a shelf.
+    assert getattr(w2, "_local_collection_index", {}) == {}
 
 
 def test_music_files_are_listed_and_playable(tmp_path):
@@ -343,3 +347,23 @@ def test_movie_lookup_needs_an_anchor():
     assert clean_title("Clip #1")[1] == ""
     assert not _TAG.search("Clip #1")
     assert not _TAG.search("Semester i fjällen")
+
+
+def test_anchored_films_in_subfolders_list_flat_under_movies(tmp_path,
+                                                             monkeypatch):
+    """Movies/12 Years a Slave/film.mkv is a film, not a folder maze."""
+    import dopeiptv.ui.mw_local as ml
+    monkeypatch.setattr(ml, "run_async",
+                        lambda pool, fn, done, err=None: done(fn()))
+    root = tmp_path / "M"
+    (root / "Movies" / "12 Years a Slave").mkdir(parents=True)
+    (root / "Movies" / "12 Years a Slave"
+     / "12.Years.a.Slave.2013.1080p.mkv").write_bytes(b"x")
+    w = _Stub()
+    w.settings.setValue("local_view", "series")
+    w._current_cat = str(root)
+    w._load_local_items(str(root))
+    films = [r for r in w.rendered if r.get("_kind") == "local"
+             and not r.get("_home")]
+    assert [f["name"] for f in films] == ["12 Years a Slave (2013)"]
+    assert not any(r.get("_kind") == "localcollection" for r in w.rendered)
