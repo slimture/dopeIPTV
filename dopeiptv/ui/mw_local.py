@@ -391,7 +391,8 @@ class _LocalFilesMixin:
             return {"name": display_name(p, tags), "_kind": "local",
                     "_clean_title": "", "_year": tags.get("date", "")[:4],
                     "_cast_url": p, "_path": p, "_key": p,
-                    "_size": 0, "added": "0", "stream_icon": "",
+                    "_size": 0, "added": "0",
+                    "stream_icon": self._album_cover(os.path.dirname(p)),
                     "_artist": tags.get("artist")
                     or tags.get("albumartist", ""),
                     "_album": tags.get("album", ""),
@@ -685,10 +686,13 @@ class _LocalFilesMixin:
         return best
 
     def _embedded_cover(self, track: str) -> str:
-        """Album art carried INSIDE the file - the usual case for a
-        properly tagged library with no cover.jpg lying about. Written to
-        the image cache once, keyed on the folder so a whole album shares
-        one extraction."""
+        """Album art carried INSIDE the files - the usual case for a
+        tagged library with no cover.jpg lying about. Extracted once per
+        FOLDER into the image cache.
+
+        Several tracks are tried before giving up: art often sits on the
+        album's tracks but not on a stray intro or a hidden track, and
+        asking only the first one marked whole albums artless."""
         d = os.path.dirname(track)
         try:
             import hashlib
@@ -699,6 +703,20 @@ class _LocalFilesMixin:
             if os.path.isfile(out):
                 return out if os.path.getsize(out) else ""
             data = cover_bytes(track)
+            if not data:
+                try:
+                    names = sorted(os.listdir(d), key=str.lower)
+                except OSError:
+                    names = []
+                tried = 0
+                for n in names:
+                    p = os.path.join(d, n)
+                    if p == track or not n.lower().endswith(self.AUDIO_EXTS):
+                        continue
+                    data = cover_bytes(p)
+                    tried += 1
+                    if data or tried >= 5:
+                        break
             os.makedirs(tdir, exist_ok=True)
             with open(out, "wb") as fh:
                 fh.write(data or b"")     # empty marks "asked, none there"
@@ -989,8 +1007,9 @@ class _LocalFilesMixin:
         for f in files:
             if f.get("stream_icon"):
                 continue
-            if (f.get("_path") or "").lower().endswith(self.AUDIO_EXTS):
-                continue          # music is covers/thumbs, never TMDB
+            if (f.get("_path") or "").lower().endswith(self.AUDIO_EXTS) \
+                    or f.get("_album") or f.get("_artist"):
+                continue          # music is covers/tags, never TMDB
             t = f.get("_clean_title") or f.get("name") or ""
             if not re.search(r"[A-Za-zÀ-ÿ]", t):
                 continue          # datestamp home videos: nothing to match

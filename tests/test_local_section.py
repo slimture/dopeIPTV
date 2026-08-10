@@ -509,3 +509,45 @@ def test_the_panel_keeps_showing_the_playing_track(tmp_path):
         assert "now-playing branch" in str(e)
     else:
         raise AssertionError("the playing track was not re-shown")
+
+
+def test_a_tagged_track_is_never_sent_to_tmdb(tmp_path):
+    """Tags give a track a year; that must not make it look like a film -
+    TMDB answered those with whatever film shared the words. The batch
+    that spends the network must contain no music at all."""
+    asked = {}
+
+    class _Tm:
+        def poster_url(self, title, kind):
+            asked.setdefault("titles", []).append(title)
+            return ""
+
+    class _R:
+        client = _Tm()
+
+    w = _Stub()
+    w.tmdb = _R()
+    w.all_items = []
+    w._load_gen = 0
+    w.list_model = type("M", (), {"refresh_all": lambda self: None})()
+    calls = []
+    w._local_make_thumbs = lambda rows: calls.append(rows)
+
+    import dopeiptv.ui.mw_local as ml
+    jobs = []
+    ml_run = ml.run_async
+    ml.run_async = lambda pool, fn, done, err=None: jobs.append(fn)
+    try:
+        w._local_resolve_posters([
+            {"_key": "t", "_path": str(tmp_path / "02.flac"),
+             "name": "2. Jail", "_year": "2021", "_artist": "Kanye West",
+             "_album": "Donda"},
+            {"_key": "f", "_path": str(tmp_path / "Film.2020.1080p.mkv"),
+             "name": "Film (2020)", "_clean_title": "Film", "_year": "2020"},
+        ])
+        for fn in jobs:
+            fn()
+    finally:
+        ml.run_async = ml_run
+    # The film was looked up; the track never was.
+    assert asked.get("titles") == ["Film 2020", "Film"]

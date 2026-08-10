@@ -78,7 +78,12 @@ class _DetailMixin:
             snap_kind, snap_kind)
         # A local file that anchors as a released film (year/release tag)
         # gets the same TMDB-backed info panel as a streamed movie.
-        if it.get("_kind") == "local":
+        if it.get("_kind") == "local" and not str(
+                it.get("_path") or "").lower().endswith(
+                    getattr(self, "AUDIO_EXTS", ())):
+            # Films only. A track carries a year from its tags too, and
+            # letting that count as "a released film" sent every song to
+            # TMDB - which answered with whatever film shares the words.
             from .mw_local import _TAG
             import re as _re
             if (it.get("_year")
@@ -115,6 +120,7 @@ class _DetailMixin:
             # Music: TMDB is a film and TV database - it knows nothing about
             # albums - so the panel is built from the folders the track sits
             # in (…/Artist/Album/track) plus whatever cover art is there.
+            import html as _html
             import os as _os
 
             from ..core.audiotags import read_tags
@@ -128,11 +134,18 @@ class _DetailMixin:
             year = (tags.get("date") or "")[:4]
             if year:
                 album = f"{album} ({year})"
-            lines = [x for x in (artist, album) if x]
-            self.media_plot.setText("\n".join(lines))
-            self.media_plot.setVisible(bool(lines))
+            # The panel never printed the track itself - only artist and
+            # album - so "what is playing" was missing from the one place
+            # it matters. Title first, in bold, then who and from what.
+            title = (tags.get("title") or name or "").strip()
+            head = f"<b>{_html.escape(title)}</b>" if title else ""
+            rest = " · ".join(_html.escape(x) for x in (artist, album) if x)
+            self.media_plot.setTextFormat(Qt.TextFormat.RichText)
+            self.media_plot.setText(
+                "<br>".join(x for x in (head, rest) if x))
+            self.media_plot.setVisible(bool(head or rest))
             self.media_meta.setVisible(False)
-            self.media_info.setVisible(bool(lines))
+            self.media_info.setVisible(bool(head or rest))
             return
 
         if self.mode == "rec":
