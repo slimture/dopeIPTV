@@ -2895,15 +2895,24 @@ class EmbeddedPlayer(QWidget):
 
     def set_visualiser(self, on: bool, style: str = "bars") -> None:
         """Show/hide the audio visualiser. A file with real video never gets
-        one; mpv builds the graph from the audio track itself."""
+        one; mpv builds the graph from the audio track itself.
+
+        The filter graph is only ever touched when it actually has to
+        change: rewriting lavfi-complex on every ordinary video play is a
+        needless poke at mpv's pipeline, and the video path must stay
+        exactly as it was before any of this existed."""
         m = self.video.mpv
         if m is None:
+            return
+        want = (bool(on), style if on else "")
+        if getattr(self, "_vis_now", (False, "")) == want:
             return
         try:
             if on:
                 m["lavfi-complex"] = self._vis_filter(style)
             else:
                 m["lavfi-complex"] = ""
+            self._vis_now = want
         except Exception as e:
             log.debug("visualiser %s failed: %s", "on" if on else "off", e)
 
@@ -2920,6 +2929,10 @@ class EmbeddedPlayer(QWidget):
         except (TypeError, ValueError):
             return
         try:
+            want = tuple(gains) if enabled else ()
+            if getattr(self, "_eq_now", None) == want:
+                return                 # already applied: leave mpv alone
+            self._eq_now = want
             if not enabled or not any(abs(g) > 0.05 for g in gains):
                 m["af"] = ""
                 return
