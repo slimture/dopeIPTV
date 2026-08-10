@@ -435,15 +435,18 @@ def test_the_play_queue_steps_and_wraps_an_album(tmp_path):
     class _Q:
         AUDIO_EXTS = MainWindow.AUDIO_EXTS
         _is_audio = MainWindow._is_audio
+        _music_is_playing = MainWindow._music_is_playing
         queue_add = MainWindow.queue_add
         _queue_step = MainWindow._queue_step
         _play_queued = MainWindow._play_queued
         _queue_autoplay = MainWindow._queue_autoplay
         player = None
+        _playing_key = "k"
 
         def __init__(self):
             self._track_queue, self._track_index = [], -1
             self.played = []
+            self._last_playback = {"kind": "local", "url": "/a/01.flac"}
 
         def _sync_queue_buttons(self):
             pass
@@ -696,3 +699,47 @@ def test_leaving_and_returning_lands_where_you_were(tmp_path):
     # A different category has nothing remembered - it starts fresh.
     w._current_cat = str(tmp_path)
     assert w._local_restore_place() is False
+
+
+def test_a_left_over_queue_never_hijacks_tv_or_film():
+    """Play music, then a channel: prev/next must mean channels again, and
+    nothing may roll on to the next track behind the channel's back."""
+    from dopeiptv.ui.main_window import MainWindow
+
+    class _Q:
+        AUDIO_EXTS = MainWindow.AUDIO_EXTS
+        _is_audio = MainWindow._is_audio
+        _music_is_playing = MainWindow._music_is_playing
+        _queue_step = MainWindow._queue_step
+        _queue_autoplay = MainWindow._queue_autoplay
+        _play_queued = MainWindow._play_queued
+        _playing_key = "k"
+
+        def __init__(self):
+            self._track_queue = [{"_path": "/m/01.flac", "name": "1"},
+                                 {"_path": "/m/02.flac", "name": "2"}]
+            self._track_index = 0
+            self.played = []
+
+        def _sync_queue_buttons(self):
+            pass
+
+        def _start_playback(self, *a, **k):
+            self.played.append(a[0])
+
+    w = _Q()
+    # Music playing: the queue is in charge.
+    w._last_playback = {"kind": "local", "url": "/m/01.flac"}
+    assert w._music_is_playing() is True
+
+    # A channel is on: the leftover queue must stay out of the way.
+    w._last_playback = {"kind": "live", "url": "http://h/live/1.ts"}
+    assert w._music_is_playing() is False
+    assert w._queue_step(1) is False
+    assert w._queue_autoplay() is False
+    assert w.played == []
+
+    # A film, likewise.
+    w._last_playback = {"kind": "movie", "url": "http://h/movie/9.mkv"}
+    assert w._queue_step(-1) is False
+    assert w.played == []

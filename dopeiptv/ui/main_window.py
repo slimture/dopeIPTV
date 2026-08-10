@@ -3501,13 +3501,20 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         q = getattr(self, "_track_queue", []) or []
         i = getattr(self, "_track_index", -1)
         try:
-            pl.set_next_available(bool(q) and i + 1 < len(q))
+            pl.set_next_available(self._music_is_playing()
+                                  and bool(q) and i + 1 < len(q))
         except Exception:
             pass
 
     def _queue_step(self, direction: int) -> bool:
-        """Play the next/previous queued track. False when no queue is
-        running, so the caller falls back to its normal zap."""
+        """Play the next/previous queued track. False when music is not
+        what is playing, so the caller falls back to its normal zap.
+
+        The queue is only in charge while a track is actually playing:
+        with a channel or a film on, prev/next mean the channel list
+        again, and a queue left over from earlier must not hijack them."""
+        if not self._music_is_playing():
+            return False
         q = getattr(self, "_track_queue", []) or []
         i = getattr(self, "_track_index", -1)
         if not q or i < 0:
@@ -3531,6 +3538,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                              it.get("stream_icon"), path, "local",
                              record=True, item=it)
         self._sync_queue_buttons()
+
+    def _music_is_playing(self) -> bool:
+        """Is a local audio file what the player is on right now?"""
+        if getattr(self, "_playing_key", None) is None:
+            return False
+        lp = getattr(self, "_last_playback", None) or {}
+        return (lp.get("kind") == "local"
+                and self._is_audio(lp.get("url")))
 
     def _queue_autoplay(self) -> bool:
         """End of a track: roll on to the next queued one."""
