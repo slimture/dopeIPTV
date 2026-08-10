@@ -551,3 +551,55 @@ def test_a_tagged_track_is_never_sent_to_tmdb(tmp_path):
         ml.run_async = ml_run
     # The film was looked up; the track never was.
     assert asked.get("titles") == ["Film 2020", "Film"]
+
+
+def _flac_with_art(path, png):
+    def block(kind, data, last=False):
+        return (bytes([kind | (0x80 if last else 0)])
+                + len(data).to_bytes(3, "big") + data)
+    vendor = b"ref"
+    body = len(vendor).to_bytes(4, "little") + vendor
+    fields = [b"ARTIST=A", b"ALBUM=B", b"TITLE=C", b"TRACKNUMBER=1"]
+    body += len(fields).to_bytes(4, "little")
+    for f in fields:
+        body += len(f).to_bytes(4, "little") + f
+    pic = (b"\x00\x00\x00\x03" + (9).to_bytes(4, "big") + b"image/png"
+           + (0).to_bytes(4, "big") + b"\x00" * 16
+           + len(png).to_bytes(4, "big") + png)
+    path.write_bytes(b"fLaC" + block(4, body) + block(6, pic, last=True))
+
+
+def test_album_art_is_found_for_tracks_albums_and_artists(tmp_path,
+                                                          monkeypatch):
+    """Art comes from a cover file, from the tags, or - for an artist
+    folder, which holds no tracks of its own - from the album inside it."""
+    from PyQt6.QtCore import QBuffer
+    from PyQt6.QtGui import QColor, QImage
+
+    img = QImage(4, 4, QImage.Format.Format_RGB32)
+    img.fill(QColor("red"))
+    buf = QBuffer()
+    buf.open(QBuffer.OpenModeFlag.WriteOnly)
+    img.save(buf, "PNG")
+    png = bytes(buf.data())
+
+    artist = tmp_path / "Kanye West"
+    album = artist / "Donda (2021)"
+    album.mkdir(parents=True)
+    _flac_with_art(album / "01.flac", png)
+
+    w = _Stub()
+    cache = tmp_path / "cache"
+    monkeypatch.setattr("dopeiptv.core.workers.default_image_cache_dir",
+                        lambda sub="images": cache / sub)
+
+    # The album itself: art lifted out of the track's tags.
+    art = w._cover_in(str(album))
+    assert art and open(art, "rb").read() == png
+
+    # The artist folder holds no tracks - it borrows from the album.
+    assert w._cover_in(str(artist), depth=1) == art
+
+    # A cover file always wins over the embedded one.
+    (album / "cover.jpg").write_bytes(b"JPEGBYTES")
+    assert w._cover_in(str(album)).endswith("cover.jpg")

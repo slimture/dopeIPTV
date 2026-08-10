@@ -263,7 +263,7 @@ class _LocalFilesMixin:
                 # An artist/album folder shows its own artwork - a wall of
                 # identical folder glyphs is what a music library must not
                 # look like. Bounded so a huge listing stays cheap.
-                art = (self._album_cover(p)
+                art = (self._cover_in(p, depth=1)
                        if len(dirs) < 300 else "") or self._folder_tile()
                 dirs.append({"name": n, "_kind": "localdir",
                              "_path": p, "_key": p, "stream_icon": art})
@@ -674,16 +674,16 @@ class _LocalFilesMixin:
         """Borrow an album cover from inside the shelf, so "Musik" shows
         real artwork instead of a blank folder."""
         albums = getattr(self, "_local_album_index", {})
-        best = ""
         for d in sorted(albums, key=str.lower):
             if not os.path.normpath(d).startswith(os.path.normpath(top_path)):
                 continue
             cov = (getattr(self, "_local_dircover", {}).get(d)
-                   or self._album_cover(d))
+                   or self._cover_in(d))
             if cov:
-                best = cov
-                break
-        return best
+                return cov
+        # Nothing indexed yet (a first visit renders before the walk has
+        # got there): look down the tree ourselves.
+        return self._cover_in(top_path, depth=2)
 
     def _embedded_cover(self, track: str) -> str:
         """Album art carried INSIDE the files - the usual case for a
@@ -726,18 +726,38 @@ class _LocalFilesMixin:
             return ""
 
     def _album_cover(self, d: str) -> str:
-        for n in ("cover.jpg", "cover.jpeg", "cover.png", "folder.jpg",
-                  "folder.png", "front.jpg", "album.jpg"):
-            p = os.path.join(d, n)
-            if os.path.isfile(p):
-                return p
-        # No cover file: borrow the art embedded in the first track.
+        return self._cover_in(d, depth=1)
+
+    _COVER_FILES = ("cover.jpg", "cover.jpeg", "cover.png", "folder.jpg",
+                    "folder.png", "front.jpg", "album.jpg")
+
+    def _cover_in(self, d: str, depth: int = 0) -> str:
+        """Artwork for folder *d*: a cover file, else the art embedded in a
+        track inside it. An ARTIST folder holds no tracks of its own - only
+        album folders - so with depth it borrows from the first album that
+        has any, which is what left artist rows blank."""
         try:
-            for n in sorted(os.listdir(d), key=str.lower)[:40]:
-                if n.lower().endswith(self.AUDIO_EXTS):
-                    return self._embedded_cover(os.path.join(d, n))
+            names = sorted(os.listdir(d), key=str.lower)
         except OSError:
-            pass
+            return ""
+        lower = {n.lower(): n for n in names}
+        for want in self._COVER_FILES:
+            if want in lower:
+                return os.path.join(d, lower[want])
+        for n in names[:60]:
+            if n.lower().endswith(self.AUDIO_EXTS):
+                art = self._embedded_cover(os.path.join(d, n))
+                if art:
+                    return art
+                break            # this folder's tracks carry none
+        if depth > 0:
+            for n in names[:40]:
+                sub = os.path.join(d, n)
+                if n.startswith(".") or not os.path.isdir(sub):
+                    continue
+                art = self._cover_in(sub, depth - 1)
+                if art:
+                    return art
         return ""
 
     def _folder_tile(self) -> str:
