@@ -102,6 +102,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "local_view_series": {"en": "View: library"},
     "local_season": {"en": "Season {n}"},
     "local_scanning": {"en": "Reading the library…"},
+    "local_collections": {"en": "My folders"},
     "sidebar_categories": {"en": "CATEGORIES"},
 
     "sidebar_library": {"en": "LIBRARY"},

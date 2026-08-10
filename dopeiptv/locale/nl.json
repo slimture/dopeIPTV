@@ -838,5 +838,6 @@
   "local_view_folders": "Weergave: Mappen",
   "local_view_series": "Weergave: Bibliotheek",
   "local_season": "Seizoen {n}",
-  "local_scanning": "Bibliotheek wordt gelezen…"
+  "local_scanning": "Bibliotheek wordt gelezen…",
+  "local_collections": "Mijn mappen"
 }

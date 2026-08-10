@@ -838,5 +838,6 @@
   "local_view_folders": "Вид: Папки",
   "local_view_series": "Вид: Библиотека",
   "local_season": "Сезон {n}",
-  "local_scanning": "Чтение библиотеки…"
+  "local_scanning": "Чтение библиотеки…",
+  "local_collections": "Мои папки"
 }

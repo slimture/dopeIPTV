@@ -838,5 +838,6 @@
   "local_view_folders": "العرض: مجلدات",
   "local_view_series": "العرض: المكتبة",
   "local_season": "الموسم {n}",
-  "local_scanning": "جارٍ قراءة المكتبة…"
+  "local_scanning": "جارٍ قراءة المكتبة…",
+  "local_collections": "مجلداتي"
 }

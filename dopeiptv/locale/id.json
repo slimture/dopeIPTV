@@ -838,5 +838,6 @@
   "local_view_folders": "Tampilan: Folder",
   "local_view_series": "Tampilan: Pustaka",
   "local_season": "Musim {n}",
-  "local_scanning": "Membaca pustaka…"
+  "local_scanning": "Membaca pustaka…",
+  "local_collections": "Folder saya"
 }

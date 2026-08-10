@@ -838,5 +838,6 @@
   "local_view_folders": "Chế độ xem: Thư mục",
   "local_view_series": "Chế độ xem: Thư viện",
   "local_season": "Mùa {n}",
-  "local_scanning": "Đang đọc thư viện…"
+  "local_scanning": "Đang đọc thư viện…",
+  "local_collections": "Thư mục của tôi"
 }

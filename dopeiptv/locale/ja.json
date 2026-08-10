@@ -838,5 +838,6 @@
   "local_view_folders": "表示:フォルダー",
   "local_view_series": "表示:ライブラリ",
   "local_season": "シーズン{n}",
-  "local_scanning": "ライブラリを読み込み中…"
+  "local_scanning": "ライブラリを読み込み中…",
+  "local_collections": "マイフォルダー"
 }

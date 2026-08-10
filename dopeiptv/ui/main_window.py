@@ -3324,7 +3324,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if it.get("_kind") == "localdir":
                 self._local_descend(path)      # a folder row drills in
                 return
-            if it.get("_kind") == "localseries":
+            if it.get("_kind") in ("localseries", "localcollection"):
                 self._local_open_series(it.get("_series_title") or "")
                 return
             if not path or not os.path.isfile(path):

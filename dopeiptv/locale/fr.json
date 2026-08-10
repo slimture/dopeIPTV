@@ -838,5 +838,6 @@
   "local_view_folders": "Vue : Dossiers",
   "local_view_series": "Vue : Bibliothèque",
   "local_season": "Saison {n}",
-  "local_scanning": "Lecture de la bibliothèque…"
+  "local_scanning": "Lecture de la bibliothèque…",
+  "local_collections": "Mes dossiers"
 }

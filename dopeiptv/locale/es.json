@@ -838,5 +838,6 @@
   "local_view_folders": "Vista: Carpetas",
   "local_view_series": "Vista: Biblioteca",
   "local_season": "Temporada {n}",
-  "local_scanning": "Leyendo la biblioteca…"
+  "local_scanning": "Leyendo la biblioteca…",
+  "local_collections": "Mis carpetas"
 }

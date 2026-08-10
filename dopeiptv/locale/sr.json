@@ -838,5 +838,6 @@
   "local_view_folders": "Prikaz: Fascikle",
   "local_view_series": "Prikaz: Biblioteka",
   "local_season": "Sezona {n}",
-  "local_scanning": "Čitanje biblioteke…"
+  "local_scanning": "Čitanje biblioteke…",
+  "local_collections": "Moje fascikle"
 }

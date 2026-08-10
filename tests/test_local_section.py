@@ -44,8 +44,9 @@ class _Stub(_LocalFilesMixin):
     def _library_cache(self):
         return getattr(self, "_libcache", {})
 
-    def _save_library_cache(self, root, series, movies):
-        self._libcache = {root: {"series": series, "movies": movies}}
+    def _save_library_cache(self, root, series, movies, collections=None):
+        self._libcache = {root: {"series": series, "movies": movies,
+                                 "collections": collections or {}}}
 
     def _hide_busy(self):
         pass
@@ -281,3 +282,30 @@ def test_scan_is_bounded_and_reports_truncation(tmp_path):
     (junk / "old.mkv").write_bytes(b"x")
     paths, cut = w._local_scan(str(root))
     assert len(paths) == 30              # the recycled file never seen
+
+
+def test_own_videos_group_by_their_folder(tmp_path, monkeypatch):
+    """Untagged files in a subfolder become a browsable collection; only
+    files directly in the root land under Movies."""
+    import dopeiptv.ui.mw_local as ml
+    monkeypatch.setattr(ml, "run_async",
+                        lambda pool, fn, done, err=None: done(fn()))
+    root = tmp_path / "M"
+    (root / "Semester 2024").mkdir(parents=True)
+    (root / "Semester 2024" / "dag1.mkv").write_bytes(b"x")
+    (root / "Semester 2024" / "dag2.mkv").write_bytes(b"x")
+    (root / "En.Film.2020.mkv").write_bytes(b"x")
+    w = _Stub()
+    w.settings.setValue("local_view", "series")
+    w._current_cat = str(root)
+    w._load_local_items(str(root))
+
+    colls = [r for r in w.rendered if r.get("_kind") == "localcollection"]
+    movies = [r for r in w.rendered if r.get("_kind") == "local"]
+    assert len(colls) == 1 and "Semester 2024" in colls[0]["name"]
+    assert len(movies) == 1
+
+    w._local_open_series("Semester 2024")
+    assert [r["name"] for r in w.rendered] == ["dag1", "dag2"]
+    w._local_up()
+    assert any(r.get("_kind") == "localcollection" for r in w.rendered)

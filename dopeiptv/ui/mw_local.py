@@ -298,9 +298,9 @@ class _LocalFilesMixin:
     _SCAN_JUNK = {"@eadir", "#recycle", "$recycle.bin", "lost+found",
                   "system volume information", "@__thumb", ".appledouble"}
 
-    def _local_scan(self, root: str, budget_s: float = 20.0,
-                    max_dirs: int = 800,
-                    max_files: int = 3000) -> tuple[list[str], bool]:
+    def _local_scan(self, root: str, budget_s: float = 600.0,
+                    max_dirs: int = 50000,
+                    max_files: int = 20000) -> tuple[list[str], bool]:
         """Video files under *root*, plus whether the walk was cut short.
 
         Over SMB every directory listing is a network round trip, so the
@@ -345,11 +345,13 @@ class _LocalFilesMixin:
         # back empty (a share that wasn't mounted yet, a transient error),
         # treating it as truth would pin the view empty forever.
         if cached is not None and not (cached.get("series")
-                                       or cached.get("movies")):
+                                       or cached.get("movies")
+                                       or cached.get("collections")):
             cached = None
         if cached is not None:
             self._apply_library(cached.get("series") or {},
-                                cached.get("movies") or [])
+                                cached.get("movies") or [],
+                                cached.get("collections") or {})
         else:
             self._show_busy(tr("local_scanning"))
 
@@ -357,8 +359,10 @@ class _LocalFilesMixin:
 
         def job():
             series: dict[str, list[tuple[int, int, str, str]]] = {}
+            collections: dict[str, list[str]] = {}
             movies: list[dict] = []
             paths, cut = self._local_scan(root)
+            rootn = os.path.normpath(root)
             for p in paths:
                 stem = os.path.splitext(os.path.basename(p))[0]
                 se = episode_info(stem)
@@ -368,27 +372,35 @@ class _LocalFilesMixin:
                         sname = os.path.basename(os.path.dirname(p))
                     series.setdefault(sname, []).append(
                         [se[0], se[1], p, stem])
+                    continue
+                rel = os.path.relpath(os.path.normpath(p), rootn)
+                parts = rel.split(os.sep)
+                if len(parts) > 1:
+                    # Own videos keep their folder as the shelf they sit on.
+                    collections.setdefault(parts[0], []).append(p)
                 else:
                     row = self._local_file_row(p, stem, stat=False)
                     if row:
                         movies.append(row)
-            log.info("library scan %s: %d series, %d movies%s",
-                     root, len(series), len(movies),
+            log.info("library scan %s: %d series, %d collections, "
+                     "%d movies%s", root, len(series), len(collections),
+                     len(movies),
                      " (walk cut short - dir/time budget hit)" if cut else "")
-            return series, movies
+            return series, collections, movies
 
         def done(result):
             if token != getattr(self, "_local_scan_token", 0) \
                     or self.mode != "local":
                 return     # superseded by a newer selection / section switch
             self._hide_busy()
-            series, movies = result
-            self._save_library_cache(root, series, movies)
+            series, collections, movies = result
+            self._save_library_cache(root, series, movies, collections)
             if cached is not None \
                     and cached.get("series") == series \
+                    and cached.get("collections") == collections \
                     and cached.get("movies") == movies:
                 return     # nothing changed: the cache render stands
-            self._apply_library(series, movies)
+            self._apply_library(series, movies, collections)
 
         def fail(e):
             if token == getattr(self, "_local_scan_token", 0):
@@ -398,8 +410,10 @@ class _LocalFilesMixin:
 
         run_async(self.pool, job, done, fail)
 
-    def _apply_library(self, series: dict, movies: list[dict]) -> None:
+    def _apply_library(self, series: dict, movies: list[dict],
+                       collections: dict | None = None) -> None:
         self._local_series_index = series
+        self._local_collection_index = collections or {}
         rows: list[dict] = []
         if series:
             rows.append({"_header": tr("nav_series")})
@@ -412,6 +426,15 @@ class _LocalFilesMixin:
                              "_clean_title": name, "_poster_kind": "tv",
                              "stream_icon": "",
                              "_desc": f"{len(seasons)} × {len(eps)}"})
+        if collections:
+            rows.append({"_header": tr("local_collections")})
+            for name in sorted(collections, key=str.lower):
+                rows.append({"name": "📁  " + name,
+                             "_kind": "localcollection",
+                             "_series_title": name,
+                             "_key": f"localcollection::{name}",
+                             "stream_icon": "",
+                             "_desc": str(len(collections[name]))})
         if movies:
             rows.append({"_header": tr("nav_movies")})
             rows += movies
@@ -434,10 +457,12 @@ class _LocalFilesMixin:
             return {}
 
     def _save_library_cache(self, root: str, series: dict,
-                            movies: list[dict]) -> None:
+                            movies: list[dict],
+                            collections: dict | None = None) -> None:
         try:
             cache = self._library_cache()
-            cache[root] = {"series": series, "movies": movies}
+            cache[root] = {"series": series, "movies": movies,
+                           "collections": collections or {}}
             # Only the latest handful of roots - this is a warm-start, not
             # a database.
             for k in list(cache)[:-8]:
@@ -457,6 +482,18 @@ class _LocalFilesMixin:
         self._load_local_episodes()
 
     def _load_local_episodes(self) -> None:
+        coll = getattr(self, "_local_collection_index", {}).get(
+            self._local_series or "")
+        if coll is not None:
+            rows = []
+            for p in sorted(coll, key=str.lower):
+                row = self._local_file_row(p, stat=False)
+                if row:
+                    rows.append(row)
+            rows = [r for r in rows if self._search_filter([r])]
+            self._render_rows(rows, "rec", tr("local_empty"))
+            self._local_resolve_posters(rows)
+            return
         eps = getattr(self, "_local_series_index", {}).get(
             self._local_series or "", [])
         rows: list[dict] = []
@@ -567,7 +604,7 @@ class _LocalFilesMixin:
         if it.get("_kind") == "localdir":
             m.addAction(tr("ctx_open"),
                         lambda: self._local_descend(it.get("_path")))
-        elif it.get("_kind") == "localseries":
+        elif it.get("_kind") in ("localseries", "localcollection"):
             m.addAction(tr("ctx_open"),
                         lambda: self._local_open_series(
                             it.get("_series_title") or ""))
