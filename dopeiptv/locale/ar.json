@@ -869,5 +869,6 @@
   "queue_play_next": "تشغيل التالي",
   "queue_show": "عرض القائمة…",
   "queue_clear": "مسح القائمة",
-  "queue_added": "تمت إضافة {n}"
+  "queue_added": "تمت إضافة {n}",
+  "local_art_online": "البحث عن أغلفة الألبومات المفقودة عبر الإنترنت"
 }

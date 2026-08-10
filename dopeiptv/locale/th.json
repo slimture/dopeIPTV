@@ -869,5 +869,6 @@
   "queue_play_next": "เล่นถัดไป",
   "queue_show": "แสดงคิว…",
   "queue_clear": "ล้างคิว",
-  "queue_added": "เพิ่มแล้ว {n}"
+  "queue_added": "เพิ่มแล้ว {n}",
+  "local_art_online": "ค้นหาปกอัลบั้มที่ขาดหายทางออนไลน์"
 }

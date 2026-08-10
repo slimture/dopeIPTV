@@ -869,5 +869,6 @@
   "queue_play_next": "下一首播放",
   "queue_show": "显示队列…",
   "queue_clear": "清空队列",
-  "queue_added": "已加入 {n} 项"
+  "queue_added": "已加入 {n} 项",
+  "local_art_online": "在线查找缺失的专辑封面"
 }

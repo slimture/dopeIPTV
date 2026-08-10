@@ -869,5 +869,6 @@
   "queue_play_next": "Sonra çal",
   "queue_show": "Sırayı göster…",
   "queue_clear": "Sırayı temizle",
-  "queue_added": "{n} eklendi"
+  "queue_added": "{n} eklendi",
+  "local_art_online": "Eksik albüm kapaklarını çevrimiçi ara"
 }

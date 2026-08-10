@@ -603,3 +603,96 @@ def test_album_art_is_found_for_tracks_albums_and_artists(tmp_path,
     # A cover file always wins over the embedded one.
     (album / "cover.jpg").write_bytes(b"JPEGBYTES")
     assert w._cover_in(str(album)).endswith("cover.jpg")
+
+
+def test_online_album_art_is_asked_once_and_only_when_needed(tmp_path,
+                                                             monkeypatch):
+    """Albums without their own art are looked up online; a row that
+    already has real art is left alone, and every answer - misses too - is
+    remembered so the same album is never asked about twice."""
+    import dopeiptv.ui.mw_local as ml
+
+    album = tmp_path / "Kanye West - Donda"
+    album.mkdir()
+    (album / "01.flac").write_bytes(b"x")
+
+    calls = []
+
+    class _Resp:
+        def __init__(self, body):
+            self._b = body
+
+        def read(self):
+            return self._b
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def fake_open(url, timeout=0):
+        calls.append(url)
+        return _Resp(b'{"results":[{"artworkUrl100":'
+                     b'"https://art/a100x100bb.jpg"}]}')
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_open)
+    jobs = []
+    monkeypatch.setattr(ml, "run_async",
+                        lambda pool, fn, done, err=None: jobs.append(
+                            (fn, done)))
+
+    w = _Stub()
+    w._load_gen = 0
+    w.pool = object()                 # run_async is stubbed; any handle does
+    w.list_model = type("M", (), {"refresh_all": lambda self: None})()
+    row = {"_kind": "localalbum", "_key": "k", "_path": str(album),
+           "stream_icon": ""}
+    w.all_items = [row]
+    w._local_fetch_album_art([row])
+    fn, done = jobs[-1]
+    done(fn())
+    assert row["stream_icon"] == "https://art/a600x600bb.jpg"
+    assert len(calls) == 1
+
+    # Asked again: served from the cache, no second request.
+    row2 = dict(row, stream_icon="")
+    w.all_items = [row2]
+    w._local_fetch_album_art([row2])
+    fn, done = jobs[-1]
+    done(fn())
+    assert len(calls) == 1
+    assert row2["stream_icon"] == "https://art/a600x600bb.jpg"
+
+    # A row that already has real art is never looked up.
+    calls.clear()
+    have = {"_kind": "localalbum", "_key": "h", "_path": str(album),
+            "stream_icon": "/cache/thumbs/art-abc.img"}
+    w.all_items = [have]
+    w._local_fetch_album_art([have])
+    assert calls == []
+
+
+def test_leaving_and_returning_lands_where_you_were(tmp_path):
+    """Going to TV and back must not dump you at the root of the share."""
+    w = _Stub()
+    root = _tree(tmp_path)
+    w._current_cat = root
+    w._load_local_items(root)
+    sub = next(r for r in w.rendered if r["_kind"] == "localdir")["_path"]
+    w._local_descend(sub)
+    assert [r["name"] for r in w.rendered] == ["dag1"]
+
+    # Off to another section and back: the category is re-selected, and
+    # the remembered place wins over starting at the root.
+    w.mode = "live"
+    w.rendered = []
+    w.mode = "local"
+    assert w._local_restore_place() is True
+    assert w._local_ctx == sub
+    assert w.back_btn.visible is True
+    assert [r["name"] for r in w.rendered] == ["dag1"]
+
+    # A different category has nothing remembered - it starts fresh.
+    w._current_cat = str(tmp_path)
+    assert w._local_restore_place() is False

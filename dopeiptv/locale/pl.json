@@ -869,5 +869,6 @@
   "queue_play_next": "Odtwórz jako następne",
   "queue_show": "Pokaż kolejkę…",
   "queue_clear": "Wyczyść kolejkę",
-  "queue_added": "Dodano {n}"
+  "queue_added": "Dodano {n}",
+  "local_art_online": "Szukaj brakujących okładek online"
 }

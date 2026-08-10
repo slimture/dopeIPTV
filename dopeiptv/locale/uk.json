@@ -869,5 +869,6 @@
   "queue_play_next": "Наступним",
   "queue_show": "Показати чергу…",
   "queue_clear": "Очистити чергу",
-  "queue_added": "Додано: {n}"
+  "queue_added": "Додано: {n}",
+  "local_art_online": "Шукати відсутні обкладинки онлайн"
 }

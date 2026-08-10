@@ -869,5 +869,6 @@
   "queue_play_next": "Hierna afspelen",
   "queue_show": "Wachtrij tonen…",
   "queue_clear": "Wachtrij wissen",
-  "queue_added": "{n} toegevoegd"
+  "queue_added": "{n} toegevoegd",
+  "local_art_online": "Ontbrekende albumhoezen online opzoeken"
 }

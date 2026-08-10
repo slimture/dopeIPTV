@@ -869,5 +869,6 @@
   "queue_play_next": "Spela härnäst",
   "queue_show": "Visa kön…",
   "queue_clear": "Töm kön",
-  "queue_added": "{n} tillagda i kön"
+  "queue_added": "{n} tillagda i kön",
+  "local_art_online": "Hämta saknad albumkonst online"
 }

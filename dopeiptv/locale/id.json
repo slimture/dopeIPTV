@@ -869,5 +869,6 @@
   "queue_play_next": "Putar berikutnya",
   "queue_show": "Tampilkan antrean…",
   "queue_clear": "Kosongkan antrean",
-  "queue_added": "{n} ditambahkan"
+  "queue_added": "{n} ditambahkan",
+  "local_art_online": "Cari sampul album yang hilang secara daring"
 }

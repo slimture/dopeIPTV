@@ -869,5 +869,6 @@
   "queue_play_next": "Riproduci dopo",
   "queue_show": "Mostra la coda…",
   "queue_clear": "Svuota la coda",
-  "queue_added": "{n} aggiunti"
+  "queue_added": "{n} aggiunti",
+  "local_art_online": "Cerca online le copertine mancanti"
 }

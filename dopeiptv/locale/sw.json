@@ -869,5 +869,6 @@
   "queue_play_next": "Cheza baadaye",
   "queue_show": "Onyesha foleni…",
   "queue_clear": "Futa foleni",
-  "queue_added": "Vimeongezwa {n}"
+  "queue_added": "Vimeongezwa {n}",
+  "local_art_online": "Tafuta mabango ya albamu yaliyokosekana mtandaoni"
 }

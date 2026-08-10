@@ -869,5 +869,6 @@
   "queue_play_next": "اگلا چلائیں",
   "queue_show": "قطار دکھائیں…",
   "queue_clear": "قطار صاف کریں",
-  "queue_added": "{n} شامل ہوئے"
+  "queue_added": "{n} شامل ہوئے",
+  "local_art_online": "غائب البم آرٹ آن لائن تلاش کریں"
 }

@@ -221,6 +221,7 @@ class _LocalFilesMixin:
 
     def _local_clear_poster_cache(self) -> None:
         self.settings.remove("local_tmdb_posters_v2")
+        self.settings.remove("music_art_v1")
 
     def _local_clear_thumbs(self) -> None:
         from ..core.workers import clear_directory, default_image_cache_dir
@@ -297,8 +298,37 @@ class _LocalFilesMixin:
                               "_filename": stem})
         rows = self._search_filter(dirs) + self._search_filter(files)
         self._render_rows(rows, "rec", tr("local_empty"))
+        self._local_fetch_album_art(rows)
         self._local_resolve_posters([r for r in rows
                                      if r.get("_kind") == "local"])
+
+    def _local_remember_place(self) -> None:
+        """Where we are right now, so leaving for TV and coming back lands
+        here instead of at the root."""
+        self._local_place = {
+            "cat": self._current_cat,
+            "ctx": getattr(self, "_local_ctx", None),
+            "series": getattr(self, "_local_series", None),
+            "nav": list(getattr(self, "_local_nav_stack", []) or []),
+        }
+
+    def _local_restore_place(self) -> bool:
+        """Put the section back where it was left. False when there is
+        nothing remembered (a first visit)."""
+        place = getattr(self, "_local_place", None)
+        if not place or place.get("cat") != self._current_cat:
+            return False
+        self._local_ctx = place.get("ctx")
+        self._local_series = place.get("series")
+        self._local_nav_stack = list(place.get("nav") or [])
+        deep = bool(self._local_ctx or self._local_series)
+        if deep:
+            self.back_btn.setText("<-  " + tr("btn_back"))
+            self.back_btn.show()
+        else:
+            self.back_btn.hide()
+        self._load_local_items(self._current_cat)
+        return True
 
     def _local_descend(self, path: str, from_key=None) -> None:
         self._local_push_nav(from_key or path)
@@ -307,6 +337,7 @@ class _LocalFilesMixin:
         self.back_btn.setText("<-  " + tr("btn_back"))
         self.back_btn.show()
         self._load_local_items(self._current_cat)
+        self._local_remember_place()
 
     def _local_up(self) -> None:
         """One level up; at the category root the back button retires. The
@@ -323,6 +354,7 @@ class _LocalFilesMixin:
                                 getattr(self, "_local_movies_rows", []),
                                 getattr(self, "_local_collection_index", {}))
             self._local_select_key(came_from)
+            self._local_remember_place()
             return
         root = self._current_cat if isinstance(self._current_cat, str) else ""
         cur = getattr(self, "_local_ctx", None)
@@ -337,6 +369,7 @@ class _LocalFilesMixin:
             self.back_btn.hide()
         self._load_local_items(root)
         self._local_select_key(came_from)
+        self._local_remember_place()
 
     def _local_push_nav(self, key) -> None:
         if not hasattr(self, "_local_nav_stack"):
@@ -861,6 +894,7 @@ class _LocalFilesMixin:
             self._set_status(self._local_scan_note())
         self._local_resolve_posters(
             [r for r in rows if r.get("_kind") in ("local", "localseries")])
+        self._local_fetch_album_art(rows)
 
     def _local_scan_note(self, state: dict | None = None) -> str:
         st = state if state is not None else getattr(
@@ -959,6 +993,7 @@ class _LocalFilesMixin:
         self.back_btn.setText("<-  " + tr("btn_back"))
         self.back_btn.show()
         self._load_local_episodes()
+        self._local_remember_place()
 
     def _load_local_episodes(self) -> None:
         coll = getattr(self, "_local_collection_index", {}).get(
@@ -972,6 +1007,7 @@ class _LocalFilesMixin:
             rows = [r for r in rows if self._search_filter([r])]
             self._render_rows(rows, "rec", tr("local_empty"))
             self._local_resolve_posters(rows)
+            self._local_fetch_album_art(rows)
             return
         eps = getattr(self, "_local_series_index", {}).get(
             self._local_series or "", [])
@@ -1156,6 +1192,114 @@ class _LocalFilesMixin:
                 self.list_model.refresh_all()
 
         run_async(self.pool, job, done, lambda _e: None)
+
+    # -- album art from the internet -----------------------------------------
+
+    def _music_art_cache(self) -> dict:
+        try:
+            v = json.loads(
+                self.settings.value("music_art_v1", "") or "{}")
+            return v if isinstance(v, dict) else {}
+        except ValueError:
+            return {}
+
+    @staticmethod
+    def _album_id(d: str) -> tuple[str, str]:
+        """(artist, album) for a folder, from a track's tags - falling back
+        to the folder name, which by convention is "Artist - Album"."""
+        try:
+            for n in sorted(os.listdir(d), key=str.lower)[:40]:
+                if n.lower().endswith(
+                        (".flac", ".mp3", ".m4a", ".ogg", ".opus", ".wav")):
+                    t = read_tags(os.path.join(d, n))[0]
+                    a = t.get("albumartist") or t.get("artist") or ""
+                    b = t.get("album") or ""
+                    if a or b:
+                        return a, b
+                    break
+        except OSError:
+            pass
+        base = os.path.basename(d.rstrip(os.sep))
+        artist, _, album = base.partition(" - ")
+        return (artist, album) if album else ("", base)
+
+    def _local_fetch_album_art(self, rows: list[dict]) -> None:
+        """Cover art for albums that carry none of their own, looked up by
+        artist and album on the iTunes search service - no API key, one
+        request per album, and the answer (misses included) is remembered
+        so the same album is never asked about twice."""
+        if self.settings.value("music_art_online", "true") != "true":
+            return
+        todo = []
+        for r in rows:
+            if r.get("_kind") not in ("localalbum", "localdir", "local"):
+                continue
+            icon = r.get("stream_icon") or ""
+            if icon and "/folder-" not in icon:
+                continue          # already has real art
+            d = (r.get("_path") if r.get("_kind") != "local"
+                 else os.path.dirname(r.get("_path") or ""))
+            if d and all(x.get("_d") != d for x in todo):
+                todo.append({"_key": r.get("_key"), "_d": d})
+            if len(todo) >= 40:
+                break
+        if not todo or getattr(self, "pool", None) is None:
+            return
+        cache = self._music_art_cache()
+        gen = getattr(self, "_load_gen", 0)
+
+        def job():
+            import json as _json
+            import urllib.parse
+            import urllib.request
+            out, changed = {}, False
+            for t in todo:
+                artist, album = self._album_id(t["_d"])
+                if not (artist or album):
+                    continue
+                ck = f"{artist}|{album}".lower()
+                if ck in cache:
+                    url = cache[ck]
+                else:
+                    q = urllib.parse.urlencode(
+                        {"term": f"{artist} {album}".strip(),
+                         "entity": "album", "limit": 1})
+                    try:
+                        with urllib.request.urlopen(
+                                "https://itunes.apple.com/search?" + q,
+                                timeout=8) as fh:
+                            res = _json.loads(fh.read().decode("utf-8"))
+                        hit = (res.get("results") or [None])[0] or {}
+                        url = (hit.get("artworkUrl100") or "").replace(
+                            "100x100bb", "600x600bb")
+                    except Exception as e:
+                        log.debug("album art lookup failed (%s): %s", ck, e)
+                        continue          # not cached: asked again later
+                    cache[ck] = url
+                    changed = True
+                if url:
+                    out[t["_d"]] = url
+            if changed:
+                self.settings.setValue("music_art_v1", json.dumps(cache))
+            log.info("album art: %d/%d resolved online", len(out), len(todo))
+            return out
+
+        def done(out):
+            if not out or gen != self._load_gen:
+                return
+            hit = False
+            for r in self.all_items:
+                d = (r.get("_path") if r.get("_kind") != "local"
+                     else os.path.dirname(r.get("_path") or ""))
+                url = out.get(d)
+                icon = r.get("stream_icon") or ""
+                if url and (not icon or "/folder-" in icon):
+                    r["stream_icon"] = url
+                    hit = True
+            if hit:
+                self.list_model.refresh_all()
+
+        run_async(getattr(self, "pool", None), job, done, lambda _e: None)
 
     # -- multiview -----------------------------------------------------------
 

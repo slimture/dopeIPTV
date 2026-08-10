@@ -869,5 +869,6 @@
   "queue_play_next": "अगला चलाएँ",
   "queue_show": "क्यू दिखाएँ…",
   "queue_clear": "क्यू साफ़ करें",
-  "queue_added": "{n} जोड़े गए"
+  "queue_added": "{n} जोड़े गए",
+  "local_art_online": "गुम एल्बम आर्ट ऑनलाइन खोजें"
 }

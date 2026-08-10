@@ -1188,6 +1188,13 @@ class _SettingsMixin:
         lv.addLayout(loc_btns)
         loc_note = QLabel("")
         loc_note.setObjectName("DetailMeta")
+        art_chk = QCheckBox(tr("local_art_online"))
+        art_chk.setChecked(
+            self.settings.value("music_art_online", "true") == "true")
+        art_chk.toggled.connect(
+            lambda on: self.settings.setValue(
+                "music_art_online", "true" if on else "false"))
+        lv.addWidget(art_chk)
         cache_btns = QHBoxLayout()
         loc_clear_lib = QPushButton(tr("local_clear_lib_cache"))
         loc_clear_post = QPushButton(tr("local_clear_posters"))

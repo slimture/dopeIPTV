@@ -869,5 +869,6 @@
   "queue_play_next": "Als Nächstes",
   "queue_show": "Warteschlange…",
   "queue_clear": "Liste leeren",
-  "queue_added": "{n} hinzugefügt"
+  "queue_added": "{n} hinzugefügt",
+  "local_art_online": "Fehlende Albumcover online suchen"
 }

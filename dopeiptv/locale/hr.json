@@ -869,5 +869,6 @@
   "queue_play_next": "Reproduciraj sljedeće",
   "queue_show": "Prikaži red…",
   "queue_clear": "Očisti red",
-  "queue_added": "Dodano: {n}"
+  "queue_added": "Dodano: {n}",
+  "local_art_online": "Potraži nedostajuće omote na internetu"
 }

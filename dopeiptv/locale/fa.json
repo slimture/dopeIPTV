@@ -869,5 +869,6 @@
   "queue_play_next": "پخش بعدی",
   "queue_show": "نمایش صف…",
   "queue_clear": "پاک کردن صف",
-  "queue_added": "{n} افزوده شد"
+  "queue_added": "{n} افزوده شد",
+  "local_art_online": "جست‌وجوی آنلاین کاور آلبوم‌های ناموجود"
 }

@@ -869,5 +869,6 @@
   "queue_play_next": "次に再生",
   "queue_show": "キューを表示…",
   "queue_clear": "キューを消去",
-  "queue_added": "{n} 件追加"
+  "queue_added": "{n} 件追加",
+  "local_art_online": "不足しているアルバムアートをオンラインで検索"
 }

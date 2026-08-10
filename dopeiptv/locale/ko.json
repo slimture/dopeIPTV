@@ -869,5 +869,6 @@
   "queue_play_next": "다음에 재생",
   "queue_show": "대기열 보기…",
   "queue_clear": "대기열 비우기",
-  "queue_added": "{n}개 추가됨"
+  "queue_added": "{n}개 추가됨",
+  "local_art_online": "없는 앨범 아트를 온라인에서 검색"
 }

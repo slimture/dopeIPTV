@@ -104,6 +104,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "local_scanning": {"en": "Reading the library…"},
     "local_scanning_n": {"en": "Reading the library… {files} files in {folders} folders"},
     "local_settings_hint": {"en": "Folders browsed by the Local files section. Mounted network shares appear there by themselves."},
+    "local_art_online": {"en": "Look up missing album art online"},
     "local_clear_lib_cache": {"en": "Clear library cache"},
     "local_clear_posters": {"en": "Clear TMDB poster cache"},
     "local_clear_thumbs": {"en": "Clear video thumbnails"},

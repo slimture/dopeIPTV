@@ -2490,12 +2490,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._sync_sort_box()            # show THIS category's sort order
         self._apply_list_layout(False)   # honour the user's grid/list choice
         if self.mode == "local":
-            # A fresh category selection always starts at the root of it.
+            # Coming back from another section lands where the user left
+            # off - the folder they were browsing, or the series they had
+            # open. Only a genuinely new category selection starts at the
+            # root of it.
+            if self._local_restore_place():
+                return
             self._local_ctx = None
             self._local_series = None
             self._local_nav_stack = []
             self.back_btn.hide()
             self._load_local_items(category_id)
+            self._local_remember_place()
             return
         if self.mode == "rec":
             if category_id == "__jobs__":

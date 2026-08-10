@@ -869,5 +869,6 @@
   "queue_play_next": "נגן אחר כך",
   "queue_show": "הצגת התור…",
   "queue_clear": "ניקוי התור",
-  "queue_added": "נוספו {n}"
+  "queue_added": "נוספו {n}",
+  "local_art_online": "חיפוש עטיפות אלבום חסרות ברשת"
 }
