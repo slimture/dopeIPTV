@@ -832,5 +832,10 @@
   "local_add_hint": "폴더를 추가하거나 네트워크 공유를 마운트하면 여기서 동영상을 탐색할 수 있습니다.",
   "local_empty": "이 폴더에 동영상이 없습니다.",
   "local_remove": "목록에서 제거",
-  "ctx_open": "열기"
+  "ctx_open": "열기",
+  "local_missing": "파일이 더 이상 없습니다 – 이동되었거나 이름이 바뀌었거나 공유가 마운트되지 않았습니다.",
+  "local_missing_remove": "기록에서 제거",
+  "local_view_folders": "보기: 폴더",
+  "local_view_series": "보기: 라이브러리",
+  "local_season": "시즌 {n}"
 }

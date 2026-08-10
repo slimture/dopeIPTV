@@ -832,5 +832,10 @@
   "local_add_hint": "フォルダーを追加するか、ネットワーク共有をマウントすると、ここで動画を閲覧できます。",
   "local_empty": "このフォルダーに動画はありません。",
   "local_remove": "リストから削除",
-  "ctx_open": "開く"
+  "ctx_open": "開く",
+  "local_missing": "ファイルが見つかりません – 移動・名前変更されたか、共有がマウントされていません。",
+  "local_missing_remove": "履歴から削除",
+  "local_view_folders": "表示:フォルダー",
+  "local_view_series": "表示:ライブラリ",
+  "local_season": "シーズン{n}"
 }

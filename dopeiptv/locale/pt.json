@@ -832,5 +832,10 @@
   "local_add_hint": "Adicione uma pasta — ou monte um compartilhamento de rede — para navegar pelos seus vídeos aqui.",
   "local_empty": "Nenhum vídeo nesta pasta.",
   "local_remove": "Remover da lista",
-  "ctx_open": "Abrir"
+  "ctx_open": "Abrir",
+  "local_missing": "O arquivo não está mais lá – foi movido, renomeado ou o compartilhamento não está montado.",
+  "local_missing_remove": "Remover do histórico",
+  "local_view_folders": "Exibição: Pastas",
+  "local_view_series": "Exibição: Biblioteca",
+  "local_season": "Temporada {n}"
 }

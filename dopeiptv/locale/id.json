@@ -832,5 +832,10 @@
   "local_add_hint": "Tambahkan folder — atau pasang berbagi jaringan — untuk menelusuri video Anda di sini.",
   "local_empty": "Tidak ada video di folder ini.",
   "local_remove": "Hapus dari daftar",
-  "ctx_open": "Buka"
+  "ctx_open": "Buka",
+  "local_missing": "Berkas sudah tidak ada – dipindahkan, diganti nama, atau berbagi belum terpasang.",
+  "local_missing_remove": "Hapus dari riwayat",
+  "local_view_folders": "Tampilan: Folder",
+  "local_view_series": "Tampilan: Pustaka",
+  "local_season": "Musim {n}"
 }

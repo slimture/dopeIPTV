@@ -832,5 +832,10 @@
   "local_add_hint": "Dodajte fasciklu — ili montirajte mrežni deljeni resurs — da biste ovde pregledali svoje video snimke.",
   "local_empty": "Nema video snimaka u ovoj fascikli.",
   "local_remove": "Ukloni sa liste",
-  "ctx_open": "Otvori"
+  "ctx_open": "Otvori",
+  "local_missing": "Datoteke više nema – premeštena je, preimenovana ili deljeni resurs nije montiran.",
+  "local_missing_remove": "Ukloni iz istorije",
+  "local_view_folders": "Prikaz: Fascikle",
+  "local_view_series": "Prikaz: Biblioteka",
+  "local_season": "Sezona {n}"
 }

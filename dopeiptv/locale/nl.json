@@ -832,5 +832,10 @@
   "local_add_hint": "Voeg een map toe — of koppel een netwerkshare — om hier je video's te bekijken.",
   "local_empty": "Geen video's in deze map.",
   "local_remove": "Uit de lijst verwijderen",
-  "ctx_open": "Openen"
+  "ctx_open": "Openen",
+  "local_missing": "Het bestand is er niet meer – verplaatst, hernoemd of de share is niet gekoppeld.",
+  "local_missing_remove": "Uit geschiedenis verwijderen",
+  "local_view_folders": "Weergave: Mappen",
+  "local_view_series": "Weergave: Bibliotheek",
+  "local_season": "Seizoen {n}"
 }

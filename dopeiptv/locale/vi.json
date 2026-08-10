@@ -832,5 +832,10 @@
   "local_add_hint": "Thêm một thư mục — hoặc gắn kết chia sẻ mạng — để duyệt video của bạn tại đây.",
   "local_empty": "Không có video trong thư mục này.",
   "local_remove": "Xóa khỏi danh sách",
-  "ctx_open": "Mở"
+  "ctx_open": "Mở",
+  "local_missing": "Tệp không còn ở đó – đã bị di chuyển, đổi tên hoặc chia sẻ chưa được gắn kết.",
+  "local_missing_remove": "Xóa khỏi lịch sử",
+  "local_view_folders": "Chế độ xem: Thư mục",
+  "local_view_series": "Chế độ xem: Thư viện",
+  "local_season": "Mùa {n}"
 }

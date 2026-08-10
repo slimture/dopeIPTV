@@ -832,5 +832,10 @@
   "local_add_hint": "Aggiungi una cartella — o monta una condivisione di rete — per sfogliare qui i tuoi video.",
   "local_empty": "Nessun video in questa cartella.",
   "local_remove": "Rimuovi dall'elenco",
-  "ctx_open": "Apri"
+  "ctx_open": "Apri",
+  "local_missing": "Il file non c'è più – spostato, rinominato o la condivisione non è montata.",
+  "local_missing_remove": "Rimuovi dalla cronologia",
+  "local_view_folders": "Vista: Cartelle",
+  "local_view_series": "Vista: Libreria",
+  "local_season": "Stagione {n}"
 }

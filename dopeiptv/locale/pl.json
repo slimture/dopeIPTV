@@ -832,5 +832,10 @@
   "local_add_hint": "Dodaj folder — lub zamontuj udział sieciowy — aby przeglądać tutaj swoje filmy.",
   "local_empty": "Brak filmów w tym folderze.",
   "local_remove": "Usuń z listy",
-  "ctx_open": "Otwórz"
+  "ctx_open": "Otwórz",
+  "local_missing": "Pliku już nie ma – przeniesiony, zmieniona nazwa albo udział nie jest zamontowany.",
+  "local_missing_remove": "Usuń z historii",
+  "local_view_folders": "Widok: Foldery",
+  "local_view_series": "Widok: Biblioteka",
+  "local_season": "Sezon {n}"
 }

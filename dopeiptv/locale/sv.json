@@ -832,5 +832,10 @@
   "local_add_hint": "Lägg till en mapp — eller montera en nätverksutdelning — för att bläddra bland dina videor här.",
   "local_empty": "Inga videor i den här mappen.",
   "local_remove": "Ta bort från listan",
-  "ctx_open": "Öppna"
+  "ctx_open": "Öppna",
+  "local_missing": "Filen finns inte längre – den har flyttats, bytt namn eller så är utdelningen inte monterad.",
+  "local_missing_remove": "Ta bort ur historiken",
+  "local_view_folders": "Vy: Mappar",
+  "local_view_series": "Vy: Bibliotek",
+  "local_season": "Säsong {n}"
 }

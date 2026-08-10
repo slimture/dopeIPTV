@@ -96,6 +96,11 @@ _STRINGS: dict[str, dict[str, str]] = {
     "local_empty": {"en": "No videos in this folder."},
     "local_remove": {"en": "Remove from the list"},
     "ctx_open": {"en": "Open"},
+    "local_missing": {"en": "The file is no longer there - it was moved, renamed or the share is not mounted."},
+    "local_missing_remove": {"en": "Remove from History"},
+    "local_view_folders": {"en": "View: folders"},
+    "local_view_series": {"en": "View: library"},
+    "local_season": {"en": "Season {n}"},
     "sidebar_categories": {"en": "CATEGORIES"},
 
     "sidebar_library": {"en": "LIBRARY"},

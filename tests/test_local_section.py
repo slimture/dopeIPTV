@@ -35,9 +35,12 @@ class _Btn:
 class _Stub(_LocalFilesMixin):
     VIDEO_EXTS = MainWindow.VIDEO_EXTS
 
+    tmdb = None
+
     def __init__(self):
         self.settings = _Settings()
         self.mode = "local"
+        self._local_series = None
         self._last_cat = {}
         self._local_ctx = None
         self._current_cat = None
@@ -78,7 +81,7 @@ def test_browse_lists_dirs_first_then_videos_only(tmp_path):
     w._load_local_items(root)
     kinds = [r["_kind"] for r in w.rendered]
     names = [r["name"] for r in w.rendered]
-    assert kinds == ["localdir", "recording"]
+    assert kinds == ["localdir", "local"]
     assert names[0].endswith("Semester")      # the folder row, glyph-prefixed
     assert names[1] == "a-film"               # .txt and dotfile filtered out
 
@@ -97,7 +100,7 @@ def test_descend_and_walk_back_up(tmp_path):
     w._local_up()
     assert w._local_ctx is None
     assert w.back_btn.visible is False
-    assert [r["_kind"] for r in w.rendered] == ["localdir", "recording"]
+    assert [r["_kind"] for r in w.rendered] == ["localdir", "local"]
 
 
 def test_registered_dirs_round_trip_and_removal(tmp_path):
@@ -139,8 +142,64 @@ def test_every_language_carries_the_section_strings():
     import pathlib
     root = pathlib.Path(__file__).resolve().parent.parent / "dopeiptv/locale"
     keys = ("nav_local", "local_add_folder", "local_add_folder_title",
-            "local_add_hint", "local_empty", "local_remove", "ctx_open")
+            "local_add_hint", "local_empty", "local_remove", "ctx_open",
+            "local_missing", "local_missing_remove", "local_view_folders",
+            "local_view_series", "local_season")
     for f in sorted(root.glob("*.json")):
         d = json.loads(f.read_text(encoding="utf-8"))
         for key in keys:
             assert key in d, f"{f.name} saknar {key}"
+
+
+# -- the Infuse-style library view -------------------------------------------
+
+def test_episode_info_reads_both_tag_styles():
+    from dopeiptv.ui.mw_local import episode_info
+    assert episode_info("Show.Name.S02E05.1080p")[:2] == (2, 5)
+    assert episode_info("show 3x07 hdtv")[:2] == (3, 7)
+    assert episode_info("A.Movie.2019.1080p") is None
+
+
+def test_library_view_groups_episodes_into_series(tmp_path):
+    root = tmp_path / "Media"
+    (root / "Serier").mkdir(parents=True)
+    (root / "Serier" / "Show.Name.S01E02.720p.mkv").write_bytes(b"x")
+    (root / "Serier" / "Show.Name.S01E01.720p.mkv").write_bytes(b"x")
+    (root / "Serier" / "Show.Name.S02E01.720p.mkv").write_bytes(b"x")
+    (root / "En.Film.2020.1080p.mkv").write_bytes(b"x")
+    w = _Stub()
+    w.settings.setValue("local_view", "series")
+    w._current_cat = str(root)
+    w._load_local_items(str(root))
+
+    # One series row (grouped from three files, wherever they live in the
+    # tree) and one movie, each under its header.
+    series = [r for r in w.rendered if r.get("_kind") == "localseries"]
+    movies = [r for r in w.rendered if r.get("_kind") == "local"]
+    assert len(series) == 1 and series[0]["_series_title"] == "Show Name"
+    assert len(movies) == 1 and movies[0]["name"] == "En Film (2020)"
+
+    # Drilling in: episodes sorted by season/episode under season headers,
+    # tagged so they never scrobble as movies.
+    w._local_open_series("Show Name")
+    assert w.back_btn.visible is True
+    names = [r.get("_header") or r["name"] for r in w.rendered]
+    assert names[0] and "1" in str(names[0])          # season 1 header first
+    eps = [r for r in w.rendered if not r.get("_header")]
+    assert [e["name"][:3] for e in eps] == ["E01", "E02", "E01"]
+    assert all(e.get("_no_scrobble") for e in eps)
+
+    # And back out to the library level.
+    w._local_up()
+    assert w.back_btn.visible is False
+    assert any(r.get("_kind") == "localseries" for r in w.rendered)
+
+
+def test_folder_view_is_untouched_by_the_library_setting(tmp_path):
+    root = tmp_path / "M"
+    root.mkdir()
+    (root / "Show.S01E01.mkv").write_bytes(b"x")
+    w = _Stub()                       # default view: folders
+    w._current_cat = str(root)
+    w._load_local_items(str(root))
+    assert [r["_kind"] for r in w.rendered] == ["local"]

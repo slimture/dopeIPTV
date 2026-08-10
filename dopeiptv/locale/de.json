@@ -832,5 +832,10 @@
   "local_add_hint": "Fügen Sie einen Ordner hinzu — oder binden Sie eine Netzwerkfreigabe ein — um hier Ihre Videos zu durchsuchen.",
   "local_empty": "Keine Videos in diesem Ordner.",
   "local_remove": "Aus der Liste entfernen",
-  "ctx_open": "Öffnen"
+  "ctx_open": "Öffnen",
+  "local_missing": "Die Datei ist nicht mehr da – verschoben, umbenannt oder die Freigabe ist nicht eingebunden.",
+  "local_missing_remove": "Aus dem Verlauf entfernen",
+  "local_view_folders": "Ansicht: Ordner",
+  "local_view_series": "Ansicht: Bibliothek",
+  "local_season": "Staffel {n}"
 }

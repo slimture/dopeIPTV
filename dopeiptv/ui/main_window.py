@@ -94,6 +94,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         super().__init__()
         self._welcome = None  # first-run onboarding overlay; created on demand
         self._local_ctx = None  # current subdirectory in the Local files view
+        self._local_series = None  # drilled-into series in the library view
         self._add_provider_btn = None  # "+ Add provider" hint when offline
         self.client = client
         self.settings = settings
@@ -2211,7 +2212,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             for label, data in [(tr("cat_all"), None),
                                 (tr("fav_channels"), "live"),
                                 (tr("nav_movies"), "movie"),
-                                (tr("nav_series"), "series")]:
+                                (tr("nav_series"), "series"),
+                                (tr("nav_local"), "local")]:
                 it = QListWidgetItem(label)
                 it.setData(Qt.ItemDataRole.UserRole, data)
                 self.cat_list.addItem(it)
@@ -2416,6 +2418,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # picker (it rebuilds the list and selects the new folder).
             self._local_add_folder()
             return
+        if self.mode == "local" and cat == "__view__":
+            self._local_toggle_view()
+            return
         locked = False
         if cat is not None:
             if self.mode == "fav":
@@ -2472,6 +2477,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self.mode == "local":
             # A fresh category selection always starts at the root of it.
             self._local_ctx = None
+            self._local_series = None
             self.back_btn.hide()
             self._load_local_items(category_id)
             return
@@ -2868,6 +2874,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         "live": {"live"},
         "movie": {"movie", "vod"},
         "series": {"series", "episode"},
+        "local": {"local"},
     }
 
     def channel_display_name(self, it) -> str:
@@ -3316,20 +3323,35 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if it.get("_kind") == "localdir":
                 self._local_descend(path)      # a folder row drills in
                 return
+            if it.get("_kind") == "localseries":
+                self._local_open_series(it.get("_series_title") or "")
+                return
             if not path or not os.path.isfile(path):
                 return
             title = it.get("name") or os.path.basename(path)
             if external or player == "vlc":
                 launch_player(player or "mpv", path, title, self)
                 return
-            self._start_playback(path, title, None, path, "recording",
-                                 record=False)
+            self._start_playback(path, title, it.get("stream_icon"), path,
+                                 "local", record=True, item=it)
             return
         if self.mode == "history":
             url = it.get("_url")
             title = it.get("name") or "dopeIPTV"
             icon, key, kind = (it.get("stream_icon"), it.get("_key"),
                                it.get("_kind"))
+            if kind == "local" and (not url or not os.path.isfile(url)):
+                # A file on an unmounted share is not an error to shrug at:
+                # say why it cannot play, and offer to drop the stale row.
+                # Cancel keeps it - after mounting the share it plays again.
+                idx = self._choice_dialog(
+                    tr("nav_local"), tr("local_missing"),
+                    [(tr("local_missing_remove"), "normal"),
+                     (tr("common_cancel"), "primary")])
+                if idx == 0:
+                    self.history.remove(key, kind)
+                    self._load_items(self._current_cat)
+                return
         else:
             url, title = self._stream_for(it)
             icon = it.get("stream_icon") or it.get("cover")
@@ -3378,8 +3400,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if not path or not os.path.isfile(path):
             return
         title = os.path.splitext(os.path.basename(path))[0]
-        self._start_playback(path, title, None, path, "recording",
-                             record=False)
+        self._start_playback(path, title, None, path, "local",
+                             record=True, item={"name": title, "_path": path,
+                                                "_key": path,
+                                                "_kind": "local"})
 
     def dragEnterEvent(self, e) -> None:
         if any(u.isLocalFile()
@@ -3527,8 +3551,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     # "vod" in one and "movie" in the other, and History rows carry their own.
     _CAST_RESUME_KIND = {"vod": "movie", "movie": "movie",
                          "episode": "episode",
-                         "rec": "recording", "recording": "recording"}
-    _RESUME_GROUP = {"movie": "vod", "episode": "episode", "recording": "rec"}
+                         "rec": "recording", "recording": "recording",
+                         "local": "local"}
+    _RESUME_GROUP = {"movie": "vod", "episode": "episode", "recording": "rec",
+                     "local": "local"}
 
     def _busy_elsewhere(self, it) -> bool:
         """Is the app holding a provider connection for something else?
@@ -4652,7 +4678,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         return "embedded" if self.player else "external"
 
     # Content kinds whose playback position is worth remembering/resuming.
-    _RESUMABLE = ("movie", "episode", "recording")
+    _RESUMABLE = ("movie", "episode", "recording", "local")
 
     # How far back the live timeline spans (minutes). A window, not the whole
     # multi-day archive, so a small drag stays fine-grained; matches the 6 h
@@ -5027,6 +5053,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                              extra=self._history_extra(kind, item, title))
         if kind in ("movie", "episode"):
             self._trakt_start_for_item(kind, item)
+        elif (kind == "local" and item is not None
+                and not item.get("_no_scrobble")):
+            # A local file scrobbles as a movie when Trakt can match the
+            # cleaned title; an unmatched file just scrobbles nothing.
+            self._trakt_start_for_item(
+                "movie", {"name": item.get("_clean_title")
+                          or item.get("name") or ""})
         self.stream_error.hide()
         # Remember the channel we're leaving so the "last channel" key can
         # bounce back to it.

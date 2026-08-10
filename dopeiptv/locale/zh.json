@@ -832,5 +832,10 @@
   "local_add_hint": "添加一个文件夹——或挂载网络共享——即可在此浏览你的视频。",
   "local_empty": "此文件夹中没有视频。",
   "local_remove": "从列表中移除",
-  "ctx_open": "打开"
+  "ctx_open": "打开",
+  "local_missing": "文件不在了——已被移动、重命名,或共享未挂载。",
+  "local_missing_remove": "从历史记录中移除",
+  "local_view_folders": "视图:文件夹",
+  "local_view_series": "视图:媒体库",
+  "local_season": "第 {n} 季"
 }

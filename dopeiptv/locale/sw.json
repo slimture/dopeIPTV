@@ -832,5 +832,10 @@
   "local_add_hint": "Ongeza folda — au unganisha hisa ya mtandao — ili kuvinjari video zako hapa.",
   "local_empty": "Hakuna video katika folda hii.",
   "local_remove": "Ondoa kwenye orodha",
-  "ctx_open": "Fungua"
+  "ctx_open": "Fungua",
+  "local_missing": "Faili haipo tena – imehamishwa, imebadilishwa jina, au hisa haijaunganishwa.",
+  "local_missing_remove": "Ondoa kwenye historia",
+  "local_view_folders": "Mwonekano: Folda",
+  "local_view_series": "Mwonekano: Maktaba",
+  "local_season": "Msimu wa {n}"
 }

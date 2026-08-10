@@ -832,5 +832,10 @@
   "local_add_hint": "Dodajte mapu — ili montirajte mrežni dijeljeni resurs — da biste ovdje pregledavali svoje videozapise.",
   "local_empty": "Nema videozapisa u ovoj mapi.",
   "local_remove": "Ukloni s popisa",
-  "ctx_open": "Otvori"
+  "ctx_open": "Otvori",
+  "local_missing": "Datoteke više nema – premještena je, preimenovana ili dijeljeni resurs nije montiran.",
+  "local_missing_remove": "Ukloni iz povijesti",
+  "local_view_folders": "Prikaz: Mape",
+  "local_view_series": "Prikaz: Biblioteka",
+  "local_season": "Sezona {n}"
 }

@@ -832,5 +832,10 @@
   "local_add_hint": "Videolarınıza buradan göz atmak için bir klasör ekleyin — veya bir ağ paylaşımı bağlayın.",
   "local_empty": "Bu klasörde video yok.",
   "local_remove": "Listeden kaldır",
-  "ctx_open": "Aç"
+  "ctx_open": "Aç",
+  "local_missing": "Dosya artık yok – taşındı, yeniden adlandırıldı veya paylaşım bağlı değil.",
+  "local_missing_remove": "Geçmişten kaldır",
+  "local_view_folders": "Görünüm: Klasörler",
+  "local_view_series": "Görünüm: Kitaplık",
+  "local_season": "Sezon {n}"
 }

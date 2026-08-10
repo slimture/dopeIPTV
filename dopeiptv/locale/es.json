@@ -832,5 +832,10 @@
   "local_add_hint": "Añade una carpeta — o monta un recurso compartido de red — para explorar tus vídeos aquí.",
   "local_empty": "No hay vídeos en esta carpeta.",
   "local_remove": "Quitar de la lista",
-  "ctx_open": "Abrir"
+  "ctx_open": "Abrir",
+  "local_missing": "El archivo ya no está – se movió, se renombró o el recurso compartido no está montado.",
+  "local_missing_remove": "Quitar del historial",
+  "local_view_folders": "Vista: Carpetas",
+  "local_view_series": "Vista: Biblioteca",
+  "local_season": "Temporada {n}"
 }

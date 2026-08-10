@@ -53,7 +53,7 @@ class _Stub:
         self.played.append((url, title, key, kind, record))
 
 
-def test_a_video_file_is_played_with_the_recordings_semantics(tmp_path):
+def test_a_video_file_is_played_as_first_class_local_content(tmp_path):
     f = tmp_path / "Semlor och TV.mkv"
     f.write_bytes(b"x")
     w = _Stub()
@@ -63,8 +63,8 @@ def test_a_video_file_is_played_with_the_recordings_semantics(tmp_path):
     assert url == str(f)
     assert title == "Semlor och TV"       # extension off, name kept
     assert key == str(f)                  # resume is keyed on the path
-    assert kind == "recording"            # rides the local-file player path
-    assert record is False                # never record a local file
+    assert kind == "local"                # own kind: resume group + History
+    assert record is True                 # local plays land in History
 
 
 def test_a_missing_path_is_ignored(tmp_path):
