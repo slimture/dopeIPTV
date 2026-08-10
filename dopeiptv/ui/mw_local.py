@@ -358,14 +358,17 @@ class _LocalFilesMixin:
             collections = state["collections"]
             movies = state["movies"]
             if not finished:
-                # Mid-walk: refresh the top level with what exists so far -
-                # but never yank the user out of a series/collection they
-                # have drilled into; they get the fresh index on the way
-                # back instead.
-                self._local_series_index = series
-                self._local_collection_index = collections
-                if not getattr(self, "_local_series", None):
-                    self._apply_library(series, movies, collections)
+                # Mid-walk. With a cached view on screen, leave it alone -
+                # swapping a full library for a half-walked one made rows
+                # "disappear" until the walk found them again. Progressive
+                # fill is for the first visit, when there is nothing else
+                # to show - and even then never while the user is drilled
+                # into a series/collection.
+                if cached is None:
+                    self._local_series_index = series
+                    self._local_collection_index = collections
+                    if not getattr(self, "_local_series", None):
+                        self._apply_library(series, movies, collections)
                 self._local_scan_step(root, state, token, cached)
                 return
             self._local_pulse_stop()
