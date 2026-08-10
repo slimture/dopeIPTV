@@ -2549,7 +2549,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             for hk, ek, rows in (
                     ("fav_channels", "fav", sect("live")),
                     ("fav_movies", "vod", sect("movie")),
-                    ("fav_series", "series", sect("series"))):
+                    ("fav_series", "series", sect("series")),
+                    ("nav_local", "vod", sect("local"))):
                 if rows:
                     grouped.append({"_header": tr(hk)})
                     grouped += [{**r, "_ekind": ek} for r in rows]

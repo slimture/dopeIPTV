@@ -470,7 +470,7 @@ class _LocalFilesMixin:
         todo = [{"_key": f["_key"],
                  "t": f.get("_clean_title") or f["name"],
                  "y": f.get("_year") or "",
-                 "k": f.get("_poster_kind") or "movie"}
+                 "k": f.get("_poster_kind") or "vod"}
                 for f in files
                 if not f.get("stream_icon") and (f.get("_clean_title")
                                                  or f.get("name"))][:80]
