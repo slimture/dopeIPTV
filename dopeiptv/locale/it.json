@@ -846,5 +846,6 @@
   "local_clear_thumbs": "Svuota miniature video",
   "local_cleared": "Svuotato.",
   "local_home_videos": "Video personali",
-  "btn_back": "Indietro"
+  "btn_back": "Indietro",
+  "local_scanning_n": "Lettura della libreria… {files} file in {folders} cartelle"
 }

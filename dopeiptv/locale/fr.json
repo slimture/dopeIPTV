@@ -846,5 +846,6 @@
   "local_clear_thumbs": "Vider les vignettes vidéo",
   "local_cleared": "Vidé.",
   "local_home_videos": "Vidéos personnelles",
-  "btn_back": "Retour"
+  "btn_back": "Retour",
+  "local_scanning_n": "Lecture de la bibliothèque… {files} fichiers dans {folders} dossiers"
 }

@@ -846,5 +846,6 @@
   "local_clear_thumbs": "Videominiaturen leeren",
   "local_cleared": "Geleert.",
   "local_home_videos": "Heimvideos",
-  "btn_back": "Zurück"
+  "btn_back": "Zurück",
+  "local_scanning_n": "Bibliothek wird eingelesen… {files} Dateien in {folders} Ordnern"
 }

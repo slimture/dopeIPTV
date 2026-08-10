@@ -846,5 +846,6 @@
   "local_clear_thumbs": "Očisti sličice videa",
   "local_cleared": "Očišćeno.",
   "local_home_videos": "Kućni videozapisi",
-  "btn_back": "Natrag"
+  "btn_back": "Natrag",
+  "local_scanning_n": "Čitanje biblioteke… {files} datoteka u {folders} mapa"
 }

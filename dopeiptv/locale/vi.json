@@ -846,5 +846,6 @@
   "local_clear_thumbs": "Xóa hình thu nhỏ video",
   "local_cleared": "Đã xóa.",
   "local_home_videos": "Video gia đình",
-  "btn_back": "Quay lại"
+  "btn_back": "Quay lại",
+  "local_scanning_n": "Đang đọc thư viện… {files} tệp trong {folders} thư mục"
 }

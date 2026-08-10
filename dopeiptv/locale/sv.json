@@ -846,5 +846,6 @@
   "local_clear_thumbs": "Rensa videominiatyrer",
   "local_cleared": "Rensat.",
   "local_home_videos": "Hemvideor",
-  "btn_back": "Tillbaka"
+  "btn_back": "Tillbaka",
+  "local_scanning_n": "Läser in biblioteket… {files} filer i {folders} mappar"
 }

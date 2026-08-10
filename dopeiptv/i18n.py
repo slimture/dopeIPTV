@@ -102,6 +102,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "local_view_series": {"en": "View: library"},
     "local_season": {"en": "Season {n}"},
     "local_scanning": {"en": "Reading the library…"},
+    "local_scanning_n": {"en": "Reading the library… {files} files in {folders} folders"},
     "local_settings_hint": {"en": "Folders browsed by the Local files section. Mounted network shares appear there by themselves."},
     "local_clear_lib_cache": {"en": "Clear library cache"},
     "local_clear_posters": {"en": "Clear TMDB poster cache"},

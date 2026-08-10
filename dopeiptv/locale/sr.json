@@ -846,5 +846,6 @@
   "local_clear_thumbs": "Očisti sličice videa",
   "local_cleared": "Očišćeno.",
   "local_home_videos": "Kućni video snimci",
-  "btn_back": "Nazad"
+  "btn_back": "Nazad",
+  "local_scanning_n": "Čitanje biblioteke… {files} datoteka u {folders} fascikli"
 }

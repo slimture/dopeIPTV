@@ -846,5 +846,6 @@
   "local_clear_thumbs": "Borrar miniaturas de vídeo",
   "local_cleared": "Borrado.",
   "local_home_videos": "Vídeos caseros",
-  "btn_back": "Atrás"
+  "btn_back": "Atrás",
+  "local_scanning_n": "Leyendo la biblioteca… {files} archivos en {folders} carpetas"
 }

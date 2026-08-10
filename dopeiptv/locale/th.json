@@ -846,5 +846,6 @@
   "local_clear_thumbs": "ล้างภาพขนาดย่อวิดีโอ",
   "local_cleared": "ล้างแล้ว",
   "local_home_videos": "วิดีโอส่วนตัว",
-  "btn_back": "ย้อนกลับ"
+  "btn_back": "ย้อนกลับ",
+  "local_scanning_n": "กำลังอ่านคลัง… {files} ไฟล์ใน {folders} โฟลเดอร์"
 }

@@ -846,5 +846,6 @@
   "local_clear_thumbs": "ویڈیو تھمب نیلز صاف کریں",
   "local_cleared": "صاف ہو گیا۔",
   "local_home_videos": "ہوم ویڈیوز",
-  "btn_back": "واپس"
+  "btn_back": "واپس",
+  "local_scanning_n": "لائبریری پڑھی جا رہی ہے… {folders} فولڈرز میں {files} فائلیں"
 }

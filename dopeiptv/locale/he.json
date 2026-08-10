@@ -846,5 +846,6 @@
   "local_clear_thumbs": "ניקוי תמונות ממוזערות",
   "local_cleared": "נוקה.",
   "local_home_videos": "סרטונים ביתיים",
-  "btn_back": "חזרה"
+  "btn_back": "חזרה",
+  "local_scanning_n": "קורא את הספרייה… {files} קבצים ב-{folders} תיקיות"
 }

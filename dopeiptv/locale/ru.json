@@ -846,5 +846,6 @@
   "local_clear_thumbs": "Очистить миниатюры видео",
   "local_cleared": "Очищено.",
   "local_home_videos": "Домашнее видео",
-  "btn_back": "Назад"
+  "btn_back": "Назад",
+  "local_scanning_n": "Чтение библиотеки… {files} файлов в {folders} папках"
 }

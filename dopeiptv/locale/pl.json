@@ -846,5 +846,6 @@
   "local_clear_thumbs": "Wyczyść miniatury wideo",
   "local_cleared": "Wyczyszczono.",
   "local_home_videos": "Filmy domowe",
-  "btn_back": "Wstecz"
+  "btn_back": "Wstecz",
+  "local_scanning_n": "Wczytywanie biblioteki… {files} plików w {folders} folderach"
 }

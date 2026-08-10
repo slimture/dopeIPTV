@@ -846,5 +846,6 @@
   "local_clear_thumbs": "Videominiaturen wissen",
   "local_cleared": "Gewist.",
   "local_home_videos": "Thuisvideo's",
-  "btn_back": "Terug"
+  "btn_back": "Terug",
+  "local_scanning_n": "Bibliotheek wordt gelezen… {files} bestanden in {folders} mappen"
 }

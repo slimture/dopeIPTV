@@ -846,5 +846,6 @@
   "local_clear_thumbs": "清除视频缩略图",
   "local_cleared": "已清除。",
   "local_home_videos": "家庭视频",
-  "btn_back": "返回"
+  "btn_back": "返回",
+  "local_scanning_n": "正在读取媒体库… {folders} 个文件夹中的 {files} 个文件"
 }

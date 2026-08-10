@@ -846,5 +846,6 @@
   "local_clear_thumbs": "مسح مصغرات الفيديو",
   "local_cleared": "تم المسح.",
   "local_home_videos": "فيديوهات منزلية",
-  "btn_back": "رجوع"
+  "btn_back": "رجوع",
+  "local_scanning_n": "جارٍ قراءة المكتبة… {files} ملفًا في {folders} مجلدًا"
 }

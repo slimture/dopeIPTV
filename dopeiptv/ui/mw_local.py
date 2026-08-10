@@ -393,7 +393,7 @@ class _LocalFilesMixin:
                     getattr(self, "_local_series_index", {}),
                     getattr(self, "_local_movies_rows", []),
                     getattr(self, "_local_collection_index", {}))
-                self._set_status(tr("local_scanning"))
+                self._set_status(self._local_scan_note())
             return
         self._local_scan_root = root
         self._local_scan_token = getattr(self, "_local_scan_token", 0) + 1
@@ -446,6 +446,7 @@ class _LocalFilesMixin:
                             os.path.join(state["root"], name))}
                     return True, False
                 state["dirs"] += 1
+                state["at"] = dirpath
                 dirnames[:] = [d for d in dirnames
                                if not d.startswith(".")
                                and d.lower() not in self._SCAN_JUNK]
@@ -495,9 +496,15 @@ class _LocalFilesMixin:
                 self._local_series_index = ms
                 self._local_collection_index = mc
                 self._local_movies_rows = mm
+                self._local_scan_state = state
                 if not getattr(self, "_local_series", None) \
                         and not getattr(self, "_local_ctx", None):
                     self._apply_library(ms, mm, mc)
+                else:
+                    # Drilled in: the list is not ours to touch, but the
+                    # progress note still is.
+                    self._set_status(self._local_scan_note(state))
+                self._show_busy(self._local_scan_note(state))
                 # Persist the merged partial view every ~15 s, so quitting
                 # or switching away mid-walk keeps everything found so far
                 # instead of starting over from nothing.
@@ -510,6 +517,7 @@ class _LocalFilesMixin:
                 return
             self._local_pulse_stop()
             self._local_scan_active = False
+            self._local_scan_state = None
             self._hide_busy()
             done_at = dict(getattr(self, "_local_scan_done", {}))
             done_at[root] = time.monotonic()
@@ -594,7 +602,7 @@ class _LocalFilesMixin:
                 t = QTimer()
                 t.setInterval(15000)
                 t.timeout.connect(
-                    lambda: self._show_busy(tr("local_scanning")))
+                    lambda: self._show_busy(self._local_scan_note()))
                 self._local_scan_pulse = t
             t.start()
         except Exception:
@@ -658,9 +666,20 @@ class _LocalFilesMixin:
                     or self._search_filter([r])]
         self._render_rows(rows, "rec", tr("local_empty"))
         if getattr(self, "_local_scan_active", False):
-            self._set_status(tr("local_scanning"))
+            self._set_status(self._local_scan_note())
         self._local_resolve_posters(
             [r for r in rows if r.get("_kind") in ("local", "localseries")])
+
+    def _local_scan_note(self, state: dict | None = None) -> str:
+        st = state if state is not None else getattr(
+            self, "_local_scan_state", None)
+        if not st:
+            return tr("local_scanning")
+        where = os.path.basename(
+            (st.get("at") or "").rstrip(os.sep))
+        note = tr("local_scanning_n", files=st.get("files", 0),
+                  folders=st.get("dirs", 0))
+        return f"{note}  ·  {where}" if where else note
 
     def _local_search_text(self) -> str:
         sb = getattr(self, "search", None)
