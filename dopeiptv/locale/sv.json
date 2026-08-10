@@ -822,5 +822,8 @@
   "cast_device_kind": "Vad {name} är",
   "cast_kind_original": "Nyare – 4K (Ultra, Google TV, Streamer)",
   "cast_kind_hd": "Vanlig – Full HD (Chromecast 2, 3, Google TV HD)",
-  "cast_kind_oldest": "Äldst – Full HD, 30 b/s (Chromecast 1, TV med inbyggd Chromecast)"
+  "cast_kind_oldest": "Äldst – Full HD, 30 b/s (Chromecast 1, TV med inbyggd Chromecast)",
+  "menu_open_video": "Öppna videofil…",
+  "open_video_title": "Öppna en video",
+  "open_video_filter": "Videofiler"
 }

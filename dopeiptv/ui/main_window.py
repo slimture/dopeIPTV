@@ -360,12 +360,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._playlist_btn.setVisible(multiple)
 
     def _build_ui(self) -> None:
+        # Dropping a video file anywhere on the window plays it (see
+        # dragEnterEvent/dropEvent - the local-files entry points).
+        self.setAcceptDrops(True)
         menubar = self.menuBar()
         app_menu = menubar.addMenu(APP_NAME)
         settings_action = app_menu.addAction(tr("btn_settings") + "…")
         settings_action.triggered.connect(self.open_settings)
         refresh_action = app_menu.addAction(tr("menu_refresh_playlist"))
         refresh_action.triggered.connect(self.refresh_playlist)
+        open_video_action = app_menu.addAction(tr("menu_open_video"))
+        open_video_action.setShortcut("Ctrl+O")
+        open_video_action.triggered.connect(self.open_local_video)
         reminders_action = app_menu.addAction(tr("reminders_menu"))
         reminders_action.triggered.connect(self._open_reminders)
         multiview_action = app_menu.addAction(tr("menu_multiview"))
@@ -396,6 +402,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # there's no duplicate. (No-op on Linux/Windows, where the single
             # menu with these items is intentional.)
             refresh_action.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
+            open_video_action.setMenuRole(
+                QAction.MenuRole.ApplicationSpecificRole)
             reminders_action.setMenuRole(
                 QAction.MenuRole.ApplicationSpecificRole)
             multiview_action.setMenuRole(
@@ -405,6 +413,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._i18n_actions = {
             settings_action: lambda: tr("btn_settings") + "…",
             refresh_action: lambda: tr("menu_refresh_playlist"),
+            open_video_action: lambda: tr("menu_open_video"),
             reminders_action: lambda: tr("reminders_menu"),
             multiview_action: lambda: tr("menu_multiview"),
             cast_action: lambda: tr("ctx_cast_to_chromecast"),
@@ -3300,6 +3309,53 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
         self._start_playback(url, title, icon, key, kind,
                              record=self.mode != "history", item=it)
+
+    # -- local files ---------------------------------------------------------------
+
+    VIDEO_EXTS = (".mkv", ".mp4", ".m4v", ".avi", ".mov", ".webm", ".ts",
+                  ".m2ts", ".mts", ".mpg", ".mpeg", ".wmv", ".flv", ".ogv",
+                  ".3gp", ".vob")
+
+    def open_local_video(self) -> None:
+        """Pick a video off the disk and play it. A mounted SMB/NFS share (or
+        a Windows UNC path) is an ordinary path here, so network files come
+        along for free - no in-app SMB client needed."""
+        from PyQt6.QtWidgets import QFileDialog
+        start = (self.settings.value("local_open_dir", "")
+                 or os.path.expanduser("~"))
+        pattern = " ".join("*" + e for e in self.VIDEO_EXTS)
+        path, _ = QFileDialog.getOpenFileName(
+            self, tr("open_video_title"), start,
+            f"{tr('open_video_filter')} ({pattern});;All files (*)",
+            options=QFileDialog.Option.DontUseNativeDialog)
+        if not path:
+            return
+        self.settings.setValue("local_open_dir", os.path.dirname(path))
+        self._play_local_path(path)
+
+    def _play_local_path(self, path: str) -> None:
+        """Play a file from disk in the embedded player. Rides the recordings
+        path: same local-file playback, same resume bookkeeping (keyed on
+        the path), no provider connection and nothing to record."""
+        if not path or not os.path.isfile(path):
+            return
+        title = os.path.splitext(os.path.basename(path))[0]
+        self._start_playback(path, title, None, path, "recording",
+                             record=False)
+
+    def dragEnterEvent(self, e) -> None:
+        if any(u.isLocalFile()
+               and u.toLocalFile().lower().endswith(self.VIDEO_EXTS)
+               for u in e.mimeData().urls()):
+            e.acceptProposedAction()
+
+    def dropEvent(self, e) -> None:
+        for u in e.mimeData().urls():
+            p = u.toLocalFile()
+            if p and p.lower().endswith(self.VIDEO_EXTS):
+                self._play_local_path(p)
+                e.acceptProposedAction()
+                return
 
     def _confirm_external_while_playing(self) -> bool:
         """Opening an external player pulls a SECOND stream from the provider

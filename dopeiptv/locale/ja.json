@@ -822,5 +822,8 @@
   "cast_device_kind": "What {name} is",
   "cast_kind_original": "Newer - 4K (Ultra, Google TV, Streamer)",
   "cast_kind_hd": "Ordinary - Full HD (Chromecast 2, 3, Google TV HD)",
-  "cast_kind_oldest": "Oldest - Full HD, 30 fps (Chromecast 1, TVs with Chromecast built in)"
+  "cast_kind_oldest": "Oldest - Full HD, 30 fps (Chromecast 1, TVs with Chromecast built in)",
+  "menu_open_video": "動画ファイルを開く…",
+  "open_video_title": "動画を開く",
+  "open_video_filter": "動画ファイル"
 }
