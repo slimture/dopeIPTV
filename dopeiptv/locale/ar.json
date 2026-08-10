@@ -847,5 +847,7 @@
   "local_cleared": "تم المسح.",
   "local_home_videos": "فيديوهات منزلية",
   "btn_back": "رجوع",
-  "local_scanning_n": "جارٍ قراءة المكتبة… {files} ملفًا في {folders} مجلدًا"
+  "local_scanning_n": "جارٍ قراءة المكتبة… {files} ملفًا في {folders} مجلدًا",
+  "local_music": "الموسيقى",
+  "local_tracks": "{n} مقطعًا"
 }

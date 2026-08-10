@@ -847,5 +847,7 @@
   "local_cleared": "साफ़ हो गया।",
   "local_home_videos": "होम वीडियो",
   "btn_back": "वापस",
-  "local_scanning_n": "लाइब्रेरी पढ़ी जा रही है… {folders} फ़ोल्डरों में {files} फ़ाइलें"
+  "local_scanning_n": "लाइब्रेरी पढ़ी जा रही है… {folders} फ़ोल्डरों में {files} फ़ाइलें",
+  "local_music": "संगीत",
+  "local_tracks": "{n} ट्रैक"
 }

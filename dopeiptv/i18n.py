@@ -110,6 +110,8 @@ _STRINGS: dict[str, dict[str, str]] = {
     "local_cleared": {"en": "Cleared."},
     "local_collections": {"en": "My folders"},
     "local_home_videos": {"en": "Home videos"},
+    "local_music": {"en": "Music"},
+    "local_tracks": {"en": "{n} tracks"},
     "sidebar_categories": {"en": "CATEGORIES"},
 
     "sidebar_library": {"en": "LIBRARY"},

@@ -847,5 +847,7 @@
   "local_cleared": "پاک شد.",
   "local_home_videos": "ویدئوهای خانگی",
   "btn_back": "بازگشت",
-  "local_scanning_n": "در حال خواندن کتابخانه… {files} پرونده در {folders} پوشه"
+  "local_scanning_n": "در حال خواندن کتابخانه… {files} پرونده در {folders} پوشه",
+  "local_music": "موسیقی",
+  "local_tracks": "{n} قطعه"
 }

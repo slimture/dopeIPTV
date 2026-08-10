@@ -847,5 +847,7 @@
   "local_cleared": "Dibersihkan.",
   "local_home_videos": "Video rumahan",
   "btn_back": "Kembali",
-  "local_scanning_n": "Membaca pustaka… {files} berkas di {folders} folder"
+  "local_scanning_n": "Membaca pustaka… {files} berkas di {folders} folder",
+  "local_music": "Musik",
+  "local_tracks": "{n} lagu"
 }

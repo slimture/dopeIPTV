@@ -847,5 +847,7 @@
   "local_cleared": "Temizlendi.",
   "local_home_videos": "Ev videoları",
   "btn_back": "Geri",
-  "local_scanning_n": "Kitaplık okunuyor… {folders} klasörde {files} dosya"
+  "local_scanning_n": "Kitaplık okunuyor… {folders} klasörde {files} dosya",
+  "local_music": "Müzik",
+  "local_tracks": "{n} parça"
 }

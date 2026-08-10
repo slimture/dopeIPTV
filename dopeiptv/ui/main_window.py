@@ -3337,7 +3337,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if it.get("_kind") == "localseries":
                 self._local_open_series(it.get("_series_title") or "")
                 return
-            if it.get("_kind") == "localcollection":
+            if it.get("_kind") in ("localcollection", "localalbum"):
                 self._local_descend(path, it.get("_key"))
                 return
             if not path or not os.path.isfile(path):

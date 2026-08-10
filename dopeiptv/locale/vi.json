@@ -847,5 +847,7 @@
   "local_cleared": "Đã xóa.",
   "local_home_videos": "Video gia đình",
   "btn_back": "Quay lại",
-  "local_scanning_n": "Đang đọc thư viện… {files} tệp trong {folders} thư mục"
+  "local_scanning_n": "Đang đọc thư viện… {files} tệp trong {folders} thư mục",
+  "local_music": "Nhạc",
+  "local_tracks": "{n} bản nhạc"
 }

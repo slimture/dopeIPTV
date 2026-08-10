@@ -847,5 +847,7 @@
   "local_cleared": "ล้างแล้ว",
   "local_home_videos": "วิดีโอส่วนตัว",
   "btn_back": "ย้อนกลับ",
-  "local_scanning_n": "กำลังอ่านคลัง… {files} ไฟล์ใน {folders} โฟลเดอร์"
+  "local_scanning_n": "กำลังอ่านคลัง… {files} ไฟล์ใน {folders} โฟลเดอร์",
+  "local_music": "เพลง",
+  "local_tracks": "{n} แทร็ก"
 }

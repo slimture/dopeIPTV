@@ -847,5 +847,7 @@
   "local_cleared": "נוקה.",
   "local_home_videos": "סרטונים ביתיים",
   "btn_back": "חזרה",
-  "local_scanning_n": "קורא את הספרייה… {files} קבצים ב-{folders} תיקיות"
+  "local_scanning_n": "קורא את הספרייה… {files} קבצים ב-{folders} תיקיות",
+  "local_music": "מוזיקה",
+  "local_tracks": "{n} רצועות"
 }

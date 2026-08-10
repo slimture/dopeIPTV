@@ -268,7 +268,12 @@ class _LocalFilesMixin:
                 except OSError:
                     continue
                 stem = os.path.splitext(n)[0]
-                title, year = clean_title(stem)
+                if n.lower().endswith(self.AUDIO_EXTS):
+                    # A track keeps its name as written; the release-tag
+                    # cleaner is for film files and mangles numbering.
+                    title, year = stem, ""
+                else:
+                    title, year = clean_title(stem)
                 files.append({"name": f"{title} ({year})" if year else title,
                               "_kind": "local", "_clean_title": title,
                               "_year": year, "_cast_url": p,
@@ -365,6 +370,13 @@ class _LocalFilesMixin:
             except OSError:
                 return None
         stem = stem or os.path.splitext(os.path.basename(p))[0]
+        if p.lower().endswith(self.AUDIO_EXTS):
+            # A track name is already the title - cleaning it mangles
+            # numbering and punctuation ("01. Jail" -> "01 Jail").
+            return {"name": stem, "_kind": "local", "_clean_title": "",
+                    "_year": "", "_cast_url": p, "_path": p, "_key": p,
+                    "_size": 0, "added": "0", "stream_icon": "",
+                    "_filename": stem}
         title, year = clean_title(stem)
         return {"name": f"{title} ({year})" if year else title,
                 "_kind": "local", "_clean_title": title, "_year": year,
@@ -401,9 +413,12 @@ class _LocalFilesMixin:
         cached = self._library_cache().get(root)
         if cached is not None and not (cached.get("series")
                                        or cached.get("movies")
-                                       or cached.get("collections")):
+                                       or cached.get("collections")
+                                       or cached.get("albums")):
             cached = None
         if cached is not None:
+            self._local_album_index = cached.get("albums") or {}
+            self._local_cover_index = cached.get("covers") or {}
             self._apply_library(cached.get("series") or {},
                                 cached.get("movies") or [],
                                 cached.get("collections") or {})
@@ -415,7 +430,7 @@ class _LocalFilesMixin:
         self._local_pulse_start()
         log.info("library scan starting: %s", root)
         state = {"walker": os.walk(root), "series": {}, "collections": {},
-                 "movies": [], "audio": [], "dirs": 0, "files": 0,
+                 "movies": [], "albums": {}, "dirs": 0, "files": 0,
                  "root": os.path.normpath(root)}
         self._local_scan_step(root, state, token, cached)
 
@@ -431,14 +446,7 @@ class _LocalFilesMixin:
                 try:
                     dirpath, dirnames, names = next(walker)
                 except StopIteration:
-                    # Videos first - this is not primarily a music player.
-                    # The audio files set aside during the walk are shelved
-                    # only now, in one go, still on the worker thread: with
-                    # thousands of tracks, re-building their rows in every
-                    # progressive slice was most of the "import" time.
-                    for ap in state.get("audio", []):
-                        self._classify(state, ap, defer_audio=False)
-                    state["audio"] = []
+                    state["dircover_map"] = dict(state.get("dircover", {}))
                     state["covers"] = {
                         name: cov for name in state["collections"]
                         for d, cov in state.get("dircover", {}).items()
@@ -472,7 +480,10 @@ class _LocalFilesMixin:
                 return
             finished, cut = result
             self._local_cover_index = state.get("covers", {})
+            self._local_dircover = state.get("dircover_map",
+                                             state.get("dircover", {}))
             series = state["series"]
+            self._local_album_index = state.get("albums", {})
             drilled = (getattr(self, "_local_series", None)
                        or getattr(self, "_local_ctx", None))
             collections = state["collections"]
@@ -496,6 +507,7 @@ class _LocalFilesMixin:
                 self._local_series_index = ms
                 self._local_collection_index = mc
                 self._local_movies_rows = mm
+                self._local_album_index = state.get("albums", {})
                 self._local_scan_state = state
                 if not getattr(self, "_local_series", None) \
                         and not getattr(self, "_local_ctx", None):
@@ -551,8 +563,14 @@ class _LocalFilesMixin:
 
     def _classify(self, state: dict, p: str,
                   defer_audio: bool = True) -> None:
-        if defer_audio and p.lower().endswith(self.AUDIO_EXTS):
-            state.setdefault("audio", []).append(p)
+        if p.lower().endswith(self.AUDIO_EXTS):
+            # Music is shelved by ALBUM - the folder that directly holds
+            # the tracks - not as thousands of loose files.
+            d = os.path.dirname(p)
+            a = state.setdefault("albums", {}).setdefault(
+                d, {"n": 0, "root": False})
+            a["n"] += 1
+            a["root"] = (os.path.normpath(d) == state["root"])
             return
         stem = os.path.splitext(os.path.basename(p))[0]
         se = episode_info(stem)
@@ -576,6 +594,35 @@ class _LocalFilesMixin:
         else:
             row["_home"] = True       # rendered under its own header
             state["movies"].append(row)
+
+    def _album_rows(self) -> list[dict]:
+        """One row per album - the folder that directly holds the tracks -
+        with its own cover art and track count, the way a music library
+        shelves things. Opening one browses that folder's tracks."""
+        albums = getattr(self, "_local_album_index", {})
+        if not albums:
+            return []
+        dircover = getattr(self, "_local_dircover", {})
+        rows: list[dict] = [{"_header": tr("local_music")}]
+        for d in sorted(albums, key=lambda x: os.path.basename(x).lower()):
+            info = albums[d]
+            n = info.get("n", 0) if isinstance(info, dict) else int(info or 0)
+            name = os.path.basename(d.rstrip(os.sep)) or d
+            rows.append({"name": name, "_kind": "localalbum",
+                         "_path": d, "_key": f"localalbum::{d}",
+                         "stream_icon": dircover.get(d)
+                         or self._album_cover(d) or self._folder_tile(),
+                         "_desc": tr("local_tracks", n=n)})
+        return rows
+
+    @staticmethod
+    def _album_cover(d: str) -> str:
+        for n in ("cover.jpg", "cover.jpeg", "cover.png", "folder.jpg",
+                  "folder.png", "front.jpg", "album.jpg"):
+            p = os.path.join(d, n)
+            if os.path.isfile(p):
+                return p
+        return ""
 
     def _folder_tile(self) -> str:
         """A drawn folder icon as an image file the row art loader can
@@ -630,10 +677,15 @@ class _LocalFilesMixin:
                              "_clean_title": name, "_poster_kind": "tv",
                              "stream_icon": "",
                              "_desc": f"{len(seasons)} × {len(eps)}"})
+        films = [m for m in movies if not m.get("_home")]
+        home = [m for m in movies if m.get("_home")]
+        if films:
+            rows.append({"_header": tr("nav_movies")})
+            rows += films
+        rows += self._album_rows()
+        covers = getattr(self, "_local_cover_index", {})
+        root = self._current_cat if isinstance(self._current_cat, str) else ""
         if collections:
-            covers = getattr(self, "_local_cover_index", {})
-            root = self._current_cat if isinstance(self._current_cat, str) \
-                else ""
             rows.append({"_header": tr("local_collections")})
             for name in sorted(collections, key=str.lower):
                 rows.append({"name": name,
@@ -644,11 +696,6 @@ class _LocalFilesMixin:
                              "stream_icon": covers.get(name)
                              or self._folder_tile(),
                              "_desc": str(len(collections[name]))})
-        films = [m for m in movies if not m.get("_home")]
-        home = [m for m in movies if m.get("_home")]
-        if films:
-            rows.append({"_header": tr("nav_movies")})
-            rows += films
         if home:
             rows.append({"_header": tr("local_home_videos")})
             rows += home
@@ -661,6 +708,9 @@ class _LocalFilesMixin:
             rows = ([r for r in rows if not r.get("_header")
                      and q in r.get("name", "").lower()]
                     + self._local_deep_search(q, collections))
+            seen = set()
+            rows = [r for r in rows
+                    if not (r.get("_key") in seen or seen.add(r.get("_key")))]
         else:
             rows = [r for r in rows if r.get("_header")
                     or self._search_filter([r])]
@@ -695,6 +745,11 @@ class _LocalFilesMixin:
         """Folder and file matches anywhere under the shelves, bounded."""
         dirs_seen: dict[str, str] = {}
         files: list[dict] = []
+        # Albums are shelves too - "kanye" must find the album folder.
+        for d in getattr(self, "_local_album_index", {}):
+            name = os.path.basename(d.rstrip(os.sep))
+            if q in name.lower() or q in d.lower():
+                dirs_seen[d] = name
         for paths in (collections or {}).values():
             for p in paths:
                 d = os.path.dirname(p)
@@ -719,7 +774,7 @@ class _LocalFilesMixin:
     # full paths to top-level shelves, movies stopped swallowing home
     # videos, ...) - an old cache would re-import rows filed under the old
     # rules forever, so it is discarded once instead.
-    _LIB_CACHE_VER = 2
+    _LIB_CACHE_VER = 3
 
     def _library_cache(self) -> dict:
         try:
@@ -739,7 +794,9 @@ class _LocalFilesMixin:
         try:
             cache = self._library_cache()
             cache[root] = {"series": series, "movies": movies,
-                           "collections": collections or {}}
+                           "collections": collections or {},
+                           "albums": getattr(self, "_local_album_index", {}),
+                           "covers": getattr(self, "_local_cover_index", {})}
             # Only the latest handful of roots - this is a warm-start, not
             # a database.
             for k in list(cache)[:-8]:
@@ -985,7 +1042,7 @@ class _LocalFilesMixin:
             m.addAction(tr("ctx_open"),
                         lambda: self._local_open_series(
                             it.get("_series_title") or ""))
-        elif it.get("_kind") == "localcollection":
+        elif it.get("_kind") in ("localcollection", "localalbum"):
             m.addAction(tr("ctx_open"),
                         lambda: self._local_descend(it.get("_path")))
         else:

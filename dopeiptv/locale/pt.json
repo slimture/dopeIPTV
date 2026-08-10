@@ -847,5 +847,7 @@
   "local_cleared": "Limpo.",
   "local_home_videos": "Vídeos caseiros",
   "btn_back": "Voltar",
-  "local_scanning_n": "Lendo a biblioteca… {files} arquivos em {folders} pastas"
+  "local_scanning_n": "Lendo a biblioteca… {files} arquivos em {folders} pastas",
+  "local_music": "Música",
+  "local_tracks": "{n} faixas"
 }

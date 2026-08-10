@@ -847,5 +847,7 @@
   "local_cleared": "지워졌습니다.",
   "local_home_videos": "홈 비디오",
   "btn_back": "뒤로",
-  "local_scanning_n": "라이브러리 읽는 중… 폴더 {folders}개에서 파일 {files}개"
+  "local_scanning_n": "라이브러리 읽는 중… 폴더 {folders}개에서 파일 {files}개",
+  "local_music": "음악",
+  "local_tracks": "{n}곡"
 }

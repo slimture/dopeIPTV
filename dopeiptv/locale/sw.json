@@ -847,5 +847,7 @@
   "local_cleared": "Imefutwa.",
   "local_home_videos": "Video za nyumbani",
   "btn_back": "Rudi",
-  "local_scanning_n": "Inasoma maktaba… faili {files} katika folda {folders}"
+  "local_scanning_n": "Inasoma maktaba… faili {files} katika folda {folders}",
+  "local_music": "Muziki",
+  "local_tracks": "nyimbo {n}"
 }

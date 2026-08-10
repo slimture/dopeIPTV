@@ -847,5 +847,7 @@
   "local_cleared": "Εκκαθαρίστηκε.",
   "local_home_videos": "Προσωπικά βίντεο",
   "btn_back": "Πίσω",
-  "local_scanning_n": "Ανάγνωση της βιβλιοθήκης… {files} αρχεία σε {folders} φακέλους"
+  "local_scanning_n": "Ανάγνωση της βιβλιοθήκης… {files} αρχεία σε {folders} φακέλους",
+  "local_music": "Μουσική",
+  "local_tracks": "{n} κομμάτια"
 }

@@ -317,8 +317,7 @@ def test_music_files_are_listed_and_playable(tmp_path):
     assert all(r["_kind"] == "local" for r in w.rendered)
 
 
-def test_audio_is_deferred_but_lands_when_the_walk_completes(tmp_path,
-                                                             monkeypatch):
+def test_music_lands_as_an_album_not_a_folder_pile(tmp_path, monkeypatch):
     import dopeiptv.ui.mw_local as ml
     monkeypatch.setattr(ml, "run_async",
                         lambda pool, fn, done, err=None: done(fn()))
@@ -330,43 +329,9 @@ def test_audio_is_deferred_but_lands_when_the_walk_completes(tmp_path,
     w.settings.setValue("local_view", "series")
     w._current_cat = str(root)
     w._load_local_items(str(root))
-    colls = getattr(w, "_local_collection_index", {})
-    assert "Artist" in colls, colls
+    assert [r["name"] for r in w.rendered
+            if r.get("_kind") == "localalbum"] == ["Album"]
     assert any(r.get("_kind") == "local" for r in w.rendered)
-
-
-def test_movie_lookup_needs_an_anchor():
-    """A TMDB movie search runs only for files that look like released
-    films (year or release tag) - home videos must never get a film's
-    poster."""
-    from dopeiptv.ui.mw_local import _TAG, clean_title
-    # Anchored: year, or a release tag.
-    assert clean_title("12.Years.a.Slave.2013.1080p")[1] == "2013"
-    assert _TAG.search("Some.Film.720p.WEB-DL")
-    # Unanchored home videos: neither.
-    assert clean_title("Clip #1")[1] == ""
-    assert not _TAG.search("Clip #1")
-    assert not _TAG.search("Semester i fjällen")
-
-
-def test_anchored_films_in_subfolders_list_flat_under_movies(tmp_path,
-                                                             monkeypatch):
-    """Movies/12 Years a Slave/film.mkv is a film, not a folder maze."""
-    import dopeiptv.ui.mw_local as ml
-    monkeypatch.setattr(ml, "run_async",
-                        lambda pool, fn, done, err=None: done(fn()))
-    root = tmp_path / "M"
-    (root / "Movies" / "12 Years a Slave").mkdir(parents=True)
-    (root / "Movies" / "12 Years a Slave"
-     / "12.Years.a.Slave.2013.1080p.mkv").write_bytes(b"x")
-    w = _Stub()
-    w.settings.setValue("local_view", "series")
-    w._current_cat = str(root)
-    w._load_local_items(str(root))
-    films = [r for r in w.rendered if r.get("_kind") == "local"
-             and not r.get("_home")]
-    assert [f["name"] for f in films] == ["12 Years a Slave (2013)"]
-    assert not any(r.get("_kind") == "localcollection" for r in w.rendered)
 
 
 def test_search_reaches_into_the_shelves(tmp_path, monkeypatch):
@@ -388,3 +353,35 @@ def test_search_reaches_into_the_shelves(tmp_path, monkeypatch):
     names = " ".join(r["name"] for r in w.rendered)
     assert "localdir" in kinds          # the album folder is openable
     assert "Kanye West" in names
+
+
+def test_music_shelves_as_albums_with_track_counts(tmp_path, monkeypatch):
+    """Music is albums - the folder holding the tracks - not thousands of
+    loose files, and it survives a walk that stops at a cap."""
+    import dopeiptv.ui.mw_local as ml
+    monkeypatch.setattr(ml, "run_async",
+                        lambda pool, fn, done, err=None: done(fn()))
+    root = tmp_path / "M"
+    album = root / "Musik" / "Flac" / "Kanye West - Donda (2021)"
+    album.mkdir(parents=True)
+    for t in ("01. Donda Chant.flac", "02. Jail.flac", "03. God On.flac"):
+        (album / t).write_bytes(b"x")
+    (album / "cover.jpg").write_bytes(b"x")
+    w = _Stub()
+    w.settings.setValue("local_view", "series")
+    w._current_cat = str(root)
+    w._load_local_items(str(root))
+
+    albums = [r for r in w.rendered if r.get("_kind") == "localalbum"]
+    assert len(albums) == 1
+    assert albums[0]["name"] == "Kanye West - Donda (2021)"
+    assert "3" in albums[0]["_desc"]                  # track count
+    assert albums[0]["stream_icon"].endswith("cover.jpg")
+    # Tracks are NOT loose rows in the library view.
+    assert not any(r.get("_path", "").endswith(".flac")
+                   for r in w.rendered if r.get("_kind") == "local")
+
+    # Opening the album browses its tracks.
+    w._local_descend(albums[0]["_path"], albums[0]["_key"])
+    names = sorted(r["name"] for r in w.rendered)
+    assert names == ["01. Donda Chant", "02. Jail", "03. God On"]

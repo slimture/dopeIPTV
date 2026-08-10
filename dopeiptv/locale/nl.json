@@ -847,5 +847,7 @@
   "local_cleared": "Gewist.",
   "local_home_videos": "Thuisvideo's",
   "btn_back": "Terug",
-  "local_scanning_n": "Bibliotheek wordt gelezen… {files} bestanden in {folders} mappen"
+  "local_scanning_n": "Bibliotheek wordt gelezen… {files} bestanden in {folders} mappen",
+  "local_music": "Muziek",
+  "local_tracks": "{n} nummers"
 }

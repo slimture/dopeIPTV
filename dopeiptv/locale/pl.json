@@ -847,5 +847,7 @@
   "local_cleared": "Wyczyszczono.",
   "local_home_videos": "Filmy domowe",
   "btn_back": "Wstecz",
-  "local_scanning_n": "Wczytywanie biblioteki… {files} plików w {folders} folderach"
+  "local_scanning_n": "Wczytywanie biblioteki… {files} plików w {folders} folderach",
+  "local_music": "Muzyka",
+  "local_tracks": "{n} utworów"
 }

@@ -847,5 +847,7 @@
   "local_cleared": "Geleert.",
   "local_home_videos": "Heimvideos",
   "btn_back": "Zurück",
-  "local_scanning_n": "Bibliothek wird eingelesen… {files} Dateien in {folders} Ordnern"
+  "local_scanning_n": "Bibliothek wird eingelesen… {files} Dateien in {folders} Ordnern",
+  "local_music": "Musik",
+  "local_tracks": "{n} Titel"
 }

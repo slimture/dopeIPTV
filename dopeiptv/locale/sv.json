@@ -847,5 +847,7 @@
   "local_cleared": "Rensat.",
   "local_home_videos": "Hemvideor",
   "btn_back": "Tillbaka",
-  "local_scanning_n": "Läser in biblioteket… {files} filer i {folders} mappar"
+  "local_scanning_n": "Läser in biblioteket… {files} filer i {folders} mappar",
+  "local_music": "Musik",
+  "local_tracks": "{n} spår"
 }

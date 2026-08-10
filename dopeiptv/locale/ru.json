@@ -847,5 +847,7 @@
   "local_cleared": "Очищено.",
   "local_home_videos": "Домашнее видео",
   "btn_back": "Назад",
-  "local_scanning_n": "Чтение библиотеки… {files} файлов в {folders} папках"
+  "local_scanning_n": "Чтение библиотеки… {files} файлов в {folders} папках",
+  "local_music": "Музыка",
+  "local_tracks": "{n} треков"
 }
