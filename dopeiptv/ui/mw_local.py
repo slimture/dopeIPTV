@@ -315,6 +315,12 @@ class _LocalFilesMixin:
         # itself in the background and re-renders only if something changed.
         # First visit to a root has nothing to show, so the busy strip does.
         cached = self._library_cache().get(root)
+        # An EMPTY cached result must not warm-start: if the first scan came
+        # back empty (a share that wasn't mounted yet, a transient error),
+        # treating it as truth would pin the view empty forever.
+        if cached is not None and not (cached.get("series")
+                                       or cached.get("movies")):
+            cached = None
         if cached is not None:
             self._apply_library(cached.get("series") or {},
                                 cached.get("movies") or [])
@@ -337,6 +343,8 @@ class _LocalFilesMixin:
                     row = self._local_file_row(p, stem)
                     if row:
                         movies.append(row)
+            log.info("library scan %s: %d series, %d movies",
+                     root, len(series), len(movies))
             return series, movies
 
         def done(result):
@@ -355,7 +363,7 @@ class _LocalFilesMixin:
         def fail(e):
             if token == getattr(self, "_local_scan_token", 0):
                 self._hide_busy()
-                log.warning("library scan failed for %s: %s", root, e)
+                log.warning("library scan FAILED for %s: %r", root, e)
                 self._render_rows([], "rec", tr("local_empty"))
 
         run_async(self.pool, job, done, fail)
