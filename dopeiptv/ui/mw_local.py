@@ -273,33 +273,59 @@ class _LocalFilesMixin:
 
     # -- the library view (Infuse-style series grouping) ----------------------
 
-    def _local_file_row(self, p: str, stem: str | None = None) -> dict | None:
-        try:
-            st = os.stat(p)
-        except OSError:
-            return None
+    def _local_file_row(self, p: str, stem: str | None = None,
+                        stat: bool = True) -> dict | None:
+        """A playable row for the file. stat=False skips the size/mtime
+        lookup - over SMB that is a network round trip per file, and the
+        library scan does not need either to show the title."""
+        size, mtime = 0, 0
+        if stat:
+            try:
+                st = os.stat(p)
+                size, mtime = st.st_size, int(st.st_mtime)
+            except OSError:
+                return None
         stem = stem or os.path.splitext(os.path.basename(p))[0]
         title, year = clean_title(stem)
         return {"name": f"{title} ({year})" if year else title,
                 "_kind": "local", "_clean_title": title, "_year": year,
-                "_cast_url": p, "_path": p, "_key": p, "_size": st.st_size,
-                "added": str(int(st.st_mtime)),
+                "_cast_url": p, "_path": p, "_key": p, "_size": size,
+                "added": str(mtime),
                 "stream_icon": "", "_filename": stem}
 
-    def _local_scan(self, root: str) -> list[str]:
-        """Every video file under *root*, hidden dirs skipped, capped so a
-        mis-registered giant tree cannot hang the list."""
+    # NAS housekeeping dirs that hold thumbnails/recycled files by the
+    # thousand - walking them over SMB is pure cost.
+    _SCAN_JUNK = {"@eadir", "#recycle", "$recycle.bin", "lost+found",
+                  "system volume information", "@__thumb", ".appledouble"}
+
+    def _local_scan(self, root: str, budget_s: float = 20.0,
+                    max_dirs: int = 800,
+                    max_files: int = 3000) -> tuple[list[str], bool]:
+        """Video files under *root*, plus whether the walk was cut short.
+
+        Over SMB every directory listing is a network round trip, so the
+        walk is bounded three ways - wall time, directories visited, videos
+        found - and reports truncation instead of grinding forever on a
+        share full of small files (the torrent-share hang)."""
+        import time
         out: list[str] = []
+        t0 = time.monotonic()
+        dirs = 0
         for dirpath, dirnames, names in os.walk(root):
-            dirnames[:] = [d for d in dirnames if not d.startswith(".")]
+            dirs += 1
+            if dirs > max_dirs or time.monotonic() - t0 > budget_s:
+                return out, True
+            dirnames[:] = [d for d in dirnames
+                           if not d.startswith(".")
+                           and d.lower() not in self._SCAN_JUNK]
             for n in sorted(names, key=str.lower):
                 if n.startswith(".") or not n.lower().endswith(
                         self.VIDEO_EXTS):
                     continue
                 out.append(os.path.join(dirpath, n))
-                if len(out) >= 3000:
-                    return out
-        return out
+                if len(out) >= max_files:
+                    return out, True
+        return out, False
 
     def _load_local_library(self, root: str) -> None:
         """Series (episode-tagged files grouped by show, wherever they live
@@ -327,10 +353,13 @@ class _LocalFilesMixin:
         else:
             self._show_busy(tr("local_scanning"))
 
+        log.info("library scan starting: %s", root)
+
         def job():
             series: dict[str, list[tuple[int, int, str, str]]] = {}
             movies: list[dict] = []
-            for p in self._local_scan(root):
+            paths, cut = self._local_scan(root)
+            for p in paths:
                 stem = os.path.splitext(os.path.basename(p))[0]
                 se = episode_info(stem)
                 if se:
@@ -340,11 +369,12 @@ class _LocalFilesMixin:
                     series.setdefault(sname, []).append(
                         [se[0], se[1], p, stem])
                 else:
-                    row = self._local_file_row(p, stem)
+                    row = self._local_file_row(p, stem, stat=False)
                     if row:
                         movies.append(row)
-            log.info("library scan %s: %d series, %d movies",
-                     root, len(series), len(movies))
+            log.info("library scan %s: %d series, %d movies%s",
+                     root, len(series), len(movies),
+                     " (walk cut short - dir/time budget hit)" if cut else "")
             return series, movies
 
         def done(result):
@@ -435,7 +465,7 @@ class _LocalFilesMixin:
             if s_no != season_now:
                 season_now = s_no
                 rows.append({"_header": tr("local_season", n=s_no)})
-            row = self._local_file_row(p, stem)
+            row = self._local_file_row(p, stem, stat=False)
             if not row:
                 continue
             se = episode_info(stem)

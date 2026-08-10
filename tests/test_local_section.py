@@ -252,3 +252,32 @@ def test_library_cache_warm_start(tmp_path, monkeypatch):
     fn, done = calls[-1]
     done(fn())                          # unchanged rescan: no re-render
     assert w.rendered is marker
+
+
+def test_scan_is_bounded_and_reports_truncation(tmp_path):
+    """A share full of directories must not be walked forever - the scan
+    stops at its caps and says it was cut short (the SMB torrent-share
+    hang)."""
+    root = tmp_path / "big"
+    for i in range(30):
+        d = root / f"d{i:02d}"
+        d.mkdir(parents=True)
+        (d / f"Film.{i}.2020.mkv").write_bytes(b"x")
+    w = _Stub()
+
+    paths, cut = w._local_scan(str(root), max_dirs=10)
+    assert cut is True
+    assert 0 < len(paths) < 30           # partial result, not nothing
+
+    paths, cut = w._local_scan(str(root), max_files=5)
+    assert cut is True and len(paths) == 5
+
+    paths, cut = w._local_scan(str(root))
+    assert cut is False and len(paths) == 30
+
+    # NAS junk dirs are pruned without being entered.
+    junk = root / "#recycle"
+    junk.mkdir()
+    (junk / "old.mkv").write_bytes(b"x")
+    paths, cut = w._local_scan(str(root))
+    assert len(paths) == 30              # the recycled file never seen
