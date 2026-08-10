@@ -44,6 +44,10 @@ def clean_title(stem: str) -> tuple[str, str]:
     t = _TAG.sub("", stem)
     t = re.sub(r"[._]+", " ", t)
     t = re.sub(r"\s{2,}", " ", t).strip(" -–")
+    # The tag often sits inside brackets - "12 Years a Slave (2013)" cuts
+    # to "12 Years a Slave (" - and TMDB does not match a dangling one.
+    # Only the tail is trimmed: "(500) Days of Summer" keeps its own.
+    t = t.rstrip(" -–._([{")
     return (t or stem, year)
 
 
@@ -268,8 +272,15 @@ class _LocalFilesMixin:
                     continue
                 p = os.path.join(base, n)
                 if os.path.isdir(p):
-                    dirs.append({"name": n, "_kind": "localdir",
-                                 "_path": p, "_key": p, "stream_icon": ""})
+                    row = {"name": n, "_kind": "localdir",
+                           "_path": p, "_key": p, "stream_icon": ""}
+                    # "12 Years a Slave (2013)" or a release-tagged folder
+                    # is a film, and gets a poster like one - a wall of
+                    # identical folder glyphs is not a library.
+                    t, y = clean_title(n)
+                    if y or _TAG.search(n):
+                        row.update({"_clean_title": t, "_year": y})
+                    dirs.append(row)
                 elif n.lower().endswith(exts):
                     try:
                         st = os.stat(p)
@@ -349,6 +360,13 @@ class _LocalFilesMixin:
                 for k, v in info.items():
                     if k == "stream_icon" and not v:
                         v = folder if r.get("_kind") == "localdir" else ""
+                    # A poster that landed first outranks the placeholder;
+                    # without this the enrich pass painted grey folders
+                    # back over films it had just resolved.
+                    if k == "stream_icon" and self._is_folder_tile(v) \
+                            and r.get("stream_icon") \
+                            and not self._is_folder_tile(r["stream_icon"]):
+                        continue
                     if v:
                         r[k] = v
                 r.pop("_needs_tags", None)
@@ -357,8 +375,14 @@ class _LocalFilesMixin:
                 self.list_model.refresh_all()
 
         run_async(self.pool, job, done, lambda _e: None)
-        self._local_resolve_posters([r for r in rows
-                                     if r.get("_kind") == "local"])
+        # Film-named FOLDERS get posters too, not just files: a library
+        # laid out as "Movies/12 Years a Slave (2013)/movie.mkv" showed
+        # nothing but grey folder glyphs before.
+        self._local_resolve_posters(
+            [r for r in rows
+             if r.get("_kind") == "local"
+             or (r.get("_kind") == "localdir"
+                 and (r.get("_year") or r.get("_clean_title")))])
 
     def _local_remember_place(self) -> None:
         """Where we are right now, so leaving for TV and coming back lands
@@ -851,6 +875,13 @@ class _LocalFilesMixin:
                     return art
         return ""
 
+    def _is_folder_tile(self, url: str) -> bool:
+        """The drawn folder glyph is a placeholder, not artwork: a film
+        folder wearing one must still be allowed to fetch its poster and
+        paint over it, or every film in folder view stays a grey folder."""
+        tile = self._folder_tile()
+        return bool(tile) and url == tile
+
     def _folder_tile(self) -> str:
         """A drawn folder icon as an image file the row art loader can
         serve - the delegate otherwise painted its letter placeholder AND
@@ -1119,7 +1150,8 @@ class _LocalFilesMixin:
         cache = self._local_poster_cache()
         todo = []
         for f in files:
-            if f.get("stream_icon"):
+            if f.get("stream_icon") and not self._is_folder_tile(
+                    f["stream_icon"]):
                 continue
             if (f.get("_path") or "").lower().endswith(self.AUDIO_EXTS) \
                     or f.get("_album") or f.get("_artist"):
@@ -1129,7 +1161,8 @@ class _LocalFilesMixin:
                 continue          # datestamp home videos: nothing to match
             if (f.get("_poster_kind") or "vod") == "vod" \
                     and not f.get("_year") \
-                    and not _TAG.search(f.get("_filename") or ""):
+                    and not _TAG.search(f.get("_filename") or f.get("name")
+                                        or ""):
                 # An unanchored film match is a guess, and the guesses put
                 # movie posters on home videos ("Clip #1"). A year or a
                 # release tag (1080p/BluRay/x265/...) in the file name says
@@ -1181,7 +1214,8 @@ class _LocalFilesMixin:
             hit = False
             for r in self.all_items:
                 u = (out or {}).get(r.get("_key"))
-                if u and not r.get("stream_icon"):
+                if u and (not r.get("stream_icon")
+                          or self._is_folder_tile(r["stream_icon"])):
                     r["stream_icon"] = u
                     hit = True
             if hit:

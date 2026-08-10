@@ -741,3 +741,54 @@ def test_a_left_over_queue_never_hijacks_tv_or_film():
     w._last_playback = {"kind": "movie", "url": "http://h/movie/9.mkv"}
     assert w._queue_step(-1) is False
     assert w.played == []
+
+
+def test_a_film_folder_gets_a_poster_not_a_grey_glyph(tmp_path):
+    """A library laid out as "Movies/12 Years a Slave (2013)/movie.mkv"
+    showed nothing but folder glyphs: browsing never asked TMDB about
+    folders at all. The folder row must carry a title and a year, land in
+    the lookup batch, and let the answer paint over the placeholder."""
+    root = tmp_path / "Movies"
+    (root / "12 Years a Slave (2013)").mkdir(parents=True)
+    (root / "12 Years a Slave (2013)" / "movie.mkv").write_bytes(b"x")
+    (root / "Semester").mkdir()
+
+    asked = []
+
+    class _Tm:
+        def poster_url(self, title, kind):
+            asked.append((title, kind))
+            return "http://img/poster.jpg" if "Slave" in title else ""
+
+    class _R:
+        client = _Tm()
+
+    w = _Stub()
+    w.tmdb = _R()
+    w.all_items = []
+    w._load_gen = 0
+    w.list_model = type("M", (), {"refresh_all": lambda self: None})()
+    w._local_make_thumbs = lambda rows: None
+
+    # The real window renders into all_items; the poster answer lands
+    # there, so the stub has to keep the two in step.
+    def _render(rows, kind, empty_msg=None):
+        w.rendered = rows
+        w.all_items = rows
+
+    w._render_rows = _render
+    w._current_cat = str(root)
+    w._load_local_items(str(root))
+
+    rows = {r["name"].lstrip("\U0001F4C1 ").strip(): r for r in w.rendered}
+    film = next(r for k, r in rows.items() if "Slave" in k)
+    plain = next(r for k, r in rows.items() if "Semester" in k)
+
+    assert film["_clean_title"] == "12 Years a Slave"
+    assert film["_year"] == "2013"
+    assert ("12 Years a Slave 2013", "vod") in asked
+    assert film["stream_icon"] == "http://img/poster.jpg"
+
+    # An ordinary folder is not guessed at, and keeps the glyph.
+    assert "Semester" not in [t for t, _k in asked]
+    assert w._is_folder_tile(plain["stream_icon"]) or not plain["stream_icon"]
