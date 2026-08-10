@@ -269,45 +269,6 @@ print("MUTE_OK")
         f"stderr={proc.stderr[-1500:]!r}")
 
 
-def test_a_video_stream_never_inherits_the_music_filter_graph():
-    """Playing music sets mpv's lavfi-complex to draw a visualiser. A TV
-    channel opened afterwards must clear it - leaving it set made the
-    channel fail to open, and the window fell back to an external mpv."""
-    from dopeiptv.media.embedded import EmbeddedPlayer
-
-    props = {"lavfi-complex": "[aid1]asplit=2[ao][a];[a]showcqt[vo]"}
-
-    class _M(dict):
-        def __setitem__(self, k, v):
-            props[k] = v
-
-        def __getitem__(self, k):
-            return props.get(k, "")
-
-    class _P:
-        AUDIO_URL_EXTS = EmbeddedPlayer.AUDIO_URL_EXTS
-
-        def __init__(self):
-            self.video = type("V", (), {"mpv": _M()})()
-            self._vis_now = (True, "bars")
-
-        def clear_for(self, url):
-            # The guard as play() runs it.
-            if not str(url or "").lower().endswith(self.AUDIO_URL_EXTS):
-                if self.video.mpv["lavfi-complex"]:
-                    self.video.mpv["lavfi-complex"] = ""
-                self._vis_now = (False, "")
-
-    p = _P()
-    p.clear_for("http://host/live/1.m3u8")
-    assert props["lavfi-complex"] == ""
-    assert p._vis_now == (False, "")
-
-    props["lavfi-complex"] = "graph"
-    p.clear_for("/music/02.flac")           # audio keeps its visualiser
-    assert props["lavfi-complex"] == "graph"
-
-
 def test_video_playback_is_never_touched_by_the_music_features():
     """The audio visuals hook must do NOTHING for a video stream - writing
     mpv's filter properties there is what broke clicking a TV channel."""
@@ -341,3 +302,12 @@ def test_video_playback_is_never_touched_by_the_music_features():
 
     w._apply_audio_visuals("/music/02.flac")
     assert touched == ["vis", "eq"]            # music: both applied
+
+    # Music -> video takes the visualiser down again (once), then leaves
+    # every later video play completely alone.
+    touched.clear()
+    w._apply_audio_visuals("http://host/live/1.m3u8")
+    assert touched == ["vis"]
+    touched.clear()
+    w._apply_audio_visuals("http://host/live/2.m3u8")
+    assert touched == []

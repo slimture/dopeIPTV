@@ -3581,13 +3581,25 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         from previous music is cleared inside player.play() instead, which
         only writes when one is actually set."""
         pl = getattr(self, "player", None)
-        if pl is None or not str(url or "").lower().endswith(
-                self.AUDIO_EXTS):
+        if pl is None:
+            return
+        if not str(url or "").lower().endswith(self.AUDIO_EXTS):
+            # Video. The ONLY thing allowed here is taking down a
+            # visualiser we ourselves put up for a previous track - and
+            # only when there is one. An ordinary channel play must reach
+            # mpv untouched.
+            if getattr(self, "_vis_active", False):
+                self._vis_active = False
+                try:
+                    pl.set_visualiser(False)
+                except Exception as e:
+                    log.debug("visualiser teardown failed: %s", e)
             return
         try:
             style = self.settings.value("vis_style", "bars")
-            pl.set_visualiser(
-                self.settings.value("vis_on", "true") == "true", style)
+            want = self.settings.value("vis_on", "true") == "true"
+            pl.set_visualiser(want, style)
+            self._vis_active = want
             gains, on = self._eq_settings()
             pl.set_equaliser(gains, on)
         except Exception as e:
@@ -5410,6 +5422,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if self.player.play(url, title, start=resume_at):
                 self.wake.acquire(f"Playing {title}")
             else:
+                log.warning("embedded play() refused %s - falling back to an "
+                            "external mpv window", url)
                 self.player.hide()
                 launch_player("mpv", url, title, self)
         else:
