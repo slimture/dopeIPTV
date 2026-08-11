@@ -3602,6 +3602,10 @@ class EmbeddedPlayer(QWidget):
         if eof:
             if not self._eof_seen:
                 self._eof_seen = True
+                # The decisive line for "the queue stopped after one track":
+                # if this never appears, mpv never reported end-of-file and
+                # nothing downstream was ever asked to play the next one.
+                log.info("eof reached: %s", self.current_url)
                 self.finished.emit()
         else:
             self._eof_seen = False

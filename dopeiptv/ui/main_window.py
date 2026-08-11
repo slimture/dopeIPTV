@@ -3421,8 +3421,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     # Music plays through the very same mpv path - the picture just stays
     # dark. Kept apart from VIDEO_EXTS: frame-grab thumbnails make no sense
     # for audio.
-    AUDIO_EXTS = (".mp3", ".flac", ".m4a", ".aac", ".ogg", ".opus", ".wav",
-                  ".wma")
+    # A file that is music but not on this list is treated as video all the
+    # way through: no visualiser, no tags in the panel, and - the reason
+    # this list grew - no place in the play queue, so it played once and
+    # went quiet. Everything here is something mpv decodes as audio.
+    AUDIO_EXTS = (".mp3", ".flac", ".m4a", ".aac", ".ogg", ".oga", ".opus",
+                  ".wav", ".wma", ".aiff", ".aif", ".alac", ".ape", ".wv",
+                  ".dsf", ".dff", ".mpc", ".mka", ".m4b", ".mp2", ".ac3",
+                  ".dts", ".amr", ".spx", ".tta")
     MEDIA_EXTS = VIDEO_EXTS + AUDIO_EXTS
 
     def open_local_video(self) -> None:
@@ -3517,11 +3523,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         The queue is only in charge while a track is actually playing:
         with a channel or a film on, prev/next mean the channel list
         again, and a queue left over from earlier must not hijack them."""
-        if not self._music_is_playing():
-            return False
         q = getattr(self, "_track_queue", []) or []
         i = getattr(self, "_track_index", -1)
+        if not self._music_is_playing():
+            log.info("queue: not stepping - music is not what is playing "
+                     "(key=%r last=%r)", getattr(self, "_playing_key", None),
+                     (getattr(self, "_last_playback", None) or {}).get("kind"))
+            return False
         if not q or i < 0:
+            log.info("queue: nothing to step to (%d tracks, index %d)",
+                     len(q), i)
             return False
         step = 1 if direction > 0 else -1
         j = i + step
@@ -3532,6 +3543,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             if self._play_queued(j):
                 return True
             j += step
+        log.info("queue: no playable track %s of %d (index %d)",
+                 "after" if step > 0 else "before", len(q), i)
         return False
 
     def _play_queued(self, index: int) -> bool:
@@ -5338,7 +5351,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         if last and last.get("kind") == "local" \
                 and self._is_audio(last.get("url")):
-            self._queue_autoplay()      # albums play through
+            went = self._queue_autoplay()      # albums play through
+            log.info("eof: local audio, queue autoplay -> %s "
+                     "(%d tracks, index %d)", went,
+                     len(getattr(self, "_track_queue", []) or []),
+                     getattr(self, "_track_index", -1))
             return
         if not last or last.get("kind") != "episode":
             return

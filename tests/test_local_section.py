@@ -1063,3 +1063,56 @@ def test_playing_from_a_listing_still_makes_the_folder_the_queue(tmp_path):
     assert w._queue_explicit is False
     assert w._queue_autoplay() is True
     assert w.played[-1] == rows[1]["_path"]
+
+
+def test_end_of_track_walks_the_queue_through_on_player_finished(tmp_path):
+    """The whole chain the app actually uses: the player reports
+    end-of-file, _on_player_finished routes it to the queue, and the next
+    track starts. Tested end to end because every piece looked right on
+    its own while the album still stopped after one song."""
+    from dopeiptv.ui.main_window import MainWindow
+
+    w = _queue_stub()
+    w._on_player_finished = MainWindow._on_player_finished.__get__(w)
+    w._playing_catchup = False
+
+    rows = []
+    for n in ("01.flac", "02.flac", "03.flac"):
+        p = tmp_path / n
+        p.write_bytes(b"x")
+        rows.append({"_path": str(p), "name": n[:2]})
+    w.all_items = rows
+
+    # Play the first track the way a double-click does.
+    w._start_playback(rows[0]["_path"], "01", None, rows[0]["_path"],
+                      "local", item=rows[0])
+    assert w._track_index == 0
+
+    # Track ends -> the player emits finished() -> next track.
+    w._on_player_finished()
+    assert w.played[-1] == rows[1]["_path"]
+    assert w._track_index == 1
+
+    w._on_player_finished()
+    assert w.played[-1] == rows[2]["_path"]
+
+    # End of the album: nothing more, and no crash.
+    w._on_player_finished()
+    assert w.played[-1] == rows[2]["_path"]
+
+
+def test_end_of_track_does_nothing_for_a_channel_or_a_film(tmp_path):
+    """The eof route must stay music-only: a film reaching its end must
+    not be sent to the track queue."""
+    from dopeiptv.ui.main_window import MainWindow
+
+    w = _queue_stub()
+    w._on_player_finished = MainWindow._on_player_finished.__get__(w)
+    w._playing_catchup = False
+    w._save_resume_position = lambda *a, **k: None
+    w._maybe_auto_mark_watched = lambda *a, **k: None
+    w._autoplay_next_episode = lambda: False
+
+    w._last_playback = {"kind": "movie", "url": "/v/film.mkv"}
+    w._on_player_finished()
+    assert w.played == []
