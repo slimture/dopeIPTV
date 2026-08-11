@@ -3486,12 +3486,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         else:
             q += rows
         self._track_queue = q
+        # Hand-built: _start_playback must not silently replace it with
+        # whatever listing happens to be on screen.
+        self._queue_explicit = True
         self._sync_queue_buttons()
         self._set_status(tr("queue_added", n=len(rows)))
 
     def queue_clear(self) -> None:
         self._track_queue = []
         self._track_index = -1
+        self._queue_explicit = False
         self._sync_queue_buttons()
 
     def _sync_queue_buttons(self) -> None:
@@ -3519,25 +3523,72 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         i = getattr(self, "_track_index", -1)
         if not q or i < 0:
             return False
-        j = i + (1 if direction > 0 else -1)
-        if not (0 <= j < len(q)):
-            return False
-        self._play_queued(j)
-        return True
+        step = 1 if direction > 0 else -1
+        j = i + step
+        # Walk past tracks whose file has gone - an unmounted share, a
+        # renamed folder. Stopping dead on the first missing one is the
+        # other way an album fell silent halfway through.
+        while 0 <= j < len(q):
+            if self._play_queued(j):
+                return True
+            j += step
+        return False
 
-    def _play_queued(self, index: int) -> None:
+    def _play_queued(self, index: int) -> bool:
+        """Play queue entry *index*. False when there is nothing playable
+        there, so the caller can move on to the next one."""
         q = getattr(self, "_track_queue", []) or []
         if not (0 <= index < len(q)):
-            return
+            return False
         it = q[index]
         path = it.get("_path")
         if not path or not os.path.isfile(path):
-            return
+            log.info("queue: skipping missing track %s", path)
+            return False
         self._track_index = index
         self._start_playback(path, it.get("name") or os.path.basename(path),
                              it.get("stream_icon"), path, "local",
                              record=True, item=it)
         self._sync_queue_buttons()
+        return True
+
+    def _place_in_queue(self, url: str, title: str, item=None) -> None:
+        """Point the play queue at the track that is starting, so that
+        end-of-track knows what comes next.
+
+        Three cases. The track is already queued: just position on it. It
+        is not, but the user built this queue by hand: slot it in ahead of
+        what they queued and play on into it - discarding a hand-built
+        queue loses the one thing they asked for. Otherwise the listing on
+        screen becomes the queue, which is what makes a folder play
+        through without anyone queueing anything.
+
+        The middle case is the bug this fixes: a hand-built queue used to
+        be replaced by the listing, and if that listing held no audio at
+        all (browsing TV, say) the queue collapsed to the single track
+        being played - so it fell silent the moment that track ended."""
+        q = getattr(self, "_track_queue", []) or []
+        here = next((n for n, t in enumerate(q)
+                     if t.get("_path") == url), -1)
+        if here < 0 and q and getattr(self, "_queue_explicit", False):
+            row = dict(item) if isinstance(item, dict) else {}
+            row["_path"] = url
+            row.setdefault("name", title)
+            i = getattr(self, "_track_index", -1)
+            here = i + 1 if 0 <= i < len(q) else 0
+            q = list(q)
+            q.insert(here, row)
+            self._track_queue = q
+        elif here < 0:
+            q = [r for r in (self.all_items or [])
+                 if not r.get("_header") and self._is_audio(r.get("_path"))]
+            here = next((n for n, t in enumerate(q)
+                         if t.get("_path") == url), -1)
+            if here < 0:
+                q, here = [{"_path": url, "name": title}], 0
+            self._track_queue = q
+            self._queue_explicit = False
+        self._track_index = here
 
     def _music_is_playing(self) -> bool:
         """Is a local audio file what the player is on right now?"""
@@ -5430,21 +5481,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                         self._show_detail(item)
                     except Exception as e:
                         log.debug("music detail refresh failed: %s", e)
-                q = getattr(self, "_track_queue", []) or []
-                here = next((n for n, t in enumerate(q)
-                             if t.get("_path") == url), -1)
-                if here < 0:
-                    # Not a queued track: the surrounding listing becomes
-                    # the queue, positioned on this track.
-                    q = [r for r in (self.all_items or [])
-                         if not r.get("_header")
-                         and self._is_audio(r.get("_path"))]
-                    here = next((n for n, t in enumerate(q)
-                                 if t.get("_path") == url), -1)
-                    if here < 0:
-                        q, here = [{"_path": url, "name": title}], 0
-                    self._track_queue = q
-                self._track_index = here
+                self._place_in_queue(url, title, item)
                 self._sync_queue_buttons()
             # Replay with the same audio/subtitle tracks the user picked last
             # time for this title (one-shot; play() consumes them).

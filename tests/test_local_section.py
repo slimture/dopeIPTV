@@ -948,3 +948,118 @@ def test_tag_reading_covers_every_row_not_just_the_first_batch(tmp_path):
     assert len(read) == 700                         # every one, not 300
     assert all(not r.get("_needs_tags") for r in rows)
     assert rows[-1]["name"] == "T699"
+
+
+def _queue_stub():
+    """A window stub carrying the real queue methods."""
+    from dopeiptv.ui.main_window import MainWindow
+
+    class _Q:
+        AUDIO_EXTS = MainWindow.AUDIO_EXTS
+        _is_audio = MainWindow._is_audio
+        _music_is_playing = MainWindow._music_is_playing
+        queue_add = MainWindow.queue_add
+        queue_clear = MainWindow.queue_clear
+        _queue_step = MainWindow._queue_step
+        _play_queued = MainWindow._play_queued
+        _queue_autoplay = MainWindow._queue_autoplay
+        _place_in_queue = MainWindow._place_in_queue
+        player = None
+        _playing_key = "k"
+
+        def __init__(self):
+            self._track_queue, self._track_index = [], -1
+            self._queue_explicit = False
+            self.all_items = []
+            self.played = []
+            self._last_playback = {"kind": "local", "url": "/a/01.flac"}
+
+        def _sync_queue_buttons(self):
+            pass
+
+        def _set_status(self, *_a, **_k):
+            pass
+
+        def _start_playback(self, url, title, icon, key, kind, record=True,
+                            item=None):
+            self.played.append(url)
+            self._last_playback = {"kind": kind, "url": url}
+            self._place_in_queue(url, title, item)
+
+    return _Q()
+
+
+def test_a_hand_built_queue_survives_playing_something_else(tmp_path):
+    """The reported bug: queue some tracks, start a track that is not in
+    the queue while a listing with no audio is on screen (browsing TV),
+    and the queue was replaced by a ONE-track list - so playback stopped
+    dead after that single song."""
+    tracks = []
+    for n in ("05.flac", "06.flac", "07.flac"):
+        p = tmp_path / n
+        p.write_bytes(b"x")
+        tracks.append({"_path": str(p), "name": n[:2]})
+    other = tmp_path / "01.flac"
+    other.write_bytes(b"x")
+
+    w = _queue_stub()
+    w.queue_add(tracks)
+    assert w._queue_explicit is True
+
+    # A TV listing is on screen: nothing here is audio.
+    w.all_items = [{"name": "SVT1", "_kind": "live"}]
+    w._start_playback(str(other), "01", None, str(other), "local", item=None)
+
+    # The queued tracks are still there, with the played one ahead of them.
+    assert [t["_path"] for t in w._track_queue] == \
+        [str(other)] + [t["_path"] for t in tracks]
+    assert w._track_index == 0
+
+    # And end-of-track rolls on into them instead of falling silent.
+    assert w._queue_autoplay() is True
+    assert w.played[-1] == tracks[0]["_path"]
+    assert w._queue_autoplay() is True
+    assert w.played[-1] == tracks[1]["_path"]
+
+
+def test_a_missing_track_is_skipped_not_the_end_of_the_queue(tmp_path):
+    """A share that went away mid-album left one unplayable path in the
+    queue, and the whole queue stopped there instead of moving past it."""
+    rows = []
+    for n in ("01.flac", "02.flac", "03.flac"):
+        rows.append({"_path": str(tmp_path / n), "name": n[:2]})
+    # 02 is never created: it is the gap.
+    (tmp_path / "01.flac").write_bytes(b"x")
+    (tmp_path / "03.flac").write_bytes(b"x")
+
+    w = _queue_stub()
+    w.queue_add(rows)
+    assert w._play_queued(0) is True
+    assert w._play_queued(1) is False           # the gap itself
+
+    w._track_index = 0
+    assert w._queue_autoplay() is True          # steps over the gap
+    assert w._track_index == 2
+    assert w.played[-1] == rows[2]["_path"]
+
+    # Nothing playable after the last one.
+    assert w._queue_autoplay() is False
+
+
+def test_playing_from_a_listing_still_makes_the_folder_the_queue(tmp_path):
+    """The no-queue case must keep working: play a track from a folder and
+    the folder plays through, without anyone queueing anything."""
+    rows = []
+    for n in ("01.flac", "02.flac"):
+        p = tmp_path / n
+        p.write_bytes(b"x")
+        rows.append({"_path": str(p), "name": n[:2]})
+
+    w = _queue_stub()
+    w.all_items = rows
+    w._start_playback(rows[0]["_path"], "01", None, rows[0]["_path"],
+                      "local", item=rows[0])
+    assert w._track_index == 0
+    assert w._queue_explicit is False
+    assert w._queue_autoplay() is True
+    assert w.played[-1] == rows[1]["_path"]
