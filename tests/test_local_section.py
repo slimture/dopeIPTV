@@ -31,6 +31,22 @@ def _inline_workers(monkeypatch):
     monkeypatch.setattr(ml, "run_async", run_now)
 
 
+@pytest.fixture(autouse=True)
+def _no_network(monkeypatch):
+    """No test in this module may reach the internet.
+
+    The film-folder test passed here and failed on CI: the album-art pass
+    asked iTunes about a home-video folder called "Semester", and on a
+    runner that HAS a network it came back with a real album cover. A test
+    whose result depends on whether the machine is online is not a test.
+    Individual tests still monkeypatch urlopen themselves; theirs wins,
+    because it is installed after this one."""
+    def _blocked(*_a, **_k):
+        raise AssertionError("test tried to open a network connection")
+
+    monkeypatch.setattr("urllib.request.urlopen", _blocked)
+
+
 class _Settings:
     def __init__(self):
         self.d = {}
@@ -770,6 +786,9 @@ def test_a_film_folder_gets_a_poster_not_a_grey_glyph(tmp_path):
     w._load_gen = 0
     w.list_model = type("M", (), {"refresh_all": lambda self: None})()
     w._local_make_thumbs = lambda rows: None
+    # This test is about TMDB, not iTunes: leave the online music-art
+    # lookup out of it entirely rather than relying on it failing.
+    w.settings.setValue("music_art_online", "false")
 
     # The real window renders into all_items; the poster answer lands
     # there, so the stub has to keep the two in step.
