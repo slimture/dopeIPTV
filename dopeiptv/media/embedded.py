@@ -626,6 +626,12 @@ class _MpvGLWidget(QOpenGLWidget):
         # screen = compositing problem; no paints = dead repaint loop).
         # One line per ~300 frames, debug level only.
         self._paint_n = getattr(self, "_paint_n", 0) + 1
+        if self._paint_n == 1:
+            # Start the clock on the first paint, not the first heartbeat:
+            # without this the opening line divided by a zero interval and
+            # always read 0.0/s, which looks exactly like a dead repaint
+            # loop in a log you are reading to find a dead repaint loop.
+            self._paint_hb_at = time.monotonic()
         if self._paint_n % 300 == 0:
             # frame is the decisive freeze diagnostic: the number of the
             # frame mpv is on. Advancing across heartbeats while the
