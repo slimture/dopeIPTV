@@ -627,12 +627,17 @@ class _MpvGLWidget(QOpenGLWidget):
         # One line per ~300 frames, debug level only.
         self._paint_n = getattr(self, "_paint_n", 0) + 1
         if self._paint_n % 300 == 0:
-            # video-pts is the decisive freeze diagnostic: it is the pts of
-            # the newest VIDEO frame mpv has produced. Advancing across
-            # heartbeats while the on-screen picture is frozen = mpv makes
-            # new frames and the freeze is presentation/compositing; stuck =
-            # the video track itself stalled (audio continues) and the
-            # decoder path (e.g. videotoolbox) is the suspect.
+            # frame is the decisive freeze diagnostic: the number of the
+            # frame mpv is on. Advancing across heartbeats while the
+            # on-screen picture is frozen = mpv makes new frames and the
+            # freeze is presentation/compositing; stuck = the video track
+            # itself stalled (audio continues) and the decoder path (e.g.
+            # videotoolbox) is the suspect. vf-fps is the same story as a
+            # rate, and collapses toward 0 the moment output stops.
+            #
+            # (These replaced "video-pts", which mpv has no such property
+            # for - every heartbeat logged err:AttributeError, which is
+            # error code -8, "mpv property does not exist".)
             def _prop(name: str):
                 # One property per try: a single unsupported name must not
                 # blank the whole probe (the first log run showed None for
@@ -651,10 +656,12 @@ class _MpvGLWidget(QOpenGLWidget):
             since = now - getattr(self, "_paint_hb_at", now)
             self._paint_hb_at = now
             log.debug("VID paint alive #%d %.1f/s state=%s fbo=%s "
-                      "video-pts=%s drops=%s cache=%s hwdec=%s",
+                      "frame=%s vf-fps=%s drops=%s cache=%s hwdec=%s",
                       self._paint_n, (300 / since if since > 0 else 0.0),
                       getattr(self, "_paint_state", "?"),
-                      self.defaultFramebufferObject(), _prop("video_pts"),
+                      self.defaultFramebufferObject(),
+                      _prop("estimated_frame_number"),
+                      _prop("estimated_vf_fps"),
                       _prop("frame_drop_count"),
                       _prop("demuxer_cache_time"), _prop("hwdec_current"))
         # Blank branch first so a repaint that arrives mid-stop (when mpv has

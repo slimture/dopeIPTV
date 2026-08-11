@@ -316,13 +316,20 @@ class _LocalFilesMixin:
         run_async(getattr(self, "pool", None), job, done,
                   lambda _e: done([]))
 
-    def _local_enrich(self, rows: list[dict]) -> None:
+    # A tag read is a network round trip over SMB, so they go in batches -
+    # chained, or a folder of thousands stopped dead after the first 300.
+    _ENRICH_BATCH = 300
+    _ENRICH_ROUNDS = 40
+
+    def _local_enrich(self, rows: list[dict], _round: int = 0) -> None:
         """Fill in what costs a file read - track names from the tags, and
         artwork for folders and albums - off the UI thread, then repaint.
         The list is already on screen by then; this only makes it better."""
-        todo = [r for r in rows
+        cand = [r for r in rows
                 if r.get("_needs_tags") or (r.get("_kind") == "localdir"
-                                            and not r.get("stream_icon"))][:300]
+                                            and not r.get("stream_icon"))]
+        todo = cand[:self._ENRICH_BATCH]
+        more = len(cand) > len(todo)
         if not todo or getattr(self, "pool", None) is None:
             return
         token = getattr(self, "_local_list_token", 0)
@@ -373,8 +380,16 @@ class _LocalFilesMixin:
                 hit = True
             if hit:
                 self.list_model.refresh_all()
+            # Every row this round touched now carries art or has lost its
+            # _needs_tags flag, so the next round starts on the ones after
+            # them and the chain runs out on its own. An empty answer is
+            # no progress and returned above, which also stops it.
+            if more and _round + 1 < self._ENRICH_ROUNDS:
+                self._local_enrich(rows, _round + 1)
 
         run_async(self.pool, job, done, lambda _e: None)
+        if _round:
+            return          # the poster chain was started by round 0
         # Film-named FOLDERS get posters too, not just files: a library
         # laid out as "Movies/12 Years a Slave (2013)/movie.mkv" showed
         # nothing but grey folder glyphs before.

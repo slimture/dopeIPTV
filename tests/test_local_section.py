@@ -5,6 +5,7 @@ bare object, so the directory walking and navigation logic is tested for real
 while Qt widgets are stand-ins that just record what happened.
 """
 import json
+import os
 
 import pytest
 
@@ -890,3 +891,41 @@ def test_a_known_miss_never_hogs_the_album_art_batch(tmp_path, monkeypatch):
     before = len(seen)
     w._local_fetch_album_art(rows)
     assert len(seen) == before
+
+
+def test_tag_reading_covers_every_row_not_just_the_first_batch(tmp_path):
+    """A tag read is an SMB round trip, so they go 300 at a time - but the
+    batch used to be the end of it, and row 301 onwards kept the letter
+    placeholder and its file name instead of its track title."""
+    read = []
+
+    class _W(_Stub):
+        def _cover_in(self, d, depth=0):
+            return ""
+
+    w = _W()
+    w.list_model = type("M", (), {"refresh_all": lambda self: None})()
+    w._local_resolve_posters = lambda rows: None
+    w._local_fetch_album_art = lambda rows, _round=0: None
+    rows = [{"_key": f"t{i}", "name": f"{i:03d}.flac", "_kind": "local",
+             "_path": f"/m/{i:03d}.flac", "_needs_tags": True,
+             "stream_icon": ""} for i in range(700)]
+    w.all_items = rows
+
+    import dopeiptv.ui.mw_local as ml
+
+    def _tags(path, want_cover=False):
+        read.append(path)
+        return {"title": "T" + os.path.basename(path)[:3]}, None
+
+    orig_read, orig_disp = ml.read_tags, ml.display_name
+    ml.read_tags = _tags
+    ml.display_name = lambda p, t=None: (t or {}).get("title", "")
+    try:
+        w._local_enrich(rows)
+    finally:
+        ml.read_tags, ml.display_name = orig_read, orig_disp
+
+    assert len(read) == 700                         # every one, not 300
+    assert all(not r.get("_needs_tags") for r in rows)
+    assert rows[-1]["name"] == "T699"
