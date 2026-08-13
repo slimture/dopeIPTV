@@ -53,10 +53,13 @@ function dl_meta(string $name): array {
         return ['os'=>'macOS','icon'=>'🍎','title'=>t('dl_t_dmg'),'fmt'=>t('dl_f_dmg'),'arch'=>$mac,'rank'=>($arm?10:12),'rec'=>$arm];
     if (str_ends_with($n, '.pkg'))
         return ['os'=>'macOS','icon'=>'🍎','title'=>t('dl_t_pkg'),'fmt'=>t('dl_f_pkg'),'arch'=>$mac,'rank'=>($arm?20:22),'rec'=>false];
+    // There is an ARM64 Windows build now, so "recommended" has to pick one -
+    // both were flagged, and a badge on every choice recommends nothing. x64
+    // is the one nearly everyone wants, exactly as with the Linux AppImage.
     if (str_ends_with($n, '.exe') || str_ends_with($n, '.msi'))
-        return ['os'=>'Windows','icon'=>'🪟','title'=>t('dl_t_exe'),'fmt'=>t('dl_f_exe'),'arch'=>$cpu,'rank'=>10,'rec'=>true];
+        return ['os'=>'Windows','icon'=>'🪟','title'=>t('dl_t_exe'),'fmt'=>t('dl_f_exe'),'arch'=>$cpu,'rank'=>($arm?12:10),'rec'=>!$arm];
     if (str_ends_with($n, '.zip') && strpos($n, 'win') !== false)
-        return ['os'=>'Windows','icon'=>'🪟','title'=>t('dl_t_winzip'),'fmt'=>t('dl_f_winzip'),'arch'=>$cpu,'rank'=>10,'rec'=>true];
+        return ['os'=>'Windows','icon'=>'🪟','title'=>t('dl_t_winzip'),'fmt'=>t('dl_f_winzip'),'arch'=>$cpu,'rank'=>($arm?22:20),'rec'=>!$arm];
     if (str_ends_with($n, '.appimage'))
         return ['os'=>'Linux','icon'=>'🐧','title'=>t('dl_t_appimage'),'fmt'=>t('dl_f_appimage'),'arch'=>$cpu,'rank'=>($arm?12:10),'rec'=>!$arm];
     if (str_ends_with($n, '.deb'))
