@@ -1206,3 +1206,51 @@ def test_an_album_never_rolls_on_into_a_film(tmp_path):
     assert w._queue_autoplay() is True
     assert w.played[-1] == rows[1]["_path"]
     assert w._queue_autoplay() is False          # end of the album, no film
+
+
+def test_the_plot_label_never_stays_in_rich_text_after_music():
+    """The music panel switches the plot label to rich text. A label left
+    in that mode renders provider/TMDB prose as markup - including
+    <img src="http://..."> in a synopsis, which QLabel would fetch. Every
+    other writer must put it back to plain."""
+    from PyQt6.QtCore import Qt as _Qt
+
+    from dopeiptv.ui.mw_detail import _DetailMixin
+
+    class _Lbl:
+        def __init__(self):
+            self.fmt = _Qt.TextFormat.RichText     # left over from music
+            self.text = ""
+
+        def setTextFormat(self, f):
+            self.fmt = f
+
+        def setText(self, t):
+            self.text = t
+
+        def setVisible(self, *_a):
+            pass
+
+    class _W:
+        _show_media_info = _DetailMixin._show_media_info
+        _current_key = "k"
+        _tmdb_details = None
+
+        def __init__(self):
+            self.media_plot = _Lbl()
+            self.media_meta = _Lbl()
+            self.media_info = _Lbl()
+
+        def _clear_epg_rows(self):
+            pass
+
+        def __getattr__(self, n):
+            return lambda *a, **k: None
+
+    w = _W()
+    try:
+        w._show_media_info({"plot": 'A <img src="http://x/p.png"> synopsis'},
+                           "k")
+    except Exception:
+        pass
+    assert w.media_plot.fmt == _Qt.TextFormat.PlainText

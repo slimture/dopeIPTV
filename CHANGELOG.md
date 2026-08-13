@@ -5,6 +5,86 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
+## [1.2.9]
+
+Your own files, played like everything else - and autoplay works again.
+
+### Added
+
+- **A Local files section**, playing what is on disk and on any share the
+  system has already mounted (a gvfs SMB mount on Linux, a `/Volumes` share
+  on macOS - ordinary paths, so no in-app SMB client to go wrong).
+- **Two views of a library**: plain folder browsing, or an Infuse-style view
+  that reads file names and groups episodes into series and seasons, with
+  films under Movies. The toggle sits in the middle column.
+- **Artwork**: TMDB posters for what can be matched, an ffmpeg frame grab for
+  what cannot, and embedded or folder cover art for music. A file with no
+  year and no release tag in its name is never guessed at - it gets a
+  thumbnail instead of some unrelated film's poster.
+- **Music as music**: albums shelved together, artist/album/title read from
+  the tags (FLAC, MP3, MP4 - dependency-free, header-only), a right-click
+  play queue, a visualiser and a ten-band equaliser.
+- **Local files behave like the rest of the app**: resume, a History category
+  of their own, casting, multiview, and Trakt scrobbling where TMDB can name
+  the file. A file on an unmounted share says so and offers to drop the row.
+- **A settings section** for the watched folders and for clearing caches.
+- **Live scan progress**, with results appearing as they are found rather
+  than after the whole tree has been walked.
+- **A native Windows ARM64 build.**
+
+### Fixed
+
+- **Autoplay, everywhere.** The music queue, local series and streamed
+  episodes all hang off one signal, raised only from a poll of mpv's
+  `eof-reached` - which is true only while `keep-open` is in force, and only
+  if a poll catches it. End of playback now comes from mpv's `end-file`
+  event, delivered exactly once whatever the options say; the poll stays as
+  a backup.
+- **The next episode no longer arrives paused.** `keep-open` pauses mpv at
+  end of file, and that pause is player state, not file state, so it
+  survived loading the next file.
+- **Local series play through.** A local episode is not a provider episode
+  and never reached the autoplay branch. Music always plays on; video only
+  when it really is an episode, so one film ending never starts another.
+- **An already-watched episode replays from History.** Those rows carry the
+  series context but no provider episode id, and the URL was built from the
+  missing id - a path that never existed.
+- **Artwork is fetched for a whole shelf**, not only its first batch.
+- **File work moved off the UI thread** - listing, tag reads and library
+  walks are SMB round trips, and on the UI thread they were the macOS
+  spinning beachball.
+- **A frozen picture in macOS fullscreen heals itself** instead of waiting
+  for the user to tab out and back.
+- **A plot summary is never rendered as markup**: the music panel switches
+  that label to rich text and did not switch it back.
+- The Intel macOS build moved to `macos-15-intel`; its retired predecessor
+  queued forever.
+
+## [1.2.8]
+
+### Fixed
+
+- **The app no longer dies where the decimal separator is a comma.** On a
+  German or French system it closed without a word as the video player
+  initialised - on a fresh install, that was the wizard's "Try demo" button.
+  libmpv requires the C numeric locale; Qt sets the locale from the system.
+  It is now reset right before the player is created. (#18)
+- **An M3U link is no longer mistaken for an Xtream URL** when its path has
+  two or more segments; those were read as username and password.
+
+### Added
+
+- **An Intel (x86_64) macOS .dmg**, alongside the Apple Silicon one.
+
+## [1.2.7]
+
+### Fixed
+
+- Casting: the stale-session check, a crash in the spool lead, the archive
+  rewind, a 4K cap, and clicks on the seek bar landing where they were
+  aimed. Chromecast setup now asks which device it is rather than whether
+  it is old.
+
 ## [1.2.6]
 
 Casting works.

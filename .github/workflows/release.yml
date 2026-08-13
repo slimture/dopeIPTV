@@ -379,7 +379,8 @@ jobs:
             *.deb
 
   # -------------------------------------------------- macOS .app + .dmg ---
-  # Builds on both Apple Silicon (macos-14, arm64) and Intel (macos-13, x86_64).
+  # Builds on both Apple Silicon (macos-14, arm64) and Intel
+  # (macos-15-intel, x86_64 - macos-13 was retired in Dec 2025).
   # Produces unsigned .dmgs - users need to right-click -> Open once to get past
   # Gatekeeper. Signing/notarising can be added later by putting DEVELOPER_ID /
   # APPLE_ID secrets in the repo and calling codesign / notarytool.

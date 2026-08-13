@@ -2305,13 +2305,19 @@ class EmbeddedPlayer(QWidget):
         """mpv says the file ended normally. Raise finished() once, sharing
         the guard with the eof-reached poll so whichever notices first wins
         and the other is a no-op."""
-        if self._stopping or self.current_url is None:
-            return          # a user-initiated stop is not an end of file
-        if self._eof_seen:
-            return
-        self._eof_seen = True
-        log.info("eof event: %s", self.current_url)
-        self.finished.emit()
+        try:
+            if self._stopping or self.current_url is None:
+                return      # a user-initiated stop is not an end of file
+            if self._eof_seen:
+                return
+            self._eof_seen = True
+            log.info("eof event: %s", self.current_url)
+            self.finished.emit()
+        except RuntimeError:
+            # This arrives from mpv's event thread via a queued connection,
+            # so it can land after the player's C++ object is gone (quit
+            # while a file happens to end). Nothing left to tell.
+            pass
 
     def _wire_video(self, w) -> None:
         """Connect a video widget's signals/filters to the player."""
@@ -3129,19 +3135,21 @@ class EmbeddedPlayer(QWidget):
         the next file. *gen* pins this to the play() call that armed it, so
         a later stream is never touched, and a pause the user pressed in
         the meantime is left alone."""
-        if gen != getattr(self, "_play_gen", 0):
-            return
-        m = self.video.mpv
-        if m is None or self.current_url is None:
-            return
-        if getattr(self, "_user_paused", False):
-            return
         try:
+            if gen != getattr(self, "_play_gen", 0):
+                return
+            m = self.video.mpv
+            if m is None or self.current_url is None:
+                return
+            if getattr(self, "_user_paused", False):
+                return
             if m.pause:
                 log.info("clearing a pause nobody asked for (keep-open eof)")
                 m.pause = False
                 self._sync_pause_label(False)
         except Exception:
+            # Fires up to 900 ms after the load, so it can outlive the
+            # player on a quick quit. A missed unpause is not worth a crash.
             pass
 
     def _ensure_audio_selected(self) -> None:

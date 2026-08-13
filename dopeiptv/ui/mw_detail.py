@@ -123,8 +123,15 @@ class _DetailMixin:
             import html as _html
             import os as _os
 
-            from ..core.audiotags import read_tags
-            tags = read_tags(it.get("_path") or "")[0]
+            # Only read the file when the row does not already carry what
+            # we need. This runs on the UI thread on every selection, and a
+            # tag read is a round trip over SMB - the enrich pass has
+            # normally filled these in already, so paying for it again on
+            # each arrow-key press is what made clicking around feel slow.
+            tags = {}
+            if not (it.get("_artist") and it.get("_album")):
+                from ..core.audiotags import read_tags
+                tags = read_tags(it.get("_path") or "")[0]
             d = _os.path.dirname(it.get("_path") or "")
             artist = (it.get("_artist") or tags.get("artist")
                       or tags.get("albumartist")
@@ -151,6 +158,7 @@ class _DetailMixin:
         if self.mode == "rec":
             # Show the user-entered description (if any) in the info panel.
             desc = (it.get("_desc") or "").strip()
+            self.media_plot.setTextFormat(Qt.TextFormat.PlainText)
             self.media_plot.setText(desc)
             self.media_plot.setVisible(bool(desc))
             self.media_meta.setVisible(False)
@@ -806,6 +814,11 @@ class _DetailMixin:
         plot = str(
             info.get("plot") or info.get("description")
             or td.get("overview") or "").strip()
+        # Explicitly plain: the music panel switches this label to rich
+        # text, and a QLabel left in that mode renders provider/TMDB prose
+        # as markup - including <img src="http://...">, which would fetch a
+        # remote image straight from a synopsis.
+        self.media_plot.setTextFormat(Qt.TextFormat.PlainText)
         self.media_plot.setText(plot)
         self.media_plot.setVisible(bool(plot))
 
