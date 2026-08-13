@@ -5162,8 +5162,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         saved = self.series_ctx
         self.series_ctx = ctx or saved
         try:
-            url = self.client.episode_url(
-                it.get("id"), it.get("container_extension"))
+            # A History row carries the series context (so it replays AS an
+            # episode) but no provider episode id - History stores the URL
+            # it was played from, not the catalogue entry. Building a URL
+            # from the missing id gave /series/user/pass/None.mp4, which is
+            # not empty, so the guard below waved it through and playback
+            # failed on a nonsense path. Same reasoning as _stream_for.
+            url = ""
+            if it.get("id") is not None:
+                url = self.client.episode_url(
+                    it.get("id"), it.get("container_extension"))
+            if not url:
+                url = it.get("_url") or ""
             if not url:
                 return
             title = it.get("name") or it.get("title") or "dopeIPTV"

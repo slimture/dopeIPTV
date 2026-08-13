@@ -141,3 +141,54 @@ def test_has_next_episode_reflects_position():
     assert f._has_next_episode() is True
     f = _make(last=_last(2))
     assert f._has_next_episode() is False
+
+
+def test_a_history_episode_replays_from_its_stored_url():
+    """A History row replays AS an episode - it carries the series context
+    so it resumes and lands in the series list - but it has no provider
+    episode id, because History stores the URL it was played from rather
+    than the catalogue entry. Building a URL from the missing id gave
+    /series/user/pass/None.mp4: not empty, so the "no url" guard waved it
+    through and playback failed on a nonsense path."""
+    f = SimpleNamespace()
+    f.series_ctx = None
+    f.played = []
+    f._item_key = lambda e: e.get("_key")
+    f.client = SimpleNamespace(
+        episode_url=lambda i, ext: f"http://srv/series/u/p/{i}.{ext or 'mp4'}")
+
+    def start(url, title, icon, key, kind, record=True, item=None):
+        f.played.append((url, kind))
+
+    f._start_playback = start
+    f._play_continue_episode = MainWindow._play_continue_episode.__get__(f)
+
+    row = {"_kind": "episode", "_key": "ep:88", "name": "Show · S1 E2",
+           "_url": "http://srv/series/u/p/88.mkv",
+           "_series_ctx": {"series_id": 7, "name": "Show"}}
+    f._play_continue_episode(row)
+
+    assert f.played == [("http://srv/series/u/p/88.mkv", "episode")]
+    assert f.series_ctx is None          # the context is restored after
+
+
+def test_a_continue_watching_episode_still_builds_its_provider_url():
+    """The normal Continue-watching row does have an id, and must keep
+    using it - the stored URL can be stale."""
+    f = SimpleNamespace()
+    f.series_ctx = None
+    f.played = []
+    f._item_key = lambda e: e.get("id")
+    f.client = SimpleNamespace(
+        episode_url=lambda i, ext: f"http://srv/series/u/p/{i}.{ext or 'mp4'}")
+
+    def start(url, title, icon, key, kind, record=True, item=None):
+        f.played.append((url, kind))
+
+    f._start_playback = start
+    f._play_continue_episode = MainWindow._play_continue_episode.__get__(f)
+
+    f._play_continue_episode({"id": 42, "container_extension": "mp4",
+                              "_url": "http://stale/old.mp4",
+                              "_series_ctx": {"series_id": 7}})
+    assert f.played == [("http://srv/series/u/p/42.mp4", "episode")]
