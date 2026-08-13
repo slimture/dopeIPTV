@@ -3093,6 +3093,22 @@ class EmbeddedPlayer(QWidget):
                 pass
             m.play(url)
             self.current_url = url
+            # Unpause AGAIN, after the load. keep-open=yes pauses mpv when a
+            # file ends, and that pause is PLAYER state, not file state: it
+            # survives loading the next one. Clearing it before the load (as
+            # above) is not enough, because mpv is still sitting at the old
+            # file's end and re-asserts it - which is why autoplay put the
+            # next episode on screen and left it standing still.
+            self._user_paused = False
+            try:
+                m.pause = False
+            except Exception:
+                pass
+            self._play_gen = getattr(self, "_play_gen", 0) + 1
+            gen = self._play_gen
+            for delay in (250, 900):
+                QTimer.singleShot(
+                    delay, lambda g=gen: self._ensure_unpaused(g))
             self._pos_timer.start()
             # Safety net for the "silent until you replay it" case: switching
             # streams while the previous one tears down can land with no audio
@@ -3105,6 +3121,28 @@ class EmbeddedPlayer(QWidget):
             log.error("Embedded playback failed: %s: %s", type(e).__name__, e)
             self.current_url = None
             return False
+
+    def _ensure_unpaused(self, gen: int) -> None:
+        """Clear a pause the user never asked for, shortly after a load.
+
+        The one that matters is keep-open's end-of-file pause carried into
+        the next file. *gen* pins this to the play() call that armed it, so
+        a later stream is never touched, and a pause the user pressed in
+        the meantime is left alone."""
+        if gen != getattr(self, "_play_gen", 0):
+            return
+        m = self.video.mpv
+        if m is None or self.current_url is None:
+            return
+        if getattr(self, "_user_paused", False):
+            return
+        try:
+            if m.pause:
+                log.info("clearing a pause nobody asked for (keep-open eof)")
+                m.pause = False
+                self._sync_pause_label(False)
+        except Exception:
+            pass
 
     def _ensure_audio_selected(self) -> None:
         """If playback has audio tracks but none is active (a stream-switch
@@ -3182,6 +3220,9 @@ class EmbeddedPlayer(QWidget):
             return
         try:
             m.pause = not m.pause
+            # Remember a DELIBERATE pause, so the post-load unpause watchdog
+            # never yanks playback back out of it.
+            self._user_paused = bool(m.pause)
             self._sync_pause_label(m.pause)
         except Exception:
             pass

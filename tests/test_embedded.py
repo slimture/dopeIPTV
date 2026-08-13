@@ -394,3 +394,56 @@ def test_the_raster_mirror_heals_a_lost_frame_signal():
     except Exception:
         pass
     assert p._raster_stalls == 1
+
+
+def test_a_pause_nobody_asked_for_is_cleared_but_a_real_one_is_not():
+    """keep-open=yes pauses mpv at end of file, and that pause is player
+    state, not file state - it survives loading the next one, which is why
+    autoplay put the next episode on screen and left it standing still.
+    The watchdog clears that, and only that: a pause the user pressed, and
+    a stale timer from an earlier stream, must both be left alone."""
+    from dopeiptv.media.embedded import EmbeddedPlayer
+
+    class _M:
+        def __init__(self):
+            self.pause = True
+
+    class _V:
+        def __init__(self):
+            self.mpv = _M()
+
+    class _P:
+        _ensure_unpaused = EmbeddedPlayer._ensure_unpaused
+        current_url = "http://host/ep2.mp4"
+        _play_gen = 4
+
+        def __init__(self):
+            self.video = _V()
+            self.synced = []
+
+        def _sync_pause_label(self, paused):
+            self.synced.append(paused)
+
+    # The keep-open pause: cleared.
+    p = _P()
+    p._ensure_unpaused(4)
+    assert p.video.mpv.pause is False
+    assert p.synced == [False]
+
+    # A pause the user pressed: untouched.
+    p = _P()
+    p._user_paused = True
+    p._ensure_unpaused(4)
+    assert p.video.mpv.pause is True
+    assert p.synced == []
+
+    # A timer armed by an earlier stream: untouched.
+    p = _P()
+    p._ensure_unpaused(3)
+    assert p.video.mpv.pause is True
+
+    # Nothing loaded: untouched.
+    p = _P()
+    p.current_url = None
+    p._ensure_unpaused(4)
+    assert p.video.mpv.pause is True
