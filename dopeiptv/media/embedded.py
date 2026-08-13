@@ -810,6 +810,16 @@ class _MpvGLWidget(QOpenGLWidget):
             self._settle_mirror_soon()
 
     def _settle_mirror_soon(self) -> None:
+        # The settle resizes this widget, which comes straight back here as
+        # another resizeGL. Without these two guards that re-arms the timer
+        # and the whole thing feeds itself at 4 Hz - 89 settles in one
+        # session, each doing a synchronous full-window repaint, which is
+        # visible as stutter in fullscreen.
+        if getattr(self, "_settling", False):
+            return                                  # our own nudge
+        if (self.width(), self.height()) == getattr(self, "_settled_size",
+                                                    None):
+            return                                  # already settled here
         t = getattr(self, "_settle_timer", None)
         if t is None:
             t = self._settle_timer = QTimer(self)
@@ -831,11 +841,13 @@ class _MpvGLWidget(QOpenGLWidget):
 
         Pure widget geometry. mpv, the render context and the docked surface
         are not touched."""
+        self._settling = True
         try:
             sz = self.size()
             if sz.isValid() and sz.height() > 1:
                 self.resize(sz.width(), sz.height() - 1)
                 self.resize(sz)
+            self._settled_size = (self.width(), self.height())
             self.update()
             win = self.window()
             if win is not None:
@@ -845,6 +857,13 @@ class _MpvGLWidget(QOpenGLWidget):
                      sz.width(), sz.height())
         except Exception as e:
             log.debug("mirror settle failed: %s", e)
+        finally:
+            # Cleared next time round the event loop, so a resizeGL our own
+            # nudge delivers asynchronously is still recognised as ours.
+            QTimer.singleShot(0, self._settle_done)
+
+    def _settle_done(self) -> None:
+        self._settling = False
 
     def shutdown(self) -> None:
         self._free_render_context("shutdown")

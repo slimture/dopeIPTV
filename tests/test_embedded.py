@@ -470,6 +470,7 @@ def test_the_macos_mirror_settles_its_surface_after_a_fullscreen_resize():
     class _M:
         _settle_mirror_soon = _MpvGLWidget._settle_mirror_soon
         _settle_mirror_surface = _MpvGLWidget._settle_mirror_surface
+        _settle_done = _MpvGLWidget._settle_done
 
         def __init__(self, mirror_of):
             self._mirror_of = mirror_of
@@ -493,6 +494,12 @@ def test_the_macos_mirror_settles_its_surface_after_a_fullscreen_resize():
 
         def size(self):
             return self._Sz(self._w, self._h)
+
+        def width(self):
+            return self._w
+
+        def height(self):
+            return self._h
 
         def resize(self, *a):
             # Qt takes resize(w, h) and resize(QSize) alike; the code uses
@@ -523,3 +530,88 @@ def test_the_macos_mirror_settles_its_surface_after_a_fullscreen_resize():
     m2._settle_mirror_surface()
     assert m2.resizes == []
     assert m2._win.repaints == 1
+
+
+def test_the_mirror_settle_cannot_feed_itself():
+    """The settle resizes the widget, and that comes straight back as
+    another resizeGL. The first cut re-armed on it and fed itself at 4 Hz -
+    89 settles in one session, each with a synchronous full-window repaint,
+    which showed up as stutter in fullscreen."""
+    from dopeiptv.media.embedded import _MpvGLWidget
+
+    class _M:
+        _settle_mirror_soon = _MpvGLWidget._settle_mirror_soon
+        _settle_mirror_surface = _MpvGLWidget._settle_mirror_surface
+        _settle_done = _MpvGLWidget._settle_done
+
+        def __init__(self):
+            self._mirror_of = object()
+            self._w, self._h = 1512, 917
+            self.settles = 0
+            self.armed = 0
+            self._pending = []
+
+        # -- the bits the settle touches ---------------------------------
+        class _Sz:
+            def __init__(self, w, h): self._w, self._h = w, h
+            def isValid(self): return True
+            def width(self): return self._w
+            def height(self): return self._h
+
+        def size(self): return self._Sz(self._w, self._h)
+        def width(self): return self._w
+        def height(self): return self._h
+        def update(self): pass
+        def window(self): return None
+
+        def resize(self, *a):
+            w, h = (a[0].width(), a[0].height()) if len(a) == 1 else a
+            self._w, self._h = w, h
+            self._settle_mirror_soon()      # what resizeGL does
+
+        # -- stand in for the QTimer -------------------------------------
+        def _fire_pending(self):
+            while self._pending:
+                self._pending.pop(0)()
+
+    m = _M()
+
+    class _T:
+        def __init__(self, owner): self.owner = owner
+        def setSingleShot(self, *_a): pass
+        class timeout:
+            @staticmethod
+            def connect(*_a): pass
+        def start(self, *_a): m.armed += 1
+
+    m._settle_timer = _T(m)
+
+    real = _MpvGLWidget._settle_mirror_surface
+
+    def counted(self):
+        self.settles += 1
+        real(self)
+
+    m._settle_mirror_surface = counted.__get__(m)
+
+    import dopeiptv.media.embedded as em
+    orig = em.QTimer
+
+    class _QT:
+        @staticmethod
+        def singleShot(_ms, fn): m._pending.append(fn)
+
+    em.QTimer = _QT
+    try:
+        m._settle_mirror_surface()          # the transition's settle
+        m._fire_pending()                   # end of the event-loop turn
+    finally:
+        em.QTimer = orig
+
+    assert m.settles == 1                   # not 89
+    assert m.armed == 0                     # its own resizes armed nothing
+
+    # And once settled at this size, a repeat resize to the same size is a
+    # no-op rather than another synchronous repaint.
+    m._settle_mirror_soon()
+    assert m.armed == 0
