@@ -825,7 +825,11 @@ class _MpvGLWidget(QOpenGLWidget):
             t = self._settle_timer = QTimer(self)
             t.setSingleShot(True)
             t.timeout.connect(self._settle_mirror_surface)
-        t.start(250)          # re-armed by each resize; fires after the last
+        # 450 ms, not 250: entering fullscreen lands on two sizes a moment
+        # apart (1512x917, then 1512x949 as the menu bar hides), and at 250
+        # each got its own settle - two synchronous full-window repaints per
+        # transition instead of one.
+        t.start(450)          # re-armed by each resize; fires after the last
 
     def _settle_mirror_surface(self) -> None:
         """Rebuild this surface's backing store after a macOS fullscreen
@@ -843,18 +847,26 @@ class _MpvGLWidget(QOpenGLWidget):
         are not touched."""
         self._settling = True
         try:
+            t0 = time.monotonic()
             sz = self.size()
             if sz.isValid() and sz.height() > 1:
                 self.resize(sz.width(), sz.height() - 1)
                 self.resize(sz)
             self._settled_size = (self.width(), self.height())
             self.update()
+            t1 = time.monotonic()
             win = self.window()
             if win is not None:
                 win.repaint()      # synchronous: an async update can lose
                                    # the race with the stale layer
-            log.info("VID mirror settled after fullscreen resize (%dx%d)",
-                     sz.width(), sz.height())
+            t2 = time.monotonic()
+            # Timed because the remedy is not free and the log has no
+            # timestamps: nudge and repaint are reported apart so a stall at
+            # the transition can be blamed on the right one - or on neither,
+            # which would put it on the mirror teardown/rebuild instead.
+            log.info("VID mirror settled (%dx%d) nudge=%.0fms repaint=%.0fms",
+                     sz.width(), sz.height(),
+                     (t1 - t0) * 1000, (t2 - t1) * 1000)
         except Exception as e:
             log.debug("mirror settle failed: %s", e)
         finally:
@@ -2074,6 +2086,7 @@ class EmbeddedPlayer(QWidget):
         and the docked video (still rendering, behind a placeholder) keeps
         driving mpv's frame timing. Returns the mirror widget for the caller to
         place in the window."""
+        _t_start = time.monotonic()
         if sys.platform.startswith("linux") or sys.platform == "win32":
             # DEFAULT Linux and Windows path: raster mirror (see
             # _RasterMirror). Every GL presentation route in a second window
@@ -2149,6 +2162,12 @@ class EmbeddedPlayer(QWidget):
         # (the intermittent "video over the control bar").
         QTimer.singleShot(0, lambda: self._show_dock_placeholder(True))
         self._reveal_sleep_badge()
+        # Every fullscreen toggle tears this down and builds it again - a new
+        # GL context and a fresh mpv render binding each time. Timed so a
+        # stall at the transition can be attributed to the rebuild rather
+        # than guessed at.
+        log.info("VID mirror start took %.0fms",
+                 (time.monotonic() - _t_start) * 1000)
         return m
 
     def _raster_mark_frame(self) -> None:
@@ -2291,6 +2310,7 @@ class EmbeddedPlayer(QWidget):
     def stop_mirror(self) -> None:
         """Tear the mirror down and hand the picture back to the docked
         surface. Safe to call when no mirror is active."""
+        _t_stop = time.monotonic()
         t = getattr(self, "_mirror_timer", None)
         if t is not None:
             t.stop()
@@ -2327,6 +2347,8 @@ class EmbeddedPlayer(QWidget):
         self._relayout_controls()
         self.video.update()
         self._reveal_sleep_badge()
+        log.info("VID mirror stop took %.0fms",
+                 (time.monotonic() - _t_stop) * 1000)
 
     def reveal_pop_overlays(self) -> None:
         """macOS/Windows pop-out hover: bring back the auto-hidden control bar
