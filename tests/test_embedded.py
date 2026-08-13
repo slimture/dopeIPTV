@@ -447,3 +447,79 @@ def test_a_pause_nobody_asked_for_is_cleared_but_a_real_one_is_not():
     p.current_url = None
     p._ensure_unpaused(4)
     assert p.video.mpv.pause is True
+
+
+def test_the_macos_mirror_settles_its_surface_after_a_fullscreen_resize():
+    """Going fullscreen resizes the mirror several times as the animation
+    runs, and on macOS a GL widget's backing framebuffer can stay bound to
+    the OLD window - frozen picture, audio fine, rendering reporting
+    success throughout. The player already carries this remedy for the
+    pop-out reparent; the mirror path never got it.
+
+    The settle is debounced, so only the LAST resize of a transition pays
+    for it, and it must never fire for the docked surface."""
+    from dopeiptv.media.embedded import _MpvGLWidget
+
+    class _Win:
+        def __init__(self):
+            self.repaints = 0
+
+        def repaint(self):
+            self.repaints += 1
+
+    class _M:
+        _settle_mirror_soon = _MpvGLWidget._settle_mirror_soon
+        _settle_mirror_surface = _MpvGLWidget._settle_mirror_surface
+
+        def __init__(self, mirror_of):
+            self._mirror_of = mirror_of
+            self._w, self._h = 1512, 917
+            self.resizes = []
+            self.updates = 0
+            self._win = _Win()
+
+        class _Sz:
+            def __init__(self, w, h):
+                self._w, self._h = w, h
+
+            def isValid(self):
+                return True
+
+            def width(self):
+                return self._w
+
+            def height(self):
+                return self._h
+
+        def size(self):
+            return self._Sz(self._w, self._h)
+
+        def resize(self, *a):
+            # Qt takes resize(w, h) and resize(QSize) alike; the code uses
+            # both, so the stub has to as well or the second call raises
+            # into the settle's own try/except and hides the failure.
+            w, h = (a[0].width(), a[0].height()) if len(a) == 1 else a
+            self.resizes.append((w, h))
+            self._w, self._h = w, h
+
+        def update(self):
+            self.updates += 1
+
+        def window(self):
+            return self._win
+
+    m = _M(mirror_of=object())
+    m._settle_mirror_surface()
+
+    # The 1 px nudge and back, then a SYNCHRONOUS host-window repaint - an
+    # async update loses the race with the stale layer.
+    assert m.resizes == [(1512, 916), (1512, 917)]
+    assert m.updates == 1
+    assert m._win.repaints == 1
+
+    # A surface with no real height is left alone rather than resized to 0.
+    m2 = _M(mirror_of=object())
+    m2._h = 1
+    m2._settle_mirror_surface()
+    assert m2.resizes == []
+    assert m2._win.repaints == 1

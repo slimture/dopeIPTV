@@ -600,6 +600,34 @@ class _MpvGLWidget(QOpenGLWidget):
                          self._ctx_id(QOpenGLContext.currentContext()),
                          self.defaultFramebufferObject(),
                          self.width(), self.height())
+            # Heartbeat, as the docked surface has. The mirror had none, so a
+            # log taken during a frozen fullscreen simply went quiet after
+            # "paint -> render" and could not say whether paints had stopped
+            # or the picture had merely stopped reaching the screen.
+            self._mpaint_n = getattr(self, "_mpaint_n", 0) + 1
+            if self._mpaint_n == 1:
+                self._mpaint_at = time.monotonic()
+            if self._mpaint_n % 300 == 0:
+                now = time.monotonic()
+                since = now - getattr(self, "_mpaint_at", now)
+                self._mpaint_at = now
+                src = self._mirror_of
+                m = getattr(src, "mpv", None) if src is not None else None
+
+                def _p(name):
+                    try:
+                        v = getattr(m, name)
+                        return "none" if v is None else v
+                    except Exception as e:
+                        return f"err:{type(e).__name__}"
+                log.debug("VID mirror alive #%d %.1f/s size=%dx%d fbo=%s "
+                          "frame=%s vf-fps=%s",
+                          self._mpaint_n,
+                          (300 / since if since > 0 else 0.0),
+                          self.width(), self.height(),
+                          self.defaultFramebufferObject(),
+                          _p("estimated_frame_number"),
+                          _p("estimated_vf_fps"))
         except Exception as e:
             if getattr(self, "_paint_state", "") != "fail":
                 self._paint_state = "fail"
@@ -774,6 +802,49 @@ class _MpvGLWidget(QOpenGLWidget):
         log.debug("VID resizeGL %dx%d fbo=%s glctx=%s", w, h,
                   self.defaultFramebufferObject(),
                   self._ctx_id(QOpenGLContext.currentContext()))
+        if self._mirror_of is not None and sys.platform == "darwin":
+            # Going fullscreen resizes this surface several times as the
+            # animation runs (720x388 -> 1512x917 -> 1512x949 -> 1512x917 in
+            # the report). Settle it once the resizes stop - see
+            # _settle_mirror_surface for why.
+            self._settle_mirror_soon()
+
+    def _settle_mirror_soon(self) -> None:
+        t = getattr(self, "_settle_timer", None)
+        if t is None:
+            t = self._settle_timer = QTimer(self)
+            t.setSingleShot(True)
+            t.timeout.connect(self._settle_mirror_surface)
+        t.start(250)          # re-armed by each resize; fires after the last
+
+    def _settle_mirror_surface(self) -> None:
+        """Rebuild this surface's backing store after a macOS fullscreen
+        transition.
+
+        The player already carries this remedy for the pop-out reparent, in
+        _settle_after_reparent: on macOS a GL widget's backing framebuffer
+        can stay bound to the OLD window and keep showing a frozen frame
+        while rendering reports success the whole time. Entering fullscreen
+        moves this mirror into a new window in exactly the same way, and
+        that path never got the fix - which matches the report: picture
+        frozen, audio fine, mpv rendering without a single error.
+
+        Pure widget geometry. mpv, the render context and the docked surface
+        are not touched."""
+        try:
+            sz = self.size()
+            if sz.isValid() and sz.height() > 1:
+                self.resize(sz.width(), sz.height() - 1)
+                self.resize(sz)
+            self.update()
+            win = self.window()
+            if win is not None:
+                win.repaint()      # synchronous: an async update can lose
+                                   # the race with the stale layer
+            log.info("VID mirror settled after fullscreen resize (%dx%d)",
+                     sz.width(), sz.height())
+        except Exception as e:
+            log.debug("mirror settle failed: %s", e)
 
     def shutdown(self) -> None:
         self._free_render_context("shutdown")
