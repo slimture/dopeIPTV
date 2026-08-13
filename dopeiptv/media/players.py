@@ -136,19 +136,33 @@ def launch_player(player: str, url: str, title: str | None = None,
                      start_new_session=True, env=_system_env())
 
 
-def _register_error_callback(mpv_instance: object, signal: pyqtSignal) -> None:
-    """Emit *signal* when a loaded file/stream ends with an error. Used by the
-    embedded player to surface a stream failure to the UI."""
+def _register_error_callback(mpv_instance: object, signal: pyqtSignal,
+                             eof_signal: pyqtSignal | None = None) -> None:
+    """Emit *signal* when a loaded file/stream ends with an error, and
+    *eof_signal* when one ends normally.
+
+    mpv's end-file event is the authoritative "this file is over" - it is
+    delivered exactly once, whatever the options say. The player also polls
+    the eof-reached property, but that one only ever becomes true while
+    keep-open is in force and only if a poll happens to catch it, so on its
+    own it is not something autoplay can be built on. Both routes funnel
+    through the same once-only guard in the player."""
     @mpv_instance.event_callback("end-file")
     def _on_end_file(evt):
         try:
             data = evt.data
-            if getattr(data, "reason", None) == _libmpv.MpvEventEndFile.ERROR:
+            reason = getattr(data, "reason", None)
+            if reason == _libmpv.MpvEventEndFile.ERROR:
                 try:
                     msg = _libmpv.ErrorCode.human_readable(data.error)
                 except Exception:
                     msg = "playback failed"
                 signal.emit(msg)
+            elif (reason == _libmpv.MpvEventEndFile.EOF
+                    and eof_signal is not None):
+                # Fires on mpv's event thread; Qt queues the emit onto the
+                # main thread, exactly as the error path above already does.
+                eof_signal.emit()
         except Exception:
             pass
 

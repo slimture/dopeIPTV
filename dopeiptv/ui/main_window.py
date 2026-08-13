@@ -3479,6 +3479,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _is_audio(self, path: str) -> bool:
         return str(path or "").lower().endswith(self.AUDIO_EXTS)
 
+    def _is_video(self, path: str) -> bool:
+        return str(path or "").lower().endswith(self.VIDEO_EXTS)
+
     def queue_add(self, items, play_next: bool = False) -> None:
         """Put tracks in the queue - at the front (play next) or the end."""
         rows = [it for it in (items or [])
@@ -3511,7 +3514,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         q = getattr(self, "_track_queue", []) or []
         i = getattr(self, "_track_index", -1)
         try:
-            pl.set_next_available(self._music_is_playing()
+            pl.set_next_available(self._local_is_playing()
                                   and bool(q) and i + 1 < len(q))
         except Exception:
             pass
@@ -3525,8 +3528,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         again, and a queue left over from earlier must not hijack them."""
         q = getattr(self, "_track_queue", []) or []
         i = getattr(self, "_track_index", -1)
-        if not self._music_is_playing():
-            log.info("queue: not stepping - music is not what is playing "
+        if not self._local_is_playing():
+            log.info("queue: not stepping - no local file is playing "
                      "(key=%r last=%r)", getattr(self, "_playing_key", None),
                      (getattr(self, "_last_playback", None) or {}).get("kind"))
             return False
@@ -3593,8 +3596,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             q.insert(here, row)
             self._track_queue = q
         elif here < 0:
+            # Same media family only: a folder holding both an album and a
+            # film must not roll from the last track into the film.
+            same = self._is_audio if self._is_audio(url) else self._is_video
             q = [r for r in (self.all_items or [])
-                 if not r.get("_header") and self._is_audio(r.get("_path"))]
+                 if not r.get("_header") and same(r.get("_path") or "")]
             here = next((n for n, t in enumerate(q)
                          if t.get("_path") == url), -1)
             if here < 0:
@@ -3603,16 +3609,42 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._queue_explicit = False
         self._track_index = here
 
-    def _music_is_playing(self) -> bool:
-        """Is a local audio file what the player is on right now?"""
+    def _local_is_playing(self) -> bool:
+        """Is a local file what the player is on right now? The queue is
+        only ever in charge then - with a channel or a provider film on,
+        prev/next mean the channel list again."""
         if getattr(self, "_playing_key", None) is None:
             return False
         lp = getattr(self, "_last_playback", None) or {}
-        return (lp.get("kind") == "local"
-                and self._is_audio(lp.get("url")))
+        return lp.get("kind") == "local"
+
+    def _music_is_playing(self) -> bool:
+        """Is a local audio file what the player is on right now?"""
+        lp = getattr(self, "_last_playback", None) or {}
+        return self._local_is_playing() and self._is_audio(lp.get("url"))
+
+    def _local_autoadvance_ok(self, url: str) -> bool:
+        """Should end-of-file roll on to the next local file?
+
+        Music always does - an album is meant to play through. Video only
+        when it is an EPISODE: either the file names one (S01E02 / 1x02)
+        or we are inside a local series. Nobody wants an unrelated film to
+        start because the one before it happened to end."""
+        if self._is_audio(url):
+            return True
+        if getattr(self, "_local_series", None):
+            return True
+        from .mw_local import episode_info
+        stem = os.path.splitext(os.path.basename(str(url or "")))[0]
+        return episode_info(stem) is not None
 
     def _queue_autoplay(self) -> bool:
-        """End of a track: roll on to the next queued one."""
+        """End of a track/episode: roll on to the next queued one."""
+        lp = getattr(self, "_last_playback", None) or {}
+        if not self._local_autoadvance_ok(lp.get("url") or ""):
+            log.info("queue: not auto-advancing past %r (not an episode)",
+                     lp.get("url"))
+            return False
         return self._queue_step(1)
 
     def open_queue(self) -> None:
@@ -5349,11 +5381,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 return
             self._reconnect_live("eof")
             return
-        if last and last.get("kind") == "local" \
-                and self._is_audio(last.get("url")):
-            went = self._queue_autoplay()      # albums play through
-            log.info("eof: local audio, queue autoplay -> %s "
-                     "(%d tracks, index %d)", went,
+        if last and last.get("kind") == "local":
+            # Albums play through, and so do local series - a local
+            # episode is kind "local", not "episode", so it never reached
+            # the episode branch below and simply stopped at every
+            # episode's end.
+            self._save_resume_position()
+            went = self._queue_autoplay()
+            log.info("eof: local file, queue autoplay -> %s "
+                     "(%d entries, index %d)", went,
                      len(getattr(self, "_track_queue", []) or []),
                      getattr(self, "_track_index", -1))
             return
@@ -5490,14 +5526,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # "if kind == local" it closed this block, so everything below
             # (including player.play()) fell into the else and every stream
             # opened in an external mpv window.
-            if kind == "local" and self._is_audio(url):
-                if item is not None:
+            if kind == "local":
+                if item is not None and self._is_audio(url):
                     # Show THIS track - a queue rolling on by itself must
                     # not leave the panel on the first one.
                     try:
                         self._show_detail(item)
                     except Exception as e:
                         log.debug("music detail refresh failed: %s", e)
+                # Video too, not just music: without a queue position a
+                # local episode had no "next" and every series stopped
+                # dead at the end of each episode.
                 self._place_in_queue(url, title, item)
                 self._sync_queue_buttons()
             # Replay with the same audio/subtitle tracks the user picked last

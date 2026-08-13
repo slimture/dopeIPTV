@@ -198,6 +198,9 @@ class _MpvGLWidget(QOpenGLWidget):
 
     frame_ready = pyqtSignal()
     playback_error = pyqtSignal(str)
+    # mpv's end-file event said the file ended normally. The authoritative
+    # end-of-playback signal; the polled eof-reached property is the backup.
+    eof_event = pyqtSignal()
     video_mouse_press = pyqtSignal(object)
     video_mouse_move = pyqtSignal(object)
     video_mouse_release = pyqtSignal(object)
@@ -509,7 +512,7 @@ class _MpvGLWidget(QOpenGLWidget):
                 log.debug("mpv option %r skipped: %s", key, e)
         log.info("mpv created, creating render context...")
         self._create_render_context()
-        _register_error_callback(self.mpv, self.playback_error)
+        _register_error_callback(self.mpv, self.playback_error, self.eof_event)
 
     def _create_render_context(self) -> None:
         """Build the mpv OpenGL render context against the CURRENT GL context.
@@ -2298,11 +2301,24 @@ class EmbeddedPlayer(QWidget):
         # and re-places against the settled geometry - both directions.
         QTimer.singleShot(0, self._settle_after_reparent)
 
+    def _on_mpv_eof(self) -> None:
+        """mpv says the file ended normally. Raise finished() once, sharing
+        the guard with the eof-reached poll so whichever notices first wins
+        and the other is a no-op."""
+        if self._stopping or self.current_url is None:
+            return          # a user-initiated stop is not an end of file
+        if self._eof_seen:
+            return
+        self._eof_seen = True
+        log.info("eof event: %s", self.current_url)
+        self.finished.emit()
+
     def _wire_video(self, w) -> None:
         """Connect a video widget's signals/filters to the player."""
         w.installEventFilter(self)
         w.setMouseTracking(True)
         w.playback_error.connect(self._on_playback_error)
+        w.eof_event.connect(self._on_mpv_eof)
         w.video_dbl_click.connect(self._on_video_dbl_click)
         w.video_mouse_press.connect(self._on_video_press)
         w.video_mouse_move.connect(self._on_video_move)

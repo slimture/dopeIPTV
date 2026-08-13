@@ -450,7 +450,10 @@ def test_the_play_queue_steps_and_wraps_an_album(tmp_path):
     class _Q:
         AUDIO_EXTS = MainWindow.AUDIO_EXTS
         _is_audio = MainWindow._is_audio
+        _is_video = MainWindow._is_video
         _music_is_playing = MainWindow._music_is_playing
+        _local_is_playing = MainWindow._local_is_playing
+        _local_autoadvance_ok = MainWindow._local_autoadvance_ok
         queue_add = MainWindow.queue_add
         _queue_step = MainWindow._queue_step
         _play_queued = MainWindow._play_queued
@@ -723,12 +726,17 @@ def test_a_left_over_queue_never_hijacks_tv_or_film():
 
     class _Q:
         AUDIO_EXTS = MainWindow.AUDIO_EXTS
+        VIDEO_EXTS = MainWindow.VIDEO_EXTS
         _is_audio = MainWindow._is_audio
+        _is_video = MainWindow._is_video
         _music_is_playing = MainWindow._music_is_playing
+        _local_is_playing = MainWindow._local_is_playing
+        _local_autoadvance_ok = MainWindow._local_autoadvance_ok
         _queue_step = MainWindow._queue_step
         _queue_autoplay = MainWindow._queue_autoplay
         _play_queued = MainWindow._play_queued
         _playing_key = "k"
+        _local_series = None
 
         def __init__(self):
             self._track_queue = [{"_path": "/m/01.flac", "name": "1"},
@@ -956,8 +964,12 @@ def _queue_stub():
 
     class _Q:
         AUDIO_EXTS = MainWindow.AUDIO_EXTS
+        VIDEO_EXTS = MainWindow.VIDEO_EXTS
         _is_audio = MainWindow._is_audio
+        _is_video = MainWindow._is_video
         _music_is_playing = MainWindow._music_is_playing
+        _local_is_playing = MainWindow._local_is_playing
+        _local_autoadvance_ok = MainWindow._local_autoadvance_ok
         queue_add = MainWindow.queue_add
         queue_clear = MainWindow.queue_clear
         _queue_step = MainWindow._queue_step
@@ -966,6 +978,7 @@ def _queue_stub():
         _place_in_queue = MainWindow._place_in_queue
         player = None
         _playing_key = "k"
+        _local_series = None
 
         def __init__(self):
             self._track_queue, self._track_index = [], -1
@@ -978,6 +991,9 @@ def _queue_stub():
             pass
 
         def _set_status(self, *_a, **_k):
+            pass
+
+        def _save_resume_position(self, *_a, **_k):
             pass
 
         def _start_playback(self, url, title, icon, key, kind, record=True,
@@ -1116,3 +1132,77 @@ def test_end_of_track_does_nothing_for_a_channel_or_a_film(tmp_path):
     w._last_playback = {"kind": "movie", "url": "/v/film.mkv"}
     w._on_player_finished()
     assert w.played == []
+
+
+def test_a_local_series_plays_the_next_episode(tmp_path):
+    """A local episode is kind "local", not "episode", so it never reached
+    the episode branch of the eof handler and every series stopped dead at
+    the end of each episode."""
+    from dopeiptv.ui.main_window import MainWindow
+
+    w = _queue_stub()
+    w._on_player_finished = MainWindow._on_player_finished.__get__(w)
+    w._playing_catchup = False
+
+    rows = []
+    for n in ("Show.S01E01.1080p.mkv", "Show.S01E02.1080p.mkv",
+              "Show.S01E03.1080p.mkv"):
+        p = tmp_path / n
+        p.write_bytes(b"x")
+        rows.append({"_path": str(p), "name": n})
+    w.all_items = rows
+
+    w._start_playback(rows[0]["_path"], "E01", None, rows[0]["_path"],
+                      "local", item=rows[0])
+    assert w._track_index == 0
+
+    w._on_player_finished()
+    assert w.played[-1] == rows[1]["_path"]
+    w._on_player_finished()
+    assert w.played[-1] == rows[2]["_path"]
+
+
+def test_one_film_ending_does_not_start_the_next_film(tmp_path):
+    """A folder of films is not a playlist: nobody wants an unrelated film
+    to start because the one before it happened to end."""
+    from dopeiptv.ui.main_window import MainWindow
+
+    w = _queue_stub()
+    w._on_player_finished = MainWindow._on_player_finished.__get__(w)
+    w._playing_catchup = False
+
+    rows = []
+    for n in ("Arrival.2016.1080p.mkv", "Dune.2021.1080p.mkv"):
+        p = tmp_path / n
+        p.write_bytes(b"x")
+        rows.append({"_path": str(p), "name": n})
+    w.all_items = rows
+
+    w._start_playback(rows[0]["_path"], "Arrival", None, rows[0]["_path"],
+                      "local", item=rows[0])
+    w._on_player_finished()
+    assert w.played == [rows[0]["_path"]]        # nothing followed it
+
+    # ...but inside a local series view, it rolls on.
+    w._local_series = "Some Show"
+    w._on_player_finished()
+    assert w.played[-1] == rows[1]["_path"]
+
+
+def test_an_album_never_rolls_on_into_a_film(tmp_path):
+    """A folder holding both music and a film must keep them apart."""
+    (tmp_path / "01.flac").write_bytes(b"x")
+    (tmp_path / "02.flac").write_bytes(b"x")
+    (tmp_path / "Film.2020.1080p.mkv").write_bytes(b"x")
+    rows = [{"_path": str(tmp_path / n), "name": n}
+            for n in ("01.flac", "02.flac", "Film.2020.1080p.mkv")]
+
+    w = _queue_stub()
+    w.all_items = rows
+    w._start_playback(rows[0]["_path"], "01", None, rows[0]["_path"],
+                      "local", item=rows[0])
+    assert [t["_path"] for t in w._track_queue] == \
+        [rows[0]["_path"], rows[1]["_path"]]     # the film is not in it
+    assert w._queue_autoplay() is True
+    assert w.played[-1] == rows[1]["_path"]
+    assert w._queue_autoplay() is False          # end of the album, no film
