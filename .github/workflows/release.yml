@@ -98,6 +98,13 @@ jobs:
           # x86_64: build on the oldest supported glibc (2.35) so it runs
           # everywhere from Ubuntu 22.04 up. PyQt6's x86_64 wheel is
           # manylinux_2_34, which 22.04 (glibc 2.35) satisfies.
+          #
+          # Deliberately the OLDEST image still offered, because that is what
+          # sets how old a distro the AppImage/.deb will run on - so this one
+          # stays until it has to move. Deprecation starts 2026-09-17 and it
+          # is gone by 2027-04-17; moving to 24.04 raises the glibc floor to
+          # 2.39 and drops Ubuntu 22.04 / Debian 12 users, so that is a
+          # decision to take deliberately, not to discover from a red build.
           - arch: x86_64
             runs_on: ubuntu-22.04
             test_distros: "ubuntu:22.04 ubuntu:24.04 debian:12"
@@ -379,8 +386,16 @@ jobs:
             *.deb
 
   # -------------------------------------------------- macOS .app + .dmg ---
-  # Builds on both Apple Silicon (macos-14, arm64) and Intel
+  # Builds on both Apple Silicon (macos-15, arm64) and Intel
   # (macos-15-intel, x86_64 - macos-13 was retired in Dec 2025).
+  #
+  # Both halves now run on macOS 15. Nothing here sets a deployment target,
+  # so the minimum macOS a .dmg supports follows the runner it was built on
+  # (Homebrew bottles are built per OS version, so pinning the target alone
+  # would not buy compatibility back). The Intel build already required 15
+  # because macos-15-intel is the only x86_64 image left; this brings the
+  # Apple Silicon build to the same floor instead of leaving it on a dying
+  # image.
   # Produces unsigned .dmgs - users need to right-click -> Open once to get past
   # Gatekeeper. Signing/notarising can be added later by putting DEVELOPER_ID /
   # APPLE_ID secrets in the repo and calling codesign / notarytool.
@@ -391,7 +406,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-14
+          # macos-14 entered deprecation on 2026-07-06: brownouts from
+          # 2026-10-05, gone entirely on 2026-11-02. Moved before it could
+          # do what macos-13 did to 1.2.8 - fail quietly and drop a .dmg
+          # from the release without anyone noticing.
+          - runner: macos-15
             arch: arm64
           # macos-13 (the old Intel image) was retired in Dec 2025 - a job
           # asking for it queues forever. macos-15-intel is its successor and

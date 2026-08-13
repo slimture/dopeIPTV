@@ -69,8 +69,10 @@ in-app SMB client to go wrong.
 ### Builds
 
 - **Windows on ARM64** gets a native build.
-- The Intel macOS build moved to the `macos-15-intel` runner, its retired
-  predecessor having queued forever.
+- Both macOS builds now run on macOS 15. The Intel one already did - it is
+  the only x86_64 image left - and the Apple Silicon one moved off an image
+  that is being retired in November. Nothing pins a deployment target, so a
+  .dmg supports macOS 15 and up.
 
 Full details in the [changelog](https://github.com/slimture/dopeIPTV/blob/main/CHANGELOG.md).
 
