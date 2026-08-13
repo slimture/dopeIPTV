@@ -86,7 +86,12 @@ function download_to(string $url, string $dest): bool {
 function classify(string $name): array {
     $n = strtolower($name);
     $arm = (strpos($n, 'arm') !== false || strpos($n, 'aarch64') !== false);
-    if (str_ends_with($n, '.dmg'))       return ['macOS · .dmg', 'Apple Silicon & Intel', '🍎'];
+    // One .dmg per architecture, and an arm64 build cannot launch on an Intel
+    // Mac at all - so each names the one machine it actually runs on. (This
+    // said "Apple Silicon & Intel" on both, left over from when there was a
+    // single universal image.)
+    if (str_ends_with($n, '.dmg'))
+        return ['macOS · .dmg', $arm ? 'Apple Silicon (M-series)' : 'Intel', '🍎'];
     if (str_ends_with($n, '.appimage'))  return ['Linux · AppImage', $arm ? 'ARM64 · portable' : 'x86_64 · portable', '🐧'];
     if (str_ends_with($n, '.deb'))       return ['Linux · .deb', 'Debian / Ubuntu' . ($arm ? ' (ARM64)' : ''), '🐧'];
     if (str_ends_with($n, '.rpm'))       return ['Linux · .rpm', 'Fedora / RHEL', '🐧'];
@@ -94,8 +99,11 @@ function classify(string $name): array {
     if (str_ends_with($n, '.pkg'))       return ['macOS · .pkg', 'installer', '🍎'];
     if (str_ends_with($n, '.exe') || str_ends_with($n, '.msi')) return ['Windows', 'installer', '🪟'];
     if (str_ends_with($n, '.zip')) {
+        // There is an ARM64 Windows build now, so the architecture cannot be
+        // hardcoded to x64 the way it was when there was only one.
         return (strpos($n, 'win') !== false)
-            ? ['Windows · portable', 'x64 · unzip &amp; run', '🪟']
+            ? ['Windows · portable',
+               ($arm ? 'ARM64' : 'x64') . ' · unzip &amp; run', '🪟']
             : ['Archive', 'zip', '📦'];
     }
     return [$name, '', '📦'];
@@ -147,6 +155,7 @@ if (!$hasLinux || !$hasMac || !$hasWin) {
 
 $assets  = [];
 $keep    = [];   // filenames we want to retain in files/
+$failed  = [];   // assets GitHub listed but we could not mirror
 
 foreach (($rel['assets'] ?? []) as $a) {
     // Never mirror an asset GitHub is still uploading.
@@ -168,6 +177,7 @@ foreach (($rel['assets'] ?? []) as $a) {
             @unlink($dest . '.part');
             fwrite(STDERR, "FAILED\n");
             unset($keep[$name]);
+            $failed[] = $name;
             continue;
         }
         rename($dest . '.part', $dest);   // atomic swap
@@ -194,6 +204,21 @@ foreach (($rel['assets'] ?? []) as $a) {
         'name'   => $name,
         'sha256' => $sha,
     ];
+}
+
+// --- Mirror gate ----------------------------------------------------------
+// The completeness gate above runs BEFORE any download and only inspects what
+// GitHub says exists. A download that then fails was simply skipped, and the
+// JSON was published without that installer - one flaky transfer and the
+// macOS Intel .dmg vanished from the site while everything else looked fine.
+// Nothing said so, because the file the page never lists is the file nobody
+// misses. Treat a failed mirror the same as a half-built release: keep what
+// is already published and try again on the next tick.
+if ($failed) {
+    fwrite(STDERR, "[sync] v$version: " . count($failed) . " asset(s) failed to"
+        . " mirror (" . implode(', ', $failed) . ") - keeping existing"
+        . " releases.json, retry next run\n");
+    exit(1);
 }
 
 // A standard SHA256SUMS file so users can run `sha256sum -c SHA256SUMS`.
