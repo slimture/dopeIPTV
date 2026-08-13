@@ -73,7 +73,7 @@ return [
     "dl_tip_total"  => "unduhan, semua versi",
     "dl_tip_row"  => "unduhan",
     "os_help_linux"   => "Tidak yakin? Ambil <b>AppImage</b> — berjalan di distribusi mana pun tanpa instalasi. Pilih <b>.deb</b> di Debian/Ubuntu. Pilih <b>Intel / AMD</b> kecuali Anda memakai mesin ARM (Raspberry Pi, server ARM).",
-    "os_help_macos"   => "Dua image: satu untuk Apple Silicon (seri M), satu untuk Mac Intel. Tidak yakin? Menu Apple → Mengenai Mac Ini.",
+    "os_help_macos"   => "Dua image: satu untuk Apple Silicon (seri M), satu untuk Mac Intel. Tidak yakin? Menu Apple → Mengenai Mac Ini. Memerlukan macOS 15 atau lebih baru.",
     "os_help_windows" => "Versi portabel — ekstrak dan jalankan, tidak ada yang perlu diinstal. Platform terbaru, masih dipoles.",
     "os_install_linux"   => "🐧 <b>AppImage:</b> jadikan dapat dieksekusi lalu jalankan — tidak ada yang perlu diinstal: <code>chmod +x dopeIPTV-*.AppImage &amp;&amp; ./dopeIPTV-*.AppImage</code>. <b>.deb</b> (Debian/Ubuntu): <code>sudo apt install ./dopeIPTV-*.deb</code>. <b>.rpm</b> (Fedora/RHEL): <code>sudo dnf install ./dopeIPTV-*.rpm</code>.",
     "os_install_macos"   => "🍎 Buka <code>.dmg</code> lalu seret dopeIPTV ke Applications. Karena aplikasi ini belum dinotarisasi (notarized) oleh Apple, peluncuran pertama mungkin diblokir — <b>klik kanan aplikasi → Open</b>, lalu <b>Open</b> pada dialog (atau izinkan di <b>System Settings → Privacy &amp; Security → Open Anyway</b>). Jika macOS malah mengatakan aplikasi <b>“rusak” (damaged)</b>, hapus penanda unduhan di Terminal: <code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code>. Aman — peringatan itu hanya berarti build belum ditandatangani.",

@@ -73,7 +73,7 @@ return [
     "dl_tip_total"  => "הורדות, כל הגרסאות",
     "dl_tip_row"  => "הורדות",
     "os_help_linux"   => "לא בטוחים? קחו את <b>AppImage</b> — הוא פועל בכל הפצה ללא התקנה. בחרו <b>.deb</b> ב-Debian/Ubuntu. קחו <b>Intel / AMD</b> אלא אם אתם על מכונת ARM (Raspberry Pi, שרת ARM).",
-    "os_help_macos"   => "שתי תמונות: אחת ל‑Apple Silicon (סדרת M) ואחת ל‑Mac עם Intel. לא בטוחים? תפריט Apple ← אודות ה‑Mac הזה.",
+    "os_help_macos"   => "שתי תמונות: אחת ל‑Apple Silicon (סדרת M) ואחת ל‑Mac עם Intel. לא בטוחים? תפריט Apple ← אודות ה‑Mac הזה. דורש macOS 15 ואילך.",
     "os_help_windows" => "גרסה ניידת — חלצו והריצו, אין מה להתקין. הפלטפורמה החדשה ביותר, עדיין בליטוש.",
     "os_install_linux"   => "🐧 <b>AppImage:</b> הפכו אותו לניתן להרצה והפעילו — אין מה להתקין: <code>chmod +x dopeIPTV-*.AppImage &amp;&amp; ./dopeIPTV-*.AppImage</code>. <b>.deb</b> (Debian/Ubuntu): <code>sudo apt install ./dopeIPTV-*.deb</code>. <b>.rpm</b> (Fedora/RHEL): <code>sudo dnf install ./dopeIPTV-*.rpm</code>.",
     "os_install_macos"   => "🍎 פתחו את <code>.dmg</code> וגררו את dopeIPTV אל Applications. מכיוון שהאפליקציה עדיין לא אושרה (notarized) על ידי Apple, ההפעלה הראשונה עשויה להיחסם — <b>לחיצה ימנית על האפליקציה ← Open</b>, ואז <b>Open</b> בתיבת הדו-שיח (או אפשרו אותה ב-<b>System Settings ← Privacy &amp; Security ← Open Anyway</b>). אם במקום זאת macOS אומר שהאפליקציה <b>„פגומה” (damaged)</b>, הסירו את סימון ההורדה ב-Terminal: <code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code>. זה בטוח — האזהרה פירושה רק שהבנייה אינה חתומה.",

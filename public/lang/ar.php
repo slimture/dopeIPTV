@@ -73,7 +73,7 @@ return [
     "dl_tip_total"  => "التنزيلات، كل الإصدارات",
     "dl_tip_row"  => "التنزيلات",
     "os_help_linux"   => "لست متأكدًا؟ خذ <b>AppImage</b> — يعمل على أي توزيعة دون تثبيت. اختر <b>.deb</b> على Debian/Ubuntu. اختر <b>Intel / AMD</b> ما لم تكن على جهاز ARM (Raspberry Pi، خادم ARM).",
-    "os_help_macos"   => "صورتان: واحدة لأجهزة Apple Silicon (سلسلة M) وأخرى لأجهزة Mac بمعالج Intel. غير متأكد؟ قائمة Apple ← حول هذا الـ Mac.",
+    "os_help_macos"   => "صورتان: واحدة لأجهزة Apple Silicon (سلسلة M) وأخرى لأجهزة Mac بمعالج Intel. غير متأكد؟ قائمة Apple ← حول هذا الـ Mac. يتطلب macOS 15 أو أحدث.",
     "os_help_windows" => "نسخة محمولة — فك الضغط وشغّل، لا شيء للتثبيت. أحدث منصة، وما زالت قيد الصقل.",
     "os_install_linux"   => "🐧 <b>AppImage:</b> اجعله قابلاً للتنفيذ وشغّله — لا شيء للتثبيت: <code>chmod +x dopeIPTV-*.AppImage &amp;&amp; ./dopeIPTV-*.AppImage</code>. <b>.deb</b> (Debian/Ubuntu): <code>sudo apt install ./dopeIPTV-*.deb</code>. <b>.rpm</b> (Fedora/RHEL): <code>sudo dnf install ./dopeIPTV-*.rpm</code>.",
     "os_install_macos"   => "🍎 افتح <code>.dmg</code> واسحب dopeIPTV إلى Applications. بما أن التطبيق لم يوثَّق بعد (notarized) من Apple، قد يُحظر التشغيل الأول — <b>انقر بزر الفأرة الأيمن على التطبيق ← Open</b>، ثم <b>Open</b> في مربع الحوار (أو اسمح به من <b>System Settings ← Privacy &amp; Security ← Open Anyway</b>). وإذا قال macOS بدلاً من ذلك إن التطبيق <b>«تالف» (damaged)</b>، فأزل علامة التنزيل في Terminal: <code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code>. إنه آمن — التحذير يعني فقط أن النسخة غير موقّعة.",

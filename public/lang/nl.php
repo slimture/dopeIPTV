@@ -73,7 +73,7 @@ return [
     "dl_tip_total"  => "downloads, alle versies",
     "dl_tip_row"  => "downloads",
     "os_help_linux"   => "Niet zeker? Neem de <b>AppImage</b> — die draait op elke distributie zonder installatie. Kies <b>.deb</b> op Debian/Ubuntu. Neem <b>Intel / AMD</b> tenzij je een ARM-machine hebt (Raspberry Pi, ARM-server).",
-    "os_help_macos"   => "Twee images: één voor Apple Silicon (M-serie), één voor Intel-Macs. Niet zeker? Apple-menu → Over deze Mac.",
+    "os_help_macos"   => "Twee images: één voor Apple Silicon (M-serie), één voor Intel-Macs. Niet zeker? Apple-menu → Over deze Mac. Vereist macOS 15 of nieuwer.",
     "os_help_windows" => "Draagbare build — uitpakken en uitvoeren, niets te installeren. Het nieuwste platform, nog volop in de afwerking.",
     "os_install_linux"   => "🐧 <b>AppImage:</b> maak het uitvoerbaar en start het — niets te installeren: <code>chmod +x dopeIPTV-*.AppImage &amp;&amp; ./dopeIPTV-*.AppImage</code>. <b>.deb</b> (Debian/Ubuntu): <code>sudo apt install ./dopeIPTV-*.deb</code>. <b>.rpm</b> (Fedora/RHEL): <code>sudo dnf install ./dopeIPTV-*.rpm</code>.",
     "os_install_macos"   => "🍎 Open de <code>.dmg</code> en sleep dopeIPTV naar Programma's. Omdat de app nog niet door Apple is genotariseerd (notarized), kan de eerste keer starten worden geblokkeerd — <b>klik met rechts op de app → Open</b>, en dan <b>Open</b> in het dialoogvenster (of sta het toe via <b>Systeeminstellingen → Privacy &amp; beveiliging → Toch openen</b>). Als macOS in plaats daarvan zegt dat de app <b>“beschadigd” (damaged)</b> is, verwijder dan de downloadmarkering in Terminal: <code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code>. Het is veilig — de waarschuwing betekent alleen dat de build niet ondertekend is.",

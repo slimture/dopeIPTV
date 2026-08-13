@@ -73,7 +73,7 @@ return [
     "dl_tip_total"  => "preuzimanja, sve verzije",
     "dl_tip_row"  => "preuzimanja",
     "os_help_linux"   => "Niste sigurni? Uzmite <b>AppImage</b> — radi na bilo kojoj distribuciji bez instalacije. Odaberite <b>.deb</b> na Debianu/Ubuntuu. Uzmite <b>Intel / AMD</b> osim ako imate ARM stroj (Raspberry Pi, ARM poslužitelj).",
-    "os_help_macos"   => "Dvije slike: jedna za Apple Silicon (M serija), jedna za Intel Macove. Niste sigurni? Apple izbornik → O ovom Macu.",
+    "os_help_macos"   => "Dvije slike: jedna za Apple Silicon (M serija), jedna za Intel Macove. Niste sigurni? Apple izbornik → O ovom Macu. Zahtijeva macOS 15 ili noviji.",
     "os_help_windows" => "Prijenosna verzija — raspakirajte i pokrenite, ništa za instalirati. Najnovija platforma, još u doradi.",
     "os_install_linux"   => "🐧 <b>AppImage:</b> učinite ga izvršnim i pokrenite — ništa za instalirati: <code>chmod +x dopeIPTV-*.AppImage &amp;&amp; ./dopeIPTV-*.AppImage</code>. <b>.deb</b> (Debian/Ubuntu): <code>sudo apt install ./dopeIPTV-*.deb</code>. <b>.rpm</b> (Fedora/RHEL): <code>sudo dnf install ./dopeIPTV-*.rpm</code>.",
     "os_install_macos"   => "🍎 Otvorite <code>.dmg</code> i povucite dopeIPTV u Aplikacije. Budući da aplikacija još nije ovjerena (notarized) od Applea, prvo pokretanje može biti blokirano — <b>desni klik na aplikaciju → Open</b>, zatim <b>Open</b> u dijaloškom okviru (ili je dopustite u <b>System Settings → Privacy &amp; Security → Open Anyway</b>). Ako umjesto toga macOS kaže da je aplikacija <b>„oštećena” (damaged)</b>, uklonite oznaku preuzimanja u Terminalu: <code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code>. Sigurno je — upozorenje samo znači da build nije potpisan.",

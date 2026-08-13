@@ -73,7 +73,7 @@ return [
     "dl_tip_total"  => "завантаження, всі версії",
     "dl_tip_row"  => "завантаження",
     "os_help_linux"   => "Не впевнені? Візьміть <b>AppImage</b> — він працює на будь-якому дистрибутиві без встановлення. Оберіть <b>.deb</b> на Debian/Ubuntu. Візьміть <b>Intel / AMD</b>, якщо у вас не машина ARM (Raspberry Pi, ARM-сервер).",
-    "os_help_macos"   => "Два образи: один для Apple Silicon (серія M), інший для Mac на Intel. Не впевнені? Меню Apple → Про цей Mac.",
+    "os_help_macos"   => "Два образи: один для Apple Silicon (серія M), інший для Mac на Intel. Не впевнені? Меню Apple → Про цей Mac. Потрібна macOS 15 або новіша.",
     "os_help_windows" => "Портативна збірка — розпакуйте й запустіть, нічого встановлювати не потрібно. Найновіша платформа, ще допрацьовується.",
     "os_install_linux"   => "🐧 <b>AppImage:</b> зробіть файл виконуваним і запустіть — нічого встановлювати не потрібно: <code>chmod +x dopeIPTV-*.AppImage &amp;&amp; ./dopeIPTV-*.AppImage</code>. <b>.deb</b> (Debian/Ubuntu): <code>sudo apt install ./dopeIPTV-*.deb</code>. <b>.rpm</b> (Fedora/RHEL): <code>sudo dnf install ./dopeIPTV-*.rpm</code>.",
     "os_install_macos"   => "🍎 Відкрийте <code>.dmg</code> і перетягніть dopeIPTV до Applications. Оскільки застосунок ще не завірений (notarized) Apple, перший запуск може бути заблокований — <b>клацніть застосунок правою кнопкою → Open</b>, потім <b>Open</b> у діалозі (або дозвольте в <b>System Settings → Privacy &amp; Security → Open Anyway</b>). Якщо ж macOS каже, що застосунок <b>«пошкоджений» (damaged)</b>, зніміть позначку завантаження в Terminal: <code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code>. Це безпечно — попередження лише означає, що збірка не підписана.",
