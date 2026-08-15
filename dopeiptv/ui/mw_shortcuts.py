@@ -134,6 +134,12 @@ class _ShortcutsMixin:
         for sid, default, _label in self.SHORTCUT_ACTIONS:
             seq = self.shortcut_sequence(sid, default)
             sc = QShortcut(QKeySequence(seq), self, activated=cbs[sid])
+            # Application-wide, not window-wide. Qt's default context only
+            # fires a shortcut while THIS window is the active one, and in
+            # fullscreen on macOS the active window is the pop-out mirror -
+            # so space did not pause, and nor did any other shortcut, in the
+            # one mode where they matter most.
+            sc.setContext(Qt.ShortcutContext.ApplicationShortcut)
             self._shortcuts[sid] = sc
 
     def apply_shortcuts(self) -> None:

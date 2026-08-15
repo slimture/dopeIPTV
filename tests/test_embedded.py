@@ -615,3 +615,75 @@ def test_the_mirror_settle_cannot_feed_itself():
     # no-op rather than another synchronous repaint.
     m._settle_mirror_soon()
     assert m.armed == 0
+
+
+def test_the_cursor_and_focus_follow_the_mirror_in_fullscreen():
+    """In fullscreen on macOS the picture lives in the MIRROR, in its own
+    window. Blanking the cursor on the player and the docked video left the
+    pointer visible over the video, and focusing the docked widget sent
+    every key press to the window nobody was looking at."""
+    from dopeiptv.media.embedded import EmbeddedPlayer
+
+    class _W:
+        def __init__(self, name):
+            self.name = name
+            self.cursor = None
+            self.focused = False
+
+        def setCursor(self, c):
+            self.cursor = c
+
+        def unsetCursor(self):
+            self.cursor = None
+
+        def setFocus(self, *_a):
+            self.focused = True
+
+    class _P:
+        _cursor_surfaces = EmbeddedPlayer._cursor_surfaces
+
+        def __init__(self, mirror=None):
+            self.video = _W("video")
+            self._mirror = mirror
+            self.cursor = None
+
+        def setCursor(self, c):
+            self.cursor = c
+
+        def unsetCursor(self):
+            self.cursor = None
+
+    # Docked: the player and the docked video, nothing else.
+    p = _P()
+    assert [getattr(w, "name", "player") for w in p._cursor_surfaces()] == \
+        ["player", "video"]
+
+    # Mirrored: the mirror is in the list, so it gets blanked too.
+    mirror = _W("mirror")
+    p = _P(mirror=mirror)
+    assert mirror in p._cursor_surfaces()
+
+    from PyQt6.QtCore import Qt as _Qt
+    for w in p._cursor_surfaces():
+        w.setCursor(_Qt.CursorShape.BlankCursor)
+    assert mirror.cursor == _Qt.CursorShape.BlankCursor
+
+    for w in p._cursor_surfaces():
+        w.unsetCursor()
+    assert mirror.cursor is None
+
+
+def test_shortcuts_are_application_wide_so_they_work_in_the_popout():
+    """Qt's default shortcut context only fires while THIS window is
+    active, and in fullscreen on macOS the active window is the pop-out
+    mirror - so space did not pause, and nor did anything else."""
+    import inspect
+
+    from PyQt6.QtCore import Qt as _Qt
+
+    from dopeiptv.ui.mw_shortcuts import _ShortcutsMixin
+
+    src = inspect.getsource(_ShortcutsMixin._install_shortcuts)
+    assert "ApplicationShortcut" in src, \
+        "every rebindable shortcut must be application-wide"
+    assert _Qt.ShortcutContext.ApplicationShortcut is not None

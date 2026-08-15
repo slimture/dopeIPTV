@@ -825,11 +825,19 @@ class _MpvGLWidget(QOpenGLWidget):
             t = self._settle_timer = QTimer(self)
             t.setSingleShot(True)
             t.timeout.connect(self._settle_mirror_surface)
-        # 450 ms, not 250: entering fullscreen lands on two sizes a moment
-        # apart (1512x917, then 1512x949 as the menu bar hides), and at 250
-        # each got its own settle - two synchronous full-window repaints per
-        # transition instead of one.
-        t.start(450)          # re-armed by each resize; fires after the last
+        # Short on purpose. The settle is not overhead ahead of the freeze -
+        # it is the CURE for it, so every millisecond of debounce is a
+        # millisecond of frozen picture. Measured on the reported stall:
+        # 2.2 settles per transition at 450 ms of waiting plus ~111 ms of
+        # work each, which is the "1-2 seconds" almost exactly. macOS goes
+        # fullscreen in two steps (1512x917, then 1512x949 as the menu bar
+        # hides) and both want curing, so collapsing them into one late
+        # settle is worse than doing two prompt ones.
+        #
+        # It cannot run away: _settling ignores the resizes the settle
+        # itself causes, and _settled_size ignores arriving at a size
+        # already cured. Real resizes per transition are a handful.
+        t.start(60)           # re-armed by each resize; fires after the last
 
     def _settle_mirror_surface(self) -> None:
         """Rebuild this surface's backing store after a macOS fullscreen
@@ -2755,12 +2763,16 @@ class EmbeddedPlayer(QWidget):
             self._hide_seek_overlay(force=True)
             self._lock_video_box()
             self._show_overlay()
-            self.video.setFocus(Qt.FocusReason.OtherFocusReason)
+            # Focus the surface that is actually on screen: with a mirror up
+            # the docked widget is behind a placeholder in another window,
+            # so focusing it sent every key press to the wrong window.
+            (getattr(self, "_mirror", None) or self.video).setFocus(
+                Qt.FocusReason.OtherFocusReason)
         else:
             self._hide_fs_ui()
             self._overlay_timer.stop()
-            self.unsetCursor()
-            self.video.unsetCursor()
+            for w in self._cursor_surfaces():
+                w.unsetCursor()
             self._mac_show_cursor()
             # The docked height is now a constant, not derived from
             # self.height(), so restoring it doesn't depend on the window
@@ -2769,6 +2781,19 @@ class EmbeddedPlayer(QWidget):
             # next tick to be robust against the transition ordering.
             self._lock_video_box()
             QTimer.singleShot(0, self._lock_video_box)
+
+    def _cursor_surfaces(self) -> list:
+        """Every surface the pointer can actually be over.
+
+        In fullscreen on macOS the picture lives in the MIRROR, in its own
+        window - so blanking the cursor on the player and the docked video
+        left the pointer sitting visibly over the video, which is what it
+        was doing there."""
+        out = [self, self.video]
+        m = getattr(self, "_mirror", None)
+        if m is not None:
+            out.append(m)
+        return out
 
     def _hide_fs_ui(self) -> None:
         # Never take the controls and cursor away under an open menu or
@@ -2782,12 +2807,12 @@ class EmbeddedPlayer(QWidget):
         self.overlay.hide()
         self.fs_controls.hide()
         if self._fs_ui:
-            self.setCursor(Qt.CursorShape.BlankCursor)
-            self.video.setCursor(Qt.CursorShape.BlankCursor)
+            for w in self._cursor_surfaces():
+                w.setCursor(Qt.CursorShape.BlankCursor)
 
     def _show_overlay(self) -> None:
-        self.unsetCursor()
-        self.video.unsetCursor()
+        for w in self._cursor_surfaces():
+            w.unsetCursor()
         if self._overlay_text:
             self.overlay.setText(self._overlay_text)
             self.overlay.show()
