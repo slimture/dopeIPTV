@@ -687,3 +687,73 @@ def test_shortcuts_are_application_wide_so_they_work_in_the_popout():
     assert "ApplicationShortcut" in src, \
         "every rebindable shortcut must be application-wide"
     assert _Qt.ShortcutContext.ApplicationShortcut is not None
+
+
+def test_the_next_episode_card_only_shows_near_the_end_of_an_episode():
+    """A card over the last minute, so the credits can be skipped with one
+    click. It must stay away everywhere else: no next episode queued, a
+    live channel (no duration), and anywhere but the end."""
+    from dopeiptv.media.embedded import EmbeddedPlayer
+
+    class _B:
+        def __init__(self):
+            self.shown = False
+            self.raised = 0
+
+        def isHidden(self):
+            return not self.shown
+
+        def show(self):
+            self.shown = True
+
+        def hide(self):
+            self.shown = False
+
+        def raise_(self):
+            self.raised += 1
+
+        def adjustSize(self):
+            pass
+
+    class _P:
+        NEXTUP_SECS = EmbeddedPlayer.NEXTUP_SECS
+        _update_nextup = EmbeddedPlayer._update_nextup
+        _hide_nextup = EmbeddedPlayer._hide_nextup
+
+        def __init__(self, has_next):
+            self.nextup_btn = _B()
+            self._next_available = has_next
+            self.placed = 0
+
+        def _place_nextup(self):
+            self.placed += 1
+
+    ep = _P(has_next=True)
+    ep._update_nextup(pos=100, dur=1800)          # middle of the episode
+    assert ep.nextup_btn.shown is False
+    ep._update_nextup(pos=1770, dur=1800)         # 30 s left
+    assert ep.nextup_btn.shown is True
+    assert ep.placed == 1
+    ep._update_nextup(pos=200, dur=1800)          # seeked back
+    assert ep.nextup_btn.shown is False
+
+    # Exactly at the threshold is inside the window; a whisker over is not.
+    ep._update_nextup(pos=1800 - EmbeddedPlayer.NEXTUP_SECS, dur=1800)
+    assert ep.nextup_btn.shown is True
+    ep._update_nextup(pos=1800 - EmbeddedPlayer.NEXTUP_SECS - 1, dur=1800)
+    assert ep.nextup_btn.shown is False
+
+    # The last episode of a series: nothing queued, so no card.
+    last = _P(has_next=False)
+    last._update_nextup(pos=1790, dur=1800)
+    assert last.nextup_btn.shown is False
+
+    # A live channel has no duration - the card must never appear.
+    live = _P(has_next=True)
+    live._update_nextup(pos=500, dur=0)
+    assert live.nextup_btn.shown is False
+
+    # And the end of the file is not "1 second left" - left must be > 0.
+    ended = _P(has_next=True)
+    ended._update_nextup(pos=1800, dur=1800)
+    assert ended.nextup_btn.shown is False

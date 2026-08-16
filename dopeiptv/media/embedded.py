@@ -1773,6 +1773,27 @@ class EmbeddedPlayer(QWidget):
         self.sleep_badge = QLabel("", self)
         self.sleep_badge.hide()
 
+        # "Next episode" card, over the picture for the last stretch of an
+        # episode, so the credits can be skipped with one click instead of
+        # being sat through. Deliberately NOT automatic: where the credits
+        # start varies per show, and cutting away from a scene nobody asked
+        # to leave is worse than a button.
+        #
+        # A sibling of the video, like the other overlays (see _blackout):
+        # a child of the GL widget is what froze the picture on reparent.
+        self.nextup_btn = QPushButton("⏭  " + tr("tooltip_next_episode"),
+                                      self, objectName="NextUp")
+        self.nextup_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.nextup_btn.setStyleSheet(
+            "QPushButton#NextUp { background: rgba(20,20,26,220);"
+            " color: #FFFFFF; border: 1px solid rgba(255,255,255,60);"
+            " border-radius: 8px; padding: 10px 16px; font-size: 13px;"
+            " font-weight: 600; }"
+            "QPushButton#NextUp:hover { background: rgba(40,40,50,235); }")
+        self.nextup_btn.clicked.connect(self._on_nextup_clicked)
+        self.nextup_btn.hide()
+        self._next_available = False
+
         # Live timeline for timeshift channels: a floating bar at the bottom of
         # the video with LIVE at the right edge. Drag left to scrub back into
         # the provider archive (opens a catch-up segment there). Shown only for
@@ -2155,7 +2176,8 @@ class EmbeddedPlayer(QWidget):
         # reparent them into the pop-out window and anchor placement to the
         # mirror. They're plain widgets, so moving them is safe.
         self._ov_surface = m
-        for ov in (self.seek_overlay, self.ts_timeline, self._stats_overlay):
+        for ov in (self.seek_overlay, self.ts_timeline, self._stats_overlay,
+                   self.nextup_btn):
             if ov is not None:
                 ov.setParent(parent)
                 ov.hide()
@@ -2341,7 +2363,8 @@ class EmbeddedPlayer(QWidget):
         self.video._render_suspended = False
         # Overlays back onto the docked player.
         self._ov_surface = self.video
-        for ov in (self.seek_overlay, self.ts_timeline, self._stats_overlay):
+        for ov in (self.seek_overlay, self.ts_timeline, self._stats_overlay,
+                   self.nextup_btn):
             if ov is not None:
                 ov.setParent(self)
                 ov.hide()
@@ -2744,14 +2767,59 @@ class EmbeddedPlayer(QWidget):
             self.overlay.setText(self._overlay_text)
             self._place_overlay()
 
+    # How close to the end the "Next episode" card appears. A minute is
+    # about where credits start on an hour-long episode and comfortably
+    # inside them on a half-hour one.
+    NEXTUP_SECS = 60
+
     def set_next_available(self, available: bool) -> None:
         """Show/hide the 'next episode' button in both control bars. The app
         calls this when it starts a stream, based on whether a next episode is
         queued in the current series."""
+        self._next_available = bool(available)
         for b in (getattr(self, "nextep_btn", None),
                   getattr(self, "fs_nextep_btn", None)):
             if b is not None:
                 b.setVisible(available)
+        if not available:
+            self._hide_nextup()
+
+    def _on_nextup_clicked(self) -> None:
+        self._hide_nextup()
+        self.next_episode.emit()
+
+    def _hide_nextup(self) -> None:
+        b = getattr(self, "nextup_btn", None)
+        if b is not None and not b.isHidden():
+            b.hide()
+
+    def _update_nextup(self, pos: float, dur: float) -> None:
+        """Show the card over the last NEXTUP_SECS of an episode.
+
+        Only where there IS a next episode and the length is known, so a
+        live channel (no duration) and the last episode of a series never
+        show it. Seeking back out of the window takes it away again."""
+        b = getattr(self, "nextup_btn", None)
+        if b is None:
+            return
+        left = (dur - pos) if (dur and dur > 0 and pos >= 0) else -1
+        if not (self._next_available and 0 < left <= self.NEXTUP_SECS):
+            self._hide_nextup()
+            return
+        if b.isHidden():
+            b.adjustSize()
+            b.show()
+        b.raise_()
+        self._place_nextup()
+
+    def _place_nextup(self) -> None:
+        """Bottom-right of whatever surface is showing the picture - the
+        docked video, or the mirror while popped out - clear of the seek
+        bar above it."""
+        b = self.nextup_btn
+        g = self._ov_surface.geometry()
+        b.adjustSize()
+        b.move(g.right() - b.width() - 24, g.bottom() - b.height() - 72)
 
     def set_fullscreen_ui(self, fullscreen: bool) -> None:
         log.info("VID set_fullscreen_ui(%s): video=%dx%d ctx=%s popout=%s",
@@ -3150,6 +3218,7 @@ class EmbeddedPlayer(QWidget):
             self._stopping = False
             self._stall_since = 0.0
             self._eof_seen = False
+            self._hide_nextup()     # new title: no stale card
             self._blackout.hide()
             self.video.set_blank(False)
             self.title_lbl.setText(title or "")
@@ -3778,6 +3847,7 @@ class EmbeddedPlayer(QWidget):
         except Exception:
             return
         self._sync_pause_label(paused)
+        self._update_nextup(float(pos or 0.0), float(dur or 0.0))
         # Freeze watchdog: mpv reports core-idle while it has nothing to render
         # (buffer starved / stream stalled). If that persists while we're not
         # paused, the stream has frozen - ask for a reconnect. Covers live too,
