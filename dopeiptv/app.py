@@ -55,21 +55,40 @@ from .core.stores import PlaylistStore
 from .ui.theme import ACCENT, apply_theme, build_style
 
 
-def make_app_icon() -> QIcon:
-    """Draw the app icon (rounded accent tile with a play triangle)."""
+# Apple draws a macOS app icon INSIDE its canvas, not edge to edge: the
+# rounded square is 824 pt on a 1024 pt canvas, so ~9.8% of each side is
+# transparent margin. Drawing full-bleed - which is right on Linux and
+# Windows - makes the Dock icon stand a quarter larger than every icon
+# beside it, because the Dock sizes by canvas and everyone else's canvas
+# carries that margin.
+MACOS_ICON_INSET = 0.098
+
+
+def make_app_icon(inset: float = 0.0, sizes=(256, 128, 64, 48, 32)) -> QIcon:
+    """Draw the app icon (rounded accent tile with a play triangle).
+
+    *inset* is the fraction of each side left as transparent margin; pass
+    MACOS_ICON_INSET for the .icns, 0 everywhere else.
+
+    *sizes* is every pixel size to render. QIcon.pixmap() never scales UP,
+    so a size not drawn here comes back as the largest one that was: asking
+    for 1024 got a 256 px image, and that is what the retina Dock icon was
+    built from."""
     icon = QIcon()
-    for s in (256, 128, 64, 48, 32):
+    for s in sizes:
         pm = QPixmap(s, s)
         pm.fill(Qt.GlobalColor.transparent)
         p = QPainter(pm)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        off = s * inset
+        side = s - 2 * off
         tile = QPainterPath()
-        tile.addRoundedRect(0, 0, s, s, s * 0.22, s * 0.22)
+        tile.addRoundedRect(off, off, side, side, side * 0.22, side * 0.22)
         p.fillPath(tile, QColor(ACCENT))
         tri = QPainterPath()
-        tri.moveTo(s * 0.40, s * 0.28)
-        tri.lineTo(s * 0.40, s * 0.72)
-        tri.lineTo(s * 0.76, s * 0.50)
+        tri.moveTo(off + side * 0.40, off + side * 0.28)
+        tri.lineTo(off + side * 0.40, off + side * 0.72)
+        tri.lineTo(off + side * 0.76, off + side * 0.50)
         tri.closeSubpath()
         p.fillPath(tri, QColor("white"))
         p.end()

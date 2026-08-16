@@ -192,3 +192,100 @@ def test_a_continue_watching_episode_still_builds_its_provider_url():
                               "_url": "http://stale/old.mp4",
                               "_series_ctx": {"series_id": 7}})
     assert f.played == [("http://srv/series/u/p/42.mp4", "episode")]
+
+
+def test_a_subtitle_choice_carries_to_the_next_episode():
+    """Picking Swedish subtitles on episode 1 means you want them on
+    episode 2. The choice was filed under the episode alone, so autoplay
+    moved on and it was gone."""
+    store = {}
+
+    class _S:
+        @staticmethod
+        def value(k, d=None):
+            return store.get(k, d)
+
+        @staticmethod
+        def setValue(k, v):
+            store[k] = v
+
+    f = SimpleNamespace()
+    f.settings = _S()
+    f.series_ctx = {"series_id": 7}
+    f._RESUMABLE = MainWindow._RESUMABLE
+    f._TRACK_PREFS_MAX = MainWindow._TRACK_PREFS_MAX
+    for n in ("_track_prefs", "_on_track_selected", "_series_pref_keys"):
+        setattr(f, n, getattr(MainWindow, n).__get__(f))
+
+    # Watching episode 1, the user picks a subtitle track.
+    f._last_playback = {"kind": "episode", "key": 101,
+                        "series_ctx": {"series_id": 7}}
+    f._on_track_selected("sid", 3)
+
+    prefs = f._track_prefs()
+    assert prefs["episode:101"]["sid"] == 3      # this episode
+    assert prefs["series:7"]["sid"] == 3         # and the show
+
+    # Episode 2 has its own key and no entry of its own - the series one
+    # is what carries the choice over.
+    assert "episode:102" not in prefs
+    f._last_playback = {"kind": "episode", "key": 102,
+                        "series_ctx": {"series_id": 7}}
+    assert f._series_pref_keys("episode") == ["series:7"]
+    assert prefs[f._series_pref_keys("episode")[0]]["sid"] == 3
+
+    # A different show is unaffected.
+    f._last_playback = {"kind": "episode", "key": 900,
+                        "series_ctx": {"series_id": 99}}
+    assert f._series_pref_keys("episode") == ["series:99"]
+    assert "series:99" not in prefs
+
+    # A movie has no series to file under, and must not grow a bogus key.
+    f._last_playback = {"kind": "movie", "key": 5, "series_ctx": None}
+    f.series_ctx = None
+    assert f._series_pref_keys("movie") == []
+    f._on_track_selected("aid", 2)
+    assert f._track_prefs()["movie:5"]["aid"] == 2
+
+
+def test_the_macos_icon_leaves_apples_margin_and_renders_full_size():
+    """Two things the Dock exposed: the tile was drawn edge to edge, so it
+    stood a quarter larger than every neighbour (Apple's is 824 of 1024),
+    and QIcon.pixmap() never scales UP, so asking for 1024 handed back the
+    256 px image the icon had actually been drawn at.
+
+    Run in a child: a QApplication built in-process fights the other tests
+    (same reasoning as tests/test_embedded.py)."""
+    import os
+    import subprocess
+    import sys
+
+    child = """
+import os
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from PyQt6.QtWidgets import QApplication
+from dopeiptv.app import MACOS_ICON_INSET, make_app_icon
+
+app = QApplication([])
+
+# Full-bleed everywhere else: the tile touches the canvas edge.
+plain = make_app_icon().pixmap(256, 256).toImage()
+assert plain.pixelColor(2, 128).alpha() > 0, "non-mac icon must be full bleed"
+
+# macOS: a transparent margin of roughly a tenth on each side, drawn at
+# the size actually asked for.
+mac = make_app_icon(inset=MACOS_ICON_INSET, sizes=(1024,)).pixmap(1024, 1024).toImage()
+assert mac.width() == 1024, "the icon must be drawn AT 1024, not upscaled"
+assert mac.pixelColor(2, 512).alpha() == 0, "no ink at the very edge"
+cols = [x for x in range(1024) if mac.pixelColor(x, 512).alpha() > 0]
+tile = (cols[-1] - cols[0] + 1) / 1024
+assert 0.78 <= tile <= 0.83, "tile is %.1f%% of canvas, want ~80.5%%" % (tile * 100)
+print("ICON_OK")
+"""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    proc = subprocess.run([sys.executable, "-c", child], capture_output=True,
+                          text=True, cwd=root, timeout=180,
+                          env=dict(os.environ, QT_QPA_PLATFORM="offscreen"))
+    assert "ICON_OK" in proc.stdout, (
+        f"icon check failed\nstdout={proc.stdout!r}\n"
+        f"stderr={proc.stderr[-1500:]!r}")

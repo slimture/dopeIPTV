@@ -5256,14 +5256,29 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if kind not in self._RESUMABLE or key is None:
             return
         prefs = self._track_prefs()
-        k = f"{kind}:{key}"
-        entry = prefs.pop(k, None)
-        entry = entry if isinstance(entry, dict) else {}
-        entry[prop] = tid
-        prefs[k] = entry            # re-insert = newest, for FIFO capping
+        # Filed under the episode AND under its series. Picking Swedish
+        # subtitles on episode 1 means you want them on episode 2, and a
+        # per-episode key alone could never say that - autoplay moved on
+        # and the choice was gone.
+        for k in [f"{kind}:{key}"] + self._series_pref_keys(kind):
+            entry = prefs.pop(k, None)
+            entry = entry if isinstance(entry, dict) else {}
+            entry[prop] = tid
+            prefs[k] = entry        # re-insert = newest, for FIFO capping
         while len(prefs) > self._TRACK_PREFS_MAX:
             prefs.pop(next(iter(prefs)))
         self.settings.setValue("track_prefs", json.dumps(prefs))
+
+    def _series_pref_keys(self, kind: str) -> list[str]:
+        """The series-wide track-preference key for what is playing, if it
+        belongs to a series at all. One entry per series, so a show is
+        remembered without 200 episodes crowding out everything else."""
+        if kind != "episode":
+            return []
+        lp = getattr(self, "_last_playback", None) or {}
+        ctx = lp.get("series_ctx") or self.series_ctx or {}
+        sid = ctx.get("series_id")
+        return [f"series:{sid}"] if sid is not None else []
 
     @staticmethod
     def _fmt_hms(seconds: float) -> str:
@@ -5552,7 +5567,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # Replay with the same audio/subtitle tracks the user picked last
             # time for this title (one-shot; play() consumes them).
             if kind in self._RESUMABLE:
-                pref = self._track_prefs().get(f"{kind}:{key}")
+                prefs = self._track_prefs()
+                # This exact title first; failing that, whatever was chosen
+                # for the series, so the next episode keeps the subtitles.
+                pref = prefs.get(f"{kind}:{key}")
+                if not isinstance(pref, dict):
+                    pref = next((prefs[k] for k in self._series_pref_keys(kind)
+                                 if isinstance(prefs.get(k), dict)), None)
                 if isinstance(pref, dict):
                     self.player.set_track_prefs(pref.get("aid"),
                                                 pref.get("sid"))
