@@ -716,7 +716,10 @@ def test_the_next_episode_card_only_shows_near_the_end_of_an_episode():
             pass
 
     class _P:
-        NEXTUP_SECS = EmbeddedPlayer.NEXTUP_SECS
+        NEXTUP_MIN_SECS = EmbeddedPlayer.NEXTUP_MIN_SECS
+        NEXTUP_MAX_SECS = EmbeddedPlayer.NEXTUP_MAX_SECS
+        NEXTUP_FRACTION = EmbeddedPlayer.NEXTUP_FRACTION
+        _nextup_window = EmbeddedPlayer._nextup_window
         _update_nextup = EmbeddedPlayer._update_nextup
         _hide_nextup = EmbeddedPlayer._hide_nextup
 
@@ -738,9 +741,10 @@ def test_the_next_episode_card_only_shows_near_the_end_of_an_episode():
     assert ep.nextup_btn.shown is False
 
     # Exactly at the threshold is inside the window; a whisker over is not.
-    ep._update_nextup(pos=1800 - EmbeddedPlayer.NEXTUP_SECS, dur=1800)
+    w = ep._nextup_window(1800)
+    ep._update_nextup(pos=1800 - w, dur=1800)
     assert ep.nextup_btn.shown is True
-    ep._update_nextup(pos=1800 - EmbeddedPlayer.NEXTUP_SECS - 1, dur=1800)
+    ep._update_nextup(pos=1800 - w - 1, dur=1800)
     assert ep.nextup_btn.shown is False
 
     # The last episode of a series: nothing queued, so no card.
@@ -757,3 +761,26 @@ def test_the_next_episode_card_only_shows_near_the_end_of_an_episode():
     ended = _P(has_next=True)
     ended._update_nextup(pos=1800, dur=1800)
     assert ended.nextup_btn.shown is False
+
+
+def test_the_next_episode_card_scales_its_lead_with_the_runtime():
+    """A fixed minute suits a sitcom and arrives well into the crawl of an
+    hour-long drama - which is what "it comes too late" was. Six percent of
+    the runtime, held between one and three minutes."""
+    from dopeiptv.media.embedded import EmbeddedPlayer as P
+
+    w = P._nextup_window
+    # Short: never less than a minute. The floor stops mattering just
+    # under 17 min (1000 s x 6% = 60 s).
+    assert w(P, 10 * 60) == 60
+    assert w(P, 16 * 60) == 60
+    assert w(P, 18 * 60) > 60
+    # A 22-minute sitcom, then a 30-minute one.
+    assert w(P, 22 * 60) == pytest.approx(79.2)
+    assert w(P, 30 * 60) == pytest.approx(108.0)
+    # Long: capped at three minutes, so an hour-long episode does not carry
+    # the card for five.
+    assert w(P, 50 * 60) == 180
+    assert w(P, 120 * 60) == 180
+    # A garbage duration cannot produce a negative or silly window.
+    assert w(P, 0) == 60

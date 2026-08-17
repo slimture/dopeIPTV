@@ -2767,10 +2767,23 @@ class EmbeddedPlayer(QWidget):
             self.overlay.setText(self._overlay_text)
             self._place_overlay()
 
-    # How close to the end the "Next episode" card appears. A minute is
-    # about where credits start on an hour-long episode and comfortably
-    # inside them on a half-hour one.
-    NEXTUP_SECS = 60
+    # How close to the end the "Next episode" card appears.
+    #
+    # Scaled, not fixed: end credits run roughly with the length of what
+    # they follow, so one minute that suits a sitcom arrives well into the
+    # crawl of an hour-long drama - which is what "it comes too late" was.
+    # Six percent of the runtime, held between one and three minutes:
+    # 60 s up to ~17 min, 79 s for a 22-min sitcom, 108 s at 30 min, and
+    # the full 180 s from 50 min up - which is where the complaint came
+    # from, an hour-long drama with a long crawl.
+    NEXTUP_MIN_SECS = 60
+    NEXTUP_MAX_SECS = 180
+    NEXTUP_FRACTION = 0.06
+
+    def _nextup_window(self, dur: float) -> float:
+        """Seconds before the end at which the card appears."""
+        return max(self.NEXTUP_MIN_SECS,
+                   min(self.NEXTUP_MAX_SECS, dur * self.NEXTUP_FRACTION))
 
     def set_next_available(self, available: bool) -> None:
         """Show/hide the 'next episode' button in both control bars. The app
@@ -2794,7 +2807,7 @@ class EmbeddedPlayer(QWidget):
             b.hide()
 
     def _update_nextup(self, pos: float, dur: float) -> None:
-        """Show the card over the last NEXTUP_SECS of an episode.
+        """Show the card over the closing stretch of an episode.
 
         Only where there IS a next episode and the length is known, so a
         live channel (no duration) and the last episode of a series never
@@ -2803,7 +2816,8 @@ class EmbeddedPlayer(QWidget):
         if b is None:
             return
         left = (dur - pos) if (dur and dur > 0 and pos >= 0) else -1
-        if not (self._next_available and 0 < left <= self.NEXTUP_SECS):
+        if not (self._next_available
+                and 0 < left <= self._nextup_window(dur)):
             self._hide_nextup()
             return
         if b.isHidden():
@@ -2814,12 +2828,26 @@ class EmbeddedPlayer(QWidget):
 
     def _place_nextup(self) -> None:
         """Bottom-right of whatever surface is showing the picture - the
-        docked video, or the mirror while popped out - clear of the seek
-        bar above it."""
+        docked video, or the mirror while popped out.
+
+        Mapped rather than read off geometry(): the card and the surface do
+        not always share a parent (docked the card sits on the player, in
+        the pop-out on the pop-out window), and geometry() is relative to
+        the SURFACE's parent. Reading it raw put the card adrift in the
+        middle of the picture."""
         b = self.nextup_btn
-        g = self._ov_surface.geometry()
+        surf = self._ov_surface
         b.adjustSize()
-        b.move(g.right() - b.width() - 24, g.bottom() - b.height() - 72)
+        par = b.parentWidget()
+        try:
+            tl = surf.mapTo(par, QPoint(0, 0)) if par is not None \
+                else surf.geometry().topLeft()
+        except (RuntimeError, TypeError):
+            tl = surf.geometry().topLeft()
+        # A generous inset: hard into the corner reads as a system control,
+        # and the seek bar lives just above the bottom edge.
+        b.move(tl.x() + surf.width() - b.width() - 28,
+               tl.y() + surf.height() - b.height() - 88)
 
     def set_fullscreen_ui(self, fullscreen: bool) -> None:
         log.info("VID set_fullscreen_ui(%s): video=%dx%d ctx=%s popout=%s",
