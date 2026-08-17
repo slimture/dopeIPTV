@@ -870,5 +870,6 @@
   "queue_show": "Mostra la coda…",
   "queue_clear": "Svuota la coda",
   "queue_added": "{n} aggiunti",
-  "local_art_online": "Cerca online le copertine mancanti"
+  "local_art_online": "Cerca online le copertine mancanti",
+  "setting_nextup_lead": "Mostra «Episodio successivo» prima della fine"
 }

@@ -870,5 +870,6 @@
   "queue_show": "Onyesha foleni…",
   "queue_clear": "Futa foleni",
   "queue_added": "Vimeongezwa {n}",
-  "local_art_online": "Tafuta mabango ya albamu yaliyokosekana mtandaoni"
+  "local_art_online": "Tafuta mabango ya albamu yaliyokosekana mtandaoni",
+  "setting_nextup_lead": "Onyesha \"Kipindi kijacho\" kabla ya mwisho"
 }

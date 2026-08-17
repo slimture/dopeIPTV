@@ -870,5 +870,6 @@
   "queue_show": "Visa kön…",
   "queue_clear": "Töm kön",
   "queue_added": "{n} tillagda i kön",
-  "local_art_online": "Hämta saknad albumkonst online"
+  "local_art_online": "Hämta saknad albumkonst online",
+  "setting_nextup_lead": "Visa ”Nästa avsnitt” före slutet"
 }

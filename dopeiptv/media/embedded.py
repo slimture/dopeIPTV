@@ -2767,23 +2767,25 @@ class EmbeddedPlayer(QWidget):
             self.overlay.setText(self._overlay_text)
             self._place_overlay()
 
-    # How close to the end the "Next episode" card appears.
+    # How close to the end the "Next episode" card appears, in seconds.
+    # The user's choice, from Settings > Playback; 0 turns the card off.
     #
-    # Scaled, not fixed: end credits run roughly with the length of what
-    # they follow, so one minute that suits a sitcom arrives well into the
-    # crawl of an hour-long drama - which is what "it comes too late" was.
-    # Six percent of the runtime, held between one and three minutes:
-    # 60 s up to ~17 min, 79 s for a 22-min sitcom, 108 s at 30 min, and
-    # the full 180 s from 50 min up - which is where the complaint came
-    # from, an hour-long drama with a long crawl.
-    NEXTUP_MIN_SECS = 60
-    NEXTUP_MAX_SECS = 180
-    NEXTUP_FRACTION = 0.06
+    # Not computed here any more. It was a fixed minute, then six percent of
+    # the runtime capped at three minutes, and the answer both times was
+    # "still too late" - because where the credits start is a property of
+    # the show, not of its length, and nothing in the file says where.
+    NEXTUP_DEFAULT_SECS = 180
 
     def _nextup_window(self, dur: float) -> float:
-        """Seconds before the end at which the card appears."""
-        return max(self.NEXTUP_MIN_SECS,
-                   min(self.NEXTUP_MAX_SECS, dur * self.NEXTUP_FRACTION))
+        """Seconds before the end at which the card appears, or 0 for off."""
+        try:
+            v = int(self._settings.value(
+                "nextup_lead_secs", self.NEXTUP_DEFAULT_SECS)) \
+                if self._settings else self.NEXTUP_DEFAULT_SECS
+        except (TypeError, ValueError):
+            v = self.NEXTUP_DEFAULT_SECS
+        # Never past the start of what it is offering to skip.
+        return max(0, min(v, dur * 0.5)) if dur > 0 else 0
 
     def set_next_available(self, available: bool) -> None:
         """Show/hide the 'next episode' button in both control bars. The app

@@ -870,5 +870,6 @@
   "queue_show": "Tampilkan antrean…",
   "queue_clear": "Kosongkan antrean",
   "queue_added": "{n} ditambahkan",
-  "local_art_online": "Cari sampul album yang hilang secara daring"
+  "local_art_online": "Cari sampul album yang hilang secara daring",
+  "setting_nextup_lead": "Tampilkan \"Episode berikutnya\" sebelum akhir"
 }

@@ -870,5 +870,6 @@
   "queue_show": "Hiện hàng đợi…",
   "queue_clear": "Xoá hàng đợi",
   "queue_added": "Đã thêm {n}",
-  "local_art_online": "Tìm ảnh bìa album còn thiếu trực tuyến"
+  "local_art_online": "Tìm ảnh bìa album còn thiếu trực tuyến",
+  "setting_nextup_lead": "Hiện \"Tập tiếp theo\" trước khi kết thúc"
 }

@@ -870,5 +870,6 @@
   "queue_show": "Prikaži red…",
   "queue_clear": "Očisti red",
   "queue_added": "Dodato: {n}",
-  "local_art_online": "Potraži omote koji nedostaju na internetu"
+  "local_art_online": "Potraži omote koji nedostaju na internetu",
+  "setting_nextup_lead": "Prikaži „Sledeća epizoda“ pre kraja"
 }

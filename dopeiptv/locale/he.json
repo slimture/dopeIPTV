@@ -870,5 +870,6 @@
   "queue_show": "הצגת התור…",
   "queue_clear": "ניקוי התור",
   "queue_added": "נוספו {n}",
-  "local_art_online": "חיפוש עטיפות אלבום חסרות ברשת"
+  "local_art_online": "חיפוש עטיפות אלבום חסרות ברשת",
+  "setting_nextup_lead": "הצג \"הפרק הבא\" לפני הסוף"
 }

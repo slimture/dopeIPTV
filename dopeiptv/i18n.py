@@ -161,6 +161,7 @@ _STRINGS: dict[str, dict[str, str]] = {
 
     "setting_autoplay_preview": {"en": "Auto-play preview on selection"},
     "setting_autoplay_next": {"en": "Auto-play next episode"},
+    "setting_nextup_lead": {"en": "Show \"Next episode\" before the end"},
     "setting_auto_reconnect": {"en": "Auto-reconnect live streams"},
     "setting_stream_format": {"en": "Live stream format"},
     "setting_audio_lang": {"en": "Preferred audio language"},

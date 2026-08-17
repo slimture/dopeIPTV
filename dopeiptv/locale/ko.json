@@ -870,5 +870,6 @@
   "queue_show": "대기열 보기…",
   "queue_clear": "대기열 비우기",
   "queue_added": "{n}개 추가됨",
-  "local_art_online": "없는 앨범 아트를 온라인에서 검색"
+  "local_art_online": "없는 앨범 아트를 온라인에서 검색",
+  "setting_nextup_lead": "끝나기 전에 \"다음 에피소드\" 표시"
 }

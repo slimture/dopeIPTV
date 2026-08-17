@@ -870,5 +870,6 @@
   "queue_show": "キューを表示…",
   "queue_clear": "キューを消去",
   "queue_added": "{n} 件追加",
-  "local_art_online": "不足しているアルバムアートをオンラインで検索"
+  "local_art_online": "不足しているアルバムアートをオンラインで検索",
+  "setting_nextup_lead": "終わりの前に「次のエピソード」を表示"
 }

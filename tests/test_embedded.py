@@ -716,10 +716,9 @@ def test_the_next_episode_card_only_shows_near_the_end_of_an_episode():
             pass
 
     class _P:
-        NEXTUP_MIN_SECS = EmbeddedPlayer.NEXTUP_MIN_SECS
-        NEXTUP_MAX_SECS = EmbeddedPlayer.NEXTUP_MAX_SECS
-        NEXTUP_FRACTION = EmbeddedPlayer.NEXTUP_FRACTION
+        NEXTUP_DEFAULT_SECS = EmbeddedPlayer.NEXTUP_DEFAULT_SECS
         _nextup_window = EmbeddedPlayer._nextup_window
+        _settings = None
         _update_nextup = EmbeddedPlayer._update_nextup
         _hide_nextup = EmbeddedPlayer._hide_nextup
 
@@ -763,24 +762,40 @@ def test_the_next_episode_card_only_shows_near_the_end_of_an_episode():
     assert ended.nextup_btn.shown is False
 
 
-def test_the_next_episode_card_scales_its_lead_with_the_runtime():
-    """A fixed minute suits a sitcom and arrives well into the crawl of an
-    hour-long drama - which is what "it comes too late" was. Six percent of
-    the runtime, held between one and three minutes."""
+def test_the_next_episode_lead_is_the_users_setting():
+    """Where the credits start is a property of the show, not of its
+    length: a fixed minute and then a runtime-scaled window were both
+    answered with "still too late". It is a setting now - and it must
+    never reach back past the halfway mark of what it offers to skip."""
     from dopeiptv.media.embedded import EmbeddedPlayer as P
 
-    w = P._nextup_window
-    # Short: never less than a minute. The floor stops mattering just
-    # under 17 min (1000 s x 6% = 60 s).
-    assert w(P, 10 * 60) == 60
-    assert w(P, 16 * 60) == 60
-    assert w(P, 18 * 60) > 60
-    # A 22-minute sitcom, then a 30-minute one.
-    assert w(P, 22 * 60) == pytest.approx(79.2)
-    assert w(P, 30 * 60) == pytest.approx(108.0)
-    # Long: capped at three minutes, so an hour-long episode does not carry
-    # the card for five.
-    assert w(P, 50 * 60) == 180
-    assert w(P, 120 * 60) == 180
-    # A garbage duration cannot produce a negative or silly window.
-    assert w(P, 0) == 60
+    class _S:
+        def __init__(self, v):
+            self.v = v
+
+        def value(self, k, d=None):
+            return self.v if k == "nextup_lead_secs" else d
+
+    class _W:
+        _nextup_window = P._nextup_window
+        NEXTUP_DEFAULT_SECS = P.NEXTUP_DEFAULT_SECS
+
+        def __init__(self, v):
+            self._settings = _S(v) if v is not None else None
+
+    hour = 55 * 60
+    assert _W("60")._nextup_window(hour) == 60
+    assert _W("300")._nextup_window(hour) == 300      # 5 min, as chosen
+    assert _W("600")._nextup_window(hour) == 600
+    assert _W("0")._nextup_window(hour) == 0          # off
+
+    # No settings object at all: the default, not a crash.
+    assert _W(None)._nextup_window(hour) == P.NEXTUP_DEFAULT_SECS
+    # Garbage in the store: the default, not a crash.
+    assert _W("nonsense")._nextup_window(hour) == P.NEXTUP_DEFAULT_SECS
+
+    # A 10-minute lead on a 6-minute clip would cover the whole thing -
+    # clamped to half.
+    assert _W("600")._nextup_window(6 * 60) == 180
+    # No duration (a live channel): no window, so no card.
+    assert _W("300")._nextup_window(0) == 0

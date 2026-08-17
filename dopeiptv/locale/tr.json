@@ -870,5 +870,6 @@
   "queue_show": "Sırayı göster…",
   "queue_clear": "Sırayı temizle",
   "queue_added": "{n} eklendi",
-  "local_art_online": "Eksik albüm kapaklarını çevrimiçi ara"
+  "local_art_online": "Eksik albüm kapaklarını çevrimiçi ara",
+  "setting_nextup_lead": "Bitmeden önce \"Sonraki bölüm\" göster"
 }

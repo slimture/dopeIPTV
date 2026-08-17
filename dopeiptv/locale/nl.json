@@ -870,5 +870,6 @@
   "queue_show": "Wachtrij tonen…",
   "queue_clear": "Wachtrij wissen",
   "queue_added": "{n} toegevoegd",
-  "local_art_online": "Ontbrekende albumhoezen online opzoeken"
+  "local_art_online": "Ontbrekende albumhoezen online opzoeken",
+  "setting_nextup_lead": "\"Volgende aflevering\" tonen vóór het einde"
 }

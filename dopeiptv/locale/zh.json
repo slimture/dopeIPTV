@@ -870,5 +870,6 @@
   "queue_show": "显示队列…",
   "queue_clear": "清空队列",
   "queue_added": "已加入 {n} 项",
-  "local_art_online": "在线查找缺失的专辑封面"
+  "local_art_online": "在线查找缺失的专辑封面",
+  "setting_nextup_lead": "在结束前显示“下一集”"
 }

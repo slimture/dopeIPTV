@@ -870,5 +870,6 @@
   "queue_show": "Pokaż kolejkę…",
   "queue_clear": "Wyczyść kolejkę",
   "queue_added": "Dodano {n}",
-  "local_art_online": "Szukaj brakujących okładek online"
+  "local_art_online": "Szukaj brakujących okładek online",
+  "setting_nextup_lead": "Pokaż „Następny odcinek” przed końcem"
 }

@@ -870,5 +870,6 @@
   "queue_show": "Mostrar la cola…",
   "queue_clear": "Vaciar la cola",
   "queue_added": "{n} añadidos",
-  "local_art_online": "Buscar carátulas que falten en línea"
+  "local_art_online": "Buscar carátulas que falten en línea",
+  "setting_nextup_lead": "Mostrar «Siguiente episodio» antes del final"
 }

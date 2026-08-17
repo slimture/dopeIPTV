@@ -567,6 +567,15 @@ class _SettingsMixin:
         autoplay_next_box = self._combo(
             [("true", tr("option_yes")), ("false", tr("option_no"))],
             self.settings.value("autoplay_next_episode", "true"))
+        # How early the "Next episode" card appears. A number the user picks
+        # rather than one guessed here: where the credits start varies from
+        # show to show, and two rounds of picking it for them landed on
+        # "still too late" both times.
+        nextup_box = self._combo(
+            [("0", tr("option_off"))]
+            + [(str(m * 60), tr("opt_minutes", n=m))
+               for m in (1, 2, 3, 5, 10)],
+            str(self.settings.value("nextup_lead_secs", "180")))
         autorecon_box = self._combo(
             [("true", tr("option_yes")), ("false", tr("option_no"))],
             self.settings.value("auto_reconnect_live", "true"))
@@ -667,6 +676,7 @@ class _SettingsMixin:
         section(tr("sec_playback"))
         pf.addRow(tr("setting_autoplay_preview"), autoplay_box)
         pf.addRow(tr("setting_autoplay_next"), autoplay_next_box)
+        pf.addRow(tr("setting_nextup_lead"), nextup_box)
         pf.addRow(tr("setting_auto_reconnect"), autorecon_box)
         pf.addRow(tr("set_upcoming_prompt"), upcoming_box)
         pf.addRow(tr("setting_stream_format"), fmt_box)
@@ -1712,6 +1722,8 @@ class _SettingsMixin:
                 "autoplay_preview", autoplay_box.currentData())
             self.settings.setValue(
                 "autoplay_next_episode", autoplay_next_box.currentData())
+            self.settings.setValue(
+                "nextup_lead_secs", nextup_box.currentData())
             self.settings.setValue(
                 "auto_reconnect_live", autorecon_box.currentData())
             self.settings.setValue(

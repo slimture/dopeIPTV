@@ -870,5 +870,6 @@
   "queue_show": "Mostrar a fila…",
   "queue_clear": "Limpar a fila",
   "queue_added": "{n} adicionados",
-  "local_art_online": "Buscar capas de álbum ausentes online"
+  "local_art_online": "Buscar capas de álbum ausentes online",
+  "setting_nextup_lead": "Mostrar «Próximo episódio» antes do fim"
 }

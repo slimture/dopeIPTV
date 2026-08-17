@@ -870,5 +870,6 @@
   "queue_show": "Afficher la file…",
   "queue_clear": "Vider la file",
   "queue_added": "{n} ajoutés",
-  "local_art_online": "Chercher les pochettes manquantes en ligne"
+  "local_art_online": "Chercher les pochettes manquantes en ligne",
+  "setting_nextup_lead": "Afficher « Épisode suivant » avant la fin"
 }
