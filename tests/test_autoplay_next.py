@@ -280,6 +280,17 @@ assert mac.pixelColor(2, 512).alpha() == 0, "no ink at the very edge"
 cols = [x for x in range(1024) if mac.pixelColor(x, 512).alpha() > 0]
 tile = (cols[-1] - cols[0] + 1) / 1024
 assert 0.78 <= tile <= 0.83, "tile is %.1f%% of canvas, want ~80.5%%" % (tile * 100)
+
+# The RUNTIME icon matters as much as the .icns: on macOS setWindowIcon
+# overrides the bundle icon in the Dock the moment the app starts, so a
+# full-bleed one here undoes the margin a second after launch. Check the
+# call main() actually makes, per platform.
+import re, inspect, dopeiptv.app as A
+src = inspect.getsource(A.main)
+assert "MACOS_ICON_INSET if _mac else 0.0" in src, \
+    "the runtime icon must carry Apple's margin on macOS"
+assert re.search(r"sizes=\(\(512", src), \
+    "the runtime icon must be drawn big enough for a retina Dock"
 print("ICON_OK")
 """
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

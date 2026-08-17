@@ -283,9 +283,20 @@ def main() -> int:
     # 64 MB keeps a large visible working set scaled exactly once.
     from PyQt6.QtGui import QPixmapCache
     QPixmapCache.setCacheLimit(64 * 1024)   # KB
-    icon = make_app_icon()
+    # On macOS setWindowIcon OVERRIDES the bundle's .icns in the Dock the
+    # moment the app starts, so giving the .icns Apple's margin was not
+    # enough on its own - this icon replaced it a second later and the Dock
+    # icon stayed a quarter larger than its neighbours. Same margin here,
+    # and drawn large enough for a retina Dock (it only ever went to 256).
+    _mac = sys.platform == "darwin"
+    icon = make_app_icon(
+        inset=MACOS_ICON_INSET if _mac else 0.0,
+        sizes=((512, 256, 128, 64, 48, 32) if _mac
+               else (256, 128, 64, 48, 32)))
     app.setWindowIcon(icon)
-    install_icon(icon)
+    # The XDG theme copy is Linux-only and wants no Apple margin.
+    if not _mac:
+        install_icon(icon)
     settings = QSettings(ORG, ORG)
     from .i18n import is_rtl, set_language
     set_language(settings.value("language", "en"))
