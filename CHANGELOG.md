@@ -5,6 +5,40 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
+## [1.2.10]
+
+A macOS release, plus a few things around watching a series in a row.
+
+### Fixed
+
+- **The picture no longer freezes on entering macOS fullscreen.** Audio
+  carried on while the image stood still - a second or two at best, until
+  you tabbed out and back at worst. Fullscreen moves the video into a new
+  window, and on macOS a GL surface can keep presenting the frame it had
+  in the old one while reporting success throughout. The remedy already
+  existed for the pop-out path and had never been wired to this one.
+- **Space pauses in fullscreen**, and so does every other shortcut. They
+  were window-scoped, and in fullscreen the active window is the one
+  showing the picture, so none of them fired there.
+- **The pointer hides in fullscreen**, having been hidden on the window
+  behind the picture rather than the one in front.
+- **The Dock icon is the same size as its neighbours.** Apple insets an
+  app icon within its canvas (824 of 1024) and ours was full-bleed. Fixed
+  in both places it is set - the bundle's .icns and the icon the running
+  app installs, which overrides it. It is also rendered above 256 px for
+  the first time, so a retina Dock is no longer upscaling.
+- **Subtitles carry to the next episode.** A track choice was filed under
+  the episode alone, so autoplay lost it immediately. It is remembered for
+  the series too.
+
+### Added
+
+- **A "Next episode" card** over the closing minutes of an episode, to
+  skip the credits in one click. How early it appears is a setting
+  (Settings > Playback: off, or one to ten minutes); it never advances on
+  its own, because where the credits start is a property of the show and
+  nothing in the file says where they are.
+
 ## [1.2.9]
 
 Your own files, played like everything else - and autoplay works again.
