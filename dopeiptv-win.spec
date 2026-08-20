@@ -84,6 +84,53 @@ _icon = os.path.join("packaging", "dopeIPTV.ico")
 icon = _icon if os.path.exists(_icon) else None
 
 
+def _version_file():
+    """Write a Windows VERSIONINFO resource and return its path.
+
+    An .exe with NO version resource - no company, no product, no
+    description - is one of the things Defender's heuristics weigh, and a
+    PyInstaller binary already starts from a bad reputation. Every real
+    Windows program carries this block; ours carried nothing.
+
+    It is not a cure on its own (see WINDOWS-README.txt: the actual fix is
+    an authenticode signature), but it is free and it is the one part of
+    the problem that lives in the build rather than in a certificate."""
+    import re
+    src = open(os.path.join("dopeiptv", "__init__.py"), encoding="utf-8").read()
+    m = re.search(r'^__version__ = "([^"]+)"', src, re.M)
+    ver = m.group(1) if m else "0.0.0"
+    parts = [int(x) for x in re.findall(r"\d+", ver)][:4]
+    parts += [0] * (4 - len(parts))
+    quad = ", ".join(str(p) for p in parts)
+    body = f"""VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=({quad}), prodvers=({quad}),
+    mask=0x3f, flags=0x0, OS=0x40004, fileType=0x1, subtype=0x0,
+    date=(0, 0)),
+  kids=[
+    StringFileInfo([StringTable('040904B0', [
+      StringStruct('CompanyName', 'dopeIPTV'),
+      StringStruct('FileDescription', 'dopeIPTV - IPTV player'),
+      StringStruct('FileVersion', '{ver}'),
+      StringStruct('InternalName', 'dopeiptv'),
+      StringStruct('LegalCopyright', 'GPL-3.0-or-later'),
+      StringStruct('OriginalFilename', 'dopeiptv.exe'),
+      StringStruct('ProductName', 'dopeIPTV'),
+      StringStruct('ProductVersion', '{ver}')])]),
+    VarFileInfo([VarStruct('Translation', [1033, 1200])])
+  ]
+)
+"""
+    path = os.path.join(tempfile.mkdtemp(prefix="dope-ver-"), "version_info.txt")
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(body)
+    print(f"Windows version resource: {ver}")
+    return path
+
+
+version_file = _version_file()
+
+
 a = Analysis(
     ['dopeiptv.py'],
     pathex=[],
@@ -118,6 +165,7 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=icon,
+    version=version_file,
 )
 coll = COLLECT(
     exe,

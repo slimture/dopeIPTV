@@ -671,7 +671,16 @@ jobs:
       - name: Python build deps
         shell: bash
         run: |
-          python -m pip install --upgrade pip pyinstaller pillow
+          python -m pip install --upgrade pip pillow
+          # Build PyInstaller's BOOTLOADER FROM SOURCE rather than taking the
+          # prebuilt wheel. Every PyInstaller app on earth ships the same
+          # prebuilt bootloader bytes, and that is what several engines -
+          # Defender included - carry signatures for, so an ordinary build
+          # gets reported as a trojan on first run. Compiling it here gives
+          # this binary its own bytes and clears the signature matches.
+          # (Heuristic and reputation flags are a separate problem; the fix
+          # for those is an authenticode signature, not a build flag.)
+          python -m pip install --upgrade --no-binary pyinstaller pyinstaller
           python -m pip install -r requirements.txt
       - name: Fetch libmpv (mpv-2.dll)
         shell: bash
