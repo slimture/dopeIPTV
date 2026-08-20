@@ -7,9 +7,22 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [1.2.10]
 
-A macOS release, plus a few things around watching a series in a row.
+macOS fullscreen and Windows antivirus, plus a few things around watching
+a series in a row.
 
 ### Fixed
+
+- **Windows Defender no longer deletes dopeiptv.exe before it starts.** A
+  false positive with two build-level causes. PyInstaller ships one
+  prebuilt launcher used by every app built with it, and several engines
+  hold signatures for those exact bytes, so the app was flagged for being
+  a PyInstaller build; it is now compiled from source. The .exe also
+  carried no VERSIONINFO resource at all, which weighs against a binary
+  heuristically - it now has company, product, description and version,
+  generated from `__version__` so it cannot drift. (onedir and no-UPX were
+  already right.) The remaining SmartScreen warning needs an authenticode
+  signature and a paid certificate; the shipped README covers what the
+  warning means and how to report the false positive to Microsoft.
 
 - **The picture no longer freezes on entering macOS fullscreen.** Audio
   carried on while the image stood still - a second or two at best, until

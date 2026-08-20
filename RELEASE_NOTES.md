@@ -1,7 +1,24 @@
 ## dopeIPTV 1.2.10
 
-A macOS release: fullscreen stopped freezing, and a few things around
-watching a series in a row.
+Fullscreen on macOS stopped freezing, Windows stopped being deleted by
+Defender, and a few things around watching a series in a row.
+
+### Windows
+
+- **Defender no longer removes dopeiptv.exe on sight.** It was a false
+  positive with two causes, both fixed here. PyInstaller ships the same
+  prebuilt launcher in every app built with it, and several engines carry
+  signatures for those bytes - so the app was detected for being a
+  PyInstaller build rather than for anything it does; that launcher is now
+  compiled from source, giving this binary its own bytes. And the .exe
+  carried no version resource at all - no company, product or description
+  - which is unusual enough for real software to count against it.
+
+  The remaining "unknown publisher" warning needs an authenticode
+  signature, which needs a paid certificate. Until then, the README in the
+  zip explains the warning, how to allow the app, and how to report the
+  false positive to Microsoft - which is what eventually clears it for
+  everyone.
 
 ### macOS fullscreen
 
