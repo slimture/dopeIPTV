@@ -60,11 +60,55 @@ repo hardcodes a real host or address.
    0,15,30,45 * * * * /usr/local/bin/php /path/to/sync-releases.php >> /var/log/iptv-sync.log 2>&1
    ```
 
-   Run it once by hand first to populate `files/` and `releases.json`. It only
-   downloads assets that are missing or changed, does atomic swaps, prunes files
-   no longer in the latest release, and keeps the page working (from the last
-   JSON) even if GitHub is unreachable. Set `GITHUB_TOKEN` in the environment to
-   raise the API rate limit if needed.
+   Run it once by hand first to populate `files/` and `releases.json` - **as
+   the same user the cron line names**, or the files land owned by root and
+   the next scheduled run cannot write over them:
+
+   ```sh
+   su -m www -c '/usr/local/bin/php /usr/local/www/iptv/sync-releases.php'
+   ```
+
+   It only downloads assets that are missing or changed, does atomic swaps,
+   prunes files no longer in the latest release, and keeps the page working
+   (from the last JSON) even if GitHub is unreachable - including when a
+   download fails halfway, which it treats as a half-built release rather than
+   publishing a list with an installer silently missing. Set `GITHUB_TOKEN` in
+   the environment to raise the API rate limit if needed.
+
+## Updating the site
+
+Copy the code, never the live data:
+
+```sh
+cd ~/dopeiptv
+git checkout website          # the site is NOT on main or testing
+git pull origin website
+cp -R public/. /usr/local/www/iptv/public/
+cp sync-releases.php /usr/local/www/iptv/
+```
+
+Three things on the server are live data that the repo does not carry, and a
+deploy must leave them alone:
+
+| | where | why |
+|---|---|---|
+| `downloads.json` | one level **above** the web root | the download counter, written by `dl.php` |
+| `public/releases.json` | written by the sync | git-ignored; a stale stub once replaced it and the page showed v0.7.0 |
+| `public/files/` | the mirrored installers | the repo has only a `.gitkeep` |
+
+**Do not use `cp -p`.** It preserves ownership and mode *from the checkout*,
+where everything belongs to root - which silently took `public/files/` away
+from the `www` user the cron sync runs as, and every asset then failed to
+mirror with "Permission denied". Plain `cp -R` overwrites file contents and
+leaves existing directories' ownership alone. If it has already happened:
+
+```sh
+chown -R www:www /usr/local/www/iptv/public/files/
+chown www:www /usr/local/www/iptv/public
+```
+
+`--delete` (rsync) is likewise never right here: the live data is absent from
+the source tree, so it would delete all of it.
 
 ## Still to add (drop-in, no code changes)
 
