@@ -20,7 +20,7 @@ return [
 
     // hero
     "hero_eyebrow" => "משדר · גרסה",
-    "hero_h1"      => "טלוויזיה חיה, catch-up והקלטות — באפליקציה <span class='hl'>שולחנית מקורית</span> אחת.",
+    "hero_h1"      => "<span class='hl'>נגן IPTV</span> בקוד פתוח ללינוקס — טלוויזיה חיה, EPG, טיימשיפט והקלטות.",
     "hero_lede"    => "נגן IPTV מהיר ומודרני עבור Xtream Codes &amp; M3U — עם מדריך EPG מלא, טיימשיפט וcatch-up חי, הקלטה בלחיצה אחת, וmultiview לעד תשעה ערוצים בו-זמנית. בנוי על mpv, נעשה עבור Linux — ופועל גם ב-macOS &amp; Windows.",
     "hero_cta"     => "הורדה עבור המערכת שלך",
     "hero_source"  => "צפייה בקוד המקור",

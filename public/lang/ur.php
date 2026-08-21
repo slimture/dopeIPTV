@@ -20,7 +20,7 @@ return [
 
     // hero
     "hero_eyebrow" => "نشر ہو رہا ہے · ورژن",
-    "hero_h1"      => "لائیو ٹی وی، catch-up اور ریکارڈنگز — ایک ہی <span class='hl'>مقامی ڈیسک ٹاپ</span> ایپ میں۔",
+    "hero_h1"      => "لینکس کے لیے اوپن سورس <span class='hl'>IPTV پلیئر</span> — لائیو ٹی وی، EPG، ٹائم شفٹ اور ریکارڈنگ۔",
     "hero_lede"    => "Xtream Codes &amp; M3U کے لیے ایک تیز، جدید IPTV پلیئر — مکمل EPG گائیڈ، لائیو ٹائم شفٹ اور catch-up، ایک کلک ریکارڈنگ، اور ایک ساتھ نو چینلز تک کے لیے multiview کے ساتھ۔ mpv پر بنایا گیا، Linux کے لیے بنایا گیا — اور macOS &amp; Windows پر بھی چلتا ہے۔",
     "hero_cta"     => "اپنے سسٹم کے لیے ڈاؤن لوڈ کریں",
     "hero_source"  => "سورس دیکھیں",

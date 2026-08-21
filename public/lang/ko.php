@@ -19,7 +19,7 @@ return [
 
     // hero
     "hero_eyebrow" => "방송 중 · 버전",
-    "hero_h1"      => "라이브 TV, catch-up, 녹화를 하나의 <span class='hl'>네이티브 데스크톱</span> 앱에서.",
+    "hero_h1"      => "리눅스를 위한 오픈 소스 <span class='hl'>IPTV 플레이어</span> — 라이브 TV, EPG, 타임시프트, 녹화.",
     "hero_lede"    => "Xtream Codes &amp; M3U를 위한 빠르고 현대적인 IPTV 플레이어 — 전체 EPG 가이드, 라이브 타임시프트와 catch-up, 원클릭 녹화, 최대 9개 채널 동시 멀티뷰를 제공합니다. mpv 기반으로 Linux용으로 제작되었으며 macOS &amp; Windows에서도 실행됩니다.",
     "hero_cta"     => "내 시스템용 다운로드",
     "hero_source"  => "소스 보기",

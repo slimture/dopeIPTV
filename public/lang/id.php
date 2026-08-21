@@ -20,7 +20,7 @@ return [
 
     // hero
     "hero_eyebrow" => "Sedang tayang · versi",
-    "hero_h1"      => "TV langsung, catch-up, dan rekaman — dalam satu aplikasi <span class='hl'>desktop native</span>.",
+    "hero_h1"      => "<span class='hl'>Pemutar IPTV</span> sumber terbuka untuk Linux — TV langsung, EPG, timeshift, dan rekaman.",
     "hero_lede"    => "Pemutar IPTV yang cepat dan modern untuk Xtream Codes &amp; M3U — dengan panduan EPG lengkap, timeshift dan catch-up langsung, perekaman satu klik, dan multiview untuk hingga sembilan saluran sekaligus. Dibangun di atas mpv, dibuat untuk Linux — dan juga berjalan di macOS &amp; Windows.",
     "hero_cta"     => "Unduh untuk sistem Anda",
     "hero_source"  => "Lihat kode sumber",

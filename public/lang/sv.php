@@ -20,7 +20,7 @@ return [
 
     // hero
     "hero_eyebrow" => "Sänds nu · version",
-    "hero_h1"      => "Live-TV, catch-up och inspelningar — i en <span class='hl'>inbyggd skrivbordsapp</span>.",
+    "hero_h1"      => "<span class='hl'>IPTV-spelaren</span> med öppen källkod för Linux — live-TV, EPG, timeshift och inspelningar.",
     "hero_lede"    => "En snabb, modern IPTV-spelare för Xtream Codes &amp; M3U — med komplett EPG-guide, timeshift och catch-up i realtid, inspelning med ett klick och multiview för upp till nio kanaler samtidigt. Byggd på mpv, gjord för Linux — och funkar även på macOS &amp; Windows.",
     "hero_cta"     => "Ladda ner för ditt system",
     "hero_source"  => "Visa källkoden",

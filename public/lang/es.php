@@ -19,7 +19,7 @@ return [
 
     // hero
     "hero_eyebrow" => "En directo · versión",
-    "hero_h1"      => "TV en directo, catch-up y grabaciones — en una sola app <span class='hl'>nativa de escritorio</span>.",
+    "hero_h1"      => "El <span class='hl'>reproductor IPTV</span> de código abierto para Linux — TV en directo, EPG, timeshift y grabaciones.",
     "hero_lede"    => "Un reproductor de IPTV rápido y moderno para Xtream Codes &amp; M3U — con guía EPG completa, timeshift y catch-up en directo, grabación con un clic y multiview para hasta nueve canales a la vez. Basado en mpv, hecho para Linux — y también funciona en macOS &amp; Windows.",
     "hero_cta"     => "Descargar para tu sistema",
     "hero_source"  => "Ver el código",

@@ -20,7 +20,7 @@ return [
 
     // hero
     "hero_eyebrow" => "U eteru · verzija",
-    "hero_h1"      => "Live TV, catch-up i snimke — u jednoj <span class='hl'>izvornoj desktop</span> aplikaciji.",
+    "hero_h1"      => "<span class='hl'>IPTV player</span> otvorenog koda za Linux — TV uživo, EPG, timeshift i snimke.",
     "hero_lede"    => "Brz, moderan IPTV player za Xtream Codes &amp; M3U — s potpunim EPG vodičem, live timeshiftom i catch-upom, snimanjem jednim klikom i multiviewom za do devet kanala istovremeno. Izgrađen na mpv-u, napravljen za Linux — i radi i na macOS-u &amp; Windowsu.",
     "hero_cta"     => "Preuzmi za svoj sustav",
     "hero_source"  => "Pogledaj izvorni kôd",

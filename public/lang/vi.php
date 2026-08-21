@@ -19,7 +19,7 @@ return [
 
     // hero
     "hero_eyebrow" => "Đang phát · phiên bản",
-    "hero_h1"      => "TV trực tiếp, xem lại và ghi hình — trong một ứng dụng <span class='hl'>máy tính để bàn gốc</span>.",
+    "hero_h1"      => "<span class='hl'>Trình phát IPTV</span> mã nguồn mở cho Linux — TV trực tiếp, EPG, timeshift và ghi hình.",
     "hero_lede"    => "Một trình phát IPTV nhanh, hiện đại cho Xtream Codes &amp; M3U — với hướng dẫn EPG đầy đủ, timeshift và catch-up trực tiếp, ghi hình một chạm và multiview cho tối đa chín kênh cùng lúc. Dựng trên mpv, tạo cho Linux — và cũng chạy trên macOS &amp; Windows.",
     "hero_cta"     => "Tải xuống cho hệ thống của bạn",
     "hero_source"  => "Xem mã nguồn",

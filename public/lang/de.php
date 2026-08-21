@@ -20,7 +20,7 @@ return [
 
     // hero
     "hero_eyebrow" => "Auf Sendung · Version",
-    "hero_h1"      => "Live-TV, Catch-up und Aufnahmen — in einer <span class='hl'>nativen Desktop-App</span>.",
+    "hero_h1"      => "Der Open-Source-<span class='hl'>IPTV-Player</span> für Linux — Live-TV, EPG, Timeshift und Aufnahmen.",
     "hero_lede"    => "Ein schneller, moderner IPTV-Player für Xtream Codes &amp; M3U — mit vollständigem EPG, Live-Timeshift und Catch-up, Aufnahme per Klick und Multiview für bis zu neun Kanäle gleichzeitig. Basiert auf mpv, gemacht für Linux — und läuft auch unter macOS &amp; Windows.",
     "hero_cta"     => "Für dein System herunterladen",
     "hero_source"  => "Quellcode ansehen",

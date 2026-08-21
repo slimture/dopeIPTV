@@ -20,7 +20,7 @@ return [
 
     // hero
     "hero_eyebrow" => "Na antenie · wersja",
-    "hero_h1"      => "Telewizja na żywo, catch-up i nagrania — w jednej <span class='hl'>natywnej aplikacji desktopowej</span>.",
+    "hero_h1"      => "<span class='hl'>Odtwarzacz IPTV</span> open source dla Linuksa — telewizja na żywo, EPG, timeshift i nagrania.",
     "hero_lede"    => "Szybki, nowoczesny odtwarzacz IPTV dla Xtream Codes &amp; M3U — z pełnym przewodnikiem EPG, timeshift i catch-up na żywo, nagrywaniem jednym kliknięciem i multiview dla maksymalnie dziewięciu kanałów naraz. Oparty na mpv, stworzony dla Linuksa — działa też na macOS &amp; Windows.",
     "hero_cta"     => "Pobierz dla swojego systemu",
     "hero_source"  => "Zobacz kod źródłowy",

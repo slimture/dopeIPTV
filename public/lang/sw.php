@@ -20,7 +20,7 @@ return [
 
     // hero
     "hero_eyebrow" => "Inarushwa hewani · toleo",
-    "hero_h1"      => "TV ya moja kwa moja, catch-up na rekodi — katika programu moja ya <span class='hl'>eneo-kazi asilia</span>.",
+    "hero_h1"      => "<span class='hl'>Kichezaji IPTV</span> chanzo huria kwa Linux — TV ya moja kwa moja, EPG, timeshift na rekodi.",
     "hero_lede"    => "Kicheza IPTV chenye kasi na cha kisasa kwa Xtream Codes &amp; M3U — chenye mwongozo kamili wa EPG, timeshift na catch-up ya moja kwa moja, kurekodi kwa mbofyo mmoja, na multiview kwa hadi chaneli tisa kwa wakati mmoja. Kimejengwa juu ya mpv, kimeundwa kwa Linux — na hufanya kazi pia kwenye macOS &amp; Windows.",
     "hero_cta"     => "Pakua kwa mfumo wako",
     "hero_source"  => "Ona msimbo wa chanzo",

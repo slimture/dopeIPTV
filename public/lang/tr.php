@@ -20,7 +20,7 @@ return [
 
     // hero
     "hero_eyebrow" => "Yayında · sürüm",
-    "hero_h1"      => "Canlı TV, catch-up ve kayıtlar — tek bir <span class='hl'>yerel masaüstü</span> uygulamasında.",
+    "hero_h1"      => "Linux için açık kaynak <span class='hl'>IPTV oynatıcı</span> — canlı TV, EPG, timeshift ve kayıtlar.",
     "hero_lede"    => "Xtream Codes &amp; M3U için hızlı ve modern bir IPTV oynatıcı — tam EPG rehberi, canlı timeshift ve catch-up, tek tıkla kayıt ve aynı anda dokuz kanala kadar multiview ile. mpv üzerine kurulu, Linux için yapıldı — ve macOS &amp; Windows'ta da çalışır.",
     "hero_cta"     => "Sisteminiz için indirin",
     "hero_source"  => "Kaynağı görüntüle",

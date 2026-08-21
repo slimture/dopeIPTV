@@ -20,7 +20,7 @@ return [
 
     // hero
     "hero_eyebrow" => "放送中 · バージョン",
-    "hero_h1"      => "ライブ TV、キャッチアップ、録画を——ひとつの<span class='hl'>ネイティブデスクトップ</span>アプリで。",
+    "hero_h1"      => "Linux 向けオープンソース <span class='hl'>IPTV プレーヤー</span> — ライブ TV、EPG、タイムシフト、録画。",
     "hero_lede"    => "Xtream Codes &amp; M3U に対応した、高速でモダンな IPTV プレーヤー。フル EPG ガイド、ライブタイムシフトとキャッチアップ、ワンクリック録画、最大 9 チャンネル同時のマルチビューを搭載。mpv 上に構築され、Linux 向けに作られ、macOS &amp; Windows でも動作します。",
     "hero_cta"     => "お使いのシステム用にダウンロード",
     "hero_source"  => "ソースを見る",

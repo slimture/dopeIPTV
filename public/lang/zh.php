@@ -19,7 +19,7 @@ return [
 
     // hero
     "hero_eyebrow" => "正在直播 · 版本",
-    "hero_h1"      => "直播、回看与录制——尽在一个<span class='hl'>原生桌面</span>应用中。",
+    "hero_h1"      => "面向 Linux 的开源 <span class='hl'>IPTV 播放器</span> — 直播电视、EPG、时移与录制。",
     "hero_lede"    => "一款快速、现代的 IPTV 播放器，支持 Xtream Codes 和 M3U——具有完整的 EPG 节目指南、实时时移与回看、一键录制，以及同时最多九个频道的多画面。基于 mpv 构建，为 Linux 打造——也可在 macOS 和 Windows 上运行。",
     "hero_cta"     => "为你的系统下载",
     "hero_source"  => "查看源代码",

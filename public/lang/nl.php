@@ -20,7 +20,7 @@ return [
 
     // hero
     "hero_eyebrow" => "Op zender · versie",
-    "hero_h1"      => "Live-tv, catch-up en opnames — in één <span class='hl'>native desktop-app</span>.",
+    "hero_h1"      => "De open source <span class='hl'>IPTV-speler</span> voor Linux — live tv, EPG, timeshift en opnames.",
     "hero_lede"    => "Een snelle, moderne IPTV-speler voor Xtream Codes &amp; M3U — met een volledige EPG-gids, live timeshift en catch-up, opname met één klik en multiview voor maximaal negen kanalen tegelijk. Gebouwd op mpv, gemaakt voor Linux — en draait ook op macOS &amp; Windows.",
     "hero_cta"     => "Downloaden voor jouw systeem",
     "hero_source"  => "Broncode bekijken",

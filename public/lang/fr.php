@@ -20,7 +20,7 @@ return [
 
     // hero
     "hero_eyebrow" => "À l'antenne · version",
-    "hero_h1"      => "TV en direct, catch-up et enregistrements — dans une seule application <span class='hl'>de bureau native</span>.",
+    "hero_h1"      => "Le <span class='hl'>lecteur IPTV</span> open source pour Linux — TV en direct, EPG, timeshift et enregistrements.",
     "hero_lede"    => "Un lecteur IPTV rapide et moderne pour Xtream Codes &amp; M3U — avec guide EPG complet, timeshift et catch-up en direct, enregistrement en un clic et multiview jusqu'à neuf chaînes à la fois. Basé sur mpv, conçu pour Linux — et fonctionne aussi sous macOS &amp; Windows.",
     "hero_cta"     => "Télécharger pour votre système",
     "hero_source"  => "Voir le code source",

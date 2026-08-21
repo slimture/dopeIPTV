@@ -20,7 +20,7 @@ return [
 
     // hero
     "hero_eyebrow" => "Στον αέρα · έκδοση",
-    "hero_h1"      => "Ζωντανή TV, catch-up και εγγραφές — σε μία <span class='hl'>εγγενή εφαρμογή υπολογιστή</span>.",
+    "hero_h1"      => "Το <span class='hl'>IPTV player</span> ανοιχτού κώδικα για Linux — ζωντανή TV, EPG, timeshift και εγγραφές.",
     "hero_lede"    => "Ένα γρήγορο, μοντέρνο πρόγραμμα αναπαραγωγής IPTV για Xtream Codes &amp; M3U — με πλήρη οδηγό EPG, ζωντανό timeshift και catch-up, εγγραφή με ένα κλικ και multiview για έως εννέα κανάλια ταυτόχρονα. Βασισμένο στο mpv, φτιαγμένο για Linux — και λειτουργεί και σε macOS &amp; Windows.",
     "hero_cta"     => "Λήψη για το σύστημά σας",
     "hero_source"  => "Προβολή κώδικα",

@@ -20,7 +20,7 @@ return [
 
     // hero
     "hero_eyebrow" => "В эфире · версия",
-    "hero_h1"      => "Прямой эфир, catch-up и записи — в одном <span class='hl'>нативном настольном</span> приложении.",
+    "hero_h1"      => "<span class='hl'>IPTV-плеер</span> с открытым исходным кодом для Linux — прямой эфир, EPG, таймшифт и записи.",
     "hero_lede"    => "Быстрый современный IPTV-плеер для Xtream Codes &amp; M3U — с полным телегидом EPG, живым timeshift и catch-up, записью в один клик и multiview для до девяти каналов одновременно. Построен на mpv, создан для Linux — и работает также на macOS &amp; Windows.",
     "hero_cta"     => "Скачать для вашей системы",
     "hero_source"  => "Посмотреть исходный код",

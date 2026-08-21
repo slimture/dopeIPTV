@@ -20,7 +20,7 @@ return [
 
     // hero
     "hero_eyebrow" => "على الهواء · الإصدار",
-    "hero_h1"      => "تلفزيون مباشر وcatch-up وتسجيلات — في تطبيق <span class='hl'>سطح مكتب أصلي</span> واحد.",
+    "hero_h1"      => "<span class='hl'>مشغّل IPTV</span> مفتوح المصدر للينكس — بث مباشر وEPG وتحويل زمني وتسجيلات.",
     "hero_lede"    => "مشغّل IPTV سريع وعصري لـ Xtream Codes &amp; M3U — مع دليل EPG كامل، وtimeshift وcatch-up مباشر، وتسجيل بنقرة واحدة، وmultiview لما يصل إلى تسع قنوات في وقت واحد. مبني على mpv، ومصمم للينكس — ويعمل أيضًا على macOS &amp; Windows.",
     "hero_cta"     => "التنزيل لنظامك",
     "hero_source"  => "عرض المصدر",

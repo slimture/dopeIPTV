@@ -20,7 +20,7 @@ return [
 
     // hero
     "hero_eyebrow" => "روی آنتن · نسخه",
-    "hero_h1"      => "تلویزیون زنده، catch-up و ضبط‌ها — در یک اپلیکیشن <span class='hl'>دسکتاپ بومی</span> واحد.",
+    "hero_h1"      => "<span class='hl'>پخش‌کننده IPTV</span> متن‌باز برای لینوکس — تلویزیون زنده، EPG، تایم‌شیفت و ضبط.",
     "hero_lede"    => "یک پخش‌کننده IPTV سریع و مدرن برای Xtream Codes &amp; M3U — با راهنمای کامل EPG، timeshift و catch-up زنده، ضبط با یک کلیک و multiview برای تا نه کانال همزمان. ساخته‌شده بر پایه mpv، برای لینوکس — و روی macOS &amp; Windows هم اجرا می‌شود.",
     "hero_cta"     => "دانلود برای سیستم شما",
     "hero_source"  => "مشاهده کد منبع",

@@ -20,7 +20,7 @@ return [
 
     // hero
     "hero_eyebrow" => "U programu · verzija",
-    "hero_h1"      => "Live TV, catch-up i snimci — u jednoj <span class='hl'>izvornoj desktop</span> aplikaciji.",
+    "hero_h1"      => "<span class='hl'>IPTV plejer</span> otvorenog koda za Linux — TV uživo, EPG, tajmšift i snimci.",
     "hero_lede"    => "Brz, moderan IPTV plejer za Xtream Codes &amp; M3U — sa potpunim EPG vodičem, live timeshiftom i catch-upom, snimanjem jednim klikom i multiview za do devet kanala istovremeno. Izgrađen na mpv-u, napravljen za Linux — i radi i na macOS-u &amp; Windowsu.",
     "hero_cta"     => "Preuzmi za svoj sistem",
     "hero_source"  => "Pogledaj izvorni kôd",
