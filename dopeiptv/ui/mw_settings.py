@@ -285,9 +285,15 @@ class _SettingsMixin:
             self.grid_btn.blockSignals(False)
         # Combined views must rebuild (grid drops their headers, list keeps
         # them); every other view just re-filters the current items.
-        if self._is_combined_view(getattr(self, "_current_cat", None)):
-            log.info("view settings: rebuilding via _load_items(%r)",
-                     getattr(self, "_current_cat", None))
+        # ...but NEVER while drilled into a series. Favorites' "All" and
+        # Watched are combined views, so a grid toggle there rebuilt the
+        # category - putting the favourites list back on screen while
+        # series_ctx still said "inside a series". The two then disagreed:
+        # the rows were series, the state said episodes, and a double-click
+        # built an episode URL from a series row. Episodes are already
+        # loaded; re-filtering is all a view toggle ever needs.
+        if (self._is_combined_view(getattr(self, "_current_cat", None))
+                and not self.series_ctx):
             self._load_items(getattr(self, "_current_cat", None))
         else:
             self._apply_filter()

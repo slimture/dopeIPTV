@@ -432,3 +432,32 @@ def test_toggling_grid_inside_a_series_keeps_the_episodes():
     assert f.series_ctx, "the drill state must survive a view toggle"
     assert f.rebuilt == [], \
         f"a view toggle must not rebuild the category: {f.rebuilt}"
+
+    # THE REPORTED CASE. Favorites' "All" and Watched ARE combined views, so
+    # the toggle took the rebuild branch there and put the favourites list
+    # back while series_ctx still said "inside a series" - the state the
+    # double-click then built ".../series/u/p/None.mp4" out of.
+    for mode, cat in (("fav", ("all", None)), ("fav", ("trakt", None)),
+                      ("watched", None)):
+        f.mode, f._current_cat = mode, cat
+        f.all_items = list(episodes)
+        f.rebuilt = []
+        f.grid_btn.on = True
+        f._inline_view_changed()
+        assert f.rebuilt == [], (
+            f"{mode}/{cat!r}: a view toggle rebuilt the category while "
+            f"inside a series")
+        assert f.list_model.kind == "episode"
+        assert len(f.list_model.items) == 5
+        f.grid_btn.on = False
+        f._inline_view_changed()
+        assert f.rebuilt == [] and f.list_model.kind == "episode"
+
+    # And with NO series open, a combined view must still rebuild - that is
+    # what makes grid drop the section headers.
+    f.series_ctx = None
+    f.mode, f._current_cat = "fav", ("all", None)
+    f.grid_btn.on = True
+    f._inline_view_changed()
+    assert f.rebuilt == [("all", None)], \
+        "a combined view must still rebuild when no series is open"
