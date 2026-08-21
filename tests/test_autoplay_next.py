@@ -461,3 +461,59 @@ def test_toggling_grid_inside_a_series_keeps_the_episodes():
     f._inline_view_changed()
     assert f.rebuilt == [("all", None)], \
         "a combined view must still rebuild when no series is open"
+
+
+def test_a_series_row_drills_in_from_every_view_that_shows_one():
+    """A series row turns up in Favorites, Watch Later, Watched and the
+    Series section. The first guard only covered mode == "series", which
+    is precisely the view the bug was NOT reported from."""
+    for mode, row in (
+            ("series", {"series_id": 7, "name": "Show"}),
+            ("fav", {"series_id": 7, "_kind": "series", "name": "Show"}),
+            ("watchlist", {"series_id": 7, "_kind": "series"}),
+            ("watched", {"series_id": 7, "_kind": "series"}),
+    ):
+        f = SimpleNamespace()
+        f.mode = mode
+        f.series_ctx = {"series_id": 7}      # stale: the list shows series
+        f._fav_section = "series"
+        f.entered, f.played = [], []
+        f._enter_series = f.entered.append
+        f._request_unlock = lambda: True
+        f.client = SimpleNamespace(episode_url=lambda i, e: "http://x")
+        f._start_playback = lambda *a, **k: f.played.append(a[0])   # noqa: B023
+        f.play_item = MainWindow.play_item.__get__(f)
+        f.play_item(row)
+        assert [r.get("series_id") for r in f.entered] == [7], \
+            f"{mode}: series row did not drill in"
+        assert f.played == [], f"{mode}: series row started playback"
+
+
+def test_a_hidden_channel_cannot_hide_a_movie_that_shares_its_id():
+    """Provider ids are unique only within a type, and the mixed views
+    checked every row against the LIVE hidden list. A favourite movie with
+    the same stream_id as a hidden channel disappeared from "All"."""
+    class _Ov:
+        def __init__(self): self.hidden = {("live", 1234)}
+        def is_hidden(self, mode, key): return (mode, key) in self.hidden
+
+    f = SimpleNamespace()
+    f.channel_ov = _Ov()
+    f._item_key = MainWindow._item_key
+    f._channel_hidden = MainWindow._channel_hidden.__get__(f)
+
+    channel = {"stream_id": 1234, "_kind": "live", "name": "SVT1"}
+    movie = {"stream_id": 1234, "_kind": "movie", "name": "Arrival"}
+
+    # The "All favorites" view passes kind="fav" for every row.
+    assert f._channel_hidden(channel, "fav") is True
+    assert f._channel_hidden(movie, "fav") is False, \
+        "a hidden CHANNEL must not hide a movie that shares its id"
+
+    # And a movie hidden in Movies is hidden in the mixed view too.
+    f.channel_ov.hidden.add(("vod", 1234))
+    assert f._channel_hidden(movie, "fav") is True
+
+    # A plain channel list (no _kind on the rows) is unchanged.
+    assert f._channel_hidden({"stream_id": 1234}, "live") is True
+    assert f._channel_hidden({"stream_id": 9}, "live") is False

@@ -3077,6 +3077,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._load_categories()
 
     def _channel_hidden(self, it, kind: str) -> bool:
+        # A row carrying its own kind is judged by THAT, not by the view's.
+        # In the mixed views (Favorites "All", Watched, History) the
+        # view-derived kind is "fav" for every row, so every one of them was
+        # looked up in the LIVE hidden list: a hidden movie stayed visible
+        # there, and - the real damage - a favourite movie vanished when an
+        # unrelated channel happened to share its id, because provider ids
+        # are only unique within a type.
+        row = it.get("_kind") or it.get("_ekind")
+        kind = {"live": "live", "fav": "live", "movie": "vod", "vod": "vod",
+                "series": "series"}.get(row, kind)
         if kind not in ("live", "vod", "series", "fav"):
             return False
         key = self._item_key(it)
@@ -3336,12 +3346,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # series row for an episode, built .../series/u/p/None.<ext> out of
         # an id it does not have, STOPPED whatever was playing and put an
         # error on screen. Trust the row, not the flag: drill in.
-        if (self.mode == "series" and it.get("series_id") is not None
-                and it.get("id") is None):
+        # Any view, not just the Series section: a series row turns up in
+        # Favorites, Watch Later, Watched and Continue watching too, and the
+        # disagreement was REPORTED from Favorites - where the old
+        # mode == "series" test would not have fired at all.
+        if (it.get("series_id") is not None and it.get("id") is None
+                and it.get("_kind") in (None, "series")
+                and self.mode in ("series", "fav", "watchlist", "watched")):
             if self.series_ctx:
-                log.info("play_item: series row while series_ctx is set - "
-                         "list and drill state disagree; entering the series "
-                         "instead of playing a nonexistent episode")
+                log.info("play_item: series row while series_ctx is set "
+                         "(mode=%s) - list and drill state disagree; entering "
+                         "the series instead of playing a nonexistent "
+                         "episode", self.mode)
             self._enter_series(it)
             return
         # Series row from Watch Later or the Favorites 'Series' section:
