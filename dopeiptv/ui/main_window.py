@@ -2455,6 +2455,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 return
             self._load_categories()
             return
+        if self.series_ctx:
+            log.info("category changed while inside a series - leaving the "
+                     "episode list (cat=%r)", cat)
         self.series_ctx = None
         self.back_btn.hide()
         self._update_sync_btn()
@@ -3244,6 +3247,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._local_up()
             return
         ctx = self.series_ctx or {}
+        log.info("_leave_series: back to the series list (series_id=%r)",
+                 ctx.get("series_id"))
         self.series_ctx = None
         self.back_btn.hide()
         # Land in the series' OWN category with the series row selected - not

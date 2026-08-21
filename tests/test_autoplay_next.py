@@ -353,3 +353,82 @@ def test_a_real_episode_still_plays_from_inside_a_series():
     assert url == "http://srv/series/u/p/4242.mkv"
     assert title == "S2 E10"
     assert f.entered == []
+
+
+def test_toggling_grid_inside_a_series_keeps_the_episodes():
+    """Turn grid on inside a series, turn it off: the episode list must
+    still be there. Pins the documented path - a view toggle re-filters
+    what is already loaded and must never rebuild the category, which
+    would put the series list back on screen while series_ctx still said
+    'inside a series' (and a double-click there then tried to play an
+    episode that does not exist)."""
+    class _Box:
+        def __init__(self, d): self._d = d
+        def currentData(self): return self._d
+        def findData(self, k): return 0
+        def setCurrentIndex(self, i): pass
+        def blockSignals(self, b): pass
+
+    class _Btn(_Box):
+        def __init__(self, on): self.on = on
+        def isChecked(self): return self.on
+        def setChecked(self, v): self.on = v
+
+    class _Model:
+        def __init__(self): self.items, self.kind = [], None
+        def set_items(self, items, kind):
+            self.items, self.kind = list(items), kind
+
+    episodes = [{"id": i, "name": f"S1 E{i}"} for i in range(1, 6)]
+    store = {}
+    f = SimpleNamespace()
+    f.settings = SimpleNamespace(
+        value=lambda k, d=None: store.get(k, d),
+        setValue=lambda k, v: store.__setitem__(k, v))
+    f.mode = "series"
+    f.series_ctx = {"series_id": 7}
+    f.all_items = list(episodes)
+    f._current_cat = "cat-1"
+    f.list_model = _Model()
+    f.size_box, f.sort_box = _Box("medium"), _Box("global")
+    f.grid_btn = _Btn(False)
+    f.delegate = SimpleNamespace(
+        set_density=lambda d: None, set_grid=lambda g: None,
+        grid_size=lambda: SimpleNamespace(height=lambda: 200), row_h=40)
+    f.listw = SimpleNamespace(
+        setVerticalScrollMode=lambda m: None,
+        verticalScrollBar=lambda: SimpleNamespace(
+            setSingleStep=lambda s: None),
+        setViewMode=lambda m: None, setFlow=lambda x: None,
+        setWrapping=lambda b: None, set_grid_cell=lambda c: None,
+        setGridSize=lambda s: None, setResizeMode=lambda m: None)
+    f.search = SimpleNamespace(text=lambda: "")
+    f.LABELS = {"episode": "episodes"}
+    f.rebuilt = []
+    f._load_items = lambda cat: f.rebuilt.append(cat)
+    f._channel_hidden = lambda it, kind: False
+    f._sorted = lambda x: x
+    f._hide_busy = lambda: None
+    f._set_status = lambda *a, **k: None
+    f._pending_jump_key = None
+    for n in ("_apply_view_settings", "_apply_filter", "_content_kind",
+              "_is_combined_view", "_apply_list_layout", "_grid_on",
+              "_inline_view_changed", "_sort_setting_key",
+              "_current_sort_raw", "_sync_sort_box"):
+        setattr(f, n, getattr(MainWindow, n).__get__(f))
+
+    f._apply_filter()
+    assert f.list_model.kind == "episode" and len(f.list_model.items) == 5
+
+    f.grid_btn.on = True
+    f._inline_view_changed()
+    assert f.list_model.kind == "episode", "grid on dropped out of the series"
+    assert len(f.list_model.items) == 5
+
+    f.grid_btn.on = False
+    f._inline_view_changed()
+    assert f.list_model.kind == "episode", "grid off dropped out of the series"
+    assert len(f.list_model.items) == 5
+    assert f.series_ctx, "the drill state must survive a view toggle"
+    assert f.rebuilt == [], \
+        f"a view toggle must not rebuild the category: {f.rebuilt}"

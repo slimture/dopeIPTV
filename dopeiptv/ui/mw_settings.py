@@ -146,6 +146,7 @@ from .dialogs import PlaylistDialog
 from .epg_grid import EpgGridDialog
 from ..providers.metadata import TmdbClient, bundled_tmdb_key
 from ..providers.client import make_client
+from ..core.log import log
 from ..core.recording import format_size
 from ..media.players import embedded_playback_reason
 from .theme import ACCENTS, P, THEMES, apply_theme, build_style
@@ -285,6 +286,8 @@ class _SettingsMixin:
         # Combined views must rebuild (grid drops their headers, list keeps
         # them); every other view just re-filters the current items.
         if self._is_combined_view(getattr(self, "_current_cat", None)):
+            log.info("view settings: rebuilding via _load_items(%r)",
+                     getattr(self, "_current_cat", None))
             self._load_items(getattr(self, "_current_cat", None))
         else:
             self._apply_filter()
@@ -422,6 +425,9 @@ class _SettingsMixin:
         self.settings.setValue(
             "view_grid",
             "true" if self.grid_btn.isChecked() else "false")
+        log.info("view toggle: mode=%s series_ctx=%s grid=%s items=%d",
+                 self.mode, "set" if self.series_ctx else "none",
+                 self.grid_btn.isChecked(), len(self.all_items or []))
         self._apply_view_settings()
 
     # -- settings dialog -----------------------------------------------------------
