@@ -260,7 +260,7 @@ def test_the_macos_icon_leaves_apples_margin_and_renders_full_size():
     import subprocess
     import sys
 
-    child = """
+    child = r"""
 import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtWidgets import QApplication
@@ -300,3 +300,56 @@ print("ICON_OK")
     assert "ICON_OK" in proc.stdout, (
         f"icon check failed\nstdout={proc.stdout!r}\n"
         f"stderr={proc.stderr[-1500:]!r}")
+
+
+def test_a_series_row_is_never_played_as_an_episode():
+    """Toggling grid view inside a series can leave the list showing the
+    series while series_ctx is still set. A double-click then took that
+    row for an episode, built ".../series/u/p/None.mp4" from an id it does
+    not have, STOPPED whatever was playing and showed an error. The row
+    decides what it is, not the flag."""
+    f = SimpleNamespace()
+    f.mode = "series"
+    f.series_ctx = {"series_id": 7}        # stale: the list shows series
+    f.entered = []
+    f.played = []
+    f._enter_series = lambda it: f.entered.append(it.get("series_id"))
+    f._request_unlock = lambda: True
+    f.client = SimpleNamespace(
+        episode_url=lambda i, ext: f"http://srv/series/u/p/{i}.{ext or 'mp4'}")
+
+    def start(*a, **k):
+        f.played.append(a[0])
+
+    f._start_playback = start
+    f.play_item = MainWindow.play_item.__get__(f)
+    f._stream_for = MainWindow._stream_for.__get__(f)
+
+    # The series row: series_id, no episode id.
+    f.play_item({"series_id": 7, "name": "The Sopranos"})
+    assert f.entered == [7], "a series row must drill in"
+    assert f.played == [], "and must never start playback"
+
+    # _stream_for is guarded too, so no other caller can build that URL.
+    url, _ = f._stream_for({"series_id": 7, "name": "The Sopranos"})
+    assert url is None or "None." not in str(url), \
+        f"built a bogus episode URL: {url!r}"
+
+
+def test_a_real_episode_still_plays_from_inside_a_series():
+    """The guard keys off the row having no episode id - a real episode
+    has one, and must be unaffected."""
+    f = SimpleNamespace()
+    f.mode = "series"
+    f.series_ctx = {"series_id": 7}
+    f.entered = []
+    f.client = SimpleNamespace(
+        episode_url=lambda i, ext: f"http://srv/series/u/p/{i}.{ext or 'mp4'}")
+    f._enter_series = lambda it: f.entered.append(it)
+
+    f._stream_for = MainWindow._stream_for.__get__(f)
+    url, title = f._stream_for(
+        {"id": 4242, "container_extension": "mkv", "name": "S2 E10"})
+    assert url == "http://srv/series/u/p/4242.mkv"
+    assert title == "S2 E10"
+    assert f.entered == []

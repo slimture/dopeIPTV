@@ -3272,7 +3272,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _stream_for(self, it) -> tuple[str | None, str]:
         title = it.get("name") or it.get("title") or "dopeIPTV"
-        if self.series_ctx:
+        # Only with an episode id. Without one this produced
+        # ".../series/user/pass/None.mp4" - not empty, so every "no url"
+        # guard downstream waved it through and playback died on a path
+        # that never existed. Same trap as the History replay had.
+        if self.series_ctx and it.get("id") is not None:
             return self.client.episode_url(
                 it.get("id"), it.get("container_extension")), title
         # Favorite movies/series route by the selected section, not by
@@ -3320,7 +3324,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if it.get("_kind") == "episode" and it.get("_series_ctx") is not None:
             self._play_continue_episode(it, player, external)
             return
-        if self.mode == "series" and not self.series_ctx:
+        # A SERIES row is never playable, whatever the drill state believes.
+        # series_ctx alone used to decide that a row was an episode, so if
+        # the list and that flag ever disagreed - a grid toggle that rebuilt
+        # the list while series_ctx stayed set - a double-click took the
+        # series row for an episode, built .../series/u/p/None.<ext> out of
+        # an id it does not have, STOPPED whatever was playing and put an
+        # error on screen. Trust the row, not the flag: drill in.
+        if (self.mode == "series" and it.get("series_id") is not None
+                and it.get("id") is None):
+            if self.series_ctx:
+                log.info("play_item: series row while series_ctx is set - "
+                         "list and drill state disagree; entering the series "
+                         "instead of playing a nonexistent episode")
             self._enter_series(it)
             return
         # Series row from Watch Later or the Favorites 'Series' section:
