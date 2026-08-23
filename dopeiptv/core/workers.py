@@ -438,8 +438,13 @@ class LogoLoader(QObject):
             return
         self.waiting[url] = [callback]
         disk_path = self._disk_path(url)
+        # Bound to a local before it becomes a default argument: the empty
+        # case returned above, so url is a str from here on - but a default
+        # expression is typed where it is written, not where the narrowing
+        # happened, so the parameter took the declared `str | None`.
+        src: str = url
 
-        def fetch(u: str = url, dp: Path | None = disk_path) -> tuple[str, bytes]:
+        def fetch(u: str = src, dp: Path | None = disk_path) -> tuple[str, bytes]:
             # A local absolute path (a generated video thumbnail, never a
             # provider URL) is read straight off disk - no network machinery,
             # no circuit breaker, no second disk cache.
