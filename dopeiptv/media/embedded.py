@@ -2116,7 +2116,23 @@ class EmbeddedPlayer(QWidget):
         driving mpv's frame timing. Returns the mirror widget for the caller to
         place in the window."""
         _t_start = time.monotonic()
-        if sys.platform.startswith("linux") or sys.platform == "win32":
+        # macOS can opt into the raster path with DOPEIPTV_MAC_RASTER=1.
+        #
+        # It is the same symptom here as there: a GL surface in a SECOND
+        # top-level window keeps presenting the frame it had, while
+        # rendering reports success the whole way. Linux and Windows both
+        # left the GL mirror behind for exactly that, and the raster path
+        # has been solid on both since. macOS kept the GL mirror because it
+        # was "proven there" - and the fullscreen freeze says it no longer
+        # is. This is opt-in rather than the default so the two can be
+        # compared in ONE build: same binary, one environment variable.
+        #
+        # It also brings the stall watchdog, which lives in the raster
+        # tick and has therefore never run on macOS.
+        _mac_raster = (sys.platform == "darwin"
+                       and os.environ.get("DOPEIPTV_MAC_RASTER") == "1")
+        if (sys.platform.startswith("linux") or sys.platform == "win32"
+                or _mac_raster):
             # DEFAULT Linux and Windows path: raster mirror (see
             # _RasterMirror). Every GL presentation route in a second window
             # shows black on modern Qt/Mesa (X11 and Wayland alike), so all GL
@@ -2196,8 +2212,9 @@ class EmbeddedPlayer(QWidget):
         # GL context and a fresh mpv render binding each time. Timed so a
         # stall at the transition can be attributed to the rebuild rather
         # than guessed at.
-        log.info("VID mirror start took %.0fms",
-                 (time.monotonic() - _t_start) * 1000)
+        log.info("VID mirror start took %.0fms (path=%s)",
+                 (time.monotonic() - _t_start) * 1000,
+                 "raster" if isinstance(m, _RasterMirror) else "gl")
         return m
 
     def _raster_mark_frame(self) -> None:

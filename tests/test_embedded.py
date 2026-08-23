@@ -799,3 +799,23 @@ def test_the_next_episode_lead_is_the_users_setting():
     assert _W("600")._nextup_window(6 * 60) == 180
     # No duration (a live channel): no window, so no card.
     assert _W("300")._nextup_window(0) == 0
+
+
+def test_macos_can_opt_into_the_raster_mirror():
+    """macOS is the last platform still using the GL mirror, and the
+    fullscreen freeze is the same symptom - a GL surface in a second window
+    presenting a stale frame while reporting success - that moved Linux and
+    Windows to the raster path. DOPEIPTV_MAC_RASTER=1 selects it so the two
+    can be compared in one build, and it brings the stall watchdog, which
+    lives in the raster tick and has never run on macOS."""
+    import inspect
+
+    from dopeiptv.media.embedded import EmbeddedPlayer
+
+    src = inspect.getsource(EmbeddedPlayer.start_mirror)
+    assert 'os.environ.get("DOPEIPTV_MAC_RASTER") == "1"' in src
+    assert 'sys.platform == "darwin"' in src
+    # The default on macOS is unchanged - opt-in, not a silent switch.
+    assert "_mac_raster = (sys.platform" in src
+    # And the log says which path ran, so a report names it without asking.
+    assert 'path=%s' in src
