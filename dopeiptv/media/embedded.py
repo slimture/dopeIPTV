@@ -2792,6 +2792,9 @@ class EmbeddedPlayer(QWidget):
     # "still too late" - because where the credits start is a property of
     # the show, not of its length, and nothing in the file says where.
     NEXTUP_DEFAULT_SECS = 180
+    # How far the card sits from the corner of the picture. Hard into the
+    # corner reads as a system control rather than an offer.
+    NEXTUP_INSET = 28
 
     def _nextup_window(self, dur: float) -> float:
         """Seconds before the end at which the card appears, or 0 for off."""
@@ -2863,10 +2866,17 @@ class EmbeddedPlayer(QWidget):
                 else surf.geometry().topLeft()
         except (RuntimeError, TypeError):
             tl = surf.geometry().topLeft()
-        # A generous inset: hard into the corner reads as a system control,
-        # and the seek bar lives just above the bottom edge.
-        b.move(tl.x() + surf.width() - b.width() - 28,
-               tl.y() + surf.height() - b.height() - 88)
+        # Clear whatever floats over the bottom of the picture, and nothing
+        # more. Only fullscreen has anything there - the control bar - and the
+        # flat 88 px was sized for that case, so docked and popped out the card
+        # rode a bar's height too high over empty picture. The bar's sizeHint
+        # rather than its height, because it auto-hides after a few idle
+        # seconds and the card must not hop down when it goes.
+        gap = self.NEXTUP_INSET
+        if self._fs_ui:
+            gap += self.fs_controls.sizeHint().height() + 12
+        b.move(tl.x() + surf.width() - b.width() - self.NEXTUP_INSET,
+               tl.y() + surf.height() - b.height() - gap)
 
     def set_fullscreen_ui(self, fullscreen: bool) -> None:
         log.info("VID set_fullscreen_ui(%s): video=%dx%d ctx=%s popout=%s",

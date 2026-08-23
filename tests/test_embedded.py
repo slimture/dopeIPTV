@@ -801,6 +801,94 @@ def test_the_next_episode_lead_is_the_users_setting():
     assert _W("300")._nextup_window(0) == 0
 
 
+def test_the_next_episode_card_clears_the_control_bar_and_nothing_more():
+    """It sat a control bar's height above the bottom of the picture even
+    when no control bar was floating there - the inset was a flat 88 px,
+    sized for fullscreen, and docked that is empty picture.
+
+    The gap is now the plain inset, plus room for the bar only in
+    fullscreen - and measured from the bar's sizeHint, because the bar
+    auto-hides after a few idle seconds and the card must not hop down
+    with it."""
+    from dopeiptv.media.embedded import EmbeddedPlayer as P
+
+    class _Size:
+        def height(self):
+            return 52
+
+    class _Bar:
+        def sizeHint(self):
+            return _Size()
+
+    class _Btn:
+        def __init__(self):
+            self.pos = None
+
+        def adjustSize(self):
+            pass
+
+        def parentWidget(self):
+            return None
+
+        def width(self):
+            return 220
+
+        def height(self):
+            return 64
+
+        def move(self, x, y):
+            self.pos = (x, y)
+
+    class _Surf:
+        def width(self):
+            return 1920
+
+        def height(self):
+            return 1080
+
+        def geometry(self):
+            class _G:
+                def topLeft(self_inner):
+                    return _Pt()
+            return _G()
+
+    class _Pt:
+        def x(self):
+            return 0
+
+        def y(self):
+            return 0
+
+    class _P:
+        NEXTUP_INSET = P.NEXTUP_INSET
+        _place_nextup = P._place_nextup
+
+        def __init__(self, fs):
+            self.nextup_btn = _Btn()
+            self._ov_surface = _Surf()
+            self.fs_controls = _Bar()
+            self._fs_ui = fs
+
+    inset = P.NEXTUP_INSET
+
+    # Docked: nothing floats over the bottom, so the card takes the plain
+    # inset on both axes.
+    docked = _P(fs=False)
+    docked._place_nextup()
+    assert docked.nextup_btn.pos == (1920 - 220 - inset, 1080 - 64 - inset)
+
+    # Fullscreen: the floating control bar is there, so the card rides
+    # above it - by its sizeHint height plus a gap.
+    fs = _P(fs=True)
+    fs._place_nextup()
+    assert fs.nextup_btn.pos == (1920 - 220 - inset,
+                                 1080 - 64 - inset - 52 - 12)
+
+    # And the fullscreen card is genuinely higher than the docked one -
+    # the whole point of splitting the two cases.
+    assert fs.nextup_btn.pos[1] < docked.nextup_btn.pos[1]
+
+
 def test_macos_can_opt_into_the_raster_mirror():
     """macOS is the last platform still using the GL mirror, and the
     fullscreen freeze is the same symptom - a GL surface in a second window
