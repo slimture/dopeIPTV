@@ -1254,3 +1254,30 @@ def test_the_plot_label_never_stays_in_rich_text_after_music():
     except Exception:
         pass
     assert w.media_plot.fmt == _Qt.TextFormat.PlainText
+
+
+def test_the_detail_panel_has_only_one_vertical_scroll_region():
+    """The right-hand column carried two nested vertical scroll areas: the
+    panel itself, and the info box inside it, pinned to the poster's height
+    so a long synopsis scrolled within. Two nested scroll regions are
+    miserable with a wheel or a trackpad - whichever is under the pointer
+    eats the gesture and the panel will not move. The box is a plain frame
+    now: it grows, and the column is the one thing that scrolls."""
+    import inspect
+
+    from dopeiptv.ui import main_window as mw
+
+    src = inspect.getsource(mw)
+    # The info box must not be a scroll area any more...
+    assert "self.media_info = QFrame" in src, \
+        "the info box must be a plain frame, not a nested scroll area"
+    assert "self.media_info = QScrollArea" not in src
+    # ...and its height is a floor, not a cap, so it can grow.
+    from dopeiptv.ui import mw_detail
+    d = inspect.getsource(mw_detail)
+    assert "self.media_info.setFixedHeight" not in d, \
+        "a fixed height forces the box to scroll its own content again"
+    assert d.count("self.media_info.setMinimumHeight") == 2
+
+    # The cast strip scrolls HORIZONTALLY - a different axis, no conflict.
+    assert "self.cast_scroll = QScrollArea" in src

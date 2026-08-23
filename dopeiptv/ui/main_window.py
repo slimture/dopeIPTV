@@ -1293,15 +1293,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # live channels use now_card and VOD/series use this). Its height is
         # pinned to the poster's height in _show_detail so the box bottom
         # lines up with the poster's bottom, with the text scrolling inside.
-        self.media_info = QScrollArea()
-        self.media_info.setWidgetResizable(True)
-        self.media_info.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # A plain box, NOT a scroll area. It used to be one, pinned to the
+        # poster's height so their bottoms lined up, with a long synopsis
+        # scrolling inside - which put a second scrollbar inside the panel's
+        # own. Two nested scroll regions are miserable to use: the wheel
+        # (and a trackpad especially) gets caught by whichever is under the
+        # pointer, and the panel refuses to move. One scroll region for the
+        # whole column; this box grows and the column scrolls.
+        self.media_info = QFrame(objectName="MediaInfo")
         self.media_info.setStyleSheet(
-            f"QScrollArea {{ background:{P['input']}; "
+            f"QFrame#MediaInfo {{ background:{P['input']}; "
             f"border:1px solid {P['border_in']}; border-radius:12px; }}")
-        mi_holder = QWidget()
-        mi = QVBoxLayout(mi_holder)
+        mi = QVBoxLayout(self.media_info)
         mi.setContentsMargins(16, 14, 16, 14)
         mi.setSpacing(8)
         self.media_plot = QLabel("", objectName="NowDesc")
@@ -1315,8 +1318,6 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.media_meta.linkActivated.connect(self._on_cast_link)
         mi.addWidget(self.media_plot)
         mi.addWidget(self.media_meta)
-        mi.addStretch(1)
-        self.media_info.setWidget(mi_holder)
         self.media_info.hide()
         # Top-aligned with the poster; its fixed height (set per-selection in
         # _show_detail to the poster height) makes the bottoms line up too.

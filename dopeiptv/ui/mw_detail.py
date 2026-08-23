@@ -107,8 +107,10 @@ class _DetailMixin:
         self.d_logo.setFixedSize(*poster_size)
         self._position_play_over_poster()
         if is_media:
-            # Match the info box to the poster height so their bottoms align.
-            self.media_info.setFixedHeight(self.POSTER_SIZE_MEDIA[1])
+            # A floor, not a cap: short blurbs still line up with the
+            # poster's bottom, a long synopsis grows the box and the
+            # column scrolls - instead of a scrollbar inside a scrollbar.
+            self.media_info.setMinimumHeight(self.POSTER_SIZE_MEDIA[1])
         self.d_logo.setPixmap(QPixmap())
         self.d_logo.setStyleSheet(self.PLACEHOLDER_LOGO_STYLE)
         self.d_logo.setText(name.strip()[:1].upper())
@@ -226,7 +228,7 @@ class _DetailMixin:
         self._detail_name = it.get("name") or it.get("title") or ""
         self.d_logo.setFixedSize(*self.POSTER_SIZE_MEDIA)
         self._position_play_over_poster()
-        self.media_info.setFixedHeight(self.POSTER_SIZE_MEDIA[1])
+        self.media_info.setMinimumHeight(self.POSTER_SIZE_MEDIA[1])
         self.d_logo.setPixmap(QPixmap())
         self.d_logo.setStyleSheet(self.PLACEHOLDER_LOGO_STYLE)
         self.d_logo.setText(
