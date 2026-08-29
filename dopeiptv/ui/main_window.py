@@ -26,7 +26,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .. import APP_NAME, ORG
-from ..core.log import log
+from ..core.log import log, redact_url
 from ..i18n import tr
 from .channel_list import (
     CategoryColorDelegate, ChannelDelegate, ChannelListModel, ChannelListView,
@@ -5619,7 +5619,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self.wake.acquire(f"Playing {title}")
             else:
                 log.warning("embedded play() refused %s - falling back to an "
-                            "external mpv window", url)
+                            "external mpv window", redact_url(url))
                 self.player.hide()
                 launch_player("mpv", url, title, self)
         else:

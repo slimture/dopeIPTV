@@ -10,7 +10,7 @@ import shutil
 import time
 from ..providers.client import b64, epg_times
 from ..i18n import tr
-from ..core.log import log
+from ..core.log import log, redact_url
 from ..core.recording import format_size, safe_filename
 from .theme import P
 from .widgets import confirm
@@ -1172,7 +1172,8 @@ class _RecordingMixin:
                 chunk = next(r.iter_content(4096), b"") or b""
                 r.close()
             except Exception as e:
-                log.debug("[ts] probe network error for %s: %s", u, e)
+                log.debug("[ts] probe network error for %s: %s",
+                          redact_url(u), e)
                 network_failed = True
                 continue
             head = chunk.lstrip()

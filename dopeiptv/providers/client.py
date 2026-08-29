@@ -12,7 +12,7 @@ from typing import Any
 
 from ..core._lazy_requests import requests
 
-from ..core.log import log
+from ..core.log import log, register_secrets
 
 
 class XtreamClient:
@@ -33,6 +33,10 @@ class XtreamClient:
             self.server = "http://" + self.server
         self.username = username
         self.password = password
+        # From here on these two strings are masked out of every log record,
+        # wherever they turn up - a stream URL, a requests exception, a line
+        # written long after this call.
+        register_secrets(username, password)
         self.session = requests.Session()
         self.session.headers["User-Agent"] = "dopeIPTV/1.0"
         self._list_cache: dict[tuple, tuple[float, list]] = {}

@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QVBoxLayout,
 )
 
-from ..core.log import log
+from ..core.log import log, redact_url
 from ..i18n import tr
 from ..core.workers import run_async
 from .cast_bridge import (
@@ -655,8 +655,8 @@ class ChromecastManager:
         # round, but tried only once everything else has failed.
         fallback = cast_content_type(url)
         if fallback not in _UNPLAYABLE:
-            log.info("cast -> %s: %s (%s, guessed)", device_name, url,
-                     fallback)
+            log.info("cast -> %s: %s (%s, guessed)", device_name,
+                     redact_url(url), fallback)
             if self._play_and_verify(mc, url, fallback, title,
                                      start=start) is not False:
                 return device_name

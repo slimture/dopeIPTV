@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (
     QStyle, QStyleOptionSlider, QVBoxLayout, QWidget, QPushButton,
 )
 
-from ..core.log import log
+from ..core.log import log, redact_url
 from ..i18n import tr
 from .players import _libmpv, _register_error_callback
 from ..ui.theme import P
@@ -2471,7 +2471,7 @@ class EmbeddedPlayer(QWidget):
             if self._eof_seen:
                 return
             self._eof_seen = True
-            log.info("eof event: %s", self.current_url)
+            log.info("eof event: %s", redact_url(self.current_url))
             self.finished.emit()
         except RuntimeError:
             # This arrives from mpv's event thread via a queued connection,
@@ -3934,7 +3934,7 @@ class EmbeddedPlayer(QWidget):
                 # The decisive line for "the queue stopped after one track":
                 # if this never appears, mpv never reported end-of-file and
                 # nothing downstream was ever asked to play the next one.
-                log.info("eof reached: %s", self.current_url)
+                log.info("eof reached: %s", redact_url(self.current_url))
                 self.finished.emit()
         else:
             self._eof_seen = False
