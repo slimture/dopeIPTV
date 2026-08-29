@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import secrets
 import shutil
 import socket
@@ -826,6 +827,13 @@ class _Server(ThreadingHTTPServer):
         log.info("cast bridge: a request failed (%s)", exc)
 
 
+# The only file names this server will answer for. The bridge listens on the
+# LAN so the television can reach it, which means anything else on the
+# network can ask it for a file too - and every name it should ever be asked
+# for is one we wrote into a playlist ourselves.
+_HLS_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
+
+
 class _Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
@@ -863,17 +871,29 @@ class _Handler(BaseHTTPRequestHandler):
         subtitles.
         """
         bridge = self.server.bridge
-        name = self.path[len(bridge.prefix or ""):]
-        # A plain name and nothing else. Everything the receiver asks for is
-        # named in a playlist we wrote, so anything with a slash or a dot
-        # path in it is somebody else asking for something else.
-        if not name or "/" in name or name.startswith("."):
+        # The query string is not part of the name: a receiver that appends
+        # one should still get its file rather than a 404.
+        name = self.path[len(bridge.prefix or ""):].split("?", 1)[0]
+        # An ALLOWLIST, not a list of things to keep out. Every file we write
+        # is a plain playlist or segment name, so anything else is somebody
+        # asking for something we never offered - and a blocklist has to
+        # think of every separator there is, which is how rejecting "/" let a
+        # Windows backslash walk straight out of the folder. Requiring the
+        # first character to be alphanumeric rules out ".." and dotfiles too.
+        if not _HLS_NAME.match(name):
             self.send_error(404)
             return
         if not bridge.hls_ready(name):
             self.send_error(503)
             return
-        path = os.path.join(bridge.hls_dir or "", name)
+        folder = os.path.abspath(bridge.hls_dir or "")
+        path = os.path.abspath(os.path.join(folder, name))
+        # Belt and braces: prove after the join that the file really is in
+        # our own folder, rather than trusting the pattern to have covered
+        # every platform's idea of a separator.
+        if os.path.dirname(path) != folder:
+            self.send_error(404)
+            return
         try:
             with open(path, "rb") as f:
                 body = f.read()

@@ -799,8 +799,14 @@ def test_the_hls_files_are_served_with_the_types_the_receiver_needs():
                 assert r.headers["Content-Type"] == ctype, name
                 assert r.headers["Access-Control-Allow-Origin"] == "*", name
                 assert r.read()
-        # Only a plain name inside our own folder is ever answered.
-        for bad in ("../secret", "sub/dir.ts", ".hidden"):
+        # Only a plain name inside our own folder is ever answered. The
+        # bridge listens on the LAN so the television can reach it, which
+        # means anything else on the network can ask it for a file too -
+        # and the old guard rejected "/" and a leading dot, which let a
+        # Windows backslash and a null byte straight through.
+        for bad in ("../secret", "sub/dir.ts", ".hidden",
+                    "..\\..\\secret", "a\\..\\..\\secret",
+                    "master.m3u8%00.ts", "~/.ssh/id_rsa"):
             try:
                 urllib.request.urlopen(f"{base}/{bad}", timeout=5)
                 raise AssertionError(f"{bad} was served")
