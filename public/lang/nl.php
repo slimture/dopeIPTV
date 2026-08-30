@@ -55,6 +55,7 @@ return [
     "wn_intro" => "Geschreven voor wie de app gebruikt, niet voor wie diffs leest.",
     "wn_full" => "Volledige release op GitHub",
     "wn_changelog" => "Alle versies",
+    "wn_open" => "Lees de releaseopmerkingen",
 
     // screenshots
     "shots_eyebrow" => "Een kijkje binnenin",

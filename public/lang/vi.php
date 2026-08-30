@@ -54,6 +54,7 @@ return [
     "wn_intro" => "Viết cho người dùng ứng dụng, không phải cho người đọc diff.",
     "wn_full" => "Bản phát hành đầy đủ trên GitHub",
     "wn_changelog" => "Mọi phiên bản",
+    "wn_open" => "Đọc ghi chú phát hành",
 
     // screenshots
     "shots_eyebrow" => "Nhìn vào bên trong",

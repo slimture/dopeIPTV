@@ -248,12 +248,30 @@ footer nav a:hover { color: var(--accent); }
 /* Rendered server-side from releases.json by render_notes(). Reads as a
    document rather than a feature grid: one column, generous line height,
    and a left rule on the headings so the sections scan without shouting. */
-.notes {
-  background: var(--surface);
+/* Collapsed by default: the notes are worth reading and worth NOT being
+   the tallest thing between the downloads and the FAQ. Same affordance as
+   the FAQ items, so the page has one way of opening things, not two. */
+.notes-wrap {
   border: 1px solid var(--line);
   border-radius: 14px;
-  padding: 22px 26px;
-  max-width: 78ch;                /* a measure that stays readable */
+  background: var(--surface);
+  max-width: 78ch;
+}
+.notes-wrap summary {
+  list-style: none; cursor: pointer; font-weight: 600; color: var(--text);
+  padding: 15px 18px; display: flex; align-items: center;
+  justify-content: space-between; gap: 14px;
+}
+.notes-wrap summary::-webkit-details-marker { display: none; }
+.notes-wrap summary::after {
+  content: "+"; color: var(--accent); font-size: 20px; line-height: 1; flex: none;
+}
+.notes-wrap[open] summary::after { content: "\2212"; }
+.notes-wrap summary:hover { color: var(--accent); }
+.notes-wrap[open] summary { border-bottom: 1px solid var(--line); }
+
+.notes {
+  padding: 20px 24px 6px;
 }
 .notes h4 {
   margin: 26px 0 10px;
@@ -289,5 +307,6 @@ footer nav a:hover { color: var(--accent); }
 }
 .notes a { color: var(--accent); }
 @media (max-width: 640px) {
-  .notes { padding: 18px; border-radius: 12px; }
+  .notes { padding: 16px 18px 4px; }
+  .notes-wrap { border-radius: 12px; }
 }

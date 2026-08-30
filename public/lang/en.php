@@ -55,6 +55,7 @@ return [
     "wn_intro" => "Written for people who use the app, not for people who read diffs.",
     "wn_full" => "Full release on GitHub",
     "wn_changelog" => "Every version",
+    "wn_open" => "Read the release notes",
 
     // screenshots
     "shots_eyebrow" => "A look inside",

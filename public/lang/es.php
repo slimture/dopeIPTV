@@ -54,6 +54,7 @@ return [
     "wn_intro" => "Escrito para quien usa la aplicación, no para quien lee diffs.",
     "wn_full" => "Versión completa en GitHub",
     "wn_changelog" => "Todas las versiones",
+    "wn_open" => "Leer las notas de la versión",
 
     // screenshots
     "shots_eyebrow" => "Un vistazo por dentro",

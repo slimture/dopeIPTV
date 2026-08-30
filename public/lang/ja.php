@@ -55,6 +55,7 @@ return [
     "wn_intro" => "差分を読む人ではなく、アプリを使う人のために書いています。",
     "wn_full" => "GitHub のリリース全文",
     "wn_changelog" => "すべてのバージョン",
+    "wn_open" => "リリースノートを読む",
 
     // screenshots
     "shots_eyebrow" => "内側をのぞく",

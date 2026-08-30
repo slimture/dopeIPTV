@@ -55,6 +55,7 @@ return [
     "wn_intro" => "Napisano za one koji koriste aplikaciju, a ne za one koji čitaju diffove.",
     "wn_full" => "Cijelo izdanje na GitHubu",
     "wn_changelog" => "Sve verzije",
+    "wn_open" => "Pročitaj bilješke o izdanju",
 
     // screenshots
     "shots_eyebrow" => "Pogled iznutra",

@@ -54,6 +54,7 @@ return [
     "wn_intro" => "diff를 읽는 사람이 아니라 앱을 쓰는 사람을 위해 썼습니다.",
     "wn_full" => "GitHub의 전체 릴리스",
     "wn_changelog" => "모든 버전",
+    "wn_open" => "릴리스 노트 읽기",
 
     // screenshots
     "shots_eyebrow" => "내부 들여다보기",

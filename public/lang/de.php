@@ -55,6 +55,7 @@ return [
     "wn_intro" => "Geschrieben für Leute, die die App benutzen, nicht für Leute, die Diffs lesen.",
     "wn_full" => "Vollständige Version auf GitHub",
     "wn_changelog" => "Alle Versionen",
+    "wn_open" => "Versionshinweise lesen",
 
     // screenshots
     "shots_eyebrow" => "Ein Blick ins Innere",

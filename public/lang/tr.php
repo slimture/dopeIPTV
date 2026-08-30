@@ -55,6 +55,7 @@ return [
     "wn_intro" => "Diff okuyanlar için değil, uygulamayı kullananlar için yazıldı.",
     "wn_full" => "GitHub'daki tam sürüm",
     "wn_changelog" => "Tüm sürümler",
+    "wn_open" => "Sürüm notlarını oku",
 
     // screenshots
     "shots_eyebrow" => "İçeriden bir bakış",

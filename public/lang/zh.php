@@ -54,6 +54,7 @@ return [
     "wn_intro" => "写给使用这个应用的人，而不是读 diff 的人。",
     "wn_full" => "GitHub 上的完整发布",
     "wn_changelog" => "所有版本",
+    "wn_open" => "阅读版本说明",
 
     // screenshots
     "shots_eyebrow" => "内部一览",

@@ -55,6 +55,7 @@ return [
     "wn_intro" => "Skrivet för den som använder appen, inte för den som läser diffar.",
     "wn_full" => "Hela releasen på GitHub",
     "wn_changelog" => "Alla versioner",
+    "wn_open" => "Läs versionsnyheterna",
 
     // screenshots
     "shots_eyebrow" => "En titt inuti",

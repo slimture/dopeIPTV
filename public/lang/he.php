@@ -55,6 +55,7 @@ return [
     "wn_intro" => "נכתב עבור מי שמשתמש באפליקציה, לא עבור מי שקורא diff.",
     "wn_full" => "הגרסה המלאה ב‑GitHub",
     "wn_changelog" => "כל הגרסאות",
+    "wn_open" => "קרא את הערות הגרסה",
 
     // screenshots
     "shots_eyebrow" => "מבט מבפנים",

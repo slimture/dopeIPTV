@@ -55,6 +55,7 @@ return [
     "wn_intro" => "Napisane dla osób, które używają aplikacji, a nie dla tych, którzy czytają diffy.",
     "wn_full" => "Pełne wydanie na GitHubie",
     "wn_changelog" => "Wszystkie wersje",
+    "wn_open" => "Przeczytaj informacje o wydaniu",
 
     // screenshots
     "shots_eyebrow" => "Spojrzenie do środka",

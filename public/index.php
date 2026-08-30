@@ -424,7 +424,10 @@ foreach ($shots as [$file, $alt, $title, $cap]):
         <h2><?= h(t('wn_h2')) ?></h2>
         <p><?= h(t('wn_intro')) ?></p>
       </div>
-      <div class="notes"><?= $notesHtml ?></div>
+      <details class="notes-wrap">
+        <summary><?= h(t('wn_open')) ?></summary>
+        <div class="notes"><?= $notesHtml ?></div>
+      </details>
       <p class="autonote"><a href="<?= h($REPO) ?>/releases/tag/v<?= h($version) ?>" rel="nofollow"><?= h(t('wn_full')) ?></a> · <a href="<?= h($REPO) ?>/blob/main/CHANGELOG.md" rel="nofollow"><?= h(t('wn_changelog')) ?></a></p>
     </div>
   </section>

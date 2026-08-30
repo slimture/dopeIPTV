@@ -55,6 +55,7 @@ return [
     "wn_intro" => "Ditulis untuk yang memakai aplikasinya, bukan untuk yang membaca diff.",
     "wn_full" => "Rilis lengkap di GitHub",
     "wn_changelog" => "Semua versi",
+    "wn_open" => "Baca catatan rilis",
 
     // screenshots
     "shots_eyebrow" => "Melihat ke dalam",

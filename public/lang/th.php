@@ -54,6 +54,7 @@ return [
     "wn_intro" => "เขียนสำหรับคนที่ใช้แอป ไม่ใช่สำหรับคนที่อ่าน diff",
     "wn_full" => "รุ่นเต็มบน GitHub",
     "wn_changelog" => "ทุกเวอร์ชัน",
+    "wn_open" => "อ่านบันทึกการอัปเดต",
 
     // screenshots
     "shots_eyebrow" => "มองข้างใน",

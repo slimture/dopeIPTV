@@ -55,6 +55,7 @@ return [
     "wn_intro" => "Imeandikwa kwa wanaotumia programu, si kwa wanaosoma diff.",
     "wn_full" => "Toleo kamili kwenye GitHub",
     "wn_changelog" => "Matoleo yote",
+    "wn_open" => "Soma maelezo ya toleo",
 
     // screenshots
     "shots_eyebrow" => "Mtazamo wa ndani",
