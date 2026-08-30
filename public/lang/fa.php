@@ -73,7 +73,7 @@ return [
     "dl_tip_total"  => "بارگیری‌ها، همه نسخه‌ها",
     "dl_tip_row"  => "بارگیری‌ها",
     "os_help_linux"   => "مطمئن نیستید؟ <b>AppImage</b> را بگیرید — بدون نصب روی هر توزیعی اجرا می‌شود. روی Debian/Ubuntu گزینه <b>.deb</b> را انتخاب کنید. اگر روی دستگاه ARM (Raspberry Pi، سرور ARM) نیستید، <b>Intel / AMD</b> را بگیرید.",
-    "os_help_macos"   => "دو ایمیج: یکی برای Apple Silicon (سری M) و یکی برای مک‌های Intel. مطمئن نیستید؟ منوی Apple ← درباره این Mac. به macOS 15 یا جدیدتر نیاز دارد.",
+    "os_help_macos"   => "‏Apple Silicon (سری M) و نیازمند macOS 15 یا جدیدتر. مطمئن نیستید کدام مک را دارید؟ منوی Apple ← دربارهٔ این مک. مک‌های اینتل دیگر پشتیبانی نمی‌شوند — آخرین نسخهٔ اینتل در صفحهٔ انتشارهای GitHub است.",
     "os_help_windows" => "نسخه قابل‌حمل — استخراج کنید و اجرا کنید، چیزی برای نصب نیست. جدیدترین پلتفرم، هنوز در حال پرداخت.",
     "os_install_linux"   => "🐧 <b>AppImage:</b> آن را اجرایی کنید و اجرا کنید — چیزی برای نصب نیست: <code>chmod +x dopeIPTV-*.AppImage &amp;&amp; ./dopeIPTV-*.AppImage</code>. <b>.deb</b> (Debian/Ubuntu): <code>sudo apt install ./dopeIPTV-*.deb</code>. <b>.rpm</b> (Fedora/RHEL): <code>sudo dnf install ./dopeIPTV-*.rpm</code>.",
     "os_install_macos"   => "🍎 <code>.dmg</code> را باز کنید و dopeIPTV را به Applications بکشید. چون این اپ هنوز توسط Apple تأیید (notarized) نشده است، ممکن است اولین اجرا مسدود شود — <b>روی اپ راست‌کلیک کنید ← Open</b>، سپس <b>Open</b> در کادر گفت‌وگو (یا آن را از <b>System Settings ← Privacy &amp; Security ← Open Anyway</b> اجازه دهید). اگر macOS به‌جای آن بگوید اپ <b>«آسیب‌دیده» (damaged)</b> است، نشانه دانلود را در Terminal بردارید: <code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code>. امن است — این هشدار فقط یعنی نسخه امضا نشده است.",

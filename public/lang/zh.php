@@ -72,7 +72,7 @@ return [
     "dl_tip_total"  => "下载次数(所有版本)",
     "dl_tip_row"  => "下载次数",
     "os_help_linux"   => "不确定？选 <b>AppImage</b>——它无需安装即可在任何发行版上运行。在 Debian/Ubuntu 上选 <b>.deb</b>。除非你用的是 ARM 机器（Raspberry Pi、ARM 服务器），否则选 <b>Intel / AMD</b>。",
-    "os_help_macos"   => "提供两个镜像:一个用于 Apple Silicon(M 系列),一个用于 Intel Mac。不确定?点按苹果菜单 → 关于本机。 需要 macOS 15 或更高版本。",
+    "os_help_macos"   => "Apple Silicon（M 系列），需要 macOS 15 或更高版本。不确定自己用的是哪一款 Mac？苹果菜单 →「关于本机」。Intel Mac 已不再支持——最后一个 Intel 版本在 GitHub 发布页面上。",
     "os_help_windows" => "便携版——解压即用，无需安装。最新的平台，仍在打磨中。",
     "os_install_linux"   => "🐧 <b>AppImage：</b>赋予可执行权限并运行——无需安装：<code>chmod +x dopeIPTV-*.AppImage &amp;&amp; ./dopeIPTV-*.AppImage</code>。<b>.deb</b>（Debian/Ubuntu）：<code>sudo apt install ./dopeIPTV-*.deb</code>。<b>.rpm</b>（Fedora/RHEL）：<code>sudo dnf install ./dopeIPTV-*.rpm</code>。",
     "os_install_macos"   => "🍎 打开 <code>.dmg</code> 并将 dopeIPTV 拖到“应用程序”。由于该应用尚未经过 Apple 公证（notarized），首次启动可能被阻止——<b>右键点击应用 → 打开</b>，然后在对话框中点<b>打开</b>（或在<b>系统设置 → 隐私与安全性 → 仍要打开</b>中允许）。如果 macOS 反而提示应用<b>“已损坏”</b>，请在“终端”中移除下载标记：<code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code>。这是安全的——该警告只是表示此构建未签名。",

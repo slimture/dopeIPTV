@@ -86,10 +86,11 @@ function download_to(string $url, string $dest): bool {
 function classify(string $name): array {
     $n = strtolower($name);
     $arm = (strpos($n, 'arm') !== false || strpos($n, 'aarch64') !== false);
-    // One .dmg per architecture, and an arm64 build cannot launch on an Intel
-    // Mac at all - so each names the one machine it actually runs on. (This
-    // said "Apple Silicon & Intel" on both, left over from when there was a
-    // single universal image.)
+    // Only an Apple Silicon .dmg is built now - Homebrew moved macOS x86_64
+    // to Tier 3 in Sept 2026 and stopped shipping the packages the Intel
+    // build needed, and 1.2.10 was the last release to carry one. The Intel
+    // label stays because an arm64 build cannot launch on an Intel Mac at
+    // all: whatever is offered must name the machine it actually runs on.
     if (str_ends_with($n, '.dmg'))
         return ['macOS · .dmg', $arm ? 'Apple Silicon (M-series)' : 'Intel', '🍎'];
     if (str_ends_with($n, '.appimage'))  return ['Linux · AppImage', $arm ? 'ARM64 · portable' : 'x86_64 · portable', '🐧'];

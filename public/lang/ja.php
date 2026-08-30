@@ -73,7 +73,7 @@ return [
     "dl_tip_total"  => "ダウンロード数(全バージョン)",
     "dl_tip_row"  => "ダウンロード数",
     "os_help_linux"   => "迷ったら <b>AppImage</b> を——インストール不要でどのディストリビューションでも動きます。Debian/Ubuntu では <b>.deb</b> を選択。ARM マシン（Raspberry Pi、ARM サーバー）でなければ <b>Intel / AMD</b> を。",
-    "os_help_macos"   => "イメージは2つ:Apple Silicon(Mシリーズ)用とIntel Mac用。不明な場合は、Appleメニュー →「このMacについて」で確認してください。 macOS 15 以降が必要です。",
+    "os_help_macos"   => "Apple Silicon（Mシリーズ）、macOS 15 以降が必要です。お使いの Mac がどちらか分からない場合は、アップルメニュー →「このMacについて」。Intel Mac はサポートを終了しました。最後の Intel 版は GitHub のリリースページにあります。",
     "os_help_windows" => "ポータブルビルド——解凍して実行、インストール不要。最新のプラットフォームで、まだ調整中です。",
     "os_install_linux"   => "🐧 <b>AppImage:</b> 実行権限を付与して起動——インストール不要: <code>chmod +x dopeIPTV-*.AppImage &amp;&amp; ./dopeIPTV-*.AppImage</code>。<b>.deb</b>（Debian/Ubuntu）: <code>sudo apt install ./dopeIPTV-*.deb</code>。<b>.rpm</b>（Fedora/RHEL）: <code>sudo dnf install ./dopeIPTV-*.rpm</code>。",
     "os_install_macos"   => "🍎 <code>.dmg</code> を開き、dopeIPTV を「アプリケーション」へドラッグします。アプリはまだ Apple の公証（notarized）を受けていないため、初回起動がブロックされることがあります——<b>アプリを右クリック → 開く</b>、続いてダイアログで<b>開く</b>（または <b>システム設定 → プライバシーとセキュリティ → このまま開く</b> から許可）。代わりに macOS がアプリは<b>「破損している」（damaged）</b>と表示する場合は、ターミナルでダウンロードマークを外します: <code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code>。安全です——この警告はビルドが署名されていないことを意味するだけです。",

@@ -45,9 +45,10 @@ function dl_meta(string $name): array {
     $n = strtolower($name);
     $arm = (strpos($n, 'arm') !== false || strpos($n, 'aarch64') !== false);
     $cpu = $arm ? t('arch_arm') : t('arch_x86');
-    // A .dmg is built per architecture (…-macOS-arm64.dmg / …-macOS-x86_64.dmg)
-    // and an arm64 app cannot launch on an Intel Mac at all, so the label must
-    // name the one architecture the file actually runs on.
+    // Only an Apple Silicon .dmg is built now (see sync-releases.php), but
+    // the label still distinguishes the two: an arm64 app cannot launch on an
+    // Intel Mac at all, so whatever is offered must name the one architecture
+    // it actually runs on.
     $mac = $arm ? t('arch_apple_arm') : t('arch_apple_intel');
     if (str_ends_with($n, '.dmg'))
         return ['os'=>'macOS','icon'=>'🍎','title'=>t('dl_t_dmg'),'fmt'=>t('dl_f_dmg'),'arch'=>$mac,'rank'=>($arm?10:12),'rec'=>$arm];

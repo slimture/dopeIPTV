@@ -73,7 +73,7 @@ return [
     "dl_tip_total"  => "downloads, all versions",
     "dl_tip_row"  => "downloads",
     "os_help_linux"   => "Not sure? Get the <b>AppImage</b> — it runs on any distribution with no install. Choose <b>.deb</b> on Debian/Ubuntu. Pick <b>Intel / AMD</b> unless you're on an ARM machine (Raspberry Pi, ARM server).",
-    "os_help_macos"   => "Two images: one for Apple Silicon (M-series), one for Intel Macs. Not sure? Apple menu → About This Mac. Requires macOS 15 or later.",
+    "os_help_macos"   => "Apple Silicon (M-series), macOS 15 or later. Not sure which Mac you have? Apple menu → About This Mac. Intel Macs are no longer supported — the last Intel build is on the GitHub releases page.",
     "os_help_windows" => "Portable build — unzip and run, nothing to install. Newest platform, still being polished.",
     "os_install_linux"   => "🐧 <b>AppImage:</b> make it executable and run it — nothing to install: <code>chmod +x dopeIPTV-*.AppImage &amp;&amp; ./dopeIPTV-*.AppImage</code>. <b>.deb</b> (Debian/Ubuntu): <code>sudo apt install ./dopeIPTV-*.deb</code>. <b>.rpm</b> (Fedora/RHEL): <code>sudo dnf install ./dopeIPTV-*.rpm</code>.",
     "os_install_macos"   => "🍎 Open the <code>.dmg</code> and drag dopeIPTV to Applications. Because the app isn't notarized by Apple yet, the first launch may be blocked — <b>right-click the app → Open</b>, then <b>Open</b> in the dialog (or allow it under <b>System Settings → Privacy &amp; Security → Open Anyway</b>). If macOS instead says the app is <b>“damaged”</b>, clear the download flag in Terminal: <code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code>. It's safe — the warning only means the build isn't code-signed.",

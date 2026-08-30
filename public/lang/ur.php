@@ -73,7 +73,7 @@ return [
     "dl_tip_total"  => "ڈاؤن لوڈز، تمام ورژن",
     "dl_tip_row"  => "ڈاؤن لوڈز",
     "os_help_linux"   => "یقین نہیں؟ <b>AppImage</b> لیں — یہ بغیر انسٹال کیے کسی بھی ڈسٹری بیوشن پر چلتا ہے۔ Debian/Ubuntu پر <b>.deb</b> منتخب کریں۔ جب تک آپ کے پاس ARM مشین (Raspberry Pi، ARM سرور) نہ ہو، <b>Intel / AMD</b> لیں۔",
-    "os_help_macos"   => "دو امیجز: ایک Apple Silicon (M سیریز) کے لیے، ایک Intel Mac کے لیے۔ یقین نہیں؟ Apple مینو ← اس Mac کے بارے میں۔ macOS 15 یا اس سے نیا درکار ہے۔",
+    "os_help_macos"   => "Apple Silicon (M سیریز)، macOS 15 یا اس کے بعد۔ معلوم نہیں آپ کے پاس کون سا Mac ہے؟ Apple مینو ← اس Mac کے بارے میں۔ Intel Mac اب معاون نہیں رہے — آخری Intel بلڈ GitHub کے ریلیز صفحے پر ہے۔",
     "os_help_windows" => "پورٹیبل بلڈ — ان زپ کریں اور چلائیں، انسٹال کرنے کے لیے کچھ نہیں۔ سب سے نیا پلیٹ فارم، ابھی بھی بہتر بنایا جا رہا ہے۔",
     "os_install_linux"   => "🐧 <b>AppImage:</b> اسے قابلِ عمل بنائیں اور چلائیں — انسٹال کرنے کے لیے کچھ نہیں: <code>chmod +x dopeIPTV-*.AppImage &amp;&amp; ./dopeIPTV-*.AppImage</code>۔ <b>.deb</b> (Debian/Ubuntu): <code>sudo apt install ./dopeIPTV-*.deb</code>۔ <b>.rpm</b> (Fedora/RHEL): <code>sudo dnf install ./dopeIPTV-*.rpm</code>۔",
     "os_install_macos"   => "🍎 <code>.dmg</code> کھولیں اور dopeIPTV کو Applications میں گھسیٹیں۔ چونکہ ایپ ابھی Apple سے نوٹرائزڈ (notarized) نہیں ہے، پہلی بار کھلنا بلاک ہو سکتا ہے — <b>ایپ پر رائٹ کلک کریں ← Open</b>، پھر ڈائیلاگ میں <b>Open</b> (یا <b>System Settings ← Privacy &amp; Security ← Open Anyway</b> سے اجازت دیں)۔ اگر اس کے بجائے macOS کہے کہ ایپ <b>”خراب“ (damaged)</b> ہے، تو Terminal میں ڈاؤن لوڈ نشان ہٹائیں: <code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code>۔ یہ محفوظ ہے — انتباہ کا صرف یہ مطلب ہے کہ بلڈ پر دستخط نہیں ہیں۔",

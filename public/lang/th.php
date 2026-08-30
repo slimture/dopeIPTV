@@ -72,7 +72,7 @@ return [
     "dl_tip_total"  => "ยอดดาวน์โหลด ทุกเวอร์ชัน",
     "dl_tip_row"  => "ยอดดาวน์โหลด",
     "os_help_linux"   => "ไม่แน่ใจ? เลือก <b>AppImage</b> — ใช้งานได้บนทุกดิสทริบิวชันโดยไม่ต้องติดตั้ง เลือก <b>.deb</b> บน Debian/Ubuntu เลือก <b>Intel / AMD</b> เว้นแต่คุณจะใช้เครื่อง ARM (Raspberry Pi, เซิร์ฟเวอร์ ARM)",
-    "os_help_macos"   => "มีสองอิมเมจ: หนึ่งสำหรับ Apple Silicon (ซีรีส์ M) และอีกหนึ่งสำหรับ Intel Mac ไม่แน่ใจ? เมนู Apple → เกี่ยวกับ Mac เครื่องนี้ ต้องใช้ macOS 15 ขึ้นไป",
+    "os_help_macos"   => "Apple Silicon (ตระกูล M) และต้องใช้ macOS 15 ขึ้นไป ไม่แน่ใจว่าเครื่องของคุณเป็นรุ่นไหน เมนู Apple → เกี่ยวกับ Mac เครื่องนี้ Mac ที่ใช้ Intel ไม่รองรับอีกต่อไป — บิลด์ Intel ล่าสุดอยู่ในหน้าเผยแพร่บน GitHub",
     "os_help_windows" => "รุ่นพกพา — แตกไฟล์แล้วเรียกใช้ ไม่มีอะไรต้องติดตั้ง แพลตฟอร์มใหม่ล่าสุด ยังอยู่ระหว่างการปรับแต่ง",
     "os_install_linux"   => "🐧 <b>AppImage:</b> ทำให้รันได้แล้วเปิดใช้งาน — ไม่มีอะไรต้องติดตั้ง: <code>chmod +x dopeIPTV-*.AppImage &amp;&amp; ./dopeIPTV-*.AppImage</code>. <b>.deb</b> (Debian/Ubuntu): <code>sudo apt install ./dopeIPTV-*.deb</code>. <b>.rpm</b> (Fedora/RHEL): <code>sudo dnf install ./dopeIPTV-*.rpm</code>.",
     "os_install_macos"   => "🍎 เปิด <code>.dmg</code> แล้วลาก dopeIPTV ไปที่ Applications เนื่องจากแอปยังไม่ได้รับการรับรอง (notarized) จาก Apple การเปิดครั้งแรกอาจถูกบล็อก — <b>คลิกขวาที่แอป → Open</b> แล้ว <b>Open</b> ในกล่องโต้ตอบ (หรืออนุญาตใน <b>System Settings → Privacy &amp; Security → Open Anyway</b>) หากแทนที่จะเป็นเช่นนั้น macOS บอกว่าแอป <b>“เสียหาย” (damaged)</b> ให้ลบเครื่องหมายดาวน์โหลดใน Terminal: <code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code> ปลอดภัย — คำเตือนหมายความเพียงว่าบิลด์ยังไม่ได้เซ็นชื่อ",
