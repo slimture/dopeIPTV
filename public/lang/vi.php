@@ -49,6 +49,11 @@ return [
     "feat_c6_p" => "Một engine mpv tích hợp, với Chromecast, đồng bộ Trakt, giao diện và điều khiển bàn phím đầy đủ.",
     "feat_lf_h" => "Cả tệp của riêng bạn",
     "feat_lf_p" => "Trỏ tới một thư mục hoặc ổ chia sẻ đã gắn, và video của bạn nằm cạnh video của nhà cung cấp — có áp phích, xem tiếp, phim bộ dựng từ tên tệp, và hàng đợi phát cho nhạc.",
+    "wn_eyebrow" => "Ghi chú phát hành",
+    "wn_h2" => "Có gì mới",
+    "wn_intro" => "Viết cho người dùng ứng dụng, không phải cho người đọc diff.",
+    "wn_full" => "Bản phát hành đầy đủ trên GitHub",
+    "wn_changelog" => "Mọi phiên bản",
 
     // screenshots
     "shots_eyebrow" => "Nhìn vào bên trong",

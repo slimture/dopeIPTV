@@ -50,6 +50,11 @@ return [
     "feat_c6_p" => "Een ingebouwde mpv-engine, met Chromecast, Trakt-synchronisatie, thema's en volledige toetsenbordbediening.",
     "feat_lf_h" => "Ook je eigen bestanden",
     "feat_lf_p" => "Wijs een map of gekoppelde share aan en je video's staan naast die van de provider — met posters, hervatten, series opgebouwd uit de bestandsnamen en een afspeelwachtrij voor muziek.",
+    "wn_eyebrow" => "Releaseopmerkingen",
+    "wn_h2" => "Wat er nieuw is",
+    "wn_intro" => "Geschreven voor wie de app gebruikt, niet voor wie diffs leest.",
+    "wn_full" => "Volledige release op GitHub",
+    "wn_changelog" => "Alle versies",
 
     // screenshots
     "shots_eyebrow" => "Een kijkje binnenin",

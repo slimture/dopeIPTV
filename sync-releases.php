@@ -283,9 +283,17 @@ foreach (glob(FILES_DIR . '/*') as $f) {
     if ($b !== '.gitkeep' && empty($keep[$b])) { @unlink($f); fwrite(STDERR, "[sync] pruned stale $b\n"); }
 }
 
+// The release notes, so the page can show what changed without anyone
+// copying them across by hand. Capped: this is a landing-page section, not
+// an archive, and an unbounded field from the API has no business being
+// written straight into a file the site reads on every request.
+$notes = (string)($rel['body'] ?? '');
+if (strlen($notes) > 20000) { $notes = substr($notes, 0, 20000) . "\n\n…"; }
+
 $out = [
     'version'      => $version,
     'published_at' => $rel['published_at'] ?? null,
+    'notes'        => $notes,
     'html_url'     => $rel['html_url'] ?? ('https://github.com/' . REPO . '/releases'),
     'assets'       => $assets,
     'synced_at'    => gmdate('c'),

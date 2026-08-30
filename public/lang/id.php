@@ -50,6 +50,11 @@ return [
     "feat_c6_p" => "Mesin mpv bawaan, dengan Chromecast, sinkronisasi Trakt, tema, dan kontrol keyboard penuh.",
     "feat_lf_h" => "Berkas Anda sendiri juga",
     "feat_lf_p" => "Arahkan ke sebuah folder atau berbagi yang terpasang, dan video Anda berdampingan dengan milik penyedia — dengan poster, lanjutkan menonton, serial yang dibangun dari nama berkas, dan antrean putar untuk musik.",
+    "wn_eyebrow" => "Catatan rilis",
+    "wn_h2" => "Apa yang baru",
+    "wn_intro" => "Ditulis untuk yang memakai aplikasinya, bukan untuk yang membaca diff.",
+    "wn_full" => "Rilis lengkap di GitHub",
+    "wn_changelog" => "Semua versi",
 
     // screenshots
     "shots_eyebrow" => "Melihat ke dalam",

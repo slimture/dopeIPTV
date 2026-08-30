@@ -243,3 +243,51 @@ footer nav a:hover { color: var(--accent); }
 .faq-item[open] summary::after { content: "\2212"; }
 .faq-item summary:hover { color: var(--accent); }
 .faq-item p { margin: 0 18px 16px; color: var(--muted); line-height: 1.65; max-width: 72ch; }
+
+/* ---- Release notes ("What's new") -------------------------------------- */
+/* Rendered server-side from releases.json by render_notes(). Reads as a
+   document rather than a feature grid: one column, generous line height,
+   and a left rule on the headings so the sections scan without shouting. */
+.notes {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 22px 26px;
+  max-width: 78ch;                /* a measure that stays readable */
+}
+.notes h4 {
+  margin: 26px 0 10px;
+  font-size: 15px;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border-left: 3px solid var(--accent);
+  padding-left: 10px;
+}
+.notes h4:first-child { margin-top: 0; }
+.notes p { margin: 0 0 14px; color: var(--text); line-height: 1.65; }
+.notes ul { margin: 0 0 14px; padding-left: 20px; }
+.notes li {
+  margin: 0 0 10px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.notes li strong { color: var(--text); font-weight: 600; }
+.notes code {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 1px 5px;
+  font-size: .92em;
+}
+.notes blockquote {
+  margin: 18px 0 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--line-2);
+  color: var(--faint);
+  font-size: 14px;
+}
+.notes a { color: var(--accent); }
+@media (max-width: 640px) {
+  .notes { padding: 18px; border-radius: 12px; }
+}

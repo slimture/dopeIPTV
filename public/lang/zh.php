@@ -49,6 +49,11 @@ return [
     "feat_c6_p" => "内置 mpv 引擎，支持 Chromecast、Trakt 同步、主题和完整的键盘控制。",
     "feat_lf_h" => "也包括你自己的文件",
     "feat_lf_p" => "指定一个文件夹或已挂载的共享，你的视频便与运营商的内容并列——带封面、续播、从文件名重建的剧集，以及音乐播放队列。",
+    "wn_eyebrow" => "版本说明",
+    "wn_h2" => "新变化",
+    "wn_intro" => "写给使用这个应用的人，而不是读 diff 的人。",
+    "wn_full" => "GitHub 上的完整发布",
+    "wn_changelog" => "所有版本",
 
     // screenshots
     "shots_eyebrow" => "内部一览",

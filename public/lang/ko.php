@@ -49,6 +49,11 @@ return [
     "feat_c6_p" => "Chromecast, Trakt 동기화, 테마, 전체 키보드 제어를 지원하는 내장 mpv 엔진.",
     "feat_lf_h" => "내 파일까지",
     "feat_lf_p" => "폴더나 마운트한 공유를 지정하면 내 동영상이 제공업체 콘텐츠 옆에 놓입니다 — 포스터, 이어보기, 파일 이름으로 구성한 시리즈, 그리고 음악용 재생 대기열까지.",
+    "wn_eyebrow" => "릴리스 노트",
+    "wn_h2" => "새로워진 점",
+    "wn_intro" => "diff를 읽는 사람이 아니라 앱을 쓰는 사람을 위해 썼습니다.",
+    "wn_full" => "GitHub의 전체 릴리스",
+    "wn_changelog" => "모든 버전",
 
     // screenshots
     "shots_eyebrow" => "내부 들여다보기",

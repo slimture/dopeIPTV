@@ -50,6 +50,11 @@ return [
     "feat_c6_p" => "Chromecast, Trakt senkronizasyonu, temalar ve tam klavye kontrolüyle yerleşik bir mpv motoru.",
     "feat_lf_h" => "Kendi dosyalarınız da",
     "feat_lf_p" => "Bir klasörü ya da bağlı bir paylaşımı gösterin; videolarınız sağlayıcınınkilerin yanında yer alsın — afişler, kaldığı yerden devam, dosya adlarından kurulan diziler ve müzik için bir çalma kuyruğu.",
+    "wn_eyebrow" => "Sürüm notları",
+    "wn_h2" => "Yenilikler",
+    "wn_intro" => "Diff okuyanlar için değil, uygulamayı kullananlar için yazıldı.",
+    "wn_full" => "GitHub'daki tam sürüm",
+    "wn_changelog" => "Tüm sürümler",
 
     // screenshots
     "shots_eyebrow" => "İçeriden bir bakış",

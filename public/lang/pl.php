@@ -50,6 +50,11 @@ return [
     "feat_c6_p" => "Wbudowany silnik mpv, z Chromecastem, synchronizacją Trakt, motywami i pełną obsługą klawiatury.",
     "feat_lf_h" => "Także twoje własne pliki",
     "feat_lf_p" => "Wskaż folder lub zamontowany zasób, a twoje filmy staną obok tych od dostawcy — z okładkami, wznawianiem, serialami zbudowanymi z nazw plików i kolejką odtwarzania dla muzyki.",
+    "wn_eyebrow" => "Informacje o wydaniu",
+    "wn_h2" => "Co nowego",
+    "wn_intro" => "Napisane dla osób, które używają aplikacji, a nie dla tych, którzy czytają diffy.",
+    "wn_full" => "Pełne wydanie na GitHubie",
+    "wn_changelog" => "Wszystkie wersje",
 
     // screenshots
     "shots_eyebrow" => "Spojrzenie do środka",

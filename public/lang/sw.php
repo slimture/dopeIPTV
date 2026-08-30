@@ -50,6 +50,11 @@ return [
     "feat_c6_p" => "Injini ya mpv iliyojengwa ndani, ikiwa na Chromecast, ulandanishi wa Trakt, mandhari na udhibiti kamili wa kibodi.",
     "feat_lf_h" => "Pia faili zako mwenyewe",
     "feat_lf_p" => "Elekeza kwenye folda au sehemu iliyopachikwa na video zako zitakaa kando ya za mtoa huduma — zikiwa na mabango, kuendelea ulipoishia, misururu iliyojengwa kutoka majina ya faili, na foleni ya kucheza kwa muziki.",
+    "wn_eyebrow" => "Maelezo ya toleo",
+    "wn_h2" => "Yaliyo mapya",
+    "wn_intro" => "Imeandikwa kwa wanaotumia programu, si kwa wanaosoma diff.",
+    "wn_full" => "Toleo kamili kwenye GitHub",
+    "wn_changelog" => "Matoleo yote",
 
     // screenshots
     "shots_eyebrow" => "Mtazamo wa ndani",

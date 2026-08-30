@@ -50,6 +50,11 @@ return [
     "feat_c6_p" => "Ugrađeni mpv engine, s Chromecastom, Trakt sinkronizacijom, temama i potpunom kontrolom tipkovnicom.",
     "feat_lf_h" => "I vaše vlastite datoteke",
     "feat_lf_p" => "Usmjerite ga na mapu ili montirani dijeljeni resurs i vaši videozapisi stoje uz one od pružatelja — s plakatima, nastavkom gledanja, serijama izgrađenima iz naziva datoteka i redom reprodukcije za glazbu.",
+    "wn_eyebrow" => "Bilješke o izdanju",
+    "wn_h2" => "Što je novo",
+    "wn_intro" => "Napisano za one koji koriste aplikaciju, a ne za one koji čitaju diffove.",
+    "wn_full" => "Cijelo izdanje na GitHubu",
+    "wn_changelog" => "Sve verzije",
 
     // screenshots
     "shots_eyebrow" => "Pogled iznutra",

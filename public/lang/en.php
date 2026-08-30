@@ -50,6 +50,11 @@ return [
     "feat_c6_p" => "A built-in mpv engine, with Chromecast, Trakt sync, themes and full keyboard control.",
     "feat_lf_h" => "Your own files too",
     "feat_lf_p" => "Point it at a folder or a mounted share and your videos sit beside the provider's — with posters, resume, series built from the file names, and a play queue for music.",
+    "wn_eyebrow" => "Release notes",
+    "wn_h2" => "What's new",
+    "wn_intro" => "Written for people who use the app, not for people who read diffs.",
+    "wn_full" => "Full release on GitHub",
+    "wn_changelog" => "Every version",
 
     // screenshots
     "shots_eyebrow" => "A look inside",

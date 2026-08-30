@@ -49,6 +49,11 @@ return [
     "feat_c6_p" => "Un motor mpv integrado, con Chromecast, sincronización con Trakt, temas y control total por teclado.",
     "feat_lf_h" => "También tus propios archivos",
     "feat_lf_p" => "Indica una carpeta o un recurso montado y tus vídeos quedan junto a los del proveedor: carátulas, reanudar, series construidas a partir de los nombres de archivo y una cola de reproducción para la música.",
+    "wn_eyebrow" => "Notas de la versión",
+    "wn_h2" => "Novedades",
+    "wn_intro" => "Escrito para quien usa la aplicación, no para quien lee diffs.",
+    "wn_full" => "Versión completa en GitHub",
+    "wn_changelog" => "Todas las versiones",
 
     // screenshots
     "shots_eyebrow" => "Un vistazo por dentro",

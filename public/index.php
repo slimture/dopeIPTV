@@ -41,6 +41,80 @@ function dl_total(array $counts): int {
  * OS. The human labels are localized via t(); the OS group key stays a fixed
  * ASCII token ('Linux'/'macOS'/'Windows'/'Other') used for grouping + icons.
  */
+/**
+ * Render the release notes.
+ *
+ * A deliberately small renderer for the subset the notes actually use -
+ * headings, bullets, bold, code, links and a closing blockquote - rather
+ * than a Markdown library pulled in for one section of one page.
+ *
+ * ESCAPED FIRST, formatted second, and never the other way round: the text
+ * arrives from the GitHub API, and building HTML out of it before escaping
+ * is how a release title becomes markup on the page. Links are rebuilt from
+ * the captured parts and only http/https survives, so an escaped javascript:
+ * URL cannot come back as an anchor.
+ */
+function render_notes(string $md): string {
+    $out   = '';
+    $inList = false;
+    $para  = [];
+
+    $inline = static function (string $t): string {
+        $t = htmlspecialchars($t, ENT_QUOTES, 'UTF-8');
+        $t = preg_replace('/`([^`]+)`/', '<code>$1</code>', $t);
+        $t = preg_replace('/\*\*([^*]+)\*\*/', '<strong>$1</strong>', $t);
+        // The URL is already escaped; accept only the two schemes a link on
+        // this page can legitimately have.
+        $t = preg_replace_callback(
+            '/\[([^\]]+)\]\((https?:&#0*39;?[^)\s]*|https?:\/\/[^)\s]+)\)/',
+            static function ($m) {
+                $href = html_entity_decode($m[2], ENT_QUOTES, 'UTF-8');
+                if (!preg_match('~^https?://~i', $href)) { return $m[0]; }
+                return '<a href="' . htmlspecialchars($href, ENT_QUOTES, 'UTF-8')
+                     . '" rel="noopener">' . $m[1] . '</a>';
+            }, $t);
+        return $t;
+    };
+    $flush = static function () use (&$para, &$out, $inline) {
+        if ($para) { $out .= '<p>' . $inline(implode(' ', $para)) . "</p>\n"; $para = []; }
+    };
+    $closeList = static function () use (&$inList, &$out) {
+        if ($inList) { $out .= "</ul>\n"; $inList = false; }
+    };
+
+    foreach (preg_split('/\R/', $md) as $line) {
+        $t = rtrim($line);
+        if ($t === '') { $flush(); $closeList(); continue; }
+        // "## dopeIPTV 1.2.11" is the version, which the section heading
+        // already says - dropped rather than repeated.
+        if (preg_match('/^##\s+dopeIPTV\b/i', $t)) { continue; }
+        if (preg_match('/^###\s+(.*)$/', $t, $m)) {
+            $flush(); $closeList();
+            $out .= '<h4>' . $inline($m[1]) . "</h4>\n";
+            continue;
+        }
+        if (preg_match('/^>\s?(.*)$/', $t, $m)) {
+            $flush(); $closeList();
+            $out .= '<blockquote>' . $inline($m[1]) . "</blockquote>\n";
+            continue;
+        }
+        if (preg_match('/^[-*]\s+(.*)$/', $t, $m)) {
+            $flush();
+            if (!$inList) { $out .= "<ul>\n"; $inList = true; }
+            $out .= '<li>' . $inline($m[1]) . "</li>\n";
+            continue;
+        }
+        // An indented continuation belongs to the bullet above it.
+        if ($inList && preg_match('/^\s+\S/', $line)) {
+            $out = preg_replace('~</li>\n$~', ' ' . $inline(trim($t)) . "</li>\n", $out);
+            continue;
+        }
+        $para[] = trim($t);
+    }
+    $flush(); $closeList();
+    return $out;
+}
+
 function dl_meta(string $name): array {
     $n = strtolower($name);
     $arm = (strpos($n, 'arm') !== false || strpos($n, 'aarch64') !== false);
@@ -341,6 +415,20 @@ foreach ($shots as [$file, $alt, $title, $cap]):
 <?php endif; ?>
     </div>
   </section>
+
+<?php $notesHtml = render_notes((string)($rel['notes'] ?? '')); if ($notesHtml !== ''): ?>
+  <section id="whats-new" class="pt0">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow"><?= h(t('wn_eyebrow')) ?> · v<?= h($version) ?><?= $relDate ? ' · ' . h($relDate) : '' ?></span>
+        <h2><?= h(t('wn_h2')) ?></h2>
+        <p><?= h(t('wn_intro')) ?></p>
+      </div>
+      <div class="notes"><?= $notesHtml ?></div>
+      <p class="autonote"><a href="<?= h($REPO) ?>/releases/tag/v<?= h($version) ?>" rel="nofollow"><?= h(t('wn_full')) ?></a> · <a href="<?= h($REPO) ?>/blob/main/CHANGELOG.md" rel="nofollow"><?= h(t('wn_changelog')) ?></a></p>
+    </div>
+  </section>
+<?php endif; ?>
 
   <section id="faq" class="pt0">
     <div class="wrap">

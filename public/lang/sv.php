@@ -50,6 +50,11 @@ return [
     "feat_c6_p" => "En inbyggd mpv-motor, med Chromecast, Trakt-synk, teman och full tangentbordsstyrning.",
     "feat_lf_h" => "Även dina egna filer",
     "feat_lf_p" => "Peka ut en mapp eller en monterad share så ligger dina videor bredvid leverantörens — med omslag, återupptagning, serier byggda ur filnamnen och en spelkö för musik.",
+    "wn_eyebrow" => "Versionsnyheter",
+    "wn_h2" => "Vad som är nytt",
+    "wn_intro" => "Skrivet för den som använder appen, inte för den som läser diffar.",
+    "wn_full" => "Hela releasen på GitHub",
+    "wn_changelog" => "Alla versioner",
 
     // screenshots
     "shots_eyebrow" => "En titt inuti",

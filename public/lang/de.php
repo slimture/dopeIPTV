@@ -50,6 +50,11 @@ return [
     "feat_c6_p" => "Eine integrierte mpv-Engine, mit Chromecast, Trakt-Sync, Themes und vollständiger Tastatursteuerung.",
     "feat_lf_h" => "Auch Ihre eigenen Dateien",
     "feat_lf_p" => "Einen Ordner oder eine eingebundene Freigabe angeben, und Ihre Videos stehen neben denen des Anbieters — mit Covern, Fortsetzen, aus Dateinamen gebauten Serien und einer Warteschlange für Musik.",
+    "wn_eyebrow" => "Versionshinweise",
+    "wn_h2" => "Was neu ist",
+    "wn_intro" => "Geschrieben für Leute, die die App benutzen, nicht für Leute, die Diffs lesen.",
+    "wn_full" => "Vollständige Version auf GitHub",
+    "wn_changelog" => "Alle Versionen",
 
     // screenshots
     "shots_eyebrow" => "Ein Blick ins Innere",
