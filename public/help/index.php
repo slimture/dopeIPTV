@@ -65,7 +65,7 @@ const HELP = [
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon.png" sizes="any">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="<?= h(asset('/style.css')) ?>">
 </head>
 <body>
 <?php $nav_current = 'help'; require __DIR__ . '/../nav.php'; ?>
@@ -135,7 +135,7 @@ const HELP = [
     </nav>
   </div>
 </footer>
-<script src="/nav.js" defer></script>
-<script src="/help.js" defer></script>
+<script src="<?= h(asset('/nav.js')) ?>" defer></script>
+<script src="<?= h(asset('/help.js')) ?>" defer></script>
 </body>
 </html>

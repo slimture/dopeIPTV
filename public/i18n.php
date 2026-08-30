@@ -128,3 +128,28 @@ function i18n_hreflang(string $site): string {
 function i18n_canonical(string $site): string {
     return lang_code() === 'en' ? "$site/" : "$site/?lang=" . lang_code();
 }
+
+/**
+ * A stylesheet or script URL with the file's own fingerprint on it.
+ *
+ * The pages are PHP and are never cached; the CSS and JS are static and are
+ * cached for an hour (deploy/content-iptv.dope.rs.conf). So for an hour
+ * after a deploy a returning visitor gets the NEW markup with the OLD
+ * stylesheet - which is not a slightly stale page, it is a broken one: the
+ * header menu came through as a bare ▸ because the rules that dress it had
+ * not arrived. Any change to markup and CSS together does this.
+ *
+ * The content hash makes the URL change exactly when the file does, so the
+ * two can never disagree. Identical content keeps its URL and stays cached.
+ * It lives in i18n.php because that is the one file every page bootstraps
+ * from, and the version has to be known before <head> is written.
+ */
+function asset(string $path): string {
+    static $seen = [];
+    if (!isset($seen[$path])) {
+        $file = __DIR__ . '/' . ltrim($path, '/');
+        $hash = @md5_file($file);
+        $seen[$path] = $hash ? substr($hash, 0, 10) : (string) time();
+    }
+    return $path . '?v=' . $seen[$path];
+}

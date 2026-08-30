@@ -200,7 +200,7 @@ unset($g);
 <link rel="icon" href="/favicon.png" sizes="any">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="<?= h(asset('/style.css')) ?>">
 <script type="application/ld+json">
 <?php
 // A linked @graph (Organization + WebSite + SoftwareApplication + FAQPage) so
@@ -457,7 +457,7 @@ foreach ($shots as [$file, $alt, $title, $cap]):
     </nav>
   </div>
 </footer>
-<script src="/nav.js" defer></script>
-<script src="/app.js" defer></script>
+<script src="<?= h(asset('/nav.js')) ?>" defer></script>
+<script src="<?= h(asset('/app.js')) ?>" defer></script>
 </body>
 </html>
