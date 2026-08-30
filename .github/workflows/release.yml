@@ -162,7 +162,15 @@ jobs:
             libgl1 libegl1 libxcb-cursor0 libpulse0 desktop-file-utils \
             libfuse2
           sudo gem install --no-document fpm
-          wget -q -O /usr/local/bin/appimagetool \
+          # Retried, because one flaky transfer used to fail the whole Linux
+          # build - the primary platform - on a download that works if you
+          # ask twice. The Windows job's fetches have had this since they
+          # were written; these two never did.
+          fetch() {
+            wget -q --tries=4 --timeout=30 --waitretry=5 \
+              --retry-connrefused -O "$1" "$2"
+          }
+          fetch /usr/local/bin/appimagetool \
             https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-${{ matrix.arch }}.AppImage
           chmod +x /usr/local/bin/appimagetool
           # Statically-linked AppImage runtime. The default runtime needs the
@@ -170,8 +178,12 @@ jobs:
           # AppImage refuses to start with a cryptic FUSE error until the user
           # runs "apt install libfuse2". This static runtime carries its own
           # FUSE, so the AppImage "just runs" on a stock system.
-          wget -q -O /usr/local/bin/appimage-runtime \
+          fetch /usr/local/bin/appimage-runtime \
             https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-${{ matrix.arch }}
+          # A truncated download is worse than a failed one: appimagetool
+          # would run and produce an AppImage nobody can start.
+          test -s /usr/local/bin/appimagetool
+          test -s /usr/local/bin/appimage-runtime
       - name: Python build deps
         run: |
           python -m pip install --upgrade pip pyinstaller
