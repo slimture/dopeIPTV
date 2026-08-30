@@ -871,5 +871,9 @@
   "queue_clear": "Liste leeren",
   "queue_added": "{n} hinzugefügt",
   "local_art_online": "Fehlende Albumcover online suchen",
-  "setting_nextup_lead": "„Nächste Folge“ anzeigen vor dem Ende"
+  "setting_nextup_lead": "„Nächste Folge“ anzeigen vor dem Ende",
+  "setting_desktop_entry": "Im Anwendungsmenü anzeigen",
+  "setting_desktop_entry_hint": "Schreibt einen Starter nach ~/.local/share/applications. Unter Wayland liest die Taskleiste von dort auch Symbol und Namen des Fensters. Abwählen entfernt den Eintrag wieder.",
+  "desktop_entry_title": "Zum Anwendungsmenü hinzufügen?",
+  "desktop_entry_ask": "Für diese Kopie von dopeIPTV hat nichts einen Menüeintrag installiert, also kennt der Desktop weder Symbol noch Namen – unter Wayland zeigt die Taskleiste deshalb einen leeren Platzhalter. Jetzt einen anlegen? Er landet nur in Ihrem Benutzerordner und lässt sich in den Einstellungen wieder entfernen."
 }

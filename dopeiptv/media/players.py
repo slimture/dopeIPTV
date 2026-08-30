@@ -8,6 +8,7 @@ import subprocess
 import sys
 
 from ..core.log import log, redact_url
+from ..core.xdg import system_env
 
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QMessageBox
@@ -91,27 +92,11 @@ def embedded_playback_supported() -> bool:
     return embedded_playback_reason() is None
 
 
-def _system_env() -> dict:
-    """Environment for spawning a SYSTEM binary (mpv/VLC) from inside a
-    frozen bundle. PyInstaller/AppImage prepend our bundled libraries to
-    the loader/plugin paths; a system player that inherits those loads
-    OUR Qt/libmpv/ffmpeg instead of its own and fails to start - which is
-    why external mpv "doesn't work" from the AppImage/.deb. Restore the
-    pre-launch values PyInstaller stashes as *_ORIG, or drop the vars
-    entirely, so the child runs against the real system libraries. On a
-    plain source run none of these are set, so this is a no-op there."""
-    env = dict(os.environ)
-    for var in ("LD_LIBRARY_PATH", "LD_PRELOAD", "QT_PLUGIN_PATH",
-                "QT_QPA_PLATFORM_PLUGIN_PATH", "QML2_IMPORT_PATH",
-                "GST_PLUGIN_SYSTEM_PATH", "GST_PLUGIN_PATH", "GTK_PATH",
-                "GDK_PIXBUF_MODULE_FILE", "FONTCONFIG_FILE",
-                "FONTCONFIG_PATH", "PYTHONHOME", "PYTHONPATH"):
-        orig = env.get(var + "_ORIG")
-        if orig:
-            env[var] = orig
-        else:
-            env.pop(var, None)
-    return env
+# Spawning a system player from inside a frozen bundle needs the bundle's
+# library paths stripped first, or the player loads OUR Qt/libmpv/ffmpeg and
+# never starts. That now lives in core.xdg, because opening a LINK has
+# exactly the same problem and exactly the same cure.
+_system_env = system_env
 
 
 def launch_player(player: str, url: str, title: str | None = None,

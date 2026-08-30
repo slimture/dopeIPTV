@@ -871,5 +871,9 @@
   "queue_clear": "Xoá hàng đợi",
   "queue_added": "Đã thêm {n}",
   "local_art_online": "Tìm ảnh bìa album còn thiếu trực tuyến",
-  "setting_nextup_lead": "Hiện \"Tập tiếp theo\" trước khi kết thúc"
+  "setting_nextup_lead": "Hiện \"Tập tiếp theo\" trước khi kết thúc",
+  "setting_desktop_entry": "Hiện trong trình đơn ứng dụng",
+  "setting_desktop_entry_hint": "Ghi một mục khởi chạy vào ~/.local/share/applications. Trên Wayland, thanh tác vụ cũng lấy biểu tượng và tên cửa sổ từ đó. Bỏ chọn sẽ xoá mục này.",
+  "desktop_entry_title": "Thêm vào trình đơn ứng dụng?",
+  "desktop_entry_ask": "Chưa có gì cài mục trình đơn cho bản dopeIPTV này, nên màn hình nền không biết biểu tượng lẫn tên của nó — trên Wayland đó là lý do thanh tác vụ hiện một ô trống. Thêm ngay bây giờ? Nó chỉ nằm trong thư mục cá nhân của bạn, và Cài đặt có thể gỡ đi."
 }

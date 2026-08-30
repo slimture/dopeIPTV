@@ -871,5 +871,9 @@
   "queue_clear": "Vider la file",
   "queue_added": "{n} ajoutés",
   "local_art_online": "Chercher les pochettes manquantes en ligne",
-  "setting_nextup_lead": "Afficher « Épisode suivant » avant la fin"
+  "setting_nextup_lead": "Afficher « Épisode suivant » avant la fin",
+  "setting_desktop_entry": "Afficher dans le menu des applications",
+  "setting_desktop_entry_hint": "Écrit un lanceur dans ~/.local/share/applications. Sous Wayland, c'est aussi de là que la barre des tâches tire l'icône et le nom de la fenêtre. Décocher supprime l'entrée.",
+  "desktop_entry_title": "Ajouter au menu des applications ?",
+  "desktop_entry_ask": "Rien n'a installé d'entrée de menu pour cette copie de dopeIPTV : le bureau n'a donc ni icône ni nom pour elle — sous Wayland, c'est pourquoi la barre des tâches affiche un emplacement vide. En ajouter une maintenant ? Elle ne va que dans votre dossier personnel, et les Réglages peuvent la retirer."
 }

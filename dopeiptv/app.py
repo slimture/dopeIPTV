@@ -97,17 +97,23 @@ def make_app_icon(inset: float = 0.0, sizes=(256, 128, 64, 48, 32)) -> QIcon:
 
 
 def install_icon(icon: QIcon) -> None:
-    """Save the icon into the XDG icon theme so .desktop files can find it."""
+    """Save the icon into the XDG icon theme so .desktop files can find it.
+
+    Every rendered size, not just 256: a panel or a dash asks for 32 or 48,
+    and with only the big one there it downscales, which is why the icon
+    looked soft beside sharp system icons."""
     base = Path(os.environ.get(
         "XDG_DATA_HOME", Path.home() / ".local" / "share"))
-    target = base / "icons" / "hicolor" / "256x256" / "apps" / "dopeiptv.png"
-    if target.exists():
-        return
-    try:
-        target.parent.mkdir(parents=True, exist_ok=True)
-        icon.pixmap(256, 256).save(str(target), "PNG")
-    except OSError:
-        pass
+    for size in (256, 128, 64, 48, 32):
+        target = (base / "icons" / "hicolor" / f"{size}x{size}" / "apps"
+                  / "dopeiptv.png")
+        if target.exists():
+            continue
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            icon.pixmap(size, size).save(str(target), "PNG")
+        except OSError:
+            pass
 
 
 def _install_crash_hooks() -> None:
@@ -294,8 +300,8 @@ def main() -> int:
         sizes=((512, 256, 128, 64, 48, 32) if _mac
                else (256, 128, 64, 48, 32)))
     app.setWindowIcon(icon)
-    # The XDG theme copy is Linux-only and wants no Apple margin.
-    if not _mac:
+    # The XDG icon theme is a Linux thing, and wants no Apple margin.
+    if sys.platform.startswith("linux"):
         install_icon(icon)
     settings = QSettings(ORG, ORG)
     from .i18n import is_rtl, set_language

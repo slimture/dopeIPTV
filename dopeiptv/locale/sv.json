@@ -871,5 +871,9 @@
   "queue_clear": "Töm kön",
   "queue_added": "{n} tillagda i kön",
   "local_art_online": "Hämta saknad albumkonst online",
-  "setting_nextup_lead": "Visa ”Nästa avsnitt” före slutet"
+  "setting_nextup_lead": "Visa ”Nästa avsnitt” före slutet",
+  "setting_desktop_entry": "Visa i programmenyn",
+  "setting_desktop_entry_hint": "Skriver en programpost till ~/.local/share/applications. På Wayland är det också därifrån aktivitetsfältet hämtar fönstrets ikon och namn. Avbockad tas posten bort igen.",
+  "desktop_entry_title": "Lägg till i programmenyn?",
+  "desktop_entry_ask": "Ingenting har installerat någon menypost för den här kopian av dopeIPTV, så skrivbordet har varken ikon eller namn för den – på Wayland är det därför aktivitetsfältet visar en tom platshållare. Lägga till en nu? Den hamnar bara i din hemkatalog, och Inställningar kan ta bort den igen."
 }

@@ -871,5 +871,9 @@
   "queue_clear": "Limpar a fila",
   "queue_added": "{n} adicionados",
   "local_art_online": "Buscar capas de álbum ausentes online",
-  "setting_nextup_lead": "Mostrar «Próximo episódio» antes do fim"
+  "setting_nextup_lead": "Mostrar «Próximo episódio» antes do fim",
+  "setting_desktop_entry": "Mostrar no menu de aplicações",
+  "setting_desktop_entry_hint": "Escreve um lançador em ~/.local/share/applications. No Wayland é também daí que a barra de tarefas lê o ícone e o nome da janela. Desmarcar remove a entrada.",
+  "desktop_entry_title": "Adicionar ao menu de aplicações?",
+  "desktop_entry_ask": "Nada instalou uma entrada de menu para esta cópia do dopeIPTV, por isso o ambiente de trabalho não tem ícone nem nome para ela — no Wayland é por isso que a barra de tarefas mostra um espaço vazio. Adicionar uma agora? Fica apenas na sua pasta pessoal e as Definições podem removê-la."
 }

@@ -871,5 +871,9 @@
   "queue_clear": "Wachtrij wissen",
   "queue_added": "{n} toegevoegd",
   "local_art_online": "Ontbrekende albumhoezen online opzoeken",
-  "setting_nextup_lead": "\"Volgende aflevering\" tonen vóór het einde"
+  "setting_nextup_lead": "\"Volgende aflevering\" tonen vóór het einde",
+  "setting_desktop_entry": "Tonen in het programmamenu",
+  "setting_desktop_entry_hint": "Schrijft een starter naar ~/.local/share/applications. Op Wayland haalt de taakbalk daar ook het pictogram en de naam van het venster vandaan. Uitvinken verwijdert het item weer.",
+  "desktop_entry_title": "Toevoegen aan het programmamenu?",
+  "desktop_entry_ask": "Niets heeft een menu-item geïnstalleerd voor deze kopie van dopeIPTV, dus het bureaublad kent er geen pictogram of naam voor — op Wayland toont de taakbalk daarom een lege plaatshouder. Nu een item toevoegen? Het komt alleen in je persoonlijke map en Instellingen kan het weer verwijderen."
 }

@@ -10,12 +10,12 @@ from __future__ import annotations
 import os
 import time
 
-from PyQt6.QtCore import Qt, QTimer, QUrl
-from PyQt6.QtGui import QDesktopServices
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton
 
 from .. import VERSION
 from ..core.updates import GITHUB_REPO, fetch_latest_release, is_newer
+from ..core.xdg import open_url
 from ..core.workers import run_async
 from ..i18n import tr
 from .theme import P
@@ -131,7 +131,7 @@ class _UpdatesMixin:
                 " padding:4px 12px; font-size:12px; font-weight:600; }"
                 "QPushButton:hover { background:rgba(255,255,255,0.30); }")
             dl.clicked.connect(
-                lambda: QDesktopServices.openUrl(QUrl(_WEBSITE)))
+                lambda: open_url(_WEBSITE))
             close = QPushButton("✕")   # ✕
             close.setCursor(Qt.CursorShape.PointingHandCursor)
             close.setFixedSize(24, 24)

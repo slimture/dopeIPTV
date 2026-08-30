@@ -300,6 +300,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # check later so it doesn't compete with the initial load.
         QTimer.singleShot(400, self._apply_cached_update)
         QTimer.singleShot(4000, self._maybe_check_updates)
+        # Asked once, well after the window is up and doing something - a
+        # dialog in the user's face before the channels have even loaded is
+        # its own kind of rude.
+        QTimer.singleShot(6000, self._maybe_offer_desktop_entry)
 
         self._auto_refresh_timer = QTimer(self)
         self._auto_refresh_timer.timeout.connect(self._maybe_auto_refresh)

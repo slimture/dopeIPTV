@@ -14,8 +14,8 @@ from ..providers.oauth_loopback import capture_oauth_redirect
 from ..providers.trakt import OAUTH_PORT, REDIRECT_URI
 from .theme import P
 from ..core.workers import run_async
-from PyQt6.QtCore import QTimer, Qt, QUrl
-from PyQt6.QtGui import QDesktopServices
+from ..core.xdg import open_url
+from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtWidgets import (
     QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
     QListWidget, QMessageBox, QPushButton, QTabWidget, QVBoxLayout)
@@ -807,8 +807,8 @@ class _TraktMixin:
         intro.setStyleSheet("font-size:12px;")
         lay.addWidget(intro)
         create = QPushButton(tr("trakt_create_app"))
-        create.clicked.connect(lambda: QDesktopServices.openUrl(
-            QUrl("https://trakt.tv/oauth/applications/new")))
+        create.clicked.connect(lambda: open_url(
+            "https://trakt.tv/oauth/applications/new"))
         crow = QHBoxLayout()
         crow.addWidget(create)
         crow.addStretch(1)
@@ -933,8 +933,7 @@ class _TraktMixin:
                 OAUTH_PORT, timeout=180.0,
                 should_cancel=lambda: state["cancelled"]),
             captured, capture_failed)
-        QDesktopServices.openUrl(
-            QUrl(self.trakt.authorize_url(state["token"], REDIRECT_URI)))
+        open_url(self.trakt.authorize_url(state["token"], REDIRECT_URI))
         d.exec()
 
     def _trakt_device_auth_dialog(self, parent) -> None:

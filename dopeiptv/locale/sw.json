@@ -871,5 +871,9 @@
   "queue_clear": "Futa foleni",
   "queue_added": "Vimeongezwa {n}",
   "local_art_online": "Tafuta mabango ya albamu yaliyokosekana mtandaoni",
-  "setting_nextup_lead": "Onyesha \"Kipindi kijacho\" kabla ya mwisho"
+  "setting_nextup_lead": "Onyesha \"Kipindi kijacho\" kabla ya mwisho",
+  "setting_desktop_entry": "Onyesha kwenye menyu ya programu",
+  "setting_desktop_entry_hint": "Huandika kianzishi katika ~/.local/share/applications. Kwenye Wayland, upau wa kazi pia husoma aikoni na jina la dirisha kutoka hapo. Ukiondoa alama, kiingizo huondolewa.",
+  "desktop_entry_title": "Kuongeza kwenye menyu ya programu?",
+  "desktop_entry_ask": "Hakuna kilichosakinisha kiingizo cha menyu kwa nakala hii ya dopeIPTV, kwa hivyo eneo-kazi halijui aikoni wala jina lake — kwenye Wayland ndiyo sababu upau wa kazi unaonyesha nafasi tupu. Kuongeza sasa? Kinaandikwa katika folda yako ya nyumbani pekee, na Mipangilio inaweza kukiondoa."
 }

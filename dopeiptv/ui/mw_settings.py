@@ -12,9 +12,9 @@ from datetime import datetime
 
 import os
 
-from PyQt6.QtCore import QEvent, QObject, QRectF, QSize, Qt, QTimer, QUrl
+from PyQt6.QtCore import QEvent, QObject, QRectF, QSize, Qt, QTimer
 from PyQt6.QtGui import (
-    QColor, QCursor, QDesktopServices, QFont, QFontMetrics, QIcon, QPainter,
+    QColor, QCursor, QFont, QFontMetrics, QIcon, QPainter,
 )
 from PyQt6.QtWidgets import (
     QAbstractItemView, QAbstractSlider, QAbstractSpinBox, QApplication,
@@ -147,6 +147,7 @@ from .epg_grid import EpgGridDialog
 from ..providers.metadata import TmdbClient, bundled_tmdb_key
 from ..providers.client import make_client
 from ..core.log import log
+from ..core.xdg import open_url
 from ..core.recording import format_size
 from ..media.players import embedded_playback_reason
 from .theme import ACCENTS, P, THEMES, apply_theme, build_style
@@ -158,6 +159,47 @@ from ..core.workers import (
 
 class _SettingsMixin:
     """MainWindow mixin: the Settings dialog, its tabs and persistence."""
+
+    def _maybe_offer_desktop_entry(self) -> None:
+        """Offer, once, to add the app to the desktop's menu.
+
+        Wayland takes a window's icon from the .desktop file matching its
+        app_id and ignores setWindowIcon entirely, so from an AppImage -
+        which nothing has installed an entry for - GNOME shows the generic
+        placeholder in the dash however good the icon inside the AppImage
+        is. From the .deb the entry is there and it looks right.
+
+        Asked rather than done, because the AppImage format's whole
+        premise is a file that changes nothing outside itself. The answer
+        is remembered either way, and Settings can change it later."""
+        try:
+            from ..core import desktop_entry
+            if self.settings.value("desktop_entry_asked", "false") == "true":
+                return
+            if not desktop_entry.can_offer():
+                return
+            self.settings.setValue("desktop_entry_asked", "true")
+            if confirm(self, tr("desktop_entry_title"),
+                       tr("desktop_entry_ask")):
+                ok = desktop_entry.install()
+                self.settings.setValue(
+                    "desktop_entry", "true" if ok else "false")
+            else:
+                self.settings.setValue("desktop_entry", "false")
+        except Exception as e:      # never let a nicety break startup
+            log.warning("desktop entry offer failed: %s", e)
+
+    def _apply_desktop_entry(self, wanted: bool) -> None:
+        """Put the entry in or take it out to match the Settings switch."""
+        from ..core import desktop_entry
+        try:
+            if wanted and not desktop_entry.is_installed():
+                desktop_entry.install()
+            elif not wanted and desktop_entry.is_installed():
+                desktop_entry.remove()
+        except Exception as e:
+            log.warning("desktop entry change failed: %s", e)
+
     def _choose_rec_dir(self) -> None:
         d = QFileDialog.getExistingDirectory(
             self, "Choose recordings folder", self.rec.directory(),
@@ -732,6 +774,21 @@ class _SettingsMixin:
             x11_hint.setWordWrap(True)
             x11_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
             pf.addRow("", x11_hint)
+        # Only where an entry is actually missing: a .deb or a Flatpak has
+        # one already, and offering to add a second would be nonsense.
+        desktop_box = None
+        if sys.platform.startswith("linux"):
+            from ..core import desktop_entry as _de
+            if _de.is_installed() or _de.can_offer():
+                desktop_box = QCheckBox(tr("setting_desktop_entry"))
+                desktop_box.setChecked(_de.is_installed())
+                desktop_box.setToolTip(tr("setting_desktop_entry_hint"))
+                pf.addRow("", desktop_box)
+                de_hint = QLabel(tr("setting_desktop_entry_hint"))
+                de_hint.setWordWrap(True)
+                de_hint.setStyleSheet(
+                    f"color:{P['muted2']}; font-size:11px;")
+                pf.addRow("", de_hint)
         delay_hint = QLabel(
             "Replay delay shifts where catch-up/timeshift starts "
             "playback, for providers whose stream lags behind their "
@@ -1744,6 +1801,14 @@ class _SettingsMixin:
             if x11_box is not None:
                 self.settings.setValue(
                     "force_x11", "true" if x11_box.isChecked() else "false")
+            if desktop_box is not None:
+                want = desktop_box.isChecked()
+                self.settings.setValue(
+                    "desktop_entry", "true" if want else "false")
+                # Answered here, so the startup prompt has nothing left to
+                # ask - either way round.
+                self.settings.setValue("desktop_entry_asked", "true")
+                self._apply_desktop_entry(want)
             self.settings.setValue(
                 "view_density", density_box.currentData())
             self.settings.setValue(
@@ -1893,7 +1958,7 @@ class _SettingsMixin:
             b = QPushButton(text)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setStyleSheet(link_css)
-            b.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(url)))
+            b.clicked.connect(lambda: open_url(url))
             return b
 
         title = QLabel(
@@ -1980,8 +2045,7 @@ class _SettingsMixin:
                     except TypeError:
                         pass
                     dl_btn.clicked.connect(
-                        lambda: QDesktopServices.openUrl(
-                            QUrl("https://iptv.dope.rs")))
+                        lambda: open_url("https://iptv.dope.rs"))
                     dl_btn.show()
             else:
                 status.setText("✓ " + tr("about_up_to_date"))

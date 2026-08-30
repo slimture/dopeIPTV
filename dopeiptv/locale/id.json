@@ -871,5 +871,9 @@
   "queue_clear": "Kosongkan antrean",
   "queue_added": "{n} ditambahkan",
   "local_art_online": "Cari sampul album yang hilang secara daring",
-  "setting_nextup_lead": "Tampilkan \"Episode berikutnya\" sebelum akhir"
+  "setting_nextup_lead": "Tampilkan \"Episode berikutnya\" sebelum akhir",
+  "setting_desktop_entry": "Tampilkan di menu aplikasi",
+  "setting_desktop_entry_hint": "Menulis entri peluncur ke ~/.local/share/applications. Di Wayland, dari sanalah bilah tugas membaca ikon dan nama jendela. Menghapus centang akan menghapus entri itu.",
+  "desktop_entry_title": "Tambahkan ke menu aplikasi?",
+  "desktop_entry_ask": "Tidak ada yang memasang entri menu untuk salinan dopeIPTV ini, jadi desktop tidak punya ikon maupun namanya — di Wayland itulah sebabnya bilah tugas menampilkan tempat kosong. Tambahkan sekarang? Hanya ditulis ke folder rumah Anda, dan Pengaturan bisa menghapusnya lagi."
 }

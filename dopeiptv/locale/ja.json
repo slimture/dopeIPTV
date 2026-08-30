@@ -871,5 +871,9 @@
   "queue_clear": "キューを消去",
   "queue_added": "{n} 件追加",
   "local_art_online": "不足しているアルバムアートをオンラインで検索",
-  "setting_nextup_lead": "終わりの前に「次のエピソード」を表示"
+  "setting_nextup_lead": "終わりの前に「次のエピソード」を表示",
+  "setting_desktop_entry": "アプリケーションメニューに表示",
+  "setting_desktop_entry_hint": "~/.local/share/applications にランチャー項目を書き込みます。Wayland ではタスクバーもそこからウィンドウのアイコンと名前を読み取ります。チェックを外すと項目を削除します。",
+  "desktop_entry_title": "アプリケーションメニューに追加しますか？",
+  "desktop_entry_ask": "この dopeIPTV にはメニュー項目が用意されていないため、デスクトップはアイコンも名前も把握していません。Wayland でタスクバーが空のプレースホルダーを表示するのはそのためです。今すぐ追加しますか？ ホームフォルダーにのみ作成され、設定から削除できます。"
 }
