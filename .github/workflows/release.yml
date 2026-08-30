@@ -757,8 +757,12 @@ jobs:
           ls -la libmpv
       - name: Build .ico from the app PNG
         shell: bash
+        # windows-256.png, not the icons beside it: those carry the ~10%
+        # margin macOS and GNOME ask for, and the Windows shell adds its own
+        # padding on top - so a padded source would look small here. The
+        # drift test in tests/test_packaging_icons.py covers this one too.
         run: |
-          python -c "from PIL import Image; Image.open('packaging/io.github.slimture.dopeIPTV.png').save('packaging/dopeIPTV.ico', sizes=[(16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256)])"
+          python -c "from PIL import Image; Image.open('packaging/icons/windows-256.png').save('packaging/dopeIPTV.ico', sizes=[(16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256)])"
       - name: Version
         id: v
         shell: bash

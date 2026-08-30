@@ -111,3 +111,13 @@ QT_QPA_PLATFORM=offscreen pytest -q
   as more non-UI modules gain type hints.
 - Bump the version in **both** `dopeiptv/__init__.py` and `pyproject.toml`
   on a release - `tests/test_version.py` fails the build if they drift.
+- **Before deleting, moving or renaming a file under `packaging/`, `docs/`
+  or any other committed asset, grep for it INCLUDING hidden directories.**
+  Plain `grep -r` and ripgrep both skip `.github/`, so a reference from a
+  workflow step is invisible to the obvious check - which is exactly how
+  `packaging/io.github.slimture.dopeIPTV.png` was removed while the
+  Windows job still built its `.ico` from it, and the release build went
+  red. Use `grep -r --include=... . .github` explicitly, or `rg --hidden`.
+  `tests/test_packaging_icons.py` now fails on any repo path a workflow
+  names that does not exist, so this cannot reach CI again - but the habit
+  is cheaper than the test.

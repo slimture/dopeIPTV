@@ -80,3 +80,47 @@ def test_the_flatpak_manifest_installs_every_size():
     joined = " ".join(icon_cmds)
     for size in (256, 128, 64, 48, 32):
         assert str(size) in joined, "size %d is not installed" % size
+
+
+def test_every_repo_file_a_workflow_names_actually_exists():
+    """A workflow step referencing a file that is not in the tree fails the
+    release build, and nothing local catches it: plain grep and ripgrep both
+    SKIP hidden directories, so a reference from `.github/` is invisible to
+    the obvious "is this still used?" check.
+
+    That is not hypothetical. packaging/io.github.slimture.dopeIPTV.png was
+    deleted when the Flatpak icons moved, the grep for references came back
+    clean because it never looked in .github/, and both Windows jobs went
+    red on "Build .ico from the app PNG".
+    """
+    import glob
+    import re
+
+    # Repo-relative paths, quoted or bare, under the directories that hold
+    # committed assets. Deliberately narrow: this is about FILES IN THE
+    # TREE, not about ${{ }} expressions.
+    pattern = re.compile(
+        r"(?<![\w/.-])((?:packaging|docs|dopeiptv)/[\w./-]+\.[a-z0-9]{2,5})")
+
+    # Paths the workflow WRITES rather than reads. Listed one by one on
+    # purpose: a new entry here should be a deliberate decision, not a
+    # pattern quietly widening until it stops catching anything.
+    generated = {
+        "dopeiptv/_tmdb_key.py",        # "Bake built-in TMDB key" writes it
+        "packaging/dopeIPTV.ico",       # "Build .ico from the app PNG" does
+    }
+    missing = []
+    for wf in glob.glob(os.path.join(_REPO, ".github/workflows/*.yml")):
+        with open(wf, encoding="utf-8") as f:
+            for lineno, line in enumerate(f, 1):
+                stripped = line.lstrip()
+                if stripped.startswith("#"):
+                    continue        # a comment naming a path is not a use
+                for hit in pattern.findall(line):
+                    if "*" in hit or "${{" in hit or hit in generated:
+                        continue
+                    if not os.path.exists(os.path.join(_REPO, hit)):
+                        missing.append(
+                            "%s:%d references %s, which does not exist"
+                            % (os.path.basename(wf), lineno, hit))
+    assert not missing, "\n".join(missing)
