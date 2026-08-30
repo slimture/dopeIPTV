@@ -136,20 +136,19 @@ def test_describe_names_the_cause_whichever_it_is(home, monkeypatch):
 
 # ------------------------------------------------------- icon theme cache ---
 
-class _StubIcon:
-    """install_icon only ever asks an icon for pixmap(w, h).save(path).
-    Every file these tests care about is already on disk, so it is never
-    called - and the tests stay free of a QApplication, which cannot be
-    built in this process without a platform plugin."""
-
-    def pixmap(self, *_a):
-        raise AssertionError("an existing icon file was overwritten")
+#: What these tests pre-write into the theme AND what the patched
+#: renderer returns, so install_icon finds the file already identical and
+#: rewrites nothing. That keeps the mtimes the test set up intact - they
+#: are the whole point - and keeps a QApplication out of this file, which
+#: cannot be built in-process without a platform plugin.
+_PNG = b"pretend-this-is-a-png"
 
 
-def _install_icon():
+def _install_icon(monkeypatch):
     """Run the real install_icon against the patched XDG_DATA_HOME."""
-    from dopeiptv.app import install_icon
-    install_icon(_StubIcon())
+    import dopeiptv.app as app
+    monkeypatch.setattr(app, "_png_bytes", lambda _icon, _size: _PNG)
+    app.install_icon(object())
 
 
 def test_a_stale_icon_cache_is_dropped_so_the_icon_can_be_seen(
@@ -166,12 +165,12 @@ def test_a_stale_icon_cache_is_dropped_so_the_icon_can_be_seen(
     for size in (256, 128, 64, 48, 32):
         d = theme / f"{size}x{size}" / "apps"
         d.mkdir(parents=True)
-        (d / "dopeiptv.png").write_bytes(b"")
+        (d / "dopeiptv.png").write_bytes(_PNG)
     cache = theme / "icon-theme.cache"
     cache.write_bytes(b"")
     os.utime(cache, (0, 0))          # long predates the icons
 
-    _install_icon()
+    _install_icon(monkeypatch)
     assert not cache.exists(), "the stale cache hid the icons and survived"
 
 
@@ -184,11 +183,12 @@ def test_a_current_icon_cache_is_left_alone(tmp_path, monkeypatch):
         d = theme / f"{size}x{size}" / "apps"
         d.mkdir(parents=True)
         p = d / "dopeiptv.png"
-        p.write_bytes(b"")
+        p.write_bytes(_PNG)
         os.utime(p, (1000, 1000))
     cache = theme / "icon-theme.cache"
     cache.write_bytes(b"")
     os.utime(cache, (2000, 2000))    # newer than the icons
 
-    _install_icon()
+    _install_icon(monkeypatch)
     assert cache.exists(), "a cache that postdates the icons was removed"
+

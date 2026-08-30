@@ -110,8 +110,17 @@ modules:
         ${FLATPAK_DEST}/share/applications/io.github.slimture.dopeIPTV.desktop
       - install -Dm644 packaging/io.github.slimture.dopeIPTV.metainfo.xml
         ${FLATPAK_DEST}/share/metainfo/io.github.slimture.dopeIPTV.metainfo.xml
-      - install -Dm644 packaging/io.github.slimture.dopeIPTV.png
-        ${FLATPAK_DEST}/share/icons/hicolor/256x256/apps/io.github.slimture.dopeIPTV.png
+      # Every rendered size, not just 256: a 32 px panel downscaling the
+      # big one is why the icon looked soft beside sharp system icons.
+      # These carry the same ~10% margin the app draws at runtime - GNOME
+      # asks for the icon to occupy about 80% of its canvas, and a
+      # full-bleed one stands a quarter larger than everything beside it.
+      # tests/test_packaging_icons.py fails if they drift from the code
+      # that draws them.
+      - for s in 256 128 64 48 32; do
+        install -Dm644 "packaging/icons/io.github.slimture.dopeIPTV-$s.png"
+        "${FLATPAK_DEST}/share/icons/hicolor/${s}x${s}/apps/io.github.slimture.dopeIPTV.png";
+        done
     sources:
       - type: file
         url: https://files.pythonhosted.org/packages/df/b2/87e62e8c3e2f4b32e5fe99e0b86d576da1312593b39f47d8ceef365e95ed/packaging-26.2-py3-none-any.whl

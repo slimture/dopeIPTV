@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PyQt6.QtWidgets import QApplication
 
-from dopeiptv.app import MACOS_ICON_INSET, make_app_icon
+from dopeiptv.app import ICON_SAFE_INSET, make_app_icon
 
 
 # (size in points, "@2x" pixel doubling flag) -> Apple's required filenames.
@@ -31,12 +31,12 @@ def main() -> int:
     os.makedirs(iconset, exist_ok=True)
     _app = QApplication([])  # noqa: F841 - needed for QPixmap.
     # The .icns is the one place the Apple margin applies - see
-    # MACOS_ICON_INSET. Without it the Dock icon towers over its
+    # ICON_SAFE_INSET. Without it the Dock icon towers over its
     # neighbours, because theirs carry the margin and ours did not.
     # Render every size the iconset asks for, largest first. QIcon.pixmap()
     # does not scale up, so any size missing here would be delivered as a
     # smaller image stretched by whoever displays it.
-    icon = make_app_icon(inset=MACOS_ICON_INSET,
+    icon = make_app_icon(inset=ICON_SAFE_INSET,
                          sizes=sorted({s * (2 if r else 1)
                                        for s, r in ICONSET}, reverse=True))
     for size, retina in ICONSET:

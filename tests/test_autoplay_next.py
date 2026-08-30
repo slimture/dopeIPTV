@@ -264,33 +264,66 @@ def test_the_macos_icon_leaves_apples_margin_and_renders_full_size():
 import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtWidgets import QApplication
-from dopeiptv.app import MACOS_ICON_INSET, make_app_icon
+from dopeiptv.app import ICON_SAFE_INSET, make_app_icon
 
 app = QApplication([])
 
-# Full-bleed everywhere else: the tile touches the canvas edge.
+# Windows keeps full bleed: its shell adds the padding itself.
 plain = make_app_icon().pixmap(256, 256).toImage()
-assert plain.pixelColor(2, 128).alpha() > 0, "non-mac icon must be full bleed"
+assert plain.pixelColor(2, 128).alpha() > 0, "inset 0 must be full bleed"
 
-# macOS: a transparent margin of roughly a tenth on each side, drawn at
-# the size actually asked for.
-mac = make_app_icon(inset=MACOS_ICON_INSET, sizes=(1024,)).pixmap(1024, 1024).toImage()
-assert mac.width() == 1024, "the icon must be drawn AT 1024, not upscaled"
-assert mac.pixelColor(2, 512).alpha() == 0, "no ink at the very edge"
-cols = [x for x in range(1024) if mac.pixelColor(x, 512).alpha() > 0]
+# The padded icon: a transparent margin of roughly a tenth on each side,
+# drawn at the size actually asked for. Apple wants 824 of 1024; GNOME
+# asks for "about 80%" of the canvas with "about 10%" margin. Same number,
+# so one constant serves both.
+pad = make_app_icon(inset=ICON_SAFE_INSET, sizes=(1024,)).pixmap(1024, 1024).toImage()
+assert pad.width() == 1024, "the icon must be drawn AT 1024, not upscaled"
+assert pad.pixelColor(2, 512).alpha() == 0, "no ink at the very edge"
+cols = [x for x in range(1024) if pad.pixelColor(x, 512).alpha() > 0]
 tile = (cols[-1] - cols[0] + 1) / 1024
 assert 0.78 <= tile <= 0.83, "tile is %.1f%% of canvas, want ~80.5%%" % (tile * 100)
 
-# The RUNTIME icon matters as much as the .icns: on macOS setWindowIcon
-# overrides the bundle icon in the Dock the moment the app starts, so a
-# full-bleed one here undoes the margin a second after launch. Check the
-# call main() actually makes, per platform.
+# The RUNTIME icon matters as much as the packaged one: setWindowIcon
+# overrides the bundle icon in the macOS Dock the moment the app starts,
+# and on Linux it is what gets written into the XDG icon theme. A
+# full-bleed one here undoes the margin either way. Check the call main()
+# actually makes, per platform.
 import re, inspect, dopeiptv.app as A
 src = inspect.getsource(A.main)
-assert "MACOS_ICON_INSET if _mac else 0.0" in src, \
-    "the runtime icon must carry Apple's margin on macOS"
+assert "_padded = _mac or sys.platform.startswith(\"linux\")" in src, \
+    "macOS AND Linux must both take the margin; only Windows is full bleed"
+assert "inset=ICON_SAFE_INSET if _padded else 0.0" in src, \
+    "the runtime icon must carry the margin on the padded platforms"
 assert re.search(r"sizes=\(\(512", src), \
     "the runtime icon must be drawn big enough for a retina Dock"
+
+# install_icon replaces an icon that CHANGED and leaves an unchanged one
+# byte for byte. "Skip anything already there" was the obvious rule and
+# the wrong one: the day the drawing changes - a margin added, as it just
+# was - every machine that had ever run the app keeps the old picture for
+# good, which is the one case where rewriting matters.
+import tempfile, pathlib
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIcon, QPixmap
+
+def _flat(colour):
+    ic = QIcon()
+    for s in (256, 128, 64, 48, 32):
+        pm = QPixmap(s, s)
+        pm.fill(colour)
+        ic.addPixmap(pm)
+    return ic
+
+with tempfile.TemporaryDirectory() as tmp:
+    os.environ["XDG_DATA_HOME"] = tmp
+    png = pathlib.Path(tmp) / "icons/hicolor/256x256/apps/dopeiptv.png"
+    A.install_icon(_flat(Qt.GlobalColor.red))
+    first = png.read_bytes()
+    A.install_icon(_flat(Qt.GlobalColor.red))
+    assert png.read_bytes() == first, "an unchanged icon was rewritten"
+    A.install_icon(_flat(Qt.GlobalColor.blue))
+    assert png.read_bytes() != first, "a changed icon did not replace the old one"
+
 print("ICON_OK")
 """
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

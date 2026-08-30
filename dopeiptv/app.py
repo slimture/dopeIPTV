@@ -55,20 +55,29 @@ from .core.stores import PlaylistStore
 from .ui.theme import ACCENT, apply_theme, build_style
 
 
-# Apple draws a macOS app icon INSIDE its canvas, not edge to edge: the
-# rounded square is 824 pt on a 1024 pt canvas, so ~9.8% of each side is
-# transparent margin. Drawing full-bleed - which is right on Linux and
-# Windows - makes the Dock icon stand a quarter larger than every icon
-# beside it, because the Dock sizes by canvas and everyone else's canvas
-# carries that margin.
-MACOS_ICON_INSET = 0.098
+# An app icon is drawn INSIDE its canvas, not edge to edge, and both
+# desktops that care ask for the same thing:
+#
+#   Apple  - the rounded square is 824 pt on a 1024 pt canvas: 80.5% of
+#            the canvas, ~9.8% margin a side.
+#   GNOME  - "a margin that measures about 10% of the image canvas ...
+#            it's best when the image occupies about 80%".
+#
+# Drawing full-bleed makes ours stand a quarter larger than every icon
+# beside it, because the shell sizes by canvas and everyone else's canvas
+# carries that margin. It was the macOS Dock first and the GNOME dash
+# second, from the same cause and with the same fix.
+#
+# Windows is left full-bleed: its shell adds the padding itself, and no
+# one has reported ours looking oversized there.
+ICON_SAFE_INSET = 0.098
 
 
 def make_app_icon(inset: float = 0.0, sizes=(256, 128, 64, 48, 32)) -> QIcon:
     """Draw the app icon (rounded accent tile with a play triangle).
 
     *inset* is the fraction of each side left as transparent margin; pass
-    MACOS_ICON_INSET for the .icns, 0 everywhere else.
+    ICON_SAFE_INSET on macOS and Linux, 0 on Windows.
 
     *sizes* is every pixel size to render. QIcon.pixmap() never scales UP,
     so a size not drawn here comes back as the largest one that was: asking
@@ -101,7 +110,14 @@ def install_icon(icon: QIcon) -> None:
 
     Every rendered size, not just 256: a panel or a dash asks for 32 or 48,
     and with only the big one there it downscales, which is why the icon
-    looked soft beside sharp system icons."""
+    looked soft beside sharp system icons.
+
+    An existing file is replaced when the icon has actually CHANGED, and
+    left alone byte for byte when it has not. "Skip anything already
+    there" was the obvious rule and the wrong one: the day the drawing
+    changed - a margin added, a colour moved - every machine that had ever
+    run the app kept the old picture forever, which is the one case where
+    rewriting matters."""
     base = Path(os.environ.get(
         "XDG_DATA_HOME", Path.home() / ".local" / "share"))
     theme = base / "icons" / "hicolor"
@@ -109,14 +125,31 @@ def install_icon(icon: QIcon) -> None:
     for size in (256, 128, 64, 48, 32):
         target = theme / f"{size}x{size}" / "apps" / "dopeiptv.png"
         try:
-            if not target.exists():
+            fresh = _png_bytes(icon, size)
+            if not fresh:
+                continue
+            if not target.exists() or target.read_bytes() != fresh:
                 target.parent.mkdir(parents=True, exist_ok=True)
-                icon.pixmap(size, size).save(str(target), "PNG")
+                target.write_bytes(fresh)
             newest = max(newest, target.stat().st_mtime)
         except OSError:
             pass
     if newest:
         _drop_stale_icon_cache(theme, newest)
+
+
+def _png_bytes(icon: QIcon, size: int) -> bytes:
+    """The icon at *size*, encoded as PNG, without touching the disk - so
+    it can be compared against what is already there."""
+    from PyQt6.QtCore import QBuffer
+    # No QByteArray argument: passing one hands the buffer a temporary that
+    # Python frees immediately, and writing into it segfaults. Default
+    # construction gives the buffer an internal array it owns.
+    buf = QBuffer()
+    buf.open(QBuffer.OpenModeFlag.WriteOnly)
+    ok = icon.pixmap(size, size).save(buf, "PNG")
+    buf.close()
+    return bytes(buf.data()) if ok else b""
 
 
 def _drop_stale_icon_cache(theme: Path, icon_mtime: float) -> None:
@@ -328,13 +361,19 @@ def main() -> int:
     # enough on its own - this icon replaced it a second later and the Dock
     # icon stayed a quarter larger than its neighbours. Same margin here,
     # and drawn large enough for a retina Dock (it only ever went to 256).
+    #
+    # Linux takes the margin too: GNOME asks for the same 80% of canvas
+    # that Apple does, and full-bleed made the dash icon stand out exactly
+    # the way the Dock one did. Windows keeps full-bleed - its shell adds
+    # the padding itself.
     _mac = sys.platform == "darwin"
+    _padded = _mac or sys.platform.startswith("linux")
     icon = make_app_icon(
-        inset=MACOS_ICON_INSET if _mac else 0.0,
+        inset=ICON_SAFE_INSET if _padded else 0.0,
         sizes=((512, 256, 128, 64, 48, 32) if _mac
                else (256, 128, 64, 48, 32)))
     app.setWindowIcon(icon)
-    # The XDG icon theme is a Linux thing, and wants no Apple margin.
+    # The XDG icon theme is a Linux thing.
     if sys.platform.startswith("linux"):
         install_icon(icon)
     settings = QSettings(ORG, ORG)
