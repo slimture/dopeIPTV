@@ -418,6 +418,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "setting_desktop_entry": {"en": "Show in the application menu"},
     "setting_desktop_entry_hint": {"en": "Writes a launcher entry to ~/.local/share/applications. On Wayland that is also where the taskbar reads the window's icon and name from. Unticking it removes the entry again."},
     "desktop_entry_title": {"en": "Add to the application menu?"},
+    "desktop_entry_done": {"en": "Added. This window keeps the icon it started with — the icon and name appear the next time you start dopeIPTV."},
     "desktop_entry_ask": {"en": "Nothing has installed a menu entry for this copy of dopeIPTV, so your desktop has no icon or name for it - on Wayland that is why the taskbar shows a blank placeholder. Add one now? It goes in your home folder only, and Settings can remove it again."},
     "ext_play_title": {"en": "Open external player?"},
     "ext_play_body": {"en": "Something is playing in the mini player. Opening an external player pulls a second stream from the provider, which many accounts don't allow. Stop the mini player first?"},

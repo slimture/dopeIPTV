@@ -174,6 +174,13 @@ class _SettingsMixin:
         is remembered either way, and Settings can change it later."""
         try:
             from ..core import desktop_entry
+            # Logged every start, offer or no offer. "No icon" has four
+            # causes that look identical from outside - nothing offered,
+            # something else already provides an entry, the entry is there
+            # but the session has not picked it up, or the icon file is
+            # missing - and one line here says which, instead of a round
+            # trip of guessing.
+            log.info("%s", desktop_entry.describe())
             if self.settings.value("desktop_entry_asked", "false") == "true":
                 return
             if not desktop_entry.can_offer():
@@ -184,6 +191,14 @@ class _SettingsMixin:
                 ok = desktop_entry.install()
                 self.settings.setValue(
                     "desktop_entry", "true" if ok else "false")
+                if ok:
+                    # A window that is already on screen keeps whatever icon
+                    # the compositor resolved for it when it appeared, so
+                    # this one does not change until the next start. Saying
+                    # so beats leaving the user to conclude it did nothing.
+                    QMessageBox.information(
+                        self, tr("desktop_entry_title"),
+                        tr("desktop_entry_done"))
             else:
                 self.settings.setValue("desktop_entry", "false")
         except Exception as e:      # never let a nicety break startup

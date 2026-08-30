@@ -875,5 +875,6 @@
   "setting_desktop_entry": "Mostra nel menu delle applicazioni",
   "setting_desktop_entry_hint": "Scrive un avviatore in ~/.local/share/applications. Su Wayland è anche da lì che la barra delle applicazioni prende icona e nome della finestra. Togliendo la spunta la voce viene rimossa.",
   "desktop_entry_title": "Aggiungere al menu delle applicazioni?",
-  "desktop_entry_ask": "Nessuno ha installato una voce di menu per questa copia di dopeIPTV, quindi il desktop non ne conosce né icona né nome: su Wayland è per questo che la barra mostra un segnaposto vuoto. Aggiungerla ora? Finisce solo nella tua cartella personale e le Impostazioni possono rimuoverla."
+  "desktop_entry_ask": "Nessuno ha installato una voce di menu per questa copia di dopeIPTV, quindi il desktop non ne conosce né icona né nome: su Wayland è per questo che la barra mostra un segnaposto vuoto. Aggiungerla ora? Finisce solo nella tua cartella personale e le Impostazioni possono rimuoverla.",
+  "desktop_entry_done": "Aggiunto. Questa finestra mantiene l'icona con cui è partita: icona e nome compariranno al prossimo avvio di dopeIPTV."
 }

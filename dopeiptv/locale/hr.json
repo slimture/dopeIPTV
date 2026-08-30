@@ -875,5 +875,6 @@
   "setting_desktop_entry": "Prikaži u izborniku programa",
   "setting_desktop_entry_hint": "Zapisuje pokretač u ~/.local/share/applications. Na Waylandu odatle programska traka čita i ikonu i naziv prozora. Uklanjanjem kvačice unos se briše.",
   "desktop_entry_title": "Dodati u izbornik programa?",
-  "desktop_entry_ask": "Ništa nije instaliralo unos u izborniku za ovu kopiju dopeIPTV-a, pa radna površina nema ni ikonu ni naziv za nju — na Waylandu zato programska traka prikazuje prazno mjesto. Dodati ga sada? Ide isključivo u vašu osobnu mapu, a Postavke ga mogu ukloniti."
+  "desktop_entry_ask": "Ništa nije instaliralo unos u izborniku za ovu kopiju dopeIPTV-a, pa radna površina nema ni ikonu ni naziv za nju — na Waylandu zato programska traka prikazuje prazno mjesto. Dodati ga sada? Ide isključivo u vašu osobnu mapu, a Postavke ga mogu ukloniti.",
+  "desktop_entry_done": "Dodano. Ovaj prozor zadržava ikonu s kojom je pokrenut — ikona i naziv pojavit će se sljedeći put kad pokrenete dopeIPTV."
 }

@@ -875,5 +875,6 @@
   "setting_desktop_entry": "在应用程序菜单中显示",
   "setting_desktop_entry_hint": "在 ~/.local/share/applications 写入一个启动项。在 Wayland 下，任务栏也从那里读取窗口的图标和名称。取消勾选会删除该项。",
   "desktop_entry_title": "添加到应用程序菜单？",
-  "desktop_entry_ask": "没有任何程序为这份 dopeIPTV 安装过菜单项，因此桌面既不知道它的图标也不知道它的名称——在 Wayland 下，任务栏显示空白占位就是这个原因。现在添加一个吗？它只会写入你的主目录，之后可以在设置中移除。"
+  "desktop_entry_ask": "没有任何程序为这份 dopeIPTV 安装过菜单项，因此桌面既不知道它的图标也不知道它的名称——在 Wayland 下，任务栏显示空白占位就是这个原因。现在添加一个吗？它只会写入你的主目录，之后可以在设置中移除。",
+  "desktop_entry_done": "已添加。当前窗口会保留启动时的图标——图标和名称将在你下次启动 dopeIPTV 时出现。"
 }

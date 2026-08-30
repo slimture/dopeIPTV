@@ -97,3 +97,37 @@ def test_a_flatpak_is_left_alone(home, monkeypatch):
     monkeypatch.setenv("APPIMAGE", str(home / "x.AppImage"))
     (home / "x.AppImage").write_text("")
     assert desktop_entry.can_offer() is False
+
+
+def test_the_written_entry_is_a_valid_desktop_file(home, monkeypatch):
+    """A malformed .desktop is not a degraded entry - GNOME ignores the
+    file completely, and the symptom is an icon that never appears with
+    nothing anywhere saying why."""
+    import shutil
+    import subprocess
+
+    exe = shutil.which("desktop-file-validate")
+    if not exe:
+        pytest.skip("desktop-file-utils not installed")
+    monkeypatch.setenv("APPIMAGE", str(home / "x.AppImage"))
+    (home / "x.AppImage").write_text("")
+    assert desktop_entry.install() is True
+    r = subprocess.run([exe, str(desktop_entry.entry_path())],
+                       capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_describe_names_the_cause_whichever_it_is(home, monkeypatch):
+    """"No icon" has four causes that look identical from outside. This
+    line is what stops the next one being a guessing game."""
+    monkeypatch.setenv("APPIMAGE", str(home / "x.AppImage"))
+    (home / "x.AppImage").write_text("")
+
+    before = desktop_entry.describe()
+    assert "installed=False" in before and "can_offer=True" in before
+    assert "icons=NONE" in before          # the icon half, reported too
+
+    desktop_entry.install()
+    after = desktop_entry.describe()
+    assert "installed=True" in after and "can_offer=False" in after
+    assert str(desktop_entry.entry_path()) in after

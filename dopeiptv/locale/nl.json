@@ -875,5 +875,6 @@
   "setting_desktop_entry": "Tonen in het programmamenu",
   "setting_desktop_entry_hint": "Schrijft een starter naar ~/.local/share/applications. Op Wayland haalt de taakbalk daar ook het pictogram en de naam van het venster vandaan. Uitvinken verwijdert het item weer.",
   "desktop_entry_title": "Toevoegen aan het programmamenu?",
-  "desktop_entry_ask": "Niets heeft een menu-item geïnstalleerd voor deze kopie van dopeIPTV, dus het bureaublad kent er geen pictogram of naam voor — op Wayland toont de taakbalk daarom een lege plaatshouder. Nu een item toevoegen? Het komt alleen in je persoonlijke map en Instellingen kan het weer verwijderen."
+  "desktop_entry_ask": "Niets heeft een menu-item geïnstalleerd voor deze kopie van dopeIPTV, dus het bureaublad kent er geen pictogram of naam voor — op Wayland toont de taakbalk daarom een lege plaatshouder. Nu een item toevoegen? Het komt alleen in je persoonlijke map en Instellingen kan het weer verwijderen.",
+  "desktop_entry_done": "Toegevoegd. Dit venster houdt het pictogram waarmee het is gestart — pictogram en naam verschijnen de volgende keer dat je dopeIPTV start."
 }

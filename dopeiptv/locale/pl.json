@@ -875,5 +875,6 @@
   "setting_desktop_entry": "Pokaż w menu programów",
   "setting_desktop_entry_hint": "Zapisuje wpis programu w ~/.local/share/applications. W Waylandzie stamtąd pasek zadań pobiera też ikonę i nazwę okna. Odznaczenie usuwa wpis.",
   "desktop_entry_title": "Dodać do menu programów?",
-  "desktop_entry_ask": "Nic nie zainstalowało wpisu menu dla tej kopii dopeIPTV, więc pulpit nie zna ani jej ikony, ani nazwy — w Waylandzie dlatego pasek zadań pokazuje pusty zastępnik. Dodać go teraz? Trafi wyłącznie do Twojego katalogu domowego, a Ustawienia mogą go usunąć."
+  "desktop_entry_ask": "Nic nie zainstalowało wpisu menu dla tej kopii dopeIPTV, więc pulpit nie zna ani jej ikony, ani nazwy — w Waylandzie dlatego pasek zadań pokazuje pusty zastępnik. Dodać go teraz? Trafi wyłącznie do Twojego katalogu domowego, a Ustawienia mogą go usunąć.",
+  "desktop_entry_done": "Dodano. To okno zachowuje ikonę, z którą zostało uruchomione — ikona i nazwa pojawią się przy następnym uruchomieniu dopeIPTV."
 }

@@ -92,6 +92,24 @@ def is_installed() -> bool:
     return entry_path().exists()
 
 
+def describe() -> str:
+    """One line saying exactly where this stands, logged at every start.
+
+    "No icon" has four different causes that look identical from the
+    outside: nothing ever offered, something already provides an entry,
+    the entry exists but the session has not picked it up, or the entry is
+    fine and the ICON file is missing. Guessing between them costs a round
+    trip each time. This says which, in one line of the log."""
+    icons = _data_home() / "icons" / "hicolor"
+    sizes = sorted(p.parent.parent.name
+                   for p in icons.glob("*/apps/dopeiptv.png"))
+    return ("desktop entry: installed=%s can_offer=%s system_entry=%s "
+            "flatpak=%s exec=%s icons=%s path=%s"
+            % (is_installed(), can_offer(), system_entry_exists(),
+               _in_flatpak(), exec_command(),
+               ",".join(sizes) or "NONE", entry_path()))
+
+
 def _quote(cmd: str) -> str:
     # Exec is not a shell command line: a path with a space is quoted, and
     # the only escapes the spec asks for inside quotes are \\ and \".
