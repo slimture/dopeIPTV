@@ -188,8 +188,23 @@ jobs:
           V=${{ steps.v.outputs.version }}
           mkdir -p AppDir/usr
           cp -r dist/dopeiptv AppDir/usr/dopeiptv
+          # The root copy is what appimagetool turns into .DirIcon, which is
+          # the icon a file manager shows for the .AppImage file itself.
           cp build/icons/dopeiptv.png AppDir/dopeiptv.png
+          # And the icon theme copy, which is where a desktop-integration tool
+          # (appimaged, AppImageLauncher) reads the icon from when it installs
+          # a menu entry. Only .DirIcon was here, so integration had a single
+          # 256 px image to work with and nothing at all at the smaller sizes
+          # a panel or a menu actually asks for.
+          for s in 256 128 64 48 32; do
+            d="AppDir/usr/share/icons/hicolor/${s}x${s}/apps"
+            mkdir -p "$d"
+            cp "build/icons/${s}x${s}/io.github.slimture.dopeIPTV.png" \
+               "$d/dopeiptv.png"
+          done
+          mkdir -p AppDir/usr/share/applications
           sed 's/^Icon=.*/Icon=dopeiptv/' dopeiptv.desktop > AppDir/dopeiptv.desktop
+          cp AppDir/dopeiptv.desktop AppDir/usr/share/applications/dopeiptv.desktop
           cat > AppDir/AppRun <<'EOF'
           #!/bin/sh
           HERE="$(dirname "$(readlink -f "$0")")"
@@ -204,8 +219,7 @@ jobs:
           V=${{ steps.v.outputs.version }}
           root=pkgroot
           mkdir -p "$root/opt/dopeiptv" "$root/usr/bin" \
-                   "$root/usr/share/applications" \
-                   "$root/usr/share/icons/hicolor/256x256/apps"
+                   "$root/usr/share/applications"
           cp -r dist/dopeiptv/* "$root/opt/dopeiptv/"
           cat > "$root/usr/bin/dopeiptv" <<'EOF'
           #!/bin/sh
@@ -213,8 +227,15 @@ jobs:
           EOF
           chmod +x "$root/usr/bin/dopeiptv"
           install -m644 dopeiptv.desktop "$root/usr/share/applications/dopeiptv.desktop"
-          install -m644 build/icons/dopeiptv.png \
-            "$root/usr/share/icons/hicolor/256x256/apps/dopeiptv.png"
+          # Every rendered size, not just 256: a panel asking for 32 px was
+          # downscaling the big one, which is why the icon looked soft in a
+          # taskbar next to sharp system icons.
+          for s in 256 128 64 48 32; do
+            d="$root/usr/share/icons/hicolor/${s}x${s}/apps"
+            mkdir -p "$d"
+            install -m644 "build/icons/${s}x${s}/io.github.slimture.dopeIPTV.png" \
+              "$d/dopeiptv.png"
+          done
           fpm -s dir -t deb -n dopeiptv -v "$V" \
             --license GPL-3.0-or-later \
             --description "Modern IPTV player for Xtream Codes with EPG" \
