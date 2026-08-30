@@ -21,6 +21,25 @@ const UA         = 'dopeiptv-site-sync';
 
 @mkdir(FILES_DIR, 0755, true);
 
+// ---- One sync at a time --------------------------------------------------
+// Two syncs running at once is not theoretical: the cron fires every fifteen
+// minutes, and a release lands in the minutes you are most likely to run it
+// by hand. Both then walked the same asset list, downloaded into the SAME
+// ".part" file - interleaving their bytes into one another's download - and
+// whichever renamed first left the other renaming a file that was no longer
+// there. Every asset after the first failed exactly that way.
+//
+// A second sync exits quietly rather than waiting: the work is idempotent and
+// the one already running is doing it.
+// Beside the script, NOT in public/files: that directory is web-served, and
+// the prune below deletes everything in it the release does not name - which
+// would hand each run a brand new inode to lock and no mutual exclusion at all.
+$lock = fopen(__DIR__ . '/.sync.lock', 'c');
+if ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {
+    fwrite(STDERR, "[sync] another sync is already running - nothing to do\n");
+    exit(0);
+}
+
 // Only these end-user installer types are listed/mirrored; dev artifacts like
 // the .whl and the source .tar.gz are skipped.
 const USER_EXTS = ['.dmg', '.appimage', '.deb', '.rpm', '.flatpak', '.pkg', '.exe', '.msi', '.zip'];
@@ -174,14 +193,40 @@ foreach (($rel['assets'] ?? []) as $a) {
     // Download only when missing or size changed (GitHub assets are immutable per release).
     if (!is_file($dest) || filesize($dest) !== (int)($a['size'] ?? -1)) {
         fwrite(STDERR, "[sync] fetching $name (" . human_size((int)$a['size']) . ") ... ");
-        if (!download_to($a['browser_download_url'], $dest . '.part')) {
-            @unlink($dest . '.part');
+        // Per-process temp on top of the lock. The lock is the fix; this is
+        // what keeps a stale .part from a killed run out of the next one's way.
+        $part = $dest . '.part.' . getmypid();
+        if (!download_to($a['browser_download_url'], $part)) {
+            @unlink($part);
             fwrite(STDERR, "FAILED\n");
             unset($keep[$name]);
             $failed[] = $name;
             continue;
         }
-        rename($dest . '.part', $dest);   // atomic swap
+        // Against GitHub's own digest, while the bytes are in hand. Without
+        // this a truncated or interleaved download is mirrored, published,
+        // and advertised with the CORRECT sha256 - the one place a checksum
+        // is worse than none.
+        if (!empty($a['digest']) && strncmp($a['digest'], 'sha256:', 7) === 0) {
+            $got = hash_file('sha256', $part) ?: '';
+            if ($got !== substr($a['digest'], 7)) {
+                @unlink($part);
+                fwrite(STDERR, "CORRUPT (sha256 mismatch)\n");
+                unset($keep[$name]);
+                $failed[] = $name;
+                continue;
+            }
+        }
+        // Checked, not assumed: a rename that fails leaves NO file, and
+        // reporting "done" there is how the page came to list downloads that
+        // were not on disk.
+        if (!rename($part, $dest)) {
+            @unlink($part);
+            fwrite(STDERR, "FAILED (could not put it in place)\n");
+            unset($keep[$name]);
+            $failed[] = $name;
+            continue;
+        }
         fwrite(STDERR, "done\n");
     } else {
         fwrite(STDERR, "[sync] $name already current\n");
