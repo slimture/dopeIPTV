@@ -9,6 +9,7 @@ Asked rather than done - the AppImage format's whole premise is a file
 that changes nothing outside itself - so these pin the shape of what gets
 written, and that it is only ever our own file that gets taken away.
 """
+import os
 import sys
 
 import pytest
@@ -131,3 +132,63 @@ def test_describe_names_the_cause_whichever_it_is(home, monkeypatch):
     after = desktop_entry.describe()
     assert "installed=True" in after and "can_offer=False" in after
     assert str(desktop_entry.entry_path()) in after
+
+
+# ------------------------------------------------------- icon theme cache ---
+
+class _StubIcon:
+    """install_icon only ever asks an icon for pixmap(w, h).save(path).
+    Every file these tests care about is already on disk, so it is never
+    called - and the tests stay free of a QApplication, which cannot be
+    built in this process without a platform plugin."""
+
+    def pixmap(self, *_a):
+        raise AssertionError("an existing icon file was overwritten")
+
+
+def _install_icon():
+    """Run the real install_icon against the patched XDG_DATA_HOME."""
+    from dopeiptv.app import install_icon
+    install_icon(_StubIcon())
+
+
+def test_a_stale_icon_cache_is_dropped_so_the_icon_can_be_seen(
+        tmp_path, monkeypatch):
+    """The icon files were right, the .desktop was right, and the desktop
+    still showed nothing - because GTK reads icon-theme.cache instead of
+    the directory, and this one was built four months before the icons.
+
+    Keyed on the cache being OLDER than the icons, not on having just
+    written one: by the time this bites, the icons are already on disk and
+    there is nothing new to write."""
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    theme = tmp_path / "icons" / "hicolor"
+    for size in (256, 128, 64, 48, 32):
+        d = theme / f"{size}x{size}" / "apps"
+        d.mkdir(parents=True)
+        (d / "dopeiptv.png").write_bytes(b"")
+    cache = theme / "icon-theme.cache"
+    cache.write_bytes(b"")
+    os.utime(cache, (0, 0))          # long predates the icons
+
+    _install_icon()
+    assert not cache.exists(), "the stale cache hid the icons and survived"
+
+
+def test_a_current_icon_cache_is_left_alone(tmp_path, monkeypatch):
+    """It is somebody else's derived data. Dropping one that already knows
+    about us buys nothing and costs every other icon a directory scan."""
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    theme = tmp_path / "icons" / "hicolor"
+    for size in (256, 128, 64, 48, 32):
+        d = theme / f"{size}x{size}" / "apps"
+        d.mkdir(parents=True)
+        p = d / "dopeiptv.png"
+        p.write_bytes(b"")
+        os.utime(p, (1000, 1000))
+    cache = theme / "icon-theme.cache"
+    cache.write_bytes(b"")
+    os.utime(cache, (2000, 2000))    # newer than the icons
+
+    _install_icon()
+    assert cache.exists(), "a cache that postdates the icons was removed"

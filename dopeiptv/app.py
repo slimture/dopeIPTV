@@ -104,16 +104,50 @@ def install_icon(icon: QIcon) -> None:
     looked soft beside sharp system icons."""
     base = Path(os.environ.get(
         "XDG_DATA_HOME", Path.home() / ".local" / "share"))
+    theme = base / "icons" / "hicolor"
+    newest = 0.0
     for size in (256, 128, 64, 48, 32):
-        target = (base / "icons" / "hicolor" / f"{size}x{size}" / "apps"
-                  / "dopeiptv.png")
-        if target.exists():
-            continue
+        target = theme / f"{size}x{size}" / "apps" / "dopeiptv.png"
         try:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            icon.pixmap(size, size).save(str(target), "PNG")
+            if not target.exists():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                icon.pixmap(size, size).save(str(target), "PNG")
+            newest = max(newest, target.stat().st_mtime)
         except OSError:
             pass
+    if newest:
+        _drop_stale_icon_cache(theme, newest)
+
+
+def _drop_stale_icon_cache(theme: Path, icon_mtime: float) -> None:
+    """Writing the PNG is not enough on its own.
+
+    Where icon-theme.cache exists, GTK - and so GNOME's shell and dash -
+    reads THAT instead of scanning the directory, and an icon that was not
+    in the theme when the cache was built is invisible however correct the
+    file on disk is. A cache four months older than the icons is exactly
+    what months of testing leaves behind, and the symptom is an icon that
+    never appears while everything else looks right.
+
+    Keyed on the cache being OLDER than our icon, not on having just
+    written one: by the time this bites, the icons have usually been on
+    disk for a while and there is nothing new to write, so "did we write
+    something this run" would skip precisely the case that needs fixing.
+
+    The cache is derived data - removing it costs a directory scan and
+    nothing else, and whatever built it will build it again with our icon
+    in it this time. The directory's own timestamp is bumped as well,
+    since that is the other half of the staleness check."""
+    try:
+        cache = theme / "icon-theme.cache"
+        if not cache.exists() or cache.stat().st_mtime >= icon_mtime:
+            return
+        cache.unlink()
+        os.utime(theme, None)
+        log.info("icon theme: dropped %s - it predates our icons, so the "
+                 "desktop could not see them", cache)
+    except OSError:
+        pass        # a cache we cannot remove is not worth failing over
 
 
 def _install_crash_hooks() -> None:
