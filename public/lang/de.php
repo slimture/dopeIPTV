@@ -156,4 +156,13 @@ return [
     "footer_releases" => "Versionen",
     "footer_docs"     => "Doku",
     "lang_label"      => "Sprache",
+
+    // ---- Help page ----
+    "nav_help" => "Hilfe",
+    "help_eyebrow" => "Hilfe",
+    "help_h1" => "So benutzt du dopeIPTV",
+    "help_intro" => "Kurze Antworten, gruppiert nach dem, was du vorhast. Suche, oder öffne einen Abschnitt.",
+    "help_search_ph" => "Hilfe durchsuchen…",
+    "help_toc" => "Abschnitte",
+    "help_no_hits" => "Kein Treffer. Versuch ein kürzeres Wort, oder frag auf GitHub.",
 ];

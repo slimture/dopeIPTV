@@ -155,4 +155,13 @@ return [
     "footer_releases" => "发布",
     "footer_docs"     => "文档",
     "lang_label"      => "语言",
+
+    // ---- Help page ----
+    "nav_help" => "帮助",
+    "help_eyebrow" => "帮助",
+    "help_h1" => "如何使用 dopeIPTV",
+    "help_intro" => "按你想做的事分组的简短答案。搜索，或者展开一个章节。",
+    "help_search_ph" => "搜索帮助…",
+    "help_toc" => "章节",
+    "help_no_hits" => "没有匹配项。换个更短的词，或到 GitHub 提问。",
 ];

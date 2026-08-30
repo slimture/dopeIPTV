@@ -325,3 +325,58 @@ footer nav a:hover { color: var(--accent); }
 @media (max-width: 640px) {
   .notes { padding: 16px 18px 4px; border-radius: 12px; }
 }
+
+/* ---- Help page --------------------------------------------------------- */
+/* Two columns on a wide screen: a table of contents that stays put, and the
+   sections beside it. One column below that, with the contents on top - a
+   sticky sidebar on a phone is just something in the way. */
+.help-search { margin: 0 0 26px; max-width: 560px; }
+.help-search input {
+  width: 100%; box-sizing: border-box;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  color: var(--text); font-size: 15px; font-family: inherit;
+}
+.help-search input:focus {
+  outline: none; border-color: var(--accent);
+}
+.help-search input::placeholder { color: var(--faint); }
+.help-count { margin: 8px 2px 0; color: var(--faint); font-size: 13px; }
+
+.help-layout { display: grid; grid-template-columns: 220px 1fr; gap: 40px; align-items: start; }
+.help-toc {
+  position: sticky; top: 80px;
+  display: flex; flex-direction: column; gap: 2px;
+  border-left: 1px solid var(--line);
+  padding-left: 14px;
+}
+.help-toc a {
+  color: var(--muted); text-decoration: none; font-size: 14px;
+  padding: 5px 0; line-height: 1.35;
+}
+.help-toc a:hover { color: var(--accent); }
+
+.help-sec { margin: 0 0 38px; scroll-margin-top: 80px; }
+.help-sec h2 {
+  font-size: 20px; margin: 0 0 14px;
+  padding-bottom: 10px; border-bottom: 1px solid var(--line);
+}
+.help-item { margin-bottom: 8px; scroll-margin-top: 80px; }
+.help-item p code {
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 5px; padding: 1px 5px; font-size: .92em;
+}
+.help-item p b { color: var(--text); font-weight: 600; }
+.help-item p a { color: var(--accent); }
+.help-none { color: var(--muted); padding: 20px 2px; }
+
+@media (max-width: 860px) {
+  .help-layout { grid-template-columns: 1fr; gap: 24px; }
+  .help-toc {
+    position: static; flex-direction: row; flex-wrap: wrap; gap: 6px 14px;
+    border-left: 0; border-bottom: 1px solid var(--line);
+    padding: 0 0 14px;
+  }
+}

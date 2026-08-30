@@ -156,4 +156,13 @@ return [
     "footer_releases" => "Matoleo",
     "footer_docs"     => "Nyaraka",
     "lang_label"      => "Lugha",
+
+    // ---- Help page ----
+    "nav_help" => "Msaada",
+    "help_eyebrow" => "Msaada",
+    "help_h1" => "Jinsi ya kutumia dopeIPTV",
+    "help_intro" => "Majibu mafupi, yamepangwa kulingana na unachotaka kufanya. Tafuta, au fungua sehemu.",
+    "help_search_ph" => "Tafuta kwenye msaada…",
+    "help_toc" => "Sehemu",
+    "help_no_hits" => "Hakuna kilichopatikana. Jaribu neno fupi zaidi, au uliza kwenye GitHub.",
 ];

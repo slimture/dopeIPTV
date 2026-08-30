@@ -156,4 +156,13 @@ return [
     "footer_releases" => "Rilis",
     "footer_docs"     => "Dokumentasi",
     "lang_label"      => "Bahasa",
+
+    // ---- Help page ----
+    "nav_help" => "Bantuan",
+    "help_eyebrow" => "Bantuan",
+    "help_h1" => "Cara memakai dopeIPTV",
+    "help_intro" => "Jawaban singkat, dikelompokkan menurut apa yang ingin Anda lakukan. Cari, atau buka sebuah bagian.",
+    "help_search_ph" => "Cari di bantuan…",
+    "help_toc" => "Bagian",
+    "help_no_hits" => "Tidak ada yang cocok. Coba kata yang lebih pendek, atau tanya di GitHub.",
 ];

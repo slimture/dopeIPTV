@@ -156,4 +156,13 @@ return [
     "footer_releases" => "Sürümler",
     "footer_docs"     => "Belgeler",
     "lang_label"      => "Dil",
+
+    // ---- Help page ----
+    "nav_help" => "Yardım",
+    "help_eyebrow" => "Yardım",
+    "help_h1" => "dopeIPTV nasıl kullanılır",
+    "help_intro" => "Yapmak istediğinize göre gruplanmış kısa yanıtlar. Arayın ya da bir bölüm açın.",
+    "help_search_ph" => "Yardımda ara…",
+    "help_toc" => "Bölümler",
+    "help_no_hits" => "Sonuç yok. Daha kısa bir sözcük deneyin ya da GitHub'da sorun.",
 ];

@@ -156,4 +156,13 @@ return [
     "footer_releases" => "リリース",
     "footer_docs"     => "ドキュメント",
     "lang_label"      => "言語",
+
+    // ---- Help page ----
+    "nav_help" => "ヘルプ",
+    "help_eyebrow" => "ヘルプ",
+    "help_h1" => "dopeIPTV の使い方",
+    "help_intro" => "やりたいことごとにまとめた短い答えです。検索するか、セクションを開いてください。",
+    "help_search_ph" => "ヘルプを検索…",
+    "help_toc" => "セクション",
+    "help_no_hits" => "一致するものがありません。短い語で試すか、GitHub で質問してください。",
 ];

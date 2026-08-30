@@ -156,4 +156,13 @@ return [
     "footer_releases" => "ریلیزز",
     "footer_docs"     => "دستاویزات",
     "lang_label"      => "زبان",
+
+    // ---- Help page ----
+    "nav_help" => "مدد",
+    "help_eyebrow" => "مدد",
+    "help_h1" => "dopeIPTV کیسے استعمال کریں",
+    "help_intro" => "آپ کیا کرنا چاہتے ہیں اس کے مطابق مختصر جوابات۔ تلاش کریں، یا کوئی حصہ کھولیں۔",
+    "help_search_ph" => "مدد میں تلاش کریں…",
+    "help_toc" => "حصے",
+    "help_no_hits" => "کچھ نہیں ملا۔ چھوٹا لفظ آزمائیں، یا GitHub پر پوچھیں۔",
 ];

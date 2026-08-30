@@ -156,4 +156,13 @@ return [
     "footer_releases" => "Izdanja",
     "footer_docs"     => "Dokumentacija",
     "lang_label"      => "Jezik",
+
+    // ---- Help page ----
+    "nav_help" => "Помоћ",
+    "help_eyebrow" => "Помоћ",
+    "help_h1" => "Како користити dopeIPTV",
+    "help_intro" => "Кратки одговори, груписани према ономе што желите да урадите. Претражите или отворите одељак.",
+    "help_search_ph" => "Претражи помоћ…",
+    "help_toc" => "Одељци",
+    "help_no_hits" => "Нема резултата. Пробајте краћу реч или питајте на GitHub-у.",
 ];

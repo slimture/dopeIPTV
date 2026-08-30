@@ -155,4 +155,13 @@ return [
     "footer_releases" => "릴리스",
     "footer_docs"     => "문서",
     "lang_label"      => "언어",
+
+    // ---- Help page ----
+    "nav_help" => "도움말",
+    "help_eyebrow" => "도움말",
+    "help_h1" => "dopeIPTV 사용법",
+    "help_intro" => "하려는 일에 따라 묶은 짧은 답변입니다. 검색하거나 섹션을 여세요.",
+    "help_search_ph" => "도움말 검색…",
+    "help_toc" => "섹션",
+    "help_no_hits" => "일치하는 항목이 없습니다. 더 짧은 단어로 시도하거나 GitHub에 문의하세요.",
 ];

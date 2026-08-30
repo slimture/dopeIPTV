@@ -248,6 +248,7 @@ echo json_encode([
       <a class="navlink" href="#features"><?= h(t('nav_features')) ?></a>
       <a class="navlink" href="#shots"><?= h(t('nav_screenshots')) ?></a>
       <a class="navlink" href="#download"><?= h(t('nav_download')) ?></a>
+      <a class="navlink" href="/help/"><?= h(t('nav_help')) ?></a>
       <a class="navlink" href="<?= h($REPO) ?>"><?= h(t('nav_github')) ?></a>
 <?php $avail = i18n_available(); if (count($avail) > 1): ?>
       <details class="langpick" id="langPick">
@@ -476,6 +477,7 @@ foreach ($shots as [$file, $alt, $title, $cap]):
     <nav>
       <a href="<?= h($REPO) ?>">GitHub</a>
       <a href="<?= h($REPO) ?>/releases"><?= h(t('footer_releases')) ?></a>
+      <a href="/help/"><?= h(t('nav_help')) ?></a>
       <a href="<?= h($REPO) ?>#readme"><?= h(t('footer_docs')) ?></a>
     </nav>
   </div>
