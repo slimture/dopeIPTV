@@ -832,6 +832,31 @@ class _Server(ThreadingHTTPServer):
 # network can ask it for a file too - and every name it should ever be asked
 # for is one we wrote into a playlist ourselves.
 _HLS_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
+# Longer than any name ffmpeg gives a playlist or a segment, by a wide
+# margin. Checked before the pattern so it never runs over a long string a
+# stranger on the network chose the length of.
+_HLS_NAME_MAX = 128
+
+
+def _hls_file(folder: str | None, name: str) -> str | None:
+    """The path of *name* inside *folder*, or None if it is not there.
+
+    The name off the network is COMPARED against a listing we produce; the
+    path handed back is the directory entry's own. Nothing from the request
+    is ever joined onto a path, so there is no traversal to reason about -
+    on any platform's idea of a separator, and with no second guard needed
+    after the fact to check where the join landed.
+    """
+    if not folder:
+        return None
+    try:
+        with os.scandir(folder) as entries:
+            for entry in entries:
+                if entry.name == name and entry.is_file():
+                    return entry.path
+    except OSError:
+        pass                        # the folder went away mid-cast
+    return None
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -881,18 +906,18 @@ class _Handler(BaseHTTPRequestHandler):
         # think of every separator there is, which is how rejecting "/" let a
         # Windows backslash walk straight out of the folder. Requiring the
         # first character to be alphanumeric rules out ".." and dotfiles too.
-        if not _HLS_NAME.match(name):
+        if len(name) > _HLS_NAME_MAX or not _HLS_NAME.match(name):
             self.send_error(404)
             return
         if not bridge.hls_ready(name):
             self.send_error(503)
             return
-        folder = os.path.abspath(bridge.hls_dir or "")
-        path = os.path.abspath(os.path.join(folder, name))
-        # Belt and braces: prove after the join that the file really is in
-        # our own folder, rather than trusting the pattern to have covered
-        # every platform's idea of a separator.
-        if os.path.dirname(path) != folder:
+        # Look the name up in a listing of our own folder rather than
+        # building a path out of the request - see _hls_file. That is what
+        # keeps the network out of the filesystem; the pattern above is the
+        # cheap first word, not the thing being relied on.
+        path = _hls_file(bridge.hls_dir, name)
+        if path is None:
             self.send_error(404)
             return
         try:

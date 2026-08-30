@@ -806,7 +806,11 @@ def test_the_hls_files_are_served_with_the_types_the_receiver_needs():
         # Windows backslash and a null byte straight through.
         for bad in ("../secret", "sub/dir.ts", ".hidden",
                     "..\\..\\secret", "a\\..\\..\\secret",
-                    "master.m3u8%00.ts", "~/.ssh/id_rsa"):
+                    "master.m3u8%00.ts", "~/.ssh/id_rsa",
+                    # Long enough to be nonsense as a segment name. Capped
+                    # before the pattern sees it, so no stranger on the LAN
+                    # chooses how much string the regex engine chews on.
+                    "a" * 4096 + ".ts"):
             try:
                 urllib.request.urlopen(f"{base}/{bad}", timeout=5)
                 raise AssertionError(f"{bad} was served")
@@ -814,6 +818,36 @@ def test_the_hls_files_are_served_with_the_types_the_receiver_needs():
                 assert e.code == 404, (bad, e.code)
     finally:
         b.stop()
+
+
+def test_a_requested_name_is_never_joined_onto_a_path(tmp_path):
+    """The guard that matters is the lookup, not the pattern.
+
+    A name off the network is compared against a listing of our own folder
+    and the entry's own path is what gets opened, so there is no join for a
+    separator - "/", "\\", or whatever the next platform invents - to escape
+    from. This pins the property directly rather than through the server,
+    because it is the property, not the 404, that makes the server safe.
+    """
+    from dopeiptv.providers.cast_bridge import _hls_file
+
+    (tmp_path / "hls").mkdir()
+    folder = str(tmp_path / "hls")
+    (tmp_path / "hls" / "v0.ts").write_bytes(b"\x47" * 188)
+    (tmp_path / "secret").write_text("not yours")
+
+    assert _hls_file(folder, "v0.ts") == os.path.join(folder, "v0.ts")
+
+    # Nothing that is not a plain entry of that folder resolves at all, and
+    # a directory is not a file to be served either.
+    for bad in ("../secret", "..\\secret", "secret", "", ".", "..",
+                "v0.ts/", os.path.join(folder, "v0.ts")):
+        assert _hls_file(folder, bad) is None, bad
+
+    # No folder yet, or one that has gone away, is a miss and not a crash -
+    # a cast can be stopped while a segment request is still in flight.
+    assert _hls_file(None, "v0.ts") is None
+    assert _hls_file(str(tmp_path / "gone"), "v0.ts") is None
 
 
 @pytest.mark.filterwarnings("ignore")
