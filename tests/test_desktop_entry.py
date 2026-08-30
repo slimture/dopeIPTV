@@ -34,7 +34,7 @@ def test_the_entry_points_at_the_appimage_not_the_mount(home, monkeypatch):
     assert desktop_entry.can_offer() == sys.platform.startswith("linux")
     assert desktop_entry.install() is True
     body = desktop_entry.entry_path().read_text(encoding="utf-8")
-    assert f"Exec={appimage} %U" in body
+    assert f"Exec={appimage}\n" in body
     # The icon name has to be the app_id, or Wayland never finds it.
     assert "Icon=dopeiptv" in body
     assert desktop_entry.entry_path().name == "dopeiptv.desktop"
@@ -48,7 +48,7 @@ def test_a_path_with_a_space_is_quoted(home, monkeypatch):
     monkeypatch.setenv("APPIMAGE", str(appimage))
     desktop_entry.install()
     body = desktop_entry.entry_path().read_text(encoding="utf-8")
-    assert f'Exec="{appimage}" %U' in body
+    assert f'Exec="{appimage}"\n' in body
 
 
 def test_nothing_is_offered_when_a_package_already_installed_one(

@@ -66,8 +66,13 @@ def register_secrets(*values: str | None) -> None:
 
 
 def redact(text: str) -> str:
-    """Mask every registered credential value in *text*."""
-    for s in _secrets:
+    """Mask every registered credential value in *text*.
+
+    Iterates a SNAPSHOT: a client is built on a worker thread (the account
+    panel fetches through run_async), so register_secrets can add to the
+    set while another thread is formatting a log line, and iterating a set
+    that grows under you raises RuntimeError."""
+    for s in tuple(_secrets):
         text = text.replace(s, "***")
     return text
 
@@ -98,7 +103,11 @@ def redact_url(url: object) -> str:
         query = parts.query
         if query:
             pairs = parse_qsl(query, keep_blank_values=True)
-            if pairs:
+            # Rebuilt only when there is actually something to mask.
+            # parse_qsl/urlencode is not a round trip for a query that is
+            # not key=value pairs - "?token" comes back as "token=" - and
+            # rewriting one we are not censoring only makes the log wrong.
+            if any(k.lower() in _CRED_PARAMS for k, _ in pairs):
                 query = urlencode([(k, "***" if k.lower() in _CRED_PARAMS
                                     else v) for k, v in pairs])
         return redact(urlunsplit((parts.scheme, netloc, "/".join(segs),

@@ -33,9 +33,18 @@ _BUNDLE_VARS = (
 def system_env() -> dict:
     """Environment for spawning a SYSTEM binary from inside a frozen
     bundle: the pre-launch value where PyInstaller stashed one, and the
-    variable dropped entirely where it did not. On a plain source run none
-    of these are set, so this is a no-op there."""
+    variable dropped entirely where it did not.
+
+    Only when actually frozen. These variables belong to us in a
+    PyInstaller build and nowhere else - under Flatpak the runtime sets
+    LD_LIBRARY_PATH to /app/lib for its own reasons, and stripping it from
+    a child would break the very thing we are trying to launch. Stripping
+    unconditionally was a no-op on a plain source run and wrong in a
+    sandbox, which is a bad trade for a guard that costs one attribute
+    lookup."""
     env = dict(os.environ)
+    if not getattr(sys, "frozen", False):
+        return env
     for var in _BUNDLE_VARS:
         orig = env.get(var + "_ORIG")
         if orig:
@@ -77,5 +86,9 @@ def open_url(url: str) -> bool:
         from PyQt6.QtGui import QDesktopServices
         return bool(QDesktopServices.openUrl(QUrl(url)))
     except Exception as e:
-        log.warning("open_url: could not open %s: %s", url, e)
+        # Redacted: the Trakt authorisation URL carries a one-time OAuth
+        # state token, and this line is written when something has gone
+        # wrong - exactly when the log gets shared.
+        from .log import redact_url
+        log.warning("open_url: could not open %s: %s", redact_url(url), e)
         return False

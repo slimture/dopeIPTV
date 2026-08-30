@@ -861,9 +861,10 @@ class _Handler(BaseHTTPRequestHandler):
     def _serve_hls(self) -> None:
         """Hand over one file of the HLS set.
 
-        Everything the receiver asks for is named in a playlist we wrote, so
-        only a plain name inside our own folder is ever answered - a path
-        with a directory in it is somebody else asking for something else.
+        Everything the receiver asks for is named in a playlist we wrote,
+        so only a plain name matching _HLS_NAME, resolving inside our own
+        folder, is ever answered. Anything else is somebody on the network
+        asking for something we never offered.
 
         The CORS header is not decoration here. A Cast receiver fetches the
         WebVTT rendition with a cross-origin request and drops it silently

@@ -5,7 +5,77 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
-## [Unreleased]
+## [1.2.11]
+
+Mostly Linux: the desktop icon, the links in the About window, and a set
+of faults that all had the same shape - a list row and the player
+disagreeing about what had been selected.
+
+### Fixed
+
+- **The app appears in the application menu, with its icon.** Wayland
+  ignores what an app sets for its own window icon: GNOME and KDE read it
+  from the .desktop entry matching the window, and an AppImage has never
+  had one installed - so the taskbar showed a blank placeholder however
+  right the icon inside the download was. The app offers once to add an
+  entry (Settings > Playback holds the same switch, and unticking it
+  removes the file); `Exec` points at `$APPIMAGE`, so it survives the file
+  being moved or upgraded in place. A `.deb`, a Flatpak or a source
+  checkout with no stable command is left alone.
+- **The Linux icon is the size everyone else's is.** Drawn edge to edge
+  while every icon beside it carries a margin - GNOME asks for about 80%
+  of the canvas, the same proportion Apple asks for, so one constant now
+  serves both. Applied to the runtime icon, the `.deb`, the AppImage and
+  the Flatpak, whose committed icon was a single full-bleed 256 px file
+  that nothing regenerated; a test now fails if those drift from the code
+  that draws them.
+- **An icon that will not appear has a readable cause.** Where a stale
+  `icon-theme.cache` exists, GTK reads it instead of the directory and an
+  icon added since is invisible - one four months old was hiding a set of
+  perfectly good files. The app drops a cache older than its own icons,
+  and logs one line naming which of the four possible causes applies.
+  `install_icon` also replaces an icon whose bytes changed rather than
+  skipping anything already present.
+- **Links in the About window work again.** Website, download and the
+  Trakt pages all did nothing from a packaged build: opening a link starts
+  the browser as a child of this process, so it inherited the bundle's
+  `LD_LIBRARY_PATH`, loaded our libraries instead of its own and died
+  before drawing. Exactly the fault external mpv had; the cure it already
+  had is now shared, and every link in the app goes through it.
+- **A view toggle inside a series keeps the episodes.** It fell back to
+  the series list, and a double-click there tried to play the series
+  itself - an error, and playback stopped. Three faults of the same shape,
+  plus the versions Favorites, Watchlist and Watched had of it.
+- **Hiding a live channel no longer hides a film.** Provider ids are only
+  unique within a type, so id 123 in live and id 123 in vod were the same
+  row as far as the hidden list was concerned.
+- **One scrollbar in the right-hand panel, not two nested ones.** The
+  wheel, and a trackpad especially, went to whichever region the pointer
+  was over, so the panel simply refused to move.
+- **The "Next episode" card sits where the picture ends.** Its inset was
+  sized for the floating fullscreen control bar and applied everywhere, so
+  docked it hovered a bar's height above empty video.
+
+### Security
+
+- **Credentials are kept out of the log.** An Xtream stream URL carries
+  the whole account (`/live/USER/PASS/1234.ts`), and these logs exist to
+  be shared in bug reports. Two layers: `redact_url` understands the
+  shapes a credential arrives in and is called where a URL is logged, and
+  the account's own values are masked in every record by a filter, which
+  covers the shapes not yet taught and any log line written later. CodeQL
+  flagged three sites; four more had the same shape and are fixed too.
+- **The cast bridge answers only for its own files.** It took the file
+  name straight from the request and joined it onto our folder behind a
+  blocklist that rejected `/` and a leading dot - which let a Windows
+  backslash walk out of the folder. It is an allowlist now, with the
+  joined path checked to be inside our own directory afterwards.
+
+### Added
+
+- **`DOPEIPTV_MAC_RASTER=1`** selects, on macOS, the fullscreen
+  presentation path that cured this on Linux and Windows - opt-in, so both
+  can be compared from a single build.
 
 ### Removed
 

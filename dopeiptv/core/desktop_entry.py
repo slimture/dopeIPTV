@@ -111,11 +111,16 @@ def describe() -> str:
 
 
 def _quote(cmd: str) -> str:
-    # Exec is not a shell command line: a path with a space is quoted, and
-    # the only escapes the spec asks for inside quotes are \\ and \".
-    if not any(c in cmd for c in ' \t"\\'):
+    # Exec is not a shell command line. A path needing quotes gets them,
+    # and inside quotes the spec asks for a backslash before ", `, $ and
+    # \\ itself - the last three because a quoted Exec is still expanded
+    # for those. The backslash must be doubled FIRST or it escapes the
+    # escapes that follow.
+    if not any(c in cmd for c in ' \t"\\`$'):
         return cmd
-    inner = cmd.replace("\\", "\\\\").replace('"', '\\"')
+    inner = cmd.replace("\\", "\\\\")
+    for ch in ('"', "`", "$"):
+        inner = inner.replace(ch, "\\" + ch)
     return f'"{inner}"'
 
 
@@ -130,7 +135,11 @@ def install() -> bool:
         "Type=Application\n"
         f"Name={APP_NAME}\n"
         "Comment=IPTV client with Xtream Codes and EPG\n"
-        f"Exec={_quote(cmd)} %U\n"
+        # No %U: the app takes no file or URL arguments (only --self-check
+        # and --no-x11), and the entry the packages ship has none either.
+        # Two entries for the same app that disagree about what it accepts
+        # is how they start drifting.
+        f"Exec={_quote(cmd)}\n"
         f"Icon={ICON_NAME}\n"
         "Terminal=false\n"
         "Categories=AudioVideo;Video;TV;\n"

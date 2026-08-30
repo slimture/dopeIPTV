@@ -6,7 +6,6 @@ libraries instead of its own and fell over before drawing anything - which
 from the user's side is a link that simply does not work. Exactly the
 fault external mpv had, and exactly the same cure.
 """
-import os
 import sys
 
 import pytest
@@ -21,6 +20,7 @@ def test_a_link_is_opened_with_the_bundles_library_paths_stripped(
     """The whole bug in one assertion: the handler must not inherit
     LD_LIBRARY_PATH, or the browser loads our libstdc++ and dies."""
     monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setenv("LD_LIBRARY_PATH", "/opt/dopeiptv/lib")
     monkeypatch.setenv("QT_PLUGIN_PATH", "/opt/dopeiptv/plugins")
     monkeypatch.setattr(xdg.shutil, "which",
@@ -44,18 +44,24 @@ def test_a_link_is_opened_with_the_bundles_library_paths_stripped(
     assert seen["session"] is True
 
 
-def test_the_pre_bundle_value_is_restored_when_there_was_one():
+def test_the_pre_bundle_value_is_restored_when_there_was_one(monkeypatch):
     """PyInstaller stashes what the variable held BEFORE the bundle set
     it. Dropping the variable is only right when there was nothing there
     to begin with - otherwise the child loses the user's own setting."""
-    os.environ["LD_LIBRARY_PATH"] = "/opt/dopeiptv/lib"
-    os.environ["LD_LIBRARY_PATH_ORIG"] = "/usr/local/lib"
-    try:
-        env = xdg.system_env()
-        assert env["LD_LIBRARY_PATH"] == "/usr/local/lib"
-    finally:
-        os.environ.pop("LD_LIBRARY_PATH", None)
-        os.environ.pop("LD_LIBRARY_PATH_ORIG", None)
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setenv("LD_LIBRARY_PATH", "/opt/dopeiptv/lib")
+    monkeypatch.setenv("LD_LIBRARY_PATH_ORIG", "/usr/local/lib")
+    assert xdg.system_env()["LD_LIBRARY_PATH"] == "/usr/local/lib"
+
+
+def test_nothing_is_stripped_when_we_are_not_a_frozen_bundle(monkeypatch):
+    """These variables are ours in a PyInstaller build and nobody else's.
+    Under Flatpak the runtime sets LD_LIBRARY_PATH to /app/lib for its own
+    reasons, and stripping that from a child would break the very thing we
+    are trying to launch."""
+    monkeypatch.delattr(sys, "frozen", raising=False)
+    monkeypatch.setenv("LD_LIBRARY_PATH", "/app/lib")
+    assert xdg.system_env()["LD_LIBRARY_PATH"] == "/app/lib"
 
 
 def test_the_next_handler_is_tried_when_one_is_missing(monkeypatch):

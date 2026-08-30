@@ -29,6 +29,7 @@ external mpv/VLC playback).
 - **Multiview** — watch 2/4/6/9 live channels at once in a separate grid, each an independent stream (even from different playlists), with per-window audio/subtitles, click-to-focus audio and a real timeshift timeline on catch-up channels
 - **TV, Movies & Series** with seasons/episodes, favorites, history, and instant search across thousands of channels
 - **27 languages** — from English, Svenska and Español to 中文, 日本語, हिन्दी and العربية, with full right-to-left support (Arabic, Persian, Hebrew, Urdu) — switchable live in Settings
+- **Local files** — point it at a folder (or a mounted network share) and browse your own videos beside the provider's: a folder view and a library view that builds series with seasons out of the file names, TMDB posters, resume, History, Trakt, casting and multiview. Music gets album art and a play queue that advances on its own
 - **Resume playback** — movies/series/recordings remember where you stopped and offer to continue
 - **Full EPG** with now/next progress bars, a searchable guide, and a persistent disk cache that shows instantly on startup
 - **TMDB metadata** — posters, ratings (linked to IMDb), and a clickable cast list that finds an actor's other titles in your playlist
@@ -153,14 +154,31 @@ username, and password.
 
 ## Add to the application menu (optional)
 
+The app offers this itself the first time it starts somewhere no menu
+entry exists — say yes and it writes one to `~/.local/share/applications`,
+say no and nothing is written. The same switch lives under **Settings →
+Playback**, and unticking it removes the entry again.
+
+On **Wayland this is also where the icon comes from**: GNOME and KDE take
+a window's icon and name from the .desktop file matching it and ignore
+what the application itself sets, so without an entry the taskbar shows a
+blank placeholder however good the icon inside the download is. Installed
+from the `.deb` the entry is already there and nothing is asked.
+
+To do it by hand instead:
+
 ```bash
 mkdir -p ~/.local/share/applications
 cp dopeiptv.desktop ~/.local/share/applications/
 update-desktop-database ~/.local/share/applications
 ```
 
-The application icon is installed automatically to `~/.local/share/icons`
-the first time the app starts.
+The icon itself is written to `~/.local/share/icons` at every start, at
+five sizes, and refreshed whenever the drawing changes. If it still does
+not appear, a stale `~/.local/share/icons/hicolor/icon-theme.cache` from
+some earlier tool is the usual reason — GTK reads that instead of the
+directory. The app deletes one older than its own icons; deleting it by
+hand costs nothing either.
 
 ## Usage
 
