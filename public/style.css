@@ -63,6 +63,9 @@ nav.links a:hover { color: var(--text); }
 .btn.ghost { background: transparent; border-color: var(--line-2); color: var(--text); }
 .btn.ghost:hover { border-color: var(--accent); color: var(--accent); }
 .bar .btn { padding: 8px 14px; }
+/* Below 720px the inline links give way to the disclosure in the header
+   (.navmenu). They used to just vanish, which left the help page with a
+   header of nothing but the logo. */
 @media (max-width: 720px) { nav.links a.navlink { display: none; } }
 .hero { padding: 76px 0 40px; }
 .hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 52px; align-items: center; }
@@ -173,7 +176,9 @@ h2 { font-size: clamp(1.7rem, 3.6vw, 2.3rem); letter-spacing: -.02em; margin: 0;
 footer { border-top: 1px solid var(--line); padding: 36px 0 56px; margin-top: 20px; }
 footer .wrap { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
 footer .v { font-family: var(--mono); font-size: 12px; color: var(--faint); }
-footer nav { display: flex; gap: 22px; }
+/* wrap: four links do not fit on one line at 320px, and a footer is no
+   reason for the whole page to scroll sideways. */
+footer nav { display: flex; gap: 22px; flex-wrap: wrap; }
 footer nav a { color: var(--muted); font-size: 14px; }
 footer nav a:hover { color: var(--accent); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
@@ -224,6 +229,68 @@ footer nav a:hover { color: var(--accent); }
 }
 .langpick-item:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .langpick-item.is-current { color: var(--accent); font-weight: 600; }
+
+/* ---- the narrow-window menu -------------------------------------------- */
+/* Same disclosure as the language picker, so the header has one idea of what
+   a menu looks like. It exists only where the inline links do not. */
+.navmenu { position: relative; display: none; }
+@media (max-width: 720px) { .navmenu { display: block; } }
+.navmenu summary {
+  list-style: none; cursor: pointer; user-select: none;
+  display: flex; align-items: center; justify-content: center;
+  /* 44px: a finger, not a pointer. */
+  width: 44px; height: 40px; border-radius: 10px;
+  border: 1px solid var(--line-2); background: var(--surface-2);
+  transition: border-color .2s ease;
+}
+.navmenu summary::-webkit-details-marker { display: none; }
+.navmenu summary::marker { content: ""; }
+.navmenu[open] summary { border-color: var(--accent); }
+.navmenu-bars { display: flex; flex-direction: column; gap: 4px; width: 18px; }
+.navmenu-bars i {
+  display: block; height: 2px; border-radius: 2px; background: var(--text);
+  transition: transform .2s ease, opacity .2s ease;
+}
+/* Open: the bars become a cross, so the button says how to close it. */
+.navmenu[open] .navmenu-bars i:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+.navmenu[open] .navmenu-bars i:nth-child(2) { opacity: 0; }
+.navmenu[open] .navmenu-bars i:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+@media (prefers-reduced-motion: reduce) { .navmenu-bars i { transition: none; } }
+.navmenu-panel {
+  position: absolute; top: calc(100% + 8px); inset-inline-end: 0; z-index: 40;
+  min-width: 200px; padding: 6px; border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--line-2);
+  box-shadow: 0 18px 44px -18px rgba(0,0,0,.6);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.navmenu-item {
+  display: block; padding: 11px 14px; border-radius: 8px;
+  color: var(--text); font-size: 15px; white-space: nowrap;
+}
+.navmenu-item:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.navmenu-item.is-current { color: var(--accent); font-weight: 600; }
+
+/* A phone header has to hold the brand, the language picker, the menu and
+   the download button in 360px. The language NAME is what gives - the globe
+   still says what the button is, and the panel marks the current language.
+   Without this the row overflowed and the whole page scrolled sideways. */
+.langpick-cur { display: inline-flex; align-items: center; gap: 8px; }
+@media (max-width: 720px) {
+  nav.links { gap: 10px; }
+  .langpick summary { padding: 9px 10px; }
+  .langpick-name, .langpick-caret { display: none; }
+
+  /* Both panels hang off a button barely wider than a finger, so anchoring
+     them to it put them half off the screen - the language list at -25px on
+     a 320px phone, and mirrored back out the other side in RTL. Dropping
+     position:relative lets them anchor to the sticky header instead, and
+     pinning both inline edges makes the width the screen's, not the
+     content's. One rule, and neither can escape in either direction. */
+  .langpick, .navmenu { position: static; }
+  .langpick-menu, .navmenu-panel {
+    inset-inline: 16px; min-width: 0; max-height: 70vh; overflow-y: auto;
+  }
+}
 
 /* ---- utilities (replace former inline styles) --------------------------- */
 .pt0 { padding-top: 0; }
@@ -373,6 +440,12 @@ footer nav a:hover { color: var(--accent); }
   display: grid; grid-template-columns: 230px 1fr; gap: 48px;
   align-items: start; padding-top: 40px;
 }
+/* A grid item's automatic minimum size is its CONTENT's minimum, so the long
+   command lines in the <pre> blocks made the column as wide as the longest
+   one and the whole page scrolled sideways on a phone. min-width:0 lets the
+   column be the screen and the <pre> scroll inside itself, which is what its
+   own overflow-x was already there for. */
+.help-toc, .help-body { min-width: 0; }
 /* Hiding the contents would otherwise leave the answers in the 230px column
    the contents used to sit in. While filtering the results take the width. */
 body.searching .help-layout { grid-template-columns: 1fr; }

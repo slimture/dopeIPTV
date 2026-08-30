@@ -241,32 +241,7 @@ echo json_encode([
 </script>
 </head>
 <body>
-<header class="bar">
-  <div class="wrap">
-    <a class="brand" href="#top"><span class="glyph">◉</span><b>dopeIPTV</b></a>
-    <nav class="links">
-      <a class="navlink" href="#features"><?= h(t('nav_features')) ?></a>
-      <a class="navlink" href="#shots"><?= h(t('nav_screenshots')) ?></a>
-      <a class="navlink" href="#download"><?= h(t('nav_download')) ?></a>
-      <a class="navlink" href="/help/"><?= h(t('nav_help')) ?></a>
-      <a class="navlink" href="<?= h($REPO) ?>"><?= h(t('nav_github')) ?></a>
-<?php $avail = i18n_available(); if (count($avail) > 1): ?>
-      <details class="langpick" id="langPick">
-        <summary aria-label="<?= h(t('lang_label')) ?>">
-          <span class="langpick-cur">🌐 <?= h(I18N_NAMES[lang_code()] ?? lang_code()) ?></span>
-          <span class="langpick-caret" aria-hidden="true">▾</span>
-        </summary>
-        <div class="langpick-menu" role="menu">
-<?php foreach ($avail as $code): /* always ?lang= — even English, so it overrides a cookie set to another language (otherwise you can't switch back) */ $href = '/?lang=' . rawurlencode($code); ?>
-          <a role="menuitem" rel="nofollow" class="langpick-item<?= $code === lang_code() ? ' is-current' : '' ?>" href="<?= h($href) ?>"<?= $code === lang_code() ? ' aria-current="true"' : '' ?>><?= h(I18N_NAMES[$code] ?? $code) ?></a>
-<?php endforeach; ?>
-        </div>
-      </details>
-<?php endif; ?>
-      <a class="btn primary" href="#download"><?= h(t('nav_download_btn')) ?></a>
-    </nav>
-  </div>
-</header>
+<?php $nav_current = 'home'; require __DIR__ . '/nav.php'; ?>
 
 <main id="top">
   <section class="hero">
@@ -482,6 +457,7 @@ foreach ($shots as [$file, $alt, $title, $cap]):
     </nav>
   </div>
 </footer>
+<script src="/nav.js" defer></script>
 <script src="/app.js" defer></script>
 </body>
 </html>

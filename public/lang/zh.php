@@ -15,6 +15,7 @@ return [
     "nav_screenshots" => "截图",
     "nav_download"    => "下载",
     "nav_github"      => "GitHub",
+    "nav_menu"        => "菜单",
     "nav_download_btn"=> "下载",
 
     // hero

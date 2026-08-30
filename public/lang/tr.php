@@ -16,6 +16,7 @@ return [
     "nav_screenshots" => "Ekran görüntüleri",
     "nav_download"    => "İndir",
     "nav_github"      => "GitHub",
+    "nav_menu"        => "Menü",
     "nav_download_btn"=> "İndir",
 
     // hero

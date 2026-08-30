@@ -16,6 +16,7 @@ return [
     "nav_screenshots" => "Skärmbilder",
     "nav_download"    => "Ladda ner",
     "nav_github"      => "GitHub",
+    "nav_menu"        => "Meny",
     "nav_download_btn"=> "Ladda ner",
 
     // hero

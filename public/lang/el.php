@@ -16,6 +16,7 @@ return [
     "nav_screenshots" => "Στιγμιότυπα",
     "nav_download"    => "Λήψη",
     "nav_github"      => "GitHub",
+    "nav_menu"        => "Μενού",
     "nav_download_btn"=> "Λήψη",
 
     // hero

@@ -16,6 +16,7 @@ return [
     "nav_screenshots" => "تصاویر",
     "nav_download"    => "دانلود",
     "nav_github"      => "GitHub",
+    "nav_menu"        => "منو",
     "nav_download_btn"=> "دانلود",
 
     // hero

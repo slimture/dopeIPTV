@@ -68,17 +68,7 @@ const HELP = [
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<header class="bar">
-  <div class="wrap">
-    <a class="brand" href="/"><span class="glyph">◉</span><b>dopeIPTV</b></a>
-    <nav class="links">
-      <a class="navlink" href="/#features"><?= h(t('nav_features')) ?></a>
-      <a class="navlink" href="/#download"><?= h(t('nav_download')) ?></a>
-      <a class="navlink" href="/help/" aria-current="page"><?= h(t('nav_help')) ?></a>
-      <a class="navlink" href="<?= h($REPO) ?>"><?= h(t('nav_github')) ?></a>
-    </nav>
-  </div>
-</header>
+<?php $nav_current = 'help'; require __DIR__ . '/../nav.php'; ?>
 
 <main id="top">
   <section class="help-top">
@@ -145,6 +135,7 @@ const HELP = [
     </nav>
   </div>
 </footer>
+<script src="/nav.js" defer></script>
 <script src="/help.js" defer></script>
 </body>
 </html>
