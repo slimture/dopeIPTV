@@ -75,17 +75,70 @@ repo hardcodes a real host or address.
    publishing a list with an installer silently missing. Set `GITHUB_TOKEN` in
    the environment to raise the API rate limit if needed.
 
-## Updating the site
+## Where this actually runs
 
-Copy the code, never the live data:
+Written down because it has cost time twice, and neither time was the
+setup's fault - it was not knowing the setup.
+
+**The site lives inside a Bastille jail called `pontusweb`, not on the
+host.** Every path below is the jail's own view of the filesystem:
+
+| | |
+|---|---|
+| host | `slimfree` |
+| jail | `pontusweb` |
+| jail root, from the host | `/usr/local/bastille/jails/pontusweb/root` (ZFS `iris-data/...`) |
+| site, inside the jail | `/usr/local/www/iptv/` |
+| checkout, inside the jail | `~/dopeiptv` — lower case; the host's is `~/dopeIPTV` |
+
+So `/usr/local/www/iptv/` typed on the HOST is not the live site. Get into
+the jail first, and note that `bastille console` opens an interactive
+shell - anything pasted after it on the same line is swallowed by the
+host's shell and never runs:
 
 ```sh
+bastille console pontusweb     # opens a shell; type the rest INSIDE it
+```
+
+**The sync's cron line is in `/etc/crontab`, with a user field**, not in
+anybody's personal crontab:
+
+```
+0,15,30,45 * * * * www /usr/local/bin/php /usr/local/www/iptv/sync-releases.php >> /var/log/iptv-sync.log 2>&1
+```
+
+`crontab -l` therefore prints nothing for root AND nothing for www, which
+looks exactly like "there is no cron job" and is not. That is what made
+the permission failure below so confusing: the sync runs as `www`, and
+nothing in `crontab -l` says so.
+
+## Updating the site
+
+Copy the code, never the live data. Inside the jail:
+
+```sh
+bastille console pontusweb
 cd ~/dopeiptv
 git checkout website          # the site is NOT on main or testing
 git pull origin website
 cp -R public/. /usr/local/www/iptv/public/
 cp sync-releases.php /usr/local/www/iptv/
 ```
+
+`public/.` with the trailing dot copies the CONTENTS. `cp -R public/ dest/`
+on FreeBSD puts the directory inside the target instead, giving you
+`public/public/`.
+
+Or from the host, without entering the jail - same commands, one prefix:
+
+```sh
+J=$(jls -j pontusweb path)
+cp -R public/. "$J/usr/local/www/iptv/public/"
+```
+
+(Prefer doing it inside the jail. `chown www:www` from the host resolves
+`www` out of the HOST's passwd; it happens to be UID 80 on both here, but
+inside the jail it cannot be wrong.)
 
 Three things on the server are live data that the repo does not carry, and a
 deploy must leave them alone:
