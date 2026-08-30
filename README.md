@@ -75,10 +75,19 @@ chmod +x dopeIPTV-*.AppImage
 ./dopeIPTV-*.AppImage
 ```
 
-(To integrate the AppImage into your application menu, use a tool like
-[Gear Lever](https://flathub.org/apps/it.mijorus.gearlever) or AppImageLauncher.)
+(The AppImage offers, on first run, to add itself to your application menu —
+which is also where a Wayland desktop reads the window's icon and name from.
+Say no and nothing is written; the same switch lives under **Settings →
+Playback**. [Gear Lever](https://flathub.org/apps/it.mijorus.gearlever) and
+AppImageLauncher do the same job if you prefer to manage it yourself.)
 
-**macOS** — open the `.dmg` and drag dopeIPTV to Applications. The app isn't
+**macOS** — Apple Silicon only from 1.2.11 onward; **1.2.10 is the last
+release with an Intel `.dmg`**. Homebrew moved macOS x86_64 to Tier 3 in
+September 2026 and stopped building the binary packages the Intel build
+depended on, and Apple has said macOS Tahoe 26 is the last macOS for Intel
+hardware.
+
+Open the `.dmg` and drag dopeIPTV to Applications. The app isn't
 notarized by Apple yet, so the first launch is blocked: **right-click the app →
 Open**, then **Open** in the dialog (or allow it under **System Settings →
 Privacy & Security → Open Anyway**). If macOS says the app is *"damaged"*, clear

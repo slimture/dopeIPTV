@@ -5,6 +5,21 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
+## [Unreleased]
+
+### Removed
+
+- **The Intel (x86_64) macOS `.dmg`.** 1.2.10 is the last release that has
+  one. Homebrew moved macOS x86_64 to Tier 3 in September 2026 — no CI, no
+  new binary packages — so `brew install mpv` on the Intel runner now
+  answers "no bottle available", and the same is coming for every
+  dependency as its formula next updates. Building that chain from source
+  on a Tier 3 machine takes hours per build and breaks constantly, and
+  pinning an old mpv only holds until the next dependency loses its own
+  package. Apple has said macOS Tahoe 26 is the last macOS for Intel and
+  Homebrew stops running on Intel entirely in September 2027, so this was
+  ending either way. Apple Silicon is unaffected.
+
 ## [1.2.10]
 
 macOS fullscreen and Windows antivirus, plus a few things around watching
