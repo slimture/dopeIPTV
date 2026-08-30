@@ -67,19 +67,31 @@ def test_the_committed_flatpak_icons_match_the_drawing_code():
 
 def test_the_flatpak_manifest_installs_every_size():
     """One 256 px file meant a 32 px panel downscaled it, which is the
-    softness the .deb had until it shipped all five."""
-    import yaml
+    softness the .deb had until it shipped all five.
 
-    with open(os.path.join(
-            _REPO, "packaging/flatpak/io.github.slimture.dopeIPTV.yaml")) as f:
-        doc = yaml.safe_load(f)
-    cmds = [c for m in doc["modules"] if isinstance(m, dict)
-            for c in m.get("build-commands", [])]
-    icon_cmds = [c for c in cmds if "icons/hicolor" in c]
-    assert icon_cmds, "the manifest installs no icon at all"
-    joined = " ".join(icon_cmds)
+    Read as text rather than parsed as YAML on purpose: PyYAML is not a
+    test dependency, and adding one to the whole suite for a single
+    substring check is a poor trade. (It was parsed at first, and CI -
+    which does not install PyYAML - said so.)"""
+    path = os.path.join(
+        _REPO, "packaging/flatpak/io.github.slimture.dopeIPTV.yaml")
+    with open(path, encoding="utf-8") as f:
+        lines = f.read().splitlines()
+
+    hit = [i for i, ln in enumerate(lines) if "icons/hicolor" in ln]
+    assert hit, "the manifest installs no icon at all"
+    # The install is a shell loop, so the sizes are in the line above it
+    # rather than in the install line itself - take the surrounding block.
+    lo, hi = max(0, hit[0] - 4), min(len(lines), hit[-1] + 3)
+    block = "\n".join(lines[lo:hi])
     for size in (256, 128, 64, 48, 32):
-        assert str(size) in joined, "size %d is not installed" % size
+        assert str(size) in block, (
+            "size %d is not installed:\n%s" % (size, block))
+    # And the files it names must be the ones actually committed.
+    for size in (256, 128, 64, 48, 32):
+        p = os.path.join(_REPO, "packaging/icons",
+                         "io.github.slimture.dopeIPTV-%d.png" % size)
+        assert os.path.exists(p), "%s is missing" % p
 
 
 def test_every_repo_file_a_workflow_names_actually_exists():

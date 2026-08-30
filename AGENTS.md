@@ -121,3 +121,9 @@ QT_QPA_PLATFORM=offscreen pytest -q
   `tests/test_packaging_icons.py` now fails on any repo path a workflow
   names that does not exist, so this cannot reach CI again - but the habit
   is cheaper than the test.
+- **A test may only import what CI installs**, which is `requirements.txt`
+  plus ruff, mypy and pytest - see `.github/workflows/ci.yml`. A green run
+  locally proves nothing about a module that happens to be on this machine
+  and not on the runner: PyYAML was imported by one test, passed here, and
+  failed CI with `ModuleNotFoundError`. Prefer reading a file as text over
+  adding a dependency to the whole suite for one assertion.
