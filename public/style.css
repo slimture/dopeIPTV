@@ -435,6 +435,11 @@ body.searching .help-layout { grid-template-columns: 1fr; }
 }
 .help-a .os { color: var(--faint); font-size: 12px; text-transform: uppercase;
   letter-spacing: .07em; display: block; margin: 0 0 5px; }
+/* A shell command is left-to-right in every language. Done here rather than
+   with dir="ltr" in the markup so the <pre> blocks stay byte-identical to
+   the English ones - which is what the translation check enforces. */
+[dir="rtl"] .help-a pre, [dir="rtl"] .help-a code { direction: ltr; }
+[dir="rtl"] .help-a pre { text-align: left; }
 .help-none { color: var(--muted); padding: 26px 2px; font-size: 16px; }
 .help-foot { margin-top: 34px; }
 /* While filtering, sections lose their headings' distance - the list should
