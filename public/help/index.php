@@ -6,14 +6,17 @@
  * `try_files $uri $uri/` plus `index index.php` serves it with no server
  * config change at all - one less thing a deploy can be missing.
  *
- * Every topic is rendered server-side, so the page works with JavaScript off
- * and a search engine sees all of it. The search box filters what is already
- * on the page; it is not a query against anything.
+ * Every topic is rendered server-side with its answer VISIBLE - articles,
+ * not an accordion. That is what makes the search useful: a match reads
+ * immediately instead of asking for a second click. It also means the page
+ * is complete with JavaScript off and a search engine indexes all of it.
  *
- * The content lives in lang/<code>.php like the rest of the site, which means
- * t()'s per-key fallback applies: a language that has not translated a topic
- * yet shows that topic in English while the rest of its page stays translated.
- * A partial translation degrades topic by topic instead of breaking.
+ * The search lives in help.js, an external file, because the site's CSP is
+ * `script-src 'self'` with no 'unsafe-inline'.
+ *
+ * Content comes from lang/<code>.php like the rest of the site, so t()'s
+ * per-key fallback applies: a language that has not translated a topic yet
+ * shows that one topic in English inside an otherwise translated page.
  */
 require __DIR__ . '/../i18n.php';
 
@@ -24,25 +27,23 @@ $rel = @json_decode(@file_get_contents(__DIR__ . '/../releases.json'), true);
 $version = $rel['version'] ?? '';
 
 /**
- * The help tree: section id => [topic ids].
+ * section id => [topic ids], in the order somebody meets the app.
  *
- * Text comes from t("help_<section>_<topic>_q") and ..._a. Ordered the way
- * somebody meets the app - install, watch, then the things you go looking
- * for - rather than the way the code is organised.
+ * Seven sections, not eleven: the guide, timeshift and recording are one
+ * subject to a reader even though they are three to the code, and a page of
+ * many small headings with two sentences under each reads as fragments
+ * rather than as documentation.
  */
 const HELP = [
     'start' => ['linux', 'macos', 'windows', 'playlist', 'm3u', 'demo'],
     'watch' => ['play', 'seek', 'fullscreen', 'popout', 'tracks', 'keys', 'resume'],
-    'epg'   => ['what', 'guide', 'xmltv', 'refresh', 'times'],
-    'ts'    => ['what', 'start', 'browse', 'depth'],
-    'rec'   => ['start', 'timed', 'scheduled', 'oneconn', 'cap', 'where', 'while'],
-    'mv'    => ['open', 'audio', 'options', 'cost'],
+    'tv'    => ['epg', 'guide', 'xmltv', 'times', 'ts', 'tsstart', 'tsbrowse',
+                'rec', 'recwhen', 'reconn', 'reccap', 'recwhere'],
+    'more'  => ['mv', 'mvaudio', 'mvcost', 'cast', 'castfix', 'trakt'],
     'local' => ['add', 'views', 'art', 'music', 'missing'],
-    'cast'  => ['start', 'convert', 'stop'],
-    'trakt' => ['connect', 'scrobble'],
-    'set'   => ['language', 'theme', 'playback', 'subs', 'parental', 'hide', 'playlists'],
-    'fix'   => ['start', 'picture', 'gatekeeper', 'smartscreen', 'defender',
-                'stream', 'limit', 'icon', 'external', 'logs'],
+    'set'   => ['language', 'playback', 'parental', 'hide', 'playlists'],
+    'fix'   => ['logs', 'start', 'picture', 'gatekeeper', 'smartscreen',
+                'defender', 'stream', 'limit', 'icon', 'external'],
 ];
 ?><!DOCTYPE html>
 <html lang="<?= h(lang_code()) ?>" dir="<?= h(lang_dir()) ?>">
@@ -80,21 +81,28 @@ const HELP = [
 </header>
 
 <main id="top">
-  <section class="pt0">
+  <section class="help-top">
     <div class="wrap">
-      <div class="sec-head">
-        <span class="eyebrow"><?= h(t('help_eyebrow')) ?></span>
-        <h1><?= h(t('help_h1')) ?></h1>
-        <p><?= h(t('help_intro')) ?></p>
-      </div>
+      <h1><?= h(t('help_h1')) ?></h1>
+      <p class="help-lede"><?= h(t('help_intro')) ?></p>
 
-      <div class="help-search">
-        <input type="search" id="helpSearch" autocomplete="off"
+      <div class="help-searchbar">
+        <span class="help-mag" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle
+          cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg></span>
+        <input type="search" id="helpSearch" autocomplete="off" autofocus
                placeholder="<?= h(t('help_search_ph')) ?>"
                aria-label="<?= h(t('help_search_ph')) ?>">
-        <p class="help-count" id="helpCount" hidden></p>
+        <button type="button" id="helpClear" hidden
+                aria-label="<?= h(t('help_clear')) ?>">✕</button>
       </div>
+      <p class="help-count" id="helpCount" hidden
+         data-fmt="<?= h(t('help_hits')) ?>"></p>
+    </div>
+  </section>
 
+  <section class="pt0">
+    <div class="wrap">
       <div class="help-layout">
         <nav class="help-toc" aria-label="<?= h(t('help_toc')) ?>">
 <?php foreach (HELP as $sec => $topics): ?>
@@ -111,10 +119,10 @@ const HELP = [
             $a = t("help_{$sec}_{$tp}_a");
             if ($q === "help_{$sec}_{$tp}_q") { continue; }   // not written yet
 ?>
-            <details class="faq-item help-item" id="<?= h("$sec-$tp") ?>">
-              <summary><?= h($q) ?></summary>
-              <p><?= $a ?></p>
-            </details>
+            <article class="help-item" id="<?= h("$sec-$tp") ?>">
+              <h3><a href="#<?= h("$sec-$tp") ?>"><?= h($q) ?></a></h3>
+              <div class="help-a"><?= $a ?></div>
+            </article>
 <?php endforeach; ?>
           </section>
 <?php endforeach; ?>
@@ -122,7 +130,7 @@ const HELP = [
         </div>
       </div>
 
-      <p class="autonote"><?= t('help_more') ?></p>
+      <p class="autonote help-foot"><?= t('help_more') ?></p>
     </div>
   </section>
 </main>
@@ -137,62 +145,6 @@ const HELP = [
     </nav>
   </div>
 </footer>
-
-<script>
-// Filters what is already on the page. With this script absent every topic
-// is still there, closed, and reachable by its anchor - which is also what a
-// search engine and a reader with JavaScript off get.
-(function () {
-  var box = document.getElementById('helpSearch');
-  var count = document.getElementById('helpCount');
-  var none = document.getElementById('helpNone');
-  if (!box) return;
-  var items = [].slice.call(document.querySelectorAll('.help-item'));
-  var secs = [].slice.call(document.querySelectorAll('.help-sec'));
-  var tocs = [].slice.call(document.querySelectorAll('[data-toc]'));
-
-  items.forEach(function (el) {
-    el.dataset.text = (el.textContent || '').toLowerCase();
-  });
-
-  function apply(q) {
-    q = q.trim().toLowerCase();
-    var hits = 0;
-    items.forEach(function (el) {
-      var on = !q || el.dataset.text.indexOf(q) !== -1;
-      el.hidden = !on;
-      // Opened while searching so the answer is visible without a second
-      // click; closed again when the box is cleared.
-      if (q) { el.open = on; } else { el.open = false; }
-      if (on) hits++;
-    });
-    secs.forEach(function (s) {
-      var any = s.querySelector('.help-item:not([hidden])');
-      s.hidden = !any;
-    });
-    tocs.forEach(function (a) {
-      var s = document.getElementById(a.dataset.toc);
-      a.hidden = !!(s && s.hidden);
-    });
-    if (q) {
-      count.hidden = false;
-      count.textContent = hits + ' / ' + items.length;
-    } else {
-      count.hidden = true;
-    }
-    none.hidden = !(q && hits === 0);
-  }
-
-  box.addEventListener('input', function () { apply(box.value); });
-  // A deep link opens the topic it names.
-  function openHash() {
-    if (!location.hash) return;
-    var el = document.querySelector(location.hash);
-    if (el && el.tagName === 'DETAILS') { el.open = true; }
-  }
-  window.addEventListener('hashchange', openHash);
-  openHash();
-})();
-</script>
+<script src="/help.js" defer></script>
 </body>
 </html>

@@ -327,56 +327,127 @@ footer nav a:hover { color: var(--accent); }
 }
 
 /* ---- Help page --------------------------------------------------------- */
-/* Two columns on a wide screen: a table of contents that stays put, and the
-   sections beside it. One column below that, with the contents on top - a
-   sticky sidebar on a phone is just something in the way. */
-.help-search { margin: 0 0 26px; max-width: 560px; }
-.help-search input {
-  width: 100%; box-sizing: border-box;
-  padding: 12px 16px;
+/* Documentation, not an FAQ list: every answer is VISIBLE. That is what makes
+   the search worth having - what you typed appears with its text, not as a
+   row you then have to open. */
+.help-top { padding: 46px 0 26px; border-bottom: 1px solid var(--line); }
+.help-top h1 { font-size: 34px; margin: 0 0 10px; }
+.help-lede { color: var(--muted); font-size: 16px; margin: 0 0 26px; max-width: 62ch; }
+
+/* The search box is the point of the page, so it is sized like it. */
+.help-searchbar {
+  position: relative;
+  display: flex; align-items: center;
+  max-width: 680px;
   background: var(--surface);
   border: 1px solid var(--line-2);
-  border-radius: 10px;
-  color: var(--text); font-size: 15px; font-family: inherit;
+  border-radius: 14px;
+  transition: border-color .15s, box-shadow .15s;
 }
-.help-search input:focus {
-  outline: none; border-color: var(--accent);
+.help-searchbar:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
 }
-.help-search input::placeholder { color: var(--faint); }
-.help-count { margin: 8px 2px 0; color: var(--faint); font-size: 13px; }
+.help-mag {
+  position: absolute; left: 18px;
+  display: flex; color: var(--faint); pointer-events: none;
+}
+.help-mag svg { width: 20px; height: 20px; display: block; }
+.help-searchbar:focus-within .help-mag { color: var(--accent); }
+.help-searchbar input {
+  flex: 1; min-width: 0;
+  background: none; border: 0; outline: none;
+  padding: 17px 16px 17px 50px;
+  color: var(--text); font-size: 17px; font-family: inherit;
+}
+.help-searchbar input::placeholder { color: var(--faint); }
+.help-searchbar input::-webkit-search-cancel-button { display: none; }
+.help-searchbar button {
+  background: none; border: 0; cursor: pointer;
+  color: var(--faint); font-size: 17px; padding: 0 18px; line-height: 1;
+}
+.help-searchbar button:hover { color: var(--accent); }
+.help-count { margin: 12px 4px 0; color: var(--accent); font-size: 14px; font-weight: 600; }
 
-.help-layout { display: grid; grid-template-columns: 220px 1fr; gap: 40px; align-items: start; }
+.help-layout {
+  display: grid; grid-template-columns: 230px 1fr; gap: 48px;
+  align-items: start; padding-top: 40px;
+}
+/* Hiding the contents would otherwise leave the answers in the 230px column
+   the contents used to sit in. While filtering the results take the width. */
+body.searching .help-layout { grid-template-columns: 1fr; }
 .help-toc {
   position: sticky; top: 80px;
-  display: flex; flex-direction: column; gap: 2px;
-  border-left: 1px solid var(--line);
-  padding-left: 14px;
+  display: flex; flex-direction: column; gap: 1px;
 }
+/* An author `display` beats the UA's [hidden] rule, so the contents column
+   would stay on screen while filtering unless this says otherwise. */
+.help-toc[hidden] { display: none; }
 .help-toc a {
   color: var(--muted); text-decoration: none; font-size: 14px;
-  padding: 5px 0; line-height: 1.35;
+  padding: 7px 12px; border-radius: 8px; line-height: 1.35;
 }
-.help-toc a:hover { color: var(--accent); }
+.help-toc a:hover { color: var(--text); background: var(--surface-2); }
+.help-toc a.is-current {
+  color: var(--accent); background: var(--surface-2); font-weight: 600;
+}
 
-.help-sec { margin: 0 0 38px; scroll-margin-top: 80px; }
+/* These are <section> elements inside a <section>, and the site gives every
+   section 72px of padding - which showed up as a dead band above and below
+   each heading. They set their own spacing with margins instead. */
+.help-sec { padding: 0; margin: 0 0 52px; scroll-margin-top: 80px; }
 .help-sec h2 {
-  font-size: 20px; margin: 0 0 14px;
-  padding-bottom: 10px; border-bottom: 1px solid var(--line);
+  font-size: 13px; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--accent); margin: 0 0 20px;
+  padding-bottom: 12px; border-bottom: 1px solid var(--line);
 }
-.help-item { margin-bottom: 8px; scroll-margin-top: 80px; }
-.help-item p code {
+.help-item {
+  padding: 0 0 22px; margin: 0 0 22px;
+  border-bottom: 1px solid var(--line);
+  scroll-margin-top: 80px;
+}
+.help-sec .help-item:last-child { border-bottom: 0; margin-bottom: 0; }
+.help-item h3 { font-size: 17px; margin: 0 0 9px; line-height: 1.35; }
+.help-item h3 a { color: var(--text); text-decoration: none; }
+.help-item h3 a:hover { color: var(--accent); }
+.help-a { color: var(--muted); line-height: 1.7; max-width: 74ch; }
+.help-a p { margin: 0 0 11px; }
+.help-a p:last-child { margin-bottom: 0; }
+.help-a b { color: var(--text); font-weight: 600; }
+.help-a a { color: var(--accent); }
+.help-a ol, .help-a ul { margin: 0 0 11px; padding-left: 22px; }
+.help-a li { margin: 0 0 6px; }
+.help-a code {
   background: var(--surface-2); border: 1px solid var(--line);
   border-radius: 5px; padding: 1px 5px; font-size: .92em;
+  word-break: break-word;
 }
-.help-item p b { color: var(--text); font-weight: 600; }
-.help-item p a { color: var(--accent); }
-.help-none { color: var(--muted); padding: 20px 2px; }
+/* A command you are meant to run, not a word in a sentence. */
+.help-a pre {
+  margin: 0 0 11px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; padding: 13px 15px;
+  overflow-x: auto;
+}
+.help-a pre code {
+  background: none; border: 0; padding: 0;
+  font-size: 13px; line-height: 1.6; color: var(--text); white-space: pre;
+}
+.help-a .os { color: var(--faint); font-size: 12px; text-transform: uppercase;
+  letter-spacing: .07em; display: block; margin: 0 0 5px; }
+.help-none { color: var(--muted); padding: 26px 2px; font-size: 16px; }
+.help-foot { margin-top: 34px; }
+/* While filtering, sections lose their headings' distance - the list should
+   read as results, not as a table of contents with gaps in it. */
+body.searching .help-sec { margin-bottom: 26px; }
 
 @media (max-width: 860px) {
-  .help-layout { grid-template-columns: 1fr; gap: 24px; }
+  .help-layout { grid-template-columns: 1fr; gap: 22px; }
   .help-toc {
-    position: static; flex-direction: row; flex-wrap: wrap; gap: 6px 14px;
-    border-left: 0; border-bottom: 1px solid var(--line);
-    padding: 0 0 14px;
+    position: static; flex-direction: row; flex-wrap: wrap; gap: 6px;
+    padding-bottom: 8px;
   }
+  .help-toc a { background: var(--surface-2); }
+  .help-top h1 { font-size: 27px; }
+  .help-searchbar input { font-size: 16px; padding: 15px 14px 15px 46px; }
 }
