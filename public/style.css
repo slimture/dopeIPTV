@@ -249,28 +249,44 @@ footer nav a:hover { color: var(--accent); }
    document rather than a feature grid: one column, generous line height,
    and a left rule on the headings so the sections scan without shouting. */
 /* Collapsed by default: the notes are worth reading and worth NOT being
-   the tallest thing between the downloads and the FAQ. Same affordance as
-   the FAQ items, so the page has one way of opening things, not two. */
-.notes-wrap {
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--surface);
-  max-width: 78ch;
-}
+   the tallest thing between the downloads and the FAQ. */
+.notes-wrap { max-width: 78ch; }
+/* The toggle is a BUTTON, not a row. As a bare full-width line it read as a
+   heading - the FAQ gets away with that shape because ten of them in a
+   column are obviously a list of things to open; one alone is not. */
 .notes-wrap summary {
-  list-style: none; cursor: pointer; font-weight: 600; color: var(--text);
-  padding: 15px 18px; display: flex; align-items: center;
-  justify-content: space-between; gap: 14px;
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 20px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 14px;
+  transition: background .15s, color .15s;
 }
 .notes-wrap summary::-webkit-details-marker { display: none; }
 .notes-wrap summary::after {
-  content: "+"; color: var(--accent); font-size: 20px; line-height: 1; flex: none;
+  content: "\25be";
+  font-size: 12px;
+  line-height: 1;
+  transition: transform .15s;
 }
-.notes-wrap[open] summary::after { content: "\2212"; }
-.notes-wrap summary:hover { color: var(--accent); }
-.notes-wrap[open] summary { border-bottom: 1px solid var(--line); }
+.notes-wrap[open] summary::after { transform: rotate(180deg); }
+.notes-wrap summary:hover,
+.notes-wrap summary:focus-visible {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
 
 .notes {
+  margin-top: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
   padding: 20px 24px 6px;
 }
 .notes h4 {
@@ -307,6 +323,5 @@ footer nav a:hover { color: var(--accent); }
 }
 .notes a { color: var(--accent); }
 @media (max-width: 640px) {
-  .notes { padding: 16px 18px 4px; }
-  .notes-wrap { border-radius: 12px; }
+  .notes { padding: 16px 18px 4px; border-radius: 12px; }
 }
