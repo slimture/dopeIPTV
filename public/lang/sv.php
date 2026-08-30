@@ -48,6 +48,8 @@ return [
     "feat_c5_p" => "Flera Xtream- eller M3U-spellistor sida vid sida, var och en med egen EPG, automatisk uppdatering och egen guide-URL.",
     "feat_c6_h" => "Mjuk uppspelning",
     "feat_c6_p" => "En inbyggd mpv-motor, med Chromecast, Trakt-synk, teman och full tangentbordsstyrning.",
+    "feat_lf_h" => "Även dina egna filer",
+    "feat_lf_p" => "Peka ut en mapp eller en monterad share så ligger dina videor bredvid leverantörens — med omslag, återupptagning, serier byggda ur filnamnen och en spelkö för musik.",
 
     // screenshots
     "shots_eyebrow" => "En titt inuti",

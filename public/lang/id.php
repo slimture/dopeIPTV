@@ -48,6 +48,8 @@ return [
     "feat_c5_p" => "Beberapa daftar putar Xtream atau M3U berdampingan, masing-masing dengan EPG-nya sendiri, penyegaran otomatis, dan URL panduan khusus.",
     "feat_c6_h" => "Pemutaran mulus",
     "feat_c6_p" => "Mesin mpv bawaan, dengan Chromecast, sinkronisasi Trakt, tema, dan kontrol keyboard penuh.",
+    "feat_lf_h" => "Berkas Anda sendiri juga",
+    "feat_lf_p" => "Arahkan ke sebuah folder atau berbagi yang terpasang, dan video Anda berdampingan dengan milik penyedia — dengan poster, lanjutkan menonton, serial yang dibangun dari nama berkas, dan antrean putar untuk musik.",
 
     // screenshots
     "shots_eyebrow" => "Melihat ke dalam",

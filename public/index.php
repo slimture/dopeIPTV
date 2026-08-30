@@ -155,7 +155,7 @@ echo json_encode([
      "featureList" => ["Xtream Codes and M3U playlists", "Full XMLTV EPG guide",
        "Live timeshift and catch-up TV", "One-click recording",
        "Multiview — up to nine channels at once", "Built-in mpv player",
-       "Chromecast and Trakt support"],
+       "Chromecast and Trakt support", "Your own local video and music files"],
      "license" => "$REPO/blob/main/LICENSE", "isAccessibleForFree" => true,
      "author" => ["@id" => "$SITE/#org"], "publisher" => ["@id" => "$SITE/#org"],
      "sameAs" => [$REPO],
@@ -252,6 +252,7 @@ echo json_encode([
         <div class="card"><div class="ic">⏺</div><h3><?= t('feat_c4_h') ?></h3><p><?= t('feat_c4_p') ?></p></div>
         <div class="card"><div class="ic">◉</div><h3><?= t('feat_c5_h') ?></h3><p><?= t('feat_c5_p') ?></p></div>
         <div class="card"><div class="ic">▶</div><h3><?= t('feat_c6_h') ?></h3><p><?= t('feat_c6_p') ?></p></div>
+        <div class="card"><div class="ic">🖿</div><h3><?= t('feat_lf_h') ?></h3><p><?= t('feat_lf_p') ?></p></div>
       </div>
     </div>
   </section>

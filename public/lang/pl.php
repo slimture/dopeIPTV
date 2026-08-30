@@ -48,6 +48,8 @@ return [
     "feat_c5_p" => "Kilka playlist Xtream lub M3U obok siebie, każda z własnym EPG, automatycznym odświeżaniem i własnym adresem URL przewodnika.",
     "feat_c6_h" => "Płynne odtwarzanie",
     "feat_c6_p" => "Wbudowany silnik mpv, z Chromecastem, synchronizacją Trakt, motywami i pełną obsługą klawiatury.",
+    "feat_lf_h" => "Także twoje własne pliki",
+    "feat_lf_p" => "Wskaż folder lub zamontowany zasób, a twoje filmy staną obok tych od dostawcy — z okładkami, wznawianiem, serialami zbudowanymi z nazw plików i kolejką odtwarzania dla muzyki.",
 
     // screenshots
     "shots_eyebrow" => "Spojrzenie do środka",

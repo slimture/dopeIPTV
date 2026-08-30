@@ -47,6 +47,8 @@ return [
     "feat_c5_p" => "Nhiều danh sách phát Xtream hoặc M3U cạnh nhau, mỗi danh sách có EPG riêng, tự động làm mới và URL hướng dẫn tùy chỉnh.",
     "feat_c6_h" => "Phát mượt mà",
     "feat_c6_p" => "Một engine mpv tích hợp, với Chromecast, đồng bộ Trakt, giao diện và điều khiển bàn phím đầy đủ.",
+    "feat_lf_h" => "Cả tệp của riêng bạn",
+    "feat_lf_p" => "Trỏ tới một thư mục hoặc ổ chia sẻ đã gắn, và video của bạn nằm cạnh video của nhà cung cấp — có áp phích, xem tiếp, phim bộ dựng từ tên tệp, và hàng đợi phát cho nhạc.",
 
     // screenshots
     "shots_eyebrow" => "Nhìn vào bên trong",

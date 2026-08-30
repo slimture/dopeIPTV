@@ -47,6 +47,8 @@ return [
     "feat_c5_p" => "多个 Xtream 或 M3U 播放列表并排排列，各自拥有独立的 EPG、自动刷新和自定义指南 URL。",
     "feat_c6_h" => "流畅播放",
     "feat_c6_p" => "内置 mpv 引擎，支持 Chromecast、Trakt 同步、主题和完整的键盘控制。",
+    "feat_lf_h" => "也包括你自己的文件",
+    "feat_lf_p" => "指定一个文件夹或已挂载的共享，你的视频便与运营商的内容并列——带封面、续播、从文件名重建的剧集，以及音乐播放队列。",
 
     // screenshots
     "shots_eyebrow" => "内部一览",

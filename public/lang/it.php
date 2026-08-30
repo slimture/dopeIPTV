@@ -48,6 +48,8 @@ return [
     "feat_c5_p" => "Più playlist Xtream o M3U affiancate, ciascuna con la propria EPG, aggiornamento automatico e URL della guida personalizzato.",
     "feat_c6_h" => "Riproduzione fluida",
     "feat_c6_p" => "Un motore mpv integrato, con Chromecast, sincronizzazione Trakt, temi e controllo completo da tastiera.",
+    "feat_lf_h" => "Anche i tuoi file",
+    "feat_lf_p" => "Indica una cartella o una condivisione montata e i tuoi video stanno accanto a quelli del provider: locandine, ripresa, serie ricostruite dai nomi dei file e una coda di riproduzione per la musica.",
 
     // screenshots
     "shots_eyebrow" => "Uno sguardo all'interno",

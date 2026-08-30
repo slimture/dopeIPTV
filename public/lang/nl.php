@@ -48,6 +48,8 @@ return [
     "feat_c5_p" => "Meerdere Xtream- of M3U-afspeellijsten naast elkaar, elk met een eigen EPG, automatisch verversen en aangepaste gids-URL.",
     "feat_c6_h" => "Vloeiende weergave",
     "feat_c6_p" => "Een ingebouwde mpv-engine, met Chromecast, Trakt-synchronisatie, thema's en volledige toetsenbordbediening.",
+    "feat_lf_h" => "Ook je eigen bestanden",
+    "feat_lf_p" => "Wijs een map of gekoppelde share aan en je video's staan naast die van de provider — met posters, hervatten, series opgebouwd uit de bestandsnamen en een afspeelwachtrij voor muziek.",
 
     // screenshots
     "shots_eyebrow" => "Een kijkje binnenin",

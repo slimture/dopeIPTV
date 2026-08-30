@@ -48,6 +48,8 @@ return [
     "feat_c5_p" => "Više Xtream ili M3U popisa jedan uz drugi, svaki sa svojim EPG-om, automatskim osvježavanjem i prilagođenim URL-om vodiča.",
     "feat_c6_h" => "Glatka reprodukcija",
     "feat_c6_p" => "Ugrađeni mpv engine, s Chromecastom, Trakt sinkronizacijom, temama i potpunom kontrolom tipkovnicom.",
+    "feat_lf_h" => "I vaše vlastite datoteke",
+    "feat_lf_p" => "Usmjerite ga na mapu ili montirani dijeljeni resurs i vaši videozapisi stoje uz one od pružatelja — s plakatima, nastavkom gledanja, serijama izgrađenima iz naziva datoteka i redom reprodukcije za glazbu.",
 
     // screenshots
     "shots_eyebrow" => "Pogled iznutra",

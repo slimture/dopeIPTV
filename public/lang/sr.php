@@ -48,6 +48,8 @@ return [
     "feat_c5_p" => "Više Xtream ili M3U plejlista jedna uz drugu, svaka sa svojim EPG-om, automatskim osvežavanjem i prilagođenim URL-om vodiča.",
     "feat_c6_h" => "Glatka reprodukcija",
     "feat_c6_p" => "Ugrađeni mpv endžin, sa Chromecastom, Trakt sinhronizacijom, temama i potpunom kontrolom tastaturom.",
+    "feat_lf_h" => "И ваши сопствени фајлови",
+    "feat_lf_p" => "Усмерите га на фасциклу или монтирани дељени ресурс и ваши видео снимци стоје уз оне од провајдера — са постерима, наставком гледања, серијама изграђеним из назива фајлова и редом репродукције за музику.",
 
     // screenshots
     "shots_eyebrow" => "Pogled iznutra",

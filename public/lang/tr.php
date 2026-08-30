@@ -48,6 +48,8 @@ return [
     "feat_c5_p" => "Yan yana birden fazla Xtream veya M3U oynatma listesi; her biri kendi EPG'si, otomatik yenilemesi ve özel rehber URL'si ile.",
     "feat_c6_h" => "Akıcı oynatma",
     "feat_c6_p" => "Chromecast, Trakt senkronizasyonu, temalar ve tam klavye kontrolüyle yerleşik bir mpv motoru.",
+    "feat_lf_h" => "Kendi dosyalarınız da",
+    "feat_lf_p" => "Bir klasörü ya da bağlı bir paylaşımı gösterin; videolarınız sağlayıcınınkilerin yanında yer alsın — afişler, kaldığı yerden devam, dosya adlarından kurulan diziler ve müzik için bir çalma kuyruğu.",
 
     // screenshots
     "shots_eyebrow" => "İçeriden bir bakış",

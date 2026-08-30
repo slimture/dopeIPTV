@@ -48,6 +48,8 @@ return [
     "feat_c5_p" => "Several Xtream or M3U playlists side by side, each with its own EPG, auto-refresh and custom guide URL.",
     "feat_c6_h" => "Smooth playback",
     "feat_c6_p" => "A built-in mpv engine, with Chromecast, Trakt sync, themes and full keyboard control.",
+    "feat_lf_h" => "Your own files too",
+    "feat_lf_p" => "Point it at a folder or a mounted share and your videos sit beside the provider's — with posters, resume, series built from the file names, and a play queue for music.",
 
     // screenshots
     "shots_eyebrow" => "A look inside",
