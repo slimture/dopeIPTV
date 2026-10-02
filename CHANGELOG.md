@@ -5,6 +5,48 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
+## [1.2.13]
+
+Linux packaging: the AppImage and .deb start where they could not, and a
+release is now proven to start before it ships.
+
+### Fixed
+
+- **Host C++ runtime.** The bundle shipped libstdc++ and libgcc_s from the
+  Ubuntu 22.04 build host (GLIBCXX 3.4.30). The GL driver is the host's,
+  and newer Mesa's LLVM needs 3.4.32: with the older copy loaded first,
+  Mesa failed to load, X11 was left without a GL config and Qt aborted.
+  Both now come from the host; the bundle needs 3.4.29 at most.
+- **Host Wayland libraries (#20, @lmerega).** The bundled libwayland-*
+  (1.20) shadowed the host's, and Mesa built against Wayland 1.23+ needs
+  `wl_display_create_queue_with_name`: on Debian 13 the window never
+  appeared under Wayland. The whole client/cursor/EGL/server family is
+  left on the host, both in the libmpv dependency staging and after
+  PyInstaller's Analysis; the .deb depends on all four.
+- **Qt's X11 platform plugin libraries.** libxkbcommon-x11, libxcb-icccm,
+  libxcb-keysyms and libxcb-xkb were not installed on the build host, so
+  PyInstaller left them out and the plugin could not load on a system
+  without them. They are installed on the build host now.
+- **No OpenGL, no crash.** On X11 without a usable GLX, Qt aborts the
+  process when the video surface's window is created - and for a bare
+  QOpenGLContext too. The X server is asked directly (GLX plus an RGBA
+  window FBConfig) before the window is built; on a definite no the
+  embedded player is left out and video opens externally. Multiview says
+  so instead of opening.
+- **Qt messages reach the log.** PyQt returns None for Qt's default
+  handler, so the message filter dropped every Qt message, including the
+  text of a fatal error.
+- **`tools/release.sh` works from anywhere inside the clone.**
+
+### Added
+
+- Release checks start the app for real: X11 under Xvfb with the
+  distro's own Mesa on Ubuntu 22.04/24.04 and Debian 12/13 (x86_64) and
+  Ubuntu 24.04/Debian 13 (ARM), plus native Wayland under Weston on
+  Debian 13, where a buffer must be committed to the titled main window.
+  The bundle is audited for Wayland libraries and for an X11 plugin that
+  cannot resolve.
+
 ## [1.2.12]
 
 The Windows player, M3U links read as Xtream logins and a crash on
