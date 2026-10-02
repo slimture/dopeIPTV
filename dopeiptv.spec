@@ -120,12 +120,11 @@ def _libmpv_dep_binaries(libmpv_path):
         # GL / Mesa / DRM / Vulkan - host's, matches its GPU driver
         "libGL", "libGLX", "libEGL", "libGLdispatch", "libOpenGL",
         "libglapi", "libgbm", "libdrm", "libgallium", "libLLVM", "libvulkan",
-        # X / input - host's, matches its display server. NOTE: we do NOT
-        # exclude libwayland-* here: libmpv's helper libs (libdecor, SDL2)
-        # pull in libwayland-cursor/server, which aren't present on every
-        # system (e.g. X11-only or a lean box), so bundle them or libmpv
-        # fails to load. libwayland has a stable ABI and vo=libmpv never
-        # opens its own Wayland connection, so a bundled copy is safe.
+        # Wayland must match the host EGL/Mesa stack, even when libmpv uses
+        # vo=libmpv: SDL2/libdecor load it into the same process as Qt.
+        "libwayland-client.so", "libwayland-cursor.so",
+        "libwayland-egl.so", "libwayland-server.so",
+        # X / input - host's, matches its display server.
         "libX11", "libxcb", "libXext", "libXfixes", "libXrandr", "libXi",
         "libXrender", "libXau", "libXdmcp", "libxkbcommon",
         "libxshmfence",
@@ -226,6 +225,18 @@ a = Analysis(
 _HOST_CXX_RUNTIME = ("libstdc++.so.6", "libgcc_s.so.1")
 a.binaries = [b for b in a.binaries
               if os.path.basename(b[0]) not in _HOST_CXX_RUNTIME]
+# Analysis also collects transitive dependencies, so the libmpv deny list
+# alone cannot keep old Wayland libraries out. New host Mesa/EGL can require
+# symbols absent from the build host's copy (Debian 13 requires
+# wl_display_create_queue_with_name), leaving a live process with no window.
+# Keep the whole family on the host, including versioned files and symlinks.
+_HOST_WAYLAND = (
+    "libwayland-client.so", "libwayland-cursor.so",
+    "libwayland-egl.so", "libwayland-server.so",
+)
+if sys.platform.startswith("linux"):
+    a.binaries = [b for b in a.binaries
+                  if not os.path.basename(b[0]).startswith(_HOST_WAYLAND)]
 pyz = PYZ(a.pure)
 
 exe = EXE(

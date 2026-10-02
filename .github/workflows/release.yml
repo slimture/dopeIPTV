@@ -107,13 +107,13 @@ jobs:
           # decision to take deliberately, not to discover from a red build.
           - arch: x86_64
             runs_on: ubuntu-22.04
-            test_distros: "ubuntu:22.04 ubuntu:24.04 debian:12"
+            test_distros: "ubuntu:22.04 ubuntu:24.04 debian:12 debian:13"
           # aarch64: PyQt6's arm64 wheel is manylinux_2_39, so we MUST build
           # on glibc >= 2.39 (Ubuntu 24.04). That makes 24.04 the floor for
           # the ARM build, so only test it on distros that new.
           - arch: aarch64
             runs_on: ubuntu-24.04-arm
-            test_distros: "ubuntu:24.04"
+            test_distros: "ubuntu:24.04 debian:13"
     runs-on: ${{ matrix.runs_on }}
     steps:
       - uses: actions/checkout@v5
@@ -197,6 +197,14 @@ jobs:
           python -m pip install -r requirements.txt
       - name: PyInstaller bundle
         run: pyinstaller --noconfirm dopeiptv.spec   # -> dist/dopeiptv/
+      - name: Audit host Wayland libraries
+        run: |
+          found=$(find dist/dopeiptv -name 'libwayland-*.so*' -print)
+          if [ -n "$found" ]; then
+            echo "::error::Bundled Wayland libraries can shadow the host Mesa dependencies"
+            printf '%s\n' "$found"
+            exit 1
+          fi
       - name: Render icons
         run: QT_QPA_PLATFORM=offscreen python packaging/gen_icon.py build/icons
       - name: Version
@@ -261,6 +269,8 @@ jobs:
             --url https://github.com/slimture/dopeiptv \
             --depends libgl1 --depends libegl1 --depends libxcb-cursor0 \
             --depends libpulse0 \
+            --depends libwayland-client0 --depends libwayland-cursor0 \
+            --depends libwayland-egl1 --depends libwayland-server0 \
             -C "$root" .
       - name: Self-containment test across clean distros
         run: |
@@ -284,7 +294,8 @@ jobs:
               apt-get install -y -qq --no-install-recommends \
                 libgl1 libegl1 libglib2.0-0 libfontconfig1 libfreetype6 \
                 libdbus-1-3 libxkbcommon0 libxcb-cursor0 libx11-6 libxext6 \
-                libxrandr2 libxv1 libxss1 libwayland-client0 libwayland-egl1 \
+                libxrandr2 libxv1 libxss1 libwayland-client0 libwayland-cursor0 \
+                libwayland-egl1 libwayland-server0 \
                 libdrm2 libgbm1 libpulse0 >/dev/null
               # libasound has different package names across releases (t64
               # transition), so try both.
@@ -343,6 +354,16 @@ jobs:
                 exit 1
               fi
               echo "alive after 15 s, in-app video enabled"
+              kill "$pid" 2>/dev/null || true
+              wait "$pid" 2>/dev/null || true
+              # Debian 13 Mesa uses Wayland symbols absent from the 22.04
+              # build host. A live process alone misses the no-window failure.
+              if [ "'"$img"'" = "debian:13" ]; then
+                apt-get install -y -qq --no-install-recommends \
+                  weston python3 libegl-mesa0 >/dev/null
+                python3 /work/tools/linux_wayland_smoke.py \
+                  /tmp/squashfs-root/AppRun
+              fi
             '
             echo "::endgroup::"
           done
