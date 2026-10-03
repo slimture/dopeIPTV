@@ -192,3 +192,40 @@ def test_a_current_icon_cache_is_left_alone(tmp_path, monkeypatch):
     _install_icon(monkeypatch)
     assert cache.exists(), "a cache that postdates the icons was removed"
 
+
+
+def test_the_offer_is_a_link_not_a_dialog_over_the_window(monkeypatch):
+    """At startup the question sat in a dialog on top of the window - and was
+    all AppImageHub's screenshot of the app showed. It is now a link in the
+    status row; the dialog comes only when the link is clicked."""
+    from types import SimpleNamespace
+    from unittest import mock
+
+    from dopeiptv.ui import mw_settings
+    from dopeiptv.ui.mw_settings import _SettingsMixin
+
+    store: dict = {}
+    w = SimpleNamespace(
+        settings=SimpleNamespace(
+            value=lambda k, d=None: store.get(k, d),
+            setValue=store.__setitem__),
+        desktop_entry_btn=mock.Mock())
+    monkeypatch.setattr(desktop_entry, "can_offer", lambda: True)
+    monkeypatch.setattr(desktop_entry, "describe", lambda: "")
+    asked = mock.Mock(return_value=False)
+    monkeypatch.setattr(mw_settings, "confirm", asked)
+
+    _SettingsMixin._maybe_offer_desktop_entry(w)
+    w.desktop_entry_btn.show.assert_called_once()
+    asked.assert_not_called()
+    assert "desktop_entry_asked" not in store     # still on offer
+
+    _SettingsMixin._ask_desktop_entry(w)
+    asked.assert_called_once()
+    w.desktop_entry_btn.hide.assert_called()
+    assert store["desktop_entry_asked"] == "true"
+    assert store["desktop_entry"] == "false"
+
+    w.desktop_entry_btn.reset_mock()
+    _SettingsMixin._maybe_offer_desktop_entry(w)   # answered: no link again
+    w.desktop_entry_btn.show.assert_not_called()

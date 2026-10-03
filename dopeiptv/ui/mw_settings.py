@@ -170,8 +170,10 @@ class _SettingsMixin:
         is. From the .deb the entry is there and it looks right.
 
         Asked rather than done, because the AppImage format's whole
-        premise is a file that changes nothing outside itself. The answer
-        is remembered either way, and Settings can change it later."""
+        premise is a file that changes nothing outside itself. The offer is
+        a link in the status row: a dialog at startup sat on top of the
+        window, and was all AppImageHub's screenshot of the app showed. The
+        answer is remembered either way, and Settings can change it later."""
         try:
             from ..core import desktop_entry
             # Logged every start, offer or no offer. "No icon" has four
@@ -185,6 +187,15 @@ class _SettingsMixin:
                 return
             if not desktop_entry.can_offer():
                 return
+            self.desktop_entry_btn.show()
+        except Exception as e:      # never let a nicety break startup
+            log.warning("desktop entry offer failed: %s", e)
+
+    def _ask_desktop_entry(self) -> None:
+        """The status-row link was clicked: ask, and remember the answer."""
+        self.desktop_entry_btn.hide()
+        try:
+            from ..core import desktop_entry
             self.settings.setValue("desktop_entry_asked", "true")
             if confirm(self, tr("desktop_entry_title"),
                        tr("desktop_entry_ask")):
@@ -201,8 +212,8 @@ class _SettingsMixin:
                         tr("desktop_entry_done"))
             else:
                 self.settings.setValue("desktop_entry", "false")
-        except Exception as e:      # never let a nicety break startup
-            log.warning("desktop entry offer failed: %s", e)
+        except Exception as e:
+            log.warning("desktop entry install failed: %s", e)
 
     def _apply_desktop_entry(self, wanted: bool) -> None:
         """Put the entry in or take it out to match the Settings switch."""
@@ -1818,9 +1829,10 @@ class _SettingsMixin:
                 want = desktop_box.isChecked()
                 self.settings.setValue(
                     "desktop_entry", "true" if want else "false")
-                # Answered here, so the startup prompt has nothing left to
-                # ask - either way round.
+                # Answered here, so the status-row offer has nothing left
+                # to ask - either way round.
                 self.settings.setValue("desktop_entry_asked", "true")
+                self.desktop_entry_btn.hide()
                 self._apply_desktop_entry(want)
             self.settings.setValue(
                 "view_density", density_box.currentData())

@@ -24,6 +24,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 - Right-clicking a row in a multi-selection (Recordings, History) no longer
   drops the selection, so "Move"/"Delete" act on every selected row.
 - A poster in the grid view can no longer be dragged loose of the grid.
+- **No dialog over the window at startup.** The once-only "Add to the
+  application menu?" offer is now a link in the status row, opened when
+  clicked; the startup dialog covered the app, and was all AppImageHub's
+  screenshot of it showed.
 
 ## [1.2.13]
 

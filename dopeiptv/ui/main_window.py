@@ -301,9 +301,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # check later so it doesn't compete with the initial load.
         QTimer.singleShot(400, self._apply_cached_update)
         QTimer.singleShot(4000, self._maybe_check_updates)
-        # Asked once, well after the window is up and doing something - a
-        # dialog in the user's face before the channels have even loaded is
-        # its own kind of rude.
+        # Offered once the window is up and doing something; a link in the
+        # status row, never a dialog over the window.
         QTimer.singleShot(6000, self._maybe_offer_desktop_entry)
 
         self._auto_refresh_timer = QTimer(self)
@@ -958,6 +957,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.update_status_btn.clicked.connect(self.show_about)
         self.update_status_btn.hide()
         status_row.addWidget(self.update_status_btn)
+        # The once-only "add to the application menu" offer, as a link the
+        # user can take or leave - a dialog at startup covered the window.
+        self.desktop_entry_btn = QPushButton(tr("desktop_entry_title"))
+        self.desktop_entry_btn.setFlat(True)
+        self.desktop_entry_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.desktop_entry_btn.setStyleSheet(
+            f"color:{P['accent']}; font-size:11px; font-weight:600;"
+            "border:none; background:transparent; padding:0 4px;")
+        self.desktop_entry_btn.clicked.connect(self._ask_desktop_entry)
+        self.desktop_entry_btn.hide()
+        status_row.addWidget(self.desktop_entry_btn)
         self.rec_indicator = QPushButton("● REC")
         self.rec_indicator.setFlat(True)
         self.rec_indicator.setCursor(Qt.CursorShape.PointingHandCursor)
