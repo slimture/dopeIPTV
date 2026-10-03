@@ -15,7 +15,7 @@ from ..core.log import log, redact_url
 from ..core.workers import run_async, tmdb_url_from_provider
 from PyQt6.QtCore import QSize, QTimer, Qt
 from PyQt6.QtGui import QIcon, QPainter, QPainterPath, QPixmap
-from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QFrame, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QMenu, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QApplication, QDialog,QDialogButtonBox, QFrame, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QMenu, QVBoxLayout, QWidget
 from datetime import datetime
 
 
@@ -26,6 +26,15 @@ class _DetailMixin:
               if current.isValid() else None)
         self._current_key = self._item_key(it)
         self._show_detail(it)
+
+    @staticmethod
+    def _extending_selection() -> bool:
+        """Ctrl/Shift held: the user is gathering rows (Ctrl/Shift-click,
+        Shift+arrow), so landing on a channel must not start its preview.
+        Explicit plays - Ctrl+arrow zapping - call play() themselves."""
+        mods = QApplication.keyboardModifiers()
+        return bool(mods & (Qt.KeyboardModifier.ControlModifier
+                            | Qt.KeyboardModifier.ShiftModifier))
 
     POSTER_SIZE_LIVE = (112, 112)
     POSTER_SIZE_MEDIA = (170, 255)
@@ -178,6 +187,7 @@ class _DetailMixin:
                 if (self.player and self._autoplay_preview()
                         and self.playback_mode() == "embedded"
                         and not self._rmb_selecting
+                        and not self._extending_selection()
                         and (it.get("stream_id") is not None
                              or it.get("_url"))):
                     self._preview_timer.start(350)
@@ -192,7 +202,8 @@ class _DetailMixin:
                 self._request_epg(it)
                 if (self.player and self._autoplay_preview()
                         and self.playback_mode() == "embedded"
-                        and not self._rmb_selecting):
+                        and not self._rmb_selecting
+                        and not self._extending_selection()):
                     self._preview_timer.start(350)
         # In History / Watch Later, defer to the snapshot's _kind so
         # a movie row fetches movie info and a series row fetches

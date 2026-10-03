@@ -40,7 +40,8 @@ map and the one-way import rule.
 
 `ui/main_window.py` is a thin composition root: the real behaviour lives
 in the `mw_*` mixins beside it, each mixed into `MainWindow`:
-`mw_settings`, `mw_trakt`, `mw_recording`, `mw_context`, `mw_detail`,
+`mw_settings`, `mw_trakt`, `mw_recording`, `mw_context`, `mw_favorites`
+(several favorites at once, move between folders, drag-and-drop), `mw_detail`,
 `mw_search` (sidebar search), `mw_sidebar` (panel collapse / icon rail),
 `mw_nav` (focus mode, nav colours/icons, Library group), `mw_shortcuts`
 (keyboard shortcuts), `mw_busy` (loading indicator), `mw_updates`

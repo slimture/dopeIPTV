@@ -84,6 +84,41 @@ class FavoriteStore:
                               if x.get(self.id_key) != ident]
         self._save()
 
+    def move(self, items: list[dict], target: str,
+             source: str | None = None) -> None:
+        """File *items* into *target*, taking them out of *source*. Without a
+        source (the item came from a view that merges folders) only the
+        default bucket gives it up - a copy the user filed elsewhere stays."""
+        source = source or FAV_DEFAULT_GROUP
+        if source == target:
+            return
+        dest = self.groups.setdefault(target, [])
+        for item in items:
+            ident = item.get(self.id_key)
+            if ident is None:
+                continue
+            if source in self.groups:
+                self.groups[source] = [x for x in self.groups[source]
+                                       if x.get(self.id_key) != ident]
+            if not any(x.get(self.id_key) == ident for x in dest):
+                dest.append(item)
+        self._save()
+
+    def reorder(self, group: str, idents: list) -> None:
+        """Put the listed items of *group* in the given order. They take the
+        slots they already held, so rows the view did not show (hidden
+        channels) keep their place among the rest."""
+        rows = self.groups.get(group)
+        if not rows:
+            return
+        by_id = {x.get(self.id_key): x for x in rows}
+        wanted = [by_id[i] for i in dict.fromkeys(idents) if i in by_id]
+        moving = {x.get(self.id_key) for x in wanted}
+        queue = iter(wanted)
+        self.groups[group] = [next(queue) if x.get(self.id_key) in moving
+                              else x for x in rows]
+        self._save()
+
     def is_favorite(self, ident) -> bool:
         for items in self.groups.values():
             if any(x.get(self.id_key) == ident for x in items):

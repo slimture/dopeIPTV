@@ -5,6 +5,26 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
+## [Unreleased]
+
+### Added
+
+- **Several favorites at once.** Ctrl/Shift-click gathers channels, movies or
+  series in TV, Movies, Series and Favorites; "Add to favorites", "Add to
+  folder" and "Remove from favorites" then act on all of them. Gathering rows
+  never starts a channel's preview.
+- **Move between folders.** In Favorites, "Move to" takes the selected rows
+  out of the folder on screen and into another one, or out of every folder.
+- **Drag and drop in Favorites.** Drag rows onto a folder in the sidebar to
+  move them there, or within a folder to reorder it (when the list is in its
+  own order, not sorted).
+
+### Fixed
+
+- Right-clicking a row in a multi-selection (Recordings, History) no longer
+  drops the selection, so "Move"/"Delete" act on every selected row.
+- A poster in the grid view can no longer be dragged loose of the grid.
+
 ## [1.2.13]
 
 Linux packaging: the AppImage and .deb start where they could not, and a

@@ -10,7 +10,7 @@ from ..core.stores import FAV_DEFAULT_GROUP
 from ..i18n import tr
 from .tmdb_match import TmdbMatchDialog
 from .widgets import confirm
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QItemSelectionModel, Qt
 from PyQt6.QtWidgets import QApplication, QInputDialog, QLineEdit, QMenu, QMessageBox
 
 
@@ -28,8 +28,14 @@ class _ContextMenuMixin:
         # live-channel autoplay preview from firing, so right-clicking a
         # channel highlights it without starting playback or interrupting
         # whatever is already playing.
+        # A row inside a multi-selection keeps the selection: the menu then
+        # acts on all of it.
+        sm = self.listw.selectionModel()
         self._rmb_selecting = True
-        self.listw.setCurrentIndex(idx)
+        if sm.isSelected(idx) and len(sm.selectedRows()) > 1:
+            sm.setCurrentIndex(idx, QItemSelectionModel.SelectionFlag.NoUpdate)
+        else:
+            self.listw.setCurrentIndex(idx)
         self._rmb_selecting = False
         if self.mode == "rec":
             self._rec_context_menu(pos, it)
@@ -51,41 +57,13 @@ class _ContextMenuMixin:
         if not (self.mode == "series" and not self.series_ctx):
             m.addAction(tr("ctx_cast_to_chromecast"),
                         lambda: self._open_cast_dialog(it))
-        content_kind = self._content_kind()
-        # The grouped "All favorites" view shares mode 'fav' for every row;
-        # honour the row's own tag so movies/series get their own menu there.
-        # Without this a movie row fell into the CHANNEL branch: "Remove from
-        # favorites" removed from the channel store (a no-op for the movie),
-        # and it was offered channel-only actions (multiview/timeshift/record).
-        if content_kind == "fav":
-            rk = it.get("_kind") or it.get("_ekind")
-            if rk in ("vod", "movie"):
-                content_kind = "vod"
-            elif rk == "series":
-                content_kind = "series"
-        # History / Watch Later / Watched rows are snapshots of channels,
-        # movies or series - map them to their real kind so they get the same
-        # add/remove-favorites (and, for channels, multiview/timeshift)
-        # actions as their home views.
-        elif content_kind in ("history", "watchlist", "watched"):
-            rk = it.get("_kind") or it.get("_ekind")
-            if rk in ("vod", "movie"):
-                content_kind = "vod"
-                # History movie rows carry the provider id only as _key and
-                # the container extension only inside the stored URL -
-                # synthesize the fields a favorite snapshot (and its later
-                # playback) needs.
-                if it.get("stream_id") is None and it.get("_key") is not None:
-                    tail = (it.get("_url") or "").rsplit(".", 1)
-                    ext = (tail[1] if len(tail) == 2
-                           and 0 < len(tail[1]) <= 4 else None)
-                    it = {**it, "stream_id": it.get("_key"),
-                          "container_extension":
-                              it.get("container_extension") or ext}
-            elif rk == "series" and it.get("series_id") is not None:
-                content_kind = "series"
-            elif rk == "live":
-                content_kind = "live"
+        # History / Watch Later / Watched and "All favorites" rows are
+        # snapshots of channels, movies or series - their own kind decides
+        # which actions they get.
+        content_kind, it = self._row_content_kind(it)
+        # Favorite actions cover every selected row of this kind.
+        batch = self._fav_batch(idx.row(), it, content_kind)
+        many = f" ({len(batch)})" if len(batch) > 1 else ""
         if (content_kind in ("live", "fav")
                 and it.get("stream_id") is not None):
             # Pick which grid window to send the stream to; each shows the
@@ -130,40 +108,37 @@ class _ContextMenuMixin:
             m.addSeparator()
             if (content_kind == "fav"
                     or self.favs.is_favorite(it.get("stream_id"))):
-                m.addAction(tr("ctx_remove_from_favorites"),
-                            lambda: self._remove_fav(it))
+                m.addAction(tr("ctx_remove_from_favorites") + many,
+                            lambda: self._fav_remove_many("chan", batch))
             else:
-                m.addAction(tr("ctx_add_to_favorites"),
-                            lambda: self._add_fav(FAV_DEFAULT_GROUP, it))
-            self._add_fav_folder_menu(
-                m, lambda g: self._add_fav(g, it),
-                lambda: self._add_fav(None, it), self.favs)
+                m.addAction(tr("ctx_add_to_favorites") + many,
+                            lambda: self._fav_add_many(
+                                "chan", batch, FAV_DEFAULT_GROUP))
+            self._add_fav_folder_menu(m, "chan", batch, self.favs, many)
+            self._add_fav_move_menu(m, "chan", batch, many)
         elif content_kind == "vod" and it.get("stream_id") is not None:
             m.addSeparator()
             if self.movie_favs.is_favorite(it.get("stream_id")):
-                m.addAction(tr("ctx_remove_from_favorites"),
-                            lambda: self._toggle_media_fav(it, "movie", False))
+                m.addAction(tr("ctx_remove_from_favorites") + many,
+                            lambda: self._fav_remove_many("movie", batch))
             else:
-                m.addAction(tr("ctx_add_to_favorites"),
-                            lambda: self._toggle_media_fav(it, "movie", True))
-            self._add_fav_folder_menu(
-                m,
-                lambda g: self._toggle_media_fav(it, "movie", True, group=g),
-                lambda: self._new_media_fav_folder(it, "movie"),
-                self.movie_favs)
+                m.addAction(tr("ctx_add_to_favorites") + many,
+                            lambda: self._fav_add_many(
+                                "movie", batch, FAV_DEFAULT_GROUP))
+            self._add_fav_folder_menu(m, "movie", batch, self.movie_favs, many)
+            self._add_fav_move_menu(m, "movie", batch, many)
         elif content_kind == "series" and it.get("series_id") is not None:
             m.addSeparator()
             if self.series_favs.is_favorite(it.get("series_id")):
-                m.addAction(tr("ctx_remove_from_favorites"),
-                            lambda: self._toggle_media_fav(it, "series", False))
+                m.addAction(tr("ctx_remove_from_favorites") + many,
+                            lambda: self._fav_remove_many("series", batch))
             else:
-                m.addAction(tr("ctx_add_to_favorites"),
-                            lambda: self._toggle_media_fav(it, "series", True))
+                m.addAction(tr("ctx_add_to_favorites") + many,
+                            lambda: self._fav_add_many(
+                                "series", batch, FAV_DEFAULT_GROUP))
             self._add_fav_folder_menu(
-                m,
-                lambda g: self._toggle_media_fav(it, "series", True, group=g),
-                lambda: self._new_media_fav_folder(it, "series"),
-                self.series_favs)
+                m, "series", batch, self.series_favs, many)
+            self._add_fav_move_menu(m, "series", batch, many)
         if (self.mode in ("vod", "series") and not self.series_ctx
                 and self.tmdb):
             m.addSeparator()
@@ -374,48 +349,18 @@ class _ContextMenuMixin:
 
     # -- favorites -----------------------------------------------------------------
 
-    def _add_fav_folder_menu(self, menu, add_to_group, new_folder,
-                             store) -> None:
+    def _add_fav_folder_menu(self, menu, section: str, items: list,
+                             store, suffix: str = "") -> None:
         """Shared 'Add to folder ▸ [folders…] / New folder…' submenu for all
-        three categories. *add_to_group* files the item into a named folder;
-        *new_folder* prompts for a new one."""
-        folder = menu.addMenu(tr("ctx_add_to_folder"))
+        three categories, filing every one of *items*."""
+        folder = menu.addMenu(tr("ctx_add_to_folder") + suffix)
         for g in store.custom_groups():
-            folder.addAction(g, lambda g=g: add_to_group(g))
+            folder.addAction(
+                g, lambda g=g: self._fav_add_many(section, items, g))
         if store.custom_groups():
             folder.addSeparator()
-        folder.addAction(tr("ctx_new_folder"), lambda: new_folder())
-
-    def _new_media_fav_folder(self, item, section: str) -> None:
-        name, ok = QInputDialog.getText(
-            self, tr("ctx_new_folder"), tr("prompt_folder_name"))
-        name = (name or "").strip()
-        if ok and name and name != FAV_DEFAULT_GROUP:
-            self._toggle_media_fav(item, section, True, group=name)
-
-    def _add_fav(self, group, item) -> None:
-        if group is None:
-            group, ok = QInputDialog.getText(
-                self, tr("ctx_new_folder"), tr("prompt_folder_name"))
-            group = (group or "").strip()
-            if not ok or not group:
-                return
-        self.favs.add(group, item)
-        if self.mode == "fav":
-            self._load_categories()
-
-    def _remove_fav(self, item) -> None:
-        if self.mode == "fav":
-            cur = self.cat_list.currentItem()
-            data = cur.data(Qt.ItemDataRole.UserRole) if cur else None
-            # fav category data is a (section, group) tuple; only the
-            # channel section carries a group to scope the removal to.
-            group = data[1] if isinstance(data, tuple) else None
-            self.favs.remove(item.get("stream_id"), group)
-            self._load_categories()
-        else:
-            self.favs.remove(item.get("stream_id"))
-            self.list_model.refresh_all()
+        folder.addAction(tr("ctx_new_folder"),
+                         lambda: self._fav_add_many(section, items, None))
 
     def _toggle_media_fav(self, item, section: str, add: bool,
                           group: str | None = None) -> None:

@@ -20,7 +20,7 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QBoxLayout, QFrame, QHBoxLayout,
-    QLabel, QLineEdit, QListWidget, QListWidgetItem,
+    QLabel, QLineEdit, QListWidgetItem,
     QMainWindow, QMenu, QMessageBox, QProgressBar, QPushButton, QScrollArea,
     QSizePolicy, QSplitter, QToolButton, QVBoxLayout, QWidget,
 )
@@ -30,6 +30,7 @@ from ..core.log import log, redact_url
 from ..i18n import tr
 from .channel_list import (
     CategoryColorDelegate, ChannelDelegate, ChannelListModel, ChannelListView,
+    FolderDropList,
 )
 from ..providers.chromecast import CastDialog, ChromecastManager
 from ..providers.client import (
@@ -57,6 +58,7 @@ from .mw_trakt import _TraktMixin
 from .mw_recording import _RecordingMixin
 from .mw_busy import _BusyMixin
 from .mw_context import _ContextMenuMixin
+from .mw_favorites import _FavoritesMixin
 from .mw_detail import _DetailMixin
 from .mw_nav import _NavMixin
 from .mw_multiview import _MultiviewMixin
@@ -80,7 +82,7 @@ _UNSET = object()
 
 
 class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
-                 _ContextMenuMixin, _DetailMixin, _RemindersMixin,
+                 _ContextMenuMixin, _FavoritesMixin, _DetailMixin, _RemindersMixin,
                  _BusyMixin, _UpdatesMixin, _SearchMixin, _SidebarMixin,
                  _NavMixin, _ShortcutsMixin, _OnboardingMixin, _SortMixin,
                  _LocalFilesMixin,
@@ -678,7 +680,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._cat_search_timer.setInterval(220)
         self._cat_search_timer.timeout.connect(self._run_category_search)
         self._search_index_cache: dict = {}
-        self.cat_list = QListWidget(objectName="CatList")
+        self.cat_list = FolderDropList(objectName="CatList")
+        self.cat_list.can_drop = self._fav_drop_allowed
+        self.cat_list.on_drop = self._fav_drop_on_folder
         self.cat_list.setItemDelegate(CategoryColorDelegate(self.cat_list))
         self.cat_list.setMinimumWidth(0)
         # Pixel-granular scrolling like the channel list - the default
@@ -2106,10 +2110,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if hasattr(self, "local_view_btn"):
             self.local_view_btn.setVisible(mode == "local")
             self._sync_local_view_btn()
+        # Ctrl/Shift-click gathers rows wherever an action can take several
+        # at once; in Favorites they can also be dragged to a folder.
         self.listw.setSelectionMode(
             QAbstractItemView.SelectionMode.ExtendedSelection
-            if mode in ("history", "rec")
+            if mode in ("history", "rec", "live", "vod", "series", "fav")
             else QAbstractItemView.SelectionMode.SingleSelection)
+        self.listw.set_fav_drag(mode == "fav")
         self.search.clear()
         self._load_categories()
         self._update_sync_btn()

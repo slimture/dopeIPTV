@@ -3,16 +3,47 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import (
-    QAbstractListModel, QModelIndex, QRect, QRectF, QSize, Qt, QTimer,
+    QAbstractListModel, QItemSelectionModel, QMimeData, QModelIndex, QRect,
+    QRectF, QSize, Qt, QTimer,
 )
 from PyQt6.QtGui import (
-    QColor, QFont, QPainter, QPainterPath, QPen, QPixmap, QPixmapCache,
+    QColor, QDrag, QFont, QFontMetrics, QPainter, QPainterPath, QPen, QPixmap,
+    QPixmapCache,
 )
 from PyQt6.QtWidgets import (
-    QListView, QStyle, QStyledItemDelegate,
+    QAbstractItemView, QListView, QListWidget, QStyle, QStyledItemDelegate,
 )
 
 from .theme import P
+
+# Marks a drag of favorites rows from the middle list. The rows themselves
+# stay on the window (_fav_drag_items) - the drag never leaves the app.
+FAV_DRAG_MIME = "application/x-dopeiptv-favorites"
+
+
+def _is_fav_drag(e) -> bool:
+    return e.mimeData().hasFormat(FAV_DRAG_MIME)
+
+
+def _drag_badge(text: str) -> QPixmap:
+    """The pill that follows the pointer while rows are dragged."""
+    font = QFont()
+    font.setBold(True)
+    fm = QFontMetrics(font)
+    text = fm.elidedText(text, Qt.TextElideMode.ElideRight, 320)
+    w, h = fm.horizontalAdvance(text) + 24, fm.height() + 12
+    pm = QPixmap(w, h)
+    pm.fill(Qt.GlobalColor.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    p.setBrush(QColor(_accent()))
+    p.setPen(Qt.PenStyle.NoPen)
+    p.drawRoundedRect(QRectF(0, 0, w, h), h / 2, h / 2)
+    p.setFont(font)
+    p.setPen(QColor("#FFFFFF"))
+    p.drawText(QRect(0, 0, w, h), Qt.AlignmentFlag.AlignCenter, text)
+    p.end()
+    return pm
 
 # Read the accent live from the palette dict (which apply_theme mutates in
 # place) rather than importing the module-level ACCENT by value - a plain
@@ -36,6 +67,84 @@ class CategoryColorDelegate(QStyledItemDelegate):
             painter.fillRect(option.rect, bg)
             painter.restore()
         super().paint(painter, option, index)
+
+
+class FolderDropList(QListWidget):
+    """The sidebar's category list. In Favorites it also takes rows dragged
+    from the middle list: dropped on a folder, they move there.
+
+    *can_drop(row_data)* says whether a row is a valid target for what is
+    being dragged; *on_drop(row_data)* performs the move."""
+
+    def __init__(self, *a, **kw) -> None:
+        super().__init__(*a, **kw)
+        self.can_drop = None
+        self.on_drop = None
+        self._drop_row = -1
+        self.setAcceptDrops(True)
+        self.viewport().setAcceptDrops(True)
+        self.setDropIndicatorShown(False)
+
+    def _target_row(self, e) -> int:
+        item = self.itemAt(e.position().toPoint())
+        if item is None or self.can_drop is None:
+            return -1
+        if not self.can_drop(item.data(Qt.ItemDataRole.UserRole)):
+            return -1
+        return self.row(item)
+
+    def _set_drop_row(self, row: int) -> None:
+        if row != self._drop_row:
+            self._drop_row = row
+            self.viewport().update()
+
+    def dragEnterEvent(self, e) -> None:
+        # Anything else (a video file) is the window's to take.
+        if _is_fav_drag(e) and self.can_drop is not None:
+            e.acceptProposedAction()
+        else:
+            e.ignore()
+
+    def dragMoveEvent(self, e) -> None:
+        if not _is_fav_drag(e):
+            e.ignore()
+            return
+        super().dragMoveEvent(e)      # scrolls when held near an edge
+        row = self._target_row(e)
+        self._set_drop_row(row)
+        if row >= 0:
+            e.setDropAction(Qt.DropAction.MoveAction)
+            e.accept()
+        else:
+            e.ignore()
+
+    def dragLeaveEvent(self, e) -> None:
+        self._set_drop_row(-1)
+        super().dragLeaveEvent(e)
+
+    def dropEvent(self, e) -> None:
+        row = self._target_row(e) if _is_fav_drag(e) else -1
+        self._set_drop_row(-1)
+        if row < 0:
+            e.ignore()
+            return
+        e.setDropAction(Qt.DropAction.MoveAction)
+        e.accept()
+        self.on_drop(self.item(row).data(Qt.ItemDataRole.UserRole))
+
+    def paintEvent(self, e) -> None:
+        super().paintEvent(e)
+        item = self.item(self._drop_row) if self._drop_row >= 0 else None
+        if item is not None:
+            r = QRectF(self.visualItemRect(item)).adjusted(1.5, 1.5, -1.5, -1.5)
+            p = QPainter(self.viewport())
+            p.setRenderHint(QPainter.RenderHint.Antialiasing)
+            pen = QPen(QColor(_accent()))
+            pen.setWidth(2)
+            p.setPen(pen)
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawRoundedRect(r, 6, 6)
+            p.end()
 
 
 class ChannelListView(QListView):
@@ -63,6 +172,132 @@ class ChannelListView(QListView):
         # and stays put; the real scroll win is the cached scaled artwork.
         self.setVerticalScrollMode(QListView.ScrollMode.ScrollPerPixel)
         self.setHorizontalScrollMode(QListView.ScrollMode.ScrollPerPixel)
+        # Rows can be dragged only in Favorites (set_fav_drag); the line
+        # marks where a reorder would land.
+        self._fav_drag = False
+        self._drop_line: tuple[int, int, int, int] | None = None
+        self.setDropIndicatorShown(False)
+
+    # -- selection and drag-and-drop ------------------------------------------
+
+    def selectionCommand(self, index, event=None):
+        # A programmatic setCurrentIndex (zapping, jump-to-playing) reads the
+        # live keyboard state: with Ctrl held for Ctrl+Right it would TOGGLE
+        # rows into a multi-selection. Only real input extends a selection.
+        if (event is None and self.selectionMode()
+                == QAbstractItemView.SelectionMode.ExtendedSelection):
+            return (QItemSelectionModel.SelectionFlag.ClearAndSelect
+                    | QItemSelectionModel.SelectionFlag.Rows)
+        return super().selectionCommand(index, event)
+
+    def set_fav_drag(self, enabled: bool) -> None:
+        self._fav_drag = enabled
+        self._apply_drag()
+
+    def _apply_drag(self) -> None:
+        self.setDragEnabled(self._fav_drag)
+        self.viewport().setAcceptDrops(self._fav_drag)
+
+    def setViewMode(self, mode) -> None:
+        # Qt turns dragging on for IconMode (to let posters be dragged loose
+        # of the grid) and off for ListMode; neither is what we want.
+        super().setViewMode(mode)
+        self._apply_drag()
+
+    def startDrag(self, _actions) -> None:
+        win = self.window()
+        start = getattr(win, "_fav_drag_start", None)
+        rows = sorted(ix.row() for ix in self.selectionModel().selectedRows())
+        label = start(rows) if start else None
+        if not label:
+            return
+        mime = QMimeData()
+        mime.setData(FAV_DRAG_MIME, b"1")
+        drag = QDrag(self)
+        drag.setMimeData(mime)
+        drag.setPixmap(_drag_badge(label))
+        try:
+            drag.exec(Qt.DropAction.MoveAction)
+        finally:
+            self._set_drop_line(None)
+            win._fav_drag_finish()
+
+    def _drop_target(self, pos):
+        """(insertion row, marker line) for a drop at *pos*, or None."""
+        n = self.model().rowCount() if self.model() else 0
+        if n == 0:
+            return None
+        grid = self.viewMode() == QListView.ViewMode.IconMode
+        idx = self.indexAt(pos)
+        if idx.isValid():
+            r = self.visualRect(idx)
+            after = (pos.x() > r.center().x() if grid
+                     else pos.y() > r.center().y())
+            row = idx.row() + (1 if after else 0)
+        else:
+            # Past the last row: append.
+            r = self.visualRect(self.model().index(n - 1, 0))
+            after, row = True, n
+        if grid:
+            x = r.right() if after else r.left()
+            return row, (x, r.top() + 4, x, r.bottom() - 4)
+        y = r.bottom() if after else r.top()
+        return row, (r.left() + 4, y, r.right() - 4, y)
+
+    def _set_drop_line(self, line) -> None:
+        if line != self._drop_line:
+            self._drop_line = line
+            self.viewport().update()
+
+    def _reorder_ok(self) -> bool:
+        check = getattr(self.window(), "_fav_can_reorder", None)
+        return bool(self._fav_drag and check and check())
+
+    def dragEnterEvent(self, e) -> None:
+        if _is_fav_drag(e) and self._fav_drag:
+            e.acceptProposedAction()
+        else:
+            e.ignore()
+
+    def dragMoveEvent(self, e) -> None:
+        if not (_is_fav_drag(e) and self._fav_drag):
+            e.ignore()
+            return
+        super().dragMoveEvent(e)      # scrolls when held near an edge
+        target = (self._drop_target(e.position().toPoint())
+                  if self._reorder_ok() else None)
+        self._set_drop_line(target[1] if target else None)
+        if target:
+            e.setDropAction(Qt.DropAction.MoveAction)
+            e.accept()
+        else:
+            e.ignore()
+
+    def dragLeaveEvent(self, e) -> None:
+        self._set_drop_line(None)
+        super().dragLeaveEvent(e)
+
+    def dropEvent(self, e) -> None:
+        self._set_drop_line(None)
+        target = (self._drop_target(e.position().toPoint())
+                  if _is_fav_drag(e) and self._reorder_ok() else None)
+        if target is None:
+            e.ignore()
+            return
+        e.setDropAction(Qt.DropAction.MoveAction)
+        e.accept()
+        self.window()._fav_reorder_drop(target[0])
+
+    def paintEvent(self, e) -> None:
+        super().paintEvent(e)
+        if self._drop_line:
+            p = QPainter(self.viewport())
+            pen = QPen(QColor(_accent()))
+            pen.setWidth(3)
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            p.setPen(pen)
+            p.drawLine(*self._drop_line)
+            p.end()
 
     def keyPressEvent(self, e) -> None:
         # Type a channel number to jump straight to it (classic TV zapping).

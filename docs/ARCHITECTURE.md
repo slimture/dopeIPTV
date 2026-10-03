@@ -55,6 +55,7 @@ dopeiptv/
     mw_trakt.py        Trakt / watched / watchlist mixin
     mw_recording.py    Recording / timeshift mixin
     mw_context.py      Right-click context-menu mixin
+    mw_favorites.py    Favorites in bulk: multi-row actions, move, drag-and-drop
     mw_detail.py       EPG / detail-panel mixin
     mw_search.py       Sidebar category / item search mixin
     mw_sidebar.py      Sidebar chrome (collapse / icon rail / mid-compact)
