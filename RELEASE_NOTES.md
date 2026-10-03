@@ -1,31 +1,32 @@
-## dopeIPTV 1.2.13
+## dopeIPTV 1.2.14
 
-A Linux release: the AppImage and the .deb start on systems where they
-could not, and say why when something does go wrong.
+Favorites, several at a time - and the window is no longer covered by a
+question at startup.
 
-### Linux
+### Favorites
 
-- **Starts on Debian 13, Ubuntu 24.04 and newer with Mesa graphics.** The
-  download carried its own copies of the C++ runtime and the Wayland
-  libraries, older than the ones a newer system's graphics driver needs.
-  With ours loaded first the driver could not load, and the app either
-  quit at start or never showed its window. Both now come from your
-  system. Thanks to @lmerega for tracking down the Wayland half (#20).
-- **Starts on a lean X11 system.** Four small X11 libraries Qt needs were
-  missing from the download, so a system without them could not open a
-  window at all. They are included now.
-- **Starts without 3D graphics.** In a virtual machine without 3D
-  acceleration, or over VNC or remote X, the app quit on launch. It now
-  opens and plays through an external player instead.
-- **A crash says what happened.** Qt's own error messages never reached
-  the log, so a failed start said only "Aborted". They are logged now.
+- **Pick several at once.** Ctrl-click (Cmd-click on a Mac) or Shift-click
+  channels, movies or series in TV, Movies, Series and Favorites, then
+  right-click: "Add to favorites", "Add to folder" and "Remove from
+  favorites" act on all of them, and the menu shows how many.
+- **Move between folders.** In Favorites, "Move to" takes the selected
+  rows out of the folder you are in and into another one, back to the
+  main list, or into a new folder.
+- **Drag and drop.** In Favorites, drag rows onto a folder in the sidebar
+  to move them there, or within a folder to put them in your own order.
+  A line shows where they will land.
+- Picking rows never switches what is playing.
 
-### Under the hood
+### Fixes
 
-- Every release is now started for real before it ships: on Ubuntu
-  22.04 and 24.04 and Debian 12 and 13, under X11, and on Debian 13 also
-  under Wayland, where the main window has to draw - on both x86_64 and
-  ARM.
+- **No dialog over the window at startup.** The one-time "Add to the
+  application menu?" question on Linux is now a small link in the status
+  bar, next to "Update available"; it asks only when you click it.
+- **Right-click keeps your selection.** In Recordings and History,
+  right-clicking one of several selected rows dropped the others, so
+  "Move" and "Delete" only ever reached one.
+- **The poster grid stays put.** A poster could be dragged loose of the
+  grid.
 
 Full details in the [changelog](https://github.com/slimture/dopeIPTV/blob/main/CHANGELOG.md).
 

@@ -5,7 +5,10 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
-## [Unreleased]
+## [1.2.14]
+
+Favorites in bulk: several at once, moved between folders by menu or by
+drag, and no dialog over the window at startup.
 
 ### Added
 
