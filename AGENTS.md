@@ -111,7 +111,10 @@ QT_QPA_PLATFORM=offscreen pytest -q
   which mypy reads in isolation as false `attr-defined` errors). Grow the list
   as more non-UI modules gain type hints.
 - Bump the version in **both** `dopeiptv/__init__.py` and `pyproject.toml`
-  on a release - `tests/test_version.py` fails the build if they drift.
+  on a release, and add a `<release>` at the top of
+  `packaging/io.github.slimture.dopeIPTV.metainfo.xml` (software catalogs
+  read the version there) - `tests/test_version.py` fails the build if any
+  of them drift.
 - **Before deleting, moving or renaming a file under `packaging/`, `docs/`
   or any other committed asset, grep for it INCLUDING hidden directories.**
   Plain `grep -r` and ripgrep both skip `.github/`, so a reference from a

@@ -27,6 +27,11 @@ drag, and no dialog over the window at startup.
 - Right-clicking a row in a multi-selection (Recordings, History) no longer
   drops the selection, so "Move"/"Delete" act on every selected row.
 - A poster in the grid view can no longer be dragged loose of the grid.
+- **Catalog metadata in the Linux downloads.** The AppImage and .deb now
+  carry the AppStream metainfo (description, links, screenshots) the Flatpak
+  already had, so AppImageHub and GNOME Software show them. Its release list
+  had stopped at 0.7.2 and is current again; a test and `tools/release.sh`
+  now refuse a release the metainfo does not name.
 - **No dialog over the window at startup.** The once-only "Add to the
   application menu?" offer is now a link in the status row, opened when
   clicked; the startup dialog covered the app, and was all AppImageHub's

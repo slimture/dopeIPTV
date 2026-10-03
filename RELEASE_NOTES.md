@@ -27,6 +27,9 @@ question at startup.
   "Move" and "Delete" only ever reached one.
 - **The poster grid stays put.** A poster could be dragged loose of the
   grid.
+- **A proper catalog page.** The AppImage and .deb now carry the app's
+  description and screenshots, so AppImageHub and software centers show
+  them - and the right version, instead of 0.7.2.
 
 Full details in the [changelog](https://github.com/slimture/dopeIPTV/blob/main/CHANGELOG.md).
 

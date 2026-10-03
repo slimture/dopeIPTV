@@ -52,7 +52,9 @@ grep -q "^## dopeIPTV ${VER}\$" RELEASE_NOTES.md \
     || die "RELEASE_NOTES.md does not start a section with '## dopeIPTV ${VER}'"
 grep -q "^## \[${VER}\]\$" CHANGELOG.md \
     || die "CHANGELOG.md has no '## [${VER}]' section"
-echo "version, pyproject, release notes and changelog all say ${VER}"
+grep -q "<release version=\"${VER}\"" packaging/io.github.slimture.dopeIPTV.metainfo.xml \
+    || die "the AppStream metainfo has no <release version=\"${VER}\"> - catalogs read the version there"
+echo "version, pyproject, release notes, changelog and metainfo all say ${VER}"
 
 say "Pushing main"
 git push origin main

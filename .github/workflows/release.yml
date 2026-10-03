@@ -160,7 +160,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             mpv libmpv-dev ffmpeg ruby ruby-dev build-essential \
             libgl1 libegl1 libxcb-cursor0 libpulse0 desktop-file-utils \
-            libfuse2
+            libfuse2 appstream
           # Everything Qt's X11 platform plugin links, so PyInstaller finds
           # and bundles it. A library missing here is silently left out, and
           # the AppImage then dies at start on any X11 box that lacks it too
@@ -232,6 +232,17 @@ jobs:
           mkdir -p AppDir/usr/share/applications
           sed 's/^Icon=.*/Icon=dopeiptv/' dopeiptv.desktop > AppDir/dopeiptv.desktop
           cp AppDir/dopeiptv.desktop AppDir/usr/share/applications/dopeiptv.desktop
+          # AppStream metadata: the description, links and screenshots a
+          # software catalog (AppImageHub, GNOME Software) shows. The same file
+          # as the Flatpak's, launching this package's own desktop file.
+          mkdir -p AppDir/usr/share/metainfo
+          sed 's#<launchable type="desktop-id">.*</launchable>#<launchable type="desktop-id">dopeiptv.desktop</launchable>#' \
+            packaging/io.github.slimture.dopeIPTV.metainfo.xml \
+            > AppDir/usr/share/metainfo/io.github.slimture.dopeIPTV.metainfo.xml
+          grep -q '<launchable type="desktop-id">dopeiptv.desktop</launchable>' \
+            AppDir/usr/share/metainfo/io.github.slimture.dopeIPTV.metainfo.xml
+          appstreamcli validate --no-net \
+            AppDir/usr/share/metainfo/io.github.slimture.dopeIPTV.metainfo.xml
           cat > AppDir/AppRun <<'EOF'
           #!/bin/sh
           HERE="$(dirname "$(readlink -f "$0")")"
@@ -254,6 +265,8 @@ jobs:
           EOF
           chmod +x "$root/usr/bin/dopeiptv"
           install -m644 dopeiptv.desktop "$root/usr/share/applications/dopeiptv.desktop"
+          install -Dm644 AppDir/usr/share/metainfo/io.github.slimture.dopeIPTV.metainfo.xml \
+            "$root/usr/share/metainfo/io.github.slimture.dopeIPTV.metainfo.xml"
           # Every rendered size, not just 256: a panel asking for 32 px was
           # downscaling the big one, which is why the icon looked soft in a
           # taskbar next to sharp system icons.
