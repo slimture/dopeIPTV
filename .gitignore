@@ -1,0 +1,4 @@
+# Python bytecode from the app checkout leaked in here once (107 .pyc
+# files under dopeiptv/, tests/, tools/) - this branch holds the site only.
+__pycache__/
+*.pyc
