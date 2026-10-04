@@ -10,7 +10,10 @@ GITHUB_REPO = "slimture/dopeIPTV"
 
 def fetch_latest_release(repo: str = GITHUB_REPO) -> dict:
     """Return the newest published release as
-    ``{"tag", "name", "body", "url"}``. Raises on network/HTTP error."""
+    ``{"tag", "name", "body", "url", "assets"}``, each asset as
+    ``{"name", "url", "size", "digest"}`` (digest is GitHub's
+    ``sha256:<hex>``, absent on old releases). Raises on network/HTTP
+    error."""
     r = requests.get(
         f"https://api.github.com/repos/{repo}/releases/latest",
         headers={"Accept": "application/vnd.github+json",
@@ -23,6 +26,12 @@ def fetch_latest_release(repo: str = GITHUB_REPO) -> dict:
         "name": d.get("name", "") or "",
         "body": d.get("body", "") or "",
         "url": d.get("html_url", "") or "",
+        "assets": [
+            {"name": a.get("name", "") or "",
+             "url": a.get("browser_download_url", "") or "",
+             "size": int(a.get("size") or 0),
+             "digest": a.get("digest", "") or ""}
+            for a in (d.get("assets") or []) if isinstance(a, dict)],
     }
 
 

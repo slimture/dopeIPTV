@@ -760,5 +760,11 @@
   "setting_desktop_entry_hint": "~/.local/share/applications içine bir başlatıcı yazar. Wayland'de görev çubuğu pencerenin simgesini ve adını da oradan okur. İşareti kaldırmak kaydı siler.",
   "desktop_entry_title": "Uygulama menüsüne eklensin mi?",
   "desktop_entry_ask": "dopeIPTV'nin bu kopyası için hiçbir şey menü kaydı oluşturmadı; masaüstü ne simgesini ne adını biliyor — Wayland'de görev çubuğunun boş bir yer tutucu göstermesinin nedeni bu. Şimdi eklensin mi? Yalnızca ev klasörünüze yazılır ve Ayarlar'dan kaldırılabilir.",
-  "desktop_entry_done": "Eklendi. Bu pencere açıldığı simgeyi korur — simge ve ad, dopeIPTV'yi bir sonraki başlatışınızda görünür."
+  "desktop_entry_done": "Eklendi. Bu pencere açıldığı simgeyi korur — simge ve ad, dopeIPTV'yi bir sonraki başlatışınızda görünür.",
+  "update_now": "Şimdi güncelle",
+  "update_checking": "Güncelleme aranıyor…",
+  "update_downloading": "{version} indiriliyor…",
+  "update_verifying": "Yeni sürümün başladığı denetleniyor…",
+  "update_done_restart": "dopeIPTV {version} kuruldu. Kullanmak için şimdi yeniden başlatılsın mı?",
+  "update_failed": "Güncelleme kurulamadı: {error}. Hiçbir şey değiştirilmedi."
 }

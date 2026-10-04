@@ -760,5 +760,11 @@
   "setting_desktop_entry_hint": "~/.local/share/applications にランチャー項目を書き込みます。Wayland ではタスクバーもそこからウィンドウのアイコンと名前を読み取ります。チェックを外すと項目を削除します。",
   "desktop_entry_title": "アプリケーションメニューに追加しますか？",
   "desktop_entry_ask": "この dopeIPTV にはメニュー項目が用意されていないため、デスクトップはアイコンも名前も把握していません。Wayland でタスクバーが空のプレースホルダーを表示するのはそのためです。今すぐ追加しますか？ ホームフォルダーにのみ作成され、設定から削除できます。",
-  "desktop_entry_done": "追加しました。このウィンドウは起動時のアイコンのままです。アイコンと名前は次回 dopeIPTV を起動したときに反映されます。"
+  "desktop_entry_done": "追加しました。このウィンドウは起動時のアイコンのままです。アイコンと名前は次回 dopeIPTV を起動したときに反映されます。",
+  "update_now": "今すぐ更新",
+  "update_checking": "アップデートを確認しています…",
+  "update_downloading": "{version} をダウンロードしています…",
+  "update_verifying": "新しいバージョンが起動するか確認しています…",
+  "update_done_restart": "dopeIPTV {version} をインストールしました。今すぐ再起動して使用しますか？",
+  "update_failed": "アップデートをインストールできませんでした: {error}。何も変更されていません。"
 }

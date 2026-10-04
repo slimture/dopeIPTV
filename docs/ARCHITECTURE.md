@@ -31,6 +31,7 @@ dopeiptv/
     workers.py         QThreadPool helpers, LogoLoader, byte-bounded caches
     recording.py       RecordingManager - ffmpeg/mpv stream-copy, timers
     updates.py         GitHub latest-release check (is_newer, fetch)
+    selfupdate.py      AppImage in-place update: download, verify, test, swap
     wakelock.py        Screensaver/suspend inhibitor (DBus + caffeinate)
     log.py             Central logging (configure_logging, DOPEIPTV_LOG)
     platform_macos.py  macOS-specific helpers (OpenGL, libmpv, paths)
@@ -64,7 +65,7 @@ dopeiptv/
     mw_popout.py       Detached-window ("pop out") player mixin
     mw_multiview.py    Multiview: 2x2 grid of live streams (own mpv per cell)
     mw_busy.py         Loading indicator + spinner overlay
-    mw_updates.py      Update-check badge/status wiring
+    mw_updates.py      Update-check badge/status wiring, "Update now"
     mw_reminders.py    Programme-reminder UI (set / list / fire)
     widgets.py         Small standalone widgets
     welcome.py         First-run welcome overlay (connect / explore)

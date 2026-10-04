@@ -760,5 +760,11 @@
   "setting_desktop_entry_hint": "Schreibt einen Starter nach ~/.local/share/applications. Unter Wayland liest die Taskleiste von dort auch Symbol und Namen des Fensters. Abwählen entfernt den Eintrag wieder.",
   "desktop_entry_title": "Zum Anwendungsmenü hinzufügen?",
   "desktop_entry_ask": "Für diese Kopie von dopeIPTV hat nichts einen Menüeintrag installiert, also kennt der Desktop weder Symbol noch Namen – unter Wayland zeigt die Taskleiste deshalb einen leeren Platzhalter. Jetzt einen anlegen? Er landet nur in Ihrem Benutzerordner und lässt sich in den Einstellungen wieder entfernen.",
-  "desktop_entry_done": "Hinzugefügt. Dieses Fenster behält das Symbol, mit dem es gestartet ist – Symbol und Name erscheinen beim nächsten Start von dopeIPTV."
+  "desktop_entry_done": "Hinzugefügt. Dieses Fenster behält das Symbol, mit dem es gestartet ist – Symbol und Name erscheinen beim nächsten Start von dopeIPTV.",
+  "update_now": "Jetzt aktualisieren",
+  "update_checking": "Update wird gesucht…",
+  "update_downloading": "{version} wird heruntergeladen…",
+  "update_verifying": "Es wird geprüft, ob die neue Version startet…",
+  "update_done_restart": "dopeIPTV {version} ist installiert. Jetzt neu starten, um sie zu verwenden?",
+  "update_failed": "Das Update konnte nicht installiert werden: {error}. Es wurde nichts verändert."
 }

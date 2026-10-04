@@ -760,5 +760,11 @@
   "setting_desktop_entry_hint": "Huandika kianzishi katika ~/.local/share/applications. Kwenye Wayland, upau wa kazi pia husoma aikoni na jina la dirisha kutoka hapo. Ukiondoa alama, kiingizo huondolewa.",
   "desktop_entry_title": "Kuongeza kwenye menyu ya programu?",
   "desktop_entry_ask": "Hakuna kilichosakinisha kiingizo cha menyu kwa nakala hii ya dopeIPTV, kwa hivyo eneo-kazi halijui aikoni wala jina lake — kwenye Wayland ndiyo sababu upau wa kazi unaonyesha nafasi tupu. Kuongeza sasa? Kinaandikwa katika folda yako ya nyumbani pekee, na Mipangilio inaweza kukiondoa.",
-  "desktop_entry_done": "Imeongezwa. Dirisha hili linabaki na aikoni lililoanza nayo — aikoni na jina vitaonekana wakati ujao unapoanzisha dopeIPTV."
+  "desktop_entry_done": "Imeongezwa. Dirisha hili linabaki na aikoni lililoanza nayo — aikoni na jina vitaonekana wakati ujao unapoanzisha dopeIPTV.",
+  "update_now": "Sasisha sasa",
+  "update_checking": "Inatafuta sasisho…",
+  "update_downloading": "Inapakua {version}…",
+  "update_verifying": "Inakagua kwamba toleo jipya linaanza…",
+  "update_done_restart": "dopeIPTV {version} imesakinishwa. Iwashe upya sasa ili uitumie?",
+  "update_failed": "Sasisho halikuweza kusakinishwa: {error}. Hakuna kilichobadilishwa."
 }

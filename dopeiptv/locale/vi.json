@@ -760,5 +760,11 @@
   "setting_desktop_entry_hint": "Ghi một mục khởi chạy vào ~/.local/share/applications. Trên Wayland, thanh tác vụ cũng lấy biểu tượng và tên cửa sổ từ đó. Bỏ chọn sẽ xoá mục này.",
   "desktop_entry_title": "Thêm vào trình đơn ứng dụng?",
   "desktop_entry_ask": "Chưa có gì cài mục trình đơn cho bản dopeIPTV này, nên màn hình nền không biết biểu tượng lẫn tên của nó — trên Wayland đó là lý do thanh tác vụ hiện một ô trống. Thêm ngay bây giờ? Nó chỉ nằm trong thư mục cá nhân của bạn, và Cài đặt có thể gỡ đi.",
-  "desktop_entry_done": "Đã thêm. Cửa sổ này giữ biểu tượng lúc nó khởi động — biểu tượng và tên sẽ xuất hiện trong lần mở dopeIPTV tiếp theo."
+  "desktop_entry_done": "Đã thêm. Cửa sổ này giữ biểu tượng lúc nó khởi động — biểu tượng và tên sẽ xuất hiện trong lần mở dopeIPTV tiếp theo.",
+  "update_now": "Cập nhật ngay",
+  "update_checking": "Đang tìm bản cập nhật…",
+  "update_downloading": "Đang tải {version}…",
+  "update_verifying": "Đang kiểm tra phiên bản mới có khởi động được không…",
+  "update_done_restart": "dopeIPTV {version} đã được cài đặt. Khởi động lại ngay để sử dụng?",
+  "update_failed": "Không thể cài đặt bản cập nhật: {error}. Không có gì bị thay đổi."
 }

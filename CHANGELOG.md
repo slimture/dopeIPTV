@@ -5,6 +5,23 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
+## [Unreleased]
+
+### Added
+
+- **Update in place (AppImage).** "Update now" in the new-version banner and
+  in About downloads the new AppImage beside the running one, checks it
+  against GitHub's SHA-256, and runs its `--self-check` before anything on
+  disk changes; only then is it moved into place and our menu entry pointed
+  at it, and the app offers to restart into it. The new version removes the
+  old file once it has started. A file the user renamed is replaced under
+  its own name. A failing self-check is accepted only where the running
+  version fails it too (no 3D graphics): never worse than now. Other
+  formats keep the "Download" button.
+- **The menu entry follows a replaced AppImage.** If the file our menu entry
+  launches is gone (an AppImage upgraded by hand), the running AppImage
+  takes its place, so the dock icon keeps working.
+
 ## [1.2.14]
 
 Favorites in bulk: several at once, moved between folders by menu or by

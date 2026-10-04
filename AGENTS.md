@@ -23,6 +23,7 @@ map and the one-way import rule.
 | `core/workers.py` | Thread pool helpers, LogoLoader, image caches |
 | `core/recording.py` | Recording manager |
 | `core/updates.py` | GitHub latest-release check |
+| `core/selfupdate.py` | AppImage in-place update (download, checksum, self-check, swap) |
 | `core/wakelock.py` | Screensaver inhibitor |
 | `core/log.py` | Central logging (`configure_logging`, `DOPEIPTV_LOG`) |
 | `core/platform_macos.py` | macOS-specific helpers |

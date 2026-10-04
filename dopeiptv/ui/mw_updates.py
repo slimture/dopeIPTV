@@ -8,12 +8,17 @@ MainWindow state (self.settings, self._sidebar_logo, self.update_status_btn,
 from __future__ import annotations
 
 import os
+import threading
 import time
 
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton
+from PyQt6.QtWidgets import (
+    QFrame, QHBoxLayout, QLabel, QMessageBox, QProgressDialog, QPushButton,
+)
 
 from .. import VERSION
+from ..core import selfupdate
+from ..core.log import log
 from ..core.updates import GITHUB_REPO, fetch_latest_release, is_newer
 from ..core.xdg import open_url
 from ..core.workers import run_async
@@ -123,15 +128,14 @@ class _UpdatesMixin:
             self._update_banner_lbl.setStyleSheet(
                 "color:#FFFFFF; font-size:12px; font-weight:600;"
                 " background:transparent;")
-            dl = QPushButton(tr("about_download"))
+            dl = self._update_banner_btn = QPushButton(tr("about_download"))
             dl.setCursor(Qt.CursorShape.PointingHandCursor)
             dl.setStyleSheet(
                 "QPushButton { background:rgba(255,255,255,0.18);"
                 " color:#FFFFFF; border:none; border-radius:6px;"
                 " padding:4px 12px; font-size:12px; font-weight:600; }"
                 "QPushButton:hover { background:rgba(255,255,255,0.30); }")
-            dl.clicked.connect(
-                lambda: open_url(_WEBSITE))
+            dl.clicked.connect(self._update_action)
             close = QPushButton("✕")   # ✕
             close.setCursor(Qt.CursorShape.PointingHandCursor)
             close.setFixedSize(24, 24)
@@ -147,6 +151,7 @@ class _UpdatesMixin:
             f"#UpdateBanner {{ background:{P['accent']}; border-radius:10px; }}")
         self._update_banner_lbl.setText(
             "\U0001F389 " + tr("about_update_available", version=tag))
+        self._update_banner_btn.setText(self._update_action_label())
         self._update_banner_tag = tag
         self._reposition_update_banner(force=True)
         banner.show()
@@ -183,3 +188,115 @@ class _UpdatesMixin:
         b.move((parent.width() - w) // 2,
                max(10, parent.height() - b.height() - 16))
         b.raise_()
+
+    # -- updating in place (AppImage) -----------------------------------------
+
+    def _update_action_label(self) -> str:
+        return (tr("update_now") if selfupdate.can_self_update()
+                else tr("about_download"))
+
+    def _update_action(self) -> None:
+        """The banner's / About's button: update in place where the app can
+        (an AppImage in a writable folder), else open the download page."""
+        if selfupdate.can_self_update():
+            self._self_update()
+        else:
+            open_url(_WEBSITE)
+
+    def _self_update(self) -> None:
+        """Download, verify and test the newest AppImage, then offer to
+        restart into it. A worker does the work; a timer carries its
+        progress to the dialog, which can cancel it."""
+        if getattr(self, "_self_updating", False):
+            return
+        self._self_updating = True
+        b = getattr(self, "_update_banner", None)
+        if b is not None:
+            b.hide()
+        cancel = threading.Event()
+        state = {"got": 0, "total": 0, "tag": ""}
+        dlg = QProgressDialog(tr("update_checking"), tr("common_cancel"),
+                              0, 0, self)
+        dlg.setWindowTitle(tr("update_now"))
+        dlg.setWindowModality(Qt.WindowModality.WindowModal)
+        dlg.setMinimumDuration(0)
+        dlg.setAutoClose(False)
+        dlg.setAutoReset(False)
+        dlg.canceled.connect(cancel.set)
+        dlg.show()
+
+        def progress(got: int, total: int) -> None:
+            state["got"], state["total"] = got, total
+
+        def tick() -> None:
+            if cancel.is_set() or not state["tag"]:
+                return
+            got, total = state["got"], state["total"]
+            if total and got < total:
+                dlg.setLabelText(tr("update_downloading",
+                                    version=state["tag"]))
+                dlg.setMaximum(100)
+                dlg.setValue(int(got * 100 / total))
+            elif got:
+                dlg.setLabelText(tr("update_verifying"))
+                dlg.setMaximum(0)
+
+        timer = QTimer(self)
+        timer.timeout.connect(tick)
+        timer.start(150)
+
+        def work():
+            rel = fetch_latest_release(GITHUB_REPO)
+            if not is_newer(rel.get("tag", ""), VERSION):
+                return None
+            state["tag"] = rel["tag"]
+            old = selfupdate.appimage_path()
+            new = selfupdate.install(rel, VERSION, progress, cancel)
+            return rel["tag"], old, new
+
+        def finish() -> None:
+            timer.stop()
+            dlg.close()
+            self._self_updating = False
+
+        def done(result) -> None:
+            finish()
+            if result is None:
+                QMessageBox.information(self, tr("update_now"),
+                                        "✓ " + tr("about_up_to_date"))
+                return
+            tag, old, new = result
+            if old is not None and old != new:
+                self.settings.setValue("selfupdate_old_path", str(old))
+            self.settings.setValue("update_banner_dismissed", tag)
+            if QMessageBox.question(
+                    self, tr("update_now"),
+                    tr("update_done_restart", version=tag)
+                    ) == QMessageBox.StandardButton.Yes:
+                selfupdate.restart_into(new)
+                self.close()
+
+        def fail(err) -> None:
+            finish()
+            if cancel.is_set():
+                return
+            log.warning("update: %s", err)
+            QMessageBox.warning(self, tr("update_now"),
+                                tr("update_failed", error=str(err)))
+
+        run_async(self.pool, work, done, fail)
+
+    def _finish_self_update(self) -> None:
+        """At start: the version that replaced an old AppImage removes it,
+        and a menu entry left naming a file that is gone (an AppImage
+        replaced by hand) is pointed at this one."""
+        running = selfupdate.appimage_path()
+        old = self.settings.value("selfupdate_old_path", "") or ""
+        if old and running is not None:
+            self.settings.remove("selfupdate_old_path")
+            selfupdate.take_pending_cleanup(old, running)
+        if running is not None:
+            try:
+                selfupdate.repoint_desktop_entry(running)
+            except Exception as e:      # a nicety; never break startup
+                log.warning("update: menu entry check failed: %s", e)

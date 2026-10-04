@@ -2069,8 +2069,9 @@ class _SettingsMixin:
                         dl_btn.clicked.disconnect()
                     except TypeError:
                         pass
+                    dl_btn.setText(self._update_action_label())
                     dl_btn.clicked.connect(
-                        lambda: open_url("https://iptv.dope.rs"))
+                        lambda: (d.accept(), self._update_action()))
                     dl_btn.show()
             else:
                 status.setText("✓ " + tr("about_up_to_date"))

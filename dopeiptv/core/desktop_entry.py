@@ -110,7 +110,7 @@ def describe() -> str:
                ",".join(sizes) or "NONE", entry_path()))
 
 
-def _quote(cmd: str) -> str:
+def quote_exec(cmd: str) -> str:
     # Exec is not a shell command line. A path needing quotes gets them,
     # and inside quotes the spec asks for a backslash before ", `, $ and
     # \\ itself - the last three because a quoted Exec is still expanded
@@ -139,7 +139,7 @@ def install() -> bool:
         # and --no-x11), and the entry the packages ship has none either.
         # Two entries for the same app that disagree about what it accepts
         # is how they start drifting.
-        f"Exec={_quote(cmd)}\n"
+        f"Exec={quote_exec(cmd)}\n"
         f"Icon={ICON_NAME}\n"
         "Terminal=false\n"
         "Categories=AudioVideo;Video;TV;\n"

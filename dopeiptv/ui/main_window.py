@@ -301,6 +301,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # check later so it doesn't compete with the initial load.
         QTimer.singleShot(400, self._apply_cached_update)
         QTimer.singleShot(4000, self._maybe_check_updates)
+        QTimer.singleShot(5000, self._finish_self_update)
         # Offered once the window is up and doing something; a link in the
         # status row, never a dialog over the window.
         QTimer.singleShot(6000, self._maybe_offer_desktop_entry)
