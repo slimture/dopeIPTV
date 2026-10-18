@@ -49,6 +49,18 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.2.15" date="2026-10-18">
+      <description>
+        <p>A new Settings window, and the whole app in your language.</p>
+        <ul>
+          <li>Settings has a sidebar with fifteen pages, a search field and switches for every yes/no choice</li>
+          <li>About 200 texts that were still in English are translated into all 27 languages, and dates follow the language</li>
+          <li>Connecting to Trakt works again after Trakt moved its sign-in</li>
+          <li>The AppImage updates itself from the new-version banner</li>
+          <li>Drop an M3U file or link on the window to add it as a playlist, and drag playlists into your own order</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.2.14" date="2026-10-04">
       <description>
         <p>Favorites, several at a time.</p>

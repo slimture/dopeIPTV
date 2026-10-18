@@ -7,6 +7,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.2.15]
+
+A redesigned Settings window, the whole app in your own language, Trakt
+sign-in working again, and an AppImage that updates itself.
+
 ### Added
 
 - **Update in place (AppImage).** "Update now" in the new-version banner and
@@ -21,6 +26,67 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 - **The menu entry follows a replaced AppImage.** If the file our menu entry
   launches is gone (an AppImage upgraded by hand), the running AppImage
   takes its place, so the dock icon keeps working.
+- **Drop a playlist on the window.** An `.m3u`/`.m3u8` file or a provider
+  link dropped anywhere on the window is added as a playlist, and the app
+  offers to switch to it.
+- **Reorder playlists** by dragging them in Settings → Playlists; the
+  playlist menu follows the same order.
+
+### Changed
+
+- **A new Settings window.** A sidebar with fifteen pages and a search
+  field replaces the row of tabs. Each page groups its settings in titled
+  cards, with a short hint under the ones that need one, and every yes/no
+  choice is a switch. Playlists show their server and an "In use" badge,
+  Refresh appears only for the playlist in use, and "Reset all settings"
+  moved to Advanced. Stored settings are unchanged.
+- **Everything in your language.** About 200 texts that were still English
+  are translated into all 27 languages: the recording dialogs and why a
+  recording stopped, timeshift, list counts, empty lists, the detail panel,
+  the player's badges, and the errors from the provider, Trakt,
+  Chromecast, the updater and the video player. The log keeps them in
+  English, so bug reports stay readable.
+- Dates and weekdays follow the app's language instead of the system's
+  English, and Qt's own buttons and dialogs (OK/Cancel/Yes/No, file
+  dialogs) follow it too.
+- Trakt signs in through auth.trakt.tv with PKCE, and a client secret is
+  optional (Trakt apps created since October 2026 have none).
+
+### Fixed
+
+- **Trakt sign-in** ended on Trakt's page with "invalid_client: client_id
+  is required": Trakt moved its sign-in in 2026. A sign-in Trakt no longer
+  accepts is dropped, so Settings offers Connect again instead of a
+  "Connected" that silently fails.
+- Trakt's device sign-in waits when Trakt asks it to slow down instead of
+  giving up, disconnecting forgets the account's favorites list, and a
+  failed watched-history sync no longer blocks every later one.
+- Self-update: closing the progress window made every failure look like a
+  cancel, so it was never shown.
+- Favorites: renaming a folder onto another merged duplicate rows (and a
+  later reorder crashed on them); a folder's colour now follows a rename
+  and goes with a delete.
+- The guide: a damaged cache or index is fetched or parsed again instead
+  of failing the guide on every start, and both are written atomically.
+- M3U playlists: å/ä/ö came out as "Ã¥" when a server named the wrong
+  character set, a byte-order mark hid the header, and `file://` paths
+  with spaces did not open. Export/import keeps M3U playlists, and
+  removing the active playlist switches to the next one.
+- Multiview keeps the screen awake, and Space, M and F act on the focused
+  window while multiview is in front (Space restarted the channel behind
+  it).
+- A pop-out player saved on a monitor that is no longer there opens on
+  this one.
+- Windows: the detail pane's schedule list crashed.
+- The Chromecast device picker and its note were in English in 25
+  languages, and eight Serbian texts were in Cyrillic.
+- Turkish headings in capitals read "DIL" instead of "DİL".
+- About no longer says VLC is built in - the built-in player is mpv.
+- macOS install steps (README, website): right-click → Open no longer gets
+  past Gatekeeper since macOS 15, the oldest version the app runs on. They
+  now go through System Settings → Privacy & Security → Open Anyway. The
+  README and the website's help also explain how to update on every
+  platform.
 
 ## [1.2.14]
 

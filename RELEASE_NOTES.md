@@ -1,35 +1,58 @@
-## dopeIPTV 1.2.14
+## dopeIPTV 1.2.15
 
-Favorites, several at a time - and the window is no longer covered by a
-question at startup.
+A new Settings window, the whole app in your own language, Trakt working
+again - and the AppImage now updates itself.
 
-### Favorites
+### A new Settings window
 
-- **Pick several at once.** Ctrl-click (Cmd-click on a Mac) or Shift-click
-  channels, movies or series in TV, Movies, Series and Favorites, then
-  right-click: "Add to favorites", "Add to folder" and "Remove from
-  favorites" act on all of them, and the menu shows how many.
-- **Move between folders.** In Favorites, "Move to" takes the selected
-  rows out of the folder you are in and into another one, back to the
-  main list, or into a new folder.
-- **Drag and drop.** In Favorites, drag rows onto a folder in the sidebar
-  to move them there, or within a folder to put them in your own order.
-  A line shows where they will land.
-- Picking rows never switches what is playing.
+- **Easier to find things.** A sidebar with fifteen pages - General,
+  Appearance, Playback, Audio & subtitles, Video, Guide, Playlists and
+  more - replaces the long row of tabs, and the **search field** at the
+  top finds any setting by name.
+- **Clearer pages.** Settings are grouped in titled cards, with a short
+  explanation under the ones that need it, and every yes/no choice is a
+  switch.
+- **Playlists at a glance.** Each playlist shows its server and an
+  "In use" badge. **Drag playlists** into the order you want - the
+  playlist menu follows it.
+- Your existing settings are kept exactly as they were.
+
+### In your language
+
+- **About 200 texts that were still in English are now translated** into
+  all 27 languages: recording messages and why a recording stopped,
+  timeshift, list counts, the detail panel, player badges, and error
+  messages from your provider, Trakt, Chromecast and the updater.
+- **Dates and weekdays** in the guide and recordings follow the app's
+  language, and so do the standard buttons in dialogs (OK, Cancel, Yes,
+  No).
+
+### New
+
+- **The AppImage updates itself.** "Update now" in the new-version banner
+  downloads the new AppImage, checks it, test-starts it and only then
+  swaps it in - your dock icon keeps working.
+- **Drop a playlist on the window.** Drag an `.m3u` file or a provider
+  link onto dopeIPTV to add it as a playlist.
 
 ### Fixes
 
-- **No dialog over the window at startup.** The one-time "Add to the
-  application menu?" question on Linux is now a small link in the status
-  bar, next to "Update available"; it asks only when you click it.
-- **Right-click keeps your selection.** In Recordings and History,
-  right-clicking one of several selected rows dropped the others, so
-  "Move" and "Delete" only ever reached one.
-- **The poster grid stays put.** A poster could be dragged loose of the
-  grid.
-- **A proper catalog page.** The AppImage and .deb now carry the app's
-  description and screenshots, so AppImageHub and software centers show
-  them - and the right version, instead of 0.7.2.
+- **Trakt sign-in works again.** Connecting ended with "invalid_client:
+  client_id is required" after Trakt moved its sign-in. If you were
+  connected before, you may be asked to connect once more.
+- **M3U playlists with å, ä, ö** and other letters no longer show "Ã¥"
+  when a server names the wrong character set.
+- **Multiview:** Space, M and F act on the window you are watching, and
+  the screen no longer sleeps while multiview plays.
+- **Favorites:** renaming a folder onto another no longer duplicates
+  channels, and a folder's colour follows it.
+- **The guide** recovers by itself from a damaged cache instead of failing
+  on every start.
+- A pop-out player saved on a monitor that is no longer connected opens on
+  this one, and Windows no longer crashes in the detail pane's schedule.
+- **macOS, first start:** right-click → Open no longer works since macOS
+  15. Open the app once, then allow it under **System Settings → Privacy &
+  Security → Open Anyway** and confirm with your password.
 
 Full details in the [changelog](https://github.com/slimture/dopeIPTV/blob/main/CHANGELOG.md).
 
