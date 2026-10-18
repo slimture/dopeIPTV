@@ -90,10 +90,14 @@ depended on, and Apple has said macOS Tahoe 26 is the last macOS for Intel
 hardware.
 
 Open the `.dmg` and drag dopeIPTV to Applications. The app isn't
-notarized by Apple yet, so the first launch is blocked: **right-click the app →
-Open**, then **Open** in the dialog (or allow it under **System Settings →
-Privacy & Security → Open Anyway**). If macOS says the app is *"damaged"*, clear
-the download flag: `xattr -dr com.apple.quarantine /Applications/dopeIPTV.app`.
+notarized by Apple yet, so macOS refuses the first launch. Close that
+message, open **System Settings → Privacy & Security**, scroll down to the
+note about dopeIPTV and click **Open Anyway**, then confirm with your
+password — from then on it opens like any other app. The button is there
+for about an hour after the app was refused, and right-click → Open no
+longer gets past this since macOS 15. If macOS says the app is
+*"damaged"*, clear the download flag:
+`xattr -dr com.apple.quarantine /Applications/dopeIPTV.app`.
 It's safe — the warning only means the build isn't code-signed.
 
 **Windows** — a portable `dopeIPTV-*-windows-x64.zip`: unzip the folder and run
@@ -143,6 +147,26 @@ pipx install .
 ```
 
 `pipx install .` also installs PyQt6, requests, python-mpv and pychromecast.
+
+### Updating
+
+Your settings, playlists and favorites are kept whichever way you update.
+
+- **AppImage** — from 1.2.15 on it updates itself: when a new version is
+  out, **Update now** in the banner (or in About) downloads it, checks its
+  SHA-256, test-starts it and swaps it in, then offers to restart. With an
+  older AppImage, download the new one, make it executable, delete the old
+  file and start the new one — the menu entry follows it.
+- **.deb** — install the new package over the old one:
+  `sudo apt install ./dopeiptv_<version>_amd64.deb`.
+- **Flatpak** — install the new `.flatpak` the same way as the first one;
+  it replaces the old version.
+- **Windows** — close the app, delete the old `dopeiptv` folder and unzip
+  the new one in its place (settings live in the registry, not the folder).
+- **macOS** — drag the new dopeIPTV to Applications and choose
+  **Replace**. If macOS refuses the first start, allow it again with
+  **Open Anyway** under Privacy & Security.
+- **From source** — `git pull` in your clone, then `./install.sh` again.
 
 ## Running
 

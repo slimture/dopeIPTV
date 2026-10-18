@@ -501,9 +501,11 @@ jobs:
   # supports follows the runner it was built on (Homebrew bottles are built
   # per OS version, so pinning the target alone would not buy compatibility
   # back). That floor is macOS 15.
-  # Produces unsigned .dmgs - users need to right-click -> Open once to get past
-  # Gatekeeper. Signing/notarising can be added later by putting DEVELOPER_ID /
-  # APPLE_ID secrets in the repo and calling codesign / notarytool.
+  # Produces unsigned .dmgs - users allow the first launch under System
+  # Settings -> Privacy & Security -> Open Anyway (right-click -> Open stopped
+  # getting past Gatekeeper in macOS 15). Signing/notarising can be added
+  # later by putting DEVELOPER_ID / APPLE_ID secrets in the repo and calling
+  # codesign / notarytool.
   macos-dmg:
     name: macOS .dmg (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
