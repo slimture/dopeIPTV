@@ -63,8 +63,9 @@ again, and an AppImage that updates itself.
   background thread could pull a timer out from under the interface; that
   cleanup now always happens on the interface's own thread.
 - **Trakt sign-in works again.** Connecting ended with "invalid_client:
-  client_id is required" after Trakt moved its sign-in. If you were
-  connected before, you may be asked to connect once more.
+  client_id is required": Trakt had retired the app dopeIPTV signed in
+  through. dopeIPTV has a new one, set up for Trakt's 2026 sign-in, so if
+  you were connected before, connect once more under Settings → Trakt.
 - **M3U playlists with å, ä, ö** and other letters no longer show "Ã¥"
   when a server names the wrong character set.
 - **Multiview:** Space, M and F act on the window you are watching, and

@@ -77,7 +77,12 @@ again, and an AppImage that updates itself.
   English, and Qt's own buttons and dialogs (OK/Cancel/Yes/No, file
   dialogs) follow it too.
 - Trakt signs in through auth.trakt.tv with PKCE, and a client secret is
-  optional (Trakt apps created since October 2026 have none).
+  optional (Trakt apps created since October 2026 have none, dopeIPTV's
+  own included). The browser sign-in of dopeIPTV's own app returns through
+  https://iptv.dope.rs/trakt/callback, which hands it on to the app on
+  127.0.0.1 - an app every Trakt account can use may only redirect to
+  https://. The device-code sign-in opens Trakt's activation page itself,
+  with the code filled in where Trakt offers that.
 - "Cast to Chromecast…" is now "Cast to TV…", and the cast panel hides the
   audio, subtitle and picture-size choices for a TV (they belong to the
   Chromecast converter) and says so.
@@ -91,7 +96,9 @@ again, and an AppImage that updates itself.
   collector now runs on the GUI thread only, on a short timer, and the
   logo cache's prune timer no longer forms such a cycle.
 - **Trakt sign-in** ended on Trakt's page with "invalid_client: client_id
-  is required": Trakt moved its sign-in in 2026. A sign-in Trakt no longer
+  is required", and the device sign-in with HTTP 401: Trakt no longer
+  knew the app dopeIPTV signed in through, so it has a new one. Trakt
+  also moved its sign-in to a new host in 2026. A sign-in Trakt no longer
   accepts is dropped, so Settings offers Connect again instead of a
   "Connected" that silently fails.
 - Trakt's device sign-in waits when Trakt asks it to slow down instead of

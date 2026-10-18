@@ -12,7 +12,9 @@ from ..core.log import log
 from ..i18n import tr
 from ..providers.metadata import PosterResolver
 from ..providers.oauth_loopback import capture_oauth_redirect
-from ..providers.trakt import OAUTH_PORT, REDIRECT_URI, new_pkce_pair
+from ..providers.trakt import (
+    ACTIVATE_URL, OAUTH_PORT, REDIRECT_URI, new_pkce_pair,
+)
 from .theme import P
 from ..core.workers import run_async
 from ..core.xdg import open_url
@@ -21,6 +23,16 @@ from PyQt6.QtWidgets import (
     QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
     QListWidget, QMessageBox, QPushButton, QTabWidget, QVBoxLayout)
 from datetime import datetime
+
+
+def device_pages(data: dict) -> tuple[str, str]:
+    """(address to show, page to open) from a device-code answer. Trakt
+    called the address verification_url; its 2026 sign-in may answer the
+    RFC 8628 way instead - verification_uri, and verification_uri_complete
+    with the code already filled in."""
+    show = (data.get("verification_url") or data.get("verification_uri")
+            or ACTIVATE_URL)
+    return show, data.get("verification_uri_complete") or show
 
 
 class _TraktMixin:
@@ -847,8 +859,10 @@ class _TraktMixin:
         a loopback redirect). Opens trakt.tv's approve page; because the
         browser already carries the user's Trakt session they just click
         'Yes' - no code, no password. A one-shot local server on OAUTH_PORT
-        catches the redirect and we swap the code for tokens. Falls back to
-        the device-code dialog for anyone who'd rather type a code."""
+        catches the redirect (for the bundled app, the project's site hands
+        it on: see trakt.WEB_REDIRECT_URI) and we swap the code for tokens.
+        Falls back to the device-code dialog for anyone who'd rather type a
+        code."""
         if not self.trakt.client_id:
             QMessageBox.information(parent, "Trakt", tr("msg_trakt_enter_creds"))
             return
@@ -936,8 +950,7 @@ class _TraktMixin:
                 OAUTH_PORT, timeout=180.0,
                 should_cancel=lambda: state["cancelled"]),
             captured, capture_failed)
-        open_url(self.trakt.authorize_url(state["token"], challenge,
-                                          REDIRECT_URI))
+        open_url(self.trakt.authorize_url(state["token"], challenge))
         d.exec()
 
     def _trakt_device_auth_dialog(self, parent) -> None:
@@ -986,10 +999,10 @@ class _TraktMixin:
             state["device_code"] = data["device_code"]
             state["interval"] = data.get("interval", 5)
             state["expires_at"] = time.time() + data.get("expires_in", 600)
+            show, page = device_pages(data)
             info.setText(
-                tr("trakt_enter_code",
-                   url=data.get('verification_url'),
-                   code=data['user_code']))
+                tr("trakt_enter_code", url=show, code=data['user_code']))
+            open_url(page)
             QTimer.singleShot(state["interval"] * 1000, poll)
 
         def start_failed(msg) -> None:

@@ -7,6 +7,7 @@ import time
 import urllib.parse
 import urllib.request
 
+import pytest
 from PyQt6.QtCore import QSettings
 
 from dopeiptv.providers import trakt as T
@@ -80,19 +81,59 @@ def test_oauth_calls_go_to_the_auth_host(monkeypatch):
                     "https://auth.trakt.tv/oauth/token"]
 
 
-def test_the_bundled_secret_goes_only_with_the_bundled_app():
+def test_the_bundled_app_has_no_secret_and_returns_through_the_site(
+        monkeypatch):
     s = QSettings("dopeIPTV-test", "secret_rules")
     s.clear()
     tc = T.TraktClient(s)
     assert tc.client_id == T.DEFAULT_CLIENT_ID
-    assert tc.client_secret == T.DEFAULT_CLIENT_SECRET
-    # Somebody's own app, created after October 2026, has no secret: ours
-    # must not be sent with their id.
-    s.setValue("trakt_client_id", "THEIRS")
+    # Trakt issues apps no secret since October 2026: PKCE proves the app.
     assert tc.client_secret == ""
-    s.setValue("trakt_client_secret", "THEIR-SECRET")
-    assert tc.client_secret == "THEIR-SECRET"
+    # A Trakt app every account can use may only redirect to https://, so
+    # the sign-in comes back through the project's site - in the sign-in
+    # page's address and in the code exchange alike.
+    assert T.WEB_REDIRECT_URI.startswith("https://")
+    q = dict(urllib.parse.parse_qsl(
+        tc.authorize_url("S", "C").split("?", 1)[1]))
+    assert q["redirect_uri"] == T.WEB_REDIRECT_URI
+    sent = {}
+
+    class Resp:
+        status_code = 200
+
+        def json(self):
+            return {"access_token": "AT", "refresh_token": "RT",
+                    "expires_in": 100}
+
+    monkeypatch.setattr(T.requests, "post",
+                        lambda url, json=None, timeout=None:
+                        sent.update(json) or Resp())
+    tc.exchange_code("CODE", "V")
+    assert sent["redirect_uri"] == T.WEB_REDIRECT_URI
+    assert "client_secret" not in sent
+    # A secret stored without an id of one's own never goes with ours.
+    s.setValue("trakt_client_secret", "STRAY")
+    assert tc.client_secret == ""
+    # Somebody's own app: its own secret, and the loopback address.
+    s.setValue("trakt_client_id", "THEIRS")
+    assert tc.client_secret == "STRAY"
+    assert tc.redirect_uri == T.REDIRECT_URI
     s.clear()
+
+
+def test_the_device_sign_in_finds_its_page_under_either_name():
+    pytest.importorskip("PyQt6.QtWidgets")
+    from dopeiptv.ui.mw_trakt import device_pages
+    # Trakt's own name for it...
+    assert device_pages({"verification_url": "https://trakt.tv/activate"}) \
+        == ("https://trakt.tv/activate", "https://trakt.tv/activate")
+    # ...RFC 8628's, with the code already filled in where it is offered...
+    assert device_pages({
+        "verification_uri": "https://trakt.tv/activate",
+        "verification_uri_complete": "https://trakt.tv/activate?code=AB12",
+    }) == ("https://trakt.tv/activate", "https://trakt.tv/activate?code=AB12")
+    # ...and Trakt's activation page when the answer names none.
+    assert device_pages({}) == (T.ACTIVATE_URL, T.ACTIVATE_URL)
 
 
 def test_exchange_code_posts_and_stores_tokens(monkeypatch):

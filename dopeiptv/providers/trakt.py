@@ -27,8 +27,17 @@ API_VERSION = "2"
 # is served by a one-shot local HTTP server (see providers/oauth_loopback.py).
 OAUTH_PORT = 41794
 REDIRECT_URI = f"http://127.0.0.1:{OAUTH_PORT}/callback"
+# A Trakt app every account can sign in to ("Production") may only redirect
+# to an https:// address, so the bundled app's sign-in comes back through this
+# page on the project's site, which hands the answer straight on to
+# REDIRECT_URI above (website branch: public/trakt/callback/index.php).
+# Somebody's own app ("Development": its owner signs in) can use the
+# loopback address itself.
+WEB_REDIRECT_URI = "https://iptv.dope.rs/trakt/callback"
 # The device-code sign-in has no redirect; Trakt's out-of-band URI stands in.
 OOB_REDIRECT_URI = "urn:ietf:wg:oauth:2.0:oob"
+# Where the device-code sign-in sends the user when Trakt does not say.
+ACTIVATE_URL = "https://trakt.tv/activate"
 # Refresh this long before the access token runs out.
 REFRESH_MARGIN = 600
 # After a failed refresh, wait this long before trying again.
@@ -36,13 +45,11 @@ REFRESH_BACKOFF = 300
 
 # dopeIPTV's own registered Trakt application, bundled so users get a true
 # one-click "Sign in with Trakt" with zero setup. A user who prefers their own
-# API app can still override these in Settings (they take precedence). As with
-# any distributed native app, an embedded secret is technically extractable;
-# that's an accepted trade-off for the frictionless flow.
-DEFAULT_CLIENT_ID = (
-    "0f954e24983e4dbd2ee5d1bd006a6fe99bbe3ada9a95e47396e5238a9b746ded")
-DEFAULT_CLIENT_SECRET = (
-    "1bc6756ea9674759f4eb38a50b71d1ee02fb5897af71a961fc9344a52bde4090")
+# API app can still override it in Settings (it takes precedence). It has no
+# client secret: Trakt issues none since October 2026, and the sign-in proves
+# itself with PKCE instead. The app the client id before this one belonged to
+# is gone - Trakt answered every sign-in with 401 / "invalid_client".
+DEFAULT_CLIENT_ID = "qc-GpnDzfqAgE4ibBEkeliJrTd6E3l3GfrEPXRLr5eM"
 
 
 class TraktAuthError(LocalizedError):
@@ -101,16 +108,25 @@ class TraktClient:
 
     @property
     def client_secret(self) -> str:
-        """The secret of the app in use, or "" when it has none.
+        """The secret of the user's own Trakt app, or "" when it has none.
 
         Optional since Trakt's 2026 sign-in change: apps created from
-        October 2026 get no secret at all, and the browser sign-in uses PKCE
-        instead. The bundled secret belongs to the bundled app only - sent
-        with somebody's own client id it made Trakt reject them."""
-        own = self.settings.value("trakt_client_secret", "") or ""
-        if own:
-            return own
-        return DEFAULT_CLIENT_SECRET if self.client_id == DEFAULT_CLIENT_ID else ""
+        October 2026 get no secret at all, the bundled one included, and
+        the browser sign-in uses PKCE instead. A secret only ever goes with
+        the user's own client id - sent with another app's id, Trakt
+        rejects the request."""
+        if not self.settings.value("trakt_client_id", ""):
+            return ""
+        return self.settings.value("trakt_client_secret", "") or ""
+
+    @property
+    def redirect_uri(self) -> str:
+        """Where the browser sign-in comes back to: through the project's
+        site for the bundled app (see WEB_REDIRECT_URI), straight to the
+        loopback address for the user's own."""
+        if self.client_id == DEFAULT_CLIENT_ID:
+            return WEB_REDIRECT_URI
+        return REDIRECT_URI
 
     @property
     def access_token(self) -> str:
@@ -188,7 +204,7 @@ class TraktClient:
     # -- browser (authorization-code) OAuth flow -----------------------------
 
     def authorize_url(self, state: str, code_challenge: str,
-                      redirect_uri: str = REDIRECT_URI) -> str:
+                      redirect_uri: str | None = None) -> str:
         """The Trakt page to open in the browser. If the user is already
         signed in on the web they only click 'Yes' (or are bounced straight
         through if they've authorised the app before) - no password typing.
@@ -199,7 +215,7 @@ class TraktClient:
         q = urlencode({
             "response_type": "code",
             "client_id": self.client_id,
-            "redirect_uri": redirect_uri,
+            "redirect_uri": redirect_uri or self.redirect_uri,
             "state": state,
             "code_challenge": code_challenge,
             "code_challenge_method": "S256",
@@ -207,7 +223,7 @@ class TraktClient:
         return f"{AUTH}/oauth/authorize?{q}"
 
     def exchange_code(self, code: str, code_verifier: str,
-                      redirect_uri: str = REDIRECT_URI) -> dict:
+                      redirect_uri: str | None = None) -> dict:
         """Trade the authorization code from the redirect for access/refresh
         tokens and store them. Raises TraktAuthError on failure.
 
@@ -216,7 +232,7 @@ class TraktClient:
         r = requests.post(
             f"{AUTH}/oauth/token",
             json={"code": code, "client_id": self.client_id,
-                  "redirect_uri": redirect_uri,
+                  "redirect_uri": redirect_uri or self.redirect_uri,
                   "grant_type": "authorization_code",
                   "code_verifier": code_verifier},
             timeout=15)
@@ -248,7 +264,7 @@ class TraktClient:
         every Trakt call failed quietly until the user signed in again."""
         tried: list[str] = []
         grants_refused = 0
-        for uri in (REDIRECT_URI, OOB_REDIRECT_URI):
+        for uri in (self.redirect_uri, OOB_REDIRECT_URI):
             body = {"refresh_token": self.refresh_token,
                     "client_id": self.client_id,
                     "redirect_uri": uri,
