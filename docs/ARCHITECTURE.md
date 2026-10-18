@@ -33,6 +33,7 @@ dopeiptv/
     updates.py         GitHub latest-release check (is_newer, fetch)
     selfupdate.py      AppImage in-place update: download, verify, test, swap
     wakelock.py        Screensaver/suspend inhibitor (DBus + caffeinate)
+    gcguard.py         Cyclic garbage collection on the GUI thread only
     log.py             Central logging (configure_logging, DOPEIPTV_LOG)
     platform_macos.py  macOS-specific helpers (OpenGL, libmpv, paths)
     platform_windows.py Windows helpers (libmpv discovery, wakelock, shortcut)

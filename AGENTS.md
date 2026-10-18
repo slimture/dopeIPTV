@@ -25,6 +25,7 @@ map and the one-way import rule.
 | `core/updates.py` | GitHub latest-release check |
 | `core/selfupdate.py` | AppImage in-place update (download, checksum, self-check, swap) |
 | `core/wakelock.py` | Screensaver inhibitor |
+| `core/gcguard.py` | Cyclic garbage collection on the GUI thread only |
 | `core/log.py` | Central logging (`configure_logging`, `DOPEIPTV_LOG`) |
 | `core/platform_macos.py` | macOS-specific helpers |
 | `core/platform_windows.py` | Windows-specific helpers |
@@ -111,8 +112,8 @@ QT_QPA_PLATFORM=offscreen pytest -q
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
   metadata, diagnostics, oauth_loopback), `core/` (stores, updates, log,
-  player_exec, wakelock) and `services/` (resume, coverart, reminders); see
-  `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
+  player_exec, wakelock, selfupdate, gcguard) and `services/` (resume,
+  coverart, reminders); see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list
   as more non-UI modules gain type hints.

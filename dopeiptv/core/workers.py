@@ -235,6 +235,10 @@ def run_async(pool: QThreadPool, fn: Callable, on_done: Callable,
     return w
 
 
+def _ignore_result(_result: object) -> None:
+    """on_done for work that is done for its side effect."""
+
+
 class LogoLoader(QObject):
     """Asynchronous image downloader with in-memory cache.
 
@@ -301,13 +305,18 @@ class LogoLoader(QObject):
             # competes with the startup burst (EPG cache load, first list
             # fetch) and short-lived sessions skip it entirely. Parented
             # timer: dies with the loader, so it can never fire on a
-            # destroyed object.
+            # destroyed object. A bound method, not a lambda over self: the
+            # lambda closed a reference cycle through the timer, and the
+            # garbage collector could clear its closure before the timer
+            # fired - a segfault in the timeout.
             t = QTimer(self)
             t.setSingleShot(True)
             t.setInterval(5000)
-            t.timeout.connect(lambda: run_async(
-                self.pool, self._prune_disk_cache, lambda _r: None))
+            t.timeout.connect(self._start_prune)
             t.start()
+
+    def _start_prune(self) -> None:
+        run_async(self.pool, self._prune_disk_cache, _ignore_result)
 
     def _prune_disk_cache(self) -> int:
         """Delete the oldest cached image files until the disk cache fits

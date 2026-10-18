@@ -58,6 +58,7 @@
           <li>Connecting to Trakt works again after Trakt moved its sign-in</li>
           <li>The AppImage updates itself from the new-version banner</li>
           <li>Drop an M3U file or link on the window to add it as a playlist, and drag playlists into your own order</li>
+          <li>A rare crash under heavy load is fixed</li>
         </ul>
       </description>
     </release>

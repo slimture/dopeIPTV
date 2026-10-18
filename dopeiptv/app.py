@@ -391,6 +391,10 @@ def main() -> int:
             pass
 
     app = QApplication(sys.argv)
+    # Cyclic garbage collection on the GUI thread only: collected on a pool
+    # thread, a cycle holding Qt objects segfaults (see core/gcguard.py).
+    from .core.gcguard import GcGuard
+    GcGuard(app)
     # Base the proxy on Fusion, not the native platform style: the app is
     # fully QSS-themed anyway, and the native macOS style ignores QSS
     # subcontrol arrows (spin-box steppers, combo-box ▼), leaving bare boxes.

@@ -37,6 +37,9 @@ again - and the AppImage now updates itself.
 
 ### Fixes
 
+- **A rare crash under heavy load is fixed.** Cleaning up memory on a
+  background thread could pull a timer out from under the interface; that
+  cleanup now always happens on the interface's own thread.
 - **Trakt sign-in works again.** Connecting ended with "invalid_client:
   client_id is required" after Trakt moved its sign-in. If you were
   connected before, you may be asked to connect once more.

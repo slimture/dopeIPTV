@@ -54,6 +54,12 @@ sign-in working again, and an AppImage that updates itself.
 
 ### Fixed
 
+- **A crash under load.** Python's garbage collector ran on whichever
+  thread happened to allocate - usually one fetching logos or the guide -
+  and freeing a cycle that held Qt objects there could clear a timer's
+  callback while the timer could still fire: the app segfaulted. The
+  collector now runs on the GUI thread only, on a short timer, and the
+  logo cache's prune timer no longer forms such a cycle.
 - **Trakt sign-in** ended on Trakt's page with "invalid_client: client_id
   is required": Trakt moved its sign-in in 2026. A sign-in Trakt no longer
   accepts is dropped, so Settings offers Connect again instead of a
