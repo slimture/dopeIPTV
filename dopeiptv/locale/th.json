@@ -261,7 +261,7 @@
   "rec_record_now_duration": "บันทึกตอนนี้ - {duration}",
   "rec_schedule_recording": "กำหนดเวลาบันทึก…",
   "rec_open_recordings": "เปิดการบันทึก",
-  "about_desc": "แอป IPTV ที่สวยงามสำหรับ Xtream Codes และเพลย์ลิสต์ M3U - พร้อม EPG, การเล่นในตัว mpv/VLC, รายการโปรด, การบันทึก และซิงก์ Trakt",
+  "about_desc": "แอป IPTV ที่สวยงามสำหรับ Xtream Codes และเพลย์ลิสต์ M3U - พร้อม EPG, การเล่นในตัว mpv, รายการโปรด, การบันทึก และซิงก์ Trakt",
   "about_website": "เว็บไซต์",
   "about_github": "GitHub",
   "about_all_releases": "ทุกเวอร์ชัน",

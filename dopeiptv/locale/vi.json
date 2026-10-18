@@ -261,7 +261,7 @@
   "rec_record_now_duration": "Ghi hình ngay — {duration}",
   "rec_schedule_recording": "Lên lịch ghi hình…",
   "rec_open_recordings": "Mở Bản ghi",
-  "about_desc": "Một ứng dụng IPTV thanh lịch cho danh sách phát Xtream Codes và M3U — với EPG, phát lại mpv/VLC tích hợp, mục yêu thích, bản ghi và đồng bộ Trakt.",
+  "about_desc": "Một ứng dụng IPTV thanh lịch cho danh sách phát Xtream Codes và M3U — với EPG, phát lại mpv tích hợp, mục yêu thích, bản ghi và đồng bộ Trakt.",
   "about_website": "Trang web",
   "about_github": "GitHub",
   "about_all_releases": "Tất cả bản phát hành",

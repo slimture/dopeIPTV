@@ -261,7 +261,7 @@
   "rec_record_now_duration": "Şimdi kaydet — {duration}",
   "rec_schedule_recording": "Kayıt zamanla…",
   "rec_open_recordings": "Kayıtları aç",
-  "about_desc": "Xtream Codes ve M3U oynatma listeleri için zarif bir IPTV istemcisi — EPG, yerleşik mpv/VLC oynatma, favoriler, kayıtlar ve Trakt senkronizasyonu ile.",
+  "about_desc": "Xtream Codes ve M3U oynatma listeleri için zarif bir IPTV istemcisi — EPG, yerleşik mpv oynatma, favoriler, kayıtlar ve Trakt senkronizasyonu ile.",
   "about_website": "Web sitesi",
   "about_github": "GitHub",
   "about_all_releases": "Tüm sürümler",

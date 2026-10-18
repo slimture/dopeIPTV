@@ -261,7 +261,7 @@
   "rec_record_now_duration": "立即录制 - {duration}",
   "rec_schedule_recording": "计划录制…",
   "rec_open_recordings": "打开录制",
-  "about_desc": "一款优雅的 IPTV 客户端，支持 Xtream Codes 和 M3U 播放列表——含 EPG、内嵌 mpv/VLC 播放、收藏、录制和 Trakt 同步。",
+  "about_desc": "一款优雅的 IPTV 客户端，支持 Xtream Codes 和 M3U 播放列表——含 EPG、内嵌 mpv 播放、收藏、录制和 Trakt 同步。",
   "about_website": "网站",
   "about_github": "GitHub",
   "about_all_releases": "所有版本",

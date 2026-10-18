@@ -261,7 +261,7 @@
   "rec_record_now_duration": "Spela in nu - {duration}",
   "rec_schedule_recording": "Schemalägg inspelning…",
   "rec_open_recordings": "Öppna inspelningar",
-  "about_desc": "En elegant IPTV-klient för Xtream Codes och M3U-spellistor - med EPG, inbäddad mpv/VLC-uppspelning, favoriter, inspelningar och Trakt-synk.",
+  "about_desc": "En elegant IPTV-klient för Xtream Codes och M3U-spellistor - med EPG, inbäddad mpv-uppspelning, favoriter, inspelningar och Trakt-synk.",
   "about_website": "Webbplats",
   "about_github": "GitHub",
   "about_all_releases": "Alla versioner",

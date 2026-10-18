@@ -261,7 +261,7 @@
   "rec_record_now_duration": "Nu opnemen — {duration}",
   "rec_schedule_recording": "Opname plannen…",
   "rec_open_recordings": "Opnames openen",
-  "about_desc": "Een elegante IPTV-client voor Xtream Codes- en M3U-afspeellijsten — met EPG, ingebouwde mpv/VLC-weergave, favorieten, opnames en Trakt-synchronisatie.",
+  "about_desc": "Een elegante IPTV-client voor Xtream Codes- en M3U-afspeellijsten — met EPG, ingebouwde mpv-weergave, favorieten, opnames en Trakt-synchronisatie.",
   "about_website": "Website",
   "about_github": "GitHub",
   "about_all_releases": "Alle releases",

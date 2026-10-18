@@ -261,7 +261,7 @@
   "rec_record_now_duration": "Nagrywaj teraz — {duration}",
   "rec_schedule_recording": "Zaplanuj nagranie…",
   "rec_open_recordings": "Otwórz Nagrania",
-  "about_desc": "Elegancki klient IPTV dla playlist Xtream Codes i M3U — z EPG, wbudowanym odtwarzaniem mpv/VLC, ulubionymi, nagraniami i synchronizacją Trakt.",
+  "about_desc": "Elegancki klient IPTV dla playlist Xtream Codes i M3U — z EPG, wbudowanym odtwarzaniem mpv, ulubionymi, nagraniami i synchronizacją Trakt.",
   "about_website": "Strona",
   "about_github": "GitHub",
   "about_all_releases": "Wszystkie wydania",

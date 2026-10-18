@@ -261,7 +261,7 @@
   "rec_record_now_duration": "지금 녹화 — {duration}",
   "rec_schedule_recording": "녹화 예약…",
   "rec_open_recordings": "녹화 열기",
-  "about_desc": "Xtream Codes 및 M3U 재생 목록을 위한 우아한 IPTV 클라이언트 — EPG, 내장 mpv/VLC 재생, 즐겨찾기, 녹화 및 Trakt 동기화 제공.",
+  "about_desc": "Xtream Codes 및 M3U 재생 목록을 위한 우아한 IPTV 클라이언트 — EPG, 내장 mpv 재생, 즐겨찾기, 녹화 및 Trakt 동기화 제공.",
   "about_website": "웹사이트",
   "about_github": "GitHub",
   "about_all_releases": "모든 릴리스",

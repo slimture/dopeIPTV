@@ -261,7 +261,7 @@
   "rec_record_now_duration": "Εγγραφή τώρα — {duration}",
   "rec_schedule_recording": "Προγραμματισμός εγγραφής…",
   "rec_open_recordings": "Άνοιγμα εγγραφών",
-  "about_desc": "Ένας κομψός πελάτης IPTV για λίστες Xtream Codes και M3U — με EPG, ενσωματωμένη αναπαραγωγή mpv/VLC, αγαπημένα, εγγραφές και συγχρονισμό Trakt.",
+  "about_desc": "Ένας κομψός πελάτης IPTV για λίστες Xtream Codes και M3U — με EPG, ενσωματωμένη αναπαραγωγή mpv, αγαπημένα, εγγραφές και συγχρονισμό Trakt.",
   "about_website": "Ιστότοπος",
   "about_github": "GitHub",
   "about_all_releases": "Όλες οι εκδόσεις",

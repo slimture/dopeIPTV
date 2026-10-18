@@ -261,7 +261,7 @@
   "rec_record_now_duration": "Jetzt aufnehmen - {duration}",
   "rec_schedule_recording": "Aufnahme planen…",
   "rec_open_recordings": "Aufnahmen öffnen",
-  "about_desc": "Ein eleganter IPTV-Client für Xtream Codes und M3U-Playlists - mit EPG, eingebetteter mpv/VLC-Wiedergabe, Favoriten, Aufnahmen und Trakt-Sync.",
+  "about_desc": "Ein eleganter IPTV-Client für Xtream Codes und M3U-Playlists - mit EPG, eingebetteter mpv-Wiedergabe, Favoriten, Aufnahmen und Trakt-Sync.",
   "about_website": "Website",
   "about_github": "GitHub",
   "about_all_releases": "Alle Versionen",

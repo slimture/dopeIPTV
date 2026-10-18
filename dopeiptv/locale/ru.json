@@ -261,7 +261,7 @@
   "rec_record_now_duration": "Записать сейчас - {duration}",
   "rec_schedule_recording": "Запланировать запись…",
   "rec_open_recordings": "Открыть записи",
-  "about_desc": "Элегантный IPTV-клиент для Xtream Codes и M3U-плейлистов - с EPG, встроенным воспроизведением mpv/VLC, избранным, записью и синхронизацией с Trakt.",
+  "about_desc": "Элегантный IPTV-клиент для Xtream Codes и M3U-плейлистов - с EPG, встроенным воспроизведением mpv, избранным, записью и синхронизацией с Trakt.",
   "about_website": "Веб-сайт",
   "about_github": "GitHub",
   "about_all_releases": "Все выпуски",

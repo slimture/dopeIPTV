@@ -261,7 +261,7 @@
   "rec_record_now_duration": "今すぐ録画 — {duration}",
   "rec_schedule_recording": "録画をスケジュール…",
   "rec_open_recordings": "録画を開く",
-  "about_desc": "Xtream CodesとM3UプレイリストのためのエレガントなIPTVクライアント — EPG、内蔵mpv/VLC再生、お気に入り、録画、Trakt同期を備えています。",
+  "about_desc": "Xtream CodesとM3UプレイリストのためのエレガントなIPTVクライアント — EPG、内蔵mpv再生、お気に入り、録画、Trakt同期を備えています。",
   "about_website": "ウェブサイト",
   "about_github": "GitHub",
   "about_all_releases": "すべてのリリース",

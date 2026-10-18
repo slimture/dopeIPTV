@@ -411,7 +411,7 @@ _STRINGS: dict[str, dict[str, str]] = {
 
     # ── About / menu ──────────────────────────────────────────────────────
 
-    "about_desc": {"en": "An elegant IPTV client for Xtream Codes and M3U playlists - with EPG, embedded mpv/VLC playback, favorites, recordings and Trakt sync."},
+    "about_desc": {"en": "An elegant IPTV client for Xtream Codes and M3U playlists - with EPG, embedded mpv playback, favorites, recordings and Trakt sync."},
     "about_website": {"en": "Website"},
     "about_github": {"en": "GitHub"},
     "about_all_releases": {"en": "All releases"},

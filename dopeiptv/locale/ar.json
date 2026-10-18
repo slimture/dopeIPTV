@@ -261,7 +261,7 @@
   "rec_record_now_duration": "سجّل الآن — {duration}",
   "rec_schedule_recording": "جدولة تسجيل…",
   "rec_open_recordings": "فتح التسجيلات",
-  "about_desc": "عميل IPTV أنيق لقوائم تشغيل Xtream Codes و M3U — مع EPG وتشغيل mpv/VLC مدمج والمفضلة والتسجيلات ومزامنة Trakt.",
+  "about_desc": "عميل IPTV أنيق لقوائم تشغيل Xtream Codes و M3U — مع EPG وتشغيل mpv مدمج والمفضلة والتسجيلات ومزامنة Trakt.",
   "about_website": "الموقع الإلكتروني",
   "about_github": "GitHub",
   "about_all_releases": "كل الإصدارات",
