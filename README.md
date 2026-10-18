@@ -34,7 +34,11 @@ external mpv/VLC playback).
 - **Full EPG** with now/next progress bars, a searchable guide, and a persistent disk cache that shows instantly on startup
 - **TMDB metadata** — posters, ratings (linked to IMDb), and a clickable cast list that finds an actor's other titles in your playlist
 - **Recording & Timeshift** — record on a timer/schedule (single-connection friendly) and watch catch-up archives from the EPG
-- **Chromecast**, **Trakt** scrobbling, **multiple playlists** (drag to reorder, export/import, or drop an M3U file or link on the window), parental control, content manager and editable channel lists
+- **Cast to a Chromecast or a smart TV** — Samsung, LG, Sony and other DLNA/UPnP TVs show up beside the Chromecasts; pause, seek and volume from the app
+- **Subtitles from OpenSubtitles** — find subtitles for the film or episode you are watching right from the player, remembered for next time, or load a subtitle file
+- **Desktop media controls** (Linux, MPRIS) — the keyboard's media keys, headphone buttons, GNOME/KDE media controls and KDE Connect pause, play and skip
+- **Follow a series** — new episodes land on Home with a notification
+- **Trakt** scrobbling, **multiple playlists** (drag to reorder, export/import, or drop an M3U file or link on the window), parental control, content manager and editable channel lists
 - **Themes** — 9 themes + 7 accent colors, applied live
 - **Updates itself** — the AppImage downloads, verifies and swaps in a new release from the update banner
 

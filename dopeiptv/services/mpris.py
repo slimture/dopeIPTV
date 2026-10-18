@@ -47,14 +47,14 @@ class MprisHost(Protocol):
 def _int64(value: int) -> Any:
     from PyQt6.QtDBus import QDBusArgument
     arg = QDBusArgument()
-    arg.add(int(value), QMetaType.Type.LongLong.value)
+    arg.add(int(value), QMetaType.Type.LongLong.value)  # type: ignore[arg-type]
     return arg
 
 
 def _strings(values: list[str]) -> Any:
     from PyQt6.QtDBus import QDBusArgument
     arg = QDBusArgument()
-    arg.add(list(values), QMetaType.Type.QStringList.value)
+    arg.add(list(values), QMetaType.Type.QStringList.value)  # type: ignore[arg-type]
     return arg
 
 
@@ -85,10 +85,13 @@ def _clean(snap: dict[str, Any]) -> dict[str, Any]:
 def _build_adaptors(service: MprisService) -> None:
     """The two exported interfaces, as QDBusAbstractAdaptors of *service*.
     Built here so QtDBus is imported only where it is used."""
-    from PyQt6.QtCore import pyqtClassInfo, pyqtProperty, pyqtSignal, pyqtSlot
+    # Not in PyQt6's stubs, which also type pyqtClassInfo as returning
+    # nothing - it is a class decorator all the same.
+    from PyQt6.QtCore import (  # type: ignore[attr-defined]
+        pyqtClassInfo, pyqtProperty, pyqtSignal, pyqtSlot)
     from PyQt6.QtDBus import QDBusAbstractAdaptor, QDBusObjectPath
 
-    @pyqtClassInfo("D-Bus Interface", "org.mpris.MediaPlayer2")
+    @pyqtClassInfo("D-Bus Interface", "org.mpris.MediaPlayer2")  # type: ignore[func-returns-value]
     class Root(QDBusAbstractAdaptor):
         @pyqtProperty(bool)
         def CanQuit(self) -> bool:
@@ -126,7 +129,7 @@ def _build_adaptors(service: MprisService) -> None:
         def Quit(self) -> None:
             service.command("quit")
 
-    @pyqtClassInfo("D-Bus Interface", PLAYER_IFACE)
+    @pyqtClassInfo("D-Bus Interface", PLAYER_IFACE)  # type: ignore[func-returns-value]
     class Player(QDBusAbstractAdaptor):
         Seeked = pyqtSignal("qlonglong")
 

@@ -23,14 +23,14 @@ EXPIRE_MS = 10000
 def _uint32(value: int) -> Any:
     from PyQt6.QtDBus import QDBusArgument
     arg = QDBusArgument()
-    arg.add(int(value), QMetaType.Type.UInt.value)
+    arg.add(int(value), QMetaType.Type.UInt.value)  # type: ignore[arg-type]
     return arg
 
 
 def _strings(values: list[str]) -> Any:
     from PyQt6.QtDBus import QDBusArgument
     arg = QDBusArgument()
-    arg.add(list(values), QMetaType.Type.QStringList.value)
+    arg.add(list(values), QMetaType.Type.QStringList.value)  # type: ignore[arg-type]
     return arg
 
 

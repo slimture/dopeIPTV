@@ -1,7 +1,29 @@
 ## dopeIPTV 1.2.15
 
-A new Settings window, the whole app in your own language, Trakt working
-again - and the AppImage now updates itself.
+Cast to your smart TV, subtitles from OpenSubtitles, your desktop's media
+controls, and word when a series you follow gets a new episode - plus a
+new Settings window, the whole app in your own language, Trakt working
+again, and an AppImage that updates itself.
+
+### Four new things
+
+- **Cast to your smart TV.** Most smart TVs (Samsung, LG, Sony, Philips,
+  Panasonic) now show up in **Cast to TV…** next to your Chromecasts,
+  marked "(DLNA)". Pause, seek and volume work from the cast strip, and
+  local files can be cast too. Nothing extra to install.
+- **Subtitles from OpenSubtitles.** In the player's **Subtitles** menu,
+  **Find subtitles online…** searches for the film or episode you are
+  watching and loads the one you pick - and it comes back with that title
+  next time. It needs a free API key from opensubtitles.com, entered under
+  **Settings → Audio & subtitles**. You can also **load a subtitle file**
+  from disk.
+- **Your desktop's media controls (Linux).** The media keys on your
+  keyboard, headphone buttons, GNOME's and KDE's media controls and KDE
+  Connect on your phone now pause, play and skip - and show what is
+  playing, with its logo.
+- **Follow a series.** Right-click a series → **Follow series**. When new
+  episodes arrive they appear on Home under **New episodes**, with a
+  notification, and opening the series takes you to the first new one.
 
 ### A new Settings window
 

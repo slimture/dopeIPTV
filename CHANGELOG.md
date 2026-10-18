@@ -9,11 +9,38 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [1.2.15]
 
-A redesigned Settings window, the whole app in your own language, Trakt
-sign-in working again, and an AppImage that updates itself.
+Casting to smart TVs, subtitles from OpenSubtitles, the desktop's media
+controls, word when a followed series has a new episode - plus a redesigned
+Settings window, the whole app in your own language, Trakt sign-in working
+again, and an AppImage that updates itself.
 
 ### Added
 
+- **Cast to DLNA / UPnP TVs.** The cast panel finds smart TVs (Samsung, LG,
+  Sony, Philips, Panasonic), AV receivers and apps such as Kodi beside the
+  Chromecasts, listed as "Name (DLNA)". The TV is handed the stream's own
+  address and fetches it itself; a local file is served to it from here,
+  with byte ranges so it can seek. Pause, seek, volume and mute work from
+  the cast strip. Nothing to install - it works without pychromecast.
+- **Subtitles from OpenSubtitles.com.** "Find subtitles online…" in the
+  player's Subtitles menu searches for the film, episode or local file
+  that is playing - by TMDB id, by the series with season and episode, or
+  by the hash of a local file, falling back to the name - and loads the
+  pick. A subtitle loaded for a title comes back with it next time. The
+  API key goes in Settings → Audio & subtitles (release builds can ship one
+  from a `DOPEIPTV_OPENSUBTITLES_KEY` secret); an account is optional and
+  only raises the daily download limit. "Load subtitle file…" loads one
+  from disk.
+- **Desktop media controls (MPRIS, Linux).** GNOME's and KDE's media
+  controls, the keyboard's media keys, headphone buttons and KDE Connect
+  pause, play, skip and seek, and the desktop shows what is playing with
+  its logo. The media keys also work inside the window on every system.
+  A switch in Settings → General turns it off.
+- **Follow a series.** "Follow series" in a series' right-click menu; the
+  provider is asked every few hours what it lists, and new episodes land on
+  Home's "New episodes" shelf, in a toast and - on Linux, with the window
+  in the background - as a desktop notification. Opening the series selects
+  the first new episode and marks the new ones with a dot.
 - **Update in place (AppImage).** "Update now" in the new-version banner and
   in About downloads the new AppImage beside the running one, checks it
   against GitHub's SHA-256, and runs its `--self-check` before anything on
@@ -51,6 +78,9 @@ sign-in working again, and an AppImage that updates itself.
   dialogs) follow it too.
 - Trakt signs in through auth.trakt.tv with PKCE, and a client secret is
   optional (Trakt apps created since October 2026 have none).
+- "Cast to Chromecast…" is now "Cast to TV…", and the cast panel hides the
+  audio, subtitle and picture-size choices for a TV (they belong to the
+  Chromecast converter) and says so.
 
 ### Fixed
 

@@ -10,8 +10,9 @@
       dopeIPTV is a clean, modern player for your own Xtream Codes or M3U
       subscription. It offers an embedded mpv player, an electronic programme
       guide with a timeline grid, movies and series with TMDB metadata,
-      recording and timeshift catch-up, optional Trakt sync, Chromecast
-      support, multiple playlists, themes and translations.
+      recording and timeshift catch-up, optional Trakt sync, casting to
+      Chromecast and DLNA smart TVs, subtitles from OpenSubtitles, desktop
+      media controls, multiple playlists, themes and translations.
     </p>
     <p>
       dopeIPTV is a player only: it does not provide any channels or content -
@@ -51,8 +52,12 @@
   <releases>
     <release version="1.2.15" date="2026-10-18">
       <description>
-        <p>A new Settings window, and the whole app in your language.</p>
+        <p>Cast to smart TVs, subtitles from OpenSubtitles, desktop media controls, a new Settings window, and the whole app in your language.</p>
         <ul>
+          <li>Cast to DLNA / UPnP smart TVs as well as Chromecasts</li>
+          <li>Find subtitles on OpenSubtitles.com from the player's Subtitles menu, or load a subtitle file</li>
+          <li>The desktop's media controls, media keys and headphone buttons control the player (MPRIS)</li>
+          <li>Follow a series and be told when new episodes arrive</li>
           <li>Settings has a sidebar with fifteen pages, a search field and switches for every yes/no choice</li>
           <li>About 200 texts that were still in English are translated into all 27 languages, and dates follow the language</li>
           <li>Connecting to Trakt works again after Trakt moved its sign-in</li>
