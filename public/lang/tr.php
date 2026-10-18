@@ -29,7 +29,7 @@ return [
 
     // feature strip chips
     "chip_timeshift" => "Timeshift / catch-up",
-    "chip_languages" => "26 dil",
+    "chip_languages" => "27 dil",
 
     // features
     "feat_eyebrow" => "Her şey tek ekranda",
@@ -169,17 +169,17 @@ return [
     'help_hits'            => 'Sonuç: %n',
     'help_toc'             => 'Bölümler',
     'help_no_hits'         => 'Sonuç yok. Daha kısa bir sözcük deneyin — arama, yazdığınız her sözcüğün aynı cevapta geçmesini ister.',
-    'help_more'            => 'Burada yok mu? <a href="https://github.com/slimture/dopeIPTV/issues" rel="nofollow">GitHub</a> üzerinde bir konu açın. <b>Ayarlar → Hakkında</b> bölümündeki sürümü yazın ve günlüğü ekleyin — yukarıdaki «Günlüğü nasıl alırım?» cevabı sisteminiz için tam komutu veriyor.',
+    'help_more'            => 'Burada yok mu? <a href="https://github.com/slimture/dopeIPTV/issues" rel="nofollow">GitHub</a> üzerinde bir konu açın. <b>dopeIPTV → dopeIPTV Hakkında</b> bölümündeki sürümü yazın ve günlüğü ekleyin — yukarıdaki «Günlüğü nasıl alırım?» cevabı sisteminiz için tam komutu veriyor.',
 
     // Kurulum ve ilk ayarlar
     'help_start_title'     => 'Kurulum ve ilk ayarlar',
     'help_start_linux_q' => 'Linux\'a nasıl kurarım?',
     'help_start_linux_a' => '<p>Üç biçim var ve hepsi kendi kendine yeter — Python, Qt, libmpv ve ffmpeg indirdiğiniz dosyanın içinde, yanına bir şey kurmanız gerekmez.</p><p><b>AppImage</b> — emin değilseniz alacağınız budur. Her dağıtımda çalışır:</p><pre><code>chmod +x dopeIPTV-*.AppImage
-./dopeIPTV-*.AppImage</code></pre><p>Debian veya Ubuntu\'da <b>.deb</b>:</p><pre><code>sudo apt install ./dopeiptv_*_amd64.deb</code></pre><p><b>Flatpak</b>:</p><pre><code>flatpak install --user dopeIPTV-*.flatpak</code></pre><p>Üçünün de arm64 yapıları var — Raspberry Pi veya ARM sunucusu için.</p>',
+./dopeIPTV-*.AppImage</code></pre><p>Debian veya Ubuntu\'da <b>.deb</b>:</p><pre><code>sudo apt install ./dopeiptv_*_amd64.deb</code></pre><p><b>Flatpak</b>:</p><pre><code>flatpak install --user dopeIPTV-*.flatpak</code></pre><p>AppImage ve .deb için arm64 yapıları da var — Raspberry Pi veya ARM sunucusu için.</p>',
     'help_start_macos_q' => 'macOS\'a nasıl kurarım?',
     'help_start_macos_a' => '<p><code>.dmg</code> dosyasını açıp dopeIPTV\'yi Uygulamalar\'a sürükleyin. <b>macOS 15 veya üstü</b> gerekir ve uygulama Apple Silicon\'da çalışır — 1.2.10, Intel yapısı olan son sürümdü.</p><p>İlk açılış reddedilir, çünkü uygulama Apple tarafından noter onaylı değil. Uygulamaya sağ tıklayıp <b>Aç</b>\'ı seçin, sonra açılan pencerede yeniden <b>Aç</b>. Bu yetmezse aşağıdaki «macOS uygulamanın açılamadığını söylüyor» başlığına bakın.</p>',
     'help_start_windows_q' => 'Windows\'a nasıl kurarım?',
-    'help_start_windows_a' => '<p>Kurulum programı yok. <code>dopeIPTV-*-windows-x64.zip</code> dosyasını istediğiniz yere açın — kullanıcı klasörünüz yeterlidir, yönetici hakkı gerekmez — ve içindeki <code>dopeiptv.exe</code> dosyasını çalıştırın.</p><p>Snapdragon dizüstülerine yönelik yerel bir <b>arm64</b> yapısı var; x64 yapısı da orada çalışır, öykünmeyle ve dolayısıyla daha yavaş.</p><p>Başlat menüsünde veya masaüstünde kısayol için: <b>Ayarlar → Arayüz → Bakım → Kısayol oluştur</b>. Arşivdeki <code>README.txt</code>, uygulamayı iz bırakmadan kaldırmak isterseniz silinecek her şeyi sıralar.</p>',
+    'help_start_windows_a' => '<p>Kurulum programı yok. <code>dopeIPTV-*-windows-x64.zip</code> dosyasını istediğiniz yere açın — kullanıcı klasörünüz yeterlidir, yönetici hakkı gerekmez — ve içindeki <code>dopeiptv.exe</code> dosyasını çalıştırın.</p><p>Snapdragon dizüstülerine yönelik yerel bir <b>arm64</b> yapısı var; x64 yapısı da orada çalışır, öykünmeyle ve dolayısıyla daha yavaş.</p><p>Başlat menüsünde veya masaüstünde kısayol için: <b>Ayarlar → Gelişmiş → Kısayol oluştur</b>. Arşivdeki <code>README.txt</code>, uygulamayı iz bırakmadan kaldırmak isterseniz silinecek her şeyi sıralar.</p>',
     'help_start_playlist_q' => 'Sağlayıcımı nasıl bağlarım?',
     'help_start_playlist_a' => '<p>İlk açılışta <b>Xtream Codes</b> hesabınızdan üç şey istenir:</p><ul><li><b>Sunucu</b> — bağlantı noktasıyla birlikte adres, örneğin <code>http://example.com:8080</code>. Tam bir oynatma listesi adresi değil, yalnızca sunucu.</li><li><b>Kullanıcı adı</b> ve <b>Parola</b> — sağlayıcınızın verdikleri.</li></ul><p>Bunlar kaydedilir. Sonradan başka bir hesap eklemek veya bunu düzenlemek için: <b>Ayarlar → Oynatma listeleri</b>. Uygulama açıkken listeler arasında geçiş yapabilirsiniz; sık kullanılanlar ve geçmiş her liste için ayrı tutulur.</p>',
     'help_start_m3u_q' => 'Bunun yerine M3U listesi kullanabilir miyim?',
@@ -213,7 +213,7 @@ return [
     'help_tv_xmltv_q' => 'Rehber yanlış, boş ya da başka bir ülkenin',
     'help_tv_xmltv_a' => '<p>O listeye sağlayıcınınki yerine kendi rehberini verin:</p><ol><li><b>Ayarlar → Oynatma listeleri</b></li><li>Listeyi seçip düzenleyin</li><li>Özel rehber alanına bir <b>XMLTV</b> adresi girin</li></ol><p>Sağlayıcının gönderdiğinin yerini alır. Uygulama kanallarınızı bu rehberle önce EPG kimliğine, sonra kanal adına göre eşleştirir; bu yüzden başka bir kaynaktan gelen rehber de genelde oturur.</p>',
     'help_tv_times_q' => 'Her şey bir iki saat kaymış',
-    'help_tv_times_a' => '<p>Bazı sağlayıcılar gerçekten yayınladıklarıyla uyuşmayan saatler yayımlar. <b>Ayarlar → Oynatma</b> altında iki ayrı düzeltme var:</p><ul><li><b>EPG kayması</b> rehberin gösterdiği her saati kaydırır.</li><li><b>Tekrar kayması</b> arşiv ve timeshift\'in oynamaya başladığı noktayı kaydırır, listeyi hiç değiştirmeden.</li></ul><p>Ayrı olmalarının nedeni, sağlayıcıların bu ikisinde birbirinden bağımsız olarak yanılmasıdır.</p>',
+    'help_tv_times_a' => '<p>Bazı sağlayıcılar gerçekten yayınladıklarıyla uyuşmayan saatler yayımlar. <b>Ayarlar → Kılavuz</b> altında iki ayrı düzeltme var:</p><ul><li><b>EPG kayması</b> rehberin gösterdiği her saati kaydırır.</li><li><b>Tekrar kayması</b> arşiv ve timeshift\'in oynamaya başladığı noktayı kaydırır, listeyi hiç değiştirmeden.</li></ul><p>Ayrı olmalarının nedeni, sağlayıcıların bu ikisinde birbirinden bağımsız olarak yanılmasıdır.</p>',
     'help_tv_ts_q' => 'Timeshift ve arşiv nedir?',
     'help_tv_ts_a' => '<p>Bazı sağlayıcılar her kanalın birkaç günlük kaydını tutar. Sizinki tutuyorsa kanal listede <b>⏪</b> işaretini alır ve ayrıntı paneli arşivin kaç gün geriye gittiğini söyler.</p><p>Bir kanalda işaret yoksa, sağlayıcı o kanal için arşiv sunmuyordur. Bu onların ayarıdır ve uygulamadaki hiçbir şey onu açamaz.</p>',
     'help_tv_tsstart_q' => 'Başlamış bir şeyi nasıl izlerim?',
@@ -244,7 +244,7 @@ return [
     'help_more_castfix_q' => 'Televizyon bir kanalı kabul etmiyor',
     'help_more_castfix_a' => '<p>Bazı kanallar <b>Dolby Digital Plus</b> sesli sıradan H.264 videodur. Ultra veya Google TV olmayan bir Chromecast\'te bunun kod çözücüsü yoktur ve yayını nedenini söylemeden reddeder.</p><p>Uygulama bu durumları bu bilgisayarda dönüştürür ve sonucu kendi ağınızda sunar: video olduğu gibi kopyalanır — yalnızca ses yeniden kodlanır, bu da ucuzdur — ve bu ancak cihaz yayını gerçekten reddettikten <em>sonra</em> olur. Cihazınızın oynatabildiği bir kanal her zaman sağlayıcının kendi yayınını, değiştirilmeden alır.</p><p>Bunun için <code>ffmpeg</code> gerekir ve o da her paketlenmiş indirmenin içindedir.</p>',
     'help_more_trakt_q' => 'Trakt\'ı nasıl bağlarım?',
-    'help_more_trakt_a' => '<p><b>Ayarlar → Trakt</b>. trakt.tv üzerinde bir uygulama oluşturur, verdiği iki anahtarı yapıştırır ve açılan tarayıcıda yetki verirsiniz.</p><p>Bundan sonra izledikleriniz scrobble edilir; izleme listeniz ve geçmişiniz uygulamanın içinde gezilebilir. TMDB dosyayı tanıyabildiği sürece kendi yerel dosyalarınız da scrobble edilir.</p>',
+    'help_more_trakt_a' => '<p><b>Ayarlar → Trakt → Tarayıcı üzerinden bağlan</b>. Tarayıcı Trakt\'ı açar: gerekirse oturum açın, <b>Yes</b> düğmesine tıklayın ve uygulama bağlanır. Oluşturulacak anahtar ya da yazılacak kod yoktur.</p><p>Bundan sonra izledikleriniz scrobble edilir; izleme listeniz ve geçmişiniz uygulamanın içinde gezilebilir. TMDB dosyayı tanıyabildiği sürece kendi yerel dosyalarınız da scrobble edilir.</p>',
 
     // Kendi dosyalarınız
     'help_local_title'     => 'Kendi dosyalarınız',
@@ -262,9 +262,9 @@ return [
     // Ayarlar
     'help_set_title'       => 'Ayarlar',
     'help_set_language_q' => 'Dil ve görünüm',
-    'help_set_language_a' => '<p><b>Ayarlar → Arayüz</b>. Arayüz <b>27 dile</b> çevrilmiştir ve yeniden başlatmadan anında değişir. Arapça, Farsça, İbranice ve Urduca tüm yerleşimi aynalar.</p><p>Aynı sekmede beş renk teması ve yedi vurgu rengi var; anında uygulanırlar.</p>',
+    'help_set_language_a' => '<p><b>Ayarlar → Genel</b>. Arayüz <b>27 dile</b> çevrilmiştir ve yeniden başlatmadan anında değişir. Arapça, Farsça, İbranice ve Urduca tüm yerleşimi aynalar.</p><p><b>Ayarlar → Görünüm</b> altında dokuz renk teması ve yedi vurgu rengi var; anında uygulanırlar.</p>',
     'help_set_playback_q' => 'Tüm yayınlar için varsayılanlar',
-    'help_set_playback_a' => '<p><b>Ayarlar → Oynatma</b>, her seferinde sormadan ne olması gerektiğini belirler:</p><ul><li>Tercih edilen <b>ses dili</b></li><li><b>Altyazılar</b> açık ya da kapalı, birinci ve ikinci tercih edilen dille</li><li>Varsayılan <b>en boy oranı</b> ve <b>ağ arabelleği</b></li><li><b>«Sonraki bölüm»</b> kartının ne kadar erken çıkacağı — kapalı ya da bir ile on dakika arası</li></ul><p>Oynatıcıdaki ⚙ menüsü, izlediğiniz yayın için bunların herhangi birini yine de geçersiz kılabilir.</p>',
+    'help_set_playback_a' => '<p><b>Ayarlar → Oynatma</b>, <b>Ses ve altyazılar</b> ve <b>Video</b> her seferinde sormadan ne olması gerektiğini belirler:</p><ul><li>Tercih edilen <b>ses dili</b></li><li><b>Altyazılar</b> açık ya da kapalı, birinci ve ikinci tercih edilen dille</li><li>Varsayılan <b>en boy oranı</b> ve <b>ağ arabelleği</b></li><li><b>«Sonraki bölüm»</b> kartının ne kadar erken çıkacağı — kapalı ya da bir ile on dakika arası</li></ul><p>Oynatıcıdaki ⚙ menüsü, izlediğiniz yayın için bunların herhangi birini yine de geçersiz kılabilir.</p>',
     'help_set_parental_q' => 'Bir şeyleri başkalarından kilitleyebilir miyim?',
     'help_set_parental_a' => '<p>Evet. Bir PIN, kilitli kategorileri ve kilitli sık kullanılan gruplarını korur. Kilitli bir grup, PIN girilene kadar içinde hangi kanalların olduğunu bile göstermez — oynatmayı değil, içeriği gizler.</p><p>PIN tuzlanmış ve özetlenmiş olarak saklanır, düz metin olarak değil.</p>',
     'help_set_hide_q' => 'Kanalları gizleyebilir veya yeniden adlandırabilir miyim?',
@@ -283,7 +283,7 @@ return [
 sudo dnf install mpv ffmpeg     # Fedora
 sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_picture_q' => 'Ses var ama görüntü yok',
-    'help_fix_picture_a' => '<p>Gömülü oynatıcı bir video yüzeyi alamıyor.</p><ol><li><code>⚙ → Stats for nerds</code>\'ü açın ve kare gelip gelmediğine bakın — bu, yayın sorununu görüntüleme sorunundan ayırır.</li><li>Wayland\'de <b>Ayarlar → Oynatma → X11 arka ucuyla çalıştır</b>\'ı deneyin ve uygulamayı yeniden başlatın.</li><li>Bir uçbirimden çalıştırın ve GL ya da mpv geçen satırlara bakın.</li></ol>',
+    'help_fix_picture_a' => '<p>Gömülü oynatıcı bir video yüzeyi alamıyor.</p><ol><li><code>⚙ → Stats for nerds</code>\'ü açın ve kare gelip gelmediğine bakın — bu, yayın sorununu görüntüleme sorunundan ayırır.</li><li>Wayland\'de <b>Ayarlar → Gelişmiş → X11 arka ucu üzerinden çalıştır</b> seçeneğini deneyin ve uygulamayı yeniden başlatın.</li><li>Bir uçbirimden çalıştırın ve GL ya da mpv geçen satırlara bakın.</li></ol>',
     'help_fix_gatekeeper_q' => 'macOS uygulamanın açılamadığını söylüyor',
     'help_fix_gatekeeper_a' => '<p>Henüz Apple tarafından noter onaylı değil. Uygulamaya sağ tıklayıp <b>Aç</b>\'ı, sonra pencerede <b>Aç</b>\'ı seçin — ya da <b>Sistem Ayarları → Gizlilik ve Güvenlik → Yine de aç</b> altından izin verin.</p><p>macOS bunun yerine uygulamanın <b>«hasarlı»</b> olduğunu söylüyorsa, bu indirmeden gelen karantina işaretidir. Kaldırın:</p><pre><code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code></pre><p>Bu uyarıların hiçbiri uygulamada bir sorun olduğu anlamına gelmez — yalnızca yapının imzalanmadığını, bunun içinse ücretli bir Apple sertifikası gerektiğini gösterir.</p>',
     'help_fix_smartscreen_q' => 'Windows «Windows bilgisayarınızı korudu» diyor',
@@ -293,9 +293,9 @@ sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_stream_q' => 'Bir kanal oynamıyor',
     'help_fix_stream_a' => '<p>Uygulama sağlayıcıyı yoklar ve çıplak bir hata göstermek yerine nedenini açık dille söyler: hesabın süresi dolmuş, bağlantı sınırına ulaşılmış, yayın yok, sunucuya erişilemiyor vb.</p><p>Diğer kanallar oynuyorsa sorun o kanaldadır. Hiçbiri oynamıyorsa <b>Ayarlar → Oynatma listeleri</b>\'ne bakın — hesap paneli bitiş tarihini ve hesabın kaç bağlantıya izin verdiğini gösterir.</p>',
     'help_fix_limit_q' => '«Bağlantı sınırına ulaşıldı»',
-    'help_fix_limit_a' => '<p>Hesabınız belirli sayıda eşzamanlı yayına izin veriyor ve hepsi kullanımda. Olasılık sırasıyla:</p><ol><li>Çoklu görünüm açık — her kare bir bağlantıdır.</li><li><em>Başka</em> bir kanalın kaydı sürüyor.</li><li>Hesabı başka bir cihaz ya da başka biri kullanıyor.</li><li>Önceki bir oturumun süresi sağlayıcıda henüz dolmamış; bir dakika beklemek çoğu zaman yeter.</li></ol><p>İzlediğiniz kanalı kaydetmek ikinci bağlantı sayılmaz.</p>',
+    'help_fix_limit_a' => '<p>Hesabınız belirli sayıda eşzamanlı yayına izin veriyor ve hepsi kullanımda. Olasılık sırasıyla:</p><ol><li>Çoklu görünüm açık — her kare bir bağlantıdır.</li><li><em>Başka</em> bir kanalın kaydı sürüyor.</li><li>Hesabı başka bir cihaz ya da başka biri kullanıyor.</li><li>Önceki bir oturumun süresi sağlayıcıda henüz dolmamış; bir dakika beklemek çoğu zaman yeter.</li></ol><p>İzlediğiniz kanalı kaydetmek ikinci bağlantı <em>sayılmaz</em>.</p>',
     'help_fix_icon_q' => 'Linux: görev çubuğunda boş bir simge görünüyor',
-    'help_fix_icon_a' => '<p>Wayland\'de GNOME ve KDE bir pencerenin simgesini ona uyan bir masaüstü girdisinden alır ve programın kendi belirlediğini yok sayar. Bir AppImage\'da, bir şey kurana kadar böyle bir girdi yoktur.</p><ol><li>Uygulama ilk açılışta bir tane eklemeyi önerir. Kabul edin — ve sonra <b>uygulamayı yeniden başlatın</b>, çünkü açık pencere hangi simgeyle açıldıysa onu korur.</li><li>Hayır dediyseniz aynı seçenek <b>Ayarlar → Oynatma</b> altındadır.</li><li>Simge yine de görünmüyorsa, onu eski bir simge önbelleği örtüyordur. GTK klasör yerine o dosyayı okur:</li></ol><pre><code>rm ~/.local/share/icons/hicolor/icon-theme.cache</code></pre><p><b>.deb</b> ile kurduysanız girdi zaten vardır ve bunların hiçbiri geçerli değildir.</p>',
+    'help_fix_icon_a' => '<p>Wayland\'de GNOME ve KDE bir pencerenin simgesini ona uyan bir masaüstü girdisinden alır ve programın kendi belirlediğini yok sayar. Bir AppImage\'da, bir şey kurana kadar böyle bir girdi yoktur.</p><ol><li>Uygulama ilk açılışta bir tane eklemeyi önerir. Kabul edin — ve sonra <b>uygulamayı yeniden başlatın</b>, çünkü açık pencere hangi simgeyle açıldıysa onu korur.</li><li>Hayır dediyseniz aynı seçenek <b>Ayarlar → Genel</b> altındadır.</li><li>Simge yine de görünmüyorsa, onu eski bir simge önbelleği örtüyordur. GTK klasör yerine o dosyayı okur:</li></ol><pre><code>rm ~/.local/share/icons/hicolor/icon-theme.cache</code></pre><p><b>.deb</b> ile kurduysanız girdi zaten vardır ve bunların hiçbiri geçerli değildir.</p>',
     'help_fix_external_q' => '«Dışarıda aç» hiçbir şey yapmıyor',
     'help_fix_external_a' => '<p>Bu seçenek sisteminizden bağımsız bir <code>mpv</code> ya da <code>vlc</code> başlatır, dolayısıyla bunlardan birinin kurulu olması gerekir — gömülü oynatıcının fazladan bir şeye ihtiyacı yoktur ve bundan etkilenmez.</p><pre><code>sudo apt install mpv vlc        # Debian/Ubuntu
 sudo dnf install mpv vlc        # Fedora
@@ -304,4 +304,14 @@ sudo pacman -S mpv vlc          # Arch</code></pre>',
     'nf_h1'   => 'Bu sayfa yok',
     'nf_lede' => 'Bağlantı eski ya da yanlış yazılmış olabilir. Ana sayfadan yeniden başlayın ya da yardıma bakın.',
     'nf_home' => 'Ana sayfaya git',
+    // front page: hero button per OS, lightbox, the app mock-up
+    'hero_cta_os' => '%s için indir',
+    'lb_close' => 'Kapat',
+    'mock_live' => 'CANLI',
+    'mock_sport' => 'Spor',
+    'mock_cinema' => 'Sinema',
+    'mock_nature' => 'Doğa',
+    'mock_kids' => 'Çocuk',
+    'mock_news' => 'Akşam Haberleri',
+    'mock_behind' => '− 12 dk',
 ];

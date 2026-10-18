@@ -61,7 +61,7 @@ const HELP = [
 <meta property="og:locale" content="<?= h(lang_locale()) ?>">
 <meta property="og:title" content="<?= h(t('help_meta_title')) ?>">
 <meta property="og:description" content="<?= h(t('help_meta_desc')) ?>">
-<meta property="og:url" content="<?= h($SITE) ?>/help/">
+<meta property="og:url" content="<?= h(i18n_canonical($SITE, '/help/')) ?>">
 <meta property="og:image" content="<?= h($SITE) ?>/og-image.png">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon.ico" sizes="32x32">

@@ -29,7 +29,7 @@ return [
 
     // feature strip chips
     "chip_timeshift" => "Timeshift / catch-up",
-    "chip_languages" => "26 jezika",
+    "chip_languages" => "27 jezika",
 
     // features
     "feat_eyebrow" => "Sve na jednom zaslonu",
@@ -169,17 +169,17 @@ return [
     'help_hits'            => 'Rezultati: %n',
     'help_toc'             => 'Odjeljci',
     'help_no_hits'         => 'Nema pogotka. Pokušajte s kraćom riječi — pretraga traži da se svaka upisana riječ pojavi u istom odgovoru.',
-    'help_more'            => 'Nema toga ovdje? Otvorite prijavu na <a href="https://github.com/slimture/dopeIPTV/issues" rel="nofollow">GitHubu</a>. Navedite verziju iz <b>Postavke → O programu</b> i priložite zapis — odgovor «Kako doći do zapisa?» gore daje točnu naredbu za vaš sustav.',
+    'help_more'            => 'Nema toga ovdje? Otvorite prijavu na <a href="https://github.com/slimture/dopeIPTV/issues" rel="nofollow">GitHubu</a>. Navedite verziju iz <b>dopeIPTV → O dopeIPTV</b> i priložite zapis — odgovor «Kako doći do zapisa?» gore daje točnu naredbu za vaš sustav.',
 
     // Instalacija i postavljanje
     'help_start_title'     => 'Instalacija i postavljanje',
     'help_start_linux_q' => 'Kako se instalira na Linuxu?',
     'help_start_linux_a' => '<p>Tri oblika, i sva tri su samostalna — Python, Qt, libmpv i ffmpeg nalaze se unutar preuzete datoteke, pa uz njih nema što instalirati.</p><p><b>AppImage</b> — uzmite ovaj ako niste sigurni. Radi na svakoj distribuciji:</p><pre><code>chmod +x dopeIPTV-*.AppImage
-./dopeIPTV-*.AppImage</code></pre><p><b>.deb</b> na Debianu ili Ubuntuu:</p><pre><code>sudo apt install ./dopeiptv_*_amd64.deb</code></pre><p><b>Flatpak</b>:</p><pre><code>flatpak install --user dopeIPTV-*.flatpak</code></pre><p>Sva tri postoje i u arm64 izdanju, za Raspberry Pi ili ARM poslužitelj.</p>',
+./dopeIPTV-*.AppImage</code></pre><p><b>.deb</b> na Debianu ili Ubuntuu:</p><pre><code>sudo apt install ./dopeiptv_*_amd64.deb</code></pre><p><b>Flatpak</b>:</p><pre><code>flatpak install --user dopeIPTV-*.flatpak</code></pre><p>AppImage i .deb postoje i u arm64 izdanju, za Raspberry Pi ili ARM poslužitelj.</p>',
     'help_start_macos_q' => 'Kako se instalira na macOS-u?',
     'help_start_macos_a' => '<p>Otvorite <code>.dmg</code> i povucite dopeIPTV u mapu Applications. Treba <b>macOS 15 ili noviji</b>, a aplikacija radi na Apple Siliconu — 1.2.10 bilo je zadnje izdanje s Intel verzijom.</p><p>Prvo pokretanje bude odbijeno jer aplikacija nije ovjerena kod Applea. Kliknite je desnom tipkom i odaberite <b>Open</b>, pa zatim još jednom <b>Open</b> u dijalogu. Ako to ne pomogne, pogledajte «macOS kaže da se aplikacija ne može otvoriti» niže.</p>',
     'help_start_windows_q' => 'Kako se instalira na Windowsu?',
-    'help_start_windows_a' => '<p>Nema instalacijskog programa. Raspakirajte <code>dopeIPTV-*-windows-x64.zip</code> gdje god želite — korisnička mapa je sasvim dovoljna, administratorska prava nisu potrebna — i pokrenite <code>dopeiptv.exe</code> iznutra.</p><p>Postoji izvorno <b>arm64</b> izdanje za Snapdragon prijenosnike; x64 izdanje radi i ondje, ali kroz emulaciju pa je sporije.</p><p>Za prečac u izborniku Start ili na radnoj površini: <b>Postavke → Sučelje → Održavanje → Stvori prečac</b>. Datoteka <code>README.txt</code> u arhivi popisuje sve što treba obrisati ako želite ukloniti aplikaciju bez traga.</p>',
+    'help_start_windows_a' => '<p>Nema instalacijskog programa. Raspakirajte <code>dopeIPTV-*-windows-x64.zip</code> gdje god želite — korisnička mapa je sasvim dovoljna, administratorska prava nisu potrebna — i pokrenite <code>dopeiptv.exe</code> iznutra.</p><p>Postoji izvorno <b>arm64</b> izdanje za Snapdragon prijenosnike; x64 izdanje radi i ondje, ali kroz emulaciju pa je sporije.</p><p>Za prečac u izborniku Start ili na radnoj površini: <b>Postavke → Napredno → Napravi prečac</b>. Datoteka <code>README.txt</code> u arhivi popisuje sve što treba obrisati ako želite ukloniti aplikaciju bez traga.</p>',
     'help_start_playlist_q' => 'Kako povezati svog davatelja usluge?',
     'help_start_playlist_a' => '<p>Pri prvom pokretanju traže se tri stvari s vašeg <b>Xtream Codes</b> računa:</p><ul><li><b>Poslužitelj</b> — adresa s portom, primjerice <code>http://example.com:8080</code>. Ne cijela adresa popisa, nego samo poslužitelj.</li><li><b>Korisničko ime</b> i <b>Lozinka</b> — one koje ste dobili od davatelja usluge.</li></ul><p>Spremaju se. Za dodavanje još jednog računa poslije, ili uređivanje ovoga: <b>Postavke → Popisi</b>. Popise možete mijenjati dok aplikacija radi, a favoriti i povijest čuvaju se odvojeno za svaki.</p>',
     'help_start_m3u_q' => 'Mogu li umjesto toga koristiti M3U popis?',
@@ -213,7 +213,7 @@ return [
     'help_tv_xmltv_q' => 'Vodič je pogrešan, prazan ili za pogrešnu zemlju',
     'help_tv_xmltv_a' => '<p>Dajte tom popisu vlastiti vodič umjesto onoga od davatelja usluge:</p><ol><li><b>Postavke → Popisi</b></li><li>Označite popis i uredite ga</li><li>Upišite <b>XMLTV</b> adresu u polje za prilagođeni vodič</li></ol><p>Zamjenjuje ono što šalje davatelj usluge. Aplikacija pridružuje vaše kanale tom vodiču najprije po EPG oznaci, a zatim po nazivu kanala, pa i vodič iz drugog izvora obično pristaje.</p>',
     'help_tv_times_q' => 'Sve je pomaknuto za sat ili dva',
-    'help_tv_times_a' => '<p>Neki davatelji usluga objavljuju vremena koja ne odgovaraju onome što doista emitiraju. U <b>Postavke → Reprodukcija</b> postoje dva odvojena ispravka:</p><ul><li><b>Pomak EPG-a</b> pomiče svako vrijeme koje vodič prikazuje.</li><li><b>Pomak reprize</b> pomiče mjesto od kojeg arhiva i timeshift počinju reproducirati, bez diranja samog rasporeda.</li></ul><p>Odvojeni su jer davatelji usluga griješe u jednome neovisno o drugome.</p>',
+    'help_tv_times_a' => '<p>Neki davatelji usluga objavljuju vremena koja ne odgovaraju onome što doista emitiraju. U <b>Postavke → Vodič</b> postoje dva odvojena ispravka:</p><ul><li><b>Pomak EPG-a</b> pomiče svako vrijeme koje vodič prikazuje.</li><li><b>Pomak reprize</b> pomiče mjesto od kojeg arhiva i timeshift počinju reproducirati, bez diranja samog rasporeda.</li></ul><p>Odvojeni su jer davatelji usluga griješe u jednome neovisno o drugome.</p>',
     'help_tv_ts_q' => 'Što su timeshift i arhiva?',
     'help_tv_ts_a' => '<p>Neki davatelji usluga čuvaju snimku svakog kanala nekoliko dana. Ondje gdje vaš to čini, kanal u popisu dobiva oznaku <b>⏪</b>, a ploča s pojedinostima kaže koliko dana unatrag arhiva seže.</p><p>Ako kanal nema oznaku, davatelj usluge za njega ne nudi arhivu. To je njegova postavka i ništa u aplikaciji ne može je uključiti.</p>',
     'help_tv_tsstart_q' => 'Kako pogledati nešto što je već počelo?',
@@ -244,7 +244,7 @@ return [
     'help_more_castfix_q' => 'Televizor odbija neki kanal',
     'help_more_castfix_a' => '<p>Neki su kanali obična H.264 slika sa zvukom <b>Dolby Digital Plus</b>. Chromecast koji nije Ultra ni Google TV nema dekoder za to i odbija tok bez objašnjenja.</p><p>Aplikacija takve slučajeve pretvara na ovom računalu i poslužuje rezultat na vašoj mreži: slika se prepisuje nedirnuta — ponovno se kodira samo zvuk, što je jeftino — i to se događa tek <em>nakon</em> što je uređaj tok doista odbio. Kanal koji vaš uređaj može reproducirati uvijek dobiva izvorni tok davatelja usluge, neizmijenjen.</p><p>Za to treba <code>ffmpeg</code>, koji se nalazi unutar svakog zapakiranog preuzimanja.</p>',
     'help_more_trakt_q' => 'Kako povezati Trakt?',
-    'help_more_trakt_a' => '<p><b>Postavke → Trakt</b>. Stvorite aplikaciju na trakt.tv, zalijepite dva ključa koja vam dâ i odobrite u pregledniku koji se otvori.</p><p>Nakon toga se ono što gledate bilježi, a popis za gledanje i povijest mogu se pregledavati unutar aplikacije. Bilježe se i vaše lokalne datoteke, kad god je TMDB uspio prepoznati datoteku.</p>',
+    'help_more_trakt_a' => '<p><b>Postavke → Trakt → Poveži putem preglednika</b>. Preglednik otvara Trakt: prijavite se ako treba, kliknite <b>Yes</b> i aplikacija je povezana. Nema ključeva za stvaranje ni kodova za upisivanje.</p><p>Nakon toga se ono što gledate bilježi, a popis za gledanje i povijest mogu se pregledavati unutar aplikacije. Bilježe se i vaše lokalne datoteke, kad god je TMDB uspio prepoznati datoteku.</p>',
 
     // Vlastite datoteke
     'help_local_title'     => 'Vlastite datoteke',
@@ -262,9 +262,9 @@ return [
     // Postavke
     'help_set_title'       => 'Postavke',
     'help_set_language_q' => 'Jezik i izgled',
-    'help_set_language_a' => '<p><b>Postavke → Sučelje</b>. Sučelje je prevedeno na <b>27 jezika</b> i mijenja se odmah, bez ponovnog pokretanja. Arapski, perzijski, hebrejski i urdu zrcale cijeli raspored.</p><p>Ista kartica ima pet tema boja i sedam naglasnih boja, koje se primjenjuju odmah.</p>',
+    'help_set_language_a' => '<p><b>Postavke → Općenito</b>. Sučelje je prevedeno na <b>27 jezika</b> i mijenja se odmah, bez ponovnog pokretanja. Arapski, perzijski, hebrejski i urdu zrcale cijeli raspored.</p><p><b>Postavke → Izgled</b> ima devet tema boja i sedam naglasnih boja, koje se primjenjuju odmah.</p>',
     'help_set_playback_q' => 'Zadane vrijednosti za sve tokove',
-    'help_set_playback_a' => '<p><b>Postavke → Reprodukcija</b> određuju što se treba dogoditi bez da svaki put tražite:</p><ul><li>Željeni <b>jezik zvuka</b></li><li><b>Titlovi</b> uključeni ili ne, s prvim i drugim željenim jezikom</li><li>Zadani <b>omjer slike</b> i <b>mrežni međuspremnik</b></li><li>Koliko se rano pojavljuje kartica <b>«Sljedeća epizoda»</b> — isključeno, ili od jedne do deset minuta</li></ul><p>Izbornik ⚙ u reproduktoru i dalje može nadjačati bilo koju od njih za tok koji gledate.</p>',
+    'help_set_playback_a' => '<p><b>Postavke → Reprodukcija</b>, <b>Zvuk i titlovi</b> te <b>Video</b> određuju što se treba dogoditi bez da svaki put tražite:</p><ul><li>Željeni <b>jezik zvuka</b></li><li><b>Titlovi</b> uključeni ili ne, s prvim i drugim željenim jezikom</li><li>Zadani <b>omjer slike</b> i <b>mrežni međuspremnik</b></li><li>Koliko se rano pojavljuje kartica <b>«Sljedeća epizoda»</b> — isključeno, ili od jedne do deset minuta</li></ul><p>Izbornik ⚙ u reproduktoru i dalje može nadjačati bilo koju od njih za tok koji gledate.</p>',
     'help_set_parental_q' => 'Mogu li nešto zaključati od drugih?',
     'help_set_parental_a' => '<p>Možete. PIN štiti zaključane kategorije i zaključane skupine favorita. Zaključana skupina ne otkriva ni koji su kanali u njoj dok se PIN ne upiše — skriva sadržaj, a ne samo reprodukciju.</p><p>PIN se pohranjuje posoljen i raspršen, a ne kao čisti tekst.</p>',
     'help_set_hide_q' => 'Mogu li sakriti ili preimenovati kanale?',
@@ -283,7 +283,7 @@ return [
 sudo dnf install mpv ffmpeg     # Fedora
 sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_picture_q' => 'Zvuk se čuje, ali slike nema',
-    'help_fix_picture_a' => '<p>Ugrađeni reproduktor ne dobiva površinu za sliku.</p><ol><li>Otvorite <code>⚙ → Stats for nerds</code> i pogledajte stižu li sličice uopće — to razdvaja problem toka od problema prikaza.</li><li>Na Waylandu probajte <b>Postavke → Reprodukcija → Pokreni preko X11 pozadine</b> i ponovno pokrenite aplikaciju.</li><li>Pokrenite iz terminala i potražite retke koji spominju GL ili mpv.</li></ol>',
+    'help_fix_picture_a' => '<p>Ugrađeni reproduktor ne dobiva površinu za sliku.</p><ol><li>Otvorite <code>⚙ → Stats for nerds</code> i pogledajte stižu li sličice uopće — to razdvaja problem toka od problema prikaza.</li><li>Na Waylandu probajte <b>Postavke → Napredno → Pokreni putem X11 pozadine</b> i ponovno pokrenite aplikaciju.</li><li>Pokrenite iz terminala i potražite retke koji spominju GL ili mpv.</li></ol>',
     'help_fix_gatekeeper_q' => 'macOS kaže da se aplikacija ne može otvoriti',
     'help_fix_gatekeeper_a' => '<p>Još nije ovjerena kod Applea. Kliknite je desnom tipkom i odaberite <b>Open</b>, zatim <b>Open</b> u dijalogu — ili je dopustite u <b>System Settings → Privacy &amp; Security → Open Anyway</b>.</p><p>Ako macOS umjesto toga kaže da je aplikacija <b>«oštećena»</b>, to je oznaka karantene s preuzimanja. Uklonite je:</p><pre><code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code></pre><p>Nijedno od tih upozorenja ne znači da s aplikacijom nešto nije u redu — samo da izdanje nije potpisano, a za potpis treba plaćeni Appleov certifikat.</p>',
     'help_fix_smartscreen_q' => 'Windows javlja «Windows protected your PC»',
@@ -295,7 +295,7 @@ sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_limit_q' => '«Dosegnuto ograničenje veza»',
     'help_fix_limit_a' => '<p>Vaš račun dopušta određen broj istodobnih tokova i svi su zauzeti. Po vjerojatnosti:</p><ol><li>Multiview je otvoren — svaki okvir je jedna veza.</li><li>Traje snimanje <em>drugog</em> kanala.</li><li>Račun koristi drugi uređaj ili druga osoba.</li><li>Prethodna sesija još nije istekla kod davatelja usluge; minuta čekanja često pomogne.</li></ol><p>Snimanje kanala koji gledate <em>ne</em> broji se kao druga veza.</p>',
     'help_fix_icon_q' => 'Linux: programska traka prikazuje praznu ikonu',
-    'help_fix_icon_a' => '<p>Na Waylandu GNOME i KDE uzimaju ikonu prozora iz odgovarajućeg unosa radne površine i zanemaruju ono što program sam postavi. AppImage takav unos nema dok ga nešto ne instalira.</p><ol><li>Aplikacija pri prvom pokretanju nudi da ga doda. Pristanite — a zatim <b>ponovno pokrenite aplikaciju</b>, jer otvoreni prozor zadržava ikonu s kojom se otvorio.</li><li>Isti prekidač nalazi se u <b>Postavke → Reprodukcija</b> ako ste odbili.</li><li>Ako se ikona i dalje ne pojavljuje, zaklanja je zastarjela predmemorija ikona. GTK čita tu datoteku umjesto da pregleda mapu:</li></ol><pre><code>rm ~/.local/share/icons/hicolor/icon-theme.cache</code></pre><p>Kod instalacije iz <b>.deb</b> unos već postoji i ništa od ovoga ne vrijedi.</p>',
+    'help_fix_icon_a' => '<p>Na Waylandu GNOME i KDE uzimaju ikonu prozora iz odgovarajućeg unosa radne površine i zanemaruju ono što program sam postavi. AppImage takav unos nema dok ga nešto ne instalira.</p><ol><li>Aplikacija pri prvom pokretanju nudi da ga doda. Pristanite — a zatim <b>ponovno pokrenite aplikaciju</b>, jer otvoreni prozor zadržava ikonu s kojom se otvorio.</li><li>Isti prekidač nalazi se u <b>Postavke → Općenito</b> ako ste odbili.</li><li>Ako se ikona i dalje ne pojavljuje, zaklanja je zastarjela predmemorija ikona. GTK čita tu datoteku umjesto da pregleda mapu:</li></ol><pre><code>rm ~/.local/share/icons/hicolor/icon-theme.cache</code></pre><p>Kod instalacije iz <b>.deb</b> unos već postoji i ništa od ovoga ne vrijedi.</p>',
     'help_fix_external_q' => '«Otvori u vanjskom reproduktoru» ne čini ništa',
     'help_fix_external_a' => '<p>Ta mogućnost pokreće samostalan <code>mpv</code> ili <code>vlc</code> iz vašeg sustava, pa jedan od njih mora biti instaliran — ugrađenom reproduktoru ne treba ništa dodatno i ovo ga se ne tiče.</p><pre><code>sudo apt install mpv vlc        # Debian/Ubuntu
 sudo dnf install mpv vlc        # Fedora
@@ -304,4 +304,14 @@ sudo pacman -S mpv vlc          # Arch</code></pre>',
     'nf_h1'   => 'Ova stranica ne postoji',
     'nf_lede' => 'Poveznica je možda zastarjela ili pogrešno upisana. Krenite s naslovne stranice ili pogledajte pomoć.',
     'nf_home' => 'Na naslovnu stranicu',
+    // front page: hero button per OS, lightbox, the app mock-up
+    'hero_cta_os' => 'Preuzmi za %s',
+    'lb_close' => 'Zatvori',
+    'mock_live' => 'UŽIVO',
+    'mock_sport' => 'Sport',
+    'mock_cinema' => 'Kino',
+    'mock_nature' => 'Priroda',
+    'mock_kids' => 'Djeca',
+    'mock_news' => 'Večernje vijesti',
+    'mock_behind' => '− 12 min',
 ];

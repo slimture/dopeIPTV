@@ -28,7 +28,7 @@ return [
 
     // feature strip chips
     "chip_timeshift" => "타임시프트 / catch-up",
-    "chip_languages" => "26개 언어",
+    "chip_languages" => "27개 언어",
 
     // features
     "feat_eyebrow" => "모든 것을 한 화면에",
@@ -168,17 +168,17 @@ return [
     'help_hits'            => '결과: %n',
     'help_toc'             => '구역',
     'help_no_hits'         => '일치하는 항목이 없습니다. 더 짧은 낱말로 해보세요 — 검색은 입력한 낱말이 모두 같은 답 안에 있어야 합니다.',
-    'help_more'            => '여기에 없나요? <a href="https://github.com/slimture/dopeIPTV/issues" rel="nofollow">GitHub</a>에 이슈를 남겨 주세요. <b>설정 → 정보</b>의 버전을 적고 로그를 첨부하세요 — 위의 「로그는 어떻게 얻나요?」에 여러분 환경에 맞는 정확한 명령이 있습니다.',
+    'help_more'            => '여기에 없나요? <a href="https://github.com/slimture/dopeIPTV/issues" rel="nofollow">GitHub</a>에 이슈를 남겨 주세요. <b>dopeIPTV → dopeIPTV 정보</b>의 버전을 적고 로그를 첨부하세요 — 위의 「로그는 어떻게 얻나요?」에 여러분 환경에 맞는 정확한 명령이 있습니다.',
 
     // 설치와 초기 설정
     'help_start_title'     => '설치와 초기 설정',
     'help_start_linux_q' => '리눅스에는 어떻게 설치하나요?',
     'help_start_linux_a' => '<p>형식은 세 가지이고 모두 독립적입니다 — Python, Qt, libmpv, ffmpeg가 내려받은 파일 안에 들어 있어 옆에 따로 설치할 것이 없습니다.</p><p><b>AppImage</b> — 잘 모르겠다면 이걸 받으세요. 어떤 배포판에서도 실행됩니다:</p><pre><code>chmod +x dopeIPTV-*.AppImage
-./dopeIPTV-*.AppImage</code></pre><p>데비안이나 우분투에서는 <b>.deb</b>:</p><pre><code>sudo apt install ./dopeiptv_*_amd64.deb</code></pre><p><b>Flatpak</b>:</p><pre><code>flatpak install --user dopeIPTV-*.flatpak</code></pre><p>셋 다 arm64 빌드가 있어 라즈베리 파이나 ARM 서버에서도 쓸 수 있습니다.</p>',
+./dopeIPTV-*.AppImage</code></pre><p>데비안이나 우분투에서는 <b>.deb</b>:</p><pre><code>sudo apt install ./dopeiptv_*_amd64.deb</code></pre><p><b>Flatpak</b>:</p><pre><code>flatpak install --user dopeIPTV-*.flatpak</code></pre><p>AppImage와 .deb는 arm64 빌드도 있어 라즈베리 파이나 ARM 서버에서도 쓸 수 있습니다.</p>',
     'help_start_macos_q' => 'macOS에는 어떻게 설치하나요?',
     'help_start_macos_a' => '<p><code>.dmg</code>를 열고 dopeIPTV를 응용 프로그램 폴더로 끌어다 놓으세요. <b>macOS 15 이상</b>이 필요하고 Apple Silicon에서 동작합니다 — Intel 빌드가 있던 마지막 릴리스는 1.2.10입니다.</p><p>첫 실행은 거부됩니다. Apple의 공증을 받지 않았기 때문입니다. 앱을 오른쪽 클릭해 <b>열기</b>를 고르고, 대화상자에서 다시 <b>열기</b>를 누르세요. 그래도 안 되면 아래의 「macOS가 앱을 열 수 없다고 합니다」를 보세요.</p>',
     'help_start_windows_q' => '윈도우에는 어떻게 설치하나요?',
-    'help_start_windows_a' => '<p>설치 프로그램은 없습니다. <code>dopeIPTV-*-windows-x64.zip</code>을 원하는 곳에 풀고 — 사용자 폴더면 충분하고 관리자 권한도 필요 없습니다 — 안에 있는 <code>dopeiptv.exe</code>를 실행하세요.</p><p>스냅드래곤 노트북용 네이티브 <b>arm64</b> 빌드가 있습니다. x64 빌드도 거기서 돌지만 에뮬레이션을 거치므로 더 느립니다.</p><p>시작 메뉴나 바탕화면에 바로 가기를 만들려면: <b>설정 → 인터페이스 → 유지 관리 → 바로 가기 만들기</b>. 압축 파일 안의 <code>README.txt</code>에 흔적 없이 지우고 싶을 때 삭제할 것들이 모두 적혀 있습니다.</p>',
+    'help_start_windows_a' => '<p>설치 프로그램은 없습니다. <code>dopeIPTV-*-windows-x64.zip</code>을 원하는 곳에 풀고 — 사용자 폴더면 충분하고 관리자 권한도 필요 없습니다 — 안에 있는 <code>dopeiptv.exe</code>를 실행하세요.</p><p>스냅드래곤 노트북용 네이티브 <b>arm64</b> 빌드가 있습니다. x64 빌드도 거기서 돌지만 에뮬레이션을 거치므로 더 느립니다.</p><p>시작 메뉴나 바탕화면에 바로 가기를 만들려면: <b>설정 → 고급 → 바로 가기 만들기</b>. 압축 파일 안의 <code>README.txt</code>에 흔적 없이 지우고 싶을 때 삭제할 것들이 모두 적혀 있습니다.</p>',
     'help_start_playlist_q' => '제 사업자는 어떻게 연결하나요?',
     'help_start_playlist_a' => '<p>첫 실행 때 <b>Xtream Codes</b> 계정에서 세 가지를 묻습니다:</p><ul><li><b>서버</b> — 포트를 포함한 주소, 예를 들어 <code>http://example.com:8080</code>. 재생 목록 전체 주소가 아니라 호스트만입니다.</li><li><b>사용자 이름</b>과 <b>비밀번호</b> — 사업자가 준 것입니다.</li></ul><p>이 값들은 저장됩니다. 나중에 계정을 더 추가하거나 이걸 수정하려면 <b>설정 → 재생 목록</b>. 앱이 켜진 채로 재생 목록을 바꿀 수 있고, 즐겨찾기와 기록은 목록마다 따로 보관됩니다.</p>',
     'help_start_m3u_q' => '대신 M3U 재생 목록을 써도 되나요?',
@@ -212,7 +212,7 @@ return [
     'help_tv_xmltv_q' => '편성표가 틀렸거나, 비었거나, 다른 나라 것입니다',
     'help_tv_xmltv_a' => '<p>그 재생 목록에 사업자 것 대신 자체 편성표를 주세요:</p><ol><li><b>설정 → 재생 목록</b></li><li>목록을 골라 편집</li><li>사용자 편성표 칸에 <b>XMLTV</b> 주소를 넣기</li></ol><p>사업자가 보내는 것을 대체합니다. 앱은 먼저 EPG id로, 다음으로 채널 이름으로 채널을 그 편성표에 맞추므로, 다른 출처의 편성표도 보통은 잘 들어맞습니다.</p>',
     'help_tv_times_q' => '전부 한두 시간씩 어긋나 있습니다',
-    'help_tv_times_a' => '<p>실제 방송과 맞지 않는 시각을 내보내는 사업자가 있습니다. <b>설정 → 재생</b>에 서로 다른 보정이 두 개 있습니다:</p><ul><li><b>EPG 보정</b>은 편성표가 보여주는 모든 시각을 옮깁니다.</li><li><b>다시보기 보정</b>은 다시보기와 타임시프트가 재생을 시작하는 지점을 옮기며, 편성표 자체는 건드리지 않습니다.</li></ul><p>따로 둔 것은 사업자가 둘 중 하나만 틀리는 일이 있기 때문입니다.</p>',
+    'help_tv_times_a' => '<p>실제 방송과 맞지 않는 시각을 내보내는 사업자가 있습니다. <b>설정 → 가이드</b>에 서로 다른 보정이 두 개 있습니다:</p><ul><li><b>EPG 보정</b>은 편성표가 보여주는 모든 시각을 옮깁니다.</li><li><b>다시보기 보정</b>은 다시보기와 타임시프트가 재생을 시작하는 지점을 옮기며, 편성표 자체는 건드리지 않습니다.</li></ul><p>따로 둔 것은 사업자가 둘 중 하나만 틀리는 일이 있기 때문입니다.</p>',
     'help_tv_ts_q' => '타임시프트와 다시보기는 무엇인가요?',
     'help_tv_ts_a' => '<p>일부 사업자는 각 채널의 녹화를 며칠 치 보관합니다. 여러분의 사업자가 그렇게 하는 채널에는 목록에 <b>⏪</b> 표시가 붙고, 상세 패널에 보관본이 며칠까지 거슬러 가는지 나옵니다.</p><p>표시가 없다면 그 채널에는 보관본이 제공되지 않는 것입니다. 사업자 쪽 설정이라 앱에서 켤 수 있는 것은 없습니다.</p>',
     'help_tv_tsstart_q' => '이미 시작한 프로그램은 어떻게 보나요?',
@@ -243,7 +243,7 @@ return [
     'help_more_castfix_q' => 'TV가 특정 채널을 거부합니다',
     'help_more_castfix_a' => '<p>일부 채널은 평범한 H.264 영상에 <b>Dolby Digital Plus</b> 음성이 붙어 있습니다. Ultra도 Google TV도 아닌 Chromecast에는 그 디코더가 없어 이유도 말하지 않고 스트림을 거부합니다.</p><p>앱은 그런 경우에만 이 컴퓨터에서 변환해 결과를 여러분의 네트워크 안에 내놓습니다. 영상은 손대지 않고 그대로 복사하고 — 다시 인코딩하는 것은 음성뿐이라 부담이 적습니다 — 게다가 기기가 실제로 거부한 <em>뒤에야</em> 그렇게 합니다. 기기가 재생할 수 있는 채널은 언제나 사업자의 원본 스트림을 그대로 받습니다.</p><p>여기에는 <code>ffmpeg</code>가 필요한데, 패키지된 모든 내려받기에 들어 있습니다.</p>',
     'help_more_trakt_q' => 'Trakt는 어떻게 연결하나요?',
-    'help_more_trakt_a' => '<p><b>설정 → Trakt</b>. trakt.tv에서 애플리케이션을 만들고, 받은 키 두 개를 붙여 넣은 뒤, 열리는 브라우저에서 승인합니다.</p><p>그 뒤로 본 것이 기록되고, 볼 목록과 기록을 앱 안에서 훑어볼 수 있습니다. 내 로컬 파일도 TMDB가 파일을 알아본 경우에는 함께 기록됩니다.</p>',
+    'help_more_trakt_a' => '<p><b>설정 → Trakt → 브라우저를 통해 연결</b>. 브라우저에서 Trakt가 열리면 필요할 때 로그인하고 <b>Yes</b>를 누르면 연결됩니다. 키를 만들거나 코드를 입력할 필요가 없습니다.</p><p>그 뒤로 본 것이 기록되고, 볼 목록과 기록을 앱 안에서 훑어볼 수 있습니다. 내 로컬 파일도 TMDB가 파일을 알아본 경우에는 함께 기록됩니다.</p>',
 
     // 내 파일
     'help_local_title'     => '내 파일',
@@ -261,9 +261,9 @@ return [
     // 설정
     'help_set_title'       => '설정',
     'help_set_language_q' => '언어와 겉모습',
-    'help_set_language_a' => '<p><b>설정 → 인터페이스</b>. 인터페이스는 <b>27개 언어</b>로 번역되어 있고 다시 시작하지 않아도 즉시 바뀝니다. 아랍어, 페르시아어, 히브리어, 우르두어는 배치 전체를 좌우로 뒤집습니다.</p><p>같은 탭에 다섯 가지 색 테마와 일곱 가지 강조색이 있고, 그 자리에서 적용됩니다.</p>',
+    'help_set_language_a' => '<p><b>설정 → 일반</b>. 인터페이스는 <b>27개 언어</b>로 번역되어 있고 다시 시작하지 않아도 즉시 바뀝니다. 아랍어, 페르시아어, 히브리어, 우르두어는 배치 전체를 좌우로 뒤집습니다.</p><p><b>설정 → 모양</b>에 아홉 가지 색 테마와 일곱 가지 강조색이 있고, 그 자리에서 적용됩니다.</p>',
     'help_set_playback_q' => '모든 스트림에 적용되는 기본값',
-    'help_set_playback_a' => '<p><b>설정 → 재생</b>은 매번 시키지 않아도 일어나야 할 일을 정합니다:</p><ul><li>선호하는 <b>음성 언어</b></li><li><b>자막</b> 켬/끔, 그리고 1순위·2순위 선호 언어</li><li>기본 <b>화면 비율</b>과 <b>네트워크 버퍼</b></li><li><b>「다음 회차」</b> 카드를 얼마나 일찍 띄울지 — 끄거나, 1분에서 10분</li></ul><p>플레이어의 ⚙ 메뉴는 지금 보고 있는 스트림에 한해 이 값들을 여전히 덮어쓸 수 있습니다.</p>',
+    'help_set_playback_a' => '<p><b>설정 → 재생</b>, <b>오디오 및 자막</b>, <b>비디오</b>에서는 매번 시키지 않아도 일어나야 할 일을 정합니다:</p><ul><li>선호하는 <b>음성 언어</b></li><li><b>자막</b> 켬/끔, 그리고 1순위·2순위 선호 언어</li><li>기본 <b>화면 비율</b>과 <b>네트워크 버퍼</b></li><li><b>「다음 회차」</b> 카드를 얼마나 일찍 띄울지 — 끄거나, 1분에서 10분</li></ul><p>플레이어의 ⚙ 메뉴는 지금 보고 있는 스트림에 한해 이 값들을 여전히 덮어쓸 수 있습니다.</p>',
     'help_set_parental_q' => '다른 사람에게서 잠가 둘 수 있나요?',
     'help_set_parental_a' => '<p>있습니다. PIN이 잠긴 분류와 잠긴 즐겨찾기 묶음을 보호합니다. 잠긴 묶음은 PIN을 넣기 전에는 어떤 채널이 들었는지조차 보여주지 않습니다 — 재생만이 아니라 내용을 감춥니다.</p><p>PIN은 솔트를 넣어 해시한 형태로 저장되며, 평문으로 두지 않습니다.</p>',
     'help_set_hide_q' => '채널을 숨기거나 이름을 바꿀 수 있나요?',
@@ -282,7 +282,7 @@ return [
 sudo dnf install mpv ffmpeg     # Fedora
 sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_picture_q' => '소리는 나는데 화면이 없습니다',
-    'help_fix_picture_a' => '<p>내장 플레이어가 영상 표면을 얻지 못하고 있습니다.</p><ol><li><code>⚙ → Stats for nerds</code>를 열어 프레임이 들어오기는 하는지 보세요 — 스트림 문제와 표시 문제를 갈라 줍니다.</li><li>Wayland에서는 <b>설정 → 재생 → X11 백엔드로 실행</b>을 시도하고 앱을 다시 켜세요.</li><li>터미널에서 실행해 GL이나 mpv가 언급된 줄을 찾아보세요.</li></ol>',
+    'help_fix_picture_a' => '<p>내장 플레이어가 영상 표면을 얻지 못하고 있습니다.</p><ol><li><code>⚙ → Stats for nerds</code>를 열어 프레임이 들어오기는 하는지 보세요 — 스트림 문제와 표시 문제를 갈라 줍니다.</li><li>Wayland에서는 <b>설정 → 고급 → X11 백엔드로 실행</b>을 시도하고 앱을 다시 켜세요.</li><li>터미널에서 실행해 GL이나 mpv가 언급된 줄을 찾아보세요.</li></ol>',
     'help_fix_gatekeeper_q' => 'macOS가 앱을 열 수 없다고 합니다',
     'help_fix_gatekeeper_a' => '<p>아직 Apple의 공증을 받지 않았기 때문입니다. 앱을 오른쪽 클릭해 <b>열기</b>를 고르고 대화상자에서 다시 <b>열기</b>를 누르거나 — <b>시스템 설정 → 개인정보 보호 및 보안 → 그래도 열기</b>에서 허용하세요.</p><p>macOS가 대신 앱이 <b>「손상되었다」</b>고 한다면, 그것은 내려받을 때 붙은 격리 표시입니다. 지우세요:</p><pre><code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code></pre><p>두 경고 모두 앱에 문제가 있다는 뜻이 아닙니다 — 빌드에 서명이 없다는 뜻일 뿐이고, 서명에는 유료 Apple 인증서가 필요합니다.</p>',
     'help_fix_smartscreen_q' => '윈도우가 「Windows의 PC 보호」라고 합니다',
@@ -294,7 +294,7 @@ sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_limit_q' => '「연결 한도에 도달했습니다」',
     'help_fix_limit_a' => '<p>계정이 허용하는 동시 스트림 수가 모두 차 있습니다. 가능성이 높은 순서로:</p><ol><li>멀티뷰가 열려 있음 — 칸마다 연결 하나입니다.</li><li><em>다른</em> 채널의 녹화가 돌고 있음.</li><li>다른 기기나 다른 사람이 계정을 쓰고 있음.</li><li>이전 세션이 사업자 쪽에서 아직 끊기지 않음. 1분쯤 기다리면 풀리는 일이 많습니다.</li></ol><p>보고 있는 채널을 녹화하는 것은 두 번째 연결로 <em>세지 않습니다</em>.</p>',
     'help_fix_icon_q' => '리눅스: 작업 표시줄에 빈 아이콘이 보입니다',
-    'help_fix_icon_a' => '<p>Wayland에서 GNOME과 KDE는 창의 아이콘을 그에 맞는 데스크톱 항목에서 가져오고, 프로그램이 스스로 지정한 것은 무시합니다. AppImage에는 무언가가 만들어 주기 전까지 그런 항목이 없습니다.</p><ol><li>앱이 첫 실행 때 하나 만들자고 제안합니다. 받아들이고 — 그런 다음 <b>앱을 다시 시작</b>하세요. 열려 있는 창은 열릴 때의 아이콘을 그대로 유지하기 때문입니다.</li><li>거절했다면 같은 스위치가 <b>설정 → 재생</b>에 있습니다.</li><li>그래도 아이콘이 나오지 않으면 오래된 아이콘 캐시가 가리고 있는 것입니다. GTK는 폴더 대신 그 파일을 읽습니다:</li></ol><pre><code>rm ~/.local/share/icons/hicolor/icon-theme.cache</code></pre><p><b>.deb</b>로 설치했다면 항목이 이미 있으므로 여기 적은 것은 해당하지 않습니다.</p>',
+    'help_fix_icon_a' => '<p>Wayland에서 GNOME과 KDE는 창의 아이콘을 그에 맞는 데스크톱 항목에서 가져오고, 프로그램이 스스로 지정한 것은 무시합니다. AppImage에는 무언가가 만들어 주기 전까지 그런 항목이 없습니다.</p><ol><li>앱이 첫 실행 때 하나 만들자고 제안합니다. 받아들이고 — 그런 다음 <b>앱을 다시 시작</b>하세요. 열려 있는 창은 열릴 때의 아이콘을 그대로 유지하기 때문입니다.</li><li>거절했다면 같은 스위치가 <b>설정 → 일반</b>에 있습니다.</li><li>그래도 아이콘이 나오지 않으면 오래된 아이콘 캐시가 가리고 있는 것입니다. GTK는 폴더 대신 그 파일을 읽습니다:</li></ol><pre><code>rm ~/.local/share/icons/hicolor/icon-theme.cache</code></pre><p><b>.deb</b>로 설치했다면 항목이 이미 있으므로 여기 적은 것은 해당하지 않습니다.</p>',
     'help_fix_external_q' => '「외부 플레이어로 열기」가 아무 반응이 없습니다',
     'help_fix_external_a' => '<p>그 항목은 시스템의 독립 <code>mpv</code>나 <code>vlc</code>를 실행하므로 둘 중 하나가 설치되어 있어야 합니다 — 내장 플레이어는 추가로 필요한 것이 없고 이 일과 무관합니다.</p><pre><code>sudo apt install mpv vlc        # Debian/Ubuntu
 sudo dnf install mpv vlc        # Fedora
@@ -303,4 +303,14 @@ sudo pacman -S mpv vlc          # Arch</code></pre>',
     'nf_h1'   => '이 페이지는 존재하지 않습니다',
     'nf_lede' => '링크가 오래되었거나 잘못 입력되었을 수 있습니다. 첫 페이지에서 다시 시작하거나 도움말을 확인하세요.',
     'nf_home' => '첫 페이지로',
+    // front page: hero button per OS, lightbox, the app mock-up
+    'hero_cta_os' => '%s용 다운로드',
+    'lb_close' => '닫기',
+    'mock_live' => '라이브',
+    'mock_sport' => '스포츠',
+    'mock_cinema' => '시네마',
+    'mock_nature' => '자연',
+    'mock_kids' => '키즈',
+    'mock_news' => '저녁 뉴스',
+    'mock_behind' => '− 12분',
 ];

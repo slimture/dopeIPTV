@@ -29,7 +29,7 @@ return [
 
     // feature strip chips
     "chip_timeshift" => "Timeshift / catch-up",
-    "chip_languages" => "Lugha 26",
+    "chip_languages" => "Lugha 27",
 
     // features
     "feat_eyebrow" => "Kila kitu kwenye skrini moja",
@@ -169,17 +169,17 @@ return [
     'help_hits'            => 'Matokeo: %n',
     'help_toc'             => 'Sehemu',
     'help_no_hits'         => 'Hakuna kilichopatikana. Jaribu neno fupi zaidi — utafutaji unahitaji kila neno unaloandika lionekane ndani ya jibu lilelile.',
-    'help_more'            => 'Hakipo hapa? Fungua issue kwenye <a href="https://github.com/slimture/dopeIPTV/issues" rel="nofollow">GitHub</a>. Taja toleo lililo katika <b>Mipangilio → Kuhusu</b> na ambatisha kumbukumbu — jibu «Napataje kumbukumbu?» hapo juu linatoa amri kamili kwa mfumo wako.',
+    'help_more'            => 'Hakipo hapa? Fungua issue kwenye <a href="https://github.com/slimture/dopeIPTV/issues" rel="nofollow">GitHub</a>. Taja toleo lililo katika <b>dopeIPTV → Kuhusu dopeIPTV</b> na ambatisha kumbukumbu — jibu «Napataje kumbukumbu?» hapo juu linatoa amri kamili kwa mfumo wako.',
 
     // Kusakinisha na kusanidi
     'help_start_title'     => 'Kusakinisha na kusanidi',
     'help_start_linux_q' => 'Nasakinishaje kwenye Linux?',
     'help_start_linux_a' => '<p>Kuna miundo mitatu, na yote inajitosheleza — Python, Qt, libmpv na ffmpeg vimo ndani ya faili unayopakua, hivyo hakuna cha kusakinisha kando yake.</p><p><b>AppImage</b> — chukua hii kama huna uhakika. Inafanya kazi kwenye kila usambazaji:</p><pre><code>chmod +x dopeIPTV-*.AppImage
-./dopeIPTV-*.AppImage</code></pre><p><b>.deb</b> kwenye Debian au Ubuntu:</p><pre><code>sudo apt install ./dopeiptv_*_amd64.deb</code></pre><p><b>Flatpak</b>:</p><pre><code>flatpak install --user dopeIPTV-*.flatpak</code></pre><p>Yote matatu yana matoleo ya arm64, kwa Raspberry Pi au seva ya ARM.</p>',
+./dopeIPTV-*.AppImage</code></pre><p><b>.deb</b> kwenye Debian au Ubuntu:</p><pre><code>sudo apt install ./dopeiptv_*_amd64.deb</code></pre><p><b>Flatpak</b>:</p><pre><code>flatpak install --user dopeIPTV-*.flatpak</code></pre><p>AppImage na .deb pia yana matoleo ya arm64, kwa Raspberry Pi au seva ya ARM.</p>',
     'help_start_macos_q' => 'Nasakinishaje kwenye macOS?',
     'help_start_macos_a' => '<p>Fungua faili ya <code>.dmg</code> kisha buruta dopeIPTV hadi Applications. Inahitaji <b>macOS 15 au mpya zaidi</b> na programu hufanya kazi kwenye Apple Silicon — 1.2.10 lilikuwa toleo la mwisho lenye jenzi la Intel.</p><p>Kuifungua mara ya kwanza kunakataliwa kwa sababu programu haijathibitishwa na Apple. Bonyeza kulia juu yake uchague <b>Open</b>, kisha <b>Open</b> tena kwenye kidirisha. Kama hilo halikutosha, angalia «macOS inasema programu haiwezi kufunguliwa» hapa chini.</p>',
     'help_start_windows_q' => 'Nasakinishaje kwenye Windows?',
-    'help_start_windows_a' => '<p>Hakuna kisakinishi. Fungua <code>dopeIPTV-*-windows-x64.zip</code> mahali popote unapotaka — folda yako ya mtumiaji inatosha, hakuna haja ya haki za msimamizi — kisha endesha <code>dopeiptv.exe</code> iliyomo ndani.</p><p>Kuna jenzi asilia la <b>arm64</b> kwa kompyuta za Snapdragon; jenzi la x64 nalo hufanya kazi hapo, ila kwa kuigwa hivyo ni polepole zaidi.</p><p>Kwa njia ya mkato kwenye menyu ya Start au eneo-kazi: <b>Mipangilio → Kiolesura → Matengenezo → Tengeneza njia ya mkato</b>. Faili ya <code>README.txt</code> ndani ya zip inaorodhesha kila kitu cha kufuta kama unataka programu iondoke bila kuacha alama.</p>',
+    'help_start_windows_a' => '<p>Hakuna kisakinishi. Fungua <code>dopeIPTV-*-windows-x64.zip</code> mahali popote unapotaka — folda yako ya mtumiaji inatosha, hakuna haja ya haki za msimamizi — kisha endesha <code>dopeiptv.exe</code> iliyomo ndani.</p><p>Kuna jenzi asilia la <b>arm64</b> kwa kompyuta za Snapdragon; jenzi la x64 nalo hufanya kazi hapo, ila kwa kuigwa hivyo ni polepole zaidi.</p><p>Kwa njia ya mkato kwenye menyu ya Start au eneo-kazi: <b>Mipangilio → Mahiri → Unda njia ya mkato</b>. Faili ya <code>README.txt</code> ndani ya zip inaorodhesha kila kitu cha kufuta kama unataka programu iondoke bila kuacha alama.</p>',
     'help_start_playlist_q' => 'Naunganishaje mtoa huduma wangu?',
     'help_start_playlist_a' => '<p>Unapoifungua mara ya kwanza, unaulizwa vitu vitatu kutoka kwenye akaunti yako ya <b>Xtream Codes</b>:</p><ul><li><b>Seva</b> — anwani pamoja na mlango, kwa mfano <code>http://example.com:8080</code>. Si anwani kamili ya orodha ya kucheza, ni mwenyeji tu.</li><li><b>Jina la mtumiaji</b> na <b>Nenosiri</b> — yale uliyopewa na mtoa huduma.</li></ul><p>Vinahifadhiwa. Ili kuongeza akaunti nyingine baadaye, au kuhariri hii: <b>Mipangilio → Orodha za kucheza</b>. Unaweza kubadilisha orodha wakati programu inaendelea, na vipendwa pamoja na historia huhifadhiwa kando kwa kila orodha.</p>',
     'help_start_m3u_q' => 'Naweza kutumia orodha ya M3U badala yake?',
@@ -213,7 +213,7 @@ return [
     'help_tv_xmltv_q' => 'Mwongozo si sahihi, ni tupu, au ni wa nchi nyingine',
     'help_tv_xmltv_a' => '<p>Ipe orodha hiyo mwongozo wake badala ya ule wa mtoa huduma:</p><ol><li><b>Mipangilio → Orodha za kucheza</b></li><li>Chagua orodha kisha ihariri</li><li>Weka anwani ya <b>XMLTV</b> kwenye sehemu ya mwongozo wa kujichagulia</li></ol><p>Huchukua nafasi ya kile mtoa huduma anachotuma. Programu hulinganisha chaneli zako na mwongozo huo kwa kitambulisho cha EPG kwanza kisha kwa jina la chaneli, hivyo hata mwongozo kutoka chanzo kingine mara nyingi hupatana.</p>',
     'help_tv_times_q' => 'Kila kitu kimehama kwa saa moja au mbili',
-    'help_tv_times_a' => '<p>Baadhi ya watoa huduma huchapisha nyakati zisizolingana na wanachorusha kweli. Kuna marekebisho mawili tofauti katika <b>Mipangilio → Uchezaji</b>:</p><ul><li><b>Uhamisho wa EPG</b> husogeza kila saa inayoonyeshwa na mwongozo.</li><li><b>Uhamisho wa kurudia</b> husogeza mahali ambapo kumbukumbu na timeshift huanzia kucheza, bila kugusa ratiba yenyewe.</li></ul><p>Yamewekwa tofauti kwa sababu watoa huduma hukosea kimoja bila kutegemea kingine.</p>',
+    'help_tv_times_a' => '<p>Baadhi ya watoa huduma huchapisha nyakati zisizolingana na wanachorusha kweli. Kuna marekebisho mawili tofauti katika <b>Mipangilio → Mwongozo</b>:</p><ul><li><b>Uhamisho wa EPG</b> husogeza kila saa inayoonyeshwa na mwongozo.</li><li><b>Uhamisho wa kurudia</b> husogeza mahali ambapo kumbukumbu na timeshift huanzia kucheza, bila kugusa ratiba yenyewe.</li></ul><p>Yamewekwa tofauti kwa sababu watoa huduma hukosea kimoja bila kutegemea kingine.</p>',
     'help_tv_ts_q' => 'Timeshift na kumbukumbu ni nini?',
     'help_tv_ts_a' => '<p>Baadhi ya watoa huduma huhifadhi rekodi ya kila chaneli kwa siku chache. Pale mtoa huduma wako anapofanya hivyo, chaneli hupata alama ya <b>⏪</b> kwenye orodha, na kidirisha cha maelezo husema kumbukumbu inarudi nyuma siku ngapi.</p><p>Chaneli isipokuwa na alama, mtoa huduma hatoi kumbukumbu kwa chaneli hiyo. Hiyo ni mipangilio yake na hakuna kitu ndani ya programu kinachoweza kuiwasha.</p>',
     'help_tv_tsstart_q' => 'Natazamaje kitu kilichokwisha anza?',
@@ -244,7 +244,7 @@ return [
     'help_more_castfix_q' => 'Televisheni inakataa chaneli fulani',
     'help_more_castfix_a' => '<p>Baadhi ya chaneli ni video ya kawaida ya H.264 yenye sauti ya <b>Dolby Digital Plus</b>. Chromecast isiyokuwa Ultra wala Google TV haina kisimbuaji cha hiyo na hukataa mtiririko bila kusema kwa nini.</p><p>Programu hubadilisha visa hivyo kwenye kompyuta hii kisha hutoa matokeo kwenye mtandao wako mwenyewe: video hunakiliwa ikiwa haijaguswa — sauti pekee ndiyo husimbwa upya, jambo lisilo na gharama kubwa — na hilo hutokea tu <em>baada</em> ya kifaa kuwa kimekataa mtiririko kweli. Chaneli ambayo kifaa chako kinaweza kucheza daima hupata mtiririko halisi wa mtoa huduma, bila kubadilishwa.</p><p>Hii inahitaji <code>ffmpeg</code>, ambayo ipo ndani ya kila upakuaji uliofungashwa.</p>',
     'help_more_trakt_q' => 'Naunganishaje Trakt?',
-    'help_more_trakt_a' => '<p><b>Mipangilio → Trakt</b>. Unatengeneza programu kwenye trakt.tv, unabandika funguo mbili unazopewa, kisha unaidhinisha kwenye kivinjari kinachofunguka.</p><p>Baada ya hapo unachotazama huandikwa, na orodha yako ya kutazama pamoja na historia zinaweza kupitiwa ndani ya programu. Faili zako za ndani nazo huandikwa, pale TMDB ilipoweza kuitambua faili.</p>',
+    'help_more_trakt_a' => '<p><b>Mipangilio → Trakt → Unganisha kupitia kivinjari</b>. Kivinjari kinafungua Trakt: ingia ikihitajika, bofya <b>Yes</b>, na programu imeunganishwa. Hakuna funguo za kutengeneza wala misimbo ya kuandika.</p><p>Baada ya hapo unachotazama huandikwa, na orodha yako ya kutazama pamoja na historia zinaweza kupitiwa ndani ya programu. Faili zako za ndani nazo huandikwa, pale TMDB ilipoweza kuitambua faili.</p>',
 
     // Faili zako mwenyewe
     'help_local_title'     => 'Faili zako mwenyewe',
@@ -262,9 +262,9 @@ return [
     // Mipangilio
     'help_set_title'       => 'Mipangilio',
     'help_set_language_q' => 'Lugha na muonekano',
-    'help_set_language_a' => '<p><b>Mipangilio → Kiolesura</b>. Kiolesura kimetafsiriwa katika <b>lugha 27</b> na hubadilika papo hapo, bila kuanzisha upya. Kiarabu, Kiajemi, Kiebrania na Kiurdu hugeuza mpangilio mzima.</p><p>Kichupo hichohicho kina mandhari tano za rangi na rangi saba za msisitizo, zinazotumika papo hapo.</p>',
+    'help_set_language_a' => '<p><b>Mipangilio → Jumla</b>. Kiolesura kimetafsiriwa katika <b>lugha 27</b> na hubadilika papo hapo, bila kuanzisha upya. Kiarabu, Kiajemi, Kiebrania na Kiurdu hugeuza mpangilio mzima.</p><p><b>Mipangilio → Mwonekano</b> kina mandhari tisa za rangi na rangi saba za msisitizo, zinazotumika papo hapo.</p>',
     'help_set_playback_q' => 'Chaguo-msingi kwa mitiririko yote',
-    'help_set_playback_a' => '<p><b>Mipangilio → Uchezaji</b> huamua kitakachotokea bila wewe kuomba kila mara:</p><ul><li><b>Lugha ya sauti</b> unayopendelea</li><li><b>Manukuu</b> yakiwa yamewashwa au la, pamoja na lugha ya kwanza na ya pili unayopendelea</li><li><b>Uwiano wa picha</b> na <b>akiba ya mtandao</b> ya chaguo-msingi</li><li>Kadi ya <b>«Kipindi kinachofuata»</b> ionekane mapema kiasi gani — imezimwa, au dakika moja hadi kumi</li></ul><p>Menyu ya ⚙ kwenye kicheza bado inaweza kupindua lolote kati ya hayo kwa mtiririko unaotazama.</p>',
+    'help_set_playback_a' => '<p><b>Mipangilio → Uchezaji</b>, <b>Sauti na manukuu</b> na <b>Video</b> huamua kitakachotokea bila wewe kuomba kila mara:</p><ul><li><b>Lugha ya sauti</b> unayopendelea</li><li><b>Manukuu</b> yakiwa yamewashwa au la, pamoja na lugha ya kwanza na ya pili unayopendelea</li><li><b>Uwiano wa picha</b> na <b>akiba ya mtandao</b> ya chaguo-msingi</li><li>Kadi ya <b>«Kipindi kinachofuata»</b> ionekane mapema kiasi gani — imezimwa, au dakika moja hadi kumi</li></ul><p>Menyu ya ⚙ kwenye kicheza bado inaweza kupindua lolote kati ya hayo kwa mtiririko unaotazama.</p>',
     'help_set_parental_q' => 'Naweza kufunga vitu visifikiwe na wengine?',
     'help_set_parental_a' => '<p>Unaweza. PIN hulinda makundi yaliyofungwa na makundi ya vipendwa yaliyofungwa. Kundi lililofungwa halionyeshi hata chaneli zilizomo hadi PIN iingizwe — hufunika maudhui, si uchezaji peke yake.</p><p>PIN huhifadhiwa ikiwa imetiwa chumvi na kuchakatwa kwa hashi, si kama maandishi wazi.</p>',
     'help_set_hide_q' => 'Naweza kuficha au kubadilisha majina ya chaneli?',
@@ -283,7 +283,7 @@ return [
 sudo dnf install mpv ffmpeg     # Fedora
 sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_picture_q' => 'Sauti inasikika lakini hakuna picha',
-    'help_fix_picture_a' => '<p>Kicheza kilichojengwa ndani hakipati uso wa kuonyesha video.</p><ol><li>Fungua <code>⚙ → Stats for nerds</code> uone kama fremu zinawasili kabisa — hilo hutenganisha tatizo la mtiririko na tatizo la kuonyesha.</li><li>Kwenye Wayland, jaribu <b>Mipangilio → Uchezaji → Endesha kupitia backend ya X11</b> kisha anzisha programu upya.</li><li>Endesha kutoka kwenye terminal kisha tafuta mistari inayotaja GL au mpv.</li></ol>',
+    'help_fix_picture_a' => '<p>Kicheza kilichojengwa ndani hakipati uso wa kuonyesha video.</p><ol><li>Fungua <code>⚙ → Stats for nerds</code> uone kama fremu zinawasili kabisa — hilo hutenganisha tatizo la mtiririko na tatizo la kuonyesha.</li><li>Kwenye Wayland, jaribu <b>Mipangilio → Mahiri → Endesha kupitia mfumo-nyuma wa X11</b> kisha anzisha programu upya.</li><li>Endesha kutoka kwenye terminal kisha tafuta mistari inayotaja GL au mpv.</li></ol>',
     'help_fix_gatekeeper_q' => 'macOS inasema programu haiwezi kufunguliwa',
     'help_fix_gatekeeper_a' => '<p>Bado haijathibitishwa na Apple. Bonyeza kulia juu yake uchague <b>Open</b>, kisha <b>Open</b> kwenye kidirisha — au iruhusu katika <b>System Settings → Privacy &amp; Security → Open Anyway</b>.</p><p>Kama macOS badala yake inasema programu <b>«imeharibika»</b>, hiyo ni alama ya karantini iliyowekwa wakati wa kupakua. Iondoe:</p><pre><code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code></pre><p>Hakuna kati ya maonyo hayo mawili linalomaanisha kuna tatizo na programu — ni kwamba tu jenzi halijatiwa saini, na saini inahitaji cheti cha Apple kinacholipiwa.</p>',
     'help_fix_smartscreen_q' => 'Windows inasema «Windows protected your PC»',
@@ -295,7 +295,7 @@ sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_limit_q' => '«Kikomo cha miunganisho kimefikiwa»',
     'help_fix_limit_a' => '<p>Akaunti yako huruhusu idadi fulani ya mitiririko kwa wakati mmoja na yote imetumika. Kwa mpangilio wa uwezekano:</p><ol><li>Mtazamo wa wingi umefunguliwa — kila kisanduku ni muunganisho mmoja.</li><li>Kuna kurekodi kwa chaneli <em>nyingine</em> kunakoendelea.</li><li>Kifaa kingine au mtu mwingine anatumia akaunti.</li><li>Kipindi cha awali bado hakijaisha kwa mtoa huduma; kusubiri dakika moja mara nyingi hutosha.</li></ol><p>Kurekodi chaneli unayotazama <em>hakuhesabiwi</em> kama muunganisho wa pili.</p>',
     'help_fix_icon_q' => 'Linux: upau wa kazi unaonyesha aikoni tupu',
-    'help_fix_icon_a' => '<p>Kwenye Wayland, GNOME na KDE huchukua aikoni ya dirisha kutoka kiingizio cha eneo-kazi kinacholingana nalo na hupuuza kile programu inachojiwekea. AppImage haina kiingizio cha aina hiyo hadi kitu fulani kikisakinishe.</p><ol><li>Programu hupendekeza kuongeza kimoja unapoifungua mara ya kwanza. Kubali — kisha <b>anzisha programu upya</b>, kwa sababu dirisha lililo wazi hubaki na aikoni lililofunguliwa nayo.</li><li>Kibadilishi hichohicho kipo katika <b>Mipangilio → Uchezaji</b> kama ulikataa.</li><li>Kama aikoni bado haionekani, akiba kuukuu ya aikoni inaifunika. GTK husoma faili hiyo badala ya kupitia folda:</li></ol><pre><code>rm ~/.local/share/icons/hicolor/icon-theme.cache</code></pre><p>Ukisakinisha kutoka <b>.deb</b>, kiingizio kipo tayari na hakuna kati ya haya kinachohusika.</p>',
+    'help_fix_icon_a' => '<p>Kwenye Wayland, GNOME na KDE huchukua aikoni ya dirisha kutoka kiingizio cha eneo-kazi kinacholingana nalo na hupuuza kile programu inachojiwekea. AppImage haina kiingizio cha aina hiyo hadi kitu fulani kikisakinishe.</p><ol><li>Programu hupendekeza kuongeza kimoja unapoifungua mara ya kwanza. Kubali — kisha <b>anzisha programu upya</b>, kwa sababu dirisha lililo wazi hubaki na aikoni lililofunguliwa nayo.</li><li>Kibadilishi hichohicho kipo katika <b>Mipangilio → Jumla</b> kama ulikataa.</li><li>Kama aikoni bado haionekani, akiba kuukuu ya aikoni inaifunika. GTK husoma faili hiyo badala ya kupitia folda:</li></ol><pre><code>rm ~/.local/share/icons/hicolor/icon-theme.cache</code></pre><p>Ukisakinisha kutoka <b>.deb</b>, kiingizio kipo tayari na hakuna kati ya haya kinachohusika.</p>',
     'help_fix_external_q' => '«Fungua kwenye kicheza cha nje» haifanyi kitu',
     'help_fix_external_a' => '<p>Chaguo hilo huanzisha <code>mpv</code> au <code>vlc</code> inayojitegemea kutoka kwenye mfumo wako, hivyo mojawapo lazima iwe imesakinishwa — kicheza kilichojengwa ndani hakihitaji chochote zaidi na hakiathiriwi.</p><pre><code>sudo apt install mpv vlc        # Debian/Ubuntu
 sudo dnf install mpv vlc        # Fedora
@@ -304,4 +304,14 @@ sudo pacman -S mpv vlc          # Arch</code></pre>',
     'nf_h1'   => 'Ukurasa huu haupo',
     'nf_lede' => 'Huenda kiungo kimepitwa na wakati au kimeandikwa vibaya. Anza tena kwenye ukurasa wa mwanzo, au angalia msaada.',
     'nf_home' => 'Nenda ukurasa wa mwanzo',
+    // front page: hero button per OS, lightbox, the app mock-up
+    'hero_cta_os' => 'Pakua kwa %s',
+    'lb_close' => 'Funga',
+    'mock_live' => 'MUBASHARA',
+    'mock_sport' => 'Michezo',
+    'mock_cinema' => 'Sinema',
+    'mock_nature' => 'Mazingira',
+    'mock_kids' => 'Watoto',
+    'mock_news' => 'Habari za Jioni',
+    'mock_behind' => '− dakika 12',
 ];

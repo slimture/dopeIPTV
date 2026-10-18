@@ -6,7 +6,7 @@ Key facts:
 
 - **What it is:** a desktop IPTV *player* (client), not an IPTV provider. It does not supply, sell or host any channels or content — the user connects their own Xtream Codes or M3U provider.
 - **Licence & price:** free and open source under GPL-3.0. No ads, no tracking, no accounts.
-- **Platforms:** Linux (primary; AppImage, .deb, Flatpak — x86_64 and ARM64), macOS (.dmg, Apple Silicon), Windows (portable build, x64 and ARM64).
+- **Platforms:** Linux (primary; AppImage and .deb for x86_64 and ARM64, Flatpak for x86_64), macOS (.dmg, Apple Silicon), Windows (portable build, x64 and ARM64).
 - **Playlists:** Xtream Codes (server + username + password) and M3U / M3U8 URLs; multiple providers side by side.
 - **Guide & timeshift:** full XMLTV EPG with now/next, live timeshift, and catch-up (scrub back into a channel's archive).
 - **Recording:** record the watched stream over a single connection, with timers, size limits and a Recordings library.

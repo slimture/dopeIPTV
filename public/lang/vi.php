@@ -28,7 +28,7 @@ return [
 
     // feature strip chips
     "chip_timeshift" => "Timeshift / xem lại",
-    "chip_languages" => "26 ngôn ngữ",
+    "chip_languages" => "27 ngôn ngữ",
 
     // features
     "feat_eyebrow" => "Mọi thứ trên một màn hình",
@@ -168,17 +168,17 @@ return [
     'help_hits'            => 'Kết quả: %n',
     'help_toc'             => 'Mục',
     'help_no_hits'         => 'Không có kết quả. Thử một từ ngắn hơn — tìm kiếm đòi mọi từ bạn gõ đều phải có trong cùng một câu trả lời.',
-    'help_more'            => 'Không có ở đây? Hãy mở một issue trên <a href="https://github.com/slimture/dopeIPTV/issues" rel="nofollow">GitHub</a>. Ghi phiên bản trong <b>Cài đặt → Giới thiệu</b> và đính kèm nhật ký — câu trả lời «Lấy nhật ký bằng cách nào?» ở trên có lệnh chính xác cho hệ thống của bạn.',
+    'help_more'            => 'Không có ở đây? Hãy mở một issue trên <a href="https://github.com/slimture/dopeIPTV/issues" rel="nofollow">GitHub</a>. Ghi phiên bản trong <b>dopeIPTV → Giới thiệu dopeIPTV</b> và đính kèm nhật ký — câu trả lời «Lấy nhật ký bằng cách nào?» ở trên có lệnh chính xác cho hệ thống của bạn.',
 
     // Cài đặt và thiết lập
     'help_start_title'     => 'Cài đặt và thiết lập',
     'help_start_linux_q' => 'Cài trên Linux thế nào?',
     'help_start_linux_a' => '<p>Có ba dạng, cả ba đều tự chứa — Python, Qt, libmpv và ffmpeg nằm sẵn bên trong bản tải về, nên không phải cài gì thêm bên cạnh.</p><p><b>AppImage</b> — nếu chưa chắc thì lấy bản này. Nó chạy trên mọi bản phân phối:</p><pre><code>chmod +x dopeIPTV-*.AppImage
-./dopeIPTV-*.AppImage</code></pre><p><b>.deb</b> trên Debian hoặc Ubuntu:</p><pre><code>sudo apt install ./dopeiptv_*_amd64.deb</code></pre><p><b>Flatpak</b>:</p><pre><code>flatpak install --user dopeIPTV-*.flatpak</code></pre><p>Cả ba đều có bản arm64, dùng cho Raspberry Pi hay máy chủ ARM.</p>',
+./dopeIPTV-*.AppImage</code></pre><p><b>.deb</b> trên Debian hoặc Ubuntu:</p><pre><code>sudo apt install ./dopeiptv_*_amd64.deb</code></pre><p><b>Flatpak</b>:</p><pre><code>flatpak install --user dopeIPTV-*.flatpak</code></pre><p>AppImage và .deb cũng có bản arm64, dùng cho Raspberry Pi hay máy chủ ARM.</p>',
     'help_start_macos_q' => 'Cài trên macOS thế nào?',
     'help_start_macos_a' => '<p>Mở tệp <code>.dmg</code> rồi kéo dopeIPTV vào Applications. Cần <b>macOS 15 trở lên</b> và ứng dụng chạy trên Apple Silicon — 1.2.10 là bản cuối cùng còn kèm bản dựng cho Intel.</p><p>Lần chạy đầu bị từ chối vì ứng dụng chưa được Apple công chứng. Nhấn chuột phải vào ứng dụng chọn <b>Open</b>, rồi bấm <b>Open</b> lần nữa trong hộp thoại. Nếu vẫn không xong, xem «macOS nói không mở được ứng dụng» ở dưới.</p>',
     'help_start_windows_q' => 'Cài trên Windows thế nào?',
-    'help_start_windows_a' => '<p>Không có trình cài đặt. Giải nén <code>dopeIPTV-*-windows-x64.zip</code> vào đâu tùy bạn — thư mục người dùng là đủ, không cần quyền quản trị — rồi chạy <code>dopeiptv.exe</code> bên trong.</p><p>Có bản <b>arm64</b> gốc cho laptop Snapdragon; bản x64 cũng chạy được ở đó, nhưng qua giả lập nên chậm hơn.</p><p>Muốn có lối tắt ở menu Start hay màn hình nền: <b>Cài đặt → Giao diện → Bảo trì → Tạo lối tắt</b>. Tệp <code>README.txt</code> trong gói nén liệt kê mọi thứ cần xóa nếu bạn muốn gỡ ứng dụng mà không để lại dấu vết.</p>',
+    'help_start_windows_a' => '<p>Không có trình cài đặt. Giải nén <code>dopeIPTV-*-windows-x64.zip</code> vào đâu tùy bạn — thư mục người dùng là đủ, không cần quyền quản trị — rồi chạy <code>dopeiptv.exe</code> bên trong.</p><p>Có bản <b>arm64</b> gốc cho laptop Snapdragon; bản x64 cũng chạy được ở đó, nhưng qua giả lập nên chậm hơn.</p><p>Muốn có lối tắt ở menu Start hay màn hình nền: <b>Cài đặt → Nâng cao → Tạo lối tắt</b>. Tệp <code>README.txt</code> trong gói nén liệt kê mọi thứ cần xóa nếu bạn muốn gỡ ứng dụng mà không để lại dấu vết.</p>',
     'help_start_playlist_q' => 'Kết nối nhà cung cấp của tôi thế nào?',
     'help_start_playlist_a' => '<p>Ở lần chạy đầu, ứng dụng hỏi ba thứ từ tài khoản <b>Xtream Codes</b> của bạn:</p><ul><li><b>Máy chủ</b> — địa chỉ kèm cổng, kiểu <code>http://example.com:8080</code>. Không phải đường dẫn danh sách phát đầy đủ, chỉ phần máy chủ.</li><li><b>Tên đăng nhập</b> và <b>Mật khẩu</b> — do nhà cung cấp cấp cho bạn.</li></ul><p>Chúng được lưu lại. Muốn thêm tài khoản khác sau này hoặc sửa cái này: <b>Cài đặt → Danh sách phát</b>. Bạn có thể đổi danh sách phát khi ứng dụng đang chạy, và mục ưa thích cùng lịch sử được giữ riêng cho từng danh sách.</p>',
     'help_start_m3u_q' => 'Dùng danh sách M3U thay thế được không?',
@@ -212,7 +212,7 @@ return [
     'help_tv_xmltv_q' => 'Lịch phát sai, trống, hoặc của nước khác',
     'help_tv_xmltv_a' => '<p>Hãy cho danh sách đó một lịch phát riêng thay cho lịch của nhà cung cấp:</p><ol><li><b>Cài đặt → Danh sách phát</b></li><li>Chọn danh sách rồi sửa</li><li>Điền một địa chỉ <b>XMLTV</b> vào ô lịch phát tùy chỉnh</li></ol><p>Nó thay cho thứ nhà cung cấp gửi tới. Ứng dụng ghép kênh của bạn với lịch đó theo mã EPG trước, theo tên kênh sau, nên lịch từ một nguồn khác thường vẫn khớp.</p>',
     'help_tv_times_q' => 'Mọi thứ lệch một hai tiếng',
-    'help_tv_times_a' => '<p>Một số nhà cung cấp công bố giờ không khớp với thứ họ phát thật. Có hai chỉnh sửa tách biệt trong <b>Cài đặt → Phát lại</b>:</p><ul><li><b>Độ lệch EPG</b> dịch mọi mốc giờ mà lịch phát hiển thị.</li><li><b>Độ lệch phát lại</b> dịch chỗ mà nội dung xem lại và timeshift bắt đầu phát, không đụng tới lịch.</li></ul><p>Chúng tách nhau vì các nhà cung cấp sai ở cái này độc lập với cái kia.</p>',
+    'help_tv_times_a' => '<p>Một số nhà cung cấp công bố giờ không khớp với thứ họ phát thật. Có hai chỉnh sửa tách biệt trong <b>Cài đặt → Lịch phát</b>:</p><ul><li><b>Độ lệch EPG</b> dịch mọi mốc giờ mà lịch phát hiển thị.</li><li><b>Độ lệch phát lại</b> dịch chỗ mà nội dung xem lại và timeshift bắt đầu phát, không đụng tới lịch.</li></ul><p>Chúng tách nhau vì các nhà cung cấp sai ở cái này độc lập với cái kia.</p>',
     'help_tv_ts_q' => 'Timeshift và xem lại là gì?',
     'help_tv_ts_a' => '<p>Một số nhà cung cấp giữ bản ghi vài ngày cho mỗi kênh. Ở đâu nhà cung cấp của bạn làm vậy, kênh sẽ có dấu <b>⏪</b> trong danh sách, và bảng chi tiết cho biết kho lưu sâu bao nhiêu ngày.</p><p>Kênh nào không có dấu thì nhà cung cấp không cấp kho lưu cho kênh đó. Đó là thiết lập bên họ và không gì trong ứng dụng bật lên được.</p>',
     'help_tv_tsstart_q' => 'Xem thứ đã bắt đầu rồi thế nào?',
@@ -243,7 +243,7 @@ return [
     'help_more_castfix_q' => 'TV từ chối một kênh',
     'help_more_castfix_a' => '<p>Có những kênh là video H.264 bình thường nhưng tiếng lại là <b>Dolby Digital Plus</b>. Chromecast không phải Ultra cũng không phải Google TV thì không có bộ giải mã cho thứ đó và từ chối luồng mà không nói vì sao.</p><p>Ứng dụng chuyển đổi những trường hợp ấy ngay trên máy này rồi phục vụ kết quả trong mạng của chính bạn: phần hình được chép qua nguyên vẹn — chỉ mã hóa lại phần tiếng, việc này nhẹ — và chỉ xảy ra <em>sau khi</em> thiết bị thực sự từ chối luồng. Kênh nào thiết bị của bạn phát được thì luôn nhận luồng gốc của nhà cung cấp, không đụng chạm.</p><p>Việc này cần <code>ffmpeg</code>, và nó nằm sẵn trong mọi bản tải đã đóng gói.</p>',
     'help_more_trakt_q' => 'Kết nối Trakt thế nào?',
-    'help_more_trakt_a' => '<p><b>Cài đặt → Trakt</b>. Bạn tạo một ứng dụng trên trakt.tv, dán hai khóa nó cấp, rồi cấp quyền trong trình duyệt vừa mở ra.</p><p>Sau đó thứ bạn xem sẽ được ghi nhận, còn danh sách chờ xem và lịch sử thì duyệt được ngay trong ứng dụng. Tệp cục bộ của bạn cũng được ghi nhận, mỗi khi TMDB nhận diện được tệp.</p>',
+    'help_more_trakt_a' => '<p><b>Cài đặt → Trakt → Kết nối qua trình duyệt</b>. Trình duyệt mở Trakt: đăng nhập nếu cần, bấm <b>Yes</b> là ứng dụng đã được kết nối. Không cần tạo khóa hay nhập mã nào.</p><p>Sau đó thứ bạn xem sẽ được ghi nhận, còn danh sách chờ xem và lịch sử thì duyệt được ngay trong ứng dụng. Tệp cục bộ của bạn cũng được ghi nhận, mỗi khi TMDB nhận diện được tệp.</p>',
 
     // Tệp của bạn
     'help_local_title'     => 'Tệp của bạn',
@@ -261,9 +261,9 @@ return [
     // Cài đặt
     'help_set_title'       => 'Cài đặt',
     'help_set_language_q' => 'Ngôn ngữ và giao diện',
-    'help_set_language_a' => '<p><b>Cài đặt → Giao diện</b>. Giao diện được dịch sang <b>27 ngôn ngữ</b> và đổi ngay, không cần khởi động lại. Tiếng Ả Rập, Ba Tư, Do Thái và Urdu lật gương toàn bộ bố cục.</p><p>Cùng thẻ đó có năm bộ màu và bảy màu nhấn, áp dụng tức thì.</p>',
+    'help_set_language_a' => '<p><b>Cài đặt → Chung</b>. Giao diện được dịch sang <b>27 ngôn ngữ</b> và đổi ngay, không cần khởi động lại. Tiếng Ả Rập, Ba Tư, Do Thái và Urdu lật gương toàn bộ bố cục.</p><p><b>Cài đặt → Diện mạo</b> có chín bộ màu và bảy màu nhấn, áp dụng tức thì.</p>',
     'help_set_playback_q' => 'Mặc định cho mọi luồng',
-    'help_set_playback_a' => '<p><b>Cài đặt → Phát lại</b> định sẵn những gì nên xảy ra mà không phải bảo lại mỗi lần:</p><ul><li><b>Ngôn ngữ tiếng</b> ưa dùng</li><li><b>Phụ đề</b> bật hay tắt, cùng ngôn ngữ ưa dùng thứ nhất và thứ hai</li><li><b>Tỷ lệ khung hình</b> và <b>bộ đệm mạng</b> mặc định</li><li>Thẻ <b>«Tập tiếp theo»</b> hiện sớm bao nhiêu — tắt, hoặc từ một tới mười phút</li></ul><p>Menu ⚙ trên trình phát vẫn ghi đè được bất kỳ mục nào trong số đó cho luồng đang xem.</p>',
+    'help_set_playback_a' => '<p><b>Cài đặt → Phát lại</b>, <b>Âm thanh &amp; phụ đề</b> và <b>Video</b> định sẵn những gì nên xảy ra mà không phải bảo lại mỗi lần:</p><ul><li><b>Ngôn ngữ tiếng</b> ưa dùng</li><li><b>Phụ đề</b> bật hay tắt, cùng ngôn ngữ ưa dùng thứ nhất và thứ hai</li><li><b>Tỷ lệ khung hình</b> và <b>bộ đệm mạng</b> mặc định</li><li>Thẻ <b>«Tập tiếp theo»</b> hiện sớm bao nhiêu — tắt, hoặc từ một tới mười phút</li></ul><p>Menu ⚙ trên trình phát vẫn ghi đè được bất kỳ mục nào trong số đó cho luồng đang xem.</p>',
     'help_set_parental_q' => 'Khóa bớt nội dung khỏi người khác được không?',
     'help_set_parental_a' => '<p>Được. Một mã PIN bảo vệ các thể loại bị khóa và các nhóm ưa thích bị khóa. Nhóm bị khóa thậm chí không lộ ra trong đó có kênh nào cho tới khi nhập mã — nó giấu nội dung, chứ không chỉ chặn phát.</p><p>Mã PIN được lưu dạng băm có muối, không lưu dưới dạng chữ thường.</p>',
     'help_set_hide_q' => 'Ẩn hoặc đổi tên kênh được không?',
@@ -282,7 +282,7 @@ return [
 sudo dnf install mpv ffmpeg     # Fedora
 sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_picture_q' => 'Có tiếng nhưng không có hình',
-    'help_fix_picture_a' => '<p>Trình phát tích hợp không lấy được bề mặt để vẽ video.</p><ol><li>Mở <code>⚙ → Stats for nerds</code> và xem có khung hình nào tới không — điều đó tách vấn đề luồng khỏi vấn đề hiển thị.</li><li>Trên Wayland, thử <b>Cài đặt → Phát lại → Chạy qua backend X11</b> rồi khởi động lại ứng dụng.</li><li>Chạy từ terminal và tìm những dòng nhắc tới GL hay mpv.</li></ol>',
+    'help_fix_picture_a' => '<p>Trình phát tích hợp không lấy được bề mặt để vẽ video.</p><ol><li>Mở <code>⚙ → Stats for nerds</code> và xem có khung hình nào tới không — điều đó tách vấn đề luồng khỏi vấn đề hiển thị.</li><li>Trên Wayland, thử <b>Cài đặt → Nâng cao → Chạy qua backend X11</b> rồi khởi động lại ứng dụng.</li><li>Chạy từ terminal và tìm những dòng nhắc tới GL hay mpv.</li></ol>',
     'help_fix_gatekeeper_q' => 'macOS nói không mở được ứng dụng',
     'help_fix_gatekeeper_a' => '<p>Nó chưa được Apple công chứng. Nhấp phải vào ứng dụng chọn <b>Open</b>, rồi <b>Open</b> trong hộp thoại — hoặc cho phép trong <b>System Settings → Privacy &amp; Security → Open Anyway</b>.</p><p>Nếu macOS lại nói ứng dụng <b>«bị hỏng»</b> thì đó là cờ cách ly do lần tải về gắn vào. Gỡ nó đi:</p><pre><code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code></pre><p>Không cảnh báo nào trong hai cái đó có nghĩa là ứng dụng có vấn đề — chỉ là bản dựng chưa ký, mà ký thì cần một chứng chỉ Apple có phí.</p>',
     'help_fix_smartscreen_q' => 'Windows báo «Windows protected your PC»',
@@ -294,7 +294,7 @@ sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_limit_q' => '«Đã chạm giới hạn kết nối»',
     'help_fix_limit_a' => '<p>Tài khoản của bạn cho một số luồng cùng lúc và tất cả đang bận. Theo thứ tự khả năng:</p><ol><li>Xem đa kênh đang mở — mỗi ô là một kết nối.</li><li>Đang ghi hình một kênh <em>khác</em>.</li><li>Thiết bị khác hoặc người khác đang dùng tài khoản.</li><li>Một phiên trước chưa hết hạn bên nhà cung cấp; chờ một phút thường là xong.</li></ol><p>Ghi chính kênh bạn đang xem thì <em>không</em> tính là kết nối thứ hai.</p>',
     'help_fix_icon_q' => 'Linux: thanh tác vụ hiện biểu tượng trống',
-    'help_fix_icon_a' => '<p>Trên Wayland, GNOME và KDE lấy biểu tượng của cửa sổ từ một mục desktop khớp với nó và bỏ qua thứ mà chương trình tự đặt. AppImage không có mục như vậy cho tới khi có thứ gì đó cài nó vào.</p><ol><li>Ứng dụng đề nghị thêm một mục ngay lần chạy đầu. Hãy đồng ý — rồi <b>khởi động lại ứng dụng</b>, vì cửa sổ đang mở vẫn giữ biểu tượng lúc nó mở ra.</li><li>Nếu bạn đã từ chối, chính công tắc đó nằm ở <b>Cài đặt → Phát lại</b>.</li><li>Nếu biểu tượng vẫn không hiện, một bộ đệm biểu tượng cũ đang che nó. GTK đọc tệp đó thay vì quét thư mục:</li></ol><pre><code>rm ~/.local/share/icons/hicolor/icon-theme.cache</code></pre><p>Cài từ <b>.deb</b> thì mục đó đã có sẵn và không điều nào ở trên áp dụng.</p>',
+    'help_fix_icon_a' => '<p>Trên Wayland, GNOME và KDE lấy biểu tượng của cửa sổ từ một mục desktop khớp với nó và bỏ qua thứ mà chương trình tự đặt. AppImage không có mục như vậy cho tới khi có thứ gì đó cài nó vào.</p><ol><li>Ứng dụng đề nghị thêm một mục ngay lần chạy đầu. Hãy đồng ý — rồi <b>khởi động lại ứng dụng</b>, vì cửa sổ đang mở vẫn giữ biểu tượng lúc nó mở ra.</li><li>Nếu bạn đã từ chối, chính công tắc đó nằm ở <b>Cài đặt → Chung</b>.</li><li>Nếu biểu tượng vẫn không hiện, một bộ đệm biểu tượng cũ đang che nó. GTK đọc tệp đó thay vì quét thư mục:</li></ol><pre><code>rm ~/.local/share/icons/hicolor/icon-theme.cache</code></pre><p>Cài từ <b>.deb</b> thì mục đó đã có sẵn và không điều nào ở trên áp dụng.</p>',
     'help_fix_external_q' => '«Mở bằng trình phát ngoài» không có phản ứng',
     'help_fix_external_a' => '<p>Tùy chọn ấy khởi chạy một <code>mpv</code> hoặc <code>vlc</code> riêng của hệ thống, nên một trong hai phải được cài — trình phát tích hợp không cần gì thêm và không dính dáng gì.</p><pre><code>sudo apt install mpv vlc        # Debian/Ubuntu
 sudo dnf install mpv vlc        # Fedora
@@ -303,4 +303,14 @@ sudo pacman -S mpv vlc          # Arch</code></pre>',
     'nf_h1'   => 'Trang này không tồn tại',
     'nf_lede' => 'Liên kết có thể đã cũ hoặc bị gõ sai. Hãy bắt đầu lại từ trang chủ hoặc xem phần trợ giúp.',
     'nf_home' => 'Về trang chủ',
+    // front page: hero button per OS, lightbox, the app mock-up
+    'hero_cta_os' => 'Tải về cho %s',
+    'lb_close' => 'Đóng',
+    'mock_live' => 'TRỰC TIẾP',
+    'mock_sport' => 'Thể thao',
+    'mock_cinema' => 'Điện ảnh',
+    'mock_nature' => 'Thiên nhiên',
+    'mock_kids' => 'Thiếu nhi',
+    'mock_news' => 'Thời sự tối',
+    'mock_behind' => '− 12 phút',
 ];

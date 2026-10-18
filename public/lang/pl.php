@@ -29,7 +29,7 @@ return [
 
     // feature strip chips
     "chip_timeshift" => "Timeshift / catch-up",
-    "chip_languages" => "26 języków",
+    "chip_languages" => "27 języków",
 
     // features
     "feat_eyebrow" => "Wszystko na jednym ekranie",
@@ -169,17 +169,17 @@ return [
     'help_hits'            => 'Wyniki: %n',
     'help_toc'             => 'Działy',
     'help_no_hits'         => 'Brak wyników. Spróbuj krótszego słowa — wyszukiwarka wymaga, żeby każde wpisane słowo znalazło się w tej samej odpowiedzi.',
-    'help_more'            => 'Nie ma tego tutaj? Zgłoś sprawę na <a href="https://github.com/slimture/dopeIPTV/issues" rel="nofollow">GitHubie</a>. Podaj wersję z <b>Ustawienia → O programie</b> i dołącz log — odpowiedź „Jak zdobyć log?” powyżej podaje dokładne polecenie dla twojego systemu.',
+    'help_more'            => 'Nie ma tego tutaj? Zgłoś sprawę na <a href="https://github.com/slimture/dopeIPTV/issues" rel="nofollow">GitHubie</a>. Podaj wersję z <b>dopeIPTV → O dopeIPTV</b> i dołącz log — odpowiedź „Jak zdobyć log?” powyżej podaje dokładne polecenie dla twojego systemu.',
 
     // Instalacja i konfiguracja
     'help_start_title'     => 'Instalacja i konfiguracja',
     'help_start_linux_q' => 'Jak zainstalować na Linuksie?',
     'help_start_linux_a' => '<p>Trzy formaty, każdy samowystarczalny — Python, Qt, libmpv i ffmpeg są w środku pobranego pliku, więc obok nie trzeba instalować niczego.</p><p><b>AppImage</b> — ten wybierz, jeśli nie masz pewności. Działa na każdej dystrybucji:</p><pre><code>chmod +x dopeIPTV-*.AppImage
-./dopeIPTV-*.AppImage</code></pre><p><b>.deb</b> na Debianie lub Ubuntu:</p><pre><code>sudo apt install ./dopeiptv_*_amd64.deb</code></pre><p><b>Flatpak</b>:</p><pre><code>flatpak install --user dopeIPTV-*.flatpak</code></pre><p>Wszystkie trzy mają też wersje arm64, na Raspberry Pi lub serwer ARM.</p>',
+./dopeIPTV-*.AppImage</code></pre><p><b>.deb</b> na Debianie lub Ubuntu:</p><pre><code>sudo apt install ./dopeiptv_*_amd64.deb</code></pre><p><b>Flatpak</b>:</p><pre><code>flatpak install --user dopeIPTV-*.flatpak</code></pre><p>AppImage i .deb mają też wersje arm64, na Raspberry Pi lub serwer ARM.</p>',
     'help_start_macos_q' => 'Jak zainstalować na macOS?',
     'help_start_macos_a' => '<p>Otwórz plik <code>.dmg</code> i przeciągnij dopeIPTV do Aplikacji. Potrzebny jest <b>macOS 15 lub nowszy</b>, a aplikacja działa na Apple Silicon — 1.2.10 to ostatnie wydanie z wersją dla Intela.</p><p>Pierwsze uruchomienie zostanie odrzucone, bo aplikacja nie jest notaryzowana przez Apple. Kliknij ją prawym przyciskiem i wybierz <b>Otwórz</b>, a potem jeszcze raz <b>Otwórz</b> w oknie. Jeśli to nie pomoże, zobacz „macOS mówi, że aplikacji nie można otworzyć” poniżej.</p>',
     'help_start_windows_q' => 'Jak zainstalować na Windowsie?',
-    'help_start_windows_a' => '<p>Nie ma instalatora. Rozpakuj <code>dopeIPTV-*-windows-x64.zip</code> gdzie chcesz — folder użytkownika w zupełności wystarczy, uprawnienia administratora nie są potrzebne — i uruchom znajdujący się w środku <code>dopeiptv.exe</code>.</p><p>Jest natywna wersja <b>arm64</b> dla laptopów ze Snapdragonem; wersja x64 też tam działa, emulowana i przez to wolniej.</p><p>Skrót w menu Start lub na pulpicie: <b>Ustawienia → Interfejs → Konserwacja → Utwórz skrót</b>. Plik <code>README.txt</code> w archiwum wymienia wszystko, co usunąć, jeśli chcesz się pozbyć aplikacji bez śladu.</p>',
+    'help_start_windows_a' => '<p>Nie ma instalatora. Rozpakuj <code>dopeIPTV-*-windows-x64.zip</code> gdzie chcesz — folder użytkownika w zupełności wystarczy, uprawnienia administratora nie są potrzebne — i uruchom znajdujący się w środku <code>dopeiptv.exe</code>.</p><p>Jest natywna wersja <b>arm64</b> dla laptopów ze Snapdragonem; wersja x64 też tam działa, emulowana i przez to wolniej.</p><p>Skrót w menu Start lub na pulpicie: <b>Ustawienia → Zaawansowane → Utwórz skrót</b>. Plik <code>README.txt</code> w archiwum wymienia wszystko, co usunąć, jeśli chcesz się pozbyć aplikacji bez śladu.</p>',
     'help_start_playlist_q' => 'Jak podłączyć swojego dostawcę?',
     'help_start_playlist_a' => '<p>Przy pierwszym uruchomieniu pytamy o trzy rzeczy z twojego konta <b>Xtream Codes</b>:</p><ul><li><b>Serwer</b> — adres z portem, na przykład <code>http://example.com:8080</code>. Nie pełny adres playlisty, tylko host.</li><li><b>Nazwa użytkownika</b> i <b>Hasło</b> — te, które dostałeś od dostawcy.</li></ul><p>Zostają zapisane. Żeby dodać kolejne konto później albo zmienić to: <b>Ustawienia → Playlisty</b>. Playlisty można przełączać przy działającej aplikacji, a ulubione i historia są prowadzone osobno dla każdej.</p>',
     'help_start_m3u_q' => 'Czy mogę zamiast tego użyć playlisty M3U?',
@@ -213,7 +213,7 @@ return [
     'help_tv_xmltv_q' => 'Program jest błędny, pusty albo z niewłaściwego kraju',
     'help_tv_xmltv_a' => '<p>Daj tej playliście własny program zamiast programu dostawcy:</p><ol><li><b>Ustawienia → Playlisty</b></li><li>Zaznacz playlistę i edytuj ją</li><li>Wpisz adres <b>XMLTV</b> w polu własnego programu</li></ol><p>Zastępuje on to, co przysyła dostawca. Aplikacja dopasowuje twoje kanały do tego programu najpierw po identyfikatorze EPG, a potem po nazwie kanału, więc program z innego źródła zwykle i tak pasuje.</p>',
     'help_tv_times_q' => 'Wszystko jest przesunięte o godzinę lub dwie',
-    'help_tv_times_a' => '<p>Niektórzy dostawcy publikują godziny, które nie zgadzają się z tym, co faktycznie nadają. W <b>Ustawienia → Odtwarzanie</b> są dwie osobne korekty:</p><ul><li><b>Przesunięcie EPG</b> przesuwa każdą godzinę pokazywaną w programie.</li><li><b>Przesunięcie powtórek</b> przesuwa miejsce, od którego zaczyna grać archiwum i timeshift, nie ruszając samego programu.</li></ul><p>Są rozdzielone, bo dostawcy mylą się w jednym niezależnie od drugiego.</p>',
+    'help_tv_times_a' => '<p>Niektórzy dostawcy publikują godziny, które nie zgadzają się z tym, co faktycznie nadają. W <b>Ustawienia → Przewodnik</b> są dwie osobne korekty:</p><ul><li><b>Przesunięcie EPG</b> przesuwa każdą godzinę pokazywaną w programie.</li><li><b>Przesunięcie powtórek</b> przesuwa miejsce, od którego zaczyna grać archiwum i timeshift, nie ruszając samego programu.</li></ul><p>Są rozdzielone, bo dostawcy mylą się w jednym niezależnie od drugiego.</p>',
     'help_tv_ts_q' => 'Czym są timeshift i archiwum?',
     'help_tv_ts_a' => '<p>Niektórzy dostawcy przechowują kilka dni nagrania każdego kanału. Tam, gdzie twój to robi, kanał ma na liście znacznik <b>⏪</b>, a panel szczegółów podaje, na ile dni wstecz sięga archiwum.</p><p>Jeśli kanał nie ma znacznika, dostawca nie udostępnia dla niego archiwum. To jego ustawienie i nic w aplikacji tego nie włączy.</p>',
     'help_tv_tsstart_q' => 'Jak obejrzeć coś, co już się zaczęło?',
@@ -244,7 +244,7 @@ return [
     'help_more_castfix_q' => 'Telewizor odrzuca kanał',
     'help_more_castfix_a' => '<p>Niektóre kanały to zwykły obraz H.264 z dźwiękiem <b>Dolby Digital Plus</b>. Chromecast, który nie jest Ultra ani Google TV, nie ma na to dekodera i odrzuca strumień, nie mówiąc dlaczego.</p><p>Aplikacja przetwarza takie przypadki na tym komputerze i podaje wynik w twojej własnej sieci: obraz jest przepisywany bez zmian — przekodowywany jest tylko dźwięk, co jest tanie — i dzieje się to dopiero <em>po</em> tym, jak urządzenie faktycznie odrzuciło strumień. Kanał, który twoje urządzenie potrafi odtworzyć, zawsze dostaje oryginalny strumień dostawcy, nietknięty.</p><p>Potrzebny jest do tego <code>ffmpeg</code>, który jest w każdym spakowanym wydaniu.</p>',
     'help_more_trakt_q' => 'Jak podłączyć Trakt?',
-    'help_more_trakt_a' => '<p><b>Ustawienia → Trakt</b>. Zakładasz aplikację na trakt.tv, wklejasz dwa otrzymane klucze i autoryzujesz w otwartej przeglądarce.</p><p>Od tej pory to, co oglądasz, jest scrobblowane, a listę do obejrzenia i historię można przeglądać w aplikacji. Twoje pliki lokalne też są scrobblowane, o ile TMDB zdołało rozpoznać plik.</p>',
+    'help_more_trakt_a' => '<p><b>Ustawienia → Trakt → Połącz przez przeglądarkę</b>. Przeglądarka otworzy Trakt: zaloguj się, jeśli trzeba, kliknij <b>Yes</b> i aplikacja jest połączona. Nie trzeba tworzyć żadnych kluczy ani wpisywać kodów.</p><p>Od tej pory to, co oglądasz, jest scrobblowane, a listę do obejrzenia i historię można przeglądać w aplikacji. Twoje pliki lokalne też są scrobblowane, o ile TMDB zdołało rozpoznać plik.</p>',
 
     // Własne pliki
     'help_local_title'     => 'Własne pliki',
@@ -262,9 +262,9 @@ return [
     // Ustawienia
     'help_set_title'       => 'Ustawienia',
     'help_set_language_q' => 'Język i wygląd',
-    'help_set_language_a' => '<p><b>Ustawienia → Interfejs</b>. Interfejs jest przetłumaczony na <b>27 języków</b> i przełącza się natychmiast, bez restartu. Arabski, perski, hebrajski i urdu odbijają lustrzanie cały układ.</p><p>Ta sama karta ma pięć motywów kolorystycznych i siedem kolorów akcentu, nakładanych na żywo.</p>',
+    'help_set_language_a' => '<p><b>Ustawienia → Ogólne</b>. Interfejs jest przetłumaczony na <b>27 języków</b> i przełącza się natychmiast, bez restartu. Arabski, perski, hebrajski i urdu odbijają lustrzanie cały układ.</p><p><b>Ustawienia → Wygląd</b> ma dziewięć motywów kolorystycznych i siedem kolorów akcentu, nakładanych na żywo.</p>',
     'help_set_playback_q' => 'Domyślne ustawienia dla wszystkich strumieni',
-    'help_set_playback_a' => '<p><b>Ustawienia → Odtwarzanie</b> ustala, co ma się dziać bez pytania za każdym razem:</p><ul><li>Preferowany <b>język dźwięku</b></li><li><b>Napisy</b> włączone lub nie, z pierwszym i drugim preferowanym językiem</li><li>Domyślne <b>proporcje obrazu</b> i <b>bufor sieciowy</b></li><li>Jak wcześnie pojawia się karta <b>„Następny odcinek”</b> — wyłączona albo od minuty do dziesięciu</li></ul><p>Menu ⚙ w odtwarzaczu nadal nadpisuje każde z nich dla oglądanego strumienia.</p>',
+    'help_set_playback_a' => '<p><b>Ustawienia → Odtwarzanie</b>, <b>Audio i napisy</b> oraz <b>Wideo</b> ustalają, co ma się dziać bez pytania za każdym razem:</p><ul><li>Preferowany <b>język dźwięku</b></li><li><b>Napisy</b> włączone lub nie, z pierwszym i drugim preferowanym językiem</li><li>Domyślne <b>proporcje obrazu</b> i <b>bufor sieciowy</b></li><li>Jak wcześnie pojawia się karta <b>„Następny odcinek”</b> — wyłączona albo od minuty do dziesięciu</li></ul><p>Menu ⚙ w odtwarzaczu nadal nadpisuje każde z nich dla oglądanego strumienia.</p>',
     'help_set_parental_q' => 'Czy mogę coś zamknąć przed innymi?',
     'help_set_parental_a' => '<p>Tak. PIN chroni zablokowane kategorie i zablokowane grupy ulubionych. Zablokowana grupa nie zdradza nawet, jakie kanały zawiera, dopóki PIN nie zostanie wpisany — ukrywa zawartość, nie tylko odtwarzanie.</p><p>PIN jest przechowywany z solą i zahaszowany, nie jako zwykły tekst.</p>',
     'help_set_hide_q' => 'Czy mogę ukrywać albo przemianowywać kanały?',
@@ -283,7 +283,7 @@ return [
 sudo dnf install mpv ffmpeg     # Fedora
 sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_picture_q' => 'Dźwięk gra, ale nie ma obrazu',
-    'help_fix_picture_a' => '<p>Wbudowany odtwarzacz nie dostaje powierzchni wideo.</p><ol><li>Otwórz <code>⚙ → Stats for nerds</code> i sprawdź, czy w ogóle napływają klatki — to oddziela problem ze strumieniem od problemu z wyświetlaniem.</li><li>Na Waylandzie spróbuj <b>Ustawienia → Odtwarzanie → Uruchom przez backend X11</b> i zrestartuj aplikację.</li><li>Uruchom z terminala i szukaj wierszy wspominających GL albo mpv.</li></ol>',
+    'help_fix_picture_a' => '<p>Wbudowany odtwarzacz nie dostaje powierzchni wideo.</p><ol><li>Otwórz <code>⚙ → Stats for nerds</code> i sprawdź, czy w ogóle napływają klatki — to oddziela problem ze strumieniem od problemu z wyświetlaniem.</li><li>Na Waylandzie spróbuj <b>Ustawienia → Zaawansowane → Uruchom przez backend X11</b> i zrestartuj aplikację.</li><li>Uruchom z terminala i szukaj wierszy wspominających GL albo mpv.</li></ol>',
     'help_fix_gatekeeper_q' => 'macOS mówi, że aplikacji nie można otworzyć',
     'help_fix_gatekeeper_a' => '<p>Nie jest jeszcze notaryzowana przez Apple. Kliknij ją prawym przyciskiem i wybierz <b>Otwórz</b>, potem <b>Otwórz</b> w oknie — albo zezwól na nią w <b>Ustawienia systemowe → Prywatność i ochrona → Otwórz mimo to</b>.</p><p>Jeśli macOS mówi zamiast tego, że aplikacja jest <b>„uszkodzona”</b>, to znacznik kwarantanny z pobierania. Usuń go:</p><pre><code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code></pre><p>Żadne z tych ostrzeżeń nie oznacza, że z aplikacją coś jest nie tak — tylko tyle, że wydanie nie jest podpisane, a to wymaga płatnego certyfikatu Apple.</p>',
     'help_fix_smartscreen_q' => 'Windows pisze „System Windows ochronił Twój komputer”',
@@ -295,7 +295,7 @@ sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_limit_q' => '„Osiągnięto limit połączeń”',
     'help_fix_limit_a' => '<p>Twoje konto dopuszcza pewną liczbę jednoczesnych strumieni i wszystkie są zajęte. W kolejności prawdopodobieństwa:</p><ol><li>Otwarty jest multiview — każde okienko to jedno połączenie.</li><li>Trwa nagrywanie <em>innego</em> kanału.</li><li>Konta używa inne urządzenie albo inna osoba.</li><li>Poprzednia sesja jeszcze nie wygasła u dostawcy; odczekanie minuty często pomaga.</li></ol><p>Nagrywanie kanału, który oglądasz, <em>nie</em> liczy się jako drugie połączenie.</p>',
     'help_fix_icon_q' => 'Linux: pasek zadań pokazuje pustą ikonę',
-    'help_fix_icon_a' => '<p>Na Waylandzie GNOME i KDE biorą ikonę okna z pasującego wpisu pulpitu i ignorują to, co ustawia sam program. AppImage takiego wpisu nie ma, dopóki coś go nie zainstaluje.</p><ol><li>Aplikacja proponuje dodanie go przy pierwszym uruchomieniu. Zgódź się — a potem <b>uruchom aplikację ponownie</b>, bo otwarte okno zachowuje ikonę, z którą się otworzyło.</li><li>Ten sam przełącznik jest w <b>Ustawienia → Odtwarzanie</b>, jeśli odmówiłeś.</li><li>Jeśli ikona nadal się nie pojawia, przesłania ją nieaktualna pamięć podręczna ikon. GTK czyta ten plik zamiast folderu:</li></ol><pre><code>rm ~/.local/share/icons/hicolor/icon-theme.cache</code></pre><p>Przy instalacji z <b>.deb</b> wpis już istnieje i nic z tego nie dotyczy.</p>',
+    'help_fix_icon_a' => '<p>Na Waylandzie GNOME i KDE biorą ikonę okna z pasującego wpisu pulpitu i ignorują to, co ustawia sam program. AppImage takiego wpisu nie ma, dopóki coś go nie zainstaluje.</p><ol><li>Aplikacja proponuje dodanie go przy pierwszym uruchomieniu. Zgódź się — a potem <b>uruchom aplikację ponownie</b>, bo otwarte okno zachowuje ikonę, z którą się otworzyło.</li><li>Ten sam przełącznik jest w <b>Ustawienia → Ogólne</b>, jeśli odmówiłeś.</li><li>Jeśli ikona nadal się nie pojawia, przesłania ją nieaktualna pamięć podręczna ikon. GTK czyta ten plik zamiast folderu:</li></ol><pre><code>rm ~/.local/share/icons/hicolor/icon-theme.cache</code></pre><p>Przy instalacji z <b>.deb</b> wpis już istnieje i nic z tego nie dotyczy.</p>',
     'help_fix_external_q' => '„Otwórz zewnętrznie” nic nie robi',
     'help_fix_external_a' => '<p>Ta opcja uruchamia samodzielny <code>mpv</code> albo <code>vlc</code> z twojego systemu, więc jeden z nich musi być zainstalowany — wbudowany odtwarzacz nie potrzebuje niczego więcej i nie ma z tym nic wspólnego.</p><pre><code>sudo apt install mpv vlc        # Debian/Ubuntu
 sudo dnf install mpv vlc        # Fedora
@@ -304,4 +304,14 @@ sudo pacman -S mpv vlc          # Arch</code></pre>',
     'nf_h1'   => 'Ta strona nie istnieje',
     'nf_lede' => 'Link może być nieaktualny lub błędnie wpisany. Zacznij od strony głównej albo zajrzyj do pomocy.',
     'nf_home' => 'Przejdź do strony głównej',
+    // front page: hero button per OS, lightbox, the app mock-up
+    'hero_cta_os' => 'Pobierz dla systemu %s',
+    'lb_close' => 'Zamknij',
+    'mock_live' => 'NA ŻYWO',
+    'mock_sport' => 'Sport',
+    'mock_cinema' => 'Kino',
+    'mock_nature' => 'Natura',
+    'mock_kids' => 'Dzieci',
+    'mock_news' => 'Wiadomości wieczorne',
+    'mock_behind' => '− 12 min',
 ];

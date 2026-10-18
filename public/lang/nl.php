@@ -29,7 +29,7 @@ return [
 
     // feature strip chips
     "chip_timeshift" => "Timeshift / catch-up",
-    "chip_languages" => "26 talen",
+    "chip_languages" => "27 talen",
 
     // features
     "feat_eyebrow" => "Alles op één scherm",
@@ -169,17 +169,17 @@ return [
     'help_hits'            => 'Treffers: %n',
     'help_toc'             => 'Onderdelen',
     'help_no_hits'         => 'Geen treffer. Probeer een korter woord — de zoekfunctie wil dat elk getypt woord in hetzelfde antwoord voorkomt.',
-    'help_more'            => 'Staat het er niet bij? Open een issue op <a href="https://github.com/slimture/dopeIPTV/issues" rel="nofollow">GitHub</a>. Vermeld de versie uit <b>Instellingen → Over</b> en voeg het log toe — het antwoord „Hoe krijg ik een log?” hierboven geeft het precieze commando voor jouw systeem.',
+    'help_more'            => 'Staat het er niet bij? Open een issue op <a href="https://github.com/slimture/dopeIPTV/issues" rel="nofollow">GitHub</a>. Vermeld de versie uit <b>dopeIPTV → Over dopeIPTV</b> en voeg het log toe — het antwoord „Hoe krijg ik een log?” hierboven geeft het precieze commando voor jouw systeem.',
 
     // Installeren en instellen
     'help_start_title'     => 'Installeren en instellen',
     'help_start_linux_q' => 'Hoe installeer ik het op Linux?',
     'help_start_linux_a' => '<p>Drie formaten, alle drie op zichzelf staand — Python, Qt, libmpv en ffmpeg zitten in de download, er hoeft niets naast geïnstalleerd te worden.</p><p><b>AppImage</b> — degene die je moet nemen als je twijfelt. Hij draait op elke distributie:</p><pre><code>chmod +x dopeIPTV-*.AppImage
-./dopeIPTV-*.AppImage</code></pre><p><b>.deb</b> op Debian of Ubuntu:</p><pre><code>sudo apt install ./dopeiptv_*_amd64.deb</code></pre><p><b>Flatpak</b>:</p><pre><code>flatpak install --user dopeIPTV-*.flatpak</code></pre><p>Van alle drie bestaan arm64-versies, voor een Raspberry Pi of een ARM-server.</p>',
+./dopeIPTV-*.AppImage</code></pre><p><b>.deb</b> op Debian of Ubuntu:</p><pre><code>sudo apt install ./dopeiptv_*_amd64.deb</code></pre><p><b>Flatpak</b>:</p><pre><code>flatpak install --user dopeIPTV-*.flatpak</code></pre><p>Van de AppImage en de .deb bestaan ook arm64-versies, voor een Raspberry Pi of een ARM-server.</p>',
     'help_start_macos_q' => 'Hoe installeer ik het op macOS?',
     'help_start_macos_a' => '<p>Open de <code>.dmg</code> en sleep dopeIPTV naar Programma\'s. Je hebt <b>macOS 15 of nieuwer</b> nodig, en de app draait op Apple Silicon — 1.2.10 was de laatste versie met een Intel-build.</p><p>De eerste start wordt geweigerd omdat de app niet door Apple genotariseerd is. Klik met rechts op de app en kies <b>Open</b>, en dan nog eens <b>Open</b> in het venster. Helpt dat niet, zie dan „macOS zegt dat de app niet geopend kan worden” verderop.</p>',
     'help_start_windows_q' => 'Hoe installeer ik het op Windows?',
-    'help_start_windows_a' => '<p>Er is geen installatieprogramma. Pak <code>dopeIPTV-*-windows-x64.zip</code> uit waar je wilt — je gebruikersmap volstaat, beheerdersrechten zijn niet nodig — en start de <code>dopeiptv.exe</code> die erin zit.</p><p>Er is een native <b>arm64</b>-build voor Snapdragon-laptops; de x64-build draait daar ook, geëmuleerd en dus trager.</p><p>Voor een snelkoppeling in het startmenu of op het bureaublad: <b>Instellingen → Interface → Onderhoud → Snelkoppeling maken</b>. De <code>README.txt</code> in het zip-bestand somt alles op wat je wist als je de app spoorloos weg wilt hebben.</p>',
+    'help_start_windows_a' => '<p>Er is geen installatieprogramma. Pak <code>dopeIPTV-*-windows-x64.zip</code> uit waar je wilt — je gebruikersmap volstaat, beheerdersrechten zijn niet nodig — en start de <code>dopeiptv.exe</code> die erin zit.</p><p>Er is een native <b>arm64</b>-build voor Snapdragon-laptops; de x64-build draait daar ook, geëmuleerd en dus trager.</p><p>Voor een snelkoppeling in het startmenu of op het bureaublad: <b>Instellingen → Geavanceerd → Snelkoppeling maken</b>. De <code>README.txt</code> in het zip-bestand somt alles op wat je wist als je de app spoorloos weg wilt hebben.</p>',
     'help_start_playlist_q' => 'Hoe koppel ik mijn provider?',
     'help_start_playlist_a' => '<p>Bij de eerste start worden drie gegevens uit je <b>Xtream Codes</b>-account gevraagd:</p><ul><li><b>Server</b> — het adres met de poort, zoals <code>http://example.com:8080</code>. Geen volledige playlist-URL, alleen de host.</li><li><b>Gebruikersnaam</b> en <b>Wachtwoord</b> — die van je provider.</li></ul><p>Ze worden bewaard. Later nog een account toevoegen, of dit aanpassen: <b>Instellingen → Afspeellijsten</b>. Je kunt tijdens het gebruik van lijst wisselen, en favorieten en geschiedenis blijven per lijst gescheiden.</p>',
     'help_start_m3u_q' => 'Kan ik in plaats daarvan een M3U-lijst gebruiken?',
@@ -213,7 +213,7 @@ return [
     'help_tv_xmltv_q' => 'De gids klopt niet, is leeg, of is van het verkeerde land',
     'help_tv_xmltv_a' => '<p>Geef die afspeellijst een eigen gids in plaats van die van de provider:</p><ol><li><b>Instellingen → Afspeellijsten</b></li><li>Selecteer de lijst en bewerk hem</li><li>Zet een <b>XMLTV</b>-adres in het veld voor de eigen gids</li></ol><p>Die vervangt wat de provider stuurt. De app koppelt je kanalen aan die gids eerst op EPG-id en daarna op kanaalnaam, dus een gids uit een andere bron sluit meestal toch aan.</p>',
     'help_tv_times_q' => 'Alles staat een of twee uur verschoven',
-    'help_tv_times_a' => '<p>Sommige providers publiceren tijden die niet kloppen met wat ze werkelijk uitzenden. In <b>Instellingen → Weergave</b> staan twee losse correcties:</p><ul><li>De <b>EPG-verschuiving</b> verschuift elke tijd die de gids toont.</li><li>De <b>replay-verschuiving</b> verschuift waar catch-up en timeshift beginnen te spelen, zonder de gids aan te raken.</li></ul><p>Ze staan los van elkaar omdat providers deze twee onafhankelijk van elkaar fout doen.</p>',
+    'help_tv_times_a' => '<p>Sommige providers publiceren tijden die niet kloppen met wat ze werkelijk uitzenden. In <b>Instellingen → Gids</b> staan twee losse correcties:</p><ul><li>De <b>EPG-verschuiving</b> verschuift elke tijd die de gids toont.</li><li>De <b>replay-verschuiving</b> verschuift waar catch-up en timeshift beginnen te spelen, zonder de gids aan te raken.</li></ul><p>Ze staan los van elkaar omdat providers deze twee onafhankelijk van elkaar fout doen.</p>',
     'help_tv_ts_q' => 'Wat zijn timeshift en catch-up?',
     'help_tv_ts_a' => '<p>Sommige providers bewaren een paar dagen opname van elk kanaal. Waar die van jou dat doet, krijgt het kanaal een <b>⏪</b>-teken in de lijst, en het detailpaneel zegt hoeveel dagen diep het archief gaat.</p><p>Heeft een kanaal geen teken, dan biedt de provider er geen archief voor. Dat is hun instelling en niets in de app kan die aanzetten.</p>',
     'help_tv_tsstart_q' => 'Hoe kijk ik iets dat al begonnen is?',
@@ -244,7 +244,7 @@ return [
     'help_more_castfix_q' => 'De televisie weigert een kanaal',
     'help_more_castfix_a' => '<p>Sommige kanalen zijn gewone H.264-video met <b>Dolby Digital Plus</b>-geluid. Een Chromecast die geen Ultra of Google TV is, heeft daar geen decoder voor en weigert de stream zonder te zeggen waarom.</p><p>De app zet die gevallen op deze computer om en serveert het resultaat op je eigen netwerk: het beeld wordt onaangeroerd doorgekopieerd — alleen het geluid wordt opnieuw gecodeerd, wat goedkoop is — en dat gebeurt pas <em>nadat</em> het apparaat de stream daadwerkelijk geweigerd heeft. Een kanaal dat je apparaat wel aankan, krijgt altijd de stream van de provider zelf, ongewijzigd.</p><p>Hiervoor is <code>ffmpeg</code> nodig, dat in elke verpakte download zit.</p>',
     'help_more_trakt_q' => 'Hoe koppel ik Trakt?',
-    'help_more_trakt_a' => '<p><b>Instellingen → Trakt</b>. Je maakt een applicatie aan op trakt.tv, plakt de twee sleutels die je krijgt, en geeft toestemming in de browser die opengaat.</p><p>Daarna wordt gescrobbeld wat je kijkt, en zijn je watchlist en geschiedenis in de app te doorbladeren. Je eigen lokale bestanden worden ook gescrobbeld, wanneer TMDB het bestand heeft kunnen herkennen.</p>',
+    'help_more_trakt_a' => '<p><b>Instellingen → Trakt → Verbinden via browser</b>. De browser opent Trakt: log in als dat nodig is, klik op <b>Yes</b> en de app is verbonden. Er zijn geen sleutels aan te maken en geen codes in te typen.</p><p>Daarna wordt gescrobbeld wat je kijkt, en zijn je watchlist en geschiedenis in de app te doorbladeren. Je eigen lokale bestanden worden ook gescrobbeld, wanneer TMDB het bestand heeft kunnen herkennen.</p>',
 
     // Je eigen bestanden
     'help_local_title'     => 'Je eigen bestanden',
@@ -262,9 +262,9 @@ return [
     // Instellingen
     'help_set_title'       => 'Instellingen',
     'help_set_language_q' => 'Taal en uiterlijk',
-    'help_set_language_a' => '<p><b>Instellingen → Interface</b>. De interface is in <b>27 talen</b> vertaald en wisselt meteen, zonder herstarten. Arabisch, Perzisch, Hebreeuws en Urdu spiegelen de hele indeling.</p><p>Hetzelfde tabblad heeft vijf kleurthema\'s en zeven accentkleuren, die meteen doorwerken.</p>',
+    'help_set_language_a' => '<p><b>Instellingen → Algemeen</b>. De interface is in <b>27 talen</b> vertaald en wisselt meteen, zonder herstarten. Arabisch, Perzisch, Hebreeuws en Urdu spiegelen de hele indeling.</p><p><b>Instellingen → Uiterlijk</b> heeft negen kleurthema\'s en zeven accentkleuren, die meteen doorwerken.</p>',
     'help_set_playback_q' => 'Standaardinstellingen voor elke stream',
-    'help_set_playback_a' => '<p><b>Instellingen → Weergave</b> legt vast wat er moet gebeuren zonder dat je het elke keer vraagt:</p><ul><li>Voorkeurstaal voor het <b>geluid</b></li><li><b>Ondertitels</b> aan of uit, met een eerste en een tweede voorkeurstaal</li><li>Standaard <b>beeldverhouding</b> en <b>netwerkbuffer</b></li><li>Hoe vroeg de kaart <b>„Volgende aflevering”</b> verschijnt — uit, of één tot tien minuten</li></ul><p>Het ⚙-menu in de speler kan al deze nog steeds overrulen voor de stream die loopt.</p>',
+    'help_set_playback_a' => '<p><b>Instellingen → Weergave</b>, <b>Audio en ondertitels</b> en <b>Video</b> leggen vast wat er moet gebeuren zonder dat je het elke keer vraagt:</p><ul><li>Voorkeurstaal voor het <b>geluid</b></li><li><b>Ondertitels</b> aan of uit, met een eerste en een tweede voorkeurstaal</li><li>Standaard <b>beeldverhouding</b> en <b>netwerkbuffer</b></li><li>Hoe vroeg de kaart <b>„Volgende aflevering”</b> verschijnt — uit, of één tot tien minuten</li></ul><p>Het ⚙-menu in de speler kan al deze nog steeds overrulen voor de stream die loopt.</p>',
     'help_set_parental_q' => 'Kan ik dingen wegsluiten voor anderen?',
     'help_set_parental_a' => '<p>Ja. Een pincode beschermt vergrendelde categorieën en vergrendelde favorietengroepen. Een vergrendelde groep laat niet eens zien welke kanalen erin zitten voordat de code is ingevoerd — hij verbergt de inhoud, niet alleen het afspelen.</p><p>De code wordt gezouten en gehasht opgeslagen, niet als leesbare tekst.</p>',
     'help_set_hide_q' => 'Kan ik kanalen verbergen of hernoemen?',
@@ -283,7 +283,7 @@ return [
 sudo dnf install mpv ffmpeg     # Fedora
 sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_picture_q' => 'Er is geluid maar geen beeld',
-    'help_fix_picture_a' => '<p>De ingebouwde speler krijgt geen videovlak.</p><ol><li>Open <code>⚙ → Stats for nerds</code> en kijk of er überhaupt beelden binnenkomen — dat scheidt een streamprobleem van een weergaveprobleem.</li><li>Op Wayland: probeer <b>Instellingen → Weergave → Via X11-backend draaien</b> en herstart de app.</li><li>Start vanuit een terminal en zoek naar regels die GL of mpv noemen.</li></ol>',
+    'help_fix_picture_a' => '<p>De ingebouwde speler krijgt geen videovlak.</p><ol><li>Open <code>⚙ → Stats for nerds</code> en kijk of er überhaupt beelden binnenkomen — dat scheidt een streamprobleem van een weergaveprobleem.</li><li>Op Wayland: probeer <b>Instellingen → Geavanceerd → Via X11-backend uitvoeren</b> en herstart de app.</li><li>Start vanuit een terminal en zoek naar regels die GL of mpv noemen.</li></ol>',
     'help_fix_gatekeeper_q' => 'macOS zegt dat de app niet geopend kan worden',
     'help_fix_gatekeeper_a' => '<p>Hij is nog niet door Apple genotariseerd. Klik met rechts op de app en kies <b>Open</b>, dan <b>Open</b> in het venster — of sta hem toe bij <b>Systeeminstellingen → Privacy en beveiliging → Toch openen</b>.</p><p>Zegt macOS in plaats daarvan dat de app <b>„beschadigd”</b> is, dan is dat het quarantainekenmerk van de download. Haal het weg:</p><pre><code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code></pre><p>Geen van beide waarschuwingen betekent dat er iets mis is met de app — alleen dat de build niet ondertekend is, waarvoor een betaald Apple-certificaat nodig is.</p>',
     'help_fix_smartscreen_q' => 'Windows zegt „Uw pc is beveiligd door Windows”',
@@ -295,7 +295,7 @@ sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_limit_q' => '„Verbindingslimiet bereikt”',
     'help_fix_limit_a' => '<p>Je account staat een bepaald aantal gelijktijdige streams toe en die zijn allemaal bezet. Op volgorde van waarschijnlijkheid:</p><ol><li>Multiview staat open — elk vakje is een verbinding.</li><li>Er loopt een opname van een <em>ander</em> kanaal.</li><li>Een ander apparaat of een andere persoon gebruikt het account.</li><li>Een eerdere sessie is bij de provider nog niet verlopen; een minuut wachten helpt vaak.</li></ol><p>Het kanaal opnemen dat je kijkt telt <em>niet</em> als tweede verbinding.</p>',
     'help_fix_icon_q' => 'Linux: de taakbalk toont een leeg pictogram',
-    'help_fix_icon_a' => '<p>Op Wayland halen GNOME en KDE het pictogram van een venster uit een bijpassende desktopvermelding en negeren ze wat het programma zelf instelt. Een AppImage heeft zo\'n vermelding niet totdat iets die aanmaakt.</p><ol><li>De app biedt bij de eerste start aan er een toe te voegen. Zeg ja — en <b>herstart daarna de app</b>, want het venster dat openstaat houdt het pictogram waarmee het geopend is.</li><li>Dezelfde schakelaar staat bij <b>Instellingen → Weergave</b> als je nee had gezegd.</li><li>Verschijnt het pictogram nog steeds niet, dan verbergt een verouderde pictogramcache het. GTK leest dat bestand in plaats van de map:</li></ol><pre><code>rm ~/.local/share/icons/hicolor/icon-theme.cache</code></pre><p>Bij installatie via de <b>.deb</b> staat de vermelding er al en geldt hier niets van.</p>',
+    'help_fix_icon_a' => '<p>Op Wayland halen GNOME en KDE het pictogram van een venster uit een bijpassende desktopvermelding en negeren ze wat het programma zelf instelt. Een AppImage heeft zo\'n vermelding niet totdat iets die aanmaakt.</p><ol><li>De app biedt bij de eerste start aan er een toe te voegen. Zeg ja — en <b>herstart daarna de app</b>, want het venster dat openstaat houdt het pictogram waarmee het geopend is.</li><li>Dezelfde schakelaar staat bij <b>Instellingen → Algemeen</b> als je nee had gezegd.</li><li>Verschijnt het pictogram nog steeds niet, dan verbergt een verouderde pictogramcache het. GTK leest dat bestand in plaats van de map:</li></ol><pre><code>rm ~/.local/share/icons/hicolor/icon-theme.cache</code></pre><p>Bij installatie via de <b>.deb</b> staat de vermelding er al en geldt hier niets van.</p>',
     'help_fix_external_q' => '„Extern openen” doet niets',
     'help_fix_external_a' => '<p>Die optie start een losse <code>mpv</code> of <code>vlc</code> van je systeem, dus een van beide moet geïnstalleerd zijn — de ingebouwde speler heeft niets extra\'s nodig en staat hierbuiten.</p><pre><code>sudo apt install mpv vlc        # Debian/Ubuntu
 sudo dnf install mpv vlc        # Fedora
@@ -304,4 +304,14 @@ sudo pacman -S mpv vlc          # Arch</code></pre>',
     'nf_h1'   => 'Deze pagina bestaat niet',
     'nf_lede' => 'De link is misschien verouderd of verkeerd getypt. Begin opnieuw op de voorpagina of kijk in de hulp.',
     'nf_home' => 'Naar de voorpagina',
+    // front page: hero button per OS, lightbox, the app mock-up
+    'hero_cta_os' => 'Downloaden voor %s',
+    'lb_close' => 'Sluiten',
+    'mock_live' => 'LIVE',
+    'mock_sport' => 'Sport',
+    'mock_cinema' => 'Film',
+    'mock_nature' => 'Natuur',
+    'mock_kids' => 'Kids',
+    'mock_news' => 'Avondnieuws',
+    'mock_behind' => '− 12 min',
 ];

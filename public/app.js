@@ -3,14 +3,18 @@
 (function () {
   "use strict";
   var ua = navigator.userAgent || "";
-  var os = "Linux · macOS · Windows", label = "Download for your system";
-  if (/Mac/i.test(ua)) { os = "macOS"; label = "Download for macOS"; }
-  else if (/Windows/i.test(ua)) { os = "Windows"; label = "Download for Windows"; }
-  else if (/Linux|X11|CrOS/i.test(ua)) { os = "Linux"; label = "Download for Linux"; }
+  var os = "";
+  if (/Mac/i.test(ua)) { os = "macOS"; }
+  else if (/Windows/i.test(ua)) { os = "Windows"; }
+  else if (/Linux|X11|CrOS/i.test(ua)) { os = "Linux"; }
+  if (!os) { return; }   // unknown system: the server-rendered text stands
   var osEl = document.getElementById("osLabel");
   if (osEl) { osEl.textContent = os; }
+  // The label comes translated from the page ("Download for %s"); this
+  // file used to carry its own English and overwrite every language with it.
   var btn = document.getElementById("heroDownload");
-  if (btn) { btn.textContent = label; }
+  var fmt = btn && btn.getAttribute("data-os-label");
+  if (fmt) { btn.textContent = fmt.replace("%s", os); }
 })();
 
 /* Screenshot lightbox: click a screenshot to open it full-size. Built with DOM
@@ -31,7 +35,9 @@
   var close = document.createElement("button");
   close.className = "lb-close";
   close.type = "button";
-  close.setAttribute("aria-label", "Close");
+  var box = document.querySelector(".shots");
+  close.setAttribute("aria-label",
+                     (box && box.getAttribute("data-close")) || "Close");
   close.textContent = "×";              // ×
   overlay.appendChild(big);
   overlay.appendChild(close);

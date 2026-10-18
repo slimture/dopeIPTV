@@ -29,7 +29,7 @@ return [
 
     // feature strip chips (proper nouns stay untranslated in the template)
     "chip_timeshift" => "Timeshift / catch-up",
-    "chip_languages" => "26 languages",
+    "chip_languages" => "27 languages",
 
     // features
     "feat_eyebrow" => "Everything on one screen",
@@ -170,17 +170,17 @@ return [
     'help_hits'            => '%n matching',
     'help_toc'             => 'Sections',
     'help_no_hits'         => 'Nothing matched. Try one shorter word — the search wants every word you type to appear in the same answer.',
-    'help_more'            => 'Not here? Open an issue on <a href="https://github.com/slimture/dopeIPTV/issues" rel="nofollow">GitHub</a>. Include the version from <b>Settings → About</b> and the log — the “How do I get a log?” answer above has the exact command for your system.',
+    'help_more'            => 'Not here? Open an issue on <a href="https://github.com/slimture/dopeIPTV/issues" rel="nofollow">GitHub</a>. Include the version from <b>dopeIPTV → About dopeIPTV</b> and the log — the “How do I get a log?” answer above has the exact command for your system.',
 
     // Install and set up
     'help_start_title'     => 'Install and set up',
     'help_start_linux_q' => 'How do I install it on Linux?',
     'help_start_linux_a' => '<p>Three formats, all self-contained — Python, Qt, libmpv and ffmpeg are inside the download, so there is nothing to install alongside it.</p><p><b>AppImage</b> — the one to take if you are not sure. It runs on any distribution:</p><pre><code>chmod +x dopeIPTV-*.AppImage
-./dopeIPTV-*.AppImage</code></pre><p><b>.deb</b> on Debian or Ubuntu:</p><pre><code>sudo apt install ./dopeiptv_*_amd64.deb</code></pre><p><b>Flatpak</b>:</p><pre><code>flatpak install --user dopeIPTV-*.flatpak</code></pre><p>There are arm64 builds of all three for a Raspberry Pi or an ARM server.</p>',
+./dopeIPTV-*.AppImage</code></pre><p><b>.deb</b> on Debian or Ubuntu:</p><pre><code>sudo apt install ./dopeiptv_*_amd64.deb</code></pre><p><b>Flatpak</b>:</p><pre><code>flatpak install --user dopeIPTV-*.flatpak</code></pre><p>The AppImage and the .deb also come as arm64 builds, for a Raspberry Pi or an ARM server.</p>',
     'help_start_macos_q' => 'How do I install it on macOS?',
     'help_start_macos_a' => '<p>Open the <code>.dmg</code> and drag dopeIPTV to Applications. It needs <b>macOS 15 or later</b> and runs on Apple Silicon — 1.2.10 was the last release with an Intel build.</p><p>The first launch is refused because the app is not notarised by Apple. Right-click the app and choose <b>Open</b>, then <b>Open</b> again in the dialog. See “macOS says the app cannot be opened” below if that does not clear it.</p>',
     'help_start_windows_q' => 'How do I install it on Windows?',
-    'help_start_windows_a' => '<p>There is no installer. Unzip <code>dopeIPTV-*-windows-x64.zip</code> anywhere you like — your user folder is fine, no admin rights needed — and run <code>dopeiptv.exe</code> inside it.</p><p>There is a native <b>arm64</b> build for Snapdragon laptops; the x64 one also runs there under emulation, just slower.</p><p>For a Start-menu or desktop shortcut: <b>Settings → Interface → Maintenance → Create shortcut</b>. The <code>README.txt</code> in the zip lists everything to delete if you want the app gone without a trace.</p>',
+    'help_start_windows_a' => '<p>There is no installer. Unzip <code>dopeIPTV-*-windows-x64.zip</code> anywhere you like — your user folder is fine, no admin rights needed — and run <code>dopeiptv.exe</code> inside it.</p><p>There is a native <b>arm64</b> build for Snapdragon laptops; the x64 one also runs there under emulation, just slower.</p><p>For a Start-menu or desktop shortcut: <b>Settings → Advanced → Create shortcut</b>. The <code>README.txt</code> in the zip lists everything to delete if you want the app gone without a trace.</p>',
     'help_start_playlist_q' => 'How do I connect my provider?',
     'help_start_playlist_a' => '<p>On first launch you are asked for three things from your <b>Xtream Codes</b> account:</p><ul><li><b>Server</b> — the address with the port, like <code>http://example.com:8080</code>. Not a full playlist URL, just the host.</li><li><b>Username</b> and <b>Password</b> — the ones your provider gave you.</li></ul><p>They are saved. To add another account later, or edit this one: <b>Settings → Playlists</b>. You can switch between playlists while the app is running, and favourites and history are kept separately for each.</p>',
     'help_start_m3u_q' => 'Can I use an M3U playlist instead?',
@@ -214,7 +214,7 @@ return [
     'help_tv_xmltv_q' => 'The guide is wrong, empty, or for the wrong country',
     'help_tv_xmltv_a' => '<p>Give that playlist its own guide instead of the provider\'s:</p><ol><li><b>Settings → Playlists</b></li><li>Select the playlist and edit it</li><li>Put an <b>XMLTV</b> URL in the custom guide field</li></ol><p>It replaces whatever the provider sends. The app matches your channels to that guide by EPG id first and by channel name second, so a guide from a different source usually still lines up.</p>',
     'help_tv_times_q' => 'Everything is shifted by an hour or two',
-    'help_tv_times_a' => '<p>Some providers publish times that do not match what they actually broadcast. Two separate corrections live in <b>Settings → Playback</b>:</p><ul><li><b>EPG delay</b> shifts every time the guide displays.</li><li><b>Replay delay</b> shifts where catch-up and timeshift start playing, without touching the listings.</li></ul><p>They are separate because providers get these two wrong independently of each other.</p>',
+    'help_tv_times_a' => '<p>Some providers publish times that do not match what they actually broadcast. Two separate corrections live in <b>Settings → Guide</b>:</p><ul><li><b>EPG delay</b> shifts every time the guide displays.</li><li><b>Replay delay</b> shifts where catch-up and timeshift start playing, without touching the listings.</li></ul><p>They are separate because providers get these two wrong independently of each other.</p>',
     'help_tv_ts_q' => 'What is timeshift and catch-up?',
     'help_tv_ts_a' => '<p>Some providers keep a recording of each channel for a few days. Where yours does, the channel gets a <b>⏪</b> marker in the list, and the detail panel says how many days deep the archive goes.</p><p>If a channel has no marker, the provider is not offering an archive for it. That is their setting and nothing in the app can turn it on.</p>',
     'help_tv_tsstart_q' => 'How do I watch something that already started?',
@@ -245,7 +245,7 @@ return [
     'help_more_castfix_q' => 'The television refuses a channel',
     'help_more_castfix_a' => '<p>Some channels are ordinary H.264 video with <b>Dolby Digital Plus</b> audio. A Chromecast that is not an Ultra or a Google TV has no decoder for that and rejects the stream without saying why.</p><p>The app converts those on this computer and serves the result on your own network: the video is copied through untouched — only the audio is re-encoded, which is cheap — and it only happens <em>after</em> the device has actually refused the stream. A channel your device can play always gets the provider\'s own stream, unaltered.</p><p>This needs <code>ffmpeg</code>, which is inside every packaged download.</p>',
     'help_more_trakt_q' => 'How do I connect Trakt?',
-    'help_more_trakt_a' => '<p><b>Settings → Trakt</b>. You create an application on trakt.tv, paste in the two keys it gives you, and authorise in the browser that opens.</p><p>After that, what you watch is scrobbled, and your watchlist and history can be browsed inside the app. Your own local files are scrobbled too, whenever TMDB could identify the file.</p>',
+    'help_more_trakt_a' => '<p><b>Settings → Trakt → Connect via browser</b>. Your browser opens Trakt: sign in if you are not already, click <b>Yes</b>, and the app is connected. There are no keys to create and no code to type.</p><p>After that, what you watch is scrobbled, and your watchlist and history can be browsed inside the app. Your own local files are scrobbled too, whenever TMDB could identify the file.</p>',
 
     // Your own files
     'help_local_title'     => 'Your own files',
@@ -263,9 +263,9 @@ return [
     // Settings
     'help_set_title'       => 'Settings',
     'help_set_language_q' => 'Language and appearance',
-    'help_set_language_a' => '<p><b>Settings → Interface</b>. The interface is translated into <b>27 languages</b> and switches immediately, with no restart. Arabic, Persian, Hebrew and Urdu mirror the entire layout.</p><p>The same tab has five colour themes and seven accent colours, applied live.</p>',
+    'help_set_language_a' => '<p><b>Settings → General</b>. The interface is translated into <b>27 languages</b> and switches immediately, with no restart. Arabic, Persian, Hebrew and Urdu mirror the entire layout.</p><p><b>Settings → Appearance</b> has nine colour themes and seven accent colours, applied live.</p>',
     'help_set_playback_q' => 'Defaults for every stream',
-    'help_set_playback_a' => '<p><b>Settings → Playback</b> sets what should happen without you asking each time:</p><ul><li>Preferred <b>audio language</b></li><li><b>Subtitles</b> on or off, with a first and second preferred language</li><li>Default <b>aspect ratio</b> and <b>network buffer</b></li><li>How early the <b>“Next episode”</b> card appears — off, or one to ten minutes</li></ul><p>The ⚙ menu in the player still overrides any of these for the stream you are watching.</p>',
+    'help_set_playback_a' => '<p><b>Settings → Playback</b>, <b>Audio &amp; subtitles</b> and <b>Video</b> set what should happen without you asking each time:</p><ul><li>Preferred <b>audio language</b></li><li><b>Subtitles</b> on or off, with a first and second preferred language</li><li>Default <b>aspect ratio</b> and <b>network buffer</b></li><li>How early the <b>“Next episode”</b> card appears — off, or one to ten minutes</li></ul><p>The ⚙ menu in the player still overrides any of these for the stream you are watching.</p>',
     'help_set_parental_q' => 'Can I lock things away from other people?',
     'help_set_parental_a' => '<p>Yes. A PIN protects locked categories and locked favourite groups. A locked group does not reveal which channels are in it until the PIN is entered — hiding the contents, not just the playback.</p><p>The PIN is stored salted and hashed, not in plain text.</p>',
     'help_set_hide_q' => 'Can I hide or rename channels?',
@@ -284,7 +284,7 @@ return [
 sudo dnf install mpv ffmpeg     # Fedora
 sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_picture_q' => 'Sound plays but there is no picture',
-    'help_fix_picture_a' => '<p>The embedded player is not getting a video surface.</p><ol><li>Open <code>⚙ → Stats for nerds</code> and see whether frames are arriving at all — that separates a stream problem from a display one.</li><li>On Wayland, try <b>Settings → Playback → Run via X11 backend</b> and restart the app.</li><li>Run from a terminal and look for lines mentioning GL or mpv.</li></ol>',
+    'help_fix_picture_a' => '<p>The embedded player is not getting a video surface.</p><ol><li>Open <code>⚙ → Stats for nerds</code> and see whether frames are arriving at all — that separates a stream problem from a display one.</li><li>On Wayland, try <b>Settings → Advanced → Run via X11 backend</b> and restart the app.</li><li>Run from a terminal and look for lines mentioning GL or mpv.</li></ol>',
     'help_fix_gatekeeper_q' => 'macOS says the app cannot be opened',
     'help_fix_gatekeeper_a' => '<p>It is not notarised by Apple yet. Right-click the app and choose <b>Open</b>, then <b>Open</b> in the dialog — or allow it under <b>System Settings → Privacy &amp; Security → Open Anyway</b>.</p><p>If macOS instead says the app is <b>“damaged”</b>, that is the quarantine flag from the download. Clear it:</p><pre><code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code></pre><p>Neither warning means anything is wrong with the app — only that the build is not code-signed, which needs a paid Apple certificate.</p>',
     'help_fix_smartscreen_q' => 'Windows says “Windows protected your PC”',
@@ -296,7 +296,7 @@ sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_limit_q' => '“Connection limit reached”',
     'help_fix_limit_a' => '<p>Your account allows a certain number of streams at the same time and they are all in use. In order of likelihood:</p><ol><li>Multiview is open — each window is a connection.</li><li>A recording of a <em>different</em> channel is running.</li><li>Another device or another person is using the account.</li><li>A previous session has not timed out yet at the provider; waiting a minute often clears it.</li></ol><p>Recording the channel you are watching does <em>not</em> count as a second connection.</p>',
     'help_fix_icon_q' => 'Linux: the taskbar shows a blank icon',
-    'help_fix_icon_a' => '<p>On Wayland, GNOME and KDE take a window\'s icon from a desktop entry matching it and ignore what the application sets for itself. An AppImage has no such entry until something installs one.</p><ol><li>The app offers to add one the first time it starts. Say yes — then <b>restart the app</b>, because the window you are looking at keeps the icon it opened with.</li><li>The same switch is under <b>Settings → Playback</b> if you said no.</li><li>If the icon still does not appear, a stale icon cache is hiding it. GTK reads that file instead of the folder:</li></ol><pre><code>rm ~/.local/share/icons/hicolor/icon-theme.cache</code></pre><p>Installed from the <b>.deb</b>, the entry is already there and none of this applies.</p>',
+    'help_fix_icon_a' => '<p>On Wayland, GNOME and KDE take a window\'s icon from a desktop entry matching it and ignore what the application sets for itself. An AppImage has no such entry until something installs one.</p><ol><li>The app offers to add one the first time it starts. Say yes — then <b>restart the app</b>, because the window you are looking at keeps the icon it opened with.</li><li>The same switch is under <b>Settings → General</b> if you said no.</li><li>If the icon still does not appear, a stale icon cache is hiding it. GTK reads that file instead of the folder:</li></ol><pre><code>rm ~/.local/share/icons/hicolor/icon-theme.cache</code></pre><p>Installed from the <b>.deb</b>, the entry is already there and none of this applies.</p>',
     'help_fix_external_q' => '“Open externally” does nothing',
     'help_fix_external_a' => '<p>That option launches a standalone <code>mpv</code> or <code>vlc</code> from your system, so one of them has to be installed — the built-in player needs nothing extra and is unaffected.</p><pre><code>sudo apt install mpv vlc        # Debian/Ubuntu
 sudo dnf install mpv vlc        # Fedora
@@ -305,4 +305,14 @@ sudo pacman -S mpv vlc          # Arch</code></pre>',
     'nf_h1'   => 'This page does not exist',
     'nf_lede' => 'The link may be out of date or mistyped. Start again from the front page, or look in the help.',
     'nf_home' => 'Go to the front page',
+    // front page: hero button per OS, lightbox, the app mock-up
+    'hero_cta_os' => 'Download for %s',
+    'lb_close' => 'Close',
+    'mock_live' => 'LIVE',
+    'mock_sport' => 'Sport',
+    'mock_cinema' => 'Cinema',
+    'mock_nature' => 'Nature',
+    'mock_kids' => 'Kids',
+    'mock_news' => 'Evening News',
+    'mock_behind' => '− 12 min',
 ];

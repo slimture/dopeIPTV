@@ -22,7 +22,7 @@ $DESC   = t('meta_desc');
 $rel = @json_decode(@file_get_contents(__DIR__ . '/releases.json'), true);
 $version = $rel['version'] ?? '0.7.0';
 $assets  = $rel['assets'] ?? [];
-$relDate = !empty($rel['published_at']) ? date('M j, Y', strtotime($rel['published_at'])) : '';
+$relDate = !empty($rel['published_at']) ? fmt_date((string)$rel['published_at']) : '';
 
 // Per-file download tallies, written by dl.php (the /dl.php?f=NAME redirector
 // every download link goes through). Kept one level above the web root so it's
@@ -38,6 +38,32 @@ function dl_count(array $counts, string $name): int {
 }
 function dl_total(array $counts): int {
     return (int)array_sum(array_map('intval', $counts));
+}
+
+/**
+ * The release date and the download tallies in the reader's own format.
+ * date('M j, Y') printed "Oct 4, 2026" on every language's page, and
+ * number_format() a comma thousands separator. intl does it properly; a
+ * server without it gets ISO dates and unseparated numbers, which read the
+ * same in every language rather than English in all of them.
+ */
+function fmt_date(string $iso): string {
+    $ts = strtotime($iso);
+    if ($ts === false) { return ''; }
+    if (class_exists('IntlDateFormatter')) {
+        $f = new IntlDateFormatter(lang_locale(), IntlDateFormatter::MEDIUM,
+                                   IntlDateFormatter::NONE, 'UTC');
+        $out = $f->format($ts);
+        if (is_string($out) && $out !== '') { return $out; }
+    }
+    return gmdate('Y-m-d', $ts);
+}
+function fmt_count(int $n): string {
+    if (class_exists('NumberFormatter')) {
+        $out = (new NumberFormatter(lang_locale(), NumberFormatter::DECIMAL))->format($n);
+        if (is_string($out) && $out !== '') { return $out; }
+    }
+    return (string)$n;
 }
 
 /**
@@ -261,7 +287,7 @@ echo json_encode([
         <h1><span class="h1-brand">dopeIPTV</span> <?= t('hero_h1') ?></h1>
         <p class="lede"><?= t('hero_lede') ?></p>
         <div class="cta-row">
-          <a class="btn primary" id="heroDownload" href="#download"><?= h(t('hero_cta')) ?></a>
+          <a class="btn primary" id="heroDownload" href="#download" data-os-label="<?= h(t('hero_cta_os')) ?>"><?= h(t('hero_cta')) ?></a>
           <a class="btn ghost" href="<?= h($REPO) ?>"><?= h(t('hero_source')) ?></a>
         </div>
         <p class="platnote"><b id="osLabel">Linux · macOS · Windows</b> — <?= t('hero_free') ?></p>
@@ -270,18 +296,18 @@ echo json_encode([
         <div class="titlebar"><span class="tl-dot"></span><span class="tl-dot"></span><span class="tl-dot"></span></div>
         <div class="body">
           <div class="chans">
-            <div class="chan active"><span class="n"></span> News 24 <span class="live-tag">LIVE</span></div>
-            <div class="chan"><span class="n"></span> Channel One</div>
-            <div class="chan"><span class="n"></span> Sport</div>
-            <div class="chan"><span class="n"></span> Cinema</div>
-            <div class="chan"><span class="n"></span> Nature</div>
-            <div class="chan"><span class="n"></span> Kids</div>
+            <div class="chan active"><span class="n"></span><span class="cn">News 24</span><span class="live-tag"><?= h(t('mock_live')) ?></span></div>
+            <div class="chan"><span class="n"></span><span class="cn">Channel One</span></div>
+            <div class="chan"><span class="n"></span><span class="cn"><?= h(t('mock_sport')) ?></span></div>
+            <div class="chan"><span class="n"></span><span class="cn"><?= h(t('mock_cinema')) ?></span></div>
+            <div class="chan"><span class="n"></span><span class="cn"><?= h(t('mock_nature')) ?></span></div>
+            <div class="chan"><span class="n"></span><span class="cn"><?= h(t('mock_kids')) ?></span></div>
           </div>
           <div class="stage">
             <div class="screen"><span class="scan"></span></div>
             <div class="timeline">
               <div class="tl-track"><span class="tl-fill"></span><span class="tl-head"></span></div>
-              <div class="tl-meta"><span>19:24 · Evening News</span><span class="behind">− 12 min</span></div>
+              <div class="tl-meta"><span>19:24 · <?= h(t('mock_news')) ?></span><span class="behind"><?= h(t('mock_behind')) ?></span></div>
             </div>
           </div>
         </div>
@@ -293,7 +319,7 @@ echo json_encode([
     <div class="wrap">
       <span class="chip">Xtream Codes</span><span class="chip">M3U / M3U8</span>
       <span class="chip">XMLTV EPG</span><span class="chip"><?= h(t('chip_timeshift')) ?></span>
-      <span class="chip">Multiview</span><span class="chip">Chromecast</span><span class="chip">Trakt</span><span class="chip"><?= h(t('chip_languages')) ?></span>
+      <span class="chip"><?= t('feat_mv_h') ?></span><span class="chip">Chromecast</span><span class="chip">Trakt</span><span class="chip"><?= h(t('chip_languages')) ?></span>
     </div>
   </div>
 
@@ -323,7 +349,7 @@ echo json_encode([
         <span class="eyebrow"><?= h(t('shots_eyebrow')) ?></span>
         <h2><?= h(t('shots_h2')) ?></h2>
       </div>
-      <div class="shots">
+      <div class="shots" data-close="<?= h(t('lb_close')) ?>">
 <?php
 $shots = [
     ['main.png',       t('shot_main_alt'), t('shot_main_t'), t('shot_main_c')],
@@ -354,7 +380,7 @@ foreach ($shots as [$file, $alt, $title, $cap]):
           <span class="eyebrow"><?= h(t('dl_eyebrow')) ?></span>
           <h2><?= h(t('dl_h2')) ?></h2>
         </div>
-        <span class="release-tag"><b>v<?= h($version) ?></b><?= $relDate ? ' · ' . h($relDate) : ' · ' . h(t('dl_latest')) ?><?php $dlTotal = dl_total($dlCounts); if ($dlTotal > 0): ?> · <span class="dl-count" title="<?= h(t('dl_tip_total')) ?>">↓ <?= number_format($dlTotal) ?></span><?php endif; ?></span>
+        <span class="release-tag"><b>v<?= h($version) ?></b><?= $relDate ? ' · ' . h($relDate) : ' · ' . h(t('dl_latest')) ?><?php $dlTotal = dl_total($dlCounts); if ($dlTotal > 0): ?> · <span class="dl-count" title="<?= h(t('dl_tip_total')) ?>">↓ <?= h(fmt_count($dlTotal)) ?></span><?php endif; ?></span>
       </div>
 <?php if ($assets): foreach ($osOrder as $os): if (empty($groups[$os])) continue; ?>
       <div class="dl-group">
@@ -377,7 +403,7 @@ foreach ($shots as [$file, $alt, $title, $cap]):
           <a class="dl<?= $m['rec'] ? ' rec' : '' ?>" href="<?= h($dlHref) ?>" rel="nofollow"<?= !empty($a['sha256']) ? ' title="SHA-256: ' . h($a['sha256']) . '"' : '' ?>>
             <span class="meta">
               <span class="name"><?= h($m['title']) ?><?php if ($m['rec']): ?> <span class="badge"><?= h(t('dl_recommended')) ?></span><?php endif; ?></span>
-              <span class="sub"><span class="arch"><?= h($m['arch']) ?></span><?= $m['fmt'] ? ' · ' . $m['fmt'] : '' ?><?= $size ? ' · ' . h($size) : '' ?><?php if ($dlN > 0): ?> · <span class="dl-count" title="<?= h(t('dl_tip_row')) ?>">↓ <?= number_format($dlN) ?></span><?php endif; ?></span>
+              <span class="sub"><span class="arch"><?= h($m['arch']) ?></span><?= $m['fmt'] ? ' · ' . $m['fmt'] : '' ?><?= $size ? ' · ' . h($size) : '' ?><?php if ($dlN > 0): ?> · <span class="dl-count" title="<?= h(t('dl_tip_row')) ?>">↓ <?= h(fmt_count($dlN)) ?></span><?php endif; ?></span>
             </span>
             <span class="go"><?= h(t('dl_go')) ?></span>
           </a>

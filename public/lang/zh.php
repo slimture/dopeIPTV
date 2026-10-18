@@ -28,7 +28,7 @@ return [
 
     // feature strip chips
     "chip_timeshift" => "时移 / 回看",
-    "chip_languages" => "26 种语言",
+    "chip_languages" => "27 种语言",
 
     // features
     "feat_eyebrow" => "一屏尽览",
@@ -168,17 +168,17 @@ return [
     'help_hits'            => '结果：%n',
     'help_toc'             => '分区',
     'help_no_hits'         => '没有匹配。换个更短的词试试 —— 搜索要求你输入的每个词都出现在同一条答案里。',
-    'help_more'            => '这里没有？到 <a href="https://github.com/slimture/dopeIPTV/issues" rel="nofollow">GitHub</a> 提一个 issue。附上 <b>设置 → 关于</b> 里的版本号和日志 —— 上面「怎么拿到日志？」那条给出了适用于你系统的确切命令。',
+    'help_more'            => '这里没有？到 <a href="https://github.com/slimture/dopeIPTV/issues" rel="nofollow">GitHub</a> 提一个 issue。附上 <b>dopeIPTV → 关于 dopeIPTV</b> 里的版本号和日志 —— 上面「怎么拿到日志？」那条给出了适用于你系统的确切命令。',
 
     // 安装与设置
     'help_start_title'     => '安装与设置',
     'help_start_linux_q' => 'Linux 上怎么安装？',
     'help_start_linux_a' => '<p>三种格式，都是自带一切的 —— Python、Qt、libmpv 和 ffmpeg 都在下载包里，旁边不需要再装什么。</p><p><b>AppImage</b> —— 拿不准就用它，任何发行版都能跑：</p><pre><code>chmod +x dopeIPTV-*.AppImage
-./dopeIPTV-*.AppImage</code></pre><p>Debian 或 Ubuntu 上用 <b>.deb</b>：</p><pre><code>sudo apt install ./dopeiptv_*_amd64.deb</code></pre><p><b>Flatpak</b>：</p><pre><code>flatpak install --user dopeIPTV-*.flatpak</code></pre><p>三种都有 arm64 版本，可用于树莓派或 ARM 服务器。</p>',
+./dopeIPTV-*.AppImage</code></pre><p>Debian 或 Ubuntu 上用 <b>.deb</b>：</p><pre><code>sudo apt install ./dopeiptv_*_amd64.deb</code></pre><p><b>Flatpak</b>：</p><pre><code>flatpak install --user dopeIPTV-*.flatpak</code></pre><p>AppImage 和 .deb 也有 arm64 版本，可用于树莓派或 ARM 服务器。</p>',
     'help_start_macos_q' => 'macOS 上怎么安装？',
     'help_start_macos_a' => '<p>打开 <code>.dmg</code>，把 dopeIPTV 拖到「应用程序」。需要 <b>macOS 15 或更新</b>，应用运行在 Apple Silicon 上 —— 1.2.10 是最后一个带 Intel 构建的版本。</p><p>首次启动会被拒绝，因为应用没有经过 Apple 的公证。右键点应用选<b>打开</b>，然后在对话框里再点一次<b>打开</b>。如果这样还不行，看下面的「macOS 说无法打开这个应用」。</p>',
     'help_start_windows_q' => 'Windows 上怎么安装？',
-    'help_start_windows_a' => '<p>没有安装程序。把 <code>dopeIPTV-*-windows-x64.zip</code> 解压到任何地方 —— 用户文件夹就行，不需要管理员权限 —— 然后运行里面的 <code>dopeiptv.exe</code>。</p><p>为骁龙笔记本准备了原生 <b>arm64</b> 构建；x64 构建在那上面也能跑，只是通过模拟，因此更慢。</p><p>想在开始菜单或桌面放快捷方式：<b>设置 → 界面 → 维护 → 创建快捷方式</b>。压缩包里的 <code>README.txt</code> 列出了想彻底删除应用时需要删掉的一切。</p>',
+    'help_start_windows_a' => '<p>没有安装程序。把 <code>dopeIPTV-*-windows-x64.zip</code> 解压到任何地方 —— 用户文件夹就行，不需要管理员权限 —— 然后运行里面的 <code>dopeiptv.exe</code>。</p><p>为骁龙笔记本准备了原生 <b>arm64</b> 构建；x64 构建在那上面也能跑，只是通过模拟，因此更慢。</p><p>想在开始菜单或桌面放快捷方式：<b>设置 → 高级 → 创建快捷方式</b>。压缩包里的 <code>README.txt</code> 列出了想彻底删除应用时需要删掉的一切。</p>',
     'help_start_playlist_q' => '怎么连接我的服务商？',
     'help_start_playlist_a' => '<p>首次启动会问你 <b>Xtream Codes</b> 账号的三样东西：</p><ul><li><b>服务器</b> —— 带端口的地址，例如 <code>http://example.com:8080</code>。不是完整的播放列表网址，只要主机。</li><li><b>用户名</b>和<b>密码</b> —— 服务商给你的那组。</li></ul><p>这些会被保存。以后要再加一个账号，或者改这一个：<b>设置 → 播放列表</b>。应用运行时就能切换播放列表，收藏和历史按播放列表分开保存。</p>',
     'help_start_m3u_q' => '能不能改用 M3U 播放列表？',
@@ -212,7 +212,7 @@ return [
     'help_tv_xmltv_q' => '指南是错的、空的，或者是别国的',
     'help_tv_xmltv_a' => '<p>给那份播放列表配一份自己的指南，替代服务商的：</p><ol><li><b>设置 → 播放列表</b></li><li>选中播放列表并编辑</li><li>在自定义指南栏里填一个 <b>XMLTV</b> 地址</li></ol><p>它会取代服务商发来的那份。应用先按 EPG id、再按频道名把你的频道和这份指南对上，所以来自别处的指南通常也能对齐。</p>',
     'help_tv_times_q' => '所有时间都差了一两个小时',
-    'help_tv_times_a' => '<p>有些服务商发布的时间和他们实际播出的对不上。<b>设置 → 播放</b> 里有两个各自独立的修正：</p><ul><li><b>EPG 偏移</b>会平移指南显示的每一个时间。</li><li><b>回看偏移</b>平移回看和时移开始播放的位置，不动节目单本身。</li></ul><p>它们分开，是因为服务商会在其中一个上出错而另一个正常。</p>',
+    'help_tv_times_a' => '<p>有些服务商发布的时间和他们实际播出的对不上。<b>设置 → 节目指南</b> 里有两个各自独立的修正：</p><ul><li><b>EPG 偏移</b>会平移指南显示的每一个时间。</li><li><b>回看偏移</b>平移回看和时移开始播放的位置，不动节目单本身。</li></ul><p>它们分开，是因为服务商会在其中一个上出错而另一个正常。</p>',
     'help_tv_ts_q' => '时移和回看是什么？',
     'help_tv_ts_a' => '<p>有些服务商会为每个频道保留几天的录像。你的服务商这么做的地方，频道在列表里会带一个 <b>⏪</b> 标记，详情面板会写明存档往回有多少天。</p><p>某个频道没有标记，就是服务商没有为它提供存档。那是他们的设置，应用里没有任何东西能把它打开。</p>',
     'help_tv_tsstart_q' => '已经开播的节目怎么看？',
@@ -243,7 +243,7 @@ return [
     'help_more_castfix_q' => '电视拒绝某个频道',
     'help_more_castfix_a' => '<p>有些频道是普通的 H.264 视频，但音频是 <b>Dolby Digital Plus</b>。不是 Ultra 也不是 Google TV 的 Chromecast 没有对应解码器，会拒绝这路流而且不说原因。</p><p>应用会在这台电脑上转换这类流，并把结果放在你自己的局域网里：视频原样拷贝 —— 只重编码音频，代价很小 —— 而且只在设备<em>确实</em>拒绝之后才这么做。你的设备本来就能播的频道，永远拿到服务商的原始流，未经改动。</p><p>这需要 <code>ffmpeg</code>，它在每一个打包好的下载里都有。</p>',
     'help_more_trakt_q' => '怎么连接 Trakt？',
-    'help_more_trakt_a' => '<p><b>设置 → Trakt</b>。你在 trakt.tv 上建一个应用，把它给的两个密钥粘进去，然后在打开的浏览器里授权。</p><p>此后你看过的内容会被记录，待看列表和历史可以在应用里浏览。你自己的本地文件也会被记录，只要 TMDB 能认出这个文件。</p>',
+    'help_more_trakt_a' => '<p><b>设置 → Trakt → 通过浏览器连接</b>。浏览器会打开 Trakt：需要的话先登录，点击 <b>Yes</b>，应用就连接好了。不用创建密钥，也不用输入任何代码。</p><p>此后你看过的内容会被记录，待看列表和历史可以在应用里浏览。你自己的本地文件也会被记录，只要 TMDB 能认出这个文件。</p>',
 
     // 自己的文件
     'help_local_title'     => '自己的文件',
@@ -261,9 +261,9 @@ return [
     // 设置
     'help_set_title'       => '设置',
     'help_set_language_q' => '语言和外观',
-    'help_set_language_a' => '<p><b>设置 → 界面</b>。界面已翻译成 <b>27 种语言</b>，切换即时生效，无需重启。阿拉伯语、波斯语、希伯来语和乌尔都语会把整个布局镜像过来。</p><p>同一个标签页里有五套配色主题和七种强调色，即时生效。</p>',
+    'help_set_language_a' => '<p><b>设置 → 常规</b>。界面已翻译成 <b>27 种语言</b>，切换即时生效，无需重启。阿拉伯语、波斯语、希伯来语和乌尔都语会把整个布局镜像过来。</p><p><b>设置 → 外观</b> 里有九套配色主题和七种强调色，即时生效。</p>',
     'help_set_playback_q' => '对所有流生效的默认值',
-    'help_set_playback_a' => '<p><b>设置 → 播放</b>决定在你不每次动手的情况下应该发生什么：</p><ul><li>偏好的<b>音轨语言</b></li><li><b>字幕</b>开或关，以及第一和第二偏好语言</li><li>默认<b>画面比例</b>和<b>网络缓冲</b></li><li><b>「下一集」</b>卡片提前多久出现 —— 关闭，或一到十分钟</li></ul><p>播放器里的 ⚙ 菜单仍然可以为当前这路流覆盖其中任何一项。</p>',
+    'help_set_playback_a' => '<p><b>设置 → 播放</b>、<b>音频与字幕</b>和<b>视频</b>决定在你不每次动手的情况下应该发生什么：</p><ul><li>偏好的<b>音轨语言</b></li><li><b>字幕</b>开或关，以及第一和第二偏好语言</li><li>默认<b>画面比例</b>和<b>网络缓冲</b></li><li><b>「下一集」</b>卡片提前多久出现 —— 关闭，或一到十分钟</li></ul><p>播放器里的 ⚙ 菜单仍然可以为当前这路流覆盖其中任何一项。</p>',
     'help_set_parental_q' => '能把一些内容锁起来不让别人看吗？',
     'help_set_parental_a' => '<p>能。一个 PIN 码保护被锁定的分类和被锁定的收藏分组。锁定的分组在输入 PIN 之前连里面有哪些频道都不显示 —— 它藏的是内容，不只是播放。</p><p>PIN 是加盐哈希后存储的，不是明文。</p>',
     'help_set_hide_q' => '能隐藏或重命名频道吗？',
@@ -282,7 +282,7 @@ return [
 sudo dnf install mpv ffmpeg     # Fedora
 sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_picture_q' => '有声音但没有画面',
-    'help_fix_picture_a' => '<p>内置播放器没有拿到视频显示面。</p><ol><li>打开 <code>⚙ → Stats for nerds</code>，看看到底有没有帧进来 —— 这能把流的问题和显示的问题分开。</li><li>在 Wayland 上试试<b>设置 → 播放 → 通过 X11 后端运行</b>，然后重启应用。</li><li>从终端运行，找带 GL 或 mpv 字样的行。</li></ol>',
+    'help_fix_picture_a' => '<p>内置播放器没有拿到视频显示面。</p><ol><li>打开 <code>⚙ → Stats for nerds</code>，看看到底有没有帧进来 —— 这能把流的问题和显示的问题分开。</li><li>在 Wayland 上试试<b>设置 → 高级 → 通过 X11 后端运行</b>，然后重启应用。</li><li>从终端运行，找带 GL 或 mpv 字样的行。</li></ol>',
     'help_fix_gatekeeper_q' => 'macOS 说无法打开这个应用',
     'help_fix_gatekeeper_a' => '<p>它还没有经过 Apple 的公证。右键点应用选<b>打开</b>，然后在对话框里点<b>打开</b> —— 或者在<b>系统设置 → 隐私与安全性 → 仍要打开</b>里放行。</p><p>如果 macOS 说的是应用<b>「已损坏」</b>，那是下载时打上的隔离标记。清掉它：</p><pre><code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code></pre><p>这两种提示都不表示应用有问题 —— 只是说明构建没有签名，而签名需要一张付费的 Apple 证书。</p>',
     'help_fix_smartscreen_q' => 'Windows 提示「Windows 已保护你的电脑」',
@@ -294,7 +294,7 @@ sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_limit_q' => '「已达连接数上限」',
     'help_fix_limit_a' => '<p>你的账号允许同时开一定数量的流，而它们都被占用了。按可能性排序：</p><ol><li>多画面开着 —— 每一格都是一条连接。</li><li>正在录制<em>另一个</em>频道。</li><li>另一台设备或另一个人在用这个账号。</li><li>之前的会话在服务商那边还没超时；等一分钟往往就好了。</li></ol><p>录制你正在看的那个频道<em>不算</em>第二条连接。</p>',
     'help_fix_icon_q' => 'Linux：任务栏显示的是空图标',
-    'help_fix_icon_a' => '<p>在 Wayland 上，GNOME 和 KDE 从与窗口匹配的桌面条目里取图标，而忽略程序自己设置的那个。AppImage 在有东西装上这样一个条目之前是没有的。</p><ol><li>应用第一次启动时会提议加一个。答应它 —— 然后<b>重启应用</b>，因为已经打开的窗口会保留它开启时的图标。</li><li>如果你当时拒绝了，同一个开关在<b>设置 → 播放</b>里。</li><li>如果图标仍然不出现，那是过期的图标缓存挡住了它。GTK 会读那个文件而不是去扫描文件夹：</li></ol><pre><code>rm ~/.local/share/icons/hicolor/icon-theme.cache</code></pre><p>用 <b>.deb</b> 安装的话，条目本来就有，这些都不适用。</p>',
+    'help_fix_icon_a' => '<p>在 Wayland 上，GNOME 和 KDE 从与窗口匹配的桌面条目里取图标，而忽略程序自己设置的那个。AppImage 在有东西装上这样一个条目之前是没有的。</p><ol><li>应用第一次启动时会提议加一个。答应它 —— 然后<b>重启应用</b>，因为已经打开的窗口会保留它开启时的图标。</li><li>如果你当时拒绝了，同一个开关在<b>设置 → 常规</b>里。</li><li>如果图标仍然不出现，那是过期的图标缓存挡住了它。GTK 会读那个文件而不是去扫描文件夹：</li></ol><pre><code>rm ~/.local/share/icons/hicolor/icon-theme.cache</code></pre><p>用 <b>.deb</b> 安装的话，条目本来就有，这些都不适用。</p>',
     'help_fix_external_q' => '「用外部播放器打开」没反应',
     'help_fix_external_a' => '<p>那个选项会启动系统里独立的 <code>mpv</code> 或 <code>vlc</code>，所以两者之一必须已安装 —— 内置播放器不需要任何额外东西，也不受影响。</p><pre><code>sudo apt install mpv vlc        # Debian/Ubuntu
 sudo dnf install mpv vlc        # Fedora
@@ -303,4 +303,14 @@ sudo pacman -S mpv vlc          # Arch</code></pre>',
     'nf_h1'   => '此页面不存在',
     'nf_lede' => '链接可能已过期或输入有误。请从首页重新开始，或查看帮助。',
     'nf_home' => '前往首页',
+    // front page: hero button per OS, lightbox, the app mock-up
+    'hero_cta_os' => '下载 %s 版',
+    'lb_close' => '关闭',
+    'mock_live' => '直播',
+    'mock_sport' => '体育',
+    'mock_cinema' => '电影',
+    'mock_nature' => '自然',
+    'mock_kids' => '少儿',
+    'mock_news' => '晚间新闻',
+    'mock_behind' => '− 12 分钟',
 ];

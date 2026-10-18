@@ -29,7 +29,7 @@ return [
 
     // feature strip chips
     "chip_timeshift" => "Timeshift / catch-up",
-    "chip_languages" => "26 bahasa",
+    "chip_languages" => "27 bahasa",
 
     // features
     "feat_eyebrow" => "Semua dalam satu layar",
@@ -169,17 +169,17 @@ return [
     'help_hits'            => 'Hasil: %n',
     'help_toc'             => 'Bagian',
     'help_no_hits'         => 'Tidak ada yang cocok. Coba kata yang lebih pendek — pencarian menuntut setiap kata yang Anda ketik muncul di jawaban yang sama.',
-    'help_more'            => 'Tidak ada di sini? Buka issue di <a href="https://github.com/slimture/dopeIPTV/issues" rel="nofollow">GitHub</a>. Sertakan versi dari <b>Pengaturan → Tentang</b> dan lampirkan log — jawaban «Bagaimana cara mendapatkan log?» di atas memberi perintah persis untuk sistem Anda.',
+    'help_more'            => 'Tidak ada di sini? Buka issue di <a href="https://github.com/slimture/dopeIPTV/issues" rel="nofollow">GitHub</a>. Sertakan versi dari <b>dopeIPTV → Tentang dopeIPTV</b> dan lampirkan log — jawaban «Bagaimana cara mendapatkan log?» di atas memberi perintah persis untuk sistem Anda.',
 
     // Pemasangan dan penyiapan
     'help_start_title'     => 'Pemasangan dan penyiapan',
     'help_start_linux_q' => 'Bagaimana memasangnya di Linux?',
     'help_start_linux_a' => '<p>Ada tiga bentuk, dan ketiganya berdiri sendiri — Python, Qt, libmpv, dan ffmpeg sudah ada di dalam unduhan, jadi tidak ada yang perlu dipasang di sampingnya.</p><p><b>AppImage</b> — ambil ini kalau ragu. Ia jalan di distribusi mana pun:</p><pre><code>chmod +x dopeIPTV-*.AppImage
-./dopeIPTV-*.AppImage</code></pre><p><b>.deb</b> di Debian atau Ubuntu:</p><pre><code>sudo apt install ./dopeiptv_*_amd64.deb</code></pre><p><b>Flatpak</b>:</p><pre><code>flatpak install --user dopeIPTV-*.flatpak</code></pre><p>Ketiganya punya versi arm64, untuk Raspberry Pi atau server ARM.</p>',
+./dopeIPTV-*.AppImage</code></pre><p><b>.deb</b> di Debian atau Ubuntu:</p><pre><code>sudo apt install ./dopeiptv_*_amd64.deb</code></pre><p><b>Flatpak</b>:</p><pre><code>flatpak install --user dopeIPTV-*.flatpak</code></pre><p>AppImage dan .deb juga punya versi arm64, untuk Raspberry Pi atau server ARM.</p>',
     'help_start_macos_q' => 'Bagaimana memasangnya di macOS?',
     'help_start_macos_a' => '<p>Buka berkas <code>.dmg</code> lalu seret dopeIPTV ke Applications. Dibutuhkan <b>macOS 15 atau lebih baru</b> dan aplikasinya jalan di Apple Silicon — 1.2.10 adalah rilis terakhir yang masih menyertakan build Intel.</p><p>Peluncuran pertama ditolak karena aplikasi belum dinotarisasi oleh Apple. Klik kanan aplikasinya, pilih <b>Open</b>, lalu <b>Open</b> sekali lagi di kotak dialog. Kalau itu belum menyelesaikan, lihat «macOS bilang aplikasinya tidak bisa dibuka» di bawah.</p>',
     'help_start_windows_q' => 'Bagaimana memasangnya di Windows?',
-    'help_start_windows_a' => '<p>Tidak ada pemasang. Ekstrak <code>dopeIPTV-*-windows-x64.zip</code> ke mana pun Anda suka — folder pengguna sudah cukup, tidak butuh hak administrator — lalu jalankan <code>dopeiptv.exe</code> di dalamnya.</p><p>Ada build <b>arm64</b> native untuk laptop Snapdragon; build x64 juga jalan di situ, tetapi lewat emulasi sehingga lebih lambat.</p><p>Untuk pintasan di menu Start atau desktop: <b>Pengaturan → Antarmuka → Pemeliharaan → Buat pintasan</b>. Berkas <code>README.txt</code> di dalam zip mendaftar semua yang perlu dihapus kalau Anda ingin aplikasinya hilang tanpa jejak.</p>',
+    'help_start_windows_a' => '<p>Tidak ada pemasang. Ekstrak <code>dopeIPTV-*-windows-x64.zip</code> ke mana pun Anda suka — folder pengguna sudah cukup, tidak butuh hak administrator — lalu jalankan <code>dopeiptv.exe</code> di dalamnya.</p><p>Ada build <b>arm64</b> native untuk laptop Snapdragon; build x64 juga jalan di situ, tetapi lewat emulasi sehingga lebih lambat.</p><p>Untuk pintasan di menu Start atau desktop: <b>Pengaturan → Lanjutan → Buat pintasan</b>. Berkas <code>README.txt</code> di dalam zip mendaftar semua yang perlu dihapus kalau Anda ingin aplikasinya hilang tanpa jejak.</p>',
     'help_start_playlist_q' => 'Bagaimana menghubungkan penyedia saya?',
     'help_start_playlist_a' => '<p>Saat pertama dijalankan, Anda dimintai tiga hal dari akun <b>Xtream Codes</b> Anda:</p><ul><li><b>Server</b> — alamat berikut portnya, misalnya <code>http://example.com:8080</code>. Bukan URL daftar putar lengkap, cukup hostnya.</li><li><b>Nama pengguna</b> dan <b>Kata sandi</b> — yang diberikan penyedia Anda.</li></ul><p>Ketiganya disimpan. Untuk menambah akun lain nanti, atau menyunting yang ini: <b>Pengaturan → Daftar putar</b>. Anda bisa berpindah daftar putar selagi aplikasi berjalan, dan favorit serta riwayat disimpan terpisah untuk tiap daftar.</p>',
     'help_start_m3u_q' => 'Bisakah saya memakai daftar M3U sebagai gantinya?',
@@ -213,7 +213,7 @@ return [
     'help_tv_xmltv_q' => 'Panduannya salah, kosong, atau untuk negara lain',
     'help_tv_xmltv_a' => '<p>Beri daftar putar itu panduannya sendiri, bukan panduan penyedia:</p><ol><li><b>Pengaturan → Daftar putar</b></li><li>Pilih daftarnya lalu sunting</li><li>Isikan alamat <b>XMLTV</b> di kolom panduan khusus</li></ol><p>Ia menggantikan apa pun yang dikirim penyedia. Aplikasi mencocokkan kanal Anda dengan panduan itu lewat id EPG lebih dulu, lalu lewat nama kanal, jadi panduan dari sumber lain pun biasanya tetap pas.</p>',
     'help_tv_times_q' => 'Semuanya bergeser satu atau dua jam',
-    'help_tv_times_a' => '<p>Sebagian penyedia menerbitkan jam yang tidak sesuai dengan yang benar-benar mereka siarkan. Ada dua koreksi terpisah di <b>Pengaturan → Pemutaran</b>:</p><ul><li><b>Geseran EPG</b> menggeser setiap jam yang ditampilkan panduan.</li><li><b>Geseran siaran ulang</b> menggeser titik tempat siaran ulang dan timeshift mulai diputar, tanpa menyentuh daftar acaranya.</li></ul><p>Keduanya terpisah karena penyedia salah pada yang satu tanpa bergantung pada yang lain.</p>',
+    'help_tv_times_a' => '<p>Sebagian penyedia menerbitkan jam yang tidak sesuai dengan yang benar-benar mereka siarkan. Ada dua koreksi terpisah di <b>Pengaturan → Panduan</b>:</p><ul><li><b>Geseran EPG</b> menggeser setiap jam yang ditampilkan panduan.</li><li><b>Geseran siaran ulang</b> menggeser titik tempat siaran ulang dan timeshift mulai diputar, tanpa menyentuh daftar acaranya.</li></ul><p>Keduanya terpisah karena penyedia salah pada yang satu tanpa bergantung pada yang lain.</p>',
     'help_tv_ts_q' => 'Apa itu timeshift dan siaran ulang?',
     'help_tv_ts_a' => '<p>Sebagian penyedia menyimpan rekaman tiap kanal selama beberapa hari. Di mana penyedia Anda melakukannya, kanal itu mendapat tanda <b>⏪</b> di daftar, dan panel rincian menyebut arsipnya menjangkau berapa hari ke belakang.</p><p>Kalau sebuah kanal tak bertanda, penyedia tidak menyediakan arsip untuknya. Itu pengaturan mereka dan tidak ada apa pun di aplikasi yang bisa menyalakannya.</p>',
     'help_tv_tsstart_q' => 'Bagaimana menonton yang sudah mulai?',
@@ -244,7 +244,7 @@ return [
     'help_more_castfix_q' => 'Televisinya menolak sebuah kanal',
     'help_more_castfix_a' => '<p>Ada kanal yang berupa video H.264 biasa dengan audio <b>Dolby Digital Plus</b>. Chromecast yang bukan Ultra dan bukan Google TV tidak punya dekodernya, lalu menolak alirannya tanpa menyebut alasan.</p><p>Aplikasi mengubah kasus semacam itu di komputer ini dan menyajikan hasilnya di jaringan Anda sendiri: videonya disalin utuh — hanya audionya yang dikodekan ulang, dan itu murah — lagi pula baru terjadi <em>setelah</em> perangkatnya benar-benar menolak alirannya. Kanal yang bisa diputar perangkat Anda selalu menerima aliran asli penyedia, tanpa diubah.</p><p>Ini membutuhkan <code>ffmpeg</code>, yang ada di dalam setiap unduhan yang sudah dipaketkan.</p>',
     'help_more_trakt_q' => 'Bagaimana menghubungkan Trakt?',
-    'help_more_trakt_a' => '<p><b>Pengaturan → Trakt</b>. Anda membuat sebuah aplikasi di trakt.tv, menempelkan dua kunci yang diberikannya, lalu memberi izin di peramban yang terbuka.</p><p>Setelah itu apa yang Anda tonton akan dicatat, dan daftar tonton serta riwayat Anda bisa ditelusuri di dalam aplikasi. Berkas lokal Anda ikut dicatat juga, setiap kali TMDB berhasil mengenali berkasnya.</p>',
+    'help_more_trakt_a' => '<p><b>Pengaturan → Trakt → Sambungkan melalui peramban</b>. Peramban membuka Trakt: masuk bila perlu, klik <b>Yes</b>, dan aplikasi pun tersambung. Tidak ada kunci yang perlu dibuat dan tidak ada kode yang perlu diketik.</p><p>Setelah itu apa yang Anda tonton akan dicatat, dan daftar tonton serta riwayat Anda bisa ditelusuri di dalam aplikasi. Berkas lokal Anda ikut dicatat juga, setiap kali TMDB berhasil mengenali berkasnya.</p>',
 
     // Berkas Anda sendiri
     'help_local_title'     => 'Berkas Anda sendiri',
@@ -262,9 +262,9 @@ return [
     // Pengaturan
     'help_set_title'       => 'Pengaturan',
     'help_set_language_q' => 'Bahasa dan tampilan',
-    'help_set_language_a' => '<p><b>Pengaturan → Antarmuka</b>. Antarmukanya diterjemahkan ke <b>27 bahasa</b> dan berganti seketika, tanpa dimulai ulang. Bahasa Arab, Persia, Ibrani, dan Urdu mencerminkan seluruh tata letak.</p><p>Tab yang sama memuat lima tema warna dan tujuh warna aksen, yang langsung diterapkan.</p>',
+    'help_set_language_a' => '<p><b>Pengaturan → Umum</b>. Antarmukanya diterjemahkan ke <b>27 bahasa</b> dan berganti seketika, tanpa dimulai ulang. Bahasa Arab, Persia, Ibrani, dan Urdu mencerminkan seluruh tata letak.</p><p><b>Pengaturan → Tampilan</b> memuat sembilan tema warna dan tujuh warna aksen, yang langsung diterapkan.</p>',
     'help_set_playback_q' => 'Bawaan untuk semua aliran',
-    'help_set_playback_a' => '<p><b>Pengaturan → Pemutaran</b> menetapkan apa yang mesti terjadi tanpa Anda minta setiap kali:</p><ul><li><b>Bahasa audio</b> yang disukai</li><li><b>Subtitle</b> menyala atau tidak, dengan bahasa pilihan pertama dan kedua</li><li><b>Rasio aspek</b> dan <b>penyangga jaringan</b> bawaan</li><li>Seberapa awal kartu <b>«Episode berikutnya»</b> muncul — mati, atau satu sampai sepuluh menit</li></ul><p>Menu ⚙ di pemutar tetap bisa menimpa salah satunya untuk aliran yang sedang ditonton.</p>',
+    'help_set_playback_a' => '<p><b>Pengaturan → Pemutaran</b>, <b>Audio &amp; subtitle</b>, dan <b>Video</b> menetapkan apa yang mesti terjadi tanpa Anda minta setiap kali:</p><ul><li><b>Bahasa audio</b> yang disukai</li><li><b>Subtitle</b> menyala atau tidak, dengan bahasa pilihan pertama dan kedua</li><li><b>Rasio aspek</b> dan <b>penyangga jaringan</b> bawaan</li><li>Seberapa awal kartu <b>«Episode berikutnya»</b> muncul — mati, atau satu sampai sepuluh menit</li></ul><p>Menu ⚙ di pemutar tetap bisa menimpa salah satunya untuk aliran yang sedang ditonton.</p>',
     'help_set_parental_q' => 'Bisakah mengunci sesuatu dari orang lain?',
     'help_set_parental_a' => '<p>Bisa. Sebuah PIN melindungi kategori terkunci dan grup favorit terkunci. Grup yang terkunci bahkan tidak menunjukkan kanal apa saja yang ada di dalamnya sebelum PIN dimasukkan — ia menyembunyikan isinya, bukan hanya pemutarannya.</p><p>PIN disimpan dalam bentuk hash bergaram, bukan teks polos.</p>',
     'help_set_hide_q' => 'Bisakah menyembunyikan atau mengganti nama kanal?',
@@ -283,7 +283,7 @@ return [
 sudo dnf install mpv ffmpeg     # Fedora
 sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_picture_q' => 'Suaranya ada tapi gambarnya tidak',
-    'help_fix_picture_a' => '<p>Pemutar bawaan tidak mendapat permukaan untuk menggambar video.</p><ol><li>Buka <code>⚙ → Stats for nerds</code> lalu lihat apakah ada bingkai yang masuk sama sekali — itu memisahkan masalah aliran dari masalah tampilan.</li><li>Di Wayland, coba <b>Pengaturan → Pemutaran → Jalankan lewat backend X11</b> lalu mulai ulang aplikasinya.</li><li>Jalankan dari terminal dan cari baris yang menyebut GL atau mpv.</li></ol>',
+    'help_fix_picture_a' => '<p>Pemutar bawaan tidak mendapat permukaan untuk menggambar video.</p><ol><li>Buka <code>⚙ → Stats for nerds</code> lalu lihat apakah ada bingkai yang masuk sama sekali — itu memisahkan masalah aliran dari masalah tampilan.</li><li>Di Wayland, coba <b>Pengaturan → Lanjutan → Jalankan melalui backend X11</b> lalu mulai ulang aplikasinya.</li><li>Jalankan dari terminal dan cari baris yang menyebut GL atau mpv.</li></ol>',
     'help_fix_gatekeeper_q' => 'macOS bilang aplikasinya tidak bisa dibuka',
     'help_fix_gatekeeper_a' => '<p>Ia belum dinotarisasi Apple. Klik kanan aplikasinya lalu pilih <b>Open</b>, kemudian <b>Open</b> di kotak dialog — atau izinkan lewat <b>System Settings → Privacy &amp; Security → Open Anyway</b>.</p><p>Kalau macOS justru bilang aplikasinya <b>«rusak»</b>, itu penanda karantina dari proses unduhnya. Bersihkan:</p><pre><code>xattr -dr com.apple.quarantine /Applications/dopeIPTV.app</code></pre><p>Tidak satu pun dari kedua peringatan itu berarti ada yang salah dengan aplikasinya — hanya bahwa build-nya belum ditandatangani, dan itu butuh sertifikat Apple berbayar.</p>',
     'help_fix_smartscreen_q' => 'Windows bilang «Windows protected your PC»',
@@ -295,7 +295,7 @@ sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_limit_q' => '«Batas koneksi tercapai»',
     'help_fix_limit_a' => '<p>Akun Anda mengizinkan sejumlah aliran sekaligus dan semuanya sedang terpakai. Menurut urutan kemungkinan:</p><ol><li>Tampilan ganda sedang terbuka — tiap kotak adalah satu koneksi.</li><li>Sedang berjalan perekaman kanal <em>lain</em>.</li><li>Perangkat lain atau orang lain sedang memakai akunnya.</li><li>Sesi sebelumnya belum kedaluwarsa di sisi penyedia; menunggu semenit sering sudah cukup.</li></ol><p>Merekam kanal yang sedang Anda tonton <em>tidak</em> dihitung sebagai koneksi kedua.</p>',
     'help_fix_icon_q' => 'Linux: bilah tugas menampilkan ikon kosong',
-    'help_fix_icon_a' => '<p>Di Wayland, GNOME dan KDE mengambil ikon sebuah jendela dari entri desktop yang cocok dengannya dan mengabaikan apa yang ditetapkan program itu sendiri. Sebuah AppImage tidak punya entri semacam itu sampai ada yang memasangnya.</p><ol><li>Aplikasi menawarkan membuatkan satu pada peluncuran pertama. Terimalah — lalu <b>mulai ulang aplikasinya</b>, karena jendela yang sedang terbuka tetap memakai ikon saat ia dibuka.</li><li>Kalau Anda menolaknya, sakelar yang sama ada di <b>Pengaturan → Pemutaran</b>.</li><li>Kalau ikonnya tetap tidak muncul, ada singgahan ikon usang yang menutupinya. GTK membaca berkas itu alih-alih memindai foldernya:</li></ol><pre><code>rm ~/.local/share/icons/hicolor/icon-theme.cache</code></pre><p>Kalau dipasang dari <b>.deb</b>, entrinya sudah ada dan tidak satu pun dari ini berlaku.</p>',
+    'help_fix_icon_a' => '<p>Di Wayland, GNOME dan KDE mengambil ikon sebuah jendela dari entri desktop yang cocok dengannya dan mengabaikan apa yang ditetapkan program itu sendiri. Sebuah AppImage tidak punya entri semacam itu sampai ada yang memasangnya.</p><ol><li>Aplikasi menawarkan membuatkan satu pada peluncuran pertama. Terimalah — lalu <b>mulai ulang aplikasinya</b>, karena jendela yang sedang terbuka tetap memakai ikon saat ia dibuka.</li><li>Kalau Anda menolaknya, sakelar yang sama ada di <b>Pengaturan → Umum</b>.</li><li>Kalau ikonnya tetap tidak muncul, ada singgahan ikon usang yang menutupinya. GTK membaca berkas itu alih-alih memindai foldernya:</li></ol><pre><code>rm ~/.local/share/icons/hicolor/icon-theme.cache</code></pre><p>Kalau dipasang dari <b>.deb</b>, entrinya sudah ada dan tidak satu pun dari ini berlaku.</p>',
     'help_fix_external_q' => '«Buka di pemutar luar» tidak melakukan apa-apa',
     'help_fix_external_a' => '<p>Pilihan itu menjalankan <code>mpv</code> atau <code>vlc</code> mandiri dari sistem Anda, jadi salah satunya harus terpasang — pemutar bawaan tidak butuh tambahan apa pun dan tidak terpengaruh.</p><pre><code>sudo apt install mpv vlc        # Debian/Ubuntu
 sudo dnf install mpv vlc        # Fedora
@@ -304,4 +304,14 @@ sudo pacman -S mpv vlc          # Arch</code></pre>',
     'nf_h1'   => 'Halaman ini tidak ada',
     'nf_lede' => 'Tautan mungkin sudah usang atau salah ketik. Mulai lagi dari halaman utama, atau lihat bantuan.',
     'nf_home' => 'Ke halaman utama',
+    // front page: hero button per OS, lightbox, the app mock-up
+    'hero_cta_os' => 'Unduh untuk %s',
+    'lb_close' => 'Tutup',
+    'mock_live' => 'LANGSUNG',
+    'mock_sport' => 'Olahraga',
+    'mock_cinema' => 'Sinema',
+    'mock_nature' => 'Alam',
+    'mock_kids' => 'Anak',
+    'mock_news' => 'Berita Malam',
+    'mock_behind' => '− 12 mnt',
 ];
