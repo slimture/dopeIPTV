@@ -14,9 +14,9 @@ again, and an AppImage that updates itself.
 - **Subtitles from OpenSubtitles.** In the player's **Subtitles** menu,
   **Find subtitles online…** searches for the film or episode you are
   watching and loads the one you pick - and it comes back with that title
-  next time. It needs a free API key from opensubtitles.com, entered under
-  **Settings → Audio & subtitles**. You can also **load a subtitle file**
-  from disk.
+  next time. If it asks for an API key, get a free one at
+  opensubtitles.com and enter it under **Settings → Audio & subtitles**.
+  You can also **load a subtitle file** from disk.
 - **Your desktop's media controls (Linux).** The media keys on your
   keyboard, headphone buttons, GNOME's and KDE's media controls and KDE
   Connect on your phone now pause, play and skip - and show what is
