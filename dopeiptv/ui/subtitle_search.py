@@ -27,15 +27,22 @@ from .theme import P
 _KEY_URL = "https://www.opensubtitles.com/consumers"
 
 
+# Where Qt names the language of one country ("American English", "español
+# de España") or repeats the region, the name the speakers would look for.
+_NAMES = {"en": "English", "es": "Español", "id": "Bahasa Indonesia",
+          "pt-BR": "Português (Brasil)", "pt-PT": "Português (Portugal)",
+          "zh-CN": "简体中文", "zh-TW": "繁體中文"}
+
+
 def language_name(code: str) -> str:
-    """A language in its own words ("svenska", "Deutsch") - read by the
+    """A language in its own words ("Svenska", "Deutsch") - read by the
     people who speak it, whichever language the app is in."""
+    if code in _NAMES:
+        return _NAMES[code]
     loc = QLocale(code.replace("-", "_"))
     if loc.language() == QLocale.Language.C:
         return code
     name = loc.nativeLanguageName() or code
-    if "-" in code:
-        name = f"{name} ({loc.nativeTerritoryName()})"
     return name[:1].upper() + name[1:]
 
 

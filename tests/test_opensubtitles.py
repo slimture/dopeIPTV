@@ -247,7 +247,11 @@ def test_language_names_are_their_own():
     from dopeiptv.ui.subtitle_search import language_name
     assert language_name("sv") == "Svenska"
     assert language_name("de") == "Deutsch"
-    assert "Brasil" in language_name("pt-BR")
+    # Not the language of one country: "American English", "español de
+    # España" is what Qt calls these.
+    assert language_name("en") == "English"
+    assert language_name("es") == "Español"
+    assert language_name("pt-BR") == "Português (Brasil)"
     assert language_name("zz") == "zz"
 
 
