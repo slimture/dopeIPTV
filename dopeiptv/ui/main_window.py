@@ -195,7 +195,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._resume_settings = self._open_resume_settings(settings)
         self.resume = ResumeStore(self._resume_settings, pid)
         self.reminders = ReminderStore(settings, pid)
-        self.followed = FollowedSeriesStore(settings, pid)
+        self._follow_settings = self._open_follow_settings()
+        self.followed = FollowedSeriesStore(self._follow_settings, pid)
         self.overrides = CategoryOverrides(
             settings, f"category_overrides_{pid}" if pid else "category_overrides")
         self.channel_ov = ChannelOverrides(
@@ -2120,7 +2121,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.history = HistoryStore(self.settings, f"history_{pid}")
             self.resume = ResumeStore(self._resume_settings, pid)
             self.reminders = ReminderStore(self.settings, pid)
-            self.followed = FollowedSeriesStore(self.settings, pid)
+            self.followed = FollowedSeriesStore(self._follow_settings, pid)
             # Hide/rename/lock rules are per playlist too: kept, the old
             # provider's locks applied here and edits saved under its key.
             self.overrides = CategoryOverrides(
@@ -5258,6 +5259,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             log.warning("cache settings migration skipped: %s", e)
         return cs
 
+    @staticmethod
+    def _open_follow_settings() -> QSettings:
+        """Followed series in a file of their own, for the same reason as the
+        resume positions: each remembers every episode id it has seen, which
+        grows with every series followed - kept in the shared settings, each
+        check would have rewritten all of it on the main thread."""
+        return QSettings(QSettings.Format.IniFormat, QSettings.Scope.UserScope,
+                         ORG, "follow")
+
     def _open_resume_settings(self, shared: QSettings) -> QSettings:
         """Resume positions get their own small settings file. They are written
         every ~12s during playback; keeping them in the shared app settings -
@@ -6462,7 +6472,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # the event loop - see app.main), which skips QSettings' auto-sync on
         # destruction. Flush every settings file explicitly so this session's
         # layout, resume points and watched/cache writes actually persist.
-        for st in (self.settings, self._resume_settings, self._cache_settings):
+        for st in (self.settings, self._resume_settings, self._cache_settings,
+                   self._follow_settings):
             try:
                 st.sync()
             except Exception:

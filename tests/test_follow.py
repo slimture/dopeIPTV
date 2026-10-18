@@ -225,9 +225,12 @@ print("FOLLOW_OK")
 """
 
 
-def test_window_follows_and_announces():
+def test_window_follows_and_announces(tmp_path):
     pytest.importorskip("PyQt6")
-    env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
+    # Followed series live in a settings file of their own in the user's
+    # config directory: a fresh one, so no earlier run is remembered.
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen",
+               XDG_CONFIG_HOME=str(tmp_path))
     proc = subprocess.run(
         [sys.executable, "-c", _CHILD], capture_output=True, text=True,
         env=env, cwd=_REPO_ROOT, timeout=180)

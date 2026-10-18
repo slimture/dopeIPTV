@@ -361,6 +361,13 @@ def test_the_hub_sends_each_device_to_its_own_kind(monkeypatch):
     assert tvs.active is None
     hub.shutdown()
     assert ("shutdown",) in cc.calls and ("shutdown",) in tvs.calls
+    # On app close the device with a cast running is stopped first.
+    order = []
+    cc.shutdown = lambda: order.append("chromecast")
+    tvs.shutdown = lambda: order.append("tv")
+    tvs.active = "Living Room TV (DLNA)"
+    hub.shutdown()
+    assert order == ["tv", "chromecast"]
     # Without pychromecast, the TVs are still found.
     monkeypatch.setattr(casting.ChromecastManager, "available",
                         staticmethod(lambda: False))

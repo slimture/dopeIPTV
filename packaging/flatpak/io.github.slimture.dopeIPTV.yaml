@@ -34,6 +34,11 @@ finish-args:
   - --talk-name=org.freedesktop.ScreenSaver
   - --talk-name=org.freedesktop.login1
   - --system-talk-name=org.freedesktop.login1
+  # The desktop's media controls (MPRIS; a second copy takes an .instance
+  # name of its own) and the new-episode notifications.
+  - --own-name=org.mpris.MediaPlayer2.dopeiptv
+  - --own-name=org.mpris.MediaPlayer2.dopeiptv.*
+  - --talk-name=org.freedesktop.Notifications
   - --env=LC_NUMERIC=C
 
 # Full ffmpeg from the runtime extension (mpv links the SDK's ffmpeg at build

@@ -74,7 +74,12 @@ class CastHub:
         self._current.stop()
 
     def shutdown(self) -> None:
-        for mgr in (self.chromecast, self.dlna):
+        # The one with a cast running goes first. On app close this races
+        # the process exit, and tearing down Chromecast discovery must not
+        # spend the time the TV's Stop needs.
+        managers = sorted((self.chromecast, self.dlna),
+                          key=lambda m: getattr(m, "active", None) is None)
+        for mgr in managers:
             try:
                 mgr.shutdown()
             except Exception as e:
