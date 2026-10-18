@@ -1,3 +1,4 @@
 User-agent: *
 Allow: /
+Disallow: /trakt/
 Sitemap: https://iptv.dope.rs/sitemap.xml
