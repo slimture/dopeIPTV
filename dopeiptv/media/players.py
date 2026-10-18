@@ -13,7 +13,7 @@ from ..core.xdg import system_env
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QMessageBox
 
-from ..i18n import tr
+from ..i18n import english, tr
 
 from ..core.player_exec import find_player_executable
 
@@ -160,22 +160,23 @@ def opengl_available() -> bool:
     return _gl_error is None
 
 
-def embedded_playback_reason() -> str | None:
-    """Returns None if in-app video is available, otherwise a short explanation."""
+def embedded_playback_reason(localized: bool = False) -> str | None:
+    """None when in-app video works; otherwise why not - in English for the
+    log, or in the user's language (*localized*) for Settings."""
+    say = tr if localized else english
     if _gl_error:
-        return _gl_error
+        return say("play_err_no_gl")
     if _libmpv is None:
         hint = ""
         if sys.platform == "darwin":
             from ..core.platform_macos import libmpv_install_hint
-            hint = libmpv_install_hint()
+            hint = libmpv_install_hint(say)
         elif sys.platform == "win32":
             from ..core.platform_windows import libmpv_load_hint
-            hint = libmpv_load_hint()
-        return (f"python-mpv/libmpv failed to load ({_libmpv_error})"
-                + hint)
+            hint = libmpv_load_hint(say)
+        return say("play_err_libmpv", error=_libmpv_error) + hint
     if not hasattr(_libmpv, "MpvRenderContext"):
-        return "installed python-mpv is too old (needs the render-api support)"
+        return say("play_err_old_mpv")
     return None
 
 

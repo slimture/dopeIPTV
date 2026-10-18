@@ -82,6 +82,16 @@ from ..core.workers import (
 _UNSET = object()
 
 
+# The status row's "123 channels", per kind of list.
+_COUNT_KEYS = {
+    "live": "count_channels", "vod": "count_movies",
+    "series": "count_series", "episode": "count_episodes",
+    "fav": "count_favorites", "history": "count_history",
+    "rec": "rec_n_recordings", "watchlist": "count_watchlist",
+    "watched": "count_watched", "local": "count_files",
+}
+
+
 class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _ContextMenuMixin, _FavoritesMixin, _DetailMixin, _RemindersMixin,
                  _BusyMixin, _UpdatesMixin, _SearchMixin, _SidebarMixin,
@@ -1125,7 +1135,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # you are not at the live edge, and this is the way back. It is the
         # only thing on the strip that is ever red, so it reads as a state
         # rather than as decoration.
-        self.cast_bar_live = QPushButton("⏭ LIVE")
+        self.cast_bar_live = QPushButton("⏭ " + tr("mv_live"))
         self.cast_bar_live.setCursor(Qt.CursorShape.PointingHandCursor)
         self.cast_bar_live.setStyleSheet(
             "QPushButton{background:#FF5C5C; color:#fff; border:none;"
@@ -2314,7 +2324,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 for g in store.custom_groups():
                     locked = (section == "chan" and store.is_locked(g)
                               and not self.parental.session_unlocked)
-                    text = f"    {g}  [locked]" if locked else f"    {g}"
+                    text = (f"    {g}  " + tr("cat_locked_suffix")
+                            if locked else f"    {g}")
                     it = QListWidgetItem(text)
                     it.setData(Qt.ItemDataRole.UserRole, (section, g))
                     self.cat_list.addItem(it)
@@ -2402,7 +2413,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     self.mode, cid, c.get("category_name", "?"))
                 if (self.overrides.is_locked(self.mode, cid)
                         and not self.parental.session_unlocked):
-                    name += "  [locked]"
+                    name += "  " + tr("cat_locked_suffix")
                 ovr = self.overrides.get(self.mode, cid)
                 icon = ovr.get("icon", "")
                 if icon:
@@ -2811,9 +2822,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             rows = [r for r in rows if not r.get("_header")]
         self.all_items = rows
         self.list_model.set_items(rows, model_kind)
-        label = self.LABELS.get(model_kind, "")
-        self._set_status(f"{n} {label}".strip() if n
-                         else (empty_msg or f"0 {label}".strip()))
+        self._set_status(self._count_text(model_kind, n) if n
+                         else (empty_msg or self._count_text(model_kind, 0)))
         # On the very first populated list, select the first playable row (not a
         # section header) so the detail pane shows something straight away -
         # selecting only, never auto-playing.
@@ -2944,13 +2954,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     # -- list and filtering --------------------------------------------------------
 
-    LABELS = {
-        "live": "channels", "vod": "movies", "series": "series",
-        "episode": "episodes", "fav": "favorites",
-        "history": "history items", "rec": "recordings",
-        "watchlist": "on your list", "watched": "watched",
-        "local": "files",
-    }
+    def _count_text(self, kind: str, n: int) -> str:
+        """"123 channels" for the status row, for each kind of list."""
+        key = _COUNT_KEYS.get(kind)
+        return tr(key, n=n) if key else str(n)
 
     # History left-category -> the stored _kind values it covers, for the
     # grouped view and the per-category delete.
@@ -3210,15 +3217,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # gen-discarded async load (e.g. rapid Home<->TV toggling) could leave
         # the "Loading channels…" overlay stuck on until the next selection.
         self._hide_busy()
-        self._set_status(f"{len(filtered)} {self.LABELS[kind]}")
+        self._set_status(self._count_text(kind, len(filtered)))
         if self.mode == "fav" and not self.series_ctx and not self.all_items:
-            where = {"movie": "a movie in Movies",
-                     "series": "a series in Series"}.get(
-                         self._fav_section, "a channel in TV")
-            self._set_status(
-                f"No favorites yet - right-click {where} to add one.")
+            self._set_status(tr({"movie": "fav_empty_movies",
+                                 "series": "fav_empty_series"}.get(
+                                     self._fav_section, "fav_empty_channels")))
         elif kind == "history" and not self.all_items:
-            self._set_status("No watch history yet.")
+            self._set_status(tr("history_empty"))
 
     # -- item identity -------------------------------------------------------------
 
@@ -3287,7 +3292,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     ep["season"] = season
                     ep["name"] = (
                         f"S{season} * E{ep.get('episode_num', '?')} - "
-                        f"{ep.get('title') or 'Episode'}")
+                        f"{ep.get('title') or tr('misc_episode')}")
                     still = (ep.get("info") or {}).get("movie_image") or ""
                     ep["stream_icon"] = (ep.get("stream_icon") or still
                                          or series_cover)
@@ -3452,7 +3457,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             path = it.get("_path")
             if not path or not os.path.exists(path):
                 return
-            title = it.get("name") or "Recording"
+            title = it.get("name") or tr("rec_status_recording")
             if external or player == "vlc":
                 launch_player(player or "mpv", path, title, self)
                 return
@@ -3547,7 +3552,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         pattern = " ".join("*" + e for e in self.MEDIA_EXTS)
         path, _ = QFileDialog.getOpenFileName(
             self, tr("open_video_title"), start,
-            f"{tr('open_video_filter')} ({pattern});;All files (*)",
+            f"{tr('open_video_filter')} ({pattern});;"
+            + tr("file_filter_all"),
             options=QFileDialog.Option.DontUseNativeDialog)
         if not path:
             return
@@ -4803,9 +4809,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         live = not paused and behind < 5
         held = "⏸ " if paused else ""
         if live:
-            edge = "● LIVE"
+            edge = "● " + tr("mv_live")
         elif paused and behind < 1:
-            edge = "⏸ PAUSED"
+            edge = "⏸ " + tr("player_paused")
         elif behind < 60:
             edge = f"{held}−{int(behind)}s"
         else:
@@ -5180,7 +5186,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._ts_live_offset = 0.0
         self._pause_started = None
         if self.player.play(url, title):
-            self.wake.acquire(f"Playing {title}")
+            self.wake.acquire(tr("wake_playing", title=title))
         self._apply_seek_mode(it, "live")
         # Refresh the poster overlay glyph (play -> pause for a timeshift
         # channel, -> stop for plain live). Unlike _start_playback, the preview
@@ -5703,7 +5709,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     self.player.set_track_prefs(pref.get("aid"),
                                                 pref.get("sid"))
             if self.player.play(url, title, start=resume_at):
-                self.wake.acquire(f"Playing {title}")
+                self.wake.acquire(tr("wake_playing", title=title))
             else:
                 log.warning("embedded play() refused %s - falling back to an "
                             "external mpv window", redact_url(url))
@@ -6299,7 +6305,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def _error(self, msg: str) -> None:
         self._hide_busy()
-        self._set_status("Error: " + msg, error=True)
+        self._set_status(tr("status_error", msg=msg), error=True)
 
     # -- keyboard and close --------------------------------------------------------
 

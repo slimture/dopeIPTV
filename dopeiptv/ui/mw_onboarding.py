@@ -50,7 +50,7 @@ class _OnboardingMixin:
         # Use the name the user typed; fall back to the server host so an
         # unnamed playlist still gets a sensible label.
         name = name.strip() or server.split("//")[-1].split("/")[0] \
-            or "My playlist"
+            or tr("playlist_default_name")
         pl = self.playlist_store.add(
             {"name": name, "kind": kind, "server": server, "username": user,
              "password": pw, "epg_url": "", "refresh": "never"})

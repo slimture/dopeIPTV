@@ -127,9 +127,11 @@ def fix_app_name(name: str) -> None:
         pass
 
 
-def libmpv_install_hint() -> str:
-    """Installation hint shown when libmpv is missing on macOS."""
-    return "\n  Install with: brew install mpv && pip install python-mpv"
+def libmpv_install_hint(say=None) -> str:
+    """Installation hint shown when libmpv is missing on macOS; *say* turns
+    a string key into text (English for the log, translated for Settings)."""
+    from ..i18n import english
+    return "\n  " + (say or english)("play_hint_macos")
 
 
 class WakeLockMacOS:

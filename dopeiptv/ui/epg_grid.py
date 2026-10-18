@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..i18n import tr
+from .qt_i18n import format_when
 from .theme import P
 
 
@@ -964,7 +965,7 @@ class EpgGridDialog(QDialog):
         # Date prefix only when the programme isn't today's - keeps the
         # common case short.
         date_tag = ("" if day.date() == datetime.now().date()
-                    else day.strftime("%a %d %b") + " · ")
+                    else format_when(day, "ddd d MMM") + " · ")
         start = day.strftime("%H:%M")
         stop = datetime.fromtimestamp(p["stop_timestamp"]).strftime("%H:%M")
         mins = int((p["stop_timestamp"] - p["start_timestamp"]) // 60)
@@ -973,7 +974,8 @@ class EpgGridDialog(QDialog):
         tag = "  ⟲" if catchup else ""
         self.info.setText(
             f"{data['channel'].get('name') or '?'} · {date_tag}"
-            f"{start}–{stop} ({mins} min)  {p.get('title') or ''}{tag}")
+            f"{start}–{stop} ({tr('opt_minutes', n=mins)})  "
+            f"{p.get('title') or ''}{tag}")
         d = (p.get("description") or "").strip()
         if d:
             self.desc.setText(d)

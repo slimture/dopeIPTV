@@ -13,6 +13,7 @@ from typing import Any
 from ..core._lazy_requests import requests
 
 from ..core.log import log, register_secrets
+from ..i18n import LocalizedError, tr
 
 
 class XtreamClient:
@@ -192,9 +193,9 @@ class XtreamClient:
         action = params.get("action") or "authenticate"
         now = time.monotonic()
         if now < self._net_down_until:
-            raise requests.ConnectionError(
-                f"provider unreachable - retrying in "
-                f"{self._net_down_until - now:.0f} s (cooldown)")
+            raise requests.ConnectionError(tr(
+                "err_provider_cooldown",
+                secs=f"{self._net_down_until - now:.0f}"))
         t0 = time.monotonic()
         read_to = 60 if action in self._BIG_ACTIONS else 20
         try:
@@ -235,12 +236,12 @@ class XtreamClient:
         if not isinstance(data, dict) or "user_info" not in data:
             log.warning("xtream auth @ %s: unexpected response (no user_info)",
                         self.server)
-            raise RuntimeError("Unexpected response from the server.")
+            raise LocalizedError("err_unexpected_response")
         ui = data["user_info"]
         if str(ui.get("auth", 0)) != "1":
             log.warning("xtream auth @ %s: rejected (auth != 1, status=%s)",
                         self.server, ui.get("status"))
-            raise RuntimeError("Wrong username or password.")
+            raise LocalizedError("err_wrong_login")
         log.info(
             "xtream auth @ %s: ok - status=%s exp=%s connections=%s/%s trial=%s",
             self.server, ui.get("status"), ui.get("exp_date"),
@@ -597,7 +598,7 @@ class M3UClient(OfflineClient):
         if not self._channels:
             # A refresh that comes back empty keeps the lineup it had.
             self._channels, self._by_stream_id, self.epg_url = old
-            raise RuntimeError("No channels found in the M3U playlist.")
+            raise LocalizedError("err_m3u_no_channels")
         self._loaded = True
         self._stale = False
         return {"user_info": {"auth": 1}}
@@ -773,7 +774,7 @@ class DemoClient(OfflineClient):
 
     def live_categories(self) -> list[dict]:
         return [{"category_id": self.CATEGORY_ID,
-                 "category_name": "Demo channels"}]
+                 "category_name": tr("demo_channels")}]
 
     def live_streams(self, category_id: str | None = None) -> list[dict]:
         return [{"stream_id": i + 1, "num": i + 1, "name": name,

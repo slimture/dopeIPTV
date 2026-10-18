@@ -412,6 +412,10 @@ QPushButton {{
 QPushButton:hover  {{ background: {p['btn_hover']}; }}
 QPushButton#Primary {{ background: {ACCENT}; border: none; color: white; }}
 QPushButton#Primary:hover {{ background: {p['accent_hi']}; }}
+/* A button that cannot be pressed has to look it: without these a disabled
+   button - the accent one above all - read exactly like a live one. */
+QPushButton:disabled {{ color: {p['muted2']}; }}
+QPushButton#Primary:disabled {{ background: {p['btn']}; color: {p['muted2']}; }}
 /* The poster play/pause/stop overlay is just a white glyph (drawn in code with
    a faint dark outline so it reads over any artwork) - no disc or ring. Fully
    transparent button; a barely-there wash on hover is the only chrome. */

@@ -15,10 +15,41 @@ from ..core.recording import format_size, free_path, safe_filename
 from .theme import P
 from .widgets import confirm
 from ..core.workers import run_async
+from .qt_i18n import format_when
 from PyQt6.QtCore import QDateTime, Qt, QTimer
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QComboBox, QDateTimeEdit, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu, QMessageBox, QPushButton, QVBoxLayout
 from datetime import datetime, timedelta
+
+
+# Why a recording stopped or failed, as the recorder says it (English, and
+# also what the log shows) -> what the user reads.
+_REC_REASONS = {
+    "stopped": "rec_reason_stopped",
+    "finished": "rec_reason_finished",
+    "size limit reached": "rec_reason_size_limit",
+    "recorder stopped unexpectedly": "rec_reason_recorder_died",
+    "playback stopped": "rec_reason_playback_stopped",
+    "channel changed": "rec_reason_channel_changed",
+    "stream error": "rec_reason_stream_error",
+    "multiview": "rec_reason_multiview",
+    "continued over a new connection": "rec_reason_continued",
+    "app closed": "rec_reason_app_closed",
+    "no data captured": "rec_reason_no_data",
+    "neither ffmpeg nor mpv found": "rec_reason_no_recorder",
+    "stop time passed before the app could start it": "rec_reason_too_late",
+}
+
+
+def rec_reason(reason: str) -> str:
+    """The recorder's reason in the user's language."""
+    key = _REC_REASONS.get(reason or "")
+    if key:
+        return tr(key)
+    if (reason or "").startswith("recorder exited early (code "):
+        return tr("rec_reason_exit_code",
+                  code=reason[len("recorder exited early (code "):-1])
+    return reason or ""
 
 
 class _RecordingMixin:
@@ -30,11 +61,14 @@ class _RecordingMixin:
                  "failed": tr("rec_status_failed"),
                  "cancelled": tr("rec_status_cancelled")}.get(
                      j["status"], j["status"])
-        start = datetime.fromtimestamp(
-            j["start"]).strftime("%a %d %b %H:%M")
-        stop = ("until stopped" if j.get("stop") is None
+        start = format_when(j["start"])
+        stop = (tr("rec_until_stopped") if j.get("stop") is None
                 else datetime.fromtimestamp(j["stop"]).strftime("%H:%M"))
-        return {"name": f"[{label}] {j['title']}  ({start} – {stop})",
+        name = f"[{label}] {j['title']}  ({start} – {stop})"
+        # Why it failed, where it failed - a bare [Failed] said nothing.
+        if j["status"] == "failed" and j.get("error"):
+            name += f"  —  {rec_reason(j['error'])}"
+        return {"name": name,
                 "_job": j["id"], "_key": f"job:{j['id']}",
                 "_kind": "recjob", "_status": j["status"],
                 "_error": j.get("error") or "",
@@ -49,7 +83,8 @@ class _RecordingMixin:
         self.rec_indicator.setVisible(n > 0)
         if self.player:
             for b in (self.player.rec_btn, self.player.fs_rec_btn):
-                b.setToolTip(f"Recording ({n})" if n else "Record")
+                b.setToolTip(tr("rec_tooltip_recording", n=n) if n
+                             else tr("tooltip_record"))
                 b.setStyleSheet(
                     "color:#FF5C5C; font-weight:700;" if n
                     else "color:#FF5C5C;")
@@ -61,14 +96,15 @@ class _RecordingMixin:
             # Transient only - the persistent "● REC" pill is the lasting
             # indicator. A resting _set_status here used to linger as
             # "Recording N streams" long after recording had stopped.
-            self._flash_status(
-                f"● Recording {n} stream{'s' if n > 1 else ''}…")
+            self._flash_status(tr("rec_running_n", n=n))
 
     def _on_recording_stopped(self, title: str, reason: str) -> None:
-        self._flash_status(f"● Recording stopped: {title} ({reason})")
+        why = rec_reason(reason)
+        self._flash_status(
+            "● " + tr("rec_stopped_named", title=title, reason=why))
         if self._player_fs and self.player:
             self.player.set_overlay_info(
-                f"Recording stopped: {title} ({reason})")
+                tr("rec_stopped_named", title=title, reason=why))
 
     def _choice_dialog(self, title: str, message: str,
                        options: list[tuple[str, str]],
@@ -131,17 +167,14 @@ class _RecordingMixin:
                 return True
             j = inplayer[0]
             can_cont = bool(j.get("url"))
-            options = [("Stop recording and switch", "danger")]
+            options = [(tr("rec_guard_stop_switch"), "danger")]
             if can_cont:
-                options.append(
-                    ("Switch, keep recording on a new connection", "normal"))
-            options.append(("Keep watching (recording continues)", "primary"))
+                options.append((tr("rec_guard_switch_keep"), "normal"))
+            options.append((tr("rec_guard_keep_watching"), "primary"))
             idx = self._choice_dialog(
-                "Recording in progress",
-                f"“{j['title']}” is being recorded from the stream you're "
-                f"watching. Switching to “{title}” will stop that recording, "
-                "unless you continue it over a second connection (needs a "
-                "multi-stream account).",
+                tr("rec_guard_title"),
+                tr("rec_guard_inplayer_body", recording=j["title"],
+                   target=title),
                 options)
             if idx == 0:
                 self.rec.finish_all_inplayer("stopped")
@@ -149,7 +182,8 @@ class _RecordingMixin:
             if can_cont and idx == 1:
                 self.rec.finish_all_inplayer(
                     "continued over a new connection")
-                self.rec.add_job(j["url"], f"{j['title']} (cont.)",
+                self.rec.add_job(j["url"],
+                                 tr("rec_continued_title", title=j["title"]),
                                  time.time(), j.get("stop"),
                                  icon=j.get("stream_icon"))
                 self._multi_stream_ok = True
@@ -157,14 +191,13 @@ class _RecordingMixin:
             return False
         j = active[0]
         idx = self._choice_dialog(
-            "Recording in progress",
-            f"“{j['title']}” is being recorded over its own connection. If "
-            f"your account only allows one stream at a time, starting "
-            f"“{title}” can kill that recording.",
-            [("Watch the recorded channel", "primary"),
-             ("Stop recording and switch", "danger"),
-             ("Play anyway (I have multiple streams)", "normal"),
-             ("Cancel", "normal")])
+            tr("rec_guard_title"),
+            tr("rec_guard_separate_body", recording=j["title"],
+               target=title),
+            [(tr("rec_guard_watch_recorded"), "primary"),
+             (tr("rec_guard_stop_switch"), "danger"),
+             (tr("rec_guard_play_anyway"), "normal"),
+             (tr("common_cancel"), "normal")])
         if idx == 0:
             self._watch_recording_file(j)
             return False
@@ -186,8 +219,9 @@ class _RecordingMixin:
         # live job dict, so j["path"] fills in as the recorder sets it.
         path = j.get("path")
         if path and os.path.exists(path) and os.path.getsize(path) > 0:
-            self._start_playback(path, f"{j['title']} (recording)", None,
-                                 path, "recording", record=False)
+            self._start_playback(
+                path, tr("rec_recording_title", title=j["title"]), None,
+                path, "recording", record=False)
             return
         if _tries < 20:                       # ~10 s at 500 ms steps
             QTimer.singleShot(
@@ -288,7 +322,8 @@ class _RecordingMixin:
                            lambda: self._show_scheduled_manager())
         cap_menu = rec_menu.addMenu(tr("rec_size_limit_session"))
         current = self.rec.session_cap
-        presets = (("From Settings", None), ("No limit", 0),
+        presets = ((tr("rec_cap_from_settings"), None),
+                   (tr("rec_cap_no_limit"), 0),
                    ("250 MB", 250 * 10**6),
                    ("500 MB", 500 * 10**6),
                    ("1 GB", 10**9), ("2 GB", 2 * 10**9),
@@ -305,9 +340,10 @@ class _RecordingMixin:
                     self.rec, "session_cap", cap))
         cap_menu.addSeparator()
         known_caps = {cap for _label, cap in presets}
-        custom_label = "Custom size..."
+        custom_label = tr("rec_cap_custom")
         if current and current not in known_caps:
-            custom_label = f"Custom size... (currently {format_size(current)})"
+            custom_label = tr("rec_cap_custom_current",
+                              size=format_size(current))
         custom_act = cap_menu.addAction(custom_label)
         custom_act.setCheckable(True)
         custom_act.setChecked(bool(current) and current not in known_caps)
@@ -354,8 +390,8 @@ class _RecordingMixin:
         title = title_override or self.channel_display_name(it)
         now = time.time()
         stop_ts = None if minutes is None else now + minutes * 60
-        length = ("until stopped" if minutes is None
-                  else f"for {minutes} min")
+        length = (tr("rec_until_stopped") if minutes is None
+                  else tr("rec_for_minutes", n=minutes))
 
         watching_this = (
             self.player is not None
@@ -374,9 +410,8 @@ class _RecordingMixin:
                     title, path, stop_ts,
                     url=self.client.live_url(it["stream_id"], "ts"),
                     icon=it.get("stream_icon"))
-                self._set_status(
-                    f"● Recording {title} {length} - capturing "
-                    "the stream you're watching (no extra connection)")
+                self._set_status("● " + tr("rec_started_inplayer",
+                                           title=title, length=length))
                 return
 
         # Not the channel currently on screen. If the embedded player is
@@ -406,8 +441,9 @@ class _RecordingMixin:
         url = self.client.live_url(it["stream_id"], "ts")
         self.rec.add_job(url, title, now, stop_ts,
                          icon=it.get("stream_icon"))
-        self._set_status(
-            f"● Recording {title} {length} → {self.rec.directory()}")
+        self._set_status("● " + tr("rec_started_to", title=title,
+                                   length=length,
+                                   folder=self.rec.directory()))
 
     def _switch_and_record(self, it, stop_ts, length: str) -> None:
         """Switch the embedded player to this channel and record the
@@ -424,15 +460,15 @@ class _RecordingMixin:
                 title, path, stop_ts,
                 url=self.client.live_url(it["stream_id"], "ts"),
                 icon=it.get("stream_icon"))
-            self._set_status(
-                f"● Recording {title} {length} - capturing "
-                "the stream you're watching (no extra connection)")
+            self._set_status("● " + tr("rec_started_inplayer",
+                                       title=title, length=length))
         elif self._recorder_ready():
             url = self.client.live_url(it["stream_id"], "ts")
             self.rec.add_job(url, title, time.time(), stop_ts,
                              icon=it.get("stream_icon"))
-            self._set_status(
-                f"● Recording {title} {length} → {self.rec.directory()}")
+            self._set_status("● " + tr("rec_started_to", title=title,
+                                       length=length,
+                                       folder=self.rec.directory()))
 
     def _schedule_recording(self, it) -> None:
         if not self._recorder_ready() or it.get("stream_id") is None:
@@ -453,17 +489,14 @@ class _RecordingMixin:
         stop_edit.setCalendarPopup(True)
         stop_edit.setDisplayFormat("yyyy-MM-dd HH:mm")
         folder_box = QComboBox()
-        folder_box.addItem("(Recordings folder)", "")
+        folder_box.addItem(tr("rec_folder_default"), "")
         for rel in self.rec.folders():
             folder_box.addItem(rel, rel)
         f.addRow(tr("playlist_name"), name_edit)
         f.addRow(tr("field_start"), start_edit)
         f.addRow(tr("field_stop"), stop_edit)
         f.addRow(tr("field_save_in"), folder_box)
-        hint = QLabel(
-            f"Saved under {self.rec.directory()} - change the "
-            "location in Settings → Recording. The app must be "
-            "running when the recording starts.")
+        hint = QLabel(tr("rec_schedule_hint", folder=self.rec.directory()))
         hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         hint.setWordWrap(True)
         f.addRow(hint)
@@ -488,10 +521,8 @@ class _RecordingMixin:
         self.rec.add_job(url, title, start_ts, stop_ts,
                          folder_box.currentData(),
                          icon=it.get("stream_icon"))
-        when = datetime.fromtimestamp(start_ts).strftime(
-            "%a %d %b %H:%M")
-        self._set_status(
-            f"Recording of {title} scheduled for {when}")
+        self._set_status(tr("rec_scheduled_for", title=title,
+                            when=format_when(start_ts)))
 
     def _edit_job_times(self, job_id: str) -> None:
         job = next((j for j in self.rec.jobs if j["id"] == job_id), None)
@@ -661,8 +692,8 @@ class _RecordingMixin:
                 self.rec.write_info(it["_path"], "", "", icon="")  # drop sidecar
                 self.rec.prune_path(it["_path"])
             except OSError as e:
-                self._set_status(
-                    f"Could not delete: {e}", error=True)
+                self._set_status(tr("rec_delete_failed", error=e),
+                                 error=True)
         cur = self.cat_list.currentItem()
         self._load_items(
             cur.data(Qt.ItemDataRole.UserRole) if cur else None)
@@ -689,7 +720,8 @@ class _RecordingMixin:
                 self.rec.write_info(it["_path"], "", "", icon="")
                 self.rec.prune_path(it["_path"])
             except OSError as e:
-                self._set_status(f"Could not delete: {e}", error=True)
+                self._set_status(tr("rec_delete_failed", error=e),
+                                 error=True)
         self._load_items(sel)
 
     def _rename_recording(self, it) -> None:
@@ -777,7 +809,7 @@ class _RecordingMixin:
                 os.path.join(self.rec.directory(), name),
                 exist_ok=True)
         except OSError as e:
-            QMessageBox.warning(self, "New folder", str(e))
+            QMessageBox.warning(self, tr("msg_new_folder_title"), str(e))
             return
         if items:
             self._move_recordings(items, name)
@@ -1010,7 +1042,7 @@ class _RecordingMixin:
         now = time.time()
         if prog:
             start = prog["start_timestamp"]
-            what = prog.get("title") or "programme"
+            what = prog.get("title") or tr("ts_programme")
         else:
             start = now - (back_min or 30) * 60
             what = None
@@ -1049,8 +1081,8 @@ class _RecordingMixin:
                   "candidates=%s", back_min, bool(prog), days,
                   datetime.fromtimestamp(start), urls)
         name = self.channel_display_name(it)
-        title = (f"{what} ({name}, timeshift)" if what
-                 else f"{name} (timeshift)")
+        title = (tr("ts_title_programme", what=what, name=name) if what
+                 else tr("ts_title_channel", name=name))
         key = self._item_key(it)
         # Probe the candidate URLs over HTTP in the background - the live video
         # keeps playing untouched. Only when a candidate is confirmed to serve
@@ -1291,19 +1323,14 @@ class _RecordingMixin:
 
         def done(progs):
             if not progs:
-                info.setText(
-                    "The guide has no past programmes for this "
-                    "channel - use 'Go back ...' instead.")
+                info.setText(tr("ts_no_past_programmes"))
                 return
-            info.setText(
-                f"{len(progs)} programmes - the provider archives "
-                f"{days} day{'s' if days != 1 else ''} back. "
-                "Double-click to watch.")
+            info.setText(tr("ts_past_programmes", n=len(progs), days=days))
             last_day = None
             for p in progs:
                 start = datetime.fromtimestamp(p["start_timestamp"])
                 stop = datetime.fromtimestamp(p["stop_timestamp"])
-                day = start.strftime("%A %d %B")
+                day = format_when(start, "dddd d MMMM")
                 if day != last_day:
                     last_day = day
                     head = QListWidgetItem(f"—  {day}  —")
@@ -1317,8 +1344,7 @@ class _RecordingMixin:
                 lst.addItem(row)
 
         run_async(self.pool, fetch, done,
-                  lambda e: info.setText(
-                      f"Could not load the guide: {e}"))
+                  lambda e: info.setText(tr("ts_guide_failed", error=e)))
         d.exec()
 
     # -- recording context menu ----------------------------------------------------

@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..core.log import log, redact_url
-from ..i18n import tr
+from ..i18n import LocalizedError, tr
 from ..core.workers import run_async
 from .cast_bridge import (
     QUALITY, SAFE_AUDIO, SAFE_VIDEO, CastBridge,
@@ -512,7 +512,7 @@ class ChromecastManager:
                 self.scan()
                 cc = self._device(device_name)
             if cc is None:
-                raise RuntimeError(f"device '{device_name}' not found - rescan")
+                raise LocalizedError("cast_err_not_found", name=device_name)
         if settle:
             # The player was holding a connection a moment ago and this
             # account has one. The panel goes on counting a closed session for
@@ -529,7 +529,7 @@ class ChromecastManager:
             # Nothing to hand over. It has happened - a panel reopened on a
             # session whose address had not been recorded - and casting an
             # empty string just produces a mystified receiver.
-            raise RuntimeError("there is no address to cast")
+            raise LocalizedError("cast_err_no_address")
         quality = self._needed_quality(quality, height, fps)
         cc.wait(timeout=10)
         mc = cc.media_controller
@@ -568,7 +568,7 @@ class ChromecastManager:
                                  title, audio, subs, start, quality):
                 return device_name
             if audio is not None or subs is not None or quality != "original":
-                raise RuntimeError("the chosen track could not be cast")
+                raise LocalizedError("cast_err_track")
             # Only the pause was riding on the converter. Casting the channel
             # matters more than being able to hold it, so carry on the
             # ordinary way rather than fail outright.
@@ -579,7 +579,7 @@ class ChromecastManager:
             if self._bridge_cast(mc, device_name, source or url, codecs,
                                  title, start=start):
                 return device_name
-            raise RuntimeError(self._no_decoder(codecs))
+            raise self._no_decoder(codecs)
 
         # First attempt: the address the stream really lives at.
         #
@@ -608,9 +608,7 @@ class ChromecastManager:
             if self._bridge_cast(mc, device_name, source or url, codecs,
                                  title, start=start):
                 return device_name
-            raise RuntimeError(
-                f"this stream is {ctype}, and repackaging it here did not "
-                f"help either")
+            raise LocalizedError("cast_err_container", type=ctype)
         log.info("cast -> %s: %s (%s)", device_name, resolved,
                  ctype if served else f"{ctype}, guessed")
         verdict = self._play_and_verify(mc, resolved, ctype, title,
@@ -660,7 +658,7 @@ class ChromecastManager:
             if self._play_and_verify(mc, url, fallback, title,
                                      start=start) is not False:
                 return device_name
-        raise RuntimeError(self._no_decoder(codecs))
+        raise self._no_decoder(codecs)
 
     @staticmethod
     def _needed_quality(want: str, height: int, fps: float) -> str:
@@ -714,12 +712,11 @@ class ChromecastManager:
         return f"{out_h}p{out_fps:g}" if out_fps else f"{out_h}p"
 
     @staticmethod
-    def _no_decoder(codecs: list[str]) -> str:
+    def _no_decoder(codecs: list[str]) -> LocalizedError:
         bad = " + ".join(c for c in codecs if c not in _CAST_CODECS)
         if not bad:
-            return ("the Chromecast refused this stream, and converting it "
-                    "here did not help either")
-        return f"this channel is {bad}, and converting it here did not help"
+            return LocalizedError("cast_err_refused")
+        return LocalizedError("cast_err_codecs", codecs=bad)
 
     def _bridge_cast(self, mc, device_name: str, url: str,
                      codecs: list[str], title: str,
@@ -746,10 +743,10 @@ class ChromecastManager:
             self._refused.setdefault(device_name, set()).update(bad)
             self._needs_bridge.add((device_name, url))
         if not CastBridge.available():
-            raise RuntimeError(
-                f"this Chromecast has no decoder for this channel "
-                f"({' + '.join(bad) or 'unknown codecs'}) - install ffmpeg "
-                f"to convert it here")
+            if bad:
+                raise LocalizedError("cast_err_need_ffmpeg",
+                                     codecs=" + ".join(bad))
+            raise LocalizedError("cast_err_need_ffmpeg_any")
         if audio is None and subs is None and quality == "original":
             log.info("cast: %s cannot decode %s - converting it here",
                      device_name, " + ".join(bad) or "this stream")

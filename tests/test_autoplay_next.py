@@ -436,7 +436,6 @@ def test_toggling_grid_inside_a_series_keeps_the_episodes():
         setWrapping=lambda b: None, set_grid_cell=lambda c: None,
         setGridSize=lambda s: None, setResizeMode=lambda m: None)
     f.search = SimpleNamespace(text=lambda: "")
-    f.LABELS = {"episode": "episodes"}
     f.rebuilt = []
     f._load_items = lambda cat: f.rebuilt.append(cat)
     f._channel_hidden = lambda it, kind: False
@@ -445,6 +444,7 @@ def test_toggling_grid_inside_a_series_keeps_the_episodes():
     f._set_status = lambda *a, **k: None
     f._pending_jump_key = None
     for n in ("_apply_view_settings", "_apply_filter", "_content_kind",
+              "_count_text",
               "_is_combined_view", "_apply_list_layout", "_grid_on",
               "_inline_view_changed", "_sort_setting_key",
               "_current_sort_raw", "_sync_sort_box"):

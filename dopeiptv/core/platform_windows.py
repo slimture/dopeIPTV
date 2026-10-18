@@ -180,7 +180,7 @@ def create_shortcut(desktop: bool = True, start_menu: bool = True,
     return made
 
 
-def libmpv_load_hint() -> str:
+def libmpv_load_hint(say=None) -> str:
     """What to tell the user when python-mpv could not load libmpv.
 
     Shown after the raw error in Settings > Playback and in the log, so it
@@ -197,27 +197,17 @@ def libmpv_load_hint() -> str:
       Releases now bundle the loader beside mpv-2.dll (issue #19); the
       check stays for older builds and for a bundle that lost the file.
     """
+    from ..i18n import english
+    say = say or english
     d = bundled_libmpv_dir()
     if d is None:
         if getattr(sys, "frozen", False):
-            return (" mpv-2.dll is missing from the app's _internal folder: "
-                    "an antivirus may have quarantined it (see README.txt), "
-                    "or the exe was moved away from its folder. Unzip the "
-                    "download again.")
-        return (" mpv-2.dll was not found. For a source run, put mpv-2.dll "
-                "next to the app or on your PATH "
-                "(https://mpv.io/installation/).")
+            return " " + say("play_hint_win_quarantined")
+        return " " + say("play_hint_win_missing")
     system32 = os.path.join(
         os.environ.get("SystemRoot", r"C:\Windows"), "System32")
     vulkan = next((os.path.join(p, "vulkan-1.dll") for p in (d, system32)
                    if os.path.isfile(os.path.join(p, "vulkan-1.dll"))), None)
     if vulkan is None:
-        return (f" mpv-2.dll is present ({d}) but Windows could not load "
-                "it: it needs vulkan-1.dll (the Vulkan runtime that "
-                "graphics drivers install), and this PC has none. Update "
-                "to a dopeIPTV release that bundles it, or update the "
-                "graphics driver.")
-    return (f" mpv-2.dll is present ({d}) and vulkan-1.dll was found "
-            f"({vulkan}), so a different dependency is missing or the file "
-            "is damaged. Please attach a log to a bug report (see "
-            "README.txt).")
+        return " " + say("play_hint_win_no_vulkan", folder=d)
+    return " " + say("play_hint_win_other", folder=d, vulkan=vulkan)

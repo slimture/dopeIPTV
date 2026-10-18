@@ -12,104 +12,15 @@ from datetime import datetime
 
 import os
 
-from PyQt6.QtCore import QEvent, QObject, QRectF, QSize, Qt, QTimer
-from PyQt6.QtGui import (
-    QColor, QCursor, QFont, QFontMetrics, QIcon, QPainter,
-)
+from PyQt6.QtCore import QEvent, QObject, Qt, QTimer
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QAbstractItemView, QAbstractSlider, QAbstractSpinBox, QApplication,
-    QCheckBox, QComboBox, QDialog,
-    QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout, QInputDialog,
-    QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox,
-    QPushButton, QScrollArea, QScrollBar, QSizePolicy, QSpinBox, QTabBar,
-    QTabWidget,
-    QTextBrowser, QVBoxLayout, QWidget,
+    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog,
+    QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
+    QListWidgetItem, QMessageBox, QPushButton, QScrollArea, QScrollBar,
+    QSpinBox, QTextBrowser, QVBoxLayout, QWidget,
 )
-
-
-class _TightTabBar(QTabBar):
-    """Tab widths computed directly from the label text, bypassing the style
-    engine entirely. macOS kept stretching/spreading styled tabs across the
-    full bar no matter which style or QSS flags were set; owning the size
-    hint is deterministic on every platform."""
-
-    def __init__(self, parent=None) -> None:
-        super().__init__(parent)
-        self.setExpanding(False)
-        self.setUsesScrollButtons(False)
-        # No base line: a replacement tab bar draws its frame line along the
-        # bar (visible as a stray line above the tabs, partly repainted away
-        # under the selected one); the styled pane draws its own border.
-        self.setDrawBase(False)
-        self.setMouseTracking(True)   # hover chip repaints (custom paint)
-
-    def tabSizeHint(self, index: int) -> QSize:
-        # Measure with a BOLD variant of the tab font: the selected tab is
-        # painted bold, and a width measured with the regular weight would
-        # clip the label on selection.
-        sz = super().tabSizeHint(index)
-        f = QFont(self.font())
-        f.setBold(True)
-        w = QFontMetrics(f).horizontalAdvance(self.tabText(index)) + 30
-        return QSize(w, sz.height())
-
-    def minimumTabSizeHint(self, index: int) -> QSize:
-        return self.tabSizeHint(index)
-
-    def sizeHint(self) -> QSize:
-        # A little headroom past the last tab, so nothing ever paints against
-        # the bar's right boundary.
-        sz = super().sizeHint()
-        return QSize(sz.width() + 12, sz.height())
-
-    def paintEvent(self, _event) -> None:
-        # Paint the tabs entirely ourselves. Letting the style paint them
-        # kept producing a selected-tab background drawn LARGER than the tab
-        # rect on macOS - its overhang clipped at the bar boundary on the
-        # last tab, immune to every size/width fix. Owning the pixels ends
-        # it: rounded chip for the selected (and hovered) tab, label centred
-        # in the exact rect the layout computed.
-        pr = QPainter(self)
-        pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        hover = self.tabAt(self.mapFromGlobal(QCursor.pos()))
-        for i in range(self.count()):
-            selected = i == self.currentIndex()
-            if selected or i == hover:
-                pr.setPen(Qt.PenStyle.NoPen)
-                pr.setBrush(QColor(P["btn"] if selected else P["hover"]))
-                pr.drawRoundedRect(
-                    QRectF(self.tabRect(i)).adjusted(1.0, 3.0, -1.0, -3.0),
-                    7.0, 7.0)
-            f = QFont(self.font())
-            f.setBold(selected)
-            pr.setFont(f)
-            pr.setPen(QColor(P["text"] if selected else P["text2"]))
-            pr.drawText(self.tabRect(i), Qt.AlignmentFlag.AlignCenter,
-                        self.tabText(i))
-        pr.end()
-
-    def mouseMoveEvent(self, event) -> None:
-        super().mouseMoveEvent(event)
-        self.update()   # refresh the hover chip
-
-    def leaveEvent(self, event) -> None:
-        super().leaveEvent(event)
-        self.update()
-
-
-class _TightTabs(QTabWidget):
-    """QTabWidget wired to the tight tab bar (setTabBar is protected, so a
-    subclass is the supported way in). Note: setTabBar RESETS the bar's
-    expanding flag to true - which is why earlier setExpanding calls never
-    stuck - so it must be re-disabled after."""
-
-    def __init__(self, parent=None) -> None:
-        super().__init__(parent)
-        bar = _TightTabBar(self)
-        self.setTabBar(bar)
-        # setTabBar resets these two on the way in - re-assert after.
-        bar.setExpanding(False)
-        bar.setDrawBase(False)
 
 
 class _WheelGuard(QObject):
@@ -151,6 +62,10 @@ from ..core.xdg import open_url
 from ..core.recording import format_size
 from ..media.players import embedded_playback_reason
 from .theme import ACCENTS, P, THEMES, apply_theme, build_style
+from .settings_ui import (
+    PlaylistDelegate, ReorderList, SettingsPage, SettingsShell, hbox,
+    page_icon, settings_style,
+)
 from .widgets import confirm
 from ..core.updates import GITHUB_REPO, fetch_latest_release, is_newer
 from ..core.workers import (
@@ -228,7 +143,7 @@ class _SettingsMixin:
 
     def _choose_rec_dir(self) -> None:
         d = QFileDialog.getExistingDirectory(
-            self, "Choose recordings folder", self.rec.directory(),
+            self, tr("rec_choose_folder_title"), self.rec.directory(),
             QFileDialog.Option.DontUseNativeDialog
             | QFileDialog.Option.ShowDirsOnly)
         if d:
@@ -607,246 +522,82 @@ class _SettingsMixin:
     def open_settings(self) -> None:
         d = QDialog(self)
         d.setWindowTitle(tr("settings_title"))
-        # Roomy enough for the full tab row (the Multiview tab pushed the old
-        # 820 width into scroll arrows) and the taller grouped forms.
-        d.setMinimumSize(900, 660)
-        # Tall enough that the grouped tabs aren't cramped, but a fixed, modest
-        # width - the forms don't need to get wider, only taller (the earlier
-        # width-scaling made it far too wide on a big window). Clamped to the
-        # main window so it never spills past it.
+        d.setMinimumSize(860, 600)
+        # Sized from the main window, never past it: wide enough for the
+        # sidebar beside a full page, no wider - the pages cap their own
+        # width, so more room would only be empty margin.
         geo = self.geometry()
-        d.resize(min(geo.width(), 960),
-                 min(geo.height(), max(700, int(geo.height() * 0.85))))
+        d.resize(min(geo.width(), 1040),
+                 min(geo.height(), max(680, int(geo.height() * 0.85))))
         # Build the whole dialog with painting suspended, re-enabled just
-        # before exec(): the tabs, forms and combos would otherwise each
-        # trigger their own paint/polish pass during construction. One pass
-        # at the end instead.
+        # before exec(): the pages, rows and combos would otherwise each
+        # trigger their own paint/polish pass during construction.
         d.setUpdatesEnabled(False)
+        d.setStyleSheet(settings_style())
         outer = QVBoxLayout(d)
-        outer.setContentsMargins(18, 18, 18, 18)
-        # Custom tab bar with code-computed tab widths (see _TightTabBar):
-        # the only approach that packs the tabs identically on macOS, Linux
-        # and Windows - style flags and QSS alone kept being overridden by
-        # macOS's tab layout.
-        tabs = _TightTabs()
-        # On macOS the native tab style hands each tab a fixed slot and elides
-        # anything that doesn't fit ("Playba…", "Interfac…"). Ask the tab bar
-        # to never elide and let scroll buttons appear if we run out of room
-        # instead. No effect on Linux, where tabs already size to their text.
-        if sys.platform == "darwin":
-            tabs.tabBar().setElideMode(Qt.TextElideMode.ElideNone)
-            tabs.tabBar().setUsesScrollButtons(True)
-            tabs.setStyleSheet(
-                "QTabBar::tab { padding: 6px 14px; min-width: 90px; }")
-        outer.addWidget(tabs)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        # A sidebar of pages with a search over it, instead of a row of ten
+        # tabs that set the dialog's width (and, translated, overflowed it).
+        shell = SettingsShell(tr("set_search"), tr("set_search_none"))
+        outer.addWidget(shell, 1)
 
-        # Playback tab
-        play_tab = QWidget()
-        pf = QFormLayout(play_tab)
-        pf.setSpacing(10)
-        autoplay_box = self._combo(
-            [("true", tr("option_yes")), ("false", tr("option_no"))],
-            "true" if self._autoplay_preview() else "false")
-        autoplay_next_box = self._combo(
-            [("true", tr("option_yes")), ("false", tr("option_no"))],
-            self.settings.value("autoplay_next_episode", "true"))
-        # How early the "Next episode" card appears. A number the user picks
-        # rather than one guessed here: where the credits start varies from
-        # show to show, and two rounds of picking it for them landed on
-        # "still too late" both times.
-        nextup_box = self._combo(
-            [("0", tr("option_off"))]
-            + [(str(m * 60), tr("opt_minutes", n=m))
-               for m in (1, 2, 3, 5, 10)],
-            str(self.settings.value("nextup_lead_secs", "180")))
-        autorecon_box = self._combo(
-            [("true", tr("option_yes")), ("false", tr("option_no"))],
-            self.settings.value("auto_reconnect_live", "true"))
-        # Stored inverted (hide_upcoming_prompt): the setting the user sees is
-        # "ask", the "Don't show again" checkbox in the prompt hides it.
-        upcoming_box = self._combo(
-            [("true", tr("option_yes")), ("false", tr("option_no"))],
-            "false" if self.settings.value(
-                "hide_upcoming_prompt", "false") == "true" else "true")
-        fmt_box = self._combo(
-            [("ts", "ts"), ("m3u8", "m3u8")],
-            self.settings.value("stream_format", "ts"))
-        LANGS = [
-            ("", tr("option_lang_auto")), ("swe", tr("lang_swe")),
-            ("eng", tr("lang_eng")), ("nor", tr("lang_nor")),
-            ("dan", tr("lang_dan")), ("fin", tr("lang_fin")),
-            ("ger", tr("lang_ger")), ("fre", tr("lang_fre")),
-            ("spa", tr("lang_spa")), ("ita", tr("lang_ita")),
-            ("por", tr("lang_por")), ("pol", tr("lang_pol")),
-            ("ara", tr("lang_ara")), ("tur", tr("lang_tur")),
-        ]
-        alang_box = self._combo(
-            LANGS, self.settings.value("audio_lang", ""))
-        sub_box = self._combo(
-            [("off", tr("option_sub_off")), ("auto", tr("option_sub_auto")),
-             ("lang", tr("option_sub_lang")),
-             ("forced", tr("option_sub_forced"))],
-            self.settings.value("sub_mode", "auto"))
-        slang_box = self._combo(
-            LANGS, self.settings.value("sub_lang", ""))
-        slang2_box = self._combo(
-            LANGS, self.settings.value("sub_lang2", ""))
-        aspect_box = self._combo(
-            [("auto", tr("option_aspect_auto")), ("16:9", "16:9"),
-             ("4:3", "4:3"), ("2.35:1", "2.35:1"),
-             ("stretch", tr("option_aspect_stretch"))],
-            self.settings.value("aspect_mode", "auto"))
-        hwdec_box = self._combo(
-            [("no", tr("option_hwdec_off")),
-             ("auto-copy-safe", tr("option_hwdec_safe")),
-             ("auto-safe", tr("option_hwdec_direct"))],
-            str(self.settings.value("hwdec_mode", "") or "no"))
-        deint_box = self._combo(
-            [("false", tr("option_no")), ("true", tr("option_yes"))],
-            self.settings.value("video_deinterlace", "false"))
-        sharpen_box = self._combo(
-            [("0.0", tr("option_off")), ("0.5", tr("option_low")),
-             ("1.0", tr("option_medium")), ("2.0", tr("option_high"))],
-            str(self.settings.value("video_sharpen", "0.0")))
-        tonemap_box = self._combo(
-            [("auto", tr("option_tonemap_auto")), ("hable", "Hable"),
-             ("mobius", "Mobius"), ("reinhard", "Reinhard"),
-             ("bt.2390", "BT.2390"), ("clip", tr("option_tonemap_clip"))],
-            self.settings.value("video_tonemapping", "auto"))
-        buf_box = self._combo(
-            [("1", "1 s"), ("3", "3 s"), ("5", "5 s"),
-             ("10", "10 s"), ("30", "30 s")],
-            str(self.settings.value("cache_secs", "10")))
+        def page(key: str, title: str, subtitle: str,
+                 icon: str) -> SettingsPage:
+            return shell.add_page(SettingsPage(key, title, subtitle),
+                                  page_icon(icon, self._action_pixmap))
 
-        def delay_row(key: str):
-            try:
-                total = int(self.settings.value(key, 0))
-            except (TypeError, ValueError):
-                total = 0
-            sign_box = self._combo(
-                [("+", "+ (later)"), ("-", "- (earlier)")],
-                "-" if total < 0 else "+")
-            hours, minutes = divmod(abs(total), 60)
-            hours_box = QSpinBox()
-            hours_box.setRange(0, 23)
-            hours_box.setSuffix(" h")
-            hours_box.setValue(hours)
-            minutes_box = QSpinBox()
-            minutes_box.setRange(0, 59)
-            minutes_box.setSuffix(" m")
-            minutes_box.setValue(minutes)
-            row = QHBoxLayout()
-            row.addWidget(sign_box)
-            row.addWidget(hours_box)
-            row.addWidget(minutes_box)
-            row.addStretch(1)
-            return row, sign_box, hours_box, minutes_box
+        on = "true"
 
-        (replay_delay_row, replay_sign_box, replay_hours_box,
-         replay_minutes_box) = delay_row("replay_delay_min")
-        (epg_delay_row, epg_sign_box, epg_hours_box,
-         epg_minutes_box) = delay_row("epg_delay_min")
-        def section(text: str) -> None:
-            """A small caps subheading that groups the rows under it, so the
-            Playback tab reads as a few labelled clusters instead of one long
-            flat list."""
-            lbl = QLabel(text)
-            lbl.setStyleSheet(
-                f"color:{P['accent']}; font-size:10px; font-weight:700;"
-                "text-transform:uppercase; letter-spacing:1px; margin-top:12px;")
-            pf.addRow(lbl)
+        def is_on(key: str, default: str) -> bool:
+            return self.settings.value(key, default) == on
 
-        section(tr("sec_playback"))
-        pf.addRow(tr("setting_autoplay_preview"), autoplay_box)
-        pf.addRow(tr("setting_autoplay_next"), autoplay_next_box)
-        pf.addRow(tr("setting_nextup_lead"), nextup_box)
-        pf.addRow(tr("setting_auto_reconnect"), autorecon_box)
-        pf.addRow(tr("set_upcoming_prompt"), upcoming_box)
-        pf.addRow(tr("setting_stream_format"), fmt_box)
-        section(tr("sec_audio_subs"))
-        pf.addRow(tr("setting_audio_lang"), alang_box)
-        pf.addRow(tr("setting_subtitles"), sub_box)
-        pf.addRow(tr("setting_sub_lang"), slang_box)
-        pf.addRow(tr("setting_sub_lang_fallback"), slang2_box)
-        section(tr("sec_video"))
-        pf.addRow(tr("setting_aspect_ratio"), aspect_box)
-        pf.addRow(tr("setting_deinterlace"), deint_box)
-        pf.addRow(tr("setting_sharpen"), sharpen_box)
-        pf.addRow(tr("setting_tonemapping"), tonemap_box)
-        pf.addRow(tr("setting_hwdec"), hwdec_box)
-        hwdec_hint = QLabel(tr("setting_hwdec_hint"))
-        hwdec_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
-        hwdec_hint.setWordWrap(True)
-        pf.addRow(hwdec_hint)
-        section(tr("sec_network"))
-        pf.addRow(tr("setting_network_buffer"), buf_box)
-        pf.addRow(tr("setting_replay_delay"), replay_delay_row)
-        pf.addRow(tr("setting_epg_delay"), epg_delay_row)
-        section(tr("sec_guide"))
-        epg_cache_row = QHBoxLayout()
-        refresh_epg_btn = QPushButton(tr("btn_refresh_epg"))
-        clear_epg_btn = QPushButton(tr("btn_clear_epg"))
-        refresh_epg_btn.clicked.connect(self._refresh_epg_now)
-        clear_epg_btn.clicked.connect(self._clear_epg_cache)
-        epg_cache_row.addWidget(refresh_epg_btn)
-        epg_cache_row.addWidget(clear_epg_btn)
-        epg_cache_row.addStretch()
-        pf.addRow(tr("setting_epg_cache"), epg_cache_row)
-        x11_box = None
-        if sys.platform.startswith("linux"):
-            x11_box = QCheckBox(tr("setting_force_x11"))
-            x11_box.setChecked(
-                self.settings.value("force_x11", "false") == "true")
-            x11_box.setToolTip(tr("setting_force_x11_hint"))
-            pf.addRow("", x11_box)
-            x11_hint = QLabel(tr("setting_force_x11_hint"))
-            x11_hint.setWordWrap(True)
-            x11_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
-            pf.addRow("", x11_hint)
+        # -- General ----------------------------------------------------------
+        from ..i18n import LANGUAGES, current_language
+        general = page("general", tr("set_page_general"),
+                       tr("set_page_general_sub"), "gear")
+        # A normal dropdown: click to open, scroll inside the popup. _combo()
+        # caps the popup at 14 rows, scrolls per pixel and keeps the
+        # scrollbar visible for the 27 languages.
+        lang_box = self._combo(
+            [(code, name) for code, name in LANGUAGES.items()],
+            current_language())
+        lang_box.currentIndexChanged.connect(
+            lambda _i: self._set_language(lang_box.currentData()))
+        c = general.card(tr("set_card_language"))
+        c.row(tr("setting_language"), lang_box,
+              tr("setting_language_restart_hint"))
+        c = general.card(tr("set_card_updates"))
+        updates_box = c.toggle(tr("setting_check_updates"),
+                               is_on("check_updates", "true"))
         # Only where an entry is actually missing: a .deb or a Flatpak has
         # one already, and offering to add a second would be nonsense.
         desktop_box = None
         if sys.platform.startswith("linux"):
             from ..core import desktop_entry as _de
             if _de.is_installed() or _de.can_offer():
-                desktop_box = QCheckBox(tr("setting_desktop_entry"))
-                desktop_box.setChecked(_de.is_installed())
-                desktop_box.setToolTip(tr("setting_desktop_entry_hint"))
-                pf.addRow("", desktop_box)
-                de_hint = QLabel(tr("setting_desktop_entry_hint"))
-                de_hint.setWordWrap(True)
-                de_hint.setStyleSheet(
-                    f"color:{P['muted2']}; font-size:11px;")
-                pf.addRow("", de_hint)
-        delay_hint = QLabel(
-            "Replay delay shifts where catch-up/timeshift starts "
-            "playback, for providers whose stream lags behind their "
-            "listed schedule. EPG delay shifts all programme guide "
-            "times shown in the app. Both default to no offset.")
-        delay_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
-        delay_hint.setWordWrap(True)
-        pf.addRow(delay_hint)
-        if not self.player:
-            reason = embedded_playback_reason() or "unknown reason"
-            hint = QLabel(
-                "Embedded playback unavailable: "
-                f"{reason}. Channels open in an external mpv window.")
-            hint.setStyleSheet(
-                f"color:{P['muted2']}; font-size:11px;")
-            hint.setWordWrap(True)
-            pf.addRow(hint)
-        # The grouped Playback form is taller than the dialog, so let it scroll
-        # instead of clipping the last rows (the hint text and EPG buttons).
-        play_scroll = QScrollArea()
-        play_scroll.setWidgetResizable(True)
-        play_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-        play_scroll.setWidget(play_tab)
-        tabs.addTab(play_scroll, tr("tab_playback"))
+                c = general.card(tr("set_card_system"))
+                desktop_box = c.toggle(tr("setting_desktop_entry"),
+                                       _de.is_installed(),
+                                       tr("setting_desktop_entry_hint"))
 
-        # Interface tab
-        ui_tab = QWidget()
-        uf = QFormLayout(ui_tab)
-        uf.setSpacing(10)
+        # -- Appearance -------------------------------------------------------
+        look = page("appearance", tr("set_page_appearance"),
+                    tr("set_page_appearance_sub"), "palette")
+        theme_box = self._combo(
+            [(key, tr(f"theme_{key}")) for key in THEMES],
+            self.settings.value("theme", "graphite"))
+        accent_box = self._combo(
+            [(key, tr(f"accent_{key}")) for key in ACCENTS],
+            self.settings.value("accent", "blue"))
+
+        def restyle(_i=None) -> None:
+            self._set_theme(theme_box.currentData(), accent_box.currentData())
+            # The dialog's own rules are built from the palette too.
+            d.setStyleSheet(settings_style())
+
+        theme_box.currentIndexChanged.connect(restyle)
+        accent_box.currentIndexChanged.connect(restyle)
         density_box = self._combo(
             [("compact", tr("option_compact")), ("medium", tr("option_medium")),
              ("large", tr("option_large")), ("xlarge", tr("option_xlarge"))],
@@ -857,169 +608,234 @@ class _SettingsMixin:
              ("alpha_desc", tr("option_sort_za")),
              ("recent", tr("option_sort_recent"))],
             self.settings.value("sort_order", "default"))
-        theme_box = self._combo(
-            [(key, tr(f"theme_{key}")) for key in THEMES],
-            self.settings.value("theme", "graphite"))
-        accent_box = self._combo(
-            [(key, tr(f"accent_{key}")) for key in ACCENTS],
-            self.settings.value("accent", "blue"))
-        theme_box.currentIndexChanged.connect(
-            lambda _i: self._set_theme(
-                theme_box.currentData(), accent_box.currentData()))
-        accent_box.currentIndexChanged.connect(
-            lambda _i: self._set_theme(
-                theme_box.currentData(), accent_box.currentData()))
-        from ..i18n import LANGUAGES, current_language
-        # A normal dropdown: click to open, scroll inside the popup. This
-        # works now that the wheel guard skips scrollbars - the popup's own
-        # scrollbar is created as a child of the combo, so the guard's
-        # findChildren sweep used to land on it and swallow every wheel event,
-        # which is why this list "couldn't scroll" no matter how the combo was
-        # configured. _combo() caps the popup at 14 rows, scrolls per pixel
-        # and keeps the scrollbar always visible for overflowing lists.
-        lang_box = self._combo(
-            [(code, name) for code, name in LANGUAGES.items()],
-            current_language())
-        lang_box.currentIndexChanged.connect(
-            lambda _i: self._set_language(lang_box.currentData()))
+        c = look.card(tr("set_card_theme"))
+        c.row(tr("setting_theme"), theme_box,
+              tr("misc_theme_applies_immediately"))
+        c.row(tr("setting_accent_color"), accent_box)
+        c = look.card(tr("set_card_lists"))
+        c.row(tr("setting_list_size"), density_box)
+        c.row(tr("setting_sort_by"), sort_box)
+
+        # -- Playback ---------------------------------------------------------
+        play = page("playback", tr("tab_playback"),
+                    tr("set_page_playback_sub"), "play")
+        # How early the "Next episode" card appears. A number the user picks
+        # rather than one guessed here: where the credits start varies from
+        # show to show.
+        nextup_box = self._combo(
+            [("0", tr("option_off"))]
+            + [(str(m * 60), tr("opt_minutes", n=m))
+               for m in (1, 2, 3, 5, 10)],
+            str(self.settings.value("nextup_lead_secs", "180")))
+        fmt_box = self._combo(
+            [("ts", "ts"), ("m3u8", "m3u8")],
+            self.settings.value("stream_format", "ts"))
+        buf_box = self._combo(
+            [("1", "1 s"), ("3", "3 s"), ("5", "5 s"),
+             ("10", "10 s"), ("30", "30 s")],
+            str(self.settings.value("cache_secs", "10")))
+        c = play.card(tr("set_card_behaviour"))
+        autoplay_box = c.toggle(tr("setting_autoplay_preview"),
+                                self._autoplay_preview())
+        autoplay_next_box = c.toggle(
+            tr("setting_autoplay_next"),
+            is_on("autoplay_next_episode", "true"))
+        c.row(tr("setting_nextup_lead"), nextup_box)
+        autorecon_box = c.toggle(tr("setting_auto_reconnect"),
+                                 is_on("auto_reconnect_live", "true"))
+        # Stored inverted (hide_upcoming_prompt): the setting the user sees
+        # is "ask"; the "Don't show again" box in the prompt hides it.
+        upcoming_box = c.toggle(
+            tr("set_upcoming_prompt"),
+            self.settings.value("hide_upcoming_prompt", "false") != on)
+        c = play.card(tr("set_card_stream"))
+        c.row(tr("setting_stream_format"), fmt_box)
+        c.row(tr("setting_network_buffer"), buf_box)
+        if not self.player:
+            c = play.card()
+            c.note(tr("set_embedded_unavailable",
+                      reason=embedded_playback_reason(localized=True)
+                      or tr("set_reason_unknown")))
+
+        # -- Audio & subtitles ------------------------------------------------
+        audio = page("audio", tr("sec_audio_subs"),
+                     tr("set_page_audio_sub"), "subtitles")
+        LANGS = [
+            ("", tr("option_lang_auto")), ("swe", tr("lang_swe")),
+            ("eng", tr("lang_eng")), ("nor", tr("lang_nor")),
+            ("dan", tr("lang_dan")), ("fin", tr("lang_fin")),
+            ("ger", tr("lang_ger")), ("fre", tr("lang_fre")),
+            ("spa", tr("lang_spa")), ("ita", tr("lang_ita")),
+            ("por", tr("lang_por")), ("pol", tr("lang_pol")),
+            ("ara", tr("lang_ara")), ("tur", tr("lang_tur")),
+        ]
+        alang_box = self._combo(LANGS, self.settings.value("audio_lang", ""))
+        sub_box = self._combo(
+            [("off", tr("option_sub_off")), ("auto", tr("option_sub_auto")),
+             ("lang", tr("option_sub_lang")),
+             ("forced", tr("option_sub_forced"))],
+            self.settings.value("sub_mode", "auto"))
+        slang_box = self._combo(LANGS, self.settings.value("sub_lang", ""))
+        slang2_box = self._combo(LANGS, self.settings.value("sub_lang2", ""))
+        c = audio.card()
+        c.row(tr("setting_audio_lang"), alang_box)
+        c.row(tr("setting_subtitles"), sub_box)
+        c.row(tr("setting_sub_lang"), slang_box)
+        c.row(tr("setting_sub_lang_fallback"), slang2_box)
+
+        # -- Video ------------------------------------------------------------
+        video = page("video", tr("sec_video"), tr("set_page_video_sub"),
+                     "picture")
+        aspect_box = self._combo(
+            [("auto", tr("option_aspect_auto")), ("16:9", "16:9"),
+             ("4:3", "4:3"), ("2.35:1", "2.35:1"),
+             ("stretch", tr("option_aspect_stretch"))],
+            self.settings.value("aspect_mode", "auto"))
+        sharpen_box = self._combo(
+            [("0.0", tr("option_off")), ("0.5", tr("option_low")),
+             ("1.0", tr("option_medium")), ("2.0", tr("option_high"))],
+            str(self.settings.value("video_sharpen", "0.0")))
+        tonemap_box = self._combo(
+            [("auto", tr("option_tonemap_auto")), ("hable", "Hable"),
+             ("mobius", "Mobius"), ("reinhard", "Reinhard"),
+             ("bt.2390", "BT.2390"), ("clip", tr("option_tonemap_clip"))],
+            self.settings.value("video_tonemapping", "auto"))
+        hwdec_box = self._combo(
+            [("no", tr("option_hwdec_off")),
+             ("auto-copy-safe", tr("option_hwdec_safe")),
+             ("auto-safe", tr("option_hwdec_direct"))],
+            str(self.settings.value("hwdec_mode", "") or "no"))
+        c = video.card()
+        c.row(tr("setting_aspect_ratio"), aspect_box)
+        deint_box = c.toggle(tr("setting_deinterlace"),
+                             is_on("video_deinterlace", "false"))
+        c.row(tr("setting_sharpen"), sharpen_box)
+        c.row(tr("setting_tonemapping"), tonemap_box)
+        c = video.card(tr("set_card_decoding"))
+        c.row(tr("setting_hwdec"), hwdec_box, tr("setting_hwdec_hint"))
+
+        # -- Programme guide --------------------------------------------------
+        guide = page("guide", tr("sec_guide"), tr("set_page_guide_sub"),
+                     "guide")
         epg_count_box = QSpinBox()
         epg_count_box.setRange(self.EPG_UPCOMING_MIN, self.EPG_UPCOMING_MAX)
         epg_count_box.setValue(self._epg_upcoming_count())
         epg_count_box.setFixedWidth(90)
-        # Wrap in a row with a stretch so it stays a small box (a full-width
-        # form field rendered as one long, hard-to-read strip).
-        epg_count_row = QHBoxLayout()
-        epg_count_row.addWidget(epg_count_box)
-        epg_count_row.addStretch(1)
-        uf.addRow(tr("setting_language"), lang_box)
-        lang_hint = QLabel(tr("setting_language_restart_hint"))
-        lang_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
-        lang_hint.setWordWrap(True)
-        uf.addRow("", lang_hint)
-        uf.addRow(tr("setting_list_size"), density_box)
-        uf.addRow(tr("setting_upcoming_count"), epg_count_row)
-        uf.addRow(tr("setting_sort_by"), sort_box)
-        uf.addRow(tr("setting_theme"), theme_box)
-        uf.addRow(tr("setting_accent_color"), accent_box)
-        theme_hint = QLabel(tr("misc_theme_applies_immediately"))
-        theme_hint.setStyleSheet(
-            f"color:{P['muted2']}; font-size:11px;")
-        theme_hint.setWordWrap(True)
-        uf.addRow(theme_hint)
 
-        updates_box = QCheckBox(tr("setting_check_updates"))
-        updates_box.setChecked(
-            self.settings.value("check_updates", "true") == "true")
-        uf.addRow("", updates_box)
+        def delay_row(key: str):
+            try:
+                total = int(self.settings.value(key, 0))
+            except (TypeError, ValueError):
+                total = 0
+            sign_box = self._combo(
+                [("+", tr("opt_delay_later")), ("-", tr("opt_delay_earlier"))],
+                "-" if total < 0 else "+")
+            sign_box.setMinimumWidth(0)
+            hours, minutes = divmod(abs(total), 60)
+            hours_box = QSpinBox()
+            hours_box.setRange(0, 23)
+            hours_box.setSuffix(" h")
+            hours_box.setValue(hours)
+            minutes_box = QSpinBox()
+            minutes_box.setRange(0, 59)
+            minutes_box.setSuffix(" m")
+            minutes_box.setValue(minutes)
+            row = QHBoxLayout()
+            row.setSpacing(6)
+            row.addWidget(sign_box, 1)
+            row.addWidget(hours_box)
+            row.addWidget(minutes_box)
+            return row, sign_box, hours_box, minutes_box
 
-        # -- Maintenance: the three actions grouped as one tidy button row,
-        # each explained by a tooltip so no inline hints clutter the form.
-        shortcuts_btn = QPushButton(tr("sc_open"))
-        shortcuts_btn.setToolTip(tr("sc_title"))
-        shortcuts_btn.clicked.connect(self._open_shortcuts)
+        (replay_delay_row, replay_sign_box, replay_hours_box,
+         replay_minutes_box) = delay_row("replay_delay_min")
+        (epg_delay_row, epg_sign_box, epg_hours_box,
+         epg_minutes_box) = delay_row("epg_delay_min")
+        c = guide.card()
+        c.row(tr("setting_upcoming_count"), epg_count_box)
+        c = guide.card(tr("set_card_offsets"))
+        c.row(tr("setting_replay_delay"), replay_delay_row,
+              tr("set_replay_delay_hint"))
+        c.row(tr("setting_epg_delay"), epg_delay_row,
+              tr("set_epg_delay_hint"))
+        refresh_epg_btn = QPushButton(tr("btn_refresh_epg"))
+        clear_epg_btn = QPushButton(tr("btn_clear_epg"))
+        refresh_epg_btn.clicked.connect(self._refresh_epg_now)
+        clear_epg_btn.clicked.connect(self._clear_epg_cache)
+        c = guide.card(tr("set_card_guide_data"))
+        c.layout_row(hbox(refresh_epg_btn, clear_epg_btn),
+                     tr("setting_epg_cache"))
 
-        # Disk-cache controls: covers/logos accumulate under
-        # QStandardPaths.CacheLocation and don't clean themselves. The live
-        # cache is the shared "images" dir; the two legacy dirs predate the
-        # loaders sharing one directory - keep them in the sweep so files from
-        # old sessions still get counted and cleared.
-        cache_dirs = [default_image_cache_dir("images"),
-                      default_image_cache_dir("logos"),
-                      default_image_cache_dir("posters")]
-        cache_lbl = QLabel()
-        clear_cache_btn = QPushButton(tr("settings_image_cache_clear"))
-        clear_cache_btn.setToolTip(tr("settings_image_cache_hint"))
+        # -- Playlists --------------------------------------------------------
+        playlists = page("playlists", tr("tab_playlists"),
+                         tr("set_page_playlists_sub"), "stack")
+        store = self.playlist_store
+        pl_list = ReorderList()
+        pl_list.setObjectName("PlaylistList")
+        pl_list.setItemDelegate(PlaylistDelegate(
+            tr("pl_in_use"), {"xtream": "Xtream", "m3u": "M3U"}, pl_list))
+        pl_list.setMouseTracking(True)
+        pl_list.setMinimumHeight(200)
+        # Drag a playlist to change its place; the sidebar's playlist menu
+        # lists them in this same order.
+        pl_list.setStyleSheet(
+            "QListWidget#PlaylistList { background: transparent; }"
+            "QListWidget#PlaylistList::item { padding: 0; margin: 0; }")
+        add_btn = QPushButton(tr("btn_add"))
+        edit_btn = QPushButton(tr("btn_edit"))
+        remove_btn = QPushButton(tr("btn_remove"))
+        use_btn = QPushButton(tr("btn_use"), objectName="Primary")
+        c = playlists.card()
+        c.widget(pl_list, tr("tab_playlists"))
+        c.layout_row(hbox(add_btn, edit_btn, remove_btn, None, use_btn))
+        c.note(tr("pl_drag_hint"))
+        # Account status for the selected Xtream provider (expiry,
+        # connections). Follows the list selection so you can check any
+        # provider without switching to it.
+        # Refresh reloads the playlist in use, so it is offered while that
+        # one is selected.
+        refresh_pl_btn = QPushButton(tr("btn_refresh"))
+        refresh_pl_btn.setToolTip(tr("tooltip_reload_channels_epg"))
+        c = playlists.card(tr("set_card_selected_playlist"))
+        account_lbl = c.row(tr("set_account"), refresh_pl_btn,
+                            tr("account_loading")).hint_label
+        export_btn = QPushButton(tr("btn_export"))
+        export_btn.setToolTip(tr("settings_export_tip"))
+        import_btn = QPushButton(tr("btn_import"))
+        import_btn.setToolTip(tr("settings_import_tip"))
+        c = playlists.card(tr("set_card_backup"))
+        c.row(tr("set_backup_label"), hbox(export_btn, import_btn,
+                                           stretch=False),
+              tr("set_backup_hint"))
 
-        def refresh_cache_label() -> None:
-            total = sum(dir_size_bytes(d) for d in cache_dirs)
-            cache_lbl.setText(
-                tr("settings_image_cache_label", size=format_size(total)))
-            clear_cache_btn.setEnabled(total > 0)
+        # -- Home -------------------------------------------------------------
+        home = page("home", tr("nav_home"), tr("set_page_home_sub"), "home")
+        c = home.card()
+        home_show_box = c.toggle(tr("set_home_show"),
+                                 is_on("home_enabled", "true"))
+        home_start_box = c.toggle(tr("set_home_start"),
+                                  is_on("home_start", "false"))
+        c = home.card(tr("set_home_shelves"))
+        home_shelf_boxes: dict[str, QCheckBox] = {}
+        for skey, slabel in (("home_sh_resume", "home_resume"),
+                             ("home_sh_fav", "home_fav_now"),
+                             ("home_sh_history", "home_recent"),
+                             ("home_sh_watchlist", "nav_watchlist"),
+                             ("home_sh_movies", "home_new_movies"),
+                             ("home_sh_series", "home_new_series"),
+                             ("home_sh_channels", "home_new_channels")):
+            home_shelf_boxes[skey] = c.toggle(tr(slabel), is_on(skey, "true"))
 
-        def clear_cache() -> None:
-            for d in cache_dirs:
-                clear_directory(d)
-            # Also drop the in-memory LRUs so a re-scroll doesn't just
-            # rewrite the same pixmaps back to disk from RAM.
-            self.logos.cache.clear()
-            self.poster_art.cache.clear()
-            refresh_cache_label()
-
-        clear_cache_btn.clicked.connect(clear_cache)
-
-        ts_reset_btn = QPushButton(tr("ts_reset_broken"))
-        ts_reset_btn.setToolTip(tr("ts_reset_hint"))
-
-        def reset_ts() -> None:
-            self._clear_ts_broken()
-            self._flash_status(tr("ts_reset_done"))
-
-        ts_reset_btn.clicked.connect(reset_ts)
-
-        maint_btns = [shortcuts_btn, clear_cache_btn, ts_reset_btn]
-        # Portable Windows build: let the user add Start-menu/desktop shortcuts
-        # so it feels installed. Each is just a .lnk file (no registry), easy
-        # to delete. Hidden on Linux/macOS, which have their own launchers.
-        if sys.platform == "win32":
-            win_sc_btn = QPushButton(tr("win_shortcut_btn"))
-            win_sc_btn.setToolTip(tr("win_shortcut_hint"))
-
-            def _make_win_shortcut() -> None:
-                from ..core.platform_windows import create_shortcut
-                made = create_shortcut()
-                self._flash_status(tr("win_shortcut_done") if made
-                                   else tr("win_shortcut_fail"))
-
-            win_sc_btn.clicked.connect(_make_win_shortcut)
-            maint_btns.append(win_sc_btn)
-
-        maint_lbl = QLabel(tr("sec_maintenance"))
-        maint_lbl.setStyleSheet(
-            f"color:{P['accent']}; font-size:10px; font-weight:700;"
-            "text-transform:uppercase; letter-spacing:1px; margin-top:12px;")
-        uf.addRow(maint_lbl)
-        btn_row = QHBoxLayout()
-        btn_row.setSpacing(8)
-        for b in maint_btns:
-            b.setSizePolicy(QSizePolicy.Policy.Expanding,
-                            QSizePolicy.Policy.Fixed)
-            btn_row.addWidget(b)
-        uf.addRow(btn_row)
-        cache_lbl.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
-        uf.addRow(cache_lbl)
-        refresh_cache_label()
-
-        tabs.addTab(ui_tab, tr("tab_interface"))
-
-        # Multiview tab - grouped under small section headers (Window /
-        # Behavior / Controls) so it reads as three short blocks, not a wall
-        # of checkboxes.
-        mv_tab = QWidget()
-        mvv = QVBoxLayout(mv_tab)
-        mvv.setSpacing(8)
-
-        def _mv_section(key: str) -> None:
-            lbl = QLabel(tr(key))
-            lbl.setStyleSheet(
-                f"color:{P['muted2']}; font-size:11px; font-weight:700;"
-                "letter-spacing:1.2px; margin-top:4px;")
-            mvv.addWidget(lbl)
-
-        _mv_section("mv_sec_window")
-        mv_titlebar_box = QCheckBox(tr("mv_set_titlebar"))
-        mv_titlebar_box.setChecked(
-            self.settings.value("mv_frameless", "true") != "true")
-        mvv.addWidget(mv_titlebar_box)
-        mv_ontop_box = QCheckBox(tr("mv_set_on_top"))
-        mv_ontop_box.setChecked(
-            self.settings.value("mv_on_top", "false") == "true")
-        mvv.addWidget(mv_ontop_box)
-        mv_geo_box = QCheckBox(tr("mv_set_remember_geo"))
-        mv_geo_box.setChecked(
-            self.settings.value("mv_remember_geo", "true") == "true")
-        mvv.addWidget(mv_geo_box)
-        mv_cells_row = QHBoxLayout()
-        mv_cells_row.addWidget(QLabel(tr("mv_set_cells")))
+        # -- Multiview --------------------------------------------------------
+        mv = page("multiview", tr("tab_multiview"),
+                  tr("set_page_multiview_sub"), "grid")
+        c = mv.card(tr("mv_sec_window"))
+        mv_titlebar_box = c.toggle(tr("mv_set_titlebar"),
+                                   not is_on("mv_frameless", "true"))
+        mv_ontop_box = c.toggle(tr("mv_set_on_top"),
+                                is_on("mv_on_top", "false"))
+        mv_geo_box = c.toggle(tr("mv_set_remember_geo"),
+                              is_on("mv_remember_geo", "true"))
         mv_cells_box = QComboBox()
         for n, label in ((2, "2  (1 × 2)"), (4, "4  (2 × 2)"),
                          (6, "6  (2 × 3)"), (9, "9  (3 × 3)")):
@@ -1029,21 +845,12 @@ class _SettingsMixin:
         except (TypeError, ValueError):
             cur_cells = 4
         mv_cells_box.setCurrentIndex(max(0, mv_cells_box.findData(cur_cells)))
-        mv_cells_row.addWidget(mv_cells_box, 1)
-        mvv.addLayout(mv_cells_row)
-        mvv.addSpacing(6)
-
-        _mv_section("mv_sec_behavior")
-        mv_stop_box = QCheckBox(tr("mv_set_stop_docked"))
-        mv_stop_box.setChecked(
-            self.settings.value("mv_stop_docked", "true") == "true")
-        mvv.addWidget(mv_stop_box)
-        mv_unmute_box = QCheckBox(tr("mv_set_new_unmuted"))
-        mv_unmute_box.setChecked(
-            self.settings.value("mv_new_unmuted", "true") == "true")
-        mvv.addWidget(mv_unmute_box)
-        mv_conflict_row = QHBoxLayout()
-        mv_conflict_row.addWidget(QLabel(tr("mv_set_conflict")))
+        c.row(tr("mv_set_cells"), mv_cells_box)
+        c = mv.card(tr("mv_sec_behavior"))
+        mv_stop_box = c.toggle(tr("mv_set_stop_docked"),
+                               is_on("mv_stop_docked", "true"))
+        mv_unmute_box = c.toggle(tr("mv_set_new_unmuted"),
+                                 is_on("mv_new_unmuted", "true"))
         mv_conflict_box = QComboBox()
         mv_conflict_box.addItem(tr("mv_conflict_ask"), "ask")
         mv_conflict_box.addItem(tr("mv_close"), "close")
@@ -1051,13 +858,8 @@ class _SettingsMixin:
         cur_mode = str(self.settings.value("mv_conflict_mode", "ask"))
         mv_conflict_box.setCurrentIndex(
             max(0, mv_conflict_box.findData(cur_mode)))
-        mv_conflict_row.addWidget(mv_conflict_box, 1)
-        mvv.addLayout(mv_conflict_row)
-        mvv.addSpacing(6)
-
-        _mv_section("mv_sec_controls")
-        mv_hide_row = QHBoxLayout()
-        mv_hide_row.addWidget(QLabel(tr("mv_set_autohide")))
+        c.row(tr("mv_set_conflict"), mv_conflict_box)
+        c = mv.card(tr("mv_sec_controls"))
         mv_hide_spin = QSpinBox()
         mv_hide_spin.setRange(1, 15)
         try:
@@ -1065,11 +867,8 @@ class _SettingsMixin:
                 int(float(self.settings.value("mv_autohide_secs", 2))))
         except (TypeError, ValueError):
             mv_hide_spin.setValue(2)
-        mv_hide_row.addWidget(mv_hide_spin)
-        mv_hide_row.addStretch(1)
-        mvv.addLayout(mv_hide_row)
-        mv_step_row = QHBoxLayout()
-        mv_step_row.addWidget(QLabel(tr("mv_set_seek_step")))
+        mv_hide_spin.setFixedWidth(90)
+        c.row(tr("mv_set_autohide"), mv_hide_spin)
         mv_step_spin = QSpinBox()
         mv_step_spin.setRange(1, 60)
         try:
@@ -1077,241 +876,104 @@ class _SettingsMixin:
                 int(float(self.settings.value("mv_seek_step_min", 5))))
         except (TypeError, ValueError):
             mv_step_spin.setValue(5)
-        mv_step_row.addWidget(mv_step_spin)
-        mv_step_row.addStretch(1)
-        mvv.addLayout(mv_step_row)
+        mv_step_spin.setFixedWidth(90)
+        c.row(tr("mv_set_seek_step"), mv_step_spin)
         mv_info_btn = QPushButton(tr("mv_set_reset_info"))
         mv_info_btn.clicked.connect(
             lambda: self.settings.setValue("mv_info_seen", "false"))
-        mv_info_row = QHBoxLayout()
-        mv_info_row.addWidget(mv_info_btn)
-        mv_info_row.addStretch(1)
-        mvv.addLayout(mv_info_row)
-        mvv.addStretch()
-        tabs.addTab(mv_tab, tr("tab_multiview"))
+        c.layout_row(hbox(mv_info_btn))
 
-        # Home tab - master toggle, open-at-start, and which shelves show.
-        home_tab = QWidget()
-        hv = QVBoxLayout(home_tab)
-        hv.setSpacing(8)
-        home_show_box = QCheckBox(tr("set_home_show"))
-        home_show_box.setChecked(
-            self.settings.value("home_enabled", "true") == "true")
-        hv.addWidget(home_show_box)
-        home_start_box = QCheckBox(tr("set_home_start"))
-        home_start_box.setChecked(
-            self.settings.value("home_start", "false") == "true")
-        hv.addWidget(home_start_box)
-        shelves_lbl = QLabel(tr("set_home_shelves"))
-        shelves_lbl.setStyleSheet(
-            f"color:{P['muted2']}; font-size:11px; font-weight:700;"
-            "letter-spacing:1.2px; margin-top:4px;")
-        hv.addWidget(shelves_lbl)
-        home_shelf_boxes: dict[str, QCheckBox] = {}
-        for skey, slabel in (("home_sh_resume", "home_resume"),
-                             ("home_sh_fav", "home_fav_now"),
-                             ("home_sh_history", "home_recent"),
-                             ("home_sh_watchlist", "nav_watchlist"),
-                             ("home_sh_movies", "home_new_movies"),
-                             ("home_sh_series", "home_new_series"),
-                             ("home_sh_channels", "home_new_channels")):
-            box = QCheckBox(tr(slabel))
-            box.setChecked(self.settings.value(skey, "true") == "true")
-            hv.addWidget(box)
-            home_shelf_boxes[skey] = box
-        hv.addStretch()
-        tabs.addTab(home_tab, tr("nav_home"))
-
-        # Playlists tab
-        pl_tab = QWidget()
-        pv = QVBoxLayout(pl_tab)
-        pv.setSpacing(10)
-        # Account status for the selected Xtream provider (expiry,
-        # connections). Follows the list selection so you can check any
-        # provider without switching to it.
-        account_lbl = QLabel(tr("account_loading"))
-        account_lbl.setWordWrap(True)
-        account_lbl.setObjectName("DetailMeta")
-        pv.addWidget(account_lbl)
-        pl_list = QListWidget()
-        pv.addWidget(pl_list, 1)
-        pl_btns = QHBoxLayout()
-        add_btn = QPushButton(tr("btn_add"))
-        edit_btn = QPushButton(tr("btn_edit"))
-        remove_btn = QPushButton(tr("btn_remove"))
-        refresh_pl_btn = QPushButton(tr("btn_refresh"))
-        refresh_pl_btn.setToolTip(tr("tooltip_reload_channels_epg"))
-        use_btn = QPushButton(tr("btn_use"), objectName="Primary")
-        for b in (add_btn, edit_btn, remove_btn, refresh_pl_btn, use_btn):
-            pl_btns.addWidget(b)
-        pv.addLayout(pl_btns)
-        io_btns = QHBoxLayout()
-        export_btn = QPushButton(tr("btn_export"))
-        export_btn.setToolTip(tr("settings_export_tip"))
-        import_btn = QPushButton(tr("btn_import"))
-        import_btn.setToolTip(tr("settings_import_tip"))
-        io_btns.addWidget(export_btn)
-        io_btns.addWidget(import_btn)
-        io_btns.addStretch()
-        pv.addLayout(io_btns)
-        tabs.addTab(pl_tab, tr("tab_playlists"))
-
-        # Parental tab
-        par_tab = QWidget()
-        parv = QVBoxLayout(par_tab)
-        parv.setSpacing(10)
-        pin_status = QLabel()
-        parv.addWidget(pin_status)
-        set_pin_btn = QPushButton(tr("pin_set_change"))
-        remove_pin_btn = QPushButton(tr("pin_remove"))
-        lock_now_btn = QPushButton(tr("pin_lock_now"))
-        pin_btns = QHBoxLayout()
-        pin_btns.setSpacing(8)
-        pin_btns.addWidget(set_pin_btn)
-        pin_btns.addWidget(remove_pin_btn)
-        pin_btns.addWidget(lock_now_btn)
-        pin_btns.addStretch(1)
-        parv.addLayout(pin_btns)
-        par_hint = QLabel(
-            "Lock favorite groups (right-click a group under "
-            "Favorites) or whole categories (right-click a "
-            "category in TV/Movies/Series). Locked content is "
-            "hidden - including from 'All' - until the PIN is "
-            "entered.")
-        par_hint.setStyleSheet(
-            f"color:{P['muted2']}; font-size:11px;")
-        par_hint.setWordWrap(True)
-        parv.addWidget(par_hint)
-        parv.addStretch()
-        tabs.addTab(par_tab, tr("tab_parental"))
-
-        # Recording tab
-        rec_tab = QWidget()
-        recv = QVBoxLayout(rec_tab)
-        recv.setSpacing(10)
-        rec_dir_lbl = QLabel(self.rec.directory())
-        rec_dir_lbl.setWordWrap(True)
-        recv.addWidget(QLabel(tr("rec_saved_in")))
-        recv.addWidget(rec_dir_lbl)
+        # -- Recording --------------------------------------------------------
+        rec = page("recording", tr("tab_recording"),
+                   tr("set_page_recording_sub"), "rec")
         rec_dir_btn = QPushButton(tr("btn_choose_folder"))
+        c = rec.card(tr("set_card_folder"))
+        rec_dir_row = c.row(tr("rec_saved_in"), rec_dir_btn,
+                            self.rec.directory())
 
         def pick_rec_dir():
             path = QFileDialog.getExistingDirectory(
-                d, "Choose recordings folder", self.rec.directory(),
+                d, tr("rec_choose_folder_title"), self.rec.directory(),
                 QFileDialog.Option.DontUseNativeDialog
                 | QFileDialog.Option.ShowDirsOnly)
             if path:
                 self.rec.set_directory(path)
-                rec_dir_lbl.setText(path)
+                rec_dir_row.hint_label.setText(path)
                 if self.mode == "rec":
                     self._load_categories()
 
         rec_dir_btn.clicked.connect(pick_rec_dir)
-        rec_dir_row = QHBoxLayout()
-        rec_dir_row.addWidget(rec_dir_btn)
-        rec_dir_row.addStretch(1)
-        recv.addLayout(rec_dir_row)
-        size_row = QHBoxLayout()
-        size_row.addWidget(QLabel(
-            "Stop a recording when the file reaches"))
         rec_max_edit = QLineEdit(
             str(self.settings.value("rec_max_value", "")))
         rec_max_edit.setPlaceholderText(tr("ph_no_limit"))
-        rec_max_edit.setMaximumWidth(90)
+        rec_max_edit.setMaximumWidth(110)
         rec_max_unit = self._combo(
             [("MB", "MB"), ("GB", "GB"), ("TB", "TB")],
             self.settings.value("rec_max_unit", "GB"))
-        size_row.addWidget(rec_max_edit)
-        size_row.addWidget(rec_max_unit)
-        size_row.addStretch()
-        recv.addLayout(size_row)
-        total_row = QHBoxLayout()
-        total_row.addWidget(QLabel(tr("rec_total_label")))
         rec_total_edit = QLineEdit(
             str(self.settings.value("rec_total_value", "")))
         rec_total_edit.setPlaceholderText(tr("ph_no_limit"))
-        rec_total_edit.setMaximumWidth(90)
+        rec_total_edit.setMaximumWidth(110)
         rec_total_unit = self._combo(
             [("GB", "GB"), ("TB", "TB")],
             self.settings.value("rec_total_unit", "GB"))
-        total_row.addWidget(rec_total_edit)
-        total_row.addWidget(rec_total_unit)
-        total_row.addStretch()
-        recv.addLayout(total_row)
+        c = rec.card(tr("set_card_limits"))
+        c.row(tr("rec_max_label"), hbox(rec_max_edit, rec_max_unit,
+                                        stretch=False))
+        c.row(tr("rec_total_label"), hbox(rec_total_edit, rec_total_unit,
+                                          stretch=False))
         # Pausing a cast channel records it here until you press play, so
         # this is the one setting that decides how long a pause may be.
-        pause_row = QHBoxLayout()
-        pause_row.addWidget(QLabel(tr("cast_pause_label")))
         cast_pause_edit = QLineEdit(
             str(self.settings.value("cast_pause_gb", "4.5")))
-        cast_pause_edit.setMaximumWidth(90)
-        pause_row.addWidget(cast_pause_edit)
-        pause_row.addWidget(QLabel("GB"))
-        pause_row.addStretch()
-        recv.addLayout(pause_row)
-        cast_pause_hint = QLabel(tr("cast_pause_hint"))
-        cast_pause_hint.setStyleSheet(
-            f"color:{P['muted2']}; font-size:11px;")
-        cast_pause_hint.setWordWrap(True)
-        recv.addWidget(cast_pause_hint)
+        cast_pause_edit.setMaximumWidth(110)
+        c = rec.card(tr("set_card_cast"))
+        c.row(tr("cast_pause_label"), hbox(cast_pause_edit, QLabel("GB"),
+                                           stretch=False),
+              tr("cast_pause_hint"))
         rk, rexe = self.rec.recorder()
-        rec_hint = QLabel(
-            f"Recorder: {rk} ({rexe})" if rexe else
-            "No recorder found - install ffmpeg (recommended) "
-            "or mpv.")
-        rec_hint.setStyleSheet(
-            f"color:{P['muted2']}; font-size:11px;")
-        rec_hint.setWordWrap(True)
-        recv.addWidget(rec_hint)
-        rec_hint2 = QLabel(
-            "Right-click a TV channel → Record to record "
-            "immediately or on a start/stop timer. Scheduled "
-            "recordings need the app to be running when they "
-            "start. Manage files under Recordings in the sidebar.")
-        rec_hint2.setStyleSheet(
-            f"color:{P['muted2']}; font-size:11px;")
-        rec_hint2.setWordWrap(True)
-        recv.addWidget(rec_hint2)
-        recv.addStretch()
-        tabs.addTab(rec_tab, tr("tab_recording"))
+        c = rec.card()
+        c.note(tr("rec_recorder_found", kind=rk, path=rexe) if rexe
+               else tr("rec_recorder_missing"))
+        c.note(tr("rec_howto_hint"))
 
-        # Local files tab: the section's folders and its three caches.
-        loc_tab = QWidget()
-        lv = QVBoxLayout(loc_tab)
-        lv.setSpacing(10)
-        loc_hint = QLabel(tr("local_settings_hint"))
-        loc_hint.setWordWrap(True)
-        loc_hint.setObjectName("DetailMeta")
-        lv.addWidget(loc_hint)
+        # -- Local files ------------------------------------------------------
+        loc = page("local", tr("nav_local"), tr("local_settings_hint"),
+                   "folder")
         loc_list = QListWidget()
+        loc_list.setMinimumHeight(120)
         for folder in self._local_dirs():
             loc_list.addItem(folder)
-        lv.addWidget(loc_list, 1)
-        loc_btns = QHBoxLayout()
         loc_add = QPushButton(tr("btn_add"))
         loc_del = QPushButton(tr("btn_remove"))
-        loc_btns.addWidget(loc_add)
-        loc_btns.addWidget(loc_del)
-        loc_btns.addStretch(1)
-        lv.addLayout(loc_btns)
-        loc_note = QLabel("")
-        loc_note.setObjectName("DetailMeta")
-        art_chk = QCheckBox(tr("local_art_online"))
-        art_chk.setChecked(
-            self.settings.value("music_art_online", "true") == "true")
+        loc_empty = QLabel(tr("set_local_none"))
+        loc_empty.setObjectName("SettingsHint")
+        c = loc.card(tr("set_card_folders"))
+        c.widget(loc_empty)
+        c.widget(loc_list)
+        c.layout_row(hbox(loc_add, loc_del))
+
+        def loc_empty_state() -> None:
+            empty = loc_list.count() == 0
+            loc_empty.setVisible(empty)
+            loc_list.setVisible(not empty)
+            loc_del.setEnabled(not empty)
+
+        loc_list.model().rowsInserted.connect(lambda *_a: loc_empty_state())
+        loc_list.model().rowsRemoved.connect(lambda *_a: loc_empty_state())
+        loc_empty_state()
+        c = loc.card(tr("set_card_music"))
+        art_chk = c.toggle(tr("local_art_online"),
+                           is_on("music_art_online", "true"))
         art_chk.toggled.connect(
-            lambda on: self.settings.setValue(
-                "music_art_online", "true" if on else "false"))
-        lv.addWidget(art_chk)
-        cache_btns = QHBoxLayout()
+            lambda checked: self.settings.setValue(
+                "music_art_online", "true" if checked else "false"))
         loc_clear_lib = QPushButton(tr("local_clear_lib_cache"))
         loc_clear_post = QPushButton(tr("local_clear_posters"))
         loc_clear_thumb = QPushButton(tr("local_clear_thumbs"))
-        for b in (loc_clear_lib, loc_clear_post, loc_clear_thumb):
-            cache_btns.addWidget(b)
-        cache_btns.addStretch(1)
-        lv.addLayout(cache_btns)
-        lv.addWidget(loc_note)
+        c = loc.card(tr("set_card_caches"))
+        c.layout_row(hbox(loc_clear_lib, loc_clear_post, loc_clear_thumb))
+        loc_note = c.note(tr("set_caches_hint"))
 
         def loc_refresh_side():
             # Reflect a folder change in the section immediately.
@@ -1354,17 +1016,14 @@ class _SettingsMixin:
             lambda: (self._local_clear_poster_cache(), loc_cleared()))
         loc_clear_thumb.clicked.connect(
             lambda: (self._local_clear_thumbs(), loc_cleared()))
-        tabs.addTab(loc_tab, tr("nav_local"))
 
-        # Metadata tab (TMDB artwork)
-        meta_tab = QWidget()
-        mf = QFormLayout(meta_tab)
-        mf.setSpacing(10)
+        # -- Metadata (TMDB artwork) ------------------------------------------
+        meta = page("metadata", tr("tab_metadata"),
+                    tr("set_page_metadata_sub"), "image")
         _bundled = bool(bundled_tmdb_key())
         # Source options: the built-in key (only offered when one ships),
-        # the user's own key, or the provider's own artwork. The key
-        # field appears only for the "own key" choice, so there's no
-        # stray field hanging under the built-in option.
+        # the user's own key, or the provider's own artwork. The key field
+        # appears only for the "own key" choice.
         _options = []
         if _bundled:
             _options.append(("tmdb", tr("meta_src_builtin")))
@@ -1376,52 +1035,40 @@ class _SettingsMixin:
             ("custom" if self.settings.value("tmdb_api_key", "")
              else "playlist"))
         meta_source_box = self._combo(_options, _default_src)
-        tmdb_key_row = QHBoxLayout()
         tmdb_key_edit = QLineEdit(self.settings.value("tmdb_api_key", ""))
         tmdb_key_edit.setPlaceholderText(tr("tmdb_key_placeholder"))
         tmdb_test_btn = QPushButton(tr("btn_test"))
+        tmdb_key_row = QHBoxLayout()
+        tmdb_key_row.setSpacing(8)
         tmdb_key_row.addWidget(tmdb_key_edit, 1)
         tmdb_key_row.addWidget(tmdb_test_btn)
-        mf.addRow(tr("setting_artwork_source"), meta_source_box)
-        key_row_idx = mf.rowCount()
-        mf.addRow(tr("setting_tmdb_key"), tmdb_key_row)
+        c = meta.card()
+        c.row(tr("setting_artwork_source"), meta_source_box)
+        key_row = c.row(tr("setting_tmdb_key"), tmdb_key_row,
+                        stretch_control=True)
         tmdb_status = QLabel()
         tmdb_status.setWordWrap(True)
-        status_row_idx = mf.rowCount()
-        mf.addRow("", tmdb_status)
-        meta_hint = QLabel(
-            ("TMDB works out of the box - no account needed. Posters are "
-             "matched by title and cached, so lookups happen once per "
-             "movie/series (not used for live TV). You can optionally "
-             "enter your own free key from themoviedb.org -> Settings -> "
-             "API to use your own quota. This product uses the TMDB API "
-             "but is not endorsed or certified by TMDB.")
-            if _bundled else
-            ("Get a free key at themoviedb.org -> Settings -> API. "
-             "Posters are matched by title and cached, so lookups "
-             "only happen once per movie/series. Not used for live TV. "
-             "This product uses the TMDB API but is not endorsed or "
-             "certified by TMDB."))
-        meta_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
-        meta_hint.setWordWrap(True)
-        mf.addRow(meta_hint)
-        tabs.addTab(meta_tab, tr("tab_metadata"))
+        status_row = c.widget(tmdb_status)
+        c.note(tr("meta_hint_builtin") if _bundled
+               else tr("meta_hint_own"))
 
-        def update_meta_visibility() -> None:
-            show_key = meta_source_box.currentData() == "custom"
-            mf.setRowVisible(key_row_idx, show_key)
-            mf.setRowVisible(status_row_idx, show_key)
+        def custom_source() -> bool:
+            return meta_source_box.currentData() == "custom"
+
+        c.shown_if(key_row, custom_source)
+        c.shown_if(status_row, custom_source)
+        meta_card = c
 
         def test_tmdb_key() -> None:
             key = tmdb_key_edit.text().strip()
             if not key:
                 tmdb_status.setText(tr("tmdb_enter_key"))
                 tmdb_status.setStyleSheet(
-                    f"color:{P['error']}; font-size:11px;")
+                    f"color:{P['error']}; font-size:12px;")
                 return
             tmdb_status.setText(tr("tmdb_checking"))
             tmdb_status.setStyleSheet(
-                f"color:{P['muted2']}; font-size:11px;")
+                f"color:{P['muted']}; font-size:12px;")
 
             def check():
                 TmdbClient(key).poster_url("Inception", "vod")
@@ -1430,69 +1077,37 @@ class _SettingsMixin:
             def ok(_r):
                 tmdb_status.setText(tr("tmdb_key_works"))
                 tmdb_status.setStyleSheet(
-                    f"color:{P['accent']}; font-size:11px; font-weight:600;")
+                    f"color:{P['accent']}; font-size:12px; font-weight:600;")
 
             def fail(msg):
                 tmdb_status.setText(tr("tmdb_key_failed", msg=msg))
                 tmdb_status.setStyleSheet(
-                    f"color:{P['error']}; font-size:11px;")
+                    f"color:{P['error']}; font-size:12px;")
 
             run_async(self.pool, check, ok, fail)
 
         meta_source_box.currentIndexChanged.connect(
-            lambda _i: update_meta_visibility())
+            lambda _i: meta_card.refresh())
         tmdb_test_btn.clicked.connect(test_tmdb_key)
-        update_meta_visibility()
 
-        # Trakt tab
-        trakt_tab = QWidget()
-        tf = QVBoxLayout(trakt_tab)
-        tf.setSpacing(10)
-        trakt_status = QLabel()
-        trakt_status.setWordWrap(True)
-        tf.addWidget(trakt_status)
-
-        # -- Easy path: one-click browser sign-in with the built-in app -------
+        # -- Trakt ------------------------------------------------------------
+        trakt = page("trakt", tr("tab_trakt"), tr("set_page_trakt_sub"),
+                     "trakt")
         trakt_browser_btn = QPushButton(tr("trakt_connect_browser"),
                                         objectName="Primary")
-        browser_row = QHBoxLayout()
-        browser_row.addWidget(trakt_browser_btn)
-        browser_row.addStretch(1)
-        tf.addLayout(browser_row)
-        browser_hint = QLabel(tr("trakt_connect_browser_hint"))
-        browser_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
-        browser_hint.setWordWrap(True)
-        tf.addWidget(browser_hint)
-
-        # -- Session actions --------------------------------------------------
-        trakt_btns = QHBoxLayout()
         trakt_disconnect_btn = QPushButton(tr("trakt_disconnect"))
         trakt_watchlist_btn = QPushButton(tr("trakt_watchlist_btn"))
-        trakt_btns.addWidget(trakt_disconnect_btn)
-        trakt_btns.addWidget(trakt_watchlist_btn)
-        trakt_btns.addStretch()
-        tf.addLayout(trakt_btns)
-        trakt_hint = QLabel(
-            "While connected, movies and episodes you play are "
-            "scrobbled to Trakt. Live TV and recordings are not.")
-        trakt_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
-        trakt_hint.setWordWrap(True)
-        tf.addWidget(trakt_hint)
-
-        # Watched-history sync controls.
-        sync_row = QHBoxLayout()
-        sync_status = QLabel()
-        sync_status.setWordWrap(True)
+        c = trakt.card(tr("set_card_account"))
+        trakt_row = c.row(tr("trakt_not_connected"),
+                          hbox(trakt_browser_btn, trakt_disconnect_btn,
+                               stretch=False),
+                          tr("trakt_connect_browser_hint"))
+        c.row(tr("set_trakt_lists"), trakt_watchlist_btn,
+              tr("trakt_scrobble_hint"))
         sync_now_btn = QPushButton(tr("trakt_sync_now"))
-        sync_row.addWidget(sync_status, 1)
-        sync_row.addWidget(sync_now_btn)
-        tf.addLayout(sync_row)
-        sync_hint = QLabel(tr("trakt_sync_hint"))
-        sync_hint.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
-        sync_hint.setWordWrap(True)
-        tf.addWidget(sync_hint)
-
-        tf.addStretch()
+        c = trakt.card(tr("set_card_watched_history"))
+        sync_row = c.row(tr("trakt_sync_never"), sync_now_btn,
+                         tr("trakt_sync_hint"))
 
         def refresh_sync_status():
             n_m, n_e = (len(self.watched.movies),
@@ -1500,23 +1115,23 @@ class _SettingsMixin:
             if self.watched.last_sync_at:
                 when = datetime.fromtimestamp(
                     self.watched.last_sync_at).strftime("%Y-%m-%d %H:%M")
-                sync_status.setText(
+                sync_row.label.setText(
                     tr("trakt_sync_status", when=when,
                        movies=n_m, episodes=n_e))
             else:
-                sync_status.setText(tr("trakt_sync_never"))
+                sync_row.label.setText(tr("trakt_sync_never"))
             sync_now_btn.setEnabled(
                 self.trakt.is_connected()
                 and not self._watched_sync_running)
 
         def do_sync_now():
             sync_now_btn.setEnabled(False)
-            sync_status.setText(tr("trakt_syncing"))
-            # Kick a forced sync and re-poll status every second while it
-            # runs so the label flips to "synced" without needing the
-            # user to close and reopen the dialog.
+            sync_row.label.setText(tr("trakt_syncing"))
+            # Kick a forced sync and re-poll status while it runs so the
+            # label flips to "synced" without reopening the dialog.
             self._maybe_sync_watched(force=True)
             poll = QTimer(d)
+
             def tick():
                 if not self._watched_sync_running:
                     poll.stop()
@@ -1527,17 +1142,19 @@ class _SettingsMixin:
         sync_now_btn.clicked.connect(do_sync_now)
 
         def refresh_trakt_status():
-            if self.trakt.is_connected():
-                trakt_status.setText(tr("trakt_connected"))
-            else:
-                trakt_status.setText(tr("trakt_not_connected"))
-            trakt_disconnect_btn.setEnabled(self.trakt.is_connected())
+            connected = self.trakt.is_connected()
+            trakt_row.label.setText(tr("trakt_connected") if connected
+                                    else tr("trakt_not_connected"))
+            # One of the two: connect while signed out, disconnect while in.
+            trakt_browser_btn.setVisible(not connected)
+            trakt_disconnect_btn.setVisible(connected)
+            trakt_row.hint_label.setVisible(not connected)
+            trakt_watchlist_btn.setEnabled(connected)
             refresh_sync_status()
 
         def do_connect_browser():
-            # Easy path: sign in through the browser with whatever Trakt app is
-            # active (the built-in one unless the user saved their own). Doesn't
-            # touch the credential fields.
+            # Sign in through the browser with whatever Trakt app is active
+            # (the built-in one unless the user saved their own).
             self._trakt_browser_auth_dialog(d)
             refresh_trakt_status()
 
@@ -1550,38 +1167,25 @@ class _SettingsMixin:
         trakt_watchlist_btn.clicked.connect(
             lambda: self._open_trakt_dialog(d))
         refresh_trakt_status()
-        tabs.addTab(trakt_tab, tr("tab_trakt"))
-        # The packed row must actually FIT: per-OS fonts change the summed tab
-        # widths, and with scroll buttons off an undersized dialog truncates
-        # the last tab (half-painted chip, clipped label). Two passes: an
-        # estimate now from the bar's size hint, then - once the dialog is
-        # laid out for real - an exact correction from the LAST tab's actual
-        # rect, which includes every style/margin adjustment the hint can't
-        # predict (the estimate alone still clipped the Trakt chip on macOS).
-        tab_w = tabs.tabBar().sizeHint().width() + 76
-        d.setMinimumWidth(max(d.minimumWidth(), tab_w))
-        if d.width() < tab_w:
-            d.resize(tab_w, d.height())
 
-        def _fit_tab_row() -> None:
-            bar = tabs.tabBar()
-            if not bar.count():
-                return
-            need = bar.tabRect(bar.count() - 1).right() + 1
-            chrome = max(0, d.width() - bar.width())   # dialog edges around bar
-            want = need + chrome + 12
-            if d.width() < want:
-                d.setMinimumWidth(want)
-                d.resize(want, d.height())
-        QTimer.singleShot(0, _fit_tab_row)
+        # -- Parental controls ------------------------------------------------
+        par = page("parental", tr("tab_parental"),
+                   tr("set_page_parental_sub"), "lock")
+        set_pin_btn = QPushButton(tr("pin_set_change"))
+        remove_pin_btn = QPushButton(tr("pin_remove"))
+        lock_now_btn = QPushButton(tr("pin_lock_now"))
+        c = par.card(tr("set_card_pin"))
+        pin_row = c.row(tr("pin_none_set"), None)
+        c.layout_row(hbox(set_pin_btn, remove_pin_btn, lock_now_btn))
+        c.note(tr("parental_hint"))
 
         def refresh_pin_status():
             if self.parental.has_pin():
-                pin_status.setText(tr("pin_set_unlocked")
-                                   if self.parental.session_unlocked
-                                   else tr("pin_set_locked"))
+                pin_row.label.setText(tr("pin_set_unlocked")
+                                      if self.parental.session_unlocked
+                                      else tr("pin_set_locked"))
             else:
-                pin_status.setText(tr("pin_none_set"))
+                pin_row.label.setText(tr("pin_none_set"))
             remove_pin_btn.setEnabled(self.parental.has_pin())
             lock_now_btn.setEnabled(
                 self.parental.has_pin()
@@ -1615,22 +1219,100 @@ class _SettingsMixin:
         lock_now_btn.clicked.connect(lock_now)
         refresh_pin_status()
 
-        store = self.playlist_store
+        # -- Advanced ---------------------------------------------------------
+        adv = page("advanced", tr("set_page_advanced"),
+                   tr("set_page_advanced_sub"), "wrench")
+        shortcuts_btn = QPushButton(tr("btn_edit"))
+        shortcuts_btn.clicked.connect(self._open_shortcuts)
+        # Disk-cache controls: covers/logos accumulate under
+        # QStandardPaths.CacheLocation and don't clean themselves. The live
+        # cache is the shared "images" dir; the two legacy dirs predate the
+        # loaders sharing one directory - keep them in the sweep so files
+        # from old sessions still get counted and cleared.
+        cache_dirs = [default_image_cache_dir("images"),
+                      default_image_cache_dir("logos"),
+                      default_image_cache_dir("posters")]
+        clear_cache_btn = QPushButton(tr("btn_clear"))
+        clear_cache_btn.setAccessibleName(tr("settings_image_cache_clear"))
+        ts_reset_btn = QPushButton(tr("common_reset"))
+        ts_reset_btn.setAccessibleName(tr("ts_reset_broken"))
+        c = adv.card(tr("sec_maintenance"))
+        c.row(tr("sc_title"), shortcuts_btn, tr("set_shortcuts_hint"))
+        cache_row = c.row(tr("settings_image_cache_label", size="…"),
+                          clear_cache_btn, tr("settings_image_cache_hint"))
+        c.row(tr("ts_reset_broken"), ts_reset_btn, tr("ts_reset_hint"))
 
+        def refresh_cache_label() -> None:
+            total = sum(dir_size_bytes(d) for d in cache_dirs)
+            cache_row.label.setText(
+                tr("settings_image_cache_label", size=format_size(total)))
+            clear_cache_btn.setEnabled(total > 0)
+
+        def clear_cache() -> None:
+            for cdir in cache_dirs:
+                clear_directory(cdir)
+            # Also drop the in-memory LRUs so a re-scroll doesn't just
+            # rewrite the same pixmaps back to disk from RAM.
+            self.logos.cache.clear()
+            self.poster_art.cache.clear()
+            refresh_cache_label()
+
+        clear_cache_btn.clicked.connect(clear_cache)
+
+        def reset_ts() -> None:
+            self._clear_ts_broken()
+            self._flash_status(tr("ts_reset_done"))
+
+        ts_reset_btn.clicked.connect(reset_ts)
+        # Portable Windows build: let the user add Start-menu/desktop
+        # shortcuts so it feels installed. Each is just a .lnk file (no
+        # registry), easy to delete. Hidden on Linux/macOS.
+        if sys.platform == "win32":
+            win_sc_btn = QPushButton(tr("win_shortcut_btn"))
+
+            def _make_win_shortcut() -> None:
+                from ..core.platform_windows import create_shortcut
+                made = create_shortcut()
+                self._flash_status(tr("win_shortcut_done") if made
+                                   else tr("win_shortcut_fail"))
+
+            win_sc_btn.clicked.connect(_make_win_shortcut)
+            c.row(tr("win_shortcut_hint"), win_sc_btn)
+        refresh_cache_label()
+        x11_box = None
+        if sys.platform.startswith("linux"):
+            c = adv.card(tr("set_card_system"))
+            x11_box = c.toggle(tr("setting_force_x11"),
+                               is_on("force_x11", "false"),
+                               tr("setting_force_x11_hint"))
+        reset_btn = QPushButton(tr("set_reset_btn"), objectName="Danger")
+        reset_btn.clicked.connect(lambda: self._reset_all_settings(d))
+        c = adv.card(tr("set_card_reset"))
+        c.row(tr("set_reset_label"), reset_btn, tr("set_reset_hint"))
+
+        # -- the playlist page's behaviour -------------------------------------
         def reload_pl_list():
             pl_list.clear()
             # The sidebar switcher chip appears/disappears with the second
-            # playlist - reflect adds/removes right away, not on next collapse.
+            # playlist - reflect adds/removes right away.
             self._update_playlist_btn()
             if not store:
-                pl_list.addItem(tr("pl_mgmt_unavailable"))
+                item = QListWidgetItem(tr("pl_mgmt_unavailable"))
+                item.setData(PlaylistDelegate.ROLE,
+                             {"name": tr("pl_mgmt_unavailable")})
+                pl_list.addItem(item)
+                pl_list.setDragDropMode(
+                    QAbstractItemView.DragDropMode.NoDragDrop)
                 return
             for p in store.playlists():
-                suffix = ("   " + tr("pl_active")
-                          if p["id"] == store.active_id else "")
-                item = QListWidgetItem(
-                    f"{p['name']}  -  {p['server']}{suffix}")
+                item = QListWidgetItem(p.get("name", ""))
                 item.setData(Qt.ItemDataRole.UserRole, p["id"])
+                item.setData(PlaylistDelegate.ROLE, {
+                    "name": p.get("name", ""),
+                    "server": p.get("server", ""),
+                    "kind": p.get("kind") or "xtream",
+                    "active": p["id"] == store.active_id})
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsDropEnabled)
                 pl_list.addItem(item)
 
         def selected_pid():
@@ -1638,9 +1320,23 @@ class _SettingsMixin:
             return (item.data(Qt.ItemDataRole.UserRole)
                     if item else None)
 
+        def select_pid(pid) -> None:
+            for i in range(pl_list.count()):
+                if pl_list.item(i).data(Qt.ItemDataRole.UserRole) == pid:
+                    pl_list.setCurrentRow(i)
+                    return
+
         def refresh_account(pid):
             pl = store.get(pid) if (store and pid) else None
+            has = pl is not None
+            for b in (edit_btn, remove_btn):
+                b.setEnabled(has)
+            use_btn.setEnabled(has and pid != store.active_id)
+            refresh_pl_btn.setEnabled(has and pid == store.active_id)
             if not pl:
+                account_lbl.setText(tr("account_unavailable"))
+                return
+            if (pl.get("kind") or "xtream") == "m3u":
                 account_lbl.setText(tr("account_unavailable"))
                 return
             account_lbl.setText(tr("account_loading"))
@@ -1663,11 +1359,22 @@ class _SettingsMixin:
         pl_list.currentItemChanged.connect(
             lambda *_: refresh_account(selected_pid()))
 
+        def playlist_moved(*_a) -> None:
+            if not store:
+                return
+            order = [pl_list.item(i).data(Qt.ItemDataRole.UserRole)
+                     for i in range(pl_list.count())]
+            store.reorder([pid for pid in order if pid])
+            self._update_playlist_btn()
+
+        pl_list.reordered.connect(playlist_moved)
+
         def add_playlist():
             dlg = PlaylistDialog(d)
             if dlg.exec():
-                store.add(dlg.values())
+                pl = store.add(dlg.values())
                 reload_pl_list()
+                select_pid(pl["id"])
 
         def edit_playlist():
             pid = selected_pid()
@@ -1678,6 +1385,7 @@ class _SettingsMixin:
             if dlg.exec():
                 store.update(pid, **dlg.values())
                 reload_pl_list()
+                select_pid(pid)
                 if pid == store.active_id:
                     self.switch_playlist(pid)
 
@@ -1695,12 +1403,14 @@ class _SettingsMixin:
                 if was_active and store.active_id:
                     self.switch_playlist(store.active_id)
                     reload_pl_list()
+                select_pid(store.active_id)
 
         def use_playlist():
             pid = selected_pid()
             if store and pid and pid != store.active_id:
                 self.switch_playlist(pid)
                 reload_pl_list()
+                select_pid(pid)
 
         def export_playlists():
             if not store or not store.playlists():
@@ -1750,6 +1460,7 @@ class _SettingsMixin:
                                     tr("pl_import_invalid"))
                 return
             reload_pl_list()
+            select_pid(store.active_id)
             QMessageBox.information(d, tr("pl_import_title"),
                                     tr("pl_import_done", n=added))
 
@@ -1760,6 +1471,7 @@ class _SettingsMixin:
         use_btn.clicked.connect(use_playlist)
         export_btn.clicked.connect(export_playlists)
         import_btn.clicked.connect(import_playlists)
+        pl_list.itemDoubleClicked.connect(lambda _i: edit_playlist())
         if not store:
             for b in (add_btn, edit_btn, remove_btn,
                       refresh_pl_btn, use_btn, export_btn, import_btn):
@@ -1768,52 +1480,59 @@ class _SettingsMixin:
         # Start on the active provider so its account status shows first
         # (selecting a row drives refresh_account via currentItemChanged).
         if store:
-            active_row = next(
-                (i for i in range(pl_list.count())
-                 if pl_list.item(i).data(Qt.ItemDataRole.UserRole)
-                 == store.active_id), 0)
             if pl_list.count():
-                pl_list.setCurrentRow(active_row)
+                select_pid(store.active_id)
+                if pl_list.currentRow() < 0:
+                    pl_list.setCurrentRow(0)
             else:
-                account_lbl.setText(tr("account_unavailable"))
+                refresh_account(None)
 
+        # -- footer -----------------------------------------------------------
+        footer = QWidget()
+        footer.setObjectName("SettingsFooter")
+        fl = QHBoxLayout(footer)
+        fl.setContentsMargins(18, 12, 18, 12)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel
-            | QDialogButtonBox.StandardButton.Reset)
+            | QDialogButtonBox.StandardButton.Cancel)
         for b in buttons.buttons():
             b.setIcon(QIcon())
-        reset_btn = buttons.button(QDialogButtonBox.StandardButton.Reset)
-        reset_btn.setText(tr("settings_reset_all"))
-        reset_btn.clicked.connect(lambda: self._reset_all_settings(d))
+        buttons.button(QDialogButtonBox.StandardButton.Ok).setObjectName(
+            "Primary")
         buttons.accepted.connect(d.accept)
         buttons.rejected.connect(d.reject)
-        outer.addWidget(buttons)
+        fl.addStretch(1)
+        fl.addWidget(buttons)
+        outer.addWidget(footer)
 
+        # Back on the page that was open last time this session.
+        shell.show_page(getattr(self, "_settings_page", None))
+        d.finished.connect(
+            lambda _r: setattr(self, "_settings_page", shell.current_key()))
         d.setUpdatesEnabled(True)
         self._install_wheel_guard(d)
 
         if d.exec():
             self.settings.setValue(
                 "stream_format", fmt_box.currentData())
-            # Stored inverted: the combo asks whether to *show* the prompt.
+            # Stored inverted: the switch asks whether to *show* the prompt.
             self.settings.setValue(
                 "hide_upcoming_prompt",
-                "false" if upcoming_box.currentData() == "true" else "true")
+                "false" if upcoming_box.isChecked() else "true")
+
+            def flag(box) -> str:
+                return "true" if box.isChecked() else "false"
+
+            self.settings.setValue("autoplay_preview", flag(autoplay_box))
             self.settings.setValue(
-                "autoplay_preview", autoplay_box.currentData())
-            self.settings.setValue(
-                "autoplay_next_episode", autoplay_next_box.currentData())
+                "autoplay_next_episode", flag(autoplay_next_box))
             self.settings.setValue(
                 "nextup_lead_secs", nextup_box.currentData())
             self.settings.setValue(
-                "auto_reconnect_live", autorecon_box.currentData())
-            self.settings.setValue(
-                "check_updates",
-                "true" if updates_box.isChecked() else "false")
+                "auto_reconnect_live", flag(autorecon_box))
+            self.settings.setValue("check_updates", flag(updates_box))
             if x11_box is not None:
-                self.settings.setValue(
-                    "force_x11", "true" if x11_box.isChecked() else "false")
+                self.settings.setValue("force_x11", flag(x11_box))
             if desktop_box is not None:
                 want = desktop_box.isChecked()
                 self.settings.setValue(
@@ -1842,14 +1561,13 @@ class _SettingsMixin:
             self.settings.setValue(
                 "hwdec_mode", hwdec_box.currentData())
             if self.player:
-                # Stage it for the next mpv build (a fresh core reads the widget
-                # attribute, not live settings). A changed decode mode takes
-                # effect on the next opened stream - we never re-assign hwdec on
-                # the running stream, which would reinitialise the decoder and
-                # glitch the video.
+                # Stage it for the next mpv build (a fresh core reads the
+                # widget attribute, not live settings). A changed decode mode
+                # takes effect on the next opened stream - we never re-assign
+                # hwdec on the running stream, which would reinitialise the
+                # decoder and glitch the video.
                 self.player.video.hwdec_pref = hwdec_box.currentData()
-            self.settings.setValue(
-                "video_deinterlace", deint_box.currentData())
+            self.settings.setValue("video_deinterlace", flag(deint_box))
             self.settings.setValue(
                 "video_sharpen", sharpen_box.currentData())
             self.settings.setValue(
@@ -1864,7 +1582,7 @@ class _SettingsMixin:
             self.settings.setValue(
                 "replay_delay_min",
                 delay_value(replay_sign_box, replay_hours_box,
-                           replay_minutes_box))
+                            replay_minutes_box))
             self.settings.setValue(
                 "epg_delay_min",
                 delay_value(epg_sign_box, epg_hours_box, epg_minutes_box))
@@ -1900,32 +1618,20 @@ class _SettingsMixin:
             self.settings.setValue(
                 "mv_frameless",
                 "false" if mv_titlebar_box.isChecked() else "true")
-            self.settings.setValue(
-                "mv_on_top", "true" if mv_ontop_box.isChecked() else "false")
-            self.settings.setValue(
-                "mv_remember_geo",
-                "true" if mv_geo_box.isChecked() else "false")
-            self.settings.setValue(
-                "mv_stop_docked",
-                "true" if mv_stop_box.isChecked() else "false")
-            self.settings.setValue(
-                "mv_new_unmuted",
-                "true" if mv_unmute_box.isChecked() else "false")
+            self.settings.setValue("mv_on_top", flag(mv_ontop_box))
+            self.settings.setValue("mv_remember_geo", flag(mv_geo_box))
+            self.settings.setValue("mv_stop_docked", flag(mv_stop_box))
+            self.settings.setValue("mv_new_unmuted", flag(mv_unmute_box))
             self.settings.setValue(
                 "mv_conflict_mode", mv_conflict_box.currentData())
             self.settings.setValue("mv_autohide_secs", mv_hide_spin.value())
             self.settings.setValue("mv_seek_step_min", mv_step_spin.value())
             self.settings.setValue("mv_cells", mv_cells_box.currentData())
             self._apply_multiview_settings()
-            self.settings.setValue(
-                "home_enabled",
-                "true" if home_show_box.isChecked() else "false")
-            self.settings.setValue(
-                "home_start",
-                "true" if home_start_box.isChecked() else "false")
+            self.settings.setValue("home_enabled", flag(home_show_box))
+            self.settings.setValue("home_start", flag(home_start_box))
             for skey, box in home_shelf_boxes.items():
-                self.settings.setValue(
-                    skey, "true" if box.isChecked() else "false")
+                self.settings.setValue(skey, flag(box))
             self._apply_home_settings()
             self.cover.reload()
             if self.player:

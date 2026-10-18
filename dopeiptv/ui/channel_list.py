@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import (
-    QAbstractListModel, QItemSelectionModel, QMimeData, QModelIndex, QRect,
-    QRectF, QSize, Qt, QTimer,
+    QAbstractListModel, QItemSelectionModel, QLocale, QMimeData, QModelIndex,
+    QRect, QRectF, QSize, Qt, QTimer,
 )
 from PyQt6.QtGui import (
     QColor, QDrag, QFont, QFontMetrics, QPainter, QPainterPath, QPen, QPixmap,
@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QAbstractItemView, QListView, QListWidget, QStyle, QStyledItemDelegate,
 )
 
+from ..i18n import tr
 from .theme import P
 
 # Marks a drag of favorites rows from the middle list. The rows themselves
@@ -571,7 +572,7 @@ class ChannelDelegate(QStyledItemDelegate):
         r = option.rect.adjusted(14, 0, -12, -2)
         painter.drawText(
             r, int(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft),
-            (text or "").upper())
+            QLocale().toUpper(text or ""))
         painter.restore()
 
     def _paint_watched_badge(self, painter, anchor: QRect,
@@ -961,11 +962,11 @@ class ChannelDelegate(QStyledItemDelegate):
                 QRect(text_x, y + name_h, text_w, sub_h),
                 Qt.AlignmentFlag.AlignVCenter,
                 fm2.elidedText(
-                    "Now: " + title,
+                    tr("epg_now_prefix", title=title),
                     Qt.TextElideMode.ElideRight, text_w))
             bar_rect = QRect(text_x, y + name_h + sub_h, text_w, 4)
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor("#2A2A32"))
+            painter.setBrush(QColor(P["btn"]))
             painter.drawRoundedRect(bar_rect, 2, 2)
             fill_w = int(
                 bar_rect.width() * max(0, min(100, pct)) / 100)
@@ -978,7 +979,7 @@ class ChannelDelegate(QStyledItemDelegate):
             # Continue-watching resume progress (movies have no EPG 'now').
             bar_rect = QRect(text_x, y + name_h, text_w, 4)
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor("#2A2A32"))
+            painter.setBrush(QColor(P["btn"]))
             painter.drawRoundedRect(bar_rect, 2, 2)
             fill_w = int(bar_rect.width() * max(0, min(100, resume_pct)) / 100)
             if fill_w > 0:

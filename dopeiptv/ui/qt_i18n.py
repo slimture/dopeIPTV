@@ -16,7 +16,7 @@ Two layers, so every language is covered:
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QLibraryInfo, QTranslator
+from PyQt6.QtCore import QDateTime, QLibraryInfo, QLocale, QTranslator
 
 from ..core.log import log
 from ..i18n import current_language, tr
@@ -33,6 +33,23 @@ BUTTON_KEYS = {
 
 # Our language code -> the name of Qt's catalogue, where the two differ.
 _QT_CODES = {"pt": "pt_BR", "zh": "zh_CN"}
+# ... and the locale its dates are written in. Serbian is the Latin script
+# here, which plain "sr" (Cyrillic) is not.
+_LOCALES = {"pt": "pt_BR", "zh": "zh_CN", "sr": "sr_Latn_RS"}
+
+
+def app_locale() -> QLocale:
+    """The locale of the app's language - not the system's."""
+    code = current_language()
+    return QLocale(_LOCALES.get(code, code))
+
+
+def format_when(when, fmt: str = "ddd d MMM HH:mm") -> str:
+    """*when* (a datetime or a Unix timestamp) in the app's language, with a
+    Qt date format. strftime's %a and %b are the C locale's - English names
+    in every language."""
+    ts = when if isinstance(when, (int, float)) else when.timestamp()
+    return app_locale().toString(QDateTime.fromSecsSinceEpoch(int(ts)), fmt)
 
 
 class _ButtonTranslator(QTranslator):
@@ -63,6 +80,8 @@ def apply_qt_language(app) -> None:
         if old is not None:
             app.removeTranslator(old)
     code = current_language()
+    # Widgets made from now on - calendar popups above all - speak it too.
+    QLocale.setDefault(app_locale())
     if code != "en":
         qt = QTranslator(app)
         path = QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)

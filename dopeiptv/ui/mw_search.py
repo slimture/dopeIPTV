@@ -57,7 +57,7 @@ class _SearchMixin:
         items = [it for it in items
                  if q in self.channel_display_name(it).lower()]
         self.list_model.set_items(self._sorted(items), kind)
-        self._set_status(f"{len(items)} {self.LABELS.get(kind, '')}")
+        self._set_status(self._count_text(kind, len(items)))
 
     def _ensure_search_index(self, mode: str, cb) -> None:
         """Fetch every channel of *mode* once (grouped by category_id) so the

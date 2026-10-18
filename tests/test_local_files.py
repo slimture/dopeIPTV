@@ -18,6 +18,9 @@ class _Url:
     def toLocalFile(self) -> str:
         return self._path if self._local else ""
 
+    def toString(self) -> str:
+        return self._path
+
 
 class _Mime:
     def __init__(self, urls):
@@ -25,6 +28,9 @@ class _Mime:
 
     def urls(self):
         return self._urls
+
+    def hasText(self) -> bool:
+        return False
 
 
 class _Event:
@@ -44,6 +50,7 @@ class _Stub:
     MEDIA_EXTS = MainWindow.MEDIA_EXTS
     dragEnterEvent = MainWindow.dragEnterEvent
     dropEvent = MainWindow.dropEvent
+    _dropped_sources = staticmethod(MainWindow._dropped_sources)
     _play_local_path = MainWindow._play_local_path
 
     def __init__(self):

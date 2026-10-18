@@ -1807,12 +1807,12 @@ class EmbeddedPlayer(QWidget):
         self.ts_slider = _SeekSlider()
         self.ts_slider.setMouseTracking(True)   # hover tooltips w/o a pressed button
         self.ts_slider.seek_requested.connect(self._on_ts_seek)
-        self.ts_label = QLabel("● LIVE")
+        self.ts_label = QLabel("● " + tr("mv_live"))
         self.ts_label.setStyleSheet(
             "background: transparent; color: #FFFFFF;"
             "font-size: 11px; font-weight: 700;")
         # Jump straight back to the live edge from anywhere in the archive.
-        self.ts_live_btn = QPushButton("⏭ LIVE")
+        self.ts_live_btn = QPushButton("⏭ " + tr("mv_live"))
         self.ts_live_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.ts_live_btn.setStyleSheet(
             "QPushButton{background: #FF5C5C; color:#fff; border:none;"
@@ -2587,7 +2587,7 @@ class EmbeddedPlayer(QWidget):
         if kind != "timeshift":
             b.hide()
             return
-        b.setText("⧗ TIMESHIFT")
+        b.setText("⧗ " + tr("player_timeshift"))
         b.setStyleSheet(
             "background: rgba(0,0,0,150); color: #FFFFFF;"
             "border-radius: 9px; padding: 3px 9px;"
@@ -2606,10 +2606,10 @@ class EmbeddedPlayer(QWidget):
         d, rem = divmod(mins, 1440)
         h, m = divmod(rem, 60)
         if d:
-            return f"{d}d {h}h"
+            return tr("dur_days_hours", d=d, h=h)
         if h:
             return f"{h}:{m:02d}"
-        return f"{m} min"
+        return tr("opt_minutes", n=m)
 
     TS_BAR_HIDE_MS = 3500
 
@@ -2623,7 +2623,7 @@ class EmbeddedPlayer(QWidget):
         clock = time.strftime("%H:%M", time.localtime(time.time()
                                                       - offset_min * 60))
         if offset_min < 0.5:
-            return f"{clock} · LIVE"
+            return f"{clock} · {tr('mv_live')}"
         return f"{clock} · −{self._fmt_offset(offset_min)}"
 
     def enter_timeshift(self, depth_min: int) -> None:
@@ -2632,7 +2632,7 @@ class EmbeddedPlayer(QWidget):
         self.ts_slider.setRange(0, self._ts_depth)
         self.ts_slider.setValue(self._ts_depth)
         self.ts_slider.set_time_provider(self._ts_hover_time_label)
-        self.ts_label.setText("● LIVE")
+        self.ts_label.setText("● " + tr("mv_live"))
         self.ts_live_btn.hide()
         self._show_ts_timeline()
         # On the very first play (esp. the auto-preview at startup) the video
@@ -2726,9 +2726,9 @@ class EmbeddedPlayer(QWidget):
         live = (not paused) and offset_min < (5 / 60.0)
         secs = int(round(offset_min * 60))
         if live:
-            edge = "● LIVE"
+            edge = "● " + tr("mv_live")
         elif paused and secs <= 0:
-            edge = "⏸ PAUSED"
+            edge = "⏸ " + tr("player_paused")
         elif offset_min < 1:
             edge = f"−{secs}s"
         else:
@@ -3530,7 +3530,7 @@ class EmbeddedPlayer(QWidget):
         def track_label(t):
             parts = [t.get("lang") or "", t.get("title") or ""]
             label = " ".join(p for p in parts if p).strip()
-            return label or f"Track {t.get('id')}"
+            return label or tr("player_track_n", n=t.get("id"))
 
         audio = menu.addMenu(tr("opt_audio_track"))
         for t in (tracks("audio") if m else []):

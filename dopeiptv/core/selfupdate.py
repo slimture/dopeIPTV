@@ -31,6 +31,7 @@ from pathlib import Path
 
 from . import desktop_entry
 from ._lazy_requests import requests
+from ..i18n import LocalizedError
 from .log import log
 from .xdg import system_env
 
@@ -40,8 +41,10 @@ _RUNTIME_VARS = ("APPIMAGE", "APPDIR", "ARGV0", "OWD")
 SELF_CHECK_TIMEOUT = 120
 
 
-class UpdateError(Exception):
-    """The update stopped; the message says why, and nothing was changed."""
+class UpdateError(LocalizedError):
+    """The update stopped; the message says why, and nothing was changed.
+    Raised with a string key, so the log says it in English and the user in
+    their own language."""
 
 
 def appimage_path() -> Path | None:
@@ -129,9 +132,9 @@ def download(asset: dict, dest: Path,
                     if progress is not None:
                         progress(got, total)
         if size and got != size:
-            raise UpdateError(f"download incomplete ({got} of {size} bytes)")
+            raise UpdateError("upd_err_incomplete", got=got, size=size)
         if sha and h.hexdigest() != sha:
-            raise UpdateError("download corrupted (checksum mismatch)")
+            raise UpdateError("upd_err_checksum")
         if not sha:
             log.warning("update: release lists no SHA-256 for %s; size "
                         "checked only", asset.get("name"))
@@ -140,7 +143,7 @@ def download(asset: dict, dest: Path,
         raise
     except Exception as e:
         dest.unlink(missing_ok=True)
-        raise UpdateError(f"download failed: {e}") from e
+        raise UpdateError("upd_err_download", error=e) from e
 
 
 def _run_self_check(path: Path, timeout: int) -> tuple[int, str]:
@@ -153,10 +156,9 @@ def _run_self_check(path: Path, timeout: int) -> tuple[int, str]:
             stdin=subprocess.DEVNULL, capture_output=True, text=True,
             errors="replace", check=False)
     except subprocess.TimeoutExpired as e:
-        raise UpdateError("the new version did not finish its start-up "
-                          "check") from e
+        raise UpdateError("upd_err_check_timeout") from e
     except OSError as e:
-        raise UpdateError(f"the new version could not be started: {e}") from e
+        raise UpdateError("upd_err_start", error=e) from e
     return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
 
 
@@ -182,7 +184,7 @@ def self_check(path: Path, version: str, current: Path | None = None,
             log.warning("update: the running version fails its self-check "
                         "here as well; accepting the new one, which starts")
             return
-    raise UpdateError("the new version failed its start-up check")
+    raise UpdateError("upd_err_check_failed")
 
 
 def install(release: dict, current_version: str,
@@ -194,11 +196,11 @@ def install(release: dict, current_version: str,
     current = appimage_path()
     cpu = arch()
     if current is None or cpu is None:
-        raise UpdateError("not running from an AppImage")
+        raise UpdateError("upd_err_not_appimage")
     tag = release.get("tag") or ""
     asset = pick_asset(release.get("assets") or [], tag, cpu)
     if asset is None:
-        raise UpdateError(f"the release has no AppImage for {cpu}")
+        raise UpdateError("upd_err_no_asset", cpu=cpu)
     target = target_path(current, current_version, tag)
     part = target.with_name(f".{target.name}.part")
     download(asset, part, progress, cancel)

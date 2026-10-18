@@ -10,7 +10,7 @@ import time
 
 from ..core._lazy_requests import requests
 from ..core.log import log
-from ..i18n import tr
+from ..i18n import LocalizedError
 from PyQt6.QtCore import QSettings
 
 API = "https://api.trakt.tv"
@@ -45,9 +45,9 @@ DEFAULT_CLIENT_SECRET = (
     "1bc6756ea9674759f4eb38a50b71d1ee02fb5897af71a961fc9344a52bde4090")
 
 
-class TraktAuthError(Exception):
-    """Raised when Trakt authentication fails, times out, or is declined."""
-    pass
+class TraktAuthError(LocalizedError):
+    """Raised when Trakt authentication fails, times out, or is declined -
+    with a string key, or with Trakt's own words."""
 
 
 def new_pkce_pair() -> tuple[str, str]:
@@ -166,13 +166,13 @@ class TraktClient:
         error = (_oauth_error_code(r)
                  if r.status_code in (400, 401, 403) else "")
         if error == "access_denied" or r.status_code == 418:
-            raise TraktAuthError(tr("trakt_denied"))
+            raise TraktAuthError("trakt_denied")
         if error == "expired_token" or r.status_code == 410:
-            raise TraktAuthError(tr("trakt_code_expired"))
+            raise TraktAuthError("trakt_code_expired")
         if r.status_code == 404:
-            raise TraktAuthError(tr("trakt_code_invalid"))
+            raise TraktAuthError("trakt_code_invalid")
         if r.status_code == 409:
-            raise TraktAuthError(tr("trakt_code_used"))
+            raise TraktAuthError("trakt_code_used")
         if error == "slow_down" or r.status_code == 429:
             # RFC 8628: add five seconds to the interval. This runs on a
             # worker, so the wait here is that extra time.
@@ -224,9 +224,8 @@ class TraktClient:
             data = r.json()
             self._store_tokens(data)
             return data
-        raise TraktAuthError(
-            f"Trakt rejected the sign-in (HTTP {r.status_code}"
-            f"{_oauth_error(r)}).")
+        raise TraktAuthError("trakt_rejected", code=r.status_code,
+                             detail=_oauth_error(r))
 
     # -- token refresh --------------------------------------------------------
 

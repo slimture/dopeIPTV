@@ -10,10 +10,13 @@ worker thread.
 
 from __future__ import annotations
 
+import html
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Callable
 from urllib.parse import parse_qs, urlparse
+
+from ..i18n import tr
 
 _PAGE = """<!doctype html><html><head><meta charset="utf-8">
 <title>dopeIPTV</title></head>
@@ -21,8 +24,7 @@ _PAGE = """<!doctype html><html><head><meta charset="utf-8">
 text-align:center;padding-top:16vh;margin:0">
 <h2 style="color:#ed1c24">dopeIPTV</h2>
 <p style="font-size:16px">{msg}</p>
-<p style="color:#6b6b76;font-size:13px">You can close this tab and return to
-the app.</p></body></html>"""
+<p style="color:#6b6b76;font-size:13px">{close}</p></body></html>"""
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -38,9 +40,10 @@ class _Handler(BaseHTTPRequestHandler):
         params = {k: v[0] for k, v in parse_qs(parsed.query).items()}
         self.server.oauth_result = params        # type: ignore[attr-defined]
         ok = "code" in params and "error" not in params
-        msg = ("Connected to Trakt ✓" if ok
-               else "Sign-in was cancelled or failed.")
-        body = _PAGE.format(msg=msg).encode("utf-8")
+        msg = (tr("oauth_page_ok") if ok else tr("oauth_page_failed"))
+        body = _PAGE.format(msg=html.escape(msg),
+                            close=html.escape(tr("oauth_page_close"))
+                            ).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))

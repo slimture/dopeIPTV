@@ -191,7 +191,10 @@ class Worker(QRunnable):
             result = self.fn(*self.args, **self.kwargs)
         except BaseException as e:
             try:
-                self.signals.fail.emit(str(e))
+                # The user's language where the error has one.
+                localized = getattr(e, "localized", None)
+                self.signals.fail.emit(
+                    localized() if callable(localized) else str(e))
             except BaseException:
                 pass
         else:

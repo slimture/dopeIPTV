@@ -10,7 +10,6 @@ set a reminder straight from the results. The heavy scan runs off the UI thread
 from __future__ import annotations
 
 import time
-from datetime import datetime
 
 from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QColor
@@ -21,6 +20,7 @@ from PyQt6.QtWidgets import (
 
 from ..core.workers import run_async
 from ..i18n import tr
+from .qt_i18n import format_when
 from .theme import P
 
 
@@ -120,8 +120,8 @@ class EpgSearchDialog(QDialog):
         now = time.time()
         for e in self._results:
             ch = e["_channel"]
-            when = datetime.fromtimestamp(e["start_timestamp"])
-            label = (f"{when.strftime('%a %d %b  %H:%M')}   ·   "
+            when = format_when(e["start_timestamp"], "ddd d MMM  HH:mm")
+            label = (f"{when}   ·   "
                      f"{e['title']}   —   {ch.get('name', '')}")
             item = QListWidgetItem(label)
             if e["stop_timestamp"] < now:

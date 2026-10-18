@@ -335,7 +335,7 @@ class _DetailMixin:
         cast = details.get("cast") or []
         stars = f"★ {rating:.1f}/10" if rating else ""
         if imdb_id:
-            label = stars or "View on IMDb"
+            label = stars or tr("detail_view_imdb")
             self.media_rating_lbl.setText(
                 f'<a href="https://www.imdb.com/title/{imdb_id}/" '
                 f'style="color:{ACCENT}; text-decoration:none;">'
@@ -376,7 +376,7 @@ class _DetailMixin:
         chip = _ClickableWidget()
         if self.tmdb and name:
             chip.setCursor(Qt.CursorShape.PointingHandCursor)
-            chip.setToolTip(f"Find other titles with {name} in your playlist")
+            chip.setToolTip(tr("detail_cast_find", name=name))
             chip.clicked.connect(
                 lambda: self._on_cast_clicked(name, person_id))
         v = QVBoxLayout(chip)
@@ -766,7 +766,7 @@ class _DetailMixin:
         sid = it.get("stream_id")   # may be None for a History row
         key = self._item_key(it)
         self._clear_epg_rows()
-        self._epg_note("Loading programme guide…")
+        self._epg_note(tr("status_loading_programme_guide"))
 
         def fetch():
             # Many providers' short_epg returns only 2-3 entries even when the
@@ -797,7 +797,7 @@ class _DetailMixin:
             return
         self.now_card.hide()
         self._clear_epg_rows()
-        self._epg_note("Could not load the programme guide.")
+        self._epg_note(tr("detail_epg_failed"))
 
     # -- movie/series info ---------------------------------------------------------
 
@@ -806,7 +806,7 @@ class _DetailMixin:
         if cached is not None:
             self._show_media_info(cached, key)
             return
-        self._epg_note("Loading information…")
+        self._epg_note(tr("detail_info_loading"))
         if kind == "vod":
             fetch = lambda: (
                 self.client.vod_info(mid) or {}).get("info") or {}
@@ -846,18 +846,19 @@ class _DetailMixin:
 
         parts: list[str] = []
         simple = (
-            ("Genre", info.get("genre") or td.get("genres")),
-            ("Director", info.get("director")),
-            ("Released",
+            (tr("detail_genre"), info.get("genre") or td.get("genres")),
+            (tr("detail_director"), info.get("director")),
+            (tr("detail_released"),
              info.get("releasedate") or info.get("releaseDate")
              or td.get("release_date")),
-            ("Duration", info.get("duration")),
-            ("Rating", info.get("rating")),
+            (tr("detail_duration"), info.get("duration")),
+            (tr("detail_rating"), info.get("rating")),
         )
         for label, value in simple:
             value = str(value or "").strip()
             if value:
-                parts.append(f"<b>{label}:</b> {html.escape(value)}")
+                parts.append(f"<b>{html.escape(label)}:</b> "
+                             f"{html.escape(value)}")
         cast = str(info.get("cast") or info.get("actors") or "").strip()
         if cast:
             names = [n.strip() for n in cast.split(",") if n.strip()]
@@ -868,7 +869,8 @@ class _DetailMixin:
                     f'{html.escape(n)}</a>' for n in names]
             else:
                 rendered = [html.escape(n) for n in names]
-            parts.append("<b>Cast:</b> " + ", ".join(rendered))
+            parts.append(f"<b>{html.escape(tr('detail_cast'))}:</b> "
+                         + ", ".join(rendered))
         elif self.tmdb and td.get("cast"):
             names = [c.get("name") for c in td["cast"]
                      if c.get("name")]
@@ -877,13 +879,14 @@ class _DetailMixin:
                 f'style="color:{ACCENT}; text-decoration:none;">'
                 f'{html.escape(n)}</a>' for n in names]
             if rendered:
-                parts.append("<b>Cast:</b> " + ", ".join(rendered))
+                parts.append(f"<b>{html.escape(tr('detail_cast'))}:</b> "
+                             + ", ".join(rendered))
         self.media_meta.setText("<br>".join(parts))
         self.media_meta.setVisible(bool(parts))
 
         self.media_info.setVisible(bool(plot or parts))
         if not (plot or parts):
-            self._epg_note("No further information available.")
+            self._epg_note(tr("detail_no_info"))
 
     def _on_cast_link(self, href: str) -> None:
         if href.startswith("cast:"):
@@ -939,9 +942,10 @@ class _DetailMixin:
         if current:
             self._current_epg = current
             self.now_time.setText(
-                f"● NOW   {current['start']:%H:%M} – {current['stop']:%H:%M}")
+                f"● {tr('detail_now')}   "
+                f"{current['start']:%H:%M} – {current['stop']:%H:%M}")
             self.now_title.setText(
-                current["title"] or "Unknown programme")
+                current["title"] or tr("detail_unknown_programme"))
             self.now_desc.setText(current["desc"][:400])
             self._refresh_progress()
             if not self._player_fs:
@@ -949,12 +953,14 @@ class _DetailMixin:
             if self.player:
                 info = (
                     f"{self._detail_name}\n"
-                    f"{current['title'] or 'Unknown programme'}   "
+                    f"{current['title'] or tr('detail_unknown_programme')}"
+                    "   "
                     f"{current['start']:%H:%M}-{current['stop']:%H:%M}")
                 nxt = upcoming[0] if upcoming else None
                 if nxt:
-                    info += (f"\nNext: {nxt['title'] or '?'}"
-                             f" at {nxt['start']:%H:%M}")
+                    info += "\n" + tr("detail_next_at",
+                                       title=nxt["title"] or "?",
+                                       time=f"{nxt['start']:%H:%M}")
                 self.player.set_overlay_info(info)
 
         for post in upcoming[:self._epg_upcoming_count()]:
@@ -965,14 +971,11 @@ class _DetailMixin:
                 (p for p in all_posts if p["start"]),
                 key=lambda p: p["start"])
             if dated:
-                self._epg_note(
-                    "The server's schedule times look wrong - "
-                    "showing the most recent entries anyway.")
+                self._epg_note(tr("detail_epg_times_wrong"))
                 for post in dated[-6:]:
                     self._epg_card(post, with_date=True)
             else:
-                self._epg_note(
-                    "No programme guide available for this channel.")
+                self._epg_note(tr("epg_no_guide_available"))
 
     def _epg_card(self, post, with_date: bool = False) -> None:
         card = QFrame(objectName="EpgRow")
@@ -987,7 +990,8 @@ class _DetailMixin:
         t = QLabel(stamp, objectName="EpgRowTime")
         t.setFixedWidth(84 if with_date else 44)
         t.setAlignment(Qt.AlignmentFlag.AlignTop)
-        ti = QLabel(post["title"] or "Unknown", objectName="EpgRowTitle")
+        ti = QLabel(post["title"] or tr("detail_unknown_programme"),
+                    objectName="EpgRowTitle")
         ti.setWordWrap(True)
         row.addWidget(t, 0, Qt.AlignmentFlag.AlignTop)
         row.addWidget(ti, 1)
