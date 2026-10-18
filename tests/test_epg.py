@@ -262,10 +262,19 @@ def test_parse_xmltv_time_offset_without_a_space():
     assert parse_xmltv_time("20260927200000 junk") is None
 
 
-_TINY_GUIDE = (b'<tv><channel id="c1"><display-name>One</display-name>'
-               b'</channel><programme start="20260927200000 +0000" '
-               b'stop="20260927210000 +0000" channel="c1"><title>Show</title>'
-               b'</programme></tv>')
+def _tiny_guide() -> bytes:
+    """One channel with a programme on now. Relative to the clock, not a
+    fixed date: the guide drops programmes that ended more than
+    KEEP_PAST_DAYS ago, so a dated sample silently empties a week after the
+    test is written (this one did, on 2026-10-04)."""
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    fmt = "%Y%m%d%H%M%S +0000"
+    start = (now - timedelta(hours=1)).strftime(fmt)
+    stop = (now + timedelta(hours=1)).strftime(fmt)
+    return ('<tv><channel id="c1"><display-name>One</display-name></channel>'
+            f'<programme start="{start}" stop="{stop}" channel="c1">'
+            '<title>Show</title></programme></tv>').encode()
 
 
 def test_a_forced_refresh_that_fails_keeps_the_guide_on_disk(tmp_path):
@@ -276,7 +285,7 @@ def test_a_forced_refresh_that_fails_keeps_the_guide_on_disk(tmp_path):
     import time
 
     cache = tmp_path / "epg_x.xml"
-    cache.write_bytes(gzip.compress(_TINY_GUIDE))
+    cache.write_bytes(gzip.compress(_tiny_guide()))
     old = time.time() - 30 * 86400                     # far past any TTL
     os.utime(cache, (old, old))
     g = XmltvGuide(client=None, cache_path=str(cache))

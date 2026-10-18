@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import secrets
 import threading
 import time
 
@@ -10,7 +13,12 @@ from ..core.log import log
 from PyQt6.QtCore import QSettings
 
 API = "https://api.trakt.tv"
-SITE = "https://trakt.tv"
+# Every OAuth request - the sign-in page, device codes, the code exchange and
+# token refresh - goes to this host since Trakt moved its sign-in in 2026.
+# The old https://trakt.tv/oauth/authorize lost the request's parameters on
+# the way to the new page, so sign-in ended at "invalid_client: client_id is
+# required" (developer.trakt.tv, "Authorize Application").
+AUTH = "https://auth.trakt.tv"
 API_VERSION = "2"
 
 # Loopback redirect for the browser (authorization-code) sign-in. The port is
@@ -41,6 +49,38 @@ class TraktAuthError(Exception):
     pass
 
 
+def new_pkce_pair() -> tuple[str, str]:
+    """A fresh PKCE (verifier, S256 challenge) for one sign-in.
+
+    The verifier is 64 characters from the RFC 7636 alphabet (token_urlsafe
+    uses A-Z a-z 0-9 - _), the challenge the base64url SHA-256 of it without
+    padding - the only method Trakt accepts."""
+    verifier = secrets.token_urlsafe(48)
+    digest = hashlib.sha256(verifier.encode("ascii")).digest()
+    challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+    return verifier, challenge
+
+
+def _oauth_error_code(r) -> str:
+    try:
+        data = r.json()
+    except Exception:
+        return ""
+    return str(data.get("error") or "") if isinstance(data, dict) else ""
+
+
+def _oauth_error(r) -> str:
+    """': <error> - <description>' from an OAuth error body, or ''."""
+    try:
+        data = r.json()
+    except Exception:
+        return ""
+    if not isinstance(data, dict) or not data.get("error"):
+        return ""
+    desc = data.get("error_description")
+    return f": {data['error']}" + (f" - {desc}" if desc else "")
+
+
 class TraktClient:
     """Trakt API client: device auth, token storage, scrobbling, lookups."""
 
@@ -60,8 +100,16 @@ class TraktClient:
 
     @property
     def client_secret(self) -> str:
-        return (self.settings.value("trakt_client_secret", "")
-                or DEFAULT_CLIENT_SECRET)
+        """The secret of the app in use, or "" when it has none.
+
+        Optional since Trakt's 2026 sign-in change: apps created from
+        October 2026 get no secret at all, and the browser sign-in uses PKCE
+        instead. The bundled secret belongs to the bundled app only - sent
+        with somebody's own client id it made Trakt reject them."""
+        own = self.settings.value("trakt_client_secret", "") or ""
+        if own:
+            return own
+        return DEFAULT_CLIENT_SECRET if self.client_id == DEFAULT_CLIENT_ID else ""
 
     @property
     def access_token(self) -> str:
@@ -91,7 +139,7 @@ class TraktClient:
     def start_device_auth(self) -> dict:
         """Step 1: request a device+user code. Returns the API response."""
         r = requests.post(
-            f"{API}/oauth/device/code",
+            f"{AUTH}/oauth/device/code",
             json={"client_id": self.client_id}, timeout=10)
         r.raise_for_status()
         return r.json()
@@ -101,11 +149,10 @@ class TraktClient:
 
         Raises TraktAuthError on denial/expiry.
         """
-        r = requests.post(
-            f"{API}/oauth/device/token",
-            json={"code": device_code, "client_id": self.client_id,
-                  "client_secret": self.client_secret},
-            timeout=10)
+        body = {"code": device_code, "client_id": self.client_id}
+        if self.client_secret:
+            body["client_secret"] = self.client_secret
+        r = requests.post(f"{AUTH}/oauth/device/token", json=body, timeout=10)
         if r.status_code == 200:
             data = r.json()
             self._store_tokens(data)
@@ -124,37 +171,46 @@ class TraktClient:
 
     # -- browser (authorization-code) OAuth flow -----------------------------
 
-    def authorize_url(self, state: str,
+    def authorize_url(self, state: str, code_challenge: str,
                       redirect_uri: str = REDIRECT_URI) -> str:
-        """The trakt.tv page to open in the browser. If the user is already
+        """The Trakt page to open in the browser. If the user is already
         signed in on the web they only click 'Yes' (or are bounced straight
-        through if they've authorised the app before) - no password typing."""
+        through if they've authorised the app before) - no password typing.
+
+        *code_challenge* is the PKCE challenge from new_pkce_pair(); the
+        matching verifier goes to exchange_code()."""
         from urllib.parse import urlencode
         q = urlencode({
             "response_type": "code",
             "client_id": self.client_id,
             "redirect_uri": redirect_uri,
             "state": state,
+            "code_challenge": code_challenge,
+            "code_challenge_method": "S256",
         })
-        return f"{SITE}/oauth/authorize?{q}"
+        return f"{AUTH}/oauth/authorize?{q}"
 
-    def exchange_code(self, code: str,
+    def exchange_code(self, code: str, code_verifier: str,
                       redirect_uri: str = REDIRECT_URI) -> dict:
         """Trade the authorization code from the redirect for access/refresh
-        tokens and store them. Raises TraktAuthError on failure."""
+        tokens and store them. Raises TraktAuthError on failure.
+
+        PKCE: the verifier proves this is the app that asked, and replaces
+        the client secret, which Trakt says a desktop app must not send."""
         r = requests.post(
-            f"{API}/oauth/token",
+            f"{AUTH}/oauth/token",
             json={"code": code, "client_id": self.client_id,
-                  "client_secret": self.client_secret,
                   "redirect_uri": redirect_uri,
-                  "grant_type": "authorization_code"},
+                  "grant_type": "authorization_code",
+                  "code_verifier": code_verifier},
             timeout=15)
         if r.status_code in (200, 201):
             data = r.json()
             self._store_tokens(data)
             return data
         raise TraktAuthError(
-            f"Trakt rejected the sign-in (HTTP {r.status_code}).")
+            f"Trakt rejected the sign-in (HTTP {r.status_code}"
+            f"{_oauth_error(r)}).")
 
     # -- token refresh --------------------------------------------------------
 
@@ -176,16 +232,17 @@ class TraktClient:
         token and expiry went unread, and when the access token ran out
         every Trakt call failed quietly until the user signed in again."""
         tried: list[str] = []
+        grants_refused = 0
         for uri in (REDIRECT_URI, OOB_REDIRECT_URI):
+            body = {"refresh_token": self.refresh_token,
+                    "client_id": self.client_id,
+                    "redirect_uri": uri,
+                    "grant_type": "refresh_token"}
+            if self.client_secret:
+                body["client_secret"] = self.client_secret
             try:
-                r = requests.post(
-                    f"{API}/oauth/token",
-                    json={"refresh_token": self.refresh_token,
-                          "client_id": self.client_id,
-                          "client_secret": self.client_secret,
-                          "redirect_uri": uri,
-                          "grant_type": "refresh_token"},
-                    timeout=15)
+                r = requests.post(f"{AUTH}/oauth/token", json=body,
+                                  timeout=15)
             except requests.RequestException as e:
                 log.warning("trakt: token refresh failed - %s",
                             type(e).__name__)
@@ -195,7 +252,19 @@ class TraktClient:
                 self._store_tokens(r.json())
                 log.info("trakt: access token refreshed")
                 return True
-            tried.append(str(r.status_code))
+            tried.append(f"{r.status_code}{_oauth_error(r)}")
+            if r.status_code == 400 and _oauth_error_code(r) == "invalid_grant":
+                grants_refused += 1
+        if grants_refused == 2:
+            # Trakt's 2026 sign-in move retired every refresh token issued
+            # before it ("invalid_grant: session not found"). Keeping the dead
+            # token only made every Trakt call fail quietly while Settings
+            # still said "Connected"; dropping it says what is true and puts
+            # the Connect button back.
+            log.warning("trakt: the saved sign-in can no longer be renewed "
+                        "(%s) - connect to Trakt again", "; ".join(tried))
+            self.disconnect()
+            return False
         log.warning("trakt: token refresh refused (HTTP %s) - sign in to "
                     "Trakt again", "/".join(tried))
         self._refresh_retry_at = time.monotonic() + REFRESH_BACKOFF

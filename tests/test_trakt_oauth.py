@@ -22,13 +22,77 @@ def _client(tmp_name):
 
 
 def test_authorize_url_carries_the_oauth_params():
-    url = _client("auth_url").authorize_url("STATE")
-    assert url.startswith("https://trakt.tv/oauth/authorize?")
+    # Trakt moved its sign-in to auth.trakt.tv in 2026; the old
+    # trakt.tv/oauth/authorize lost the parameters on the way and the user
+    # got "invalid_client: client_id is required".
+    url = _client("auth_url").authorize_url("STATE", "CHALLENGE")
+    assert url.startswith("https://auth.trakt.tv/oauth/authorize?")
     q = dict(urllib.parse.parse_qsl(url.split("?", 1)[1]))
     assert q["response_type"] == "code"
     assert q["client_id"] == "CID"
     assert q["state"] == "STATE"
     assert q["redirect_uri"] == T.REDIRECT_URI
+    assert q["code_challenge"] == "CHALLENGE"
+    assert q["code_challenge_method"] == "S256"
+
+
+def test_pkce_pair_follows_rfc_7636():
+    import base64
+    import hashlib
+    import re
+    verifier, challenge = T.new_pkce_pair()
+    assert 43 <= len(verifier) <= 128
+    assert re.fullmatch(r"[A-Za-z0-9\-._~]+", verifier)
+    want = base64.urlsafe_b64encode(
+        hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    assert challenge == want and "=" not in challenge
+    assert T.new_pkce_pair()[0] != verifier          # fresh every sign-in
+
+
+def test_oauth_calls_go_to_the_auth_host(monkeypatch):
+    urls = []
+
+    class Resp:
+        status_code = 200
+
+        def json(self):
+            return {"device_code": "D", "user_code": "U",
+                    "access_token": "AT", "refresh_token": "RT",
+                    "expires_in": 100}
+
+        def raise_for_status(self):
+            pass
+
+    def fake_post(url, json=None, timeout=None):
+        urls.append(url)
+        return Resp()
+
+    monkeypatch.setattr(T.requests, "post", fake_post)
+    tc = _client("auth_host")
+    tc.start_device_auth()
+    tc.poll_device_token("D")
+    tc.exchange_code("C", "V")
+    tc.settings.setValue("trakt_refresh_token", "RT")
+    tc.refresh_tokens()
+    assert urls == ["https://auth.trakt.tv/oauth/device/code",
+                    "https://auth.trakt.tv/oauth/device/token",
+                    "https://auth.trakt.tv/oauth/token",
+                    "https://auth.trakt.tv/oauth/token"]
+
+
+def test_the_bundled_secret_goes_only_with_the_bundled_app():
+    s = QSettings("dopeIPTV-test", "secret_rules")
+    s.clear()
+    tc = T.TraktClient(s)
+    assert tc.client_id == T.DEFAULT_CLIENT_ID
+    assert tc.client_secret == T.DEFAULT_CLIENT_SECRET
+    # Somebody's own app, created after October 2026, has no secret: ours
+    # must not be sent with their id.
+    s.setValue("trakt_client_id", "THEIRS")
+    assert tc.client_secret == ""
+    s.setValue("trakt_client_secret", "THEIR-SECRET")
+    assert tc.client_secret == "THEIR-SECRET"
+    s.clear()
 
 
 def test_exchange_code_posts_and_stores_tokens(monkeypatch):
@@ -48,11 +112,14 @@ def test_exchange_code_posts_and_stores_tokens(monkeypatch):
 
     monkeypatch.setattr(T.requests, "post", fake_post)
     tc = _client("exchange")
-    tc.exchange_code("THECODE")
-    assert seen["url"] == "https://api.trakt.tv/oauth/token"
+    tc.exchange_code("THECODE", "VERIFIER")
+    assert seen["url"] == "https://auth.trakt.tv/oauth/token"
     assert seen["json"]["grant_type"] == "authorization_code"
     assert seen["json"]["code"] == "THECODE"
-    assert seen["json"]["client_secret"] == "SECRET"
+    # PKCE: the verifier replaces the secret, which a desktop app must not
+    # send (developer.trakt.tv/docs/pkce).
+    assert seen["json"]["code_verifier"] == "VERIFIER"
+    assert "client_secret" not in seen["json"]
     assert tc.access_token == "AT" and tc.is_connected()
 
 
@@ -66,7 +133,7 @@ def test_exchange_code_raises_on_rejection(monkeypatch):
     monkeypatch.setattr(T.requests, "post", lambda *a, **k: Resp())
     tc = _client("exchange_fail")
     try:
-        tc.exchange_code("X")
+        tc.exchange_code("X", "V")
         raise AssertionError("expected TraktAuthError")
     except T.TraktAuthError:
         pass
@@ -170,3 +237,32 @@ def test_a_refused_refresh_tries_the_oob_uri_then_backs_off(monkeypatch):
     assert posts == [T.REDIRECT_URI, T.OOB_REDIRECT_URI]
     tc._headers()
     assert len(posts) == 2                       # backed off, no hammering
+
+
+def test_a_retired_refresh_token_disconnects(monkeypatch):
+    # Trakt's 2026 sign-in move retired every refresh token issued before
+    # it. Keeping the dead token left Settings saying "Connected" while
+    # every Trakt call failed; now the sign-in is dropped so Connect shows.
+    def fake_post(url, json=None, timeout=None):
+        return _TokenResp(400, {"error": "invalid_grant",
+                                "error_description": "session not found"})
+
+    monkeypatch.setattr(T.requests, "post", fake_post)
+    tc = _client("refresh_retired")
+    tc.settings.setValue("trakt_access_token", "AT1")
+    tc.settings.setValue("trakt_refresh_token", "RT1")
+    tc.settings.setValue("trakt_expires_at", int(time.time()) - 5)
+    assert tc.is_connected()
+    assert tc.refresh_tokens() is False
+    assert not tc.is_connected() and tc.refresh_token == ""
+
+
+def test_a_server_error_keeps_the_sign_in(monkeypatch):
+    monkeypatch.setattr(T.requests, "post",
+                        lambda *a, **k: _TokenResp(503))
+    tc = _client("refresh_503")
+    tc.settings.setValue("trakt_access_token", "AT1")
+    tc.settings.setValue("trakt_refresh_token", "RT1")
+    tc.settings.setValue("trakt_expires_at", int(time.time()) - 5)
+    assert tc.refresh_tokens() is False
+    assert tc.is_connected() and tc.refresh_token == "RT1"

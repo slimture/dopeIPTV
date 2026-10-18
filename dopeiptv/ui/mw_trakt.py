@@ -11,7 +11,7 @@ import time
 from ..i18n import tr
 from ..providers.metadata import PosterResolver
 from ..providers.oauth_loopback import capture_oauth_redirect
-from ..providers.trakt import OAUTH_PORT, REDIRECT_URI
+from ..providers.trakt import OAUTH_PORT, REDIRECT_URI, new_pkce_pair
 from .theme import P
 from ..core.workers import run_async
 from ..core.xdg import open_url
@@ -771,8 +771,9 @@ class _TraktMixin:
         """Entry point for the wizard's 'Connect Trakt' button. If the app
         credentials are already set, go straight to the one-click browser
         sign-in; otherwise collect them first (they're a one-time thing) and
-        then continue to the browser."""
-        if self.trakt.client_id and self.trakt.client_secret:
+        then continue to the browser. A client id is all it takes: the
+        secret is optional since Trakt's 2026 sign-in (PKCE) change."""
+        if self.trakt.client_id:
             self._trakt_browser_auth_dialog(parent)
             return
         if self._trakt_creds_dialog(parent):
@@ -791,7 +792,7 @@ class _TraktMixin:
         lay.addWidget(intro)
         create = QPushButton(tr("trakt_create_app"))
         create.clicked.connect(lambda: open_url(
-            "https://trakt.tv/oauth/applications/new"))
+            "https://app.trakt.tv/settings/apps/api/new"))
         crow = QHBoxLayout()
         crow.addWidget(create)
         crow.addStretch(1)
@@ -819,7 +820,8 @@ class _TraktMixin:
         def accept() -> None:
             cid = id_edit.text().strip()
             sec = sec_edit.text().strip()
-            if not (cid and sec):
+            # Apps created since October 2026 have no secret to paste.
+            if not cid:
                 err.setText(tr("msg_trakt_enter_creds"))
                 return
             self.settings.setValue("trakt_client_id", cid)
@@ -837,7 +839,7 @@ class _TraktMixin:
         'Yes' - no code, no password. A one-shot local server on OAUTH_PORT
         catches the redirect and we swap the code for tokens. Falls back to
         the device-code dialog for anyone who'd rather type a code."""
-        if not (self.trakt.client_id and self.trakt.client_secret):
+        if not self.trakt.client_id:
             QMessageBox.information(parent, "Trakt", tr("msg_trakt_enter_creds"))
             return
 
@@ -859,6 +861,9 @@ class _TraktMixin:
         lay.addLayout(row)
 
         state = {"cancelled": False, "token": secrets.token_urlsafe(16)}
+        # PKCE: the challenge goes out with the sign-in page, the verifier
+        # stays here until the code comes back.
+        verifier, challenge = new_pkce_pair()
 
         def cancel() -> None:
             state["cancelled"] = True
@@ -890,7 +895,7 @@ class _TraktMixin:
             run_async(
                 self.pool,
                 lambda code=params.get("code", ""): self.trakt.exchange_code(
-                    code),
+                    code, verifier),
                 exchanged, exchange_failed)
 
         def capture_failed(msg) -> None:
@@ -921,7 +926,8 @@ class _TraktMixin:
                 OAUTH_PORT, timeout=180.0,
                 should_cancel=lambda: state["cancelled"]),
             captured, capture_failed)
-        open_url(self.trakt.authorize_url(state["token"], REDIRECT_URI))
+        open_url(self.trakt.authorize_url(state["token"], challenge,
+                                          REDIRECT_URI))
         d.exec()
 
     def _trakt_device_auth_dialog(self, parent) -> None:
