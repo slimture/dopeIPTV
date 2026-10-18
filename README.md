@@ -21,7 +21,7 @@ external mpv/VLC playback).
 | ![Live TV with the EPG](docs/screenshots/live.png) | ![EPG timeline grid](docs/screenshots/epg-grid.png) |
 | *Live TV with the programme guide* | *EPG timeline grid* |
 | ![Themes and accent colors](docs/screenshots/themes.png) | ![Favorites and the player](docs/screenshots/player.png) |
-| *Themes — 5 palettes + 7 accents* | *Favorites and the embedded player* |
+| *Themes and accent colors* | *Favorites and the embedded player* |
 
 ## Features
 
@@ -34,8 +34,9 @@ external mpv/VLC playback).
 - **Full EPG** with now/next progress bars, a searchable guide, and a persistent disk cache that shows instantly on startup
 - **TMDB metadata** — posters, ratings (linked to IMDb), and a clickable cast list that finds an actor's other titles in your playlist
 - **Recording & Timeshift** — record on a timer/schedule (single-connection friendly) and watch catch-up archives from the EPG
-- **Chromecast**, **Trakt** scrobbling, **multiple playlists**, parental control, content manager and editable channel lists
-- **Themes** — 5 palettes + 7 accent colors, applied live
+- **Chromecast**, **Trakt** scrobbling, **multiple playlists** (drag to reorder, export/import, or drop an M3U file or link on the window), parental control, content manager and editable channel lists
+- **Themes** — 9 themes + 7 accent colors, applied live
+- **Updates itself** — the AppImage downloads, verifies and swaps in a new release from the update banner
 
 See [FEATURES.md](docs/FEATURES.md) for the full feature list.
 
@@ -79,7 +80,7 @@ chmod +x dopeIPTV-*.AppImage
 (The AppImage offers, on first run, to add itself to your application menu —
 which is also where a Wayland desktop reads the window's icon and name from.
 Say no and nothing is written; the same switch lives under **Settings →
-Playback**. [Gear Lever](https://flathub.org/apps/it.mijorus.gearlever) and
+General**. [Gear Lever](https://flathub.org/apps/it.mijorus.gearlever) and
 AppImageLauncher do the same job if you prefer to manage it yourself.)
 
 **macOS** — Apple Silicon only from 1.2.11 onward; **1.2.10 is the last
@@ -99,7 +100,7 @@ It's safe — the warning only means the build isn't code-signed.
 `dopeiptv.exe`, no installer and no admin rights. The app isn't code-signed
 yet, so SmartScreen may show *"Windows protected your PC"* — click **More info →
 Run anyway**. An optional Start-menu/desktop shortcut lives under
-**Settings → Interface → Maintenance → Create shortcut**, and the bundled
+**Settings → Advanced → Create shortcut**, and the bundled
 `README.txt` covers removing every trace of the app.
 
 > Linux is the primary target; macOS and Windows are a bonus.
@@ -139,9 +140,9 @@ sudo pacman -S python python-pipx mpv ffmpeg
 
 pipx ensurepath
 pipx install .
-
 ```
-pipx install . will install PyQt6, requests, python-mpv, pychromecast
+
+`pipx install .` also installs PyQt6, requests, python-mpv and pychromecast.
 
 ## Running
 
@@ -157,7 +158,7 @@ username, and password.
 The app offers this itself the first time it starts somewhere no menu
 entry exists — say yes and it writes one to `~/.local/share/applications`,
 say no and nothing is written. The same switch lives under **Settings →
-Playback**, and unticking it removes the entry again.
+General**, and unticking it removes the entry again.
 
 On **Wayland this is also where the icon comes from**: GNOME and KDE take
 a window's icon and name from the .desktop file matching it and ignore
@@ -197,11 +198,11 @@ hand costs nothing either.
 | Open in an external player (mpv/VLC) | Right-click → Open externally |
 | Record a channel | Right-click → Record (or the ● REC button in the player) |
 | Stop a recording | Click the red ● REC indicator under the list |
-| Change theme / accent color | Settings → Interface |
+| Change theme / accent color | Settings → Appearance |
 | Watch a programme from the start | Right-click a ⏪ channel → Timeshift |
 | Browse the full guide | The **EPG Guide** button in the sidebar |
 | Search | Type in the search field at the top |
-| Switch account | Settings → "Switch account / server" |
+| Switch playlist / provider | The playlist menu at the top of the sidebar, or Settings → Playlists |
 
 ## Keyboard shortcuts
 
@@ -212,9 +213,13 @@ hand costs nothing either.
 | `Space` | Play / pause |
 | `F` | Fullscreen (`Esc` to leave) |
 | `Ctrl`+`←` / `Ctrl`+`→` | Previous / next channel (zap) |
+| `Backspace` | Back to the last channel |
 | `Ctrl`+`B` | Collapse / expand the sidebar (icon rail) |
 | `Ctrl`+`Shift`+`M` | Focus mode (hide the list) |
 | `Ctrl`+`G` | Open the EPG guide |
+| `Ctrl`+`Shift`+`F` | Search the guide |
+| `Ctrl`+`Shift`+`R` | Reminders |
+| `Ctrl`+`O` | Open a video file |
 | `M` | Mute |
 | `P` | Pop the player out to its own window |
 | `R` | Record |
@@ -223,7 +228,8 @@ hand costs nothing either.
 | `Esc` | Leave fullscreen / close a dialog |
 
 Single-letter keys (`M`, `P`, `R`, `I`) act on the player and are ignored
-while you're typing in the search box.
+while you're typing in the search box. Every one of these can be changed
+under **Settings → Advanced → Keyboard shortcuts**.
 
 **With the video focused** (click the video first)
 
@@ -239,6 +245,7 @@ while you're typing in the search box.
 |---|---|
 | `N` | Jump to *now* |
 | `P` | Jump to the channel that's playing |
+| `←` `→` `↑` `↓` | Move between programmes |
 | `Enter` | Play the selected programme |
 | `Esc` | Close the guide |
 
@@ -247,7 +254,7 @@ while you're typing in the search box.
 - **Embedded playback disabled** — install `mpv`/`libmpv` and `python-mpv` (see Dependencies). Not needed for the packaged AppImage/.deb/Flatpak, which bundle the embedded player.
 - **"Open externally" does nothing** — the external-player options launch a standalone `mpv` or `vlc` from your system; install one (`sudo apt install mpv vlc`). The embedded player does not need them.
 - **Recording does nothing** — install `ffmpeg`; it is the recording backend.
-- **Live stream won't start** — try switching the live format to `m3u8` in Settings.
+- **Live stream won't start** — try switching **Live stream format** to `m3u8` under **Settings → Playback**.
 - **No categories** — check the server URL (include the port, e.g. `:8080`).
 - **No EPG for a channel** — the provider may not have a programme guide mapped to it; dopeIPTV tries three different sources (short EPG, full EPG table, XMLTV) before giving up.
 
@@ -259,7 +266,7 @@ Nederlands, Polski, Hrvatski, Srpski, Ελληνικά, Türkçe, Українс
 Indonesia, Tiếng Việt, हिन्दी, 日本語, 한국어, Kiswahili, العربية, فارسی,
 עברית and اردو. The four right-to-left languages (Arabic, Persian, Hebrew,
 Urdu) mirror the whole layout. Pick your language under
-**Settings → Interface → Language**. Menus, the sidebar, settings and
+**Settings → General → Language**. Menus, the sidebar, settings and
 notifications switch immediately.
 
 English is the source language, inline in `dopeiptv/i18n.py`; every other

@@ -3,15 +3,13 @@
 ## Setup
 
 ```bash
-pip install PyQt6 requests
-sudo apt install mpv
+pip install -r requirements.txt   # PyQt6, requests, python-mpv, pychromecast
+sudo apt install mpv ffmpeg       # libmpv for the embedded player, ffmpeg for recording
 python3 dopeiptv.py
 ```
 
-Optional dependencies:
-- `pip install python-mpv` - embedded in-app video player
-- `pip install pychromecast` - Chromecast casting
-- `sudo apt install ffmpeg` - standalone stream recording
+Without libmpv the app still runs and opens channels in an external mpv
+window; without ffmpeg, recording falls back to mpv.
 
 ## Package structure
 

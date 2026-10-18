@@ -8,7 +8,7 @@ point at them:
 |---|---|
 | `live.png` | **The hero shot.** Live TV: the sidebar, the channel list, and a channel playing in the embedded player with the now/next EPG visible. Colour a category or two (right-click → Set background) so the left column looks alive. |
 | `epg-grid.png` | The **EPG timeline grid** (sidebar → *EPG Guide*, or `Ctrl+G`). Best if the playing channel's row is flagged (▶ accent) and a few ⏪ catch-up channels show. |
-| `themes.png` | **Settings → Interface** with the theme + accent picker open (works with any content — even the demo channels). |
+| `themes.png` | **Settings → Appearance**: the theme and accent pickers (works with any content — even the demo channels). |
 | `player.png` | Favourites or a grid view with the mini player going — or show off **focus mode** (`⤢` / `Ctrl+Shift+M`) for a clean player-forward layout. |
 
 ## Getting content for free (no personal provider needed)

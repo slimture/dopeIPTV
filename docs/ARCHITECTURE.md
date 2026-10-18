@@ -52,7 +52,11 @@ dopeiptv/
   ui/                  Everything the user sees
     __init__.py        Lazy MainWindow export (PEP 562)
     main_window.py     MainWindow composition root (QMainWindow + mixins)
-    mw_settings.py     Settings dialog mixin
+    mw_settings.py     Settings dialog mixin (the pages and what they store)
+    settings_ui.py     Settings building blocks: sidebar shell, pages,
+                       cards, rows, switches, the playlist delegate
+    qt_i18n.py         Qt's own strings (standard buttons, calendars) and
+                       QLocale-formatted dates in the app's language
     mw_trakt.py        Trakt / watched / watchlist mixin
     mw_recording.py    Recording / timeshift mixin
     mw_context.py      Right-click context-menu mixin
@@ -63,14 +67,18 @@ dopeiptv/
     mw_nav.py          Nav chrome (focus mode, nav colours/icons, Library)
     mw_shortcuts.py    Keyboard shortcuts + registry
     mw_popout.py       Detached-window ("pop out") player mixin
-    mw_multiview.py    Multiview: 2x2 grid of live streams (own mpv per cell)
+    mw_multiview.py    Multiview: 2/4/6/9 live streams (own mpv per cell)
     mw_busy.py         Loading indicator + spinner overlay
     mw_updates.py      Update-check badge/status wiring, "Update now"
     mw_reminders.py    Programme-reminder UI (set / list / fire)
+    mw_home.py         The Home page (shelves: resume, favourites, new)
+    mw_local.py        Local files: folders, library view, music queue
+    mw_onboarding.py   First-run setup wizard
+    mw_sort.py         List sort order
     widgets.py         Small standalone widgets
     welcome.py         First-run welcome overlay (connect / explore)
     channel_list.py    Virtualized list: model, view, painted delegate
-    dialogs.py         Login, playlist editor, content manager
+    dialogs.py         Playlist editor, content manager
     epg_grid.py        EPG timeline grid view
     epg_search.py      Programme search across the whole guide
     reminders.py       Reminders manager dialog

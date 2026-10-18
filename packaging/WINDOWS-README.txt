@@ -54,7 +54,7 @@ NO VIDEO INSIDE THE APP - channels open in a separate mpv window, or
   then attach %TEMP%\dopeiptv.log (passwords are masked automatically).
 
 OPTIONAL - Start-menu / desktop shortcut
-  In the app: Settings -> Interface -> Maintenance -> Create shortcut.
+  In the app: Settings -> Advanced -> Create shortcut.
   (Each shortcut is a single .lnk file you can delete anytime.)
 
 REMOVING dopeIPTV COMPLETELY (leave no trace)

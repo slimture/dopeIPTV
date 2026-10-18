@@ -33,6 +33,8 @@ map and the one-way import rule.
 | `ui/main_window.py` | MainWindow composition root (+ `mw_*` mixins) |
 | `ui/channel_list.py` | List model, view, delegate painting |
 | `ui/dialogs.py` | Dialog windows |
+| `ui/settings_ui.py` | Settings building blocks: sidebar shell, pages, cards, rows, switches |
+| `ui/qt_i18n.py` | Qt's own strings and QLocale dates in the app's language |
 | `ui/tmdb_match.py` | Manual TMDB match dialog |
 | `ui/widgets.py` | Small standalone widgets |
 | `ui/theme.py` | Theming engine |
@@ -81,7 +83,10 @@ When making changes:
 it is used, wire it to a menu action.
 
 **Add a new setting**: add the QSettings key read/write in the relevant
-method in `ui/mw_settings.py` (usually `open_settings`).
+method in `ui/mw_settings.py` (usually `open_settings`): a `card.row()` or
+`card.toggle()` on the page it belongs to, and the write-back in the
+`if d.exec():` block at the end. Rows are found by the Settings search
+automatically.
 
 **Add a new data store**: add a class to `core/stores.py` following the
 pattern of `FavoriteStore` or `HistoryStore`.
