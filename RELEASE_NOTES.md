@@ -1,3 +1,16 @@
+## dopeIPTV 1.2.16
+
+A fix for subtitles from OpenSubtitles on macOS, Windows and the Flatpak.
+
+- **Subtitles from OpenSubtitles load again.** The subtitle you picked was
+  downloaded and loaded, but the app said "OpenSubtitles did not send a
+  usable subtitle file" and kept the search open. The setting "On - forced
+  subtitles only" works there again as well, and a subtitle you picked for
+  a title is always shown when you play it again.
+
+On the AppImage from 1.2.15? Click **Update now** in the banner. Coming
+from 1.2.14 or earlier, everything new in 1.2.15 is below.
+
 ## dopeIPTV 1.2.15
 
 Cast to your smart TV, subtitles from OpenSubtitles, your desktop's media

@@ -7,6 +7,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.2.16]
+
+A fix for subtitles from OpenSubtitles on macOS, Windows and the Flatpak.
+
 ### Fixed
 
 - **Subtitles from OpenSubtitles** were downloaded and loaded, then
