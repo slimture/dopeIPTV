@@ -39,7 +39,7 @@ const HELP = [
     'watch' => ['play', 'seek', 'fullscreen', 'popout', 'tracks', 'keys', 'resume'],
     'tv'    => ['epg', 'guide', 'xmltv', 'times', 'ts', 'tsstart', 'tsbrowse',
                 'rec', 'recwhen', 'reconn', 'reccap', 'recwhere'],
-    'more'  => ['mv', 'mvaudio', 'mvcost', 'cast', 'castfix', 'trakt'],
+    'more'  => ['mv', 'mvaudio', 'mvcost', 'cast', 'castfix', 'subs', 'trakt'],
     'local' => ['add', 'views', 'art', 'music', 'missing'],
     'set'   => ['language', 'playback', 'parental', 'hide', 'playlists'],
     'fix'   => ['logs', 'start', 'picture', 'gatekeeper', 'smartscreen',

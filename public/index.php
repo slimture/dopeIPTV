@@ -252,7 +252,10 @@ $app = ["@type" => "SoftwareApplication", "@id" => "$SITE/#app", "name" => "dope
      "featureList" => ["Xtream Codes and M3U playlists", "Full XMLTV EPG guide",
        "Live timeshift and catch-up TV", "One-click recording",
        "Multiview — up to nine channels at once", "Built-in mpv player",
-       "Chromecast and Trakt support", "Your own local video and music files"],
+       "Casting to Chromecast and DLNA smart TVs", "Subtitles from OpenSubtitles",
+       "Desktop media controls (MPRIS) and media keys",
+       "New-episode alerts for followed series", "Trakt sync",
+       "Your own local video and music files"],
      "license" => "$REPO/blob/main/LICENSE", "isAccessibleForFree" => true,
      "author" => ["@id" => "$SITE/#org"], "publisher" => ["@id" => "$SITE/#org"],
      "sameAs" => [$REPO],
@@ -319,7 +322,7 @@ echo json_encode([
     <div class="wrap">
       <span class="chip">Xtream Codes</span><span class="chip">M3U / M3U8</span>
       <span class="chip">XMLTV EPG</span><span class="chip"><?= h(t('chip_timeshift')) ?></span>
-      <span class="chip"><?= t('feat_mv_h') ?></span><span class="chip">Chromecast</span><span class="chip">Trakt</span><span class="chip"><?= h(t('chip_languages')) ?></span>
+      <span class="chip"><?= t('feat_mv_h') ?></span><span class="chip">Chromecast</span><span class="chip">DLNA</span><span class="chip">OpenSubtitles</span><span class="chip">Trakt</span><span class="chip"><?= h(t('chip_languages')) ?></span>
     </div>
   </div>
 
@@ -339,6 +342,10 @@ echo json_encode([
         <div class="card"><div class="ic">◉</div><h3><?= t('feat_c5_h') ?></h3><p><?= t('feat_c5_p') ?></p></div>
         <div class="card"><div class="ic">▶</div><h3><?= t('feat_c6_h') ?></h3><p><?= t('feat_c6_p') ?></p></div>
         <div class="card"><div class="ic">🖿</div><h3><?= t('feat_lf_h') ?></h3><p><?= t('feat_lf_p') ?></p></div>
+        <div class="card"><div class="ic">📺</div><h3><?= t('feat_cast_h') ?></h3><p><?= t('feat_cast_p') ?></p></div>
+        <div class="card"><div class="ic">💬</div><h3><?= t('feat_subs_h') ?></h3><p><?= t('feat_subs_p') ?></p></div>
+        <div class="card"><div class="ic">⏯</div><h3><?= t('feat_keys_h') ?></h3><p><?= t('feat_keys_p') ?></p></div>
+        <div class="card"><div class="ic">🔔</div><h3><?= t('feat_follow_h') ?></h3><p><?= t('feat_follow_p') ?></p></div>
       </div>
     </div>
   </section>
