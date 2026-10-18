@@ -52,7 +52,8 @@ const HELP = [
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= h(t('help_meta_title')) ?></title>
 <meta name="description" content="<?= h(t('help_meta_desc')) ?>">
-<link rel="canonical" href="<?= h($SITE) ?>/help/<?= lang_code() === 'en' ? '' : '?lang=' . h(lang_code()) ?>">
+<link rel="canonical" href="<?= h(i18n_canonical($SITE, '/help/')) ?>">
+<?= i18n_hreflang($SITE, '/help/') ?>
 <meta name="theme-color" content="#0f1218">
 <meta name="robots" content="index,follow">
 <meta property="og:type" content="article">

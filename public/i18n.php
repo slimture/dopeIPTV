@@ -81,6 +81,11 @@ function i18n_pick(): string {
         @setcookie('lang', $q, time() + 31536000, '/');
         return $q;
     }
+    // From here the same URL answers in different languages depending on the
+    // visitor, so say so: a cache in between must not hand one visitor's
+    // language to the next. (Crawlers send no cookie and no Accept-Language,
+    // so they get English here, and each translation has its own ?lang= URL.)
+    if (!headers_sent()) { header('Vary: Accept-Language, Cookie'); }
     $c = $_COOKIE['lang'] ?? '';
     if (is_string($c) && in_array($c, $avail, true)) { return $c; }
     $al = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '';
@@ -111,22 +116,30 @@ function lang_is_rtl(): bool { return in_array($GLOBALS['I18N_LANG'], I18N_RTL, 
 function lang_dir(): string { return lang_is_rtl() ? 'rtl' : 'ltr'; }
 function lang_locale(): string { return I18N_LOCALE[$GLOBALS['I18N_LANG']] ?? 'en_US'; }
 
-/** <link rel="alternate" hreflang> block for every available language. */
-function i18n_hreflang(string $site): string {
+/** The URL of *path* in language *code*: English bare, the rest ?lang=. */
+function i18n_url(string $site, string $path, string $code): string {
+    return $site . $path . ($code === 'en' ? '' : '?lang=' . rawurlencode($code));
+}
+
+/**
+ * <link rel="alternate" hreflang> block for every available language of the
+ * page at *path*. Every page needs its own: without it a search engine sees
+ * 27 copies of the help page and has to guess which one a reader wants.
+ */
+function i18n_hreflang(string $site, string $path = '/'): string {
     $out = '';
     foreach (i18n_available() as $code) {
-        $href = $code === 'en' ? "$site/" : "$site/?lang=$code";
         $out .= '<link rel="alternate" hreflang="' . h($code)
-              . '" href="' . h($href) . "\">\n";
+              . '" href="' . h(i18n_url($site, $path, $code)) . "\">\n";
     }
     $out .= '<link rel="alternate" hreflang="x-default" href="'
-          . h("$site/") . "\">\n";
+          . h($site . $path) . "\">\n";
     return $out;
 }
 
-/** Canonical URL for the active language. */
-function i18n_canonical(string $site): string {
-    return lang_code() === 'en' ? "$site/" : "$site/?lang=" . lang_code();
+/** Canonical URL of *path* in the active language. */
+function i18n_canonical(string $site, string $path = '/'): string {
+    return i18n_url($site, $path, lang_code());
 }
 
 /**

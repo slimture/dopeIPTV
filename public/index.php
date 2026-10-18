@@ -5,6 +5,10 @@
  * sync-releases.php via cron). Zero client-side GitHub calls, so it stays
  * comfortably inside a strict same-origin CSP.
  *
+ * The mock-up in the hero names no real channel. Brand channels next to the
+ * word IPTV is what pirate services advertise with, and what rights holders'
+ * automated takedown requests to search engines look for.
+ *
  * Multilingual: the interface strings live in lang/<code>.php and the language
  * is chosen from ?lang=, a cookie or the browser (see i18n.php). Only languages
  * with a translation file advertise themselves via hreflang / the switcher.
@@ -211,6 +215,24 @@ for ($i = 1; $i <= 10; $i++) {
     $faq[] = ["@type" => "Question", "name" => t("faq_q$i"),
               "acceptedAnswer" => ["@type" => "Answer", "text" => t("faq_a$i")]];
 }
+$app = ["@type" => "SoftwareApplication", "@id" => "$SITE/#app", "name" => "dopeIPTV",
+     "operatingSystem" => "Linux, macOS, Windows",
+     "applicationCategory" => "MultimediaApplication",
+     "applicationSubCategory" => "IPTV player", "description" => $DESC,
+     "softwareVersion" => $version, "url" => "$SITE/",
+     "downloadUrl" => "$SITE/#download", "installUrl" => "$SITE/#download",
+     "featureList" => ["Xtream Codes and M3U playlists", "Full XMLTV EPG guide",
+       "Live timeshift and catch-up TV", "One-click recording",
+       "Multiview — up to nine channels at once", "Built-in mpv player",
+       "Chromecast and Trakt support", "Your own local video and music files"],
+     "license" => "$REPO/blob/main/LICENSE", "isAccessibleForFree" => true,
+     "author" => ["@id" => "$SITE/#org"], "publisher" => ["@id" => "$SITE/#org"],
+     "sameAs" => [$REPO],
+     "offers" => ["@type" => "Offer", "price" => "0", "priceCurrency" => "USD"]];
+// A screenshot URL that 404s is worse than none: only name one that exists.
+if (is_file(__DIR__ . '/screenshots/main.png')) {
+    $app["screenshot"] = "$SITE/screenshots/main.png";
+}
 echo json_encode([
   "@context" => "https://schema.org",
   "@graph" => [
@@ -219,21 +241,7 @@ echo json_encode([
     ["@type" => "WebSite", "@id" => "$SITE/#website", "name" => "dopeIPTV",
      "url" => "$SITE/", "inLanguage" => lang_code(),
      "publisher" => ["@id" => "$SITE/#org"]],
-    ["@type" => "SoftwareApplication", "@id" => "$SITE/#app", "name" => "dopeIPTV",
-     "operatingSystem" => "Linux, macOS, Windows",
-     "applicationCategory" => "MultimediaApplication",
-     "applicationSubCategory" => "IPTV player", "description" => $DESC,
-     "softwareVersion" => $version, "url" => "$SITE/",
-     "downloadUrl" => "$SITE/#download", "installUrl" => "$SITE/#download",
-     "screenshot" => "$SITE/screenshots/main.png",
-     "featureList" => ["Xtream Codes and M3U playlists", "Full XMLTV EPG guide",
-       "Live timeshift and catch-up TV", "One-click recording",
-       "Multiview — up to nine channels at once", "Built-in mpv player",
-       "Chromecast and Trakt support", "Your own local video and music files"],
-     "license" => "$REPO/blob/main/LICENSE", "isAccessibleForFree" => true,
-     "author" => ["@id" => "$SITE/#org"], "publisher" => ["@id" => "$SITE/#org"],
-     "sameAs" => [$REPO],
-     "offers" => ["@type" => "Offer", "price" => "0", "priceCurrency" => "USD"]],
+    $app,
     ["@type" => "FAQPage", "@id" => "$SITE/#faq", "mainEntity" => $faq],
   ],
 ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -260,12 +268,12 @@ echo json_encode([
         <div class="titlebar"><span class="tl-dot"></span><span class="tl-dot"></span><span class="tl-dot"></span></div>
         <div class="body">
           <div class="chans">
-            <div class="chan active"><span class="n"></span> SVT1 HD <span class="live-tag">LIVE</span></div>
-            <div class="chan"><span class="n"></span> BBC One</div>
-            <div class="chan"><span class="n"></span> Sky Sports</div>
-            <div class="chan"><span class="n"></span> Discovery</div>
-            <div class="chan"><span class="n"></span> Arte</div>
-            <div class="chan"><span class="n"></span> National Geo</div>
+            <div class="chan active"><span class="n"></span> News 24 <span class="live-tag">LIVE</span></div>
+            <div class="chan"><span class="n"></span> Channel One</div>
+            <div class="chan"><span class="n"></span> Sport</div>
+            <div class="chan"><span class="n"></span> Cinema</div>
+            <div class="chan"><span class="n"></span> Nature</div>
+            <div class="chan"><span class="n"></span> Kids</div>
           </div>
           <div class="stage">
             <div class="screen"><span class="scan"></span></div>

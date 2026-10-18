@@ -14,7 +14,8 @@ website/
 │   ├── favicon.svg         accent-amber TV glyph
 │   ├── site.webmanifest    PWA/icon metadata
 │   ├── robots.txt          allows all + sitemap
-│   ├── sitemap.xml         single URL
+│   ├── sitemap.xml         index → sitemap.php
+│   ├── sitemap.php         every page × every language, with hreflang
 │   ├── releases.json       written by the sync script on the server (never committed)
 │   ├── files/              mirrored release assets land here (git-ignored)
 │   └── screenshots/        drop real PNGs here (see below)
@@ -174,11 +175,22 @@ the source tree, so it would delete all of it.
 
 ## SEO built in
 
-Unique `<title>` + meta description, canonical URL, Open Graph + Twitter cards,
-`SoftwareApplication` JSON-LD, `robots.txt`, `sitemap.xml`, semantic headings,
-`lang="en"`, responsive viewport, and fast static delivery (gzip + cache
-headers). After launch, submit the site in Google Search Console and Bing
-Webmaster Tools and request indexing of `https://iptv.dope.rs/`.
+Unique `<title>` + meta description per page and language, a canonical URL
+and a full hreflang set on every page (home and help, 27 languages), Open
+Graph + Twitter cards, `SoftwareApplication` JSON-LD, `robots.txt`, a
+generated sitemap (`sitemap.xml` is an index pointing at `sitemap.php`),
+semantic headings, `<html lang>` per language, and fast static delivery
+(gzip + cache headers). The root URL picks a language from the visitor's
+cookie or browser and says so with `Vary`; crawlers get English there and
+find every translation at its own `?lang=` URL.
+
+Keep real broadcasters out of the page - text, mock-ups and screenshots. A
+channel brand next to "IPTV" is what pirate services advertise with and what
+rights holders' automated takedown requests look for; the demo channels
+(Big Buck Bunny, Sintel, Tears of Steel) are free to show.
+
+After a deploy, resubmit `https://iptv.dope.rs/sitemap.xml` in Google Search
+Console and Bing Webmaster Tools.
 
 ## Local preview
 

@@ -54,7 +54,7 @@ $nav_avail = i18n_available();
         <div class="langpick-menu" role="menu">
 <?php foreach ($nav_avail as $code): /* always ?lang= — even English, so it overrides a cookie set to another language (otherwise you can't switch back) */
           $href = $nav_self . '?lang=' . rawurlencode($code); ?>
-          <a role="menuitem" rel="nofollow" class="langpick-item<?= $code === lang_code() ? ' is-current' : '' ?>" href="<?= h($href) ?>"<?= $code === lang_code() ? ' aria-current="true"' : '' ?>><?= h(I18N_NAMES[$code] ?? $code) ?></a>
+          <a role="menuitem" class="langpick-item<?= $code === lang_code() ? ' is-current' : '' ?>" href="<?= h($href) ?>"<?= $code === lang_code() ? ' aria-current="true"' : '' ?>><?= h(I18N_NAMES[$code] ?? $code) ?></a>
 <?php endforeach; ?>
         </div>
       </details>

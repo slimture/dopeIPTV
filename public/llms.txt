@@ -6,7 +6,7 @@ Key facts:
 
 - **What it is:** a desktop IPTV *player* (client), not an IPTV provider. It does not supply, sell or host any channels or content — the user connects their own Xtream Codes or M3U provider.
 - **Licence & price:** free and open source under GPL-3.0. No ads, no tracking, no accounts.
-- **Platforms:** Linux (primary; AppImage, .deb, .rpm), macOS (.dmg), Windows (portable build).
+- **Platforms:** Linux (primary; AppImage, .deb, Flatpak — x86_64 and ARM64), macOS (.dmg, Apple Silicon), Windows (portable build, x64 and ARM64).
 - **Playlists:** Xtream Codes (server + username + password) and M3U / M3U8 URLs; multiple providers side by side.
 - **Guide & timeshift:** full XMLTV EPG with now/next, live timeshift, and catch-up (scrub back into a channel's archive).
 - **Recording:** record the watched stream over a single connection, with timers, size limits and a Recordings library.
@@ -20,6 +20,7 @@ Key facts:
 - [Features](https://iptv.dope.rs/#features): EPG, timeshift & catch-up, pause live TV, recording, multiview, multi-provider, playback.
 - [Download](https://iptv.dope.rs/#download): latest builds for Linux, macOS and Windows, generated from the GitHub releases.
 - [FAQ](https://iptv.dope.rs/#faq): short answers to common questions about dopeIPTV.
+- [Help](https://iptv.dope.rs/help/): setup, playback, the guide, timeshift, recording, multiview, casting and troubleshooting.
 
 ## Source & documentation
 
