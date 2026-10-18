@@ -1185,7 +1185,9 @@ class CastDialog(QDialog):
             lay.addLayout(row)
         self.track_note = QLabel(tr("cast_track_note"))
         self.track_note.setWordWrap(True)
-        self.track_note.setStyleSheet("font-size:11px; opacity:0.7;")
+        # Dimmed by the theme's own rule; QSS has no "opacity", so the
+        # inline style this had was silently ignored.
+        self.track_note.setObjectName("DetailMeta")
         self.track_note.hide()
         lay.addWidget(self.track_note)
         # One question, in the words of the problem: nobody thinks "my
@@ -1196,7 +1198,7 @@ class CastDialog(QDialog):
         lay.addWidget(self.kind_box)
         self.quality_note = QLabel(tr("cast_quality_note"))
         self.quality_note.setWordWrap(True)
-        self.quality_note.setStyleSheet("font-size:11px; opacity:0.7;")
+        self.quality_note.setObjectName("DetailMeta")
         # Shown with the question, not after it is answered: which receivers
         # this is for is what you need in order to answer it, so hiding it
         # until the box is ticked shows it to the only person who no longer

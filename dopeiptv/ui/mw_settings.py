@@ -444,6 +444,8 @@ class _SettingsMixin:
             app.setLayoutDirection(
                 Qt.LayoutDirection.RightToLeft if is_rtl(code)
                 else Qt.LayoutDirection.LeftToRight)
+        from .qt_i18n import apply_qt_language
+        apply_qt_language(app)
         self.retranslate_ui()
 
     def retranslate_ui(self) -> None:
@@ -483,7 +485,8 @@ class _SettingsMixin:
         self.search.setPlaceholderText(tr("search_placeholder"))
         self._size_label.setText(tr("label_size"))
         self._sort_label.setText(tr("label_sort"))
-        self.play_mpv.setText("▶  " + tr("btn_play"))
+        # Icon only: the 30 px poster overlay has no room for a label, and
+        # stamping one on here left clipped text after a language switch.
         self.play_mpv.setToolTip(tr("tooltip_play_in_mpv"))
         # Player control tooltips (embedded bar + fullscreen overlay).
         if self.player:
@@ -1684,8 +1687,14 @@ class _SettingsMixin:
                 return
             if confirm(d, tr("msg_remove_playlist_title"),
                        tr("msg_remove_playlist_body")):
+                was_active = pid == store.active_id
                 store.remove(pid)
                 reload_pl_list()
+                # The app went on showing the removed provider until the
+                # next start: move to the one that is active now.
+                if was_active and store.active_id:
+                    self.switch_playlist(store.active_id)
+                    reload_pl_list()
 
         def use_playlist():
             pid = selected_pid()
@@ -1696,73 +1705,53 @@ class _SettingsMixin:
         def export_playlists():
             if not store or not store.playlists():
                 QMessageBox.information(
-                    d, "Export", "No playlists to export.")
+                    d, tr("pl_export_title"), tr("pl_export_none"))
                 return
             path, _ = QFileDialog.getSaveFileName(
-                d, "Export playlists", "playlists.json",
-                "JSON files (*.json)",
+                d, tr("pl_export_title"), "playlists.json",
+                tr("file_filter_json"),
                 options=QFileDialog.Option.DontUseNativeDialog)
             if not path:
                 return
             import json
-            data = []
-            for p in store.playlists():
-                data.append({
-                    "name": p.get("name", ""),
-                    "server": p.get("server", ""),
-                    "username": p.get("username", ""),
-                    "password": p.get("password", ""),
-                    "epg_url": p.get("epg_url", ""),
-                    "refresh": p.get("refresh", "never"),
-                })
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2)
+            data = store.export_data()
+            try:
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False)
+            except OSError as exc:
+                QMessageBox.warning(d, tr("pl_export_title"),
+                                    tr("pl_export_failed", error=exc))
+                return
             QMessageBox.information(
-                d, "Export",
-                f"Exported {len(data)} playlist(s) to:\n{path}")
+                d, tr("pl_export_title"),
+                tr("pl_export_done", n=len(data), path=path))
 
         def import_playlists():
             if not store:
                 return
             path, _ = QFileDialog.getOpenFileName(
-                d, "Import playlists", "",
-                "JSON files (*.json);;All files (*)",
+                d, tr("pl_import_title"), "",
+                tr("file_filter_json") + ";;" + tr("file_filter_all"),
                 options=QFileDialog.Option.DontUseNativeDialog)
             if not path:
                 return
             import json
             try:
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, "r", encoding="utf-8-sig") as f:
                     data = json.load(f)
-            except Exception as exc:
-                QMessageBox.warning(
-                    d, "Import", f"Could not read file:\n{exc}")
+            except (OSError, ValueError) as exc:
+                QMessageBox.warning(d, tr("pl_import_title"),
+                                    tr("pl_import_unreadable", error=exc))
                 return
-            if not isinstance(data, list):
-                QMessageBox.warning(
-                    d, "Import", "Invalid format — expected a JSON list.")
+            try:
+                added = store.import_data(data)
+            except ValueError:
+                QMessageBox.warning(d, tr("pl_import_title"),
+                                    tr("pl_import_invalid"))
                 return
-            added = 0
-            for entry in data:
-                if not isinstance(entry, dict):
-                    continue
-                server = entry.get("server", "").strip()
-                user = entry.get("username", "").strip()
-                pw = entry.get("password", "").strip()
-                if not (server and user and pw):
-                    continue
-                store.add({
-                    "name": entry.get("name", "").strip()
-                            or server.split("//")[-1].split("/")[0],
-                    "server": server, "username": user,
-                    "password": pw,
-                    "epg_url": entry.get("epg_url", "").strip(),
-                    "refresh": entry.get("refresh", "never"),
-                })
-                added += 1
             reload_pl_list()
-            QMessageBox.information(
-                d, "Import", f"Imported {added} playlist(s).")
+            QMessageBox.information(d, tr("pl_import_title"),
+                                    tr("pl_import_done", n=added))
 
         add_btn.clicked.connect(add_playlist)
         edit_btn.clicked.connect(edit_playlist)

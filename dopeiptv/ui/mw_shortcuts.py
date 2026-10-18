@@ -12,14 +12,32 @@ import sys
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeySequence, QShortcut
-from PyQt6.QtWidgets import QLineEdit
+from PyQt6.QtWidgets import QApplication, QLineEdit
 
 from ..media.embedded import _is_bare_arrow, _is_shift_arrow
 
 
 class _ShortcutsMixin:
     """MainWindow mixin: the keyboard-shortcuts editor and dispatch."""
+    def _multiview_active(self):
+        """The multiview window while it is the one in use, else None.
+
+        The shortcuts are application-wide (see _install_shortcuts), so in
+        the grid Space reached the docked player - which multiview had
+        stopped, so "resume" started the old channel again behind it - while
+        the cell you were watching never paused. There, the player keys act
+        on the focused cell instead, and the rest do nothing."""
+        win = getattr(self, "_multiview_win", None)
+        if win is not None and QApplication.activeWindow() is win:
+            return win
+        return None
+
     def _toggle_pause_shortcut(self) -> None:
+        mv = self._multiview_active()
+        if mv is not None:
+            if mv._focused is not None:
+                mv._focused.toggle_pause()
+            return
         if self.player and self.player.isVisible():
             self.player.toggle_pause()
 
@@ -29,11 +47,26 @@ class _ShortcutsMixin:
         return isinstance(self.focusWidget(), QLineEdit)
 
     def _player_up(self) -> bool:
+        if self._multiview_active() is not None:
+            return False
         return bool(self.player and self.player.isVisible())
 
     def _shortcut_mute(self) -> None:
+        mv = self._multiview_active()
+        if mv is not None:
+            if mv._focused is not None:
+                mv._focused.set_muted(not mv._focused.is_muted())
+            return
         if not self._typing() and self._player_up():
             self.player.toggle_mute()
+
+    def _shortcut_zap(self, step: int) -> None:
+        if self._multiview_active() is None:
+            self._zap(step)
+
+    def _shortcut_last_channel(self) -> None:
+        if self._multiview_active() is None:
+            self._last_channel()
 
     def _shortcut_popout(self) -> None:
         if not self._typing() and self._player_up():
@@ -54,6 +87,10 @@ class _ShortcutsMixin:
     # -- fullscreen ----------------------------------------------------------------
 
     def _toggle_fullscreen_shortcut(self) -> None:
+        mv = self._multiview_active()
+        if mv is not None:
+            mv._toggle_max()
+            return
         if self.player and self.player.isVisible():
             self._toggle_player_fullscreen()
 
@@ -93,9 +130,9 @@ class _ShortcutsMixin:
 
     def _shortcut_callbacks(self):
         return {
-            "zap_next": lambda: self._zap(1),
-            "zap_prev": lambda: self._zap(-1),
-            "last_channel": self._last_channel,
+            "zap_next": lambda: self._shortcut_zap(1),
+            "zap_prev": lambda: self._shortcut_zap(-1),
+            "last_channel": self._shortcut_last_channel,
             "pause": self._toggle_pause_shortcut,
             "fullscreen": self._toggle_fullscreen_shortcut,
             "mute": self._shortcut_mute,

@@ -294,7 +294,6 @@ QPushButton#SideAction {{
 QPushButton#SideAction:hover {{
     background: {side_action_hover}; border-color: {ACCENT}; color: {p['text']};
 }}
-QPushButton#SideAction:pressed {{ background: {side_action_edge}; }}
 QPushButton#SideAction:pressed {{ background: {p['hover']}; }}
 QPushButton#SideAction[rail="true"] {{
     text-align: center; padding: 8px 0; font-size: 14px; font-weight: 600;

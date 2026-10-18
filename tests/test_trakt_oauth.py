@@ -266,3 +266,91 @@ def test_a_server_error_keeps_the_sign_in(monkeypatch):
     tc.settings.setValue("trakt_expires_at", int(time.time()) - 5)
     assert tc.refresh_tokens() is False
     assert tc.is_connected() and tc.refresh_token == "RT1"
+
+
+def _poll(monkeypatch, code, body=None, name="poll"):
+    monkeypatch.setattr(T.requests, "post",
+                        lambda *a, **k: _TokenResp(code, body))
+    monkeypatch.setattr(T.time, "sleep", lambda _s: None)
+    return _client(name).poll_device_token("D")
+
+
+def test_device_poll_keeps_waiting_when_asked_to_slow_down(monkeypatch):
+    # A 429 went to raise_for_status and aborted the sign-in; RFC 8628 says
+    # slow down and keep going.
+    assert _poll(monkeypatch, 429) is None
+    assert _poll(monkeypatch, 400, {"error": "slow_down"}) is None
+    assert _poll(monkeypatch, 400, {"error": "authorization_pending"}) is None
+    assert _poll(monkeypatch, 400) is None
+
+
+def test_device_poll_reports_a_denial_and_an_expiry(monkeypatch):
+    from dopeiptv.i18n import tr
+    for code, body, want in ((400, {"error": "access_denied"}, "trakt_denied"),
+                             (418, None, "trakt_denied"),
+                             (400, {"error": "expired_token"},
+                              "trakt_code_expired"),
+                             (410, None, "trakt_code_expired"),
+                             (404, None, "trakt_code_invalid"),
+                             (409, None, "trakt_code_used")):
+        try:
+            _poll(monkeypatch, code, body)
+            raise AssertionError(f"{code} {body} did not raise")
+        except T.TraktAuthError as e:
+            assert str(e) == tr(want)
+
+
+def test_device_poll_names_an_unknown_oauth_error(monkeypatch):
+    try:
+        _poll(monkeypatch, 401, {"error": "invalid_client",
+                                 "error_description": "unknown app"})
+        raise AssertionError("expected TraktAuthError")
+    except T.TraktAuthError as e:
+        assert "invalid_client" in str(e) and "unknown app" in str(e)
+
+
+def test_disconnect_forgets_the_accounts_favorites_list():
+    tc = _client("disconnect")
+    tc.settings.setValue("trakt_access_token", "AT")
+    tc.settings.setValue("trakt_fav_list_slug", "someone-elses-list")
+    tc.disconnect()
+    assert not tc.is_connected()
+    assert not tc.settings.value("trakt_fav_list_slug", "")
+
+
+def test_a_failed_watched_sync_lets_the_next_one_run(monkeypatch):
+    """An error while storing the result left the running flag set, and no
+    sync ran again until the app was restarted."""
+    from types import SimpleNamespace
+
+    from dopeiptv.ui import mw_trakt
+    from dopeiptv.ui.mw_trakt import _TraktMixin
+
+    monkeypatch.setattr(mw_trakt.QTimer, "singleShot",
+                        staticmethod(lambda _ms, fn: fn()))
+
+    class _Thread:
+        def __init__(self, target, daemon=False):
+            self.target = target
+
+        def start(self):
+            self.target()
+
+    monkeypatch.setattr(mw_trakt.threading, "Thread", _Thread)
+
+    def broken(*_a, **_k):
+        raise ValueError("bad row")
+
+    w = SimpleNamespace(
+        _watched_sync_running=False,
+        trakt=SimpleNamespace(is_connected=lambda: True,
+                              watched_movies=lambda _t: {},
+                              watched_shows=lambda _t: {},
+                              watchlist_movies=lambda: set(),
+                              watchlist_shows=lambda: set()),
+        watched=SimpleNamespace(replace=broken),
+        watchlist=SimpleNamespace(replace=lambda *_a: None))
+    w._on_watched_sync_failed = lambda: _TraktMixin._on_watched_sync_failed(w)
+    w._push_local_watched_to_trakt = lambda: None
+    _TraktMixin._maybe_sync_watched(w, force=True)
+    assert w._watched_sync_running is False

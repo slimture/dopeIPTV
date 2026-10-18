@@ -1381,6 +1381,9 @@ class _MultiviewMixin:
         self._ensure_multiview_window().add_stream(
             url, title, cell, item=item, client=client, guide=guide,
             playlist=playlist, start=start)
+        # Watching only multiview is watching video too: without this the
+        # screensaver came on mid-match (the docked player had let go).
+        self.wake.acquire(f"Multiview: {title}")
 
     def _maybe_show_multiview_info(self) -> None:
         """One-time notice that multiview needs enough provider connections,
@@ -1475,10 +1478,8 @@ class _MultiviewMixin:
             p.stop()
         except Exception:
             pass
-        try:
-            self.wake.release()
-        except Exception:
-            pass
+        # No wake release here: multiview takes the screen over right away
+        # and keeps the lock (see add_to_multiview).
         self._apply_play_icon()
 
     def _apply_multiview_settings(self) -> None:
@@ -1508,6 +1509,8 @@ class _MultiviewMixin:
         for c in win.cells:
             c.shutdown()
         win.deleteLater()
+        if not getattr(getattr(self, "player", None), "current_url", None):
+            self.wake.release()
 
     def _close_multiview_if_active(self) -> None:
         if self._multiview_win is not None:

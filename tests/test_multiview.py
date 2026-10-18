@@ -35,12 +35,23 @@ class Client:
         return [base + ".ts", base + ".m3u8"]
 
 
+class Wake:
+    held = False
+
+    def acquire(self, reason=""):
+        self.held = True
+
+    def release(self):
+        self.held = False
+
+
 class Host(QMainWindow, _MultiviewMixin):
     def __init__(self):
         super().__init__()
         self.settings = QSettings("dopeiptv-test", "mv")
         self.settings.clear()
         self.client = Client()
+        self.wake = Wake()
         self._multiview_win = None
 
 
@@ -63,6 +74,8 @@ assert h._multiview_win is None
 h.add_to_multiview("http://x/live/1.ts", "One")
 app.processEvents()
 w = h._multiview_win
+# Watching multiview keeps the screensaver away.
+assert h.wake.held
 assert w is not None and len(w.cells) == 4
 assert w.cells[0].url == "http://x/live/1.ts"
 assert w._focused is w.cells[0]
@@ -237,6 +250,16 @@ assert h._multiview_win is w
 h._close_multiview()
 app.processEvents()
 assert h._multiview_win is None
+assert h.wake.held                      # the docked player still plays
+
+# With nothing docked, closing multiview lets the screen sleep again.
+h.player = None
+h.add_to_multiview("http://x/live/1.ts", "One")
+app.processEvents()
+assert h.wake.held
+h._close_multiview()
+app.processEvents()
+assert not h.wake.held
 
 print("MULTIVIEW_OK")
 """
@@ -302,3 +325,66 @@ def test_no_opengl_means_no_multiview_window(monkeypatch):
     assert toasts
     monkeypatch.setattr(players, "_gl_error", None)
     assert _MultiviewMixin._multiview_available(host) is True
+
+
+def test_player_keys_act_on_the_multiview_cell_while_it_is_in_use(
+        monkeypatch):
+    """The shortcuts are application-wide: in the grid, Space reached the
+    docked player multiview had stopped - and restarted its old channel -
+    while the cell on screen never paused."""
+    from types import SimpleNamespace
+
+    from dopeiptv.ui import mw_shortcuts
+    from dopeiptv.ui.mw_shortcuts import _ShortcutsMixin
+
+    calls = []
+    cell = SimpleNamespace(
+        toggle_pause=lambda: calls.append("cell pause"),
+        is_muted=lambda: False,
+        set_muted=lambda m: calls.append(f"cell mute {m}"))
+    grid = SimpleNamespace(_focused=cell,
+                           _toggle_max=lambda: calls.append("grid max"))
+
+    class _Win(_ShortcutsMixin):
+        _multiview_win = grid
+        player = SimpleNamespace(
+            isVisible=lambda: True,
+            toggle_pause=lambda: calls.append("docked pause"),
+            toggle_mute=lambda: calls.append("docked mute"))
+
+        def focusWidget(self):
+            return None
+
+        def _zap(self, step):
+            calls.append(f"zap {step}")
+
+        def _last_channel(self):
+            calls.append("last channel")
+
+        def _toggle_player_fullscreen(self):
+            calls.append("docked fullscreen")
+
+        def _toggle_popout(self):
+            calls.append("popout")
+
+    w = _Win()
+    active = {"win": grid}
+    monkeypatch.setattr(mw_shortcuts.QApplication, "activeWindow",
+                        staticmethod(lambda: active["win"]))
+
+    def press_all():
+        w._toggle_pause_shortcut()
+        w._shortcut_mute()
+        w._toggle_fullscreen_shortcut()
+        w._shortcut_zap(1)
+        w._shortcut_last_channel()
+        w._shortcut_popout()
+
+    press_all()
+    assert calls == ["cell pause", "cell mute True", "grid max"]
+
+    calls.clear()
+    active["win"] = w                   # back in the main window
+    press_all()
+    assert calls == ["docked pause", "docked mute", "docked fullscreen",
+                     "zap 1", "last channel", "popout"]

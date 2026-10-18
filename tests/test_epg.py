@@ -304,3 +304,38 @@ def test_a_forced_refresh_with_no_cache_and_no_network_fails(tmp_path):
         raise OSError("offline")
     g._download = offline
     assert g.ensure_loaded(force=True) is False
+
+
+def test_a_damaged_cache_is_replaced_by_a_download(tmp_path):
+    # Valid gzip magic, broken deflate data: zlib.error is no OSError, so it
+    # escaped _read_cache before the download could replace the file.
+    import gzip
+
+    cache = tmp_path / "epg_x.xml"
+    good = gzip.compress(_tiny_guide())
+    cache.write_bytes(good[:10] + b"\xff" * 40 + good[50:])
+    g = XmltvGuide(client=None, cache_path=str(cache))
+    g._download = _tiny_guide
+    assert g.ensure_loaded() is True
+    assert g._entries_for({"epg_channel_id": "c1"})
+
+
+def test_a_damaged_index_falls_back_to_the_xml(tmp_path):
+    import gzip
+    import os
+    import time
+
+    cache = tmp_path / "epg_x.xml"
+    cache.write_bytes(gzip.compress(_tiny_guide()))
+    g = XmltvGuide(client=None, cache_path=str(cache))
+    idx = g._index_path()
+    bad = gzip.compress(b"\x80\x05" + b"x" * 200)
+    idx.write_bytes(bad[:10] + b"\xff" * 30 + bad[40:])   # zlib.error
+    later = time.time() + 5
+    os.utime(idx, (later, later))
+    assert g.ensure_loaded() is True
+    assert g._entries_for({"epg_channel_id": "c1"})
+    # ...and the index was written again, whole.
+    g2 = XmltvGuide(client=None, cache_path=str(cache))
+    assert g2._load_index() is True
+    assert not list(tmp_path.glob("*.part"))

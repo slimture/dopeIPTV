@@ -288,3 +288,92 @@ def test_a_malformed_watched_cache_does_not_break_startup():
             assert w.episodes_for(7) == {(1, 2)}
             assert w.trakt_movie_titles == {9: "Nine"}
             assert w.last_sync_at == 0
+
+
+def test_renaming_a_folder_onto_another_merges_without_duplicates():
+    fav = FavoriteStore(_mock_settings())
+    fav.add("Sport", {"stream_id": 1, "name": "One"})
+    fav.add("Sport", {"stream_id": 2, "name": "Two"})
+    fav.add("News", {"stream_id": 2, "name": "Two"})
+    fav.add("News", {"stream_id": 3, "name": "Three"})
+    fav.rename_group("Sport", "News")
+    assert "Sport" not in fav.groups
+    assert [x["stream_id"] for x in fav.items("News")] == [2, 3, 1]
+    # A reorder of the merged folder used to run out of rows and crash.
+    fav.reorder("News", [1, 2, 3])
+    assert [x["stream_id"] for x in fav.items("News")] == [1, 2, 3]
+
+
+def test_reorder_survives_a_folder_already_holding_duplicates():
+    s = _mock_settings()
+    s.setValue("favorites", '{"F": [{"stream_id": 1}, {"stream_id": 2},'
+                            ' {"stream_id": 1}]}')
+    fav = FavoriteStore(s)
+    fav.reorder("F", [2, 1])
+    assert [x["stream_id"] for x in fav.items("F")] == [2, 1]
+
+
+def test_a_folder_keeps_its_colour_through_a_rename_and_loses_it_on_delete():
+    fav = FavoriteStore(_mock_settings())
+    fav.add("Kids", {"stream_id": 7})
+    fav.set_group_color("Kids", color="#ff0000")
+    fav.rename_group("Kids", "Children")
+    assert fav.group_color("Children") == {"color": "#ff0000"}
+    assert fav.group_color("Kids") == {}
+    fav.remove_group("Children")
+    fav.ensure_group("Children")
+    assert fav.group_color("Children") == {}
+
+
+def test_playlists_can_be_reordered():
+    from dopeiptv.core.stores import PlaylistStore
+    s = _mock_settings()
+    s.setValue("playlists", '[{"id": "a"}, {"id": "b"}, {"id": "c"}, 7]')
+    store = PlaylistStore(s)
+    assert [p["id"] for p in store.playlists()] == ["a", "b", "c"]
+    store.reorder(["c", "a", "zz", "c"])
+    assert [p["id"] for p in store.playlists()] == ["c", "a", "b"]
+    # Persisted, so the menu and the next start show the same order.
+    assert [p["id"] for p in PlaylistStore(s).playlists()] == ["c", "a", "b"]
+
+
+def test_an_export_brings_m3u_playlists_back():
+    """The kind was not exported and the import wanted a user name and a
+    password - so every M3U playlist was silently lost on the way."""
+    from dopeiptv.core.stores import PlaylistStore
+    src = PlaylistStore(_mock_settings())
+    src.add({"name": "Xt", "kind": "xtream", "server": "http://x.tv",
+             "username": "u", "password": "p", "epg_url": "",
+             "refresh": "24h"})
+    src.add({"name": "Free", "kind": "m3u",
+             "server": "https://iptv-org.github.io/iptv/index.m3u",
+             "username": "", "password": "", "epg_url": "",
+             "refresh": "never"})
+    src.add({"name": "Old", "server": "http://old.tv", "username": "a",
+             "password": "b"})                    # stored before kinds
+    data = src.export_data()
+    assert [p["kind"] for p in data] == ["xtream", "m3u", "xtream"]
+
+    dst = PlaylistStore(_mock_settings())
+    assert dst.import_data(data) == 3
+    assert [(p["name"], p["kind"]) for p in dst.playlists()] == [
+        ("Xt", "xtream"), ("Free", "m3u"), ("Old", "xtream")]
+    assert dst.playlists()[0]["refresh"] == "24h"
+    # The same file twice adds nothing new.
+    assert dst.import_data(data) == 0
+
+
+def test_an_import_skips_what_it_cannot_use():
+    import pytest
+
+    from dopeiptv.core.stores import PlaylistStore
+    store = PlaylistStore(_mock_settings())
+    with pytest.raises(ValueError):
+        store.import_data({"name": "not a list"})
+    assert store.import_data([
+        "junk", {"server": "http://x.tv"},           # Xtream without login
+        {"kind": "m3u", "server": ""},               # M3U without address
+        {"server": ["bad"], "username": 1, "password": None},
+        {"kind": "m3u", "server": " http://ok/list.m3u "}]) == 1
+    assert store.playlists()[0]["server"] == "http://ok/list.m3u"
+    assert store.playlists()[0]["name"] == "ok"

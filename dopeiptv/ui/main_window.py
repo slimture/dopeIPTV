@@ -34,7 +34,7 @@ from .channel_list import (
 )
 from ..providers.chromecast import CastDialog, ChromecastManager
 from ..providers.client import (
-    DemoClient, XtreamClient, make_client,
+    DemoClient, OfflineClient, XtreamClient, dropped_playlist, make_client,
 )
 from ..media.embedded import EmbeddedPlayer, _SeekSlider
 from ..providers.epg import XmltvGuide, epg_cache_path, prune_epg_caches
@@ -50,8 +50,9 @@ from ..core.stores import (
 from .theme import P
 from ..providers.trakt import TraktClient
 from ..core.wakelock import WakeLock
+from .dialogs import PlaylistDialog
 from .widgets import (
-    FlowRow, _HoverTextButton, _SidebarLogo, _Toast, cast_strip_icon,
+    FlowRow, _HoverTextButton, _SidebarLogo, _Toast, cast_strip_icon, confirm,
 )
 from .mw_settings import _SettingsMixin
 from .mw_trakt import _TraktMixin
@@ -1157,8 +1158,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.rec.stop_inplayer_cb = self.player.stop_stream_record
             self.player.stop_btn.clicked.connect(
                 lambda: self.rec.finish_all_inplayer("playback stopped"))
-            self.player.stop_btn.clicked.connect(
-                lambda: self.wake.release())
+            self.player.stop_btn.clicked.connect(self._release_wake)
             self.player.stop_btn.clicked.connect(self._trakt_stop_current)
             self.player.playback_error.connect(self._playback_error)
             self.player.zap.connect(self._zap)
@@ -2051,6 +2051,29 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._update_provider_hint()   # hides the '+ Add provider' hint
         self._show_toast(tr("demo_notice"), 8000)
 
+    def _add_dropped_playlist(self, found) -> None:
+        """An M3U file or a provider link dropped on the window: the Add
+        playlist dialog with it filled in, then on to the new playlist."""
+        if not self.playlist_store:
+            return
+        kind, server, user, pw = found
+        name = ""
+        if kind == "m3u" and "://" not in server:
+            name = os.path.splitext(os.path.basename(server))[0]
+        dlg = PlaylistDialog(self, prefill={
+            "name": name, "kind": kind, "server": server,
+            "username": user, "password": pw})
+        if not dlg.exec():
+            return
+        pl = self.playlist_store.add(dlg.values())
+        self._update_playlist_btn()
+        # The first real provider is simply used; with one already playing
+        # the switch is offered, not forced.
+        first = type(self.client) in (OfflineClient, DemoClient)
+        if first or confirm(self, tr("pl_dropped_title"),
+                            tr("pl_dropped_switch", name=pl["name"])):
+            self.switch_playlist(pl["id"])
+
     def switch_playlist(self, pid: str) -> None:
         pl = self.playlist_store.get(pid) if self.playlist_store else None
         if not pl:
@@ -2482,7 +2505,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self.cat_list.blockSignals(True)
                 self.cat_list.setCurrentRow(0)
                 self.cat_list.blockSignals(False)
-                self._load_items(None)
+                # What row 0 holds: in Favorites that is "All", and None
+                # there loaded the channels only, under an "All" highlight.
+                first = self.cat_list.item(0)
+                self._load_items(first.data(Qt.ItemDataRole.UserRole)
+                                 if first else None)
                 return
             self._load_categories()
             return
@@ -3539,10 +3566,23 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                                                 "_key": path,
                                                 "_kind": "local"})
 
+    @staticmethod
+    def _dropped_sources(mime) -> list[str]:
+        """The local paths and link addresses in a drop. A link dragged out
+        of a browser's address bar or page usually comes as a URL; selected
+        text holding one as plain text."""
+        out = [u.toLocalFile() if u.isLocalFile() else u.toString()
+               for u in mime.urls()]
+        if not out and mime.hasText():
+            out = [t for t in mime.text().split() if "://" in t][:1]
+        return out
+
     def dragEnterEvent(self, e) -> None:
-        if any(u.isLocalFile()
-               and u.toLocalFile().lower().endswith(self.MEDIA_EXTS)
-               for u in e.mimeData().urls()):
+        mime = e.mimeData()
+        if (any(u.isLocalFile()
+                and u.toLocalFile().lower().endswith(self.MEDIA_EXTS)
+                for u in mime.urls())
+                or dropped_playlist(self._dropped_sources(mime))):
             e.acceptProposedAction()
 
     def dropEvent(self, e) -> None:
@@ -3552,6 +3592,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self._play_local_path(p)
                 e.acceptProposedAction()
                 return
+        found = dropped_playlist(self._dropped_sources(e.mimeData()))
+        if found:
+            e.acceptProposedAction()
+            # After the drop, not inside it: a dialog opened here holds the
+            # file manager the drag came from until it is closed.
+            QTimer.singleShot(0, lambda: self._add_dropped_playlist(found))
 
     # -- music: the play queue -------------------------------------------------
 
@@ -5787,9 +5833,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     MAX_STREAM_RETRIES = 2
 
+    def _release_wake(self) -> None:
+        """Let the screen sleep again - unless multiview is still showing
+        video, which has no wake lock of its own."""
+        win = getattr(self, "_multiview_win", None)
+        if win is not None and any(c.url for c in win.cells):
+            return
+        self.wake.release()
+
     def _playback_error(self, msg: str) -> None:
         self.rec.finish_all_inplayer("stream error")
-        self.wake.release()
+        self._release_wake()
         self._trakt_active = None
         # A catch-up segment that fails right after starting is usually the
         # wrong archive-URL format for this provider - walk to the next
@@ -6230,7 +6284,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         for it in items:
             self.history.remove(it.get("_key"), it.get("_kind"))
         if items:
-            self._load_items(None)
+            # The category on screen, not "All": the sidebar still shows
+            # e.g. Movies, and the list jumped to everything under it.
+            self._load_items(getattr(self, "_history_subcat", None))
 
     def _delete_pressed(self) -> None:
         if self.mode == "history":

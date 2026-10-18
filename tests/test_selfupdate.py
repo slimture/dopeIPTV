@@ -255,3 +255,43 @@ def test_the_new_version_cleans_up_after_the_update(env, monkeypatch):
 
     monkeypatch.delenv("APPIMAGE")
     assert _UpdatesMixin._update_action_label(w) == tr("about_download")
+
+
+def test_a_failed_update_says_why(monkeypatch):
+    """Closing the progress dialog emitted canceled, so every failure was
+    taken for the user's own cancel and nothing was shown at all."""
+    import os as _os
+    _os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PyQt6.QtWidgets import QApplication, QMessageBox, QWidget
+
+    from dopeiptv.ui import mw_updates
+    from dopeiptv.ui.mw_updates import _UpdatesMixin
+
+    app = QApplication.instance() or QApplication([])   # noqa: F841 - kept alive
+
+    class _Win(_UpdatesMixin, QWidget):
+        pool = None
+
+    shown: list[str] = []
+    monkeypatch.setattr(QMessageBox, "warning",
+                        lambda _p, _t, text: shown.append(text))
+    monkeypatch.setattr(mw_updates, "run_async",
+                        lambda _pool, _work, _done, fail: fail(
+                            UpdateError("checksum mismatch")))
+    w = _Win()
+    w._self_update()
+    assert shown and "checksum mismatch" in shown[0]
+    assert not w._self_updating
+
+    # The user's own cancel stays quiet.
+    shown.clear()
+
+    def cancelled(_pool, _work, _done, fail):
+        from PyQt6.QtWidgets import QProgressDialog
+        dlg = w.findChildren(QProgressDialog)[-1]
+        dlg.canceled.emit()                 # the Cancel button
+        fail(UpdateError("cancelled"))
+
+    monkeypatch.setattr(mw_updates, "run_async", cancelled)
+    w._self_update()
+    assert shown == []

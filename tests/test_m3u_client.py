@@ -190,3 +190,67 @@ def test_a_url_lookup_never_waits_for_a_refresh():
     c._fetch = must_not_run
     c.clear_list_cache()
     assert c.live_url(2) == "http://stream/cnn.ts"
+
+
+def _served(body: bytes, content_type: str):
+    """A requests-like response, decoding .text the way requests does."""
+    import requests
+
+    r = requests.models.Response()
+    r.status_code = 200
+    r._content = body
+    r.headers["Content-Type"] = content_type
+    r.encoding = requests.utils.get_encoding_from_headers(r.headers)
+    return r
+
+
+def test_utf8_names_survive_a_server_that_names_no_charset():
+    # requests reads text/* without a charset as ISO-8859-1: "SVT Barnkanalen
+    # Å" became "Ã…". The playlist is UTF-8 whatever the header says.
+    body = ("﻿#EXTM3U url-tvg=\"http://epg/x.xml\"\n"
+            "#EXTINF:-1 group-title=\"Sverige\",Kanal Fem Ö\n"
+            "http://s/1.ts\n").encode("utf-8")
+    c = M3UClient("http://example/list.m3u")
+    c.session.get = lambda *_a, **_k: _served(body, "text/plain")
+    c._parse(c._fetch())
+    assert c.live_streams(None)[0]["name"] == "Kanal Fem Ö"
+    # The byte-order mark no longer hides the header and its guide address.
+    assert c.epg_url == "http://epg/x.xml"
+
+
+def test_a_declared_legacy_charset_is_still_honoured():
+    body = ("#EXTM3U\n#EXTINF:-1,Первый канал\nhttp://s/1.ts\n"
+            ).encode("cp1251")
+    c = M3UClient("http://example/list.m3u")
+    c.session.get = lambda *_a, **_k: _served(
+        body, "audio/x-mpegurl; charset=windows-1251")
+    c._parse(c._fetch())
+    assert c.live_streams(None)[0]["name"] == "Первый канал"
+
+
+def test_a_file_url_with_spaces_is_read(tmp_path):
+    folder = tmp_path / "My Lists"
+    folder.mkdir()
+    f = folder / "tv ä.m3u"
+    f.write_text("#EXTM3U\n#EXTINF:-1,Local\nhttp://s/1.ts\n",
+                 encoding="utf-8")
+    c = M3UClient(f.as_uri())               # file:///.../My%20Lists/tv%20%C3%A4.m3u
+    c._parse(c._fetch())
+    assert c.live_streams(None)[0]["name"] == "Local"
+
+
+def test_what_a_drop_on_the_window_adds_as_a_playlist():
+    from dopeiptv.providers.client import dropped_playlist
+    assert dropped_playlist(["/home/u/My list.m3u"]) == (
+        "m3u", "/home/u/My list.m3u", "", "")
+    # A video beside it is not a playlist; the .M3U8 file after it is.
+    assert dropped_playlist(["/v/film.mkv", "/v/tv.M3U8"])[0] == "m3u"
+    assert dropped_playlist(
+        ["https://iptv-org.github.io/iptv/index.m3u"])[0] == "m3u"
+    # A provider link fills in the account, exactly like a paste.
+    assert dropped_playlist(
+        ["http://h.tv:8080/get.php?username=a&password=b&type=m3u_plus"]
+    ) == ("xtream", "http://h.tv:8080", "a", "b")
+    assert dropped_playlist(["https://example.com/page.html"]) is None
+    assert dropped_playlist(["/home/u/notes.txt", ""]) is None
+    assert dropped_playlist(["ftp://h/list.m3u"]) is None

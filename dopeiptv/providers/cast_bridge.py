@@ -677,7 +677,11 @@ class _SpoolReader:
         # opening, then skip to where the next fragment starts.
         self._head = spool.init if self.i else b""
         self._align = self.i > 0
-        spool._at[id(self)] = self.i
+        # Under the spool's lock: write() takes min() over these on ffmpeg's
+        # pump thread, and a dict that grows during that iteration raises -
+        # which ended the cast whenever the receiver reconnected.
+        with spool._lock:
+            spool._at[id(self)] = self.i
 
     def read(self, n: int) -> bytes:
         """The next bytes, or b"" when there are none yet."""
@@ -704,7 +708,8 @@ class _SpoolReader:
                 return b""
             self._f.close()                         # type: ignore[union-attr]
             self._f, self.i = None, self.i + 1
-            self.spool._at[id(self)] = self.i
+            with self.spool._lock:
+                self.spool._at[id(self)] = self.i
 
     def close(self) -> None:
         if self._f is not None:
@@ -713,7 +718,8 @@ class _SpoolReader:
             except OSError:
                 pass
             self._f = None
-        self.spool._at.pop(id(self), None)
+        with self.spool._lock:
+            self.spool._at.pop(id(self), None)
 
 
 # Where ffmpeg's transport-stream clock starts, in 90 kHz ticks. Measured

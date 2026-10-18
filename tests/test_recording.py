@@ -180,3 +180,28 @@ def test_console_tools_never_open_a_window_on_windows(monkeypatch):
     finally:
         monkeypatch.undo()
         importlib.reload(player_exec)
+
+
+def test_damaged_scheduled_jobs_are_skipped_not_crashed_on(tmp_path):
+    """A hand-edited entry raised in tick() every five seconds."""
+    import json
+    import time
+
+    from PyQt6.QtCore import QSettings
+    from dopeiptv.core.recording import RecordingManager
+
+    s = QSettings("dopeIPTV-test", "recjobs")
+    s.clear()
+    s.setValue("recordings_dir", str(tmp_path))
+    later = time.time() + 3600
+    s.setValue("recording_jobs", json.dumps([
+        "junk", 7, {"status": "scheduled"},
+        {"status": "scheduled", "url": "http://x", "start": "soon"},
+        {"status": "scheduled", "url": "http://x", "start": later,
+         "stop": "later"},
+        {"status": "scheduled", "url": "http://ok", "start": later,
+         "stop": later + 60}]))
+    rm = RecordingManager(s)
+    assert [j["url"] for j in rm.jobs] == ["http://ok"]
+    assert rm.jobs[0]["id"] and rm.jobs[0]["title"] == ""
+    rm.tick()                       # and the scheduler runs over it

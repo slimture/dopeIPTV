@@ -546,6 +546,11 @@ class LogoLoader(QObject):
                 # Empty = skipped (host on cooldown) or nothing served.
                 # Just drop the pending entry; the delegate keeps the
                 # placeholder and will re-try once the cooldown expires.
+                # Nothing served and no cooldown yet (a local thumbnail that
+                # is gone or unreadable) gets a short one, or every paint
+                # queued the same failing read again.
+                if not self.is_dead(u):
+                    self._mark_dead(u, self.dead_ttl_transient)
                 return
             pm = QPixmap()
             if not pm.loadFromData(data):

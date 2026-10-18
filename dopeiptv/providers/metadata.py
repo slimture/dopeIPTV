@@ -302,6 +302,8 @@ class PosterResolver(QObject):
             raw: dict = json.loads(settings.value(self.CACHE_KEY, "") or "{}")
         except Exception:
             raw = {}
+        if not isinstance(raw, dict):
+            raw = {}                    # damaged: start over, never crash
         # Migrate the older cache format (plain poster-URL strings) to the
         # richer dict format transparently.
         self._cache: dict[str, dict] = {

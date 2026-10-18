@@ -979,8 +979,12 @@ class _DetailMixin:
         row = QHBoxLayout(card)
         row.setContentsMargins(12, 8, 12, 8)
         row.setSpacing(12)
-        fmt = "%-d/%-m %H:%M" if with_date else "%H:%M"
-        t = QLabel(post["start"].strftime(fmt), objectName="EpgRowTime")
+        when = post["start"]
+        # Not "%-d/%-m": that is glibc-only, and on Windows strftime raised
+        # ValueError and this list was never shown.
+        stamp = (f"{when.day}/{when.month} {when:%H:%M}" if with_date
+                 else f"{when:%H:%M}")
+        t = QLabel(stamp, objectName="EpgRowTime")
         t.setFixedWidth(84 if with_date else 44)
         t.setAlignment(Qt.AlignmentFlag.AlignTop)
         ti = QLabel(post["title"] or "Unknown", objectName="EpgRowTitle")

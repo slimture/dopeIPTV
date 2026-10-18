@@ -8,6 +8,7 @@ from __future__ import annotations
 import secrets
 import threading
 import time
+from ..core.log import log
 from ..i18n import tr
 from ..providers.metadata import PosterResolver
 from ..providers.oauth_loopback import capture_oauth_redirect
@@ -115,13 +116,22 @@ class _TraktMixin:
                 # is safe as long as the target QObject lives there.
                 QTimer.singleShot(0, self._on_watched_sync_failed)
                 return
-            self.watched.replace(movies, shows, movie_titles, show_titles)
-            self.watchlist.replace(wl_movies, wl_shows)
-            # Cross-device: anything the user marked 'seen (local)' that
-            # has since resolved to a TMDB id but isn't on Trakt yet gets
-            # pushed up now, then promoted into the Trakt layer so it's
-            # never POSTed twice (which would add duplicate watches).
-            self._push_local_watched_to_trakt()
+            try:
+                self.watched.replace(movies, shows, movie_titles,
+                                     show_titles)
+                self.watchlist.replace(wl_movies, wl_shows)
+                # Cross-device: anything the user marked 'seen (local)'
+                # that has since resolved to a TMDB id but isn't on Trakt
+                # yet gets pushed up now, then promoted into the Trakt
+                # layer so it's never POSTed twice (which would add
+                # duplicate watches).
+                self._push_local_watched_to_trakt()
+            except Exception as e:
+                # Without this the running flag stayed set and no sync ran
+                # again until the app was restarted.
+                log.warning("trakt: watched sync failed: %s", e)
+                QTimer.singleShot(0, self._on_watched_sync_failed)
+                return
             QTimer.singleShot(0, self._on_watched_sync_done)
 
         threading.Thread(target=worker, daemon=True).start()

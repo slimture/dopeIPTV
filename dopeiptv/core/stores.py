@@ -111,11 +111,20 @@ class FavoriteStore:
         rows = self.groups.get(group)
         if not rows:
             return
+        # One row per item. A folder renamed onto another used to hold some
+        # items twice, and the second copy had no slot left in the queue.
+        seen: set = set()
+        unique: list[dict] = []
+        for x in rows:
+            if x.get(self.id_key) not in seen:
+                seen.add(x.get(self.id_key))
+                unique.append(x)
+        rows = unique
         by_id = {x.get(self.id_key): x for x in rows}
         wanted = [by_id[i] for i in dict.fromkeys(idents) if i in by_id]
         moving = {x.get(self.id_key) for x in wanted}
         queue = iter(wanted)
-        self.groups[group] = [next(queue) if x.get(self.id_key) in moving
+        self.groups[group] = [next(queue, x) if x.get(self.id_key) in moving
                               else x for x in rows]
         self._save()
 
@@ -133,6 +142,8 @@ class FavoriteStore:
         self.groups.pop(group, None)
         if group in self.locked_groups():
             self.set_group_locked(group, False)
+        # A new folder given the same name must not come back coloured.
+        self._drop_group_color(group)
         self._save()
 
     def ensure_group(self, group: str) -> None:
@@ -142,14 +153,26 @@ class FavoriteStore:
         self._save()
 
     def rename_group(self, old: str, new: str) -> None:
-        """Rename a folder, carrying its items and any parental lock over."""
+        """Rename a folder, carrying its items, parental lock and colour
+        over. Renaming onto a folder that exists merges the two, and an item
+        that was in both is filed there once."""
         new = (new or "").strip()
         if old not in self.groups or not new or new == old:
             return
-        self.groups.setdefault(new, []).extend(self.groups.pop(old))
+        dest = self.groups.setdefault(new, [])
+        have = {x.get(self.id_key) for x in dest}
+        for item in self.groups.pop(old):
+            if item.get(self.id_key) not in have:
+                have.add(item.get(self.id_key))
+                dest.append(item)
         if self.is_locked(old):
             self.set_group_locked(old, False)
             self.set_group_locked(new, True)
+        colour = self.group_color(old)
+        if colour:
+            self._drop_group_color(old)
+            if not self.group_color(new):
+                self.set_group_color(new, **colour)
         self._save()
 
     def custom_groups(self) -> list[str]:
@@ -197,6 +220,15 @@ class FavoriteStore:
         if not any(entry.values()):
             data.pop(group, None)
         self.settings.setValue(f"{self.key}_colors", json.dumps(data))
+
+    def _drop_group_color(self, group: str) -> None:
+        try:
+            data = json.loads(
+                self.settings.value(f"{self.key}_colors", "") or "{}")
+        except Exception:
+            return
+        if isinstance(data, dict) and data.pop(group, None) is not None:
+            self.settings.setValue(f"{self.key}_colors", json.dumps(data))
 
     def items(self, group: str | None = None,
               exclude_groups: tuple[str, ...] = ()) -> list[dict]:
@@ -437,7 +469,8 @@ class PlaylistStore:
             data = json.loads(settings.value("playlists", "") or "[]")
         except Exception:
             data = []
-        self.items: list[dict] = data if isinstance(data, list) else []
+        self.items: list[dict] = ([p for p in data if isinstance(p, dict)]
+                                  if isinstance(data, list) else [])
         self.active_id: str = settings.value("active_playlist", "")
         if not self.items:
             server = settings.value("server", "")
@@ -493,6 +526,67 @@ class PlaylistStore:
         if self.get(pid):
             self.active_id = pid
             self._save()
+
+    #: What an export file holds per playlist, and an import reads back.
+    EXPORT_FIELDS = ("name", "kind", "server", "username", "password",
+                     "epg_url", "refresh")
+
+    def export_data(self) -> list[dict]:
+        """The playlists for an export file. The kind goes along: without
+        it an M3U playlist came back as an Xtream one - or not at all."""
+        out = []
+        for p in self.items:
+            row = {k: p.get(k, "") for k in self.EXPORT_FIELDS}
+            row["kind"] = p.get("kind") or "xtream"
+            row["refresh"] = p.get("refresh") or "never"
+            out.append(row)
+        return out
+
+    def import_data(self, data: Any) -> int:
+        """Add the playlists of an export file; returns how many were new.
+
+        An Xtream playlist needs its server, user name and password; an M3U
+        one only its address (it has no account - the import used to skip
+        every one of them). One that is already here is not added twice.
+        Raises ValueError when *data* is not an export at all."""
+        if not isinstance(data, list):
+            raise ValueError("not a list of playlists")
+        added = 0
+        for entry in data:
+            if not isinstance(entry, dict):
+                continue
+
+            def field(key: str, entry: dict = entry) -> str:
+                value = entry.get(key, "")
+                return value.strip() if isinstance(value, str) else ""
+
+            kind = "m3u" if field("kind") == "m3u" else "xtream"
+            server = field("server")
+            user, pw = field("username"), field("password")
+            if not server or (kind == "xtream" and not (user and pw)):
+                continue
+            if any((p.get("kind") or "xtream") == kind
+                   and p.get("server") == server
+                   and (p.get("username") or "") == user
+                   for p in self.items):
+                continue
+            self.add({"name": field("name")
+                      or server.split("//")[-1].split("/")[0],
+                      "kind": kind, "server": server, "username": user,
+                      "password": pw, "epg_url": field("epg_url"),
+                      "refresh": field("refresh") or "never"})
+            added += 1
+        return added
+
+    def reorder(self, pids: list[str]) -> None:
+        """Put the playlists in the order of *pids* (dragged in Settings).
+        One that is not named keeps its turn after the named ones."""
+        by_id = {p.get("id"): p for p in self.items}
+        ordered = [by_id[i] for i in dict.fromkeys(pids) if i in by_id]
+        named = {p.get("id") for p in ordered}
+        self.items = ordered + [p for p in self.items
+                                if p.get("id") not in named]
+        self._save()
 
 
 class WatchedStore:

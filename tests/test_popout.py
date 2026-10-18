@@ -284,3 +284,31 @@ def test_windows_pops_out_by_reparenting():
     assert "WIN32_POPOUT_OK" in proc.stdout, (
         f"win32 pop-out checks failed\nstdout={proc.stdout!r}\n"
         f"stderr={proc.stderr[-1500:]!r}")
+
+
+def test_a_popout_saved_on_an_unplugged_monitor_opens_on_this_one():
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from types import SimpleNamespace
+
+    from PyQt6.QtWidgets import QApplication
+    from dopeiptv.ui.mw_popout import _PopoutMixin
+
+    app = QApplication.instance() or QApplication([])   # noqa: F841
+    screen = QApplication.primaryScreen()
+    avail = screen.availableGeometry()
+    store = {}
+    w = SimpleNamespace(settings=SimpleNamespace(
+        value=lambda k, d="": store.get(k, d)), screen=lambda: screen)
+
+    # On a screen that is there: used as saved.
+    store["popout_geometry"] = f"{avail.x() + 10},{avail.y() + 10},400,300"
+    g = _PopoutMixin._saved_popout_geometry(w)
+    assert (g.x(), g.y(), g.width(), g.height()) == (
+        avail.x() + 10, avail.y() + 10, 400, 300)
+
+    # Saved on a second monitor far to the right that is gone now.
+    store["popout_geometry"] = f"{avail.right() + 2000},100,640,360"
+    g = _PopoutMixin._saved_popout_geometry(w)
+    assert avail.contains(g.center())
+    assert (g.width(), g.height()) == (min(640, avail.width()),
+                                       min(360, avail.height()))

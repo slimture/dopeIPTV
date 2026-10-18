@@ -221,8 +221,20 @@ class RecordingManager(QObject):
             data = []
         now = time.time()
         for j in data if isinstance(data, list) else []:
+            # A hand-edited or damaged entry would raise in tick() every
+            # five seconds for the rest of the session: keep only jobs that
+            # have what the scheduler reads.
+            if (not isinstance(j, dict) or not j.get("url")
+                    or not isinstance(j.get("start"), (int, float))
+                    or not isinstance(j.get("stop"), (int, float, type(None)))):
+                continue
             if (j.get("status") == "scheduled"
                     and (j.get("stop") is None or j["stop"] > now)):
+                for key, default in (("id", uuid.uuid4().hex[:10]),
+                                     ("title", ""), ("folder", ""),
+                                     ("path", ""), ("error", ""),
+                                     ("stream_icon", "")):
+                    j.setdefault(key, default)
                 j["proc"] = None
                 self.jobs.append(j)
 

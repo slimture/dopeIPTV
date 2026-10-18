@@ -161,7 +161,9 @@ class XtreamClient:
         requests embeds the full credentialed URL in its exception messages,
         and these logs are meant to be shared in bug reports."""
         for secret in (self.password, self.username):
-            if secret:
+            # The same floor as core.log.register_secrets: a one- or two-
+            # letter value would mask every "p" or "u" in the line.
+            if secret and len(secret) > 3:
                 text = text.replace(secret, "***")
         return text
 
@@ -501,11 +503,25 @@ class M3UClient(OfflineClient):
         if url.startswith(("http://", "https://")):
             r = self.session.get(url, timeout=(20, 180))
             r.raise_for_status()
-            return r.text
-        if url.startswith("file://"):
-            url = url[7:]
-        with open(url, "r", encoding="utf-8", errors="replace") as fh:
-            return fh.read()
+            # UTF-8 first, whatever the server claims: requests falls back to
+            # ISO-8859-1 for a text/* type without a charset, which turned
+            # every å, ö and ü in a channel name into "Ã¥"-style junk.
+            try:
+                return r.content.decode("utf-8-sig")
+            except UnicodeDecodeError:
+                return r.text           # a declared charset, or a good guess
+        if url.startswith("file:"):
+            # A dropped file arrives as file:///C:/My%20Lists/tv.m3u - the
+            # path has to be unquoted, and on Windows lose its leading slash.
+            from urllib.parse import urlparse
+            from urllib.request import url2pathname
+            url = url2pathname(urlparse(url).path)
+        with open(url, "rb") as fh:
+            raw = fh.read()
+        try:
+            return raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            return raw.decode("cp1252", errors="replace")
 
     def _parse(self, text: str) -> None:
         channels: list[dict] = []
@@ -826,6 +842,31 @@ def parse_xtream_url(text: str) -> tuple[str, str, str] | None:
     if (len(parts) >= 3 and parts[0] and parts[1]
             and re.fullmatch(r"\d+(\.[A-Za-z0-9]{1,5})?", parts[-1])):
         return server, parts[0], parts[1]
+    return None
+
+
+PLAYLIST_FILE_EXTS = (".m3u", ".m3u8")
+
+
+def dropped_playlist(sources: list[str]) -> tuple[str, str, str, str] | None:
+    """What a drop on the window adds as a playlist, if anything.
+
+    *sources* are the dropped local paths and link addresses. A local
+    .m3u/.m3u8 file is an M3U playlist; a link is classified exactly like a
+    pasted one (see detect_provider_link). Returns the first that
+    qualifies, as ``(kind, server, username, password)``."""
+    for src in sources:
+        s = (src or "").strip()
+        if not s:
+            continue
+        if "://" not in s:
+            if s.lower().endswith(PLAYLIST_FILE_EXTS):
+                return ("m3u", s, "", "")
+            continue
+        if s.lower().startswith(("http://", "https://")):
+            found = detect_provider_link(s)
+            if found is not None:
+                return found
     return None
 
 

@@ -21,6 +21,7 @@ import sys
 import time
 
 from PyQt6.QtCore import QRect, QSize, Qt, QTimer
+from PyQt6.QtGui import QGuiApplication
 from PyQt6.QtWidgets import (
     QApplication, QMenu, QPushButton, QVBoxLayout, QWidget)
 
@@ -510,15 +511,23 @@ class _PopoutMixin:
         win.raise_()
 
     def _saved_popout_geometry(self) -> "QRect":
-        raw = self.settings.value("popout_geometry", "")
-        try:
-            x, y, w, h = (int(v) for v in str(raw).split(","))
-            if w >= 320 and h >= 200:
-                return QRect(x, y, w, h)
-        except (ValueError, TypeError):
-            pass
         screen_geo = self.screen().availableGeometry()
         w, h = 720, 420
+        raw = self.settings.value("popout_geometry", "")
+        try:
+            sx, sy, sw, sh = (int(v) for v in str(raw).split(","))
+        except (ValueError, TypeError):
+            sw = sh = 0
+        if sw >= 320 and sh >= 200:
+            saved = QRect(sx, sy, sw, sh)
+            for scr in QGuiApplication.screens():
+                seen = scr.availableGeometry().intersected(saved)
+                if seen.width() >= 120 and seen.height() >= 80:
+                    return saved
+            # Saved on a monitor that has been unplugged since: the window
+            # would open out of sight, and without a title bar there is no
+            # dragging it back. Same size, on this screen.
+            w, h = min(sw, screen_geo.width()), min(sh, screen_geo.height())
         return QRect(screen_geo.center().x() - w // 2,
                      screen_geo.center().y() - h // 2, w, h)
 

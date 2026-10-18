@@ -432,6 +432,8 @@ def main() -> int:
     settings = QSettings(ORG, ORG)
     from .i18n import is_rtl, set_language
     set_language(settings.value("language", "en"))
+    from .ui.qt_i18n import apply_qt_language
+    apply_qt_language(app)          # Qt's own buttons and dialogs too
     # Right-to-left languages (Arabic, Persian) mirror the whole UI.
     app.setLayoutDirection(
         Qt.LayoutDirection.RightToLeft if is_rtl()

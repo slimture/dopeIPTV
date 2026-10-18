@@ -257,12 +257,15 @@ def repoint_desktop_entry(new: Path, old: Path | None = None) -> bool:
 
 def restart_into(new: Path, pid: int | None = None) -> None:
     """Start *new* once this process (*pid*) has exited, so the old
-    instance finishes writing its settings before the new one reads them."""
+    instance finishes writing its settings before the new one reads them.
+    Gives up after five minutes: an instance that never exits must not get
+    a second one started beside it, at some random later moment."""
     pid = pid or os.getpid()
     env = system_env()
     for var in _RUNTIME_VARS:
         env.pop(var, None)
-    script = ('while kill -0 "$0" 2>/dev/null; do sleep 0.2; done; '
+    script = ('n=0; while kill -0 "$0" 2>/dev/null; do '
+              'n=$((n+1)); [ "$n" -ge 1500 ] && exit 0; sleep 0.2; done; '
               'exec "$1"')
     subprocess.Popen(
         ["/bin/sh", "-c", script, str(pid), str(new)], env=env,

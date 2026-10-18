@@ -256,7 +256,12 @@ class _UpdatesMixin:
 
         def finish() -> None:
             timer.stop()
-            dlg.close()
+            timer.deleteLater()
+            # hide(), not close(): closing a QProgressDialog emits canceled,
+            # which marked every finished update as cancelled - and fail()
+            # then swallowed the error it was about to show.
+            dlg.hide()
+            dlg.deleteLater()
             self._self_updating = False
 
         def done(result) -> None:

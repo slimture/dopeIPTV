@@ -151,16 +151,35 @@ class XmltvGuide:
         if data[:2] == b"\x1f\x8b":
             try:
                 return gzip.decompress(data)
-            except (OSError, EOFError):
+            except Exception:
+                # zlib.error is not an OSError: a damaged cache raised out of
+                # ensure_loaded before the download that would replace it,
+                # and the guide stayed broken until the cache was cleared.
                 return None
         return data
+
+    @staticmethod
+    def _write_atomic(path: Path, data: bytes) -> None:
+        """Write *path* whole or not at all: a write cut short (app killed,
+        disk full) leaves the old file, never a truncated one."""
+        tmp = path.with_name(path.name + ".part")
+        try:
+            tmp.write_bytes(data)
+            tmp.replace(path)
+        except OSError:
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+            raise
 
     def _write_cache(self, data: bytes) -> None:
         if not self.cache_path:
             return
         try:
             self.cache_path.parent.mkdir(parents=True, exist_ok=True)
-            self.cache_path.write_bytes(gzip.compress(data, compresslevel=5))
+            self._write_atomic(self.cache_path,
+                               gzip.compress(data, compresslevel=5))
         except OSError:
             pass
 
@@ -302,7 +321,10 @@ class XmltvGuide:
             if data[:2] == b"\x1f\x8b":
                 data = gzip.decompress(data)
             blob = pickle.loads(data)
-        except (OSError, pickle.PickleError, EOFError, ValueError):
+        except Exception:
+            # Any damage at all means "parse the XML again". Letting one
+            # through (zlib.error, a truncated pickle's AttributeError...)
+            # failed the whole guide load instead, and on every start.
             return False
         if not isinstance(blob, dict) or blob.get("v") != _INDEX_VERSION:
             return False
@@ -319,7 +341,7 @@ class XmltvGuide:
                                  "by_id": self._by_id,
                                  "by_name": self._by_name},
                                 protocol=pickle.HIGHEST_PROTOCOL)
-            p.write_bytes(gzip.compress(blob, compresslevel=5))
+            self._write_atomic(p, gzip.compress(blob, compresslevel=5))
         except OSError:
             pass
 

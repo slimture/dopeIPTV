@@ -620,6 +620,14 @@ _STRINGS: dict[str, dict[str, str]] = {
     # ── Common buttons reused in several dialogs ──────────────────────────
     "common_close": {"en": "Close"},
     "common_cancel": {"en": "Cancel"},
+    "common_ok": {"en": "OK"},
+    "common_apply": {"en": "Apply"},
+    "common_reset": {"en": "Reset"},
+    "common_save": {"en": "Save"},
+    "common_open": {"en": "Open"},
+    "common_discard": {"en": "Discard"},
+    "common_restore_defaults": {"en": "Restore defaults"},
+    "common_help": {"en": "Help"},
     "common_dismiss": {"en": "Dismiss"},
     "reminder_add": {"en": "Remind me when it starts"},
     "reminder_remove": {"en": "Remove reminder"},
@@ -800,6 +808,18 @@ _STRINGS: dict[str, dict[str, str]] = {
     # ── Settings extras ───────────────────────────────────────────────────
     "settings_export_tip": {"en": "Export all playlists to a JSON file"},
     "settings_import_tip": {"en": "Import playlists from a JSON file"},
+    "pl_export_title": {"en": "Export playlists"},
+    "pl_import_title": {"en": "Import playlists"},
+    "pl_export_none": {"en": "There are no playlists to export."},
+    "pl_export_done": {"en": "Playlists exported: {n}\n\nFile: {path}"},
+    "pl_export_failed": {"en": "Could not save the file:\n{error}"},
+    "pl_import_done": {"en": "Playlists imported: {n}"},
+    "pl_import_unreadable": {"en": "Could not read the file:\n{error}"},
+    "pl_import_invalid": {"en": "This file is not a playlist export."},
+    "file_filter_json": {"en": "JSON files (*.json)"},
+    "file_filter_all": {"en": "All files (*)"},
+    "pl_dropped_title": {"en": "New playlist"},
+    "pl_dropped_switch": {"en": "\"{name}\" was added. Switch to it now?"},
     "setting_artwork_source": {"en": "Artwork source"},
     "setting_tmdb_key": {"en": "TMDB API key"},
     "tmdb_key_placeholder": {"en": "TMDB API key (v3 auth)"},
@@ -856,6 +876,8 @@ _STRINGS: dict[str, dict[str, str]] = {
     "trakt_use_code_instead": {"en": "Use a code instead"},
     "trakt_requesting_code": {"en": "Requesting a device code…"},
     "trakt_code_expired": {"en": "Code expired - try again."},
+    "trakt_code_invalid": {"en": "That sign-in code is not valid. Try again."},
+    "trakt_code_used": {"en": "That sign-in code has already been used. Try again."},
     "trakt_connected_excl": {"en": "Connected to Trakt!"},
     "trakt_login_failed": {"en": "Trakt login failed: {msg}"},
     "trakt_enter_code": {"en": "Go to <b>{url}</b> and enter this code:<br><br><span style='font-size:20px; font-weight:700;'>{code}</span>"},
@@ -989,7 +1011,9 @@ def tr(key: str, **kwargs: object) -> str:
     if kwargs:
         try:
             return text.format_map(kwargs)
-        except (KeyError, IndexError):
+        except (KeyError, IndexError, ValueError):
+            # ValueError: a stray "{" or "}" in a translation. Show the text
+            # as it is rather than crash whatever was being labelled.
             return text
     return text
 

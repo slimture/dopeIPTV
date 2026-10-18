@@ -10,6 +10,7 @@ import time
 
 from ..core._lazy_requests import requests
 from ..core.log import log
+from ..i18n import tr
 from PyQt6.QtCore import QSettings
 
 API = "https://api.trakt.tv"
@@ -123,8 +124,10 @@ class TraktClient:
         return bool(self.access_token and self.client_id)
 
     def disconnect(self) -> None:
+        # The favorites list belongs to the account: signing in to another
+        # one must not go on writing to a list slug that is not theirs.
         for k in ("trakt_access_token", "trakt_refresh_token",
-                  "trakt_expires_at"):
+                  "trakt_expires_at", "trakt_fav_list_slug"):
             self.settings.remove(k)
 
     def _store_tokens(self, data: dict) -> None:
@@ -147,7 +150,10 @@ class TraktClient:
     def poll_device_token(self, device_code: str) -> dict | None:
         """Step 2: poll for the token. None while pending, dict on success.
 
-        Raises TraktAuthError on denial/expiry.
+        Raises TraktAuthError on denial/expiry. The auth host answers the
+        RFC 8628 way too - a 400 carrying an error code - and being asked to
+        slow down (slow_down, or a 429) means waiting longer, never giving
+        up: that used to abort the sign-in with an HTTP error.
         """
         body = {"code": device_code, "client_id": self.client_id}
         if self.client_secret:
@@ -157,15 +163,25 @@ class TraktClient:
             data = r.json()
             self._store_tokens(data)
             return data
-        if r.status_code == 400:
-            return None  # authorization pending
-        if r.status_code in (404, 409, 410, 418):
-            raise TraktAuthError({
-                404: "Invalid device code.",
-                409: "Code already used.",
-                410: "Code expired - try again.",
-                418: "Authorization denied.",
-            }[r.status_code])
+        error = (_oauth_error_code(r)
+                 if r.status_code in (400, 401, 403) else "")
+        if error == "access_denied" or r.status_code == 418:
+            raise TraktAuthError(tr("trakt_denied"))
+        if error == "expired_token" or r.status_code == 410:
+            raise TraktAuthError(tr("trakt_code_expired"))
+        if r.status_code == 404:
+            raise TraktAuthError(tr("trakt_code_invalid"))
+        if r.status_code == 409:
+            raise TraktAuthError(tr("trakt_code_used"))
+        if error == "slow_down" or r.status_code == 429:
+            # RFC 8628: add five seconds to the interval. This runs on a
+            # worker, so the wait here is that extra time.
+            time.sleep(5)
+            return None
+        if r.status_code == 400 and error in ("", "authorization_pending"):
+            return None
+        if error:                   # invalid_client and the like
+            raise TraktAuthError(_oauth_error(r).lstrip(": "))
         r.raise_for_status()
         return None
 

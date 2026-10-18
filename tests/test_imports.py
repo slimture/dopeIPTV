@@ -87,3 +87,19 @@ def test_relative_imports_resolve():
         except ModuleNotFoundError:
             broken.append(f"{src} -> {target}")
     assert not broken, "unresolved relative imports:\n  " + "\n  ".join(broken)
+
+
+def test_no_glibc_only_strftime_flags():
+    """'%-d' and friends exist only in glibc: on Windows strftime raises
+    ValueError, which hid the detail pane's schedule list there."""
+    import re
+    flag = re.compile(r"%-[a-zA-Z]")
+    root = pathlib.Path(dopeiptv.__file__).parent
+    hits = []
+    for path in root.rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if (isinstance(node, ast.Constant) and isinstance(node.value, str)
+                    and flag.search(node.value)):
+                hits.append(f"{path.relative_to(root)}:{node.lineno}")
+    assert not hits, hits

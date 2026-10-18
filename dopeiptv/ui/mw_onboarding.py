@@ -41,10 +41,9 @@ class _OnboardingMixin:
             self._welcome.set_trakt_connected(self.trakt.is_connected())
 
     def _wizard_language(self, code: str) -> None:
-        from ..i18n import set_language
-        set_language(code)
-        self.settings.setValue("language", code)
-        self.retranslate_ui()
+        # The same switch as Settings makes: Arabic, Persian, Hebrew and
+        # Urdu mirror the layout right away, and Qt's own buttons follow.
+        self._set_language(code)
 
     def _wizard_connect(self, server: str, user: str, pw: str,
                         kind: str = "xtream", name: str = "") -> None:

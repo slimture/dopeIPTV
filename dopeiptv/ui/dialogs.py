@@ -27,10 +27,15 @@ class PlaylistDialog(QDialog):
         ("1w", "refresh_weekly"),
     ]
 
-    def __init__(self, parent=None, playlist=None) -> None:
+    def __init__(self, parent=None, playlist=None,
+                 prefill: dict | None = None) -> None:
+        """*playlist* edits a stored playlist; *prefill* starts a new one
+        with fields already filled in (a playlist file dropped on the
+        window)."""
         super().__init__(parent)
-        playlist = playlist or {}
-        self.setWindowTitle(tr("playlist_edit_title") if playlist
+        editing = bool(playlist)
+        playlist = playlist or prefill or {}
+        self.setWindowTitle(tr("playlist_edit_title") if editing
                             else tr("playlist_add_title"))
         self.setMinimumWidth(460)
         lay = QVBoxLayout(self)
