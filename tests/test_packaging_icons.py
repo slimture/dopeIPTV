@@ -119,6 +119,7 @@ def test_every_repo_file_a_workflow_names_actually_exists():
     # pattern quietly widening until it stops catching anything.
     generated = {
         "dopeiptv/_tmdb_key.py",        # "Bake built-in TMDB key" writes it
+        "dopeiptv/_opensubtitles_key.py",   # "Bake built-in OpenSubtitles key"
         "packaging/dopeIPTV.ico",       # "Build .ico from the app PNG" does
     }
     missing = []

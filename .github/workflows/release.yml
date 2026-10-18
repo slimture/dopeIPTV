@@ -43,6 +43,15 @@ jobs:
             exit 1
           fi
           echo "Tag, version and release notes all agree on ${VER}."
+      - name: Bake built-in OpenSubtitles key
+        shell: bash
+        env:
+          DOPEIPTV_OPENSUBTITLES_KEY: ${{ secrets.DOPEIPTV_OPENSUBTITLES_KEY }}
+        run: |
+          printf 'OPENSUBTITLES_API_KEY = "%s"\n' "${DOPEIPTV_OPENSUBTITLES_KEY}" > dopeiptv/_opensubtitles_key.py
+          if [ -z "${DOPEIPTV_OPENSUBTITLES_KEY}" ]; then
+            echo "::warning::DOPEIPTV_OPENSUBTITLES_KEY secret is empty - subtitles from OpenSubtitles need a key in Settings in this build."
+          fi
       - name: Bake built-in TMDB key
         env:
           DOPEIPTV_TMDB_KEY: ${{ secrets.DOPEIPTV_TMDB_KEY }}
@@ -141,6 +150,15 @@ jobs:
             exit 1
           fi
           echo "Tag, version and release notes all agree on ${VER}."
+      - name: Bake built-in OpenSubtitles key
+        shell: bash
+        env:
+          DOPEIPTV_OPENSUBTITLES_KEY: ${{ secrets.DOPEIPTV_OPENSUBTITLES_KEY }}
+        run: |
+          printf 'OPENSUBTITLES_API_KEY = "%s"\n' "${DOPEIPTV_OPENSUBTITLES_KEY}" > dopeiptv/_opensubtitles_key.py
+          if [ -z "${DOPEIPTV_OPENSUBTITLES_KEY}" ]; then
+            echo "::warning::DOPEIPTV_OPENSUBTITLES_KEY secret is empty - subtitles from OpenSubtitles need a key in Settings in this build."
+          fi
       - name: Bake built-in TMDB key
         env:
           DOPEIPTV_TMDB_KEY: ${{ secrets.DOPEIPTV_TMDB_KEY }}
@@ -564,6 +582,15 @@ jobs:
             exit 1
           fi
           echo "Tag, version and release notes all agree on ${VER}."
+      - name: Bake built-in OpenSubtitles key
+        shell: bash
+        env:
+          DOPEIPTV_OPENSUBTITLES_KEY: ${{ secrets.DOPEIPTV_OPENSUBTITLES_KEY }}
+        run: |
+          printf 'OPENSUBTITLES_API_KEY = "%s"\n' "${DOPEIPTV_OPENSUBTITLES_KEY}" > dopeiptv/_opensubtitles_key.py
+          if [ -z "${DOPEIPTV_OPENSUBTITLES_KEY}" ]; then
+            echo "::warning::DOPEIPTV_OPENSUBTITLES_KEY secret is empty - subtitles from OpenSubtitles need a key in Settings in this build."
+          fi
       - name: Bake built-in TMDB key
         env:
           DOPEIPTV_TMDB_KEY: ${{ secrets.DOPEIPTV_TMDB_KEY }}
@@ -777,6 +804,15 @@ jobs:
             exit 1
           fi
           echo "Tag, version and release notes all agree on ${VER}."
+      - name: Bake built-in OpenSubtitles key
+        shell: bash
+        env:
+          DOPEIPTV_OPENSUBTITLES_KEY: ${{ secrets.DOPEIPTV_OPENSUBTITLES_KEY }}
+        run: |
+          printf 'OPENSUBTITLES_API_KEY = "%s"\n' "${DOPEIPTV_OPENSUBTITLES_KEY}" > dopeiptv/_opensubtitles_key.py
+          if [ -z "${DOPEIPTV_OPENSUBTITLES_KEY}" ]; then
+            echo "::warning::DOPEIPTV_OPENSUBTITLES_KEY secret is empty - subtitles from OpenSubtitles need a key in Settings in this build."
+          fi
       - name: Bake built-in TMDB key
         shell: bash
         env:
@@ -975,6 +1011,15 @@ jobs:
             exit 1
           fi
           echo "Tag, version and release notes all agree on ${VER}."
+      - name: Bake built-in OpenSubtitles key
+        shell: bash
+        env:
+          DOPEIPTV_OPENSUBTITLES_KEY: ${{ secrets.DOPEIPTV_OPENSUBTITLES_KEY }}
+        run: |
+          printf 'OPENSUBTITLES_API_KEY = "%s"\n' "${DOPEIPTV_OPENSUBTITLES_KEY}" > dopeiptv/_opensubtitles_key.py
+          if [ -z "${DOPEIPTV_OPENSUBTITLES_KEY}" ]; then
+            echo "::warning::DOPEIPTV_OPENSUBTITLES_KEY secret is empty - subtitles from OpenSubtitles need a key in Settings in this build."
+          fi
       - name: Bake built-in TMDB key
         env:
           DOPEIPTV_TMDB_KEY: ${{ secrets.DOPEIPTV_TMDB_KEY }}

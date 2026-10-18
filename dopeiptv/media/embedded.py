@@ -1297,6 +1297,7 @@ class EmbeddedPlayer(QWidget):
     timeshift_seek = pyqtSignal(int)   # minutes back from live (0 = go live)
     program_seek = pyqtSignal(int)     # seconds from the picked programme start
     track_selected = pyqtSignal(str, object)  # "aid"/"sid", track id or "no"
+    subtitle_added = pyqtSignal(str)          # a subtitle file now showing
 
     OVERLAY_HIDE_MS = 3000
     VIDEO_BOX_HEIGHT = 260
@@ -1337,6 +1338,9 @@ class EmbeddedPlayer(QWidget):
         # populate_options_menu). Kept as (label_callable, action) so a
         # language change is picked up when the menu is next opened.
         self.extra_options: list = []
+        # The window's "Find subtitles online…" (None: not offered), the
+        # same way: the player shows the entry, the window knows the site.
+        self.find_subtitles = None
         self._popout_bar_timer = QTimer(self)
         self._popout_bar_timer.setSingleShot(True)
         self._popout_bar_timer.setInterval(2500)
@@ -1347,6 +1351,8 @@ class EmbeddedPlayer(QWidget):
         # set_track_prefs() to restore a title's remembered track choices.
         self._pref_aid = None
         self._pref_sid = None
+        # One-shot subtitle files for the NEXT play() (set_sub_files).
+        self._pref_sub_files: list[str] = []
         # Docked video-box height scales with the display so the mini player
         # is usefully large on a 27"/4K screen and modest on a laptop -
         # computed once here, then constant (nothing resizes on its own).
@@ -3251,6 +3257,35 @@ class EmbeddedPlayer(QWidget):
         self._pref_aid = aid
         self._pref_sid = sid
 
+    def set_sub_files(self, paths: list[str]) -> None:
+        """Arm subtitle files for the next play() - one fetched or picked
+        for this title before comes back with it. One-shot, like the track
+        choices."""
+        self._pref_sub_files = [str(p) for p in paths if p]
+
+    def add_subtitle(self, path: str, title: str = "", lang: str = "") -> bool:
+        """Load a subtitle file into what is playing and show it."""
+        m = self.video.mpv
+        if m is None or not self.current_url:
+            return False
+        try:
+            m.command("sub-add", str(path), "select", title or "", lang or "")
+            m["sub-forced-only"] = False
+            m["sub-visibility"] = True
+        except Exception as e:
+            log.warning("sub-add %s failed: %s", path, e)
+            return False
+        self.subtitle_added.emit(str(path))
+        return True
+
+    def _load_subtitle_file(self) -> None:
+        from PyQt6.QtWidgets import QFileDialog
+        path, _flt = QFileDialog.getOpenFileName(
+            self.window(), tr("subs_pick_title"), "",
+            tr("opt_subtitles") + " (*.srt *.ass *.ssa *.vtt *.sub)")
+        if path:
+            self.add_subtitle(path)
+
     def play(self, url: str, title: str, start: float = 0.0) -> bool:
         try:
             # Fresh play cycle - drop the stop-in-progress flag so any real
@@ -3320,6 +3355,23 @@ class EmbeddedPlayer(QWidget):
             except Exception as e:
                 log.debug("track prefs (aid=%r sid=%r) failed: %s",
                           pref_aid, pref_sid, e)
+            # A subtitle fetched or picked for this title before. Through
+            # change-list: a path is one item whatever characters it holds,
+            # where the option's own string form splits on the separator.
+            sub_files, self._pref_sub_files = self._pref_sub_files, []
+            try:
+                m.command("change-list", "sub-files", "clr", "")
+                for path in sub_files:
+                    m.command("change-list", "sub-files", "append", path)
+                if sub_files:
+                    # Chosen for this title on purpose: shown, whatever the
+                    # default subtitle mode says (mpv prefers an external
+                    # track when it picks one).
+                    m["sid"] = "auto"
+                    m["sub-forced-only"] = False
+                    m["sub-visibility"] = True
+            except Exception as e:
+                log.debug("sub-files %r failed: %s", sub_files, e)
             try:
                 # While muted the slider reads 0. Sending that as the volume
                 # would leave the stream silent even after unmuting, since mute
@@ -3554,6 +3606,13 @@ class EmbeddedPlayer(QWidget):
             act.setChecked(bool(t.get("selected")))
             act.triggered.connect(
                 lambda _c, tid=t.get("id"): self._pick_track("sid", tid))
+        if m and self.current_url:
+            subs.addSeparator()
+            subs.addAction(tr("opt_sub_load_file"), self._load_subtitle_file)
+            # Films, episodes and files - a live channel has nothing to find.
+            if (self.find_subtitles is not None
+                    and getattr(self, "_seek_mode", "vod") == "vod"):
+                subs.addAction(tr("opt_sub_find_online"), self.find_subtitles)
 
         delay = menu.addMenu(tr("opt_audio_delay"))
         current_delay = 0.0

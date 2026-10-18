@@ -25,6 +25,7 @@ dopeiptv/
     oauth_loopback.py  Loopback HTTP server for the Trakt OAuth redirect
     diagnostics.py     Plain-language "why won't this stream play?" probe
     chromecast.py      ChromecastManager, CastDialog
+    opensubtitles.py   OpenSubtitles.com REST client (search, download, hash)
 
   core/                Storage, background work, OS integration
     stores.py          JSON data stores (playlists, favorites, history, ...)
@@ -76,6 +77,7 @@ dopeiptv/
     mw_reminders.py    Programme-reminder UI (set / list / fire)
     mw_mpris.py        Desktop media controls (MPRIS host) + media keys
     mw_follow.py       Follow a series: new-episode checks and news
+    mw_subtitles.py    Subtitles from OpenSubtitles; remembered per title
     mw_home.py         The Home page (shelves: resume, favourites, new)
     mw_local.py        Local files: folders, library view, music queue
     mw_onboarding.py   First-run setup wizard
@@ -89,6 +91,7 @@ dopeiptv/
     reminders.py       Reminders manager dialog
     shortcuts.py       Keyboard-shortcuts editor dialog
     tmdb_match.py      Manual TMDB match dialog
+    subtitle_search.py OpenSubtitles search dialog
     theme.py           9 themes x 7 accents, palette dict P, QSS generator
 ```
 

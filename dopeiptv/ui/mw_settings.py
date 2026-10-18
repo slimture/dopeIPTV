@@ -56,6 +56,8 @@ from ..i18n import tr
 from .dialogs import PlaylistDialog
 from .epg_grid import EpgGridDialog
 from ..providers.metadata import TmdbClient, bundled_tmdb_key
+from ..providers.opensubtitles import OpenSubtitles
+from ..providers.opensubtitles import bundled_key as bundled_os_key
 from ..providers.client import make_client
 from ..core.log import log
 from ..core.xdg import open_url
@@ -685,6 +687,58 @@ class _SettingsMixin:
         c.row(tr("setting_subtitles"), sub_box)
         c.row(tr("setting_sub_lang"), slang_box)
         c.row(tr("setting_sub_lang_fallback"), slang2_box)
+
+        # OpenSubtitles: a key (built in, or the user's own) and an optional
+        # account, which only raises how many subtitles a day can be fetched.
+        os_bundled = bool(bundled_os_key())
+        os_key_edit = QLineEdit(self.settings.value("os_api_key", "") or "")
+        os_test_btn = QPushButton(tr("btn_test"))
+        os_user_edit = QLineEdit(self.settings.value("os_username", "") or "")
+        os_pass_edit = QLineEdit(self.settings.value("os_password", "") or "")
+        os_pass_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        c = audio.card("OpenSubtitles.com")
+        c.row(tr("setting_api_key"), hbox(os_key_edit, os_test_btn,
+                                          stretch=False),
+              tr("os_key_builtin_hint") if os_bundled else tr("os_key_hint"),
+              stretch_control=True)
+        c.row(tr("login_username"), os_user_edit)
+        c.row(tr("login_password"), os_pass_edit, tr("os_account_hint"))
+        os_status = QLabel()
+        os_status.setWordWrap(True)
+        c.widget(os_status)
+
+        def test_os_key() -> None:
+            key = os_key_edit.text().strip() or bundled_os_key()
+            if not key:
+                os_status.setText(tr("tmdb_enter_key"))
+                os_status.setStyleSheet(
+                    f"color:{P['error']}; font-size:12px;")
+                return
+            os_status.setText(tr("tmdb_checking"))
+            os_status.setStyleSheet(f"color:{P['muted']}; font-size:12px;")
+            client = OpenSubtitles(key, os_user_edit.text(),
+                                   os_pass_edit.text())
+
+            def check():
+                # With an account, its password is what gets checked too.
+                if client.username and client.password:
+                    client.login()
+                client.search(languages="en", query="big buck bunny")
+                return True
+
+            def ok(_r):
+                os_status.setText(tr("tmdb_key_works"))
+                os_status.setStyleSheet(
+                    f"color:{P['accent']}; font-size:12px; font-weight:600;")
+
+            def fail(msg):
+                os_status.setText(tr("tmdb_key_failed", msg=msg))
+                os_status.setStyleSheet(
+                    f"color:{P['error']}; font-size:12px;")
+
+            run_async(self.pool, check, ok, fail)
+
+        os_test_btn.clicked.connect(test_os_key)
 
         # -- Video ------------------------------------------------------------
         video = page("video", tr("sec_video"), tr("set_page_video_sub"),
@@ -1563,6 +1617,14 @@ class _SettingsMixin:
                 "sub_lang", slang_box.currentData())
             self.settings.setValue(
                 "sub_lang2", slang2_box.currentData())
+            # Written only when changed: an untouched empty field is not a
+            # setting, and OK with nothing touched changes nothing.
+            for skey, value in (
+                    ("os_api_key", os_key_edit.text().strip()),
+                    ("os_username", os_user_edit.text().strip()),
+                    ("os_password", os_pass_edit.text())):
+                if value != (self.settings.value(skey, "") or ""):
+                    self.settings.setValue(skey, value)
             self.settings.setValue(
                 "aspect_mode", aspect_box.currentData())
             self.settings.setValue(

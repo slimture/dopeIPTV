@@ -1,0 +1,19 @@
+"""Built-in OpenSubtitles.com API key (optional).
+
+Subtitles from OpenSubtitles work out of the box when a key is available
+here or in the DOPEIPTV_OPENSUBTITLES_KEY environment variable. To ship one:
+
+  1. Copy this file to  dopeiptv/_opensubtitles_key.py  (git-ignored), or
+  2. export DOPEIPTV_OPENSUBTITLES_KEY=<your key>  before running, or
+  3. for release builds, set a DOPEIPTV_OPENSUBTITLES_KEY GitHub Actions
+     secret so it is baked into the packaged artifacts without ever
+     touching git.
+
+The key is an "API consumer" key: sign in at opensubtitles.com, open
+https://www.opensubtitles.com/consumers and create one for the app. A key
+a user enters in Settings always overrides this.
+
+The real key is deliberately never committed to the public repository.
+"""
+
+OPENSUBTITLES_API_KEY = ""

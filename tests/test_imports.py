@@ -74,9 +74,10 @@ def test_relative_imports_resolve():
     """Every `from .x`/`from ..x` in the package must point at a real module -
     at module level AND inside methods. Catches the classic 'moved a file but
     an inline import still says .foo instead of ..foo' bug."""
-    # _tmdb_key is git-ignored and only baked into release builds by CI; it is
-    # imported inside a try/except, so a missing target there is expected.
-    optional = {"dopeiptv._tmdb_key"}
+    # _tmdb_key and _opensubtitles_key are git-ignored and only baked into
+    # release builds by CI; each is imported inside a try/except, so a
+    # missing target there is expected.
+    optional = {"dopeiptv._tmdb_key", "dopeiptv._opensubtitles_key"}
     broken = []
     for src, target in _relative_import_targets():
         if target in optional:

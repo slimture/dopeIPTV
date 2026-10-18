@@ -19,6 +19,7 @@ map and the one-way import rule.
 | `providers/metadata.py` | TMDB client, PosterResolver |
 | `providers/trakt.py` | Trakt.tv sync |
 | `providers/chromecast.py` | Chromecast support |
+| `providers/opensubtitles.py` | OpenSubtitles.com client (search, download, file hash) |
 | `core/stores.py` | Data persistence layer |
 | `core/workers.py` | Thread pool helpers, LogoLoader, image caches |
 | `core/recording.py` | Recording manager |
@@ -39,6 +40,7 @@ map and the one-way import rule.
 | `ui/settings_ui.py` | Settings building blocks: sidebar shell, pages, cards, rows, switches |
 | `ui/qt_i18n.py` | Qt's own strings and QLocale dates in the app's language |
 | `ui/tmdb_match.py` | Manual TMDB match dialog |
+| `ui/subtitle_search.py` | OpenSubtitles search dialog |
 | `ui/widgets.py` | Small standalone widgets |
 | `ui/theme.py` | Theming engine |
 
@@ -53,7 +55,8 @@ in the `mw_*` mixins beside it, each mixed into `MainWindow`:
 (keyboard shortcuts), `mw_busy` (loading indicator), `mw_updates`
 (update badge), `mw_reminders`, `mw_sort`, `mw_onboarding`,
 `mw_mpris` (desktop media controls, media keys), `mw_follow` (followed
-series, new-episode news) and `mw_popout` (detached-window player). What stays in `main_window.py` is
+series, new-episode news), `mw_subtitles` (OpenSubtitles, subtitles
+remembered per title) and `mw_popout` (detached-window player). What stays in `main_window.py` is
 the `__init__`/`_build_ui` composition and the playback path (start/stop,
 seek, fullscreen, reconnect) - keep playback code there.
 When making changes:
@@ -114,7 +117,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   `DOPEIPTV_LOG=debug` shows debug traces; `DOPEIPTV_LOG_FILE=/path` tees
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
-  metadata, diagnostics, oauth_loopback), `core/` (stores, updates, log,
+  metadata, diagnostics, oauth_loopback, opensubtitles), `core/` (stores, updates, log,
   player_exec, wakelock, selfupdate, gcguard) and `services/` (resume,
   coverart, reminders, mpris, notify); see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,

@@ -25,3 +25,5 @@ recordings/
 # Provide it via the DOPEIPTV_TMDB_KEY env var (CI secret for releases)
 # or a local copy of this module made from _tmdb_key.py.example.
 dopeiptv/_tmdb_key.py
+# The same for the built-in OpenSubtitles key (_opensubtitles_key.py.example).
+dopeiptv/_opensubtitles_key.py

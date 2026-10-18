@@ -74,6 +74,7 @@ from .mw_search import _SearchMixin
 from .mw_shortcuts import _ShortcutsMixin
 from .mw_sidebar import _SidebarMixin
 from .mw_sort import _SortMixin
+from .mw_subtitles import _SubtitlesMixin
 from .mw_updates import _UpdatesMixin
 from ..core.workers import (
     LogoLoader, default_image_cache_dir, run_async)
@@ -100,7 +101,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _NavMixin, _ShortcutsMixin, _OnboardingMixin, _SortMixin,
                  _LocalFilesMixin,
                  _PopoutMixin, _MultiviewMixin, _HomeMixin, _MprisMixin,
-                 _FollowMixin, QMainWindow):
+                 _FollowMixin, _SubtitlesMixin, QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
     epg_progress = pyqtSignal(int)
@@ -1201,6 +1202,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # does not need to know what a Chromecast is.
             self.player.extra_options = [
                 (lambda: tr("ctx_cast_to_chromecast"), self.cast_playing)]
+            # Subtitles from OpenSubtitles, and a subtitle loaded for a title
+            # remembered for the next time it plays (mw_subtitles).
+            self.player.find_subtitles = self._open_subtitle_search
+            self.player.subtitle_added.connect(self._on_subtitle_added)
             # The player draws the visualiser and applies the equaliser; the
             # window owns the settings behind both.
             self.player.open_equaliser = self.open_equaliser
@@ -5718,6 +5723,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 if isinstance(pref, dict):
                     self.player.set_track_prefs(pref.get("aid"),
                                                 pref.get("sid"))
+                # A subtitle fetched or picked for this title before.
+                self.player.set_sub_files(
+                    self._remembered_subtitles(kind, key))
             if self.player.play(url, title, start=resume_at):
                 self.wake.acquire(tr("wake_playing", title=title))
             else:
