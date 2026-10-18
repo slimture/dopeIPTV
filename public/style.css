@@ -308,6 +308,7 @@ footer nav a:hover { color: var(--accent); }
   padding: 15px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px;
 }
 .faq-item summary::-webkit-details-marker { display: none; }
+.faq-item .faq-q { margin: 0; font: inherit; color: inherit; }
 .faq-item summary::after {
   content: "+"; color: var(--accent); font-size: 20px; line-height: 1; flex: none;
 }
@@ -360,7 +361,7 @@ footer nav a:hover { color: var(--accent); }
   border-radius: 14px;
   padding: 20px 24px 6px;
 }
-.notes h4 {
+.notes h3 {
   margin: 26px 0 10px;
   font-size: 15px;
   letter-spacing: .02em;
@@ -369,7 +370,7 @@ footer nav a:hover { color: var(--accent); }
   border-left: 3px solid var(--accent);
   padding-left: 10px;
 }
-.notes h4:first-child { margin-top: 0; }
+.notes h3:first-child { margin-top: 0; }
 .notes p { margin: 0 0 14px; color: var(--text); line-height: 1.65; }
 .notes ul { margin: 0 0 14px; padding-left: 20px; }
 .notes li {

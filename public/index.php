@@ -94,7 +94,7 @@ function render_notes(string $md): string {
         if (preg_match('/^##\s+dopeIPTV\b/i', $t)) { continue; }
         if (preg_match('/^###\s+(.*)$/', $t, $m)) {
             $flush(); $closeList();
-            $out .= '<h4>' . $inline($m[1]) . "</h4>\n";
+            $out .= '<h3>' . $inline($m[1]) . "</h3>\n";
             continue;
         }
         if (preg_match('/^>\s?(.*)$/', $t, $m)) {
@@ -428,7 +428,7 @@ foreach ($shots as [$file, $alt, $title, $cap]):
       <div class="faq">
 <?php for ($i = 1; $i <= 10; $i++): ?>
         <details class="faq-item">
-          <summary><?= h(t("faq_q$i")) ?></summary>
+          <summary><h3 class="faq-q"><?= h(t("faq_q$i")) ?></h3></summary>
           <p><?= h(t("faq_a$i")) ?></p>
         </details>
 <?php endfor; ?>

@@ -200,10 +200,16 @@ to `/` and `/help/`, so each page has one address.
 After a deploy, resubmit `https://iptv.dope.rs/sitemap.xml` in Google Search
 Console and Bing Webmaster Tools.
 
-Two server-side lines belong with this, in the templates in `deploy/`:
-`error_page 404 /404.php;` on the content server, and the port-80 block in
-the proxy that sends `http://` to `https://` (skip it if `nginx.conf`
-already redirects all port-80 traffic).
+CSS and JS are cached for a year: every page links them through `asset()`,
+which puts the file's content hash in the URL, so a changed file always gets
+a new address. Anything linked without `asset()` would be stuck for a year.
+
+Server-side lines that belong with this, all in the templates in `deploy/`:
+
+- content server: `error_page 404 /404.php;` and the two cache rules;
+- TLS front: `http2 on;`, and the port-80 block that sends `http://` to
+  `https://` (skip that one if `nginx.conf` already redirects all port-80
+  traffic).
 
 ## Local preview
 
