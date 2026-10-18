@@ -573,13 +573,16 @@ class _SettingsMixin:
         # Only where an entry is actually missing: a .deb or a Flatpak has
         # one already, and offering to add a second would be nonsense.
         desktop_box = None
+        mpris_box = None
         if sys.platform.startswith("linux"):
             from ..core import desktop_entry as _de
+            c = general.card(tr("set_card_system"))
             if _de.is_installed() or _de.can_offer():
-                c = general.card(tr("set_card_system"))
                 desktop_box = c.toggle(tr("setting_desktop_entry"),
                                        _de.is_installed(),
                                        tr("setting_desktop_entry_hint"))
+            mpris_box = c.toggle(tr("setting_mpris"), is_on("mpris", "true"),
+                                 tr("setting_mpris_hint"))
 
         # -- Appearance -------------------------------------------------------
         look = page("appearance", tr("set_page_appearance"),
@@ -818,6 +821,7 @@ class _SettingsMixin:
         c = home.card(tr("set_home_shelves"))
         home_shelf_boxes: dict[str, QCheckBox] = {}
         for skey, slabel in (("home_sh_resume", "home_resume"),
+                             ("home_sh_new_eps", "home_new_episodes"),
                              ("home_sh_fav", "home_fav_now"),
                              ("home_sh_history", "home_recent"),
                              ("home_sh_watchlist", "nav_watchlist"),
@@ -1533,6 +1537,9 @@ class _SettingsMixin:
             self.settings.setValue("check_updates", flag(updates_box))
             if x11_box is not None:
                 self.settings.setValue("force_x11", flag(x11_box))
+            if mpris_box is not None:
+                self.settings.setValue("mpris", flag(mpris_box))
+                self._apply_media_session_setting()
             if desktop_box is not None:
                 want = desktop_box.isChecked()
                 self.settings.setValue(

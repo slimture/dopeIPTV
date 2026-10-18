@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 import uuid
 from datetime import datetime
 from typing import Any
@@ -1151,3 +1152,158 @@ class WatchlistStore:
         self.trakt_shows = set()
         self.last_sync_at = 0
         self.settings.remove("trakt_watchlist_cache")
+
+
+def episode_rows(info: Any) -> list[dict]:
+    """Every episode in a get_series_info answer, slimmed to what a new
+    episode needs: id, season, number, title, when the provider added it.
+    Panels answer with seasons as a dict, or occasionally a flat list."""
+    eps = (info or {}).get("episodes") if isinstance(info, dict) else None
+    if isinstance(eps, dict):
+        groups = list(eps.items())
+    elif isinstance(eps, list):
+        groups = [(None, eps)]
+    else:
+        return []
+    out = []
+    for season, items in groups:
+        for ep in items or []:
+            if not isinstance(ep, dict) or ep.get("id") in (None, ""):
+                continue
+            try:
+                added = int(ep.get("added") or 0)
+            except (TypeError, ValueError):
+                added = 0
+            out.append({"id": str(ep["id"]),
+                        "season": str(ep.get("season") or season or ""),
+                        "episode_num": str(ep.get("episode_num") or ""),
+                        "title": str(ep.get("title") or ""),
+                        "added": added})
+    return out
+
+
+class FollowedSeriesStore:
+    """Series being followed, and their episodes that arrived since the user
+    last looked. Per playlist: a series id means nothing on another provider.
+
+    Each entry keeps a slim snapshot of the series (enough to open it and
+    draw its card), the episode ids already seen, and the new ones. The first
+    look after following only learns what is there: everything already out
+    is not news.
+    """
+
+    MAX_NEW = 50
+
+    def __init__(self, settings: QSettings, playlist_id: str | None = None):
+        self.settings = settings
+        self._key = (f"followed_series_{playlist_id}" if playlist_id
+                     else "followed_series")
+        self.series: dict[str, dict] = {}
+        try:
+            data = json.loads(settings.value(self._key, "") or "{}")
+        except (ValueError, TypeError):
+            data = {}
+        if isinstance(data, dict):
+            self.series = {str(k): v for k, v in data.items()
+                           if isinstance(v, dict)
+                           and isinstance(v.get("snap"), dict)}
+
+    def _save(self) -> None:
+        self.settings.setValue(self._key, json.dumps(
+            self.series, separators=(",", ":")))
+
+    def is_followed(self, series_id: Any) -> bool:
+        return series_id is not None and str(series_id) in self.series
+
+    def ids(self) -> list[str]:
+        return list(self.series)
+
+    def snapshot(self, series_id: Any) -> dict:
+        return dict((self.series.get(str(series_id)) or {}).get("snap") or {})
+
+    def new_ids(self, series_id: Any) -> list[str]:
+        entry = self.series.get(str(series_id)) or {}
+        return [e.get("id") for e in entry.get("new") or []]
+
+    def due(self, now: float, min_age: float) -> list[str]:
+        """Series not asked about within *min_age* seconds, the longest
+        unasked first."""
+        rows = [(int(e.get("checked") or 0), sid)
+                for sid, e in self.series.items()
+                if now - int(e.get("checked") or 0) >= min_age]
+        return [sid for _checked, sid in sorted(rows)]
+
+    def follow(self, item: dict) -> None:
+        sid = item.get("series_id")
+        if sid is None or self.is_followed(sid):
+            return
+        snap = {k: item.get(k) for k in (
+            "series_id", "name", "title", "cover", "stream_icon",
+            "category_id", "_tmdb_id") if item.get(k) is not None}
+        self.series[str(sid)] = {"snap": snap, "known": [], "new": [],
+                                 "primed": False, "checked": 0}
+        self._save()
+
+    def unfollow(self, series_id: Any) -> None:
+        if self.series.pop(str(series_id), None) is not None:
+            self._save()
+
+    def update(self, series_id: Any, info: Any,
+               now: float | None = None) -> list[dict]:
+        """Record what the provider lists now; return the episodes that
+        are new since the last look (none on the first one)."""
+        return self.update_rows(series_id, episode_rows(info), now)
+
+    def update_rows(self, series_id: Any, eps: list[dict],
+                    now: float | None = None) -> list[dict]:
+        """update(), from episode_rows() already taken - the background
+        check slims each answer on its own thread."""
+        entry = self.series.get(str(series_id))
+        if entry is None:
+            return []
+        if not eps:
+            # An empty answer is a provider hiccup, not a series that lost
+            # every episode - and treating it as one would announce the
+            # whole series as new the next time it answered properly.
+            return []
+        entry["checked"] = int(now if now is not None else time.time())
+        ids = {e["id"] for e in eps}
+        if not entry.get("primed"):
+            entry["known"] = sorted(ids)
+            entry["primed"] = True
+            self._save()
+            return []
+        known = set(entry.get("known") or [])
+        fresh = [e for e in eps if e["id"] not in known]
+        entry["known"] = sorted(known | ids)
+        if fresh:
+            have = {e.get("id") for e in entry.get("new") or []}
+            entry["new"] = ((entry.get("new") or [])
+                            + [e for e in fresh if e["id"] not in have]
+                            )[-self.MAX_NEW:]
+        self._save()
+        return fresh
+
+    def seen(self, series_id: Any, info: Any = None) -> None:
+        """The series was opened: its new episodes are new no longer, and
+        what it lists now is known."""
+        entry = self.series.get(str(series_id))
+        if entry is None:
+            return
+        if info is not None:
+            ids = {e["id"] for e in episode_rows(info)}
+            if ids:
+                entry["known"] = sorted(set(entry.get("known") or []) | ids)
+                entry["primed"] = True
+        if entry.get("new") or info is not None:
+            entry["new"] = []
+            self._save()
+
+    def with_new(self) -> list[dict]:
+        """{snap, new} for every series with something new, the most
+        recently added first."""
+        rows = [(e["snap"], e.get("new") or []) for e in self.series.values()
+                if e.get("new")]
+        rows.sort(key=lambda r: max((x.get("added") or 0) for x in r[1]),
+                  reverse=True)
+        return [{"snap": s, "new": n} for s, n in rows]

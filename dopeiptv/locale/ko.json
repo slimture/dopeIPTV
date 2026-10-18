@@ -973,5 +973,16 @@
   "set_reset_hint": "dopeIPTV가 이 컴퓨터에 저장한 모든 것(재생 목록, 즐겨찾기, 기록 포함)을 지우고 앱을 닫습니다.",
   "pl_dropped_switch": "\"{name}\"이(가) 추가되었습니다. 지금 전환하시겠습니까?",
   "trakt_code_invalid": "로그인 코드가 유효하지 않습니다. 다시 시도하세요.",
-  "trakt_code_used": "이미 사용된 로그인 코드입니다. 다시 시도하세요."
+  "trakt_code_used": "이미 사용된 로그인 코드입니다. 다시 시도하세요.",
+  "setting_mpris": "데스크톱 미디어 컨트롤 (MPRIS)",
+  "setting_mpris_hint": "데스크톱의 미디어 컨트롤, 키보드의 미디어 키, 헤드폰 버튼과 KDE Connect로 일시정지, 재생, 건너뛰기를 할 수 있고, 재생 중인 내용을 로고와 함께 표시합니다.",
+  "ctx_follow_series": "시리즈 팔로우",
+  "ctx_unfollow_series": "시리즈 팔로우 취소",
+  "follow_on_toast": "{name} 팔로우 중 — 새 에피소드가 나오면 알려 드립니다",
+  "follow_off_toast": "{name} 팔로우를 취소했습니다",
+  "follow_new_episode": "{name} 새 에피소드: {episode}",
+  "follow_new_episodes": "{name} 새 에피소드 {n}개",
+  "follow_new_series": "팔로우 중인 시리즈 {n}개에 새 에피소드",
+  "home_new_episodes": "새 에피소드",
+  "home_new_count": "새 에피소드 {n}개"
 }

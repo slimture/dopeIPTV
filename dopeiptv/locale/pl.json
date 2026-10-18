@@ -973,5 +973,16 @@
   "set_reset_hint": "Usuwa wszystko, co dopeIPTV zapisało na tym komputerze — łącznie z playlistami, ulubionymi i historią — i zamyka aplikację.",
   "pl_dropped_switch": "Dodano „{name}”. Przełączyć się na nią teraz?",
   "trakt_code_invalid": "Ten kod logowania jest nieprawidłowy. Spróbuj ponownie.",
-  "trakt_code_used": "Ten kod logowania został już użyty. Spróbuj ponownie."
+  "trakt_code_used": "Ten kod logowania został już użyty. Spróbuj ponownie.",
+  "setting_mpris": "Sterowanie multimediami pulpitu (MPRIS)",
+  "setting_mpris_hint": "Pozwala sterowaniu multimediami pulpitu, klawiszom multimedialnym klawiatury, przyciskom słuchawek i KDE Connect wstrzymywać, odtwarzać i przeskakiwać — oraz pokazuje, co jest odtwarzane, wraz z logo.",
+  "ctx_follow_series": "Obserwuj serial",
+  "ctx_unfollow_series": "Przestań obserwować serial",
+  "follow_on_toast": "Obserwujesz {name} — dowiesz się, gdy pojawią się nowe odcinki",
+  "follow_off_toast": "Nie obserwujesz już {name}",
+  "follow_new_episode": "Nowy odcinek {name}: {episode}",
+  "follow_new_episodes": "Nowe odcinki {name}: {n}",
+  "follow_new_series": "Nowe odcinki w obserwowanych serialach: {n}",
+  "home_new_episodes": "Nowe odcinki",
+  "home_new_count": "Nowe: {n}"
 }

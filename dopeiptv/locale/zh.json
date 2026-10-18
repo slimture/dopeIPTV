@@ -973,5 +973,16 @@
   "set_reset_hint": "清除 dopeIPTV 在这台计算机上保存的所有内容（包括播放列表、收藏和历史），然后关闭应用。",
   "pl_dropped_switch": "已添加“{name}”。现在切换到它吗？",
   "trakt_code_invalid": "该登录码无效。请重试。",
-  "trakt_code_used": "该登录码已被使用。请重试。"
+  "trakt_code_used": "该登录码已被使用。请重试。",
+  "setting_mpris": "桌面媒体控制（MPRIS）",
+  "setting_mpris_hint": "让桌面的媒体控制、键盘的媒体键、耳机按键和 KDE Connect 可以暂停、播放和跳转——并显示正在播放的内容及其标志。",
+  "ctx_follow_series": "关注剧集",
+  "ctx_unfollow_series": "取消关注剧集",
+  "follow_on_toast": "已关注 {name}——有新剧集时会通知你",
+  "follow_off_toast": "已取消关注 {name}",
+  "follow_new_episode": "{name} 有新的一集：{episode}",
+  "follow_new_episodes": "{name} 有 {n} 集新内容",
+  "follow_new_series": "你关注的 {n} 部剧集有新集",
+  "home_new_episodes": "新剧集",
+  "home_new_count": "新增 {n} 集"
 }

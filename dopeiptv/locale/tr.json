@@ -973,5 +973,16 @@
   "set_reset_hint": "dopeIPTV'nin bu bilgisayarda sakladığı her şeyi — oynatma listeleri, favoriler ve geçmiş dahil — siler ve uygulamayı kapatır.",
   "pl_dropped_switch": "\"{name}\" eklendi. Şimdi ona geçilsin mi?",
   "trakt_code_invalid": "Bu oturum açma kodu geçerli değil. Yeniden deneyin.",
-  "trakt_code_used": "Bu oturum açma kodu zaten kullanılmış. Yeniden deneyin."
+  "trakt_code_used": "Bu oturum açma kodu zaten kullanılmış. Yeniden deneyin.",
+  "setting_mpris": "Masaüstü medya denetimleri (MPRIS)",
+  "setting_mpris_hint": "Masaüstünün medya denetimlerinin, klavyenin medya tuşlarının, kulaklık düğmelerinin ve KDE Connect'in duraklatmasına, oynatmasına ve atlamasına izin verir — ve çalanı logosuyla gösterir.",
+  "ctx_follow_series": "Diziyi takip et",
+  "ctx_unfollow_series": "Diziyi takip etmeyi bırak",
+  "follow_on_toast": "{name} takip ediliyor — yeni bölümler geldiğinde haberiniz olacak",
+  "follow_off_toast": "{name} artık takip edilmiyor",
+  "follow_new_episode": "{name} için yeni bölüm: {episode}",
+  "follow_new_episodes": "{name} için {n} yeni bölüm",
+  "follow_new_series": "Takip ettiğiniz {n} dizide yeni bölümler",
+  "home_new_episodes": "Yeni bölümler",
+  "home_new_count": "{n} yeni"
 }

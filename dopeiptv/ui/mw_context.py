@@ -139,6 +139,10 @@ class _ContextMenuMixin:
             self._add_fav_folder_menu(
                 m, "series", batch, self.series_favs, many)
             self._add_fav_move_menu(m, "series", batch, many)
+            self._add_follow_action(m, it)
+        elif content_kind == "episode" and self.series_ctx:
+            m.addSeparator()
+            self._add_follow_action(m, self.series_ctx)
         if (self.mode in ("vod", "series") and not self.series_ctx
                 and self.tmdb):
             m.addSeparator()

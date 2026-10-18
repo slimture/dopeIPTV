@@ -634,6 +634,22 @@ class ChannelDelegate(QStyledItemDelegate):
         painter.drawPath(path)
         painter.restore()
 
+    def _paint_new_badge(self, painter, anchor: QRect, size: int) -> None:
+        """Accent dot with a white ring in the top-LEFT corner of *anchor* -
+        an episode of a followed series that arrived since the series was
+        last opened (ui/mw_follow.py). Episodes are never on Watch Later, so
+        the corner is free."""
+        pad = 3
+        d = max(10, int(size * 0.7))
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        pen = QPen(QColor("#ffffff"))
+        pen.setWidth(2)
+        painter.setPen(pen)
+        painter.setBrush(QColor(_accent()))
+        painter.drawEllipse(anchor.left() + pad, anchor.top() + pad, d, d)
+        painter.restore()
+
     def _paint_fav_star(self, painter, anchor: QRect, size: int) -> None:
         """Gold star in the bottom-right corner of *anchor* - the same
         favourite marker channels use, now on movie/series posters too.
@@ -769,6 +785,8 @@ class ChannelDelegate(QStyledItemDelegate):
         if self.window.is_item_on_watchlist(it, kind):
             self._paint_watchlist_badge(
                 painter, logo_rect, max(18, logo_sz // 5))
+        if it.get("_new"):
+            self._paint_new_badge(painter, logo_rect, max(18, logo_sz // 5))
         if self.window.is_favorite_item(it, kind):
             self._paint_fav_star(painter, logo_rect, max(18, logo_sz // 5))
 
@@ -864,6 +882,8 @@ class ChannelDelegate(QStyledItemDelegate):
         if self.window.is_item_on_watchlist(it, kind):
             self._paint_watchlist_badge(
                 painter, logo_rect, max(16, logo_sz // 4))
+        if it.get("_new"):
+            self._paint_new_badge(painter, logo_rect, max(16, logo_sz // 4))
 
         num_w = 0
         is_fav = self.window.is_favorite_item(it, kind)

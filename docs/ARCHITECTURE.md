@@ -49,6 +49,8 @@ dopeiptv/
     reminders.py       ReminderStore - programme reminders (persistence)
     resume.py          ResumeStore - per-playlist resume positions
                        (persistence + keep/drop rule)
+    mpris.py           MPRIS media session on the D-Bus session bus (Linux)
+    notify.py          Desktop notifications (org.freedesktop.Notifications)
 
   ui/                  Everything the user sees
     __init__.py        Lazy MainWindow export (PEP 562)
@@ -72,6 +74,8 @@ dopeiptv/
     mw_busy.py         Loading indicator + spinner overlay
     mw_updates.py      Update-check badge/status wiring, "Update now"
     mw_reminders.py    Programme-reminder UI (set / list / fire)
+    mw_mpris.py        Desktop media controls (MPRIS host) + media keys
+    mw_follow.py       Follow a series: new-episode checks and news
     mw_home.py         The Home page (shelves: resume, favourites, new)
     mw_local.py        Local files: folders, library view, music queue
     mw_onboarding.py   First-run setup wizard

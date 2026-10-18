@@ -69,6 +69,8 @@ files = [
     "dopeiptv/services/resume.py",
     "dopeiptv/services/coverart.py",
     "dopeiptv/services/reminders.py",
+    "dopeiptv/services/mpris.py",
+    "dopeiptv/services/notify.py",
 ]
 
 [tool.pytest.ini_options]

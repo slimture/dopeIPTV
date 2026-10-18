@@ -973,5 +973,16 @@
   "set_reset_hint": "Hufuta kila kitu ambacho dopeIPTV imehifadhi kwenye kompyuta hii — pamoja na orodha za kucheza, vipendwa na historia — kisha hufunga programu.",
   "pl_dropped_switch": "\"{name}\" imeongezwa. Badili uitumie sasa?",
   "trakt_code_invalid": "Msimbo huo wa kuingia si halali. Jaribu tena.",
-  "trakt_code_used": "Msimbo huo wa kuingia umeshatumika. Jaribu tena."
+  "trakt_code_used": "Msimbo huo wa kuingia umeshatumika. Jaribu tena.",
+  "setting_mpris": "Vidhibiti vya media vya eneo-kazi (MPRIS)",
+  "setting_mpris_hint": "Huruhusu vidhibiti vya media vya eneo-kazi, vitufe vya media vya kibodi, vitufe vya vipokea sauti na KDE Connect kusitisha, kucheza na kuruka — na huonyesha kinachochezwa, pamoja na nembo yake.",
+  "ctx_follow_series": "Fuatilia msururu",
+  "ctx_unfollow_series": "Acha kufuatilia msururu",
+  "follow_on_toast": "Unafuatilia {name} — utaarifiwa vipindi vipya vikifika",
+  "follow_off_toast": "Hufuatilii tena {name}",
+  "follow_new_episode": "Kipindi kipya cha {name}: {episode}",
+  "follow_new_episodes": "Vipindi vipya {n} vya {name}",
+  "follow_new_series": "Vipindi vipya katika misururu {n} unayofuatilia",
+  "home_new_episodes": "Vipindi vipya",
+  "home_new_count": "Vipya {n}"
 }

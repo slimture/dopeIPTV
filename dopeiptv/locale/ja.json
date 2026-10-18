@@ -973,5 +973,16 @@
   "set_reset_hint": "dopeIPTVがこのコンピューターに保存したもの（プレイリスト、お気に入り、履歴を含む）をすべて消去し、アプリを終了します。",
   "pl_dropped_switch": "「{name}」を追加しました。今すぐ切り替えますか？",
   "trakt_code_invalid": "そのサインインコードは無効です。もう一度お試しください。",
-  "trakt_code_used": "そのサインインコードはすでに使用されています。もう一度お試しください。"
+  "trakt_code_used": "そのサインインコードはすでに使用されています。もう一度お試しください。",
+  "setting_mpris": "デスクトップのメディアコントロール（MPRIS）",
+  "setting_mpris_hint": "デスクトップのメディアコントロール、キーボードのメディアキー、ヘッドホンのボタン、KDE Connect から一時停止・再生・スキップでき、再生中の内容をロゴ付きで表示します。",
+  "ctx_follow_series": "シリーズをフォロー",
+  "ctx_unfollow_series": "シリーズのフォローを解除",
+  "follow_on_toast": "{name}をフォロー中 — 新しいエピソードが追加されるとお知らせします",
+  "follow_off_toast": "{name}のフォローを解除しました",
+  "follow_new_episode": "{name}の新しいエピソード: {episode}",
+  "follow_new_episodes": "{name}の新しいエピソード{n}件",
+  "follow_new_series": "フォロー中の{n}シリーズに新しいエピソード",
+  "home_new_episodes": "新しいエピソード",
+  "home_new_count": "新着{n}件"
 }

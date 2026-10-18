@@ -973,5 +973,16 @@
   "set_reset_hint": "Cancella tutto ciò che dopeIPTV ha salvato su questo computer, comprese playlist, preferiti e cronologia, e chiude l'app.",
   "pl_dropped_switch": "«{name}» è stata aggiunta. Passare a questa ora?",
   "trakt_code_invalid": "Questo codice di accesso non è valido. Riprova.",
-  "trakt_code_used": "Questo codice di accesso è già stato usato. Riprova."
+  "trakt_code_used": "Questo codice di accesso è già stato usato. Riprova.",
+  "setting_mpris": "Controlli multimediali del desktop (MPRIS)",
+  "setting_mpris_hint": "Consente ai controlli multimediali del desktop, ai tasti multimediali della tastiera, ai pulsanti delle cuffie e a KDE Connect di mettere in pausa, riprodurre e saltare — e mostra cosa è in riproduzione, con il suo logo.",
+  "ctx_follow_series": "Segui la serie",
+  "ctx_unfollow_series": "Smetti di seguire la serie",
+  "follow_on_toast": "Segui {name} — riceverai un avviso quando arriveranno nuovi episodi",
+  "follow_off_toast": "Non segui più {name}",
+  "follow_new_episode": "Nuovo episodio di {name}: {episode}",
+  "follow_new_episodes": "{n} nuovi episodi di {name}",
+  "follow_new_series": "Nuovi episodi in {n} serie che segui",
+  "home_new_episodes": "Nuovi episodi",
+  "home_new_count": "{n} nuovi"
 }

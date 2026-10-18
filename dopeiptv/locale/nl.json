@@ -973,5 +973,16 @@
   "set_reset_hint": "Wist alles wat dopeIPTV op deze computer heeft opgeslagen – ook afspeellijsten, favorieten en geschiedenis – en sluit de app.",
   "pl_dropped_switch": "‘{name}’ is toegevoegd. Er nu naar overschakelen?",
   "trakt_code_invalid": "Die inlogcode is niet geldig. Probeer het opnieuw.",
-  "trakt_code_used": "Die inlogcode is al gebruikt. Probeer het opnieuw."
+  "trakt_code_used": "Die inlogcode is al gebruikt. Probeer het opnieuw.",
+  "setting_mpris": "Mediabediening van het bureaublad (MPRIS)",
+  "setting_mpris_hint": "Laat de mediabediening van het bureaublad, de mediatoetsen van het toetsenbord, koptelefoonknoppen en KDE Connect pauzeren, afspelen en overslaan — en toont wat er speelt, met logo.",
+  "ctx_follow_series": "Serie volgen",
+  "ctx_unfollow_series": "Serie niet meer volgen",
+  "follow_on_toast": "Je volgt {name} — je hoort het wanneer er nieuwe afleveringen zijn",
+  "follow_off_toast": "Je volgt {name} niet meer",
+  "follow_new_episode": "Nieuwe aflevering van {name}: {episode}",
+  "follow_new_episodes": "{n} nieuwe afleveringen van {name}",
+  "follow_new_series": "Nieuwe afleveringen in {n} series die je volgt",
+  "home_new_episodes": "Nieuwe afleveringen",
+  "home_new_count": "{n} nieuw"
 }

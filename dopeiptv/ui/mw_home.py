@@ -459,6 +459,32 @@ class HomePage(QWidget):
                 shelf.finish(POSTER_H)
                 self._v.addWidget(shelf)
 
+        if on("home_sh_new_eps"):
+            rows = []
+            try:
+                rows = w.followed.with_new()[:20]
+            except Exception:
+                pass
+            if rows:
+                from .mw_follow import episode_label
+                shelf = _Shelf(tr("home_new_episodes"))
+                for row in rows:
+                    snap, new = row["snap"], row["new"]
+                    sub = (episode_label(new[0]) if len(new) == 1
+                           else tr("home_new_count", n=len(new)))
+                    card = _Card(POSTER_W, POSTER_H,
+                                 snap.get("name") or snap.get("title") or "?",
+                                 sub)
+                    card.clicked.connect(
+                        lambda snap=snap: self._open_series(snap))
+                    card.right_clicked.connect(
+                        lambda snap=snap: self._new_episodes_menu(snap))
+                    self._set_art(card, self._media_art(snap, "series"),
+                                  w.poster_art)
+                    shelf.add(card)
+                shelf.finish(POSTER_H)
+                self._v.addWidget(shelf)
+
         if on("home_sh_fav"):
             chans = self._favorite_channels()[:14]
             if chans:
@@ -931,6 +957,21 @@ class HomePage(QWidget):
         m.addAction(tr("upcoming_record_stop"), lambda: w._record_now(it, None))
         m.addAction(tr("upcoming_schedule"),
                     lambda: w._schedule_recording(it))
+        m.exec(QCursor.pos())
+
+    def _new_episodes_menu(self, snap: dict) -> None:
+        """Right-click on a New episodes card: open it, dismiss the news
+        without opening it, or stop following the series."""
+        from PyQt6.QtGui import QCursor
+        from PyQt6.QtWidgets import QMenu
+        w = self.window
+        sid = snap.get("series_id")
+        m = QMenu(self)
+        m.addAction(tr("common_open"), lambda: self._open_series(snap))
+        m.addSeparator()
+        m.addAction(tr("common_dismiss"), lambda: w._follow_mark_seen(sid))
+        m.addAction(tr("ctx_unfollow_series"),
+                    lambda: w._unfollow_series(snap))
         m.exec(QCursor.pos())
 
     def _play_media(self, it: dict) -> None:

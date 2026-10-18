@@ -973,5 +973,16 @@
   "set_reset_hint": "Efface tout ce que dopeIPTV a enregistré sur cet ordinateur – y compris les listes de lecture, favoris et historique – puis ferme l'application.",
   "pl_dropped_switch": "« {name} » a été ajoutée. Y passer maintenant ?",
   "trakt_code_invalid": "Ce code de connexion n'est pas valide. Réessayez.",
-  "trakt_code_used": "Ce code de connexion a déjà été utilisé. Réessayez."
+  "trakt_code_used": "Ce code de connexion a déjà été utilisé. Réessayez.",
+  "setting_mpris": "Commandes multimédias du bureau (MPRIS)",
+  "setting_mpris_hint": "Permet aux commandes multimédias du bureau, aux touches multimédias du clavier, aux boutons du casque et à KDE Connect de mettre en pause, lire et passer — et affiche ce qui est en lecture, avec son logo.",
+  "ctx_follow_series": "Suivre la série",
+  "ctx_unfollow_series": "Ne plus suivre la série",
+  "follow_on_toast": "Vous suivez {name} — vous serez prévenu à la sortie de nouveaux épisodes",
+  "follow_off_toast": "Vous ne suivez plus {name}",
+  "follow_new_episode": "Nouvel épisode de {name} : {episode}",
+  "follow_new_episodes": "{n} nouveaux épisodes de {name}",
+  "follow_new_series": "Nouveaux épisodes dans {n} séries que vous suivez",
+  "home_new_episodes": "Nouveaux épisodes",
+  "home_new_count": "{n} nouveaux"
 }

@@ -973,5 +973,16 @@
   "set_reset_hint": "Menghapus semua yang disimpan dopeIPTV di komputer ini — termasuk daftar putar, favorit, dan riwayat — lalu menutup aplikasi.",
   "pl_dropped_switch": "\"{name}\" telah ditambahkan. Beralih ke sana sekarang?",
   "trakt_code_invalid": "Kode masuk itu tidak valid. Coba lagi.",
-  "trakt_code_used": "Kode masuk itu sudah digunakan. Coba lagi."
+  "trakt_code_used": "Kode masuk itu sudah digunakan. Coba lagi.",
+  "setting_mpris": "Kontrol media desktop (MPRIS)",
+  "setting_mpris_hint": "Memungkinkan kontrol media desktop, tombol media keyboard, tombol headphone, dan KDE Connect untuk menjeda, memutar, dan melompat — serta menampilkan apa yang sedang diputar, beserta logonya.",
+  "ctx_follow_series": "Ikuti serial",
+  "ctx_unfollow_series": "Berhenti mengikuti serial",
+  "follow_on_toast": "Mengikuti {name} — Anda akan diberi tahu saat episode baru tersedia",
+  "follow_off_toast": "Tidak lagi mengikuti {name}",
+  "follow_new_episode": "Episode baru {name}: {episode}",
+  "follow_new_episodes": "{n} episode baru {name}",
+  "follow_new_series": "Episode baru di {n} serial yang Anda ikuti",
+  "home_new_episodes": "Episode baru",
+  "home_new_count": "{n} baru"
 }

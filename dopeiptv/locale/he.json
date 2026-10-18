@@ -973,5 +973,16 @@
   "set_reset_hint": "מוחק את כל מה ש-dopeIPTV שמר במחשב זה — כולל רשימות השמעה, מועדפים והיסטוריה — וסוגר את האפליקציה.",
   "pl_dropped_switch": "\"{name}\" נוספה. לעבור אליה עכשיו?",
   "trakt_code_invalid": "קוד ההתחברות אינו תקף. נסה שוב.",
-  "trakt_code_used": "קוד ההתחברות כבר נוצל. נסה שוב."
+  "trakt_code_used": "קוד ההתחברות כבר נוצל. נסה שוב.",
+  "setting_mpris": "פקדי מדיה של שולחן העבודה (MPRIS)",
+  "setting_mpris_hint": "מאפשר לפקדי המדיה של שולחן העבודה, למקשי המדיה במקלדת, ללחצני האוזניות ול‑KDE Connect להשהות, לנגן ולדלג — ומציג מה מתנגן, עם הלוגו שלו.",
+  "ctx_follow_series": "עקוב אחר הסדרה",
+  "ctx_unfollow_series": "הפסק לעקוב אחר הסדרה",
+  "follow_on_toast": "{name} במעקב — תוצג הודעה כשיגיעו פרקים חדשים",
+  "follow_off_toast": "{name} כבר לא במעקב",
+  "follow_new_episode": "פרק חדש של {name}: {episode}",
+  "follow_new_episodes": "פרקים חדשים של {name}: {n}",
+  "follow_new_series": "פרקים חדשים בסדרות במעקב: {n}",
+  "home_new_episodes": "פרקים חדשים",
+  "home_new_count": "חדשים: {n}"
 }

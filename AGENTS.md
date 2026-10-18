@@ -26,6 +26,8 @@ map and the one-way import rule.
 | `core/selfupdate.py` | AppImage in-place update (download, checksum, self-check, swap) |
 | `core/wakelock.py` | Screensaver inhibitor |
 | `core/gcguard.py` | Cyclic garbage collection on the GUI thread only |
+| `services/mpris.py` | MPRIS media session on the session bus (Linux) |
+| `services/notify.py` | Desktop notifications over D-Bus (Linux) |
 | `core/log.py` | Central logging (`configure_logging`, `DOPEIPTV_LOG`) |
 | `core/platform_macos.py` | macOS-specific helpers |
 | `core/platform_windows.py` | Windows-specific helpers |
@@ -49,8 +51,9 @@ in the `mw_*` mixins beside it, each mixed into `MainWindow`:
 `mw_search` (sidebar search), `mw_sidebar` (panel collapse / icon rail),
 `mw_nav` (focus mode, nav colours/icons, Library group), `mw_shortcuts`
 (keyboard shortcuts), `mw_busy` (loading indicator), `mw_updates`
-(update badge), `mw_reminders`, `mw_sort`, `mw_onboarding` and
-`mw_popout` (detached-window player). What stays in `main_window.py` is
+(update badge), `mw_reminders`, `mw_sort`, `mw_onboarding`,
+`mw_mpris` (desktop media controls, media keys), `mw_follow` (followed
+series, new-episode news) and `mw_popout` (detached-window player). What stays in `main_window.py` is
 the `__init__`/`_build_ui` composition and the playback path (start/stop,
 seek, fullscreen, reconnect) - keep playback code there.
 When making changes:
@@ -113,7 +116,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
   metadata, diagnostics, oauth_loopback), `core/` (stores, updates, log,
   player_exec, wakelock, selfupdate, gcguard) and `services/` (resume,
-  coverart, reminders); see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
+  coverart, reminders, mpris, notify); see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list
   as more non-UI modules gain type hints.

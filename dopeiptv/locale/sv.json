@@ -973,5 +973,16 @@
   "set_reset_hint": "Raderar allt som dopeIPTV har sparat på den här datorn – även spellistor, favoriter och historik – och stänger appen.",
   "pl_dropped_switch": "”{name}” har lagts till. Byta till den nu?",
   "trakt_code_invalid": "Inloggningskoden är ogiltig. Försök igen.",
-  "trakt_code_used": "Inloggningskoden har redan använts. Försök igen."
+  "trakt_code_used": "Inloggningskoden har redan använts. Försök igen.",
+  "setting_mpris": "Skrivbordets mediakontroller (MPRIS)",
+  "setting_mpris_hint": "Låter skrivbordets mediakontroller, tangentbordets medieknappar, hörlursknappar och KDE Connect pausa, spela och hoppa — och visar vad som spelas, med logotyp.",
+  "ctx_follow_series": "Följ serien",
+  "ctx_unfollow_series": "Sluta följa serien",
+  "follow_on_toast": "Du följer {name} — du får veta när nya avsnitt kommer",
+  "follow_off_toast": "Du följer inte längre {name}",
+  "follow_new_episode": "Nytt avsnitt av {name}: {episode}",
+  "follow_new_episodes": "{n} nya avsnitt av {name}",
+  "follow_new_series": "Nya avsnitt i {n} serier du följer",
+  "home_new_episodes": "Nya avsnitt",
+  "home_new_count": "{n} nya"
 }

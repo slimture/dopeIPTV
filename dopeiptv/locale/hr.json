@@ -973,5 +973,16 @@
   "set_reset_hint": "Briše sve što je dopeIPTV spremio na ovom računalu — uključujući popise, favorite i povijest — i zatvara aplikaciju.",
   "pl_dropped_switch": "„{name}” je dodan. Prebaciti se na njega sada?",
   "trakt_code_invalid": "Taj kod za prijavu nije valjan. Pokušaj ponovno.",
-  "trakt_code_used": "Taj kod za prijavu je već iskorišten. Pokušaj ponovno."
+  "trakt_code_used": "Taj kod za prijavu je već iskorišten. Pokušaj ponovno.",
+  "setting_mpris": "Medijske kontrole radne površine (MPRIS)",
+  "setting_mpris_hint": "Omogućuje medijskim kontrolama radne površine, medijskim tipkama tipkovnice, tipkama slušalica i KDE Connectu pauziranje, reprodukciju i preskakanje — i prikazuje što se reproducira, s logotipom.",
+  "ctx_follow_series": "Prati seriju",
+  "ctx_unfollow_series": "Prestani pratiti seriju",
+  "follow_on_toast": "Pratite {name} — bit ćete obaviješteni kad stignu nove epizode",
+  "follow_off_toast": "Više ne pratite {name}",
+  "follow_new_episode": "Nova epizoda serije {name}: {episode}",
+  "follow_new_episodes": "Nove epizode serije {name}: {n}",
+  "follow_new_series": "Nove epizode u serijama koje pratite: {n}",
+  "home_new_episodes": "Nove epizode",
+  "home_new_count": "Novo: {n}"
 }

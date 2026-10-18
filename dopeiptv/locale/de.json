@@ -973,5 +973,16 @@
   "set_reset_hint": "Löscht alles, was dopeIPTV auf diesem Computer gespeichert hat – auch Wiedergabelisten, Favoriten und Verlauf – und schließt die App.",
   "pl_dropped_switch": "„{name}“ wurde hinzugefügt. Jetzt dorthin wechseln?",
   "trakt_code_invalid": "Dieser Anmeldecode ist ungültig. Bitte erneut versuchen.",
-  "trakt_code_used": "Dieser Anmeldecode wurde bereits verwendet. Bitte erneut versuchen."
+  "trakt_code_used": "Dieser Anmeldecode wurde bereits verwendet. Bitte erneut versuchen.",
+  "setting_mpris": "Medienbedienung des Desktops (MPRIS)",
+  "setting_mpris_hint": "Lässt die Medienbedienung des Desktops, die Medientasten der Tastatur, Kopfhörertasten und KDE Connect pausieren, abspielen und springen — und zeigt, was läuft, mit Logo.",
+  "ctx_follow_series": "Serie folgen",
+  "ctx_unfollow_series": "Serie nicht mehr folgen",
+  "follow_on_toast": "Sie folgen {name} — Sie erfahren es, sobald neue Folgen erscheinen",
+  "follow_off_toast": "Sie folgen {name} nicht mehr",
+  "follow_new_episode": "Neue Folge von {name}: {episode}",
+  "follow_new_episodes": "{n} neue Folgen von {name}",
+  "follow_new_series": "Neue Folgen in {n} Serien, denen Sie folgen",
+  "home_new_episodes": "Neue Folgen",
+  "home_new_count": "{n} neu"
 }

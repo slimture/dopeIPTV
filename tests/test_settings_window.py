@@ -50,7 +50,8 @@ PRESET = {
     "mv_stop_docked": "false", "mv_new_unmuted": "false",
     "mv_conflict_mode": "keep", "mv_autohide_secs": "7",
     "mv_seek_step_min": "12", "mv_cells": "9", "home_enabled": "false",
-    "home_start": "true", "home_sh_resume": "false", "home_sh_fav": "true",
+    "home_start": "true", "home_sh_resume": "false",
+    "home_sh_new_eps": "false", "home_sh_fav": "true",
     "home_sh_history": "false", "home_sh_watchlist": "true",
     "home_sh_movies": "false", "home_sh_series": "true",
     "home_sh_channels": "false",
@@ -78,7 +79,8 @@ diff = {k: (before[k], v) for k, v in after.items()
         if k in before and before[k] != v}
 assert not diff, diff
 # Written only where the platform offers them (Linux), with their defaults.
-assert set(after) - set(before) <= {"force_x11"}, set(after) - set(before)
+assert set(after) - set(before) <= {"force_x11", "mpris"}, (
+    set(after) - set(before))
 
 # 2. The switches store what the Yes/No lists stored.
 def flip_and_ok(labels):

@@ -44,8 +44,8 @@ from ..services.reminders import ReminderStore
 from ..media.players import embedded_playback_supported, launch_player
 from ..core.recording import RecordingManager
 from ..core.stores import (
-    CategoryOverrides, ChannelOverrides, FavoriteStore, HistoryStore,
-    ParentalControl, PlaylistStore, WatchedStore, WatchlistStore,
+    CategoryOverrides, ChannelOverrides, FavoriteStore, FollowedSeriesStore,
+    HistoryStore, ParentalControl, PlaylistStore, WatchedStore, WatchlistStore,
 )
 from .theme import P
 from ..providers.trakt import TraktClient
@@ -60,8 +60,10 @@ from .mw_recording import _RecordingMixin
 from .mw_busy import _BusyMixin
 from .mw_context import _ContextMenuMixin
 from .mw_favorites import _FavoritesMixin
+from .mw_follow import _FollowMixin
 from .mw_detail import _DetailMixin
 from .mw_nav import _NavMixin
+from .mw_mpris import _MprisMixin
 from .mw_multiview import _MultiviewMixin
 from .mw_home import _HomeMixin
 from .mw_local import _LocalFilesMixin
@@ -97,7 +99,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _BusyMixin, _UpdatesMixin, _SearchMixin, _SidebarMixin,
                  _NavMixin, _ShortcutsMixin, _OnboardingMixin, _SortMixin,
                  _LocalFilesMixin,
-                 _PopoutMixin, _MultiviewMixin, _HomeMixin, QMainWindow):
+                 _PopoutMixin, _MultiviewMixin, _HomeMixin, _MprisMixin,
+                 _FollowMixin, QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
     epg_progress = pyqtSignal(int)
@@ -190,6 +193,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._resume_settings = self._open_resume_settings(settings)
         self.resume = ResumeStore(self._resume_settings, pid)
         self.reminders = ReminderStore(settings, pid)
+        self.followed = FollowedSeriesStore(settings, pid)
         self.overrides = CategoryOverrides(
             settings, f"category_overrides_{pid}" if pid else "category_overrides")
         self.channel_ov = ChannelOverrides(
@@ -1499,6 +1503,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         QShortcut(QKeySequence(Qt.Key.Key_Delete), self,
                   activated=self._delete_pressed)
         self._install_shortcuts()
+        # The desktop's media controls and the keyboard's media keys.
+        self._start_media_session()
+        # New episodes of the series the user follows.
+        self._start_follow_checks()
 
         # Channel-number quick-jump state (digits typed in the list).
         self._prev_live_item = None
@@ -2105,6 +2113,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.history = HistoryStore(self.settings, f"history_{pid}")
             self.resume = ResumeStore(self._resume_settings, pid)
             self.reminders = ReminderStore(self.settings, pid)
+            self.followed = FollowedSeriesStore(self.settings, pid)
             # Hide/rename/lock rules are per playlist too: kept, the old
             # provider's locks applied here and edits saved under its key.
             self.overrides = CategoryOverrides(
@@ -3310,6 +3319,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     sctx = dict(sctx)
                     sctx["category_id"] = cid
             self.series_ctx = sctx
+            self._follow_entered(sid, info, episodes)
             self.all_items = episodes
             self.back_btn.setText("<-  " + tr("btn_back_to_series"))
             self.back_btn.show()
@@ -6426,6 +6436,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._save_resume_position()
             self._maybe_auto_mark_watched()
         self.wake.release()
+        self._stop_media_session()
         self.cover.flush()
         if self._trakt_active:
             active = self._trakt_active

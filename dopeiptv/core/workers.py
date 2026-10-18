@@ -423,6 +423,11 @@ class LogoLoader(QObject):
         h = hashlib.sha1(url.encode("utf-8")).hexdigest()
         return self.disk_dir / h[:2] / h[2:]
 
+    def disk_file(self, url: str) -> Path | None:
+        """The cached copy of *url* on disk, when there is one."""
+        path = self._disk_path(url)
+        return path if path is not None and path.is_file() else None
+
     @staticmethod
     def _pm_bytes(pm: QPixmap) -> int:
         # Decoded pixmap cost: width x height x 4 (RGBA). Never zero, so

@@ -973,5 +973,16 @@
   "set_reset_hint": "Xóa mọi thứ dopeIPTV đã lưu trên máy tính này — bao gồm danh sách phát, mục yêu thích và lịch sử — rồi đóng ứng dụng.",
   "pl_dropped_switch": "Đã thêm \"{name}\". Chuyển sang danh sách này ngay?",
   "trakt_code_invalid": "Mã đăng nhập đó không hợp lệ. Hãy thử lại.",
-  "trakt_code_used": "Mã đăng nhập đó đã được sử dụng. Hãy thử lại."
+  "trakt_code_used": "Mã đăng nhập đó đã được sử dụng. Hãy thử lại.",
+  "setting_mpris": "Điều khiển đa phương tiện của màn hình nền (MPRIS)",
+  "setting_mpris_hint": "Cho phép điều khiển đa phương tiện của màn hình nền, phím đa phương tiện trên bàn phím, nút tai nghe và KDE Connect tạm dừng, phát và bỏ qua — đồng thời hiển thị nội dung đang phát kèm logo.",
+  "ctx_follow_series": "Theo dõi loạt phim",
+  "ctx_unfollow_series": "Bỏ theo dõi loạt phim",
+  "follow_on_toast": "Đang theo dõi {name} — bạn sẽ được báo khi có tập mới",
+  "follow_off_toast": "Đã bỏ theo dõi {name}",
+  "follow_new_episode": "Tập mới của {name}: {episode}",
+  "follow_new_episodes": "{n} tập mới của {name}",
+  "follow_new_series": "Có tập mới trong {n} loạt phim bạn theo dõi",
+  "home_new_episodes": "Tập mới",
+  "home_new_count": "{n} tập mới"
 }

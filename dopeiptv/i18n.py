@@ -1169,6 +1169,19 @@ _STRINGS: dict[str, dict[str, str]] = {
     "sc_reminders": {"en": "Reminders"},
     "sc_sidebar": {"en": "Toggle sidebar"},
     "sc_focus_mode": {"en": "Focus mode"},
+    # Media controls (MPRIS)
+    "setting_mpris": {"en": "Desktop media controls (MPRIS)"},
+    "setting_mpris_hint": {"en": "Lets the desktop's media controls, the keyboard's media keys, headphone buttons and KDE Connect pause, play and skip — and shows what is playing, with its logo."},
+    # Following a series (new episodes)
+    "ctx_follow_series": {"en": "Follow series"},
+    "ctx_unfollow_series": {"en": "Stop following series"},
+    "follow_on_toast": {"en": "Following {name} — you will hear when new episodes arrive"},
+    "follow_off_toast": {"en": "No longer following {name}"},
+    "follow_new_episode": {"en": "New episode of {name}: {episode}"},
+    "follow_new_episodes": {"en": "{n} new episodes of {name}"},
+    "follow_new_series": {"en": "New episodes of {n} series you follow"},
+    "home_new_episodes": {"en": "New episodes"},
+    "home_new_count": {"en": "{n} new"},
 }
 
 
