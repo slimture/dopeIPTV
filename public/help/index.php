@@ -35,7 +35,7 @@ $version = $rel['version'] ?? '';
  * rather than as documentation.
  */
 const HELP = [
-    'start' => ['linux', 'macos', 'windows', 'playlist', 'm3u', 'demo'],
+    'start' => ['linux', 'macos', 'windows', 'playlist', 'm3u', 'demo', 'update'],
     'watch' => ['play', 'seek', 'fullscreen', 'popout', 'tracks', 'keys', 'resume'],
     'tv'    => ['epg', 'guide', 'xmltv', 'times', 'ts', 'tsstart', 'tsbrowse',
                 'rec', 'recwhen', 'reconn', 'reccap', 'recwhere'],
