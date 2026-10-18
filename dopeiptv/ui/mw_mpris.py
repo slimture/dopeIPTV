@@ -37,18 +37,22 @@ class _MprisMixin:
                            activated=lambda n=name: self._media_key(n))
             sc.setContext(Qt.ShortcutContext.ApplicationShortcut)
         self._mpris = None
-        if self.settings.value("mpris", "true") != "true":
-            return
-        from ..services.mpris import MprisService
-        svc = MprisService(self, self)
-        if not svc.start():
-            svc.deleteLater()
-            return
-        self._mpris = svc
+        # The player says at once when it pauses or stops; the service's own
+        # poll would otherwise tell the desktop up to a second late.
         if self.player is not None:
             for signal in (self.player.paused_changed, self.player.stopped,
                            self.player.finished):
                 signal.connect(self._mpris_refresh_soon)
+        if self.settings.value("mpris", "true") == "true":
+            self._join_media_session()
+
+    def _join_media_session(self) -> None:
+        from ..services.mpris import MprisService
+        svc = MprisService(self, self)
+        if svc.start():
+            self._mpris = svc
+        else:
+            svc.deleteLater()
 
     def _stop_media_session(self) -> None:
         svc = getattr(self, "_mpris", None)
@@ -60,12 +64,7 @@ class _MprisMixin:
         """Settings changed the switch: join or leave the bus now."""
         want = self.settings.value("mpris", "true") == "true"
         if want and getattr(self, "_mpris", None) is None:
-            from ..services.mpris import MprisService
-            svc = MprisService(self, self)
-            if svc.start():
-                self._mpris = svc
-            else:
-                svc.deleteLater()
+            self._join_media_session()
         elif not want:
             self._stop_media_session()
 
