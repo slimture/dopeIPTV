@@ -60,6 +60,7 @@ files = [
     "dopeiptv/providers/diagnostics.py",
     "dopeiptv/providers/oauth_loopback.py",
     "dopeiptv/providers/opensubtitles.py",
+    "dopeiptv/providers/dlna.py",
     "dopeiptv/core/stores.py",
     "dopeiptv/core/updates.py",
     "dopeiptv/core/selfupdate.py",

@@ -25,6 +25,8 @@ dopeiptv/
     oauth_loopback.py  Loopback HTTP server for the Trakt OAuth redirect
     diagnostics.py     Plain-language "why won't this stream play?" probe
     chromecast.py      ChromecastManager, CastDialog
+    dlna.py            DLNA / UPnP TVs: SSDP discovery, SOAP control, file share
+    casting.py         CastHub - Chromecast and DLNA behind one object
     opensubtitles.py   OpenSubtitles.com REST client (search, download, hash)
 
   core/                Storage, background work, OS integration

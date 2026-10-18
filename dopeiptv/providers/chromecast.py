@@ -7,7 +7,7 @@ import time
 
 from PyQt6.QtWidgets import (
     QComboBox, QDialog, QHBoxLayout, QLabel, QListWidget,
-    QPushButton, QVBoxLayout,
+    QPushButton, QVBoxLayout, QWidget,
 )
 
 from ..core.log import log, redact_url
@@ -1081,7 +1081,7 @@ class ChromecastManager:
 
 
 class CastDialog(QDialog):
-    """Scan for Chromecast devices and cast a stream to one."""
+    """Scan for Chromecasts and DLNA TVs and cast a stream to one."""
 
     def __init__(self, window: object, url: str, title: str,
                  codecs: list[str] | None = None,
@@ -1170,16 +1170,22 @@ class CastDialog(QDialog):
             self.kind_box.addItem(tr(f"cast_kind_{key}"), key)
         self.kind_label.hide()
         self.kind_box.hide()
+        # Each row in a widget of its own, so a DLNA TV - which plays the
+        # stream as it is, with no converter to choose tracks - can hide it.
+        self.track_rows: list[QWidget] = []
         for box, label in ((self.audio_box, tr("cast_audio")),
                            (self.subs_box, tr("cast_subtitles"))):
-            row = QHBoxLayout()
+            holder = QWidget()
+            row = QHBoxLayout(holder)
+            row.setContentsMargins(0, 0, 0, 0)
             cap = QLabel(label)
             cap.setMinimumWidth(80)
             row.addWidget(cap)
             box.addItem(tr("cast_reading_tracks"), None)
             box.setEnabled(False)
             row.addWidget(box, 1)
-            lay.addLayout(row)
+            lay.addWidget(holder)
+            self.track_rows.append(holder)
         self.track_note = QLabel(tr("cast_track_note"))
         self.track_note.setWordWrap(True)
         # Dimmed by the theme's own rule; QSS has no "opacity", so the
@@ -1202,6 +1208,11 @@ class CastDialog(QDialog):
         # needs it.
         self.quality_note.hide()
         lay.addWidget(self.quality_note)
+        self.dlna_note = QLabel(tr("cast_dlna_note"))
+        self.dlna_note.setWordWrap(True)
+        self.dlna_note.setObjectName("DetailMeta")
+        self.dlna_note.hide()
+        lay.addWidget(self.dlna_note)
         self.kind_box.currentIndexChanged.connect(self._quality_changed)
         self.list.currentItemChanged.connect(
             lambda *_a: self._show_device_quality())
@@ -1303,13 +1314,28 @@ class CastDialog(QDialog):
     def _quality_key(self, device: str) -> str:
         return f"cast_quality_{device}"
 
+    def _is_dlna(self, name: str | None) -> bool:
+        is_dlna = getattr(self.window.cast, "is_dlna", None)
+        return bool(callable(is_dlna) and is_dlna(name))
+
     def _show_device_quality(self) -> None:
         """Show what this device is remembered as being."""
         item = self.list.currentItem()
-        self.kind_label.setVisible(item is not None)
-        self.kind_box.setVisible(item is not None)
-        self.quality_note.setVisible(item is not None)
-        if not item:
+        dlna = item is not None and self._is_dlna(item.text())
+        # A TV fetches the stream itself and plays it as it is: the track
+        # and picture choices are the converter's, which only a Chromecast
+        # is fed through.
+        for row in self.track_rows:
+            row.setVisible(not dlna)
+        self.dlna_note.setVisible(dlna)
+        if dlna:
+            self.track_note.hide()
+        else:
+            self._track_changed()
+        self.kind_label.setVisible(item is not None and not dlna)
+        self.kind_box.setVisible(item is not None and not dlna)
+        self.quality_note.setVisible(item is not None and not dlna)
+        if not item or dlna:
             return
         want = normalise_quality(str(self.window.settings.value(
             self._quality_key(item.text()), "original") or "original"))
@@ -1334,7 +1360,10 @@ class CastDialog(QDialog):
             self._quality_key(item.text()), "original") or "original"))
 
     def _track_changed(self) -> None:
-        self.track_note.setVisible(self._chosen() != (None, None))
+        item = self.list.currentItem()
+        dlna = item is not None and self._is_dlna(item.text())
+        self.track_note.setVisible(self._chosen() != (None, None)
+                                   and not dlna)
 
     def _chosen(self) -> tuple[dict | None, dict | None]:
         return self.audio_box.currentData(), self.subs_box.currentData()
@@ -1378,9 +1407,16 @@ class CastDialog(QDialog):
                 self.list.clear()
                 for name in names or []:
                     self.list.addItem(name)
-                self._set_status(
-                    tr("cast_devices_found", n=len(names)) if names
-                    else tr("cast_none_found"))
+                status = (tr("cast_devices_found", n=len(names)) if names
+                          else tr("cast_none_found"))
+                if not names and not ChromecastManager.available():
+                    # Nothing found, and Chromecasts could not even be looked
+                    # for: say why, or the empty list reads as "you have none".
+                    why = cast_import_error()
+                    status += "\n\n" + (
+                        tr("msg_cast_package_broken", why=why) if why
+                        else tr("msg_cast_needs_package"))
+                self._set_status(status)
                 if names:
                     self.list.setCurrentRow(0)
             except RuntimeError:
@@ -1424,6 +1460,8 @@ class CastDialog(QDialog):
             self._banner(None, "")
 
         audio, subs = self._chosen()
+        if self._is_dlna(name):
+            audio = subs = None         # a TV plays the stream as it is
         # A channel with catch-up goes through the converter on purpose, so
         # that pausing it means something. The converter writes the stream to
         # a spool on this machine as it goes; the receiver reads that spool at
@@ -1448,7 +1486,10 @@ class CastDialog(QDialog):
                                                  self.codecs, audio, subs,
                                                  self.start, self.duration,
                                                  settle, self.source,
-                                                 self.quality(), self.height,
+                                                 "original" if self._is_dlna(
+                                                     name)
+                                                 else self.quality(),
+                                                 self.height,
                                                  self.fps, dvr),
                   done, failed)
 

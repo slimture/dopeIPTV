@@ -19,6 +19,8 @@ map and the one-way import rule.
 | `providers/metadata.py` | TMDB client, PosterResolver |
 | `providers/trakt.py` | Trakt.tv sync |
 | `providers/chromecast.py` | Chromecast support |
+| `providers/dlna.py` | DLNA / UPnP TVs (discovery, control, local file share) |
+| `providers/casting.py` | `CastHub`: Chromecast and DLNA behind one object |
 | `providers/opensubtitles.py` | OpenSubtitles.com client (search, download, file hash) |
 | `core/stores.py` | Data persistence layer |
 | `core/workers.py` | Thread pool helpers, LogoLoader, image caches |
@@ -117,7 +119,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   `DOPEIPTV_LOG=debug` shows debug traces; `DOPEIPTV_LOG_FILE=/path` tees
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
-  metadata, diagnostics, oauth_loopback, opensubtitles), `core/` (stores, updates, log,
+  metadata, diagnostics, oauth_loopback, opensubtitles, dlna), `core/` (stores, updates, log,
   player_exec, wakelock, selfupdate, gcguard) and `services/` (resume,
   coverart, reminders, mpris, notify); see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,

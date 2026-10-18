@@ -32,7 +32,8 @@ from .channel_list import (
     CategoryColorDelegate, ChannelDelegate, ChannelListModel, ChannelListView,
     FolderDropList,
 )
-from ..providers.chromecast import CastDialog, ChromecastManager
+from ..providers.casting import CastHub
+from ..providers.chromecast import CastDialog
 from ..providers.client import (
     DemoClient, OfflineClient, XtreamClient, dropped_playlist, make_client,
 )
@@ -200,7 +201,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.channel_ov = ChannelOverrides(
             settings, f"channel_overrides_{pid}" if pid else "channel_overrides")
         self.parental = ParentalControl(settings)
-        self.cast = ChromecastManager()
+        # Chromecasts and DLNA TVs alike, behind one object (casting.py).
+        self.cast = CastHub()
         self.rec = RecordingManager(settings, self)
         self.rec.jobs_changed.connect(self._recordings_changed)
         self.rec.recording_stopped.connect(self._on_recording_stopped)
@@ -3971,17 +3973,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         return idx == 1                 # 1 = open anyway; else cancel
 
     def _open_cast_dialog(self, it) -> None:
-        if not ChromecastManager.available():
-            # Which of the two it is. Being told to install a package that is
-            # already installed is a wild goose chase, and the reason it
-            # would not import is the only thing that can end it.
-            from ..providers.chromecast import cast_import_error
-            why = cast_import_error()
-            QMessageBox.information(
-                self, "Chromecast",
-                tr("msg_cast_package_broken", why=why) if why
-                else tr("msg_cast_needs_package"))
-            return
+        # No refusal here when pychromecast is missing: a DLNA TV needs
+        # nothing installed, and the panel says what is missing for a
+        # Chromecast when it finds nothing at all (CastDialog._scan).
         # Already casting this very title? Then this is not a new cast - it is
         # someone coming back to change the device or a track. Reopen the
         # panel on the running session: no question about resuming (that was
@@ -4489,6 +4483,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._last_menu_subs = len(subs)
         menu = QMenu(self)
         menu.addAction(tr("cast_title"), self.manage_cast)
+        if self.cast.is_dlna(self._cast_device):
+            # A TV plays the stream as it is. Tracks and the picture setting
+            # are the converter's, and only a Chromecast is fed through it.
+            note = menu.addAction(tr("cast_dlna_note"))
+            note.setEnabled(False)
+            menu.exec(self.cast_bar_tracks.mapToGlobal(
+                self.cast_bar_tracks.rect().bottomLeft()))
+            return
         menu.addSeparator()
         cur_a = (ctx.get("audio") or {}).get("index")
         cur_s = (ctx.get("subs") or {}).get("index")

@@ -57,7 +57,6 @@ class FakeClient(DemoClient):
 
 
 mw.CastDialog = FakeDialog
-mw.ChromecastManager.available = staticmethod(lambda: True)
 w.client = FakeClient()
 
 

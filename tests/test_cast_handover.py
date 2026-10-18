@@ -1004,6 +1004,9 @@ class _CastAt:
     def bridged(self):
         return True
 
+    def is_dlna(self, _name):
+        return False
+
 
 class _History:
     def __init__(self):

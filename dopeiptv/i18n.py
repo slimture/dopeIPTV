@@ -506,7 +506,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "mv_empty_cell": {"en": "Right-click a channel → Add to multiview"},
     "mv_cell_error": {"en": "{title} — stream failed"},
     "ctx_open_externally": {"en": "Open externally"},
-    "ctx_cast_to_chromecast": {"en": "Cast to Chromecast…"},
+    "ctx_cast_to_chromecast": {"en": "Cast to TV…"},
     "ctx_add_to_favorites": {"en": "Add to favorites"},
     "ctx_add_to_folder": {"en": "Add to folder"},
     "ctx_rename_folder": {"en": "Rename folder…"},
@@ -642,13 +642,13 @@ _STRINGS: dict[str, dict[str, str]] = {
     "rec_record_background": {"en": "Record in the background (needs a second connection)"},
 
     # ── Chromecast dialog ─────────────────────────────────────────────────
-    "cast_title": {"en": "Cast to Chromecast"},
-    "cast_scanning": {"en": "Scanning for Chromecast devices…"},
+    "cast_title": {"en": "Cast to TV"},
+    "cast_scanning": {"en": "Looking for TVs and Chromecasts…"},
     "cast_rescan": {"en": "Rescan"},
     "cast_cast": {"en": "Cast"},
     "cast_stop": {"en": "Stop casting"},
     "cast_devices_found": {"en": "{n} device(s) found."},
-    "cast_none_found": {"en": "No Chromecast devices found on this network."},
+    "cast_none_found": {"en": "No TVs or Chromecasts found on this network."},
     "cast_scan_failed": {"en": "Scan failed: {msg}"},
     "cast_starting": {"en": "Starting cast to {name}…"},
     "cast_casting_to": {"en": "Casting to {name}."},
@@ -1208,6 +1208,11 @@ _STRINGS: dict[str, dict[str, str]] = {
     "os_key_hint": {"en": "Free: sign in at opensubtitles.com, open API consumers and create one."},
     "os_key_builtin_hint": {"en": "One is built in — enter your own only to use it instead."},
     "os_account_hint": {"en": "Optional — signing in raises how many subtitles you can download a day."},
+    # Casting to DLNA / UPnP TVs
+    "cast_dlna_note": {"en": "A TV plays the stream as it is — choosing audio, subtitles or picture size works with a Chromecast."},
+    "cast_err_dlna_refused": {"en": "The TV refused the stream ({msg})."},
+    "cast_err_dlna_no_answer": {"en": "{name} did not answer."},
+    "cast_err_dlna_no_start": {"en": "The TV did not start playing — it may not support this format."},
 }
 
 
