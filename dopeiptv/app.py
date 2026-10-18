@@ -38,6 +38,9 @@ from .media.players import _libmpv, _libmpv_error, embedded_playback_reason
 _SUPPRESSED_QT_WARNINGS = (
     b"Failed to register with host portal",
     b"Got leave event for surface",
+    # macOS, on drawing the Hindi name in the language list: the system
+    # font has no OpenType tables for Devanagari and Qt shapes it without.
+    b"OpenType support missing for",
 )
 _original_msg_handler = None
 
