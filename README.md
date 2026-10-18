@@ -166,6 +166,27 @@ chown www:www /usr/local/www/iptv/public
 `--delete` (rsync) is likewise never right here: the live data is absent from
 the source tree, so it would delete all of it.
 
+## Trakt sign-in comes back through here
+
+`public/trakt/callback/index.php` is part of the app, not of the site: it is
+the redirect URI registered with dopeIPTV's Trakt app. A Trakt app that every
+account can sign in to may only redirect to an `https://` address, so Trakt
+sends the browser here, and the page hands the answer straight on to the
+app on the user's own machine (`http://127.0.0.1:41794/callback`). It passes
+on `code`, `state` and `error` only, to that one fixed address - no open
+redirect - and the code is useless without the app's PKCE verifier.
+
+If this page is missing, signing in to Trakt through the browser fails for
+every user (the code sign-in still works). Keep it deployed, and change its
+address only together with the app (`trakt.WEB_REDIRECT_URI`) and the Trakt
+app's registered redirect URI. nginx answers `/trakt/callback` with a 301 to
+`/trakt/callback/`, keeping the query. A quick check after a deploy:
+
+```sh
+curl -sI 'https://iptv.dope.rs/trakt/callback/?code=x&state=y' | grep -i location
+# location: http://127.0.0.1:41794/callback?code=x&state=y
+```
+
 ## Still to add (drop-in, no code changes)
 
 - **Screenshots** — put real PNGs in `public/screenshots/` and swap the four
