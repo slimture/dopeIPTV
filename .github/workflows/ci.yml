@@ -22,7 +22,10 @@ concurrency:
 jobs:
   lint-test:
     name: Lint + tests
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: that label moves to Ubuntu 26.04 from
+    # 2026-10-19. Take a new image on purpose, with a green run, never by
+    # surprise in the middle of a release.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6

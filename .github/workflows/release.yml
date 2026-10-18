@@ -16,7 +16,9 @@ jobs:
   # ---------------------------------------------------------------- Python ---
   python-dist:
     name: sdist + wheel (pipx / PyPI)
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: that label moves to Ubuntu 26.04 from
+    # 2026-10-19, and a release must not meet a new image unannounced.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - name: Guard - release notes must match this version
@@ -980,7 +982,9 @@ jobs:
   # blocking the release with continue-on-error.
   flatpak:
     name: Flatpak (experimental)
-    runs-on: ubuntu-latest
+    # Only the host: the build runs in the container below. Pinned for the
+    # same reason as python-dist.
+    runs-on: ubuntu-24.04
     continue-on-error: true
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-24.08
