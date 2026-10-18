@@ -145,6 +145,7 @@ class SettingsCard(QFrame):
                     or isinstance(control, QCheckBox)):
                 control.setMinimumWidth(max(control.minimumWidth(), 220))
                 control.setMaximumWidth(max(control.minimumWidth(), 320))
+                self._page.column.append(control)
             h.addWidget(control, 1 if stretch_control else 0,
                         Qt.AlignmentFlag.AlignVCenter)
         return self._add(w, f"{label} {hint}")
@@ -251,6 +252,8 @@ class SettingsPage(QScrollArea):
         self._col.addWidget(self._tail, 1)
         self.setWidget(body)
         self.cards: list[SettingsCard] = []
+        #: The controls in the column down the right of the cards.
+        self.column: list[QWidget] = []
 
     def card(self, title: str = "") -> SettingsCard:
         at = self._col.indexOf(self._tail)
@@ -323,8 +326,33 @@ class SettingsShell(QWidget):
         self._none.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.stack.addWidget(self._none)
         self.pages: list[SettingsPage] = []
+        self._aligned = False
         self.nav.page_chosen.connect(self._show)
         self.search.textChanged.connect(self._filter)
+
+    def showEvent(self, event) -> None:
+        # Measured on show, not as the rows are built: a size hint is only
+        # right once the style sheet has been applied.
+        if not self._aligned:
+            self._aligned = True
+            self.align_column()
+        super().showEvent(event)
+
+    def align_column(self) -> None:
+        """One width for the column of controls on every page: the widest
+        control's, within the column's bounds. Each control used to take the
+        width of its own text, so a long entry ("Default (provider order)")
+        stuck out past the dropdowns above it. Only the minimum is set: a
+        control whose text grows later widens instead of being cut off."""
+        controls = [c for p in self.pages for c in p.column]
+        if not controls:
+            return
+        for c in controls:
+            c.ensurePolished()
+        widest = max(c.sizeHint().width() for c in controls)
+        for c in controls:
+            c.setMinimumWidth(min(max(widest, c.minimumWidth()),
+                                  c.maximumWidth()))
 
     def add_page(self, page: SettingsPage, icon: QIcon) -> SettingsPage:
         self.pages.append(page)

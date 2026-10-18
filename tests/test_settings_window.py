@@ -152,6 +152,24 @@ def reset_button_place(self):
     return 0
 QDialog.exec = reset_button_place
 w.open_settings()
+
+# 6. One width for the column of controls, on every page: a dropdown with a
+# long entry no longer sticks out past the ones above it.
+def column_widths(self):
+    self.show()
+    app.processEvents()
+    shell = self.findChild(SettingsShell)
+    widths = set()
+    for page in shell.pages:
+        shell.stack.setCurrentWidget(page)
+        app.processEvents()
+        widths |= {c.width() for c in page.column if c.isVisible()}
+    self.hide()
+    assert len(widths) == 1, widths
+    assert 220 <= min(widths) <= 320, widths
+    return 0
+QDialog.exec = column_widths
+w.open_settings()
 print("SETTINGS_OK", flush=True)
 """
 
