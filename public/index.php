@@ -201,7 +201,8 @@ unset($g);
 <meta name="twitter:description" content="<?= h($DESC) ?>">
 <meta name="twitter:image" content="<?= h($SITE) ?>/og-image.png">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="icon" href="/favicon.png" sizes="any">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" href="/favicon.png" sizes="512x512" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
 <link rel="stylesheet" href="<?= h(asset('/style.css')) ?>">
@@ -216,6 +217,7 @@ for ($i = 1; $i <= 10; $i++) {
               "acceptedAnswer" => ["@type" => "Answer", "text" => t("faq_a$i")]];
 }
 $app = ["@type" => "SoftwareApplication", "@id" => "$SITE/#app", "name" => "dopeIPTV",
+     "alternateName" => "dopeiptv",
      "operatingSystem" => "Linux, macOS, Windows",
      "applicationCategory" => "MultimediaApplication",
      "applicationSubCategory" => "IPTV player", "description" => $DESC,
@@ -256,7 +258,7 @@ echo json_encode([
     <div class="wrap hero-grid">
       <div>
         <span class="eyebrow"><span class="dot"></span> <?= h(t('hero_eyebrow')) ?> <?= h($version) ?></span>
-        <h1><?= t('hero_h1') ?></h1>
+        <h1><span class="h1-brand">dopeIPTV</span> <?= t('hero_h1') ?></h1>
         <p class="lede"><?= t('hero_lede') ?></p>
         <div class="cta-row">
           <a class="btn primary" id="heroDownload" href="#download"><?= h(t('hero_cta')) ?></a>

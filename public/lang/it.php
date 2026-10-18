@@ -300,4 +300,8 @@ sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_external_a' => '<p>Quella voce avvia un <code>mpv</code> o un <code>vlc</code> autonomo del tuo sistema, quindi uno dei due deve essere installato — il lettore integrato non ha bisogno di nient\'altro e non è coinvolto.</p><pre><code>sudo apt install mpv vlc        # Debian/Ubuntu
 sudo dnf install mpv vlc        # Fedora
 sudo pacman -S mpv vlc          # Arch</code></pre>',
+    // 404 page
+    'nf_h1'   => 'Questa pagina non esiste',
+    'nf_lede' => 'Il link potrebbe essere vecchio o scritto male. Riparti dalla home page o consulta l’aiuto.',
+    'nf_home' => 'Vai alla home page',
 ];

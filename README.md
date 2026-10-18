@@ -16,6 +16,8 @@ website/
 │   ├── robots.txt          allows all + sitemap
 │   ├── sitemap.xml         index → sitemap.php
 │   ├── sitemap.php         every page × every language, with hreflang
+│   ├── 404.php             "page not found", needs `error_page` (deploy/)
+│   ├── favicon.ico         16/32/48 px, for clients that ask for it blind
 │   ├── releases.json       written by the sync script on the server (never committed)
 │   ├── files/              mirrored release assets land here (git-ignored)
 │   └── screenshots/        drop real PNGs here (see below)
@@ -189,8 +191,19 @@ channel brand next to "IPTV" is what pirate services advertise with and what
 rights holders' automated takedown requests look for; the demo channels
 (Big Buck Bunny, Sintel, Tears of Steel) are free to show.
 
+The name is the first word of each page's `<h1>` (it is what people type
+into a search box, and Google splits the bare word "dopeiptv" into "dope
+iptv" unless the page says otherwise), and the JSON-LD gives the lowercase
+spelling as an `alternateName`. `/index.php` and `/help/index.php` redirect
+to `/` and `/help/`, so each page has one address.
+
 After a deploy, resubmit `https://iptv.dope.rs/sitemap.xml` in Google Search
 Console and Bing Webmaster Tools.
+
+Two server-side lines belong with this, in the templates in `deploy/`:
+`error_page 404 /404.php;` on the content server, and the port-80 block in
+the proxy that sends `http://` to `https://` (skip it if `nginx.conf`
+already redirects all port-80 traffic).
 
 ## Local preview
 

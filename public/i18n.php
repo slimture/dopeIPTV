@@ -97,6 +97,22 @@ function i18n_pick(): string {
     return I18N_DEFAULT;
 }
 
+/**
+ * One address per page. `index index.php` makes /index.php answer exactly
+ * like /, so every page had a second URL; send it home. REQUEST_URI is what
+ * the browser asked for - nginx's internal index rewrite does not change it.
+ */
+function i18n_canonical_redirect(): void {
+    $uri = (string)($_SERVER['REQUEST_URI'] ?? '');
+    $path = parse_url($uri, PHP_URL_PATH) ?: '';
+    if (preg_match('~^(.*/)index\.php$~', $path, $m) && !headers_sent()) {
+        $q = parse_url($uri, PHP_URL_QUERY);
+        header('Location: ' . $m[1] . ($q ? '?' . $q : ''), true, 301);
+        exit;
+    }
+}
+i18n_canonical_redirect();
+
 $GLOBALS['I18N_LANG'] = i18n_pick();
 $GLOBALS['I18N_EN'] = require __DIR__ . '/lang/en.php';
 if ($GLOBALS['I18N_LANG'] === 'en') {

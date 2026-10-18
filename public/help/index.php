@@ -64,7 +64,8 @@ const HELP = [
 <meta property="og:url" content="<?= h($SITE) ?>/help/">
 <meta property="og:image" content="<?= h($SITE) ?>/og-image.png">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="icon" href="/favicon.png" sizes="any">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" href="/favicon.png" sizes="512x512" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="stylesheet" href="<?= h(asset('/style.css')) ?>">
 </head>
@@ -74,7 +75,7 @@ const HELP = [
 <main id="top">
   <section class="help-top">
     <div class="wrap">
-      <h1><?= h(t('help_h1')) ?></h1>
+      <h1>dopeIPTV <?= h(t('help_h1')) ?></h1>
       <p class="help-lede"><?= h(t('help_intro')) ?></p>
 
       <div class="help-searchbar">

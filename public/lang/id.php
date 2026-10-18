@@ -300,4 +300,8 @@ sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_external_a' => '<p>Pilihan itu menjalankan <code>mpv</code> atau <code>vlc</code> mandiri dari sistem Anda, jadi salah satunya harus terpasang — pemutar bawaan tidak butuh tambahan apa pun dan tidak terpengaruh.</p><pre><code>sudo apt install mpv vlc        # Debian/Ubuntu
 sudo dnf install mpv vlc        # Fedora
 sudo pacman -S mpv vlc          # Arch</code></pre>',
+    // 404 page
+    'nf_h1'   => 'Halaman ini tidak ada',
+    'nf_lede' => 'Tautan mungkin sudah usang atau salah ketik. Mulai lagi dari halaman utama, atau lihat bantuan.',
+    'nf_home' => 'Ke halaman utama',
 ];

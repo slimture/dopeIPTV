@@ -300,4 +300,8 @@ sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_external_a' => '<p>האפשרות הזאת מפעילה <code>mpv</code> או <code>vlc</code> עצמאי מהמערכת שלכם, ולכן אחד מהם חייב להיות מותקן — הנגן המובנה אינו זקוק לדבר נוסף ואינו מושפע מכך.</p><pre><code>sudo apt install mpv vlc        # Debian/Ubuntu
 sudo dnf install mpv vlc        # Fedora
 sudo pacman -S mpv vlc          # Arch</code></pre>',
+    // 404 page
+    'nf_h1'   => 'הדף הזה לא קיים',
+    'nf_lede' => 'ייתכן שהקישור ישן או שהוקלד בטעות. התחילו מחדש מדף הבית או עיינו בעזרה.',
+    'nf_home' => 'לדף הבית',
 ];

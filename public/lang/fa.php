@@ -300,4 +300,8 @@ sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_external_a' => '<p>این گزینه یک <code>mpv</code> یا <code>vlc</code> مستقل از سیستم شما را اجرا می‌کند، پس یکی از این دو باید نصب باشد — پخش‌کنندهٔ توکار به چیزی افزون نیاز ندارد و از این ماجرا بیرون است.</p><pre><code>sudo apt install mpv vlc        # Debian/Ubuntu
 sudo dnf install mpv vlc        # Fedora
 sudo pacman -S mpv vlc          # Arch</code></pre>',
+    // 404 page
+    'nf_h1'   => 'این صفحه وجود ندارد',
+    'nf_lede' => 'ممکن است پیوند قدیمی باشد یا اشتباه تایپ شده باشد. از صفحهٔ اصلی دوباره شروع کنید یا راهنما را ببینید.',
+    'nf_home' => 'رفتن به صفحهٔ اصلی',
 ];

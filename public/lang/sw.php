@@ -300,4 +300,8 @@ sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_external_a' => '<p>Chaguo hilo huanzisha <code>mpv</code> au <code>vlc</code> inayojitegemea kutoka kwenye mfumo wako, hivyo mojawapo lazima iwe imesakinishwa — kicheza kilichojengwa ndani hakihitaji chochote zaidi na hakiathiriwi.</p><pre><code>sudo apt install mpv vlc        # Debian/Ubuntu
 sudo dnf install mpv vlc        # Fedora
 sudo pacman -S mpv vlc          # Arch</code></pre>',
+    // 404 page
+    'nf_h1'   => 'Ukurasa huu haupo',
+    'nf_lede' => 'Huenda kiungo kimepitwa na wakati au kimeandikwa vibaya. Anza tena kwenye ukurasa wa mwanzo, au angalia msaada.',
+    'nf_home' => 'Nenda ukurasa wa mwanzo',
 ];

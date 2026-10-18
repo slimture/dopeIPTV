@@ -300,4 +300,8 @@ sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_external_a' => '<p>Ta mogućnost pokreće samostalan <code>mpv</code> ili <code>vlc</code> iz vašeg sustava, pa jedan od njih mora biti instaliran — ugrađenom reproduktoru ne treba ništa dodatno i ovo ga se ne tiče.</p><pre><code>sudo apt install mpv vlc        # Debian/Ubuntu
 sudo dnf install mpv vlc        # Fedora
 sudo pacman -S mpv vlc          # Arch</code></pre>',
+    // 404 page
+    'nf_h1'   => 'Ova stranica ne postoji',
+    'nf_lede' => 'Poveznica je možda zastarjela ili pogrešno upisana. Krenite s naslovne stranice ili pogledajte pomoć.',
+    'nf_home' => 'Na naslovnu stranicu',
 ];

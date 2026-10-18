@@ -299,4 +299,8 @@ sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_external_a' => '<p>那个选项会启动系统里独立的 <code>mpv</code> 或 <code>vlc</code>，所以两者之一必须已安装 —— 内置播放器不需要任何额外东西，也不受影响。</p><pre><code>sudo apt install mpv vlc        # Debian/Ubuntu
 sudo dnf install mpv vlc        # Fedora
 sudo pacman -S mpv vlc          # Arch</code></pre>',
+    // 404 page
+    'nf_h1'   => '此页面不存在',
+    'nf_lede' => '链接可能已过期或输入有误。请从首页重新开始，或查看帮助。',
+    'nf_home' => '前往首页',
 ];

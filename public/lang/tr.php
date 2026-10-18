@@ -300,4 +300,8 @@ sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_external_a' => '<p>Bu seçenek sisteminizden bağımsız bir <code>mpv</code> ya da <code>vlc</code> başlatır, dolayısıyla bunlardan birinin kurulu olması gerekir — gömülü oynatıcının fazladan bir şeye ihtiyacı yoktur ve bundan etkilenmez.</p><pre><code>sudo apt install mpv vlc        # Debian/Ubuntu
 sudo dnf install mpv vlc        # Fedora
 sudo pacman -S mpv vlc          # Arch</code></pre>',
+    // 404 page
+    'nf_h1'   => 'Bu sayfa yok',
+    'nf_lede' => 'Bağlantı eski ya da yanlış yazılmış olabilir. Ana sayfadan yeniden başlayın ya da yardıma bakın.',
+    'nf_home' => 'Ana sayfaya git',
 ];

@@ -300,4 +300,8 @@ sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_external_a' => '<p>یہ اختیار آپ کے نظام سے الگ <code>mpv</code> یا <code>vlc</code> چلاتا ہے، اس لیے ان میں سے ایک کا نصب ہونا ضروری ہے — اندرونی پلیئر کو کچھ اضافی درکار نہیں اور اس پر کوئی اثر نہیں پڑتا۔</p><pre><code>sudo apt install mpv vlc        # Debian/Ubuntu
 sudo dnf install mpv vlc        # Fedora
 sudo pacman -S mpv vlc          # Arch</code></pre>',
+    // 404 page
+    'nf_h1'   => 'یہ صفحہ موجود نہیں ہے',
+    'nf_lede' => 'ہو سکتا ہے لنک پرانا ہو یا غلط لکھا گیا ہو۔ مرکزی صفحے سے دوبارہ شروع کریں، یا مدد دیکھیں۔',
+    'nf_home' => 'مرکزی صفحے پر جائیں',
 ];

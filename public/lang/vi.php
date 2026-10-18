@@ -299,4 +299,8 @@ sudo pacman -S mpv ffmpeg       # Arch</code></pre>',
     'help_fix_external_a' => '<p>Tùy chọn ấy khởi chạy một <code>mpv</code> hoặc <code>vlc</code> riêng của hệ thống, nên một trong hai phải được cài — trình phát tích hợp không cần gì thêm và không dính dáng gì.</p><pre><code>sudo apt install mpv vlc        # Debian/Ubuntu
 sudo dnf install mpv vlc        # Fedora
 sudo pacman -S mpv vlc          # Arch</code></pre>',
+    // 404 page
+    'nf_h1'   => 'Trang này không tồn tại',
+    'nf_lede' => 'Liên kết có thể đã cũ hoặc bị gõ sai. Hãy bắt đầu lại từ trang chủ hoặc xem phần trợ giúp.',
+    'nf_home' => 'Về trang chủ',
 ];
