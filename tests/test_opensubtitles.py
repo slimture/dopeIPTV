@@ -396,6 +396,40 @@ assert p.add_subtitle("/tmp/b.srt", "Rel", "sv")
 assert ("sub-add", "/tmp/b.srt", "select", "Rel", "sv") in m.cmds
 assert added == ["/tmp/b.srt"]
 
+
+# mpv 0.37 renamed sub-forced-only to sub-forced-events-only. On a newer mpv
+# (Homebrew's, the macOS build's) setting the old name raised, and a
+# subtitle that had loaded fine was reported as "not a usable file".
+class NewMpv(FakeMpv):
+    def __setitem__(self, key, value):
+        if key == "sub-forced-only":
+            raise AttributeError(key)
+        super().__setitem__(key, value)
+
+
+class OldMpv(FakeMpv):
+    def __setitem__(self, key, value):
+        if key == "sub-forced-events-only":
+            raise AttributeError(key)
+        super().__setitem__(key, value)
+
+
+new = p.video.mpv = NewMpv()
+assert p.add_subtitle("/tmp/c.srt", "Rel", "en")
+assert new["sub-forced-events-only"] is False
+assert new["sub-visibility"] is True
+old = p.video.mpv = OldMpv()
+assert p.add_subtitle("/tmp/d.srt")
+assert old["sub-forced-only"] is False
+# The same for a subtitle remembered with its title, and for the
+# "forced subtitles only" setting.
+p.video.mpv = new
+p.set_sub_files(["/tmp/e.srt"])
+assert p.play("http://x/movie/3.mkv", "Film")
+assert new["sub-forced-events-only"] is False
+assert new["sub-visibility"] is True
+p.video.mpv = m
+
 # The Subtitles menu offers a file always, the search for seekable titles.
 p.find_subtitles = lambda: None
 def entries():

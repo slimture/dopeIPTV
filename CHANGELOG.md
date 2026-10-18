@@ -7,6 +7,17 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Fixed
+
+- **Subtitles from OpenSubtitles** were downloaded and loaded, then
+  reported as "OpenSubtitles did not send a usable subtitle file" on the
+  macOS, Windows and Flatpak builds: their newer mpv (0.37 and later) calls
+  the forced-subtitles option sub-forced-events-only, and setting the old
+  name failed after the subtitle was already in. The same old name kept
+  "On - forced subtitles only" from working there, and could leave a
+  subtitle remembered for a title hidden. The player now sets whichever
+  name its mpv has, and only the loading itself decides success.
+
 ## [1.2.15]
 
 Casting to smart TVs, subtitles from OpenSubtitles, the desktop's media

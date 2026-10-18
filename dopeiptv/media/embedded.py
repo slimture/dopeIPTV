@@ -193,6 +193,21 @@ def _format_time(seconds: float | None) -> str:
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
 
+def _set_forced_only(m, on: bool) -> None:
+    """Show only the forced subtitle events, or everything. mpv 0.37 renamed
+    sub-forced-only to sub-forced-events-only, and the libmpv in use may be
+    either side of that (Homebrew's and the macOS, Windows and Flatpak
+    builds are newer, the AppImage's older): the new name, else the old.
+    Setting the old name on a new mpv raised - and a subtitle that had
+    loaded fine was then reported as unusable."""
+    for name in ("sub-forced-events-only", "sub-forced-only"):
+        try:
+            m[name] = on
+            return
+        except Exception:
+            continue
+
+
 class _MpvGLWidget(QOpenGLWidget):
     """Video surface that owns the mpv render context."""
 
@@ -3087,7 +3102,7 @@ class EmbeddedPlayer(QWidget):
         sub_mode = s.value("sub_mode", "auto")
         if sub_mode == "off":
             set_opt("sid", "no")
-            set_opt("sub-forced-only", False)
+            _set_forced_only(m, False)
         else:
             set_opt("sid", "auto")
             if sub_mode == "lang":
@@ -3099,7 +3114,7 @@ class EmbeddedPlayer(QWidget):
                 set_opt("slang", ",".join(l for l in langs if l))
             else:
                 set_opt("slang", "")
-            set_opt("sub-forced-only", sub_mode == "forced")
+            _set_forced_only(m, sub_mode == "forced")
         aspect = s.value("aspect_mode", "auto")
         if aspect == "stretch":
             set_opt("keepaspect", False)
@@ -3270,11 +3285,16 @@ class EmbeddedPlayer(QWidget):
             return False
         try:
             m.command("sub-add", str(path), "select", title or "", lang or "")
-            m["sub-forced-only"] = False
-            m["sub-visibility"] = True
         except Exception as e:
             log.warning("sub-add %s failed: %s", path, e)
             return False
+        # Loaded: from here on it is only about showing it, which must not
+        # turn a loaded subtitle into a failure.
+        _set_forced_only(m, False)
+        try:
+            m["sub-visibility"] = True
+        except Exception as e:
+            log.debug("sub-visibility after sub-add failed: %s", e)
         self.subtitle_added.emit(str(path))
         return True
 
@@ -3368,7 +3388,7 @@ class EmbeddedPlayer(QWidget):
                     # default subtitle mode says (mpv prefers an external
                     # track when it picks one).
                     m["sid"] = "auto"
-                    m["sub-forced-only"] = False
+                    _set_forced_only(m, False)
                     m["sub-visibility"] = True
             except Exception as e:
                 log.debug("sub-files %r failed: %s", sub_files, e)
