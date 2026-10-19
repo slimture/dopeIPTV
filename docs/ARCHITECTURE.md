@@ -45,6 +45,7 @@ dopeiptv/
   media/               Playback
     embedded.py        _MpvGLWidget(QOpenGLWidget), EmbeddedPlayer, seek bar
     players.py         External player launch (mpv IPC / VLC), libmpv detect
+    subtitle_text.py   Stray right-to-left marks out of subtitle files
 
   services/            Window-agnostic application services
     coverart.py        CoverArtService - TMDB resolver lifecycle + the

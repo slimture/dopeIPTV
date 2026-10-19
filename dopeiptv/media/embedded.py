@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import sys
 import time
 
 from PyQt6.QtCore import (
-    QByteArray, QEvent, QObject, QPoint, QPointF, QRect, QRectF, QSize, Qt,
-    QTimer, pyqtSignal,
+    QByteArray, QEvent, QObject, QPoint, QPointF, QRect, QRectF, QSize,
+    QStandardPaths, Qt, QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import (
     QColor, QCursor, QIcon, QImage, QOpenGLContext, QPainter, QPen, QPixmap,
@@ -24,6 +25,7 @@ from PyQt6.QtWidgets import (
 from ..core.log import log, redact_url
 from ..i18n import tr
 from .players import _libmpv, _register_error_callback
+from .subtitle_text import fixed_bytes
 from ..ui.theme import P
 
 
@@ -206,6 +208,41 @@ def _set_forced_only(m, on: bool) -> None:
             return
         except Exception:
             continue
+
+
+_SUB_FIX_MAX_BYTES = 20 * 1024 * 1024
+
+
+def _subtitle_to_load(path: str) -> str:
+    """*path*, or a copy of it without the right-to-left marks a file
+    translated from Arabic or Hebrew can keep around every line
+    (subtitle_text.py). The copy goes to the cache under the same file
+    name, so mpv still reads a language from it."""
+    try:
+        if os.path.getsize(path) > _SUB_FIX_MAX_BYTES:
+            return path
+        with open(path, "rb") as fh:
+            fixed = fixed_bytes(fh.read())
+    except OSError:
+        return path
+    base = QStandardPaths.writableLocation(
+        QStandardPaths.StandardLocation.CacheLocation)
+    if fixed is None or not base:
+        return path
+    key = hashlib.sha1(os.path.abspath(path).encode(
+        "utf-8", "surrogateescape")).hexdigest()[:12]
+    folder = os.path.join(base, "subtitles", key)
+    copy = os.path.join(folder, os.path.basename(path))
+    try:
+        os.makedirs(folder, exist_ok=True)
+        with open(copy, "wb") as fh:
+            fh.write(fixed)
+    except OSError as e:
+        log.info("subtitle: no fixed copy of %s: %s", path, e)
+        return path
+    log.info("subtitle: right-to-left marks taken out of %s",
+             os.path.basename(path))
+    return copy
 
 
 class _MpvGLWidget(QOpenGLWidget):
@@ -3284,7 +3321,8 @@ class EmbeddedPlayer(QWidget):
         if m is None or not self.current_url:
             return False
         try:
-            m.command("sub-add", str(path), "select", title or "", lang or "")
+            m.command("sub-add", _subtitle_to_load(str(path)), "select",
+                      title or "", lang or "")
         except Exception as e:
             log.warning("sub-add %s failed: %s", path, e)
             return False
@@ -3382,7 +3420,8 @@ class EmbeddedPlayer(QWidget):
             try:
                 m.command("change-list", "sub-files", "clr", "")
                 for path in sub_files:
-                    m.command("change-list", "sub-files", "append", path)
+                    m.command("change-list", "sub-files", "append",
+                              _subtitle_to_load(path))
                 if sub_files:
                     # Chosen for this title on purpose: shown, whatever the
                     # default subtitle mode says (mpv prefers an external

@@ -37,6 +37,7 @@ map and the one-way import rule.
 | `core/platform_windows.py` | Windows-specific helpers |
 | `media/embedded.py` | Embedded mpv player widget |
 | `media/players.py` | External player launch, libmpv detection |
+| `media/subtitle_text.py` | Stray right-to-left marks out of subtitle files before mpv reads them |
 | `ui/main_window.py` | MainWindow composition root (+ `mw_*` mixins) |
 | `ui/channel_list.py` | List model, view, delegate painting |
 | `ui/dialogs.py` | Dialog windows |
@@ -122,7 +123,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
   metadata, diagnostics, oauth_loopback, opensubtitles, dlna), `core/` (stores, updates, log,
   player_exec, wakelock, selfupdate, gcguard) and `services/` (resume,
-  coverart, reminders, mpris, notify, popular); see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
+  coverart, reminders, mpris, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list
   as more non-UI modules gain type hints.

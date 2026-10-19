@@ -32,6 +32,13 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   system, with freetype, harfbuzz and expat, as the AppImage project
   recommends; the .deb lists them as dependencies, and the release build
   starts the AppImage on Arch Linux and fails on either error.
+- **Subtitles with the full stop in front (".Hej då").** A subtitle
+  translated from an Arabic or Hebrew file can keep that language's
+  right-to-left marks around every line, and mpv then laid a Swedish or
+  English line out right to left. When a subtitle file is loaded - found
+  on OpenSubtitles, picked from disk, or remembered for a title - those
+  marks are taken out of every line without an Arabic or Hebrew letter;
+  the file itself is left as it was.
 
 ## [1.2.17]
 

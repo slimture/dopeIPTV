@@ -74,6 +74,7 @@ files = [
     "dopeiptv/services/mpris.py",
     "dopeiptv/services/notify.py",
     "dopeiptv/services/popular.py",
+    "dopeiptv/media/subtitle_text.py",
 ]
 
 [tool.pytest.ini_options]
