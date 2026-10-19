@@ -54,7 +54,7 @@ PRESET = {
     "home_sh_new_eps": "false", "home_sh_fav": "true",
     "home_sh_history": "false", "home_sh_watchlist": "true",
     "home_sh_movies": "false", "home_sh_series": "true",
-    "home_sh_channels": "false",
+    "home_sh_channels": "false", "follow_notify": "false",
 }
 for k, v in PRESET.items():
     s.setValue(k, v)
@@ -170,16 +170,38 @@ def column_widths(self):
     return 0
 QDialog.exec = column_widths
 w.open_settings()
+
+# 7. Followed series: listed by name, and Stop following stops at once.
+w.followed.follow({"series_id": 2, "name": "Beta"})
+w.followed.follow({"series_id": 1, "name": "alpha"})
+def followed_series(self):
+    from PyQt6.QtWidgets import QListWidget
+    lst = self.findChild(QListWidget, "FollowedList")
+    assert [lst.item(i).text() for i in range(lst.count())] == \
+        ["alpha", "Beta"]
+    stop = [b for b in self.findChildren(QPushButton)
+            if b.text() == tr("ctx_unfollow_series")][0]
+    lst.setCurrentRow(1)
+    stop.click()
+    assert [lst.item(i).text() for i in range(lst.count())] == ["alpha"]
+    assert lst.currentRow() == 0
+    return 0
+QDialog.exec = followed_series
+w.open_settings()
+assert w.followed.is_followed(1) and not w.followed.is_followed(2)
 print("SETTINGS_OK", flush=True)
 """
 
 
-def test_settings_window():
+def test_settings_window(tmp_path):
     try:
         import PyQt6  # noqa: F401
     except Exception:
         pytest.skip("PyQt6 not available")
-    env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
+    # Followed series live in a settings file of their own in the user's
+    # config directory: a fresh one, so the test follows nothing for real.
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen",
+               XDG_CONFIG_HOME=str(tmp_path))
     for _attempt in (1, 2):
         proc = subprocess.run(
             [sys.executable, "-c", _CHILD], capture_output=True, text=True,

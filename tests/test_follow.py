@@ -219,6 +219,17 @@ toasts.clear()
 w._check_followed(); settle(lambda: not w._follow_running)
 assert toasts == [tr("follow_new_series", n=2)], toasts
 
+# Announcements switched off under Settings -> Home: nothing is said, and
+# the new episode is still noted for the shelf and the dots.
+settings.setValue("follow_notify", "false")
+answers["12"]["episodes"]["1"].append({"id": "105", "episode_num": 5})
+toasts.clear()
+notes.clear()
+w._check_followed(); settle(lambda: not w._follow_running)
+assert toasts == [] and notes == [], (toasts, notes)
+assert "105" in w.followed.new_ids(12)
+settings.setValue("follow_notify", "true")
+
 w._unfollow_series(show)
 assert not w.followed.is_followed(12)
 print("FOLLOW_OK")

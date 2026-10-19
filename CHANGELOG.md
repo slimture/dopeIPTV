@@ -7,6 +7,15 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Added
+
+- **Settings → Home → Followed series.** A switch for whether new
+  episodes of a followed series are announced (the note in the app, and
+  on Linux the desktop notification); the New episodes shelf and the
+  dots on new episodes show them either way. Below it, the series this
+  playlist follows, by name, with Stop following - no need to find a
+  series again to stop following it.
+
 ### Changed
 
 - **OpenSubtitles' daily limit is explained.** Settings → Audio &

@@ -156,11 +156,14 @@ class _FollowMixin:
         else:
             text = tr("follow_new_series", n=len(fresh))
         log.info("follow: %s", text)
-        self._show_toast(text, 6000)
-        if not self.isActiveWindow():
-            from ..services.notify import notify
-            notify(tr("home_new_episodes"), text,
-                   self._follow_image(fresh[0][0]))
+        # Switched off under Settings -> Home: no toast and no desktop
+        # notification, but the shelf and the episode dots still show them.
+        if self.settings.value("follow_notify", "true") == "true":
+            self._show_toast(text, 6000)
+            if not self.isActiveWindow():
+                from ..services.notify import notify
+                notify(tr("home_new_episodes"), text,
+                       self._follow_image(fresh[0][0]))
         if self._home_showing():
             self._home_page.refresh()
 

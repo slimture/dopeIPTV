@@ -883,6 +883,53 @@ class _SettingsMixin:
                              ("home_sh_series", "home_new_series"),
                              ("home_sh_channels", "home_new_channels")):
             home_shelf_boxes[skey] = c.toggle(tr(slabel), is_on(skey, "true"))
+        # Following a series: whether new episodes are announced (the shelf
+        # and the episode dots show them either way), and the series this
+        # playlist follows, to stop following one without finding it again.
+        followed_card = home.card(tr("set_card_followed"))
+        follow_notify_box = followed_card.toggle(
+            tr("set_follow_notify"), is_on("follow_notify", "true"),
+            tr("set_follow_notify_hint", shelf=tr("home_new_episodes")))
+        fol_list = QListWidget(objectName="FollowedList")
+        series_icon = page_icon("series", self._action_pixmap, 16)
+        fol_store = self.followed
+        for sid in sorted(fol_store.ids(), key=lambda i: str(
+                fol_store.snapshot(i).get("name") or "").casefold()):
+            name = fol_store.snapshot(sid).get("name") or str(sid)
+            item = QListWidgetItem(series_icon, name)
+            item.setData(Qt.ItemDataRole.UserRole, sid)
+            fol_list.addItem(item)
+        fit_to_rows(fol_list)
+        fol_list.setCurrentRow(0)
+        fol_none = QLabel(tr("set_follow_none",
+                             follow=tr("ctx_follow_series")))
+        fol_none.setObjectName("SettingsHint")
+        fol_none.setWordWrap(True)
+        fol_stop = QPushButton(tr("ctx_unfollow_series"))
+        followed_card.shown_if(
+            followed_card.widget(fol_none, tr("set_card_followed")),
+            lambda: fol_list.count() == 0)
+        followed_card.shown_if(
+            followed_card.widget(fol_list, tr("set_card_followed")),
+            lambda: fol_list.count() > 0)
+        followed_card.shown_if(followed_card.layout_row(hbox(fol_stop)),
+                               lambda: fol_list.count() > 0)
+
+        def fol_unfollow() -> None:
+            # At once, like the right-click menu: Cancel does not bring a
+            # series back.
+            item = fol_list.currentItem()
+            if item is None:
+                return
+            row = fol_list.row(item)
+            self._unfollow_series({
+                "series_id": item.data(Qt.ItemDataRole.UserRole),
+                "name": item.text()})
+            fol_list.takeItem(row)
+            fol_list.setCurrentRow(min(row, fol_list.count() - 1))
+            followed_card.refresh()
+
+        fol_stop.clicked.connect(fol_unfollow)
 
         # -- Multiview --------------------------------------------------------
         mv = page("multiview", tr("tab_multiview"),
@@ -1715,6 +1762,7 @@ class _SettingsMixin:
             self.settings.setValue("home_start", flag(home_start_box))
             for skey, box in home_shelf_boxes.items():
                 self.settings.setValue(skey, flag(box))
+            self.settings.setValue("follow_notify", flag(follow_notify_box))
             self._apply_home_settings()
             self.cover.reload()
             if self.player:

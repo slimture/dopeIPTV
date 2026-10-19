@@ -1180,6 +1180,10 @@ _STRINGS: dict[str, dict[str, str]] = {
     "follow_new_episode": {"en": "New episode of {name}: {episode}"},
     "follow_new_episodes": {"en": "{n} new episodes of {name}"},
     "follow_new_series": {"en": "New episodes of {n} series you follow"},
+    "set_card_followed": {"en": "Followed series"},
+    "set_follow_notify": {"en": "Tell me about new episodes"},
+    "set_follow_notify_hint": {"en": "A note in the app, and on Linux a desktop notification while the window is in the background. The {shelf} shelf lists them either way."},
+    "set_follow_none": {"en": "You don't follow any series yet. Right-click a series and choose {follow}."},
     "home_new_episodes": {"en": "New episodes"},
     "home_new_count": {"en": "{n} new"},
     # Subtitles: from a file, or found online (OpenSubtitles.com)
