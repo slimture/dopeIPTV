@@ -1,4 +1,5 @@
-"""Host Mesa must not inherit the build machine's older Wayland libraries.
+"""Host Mesa must not inherit the build machine's older Wayland libraries,
+and the host's fontconfig not our older font stack - nor its EGL our GBM.
 
 Execute the spec's actual policy without importing PyInstaller, which is not
 installed by the normal test job. Both collection stages matter: Analysis can
@@ -23,6 +24,10 @@ _HOST_PACKAGES = (
     "libwayland-client0", "libwayland-cursor0",
     "libwayland-egl1", "libwayland-server0",
 )
+_FONTS_GBM = ("libfontconfig.so", "libfreetype.so", "libharfbuzz.so",
+              "libexpat.so", "libgbm.so")
+_FONT_GBM_PACKAGES = ("libfontconfig1", "libfreetype6", "libharfbuzz0b",
+                      "libexpat1", "libgbm1")
 
 
 def _tree() -> ast.Module:
@@ -60,10 +65,21 @@ def test_linux_removes_every_wayland_family_and_alias(
     assert _apply_policy("linux", [entry]) == []
 
 
+@pytest.mark.parametrize("stem", _FONTS_GBM)
+@pytest.mark.parametrize("suffix", ("", ".1", ".6", ".0.20704.0"))
+@pytest.mark.parametrize("kind", ("BINARY", "SYMLINK"))
+def test_linux_leaves_the_font_stack_and_gbm_to_the_host(stem, suffix, kind):
+    entry = (f"{stem}{suffix}", "/build/host-library", kind)
+    assert _apply_policy("linux", [entry]) == []
+
+
 def test_the_filter_preserves_qt_wayland_and_media_dependencies():
     keep = [
         ("libmpv.so.2", "/build/libmpv.so.2", "BINARY"),
         ("libavcodec.so.58", "/build/libavcodec.so.58", "BINARY"),
+        ("libass.so.9", "/build/libass.so.9", "BINARY"),
+        ("libfribidi.so.0", "/build/libfribidi.so.0", "BINARY"),
+        ("libharfbuzz-subset.so.0", "/build/hb-subset", "BINARY"),
         ("libSDL2-2.0.so.0", "/build/libSDL2-2.0.so.0", "BINARY"),
         ("libdecor-0.so.0", "/build/libdecor-0.so.0", "BINARY"),
         ("libQt6WaylandClient.so.6", "/build/qt-client", "BINARY"),
@@ -75,6 +91,8 @@ def test_the_filter_preserves_qt_wayland_and_media_dependencies():
         ("libstdc++.so.6", "/build/libstdc++.so.6", "BINARY"),
         ("libgcc_s.so.1", "/build/libgcc_s.so.1", "BINARY"),
         ("libwayland-client.so.0", "/build/libwayland-client.so.0", "BINARY"),
+        ("libfontconfig.so.1", "/build/libfontconfig.so.1", "BINARY"),
+        ("libgbm.so.1", "/build/libgbm.so.1", "BINARY"),
     ]
     assert _apply_policy("linux", keep + host) == keep
 
@@ -88,7 +106,8 @@ def test_wayland_filter_does_not_change_other_platforms(platform):
     assert _apply_policy(platform, binaries) == binaries
 
 
-def test_libmpv_collection_leaves_wayland_on_the_host(tmp_path, monkeypatch):
+def test_libmpv_collection_leaves_host_libraries_on_the_host(
+        tmp_path, monkeypatch):
     node = next(node for node in _tree().body
                 if isinstance(node, ast.FunctionDef)
                 and node.name == "_libmpv_dep_binaries")
@@ -96,6 +115,8 @@ def test_libmpv_collection_leaves_wayland_on_the_host(tmp_path, monkeypatch):
     exec(compile(ast.Module(body=[node], type_ignores=[]), str(_SPEC), "exec"),
          namespace)
     names = [f"libwayland-{family}.so.0" for family in _WAYLAND]
+    names += ["libharfbuzz.so.0", "libexpat.so.1", "libfontconfig.so.1",
+              "libfreetype.so.6", "libgbm.so.1"]
     names += ["libavcodec.so.58", "libSDL2-2.0.so.0", "libdecor-0.so.0"]
     sources = tmp_path / "sources"
     sources.mkdir()
@@ -141,8 +162,30 @@ def test_clean_distro_checks_install_the_whole_host_wayland_family():
     step = _step(_linux_release(), "Self-containment test across clean distros")
     installs = "\n".join(re.findall(
         r"apt-get install(?:[^\n]*\\\n)*[^\n]*", step))
-    for package in _HOST_PACKAGES:
+    for package in _HOST_PACKAGES + _FONT_GBM_PACKAGES:
         assert re.search(rf"\b{re.escape(package)}\b", installs), package
+
+
+def test_debian_package_declares_the_host_font_stack_and_gbm():
+    step = _step(_linux_release(), "Build .deb")
+    dependencies = set(re.findall(r"--depends\s+(\S+)", step))
+    assert set(_FONT_GBM_PACKAGES) <= dependencies
+
+
+def test_release_audits_the_bundle_for_the_font_stack_and_gbm():
+    step = _step(_linux_release(), "Audit host font and GBM libraries")
+    assert re.search(r"find\s+dist/dopeiptv", step)
+    for stem in _FONTS_GBM:
+        assert f"-name '{stem}*'" in step, stem
+
+
+def test_arch_linux_start_fails_on_font_and_mesa_errors():
+    step = _step(_linux_release(),
+                 "Newest distro - Arch Linux starts without font or Mesa errors")
+    assert "archlinux:latest" in step
+    assert "Embedded playback: enabled" in step
+    for error in ("Fontconfig (error|warning)", "DRI_Mesa"):
+        assert error in step, error
 
 
 def test_debian_13_is_checked_on_both_supported_architectures():

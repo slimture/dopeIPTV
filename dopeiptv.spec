@@ -131,7 +131,8 @@ def _libmpv_dep_binaries(libmpv_path):
         # audio - host's, matches its sound server
         "libpulse", "libasound", "libpipewire", "libjack",
         # font stack + ubiquitous base libs present on every desktop
-        "libfontconfig", "libfreetype", "libz.so", "libzstd", "liblzma",
+        "libfontconfig", "libfreetype", "libharfbuzz.so", "libexpat.so",
+        "libz.so", "libzstd", "liblzma",
         "libbz2", "libudev", "libsystemd", "libdbus", "libcap", "libffi",
         "libpcre", "libselinux", "libmount", "libblkid",
     )
@@ -236,9 +237,23 @@ _HOST_WAYLAND = (
     "libwayland-client.so", "libwayland-cursor.so",
     "libwayland-egl.so", "libwayland-server.so",
 )
+# The font stack and Mesa's GBM come from the host as well, as the AppImage
+# project's excludelist has them. Our fontconfig was the build host's, older
+# than the configuration a current distro ships: on Arch it printed a page of
+# "Fontconfig error: ... invalid attribute 'xsi:nil'" at every start and
+# matched fonts without those rules. freetype, harfbuzz and expat go with it,
+# so the host's fontconfig never meets an older copy of what it links. Our
+# libgbm was the build host's Mesa, which the host's EGL loaded ahead of its
+# own and which could not drive the newer driver ("did not find extension
+# DRI_Mesa version 1").
+_HOST_FONTS_GBM = (
+    "libfontconfig.so", "libfreetype.so", "libharfbuzz.so", "libexpat.so",
+    "libgbm.so",
+)
 if sys.platform.startswith("linux"):
     a.binaries = [b for b in a.binaries
-                  if not os.path.basename(b[0]).startswith(_HOST_WAYLAND)]
+                  if not os.path.basename(b[0]).startswith(
+                      _HOST_WAYLAND + _HOST_FONTS_GBM)]
 pyz = PYZ(a.pure)
 
 exe = EXE(

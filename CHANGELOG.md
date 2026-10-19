@@ -21,6 +21,18 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   under Settings → Home, and a shelf switched on or off there now shows
   so at once, also while Home is open.
 
+### Fixed
+
+- **AppImage and .deb on a current distro (Arch, and others as they
+  update):** every start printed a page of "Fontconfig error: ... invalid
+  attribute 'xsi:nil'" and "did not find extension DRI_Mesa version 1".
+  The package carried the build machine's older fontconfig, which cannot
+  read a newer distro's font configuration, and its older libgbm, which
+  the system's Mesa loaded and could not use. Both now come from the
+  system, with freetype, harfbuzz and expat, as the AppImage project
+  recommends; the .deb lists them as dependencies, and the release build
+  starts the AppImage on Arch Linux and fails on either error.
+
 ## [1.2.17]
 
 The series you follow get a place in Settings, and OpenSubtitles' daily
