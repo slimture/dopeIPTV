@@ -65,8 +65,8 @@ from ..core.recording import format_size
 from ..media.players import embedded_playback_reason
 from .theme import ACCENTS, P, THEMES, apply_theme, build_style
 from .settings_ui import (
-    PlaylistDelegate, ReorderList, SettingsPage, SettingsShell, hbox,
-    page_icon, settings_style,
+    PlaylistDelegate, ReorderList, SettingsPage, SettingsShell, fit_to_rows,
+    hbox, page_icon, settings_style,
 )
 from .widgets import confirm
 from ..core.updates import GITHUB_REPO, fetch_latest_release, is_newer
@@ -998,24 +998,35 @@ class _SettingsMixin:
         # -- Local files ------------------------------------------------------
         loc = page("local", tr("nav_local"), tr("local_settings_hint"),
                    "folder")
-        loc_list = QListWidget()
-        loc_list.setMinimumHeight(120)
+        loc_list = QListWidget(objectName="FolderList")
+        folder_icon = page_icon("folder", self._action_pixmap, 16)
+
+        def loc_item(folder: str) -> QListWidgetItem:
+            it = QListWidgetItem(folder_icon, folder)
+            it.setToolTip(folder)
+            return it
+
         for folder in self._local_dirs():
-            loc_list.addItem(folder)
+            loc_list.addItem(loc_item(folder))
+        fit_to_rows(loc_list)
+        # Selected from the start: Remove says what it would remove.
+        loc_list.setCurrentRow(0)
         loc_add = QPushButton(tr("btn_add"))
         loc_del = QPushButton(tr("btn_remove"))
         loc_empty = QLabel(tr("set_local_none"))
         loc_empty.setObjectName("SettingsHint")
-        c = loc.card(tr("set_card_folders"))
-        c.widget(loc_empty)
-        c.widget(loc_list)
-        c.layout_row(hbox(loc_add, loc_del))
+        folders = loc.card(tr("set_card_folders"))
+        # The rows come and go, not just what is in them: a hidden label in
+        # a row still shown left an empty band above the list.
+        folders.shown_if(folders.widget(loc_empty, tr("set_card_folders")),
+                         lambda: loc_list.count() == 0)
+        folders.shown_if(folders.widget(loc_list, tr("set_card_folders")),
+                         lambda: loc_list.count() > 0)
+        folders.layout_row(hbox(loc_add, loc_del))
 
         def loc_empty_state() -> None:
-            empty = loc_list.count() == 0
-            loc_empty.setVisible(empty)
-            loc_list.setVisible(not empty)
-            loc_del.setEnabled(not empty)
+            folders.refresh()
+            loc_del.setEnabled(loc_list.count() > 0)
 
         loc_list.model().rowsInserted.connect(lambda *_a: loc_empty_state())
         loc_list.model().rowsRemoved.connect(lambda *_a: loc_empty_state())
@@ -1051,7 +1062,8 @@ class _SettingsMixin:
             dirs = self._local_dirs()
             if path and path not in dirs:
                 self._save_local_dirs(dirs + [path])
-                loc_list.addItem(path)
+                loc_list.addItem(loc_item(path))
+                loc_list.setCurrentRow(loc_list.count() - 1)
                 loc_refresh_side()
 
         def loc_del_dir():
@@ -1060,7 +1072,9 @@ class _SettingsMixin:
                 return
             self._save_local_dirs(
                 [d for d in self._local_dirs() if d != it.text()])
-            loc_list.takeItem(loc_list.row(it))
+            row = loc_list.row(it)
+            loc_list.takeItem(row)
+            loc_list.setCurrentRow(min(row, loc_list.count() - 1))
             loc_refresh_side()
 
         def loc_cleared():

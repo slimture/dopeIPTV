@@ -667,6 +667,23 @@ class ReorderList(QListWidget):
         self.reordered.emit()
 
 
+def fit_to_rows(lst: QListWidget, most: int = 6) -> None:
+    """As tall as its rows, up to *most* (then it scrolls). A list left at
+    Qt's default height showed one folder above an empty well."""
+    def fit() -> None:
+        lst.ensurePolished()
+        row = lst.sizeHintForRow(0) if lst.count() else -1
+        if row <= 0:
+            row = lst.fontMetrics().height() + 18
+        rows = max(1, min(lst.count(), most))
+        lst.setFixedHeight(rows * (row + 2 * lst.spacing())
+                           + 2 * lst.frameWidth() + 4)
+
+    lst.model().rowsInserted.connect(lambda *_a: fit())
+    lst.model().rowsRemoved.connect(lambda *_a: fit())
+    fit()
+
+
 def expanding(w: QWidget) -> QWidget:
     w.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
     return w

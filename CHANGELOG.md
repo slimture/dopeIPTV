@@ -15,6 +15,15 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   day's downloads are used up, the search says so in the app's language,
   with where a free account goes, instead of the site's English.
 
+### Fixed
+
+- **Settings → Local files:** the folder list stood at Qt's default
+  height, so one folder floated above an empty well, under an empty band
+  where the hidden "No folders yet" line still took its room. The list is
+  now as tall as its folders (up to six, then it scrolls), each with a
+  folder icon and its full path as a tooltip, and one is selected so
+  Remove says what it would remove.
+
 ## [1.2.16]
 
 A fix for subtitles from OpenSubtitles on macOS, Windows and the Flatpak.
