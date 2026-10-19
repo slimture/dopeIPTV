@@ -879,10 +879,13 @@ class _SettingsMixin:
                              ("home_sh_fav", "home_fav_now"),
                              ("home_sh_history", "home_recent"),
                              ("home_sh_watchlist", "nav_watchlist"),
+                             ("home_sh_pop_movies", "home_pop_movies"),
+                             ("home_sh_pop_series", "home_pop_series"),
                              ("home_sh_movies", "home_new_movies"),
                              ("home_sh_series", "home_new_series"),
                              ("home_sh_channels", "home_new_channels")):
             home_shelf_boxes[skey] = c.toggle(tr(slabel), is_on(skey, "true"))
+        c.note(tr("set_home_popular_note"))
         # Following a series: whether new episodes are announced (the shelf
         # and the episode dots show them either way), and the series this
         # playlist follows, to stop following one without finding it again.

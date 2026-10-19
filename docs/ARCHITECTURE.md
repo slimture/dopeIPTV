@@ -54,6 +54,8 @@ dopeiptv/
                        (persistence + keep/drop rule)
     mpris.py           MPRIS media session on the D-Bus session bus (Linux)
     notify.py          Desktop notifications (org.freedesktop.Notifications)
+    popular.py         Popular right now: TMDB's chart of the week matched
+                       against the provider's catalogue (Home shelves)
 
   ui/                  Everything the user sees
     __init__.py        Lazy MainWindow export (PEP 562)

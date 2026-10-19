@@ -270,3 +270,144 @@ def test_a_home_card_acts_after_the_click_not_inside_it():
     assert "CARD_OK" in proc.stdout, (
         f"card checks failed\n"
         f"stdout={proc.stdout!r}\nstderr={proc.stderr[-2000:]!r}")
+
+
+_POPULAR_CHILD = r"""
+import os, time
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from PyQt6.QtCore import QSettings
+from PyQt6.QtWidgets import QApplication, QLabel
+
+from dopeiptv.i18n import current_language, tr
+from dopeiptv.providers.client import DemoClient
+from dopeiptv.ui.main_window import MainWindow
+from dopeiptv.ui.mw_home import _Shelf
+
+app = QApplication.instance() or QApplication([])
+settings = QSettings("dopeiptv-test", "home-popular")
+settings.clear()
+w = MainWindow(DemoClient(), settings)
+movies = [
+    # The copy in a hidden category gives way to the visible one.
+    {"stream_id": 3, "name": "AR - Dune: Part Two (2024)",
+     "category_id": "2", "added": "7"},
+    {"stream_id": 1, "name": "EN - Inception (2010)", "category_id": "1",
+     "added": "5"},
+    {"stream_id": 2, "name": "EN - Dune: Part Two (2024)",
+     "category_id": "1", "added": "6"},
+    {"stream_id": 4, "name": "Some Old Film", "category_id": "1",
+     "added": "8"},
+]
+shows = [{"series_id": 20, "name": "Shogun (2024)", "category_id": "9"}]
+w.client.vod_streams = lambda category_id=None: movies
+w.client.series_list = lambda category_id=None: shows
+w.overrides.update("vod", "2", hidden=True)
+w._popular_chart = {
+    "t": time.time(), "lang": current_language(),
+    "vod": [{"id": 693134, "titles": ["Dune: Part Two"], "year": 2024},
+            {"id": 1, "titles": ["Not On The Provider"], "year": 2024},
+            {"id": 27205, "titles": ["Inception"], "year": 2010}],
+    "series": [{"id": 126308, "titles": ["Shōgun"], "year": 2024}]}
+
+def settle(cond, secs=15):
+    end = time.time() + secs
+    while not cond() and time.time() < end:
+        app.processEvents()
+        time.sleep(0.01)
+    app.processEvents()
+    return cond()
+
+def shelves():
+    out = {}
+    for shelf in w._home_page.findChildren(_Shelf):
+        if shelf.isHidden():
+            continue                     # torn down by a rebuild
+        head = shelf.findChildren(QLabel)[0].text()
+        cards = [shelf._h.itemAt(i).widget() for i in range(shelf.count())]
+        out[head] = [[l.text() for l in c.findChildren(QLabel)
+                      if l.text()][0] for c in cards]
+    return out
+
+def same(got, want):
+    # Card titles are elided to the card's width.
+    return len(got) == len(want) and all(
+        w_.startswith(g.rstrip("…")) for g, w_ in zip(got, want))
+
+pop_m, pop_s = tr("home_pop_movies"), tr("home_pop_series")
+w._show_home_page()
+assert settle(lambda: pop_m in shelves()), shelves()
+got = shelves()
+assert same(got[pop_m], ["EN - Dune: Part Two (2024)",
+                         "EN - Inception (2010)"]), got
+assert same(got[pop_s], ["Shogun (2024)"]), got
+heads = list(got)
+assert heads.index(pop_m) < heads.index(pop_s) \
+    < heads.index(tr("home_new_movies")), heads
+
+# A card plays its movie.
+plays = []
+w._start_playback = (lambda url, title, icon, key, kind, *a, **k:
+                     plays.append((title, kind)))
+w.client.vod_url = lambda sid, ext=None: f"http://x/movie/{sid}.mp4"
+shelf = [s for s in w._home_page.findChildren(_Shelf)
+         if not s.isHidden() and s.findChildren(QLabel)[0].text() == pop_m][0]
+shelf._h.itemAt(0).widget().clicked.emit()
+app.processEvents()
+assert plays == [("EN - Dune: Part Two (2024)", "movie")], plays
+
+# Switched off in Settings: gone at once, the other one stays.
+w._show_home_page()
+assert settle(lambda: pop_m in shelves()), shelves()
+settings.setValue("home_sh_pop_movies", "false")
+w._apply_home_settings()
+assert settle(lambda: pop_m not in shelves() and pop_s in shelves()), \
+    shelves()
+# Both off: no chart is wanted, so none is fetched.
+settings.setValue("home_sh_pop_series", "false")
+assert w._home_page._trending() is None
+settings.setValue("home_sh_pop_movies", "true")
+settings.setValue("home_sh_pop_series", "true")
+
+# A day-old chart is fetched again in the background, kept on disk, and
+# the shelves follow it.
+class FakeTmdb:
+    def trending(self, kind, pages, languages):
+        if kind != "vod":
+            return []
+        return [{"id": 27205, "titles": ["Inception"], "year": 2010}]
+
+class FakeResolver:
+    client = FakeTmdb()
+    def tmdb_id_for(self, name, kind): return None
+    def get(self, *a, **k): return None
+    def get_full(self, *a, **k): return None
+    def is_resolved(self, *a, **k): return True
+    def flush(self): return None
+
+w.cover.resolver = FakeResolver()
+w._popular_chart = dict(w._popular_chart, t=time.time() - 2 * 86400)
+w._show_home_page()
+assert settle(lambda: same(shelves().get(pop_m, []),
+                          ["EN - Inception (2010)"])), shelves()
+assert pop_s not in shelves()
+assert os.path.exists(w._home_page._chart_path())
+print("POPULAR_OK")
+"""
+
+
+def test_home_popular_shelves(tmp_path):
+    """Popular movies / series right now: TMDB's chart of the week, only
+    what the provider has, in the chart's order, above Recently added."""
+    try:
+        import PyQt6  # noqa: F401
+    except Exception:
+        pytest.skip("PyQt6 not available")
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen",
+               XDG_CACHE_HOME=str(tmp_path))
+    env.pop("DOPEIPTV_TMDB_KEY", None)        # never the real TMDB here
+    proc = subprocess.run(
+        [sys.executable, "-c", _POPULAR_CHILD], capture_output=True,
+        text=True, env=env, cwd=_REPO_ROOT, timeout=180)
+    assert "POPULAR_OK" in proc.stdout, (
+        f"popular checks failed\n"
+        f"stdout={proc.stdout!r}\nstderr={proc.stderr[-3000:]!r}")

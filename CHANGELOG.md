@@ -7,6 +7,20 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Added
+
+- **Popular right now, on Home.** Two new shelves, "Popular movies right
+  now" and "Popular series right now": this week's most popular titles on
+  TMDB that your provider has, in the chart's order. A provider's API has
+  no chart of its own, so TMDB's list of the week is fetched once a day,
+  through the TMDB key the covers use, and matched against the provider's
+  catalogue - by TMDB id where the provider gives one, else by title and
+  year, in English or the app's language, with tags such as "EN - " or
+  "|SE|" in front of a name ignored. A copy in a hidden or locked
+  category gives way to a visible one. Each shelf can be switched off
+  under Settings → Home, and a shelf switched on or off there now shows
+  so at once, also while Home is open.
+
 ## [1.2.17]
 
 The series you follow get a place in Settings, and OpenSubtitles' daily

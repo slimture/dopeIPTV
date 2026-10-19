@@ -200,6 +200,44 @@ class TmdbClient:
             })
         return out
 
+    def trending(self, kind: str, pages: int = 4,
+                 languages: tuple[str, ...] = ("en-US",)) -> list[dict]:
+        """This week's most popular movies (*kind* "vod") or series, most
+        popular first: ``{"id", "titles", "year"}`` each. *titles* holds
+        the title in every one of *languages* and the original one, as the
+        provider may name a title any of those ways. The chart's order is
+        the first language's; the others only add titles."""
+        endpoint = "movie" if kind == "vod" else "tv"
+        rows: dict[int, dict] = {}
+        order: list[int] = []
+        for lang in languages:
+            for page in range(1, pages + 1):
+                params: dict[str, Any] = {"api_key": self.api_key,
+                                          "page": page, "language": lang}
+                r = requests.get(f"{self.BASE}/trending/{endpoint}/week",
+                                 params=params, timeout=10)
+                r.raise_for_status()
+                data = r.json() or {}
+                for res in data.get("results") or []:
+                    tid = res.get("id")
+                    if not isinstance(tid, int):
+                        continue
+                    row = rows.get(tid)
+                    if row is None:
+                        if lang != languages[0]:
+                            continue
+                        row = rows[tid] = {"id": tid, "titles": [],
+                                           "year": self._result_year(res)}
+                        order.append(tid)
+                    for key in ("title", "name", "original_title",
+                                "original_name"):
+                        title = res.get(key)
+                        if title and title not in row["titles"]:
+                            row["titles"].append(title)
+                if page >= int(data.get("total_pages") or 1):
+                    break
+        return [rows[i] for i in order]
+
     def fetch_details_by_id(self, tmdb_id: int, kind: str) -> dict | None:
         """Same shape as fetch_details() but skips the search step - used
         by the manual-match flow after the user has picked an id."""

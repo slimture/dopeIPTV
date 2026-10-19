@@ -12,9 +12,10 @@ so this module is pure presentation + wiring.
 from __future__ import annotations
 
 import json
+import os
 import time
 
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QStandardPaths, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (
     QColor, QFont, QIcon, QPainter, QPainterPath, QPen, QPixmap,
 )
@@ -23,8 +24,10 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
+from ..core.log import log
 from ..core.workers import run_async
-from ..i18n import tr
+from ..i18n import current_language, tr
+from ..services import popular
 from .theme import P
 
 # Card geometry (image area; the card adds a text strip underneath).
@@ -687,9 +690,13 @@ class HomePage(QWidget):
 
     def _load_posters(self) -> None:
         w, gen = self.window, self._gen
+        chart = self._trending()
+        stamp = chart.get("t") if chart else None
         cache = getattr(w, "_home_poster_cache", None)
-        if cache and time.time() - cache[0] < self.MEDIA_CACHE_SECS:
-            self._fill_posters(cache[1], cache[2])
+        # A new chart makes the cached popular shelves out of date.
+        if (cache and time.time() - cache[0] < self.MEDIA_CACHE_SECS
+                and cache[5] == stamp):
+            self._fill_posters(*cache[1:5])
             return
         # Cold start: paint last session's posters straight from disk so the
         # Featured row appears instantly, then refresh from the provider in the
@@ -698,16 +705,31 @@ class HomePage(QWidget):
         # fast on launch.
         disk = self._read_disk_posters()
         if disk:
-            self._fill_posters(disk[0], disk[1])
+            self._fill_posters(*disk)
         client = w.client
+        resolver = getattr(getattr(w, "cover", None), "resolver", None)
+
+        def known(kind: str):
+            if resolver is None:
+                return None
+            return lambda name: resolver.tmdb_id_for(name, kind)
 
         def work():
             vod = list(client.vod_streams(None) or [])
             ser = list(client.series_list(None) or [])
-            return vod, ser
+            # The chart is matched against the whole catalogue here: tens
+            # of thousands of names are too many for the GUI thread.
+            gvod: list = []
+            gser: list = []
+            if chart:
+                gvod = popular.match(chart["vod"], vod, known("vod"))
+                gser = popular.match(chart["series"], ser, known("series"))
+            return vod, ser, gvod, gser
 
         def done(res):
-            vod, ser = res
+            vod, ser, gvod, gser = res
+            pvod = self._pick_popular(gvod, "vod")
+            pser = self._pick_popular(gser, "series")
             # Keep each shelf to its own content type. Some providers dump live
             # channels into the VOD "all" list, so the Movies shelf takes only
             # real movie rows and the Series shelf only rows with a series_id.
@@ -721,8 +743,8 @@ class HomePage(QWidget):
             # Cap the shelves modestly: a horizontal row of ~18 poster cards is
             # plenty, and fewer widgets keeps the vertical page scroll smooth.
             vod, ser = vod[:18], ser[:18]
-            w._home_poster_cache = (time.time(), vod, ser)
-            self._write_disk_posters(vod, ser)
+            w._home_poster_cache = (time.time(), vod, ser, pvod, pser, stamp)
+            self._write_disk_posters(vod, ser, pvod, pser)
             if gen != self._gen:
                 return
             try:
@@ -759,16 +781,94 @@ class HomePage(QWidget):
                 return None
         except (TypeError, ValueError):
             return None
-        vod, ser = d.get("vod") or [], d.get("ser") or []
-        return (vod, ser) if (vod or ser) else None
+        rows = tuple(d.get(k) or [] for k in ("vod", "ser", "pvod", "pser"))
+        return rows if any(rows) else None
 
-    def _write_disk_posters(self, vod: list, ser: list) -> None:
+    def _write_disk_posters(self, vod: list, ser: list, pvod: list,
+                            pser: list) -> None:
         try:
             self.window.settings.setValue(
                 self._disk_key(),
-                json.dumps({"t": time.time(), "vod": vod, "ser": ser}))
+                json.dumps({"t": time.time(), "vod": vod, "ser": ser,
+                            "pvod": pvod, "pser": pser}))
         except Exception:
             pass
+
+    # -- popular right now (TMDB's chart of the week, what the provider has) --
+
+    POPULAR_MAX = 18
+
+    def _trending(self) -> dict | None:
+        """This week's TMDB chart for the popular shelves, from memory or
+        disk - fetched again in the background once it is a day old or in
+        another language. None while there is none, or no shelf wants it."""
+        w = self.window
+        s = w.settings
+        if (s.value("home_sh_pop_movies", "true") != "true"
+                and s.value("home_sh_pop_series", "true") != "true"):
+            return None
+        if getattr(w, "_popular_chart", None) is None:
+            w._popular_chart = popular.load(self._chart_path()) or {}
+        chart = w._popular_chart
+        now, lang = time.time(), current_language()
+        # The chart comes from TMDB, through the key the covers use.
+        resolver = getattr(getattr(w, "cover", None), "resolver", None)
+        if (resolver is not None and not popular.is_fresh(chart, lang, now)
+                and not getattr(w, "_popular_fetching", False)
+                and now - getattr(w, "_popular_failed", 0.0)
+                > popular.RETRY_AFTER_S):
+            self._fetch_chart(resolver.client, lang)
+        return chart if popular.usable(chart, now) else None
+
+    def _fetch_chart(self, client, lang: str) -> None:
+        w = self.window
+        w._popular_fetching = True
+        path = self._chart_path()
+
+        def work():
+            chart = popular.fetch(client, lang)
+            if path:
+                try:
+                    popular.save(path, chart)
+                except OSError as e:
+                    log.info("popular: could not keep the chart: %s", e)
+            return chart
+
+        def done(chart):
+            w._popular_fetching = False
+            w._popular_chart = chart
+            log.info("popular: TMDB chart of %d movies and %d series",
+                     len(chart["vod"]), len(chart["series"]))
+            if w._home_showing():
+                w._home_page.refresh()
+
+        def failed(msg):
+            w._popular_fetching = False
+            w._popular_failed = time.time()
+            log.info("popular: no TMDB chart: %s", msg)
+
+        run_async(w.pool, work, done, failed)
+
+    @staticmethod
+    def _chart_path() -> str:
+        base = QStandardPaths.writableLocation(
+            QStandardPaths.StandardLocation.CacheLocation)
+        return os.path.join(base, "tmdb_trending.json") if base else ""
+
+    def _pick_popular(self, groups: list, kind: str) -> list[dict]:
+        """For each title on the chart, the first copy the user may see: not
+        hidden, not locked away, and on the movie shelf a real movie."""
+        flat = [row for rows in groups for row in rows]
+        seen = {id(r) for r in self.window._visible_catalog(flat, kind)}
+
+        def ok(row: dict) -> bool:
+            if id(row) not in seen:
+                return False
+            if kind == "vod":
+                return self._is_movie(row)
+            return row.get("series_id") is not None
+
+        return popular.pick(groups, ok, self.POPULAR_MAX)
 
     def _load_channels(self) -> None:
         w, gen = self.window, self._gen
@@ -797,37 +897,42 @@ class HomePage(QWidget):
 
         run_async(w.pool, work, done, lambda _e: None)
 
-    def _fill_posters(self, vod: list, ser: list) -> None:
+    def _fill_posters(self, vod: list, ser: list, pvod: list | None = None,
+                      pser: list | None = None) -> None:
         w = self.window
         s = w.settings
         # Again here: the memory and disk copies may predate a lock or a hide.
         vod = w._visible_catalog(vod, "vod")
         ser = w._visible_catalog(ser, "series")
+        pvod = w._visible_catalog(pvod or [], "vod")
+        pser = w._visible_catalog(pser or [], "series")
 
-        if s.value("home_sh_movies", "true") == "true" and vod:
-            shelf = _Shelf(tr("home_new_movies"))
-            for it in vod:
-                card = _Card(POSTER_W, POSTER_H, it.get("name") or "?")
-                card.clicked.connect(lambda it=it: self._play_media(it))
-                self._set_art(card, self._media_art(it), w.poster_art)
-                shelf.add(card)
-            shelf.finish(POSTER_H)
-            self._movies_box.addWidget(shelf)
-        if s.value("home_sh_series", "true") == "true" and ser:
-            shelf = _Shelf(tr("home_new_series"))
-            for it in ser:
-                card = _Card(POSTER_W, POSTER_H, it.get("name") or "?")
-                card.clicked.connect(lambda it=it: self._open_series(it))
-                self._set_art(card, self._media_art(it, "series"),
-                              w.poster_art)
-                shelf.add(card)
-            shelf.finish(POSTER_H)
-            self._movies_box.addWidget(shelf)
-        if vod or ser:
+        for key, title, rows, kind in (
+                ("home_sh_pop_movies", "home_pop_movies", pvod, "vod"),
+                ("home_sh_pop_series", "home_pop_series", pser, "series"),
+                ("home_sh_movies", "home_new_movies", vod, "vod"),
+                ("home_sh_series", "home_new_series", ser, "series")):
+            if s.value(key, "true") == "true" and rows:
+                self._poster_shelf(tr(title), rows, kind)
+        if vod or ser or pvod or pser:
             # Adding the movie/series shelves grows the page; on macOS a layout
             # reflow can leave the shelves below painted behind their old
             # position. Force a clean repaint once the layout has settled.
             self._repaint_after_reflow()
+
+    def _poster_shelf(self, title: str, rows: list, kind: str) -> None:
+        w = self.window
+        shelf = _Shelf(title)
+        for it in rows:
+            card = _Card(POSTER_W, POSTER_H, it.get("name") or "?")
+            if kind == "series":
+                card.clicked.connect(lambda it=it: self._open_series(it))
+            else:
+                card.clicked.connect(lambda it=it: self._play_media(it))
+            self._set_art(card, self._media_art(it, kind), w.poster_art)
+            shelf.add(card)
+        shelf.finish(POSTER_H)
+        self._movies_box.addWidget(shelf)
 
     def _repaint_after_reflow(self) -> None:
         """Force a clean repaint after a layout change that moved shelves.
@@ -1137,6 +1242,9 @@ class _HomeMixin:
             self.nav_btns["home"].setVisible(self._home_enabled())
         if not self._home_enabled() and self._home_showing():
             self._leave_home()
+        elif self._home_showing():
+            # A shelf switched on or off in Settings shows so at once.
+            self._home_page.refresh()
 
     def _maybe_open_home_at_start(self) -> None:
         if (self._home_enabled()

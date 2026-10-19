@@ -55,6 +55,7 @@ PRESET = {
     "home_sh_history": "false", "home_sh_watchlist": "true",
     "home_sh_movies": "false", "home_sh_series": "true",
     "home_sh_channels": "false", "follow_notify": "false",
+    "home_sh_pop_movies": "true", "home_sh_pop_series": "false",
 }
 for k, v in PRESET.items():
     s.setValue(k, v)

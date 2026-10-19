@@ -31,6 +31,7 @@ map and the one-way import rule.
 | `core/gcguard.py` | Cyclic garbage collection on the GUI thread only |
 | `services/mpris.py` | MPRIS media session on the session bus (Linux) |
 | `services/notify.py` | Desktop notifications over D-Bus (Linux) |
+| `services/popular.py` | Popular right now: TMDB's weekly chart matched to the provider's catalogue |
 | `core/log.py` | Central logging (`configure_logging`, `DOPEIPTV_LOG`) |
 | `core/platform_macos.py` | macOS-specific helpers |
 | `core/platform_windows.py` | Windows-specific helpers |
@@ -121,7 +122,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
   metadata, diagnostics, oauth_loopback, opensubtitles, dlna), `core/` (stores, updates, log,
   player_exec, wakelock, selfupdate, gcguard) and `services/` (resume,
-  coverart, reminders, mpris, notify); see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
+  coverart, reminders, mpris, notify, popular); see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list
   as more non-UI modules gain type hints.
