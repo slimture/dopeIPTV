@@ -8,7 +8,7 @@ import sys
 import pytest
 
 from dopeiptv import VERSION
-from dopeiptv.i18n import LocalizedError
+from dopeiptv.i18n import LocalizedError, tr
 from dopeiptv.providers import opensubtitles as osub
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -134,9 +134,6 @@ def test_errors_say_what_went_wrong():
     with pytest.raises(LocalizedError) as e:
         c.search(query="x")
     assert e.value.key == "subs_err_key"
-    with pytest.raises(LocalizedError) as e:
-        c.download(1)
-    assert "allowed 5 subtitles" in e.value.localized()
     s.routes[("GET", "/subtitles")] = osub.requests.ConnectionError("dns")
     with pytest.raises(LocalizedError) as e:
         c.search(query="x")
@@ -148,6 +145,39 @@ def test_errors_say_what_went_wrong():
     with pytest.raises(LocalizedError) as e:
         osub.OpenSubtitles("", session=s).search(query="x")
     assert e.value.key == "subs_need_key"
+
+
+def test_used_up_downloads_say_so_in_the_users_words():
+    """Without an account OpenSubtitles allows 5 downloads a day per
+    internet connection. When they are used up the user is told so in
+    their own language, with where a free account goes - whichever status
+    code and words the site uses for it."""
+    where = f"{tr('settings_title')} → {tr('sec_audio_subs')}"
+    for answer in (
+            _Resp(406, data={"message": "You have downloaded your allowed "
+                                        "5 subtitles for 24h."}),
+            _Resp(407, data={}),
+            _Resp(400, data={"message": "Download limit reached"})):
+        c = osub.OpenSubtitles("k", session=_Session({
+            ("POST", "/download"): answer}))
+        with pytest.raises(LocalizedError) as e:
+            c.download(1)
+        assert e.value.key == "subs_err_quota"
+        assert where in e.value.localized()
+    # Signed in, the account's own allowance ran out: no advice to sign in.
+    s = _Session({
+        ("POST", "/login"): _Resp(data={"token": "T"}),
+        ("POST", "/download"): _Resp(406, data={"message": "limit"}),
+    })
+    with pytest.raises(LocalizedError) as e:
+        osub.OpenSubtitles("k", "me", "pw", session=s).download(1)
+    assert e.value.key == "subs_err_quota_account"
+    # Any other refusal is still the site's own words.
+    c = osub.OpenSubtitles("k", session=_Session({
+        ("POST", "/download"): _Resp(400, data={"message": "Bad file id"})}))
+    with pytest.raises(LocalizedError) as e:
+        c.download(1)
+    assert e.value.localized() == "Bad file id"
 
 
 def test_download_signs_in_once_and_fetches_the_file():

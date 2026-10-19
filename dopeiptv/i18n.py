@@ -1204,10 +1204,12 @@ _STRINGS: dict[str, dict[str, str]] = {
     "subs_err_http": {"en": "OpenSubtitles answered with an error ({code})."},
     "subs_err_network": {"en": "Could not reach OpenSubtitles."},
     "subs_err_bad_file": {"en": "OpenSubtitles did not send a usable subtitle file."},
+    "subs_err_quota": {"en": "Today's subtitle downloads are used up: without an account OpenSubtitles allows 5 a day. Enter a free OpenSubtitles account under {where} for 20 a day, or try again tomorrow."},
+    "subs_err_quota_account": {"en": "Today's subtitle downloads on your OpenSubtitles account are used up. Try again tomorrow."},
     "setting_api_key": {"en": "API key"},
     "os_key_hint": {"en": "Free: sign in at opensubtitles.com, open API consumers and create one."},
     "os_key_builtin_hint": {"en": "One is built in — enter your own only to use it instead."},
-    "os_account_hint": {"en": "Optional — signing in raises how many subtitles you can download a day."},
+    "os_account_hint": {"en": "Optional — without an account OpenSubtitles allows 5 downloads a day per internet connection, with a free account 20."},
     # Casting to DLNA / UPnP TVs
     "cast_dlna_note": {"en": "A TV plays the stream as it is — choosing audio, subtitles or picture size works with a Chromecast."},
     "cast_err_dlna_refused": {"en": "The TV refused the stream ({msg})."},

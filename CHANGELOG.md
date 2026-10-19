@@ -7,6 +7,14 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Changed
+
+- **OpenSubtitles' daily limit is explained.** Settings → Audio &
+  subtitles says how many subtitles a day OpenSubtitles allows: 5 per
+  internet connection without an account, 20 with a free one. When the
+  day's downloads are used up, the search says so in the app's language,
+  with where a free account goes, instead of the site's English.
+
 ## [1.2.16]
 
 A fix for subtitles from OpenSubtitles on macOS, Windows and the Flatpak.

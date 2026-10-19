@@ -17,10 +17,16 @@ from typing import Any
 from .. import APP_NAME, VERSION
 from ..core._lazy_requests import requests
 from ..core.log import log
-from ..i18n import LocalizedError
+from ..i18n import LocalizedError, tr
 
 API = "https://api.opensubtitles.com/api/v1"
 TIMEOUT = (10, 30)
+# How the download endpoint says the day's allowance is used up - 5 a day
+# per internet connection without an account, more with one. Seen as 406
+# and as 407, so its own words count too ("You have downloaded your allowed
+# 5 subtitles for 24h").
+_QUOTA_STATUS = (406, 407)
+_QUOTA_WORDS = re.compile(r"\bdownload.*\b(allowed|limit|quota)\b", re.I)
 # A subtitle is text; anything this big is not one.
 MAX_BYTES = 8 * 1024 * 1024
 HASH_CHUNK = 65536
@@ -225,21 +231,37 @@ class OpenSubtitles:
         rows = [r for r in (_row(e) for e in data.get("data") or []) if r]
         return rank(rows)
 
+    def _download_link(self, file_id: int) -> dict:
+        """The download endpoint's answer; "the day's downloads are used up"
+        said in the user's language, with what to do about it."""
+        try:
+            return self._call("POST", "/download",
+                              json={"file_id": int(file_id)}) or {}
+        except LocalizedError as e:
+            if (getattr(e, "status", None) not in _QUOTA_STATUS
+                    and not _QUOTA_WORDS.search(str(e))):
+                raise
+            log.info("opensubtitles: the day's downloads are used up: %s", e)
+            if self._token:
+                raise LocalizedError("subs_err_quota_account") from e
+            raise LocalizedError(
+                "subs_err_quota",
+                where=f"{tr('settings_title')} → {tr('sec_audio_subs')}",
+            ) from e
+
     def download(self, file_id: int) -> tuple[str, bytes]:
         """(file name, subtitle bytes). One of the day's downloads."""
         if self.username and self.password and not self._token:
             self.login()
         try:
-            data = self._call("POST", "/download",
-                              json={"file_id": int(file_id)}) or {}
+            data = self._download_link(file_id)
         except LocalizedError as e:
             # A sign-in lasts a day; the app may run longer than that.
             if getattr(e, "status", None) != 401 or not self._token:
                 raise
             self._token = ""
             self.login()
-            data = self._call("POST", "/download",
-                              json={"file_id": int(file_id)}) or {}
+            data = self._download_link(file_id)
         link = str(data.get("link") or "")
         if not link.startswith("https://"):
             raise LocalizedError("subs_err_bad_file")
