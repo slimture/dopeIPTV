@@ -7,6 +7,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.2.17]
+
+The series you follow get a place in Settings, and OpenSubtitles' daily
+limit is explained.
+
 ### Added
 
 - **Settings → Home → Followed series.** A switch for whether new

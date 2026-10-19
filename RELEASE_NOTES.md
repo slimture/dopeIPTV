@@ -1,3 +1,25 @@
+## dopeIPTV 1.2.17
+
+The series you follow get a place in Settings, and OpenSubtitles' daily
+limit is explained.
+
+- **Followed series in Settings.** **Settings → Home → Followed series**
+  lists the series you follow, and **Stop following series** stops one
+  without having to find it first. A switch there turns the notifications
+  about new episodes off - new episodes still show on Home under **New
+  episodes**, and with a dot in the episode list.
+- **OpenSubtitles' daily limit, explained.** Without an account
+  OpenSubtitles allows 5 subtitles a day per internet connection, with a
+  free account 20. **Settings → Audio & subtitles** says so, and when the
+  day's downloads are used up the search tells you so in your language,
+  with where to enter a free account.
+- **Settings → Local files** lists your folders properly, each with its
+  full path when you point at it.
+
+On the AppImage from 1.2.15 or later? Click **Update now** in the banner.
+Coming from 1.2.15, the subtitle fix in 1.2.16 is below; from 1.2.14 or
+earlier, everything new in 1.2.15 as well.
+
 ## dopeIPTV 1.2.16
 
 A fix for subtitles from OpenSubtitles on macOS, Windows and the Flatpak.
@@ -7,9 +29,6 @@ A fix for subtitles from OpenSubtitles on macOS, Windows and the Flatpak.
   usable subtitle file" and kept the search open. The setting "On - forced
   subtitles only" works there again as well, and a subtitle you picked for
   a title is always shown when you play it again.
-
-On the AppImage from 1.2.15? Click **Update now** in the banner. Coming
-from 1.2.14 or earlier, everything new in 1.2.15 is below.
 
 ## dopeIPTV 1.2.15
 
