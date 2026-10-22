@@ -96,7 +96,7 @@ count_downloads() {
     : > "$TMP/log.new"
     if [ -n "$old_ino" ] && [ "$ino" != "$old_ino" ]; then
         # Rotated since the last run: first what was left of the old file,
-        # which newsyslog keeps uncompressed as .0 (the p flag, DEPLOY.md).
+        # which newsyslog keeps uncompressed as .0 (the P flag, DEPLOY.md).
         if [ -f "$DL_LOG.0" ] && [ "$(inode "$DL_LOG.0")" = "$old_ino" ]; then
             tail -c +$((old_off + 1)) "$DL_LOG.0" >> "$TMP/log.new"
         fi
@@ -104,7 +104,11 @@ count_downloads() {
     fi
     size=$(wc -c < "$DL_LOG" | tr -d ' ')
     [ "$size" -ge "$old_off" ] || old_off=0
-    tail -c +$((old_off + 1)) "$DL_LOG" | head -c $((size - old_off)) > "$TMP/log.cur"
+    : > "$TMP/log.cur"
+    # Nothing new is the usual case, and FreeBSD's head refuses -c 0.
+    if [ "$size" -gt "$old_off" ]; then
+        tail -c +$((old_off + 1)) "$DL_LOG" | head -c $((size - old_off)) > "$TMP/log.cur"
+    fi
     # A line nginx is still writing waits for the next run.
     if [ -s "$TMP/log.cur" ] && [ "$(tail -c 1 "$TMP/log.cur" | od -An -c | tr -d ' ')" != '\n' ]; then
         sed '$d' "$TMP/log.cur" > "$TMP/log.cur2"
