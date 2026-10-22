@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="{{v:lang}}" dir="{{v:dir}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{h:meta_title}}</title>
+<meta name="description" content="{{h:meta_desc}}">
+<link rel="canonical" href="{{v:canonical}}">
+{{b:hreflang}}<meta name="theme-color" content="#0f1218">
+<meta name="robots" content="index,follow">
+<meta name="keywords" content="{{h:meta_keywords}}">
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="dopeIPTV">
+<meta property="og:locale" content="{{v:locale}}">
+<meta property="og:title" content="{{h:meta_title}}">
+<meta property="og:description" content="{{h:meta_desc}}">
+<meta property="og:url" content="{{v:canonical}}">
+<meta property="og:image" content="https://iptv.dope.rs/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{h:meta_title}}">
+<meta name="twitter:description" content="{{h:meta_desc}}">
+<meta name="twitter:image" content="https://iptv.dope.rs/og-image.png">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" href="/favicon.png" sizes="512x512" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<link rel="stylesheet" href="{{v:css}}">
+<script type="application/ld+json">
+{{b:jsonld}}</script>
+</head>
+<body>
+{{b:nav}}
+<main id="top">
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <span class="eyebrow"><span class="dot"></span> {{h:hero_eyebrow}} {{v:version}}</span>
+        <h1><span class="h1-brand">dopeIPTV</span> {{t:hero_h1}}</h1>
+        <p class="lede">{{t:hero_lede}}</p>
+        <div class="cta-row">
+          <a class="btn primary" id="heroDownload" href="#download" data-os-label="{{h:hero_cta_os}}">{{h:hero_cta}}</a>
+          <a class="btn ghost" href="https://github.com/slimture/dopeIPTV">{{h:hero_source}}</a>
+        </div>
+        <p class="platnote"><b id="osLabel">Linux · macOS · Windows</b> — {{t:hero_free}}</p>
+      </div>
+      <div class="mock" aria-hidden="true">
+        <div class="titlebar"><span class="tl-dot"></span><span class="tl-dot"></span><span class="tl-dot"></span></div>
+        <div class="body">
+          <div class="chans">
+            <div class="chan active"><span class="n"></span><span class="cn">News 24</span><span class="live-tag">{{h:mock_live}}</span></div>
+            <div class="chan"><span class="n"></span><span class="cn">Channel One</span></div>
+            <div class="chan"><span class="n"></span><span class="cn">{{h:mock_sport}}</span></div>
+            <div class="chan"><span class="n"></span><span class="cn">{{h:mock_cinema}}</span></div>
+            <div class="chan"><span class="n"></span><span class="cn">{{h:mock_nature}}</span></div>
+            <div class="chan"><span class="n"></span><span class="cn">{{h:mock_kids}}</span></div>
+          </div>
+          <div class="stage">
+            <div class="screen"><span class="scan"></span></div>
+            <div class="timeline">
+              <div class="tl-track"><span class="tl-fill"></span><span class="tl-head"></span></div>
+              <div class="tl-meta"><span>19:24 · {{h:mock_news}}</span><span class="behind">{{h:mock_behind}}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="strip">
+    <div class="wrap">
+      <span class="chip">Xtream Codes</span><span class="chip">M3U / M3U8</span>
+      <span class="chip">XMLTV EPG</span><span class="chip">{{h:chip_timeshift}}</span>
+      <span class="chip">{{t:feat_mv_h}}</span><span class="chip">Chromecast</span><span class="chip">DLNA</span><span class="chip">OpenSubtitles</span><span class="chip">Trakt</span><span class="chip">{{h:chip_languages}}</span>
+    </div>
+  </div>
+
+  <section id="features">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">{{h:feat_eyebrow}}</span>
+        <h2>{{h:feat_h2}}</h2>
+        <p>{{t:feat_intro}}</p>
+      </div>
+      <div class="grid">
+        <div class="card"><div class="ic">⏱</div><h3>{{t:feat_c1_h}}</h3><p>{{t:feat_c1_p}}</p></div>
+        <div class="card"><div class="ic">⊞</div><h3>{{t:feat_mv_h}}</h3><p>{{t:feat_mv_p}}</p></div>
+        <div class="card"><div class="ic">⏸</div><h3>{{t:feat_c2_h}}</h3><p>{{t:feat_c2_p}}</p></div>
+        <div class="card"><div class="ic">▦</div><h3>{{t:feat_c3_h}}</h3><p>{{t:feat_c3_p}}</p></div>
+        <div class="card"><div class="ic">⏺</div><h3>{{t:feat_c4_h}}</h3><p>{{t:feat_c4_p}}</p></div>
+        <div class="card"><div class="ic">◉</div><h3>{{t:feat_c5_h}}</h3><p>{{t:feat_c5_p}}</p></div>
+        <div class="card"><div class="ic">▶</div><h3>{{t:feat_c6_h}}</h3><p>{{t:feat_c6_p}}</p></div>
+        <div class="card"><div class="ic">🖿</div><h3>{{t:feat_lf_h}}</h3><p>{{t:feat_lf_p}}</p></div>
+        <div class="card"><div class="ic">📺</div><h3>{{t:feat_cast_h}}</h3><p>{{t:feat_cast_p}}</p></div>
+        <div class="card"><div class="ic">💬</div><h3>{{t:feat_subs_h}}</h3><p>{{t:feat_subs_p}}</p></div>
+        <div class="card"><div class="ic">⏯</div><h3>{{t:feat_keys_h}}</h3><p>{{t:feat_keys_p}}</p></div>
+        <div class="card"><div class="ic">🔔</div><h3>{{t:feat_follow_h}}</h3><p>{{t:feat_follow_p}}</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="shots" class="pt0">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">{{h:shots_eyebrow}}</span>
+        <h2>{{h:shots_h2}}</h2>
+      </div>
+      <div class="shots" data-close="{{h:lb_close}}">
+{{b:shots}}      </div>
+    </div>
+  </section>
+
+  <section id="download" class="pt0">
+    <div class="wrap">
+      <div class="dl-head">
+        <div class="sec-head mb0">
+          <span class="eyebrow">{{h:dl_eyebrow}}</span>
+          <h2>{{h:dl_h2}}</h2>
+        </div>
+        <span class="release-tag"><b>v{{v:version}}</b>{{b:release_tag}}</span>
+      </div>
+{{b:downloads}}      <p class="autonote">{{t:note_generated}}</p>
+{{b:verify}}    </div>
+  </section>
+
+{{b:whatsnew}}
+  <section id="faq" class="pt0">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">{{h:faq_eyebrow}}</span>
+        <h2>{{h:faq_h2}}</h2>
+      </div>
+      <div class="faq">
+        <details class="faq-item">
+          <summary><h3 class="faq-q">{{h:faq_q1}}</h3></summary>
+          <p>{{h:faq_a1}}</p>
+        </details>
+        <details class="faq-item">
+          <summary><h3 class="faq-q">{{h:faq_q2}}</h3></summary>
+          <p>{{h:faq_a2}}</p>
+        </details>
+        <details class="faq-item">
+          <summary><h3 class="faq-q">{{h:faq_q3}}</h3></summary>
+          <p>{{h:faq_a3}}</p>
+        </details>
+        <details class="faq-item">
+          <summary><h3 class="faq-q">{{h:faq_q4}}</h3></summary>
+          <p>{{h:faq_a4}}</p>
+        </details>
+        <details class="faq-item">
+          <summary><h3 class="faq-q">{{h:faq_q5}}</h3></summary>
+          <p>{{h:faq_a5}}</p>
+        </details>
+        <details class="faq-item">
+          <summary><h3 class="faq-q">{{h:faq_q6}}</h3></summary>
+          <p>{{h:faq_a6}}</p>
+        </details>
+        <details class="faq-item">
+          <summary><h3 class="faq-q">{{h:faq_q7}}</h3></summary>
+          <p>{{h:faq_a7}}</p>
+        </details>
+        <details class="faq-item">
+          <summary><h3 class="faq-q">{{h:faq_q8}}</h3></summary>
+          <p>{{h:faq_a8}}</p>
+        </details>
+        <details class="faq-item">
+          <summary><h3 class="faq-q">{{h:faq_q9}}</h3></summary>
+          <p>{{h:faq_a9}}</p>
+        </details>
+        <details class="faq-item">
+          <summary><h3 class="faq-q">{{h:faq_q10}}</h3></summary>
+          <p>{{h:faq_a10}}</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section id="credits" class="pt0">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">{{h:cred_eyebrow}}</span>
+        <h2>{{h:cred_h2}}</h2>
+        <p>{{t:cred_intro}}</p>
+      </div>
+      <div class="credits-grid">
+        <div class="credit"><h3>{{t:cred_playback}}</h3><p><a href="https://mpv.io" rel="noopener">mpv</a> &amp; <a href="https://ffmpeg.org" rel="noopener">FFmpeg</a>, via python-mpv</p></div>
+        <div class="credit"><h3>{{t:cred_interface}}</h3><p>Qt &amp; <a href="https://www.riverbankcomputing.com/software/pyqt/" rel="noopener">PyQt6</a></p></div>
+        <div class="credit"><h3>{{t:cred_casting}}</h3><p><a href="https://github.com/home-assistant-libs/pychromecast" rel="noopener">PyChromecast</a> — Google Cast</p></div>
+        <div class="credit"><h3>{{t:cred_metadata}}</h3><p><a href="https://www.themoviedb.org" rel="noopener">The Movie Database (TMDB)</a></p></div>
+        <div class="credit"><h3>{{t:cred_watched}}</h3><p><a href="https://trakt.tv" rel="noopener">Trakt</a></p></div>
+        <div class="credit"><h3>{{t:cred_licences}}</h3><p><a href="https://github.com/slimture/dopeIPTV/blob/main/docs/THIRD-PARTY-LICENSES.md" rel="noopener">{{t:cred_licences_link}}</a></p></div>
+      </div>
+      <p class="disclaimer">{{h:disclaimer}}</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span class="v">dopeIPTV {{v:version}} · © {{v:year}}</span>
+    <nav>
+      <a href="https://github.com/slimture/dopeIPTV">GitHub</a>
+      <a href="https://github.com/slimture/dopeIPTV/releases">{{h:footer_releases}}</a>
+      <a href="/help/">{{h:nav_help}}</a>
+      <a href="https://github.com/slimture/dopeIPTV#readme">{{h:footer_docs}}</a>
+    </nav>
+  </div>
+</footer>
+<script src="{{v:navjs}}" defer></script>
+<script src="{{v:appjs}}" defer></script>
+</body>
+</html>

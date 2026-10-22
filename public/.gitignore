@@ -1,3 +1,5 @@
-# Written by sync-releases.php on the server - the repo must never carry one,
+# Written by sync-releases.sh on the server - the repo must never carry one,
 # or a deploy copy overwrites the live file with a stale stub (v0.7.0 incident).
 releases.json
+# Every page in every language, rendered by sync-releases.sh on the server.
+i18n/

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="{{v:lang}}" dir="{{v:dir}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{h:help_meta_title}}</title>
+<meta name="description" content="{{h:help_meta_desc}}">
+<link rel="canonical" href="{{v:canonical}}">
+{{b:hreflang}}<meta name="theme-color" content="#0f1218">
+<meta name="robots" content="index,follow">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="dopeIPTV">
+<meta property="og:locale" content="{{v:locale}}">
+<meta property="og:title" content="{{h:help_meta_title}}">
+<meta property="og:description" content="{{h:help_meta_desc}}">
+<meta property="og:url" content="{{v:canonical}}">
+<meta property="og:image" content="https://iptv.dope.rs/og-image.png">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" href="/favicon.png" sizes="512x512" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="{{v:css}}">
+</head>
+<body>
+{{b:nav}}
+<main id="top">
+  <section class="help-top">
+    <div class="wrap">
+      <h1>dopeIPTV {{h:help_h1}}</h1>
+      <p class="help-lede">{{h:help_intro}}</p>
+
+      <div class="help-searchbar">
+        <span class="help-mag" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle
+          cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg></span>
+        <input type="search" id="helpSearch" autocomplete="off" autofocus
+               placeholder="{{h:help_search_ph}}"
+               aria-label="{{h:help_search_ph}}">
+        <button type="button" id="helpClear" hidden
+                aria-label="{{h:help_clear}}">✕</button>
+      </div>
+      <p class="help-count" id="helpCount" hidden
+         data-fmt="{{h:help_hits}}"></p>
+    </div>
+  </section>
+
+  <section class="pt0">
+    <div class="wrap">
+      <div class="help-layout">
+        <nav class="help-toc" aria-label="{{h:help_toc}}">
+{{b:toc}}        </nav>
+
+        <div class="help-body">
+{{b:sections}}          <p class="help-none" id="helpNone" hidden>{{h:help_no_hits}}</p>
+        </div>
+      </div>
+
+      <p class="autonote help-foot">{{t:help_more}}</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span class="v">dopeIPTV{{b:help_version}} · © {{v:year}}</span>
+    <nav>
+      <a href="/">{{h:nav_download}}</a>
+      <a href="https://github.com/slimture/dopeIPTV">GitHub</a>
+      <a href="https://github.com/slimture/dopeIPTV/releases">{{h:footer_releases}}</a>
+    </nav>
+  </div>
+</footer>
+<script src="{{v:navjs}}" defer></script>
+<script src="{{v:helpjs}}" defer></script>
+</body>
+</html>
