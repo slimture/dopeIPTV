@@ -1,3 +1,24 @@
+## dopeIPTV 1.2.18
+
+What is popular right now, on Home - and fixes for fullscreen video on
+Linux and for subtitles with the full stop in front.
+
+- **Popular right now, on Home.** Two new shelves, **Popular movies right
+  now** and **Popular series right now**: this week's most popular films
+  and series on TMDB that your provider has. Either can be switched off
+  under **Settings → Home**.
+- **Fullscreen video flickered around its edges** on a current Linux
+  distro (Arch, and others as they update), and every start printed a
+  page of font and Mesa errors. The AppImage and .deb now use the
+  system's own font and graphics libraries.
+- **Subtitles with the full stop in front (".Hej då").** A subtitle
+  translated from Arabic or Hebrew could put the full stop at the start
+  of a Swedish or English line. It is at the end again.
+
+On the AppImage from 1.2.15 or later? Click **Update now** in the banner.
+Coming from an older version, what changed since is below - from 1.2.14
+or earlier, everything new in 1.2.15 as well.
+
 ## dopeIPTV 1.2.17
 
 The series you follow get a place in Settings, and OpenSubtitles' daily
@@ -15,10 +36,6 @@ limit is explained.
   with where to enter a free account.
 - **Settings → Local files** lists your folders properly, each with its
   full path when you point at it.
-
-On the AppImage from 1.2.15 or later? Click **Update now** in the banner.
-Coming from 1.2.15, the subtitle fix in 1.2.16 is below; from 1.2.14 or
-earlier, everything new in 1.2.15 as well.
 
 ## dopeIPTV 1.2.16
 
