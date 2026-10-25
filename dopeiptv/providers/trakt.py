@@ -29,8 +29,8 @@ OAUTH_PORT = 41794
 REDIRECT_URI = f"http://127.0.0.1:{OAUTH_PORT}/callback"
 # A Trakt app every account can sign in to ("Production") may only redirect
 # to an https:// address, so the bundled app's sign-in comes back through this
-# page on the project's site, which hands the answer straight on to
-# REDIRECT_URI above (website branch: public/trakt/callback/index.php).
+# address on the project's site, where nginx hands the answer straight on to
+# REDIRECT_URI above (website branch: deploy/content-iptv.dope.rs.conf).
 # Somebody's own app ("Development": its owner signs in) can use the
 # loopback address itself.
 WEB_REDIRECT_URI = "https://iptv.dope.rs/trakt/callback"

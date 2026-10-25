@@ -125,10 +125,10 @@ New `windows-build` job on `windows-latest`:
 3. download + extract libmpv dev, drop `mpv-2.dll` next to the spec,
 4. `pyinstaller --noconfirm dopeiptv-win.spec`,
 5. package the `dist/dopeiptv/` folder as an **installer `.exe`** (Inno Setup or
-   NSIS) — nicer than a zip and, importantly, the website's release sync already
-   recognises `.exe`/`.msi` (`USER_EXTS`), so a `.exe` asset appears on
-   iptv.dope.rs automatically. (If you'd rather ship a portable `.zip`, add
-   `.zip` to `USER_EXTS` in `website/sync-releases.php`.)
+   NSIS) — nicer than a zip and, importantly, the website's release sync
+   (`sync-releases.sh` on the website branch) already recognises
+   `.exe`/`.msi`, so a `.exe` asset appears on iptv.dope.rs automatically. (A
+   portable `.zip` with `win` in its name is recognised too.)
 6. `actions/upload-artifact` + attach to the release like the other jobs.
 
 ### G. Platform-guard audit (quick pass)
