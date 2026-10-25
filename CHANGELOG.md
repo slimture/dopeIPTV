@@ -7,6 +7,16 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Fixed
+
+- **About dopeIPTV, with an update waiting:** on Linux (Wayland) the
+  release notes lay over "Update now", "Check for updates", the links and
+  the TMDB line, and the title read "About dopeIPTV dopeIPTV". The notes
+  arrive after the dialog is up, and needed it to grow, which Wayland did
+  not do; their room is now there from the start, so the dialog never
+  changes size. When the app is up to date, the box shows what the newest
+  version brought.
+
 ## [1.2.18]
 
 What is popular right now, on Home - and fixes for fullscreen video on a

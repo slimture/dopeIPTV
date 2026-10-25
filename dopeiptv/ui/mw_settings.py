@@ -1794,8 +1794,9 @@ class _SettingsMixin:
 
     def show_about(self) -> None:
         d = QDialog(self)
-        d.setWindowTitle(f"{tr('menu_about')} {APP_NAME}")
-        d.setMinimumWidth(440)
+        d.setWindowTitle(tr("menu_about"))   # "About dopeIPTV": named already
+        # Wide enough for the release notes from the start: see notes below.
+        d.setMinimumWidth(520)
         lay = QVBoxLayout(d)
         lay.setContentsMargins(22, 20, 22, 18)
         lay.setSpacing(12)
@@ -1838,6 +1839,13 @@ class _SettingsMixin:
             f"QTextBrowser {{ background:{P['input']}; color:{P['text']};"
             f" border:1px solid {P['border']};"
             f" border-radius:8px; padding:4px 8px; font-size:12px; }}")
+        # Its room is kept while the check runs, so the notes never have to
+        # make the dialog grow once it is up: on Wayland a dialog can stay at
+        # its first size, and the notes then lay over the buttons, the links
+        # and the TMDB line below them.
+        keep = notes.sizePolicy()
+        keep.setRetainSizeWhenHidden(True)
+        notes.setSizePolicy(keep)
         notes.hide()
         lay.addWidget(notes)
 
@@ -1889,10 +1897,6 @@ class _SettingsMixin:
                 if rel.get("body"):
                     notes.setMarkdown(self._format_release_notes(rel["body"]))
                     notes.show()
-                    # Grow the dialog so the notes get real room the first time
-                    # an update appears (the check is async, after show()).
-                    d.setMinimumWidth(520)
-                    d.adjustSize()
                 if rel.get("url"):
                     try:
                         dl_btn.clicked.disconnect()
@@ -1904,7 +1908,13 @@ class _SettingsMixin:
                     dl_btn.show()
             else:
                 status.setText("✓ " + tr("about_up_to_date"))
-                notes.hide()
+                # Up to date: the room is there anyway, and the newest
+                # release's notes are what this version brought.
+                if rel.get("body"):
+                    notes.setMarkdown(self._format_release_notes(rel["body"]))
+                    notes.show()
+                else:
+                    notes.hide()
                 dl_btn.hide()
 
         def fail(_e) -> None:
