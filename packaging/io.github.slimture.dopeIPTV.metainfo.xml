@@ -52,7 +52,7 @@
   <releases>
     <release version="1.2.18" date="2026-10-25">
       <description>
-        <p>Home shows what is popular right now among your provider's movies and series. Fullscreen video no longer flickers around its edges on a current Linux distro, and translated subtitles no longer put the full stop in front.</p>
+        <p>Home shows what is popular right now among your provider's movies and series. The AppImage and .deb use the system's font and graphics libraries on a current Linux distro, and translated subtitles no longer put the full stop in front.</p>
       </description>
     </release>
     <release version="1.2.17" date="2026-10-19">

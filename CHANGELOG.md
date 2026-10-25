@@ -19,8 +19,8 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [1.2.18]
 
-What is popular right now, on Home - and fixes for fullscreen video on a
-current Linux distro and for subtitles with the full stop in front.
+What is popular right now, on Home - and fixes for the AppImage and .deb
+on a current Linux distro and for subtitles with the full stop in front.
 
 ### Added
 
@@ -39,12 +39,11 @@ current Linux distro and for subtitles with the full stop in front.
 ### Fixed
 
 - **AppImage and .deb on a current distro (Arch, and others as they
-  update):** video in fullscreen flickered all around its edges, and every
-  start printed a page of "Fontconfig error: ... invalid attribute
-  'xsi:nil'" and "did not find extension DRI_Mesa version 1". The package
-  carried the build machine's older fontconfig, which cannot read a newer
-  distro's font configuration, and its older libgbm, which the system's
-  Mesa loaded and could not use - the flicker. Both now come from the
+  update):** every start printed a page of "Fontconfig error: ... invalid
+  attribute 'xsi:nil'" and "did not find extension DRI_Mesa version 1".
+  The package carried the build machine's older fontconfig, which cannot
+  read a newer distro's font configuration, and its older libgbm, which
+  the system's Mesa loaded and could not use. Both now come from the
   system, with freetype, harfbuzz and expat, as the AppImage project
   recommends; the .deb lists them as dependencies, and the release build
   starts the AppImage on Arch Linux and fails on either error.
