@@ -39,6 +39,7 @@ def _window(settings, unlocked=False):
     w._item_key = MainWindow._item_key
     w._channel_hidden = lambda it, kind: MainWindow._channel_hidden(
         w, it, kind)
+    w._catalog_filter = lambda mode: MainWindow._catalog_filter(w, mode)
     return w
 
 

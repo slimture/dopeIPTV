@@ -6,6 +6,7 @@ import gzip
 import io
 import os
 import pickle
+import shutil
 import subprocess
 import sys
 import threading
@@ -134,6 +135,24 @@ def prune_epg_caches(keep_ids) -> int:
         if pid not in keep:
             try:
                 f.unlink()
+                removed += 1
+            except OSError:
+                pass
+    # The provider's lists, kept here too (make_client): the folder with a
+    # file per list, and the single file older versions wrote.
+    for f in d.glob("lists_*"):
+        for suffix in (".json", ".d"):
+            if f.name.endswith(suffix):
+                pid = f.name[len("lists_"):-len(suffix)]
+                break
+        else:
+            continue
+        if pid not in keep:
+            try:
+                if f.is_dir():
+                    shutil.rmtree(f)
+                else:
+                    f.unlink()
                 removed += 1
             except OSError:
                 pass
@@ -459,12 +478,19 @@ class XmltvGuide:
         total = int(r.headers.get("content-length") or 0)
         chunks: list[bytes] = []
         received = 0
+        # Reported when the figure changes, and without a total twice a
+        # second: once per 64 KB it was ~2,200 calls into the window for a
+        # 140 MB guide, each one restyling the loading strip.
+        said, said_at = None, 0.0
         for chunk in r.iter_content(64 * 1024):
             chunks.append(chunk)
             received += len(chunk)
             if self.progress_cb:
-                self.progress_cb(min(99, received * 100 // total)
-                                 if total else -1)
+                pct = min(99, received * 100 // total) if total else -1
+                now = time.monotonic()
+                if pct != said or (pct < 0 and now - said_at >= 0.5):
+                    said, said_at = pct, now
+                    self.progress_cb(pct)
         if self.progress_cb:
             self.progress_cb(100)
         # Not cached here: the parse process keeps it (_parse_and_index).

@@ -80,14 +80,19 @@ class EpgSearchDialog(QDialog):
         self.info.setText(tr("status_loading_channels"))
 
         def done(chans) -> None:
-            self._channels = self.window._visible_catalog(chans, "live")
+            self._channels = chans
             self.info.setText(tr("epg_search_hint"))
             self.box.setFocus()
             if self.box.text().strip():
                 self._run_search()
 
+        # Filtered on the worker: tens of thousands of channels are too many
+        # for the GUI thread (see MainWindow._catalog_filter).
+        keep = self.window._catalog_filter("live")
+        client = self.window.client
         run_async(self.window.pool,
-                  lambda: self.window.client.live_streams(None),
+                  lambda: [c for c in client.live_streams(None) or []
+                           if keep(c)],
                   done, lambda _e: self.info.setText(tr("epg_search_hint")))
 
     def _run_search(self) -> None:

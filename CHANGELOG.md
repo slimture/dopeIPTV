@@ -9,6 +9,31 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- **Video and the window keep up while the app loads in the background.**
+  Measured against a big provider (20,000 channels, 80,000 films, 20,000
+  series), a playlist refresh held the window - and a playing video - up
+  for 6.3 s in all, up to 1.9 s at a time; now 0.2 s, never more than
+  60 ms. Opening Home: 1.9 s, up to 0.6 s at a time; now 0.5 s. What did
+  it:
+  - Every call between Qt and Python waited out the 5 ms turn of any
+    thread busy in Python; the turn is now 0.2 ms (1 ms on Windows).
+    Home's cards took 9 s to build next to two busy threads; now 0.5 s.
+  - The lists kept on disk for a provider that is down: every fetch,
+    even of one category, wrote all of them again (tens of MB, several
+    times at once), and every start and refresh read all of them back
+    in, wanted or not. Each list now has a file of its own, the
+    provider's reply as it came, read only when it is going to be used.
+  - The provider's lists are parsed a row at a time as far as the
+    window is concerned, instead of in one go that stopped it.
+  - Home's newest films, series and channels, the guide search's and
+    the guide's channel lists, and a cast member's other titles are
+    picked out of the whole catalogue on a worker, not the GUI thread.
+  - The guide download told the window its progress for every 64 KB -
+    2,200 times for a big guide; now when the figure changes.
+  - A full garbage collection walked every object in the app every five
+    minutes, the whole catalogue included (~150 ms with a big one);
+    what it leaves is now set aside until the hour comes round.
+
 - **The app no longer crawls while the programme guide loads.** A big
   guide (hundreds of thousands of programmes) is parsed in a process of
   its own now: parsed in a thread, it held Python's interpreter for most

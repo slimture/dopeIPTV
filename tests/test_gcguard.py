@@ -73,6 +73,39 @@ def test_the_guard_turns_automatic_collection_off():
         gc.disable()                     # the suite's own policy (conftest)
 
 
+def test_what_a_full_collection_leaves_is_frozen_and_thawed_hourly(
+        monkeypatch):
+    QApplication.instance() or QApplication([])
+    clock = {"now": 1000.0}
+    monkeypatch.setattr(gcguard.time, "monotonic", lambda: clock["now"])
+    gens = iter([2, 0, 2, 2])
+    monkeypatch.setattr(gcguard, "collect_due",
+                        lambda last, now: (g := next(gens),
+                                           now if g == 2 else last))
+    guard = gcguard.GcGuard()
+    try:
+        clock["now"] += 300
+        guard._tick()                   # a full collection: what is left
+        assert gc.get_freeze_count() > 0     # is out of the next ones' way
+        clock["now"] += 1
+        guard._tick()
+        assert gc.get_freeze_count() > 0
+        clock["now"] += 400
+        thawed = []
+        monkeypatch.setattr(gcguard.gc, "unfreeze",
+                            lambda: thawed.append(1))
+        guard._tick()                   # not an hour yet: stays frozen
+        assert thawed == []
+        clock["now"] += gcguard.THAW_EVERY_S
+        guard._tick()                   # an hour: thawed into this one
+        assert thawed == [1]
+    finally:
+        guard.deleteLater()
+        monkeypatch.undo()
+        gc.unfreeze()
+        gc.disable()                     # the suite's own policy (conftest)
+
+
 def test_a_logo_loader_with_a_disk_cache_leaves_no_cycle(tmp_path):
     """Its prune timer was connected to a lambda over the loader: a cycle
     through the timer, so only the collector could free it - and the

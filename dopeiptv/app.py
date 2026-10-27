@@ -410,6 +410,15 @@ def main() -> int:
     # thread, a cycle holding Qt objects segfaults (see core/gcguard.py).
     from .core.gcguard import GcGuard
     GcGuard(app)
+    # Every way between Qt and Python - a signal, an event, each list row a
+    # delegate paints, many a widget call, every video frame - takes the
+    # interpreter lock, and while pool threads were busy in Python (lists,
+    # guide, artwork) each one waited out their 5 ms turn: building Home's
+    # 18 cards took 9 s instead of 16 ms next to two busy threads, and the
+    # window and the player crawled whenever anything loaded. 0.2 ms brings
+    # that to 0.5 s. Windows rounds a wait under 1 ms down to none, which
+    # would have busy threads trade the lock back and forth all the time.
+    sys.setswitchinterval(0.001 if sys.platform == "win32" else 0.0002)
     # Base the proxy on Fusion, not the native platform style: the app is
     # fully QSS-themed anyway, and the native macOS style ignores QSS
     # subcontrol arrows (spin-box steppers, combo-box ▼), leaving bare boxes.

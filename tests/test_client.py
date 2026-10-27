@@ -152,32 +152,35 @@ def test_refresh_forces_refetch_even_with_a_fresh_cache(tmp_path):
 
 
 def test_concurrent_disk_cache_saves_do_not_race(tmp_path):
-    # Several list fetches (live/vod/series) finish near-simultaneously on
-    # the worker pool and each persists the cache. With one shared ".part"
-    # temp name, writer A's os.replace consumed the file and writer B's hit
-    # "No such file or directory" (the log spam the user reported). Unique
-    # per-thread temps must leave a valid cache file and no .part crumbs.
+    # Several fetches of the same list can finish at once on the worker
+    # pool and each keeps it on disk. With one shared ".part" temp name,
+    # writer A's os.replace consumed the file and writer B's hit "No such
+    # file or directory" (the log spam the user reported). Unique
+    # per-thread temps must leave a whole file and no .part crumbs.
     import json
+    import os
     import threading
+    import time
 
     from dopeiptv.providers.client import XtreamClient
 
     path = tmp_path / "sub" / "lists_test.json"   # dir created on demand
     c = XtreamClient("http://h.tv", "u", "p", cache_path=str(path))
-    c._list_cache[("live", None)] = (1.0, [{"stream_id": 1}])
+    key = ("live", None)
 
     def hammer():
         for _ in range(25):
-            c._save_disk_lists()
+            c._save_list(key, time.time(), b'[{"stream_id": 1}]')
 
     threads = [threading.Thread(target=hammer) for _ in range(8)]
     for t in threads:
         t.start()
     for t in threads:
         t.join()
-    with open(path, encoding="utf-8") as fh:
-        assert json.load(fh)                       # valid, complete JSON
-    crumbs = list(path.parent.glob("*.part"))
+    with open(c._list_file(key), encoding="utf-8") as fh:
+        assert json.load(fh) == [{"stream_id": 1}]   # valid, complete
+    crumbs = [p for p in os.listdir(os.path.dirname(c._list_file(key)))
+              if p.endswith(".part")]
     assert crumbs == [], crumbs
 
 

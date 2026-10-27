@@ -16,6 +16,16 @@ from ..core.log import log, register_secrets
 from ..i18n import LocalizedError, tr
 
 
+def json_object(pairs: list[tuple[str, Any]]) -> dict:
+    """object_pairs_hook for the big lists. json.loads() is one C call that
+    holds the interpreter (the GIL) to the end: a 30 MB movie list stopped
+    the window, and the player's frames with it, for a third of a second.
+    A Python call per object lets the window in between objects (6 ms at
+    most), for a fifth more parse time. Keys stay shared between rows, as
+    with a plain json.loads()."""
+    return dict(pairs)
+
+
 class XtreamClient:
     """HTTP client for the Xtream Codes player_api.php endpoint."""
 
@@ -44,9 +54,14 @@ class XtreamClient:
         self._list_lock = threading.Lock()
         # Optional on-disk copy of the list cache (per playlist): lets the app
         # start with the last session's channel lineup when the provider is
-        # down/overloaded, instead of empty lists and timeouts.
+        # down/overloaded, instead of empty lists and timeouts. One file per
+        # list in <cache_path minus .json>.d/; cache_path itself is the
+        # single file older versions wrote, read only as a last resort.
         self._cache_path = cache_path
         self._disk_loaded = cache_path is None
+        # The reply behind the list _cached_list is fetching, per thread:
+        # its bytes go to the disk copy as they came.
+        self._tls = threading.local()
         # Wall-clock time of the last clear_list_cache(): a cached entry older
         # than this (the re-merged disk copy) is NOT treated as a fresh hit, so
         # Refresh forces a real re-fetch while the disk copy stays as a
@@ -56,16 +71,16 @@ class XtreamClient:
         self._net_down_until = 0.0
 
     def _load_disk_lists(self) -> None:
-        """(under _list_lock) Lazily merge the previous session's lists in as
-        stale entries - fresh fetches still win, but the stale-fallback path
-        can serve them when the provider doesn't answer."""
+        """(under _list_lock) The single file of every list that older
+        versions wrote, merged in as stale entries: the last resort when the
+        provider doesn't answer and a list has no file of its own yet."""
         if self._disk_loaded or self._cache_path is None:
             return
         self._disk_loaded = True
         try:
             import json
             with open(self._cache_path, encoding="utf-8") as fh:
-                raw = json.load(fh)
+                raw = json.load(fh, object_pairs_hook=json_object)
             for k, (t, data) in raw.items():
                 key = tuple(None if p == "" else p for p in k.split("\x1f"))
                 self._list_cache.setdefault(key, (float(t), data))
@@ -76,31 +91,68 @@ class XtreamClient:
             log.warning("xtream list cache: could not read %s: %s",
                         self._cache_path, e)
 
-    def _save_disk_lists(self) -> None:
-        """(worker thread, after a successful fetch) Persist the cache."""
+    def _list_file(self, key: tuple) -> str | None:
+        """The disk copy of one list. A file per list: with one file for
+        all of them, every fetch - a category opened - wrote the whole
+        catalogue again (tens of MB for a big provider), and every start
+        read all of it back in, wanted or not."""
         if self._cache_path is None:
-            return
+            return None
+        import hashlib
+        import os
+        base = self._cache_path
+        if base.endswith(".json"):
+            base = base[:-5]
+        name = "\x1f".join("" if p is None else str(p) for p in key)
+        return os.path.join(base + ".d", hashlib.sha1(
+            name.encode("utf-8")).hexdigest()[:24] + ".json")
+
+    def _disk_hit(self, key: tuple, fresh_after: float | None = None
+                  ) -> tuple[float, Any] | None:
+        """*key*'s disk copy as a cache entry, read only when it will be
+        used: written after *fresh_after* (None: whatever its age)."""
+        import json
+        import os
+        path = self._list_file(key)
+        if path is None:
+            return None
         try:
-            import json
-            import os
-            with self._list_lock:
-                raw = {"\x1f".join("" if p is None else str(p) for p in k):
-                       [t, data] for k, (t, data) in self._list_cache.items()}
-            d = os.path.dirname(self._cache_path)
-            if d:
-                os.makedirs(d, exist_ok=True)
-            # Unique temp per writer: several list fetches (live/vod/series)
-            # finish near-simultaneously on the worker pool and each saves
-            # the cache. With one shared ".part" name, writer A's os.replace
-            # consumed the file and writer B's replace hit "No such file or
-            # directory". Per-thread temps + atomic replace = last writer
-            # wins, no window where the real file is missing or truncated.
-            tmp = (f"{self._cache_path}.{os.getpid()}"
-                   f".{threading.get_ident()}.part")
+            t = os.stat(path).st_mtime
+            if fresh_after is not None and t < fresh_after:
+                return None
+            with open(path, "rb") as fh:
+                body = fh.read()
+            data = json.loads(body, object_pairs_hook=json_object) or []
+        except FileNotFoundError:
+            return None
+        except (OSError, ValueError) as e:
+            log.warning("xtream list cache: could not read %s: %s", path, e)
+            return None
+        with self._list_lock:
+            hit = self._list_cache.get(key)
+            if hit is None or hit[0] < t:
+                hit = self._list_cache[key] = (t, data)
+        return hit
+
+    def _save_list(self, key: tuple, t: float, body: bytes) -> None:
+        """(worker thread) Keep one list's reply on disk, as it came: bytes
+        out, nothing to encode. Whole or not at all; the file's time is
+        the fetch's."""
+        import os
+        path = self._list_file(key)
+        if path is None:
+            return
+        # Unique temp per writer: the same list fetched twice at once must
+        # not have one writer's replace consume the other's file.
+        tmp = f"{path}.{os.getpid()}.{threading.get_ident()}.part"
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
             try:
-                with open(tmp, "w", encoding="utf-8") as fh:
-                    json.dump(raw, fh)
-                os.replace(tmp, self._cache_path)
+                with open(tmp, "wb") as fh:
+                    fh.write(body)
+                os.utime(tmp, (t, t))
+                os.replace(tmp, path)
+                self._retire_single_file()
             finally:
                 # Never leave a crumb if the write or replace failed.
                 try:
@@ -108,8 +160,40 @@ class XtreamClient:
                 except OSError:
                     pass
         except Exception as e:
-            log.warning("xtream list cache: could not write %s: %s",
-                        self._cache_path, e)
+            log.warning("xtream list cache: could not write %s: %s", path, e)
+
+    # The single file of all lists that older versions wrote: read when a
+    # list has no file of its own and the provider is down, and deleted once
+    # it is this old - by then the lists have files of their own.
+    SINGLE_FILE_KEEP_SECS = 14 * 86400
+
+    def _retire_single_file(self) -> None:
+        import os
+        if self._cache_path is None or getattr(self, "_single_checked", False):
+            return
+        self._single_checked = True
+        try:
+            if (time.time() - os.stat(self._cache_path).st_mtime
+                    > self.SINGLE_FILE_KEEP_SECS):
+                os.unlink(self._cache_path)
+                log.info("xtream list cache: removed the old single file %s",
+                         self._cache_path)
+        except OSError:
+            pass
+
+    @staticmethod
+    def _reply_body(data: Any, got: tuple | None) -> bytes:
+        """The bytes of the reply *data* was parsed from (*got*: the reply
+        and what it parsed to) - as the provider sent them, unless they were
+        read in a declared non-UTF-8 charset - or else *data* encoded."""
+        import json
+        if got is not None and got[1] is data:
+            r = got[0]
+            enc = (r.encoding or "").lower().replace("-", "").replace("_", "")
+            if enc in ("", "utf8", "utf8sig"):
+                return r.content
+            return r.text.encode("utf-8")
+        return json.dumps(data).encode("utf-8")
 
     def _cached_list(self, key: tuple, fetch) -> list:
         """Serve *key* from the short list cache, else *fetch* and store.
@@ -119,20 +203,29 @@ class XtreamClient:
         or overloaded provider degrades to slightly-old data, not to an error
         and an empty list. Thread-safe - list loads run on the worker pool."""
         now = time.time()
+        # A hit counts as fresh only if it is under the TTL AND was fetched
+        # since the last Refresh - otherwise Refresh would never re-fetch.
+        fresh_after = max(now - self.LIST_CACHE_SECS, self._refetch_after)
         with self._list_lock:
-            self._load_disk_lists()
             hit = self._list_cache.get(key)
-            # A hit counts as fresh only if it is under the TTL AND was fetched
-            # since the last Refresh - otherwise the disk copy re-merged just
-            # above would be served as "fresh" and Refresh would never re-fetch.
-            if (hit and now - hit[0] < self.LIST_CACHE_SECS
-                    and hit[0] >= self._refetch_after):
-                return hit[1]
+        if hit is None:
+            hit = self._disk_hit(key, fresh_after)
+        if hit and hit[0] > fresh_after:
+            return hit[1]
+        self._tls.want_reply = True
+        self._tls.reply = None
         try:
             data = fetch() or []
         except requests.RequestException:
+            self._tls.reply = None
             with self._list_lock:
                 hit = self._list_cache.get(key)
+            if hit is None:
+                hit = self._disk_hit(key)
+            if hit is None:
+                with self._list_lock:
+                    self._load_disk_lists()
+                    hit = self._list_cache.get(key)
             if hit is not None:
                 log.warning(
                     "xtream %s @ %s: network failure - serving the cached "
@@ -140,21 +233,23 @@ class XtreamClient:
                     (now - hit[0]) / 60)
                 return hit[1]
             raise
+        finally:
+            self._tls.want_reply = False
+        got, self._tls.reply = self._tls.reply, None
         with self._list_lock:
             self._list_cache[key] = (now, data)
-        self._save_disk_lists()
+        self._save_list(key, now, self._reply_body(data, got))
         return data
 
     def clear_list_cache(self) -> None:
-        """Drop every cached list so the next call re-fetches (Refresh).
-        The disk copy is kept: it only ever serves as a last resort when the
-        provider doesn't answer at all, and Refresh overwrites it with fresh
-        data as soon as a fetch succeeds."""
+        """Make the next call of every list re-fetch it (Refresh). The lists
+        in memory stay as the last resort for a provider that doesn't
+        answer - the same lists the disk copy holds. Dropping them meant
+        reading that copy back in, tens of MB in one go for a big provider,
+        on every refresh."""
         with self._list_lock:
-            self._list_cache.clear()
-            self._disk_loaded = False   # re-mergeable if the fetch fails
-            # Any entry older than now (incl. the re-merged disk copy) is no
-            # longer "fresh", so the next call actually re-fetches.
+            # Any entry older than now is no longer "fresh", so the next
+            # call actually re-fetches.
             self._refetch_after = time.time()
 
     def _redact(self, text: str) -> str:
@@ -222,7 +317,7 @@ class XtreamClient:
                       action, self.server, dt, len(r.content))
         r.raise_for_status()
         try:
-            return r.json()
+            data = r.json(object_pairs_hook=json_object)
         except ValueError:
             log.warning(
                 "xtream %s @ %s: non-JSON reply (content-type=%s, %d bytes) - "
@@ -230,6 +325,9 @@ class XtreamClient:
                 action, self.server, r.headers.get("content-type", "?"),
                 len(r.content))
             raise
+        if getattr(self._tls, "want_reply", False):
+            self._tls.reply = (r, data)     # for _cached_list's disk copy
+        return data
 
     def authenticate(self) -> dict:
         data = self._api()

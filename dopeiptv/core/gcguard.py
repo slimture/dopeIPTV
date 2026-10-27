@@ -29,6 +29,13 @@ INTERVAL_MS = 500
 # collector rations those too (only once the old generation has grown by a
 # quarter); a fixed spacing keeps a big guide from costing a pause a minute.
 FULL_EVERY_S = 300.0
+# What a full collection leaves behind is alive, and mostly stays so: the
+# provider's lists, the guide, the window. Frozen after each full collection
+# (gc.freeze), the next ones walk only what is newer - with a big catalogue
+# a full collection took ~150 ms, a stutter in the playing video every five
+# minutes. Once an hour everything is thawed into the next full collection,
+# so a cycle among older objects waits at most that long to be freed.
+THAW_EVERY_S = 3600.0
 
 
 def collect_due(last_full: float, now: float,
@@ -55,7 +62,8 @@ class GcGuard(QObject):
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
-        self._last_full = time.monotonic()
+        self._last_full = self._last_thaw = time.monotonic()
+        self._frozen = False
         gc.disable()
         self._timer = QTimer(self)
         self._timer.setInterval(INTERVAL_MS)
@@ -65,5 +73,13 @@ class GcGuard(QObject):
                   "thread every %d ms", INTERVAL_MS)
 
     def _tick(self) -> None:
-        _gen, self._last_full = collect_due(self._last_full,
-                                            time.monotonic())
+        now = time.monotonic()
+        if (self._frozen and now - self._last_thaw >= THAW_EVERY_S
+                and now - self._last_full >= FULL_EVERY_S):
+            gc.unfreeze()                   # into the next full collection
+            self._frozen = False
+            self._last_thaw = now
+        gen, self._last_full = collect_due(self._last_full, now)
+        if gen == 2:
+            gc.freeze()
+            self._frozen = True

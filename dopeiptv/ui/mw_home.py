@@ -11,6 +11,7 @@ so this module is pure presentation + wiring.
 
 from __future__ import annotations
 
+import heapq
 import json
 import os
 import time
@@ -714,6 +715,11 @@ class HomePage(QWidget):
                 return None
             return lambda name: resolver.tmdb_id_for(name, kind)
 
+        keep_vod = w._catalog_filter("vod")
+        keep_ser = w._catalog_filter("series")
+        num = self._num
+        is_movie = self._is_movie
+
         def work():
             vod = list(client.vod_streams(None) or [])
             ser = list(client.series_list(None) or [])
@@ -724,25 +730,25 @@ class HomePage(QWidget):
             if chart:
                 gvod = popular.match(chart["vod"], vod, known("vod"))
                 gser = popular.match(chart["series"], ser, known("series"))
+            # The newest titles, picked here for the same reason: filtering
+            # and sorting the whole catalogue in done() held up the window
+            # and the player for almost half a second. Each shelf keeps to
+            # its own content type - some providers dump live channels into
+            # the VOD "all" list - and to ~18 cards, plenty for a row and
+            # few widgets for a smooth page scroll.
+            vod = heapq.nlargest(
+                18, (i for i in vod if is_movie(i) and keep_vod(i)),
+                key=lambda i: num(i.get("added")))
+            ser = heapq.nlargest(
+                18, (i for i in ser
+                     if i.get("series_id") is not None and keep_ser(i)),
+                key=lambda i: num(i.get("last_modified")))
             return vod, ser, gvod, gser
 
         def done(res):
             vod, ser, gvod, gser = res
             pvod = self._pick_popular(gvod, "vod")
             pser = self._pick_popular(gser, "series")
-            # Keep each shelf to its own content type. Some providers dump live
-            # channels into the VOD "all" list, so the Movies shelf takes only
-            # real movie rows and the Series shelf only rows with a series_id.
-            vod = [i for i in w._visible_catalog(vod, "vod")
-                   if self._is_movie(i)]
-            ser = [i for i in w._visible_catalog(ser, "series")
-                   if i.get("series_id") is not None]
-            vod.sort(key=lambda i: self._num(i.get("added")), reverse=True)
-            ser.sort(key=lambda i: self._num(i.get("last_modified")),
-                     reverse=True)
-            # Cap the shelves modestly: a horizontal row of ~18 poster cards is
-            # plenty, and fewer widgets keeps the vertical page scroll smooth.
-            vod, ser = vod[:18], ser[:18]
             w._home_poster_cache = (time.time(), vod, ser, pvod, pser, stamp)
             self._write_disk_posters(vod, ser, pvod, pser)
             if gen != self._gen:
@@ -879,15 +885,17 @@ class HomePage(QWidget):
             self._fill_channels(cache[1])
             return
         client = w.client
+        keep = w._catalog_filter("live")
+        num = self._num
 
         def work():
-            return list(client.live_streams(None) or [])
+            # Picked here, not in done(): see _load_posters.
+            return heapq.nlargest(
+                18, (i for i in client.live_streams(None) or []
+                     if i.get("stream_id") is not None and keep(i)),
+                key=lambda i: num(i.get("added")))
 
         def done(chan):
-            chan = [i for i in w._visible_catalog(chan, "live")
-                    if i.get("stream_id") is not None]
-            chan.sort(key=lambda i: self._num(i.get("added")), reverse=True)
-            chan = chan[:18]
             w._home_chan_cache = (time.time(), chan)
             if gen == self._gen:
                 try:

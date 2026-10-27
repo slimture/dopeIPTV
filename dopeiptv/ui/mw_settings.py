@@ -212,9 +212,13 @@ class _SettingsMixin:
 
         def done(channels):
             dlg.close()
-            EpgGridDialog(self, self._visible_catalog(channels, "live")).exec()
+            EpgGridDialog(self, channels).exec()
 
-        run_async(self.pool, lambda: self.client.live_streams(None),
+        keep = self._catalog_filter("live")
+        client = self.client
+        run_async(self.pool,
+                  lambda: [c for c in client.live_streams(None) or []
+                           if keep(c)],
                   done, lambda _: dlg.close())
 
     def _open_epg_search(self) -> None:

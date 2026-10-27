@@ -473,11 +473,16 @@ class _DetailMixin:
             callback(self._full_catalog)
             return
 
+        norm = self._normalize_title
+
         def fetch():
             vod = self.client.vod_streams(None) or []
             series = self.client.series_list(None) or []
-            return ([(it, "vod") for it in vod]
-                    + [(it, "series") for it in series])
+            # Each title normalised once, here, for every cast member asked
+            # about after: on the GUI thread, a big catalogue took a second.
+            return [(it, kind, norm(it.get("name") or it.get("title") or ""))
+                    for kind, rows in (("vod", vod), ("series", series))
+                    for it in rows]
 
         def done(items):
             self._full_catalog = items
@@ -508,17 +513,20 @@ class _DetailMixin:
         # one carries too little signal to claim a longer provider title.
         long_titles = [t for t in norm_titles if len(t) >= 6]
 
+        matches = self._title_matches
+
         def with_catalog(catalog):
-            matches = []
-            for it, kind in catalog:
-                cnorm = self._normalize_title(
-                    it.get("name") or it.get("title") or "")
-                if not cnorm:
-                    continue
-                if self._title_matches(cnorm, norm_titles, long_titles):
-                    matches.append((it, kind))
-            callback([(it, kind) for it, kind in matches
-                      if self._visible_catalog([it], kind)])
+            def find():
+                return [(it, kind) for it, kind, cnorm in catalog
+                        if cnorm and matches(cnorm, norm_titles, long_titles)]
+
+            # The whole catalogue is gone through on a worker; only the few
+            # matches come back to the GUI thread.
+            run_async(self.pool, find,
+                      lambda found: callback(
+                          [(it, kind) for it, kind in found
+                           if self._visible_catalog([it], kind)]),
+                      lambda _e: callback([]))
 
         self._ensure_full_catalog(with_catalog)
 

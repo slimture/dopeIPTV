@@ -3163,11 +3163,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         user hid or locked taken out, exactly as the category views do. Home,
         the guide and the searches read the whole catalogue directly, and
         showed a locked category's films to anyone who opened them there."""
+        keep = self._catalog_filter(mode)
+        return [it for it in (items or []) if keep(it)]
+
+    def _catalog_filter(self, mode: str):
+        """_visible_catalog's test for one row. Made here on the GUI thread,
+        it can run on a worker: going through tens of thousands of films
+        on the GUI thread held up the window, and the player with it."""
         excluded = self.overrides.excluded_ids(
             mode, include_locked=not self.parental.session_unlocked)
-        return [it for it in (items or [])
-                if str(it.get("category_id")) not in excluded
-                and not self._channel_hidden(it, mode)]
+        hidden = self._channel_hidden
+        return lambda it: (str(it.get("category_id")) not in excluded
+                           and not hidden(it, mode))
 
     def _channel_hidden(self, it, kind: str) -> bool:
         # A row carrying its own kind is judged by THAT, not by the view's.
