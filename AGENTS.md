@@ -16,6 +16,7 @@ map and the one-way import rule.
 | `i18n.py` | English source strings, `set_language`, `tr()` (other 26 languages in `locale/*.json`) |
 | `providers/client.py` | Xtream Codes API client |
 | `providers/epg.py` | EPG/XMLTV parser, cache and compact index |
+| `providers/epg_index.py` | The guide parser as a process of its own (`--epg-index`) |
 | `providers/metadata.py` | TMDB client, PosterResolver |
 | `providers/trakt.py` | Trakt.tv sync |
 | `providers/chromecast.py` | Chromecast support |
@@ -121,7 +122,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   `DOPEIPTV_LOG=debug` shows debug traces; `DOPEIPTV_LOG_FILE=/path` tees
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
-  metadata, diagnostics, oauth_loopback, opensubtitles, dlna), `core/` (stores, updates, log,
+  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna), `core/` (stores, updates, log,
   player_exec, wakelock, selfupdate, gcguard) and `services/` (resume,
   coverart, reminders, mpris, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,

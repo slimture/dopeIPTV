@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import gzip
 import io
+import os
 import pickle
+import subprocess
+import sys
 import threading
 import time
 import xml.etree.ElementTree as ET
@@ -25,6 +28,11 @@ from .client import XtreamClient
 # v2: compact column storage (arrays + deduped strings) instead of one
 # dict per programme - a ~260 MB guide used to cost ~1 GB of RAM.
 _INDEX_VERSION = 2
+
+# The command line that makes the app a guide parser (see index_main).
+INDEX_FLAG = "--epg-index"
+
+Schedule = tuple[array, array, tuple, tuple]
 
 
 def normalize_name(s: str | None) -> str:
@@ -93,6 +101,145 @@ def prune_epg_caches(keep_ids) -> int:
     return removed
 
 
+def parse_xmltv(data: bytes, keep_past_days: int
+                ) -> tuple[dict[str, Schedule], dict[str, str]]:
+    """XMLTV (plain or gzipped) -> (schedules by channel id, channel id by
+    normalised display name)."""
+    # Many EPG URLs serve gzipped XMLTV (.xml.gz); requests doesn't
+    # transparently decompress a gzip *body* (only transfer-encoding), so
+    # detect the gzip magic and inflate it ourselves.
+    if data[:2] == b"\x1f\x8b":
+        try:
+            data = gzip.decompress(data)
+        except OSError:
+            pass
+    # Robustness: refuse a guide that declares its own internal XML
+    # entities. A hostile or broken EPG URL could otherwise ship a
+    # "billion laughs" entity-expansion bomb that balloons memory during
+    # iterparse. Entity definitions live in the DOCTYPE prolog, before the
+    # root element, so scanning the head is enough - and real XMLTV never
+    # declares custom entities (a plain <!DOCTYPE tv SYSTEM "xmltv.dtd">
+    # carries none and is left to parse normally). Caught by ensure_loaded.
+    if b"<!ENTITY" in data[:65536]:
+        raise ValueError("XMLTV declares internal entities; refusing to parse")
+    cutoff = (datetime.now().astimezone().timestamp()
+              - keep_past_days * 86400)
+    rows: dict[str, list[tuple]] = {}
+    by_name: dict[str, str] = {}
+    seen: set[tuple] = set()
+    # Guides repeat the same titles and descriptions endlessly (reruns,
+    # daily shows, episode blurbs); keeping one str object per unique
+    # text instead of one per programme cuts the string heap by well
+    # over half - and shrinks the pickle index the same way.
+    text_pool: dict[str, str] = {}
+
+    def pooled(s: str) -> str:
+        return text_pool.setdefault(s, s)
+
+    for _, el in ET.iterparse(io.BytesIO(data)):
+        if el.tag == "channel":
+            cid = (el.get("id") or "").strip().lower()
+            if cid:
+                for dn in el.findall("display-name"):
+                    name = normalize_name(dn.text)
+                    if name:
+                        by_name.setdefault(name, cid)
+            el.clear()
+        elif el.tag == "programme":
+            cid = (el.get("channel") or "").strip().lower()
+            start = parse_xmltv_time(el.get("start"))
+            stop = parse_xmltv_time(el.get("stop"))
+            title = (el.findtext("title") or "").strip()
+            if cid and start and stop and stop.timestamp() > cutoff:
+                dedup_key = (cid, int(start.timestamp()), title.lower())
+                if dedup_key not in seen:
+                    seen.add(dedup_key)
+                    rows.setdefault(cid, []).append((
+                        int(start.timestamp()),
+                        int(stop.timestamp()),
+                        pooled(title),
+                        pooled((el.findtext("desc") or "").strip()),
+                    ))
+            el.clear()
+    seen.clear()
+    text_pool.clear()
+    by_id: dict[str, Schedule] = {}
+    for cid, lst in rows.items():
+        lst.sort(key=lambda r: r[0])
+        by_id[cid] = (array("q", (r[0] for r in lst)),
+                      array("q", (r[1] for r in lst)),
+                      tuple(r[2] for r in lst),
+                      tuple(r[3] for r in lst))
+    return by_id, by_name
+
+
+def index_blob(by_id: dict[str, Schedule], by_name: dict[str, str]) -> bytes:
+    """The index as stored next to the cached guide: a gzipped pickle."""
+    blob = pickle.dumps({"v": _INDEX_VERSION, "by_id": by_id,
+                         "by_name": by_name},
+                        protocol=pickle.HIGHEST_PROTOCOL)
+    return gzip.compress(blob, compresslevel=5)
+
+
+def read_index_blob(data: bytes
+                    ) -> tuple[dict[str, Schedule], dict[str, str]] | None:
+    """(by_id, by_name) from index_blob()'s bytes; None when damaged or from
+    another schema version."""
+    try:
+        # New index files are gzip-compressed; a plain pickle from an older
+        # build (pickle proto starts \x80, never the gzip magic) still loads.
+        if data[:2] == b"\x1f\x8b":
+            data = gzip.decompress(data)
+        blob = pickle.loads(data)
+    except Exception:
+        # Any damage at all means "parse the XML again". Letting one
+        # through (zlib.error, a truncated pickle's AttributeError...)
+        # failed the whole guide load instead, and on every start.
+        return None
+    if not isinstance(blob, dict) or blob.get("v") != _INDEX_VERSION:
+        return None
+    return blob.get("by_id", {}), blob.get("by_name", {})
+
+
+def index_main() -> int:
+    """The app started with INDEX_FLAG: XMLTV on stdin, its index_blob() on
+    stdout. The window runs this as a process of its own (_parse_elsewhere)
+    so a big guide's parse never competes with it for the interpreter."""
+    try:
+        chunks = []
+        while True:
+            chunk = os.read(0, 1 << 20)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        by_id, by_name = parse_xmltv(b"".join(chunks),
+                                     XmltvGuide.KEEP_PAST_DAYS)
+        out = memoryview(index_blob(by_id, by_name))
+        while out:
+            out = out[os.write(1, out):]
+    except Exception as e:
+        try:
+            os.write(2, f"epg index: {type(e).__name__}: {e}\n".encode())
+        except OSError:
+            pass
+        return 1
+    return 0
+
+
+def _index_command() -> tuple[list[str], dict[str, str]]:
+    """How to start index_main(): the frozen app is its own interpreter
+    (dopeiptv.py hands INDEX_FLAG to index_main); from source it is
+    `python -m`, with this package findable from any directory."""
+    env = dict(os.environ)
+    if getattr(sys, "frozen", False):
+        return [sys.executable, INDEX_FLAG], env
+    root = str(Path(__file__).resolve().parent.parent.parent)
+    env["PYTHONPATH"] = os.pathsep.join(
+        p for p in (root, env.get("PYTHONPATH", "")) if p)
+    return [sys.executable, "-m", "dopeiptv.providers.epg_index",
+            INDEX_FLAG], env
+
+
 class XmltvGuide:
     """Downloads and indexes the provider's XMLTV guide.
 
@@ -107,6 +254,10 @@ class XmltvGuide:
 
     CACHE_TTL: int = 6 * 3600
     KEEP_PAST_DAYS: int = 7
+    # Parse in a process of its own (see _parse_elsewhere); off, or when
+    # that process cannot run, the parse happens in the calling thread.
+    PARSE_ELSEWHERE: bool = True
+    PARSE_TIMEOUT_S: float = 900.0
 
     def __init__(self, client: XtreamClient,
                  custom_url: str | None = None,
@@ -126,7 +277,7 @@ class XmltvGuide:
         # instead of scanning. Query methods materialise the small
         # {"_plain": True, ...} dicts on demand, so callers see the exact
         # same entries as before.
-        self._by_id: dict[str, tuple[array, array, tuple, tuple]] = {}
+        self._by_id: dict[str, Schedule] = {}
         self._by_name: dict[str, str] = {}
         self.delay_minutes = 0
 
@@ -255,6 +406,12 @@ class XmltvGuide:
 
     def ensure_loaded(self, force: bool = False) -> bool:
         """Load the guide if needed.  Returns True when data is available."""
+        # A guide in memory answers at once, also while a refresh holds the
+        # lock for its download and parse: waiting for it here tied up every
+        # pool thread that wanted a schedule (the detail pane, recordings,
+        # search), and logos and lists queued behind them.
+        if self._loaded and not force:
+            return True
         with self._lock:
             if self._loaded and not force:
                 return True
@@ -265,8 +422,11 @@ class XmltvGuide:
             if data is None:
                 stale = None if force else self._read_cache(max_age=None)
                 if stale is not None and not self._loaded:
+                    # The old guide's index is still good for the old guide:
+                    # a second instead of a whole parse, every morning.
                     try:
-                        self._parse(stale)
+                        if not self._load_index():
+                            self._parse_and_index(stale)
                         self._loaded = True
                     except Exception:
                         pass
@@ -292,8 +452,7 @@ class XmltvGuide:
                 if source != "download" and self._load_index():
                     pass
                 else:
-                    self._parse(data)
-                    self._write_index()
+                    self._parse_and_index(data)
                 self._loaded = True
                 self._failed = False
                 log.info("EPG loaded from %s (%d KB)", source, len(data) // 1024)
@@ -316,20 +475,12 @@ class XmltvGuide:
             if p.stat().st_mtime < self.cache_path.stat().st_mtime:
                 return False
             data = p.read_bytes()
-            # New index files are gzip-compressed; a plain pickle from an older
-            # build (pickle proto starts \x80, never the gzip magic) still loads.
-            if data[:2] == b"\x1f\x8b":
-                data = gzip.decompress(data)
-            blob = pickle.loads(data)
-        except Exception:
-            # Any damage at all means "parse the XML again". Letting one
-            # through (zlib.error, a truncated pickle's AttributeError...)
-            # failed the whole guide load instead, and on every start.
+        except OSError:
             return False
-        if not isinstance(blob, dict) or blob.get("v") != _INDEX_VERSION:
+        loaded = read_index_blob(data)
+        if loaded is None:
             return False
-        self._by_id = blob.get("by_id", {})
-        self._by_name = blob.get("by_name", {})
+        self._by_id, self._by_name = loaded
         return True
 
     def _write_index(self) -> None:
@@ -337,13 +488,46 @@ class XmltvGuide:
         if not p:
             return
         try:
-            blob = pickle.dumps({"v": _INDEX_VERSION,
-                                 "by_id": self._by_id,
-                                 "by_name": self._by_name},
-                                protocol=pickle.HIGHEST_PROTOCOL)
-            self._write_atomic(p, gzip.compress(blob, compresslevel=5))
+            self._write_atomic(p, index_blob(self._by_id, self._by_name))
         except OSError:
             pass
+
+    def _parse_and_index(self, data: bytes) -> None:
+        """Parse *data* into the guide and keep its index on disk."""
+        if not (self.PARSE_ELSEWHERE and self._parse_elsewhere(data)):
+            self._parse(data)
+            self._write_index()
+
+    def _parse_elsewhere(self, data: bytes) -> bool:
+        """Parse in a process of its own and take its index. A parse in a
+        thread holds the interpreter (the GIL) for most of its 10-25 s on a
+        big guide, and the window shares the rest with it: the whole app
+        crawled until the guide was in. False when that process cannot run
+        or fails; the caller then parses here, as before."""
+        cmd, env = _index_command()
+        try:
+            r = subprocess.run(
+                cmd, input=data, capture_output=True, env=env,
+                timeout=self.PARSE_TIMEOUT_S,
+                creationflags=(getattr(subprocess, "CREATE_NO_WINDOW", 0)
+                               if sys.platform == "win32" else 0))
+        except (OSError, ValueError, subprocess.SubprocessError) as e:
+            log.info("EPG: no parse process (%s) - parsing in the app", e)
+            return False
+        loaded = read_index_blob(r.stdout) if r.returncode == 0 else None
+        if loaded is None:
+            err = (r.stderr or b"")[-300:].decode("utf-8", "replace").strip()
+            log.info("EPG: parse process failed (exit %s: %s) - parsing in "
+                     "the app", r.returncode, err)
+            return False
+        self._by_id, self._by_name = loaded
+        p = self._index_path()
+        if p is not None:
+            try:
+                self._write_atomic(p, r.stdout)
+            except OSError:
+                pass
+        return True
 
     def _sched_for(self, item: dict) -> tuple[array, array, tuple, tuple] | None:
         cid = (item.get("epg_channel_id") or "").strip().lower()
@@ -494,69 +678,4 @@ class XmltvGuide:
         return out[:limit]
 
     def _parse(self, data: bytes) -> None:
-        # Many EPG URLs serve gzipped XMLTV (.xml.gz); requests doesn't
-        # transparently decompress a gzip *body* (only transfer-encoding), so
-        # detect the gzip magic and inflate it ourselves.
-        if data[:2] == b"\x1f\x8b":
-            try:
-                data = gzip.decompress(data)
-            except OSError:
-                pass
-        # Robustness: refuse a guide that declares its own internal XML
-        # entities. A hostile or broken EPG URL could otherwise ship a
-        # "billion laughs" entity-expansion bomb that balloons memory during
-        # iterparse. Entity definitions live in the DOCTYPE prolog, before the
-        # root element, so scanning the head is enough - and real XMLTV never
-        # declares custom entities (a plain <!DOCTYPE tv SYSTEM "xmltv.dtd">
-        # carries none and is left to parse normally). Caught by ensure_loaded.
-        if b"<!ENTITY" in data[:65536]:
-            raise ValueError("XMLTV declares internal entities; refusing to parse")
-        cutoff = (datetime.now().astimezone().timestamp()
-                  - self.KEEP_PAST_DAYS * 86400)
-        rows: dict[str, list[tuple]] = {}
-        by_name: dict[str, str] = {}
-        seen: set[tuple] = set()
-        # Guides repeat the same titles and descriptions endlessly (reruns,
-        # daily shows, episode blurbs); keeping one str object per unique
-        # text instead of one per programme cuts the string heap by well
-        # over half - and shrinks the pickle index the same way.
-        text_pool: dict[str, str] = {}
-
-        def pooled(s: str) -> str:
-            return text_pool.setdefault(s, s)
-
-        for _, el in ET.iterparse(io.BytesIO(data)):
-            if el.tag == "channel":
-                cid = (el.get("id") or "").strip().lower()
-                if cid:
-                    for dn in el.findall("display-name"):
-                        name = normalize_name(dn.text)
-                        if name:
-                            by_name.setdefault(name, cid)
-                el.clear()
-            elif el.tag == "programme":
-                cid = (el.get("channel") or "").strip().lower()
-                start = parse_xmltv_time(el.get("start"))
-                stop = parse_xmltv_time(el.get("stop"))
-                title = (el.findtext("title") or "").strip()
-                if cid and start and stop and stop.timestamp() > cutoff:
-                    dedup_key = (cid, int(start.timestamp()), title.lower())
-                    if dedup_key not in seen:
-                        seen.add(dedup_key)
-                        rows.setdefault(cid, []).append((
-                            int(start.timestamp()),
-                            int(stop.timestamp()),
-                            pooled(title),
-                            pooled((el.findtext("desc") or "").strip()),
-                        ))
-                el.clear()
-        seen.clear()
-        text_pool.clear()
-        by_id: dict[str, tuple[array, array, tuple, tuple]] = {}
-        for cid, lst in rows.items():
-            lst.sort(key=lambda r: r[0])
-            by_id[cid] = (array("q", (r[0] for r in lst)),
-                          array("q", (r[1] for r in lst)),
-                          tuple(r[2] for r in lst),
-                          tuple(r[3] for r in lst))
-        self._by_id, self._by_name = by_id, by_name
+        self._by_id, self._by_name = parse_xmltv(data, self.KEEP_PAST_DAYS)

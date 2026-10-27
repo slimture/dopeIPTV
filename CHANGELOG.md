@@ -9,6 +9,18 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- **The app no longer crawls while the programme guide loads.** A big
+  guide (hundreds of thousands of programmes) is parsed in a process of
+  its own now: parsed in a thread, it held Python's interpreter for most
+  of its 10-30 seconds, and the window had to share it - in a measurement
+  with a 140 MB guide the window stalled for 1.4 s in all, up to half a
+  second at a time; now 0.1 s, never more than 70 ms. A guide older than
+  six hours comes from its saved index while the new one downloads,
+  instead of being parsed again first (the start of every day), and a
+  guide already loaded answers at once while a refresh runs, instead of
+  holding up the programme lists, logos and searches waiting behind it.
+  Where the separate process cannot run, the guide is parsed in the app
+  as before.
 - **About dopeIPTV, with an update waiting:** on Linux (Wayland) the
   release notes lay over "Update now", "Check for updates", the links and
   the TMDB line, and the title read "About dopeIPTV dopeIPTV". The notes

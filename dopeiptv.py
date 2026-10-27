@@ -6,6 +6,12 @@ Run with:  python3 dopeiptv.py
 
 import sys
 
+# The guide parser, started by the app itself as a process of its own
+# (providers/epg.py, _parse_elsewhere): no window, no allocator re-exec.
+if sys.argv[1:2] == ["--epg-index"]:
+    from dopeiptv.providers.epg import index_main
+    sys.exit(index_main())
+
 # Optionally re-exec with a custom memory allocator (jemalloc/mimalloc)
 # preloaded, before anything heavy is imported. Strict no-op unless a library
 # is actually found for this platform, so it can never affect a normal start.

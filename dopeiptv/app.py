@@ -357,6 +357,18 @@ def main() -> int:
                 len(missing), ", ".join(missing))
             return 1
         log.info("self-check: all %d languages loaded", len(LANGUAGES))
+        # The programme guide is parsed by this same executable started as a
+        # process of its own (providers/epg.py). A bundle that cannot do that
+        # still parses in the app, slowly - the regression this catches.
+        from .providers.epg import XmltvGuide
+        probe = XmltvGuide(None)
+        if not probe._parse_elsewhere(
+                b'<tv><channel id="c1"><display-name>One</display-name>'
+                b'</channel></tv>') or probe._by_name.get("one") != "c1":
+            log.error("self-check: the guide parse process did not run "
+                      "from this bundle")
+            return 1
+        log.info("self-check: the guide parse process works")
         return 0
 
     _install_crash_hooks()

@@ -20,6 +20,7 @@ dopeiptv/
   providers/           Data sources (the network / provider edge)
     client.py          XtreamClient, OfflineClient/M3UClient/DemoClient
     epg.py             XmltvGuide - XMLTV parser with disk cache + index
+    epg_index.py       The guide parser as a process of its own (--epg-index)
     metadata.py        TMDB client, PosterResolver (cover art)
     trakt.py           Trakt.tv sync (watched, watchlist)
     oauth_loopback.py  Loopback HTTP server for the Trakt OAuth redirect
