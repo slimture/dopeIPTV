@@ -9,6 +9,19 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- **Lists, categories and the detail panel no longer wait for the
+  programme guide.** Every channel list loaded while the guide was coming
+  in started another guide load, which then sat on a background thread
+  waiting for the first one's download and parse - as did the detail
+  panel for every channel clicked. A few clicks took every background
+  thread, and nothing else loaded until the guide was in: opening Movies
+  took 21 s in a measurement, now 50 ms. One guide load runs at a time,
+  and the detail panel fills in its programmes when the guide arrives.
+- **"All" with tens of thousands of films, the search box and the switch
+  between list and grid react at once.** Each of them asked every row
+  whether it was hidden or renamed, also when nothing was (most lists):
+  search went from 0.8 s to under 0.3 s, list/grid from 0.5 s to 0.2 s.
+  The sidebar's category search builds its index off the GUI thread.
 - **Video and the window keep up while the app loads in the background.**
   Measured against a big provider (20,000 channels, 80,000 films, 20,000
   series), a playlist refresh held the window - and a playing video - up

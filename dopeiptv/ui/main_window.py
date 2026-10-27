@@ -2033,21 +2033,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # New/refreshed provider: re-learn which Browse modes it has and hide
         # the empty ones (Browse nav is shown by default until this resolves).
         self._refresh_mode_availability()
-        run_async(
-            self.pool, lambda: self.xmltv.ensure_loaded(force=force),
-            lambda ok: (self._epg_progress_finished(),
-                        self.list_model.refresh_all() if ok else None),
-            lambda _: self._epg_progress_finished())
+        self._load_guide(force=force)
 
     def _refresh_epg_now(self) -> None:
         """Force a fresh EPG fetch now (Settings button) without reloading the
         channel list."""
         self._flash_status(tr("status_loading_programme_guide"))
-        run_async(
-            self.pool, lambda: self.xmltv.ensure_loaded(force=True),
-            lambda ok: (self._epg_progress_finished(),
-                        self.list_model.refresh_all() if ok else None),
-            lambda _: self._epg_progress_finished())
+        self._load_guide(force=True)
 
     def _clear_epg_cache(self) -> None:
         """Delete the cached guide for the current playlist, sweep away caches
@@ -2805,8 +2797,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         text = self.search.text().lower().strip()
         if not text:
             return items
-        return [it for it in items
-                if text in self.channel_display_name(it).lower()]
+        name = self._display_name_fn()
+        return [it for it in items if text in name(it).lower()]
 
     def _grouped(self, sections: list) -> list:
         """Build a headed list from ordered (header_key, ekind, kind, items)
@@ -2942,17 +2934,37 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.listw.set_grid_cell(self.delegate.grid_size())
 
     def _ensure_xmltv_loaded(self) -> None:
-        if self.xmltv._loaded or self.xmltv._failed:
+        x = self.xmltv
+        # One load at a time: every live list loaded asked again, and each
+        # extra job sat on a pool thread waiting for the first one's
+        # download and parse - with a few category clicks, every pool
+        # thread, so lists and categories waited for the guide as well.
+        if x._loaded or x._failed or getattr(self, "_guide_loading", None) is x:
             return
-        # The guide download drives the "Loading programme guide" strip via
-        # epg_progress, so this load must END that indicator too - on both
-        # completion and failure, like refresh_playlist does. Without it the
-        # strip lingered after the download (until the watchdog, or until a
-        # category switch happened to hide it).
-        run_async(self.pool, self.xmltv.ensure_loaded,
-                  lambda ok: (self._epg_progress_finished(),
-                              self.list_model.refresh_all() if ok else None),
-                  lambda _: self._epg_progress_finished())
+        self._load_guide()
+
+    def _load_guide(self, force: bool = False) -> None:
+        """Load the current guide on the pool. The download drives the
+        "Loading programme guide" strip via epg_progress, so the load must
+        END that indicator too, on completion and failure alike - without it
+        the strip lingered (until the watchdog, or a category switch)."""
+        x = self.xmltv
+        first = not x._loaded
+        self._guide_loading = x
+
+        def finished(ok) -> None:
+            if getattr(self, "_guide_loading", None) is x:
+                self._guide_loading = None
+            self._epg_progress_finished()
+            if ok and x is self.xmltv:
+                self.list_model.refresh_all()
+                if first and hasattr(self, "_request_epg"):
+                    # The detail panel asked while the guide was still on its
+                    # way (lookups don't wait for it): fill it in now.
+                    self._request_epg()
+
+        run_async(self.pool, lambda: x.ensure_loaded(force=force),
+                  finished, lambda _e: finished(False))
 
     # -- metadata (TMDB artwork) -----------------------------------------------------
 
@@ -2984,6 +2996,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         "series": {"series", "episode"},
         "local": {"local"},
     }
+
+    def _display_name_fn(self):
+        """channel_display_name for the rows of the current list, as one
+        function: the plain name when nothing here is renamed (most lists),
+        so a search goes through 80,000 rows without a lookup for each."""
+        mode = "episode" if self.series_ctx else self.mode
+        if (mode in ("live", "vod", "series", "fav")
+                and self.channel_ov.anything_renamed(
+                    "live" if mode == "fav" else mode)):
+            return self.channel_display_name
+        return lambda it: it.get("name") or it.get("title") or "?"
 
     def channel_display_name(self, it) -> str:
         base = it.get("name") or it.get("title") or "?"
@@ -3222,11 +3245,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _apply_filter(self) -> None:
         text = self.search.text().lower().strip()
         kind = self._content_kind()
-        items = [it for it in self.all_items
-                 if not self._channel_hidden(it, kind)]
+        if self.channel_ov.anything_hidden():
+            items = [it for it in self.all_items
+                     if not self._channel_hidden(it, kind)]
+        else:
+            # Nothing hidden (most lists): asking each of 80,000 films
+            # took a third of a second on the GUI thread.
+            items = list(self.all_items)
         if text:
-            filtered = [it for it in items
-                        if text in self.channel_display_name(it).lower()]
+            name = self._display_name_fn()
+            filtered = [it for it in items if text in name(it).lower()]
         else:
             filtered = items
         filtered = self._sorted(filtered)

@@ -439,6 +439,8 @@ def test_toggling_grid_inside_a_series_keeps_the_episodes():
     f.rebuilt = []
     f._load_items = lambda cat: f.rebuilt.append(cat)
     f._channel_hidden = lambda it, kind: False
+    f.channel_ov = SimpleNamespace(anything_hidden=lambda: False,
+                                   anything_renamed=lambda mode: False)
     f._sorted = lambda x: x
     f._hide_busy = lambda: None
     f._set_status = lambda *a, **k: None

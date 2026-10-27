@@ -496,6 +496,22 @@ class XmltvGuide:
         # Not cached here: the parse process keeps it (_parse_and_index).
         return b"".join(chunks)
 
+    def is_loading(self) -> bool:
+        """Whether a thread is loading the guide right now."""
+        return self._lock.locked()
+
+    def _ready(self) -> bool:
+        """For a lookup: the guide in memory - or loaded here, unless another
+        thread is loading it already. Waiting for that load held a pool
+        thread through its whole download and parse, and the detail panel
+        asks for every channel clicked: a few clicks took every pool
+        thread, and lists and categories waited for the guide too."""
+        if self._loaded:
+            return True
+        if self.is_loading():
+            return False
+        return self.ensure_loaded()
+
     def is_loaded(self) -> bool:
         """Non-blocking: whether guide data is available right now. Lets the
         UI (e.g. the EPG grid) tell 'no guide data for this channel' apart
@@ -662,7 +678,7 @@ class XmltvGuide:
     _MAX_PROG_SECS = 86400
 
     def listings_for(self, item: dict, limit: int = 8) -> list[dict]:
-        if not self.ensure_loaded():
+        if not self._ready():
             return []
         sched = self._sched_for(item)
         if not sched:

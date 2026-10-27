@@ -48,14 +48,14 @@ class _SearchMixin:
     def _render_item_search(self, q: str) -> None:
         kind = self._content_kind()
         text = self.search.text().lower().strip()   # honour the top search too
+        hidden = self.channel_ov.anything_hidden()
         items = [it for it in (self.all_items or [])
                  if not it.get("_header")
-                 and not self._channel_hidden(it, kind)]
+                 and not (hidden and self._channel_hidden(it, kind))]
+        name = self._display_name_fn()
         if text:
-            items = [it for it in items
-                     if text in self.channel_display_name(it).lower()]
-        items = [it for it in items
-                 if q in self.channel_display_name(it).lower()]
+            items = [it for it in items if text in name(it).lower()]
+        items = [it for it in items if q in name(it).lower()]
         self.list_model.set_items(self._sorted(items), kind)
         self._set_status(self._count_text(kind, len(items)))
 
@@ -71,18 +71,25 @@ class _SearchMixin:
                  "vod": self.client.vod_streams,
                  "series": self.client.series_list}[mode]
 
-        def done(items) -> None:
+        def build() -> dict:
+            # On the worker, names lowered once: done on the GUI thread, and
+            # every keystroke lowering them all again, a big catalogue held
+            # the window up each time.
             from collections import defaultdict
             idx: dict = defaultdict(list)
-            for it in items or []:
+            for it in fetch(None) or []:
                 cid = it.get("category_id")
                 if cid is None:
                     continue
-                idx[cid].append(it.get("name") or it.get("title") or "")
+                n = it.get("name") or it.get("title") or ""
+                idx[cid].append((n, n.lower()))
+            return idx
+
+        def done(idx) -> None:
             self._search_index_cache[mode] = idx
             cb(idx)
 
-        run_async(self.pool, fetch, done, lambda _m: cb({}))
+        run_async(self.pool, build, done, lambda _m: cb({}))
 
     def _render_cat_search(self, q: str, idx: dict) -> None:
         results = []
@@ -94,14 +101,14 @@ class _SearchMixin:
                 self.mode, cid, c.get("category_name", "?"))
             name_match = q in cname.lower()
             chans = idx.get(cid, [])
-            matches = [n for n in chans if q in n.lower()]
+            matches = [n for n, low in chans if q in low]
             if not name_match and not matches:
                 continue
             # Rank: a category whose NAME matches wins; among the rest, the more
             # of its channels match the higher it sits (so "bbc" surfaces UK,
             # with its many BBC channels, above a country with just one).
             score = (1_000_000 if name_match else 0) + len(matches)
-            sample = (matches or chans)[:3]
+            sample = (matches or [n for n, _low in chans[:3]])[:3]
             results.append((score, cname, cid, sample))
         results.sort(key=lambda r: (-r[0], r[1].lower()))
 

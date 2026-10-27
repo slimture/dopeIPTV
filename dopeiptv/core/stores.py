@@ -452,6 +452,19 @@ class ChannelOverrides:
     def has_overrides(self, mode: str) -> bool:
         return bool(self.data.get(mode))
 
+    def anything_hidden(self) -> bool:
+        """Whether any row of any kind is hidden. Most lists have none, and
+        a list then needn't ask each of its rows."""
+        return any(e.get("hidden") for d in self.data.values()
+                   if isinstance(d, dict) for e in d.values()
+                   if isinstance(e, dict))
+
+    def anything_renamed(self, mode: str) -> bool:
+        """Whether any row of *mode* carries a name of the user's."""
+        d = self.data.get(mode)
+        return isinstance(d, dict) and any(
+            e.get("name") for e in d.values() if isinstance(e, dict))
+
     def reset_mode(self, mode: str) -> None:
         self.data.pop(mode, None)
         self._save()

@@ -205,3 +205,60 @@ def test_the_frozen_app_starts_itself_as_the_parser(tmp_path, monkeypatch):
     probe = XmltvGuide(None)
     assert probe._parse_elsewhere(_guide()) is True
     assert sorted(probe._by_id) == ["c0", "c1", "c2"]
+
+
+def test_a_lookup_does_not_wait_for_another_threads_load(tmp_path):
+    # The detail panel looks a channel up on a pool thread for every click.
+    # Waiting for a load already under way kept that thread for the whole
+    # download and parse; a few clicks took the whole pool.
+    g = XmltvGuide(client=None, cache_path=str(tmp_path / "epg_x.xml"))
+    g._download = _guide
+    answers = []
+    with g._lock:                     # another thread is loading it
+        t = threading.Thread(target=lambda: answers.append(
+            g.listings_for({"epg_channel_id": "c1"})))
+        t.start()
+        t.join(timeout=5)
+        assert not t.is_alive(), "waited for the other load"
+    assert answers == [[]]
+    # Nobody loading: the lookup loads the guide itself, as before.
+    assert g.listings_for({"epg_channel_id": "c1"})
+
+
+def test_one_guide_load_at_a_time(monkeypatch):
+    import dopeiptv.ui.main_window as mw
+    jobs = []
+    monkeypatch.setattr(mw, "run_async",
+                        lambda _pool, fn, done, err=None: jobs.append(
+                            (fn, done)))
+
+    class _Window:
+        _ensure_xmltv_loaded = mw.MainWindow._ensure_xmltv_loaded
+        _load_guide = mw.MainWindow._load_guide
+        pool = None
+
+        def __init__(self):
+            self.xmltv = XmltvGuide(client=None)
+            self.xmltv.ensure_loaded = lambda force=False: True
+            self.finished = 0
+            self.list_model = type("M", (), {"refresh_all": lambda s: None})()
+            self.epg_asked = 0
+
+        def _epg_progress_finished(self):
+            self.finished += 1
+
+        def _request_epg(self):
+            self.epg_asked += 1
+
+    w = _Window()
+    for _ in range(4):                # four live lists loaded meanwhile
+        w._ensure_xmltv_loaded()
+    assert len(jobs) == 1
+    fn, done = jobs.pop()
+    done(fn())
+    assert w.finished == 1
+    assert w.epg_asked == 1           # the detail panel filled in now
+    w.xmltv._failed = False
+    w.xmltv._loaded = False
+    w._ensure_xmltv_loaded()          # the next one may go again
+    assert len(jobs) == 1
