@@ -6,6 +6,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
+import threading
+from pathlib import Path
 from typing import Any, Callable
 
 from ..core._lazy_requests import requests
@@ -291,6 +294,130 @@ class TmdbClient:
         return results[0].get("id") if results else None
 
 
+class CacheFiles:
+    """Where PosterResolver keeps its caches: a JSON file each, beside the
+    settings file it is given (cache.ini -> cache.d/), written on a thread
+    of their own. Kept in the settings file, each save had Qt rewrite all
+    of it on the GUI thread - 7.7 MB with a full poster cache, 0.25 s - two
+    seconds after every batch of lookups: a stall while browsing, video
+    included. A cache found in the settings file (where older versions
+    kept it) is moved out on first read. Settings that are not an INI
+    file keep the caches in them, as before."""
+
+    def __init__(self, settings: QSettings) -> None:
+        self.settings = settings
+        self.dir: Path | None = None
+        name = settings.fileName()
+        if settings.format() == QSettings.Format.IniFormat and name:
+            f = Path(name)
+            self.dir = f.with_name(f.stem + ".d")
+        self._lock = threading.Lock()
+        self._pending: dict[str, Any] = {}
+        self._writer: threading.Thread | None = None
+        self._closed = False
+
+    def _file(self, key: str) -> Path | None:
+        return None if self.dir is None else self.dir / f"{key}.json"
+
+    def load(self, key: str) -> Any:
+        """What was saved under *key*; None when nothing (or damaged)."""
+        f = self._file(key)
+        data: Any = None
+        found = False
+        if f is not None:
+            try:
+                with f.open(encoding="utf-8") as fh:
+                    data = json.load(fh)
+                found = True
+            except FileNotFoundError:
+                pass
+            except (OSError, ValueError):
+                found = True                    # damaged: start over
+        legacy = self.settings.contains(key)
+        if not found and legacy:
+            try:
+                raw = self.settings.value(key, "") or ""
+                data = json.loads(raw) if raw else None
+            except Exception:
+                data = None
+        if f is not None and legacy:
+            self.settings.remove(key)
+            if not found and data is not None:
+                self.save(key, data)
+        return data
+
+    def save(self, key: str, data: Any) -> None:
+        if self._closed:
+            return
+        if self.dir is None:
+            self.settings.setValue(key, json.dumps(data))
+            return
+        with self._lock:
+            self._pending[key] = data           # the latest one wins
+            if self._writer is None:
+                self._writer = threading.Thread(
+                    target=self._write_pending, name="tmdb-cache",
+                    daemon=True)
+                self._writer.start()
+
+    def _write_pending(self) -> None:
+        while True:
+            with self._lock:
+                if not self._pending:
+                    self._writer = None
+                    return
+                key, data = self._pending.popitem()
+            self._write(key, data)
+
+    def _write(self, key: str, data: Any) -> None:
+        f = self._file(key)
+        if f is None:
+            return
+        tmp = f.with_name(f.name + ".part")
+        try:
+            f.parent.mkdir(parents=True, exist_ok=True)
+            with tmp.open("w", encoding="utf-8") as fh:
+                # An entry at a time, not one json.dumps of the whole: that
+                # holds the interpreter (and the window) for its whole run.
+                if isinstance(data, dict):
+                    fh.write("{")
+                    for i, (k, v) in enumerate(list(data.items())):
+                        fh.write(("," if i else "") + json.dumps(k) + ":"
+                                 + json.dumps(v))
+                    fh.write("}")
+                else:
+                    fh.write(json.dumps(data))
+            tmp.replace(f)
+        except (OSError, TypeError, ValueError, RuntimeError) as e:
+            log.warning("tmdb cache: could not write %s: %s", f, e)
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+
+    def flush(self) -> None:
+        """Write what is waiting now, on this thread (on quit)."""
+        writer = self._writer
+        if writer is not None:
+            writer.join(timeout=5)
+        with self._lock:
+            pending, self._pending = self._pending, {}
+        for key, data in pending.items():
+            self._write(key, data)
+
+    def clear(self) -> None:
+        """Forget every saved cache, and save nothing more this session
+        (Settings -> Reset all, which then quits)."""
+        self._closed = True
+        with self._lock:
+            self._pending.clear()
+        writer = self._writer
+        if writer is not None:
+            writer.join(timeout=5)
+        if self.dir is not None:
+            shutil.rmtree(self.dir, ignore_errors=True)
+
+
 class PosterResolver(QObject):
     """Async, cached title -> TMDB metadata resolver.
 
@@ -336,10 +463,8 @@ class PosterResolver(QObject):
         self.pool = pool
         self.settings = settings
         self.client = client
-        try:
-            raw: dict = json.loads(settings.value(self.CACHE_KEY, "") or "{}")
-        except Exception:
-            raw = {}
+        self.files = CacheFiles(settings)
+        raw = self.files.load(self.CACHE_KEY) or {}
         if not isinstance(raw, dict):
             raw = {}                    # damaged: start over, never crash
         # Migrate the older cache format (plain poster-URL strings) to the
@@ -365,7 +490,7 @@ class PosterResolver(QObject):
                 if v.get("manual") or v.get("poster_url")}
             settings.setValue(self.CACHE_MATCHER_VER_KEY,
                               self.CACHE_MATCHER_VER)
-            settings.setValue(self.CACHE_KEY, json.dumps(self._cache))
+            self.files.save(self.CACHE_KEY, self._cache)
             _tmdb_dbg(f"cache prune: dropped {before - len(self._cache)} "
                       f"no-poster entries for re-match")
         self._pending: set[str] = set()
@@ -376,27 +501,22 @@ class PosterResolver(QObject):
         self._waiting: dict[str, list[Callable]] = {}
         self._dirty = False
         # tmdb-id lookup cache ("vod:123"/"series:456" -> {name, poster}).
-        try:
-            self._byid_cache: dict[str, dict] = json.loads(
-                settings.value(self.BYID_CACHE_KEY, "") or "{}")
-        except Exception:
-            self._byid_cache = {}
+        self._byid_cache: dict[str, dict] = (
+            self.files.load(self.BYID_CACHE_KEY) or {})
         if not isinstance(self._byid_cache, dict):
             self._byid_cache = {}
         self._byid_pending: set[str] = set()
         self._byid_waiting: dict[str, list[Callable]] = {}
         self._byid_dirty = False
-        try:
-            self._person_cache: dict[str, list[str]] = json.loads(
-                settings.value(self.PERSON_CACHE_KEY, "") or "{}")
-        except Exception:
+        self._person_cache: dict[str, list[str]] = (
+            self.files.load(self.PERSON_CACHE_KEY) or {})
+        if not isinstance(self._person_cache, dict):
             self._person_cache = {}
         self._person_pending: set[str] = set()
         self._person_waiting: dict[str, list[Callable]] = {}
-        try:
-            self._person_id_cache: dict[str, int | None] = json.loads(
-                settings.value(self.PERSON_ID_CACHE_KEY, "") or "{}")
-        except Exception:
+        self._person_id_cache: dict[str, int | None] = (
+            self.files.load(self.PERSON_ID_CACHE_KEY) or {})
+        if not isinstance(self._person_id_cache, dict):
             self._person_id_cache = {}
         # Enforce the caps on already-persisted caches too, so an existing
         # oversized cache file shrinks on the next launch instead of lingering.
@@ -424,12 +544,11 @@ class PosterResolver(QObject):
         if self._dirty:
             self._dirty = False
             self._cache = self._capped(self._cache, self.MAX_POSTER)
-            self.settings.setValue(self.CACHE_KEY, json.dumps(self._cache))
+            self.files.save(self.CACHE_KEY, self._cache)
         if self._byid_dirty:
             self._byid_dirty = False
             self._byid_cache = self._capped(self._byid_cache, self.MAX_BYID)
-            self.settings.setValue(self.BYID_CACHE_KEY,
-                                   json.dumps(self._byid_cache))
+            self.files.save(self.BYID_CACHE_KEY, self._byid_cache)
 
     def _save_byid(self) -> None:
         self._byid_dirty = True
@@ -439,6 +558,7 @@ class PosterResolver(QObject):
         """Force any pending cache write out immediately (e.g. on quit)."""
         self._save_timer.stop()
         self._flush_save()
+        self.files.flush()
 
     @staticmethod
     def _byid_key(tmdb_id: int, kind: str) -> str:
@@ -744,8 +864,7 @@ class PosterResolver(QObject):
             self._person_cache[key] = titles or []
             self._person_cache = self._capped(
                 self._person_cache, self.MAX_PERSON)
-            self.settings.setValue(
-                self.PERSON_CACHE_KEY, json.dumps(self._person_cache))
+            self.files.save(self.PERSON_CACHE_KEY, self._person_cache)
             self._person_pending.discard(key)
             for cb in self._person_waiting.pop(key, []):
                 try:
@@ -788,8 +907,7 @@ class PosterResolver(QObject):
             self._person_id_cache[key] = pid
             self._person_id_cache = self._capped(
                 self._person_id_cache, self.MAX_PERSON_ID)
-            self.settings.setValue(
-                self.PERSON_ID_CACHE_KEY, json.dumps(self._person_id_cache))
+            self.files.save(self.PERSON_ID_CACHE_KEY, self._person_id_cache)
             self._person_id_pending.discard(key)
             for cb in self._person_id_waiting.pop(key, []):
                 try:

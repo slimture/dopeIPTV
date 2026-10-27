@@ -24,6 +24,12 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   A list without section headers is laid out from one row's height
   instead of asking each of its rows (80,000 films: 0.65 s to 0.1 s).
   The sidebar's category search builds its index off the GUI thread.
+- **No more stalls every few seconds while browsing films and series.**
+  The TMDB caches (posters, ids, cast) were kept in a settings file, and
+  each save - two seconds after any batch of lookups - had Qt rewrite all
+  of it on the GUI thread: 0.25 s with a full cache, and the playing video
+  stuttered with it. They are files of their own now, written in the
+  background; the existing cache moves over on the first start.
 - **Video and the window keep up while the app loads in the background.**
   Measured against a big provider (20,000 channels, 80,000 films, 20,000
   series), a playlist refresh held the window - and a playing video - up

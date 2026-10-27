@@ -55,7 +55,7 @@ from .. import APP_NAME, BUILD_VERSION, VERSION
 from ..i18n import tr
 from .dialogs import PlaylistDialog
 from .epg_grid import EpgGridDialog
-from ..providers.metadata import TmdbClient, bundled_tmdb_key
+from ..providers.metadata import CacheFiles, TmdbClient, bundled_tmdb_key
 from ..providers.opensubtitles import OpenSubtitles
 from ..providers.opensubtitles import bundled_key as bundled_os_key
 from ..providers.client import make_client
@@ -335,6 +335,12 @@ class _SettingsMixin:
             if st is not None:
                 st.clear()
                 st.sync()
+        # The TMDB caches have files of their own beside the cache settings.
+        resolver = getattr(getattr(self, "cover", None), "resolver", None)
+        if resolver is not None:
+            resolver.files.clear()
+        elif getattr(self, "_cache_settings", None) is not None:
+            CacheFiles(self._cache_settings).clear()
         # closeEvent persists layout/resume/watched on the way out - skip
         # that during a reset, or the freshly cleared config gets seeded
         # with those keys again.
