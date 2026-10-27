@@ -83,3 +83,38 @@ def test_grid_reflow_is_debounced_during_resize_storms():
     while len(calls) < 2 and time.monotonic() < deadline:
         app.processEvents()
     assert len(calls) == 2
+
+
+def test_a_list_without_headers_is_laid_out_as_uniform_rows():
+    """80,000 films: one sizeHint call instead of one per row (0.65 s ->
+    0.1 s on the GUI thread). Section headers keep their own height."""
+    app = _app()
+    from PyQt6.QtCore import QSize, Qt
+    from PyQt6.QtWidgets import QStyledItemDelegate
+    from dopeiptv.ui.channel_list import ChannelListModel, ChannelListView
+
+    class Delegate(QStyledItemDelegate):
+        calls = 0
+
+        def sizeHint(self, option, index):
+            Delegate.calls += 1
+            it = index.data(Qt.ItemDataRole.UserRole)
+            return QSize(0, 30 if it and it.get("_header") else 56)
+
+    v = ChannelListView()
+    m = ChannelListModel()
+    v.setModel(m)
+    v.setItemDelegate(Delegate())
+    v.resize(400, 600)
+    rows = [{"stream_id": i, "name": f"Film {i}"} for i in range(5000)]
+    m.set_items(list(rows), "vod")
+    v.doItemsLayout()
+    app.processEvents()
+    assert v.uniformItemSizes()
+    assert Delegate.calls < 50
+    m.set_items([{"_header": "Movies"}] + rows[:20], "vod")
+    v.doItemsLayout()
+    app.processEvents()
+    assert not v.uniformItemSizes()
+    assert v.visualRect(m.index(0)).height() == 30
+    assert v.visualRect(m.index(1)).height() == 56

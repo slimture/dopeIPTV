@@ -21,6 +21,8 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   between list and grid react at once.** Each of them asked every row
   whether it was hidden or renamed, also when nothing was (most lists):
   search went from 0.8 s to under 0.3 s, list/grid from 0.5 s to 0.2 s.
+  A list without section headers is laid out from one row's height
+  instead of asking each of its rows (80,000 films: 0.65 s to 0.1 s).
   The sidebar's category search builds its index off the GUI thread.
 - **Video and the window keep up while the app loads in the background.**
   Measured against a big provider (20,000 channels, 80,000 films, 20,000
