@@ -11,6 +11,7 @@ import sys
 import threading
 import time
 import xml.etree.ElementTree as ET
+import zlib
 from array import array
 from bisect import bisect_left, bisect_right
 from datetime import datetime
@@ -27,12 +28,50 @@ from .client import XtreamClient
 # Bump to invalidate all pickled indexes on disk after a schema change.
 # v2: compact column storage (arrays + deduped strings) instead of one
 # dict per programme - a ~260 MB guide used to cost ~1 GB of RAM.
-_INDEX_VERSION = 2
+# v3: a header, then the channels in pieces (see index_blob).
+_INDEX_VERSION = 3
+_CHANNELS_PER_PIECE = 50
 
 # The command line that makes the app a guide parser (see index_main).
 INDEX_FLAG = "--epg-index"
 
 Schedule = tuple[array, array, tuple, tuple]
+
+# zlib's one-shot calls and pickle.loads hold the interpreter for their
+# whole run - unpacking a 140 MB guide in one call stopped the window, and
+# the player's frames with it, for 0.8 s. Fed a slice at a time, the window
+# runs between slices.
+_ZLIB_STEP = 1 << 18
+
+
+def gzip_gently(data: bytes, level: int = 5) -> bytes:
+    """gzip.compress(), a slice at a time."""
+    c = zlib.compressobj(level, zlib.DEFLATED, 31)
+    view = memoryview(data)
+    out = [c.compress(view[i:i + _ZLIB_STEP])
+           for i in range(0, len(view), _ZLIB_STEP)]
+    out.append(c.flush())
+    return b"".join(out)
+
+
+def gunzip_gently(data: bytes) -> bytes:
+    """gzip.decompress(), a slice at a time, every member of the stream.
+    Raises zlib.error on damaged or cut-short data."""
+    out: list[bytes] = []
+    view = memoryview(data)
+    while len(view):
+        d = zlib.decompressobj(31)
+        pos = 0
+        while not d.eof:
+            if pos >= len(view):
+                raise zlib.error("compressed data ends early")
+            out.append(d.decompress(view[pos:pos + _ZLIB_STEP]))
+            pos += _ZLIB_STEP
+        rest = d.unused_data + bytes(view[pos:])
+        if rest[:2] != b"\x1f\x8b":
+            break           # padding after the last member
+        view = memoryview(rest)
+    return b"".join(out)
 
 
 def normalize_name(s: str | None) -> str:
@@ -110,8 +149,8 @@ def parse_xmltv(data: bytes, keep_past_days: int
     # detect the gzip magic and inflate it ourselves.
     if data[:2] == b"\x1f\x8b":
         try:
-            data = gzip.decompress(data)
-        except OSError:
+            data = gunzip_gently(data)
+        except zlib.error:
             pass
     # Robustness: refuse a guide that declares its own internal XML
     # entities. A hostile or broken EPG URL could otherwise ship a
@@ -174,11 +213,19 @@ def parse_xmltv(data: bytes, keep_past_days: int
 
 
 def index_blob(by_id: dict[str, Schedule], by_name: dict[str, str]) -> bytes:
-    """The index as stored next to the cached guide: a gzipped pickle."""
-    blob = pickle.dumps({"v": _INDEX_VERSION, "by_id": by_id,
-                         "by_name": by_name},
-                        protocol=pickle.HIGHEST_PROTOCOL)
-    return gzip.compress(blob, compresslevel=5)
+    """The index as stored next to the cached guide, gzipped: a header,
+    then the channels in pieces, one pickle after another, so reading it
+    back never holds the interpreter for the whole guide at once. One
+    pickler for all of them keeps a text shared by channels in different
+    pieces shared after loading."""
+    items = list(by_id.items())
+    pieces = range(0, len(items), _CHANNELS_PER_PIECE)
+    buf = io.BytesIO()
+    p = pickle.Pickler(buf, protocol=pickle.HIGHEST_PROTOCOL)
+    p.dump({"v": _INDEX_VERSION, "pieces": len(pieces), "by_name": by_name})
+    for i in pieces:
+        p.dump(dict(items[i:i + _CHANNELS_PER_PIECE]))
+    return gzip_gently(buf.getvalue())
 
 
 def read_index_blob(data: bytes
@@ -186,25 +233,51 @@ def read_index_blob(data: bytes
     """(by_id, by_name) from index_blob()'s bytes; None when damaged or from
     another schema version."""
     try:
-        # New index files are gzip-compressed; a plain pickle from an older
-        # build (pickle proto starts \x80, never the gzip magic) still loads.
+        # Index files are gzip-compressed; a plain pickle (proto starts \x80,
+        # never the gzip magic) loads as well. Unpacked as it is read, the
+        # whole of it never sits in memory at once.
+        f: io.BufferedIOBase = io.BytesIO(data)
         if data[:2] == b"\x1f\x8b":
-            data = gzip.decompress(data)
-        blob = pickle.loads(data)
+            f = gzip.GzipFile(fileobj=f)
+        u = pickle.Unpickler(f)
+        head = u.load()
+        if not isinstance(head, dict) or head.get("v") != _INDEX_VERSION:
+            return None
+        by_id: dict[str, Schedule] = {}
+        for _ in range(head["pieces"]):
+            by_id.update(u.load())
+        if f.read(1):       # the end of the file checks gzip's CRC too
+            return None
     except Exception:
         # Any damage at all means "parse the XML again". Letting one
         # through (zlib.error, a truncated pickle's AttributeError...)
         # failed the whole guide load instead, and on every start.
         return None
-    if not isinstance(blob, dict) or blob.get("v") != _INDEX_VERSION:
-        return None
-    return blob.get("by_id", {}), blob.get("by_name", {})
+    return by_id, head.get("by_name", {})
 
 
-def index_main() -> int:
+def _write_atomic(path: Path, data: bytes) -> None:
+    """Write *path* whole or not at all: a write cut short (app killed,
+    disk full) leaves the old file, never a truncated one."""
+    tmp = path.with_name(path.name + ".part")
+    try:
+        tmp.write_bytes(data)
+        tmp.replace(path)
+    except OSError:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise
+
+
+def index_main(argv: list[str] | None = None) -> int:
     """The app started with INDEX_FLAG: XMLTV on stdin, its index_blob() on
     stdout. The window runs this as a process of its own (_parse_elsewhere)
-    so a big guide's parse never competes with it for the interpreter."""
+    so a big guide's parse never competes with it for the interpreter.
+    ``--cache PATH`` also keeps the guide there, gzipped, as the window's
+    cache - packing 140 MB stalled the window too."""
+    args = list(sys.argv[1:] if argv is None else argv)
     try:
         chunks = []
         while True:
@@ -212,8 +285,13 @@ def index_main() -> int:
             if not chunk:
                 break
             chunks.append(chunk)
-        by_id, by_name = parse_xmltv(b"".join(chunks),
-                                     XmltvGuide.KEEP_PAST_DAYS)
+        data = b"".join(chunks)
+        if "--cache" in args:
+            cache = Path(args[args.index("--cache") + 1])
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            _write_atomic(cache, data if data[:2] == b"\x1f\x8b"
+                          else gzip_gently(data))
+        by_id, by_name = parse_xmltv(data, XmltvGuide.KEEP_PAST_DAYS)
         out = memoryview(index_blob(by_id, by_name))
         while out:
             out = out[os.write(1, out):]
@@ -285,14 +363,21 @@ class XmltvGuide:
         return (datetime.now().astimezone().timestamp()
                 - self.delay_minutes * 60)
 
+    def _cache_age(self) -> float | None:
+        """Seconds since the cached guide was written; None without one."""
+        try:
+            if self.cache_path is not None:
+                return time.time() - self.cache_path.stat().st_mtime
+        except OSError:
+            pass
+        return None
+
     def _read_cache(self, max_age: float | None = None) -> bytes | None:
-        if not self.cache_path or not self.cache_path.exists():
+        age = self._cache_age()
+        if age is None or (max_age is not None and age > max_age):
             return None
         try:
-            if (max_age is not None
-                    and time.time() - self.cache_path.stat().st_mtime > max_age):
-                return None
-            data = self.cache_path.read_bytes()
+            data = self.cache_path.read_bytes() if self.cache_path else b""
         except OSError:
             return None
         # Transparently gunzip. New caches are gzip-compressed (a raw XMLTV
@@ -301,28 +386,15 @@ class XmltvGuide:
         # an older build (no gzip magic) is returned unchanged.
         if data[:2] == b"\x1f\x8b":
             try:
-                return gzip.decompress(data)
+                return gunzip_gently(data)
             except Exception:
                 # zlib.error is not an OSError: a damaged cache raised out of
                 # ensure_loaded before the download that would replace it,
                 # and the guide stayed broken until the cache was cleared.
                 return None
-        return data
+        return data or None
 
-    @staticmethod
-    def _write_atomic(path: Path, data: bytes) -> None:
-        """Write *path* whole or not at all: a write cut short (app killed,
-        disk full) leaves the old file, never a truncated one."""
-        tmp = path.with_name(path.name + ".part")
-        try:
-            tmp.write_bytes(data)
-            tmp.replace(path)
-        except OSError:
-            try:
-                tmp.unlink()
-            except OSError:
-                pass
-            raise
+    _write_atomic = staticmethod(_write_atomic)
 
     def _write_cache(self, data: bytes) -> None:
         if not self.cache_path:
@@ -330,7 +402,8 @@ class XmltvGuide:
         try:
             self.cache_path.parent.mkdir(parents=True, exist_ok=True)
             self._write_atomic(self.cache_path,
-                               gzip.compress(data, compresslevel=5))
+                               data if data[:2] == b"\x1f\x8b"
+                               else gzip_gently(data))
         except OSError:
             pass
 
@@ -394,9 +467,8 @@ class XmltvGuide:
                                  if total else -1)
         if self.progress_cb:
             self.progress_cb(100)
-        data = b"".join(chunks)
-        self._write_cache(data)
-        return data
+        # Not cached here: the parse process keeps it (_parse_and_index).
+        return b"".join(chunks)
 
     def is_loaded(self) -> bool:
         """Non-blocking: whether guide data is available right now. Lets the
@@ -417,48 +489,47 @@ class XmltvGuide:
                 return True
             if self._failed and not force:
                 return False
-            data = None if force else self._read_cache(max_age=self.CACHE_TTL)
-            source = "cache"
-            if data is None:
-                stale = None if force else self._read_cache(max_age=None)
-                if stale is not None and not self._loaded:
-                    # The old guide's index is still good for the old guide:
-                    # a second instead of a whole parse, every morning.
-                    try:
-                        if not self._load_index():
-                            self._parse_and_index(stale)
-                        self._loaded = True
-                    except Exception:
-                        pass
-                try:
-                    data = self._download()
-                    source = "download"
-                except Exception:
-                    # A forced refresh that cannot reach the guide keeps the
-                    # copy on disk, whatever its age, rather than none at all.
-                    if stale is None and force:
-                        stale = self._read_cache(max_age=None)
-                    data = stale
-                    source = "stale cache (download failed)"
-            if data is None:
-                self._failed = True
-                return False
+            age = self._cache_age()
+            if (age is not None and not self._loaded
+                    and self._load_from_disk()):
+                # A stale guide - or the one a refresh replaces - stands in
+                # while the new one downloads.
+                if not force and age <= self.CACHE_TTL:
+                    log.info("EPG loaded from cache")
+                    return True
             try:
-                # Prefer the pickled parse-index next to the XML: a 280 MB
-                # XMLTV dump takes 10-15 s to iterparse but loads from
-                # pickle in ~1 s. Fall back to re-parsing (and re-writing
-                # the pickle) if it's missing, older than the XML, or
-                # from an older schema version.
-                if source != "download" and self._load_index():
-                    pass
-                else:
-                    self._parse_and_index(data)
+                data = self._download()
+            except Exception as e:
+                log.info("EPG download failed (%s)", e)
+                # A refresh that cannot reach the guide keeps the one it has
+                # (the copy on disk, whatever its age) rather than none.
+                self._failed = not self._loaded
+                return self._loaded
+            try:
+                self._parse_and_index(data, keep=True)
                 self._loaded = True
                 self._failed = False
-                log.info("EPG loaded from %s (%d KB)", source, len(data) // 1024)
+                log.info("EPG loaded from download (%d KB)", len(data) // 1024)
             except Exception:
-                self._failed = self._loaded is False
+                self._failed = not self._loaded
             return self._loaded
+
+    def _load_from_disk(self) -> bool:
+        """The guide on disk into memory. Its index alone does it - the XML
+        beside it is unpacked and parsed again only when the index is
+        missing, damaged or older than the XML. A 280 MB guide parses in
+        10-25 s and its index loads in about one."""
+        try:
+            if not self._load_index():
+                data = self._read_cache()
+                if data is None:
+                    return False
+                self._parse_and_index(data)
+        except Exception:
+            return False
+        self._loaded = True
+        self._failed = False
+        return True
 
     # -- pickle index --------------------------------------------------------
 
@@ -492,19 +563,26 @@ class XmltvGuide:
         except OSError:
             pass
 
-    def _parse_and_index(self, data: bytes) -> None:
-        """Parse *data* into the guide and keep its index on disk."""
-        if not (self.PARSE_ELSEWHERE and self._parse_elsewhere(data)):
+    def _parse_and_index(self, data: bytes, keep: bool = False) -> None:
+        """Parse *data* into the guide and keep its index on disk - and,
+        with *keep* (a fresh download), the guide itself as the cache."""
+        cache = self.cache_path if keep else None
+        if not (self.PARSE_ELSEWHERE and self._parse_elsewhere(data, cache)):
+            if keep:
+                self._write_cache(data)
             self._parse(data)
             self._write_index()
 
-    def _parse_elsewhere(self, data: bytes) -> bool:
+    def _parse_elsewhere(self, data: bytes, cache: Path | None = None) -> bool:
         """Parse in a process of its own and take its index. A parse in a
         thread holds the interpreter (the GIL) for most of its 10-25 s on a
         big guide, and the window shares the rest with it: the whole app
-        crawled until the guide was in. False when that process cannot run
-        or fails; the caller then parses here, as before."""
+        crawled until the guide was in. With *cache* that process also
+        keeps the guide there. False when it cannot run or fails; the
+        caller then parses here, as before."""
         cmd, env = _index_command()
+        if cache is not None:
+            cmd = [*cmd, "--cache", str(cache)]
         try:
             r = subprocess.run(
                 cmd, input=data, capture_output=True, env=env,

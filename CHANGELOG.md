@@ -14,9 +14,14 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   its own now: parsed in a thread, it held Python's interpreter for most
   of its 10-30 seconds, and the window had to share it - in a measurement
   with a 140 MB guide the window stalled for 1.4 s in all, up to half a
-  second at a time; now 0.1 s, never more than 70 ms. A guide older than
-  six hours comes from its saved index while the new one downloads,
-  instead of being parsed again first (the start of every day), and a
+  second at a time, and a playing video stuttered with it; now about
+  0.1 s in all, never more than 60 ms. That process also packs the new
+  guide for the disk, the saved index is read a piece at a time, and a
+  start with a guide on disk reads only its index instead of unpacking
+  the whole guide too. A guide older than six hours comes from its saved
+  index while the new one downloads, instead of being parsed again first
+  (the start of every day); a playlist refresh keeps showing the old
+  guide until the new one is in, instead of none for half a minute; and a
   guide already loaded answers at once while a refresh runs, instead of
   holding up the programme lists, logos and searches waiting behind it.
   Where the separate process cannot run, the guide is parsed in the app

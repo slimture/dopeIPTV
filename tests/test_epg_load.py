@@ -57,18 +57,46 @@ def test_the_frozen_entry_hands_the_flag_to_the_parser():
 
 def test_a_download_is_parsed_in_a_process_of_its_own(tmp_path, monkeypatch):
     def not_here(self, data):
-        raise AssertionError("parsed in the app's own process")
+        raise AssertionError("parsed or packed in the app's own process")
     monkeypatch.setattr(XmltvGuide, "_parse", not_here)
-    g = XmltvGuide(client=None, cache_path=str(tmp_path / "epg_x.xml"))
-    g._download = _guide
+    monkeypatch.setattr(XmltvGuide, "_write_cache", not_here)
+    cache = tmp_path / "epg_x.xml"
+    data = _guide()
+    g = XmltvGuide(client=None, cache_path=str(cache))
+    g._download = lambda: data
     assert g.ensure_loaded() is True
     assert g.listings_for({"epg_channel_id": "c1"})
-    # The process's index is kept for the next start.
-    g2 = XmltvGuide(client=None, cache_path=str(tmp_path / "epg_x.xml"))
-    (tmp_path / "epg_x.xml").write_bytes(gzip.compress(_guide()))
-    later = time.time() + 5
-    os.utime(g2._index_path(), (later, later))
+    # The process kept the guide, gzipped, and its index for the next start.
+    assert gzip.decompress(cache.read_bytes()) == data
+    g2 = XmltvGuide(client=None, cache_path=str(cache))
     assert g2._load_index() is True
+
+
+def test_a_fresh_guide_on_disk_loads_without_its_xml(tmp_path, monkeypatch):
+    cache = tmp_path / "epg_x.xml"
+    first = XmltvGuide(client=None, cache_path=str(cache))
+    first._download = _guide
+    assert first.ensure_loaded() is True
+
+    def not_read(self, max_age=None):
+        raise AssertionError("unpacked the XML although the index is good")
+    monkeypatch.setattr(XmltvGuide, "_read_cache", not_read)
+    g = XmltvGuide(client=None, cache_path=str(cache))
+    g._download = lambda: (_ for _ in ()).throw(AssertionError("downloaded"))
+    assert g.ensure_loaded() is True
+    assert g.listings_for({"epg_channel_id": "c2"})
+
+
+def test_gentle_gzip_matches_gzip(tmp_path):
+    data = os.urandom(300_000) + b"guide " * 200_000
+    assert gzip.decompress(epg.gzip_gently(data)) == data
+    assert epg.gunzip_gently(gzip.compress(data)) == data
+    two = gzip.compress(b"one ") + gzip.compress(b"two")
+    assert epg.gunzip_gently(two) == gzip.decompress(two)
+    import pytest
+    import zlib
+    with pytest.raises(zlib.error):
+        epg.gunzip_gently(gzip.compress(data)[:-50_000])
 
 
 def test_a_parse_process_that_fails_leaves_the_parse_here(tmp_path,
@@ -105,9 +133,9 @@ def test_a_stale_guide_comes_from_its_index_while_the_new_one_loads(
     parsed = []
     real = XmltvGuide._parse_and_index
 
-    def counting(self, data):
+    def counting(self, data, **kw):
         parsed.append(data)
-        real(self, data)
+        real(self, data, **kw)
     monkeypatch.setattr(XmltvGuide, "_parse_and_index", counting)
     g = XmltvGuide(client=None, cache_path=str(cache))
     seen_during_download = []
@@ -122,6 +150,27 @@ def test_a_stale_guide_comes_from_its_index_while_the_new_one_loads(
     assert seen_during_download[0]["title"].startswith("Old")
     assert len(parsed) == 1                     # the new guide only
     assert g.current_programme({"epg_channel_id": "c1"})["title"] \
+        .startswith("New")
+
+
+def test_a_refresh_shows_the_guide_on_disk_until_the_new_one_is_in(tmp_path):
+    # A playlist refresh (button or auto-refresh) starts a new guide object
+    # with force=True: it showed no programmes at all for the half minute
+    # the new guide took.
+    cache = tmp_path / "epg_x.xml"
+    first = XmltvGuide(client=None, cache_path=str(cache))
+    first._download = lambda: _guide("Old")
+    assert first.ensure_loaded() is True
+    g = XmltvGuide(client=None, cache_path=str(cache))
+    seen = []
+
+    def download():
+        seen.append(g.current_programme({"epg_channel_id": "c0"}))
+        return _guide("New")
+    g._download = download
+    assert g.ensure_loaded(force=True) is True
+    assert seen[0]["title"].startswith("Old")
+    assert g.current_programme({"epg_channel_id": "c0"})["title"] \
         .startswith("New")
 
 
