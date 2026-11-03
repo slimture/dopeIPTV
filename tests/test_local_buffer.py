@@ -81,6 +81,13 @@ def test_relative_seek_stays_inside_local_cache():
     assert m.commands == [("seek", 30.25, "absolute+exact")]
 
 
+def test_relative_seek_does_not_escape_a_lost_local_cache():
+    p, m = player()
+    m.demuxer_cache_state = None
+    EmbeddedPlayer._relative_seek(p, -10)
+    assert m.commands == []
+
+
 def test_non_live_and_stopped_players_have_no_local_timeline():
     p, m = player()
     p._local_buffer_enabled = False

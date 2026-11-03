@@ -3616,6 +3616,8 @@ class EmbeddedPlayer(QWidget):
         if window is not None:
             self._seek_local_target(self.playback_position() + seconds, window)
             return
+        if getattr(self, "_local_buffer_enabled", False):
+            return
         # 'program' mode: a relative nudge is a re-load at the new offset (see
         # _do_seek) - the loaded archive segment isn't seekable in place.
         if self._seek_mode == "program" and self._program_window > 1:

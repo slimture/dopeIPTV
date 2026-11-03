@@ -23,7 +23,7 @@ actually cached, not the provider's EPG or an assumed programme length.
 Flags are displayed at 16 x 12 logical pixels to match the smaller category
 icons.
 
-Validation on Windows: Ruff, mypy and 45 playback/display tests pass. A real
+Validation on Windows: Ruff, mypy and 46 playback/display tests pass. A real
 libmpv smoke check with a synthetic HTTP stream verifies disk caching,
 rewinding, LIVE and stop cleanup using a single connection. An offscreen
 MainWindow check with libmpv loaded covers resizing, a smaller main window,
