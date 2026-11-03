@@ -49,6 +49,7 @@ from ..core.stores import (
     HistoryStore, ParentalControl, PlaylistStore, WatchedStore, WatchlistStore,
 )
 from .theme import P
+from .player_resize import PlayerResizeHandle
 from ..providers.trakt import TraktClient
 from ..core.wakelock import WakeLock
 from .dialogs import PlaylistDialog
@@ -1216,7 +1217,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self.settings.value("vis_on", "true") == "true",
                 self.settings.value("vis_style", "bars"))
             self.player.vis_choose = self._vis_choose
-            dl.addWidget(self.player, 1)
+            dl.addWidget(self.player)
 
         # Everything below the video lives in ONE scroll column. This is the
         # structural guarantee that the channel logo / programme info can never
@@ -1246,6 +1247,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # column scrolls rather than anything overlapping.
         self._info_scroll.setMinimumHeight(96)
         dl.addWidget(self._info_scroll, 1)
+        if self.player is not None:
+            self._player_resize = PlayerResizeHandle(
+                self.player, self._info_scroll, self.settings, det)
+            dl.insertWidget(dl.indexOf(self.player) + 1, self._player_resize)
 
         self.stream_error = QLabel("")
         self.stream_error.setStyleSheet(
@@ -1460,7 +1465,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # player(box_h+~52) + pane margins(40) + spacing(12) + info floor(96)
         # + menu bar/chrome ≈ box_h + 240.
         box_h = getattr(self.player, "VIDEO_BOX_HEIGHT", 260) if self.player else 0
-        min_h = (box_h + 240) if self.player else 320
+        min_h = (min(box_h, 180) + 240) if self.player else 320
         self._base_min = QSize(700, min_h)
         self.setMinimumSize(self._base_min)
         # Parent the toast to the window itself, not the splitter: a QSplitter

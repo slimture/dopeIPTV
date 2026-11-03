@@ -3057,7 +3057,22 @@ class EmbeddedPlayer(QWidget):
             bar_here = self.bar.isVisible() and self.bar.parent() is self
             bar_h = self.bar.sizeHint().height() if bar_here else 0
             spacing = self.layout().spacing() if bar_h else 0
-            self.setFixedHeight(self.VIDEO_BOX_HEIGHT + bar_h + spacing)
+            box_h = getattr(self, "_docked_video_height", self.VIDEO_BOX_HEIGHT)
+            if hasattr(self, "_docked_video_height"):
+                self.setMinimumHeight(120 + bar_h + spacing)
+                self.setMaximumHeight(box_h + bar_h + spacing)
+            else:
+                self.setFixedHeight(box_h + bar_h + spacing)
+
+    def sizeHint(self) -> QSize:
+        size = super().sizeHint()
+        if (hasattr(self, "_docked_video_height")
+                and not self._fs_ui and not self._popout_mode):
+            bar_here = self.bar.isVisible() and self.bar.parent() is self
+            bar_h = self.bar.sizeHint().height() if bar_here else 0
+            spacing = self.layout().spacing() if bar_h else 0
+            size.setHeight(self._docked_video_height + bar_h + spacing)
+        return size
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)

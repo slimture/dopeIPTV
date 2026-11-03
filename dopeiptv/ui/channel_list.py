@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
 
 from ..i18n import tr
 from .theme import P
+from .category_flags import category_flag, flag_icon
 
 # Marks a drag of favorites rows from the middle list. The rows themselves
 # stay on the window (_fav_drag_items) - the drag never leaves the app.
@@ -59,6 +60,15 @@ class CategoryColorDelegate(QStyledItemDelegate):
     """Paints a category/folder row's custom background. The list's stylesheet
     makes a plain QListWidgetItem.setBackground invisible, so fill it here
     (under the normal text painting) for non-selected rows."""
+
+    def initStyleOption(self, option, index) -> None:
+        super().initStyleOption(option, index)
+        code, label = category_flag(option.text)
+        if code:
+            option.text = label
+            option.icon = flag_icon(code)
+            option.decorationSize = QSize(24, 18)
+            option.features |= option.ViewItemFeature.HasDecoration
 
     def paint(self, painter, option, index) -> None:
         bg = index.data(Qt.ItemDataRole.BackgroundRole)
