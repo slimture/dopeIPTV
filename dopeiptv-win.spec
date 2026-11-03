@@ -81,6 +81,7 @@ datas += collect_data_files('dopeiptv')
 # ship even if collect_data_files misses them. Without these the picker
 # silently collapses to English-only in the frozen app.
 datas += [(f, 'dopeiptv/locale') for f in glob.glob('dopeiptv/locale/*.json')]
+datas += [(f, 'dopeiptv/assets/flags') for f in glob.glob('dopeiptv/assets/flags/*')]
 hiddenimports = ["mpv"]
 
 for pkg in ("pychromecast", "zeroconf"):

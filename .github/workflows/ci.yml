@@ -47,7 +47,9 @@ jobs:
           # Pin ruff so a future release adding rules can't turn the gate red
           # without an intentional bump here.
           pip install "ruff==0.15.8" "mypy==1.18.2" pytest
-          pip install -r requirements.txt
+          # PyQt6 6.12's QtDBus.pyi has an invalid signature ("/" after "*").
+          # Keep the type gate on a verified binding until that stub is fixed.
+          pip install -r requirements.txt "PyQt6==6.10.2"
       - name: Ruff (lint)
         run: ruff check dopeiptv tests
       - name: Mypy (types, scoped to the logic modules)
