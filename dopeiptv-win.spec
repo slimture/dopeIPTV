@@ -101,7 +101,8 @@ if os.path.exists(os.path.join("dopeiptv", "_opensubtitles_key.py")):
     hiddenimports += ["dopeiptv._opensubtitles_key"]
 
 _icon = os.path.join("packaging", "dopeIPTV.ico")
-icon = _icon if os.path.exists(_icon) else None
+icon = (_icon if os.path.exists(_icon)
+        else os.path.join("packaging", "icons", "windows-256.png"))
 
 
 def _version_file():

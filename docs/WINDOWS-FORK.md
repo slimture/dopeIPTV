@@ -31,6 +31,15 @@ icons.
 All 27 original locales are retained. The new DVR controls reuse translated
 strings and update when the language is switched at runtime.
 
+Windows source builds use the committed original `windows-256.png` when the
+CI-generated `.ico` is absent. Install Pillow alongside PyInstaller for that
+conversion; this keeps local builds from silently using PyInstaller's icon.
+The original logo assets and runtime icon drawing are unchanged.
+
+Graphite and OLED screenshots under `docs/screenshots/windows-player-*.png`
+use an isolated demo UI fixture and a synthetic cache interval, with no
+provider account or user data.
+
 Validation on Windows: Ruff, mypy and 56 playback/display/i18n tests pass. A real
 libmpv smoke check with a synthetic HTTP stream verifies disk caching,
 rewinding, LIVE and stop cleanup using a single connection. An offscreen
