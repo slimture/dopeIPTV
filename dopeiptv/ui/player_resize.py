@@ -58,10 +58,22 @@ class PlayerResizeHandle(QWidget):
         bar = (p.bar.sizeHint().height() + p.layout().spacing()
                if p.bar.isVisible() and p.bar.parentWidget() is p else 0)
         height = max(self.MIN_VIDEO_HEIGHT, min(self._preferred, available - bar))
-        if getattr(p, "_docked_video_height", None) != height:
+        if (getattr(p, "_docked_video_height", None) != height
+                or p.minimumHeight() != self.MIN_VIDEO_HEIGHT + bar
+                or p.maximumHeight() != height + bar):
             p._docked_video_height = height
             p._lock_video_box()
             p.updateGeometry()
+
+    def restore_after_dock(self) -> None:
+        self._drag = None
+        layout = self.parentWidget().layout()
+        index = layout.indexOf(self.player)
+        if index >= 0:
+            layout.setStretch(index, 0)
+        layout.invalidate()
+        self.apply_height()
+        self.player.updateGeometry()
 
     def mousePressEvent(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton:

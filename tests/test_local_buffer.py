@@ -52,6 +52,7 @@ def player():
     p._seek_local_target = lambda t, w: EmbeddedPlayer._seek_local_target(p, t, w)
     p.playback_position = lambda: m.playback_time
     p._set_mpv = lambda k, v: m.__setitem__(k, v)
+    p._reveal_local_buffer = lambda: None
     return p, m
 
 

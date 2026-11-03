@@ -76,12 +76,13 @@ def resize_edge_cursor(edges) -> "Qt.CursorShape":
     return Qt.CursorShape.SizeVerCursor
 
 
-def start_frameless_resize(win, edges, gpos) -> dict | None:
+def start_frameless_resize(win, edges, gpos, *, native: bool = True) -> dict | None:
     """Begin a resize of *win*. Hands the drag to the window manager where that
     exists (X11, Wayland, Windows) and returns None - it owns the drag from
     there. Where it does not (macOS), returns the state to feed back into
-    ``drag_frameless_resize`` on every mouse move."""
-    handle = win.windowHandle() if win is not None else None
+    ``drag_frameless_resize`` on every mouse move. A frameless host may request
+    client-side sizing with native=False."""
+    handle = win.windowHandle() if win is not None and native else None
     if handle is not None and handle.startSystemResize(edges):
         return None
     return {"edges": edges, "from": gpos, "geo": QRect(win.geometry())}

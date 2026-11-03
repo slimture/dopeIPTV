@@ -20,7 +20,7 @@ from __future__ import annotations
 import sys
 import time
 
-from PyQt6.QtCore import QRect, QSize, Qt, QTimer
+from PyQt6.QtCore import QEvent, QRect, QSize, Qt, QTimer
 from PyQt6.QtGui import QGuiApplication
 from PyQt6.QtWidgets import (
     QApplication, QMenu, QPushButton, QVBoxLayout, QWidget)
@@ -72,6 +72,80 @@ class _PopoutWindow(QWidget):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
+        self._resize_state = None
+        self._edge_drag_active = False
+        self._edge_cursor_widget = None
+        self._resize_grabber = None
+        # Windows reparents the player, bypassing the mirror's edge handlers.
+        if not _use_mirror_popout():
+            QApplication.instance().installEventFilter(self)
+
+    def _clear_edge_cursor(self) -> None:
+        widget = self._edge_cursor_widget
+        if widget is not None:
+            try:
+                widget.unsetCursor()
+            except RuntimeError:
+                pass
+        self._edge_cursor_widget = None
+        self._owner._popout_edge_cursor = False
+
+    def _finish_edge_drag(self) -> None:
+        if self._resize_grabber is not None:
+            self._resize_grabber.releaseMouse()
+            self._resize_grabber = None
+        self._edge_drag_active = False
+        self._resize_state = None
+        player = getattr(self._owner, "player", None)
+        if player is not None:
+            player._reveal_popout_bar()
+            player._reveal_local_buffer()
+
+    def eventFilter(self, obj, event) -> bool:
+        if not isinstance(obj, QWidget) or obj.window() is not self:
+            return False
+        kind = event.type()
+        if kind == QEvent.Type.MouseButtonRelease and self._edge_drag_active:
+            self._finish_edge_drag()
+            event.accept()
+            return True
+        if kind not in (QEvent.Type.MouseButtonPress, QEvent.Type.MouseMove):
+            if kind == QEvent.Type.Leave and not self._edge_drag_active:
+                self._clear_edge_cursor()
+            return False
+        gpos = event.globalPosition().toPoint()
+        if kind == QEvent.Type.MouseMove and self._edge_drag_active:
+            if event.buttons() & Qt.MouseButton.LeftButton:
+                drag_frameless_resize(self, self._resize_state, gpos)
+                event.accept()
+                return True
+            self._finish_edge_drag()
+        edges = frameless_resize_edges(self, gpos)
+        if not edges:
+            self._clear_edge_cursor()
+            return False
+        self._owner._popout_cursor_activity()
+        if self._edge_cursor_widget is not obj:
+            self._clear_edge_cursor()
+        self._edge_cursor_widget = obj
+        obj.setCursor(resize_edge_cursor(edges))
+        self._owner._popout_edge_cursor = True
+        if (kind == QEvent.Type.MouseButtonPress
+                and event.button() == Qt.MouseButton.LeftButton):
+            self._edge_drag_active = True
+            # Drive the frameless Windows host directly, including drags that
+            # leave its old bounds, rather than depending on native borders.
+            self._resize_state = start_frameless_resize(self, edges, gpos, native=False)
+            self._resize_grabber = obj
+            obj.grabMouse()
+            player = getattr(self._owner, "player", None)
+            if player is not None:
+                player._popout_bar_timer.stop()
+                player._local_buffer_hide_timer.stop()
+        elif kind == QEvent.Type.MouseButtonPress:
+            return False
+        event.accept()
+        return True
 
     def closeEvent(self, event) -> None:
         event.ignore()
@@ -146,7 +220,7 @@ class _PopoutMixin:
         # brings the player home.
         ph = QPushButton(tr("popout_placeholder"), self._det)
         ph.setCursor(Qt.CursorShape.PointingHandCursor)
-        box_h = getattr(self.player, "VIDEO_BOX_HEIGHT", 260)
+        box_h = getattr(self.player, "_docked_video_height", self.player.VIDEO_BOX_HEIGHT)
         ph.setFixedHeight(box_h + 44)
         ph.setStyleSheet(
             "QPushButton { background:#000000; color:#B8B8C0; border:none;"
@@ -154,7 +228,8 @@ class _PopoutMixin:
             "QPushButton:hover { color:#FFFFFF; }")
         ph.clicked.connect(self._exit_popout)
         self._popout_placeholder = ph
-        self._det.layout().insertWidget(0, ph)
+        self._popout_dock_index = self._det.layout().indexOf(self.player)
+        self._det.layout().insertWidget(self._popout_dock_index, ph)
 
         # Reparent the real player into the pop-out window (this removes it from
         # the detail-pane layout). set_popout_mode releases the docked fixed
@@ -582,11 +657,6 @@ class _PopoutMixin:
         if t is not None:
             t.stop()
         self._show_popout_cursor()
-        self.player.set_popout_mode(False)
-        # Reparent back to the top of the detail pane (stretch 1, as built).
-        self._det.layout().insertWidget(0, self.player, 1)
-        self.player.show()
-
         ph = getattr(self, "_popout_placeholder", None)
         if ph is not None:
             self._det.layout().removeWidget(ph)
@@ -598,6 +668,17 @@ class _PopoutMixin:
             ph.setParent(None)
             ph.deleteLater()
             self._popout_placeholder = None
+        # Restore the original layout slot and sizing policy before reapplying
+        # docked constraints; the pop-out's geometry must not become its hint.
+        self._det.layout().insertWidget(
+            getattr(self, "_popout_dock_index", 0), self.player, 0)
+        self.player.set_popout_mode(False)
+        self.player.show()
+        resize_handle = getattr(self, "_player_resize", None)
+        if resize_handle is not None:
+            QTimer.singleShot(0, resize_handle.restore_after_dock)
+        win._finish_edge_drag()
+        win._clear_edge_cursor()
         win.deleteLater()
 
     def _toggle_popout_fullscreen(self) -> None:

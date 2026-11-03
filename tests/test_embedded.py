@@ -196,7 +196,7 @@ player._start_sleep_timer(0)                  # cancel
 assert player.sleep_badge.isHidden(), "cancel hides the pill"
 assert not player._sleep_tick.isActive() and not player._sleep_badge_timer.isActive()
 
-print("EMBEDDED_OK")
+print("EMBEDDED_OK", flush=True)
 """
 
 

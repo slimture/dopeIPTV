@@ -1449,6 +1449,11 @@ class EmbeddedPlayer(QWidget):
         bar_layout.setContentsMargins(0, 0, 0, 0)
         bar_layout.setSpacing(2)
         self._local_buffer_enabled = False
+        self._local_buffer_ready = False
+        self._local_buffer_hide_timer = QTimer(self)
+        self._local_buffer_hide_timer.setSingleShot(True)
+        self._local_buffer_hide_timer.setInterval(2500)
+        self._local_buffer_hide_timer.timeout.connect(self._hide_local_buffer)
         self._local_slider_window: BufferWindow | None = None
         self._local_fs_window: BufferWindow | None = None
         self.local_buffer_bar = QWidget(self.bar)
@@ -1461,6 +1466,12 @@ class EmbeddedPlayer(QWidget):
         self.local_buffer_seek.seek_requested.connect(self._seek_local_buffer)
         self.local_buffer_live = QPushButton(tr("mv_live"), objectName="MiniBtn")
         self.local_buffer_live.clicked.connect(self._local_go_live)
+        self._local_buffer_controls = (
+            self.local_buffer_bar, self.local_buffer_seek, self.local_buffer_live,
+            self.local_buffer_time)
+        for widget in self._local_buffer_controls:
+            widget.setMouseTracking(True)
+            widget.installEventFilter(self)
         local_layout.addWidget(self.local_buffer_time)
         local_layout.addWidget(self.local_buffer_seek, 1)
         local_layout.addWidget(self.local_buffer_live)
@@ -1946,10 +1957,20 @@ class EmbeddedPlayer(QWidget):
         self.fs_rec_btn.setToolTip(tr("tooltip_record"))
         self.fs_opts_btn.setToolTip(tr("tooltip_audio_subs_aspect"))
         self.fs_exit_btn.setToolTip(tr("tooltip_exit_fullscreen") + " (Esc)")
+        self.local_buffer_live.setText(tr("mv_live"))
+        self.local_buffer_seek.setToolTip(tr("tooltip_timeshift"))
 
     # -- event filter (fullscreen overlay reveal on hover) --------------------
 
     def eventFilter(self, obj, event):
+        if obj in getattr(self, "_local_buffer_controls", ()):
+            if event.type() in (QEvent.Type.Enter, QEvent.Type.MouseMove,
+                                 QEvent.Type.MouseButtonPress,
+                                 QEvent.Type.MouseButtonRelease):
+                self._reveal_local_buffer()
+                if self._popout_autohide:
+                    self._popout_bar_timer.start()
+            return super().eventFilter(obj, event)
         if self.seek_overlay is not None and obj in (self.seek_overlay,
                                                      self.seek):
             # Keep the hover scrubber alive while the pointer is on it.
@@ -2067,6 +2088,7 @@ class EmbeddedPlayer(QWidget):
             self._popout_drag_from = event.position().toPoint()
 
     def _on_video_move(self, event) -> None:
+        self._reveal_local_buffer()
         # A timeshift channel's timeline reappears on any mouse activity over
         # the video (docked or fullscreen) and re-arms its idle fade.
         if self._seek_mode == "timeline":
@@ -2481,6 +2503,7 @@ class EmbeddedPlayer(QWidget):
         and flash the seek bar (VOD / catch-up) or the timeshift timeline,
         whichever applies. The mirror forwards its pointer movement here; the
         overlays are already reparented over it."""
+        self._reveal_local_buffer()
         self._reveal_popout_bar()       # no-op unless auto-hide is on
         self._reveal_sleep_badge()      # no-op unless a sleep timer is armed
         if self._seek_mode == "timeline":
@@ -2621,6 +2644,9 @@ class EmbeddedPlayer(QWidget):
 
     def _hide_popout_bar(self) -> None:
         if self._in_popout() and self._popout_autohide and not self._fs_ui:
+            if self.bar.underMouse() or self.local_buffer_seek.dragging:
+                self._popout_bar_timer.start()
+                return
             self.bar.hide()
 
     def _reveal_popout_bar(self) -> None:
@@ -3390,6 +3416,8 @@ class EmbeddedPlayer(QWidget):
     def play(self, url: str, title: str, start: float = 0.0,
              *, local_buffer: bool = False) -> bool:
         self._local_buffer_enabled = local_buffer
+        self._local_buffer_ready = False
+        self._local_buffer_hide_timer.stop()
         self._local_slider_window = self._local_fs_window = None
         self.local_buffer_bar.hide()
         try:
@@ -3614,6 +3642,7 @@ class EmbeddedPlayer(QWidget):
     def _relative_seek(self, seconds: int) -> None:
         window = self.local_buffer_window()
         if window is not None:
+            self._reveal_local_buffer()
             self._seek_local_target(self.playback_position() + seconds, window)
             return
         if getattr(self, "_local_buffer_enabled", False):
@@ -4063,18 +4092,37 @@ class EmbeddedPlayer(QWidget):
         except Exception:
             return None
 
-    def _update_local_buffer(self, position: float | None) -> BufferWindow | None:
-        window = self.local_buffer_window()
-        visible = window is not None
-        changed = self.local_buffer_bar.isHidden() == visible
-        self.local_buffer_bar.setVisible(visible)
-        if changed:
+    def _set_local_buffer_visible(self, visible: bool) -> None:
+        if self.local_buffer_bar.isHidden() == visible:
+            self.local_buffer_bar.setVisible(visible)
             self._lock_video_box()
             self.updateGeometry()
+
+    def _reveal_local_buffer(self) -> None:
+        if not getattr(self, "_local_buffer_ready", False):
+            return
+        self._set_local_buffer_visible(True)
+        self._local_buffer_hide_timer.start()
+
+    def _hide_local_buffer(self) -> None:
+        if (self.local_buffer_seek.dragging or self.local_buffer_bar.underMouse()
+                or QApplication.activePopupWidget() is not None):
+            self._local_buffer_hide_timer.start()
+            return
+        self._set_local_buffer_visible(False)
+
+    def _update_local_buffer(self, position: float | None) -> BufferWindow | None:
+        window = self.local_buffer_window()
+        first_available = window is not None and not self._local_buffer_ready
+        self._local_buffer_ready = window is not None
         if window is None:
+            self._local_buffer_hide_timer.stop()
+            self._set_local_buffer_visible(False)
             self._local_slider_window = None
             self._local_fs_window = None
             return None
+        if first_available:
+            self._reveal_local_buffer()
         behind = max(0, window.end - (position or 0))
         self.local_buffer_time.setText(
             f"DVR −{_format_time(behind)} / {_format_time(window.duration)}")
@@ -4325,6 +4373,8 @@ class EmbeddedPlayer(QWidget):
 
     def stop(self) -> None:
         self._local_buffer_enabled = False
+        self._local_buffer_ready = False
+        self._local_buffer_hide_timer.stop()
         self._local_slider_window = self._local_fs_window = None
         self.local_buffer_bar.hide()
         # Tell the main window first (while position/duration are still valid)
