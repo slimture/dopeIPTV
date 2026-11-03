@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..core.log import log, redact_url
+from ..core.local_buffer import BufferWindow, buffer_window
 from ..i18n import tr
 from .players import _libmpv, _register_error_callback
 from .subtitle_text import fixed_bytes
@@ -1444,7 +1445,30 @@ class EmbeddedPlayer(QWidget):
         lay.addWidget(self.video, 1)
 
         self.bar = QWidget()
-        bl = QHBoxLayout(self.bar)
+        bar_layout = QVBoxLayout(self.bar)
+        bar_layout.setContentsMargins(0, 0, 0, 0)
+        bar_layout.setSpacing(2)
+        self._local_buffer_enabled = False
+        self._local_slider_window: BufferWindow | None = None
+        self._local_fs_window: BufferWindow | None = None
+        self.local_buffer_bar = QWidget(self.bar)
+        local_layout = QHBoxLayout(self.local_buffer_bar)
+        local_layout.setContentsMargins(6, 2, 6, 2)
+        local_layout.setSpacing(6)
+        self.local_buffer_time = QLabel("", objectName="DetailMeta")
+        self.local_buffer_seek = _SeekSlider()
+        self.local_buffer_seek.setToolTip(tr("tooltip_timeshift"))
+        self.local_buffer_seek.seek_requested.connect(self._seek_local_buffer)
+        self.local_buffer_live = QPushButton(tr("mv_live"), objectName="MiniBtn")
+        self.local_buffer_live.clicked.connect(self._local_go_live)
+        local_layout.addWidget(self.local_buffer_time)
+        local_layout.addWidget(self.local_buffer_seek, 1)
+        local_layout.addWidget(self.local_buffer_live)
+        bar_layout.addWidget(self.local_buffer_bar)
+        self.local_buffer_bar.hide()
+        controls = QWidget(self.bar)
+        bar_layout.addWidget(controls)
+        bl = QHBoxLayout(controls)
         bl.setContentsMargins(4, 2, 4, 2)
         bl.setSpacing(8)
         bl.setAlignment(Qt.AlignmentFlag.AlignVCenter)
@@ -2091,6 +2115,8 @@ class EmbeddedPlayer(QWidget):
         """Whether the underlying mpv stream can seek (has a real duration),
         independent of _seek_mode - a catch-up archive segment is seekable even
         in 'timeline' mode, so arrows can fine-seek inside it."""
+        if self.local_buffer_window() is not None:
+            return True
         m = self.video.mpv
         try:
             return bool(m is not None and m.duration and m.duration > 1)
@@ -2999,7 +3025,9 @@ class EmbeddedPlayer(QWidget):
         # briefly hides the scrubber (play() calls _hide_seek_ui), and keying off
         # that made the bar collapse to compact and re-stretch on every seek.
         # A seek bar belongs to vod/program -> full width; live/timeline -> hug.
-        if self._seek_mode in ("vod", "program"):
+        if (self._seek_mode in ("vod", "program")
+                or (self._local_buffer_enabled and self._seek_mode == "live"
+                    and self._local_fs_window is not None)):
             controls_w = self.width() - 2 * margin
         else:
             controls_w = self.fs_controls.sizeHint().width()
@@ -3359,7 +3387,11 @@ class EmbeddedPlayer(QWidget):
         if path:
             self.add_subtitle(path)
 
-    def play(self, url: str, title: str, start: float = 0.0) -> bool:
+    def play(self, url: str, title: str, start: float = 0.0,
+             *, local_buffer: bool = False) -> bool:
+        self._local_buffer_enabled = local_buffer
+        self._local_slider_window = self._local_fs_window = None
+        self.local_buffer_bar.hide()
         try:
             # Fresh play cycle - drop the stop-in-progress flag so any real
             # error from this new stream (auth failed, 404, ...) is surfaced.
@@ -3400,6 +3432,10 @@ class EmbeddedPlayer(QWidget):
                 m["cache-secs"] = float(self._cache_secs())
             except Exception:
                 pass
+            try:
+                m["cache-on-disk"] = "yes" if local_buffer else "no"
+            except Exception as e:
+                log.warning("local disk cache unavailable: %s", e)
             # Decode mode, set per stream (not in apply_default_options - that
             # also runs on every Settings save, and re-assigning hwdec
             # mid-playback reinitialises the decoder and glitches the video). A
@@ -3558,6 +3594,9 @@ class EmbeddedPlayer(QWidget):
         self._hide_seek_overlay(force=True)
 
     def _do_seek(self, seconds: int) -> None:
+        if self._local_buffer_enabled and self._seek_mode == "live":
+            self._seek_local_buffer(seconds, self._local_fs_window)
+            return
         # In 'program' mode the seek bar is virtual: the archive stream can't be
         # seeked in place (it snaps to live), so ask the app to re-load the
         # archive at the chosen programme offset instead.
@@ -3573,6 +3612,10 @@ class EmbeddedPlayer(QWidget):
             pass
 
     def _relative_seek(self, seconds: int) -> None:
+        window = self.local_buffer_window()
+        if window is not None:
+            self._seek_local_target(self.playback_position() + seconds, window)
+            return
         # 'program' mode: a relative nudge is a re-load at the new offset (see
         # _do_seek) - the loaded archive segment isn't seekable in place.
         if self._seek_mode == "program" and self._program_window > 1:
@@ -4009,6 +4052,59 @@ class EmbeddedPlayer(QWidget):
 
     # -- position polling ------------------------------------------------------
 
+    def local_buffer_window(self) -> BufferWindow | None:
+        if not getattr(self, "_local_buffer_enabled", False) or self.current_url is None:
+            return None
+        m = self.video.mpv
+        try:
+            return buffer_window(m.demuxer_cache_state, m.playback_time)
+        except Exception:
+            return None
+
+    def _update_local_buffer(self, position: float | None) -> BufferWindow | None:
+        window = self.local_buffer_window()
+        visible = window is not None
+        changed = self.local_buffer_bar.isHidden() == visible
+        self.local_buffer_bar.setVisible(visible)
+        if changed:
+            self._lock_video_box()
+            self.updateGeometry()
+        if window is None:
+            self._local_slider_window = None
+            self._local_fs_window = None
+            return None
+        behind = max(0, window.end - (position or 0))
+        self.local_buffer_time.setText(
+            f"DVR −{_format_time(behind)} / {_format_time(window.duration)}")
+        if not self.local_buffer_seek.dragging:
+            self._local_slider_window = window
+            self.local_buffer_seek.setRange(0, max(1, int(window.duration)))
+            self.local_buffer_seek.setValue(int(max(0, (position or 0) - window.start)))
+        return window
+
+    def _seek_local_target(self, target: float, window: BufferWindow) -> None:
+        m = self.video.mpv
+        if m is not None:
+            try:
+                m.command("seek", window.clamp(target), "absolute+exact")
+            except Exception as e:
+                log.debug("local buffer seek failed: %s", e)
+
+    def _seek_local_buffer(self, seconds: int,
+                           origin: BufferWindow | None = None) -> None:
+        origin = origin or self._local_slider_window
+        # Re-read on release: a long drag can outlive the cache range it began on.
+        window = self.local_buffer_window()
+        if window is not None and origin is not None:
+            self._seek_local_target(origin.start + seconds, window)
+
+    def _local_go_live(self) -> None:
+        window = self.local_buffer_window()
+        if window is not None:
+            self._seek_local_target(window.end, window)
+            self._user_paused = False
+            self._set_mpv("pause", False)
+
     def _poll_position(self) -> None:
         m = self.video.mpv
         if m is None:
@@ -4020,6 +4116,7 @@ class EmbeddedPlayer(QWidget):
         except Exception:
             return
         self._sync_pause_label(paused)
+        local_window = self._update_local_buffer(pos)
         self._update_nextup(float(pos or 0.0), float(dur or 0.0))
         # Freeze watchdog: mpv reports core-idle while it has nothing to render
         # (buffer starved / stream stalled). If that persists while we're not
@@ -4054,6 +4151,18 @@ class EmbeddedPlayer(QWidget):
                 self.finished.emit()
         else:
             self._eof_seen = False
+        if local_window is not None and self._seek_mode == "live":
+            self._seekable = False
+            self._hide_seek_overlay(force=True)
+            if not self.fs_seek.dragging:
+                self._local_fs_window = local_window
+                self.fs_seek.setRange(0, max(1, int(local_window.duration)))
+                self.fs_seek.setValue(int(max(0, (pos or 0) - local_window.start)))
+            self.fs_time_lbl.setText(self.local_buffer_time.text())
+            for widget in self._seek_widgets():
+                widget.show()
+            self._sync_fs_controls_width(True)
+            return
         seekable = (bool(dur) and dur > 1
                     and self._seek_mode not in ("live", "timeline"))
         # In 'program' mode the bar is virtual and always present: scrubbing it
@@ -4213,6 +4322,9 @@ class EmbeddedPlayer(QWidget):
             pass
 
     def stop(self) -> None:
+        self._local_buffer_enabled = False
+        self._local_slider_window = self._local_fs_window = None
+        self.local_buffer_bar.hide()
         # Tell the main window first (while position/duration are still valid)
         # so it can remember this item as last-active and save its resume point.
         self.stopped.emit()

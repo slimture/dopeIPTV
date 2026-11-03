@@ -1639,7 +1639,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                       self.player.ts_timeline.isVisible()
                       if self.player else None)
         if (it and lp.get("kind") == "live"
-                and self._timeshift_days(it) > 0 and elapsed >= 120):
+                and self._timeshift_days(it) > 0 and elapsed >= 120
+                and (not self.player or self.player.local_buffer_window() is None)):
             # Only a *long* pause (beyond what mpv's buffer holds) falls to the
             # archive. Shorter pauses resume seamlessly from the buffer, which
             # is the real pause - re-opening a tiny archive segment for them
@@ -5243,7 +5244,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._ts_segment_start = None
         self._ts_live_offset = 0.0
         self._pause_started = None
-        if self.player.play(url, title):
+        if self.player.play(url, title, local_buffer=True):
             self.wake.acquire(tr("wake_playing", title=title))
         self._apply_seek_mode(it, "live")
         # Refresh the poster overlay glyph (play -> pause for a timeshift
@@ -5778,7 +5779,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 # A subtitle fetched or picked for this title before.
                 self.player.set_sub_files(
                     self._remembered_subtitles(kind, key))
-            if self.player.play(url, title, start=resume_at):
+            if self.player.play(url, title, start=resume_at,
+                                local_buffer=kind == "live" and not catchup):
                 self.wake.acquire(tr("wake_playing", title=title))
             else:
                 log.warning("embedded play() refused %s - falling back to an "

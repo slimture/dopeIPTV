@@ -329,7 +329,7 @@ def test_the_embedded_branch_reaches_player_play():
     at = src.index("if self.player:\n")
     indent = len(src[at:].split("if self.player:")[0])
     body = src[at:]
-    play_at = body.index("self.player.play(url, title, start=resume_at)")
+    play_at = body.index("self.player.play(")
     # Everything between must stay INSIDE the branch: no line may return to
     # the branch's own indentation level (which would close it).
     between = body[:play_at].splitlines()[1:]

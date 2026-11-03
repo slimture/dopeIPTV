@@ -67,7 +67,7 @@ class CategoryColorDelegate(QStyledItemDelegate):
         if code:
             option.text = label
             option.icon = flag_icon(code)
-            option.decorationSize = QSize(24, 18)
+            option.decorationSize = QSize(16, 12)
             option.features |= option.ViewItemFeature.HasDecoration
 
     def paint(self, painter, option, index) -> None:

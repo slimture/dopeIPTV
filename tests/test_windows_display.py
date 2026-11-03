@@ -38,6 +38,7 @@ def test_flag_delegate_keeps_provider_text_and_paints_svg(app):
     option = QStyleOptionViewItem()
     delegate = CategoryColorDelegate(view)
     delegate.initStyleOption(option, view.model().index(0, 0))
+    assert (option.decorationSize.width(), option.decorationSize.height()) == (16, 12)
     assert option.text == "IT | Cinema"
     assert item.text() == "🇮🇹 IT | Cinema"
     image = flag_icon("it").pixmap(24, 18).toImage()
