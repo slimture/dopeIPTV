@@ -21,7 +21,11 @@ Most of this is a contribution by Luca Merega (pull request #22).
   default, about 60 MB a minute for an HD channel), or up to 6 hours with
   **Keep the rewind buffer on disk** - mpv's file only grows, 1-4 GB an
   hour while a channel plays, and is freed when the channel changes.
-  Catch-up from the provider's archive works as before.
+  Paused or rewound for longer than the network buffer, mpv stops reading
+  and the channel runs on without it; the row then shows the real time
+  behind live, and LIVE opens the channel again rather than landing at the
+  end of what had arrived - except while recording, where it keeps the
+  stream. Catch-up from the provider's archive works as before.
 - **Drag the height of the docked video.** A small handle under the video
   sets how tall it is, and the height is remembered. On Windows the
   detached player now resizes from its edges and corners, also with the

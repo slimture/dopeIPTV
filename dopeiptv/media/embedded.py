@@ -23,7 +23,9 @@ from PyQt6.QtWidgets import (
 )
 
 from ..core.log import log, redact_url
-from ..core.local_buffer import BufferWindow, buffer_window, rewind_bytes
+from ..core.local_buffer import (
+    LIVE_REOPEN_LAG, BufferWindow, LiveLag, buffer_window, rewind_bytes,
+)
 from ..i18n import tr
 from .players import _libmpv, _register_error_callback
 from .subtitle_text import fixed_bytes
@@ -1344,6 +1346,8 @@ class EmbeddedPlayer(QWidget):
     stopped = pyqtSignal()
     resume_requested = pyqtSignal()
     stalled = pyqtSignal()
+    # LIVE in the DVR row with the buffer far behind the channel: open it again.
+    reopen_live = pyqtSignal()
     finished = pyqtSignal()
     next_episode = pyqtSignal()
     paused_changed = pyqtSignal(bool)
@@ -1455,6 +1459,7 @@ class EmbeddedPlayer(QWidget):
         self._local_buffer_hide_timer.setInterval(2500)
         self._local_buffer_hide_timer.timeout.connect(self._hide_local_buffer)
         self._local_slider_window: BufferWindow | None = None
+        self._live_lag = LiveLag()
         self._local_fs_window: BufferWindow | None = None
         self.local_buffer_bar = QWidget(self.bar)
         local_layout = QHBoxLayout(self.local_buffer_bar)
@@ -3422,6 +3427,7 @@ class EmbeddedPlayer(QWidget):
         self._local_buffer_ready = False
         self._local_buffer_hide_timer.stop()
         self._local_slider_window = self._local_fs_window = None
+        self._live_lag.reset()
         self.local_buffer_bar.hide()
         try:
             # Fresh play cycle - drop the stop-in-progress flag so any real
@@ -4152,6 +4158,9 @@ class EmbeddedPlayer(QWidget):
         if first_available:
             self._reveal_local_buffer()
         behind = max(0, window.end - (position or 0))
+        lag = self._live_lag.observe(time.monotonic(), window.end)
+        if lag >= LIVE_REOPEN_LAG:
+            behind += lag   # the time to live, not just to the buffer's end
         self.local_buffer_time.setText(
             f"DVR −{_format_time(behind)} / {_format_time(window.duration)}")
         if not self.local_buffer_seek.dragging:
@@ -4178,6 +4187,21 @@ class EmbeddedPlayer(QWidget):
 
     def _local_go_live(self) -> None:
         window = self.local_buffer_window()
+        if window is None:
+            return
+        # Paused or rewound past the network buffer, mpv stopped reading, so
+        # the end of the buffer is that far behind the channel: only opening
+        # it again reaches live. That starts a new buffer.
+        if (self._live_lag.lag >= LIVE_REOPEN_LAG
+                and self.receivers(self.reopen_live)):
+            log.info("DVR: %.0f s behind live, opening the channel again",
+                     self._live_lag.lag)
+            self.reopen_live.emit()
+            return
+        self.go_to_buffer_end(window)
+
+    def go_to_buffer_end(self, window: BufferWindow | None = None) -> None:
+        window = window or self.local_buffer_window()
         if window is not None:
             self._seek_local_target(window.end, window)
             self._user_paused = False
@@ -4404,6 +4428,7 @@ class EmbeddedPlayer(QWidget):
         self._local_buffer_ready = False
         self._local_buffer_hide_timer.stop()
         self._local_slider_window = self._local_fs_window = None
+        self._live_lag.reset()
         self.local_buffer_bar.hide()
         # Tell the main window first (while position/duration are still valid)
         # so it can remember this item as last-active and save its resume point.

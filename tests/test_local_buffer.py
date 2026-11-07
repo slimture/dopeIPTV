@@ -6,7 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from dopeiptv.core.local_buffer import BufferWindow, buffer_window
+from dopeiptv.core.local_buffer import (
+    LIVE_REOPEN_LAG, BufferWindow, LiveLag, buffer_window)
 from dopeiptv.media.embedded import EmbeddedPlayer
 
 
@@ -53,6 +54,11 @@ def player():
     p.playback_position = lambda: m.playback_time
     p._set_mpv = lambda k, v: m.__setitem__(k, v)
     p._reveal_local_buffer = lambda: None
+    p._live_lag = LiveLag()
+    p.reopened = []
+    p.reopen_live = SimpleNamespace(emit=lambda: p.reopened.append(True))
+    p.receivers = lambda _signal: 1
+    p.go_to_buffer_end = lambda w=None: EmbeddedPlayer.go_to_buffer_end(p, w)
     return p, m
 
 
@@ -67,6 +73,63 @@ def test_live_uses_newest_cached_packet_and_unpauses_without_reloading():
     EmbeddedPlayer._local_go_live(p)
     assert m.commands == [("seek", 89.75, "absolute+exact")]
     assert m["pause"] is False
+
+
+def test_live_far_behind_the_channel_opens_it_again():
+    p, m = player()
+    p._live_lag.lag = LIVE_REOPEN_LAG + 1
+    EmbeddedPlayer._local_go_live(p)
+    assert p.reopened == [True]
+    assert m.commands == []
+
+
+def test_live_without_anyone_to_reopen_still_goes_to_the_buffer_end():
+    p, m = player()
+    p._live_lag.lag = LIVE_REOPEN_LAG + 1
+    p.receivers = lambda _signal: 0
+    EmbeddedPlayer._local_go_live(p)
+    assert p.reopened == []
+    assert m.commands == [("seek", 89.75, "absolute+exact")]
+
+
+def _feed(lag, clock, end, gop=2.0):
+    """The seekable end moves a keyframe interval at a time."""
+    return lag.observe(clock, end - (end % gop))
+
+
+def test_a_buffer_keeping_up_with_the_channel_is_not_behind():
+    lag = LiveLag()
+    for i in range(240):
+        t = i * 0.5
+        assert _feed(lag, 1000 + t, 50 + t) < LIVE_REOPEN_LAG / 4
+
+
+def test_a_reader_that_stopped_falls_behind_by_the_time_it_stood():
+    lag = LiveLag()
+    for i in range(20):
+        lag.observe(1000 + i * 0.5, 50 + i * 0.5)
+    # Paused past the network buffer: the end stands for 60 s.
+    for i in range(1, 121):
+        lag.observe(1009.5 + i * 0.5, 59.5)
+    assert 59 <= lag.lag <= 61
+    # Reading again: what the server held arrives in a burst, the rest is lost.
+    lag.observe(1070, 64.5)
+    lag.observe(1070.5, 65)
+    assert 54 <= lag.lag <= 56
+
+
+@pytest.mark.parametrize("jump", [-120.0, 600.0])
+def test_a_timestamp_jump_starts_the_measure_again(jump):
+    lag = LiveLag()
+    for i in range(20):
+        lag.observe(1000 + i * 0.5, 50 + i * 0.5)
+    for i in range(1, 61):
+        lag.observe(1009.5 + i * 0.5, 59.5)
+    assert lag.lag >= 29
+    lag.observe(1040, 59.5 + jump)
+    assert lag.lag == 0
+    lag.reset()
+    assert lag.lag == 0 and lag.observe(5, 5) == 0
 
 
 def test_lost_cache_cannot_turn_a_drag_into_a_network_seek():

@@ -1188,6 +1188,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.stopped.connect(self._on_player_stopped)
             self.player.resume_requested.connect(self._resume_last)
             self.player.stalled.connect(self._on_player_stalled)
+            self.player.reopen_live.connect(self._reopen_live_edge)
             self.player.finished.connect(self._on_player_finished)
             self.player.next_episode.connect(self._play_next_episode)
             # Keep the poster overlay's play/pause/stop glyph in sync with the
@@ -6107,6 +6108,23 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _on_player_stalled(self) -> None:
         """The player reported the live stream frozen (buffer-starved)."""
         self._reconnect_live("stall")
+
+    def _reopen_live_edge(self) -> None:
+        """LIVE in the DVR row with the buffer far behind the channel: open
+        the channel again, the way a reconnect does. Not while anything
+        records - a new stream ends a recording made in the player, and
+        another may hold the account's only connection - nor in an archive:
+        then LIVE goes to the end of the buffer, as it did before."""
+        lp = getattr(self, "_last_playback", None)
+        recording = any(j.get("status") == "recording" for j in self.rec.jobs)
+        if (not lp or lp.get("kind") != "live" or recording
+                or getattr(self, "_playing_catchup", False)):
+            self.player.go_to_buffer_end()
+            return
+        # A diagnosis shown for an earlier failure would make the retry a
+        # no-op, and the channel plays: this is a fresh start, as a click is.
+        self._diag_shown = False
+        self._retry_last_stream()
 
     def _auto_reconnect_live(self) -> bool:
         return self.settings.value("auto_reconnect_live", "true") == "true"

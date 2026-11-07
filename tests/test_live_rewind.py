@@ -10,6 +10,7 @@ from PyQt6.QtCore import QSettings
 from dopeiptv.core.local_buffer import (
     BYTES_PER_MINUTE, MEMORY_MAX_MINUTES, rewind_bytes)
 from dopeiptv.media.embedded import EmbeddedPlayer
+from dopeiptv.ui.main_window import MainWindow
 
 
 def _player(tmp_path, minutes=None, disk=None):
@@ -57,3 +58,35 @@ def test_play_puts_the_buffer_on_disk_only_when_asked():
     src = inspect.getsource(EmbeddedPlayer.play)
     assert "self._live_rewind_disk()" in src.split('m["cache-on-disk"]', 1)[1][:120]
     assert "_live_rewind_minutes() > 0" in src
+
+
+def _window(playback=None, catchup=False, jobs=()):
+    calls = []
+    w = SimpleNamespace(
+        _last_playback=playback, _playing_catchup=catchup, _diag_shown=True,
+        rec=SimpleNamespace(jobs=list(jobs)),
+        player=SimpleNamespace(go_to_buffer_end=lambda: calls.append("end")),
+        _retry_last_stream=lambda: calls.append("reopen"))
+    return w, calls
+
+
+LIVE = {"kind": "live", "url": "http://x.invalid/live/1.ts", "item": {}}
+
+
+def test_live_far_behind_opens_the_channel_again():
+    w, calls = _window(LIVE)
+    MainWindow._reopen_live_edge(w)
+    assert calls == ["reopen"]
+    assert w._diag_shown is False
+
+
+def test_never_while_recording_or_in_an_archive():
+    for w, calls in (_window(LIVE, jobs=[{"status": "recording"}]),
+                     _window(LIVE, catchup=True),
+                     _window(None),
+                     _window({"kind": "movie"})):
+        MainWindow._reopen_live_edge(w)
+        assert calls == ["end"]
+    w, calls = _window(LIVE, jobs=[{"status": "done"}])
+    MainWindow._reopen_live_edge(w)
+    assert calls == ["reopen"]

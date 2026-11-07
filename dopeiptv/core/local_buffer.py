@@ -45,6 +45,46 @@ def rewind_bytes(minutes: int, on_disk: bool) -> int:
 # that blinked away under the pointer.
 LIVE_EDGE_SLACK = 5.0
 
+# Behind live by this much, LIVE opens the channel again instead of seeking
+# to the end of the buffer. Well above a keyframe interval and network jitter.
+LIVE_REOPEN_LAG = 20.0
+
+
+class LiveLag:
+    """How far the end of a live channel's buffer is behind the channel.
+
+    mpv stops reading once its forward cache holds the network buffer, so
+    while the user is paused or rewound the channel runs on without it: the
+    end of the buffer stands still while the clock does not, and LIVE can
+    only reach what had arrived. The smallest (clock - buffer end) seen is the
+    live edge; how far the current one is above it is the lag.
+    """
+
+    # The end moving back, or this much more than the clock: a timestamp jump
+    # or a range after a gap, which says nothing about the channel's pace.
+    JUMP = 30.0
+
+    def __init__(self) -> None:
+        self.reset()
+
+    def reset(self) -> None:
+        self._edge: float | None = None
+        self._last: tuple[float, float] | None = None
+        self.lag = 0.0
+
+    def observe(self, clock: float, end: float) -> float:
+        if self._last is not None:
+            last_clock, last_end = self._last
+            moved = end - last_end
+            if moved < -1.0 or moved > clock - last_clock + self.JUMP:
+                self._edge = None
+        self._last = (clock, end)
+        offset = clock - end
+        if self._edge is None or offset < self._edge:
+            self._edge = offset
+        self.lag = offset - self._edge
+        return self.lag
+
 
 def buffer_window(state: Any, position: float | None) -> BufferWindow | None:
     """Merge overlapping cache ranges, then choose the one under the playhead."""
