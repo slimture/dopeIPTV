@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..i18n import tr
-from .theme import P
+from .theme import P, corner_radius
 from .category_flags import category_flag, flag_icon
 
 # Marks a drag of favorites rows from the middle list. The rows themselves
@@ -154,7 +154,7 @@ class FolderDropList(QListWidget):
             pen.setWidth(2)
             p.setPen(pen)
             p.setBrush(Qt.BrushStyle.NoBrush)
-            p.drawRoundedRect(r, 6, 6)
+            p.drawRoundedRect(r, corner_radius(6), corner_radius(6))
             p.end()
 
 
@@ -741,29 +741,29 @@ class ChannelDelegate(QStyledItemDelegate):
         if tint_bg:
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(QColor(tint_bg))
-            painter.drawRoundedRect(inner, 12, 12)
+            painter.drawRoundedRect(inner, corner_radius(12), corner_radius(12))
         if option.state & QStyle.StateFlag.State_Selected:
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(QColor(P["sel"]))
-            painter.drawRoundedRect(inner, 12, 12)
+            painter.drawRoundedRect(inner, corner_radius(12), corner_radius(12))
         elif option.state & QStyle.StateFlag.State_MouseOver:
             painter.setPen(Qt.PenStyle.NoPen)
             # Keep a custom background on hover: veil it instead of covering it.
             painter.setBrush(self._hover_overlay(tint_bg) if tint_bg
                              else QColor(P["hover"]))
-            painter.drawRoundedRect(inner, 12, 12)
+            painter.drawRoundedRect(inner, corner_radius(12), corner_radius(12))
         if playing:
             pen = QPen(QColor(_accent()))
             pen.setWidth(2)
             painter.setPen(pen)
             painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawRoundedRect(inner, 12, 12)
+            painter.drawRoundedRect(inner, corner_radius(12), corner_radius(12))
 
         name = self.window.channel_display_name(it)
         logo_x = rect.left() + (rect.width() - logo_sz) // 2
         logo_y = rect.top() + 8
         logo_rect = QRect(logo_x, logo_y, logo_sz, logo_sz)
-        radius = max(8, logo_sz // 5)
+        radius = corner_radius(max(8, logo_sz // 5))
         # cover_url picks TMDB (title search), then a TMDB path
         # extracted from the provider's own icon URL, then the raw
         # provider URL - first that isn't blacklisted. is_dead()
@@ -860,7 +860,7 @@ class ChannelDelegate(QStyledItemDelegate):
             rect.left() + 10,
             rect.top() + (rect.height() - logo_sz) // 2,
             logo_sz, logo_sz)
-        radius = max(6, logo_sz // 4)
+        radius = corner_radius(max(6, logo_sz // 4))
         # cover_url picks TMDB (title search), then a TMDB path
         # extracted from the provider's own icon URL, then the raw
         # provider URL - first that isn't blacklisted. is_dead()

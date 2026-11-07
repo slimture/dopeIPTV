@@ -25,7 +25,7 @@ from PyQt6.QtWidgets import (
 
 from ..i18n import tr
 from .qt_i18n import format_when
-from .theme import P
+from .theme import P, corner_radius
 
 
 class _GridView(QGraphicsView):
@@ -772,7 +772,7 @@ class EpgGridDialog(QDialog):
         """A rounded, bevelled programme card. Rounded (a path item, not a
         plain rect) for the softer look; carries the click payload."""
         path = QPainterPath()
-        path.addRoundedRect(QRectF(x, y, w, h), 8, 8)
+        path.addRoundedRect(QRectF(x, y, w, h), corner_radius(8), corner_radius(8))
         item = QGraphicsPathItem(path)
         self._style_card(item, state, tones)
         item.setZValue(5)

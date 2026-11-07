@@ -48,7 +48,7 @@ from ..core.stores import (
     CategoryOverrides, ChannelOverrides, FavoriteStore, FollowedSeriesStore,
     HistoryStore, ParentalControl, PlaylistStore, WatchedStore, WatchlistStore,
 )
-from .theme import P
+from .theme import P, rounded
 from .player_resize import PlayerResizeHandle
 from ..providers.trakt import TraktClient
 from ..core.wakelock import WakeLock
@@ -1348,9 +1348,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # pointer, and the panel refuses to move. One scroll region for the
         # whole column; this box grows and the column scrolls.
         self.media_info = QFrame(objectName="MediaInfo")
-        self.media_info.setStyleSheet(
-            f"QFrame#MediaInfo {{ background:{P['input']}; "
-            f"border:1px solid {P['border_in']}; border-radius:12px; }}")
+        self._style_media_info()
         mi = QVBoxLayout(self.media_info)
         mi.setContentsMargins(16, 14, 16, 14)
         mi.setSpacing(8)
@@ -6105,6 +6103,12 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
         run_async(self.pool, lambda: diagnose_stream(url, self.client),
                   show, lambda _e: show(tr("diag_generic")))
+
+    def _style_media_info(self) -> None:
+        """The detail panel's info box, in the theme's colours and corners."""
+        self.media_info.setStyleSheet(rounded(
+            f"QFrame#MediaInfo {{ background:{P['input']}; "
+            f"border:1px solid {P['border_in']}; border-radius:12px; }}"))
 
     def _on_player_stalled(self) -> None:
         """The player reported the live stream frozen (buffer-starved)."""

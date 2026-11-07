@@ -29,7 +29,7 @@ from ..core.log import log
 from ..core.workers import run_async
 from ..i18n import current_language, tr
 from ..services import popular
-from .theme import P
+from .theme import P, corner_radius, rounded
 
 # Card geometry (image area; the card adds a text strip underneath).
 POSTER_W, POSTER_H = 160, 240      # shelf posters
@@ -72,7 +72,8 @@ def _cover_pixmap(pm: QPixmap, w: int, h: int, radius: int = 10) -> QPixmap:
     p = QPainter(out)
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
     path = QPainterPath()
-    path.addRoundedRect(0.0, 0.0, float(w), float(h), radius, radius)
+    r = corner_radius(radius)
+    path.addRoundedRect(0.0, 0.0, float(w), float(h), r, r)
     p.setClipPath(path)
     p.drawPixmap((w - scaled.width()) // 2, (h - scaled.height()) // 2, scaled)
     p.end()
@@ -88,7 +89,8 @@ def _contain_pixmap(pm: QPixmap, w: int, h: int, radius: int = 10) -> QPixmap:
     p = QPainter(out)
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
     path = QPainterPath()
-    path.addRoundedRect(0.0, 0.0, float(w), float(h), radius, radius)
+    r = corner_radius(radius)
+    path.addRoundedRect(0.0, 0.0, float(w), float(h), r, r)
     p.fillPath(path, QColor(P["pane"]).lighter(118))
     scaled = pm.scaled(int(w * 0.62), int(h * 0.66),
                        Qt.AspectRatioMode.KeepAspectRatio,
@@ -111,7 +113,8 @@ def _placeholder_pixmap(w: int, h: int, letter: str,
     p = QPainter(out)
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
     path = QPainterPath()
-    path.addRoundedRect(0.0, 0.0, float(w), float(h), radius, radius)
+    r = corner_radius(radius)
+    path.addRoundedRect(0.0, 0.0, float(w), float(h), r, r)
     p.fillPath(path, QColor(P["pane"]).lighter(115))
     f = QFont()
     f.setPointSize(26)
@@ -193,9 +196,9 @@ class _Card(QFrame):
             hv = QFrame(self.img)
             hv.setGeometry(0, 0, self._w, self._h)
             hv.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-            hv.setStyleSheet(
+            hv.setStyleSheet(rounded(
                 f"background:transparent; border:2px solid {P['accent']};"
-                "border-radius:10px;")
+                "border-radius:10px;"))
             self._hover = hv
         self._hover.raise_()
         self._hover.show()
@@ -372,6 +375,7 @@ class HomePage(QWidget):
             # A translucent accent so the hovered item glows in the accent
             # colour while the label stays readable on top.
             "hover": f"rgba({ac.red()}, {ac.green()}, {ac.blue()}, 0.28)"}
+        qss = rounded(qss)
         bar = QWidget()
         h = QHBoxLayout(bar)
         h.setContentsMargins(0, 4, 0, 4)
@@ -387,12 +391,12 @@ class HomePage(QWidget):
         back.setFixedSize(36, 34)
         back.setToolTip(tr("common_close"))
         back.setCursor(Qt.CursorShape.PointingHandCursor)
-        back.setStyleSheet(
+        back.setStyleSheet(rounded(
             "QPushButton { background: %s; border:1px solid %s;"
             " border-radius: 17px; }"
             "QPushButton:hover { border-color: %s; }" % (
                 QColor(P["pane"]).lighter(112).name(),
-                QColor(P["pane"]).lighter(135).name(), P["accent"]))
+                QColor(P["pane"]).lighter(135).name(), P["accent"])))
         back.clicked.connect(w._leave_home)
         h.addWidget(back)
         h.addStretch(1)

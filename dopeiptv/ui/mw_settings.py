@@ -323,6 +323,8 @@ class _SettingsMixin:
             self._apply_nav_icons()   # re-tint the sidebar icons to the new theme
         self._sidebar_logo.update()
         self.listw.viewport().update()
+        if hasattr(self, "media_info"):
+            self._style_media_info()
         self.count_lbl.setStyleSheet(
             f"color:{P['muted3']}; font-size:11px;")
         self.update_status_btn.setStyleSheet(
