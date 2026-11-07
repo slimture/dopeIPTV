@@ -656,6 +656,11 @@ QPushButton#MiniBtn {{
 QPushButton#MiniBtn:hover {{
     background: {p['sel']}; border-color: {ACCENT};
 }}
+/* LIVE in the DVR row while following live: lit, the way a TV shows it. */
+QPushButton#MiniBtn[atLive="true"] {{
+    background: {p['rec']}; border-color: {p['rec']}; color: white;
+    font-weight: 600;
+}}
 
 QToolButton#SectionToggle {{
     background: transparent; border: none; border-radius: 6px;

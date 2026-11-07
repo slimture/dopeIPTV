@@ -55,6 +55,7 @@ def player():
     p._set_mpv = lambda k, v: m.__setitem__(k, v)
     p._reveal_local_buffer = lambda: None
     p._live_lag = LiveLag()
+    p._live_ahead, p._dvr_live = 0.0, True
     p.reopened = []
     p.reopen_live = SimpleNamespace(emit=lambda: p.reopened.append(True))
     p.receivers = lambda _signal: 1
@@ -188,3 +189,59 @@ def test_live_says_when_it_opens_the_channel_again():
     p._live_lag.reset()
     EmbeddedPlayer._label_live_button(p)
     assert p.local_buffer_live.text() == tr("mv_live")
+
+
+def _dvr_player(window):
+    from PyQt6.QtWidgets import QLabel, QPushButton
+    from dopeiptv.media.embedded import _SeekSlider
+    m = Mpv()
+    p = SimpleNamespace(
+        video=SimpleNamespace(mpv=m), current_url="http://x.invalid/l.ts",
+        _local_buffer_enabled=True, _local_buffer_ready=False,
+        _local_slider_window=None, _local_fs_window=None, _paused=False,
+        _dvr_live=True, _live_ahead=0.0, _dvr_span=0.0, _live_lag=LiveLag(),
+        local_buffer_time=QLabel(), local_buffer_seek=_SeekSlider(),
+        local_buffer_live=QPushButton(), reopen_live=object(),
+        receivers=lambda _s: 1)
+    p.local_buffer_window = lambda: window[0]
+    p._set_local_buffer_visible = lambda _v: None
+    p._local_buffer_hide_timer = SimpleNamespace(stop=lambda: None)
+    p._label_live_button = lambda force=False: None
+    p._seek_local_target = lambda t, w: EmbeddedPlayer._seek_local_target(p, t, w)
+    p._set_mpv = lambda k, v: m.__setitem__(k, v)
+    return p, m
+
+
+def test_the_network_buffer_at_live_is_live_not_rewound():
+    from PyQt6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])  # noqa: F841 - kept alive
+    window = [BufferWindow(0, 30)]
+    p, m = _dvr_player(window)
+    # mpv plays ~9 s behind the newest data it holds: that is live.
+    EmbeddedPlayer._update_local_buffer(p, 21)
+    assert p.local_buffer_time.text() == "DVR 0:21"
+    assert p.local_buffer_seek.value() == p.local_buffer_seek.maximum() == 21
+    assert p.local_buffer_live.property("atLive") is True
+    # Rewound 16 s: the time counts from the live point, not the newest data.
+    EmbeddedPlayer._seek_local_target(p, 5, window[0])
+    window[0] = BufferWindow(0, 34)
+    EmbeddedPlayer._update_local_buffer(p, 9)
+    assert p.local_buffer_time.text() == "DVR −0:16 / 0:25"
+    assert p.local_buffer_live.property("atLive") is False
+    # LIVE goes back to the live point, buffer kept, and lights up again.
+    EmbeddedPlayer.go_to_buffer_end(p, window[0])
+    assert m.commands[-1] == ("seek", 25.0, "absolute+exact")
+    EmbeddedPlayer._update_local_buffer(p, 25)
+    assert p.local_buffer_time.text() == "DVR 0:25"
+
+
+def test_a_pause_leaves_live():
+    from PyQt6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])  # noqa: F841 - kept alive
+    window = [BufferWindow(0, 30)]
+    p, _m = _dvr_player(window)
+    EmbeddedPlayer._update_local_buffer(p, 21)
+    p._paused = True
+    window[0] = BufferWindow(0, 40)
+    EmbeddedPlayer._update_local_buffer(p, 21)
+    assert p.local_buffer_time.text() == "DVR −0:10 / 0:31"

@@ -46,13 +46,18 @@ and lists load.
 The rest of this section is mostly a contribution by Luca Merega (pull
 request #22).
 
-- **Rewind a live channel (DVR).** A row under the video shows how much of
-  the channel is kept - "DVR −0:18 / 2:00" - with a slider to go back in it
-  and a LIVE button to return. Arrow keys seek in it too, and a pause picks
-  up where it stopped. Rewinding uses only what mpv actually holds and
-  never seeks across a gap; the row hides after a few seconds and comes
-  back with the mouse. **Settings → Playback → Rewind
-  live channels** sets how far back: off, 1-10 minutes in memory (2 by
+- **Rewind a live channel (DVR).** A row over the bottom of the video shows
+  how much of the channel is kept - "DVR −0:18 / 2:00" - with a slider to
+  go back in it and a LIVE button to return. Arrow keys seek in it too, and
+  a pause picks up where it stopped. Rewinding uses only what mpv actually
+  holds and never seeks across a gap. The row floats over the video like a
+  film's scrubber, so the mini player never changes height for it, and it
+  shows only when the pointer moves over the video and fades after a few
+  seconds. At live it says so - LIVE lit, and the time the buffer holds:
+  mpv plays about 10 s behind the newest data (the network buffer), which
+  is live, not rewound; the time back counts from there, and LIVE returns
+  there with the buffer kept. **Settings → Playback → Rewind live
+  channels** sets how far back: off, 1-10 minutes in memory (2 by
   default, about 60 MB a minute for an HD channel), or up to 6 hours with
   **Keep the rewind buffer on disk** - mpv's file only grows, 1-4 GB an
   hour while a channel plays, and is freed when the channel changes.

@@ -105,20 +105,30 @@ with patch('dopeiptv.ui.mw_popout._use_mirror_popout', return_value=False):
         settle()
         assert p.height() >= before+100, (cycle, before, p.height())
 
-# The polling loop must not resurrect an idle-hidden DVR row. Activity does.
+# The DVR row shows on activity only: never by itself - not even when the
+# buffer first becomes available - and never for a pointer that did not move.
 p.local_buffer_window = lambda: BufferWindow(0, 60)
 p._local_buffer_ready = False
 p._local_buffer_hide_timer.setInterval(40)
 p._update_local_buffer(20)
-assert not p.local_buffer_bar.isHidden()
+assert p.local_buffer_bar.isHidden(), 'polling must not show the DVR row'
+def hover(x):
+    QApplication.sendEvent(p.video, QMouseEvent(QEvent.Type.MouseMove,
+        QPointF(x, 40), QPointF(p.video.mapToGlobal(QPoint(x, 40))),
+        Qt.MouseButton.NoButton, Qt.MouseButton.NoButton,
+        Qt.KeyboardModifier.NoModifier))
+hover(40)
+assert not p.local_buffer_bar.isHidden(), 'video hover must reveal DVR'
+assert p.local_buffer_bar.parent() is p and p.local_buffer_bar.y() > 0, \
+    'the DVR row floats over the video'
 QTest.qWait(100)
 assert p.local_buffer_bar.isHidden(), 'DVR row must hide after idle'
 p._update_local_buffer(21)
 assert p.local_buffer_bar.isHidden(), 'position polling must not reveal it'
-QApplication.sendEvent(p.video, QMouseEvent(QEvent.Type.MouseMove, QPointF(40,40),
-    QPointF(p.video.mapToGlobal(QPoint(40,40))), Qt.MouseButton.NoButton,
-    Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier))
-assert not p.local_buffer_bar.isHidden(), 'video hover must reveal DVR'
+hover(40)
+assert p.local_buffer_bar.isHidden(), 'a resting pointer is no hover'
+hover(60)
+assert not p.local_buffer_bar.isHidden(), 'a moved pointer reveals it'
 p.local_buffer_seek.dragging = True
 p._hide_local_buffer()
 assert not p.local_buffer_bar.isHidden(), 'must stay visible while scrubbing'

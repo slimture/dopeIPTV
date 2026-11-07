@@ -1483,12 +1483,29 @@ class EmbeddedPlayer(QWidget):
         self._local_buffer_hide_timer.timeout.connect(self._hide_local_buffer)
         self._local_slider_window: BufferWindow | None = None
         self._live_lag = LiveLag()
+        # At live, the playhead runs behind the newest data by mpv's forward
+        # buffer (the network buffer, ~10 s): that is live, not rewound. The
+        # row measures from it - _live_ahead, taken while following live -
+        # and _dvr_live is whether the user is following live at all.
+        self._dvr_live = True
+        self._live_ahead = 0.0
+        self._dvr_span = 0.0
         self._local_fs_window: BufferWindow | None = None
-        self.local_buffer_bar = QWidget(self.bar)
+        # The DVR row floats over the bottom of the video, like the hover
+        # scrubber of a film: shown on pointer movement, gone when idle. In
+        # the control bar it was a row of its own that came and went - the
+        # docked player changed height under the pointer each time, Qt sent a
+        # synthetic mouse move for it, and that brought the row back.
+        self.local_buffer_bar = QWidget(self, objectName="DvrOverlay")
+        self.local_buffer_bar.setStyleSheet(
+            "QWidget#DvrOverlay { background: rgba(16,16,20,215);"
+            " border-radius: 8px; }")
         local_layout = QHBoxLayout(self.local_buffer_bar)
-        local_layout.setContentsMargins(6, 2, 6, 2)
-        local_layout.setSpacing(6)
-        self.local_buffer_time = QLabel("", objectName="DetailMeta")
+        local_layout.setContentsMargins(8, 5, 8, 5)
+        local_layout.setSpacing(8)
+        self.local_buffer_time = QLabel("")
+        self.local_buffer_time.setStyleSheet(
+            "color: #ECECF1; font-size: 12px; background: transparent;")
         self.local_buffer_seek = _SeekSlider()
         self.local_buffer_seek.setToolTip(tr("tooltip_timeshift"))
         self.local_buffer_seek.seek_requested.connect(self._seek_local_buffer)
@@ -1504,7 +1521,6 @@ class EmbeddedPlayer(QWidget):
         local_layout.addWidget(self.local_buffer_time)
         local_layout.addWidget(self.local_buffer_seek, 1)
         local_layout.addWidget(self.local_buffer_live)
-        bar_layout.addWidget(self.local_buffer_bar)
         self.local_buffer_bar.hide()
         controls = QWidget(self.bar)
         bar_layout.addWidget(controls)
@@ -2117,7 +2133,13 @@ class EmbeddedPlayer(QWidget):
             self._popout_drag_from = event.position().toPoint()
 
     def _on_video_move(self, event) -> None:
-        self._reveal_local_buffer()
+        # Only a pointer that actually moved: Qt sends a synthetic move when
+        # what is under a resting pointer changes, which is no one's hover.
+        at = event.globalPosition()
+        last = getattr(self, "_dvr_pointer", None)
+        self._dvr_pointer = at
+        if last is None or (at - last).manhattanLength() > 2:
+            self._reveal_local_buffer()
         # A timeshift channel's timeline reappears on any mouse activity over
         # the video (docked or fullscreen) and re-arms its idle fade.
         if self._seek_mode == "timeline":
@@ -2322,7 +2344,7 @@ class EmbeddedPlayer(QWidget):
         # mirror. They're plain widgets, so moving them is safe.
         self._ov_surface = m
         for ov in (self.seek_overlay, self.ts_timeline, self._stats_overlay,
-                   self.nextup_btn):
+                   self.nextup_btn, self.local_buffer_bar):
             if ov is not None:
                 ov.setParent(parent)
                 ov.hide()
@@ -2510,7 +2532,7 @@ class EmbeddedPlayer(QWidget):
         # Overlays back onto the docked player.
         self._ov_surface = self.video
         for ov in (self.seek_overlay, self.ts_timeline, self._stats_overlay,
-                   self.nextup_btn):
+                   self.nextup_btn, self.local_buffer_bar):
             if ov is not None:
                 ov.setParent(self)
                 ov.hide()
@@ -2631,6 +2653,8 @@ class EmbeddedPlayer(QWidget):
         if (self.seek_overlay is not None
                 and self.seek_overlay.isVisible()):
             self._place_seek_overlay()
+        if self.local_buffer_bar.isVisible():
+            self._place_local_buffer()
         # macOS keeps the GL context across the reparent, so the widget's
         # backing framebuffer can stay bound to the old window and show a
         # frozen frame. A 1 px resize and back rebuilds it. Pure widget
@@ -2792,6 +2816,8 @@ class EmbeddedPlayer(QWidget):
             self._place_ts_timeline()
             self.ts_timeline.show()
             self.ts_timeline.raise_()
+            if self.local_buffer_bar.isVisible():
+                self._place_local_buffer()      # above the timeline
         self._ts_hide_timer.start()
 
     def _hide_ts_timeline(self) -> None:
@@ -3012,6 +3038,7 @@ class EmbeddedPlayer(QWidget):
         self.bar.setVisible(not fullscreen)
         if fullscreen:
             self._hide_seek_overlay(force=True)
+            self._set_local_buffer_visible(False)   # fullscreen has its own
             self._lock_video_box()
             self._show_overlay()
             # Focus the surface that is actually on screen: with a mirror up
@@ -3181,6 +3208,8 @@ class EmbeddedPlayer(QWidget):
             self._place_seek_overlay()
         if self.ts_timeline.isVisible():
             self._place_ts_timeline()
+        if self.local_buffer_bar.isVisible():
+            self._place_local_buffer()
 
     def _relayout_controls(self) -> None:
         """Responsive docked control bar: when the right column is dragged
@@ -3453,6 +3482,7 @@ class EmbeddedPlayer(QWidget):
         self._local_buffer_hide_timer.stop()
         self._local_slider_window = self._local_fs_window = None
         self._live_lag.reset()
+        self._dvr_live, self._live_ahead, self._dvr_span = True, 0.0, 0.0
         self._label_live_button()
         self.local_buffer_bar.hide()
         try:
@@ -4198,10 +4228,31 @@ class EmbeddedPlayer(QWidget):
             return None
 
     def _set_local_buffer_visible(self, visible: bool) -> None:
-        if self.local_buffer_bar.isHidden() == visible:
-            self.local_buffer_bar.setVisible(visible)
-            self._lock_video_box()
-            self.updateGeometry()
+        bar = self.local_buffer_bar
+        if visible and self._fs_ui:
+            visible = False     # fullscreen shows the DVR on its own scrubber
+        if not visible:
+            if not bar.isHidden():
+                bar.hide()
+            return
+        # Placed only as it appears: re-placing on every pointer event was a
+        # layout pass (and a repaint of the video) each time.
+        if bar.isHidden():
+            self._place_local_buffer()
+            bar.show()
+            bar.raise_()
+
+    def _place_local_buffer(self) -> None:
+        margin = 10
+        bar = self.local_buffer_bar
+        vg = self._ov_surface.geometry()
+        bar.setFixedWidth(max(220, vg.width() - 2 * margin))
+        bar.adjustSize()
+        y = vg.y() + vg.height() - bar.height() - margin
+        if self.ts_timeline.isVisible():
+            # A catch-up channel's timeline sits at the bottom too: go above.
+            y = min(y, self.ts_timeline.y() - bar.height() - 6)
+        bar.move(vg.x() + margin, max(margin, y))
 
     def _reveal_local_buffer(self) -> None:
         if not getattr(self, "_local_buffer_ready", False):
@@ -4218,7 +4269,6 @@ class EmbeddedPlayer(QWidget):
 
     def _update_local_buffer(self, position: float | None) -> BufferWindow | None:
         window = self.local_buffer_window()
-        first_available = window is not None and not self._local_buffer_ready
         self._local_buffer_ready = window is not None
         if window is None:
             self._local_buffer_hide_timer.stop()
@@ -4226,22 +4276,39 @@ class EmbeddedPlayer(QWidget):
             self._local_slider_window = None
             self._local_fs_window = None
             return None
-        if first_available:
-            self._reveal_local_buffer()
-        behind = max(0, window.end - (position or 0))
+        pos = position or 0.0
+        if getattr(self, "_paused", False):
+            self._dvr_live = False
+        if self._dvr_live:
+            self._live_ahead = max(0.0, window.end - pos)
+        live_end = max(window.start, window.end - self._live_ahead)
+        self._dvr_span = live_end - window.start
+        behind = max(0.0, live_end - pos)
         lag = self._live_lag.observe(time.monotonic(), window.end)
         if lag >= LIVE_REOPEN_LAG:
             behind += lag   # the time to live, not just to the buffer's end
+        at_live = self._dvr_live and behind < 1
         self._label_live_button()
+        if self.local_buffer_live.property("atLive") != at_live:
+            self.local_buffer_live.setProperty("atLive", at_live)
+            st = self.local_buffer_live.style()
+            st.unpolish(self.local_buffer_live)
+            st.polish(self.local_buffer_live)
+        span = _format_time(self._dvr_span)
         self.local_buffer_time.setText(
-            f"DVR −{_format_time(behind)} / {_format_time(window.duration)}")
+            f"DVR {span}" if at_live
+            else f"DVR −{_format_time(behind)} / {span}")
         if not self.local_buffer_seek.dragging:
             self._local_slider_window = window
-            self.local_buffer_seek.setRange(0, max(1, int(window.duration)))
-            self.local_buffer_seek.setValue(int(max(0, (position or 0) - window.start)))
+            self.local_buffer_seek.setRange(0, max(1, int(self._dvr_span)))
+            self.local_buffer_seek.setValue(
+                int(min(self._dvr_span, max(0.0, pos - window.start))))
         return window
 
     def _seek_local_target(self, target: float, window: BufferWindow) -> None:
+        # Up to the live point is following live again; anything before it
+        # is rewound.
+        self._dvr_live = target >= window.end - self._live_ahead - 1.0
         m = self.video.mpv
         if m is not None:
             try:
@@ -4289,7 +4356,10 @@ class EmbeddedPlayer(QWidget):
     def go_to_buffer_end(self, window: BufferWindow | None = None) -> None:
         window = window or self.local_buffer_window()
         if window is not None:
-            self._seek_local_target(window.end, window)
+            # Back to the live point, the forward buffer kept: the very end of
+            # what arrived would leave nothing to play from and stall.
+            self._seek_local_target(window.end - self._live_ahead, window)
+            self._dvr_live = True
             self._user_paused = False
             self._set_mpv("pause", False)
 
@@ -4344,8 +4414,9 @@ class EmbeddedPlayer(QWidget):
             self._hide_seek_overlay(force=True)
             if not self.fs_seek.dragging:
                 self._local_fs_window = local_window
-                self.fs_seek.setRange(0, max(1, int(local_window.duration)))
-                self.fs_seek.setValue(int(max(0, (pos or 0) - local_window.start)))
+                self.fs_seek.setRange(0, max(1, int(self._dvr_span)))
+                self.fs_seek.setValue(int(min(
+                    self._dvr_span, max(0, (pos or 0) - local_window.start))))
             self.fs_time_lbl.setText(self.local_buffer_time.text())
             for widget in self._seek_widgets():
                 widget.show()
@@ -4515,6 +4586,7 @@ class EmbeddedPlayer(QWidget):
         self._local_buffer_hide_timer.stop()
         self._local_slider_window = self._local_fs_window = None
         self._live_lag.reset()
+        self._dvr_live, self._live_ahead, self._dvr_span = True, 0.0, 0.0
         self._label_live_button()
         self.local_buffer_bar.hide()
         # Tell the main window first (while position/duration are still valid)

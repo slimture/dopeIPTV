@@ -4,9 +4,9 @@ Pause and rewind live TV, a new look, subtitles your way, a taller video
 and country flags in the category list on every system - and an app that
 stays quick with a big provider while its guide and lists load.
 
-- **Rewind live TV.** A row under the video takes you back in the channel
-  you are watching, and **LIVE** brings you back; the arrow keys and pause
-  work too. **Settings → Playback → Rewind live channels** sets how far
+- **Rewind live TV.** Move the pointer over the video and a bar takes you
+  back in the channel you are watching; **LIVE** brings you back, and the
+  arrow keys and pause work too. **Settings → Playback → Rewind live channels** sets how far
   back - 2 minutes by default. Turn on **Keep the rewind buffer on disk**
   to go back up to 6 hours without using memory. Paused for long, the
   button reads **↻ LIVE**: it opens the channel again at live, and the
