@@ -7,6 +7,31 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Added
+
+Most of this is a contribution by Luca Merega (pull request #22).
+
+- **Rewind a live channel (DVR).** A row under the video shows how much of
+  the channel is kept - "DVR −0:18 / 2:00" - with a slider to go back in it
+  and a LIVE button to return. Arrow keys seek in it too, and a pause picks
+  up where it stopped. It uses only what mpv actually holds, never seeks
+  across a gap and never reopens the channel; the row hides after a few
+  seconds and comes back with the mouse. **Settings → Playback → Rewind
+  live channels** sets how far back: off, 1-10 minutes in memory (2 by
+  default, about 60 MB a minute for an HD channel), or up to 6 hours with
+  **Keep the rewind buffer on disk** - mpv's file only grows, 1-4 GB an
+  hour while a channel plays, and is freed when the channel changes.
+  Catch-up from the provider's archive works as before.
+- **Drag the height of the docked video.** A small handle under the video
+  sets how tall it is, and the height is remembered. On Windows the
+  detached player now resizes from its edges and corners, also with the
+  title bar hidden.
+- **Country flags in the category list on every system.** Windows shows a
+  flag emoji as two letters; a category named with one ("🇸🇪 Sverige"), or
+  with a country code before a separator ("SE | Sport", "DE: News"), now
+  gets a small bundled flag (flag-icons, MIT). Codes that providers mostly
+  use for something else - AR for Arabic, AF, LA, SA, TV - get none.
+
 ### Fixed
 
 - **Lists, categories and the detail panel no longer wait for the
@@ -79,6 +104,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   not do; their room is now there from the start, so the dialog never
   changes size. When the app is up to date, the box shows what the newest
   version brought.
+- **A quieter log on Wayland.** Qt's "QWaylandTextInputv3::disableSurface
+  ... but 0x0 is focused" came on every focus change, dozens a minute, and
+  buried what the log is for; it is left out like the other harmless
+  Wayland lines.
 
 ## [1.2.18]
 

@@ -25,6 +25,7 @@ map and the one-way import rule.
 | `providers/opensubtitles.py` | OpenSubtitles.com client (search, download, file hash) |
 | `core/stores.py` | Data persistence layer |
 | `core/workers.py` | Thread pool helpers, LogoLoader, image caches |
+| `core/local_buffer.py` | The seekable window of a live channel's rewind buffer (DVR row) |
 | `core/recording.py` | Recording manager |
 | `core/updates.py` | GitHub latest-release check |
 | `core/selfupdate.py` | AppImage in-place update (download, checksum, self-check, swap) |
@@ -47,6 +48,8 @@ map and the one-way import rule.
 | `ui/tmdb_match.py` | Manual TMDB match dialog |
 | `ui/subtitle_search.py` | OpenSubtitles search dialog |
 | `ui/widgets.py` | Small standalone widgets |
+| `ui/category_flags.py` | Bundled SVG flags for category names (flag emoji, "SE \| …" prefixes) |
+| `ui/player_resize.py` | The handle under the docked video that sets its height |
 | `ui/theme.py` | Theming engine |
 
 ## Working with individual modules
@@ -122,7 +125,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   `DOPEIPTV_LOG=debug` shows debug traces; `DOPEIPTV_LOG_FILE=/path` tees
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
-  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna), `core/` (stores, updates, log,
+  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna), `core/` (stores, local_buffer, updates, log,
   player_exec, wakelock, selfupdate, gcguard) and `services/` (resume,
   coverart, reminders, mpris, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,

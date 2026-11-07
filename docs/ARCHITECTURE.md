@@ -33,6 +33,7 @@ dopeiptv/
   core/                Storage, background work, OS integration
     stores.py          JSON data stores (playlists, favorites, history, ...)
     workers.py         QThreadPool helpers, LogoLoader, byte-bounded caches
+    local_buffer.py    Seekable window of a live channel's rewind buffer (DVR)
     recording.py       RecordingManager - ffmpeg/mpv stream-copy, timers
     updates.py         GitHub latest-release check (is_newer, fetch)
     selfupdate.py      AppImage in-place update: download, verify, test, swap
@@ -89,6 +90,8 @@ dopeiptv/
     mw_onboarding.py   First-run setup wizard
     mw_sort.py         List sort order
     widgets.py         Small standalone widgets
+    category_flags.py  Bundled SVG flags for category names (flag-icons, MIT)
+    player_resize.py   Height handle under the docked video
     welcome.py         First-run welcome overlay (connect / explore)
     channel_list.py    Virtualized list: model, view, painted delegate
     dialogs.py         Playlist editor, content manager

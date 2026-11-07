@@ -61,7 +61,8 @@ python3 dopeiptv.py --self-check       # libmpv loads, GL player constructs
 
 ## Pull requests
 
-- Target the `main` branch. Keep PRs small and focused — one fix or feature
+- Target the `testing` branch: changes are tried there first, and a release
+  takes `testing` to `main`. Keep PRs small and focused — one fix or feature
   per PR beats a grab-bag.
 - Describe **how you tested it** (real provider, demo mode, OS).
 - UI changes: include a screenshot, and check both a dark and the
