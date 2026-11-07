@@ -170,3 +170,21 @@ def test_the_playhead_past_the_last_keyframe_keeps_the_window(ahead):
 
 def test_a_playhead_far_past_the_range_has_no_window():
     assert buffer_window(state((0, 90)), 96) is None
+
+
+def test_live_says_when_it_opens_the_channel_again():
+    from PyQt6.QtWidgets import QApplication, QPushButton
+    from dopeiptv.i18n import tr
+    app = QApplication.instance() or QApplication([])  # noqa: F841 - kept alive
+    p = SimpleNamespace(_live_lag=LiveLag(), local_buffer_live=QPushButton(),
+                        reopen_live=object(), receivers=lambda _s: 1)
+    EmbeddedPlayer._label_live_button(p, force=True)
+    assert p.local_buffer_live.text() == tr("mv_live")
+    assert p.local_buffer_live.toolTip() == tr("dvr_live_tip")
+    p._live_lag.lag = LIVE_REOPEN_LAG + 5
+    EmbeddedPlayer._label_live_button(p)
+    assert p.local_buffer_live.text() == "↻ " + tr("mv_live")
+    assert p.local_buffer_live.toolTip() == tr("dvr_live_reopen_tip")
+    p._live_lag.reset()
+    EmbeddedPlayer._label_live_button(p)
+    assert p.local_buffer_live.text() == tr("mv_live")

@@ -316,6 +316,8 @@
   "mv_remove_cell": "Aus diesem Fenster entfernen",
   "mv_cell": "Fenster {n}",
   "mv_live": "LIVE",
+  "dvr_live_tip": "Zurück zum neuesten Teil des Puffers.",
+  "dvr_live_reopen_tip": "Der Sender ist dem Puffer voraus: LIVE öffnet ihn neu beim Live-Bild, und der Puffer beginnt von vorn. Um im Puffer zu bleiben, ziehen Sie den Regler stattdessen ans Ende.",
   "mv_pause": "Pause / Wiedergabe",
   "mv_conflict_title": "Multiview läuft",
   "mv_conflict_body": "Multiview streamt noch und hält Verbindungen zu deinem Anbieter. Multiview schließen und hier abspielen? Hat dein Konto genug gleichzeitige Verbindungen, kannst du beides behalten.",

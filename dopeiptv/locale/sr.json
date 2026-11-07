@@ -316,6 +316,8 @@
   "mv_remove_cell": "Ukloni iz ovog prozora",
   "mv_cell": "Prozor {n}",
   "mv_live": "UŽIVO",
+  "dvr_live_tip": "Nazad na najnoviji deo bafera.",
+  "dvr_live_reopen_tip": "Kanal je otišao dalje od bafera: LIVE ga ponovo otvara uživo, a bafer počinje iznova. Da biste ostali u njemu, radije prevucite traku do kraja.",
   "mv_pause": "Pauza / pusti",
   "mv_conflict_title": "Višestruki prikaz je pokrenut",
   "mv_conflict_body": "Višestruki prikaz i dalje emituje i drži veze ka vašem provajderu. Zatvoriti višestruki prikaz i pustiti ovde? Ako vaš nalog ima dovoljno istovremenih veza, možete zadržati oba.",

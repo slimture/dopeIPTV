@@ -316,6 +316,8 @@
   "mv_remove_cell": "Xóa khỏi cửa sổ này",
   "mv_cell": "Cửa sổ {n}",
   "mv_live": "TRỰC TIẾP",
+  "dvr_live_tip": "Quay lại phần mới nhất của bộ đệm.",
+  "dvr_live_reopen_tip": "Kênh đã chạy vượt quá bộ đệm: LIVE mở lại kênh ở phát trực tiếp và bộ đệm bắt đầu lại. Để ở lại trong bộ đệm, hãy kéo thanh đến cuối thay vì vậy.",
   "mv_pause": "Tạm dừng / phát",
   "mv_conflict_title": "Xem đa kênh đang chạy",
   "mv_conflict_body": "Xem đa kênh vẫn đang phát và giữ các kết nối tới nhà cung cấp của bạn. Đóng xem đa kênh và phát ở đây? Nếu tài khoản của bạn có đủ kết nối đồng thời, bạn có thể giữ cả hai.",

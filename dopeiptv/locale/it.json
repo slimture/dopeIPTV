@@ -316,6 +316,8 @@
   "mv_remove_cell": "Rimuovi da questa finestra",
   "mv_cell": "Finestra {n}",
   "mv_live": "LIVE",
+  "dvr_live_tip": "Torna alla parte più recente del buffer.",
+  "dvr_live_reopen_tip": "Il canale è andato oltre il buffer: LIVE lo riapre in diretta e il buffer ricomincia da capo. Per restarci, trascina invece la barra fino alla fine.",
   "mv_pause": "Pausa / riproduci",
   "mv_conflict_title": "Il multiview è in esecuzione",
   "mv_conflict_body": "Il multiview è ancora in streaming e mantiene connessioni al tuo fornitore. Chiudere il multiview e riprodurre qui? Se il tuo account ha abbastanza connessioni simultanee puoi tenere entrambi.",

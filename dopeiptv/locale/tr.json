@@ -316,6 +316,8 @@
   "mv_remove_cell": "Bu pencereden kaldır",
   "mv_cell": "Pencere {n}",
   "mv_live": "CANLI",
+  "dvr_live_tip": "Arabelleğin en yeni kısmına dön.",
+  "dvr_live_reopen_tip": "Kanal arabelleğin ötesine geçti: LIVE onu canlı yayında yeniden açar ve arabellek baştan başlar. Arabellekte kalmak için bunun yerine çubuğu sonuna sürükleyin.",
   "mv_pause": "Duraklat / oynat",
   "mv_conflict_title": "Çoklu görünüm çalışıyor",
   "mv_conflict_body": "Çoklu görünüm hâlâ yayın yapıyor ve sağlayıcınıza bağlantı tutuyor. Çoklu görünüm kapatılıp burada oynatılsın mı? Hesabınızın yeterli eşzamanlı bağlantısı varsa ikisini de tutabilirsiniz.",

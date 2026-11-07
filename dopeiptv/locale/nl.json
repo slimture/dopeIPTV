@@ -316,6 +316,8 @@
   "mv_remove_cell": "Uit dit venster verwijderen",
   "mv_cell": "Venster {n}",
   "mv_live": "LIVE",
+  "dvr_live_tip": "Terug naar het nieuwste deel van de buffer.",
+  "dvr_live_reopen_tip": "De zender is de buffer voorbij: LIVE opent hem opnieuw live en de buffer begint opnieuw. Sleep de balk liever naar het einde om in de buffer te blijven.",
   "mv_pause": "Pauzeren / afspelen",
   "mv_conflict_title": "Multiview is actief",
   "mv_conflict_body": "Multiview streamt nog en houdt verbindingen met je provider vast. Multiview sluiten en hier afspelen? Als je account genoeg gelijktijdige verbindingen heeft, kun je beide behouden.",

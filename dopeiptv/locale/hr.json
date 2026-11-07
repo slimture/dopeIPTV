@@ -316,6 +316,8 @@
   "mv_remove_cell": "Ukloni iz ovog prozora",
   "mv_cell": "Prozor {n}",
   "mv_live": "UŽIVO",
+  "dvr_live_tip": "Natrag na najnoviji dio međuspremnika.",
+  "dvr_live_reopen_tip": "Kanal je otišao dalje od međuspremnika: LIVE ga ponovno otvara uživo, a međuspremnik počinje ispočetka. Da biste ostali u njemu, radije povucite traku do kraja.",
   "mv_pause": "Pauziraj / reproduciraj",
   "mv_conflict_title": "Multiview je pokrenut",
   "mv_conflict_body": "Multiview još prenosi i drži veze s pružateljem. Zatvoriti multiview i reproducirati ovdje? Ako tvoj račun ima dovoljno istovremenih veza, možeš zadržati oboje.",

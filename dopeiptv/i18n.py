@@ -490,6 +490,8 @@ _STRINGS: dict[str, dict[str, str]] = {
     "mv_remove_cell": {"en": "Remove from this window"},
     "mv_cell": {"en": "Window {n}"},
     "mv_live": {"en": "LIVE"},
+    "dvr_live_tip": {"en": "Back to the newest part of the rewind buffer."},
+    "dvr_live_reopen_tip": {"en": "The channel has run on past the rewind buffer: LIVE opens it again at live, and the buffer starts over. To stay in it, drag the bar to its end instead."},
     "mv_pause": {"en": "Pause / play"},
     "mv_conflict_title": {"en": "Multiview is running"},
     "mv_conflict_body": {"en": "Multiview is still streaming and holds connections to your provider. Close multiview and play here? If your account has enough simultaneous connections you can keep both."},

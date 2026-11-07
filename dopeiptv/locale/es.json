@@ -316,6 +316,8 @@
   "mv_remove_cell": "Quitar de esta ventana",
   "mv_cell": "Ventana {n}",
   "mv_live": "EN VIVO",
+  "dvr_live_tip": "Volver a lo más reciente del búfer.",
+  "dvr_live_reopen_tip": "El canal ha avanzado más allá del búfer: LIVE lo vuelve a abrir en directo y el búfer empieza de nuevo. Para quedarte en él, arrastra la barra hasta el final.",
   "mv_pause": "Pausar / reproducir",
   "mv_conflict_title": "Multivista está activa",
   "mv_conflict_body": "Multivista sigue transmitiendo y mantiene conexiones con tu proveedor. ¿Cerrar multivista y reproducir aquí? Si tu cuenta tiene suficientes conexiones simultáneas puedes mantener ambas.",

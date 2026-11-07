@@ -316,6 +316,8 @@
   "mv_remove_cell": "Ondoa kutoka kwenye dirisha hili",
   "mv_cell": "Dirisha {n}",
   "mv_live": "MOJA KWA MOJA",
+  "dvr_live_tip": "Rudi kwenye sehemu mpya zaidi ya bafa.",
+  "dvr_live_reopen_tip": "Chaneli imesonga mbele kupita bafa: LIVE huifungua tena moja kwa moja, na bafa huanza upya. Ili kubaki ndani yake, buruta upau hadi mwisho badala yake.",
   "mv_pause": "Sitisha / cheza",
   "mv_conflict_title": "Mtazamo wa wingi unaendeshwa",
   "mv_conflict_body": "Mtazamo wa wingi bado unatiririsha na unashikilia miunganisho kwa mtoa huduma wako. Funga mtazamo wa wingi na ucheze hapa? Ikiwa akaunti yako ina miunganisho ya kutosha ya wakati mmoja unaweza kuweka zote mbili.",

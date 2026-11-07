@@ -316,6 +316,8 @@
   "mv_remove_cell": "Hapus dari jendela ini",
   "mv_cell": "Jendela {n}",
   "mv_live": "LANGSUNG",
+  "dvr_live_tip": "Kembali ke bagian terbaru buffer.",
+  "dvr_live_reopen_tip": "Saluran sudah melewati buffer: LIVE membukanya lagi secara langsung, dan buffer dimulai ulang. Agar tetap di buffer, seret bilah ke ujungnya saja.",
   "mv_pause": "Jeda / putar",
   "mv_conflict_title": "Tampilan ganda sedang berjalan",
   "mv_conflict_body": "Tampilan ganda masih menyiarkan dan menahan koneksi ke penyedia Anda. Tutup tampilan ganda dan putar di sini? Jika akun Anda memiliki cukup koneksi bersamaan, Anda bisa menyimpan keduanya.",

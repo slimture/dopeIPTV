@@ -316,6 +316,8 @@
   "mv_remove_cell": "Retirer de cette fenêtre",
   "mv_cell": "Fenêtre {n}",
   "mv_live": "EN DIRECT",
+  "dvr_live_tip": "Revenir à la partie la plus récente de la mémoire tampon.",
+  "dvr_live_reopen_tip": "La chaîne a pris de l'avance sur la mémoire tampon : LIVE la rouvre en direct et la mémoire tampon repart de zéro. Pour y rester, faites plutôt glisser la barre jusqu'au bout.",
   "mv_pause": "Pause / lecture",
   "mv_conflict_title": "Le multivue est actif",
   "mv_conflict_body": "Le multivue diffuse encore et occupe des connexions chez votre fournisseur. Fermer le multivue et lire ici ? Si votre compte dispose d'assez de connexions simultanées, vous pouvez garder les deux.",

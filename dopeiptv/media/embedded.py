@@ -1494,6 +1494,7 @@ class EmbeddedPlayer(QWidget):
         self.local_buffer_seek.seek_requested.connect(self._seek_local_buffer)
         self.local_buffer_live = QPushButton(tr("mv_live"), objectName="MiniBtn")
         self.local_buffer_live.clicked.connect(self._local_go_live)
+        self._label_live_button(force=True)
         self._local_buffer_controls = (
             self.local_buffer_bar, self.local_buffer_seek, self.local_buffer_live,
             self.local_buffer_time)
@@ -1985,7 +1986,7 @@ class EmbeddedPlayer(QWidget):
         self.fs_rec_btn.setToolTip(tr("tooltip_record"))
         self.fs_opts_btn.setToolTip(tr("tooltip_audio_subs_aspect"))
         self.fs_exit_btn.setToolTip(tr("tooltip_exit_fullscreen") + " (Esc)")
-        self.local_buffer_live.setText(tr("mv_live"))
+        self._label_live_button(force=True)
         self.local_buffer_seek.setToolTip(tr("tooltip_timeshift"))
 
     # -- event filter (fullscreen overlay reveal on hover) --------------------
@@ -3452,6 +3453,7 @@ class EmbeddedPlayer(QWidget):
         self._local_buffer_hide_timer.stop()
         self._local_slider_window = self._local_fs_window = None
         self._live_lag.reset()
+        self._label_live_button()
         self.local_buffer_bar.hide()
         try:
             # Fresh play cycle - drop the stop-in-progress flag so any real
@@ -4185,6 +4187,7 @@ class EmbeddedPlayer(QWidget):
         lag = self._live_lag.observe(time.monotonic(), window.end)
         if lag >= LIVE_REOPEN_LAG:
             behind += lag   # the time to live, not just to the buffer's end
+        self._label_live_button()
         self.local_buffer_time.setText(
             f"DVR −{_format_time(behind)} / {_format_time(window.duration)}")
         if not self.local_buffer_seek.dragging:
@@ -4208,6 +4211,20 @@ class EmbeddedPlayer(QWidget):
         window = self.local_buffer_window()
         if window is not None and origin is not None:
             self._seek_local_target(origin.start + seconds, window)
+
+    def _label_live_button(self, force: bool = False) -> None:
+        """LIVE says which it does: go to the end of the buffer, or - far
+        behind the channel - open the channel again, which starts the
+        rewind buffer over. Changed only when that flips."""
+        reopen = (self._live_lag.lag >= LIVE_REOPEN_LAG
+                  and bool(self.receivers(self.reopen_live)))
+        if not force and reopen == getattr(self, "_live_reopens", None):
+            return
+        self._live_reopens = reopen
+        self.local_buffer_live.setText(
+            ("↻ " if reopen else "") + tr("mv_live"))
+        self.local_buffer_live.setToolTip(
+            tr("dvr_live_reopen_tip") if reopen else tr("dvr_live_tip"))
 
     def _local_go_live(self) -> None:
         window = self.local_buffer_window()
@@ -4453,6 +4470,7 @@ class EmbeddedPlayer(QWidget):
         self._local_buffer_hide_timer.stop()
         self._local_slider_window = self._local_fs_window = None
         self._live_lag.reset()
+        self._label_live_button()
         self.local_buffer_bar.hide()
         # Tell the main window first (while position/duration are still valid)
         # so it can remember this item as last-active and save its resume point.
