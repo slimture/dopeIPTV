@@ -1,3 +1,34 @@
+## dopeIPTV 1.3.0
+
+Pause and rewind live TV, make the video taller, and country flags in the
+category list on every system - and an app that stays quick with a big
+provider while its guide and lists load.
+
+- **Rewind live TV.** A row under the video takes you back in the channel
+  you are watching, and **LIVE** brings you back; the arrow keys and pause
+  work too. **Settings → Playback → Rewind live channels** sets how far
+  back - 2 minutes by default. Turn on **Keep the rewind buffer on disk**
+  to go back up to 6 hours without using memory.
+- **Make the video taller.** Drag the small handle under the video; the
+  height is remembered. On Windows the detached player now resizes from
+  its edges and corners.
+- **Country flags in the category list**, on Windows too, for categories
+  named with a flag or a country code ("SE | Sport", "DE: News").
+- **Quick with a big provider.** Opening Movies while the guide loaded
+  could take 20 seconds and is now instant. Search, "All" with tens of
+  thousands of films and the list/grid switch react at once, and the
+  window and the playing video no longer stall while the guide, the lists
+  or the poster cache load or save in the background.
+- **About dopeIPTV** on Wayland no longer lays the release notes over its
+  buttons.
+
+The live rewind, the video height and the flags are a contribution by Luca
+Merega (lmerega on GitHub) - thank you!
+
+On the AppImage from 1.2.15 or later? Click **Update now** in the banner.
+Coming from an older version, what changed since is below - from 1.2.14
+or earlier, everything new in 1.2.15 as well.
+
 ## dopeIPTV 1.2.18
 
 What is popular right now, on Home - and fixes for the AppImage and .deb
@@ -13,10 +44,6 @@ on a current Linux distro and for subtitles with the full stop in front.
 - **Subtitles with the full stop in front (".Hej då").** A subtitle
   translated from Arabic or Hebrew could put the full stop at the start
   of a Swedish or English line. It is at the end again.
-
-On the AppImage from 1.2.15 or later? Click **Update now** in the banner.
-Coming from an older version, what changed since is below - from 1.2.14
-or earlier, everything new in 1.2.15 as well.
 
 ## dopeIPTV 1.2.17
 

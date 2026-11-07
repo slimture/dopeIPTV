@@ -50,6 +50,11 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.3.0" date="2026-11-07">
+      <description>
+        <p>Pause and rewind live TV, with how far back set in Settings; drag the docked video taller; and country flags in the category list on every system. Browsing a big provider stays quick while the guide and lists load, and the playing video no longer stutters meanwhile.</p>
+      </description>
+    </release>
     <release version="1.2.18" date="2026-10-25">
       <description>
         <p>Home shows what is popular right now among your provider's movies and series. The AppImage and .deb use the system's font and graphics libraries on a current Linux distro, and translated subtitles no longer put the full stop in front.</p>
