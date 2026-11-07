@@ -18,8 +18,8 @@ stays quick with a big provider while its guide and lists load.
   like. The app can follow your desktop's light and dark mode, corners can
   be sharp or extra rounded, and text and controls can be made larger or
   smaller.
-- **Subtitles your way:** size, colour and a dark box behind them, under
-  **Settings → Audio & subtitles**.
+- **Subtitles your way:** size, colour and a dark box behind them - under
+  **Settings → Audio & subtitles**, or right-click the video → **Subtitles**.
 - **Make the video taller.** Drag the small handle under the video; the
   height is remembered. On Windows the detached player now resizes from
   its edges and corners.

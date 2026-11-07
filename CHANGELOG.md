@@ -29,13 +29,18 @@ and lists load.
   the desktop is dark, a light one of your choice while it is light, and
   the switch as the desktop switches - where Qt can tell (KDE, GNOME,
   Windows, macOS); otherwise the picked theme stays.
-- **Corners and size.** Sharp, rounded or extra rounded corners, and the
-  size of text and controls from 90 to 150 % - Qt scales the whole window,
-  so everything keeps its proportions. The size applies at the next start;
+- **Corners and size.** Sharp, rounded or extra rounded corners - on
+  buttons, fields, menus and cards, and on what the app draws itself: the
+  grid's tiles and channel logos, Home's cards, the guide's programmes (the
+  window's own corners are the desktop's) - and the size of text and
+  controls from 90 to 150 %: Qt scales the whole window, so everything
+  keeps its proportions. The size applies at the next start;
   a QT_SCALE_FACTOR set in the environment wins.
 - **How subtitles look.** Size (75-200 %), colour (white, yellow, light
-  gray) and a dark box behind them, under **Settings → Audio & subtitles**,
-  applied to what is playing at once. Subtitles with styling of their own
+  gray) and a dark box behind them, under **Settings → Audio & subtitles**
+  and in the player's menu (right-click the video → Subtitles → How
+  subtitles look), applied to what is playing at once; a subtitle track
+  picked by hand stays picked. Subtitles with styling of their own
   keep their colours. The box works with mpv before 0.38 too.
 
 The rest of this section is mostly a contribution by Luca Merega (pull
