@@ -38,6 +38,9 @@ from .media.players import _libmpv, _libmpv_error, embedded_playback_reason
 _SUPPRESSED_QT_WARNINGS = (
     b"Failed to register with host portal",
     b"Got leave event for surface",
+    # Wayland, on every focus change while no text field has focus: Qt's
+    # text-input-v3 bookkeeping, dozens a minute and nothing the app can act on.
+    b"QWaylandTextInputv3::disableSurface",
     # macOS, on drawing the Hindi name in the language list: the system
     # font has no OpenType tables for Devanagari and Qt shapes it without.
     b"OpenType support missing for",
