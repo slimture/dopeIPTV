@@ -32,6 +32,19 @@ def test_category_country_detection(label, code):
     assert category_flag(label)[0] == code
 
 
+@pytest.mark.parametrize("label", [
+    "AR North Africa", "AR | Arabic", "TV Shows", "TV | Sport",
+    "AF | Africa", "LA | Latino", "SA | Sport", "SE Network",
+])
+def test_no_flag_guessed_from_a_word_or_an_ambiguous_code(label):
+    # Seen on a real provider: "AR North Africa" got Argentina's flag.
+    assert category_flag(label)[0] is None
+
+
+def test_a_flag_emoji_still_wins_over_the_ambiguous_codes():
+    assert category_flag("\U0001F1E6\U0001F1F7 Argentina")[0] == "ar"
+
+
 def test_flag_delegate_keeps_provider_text_and_paints_svg(app):
     view = QListWidget()
     item = QListWidgetItem("🇮🇹 IT | Cinema", view)
