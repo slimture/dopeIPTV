@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..core.log import log, redact_url
-from ..core.local_buffer import BufferWindow, buffer_window
+from ..core.local_buffer import BufferWindow, buffer_window, rewind_bytes
 from ..i18n import tr
 from .players import _libmpv, _register_error_callback
 from .subtitle_text import fixed_bytes
@@ -3415,6 +3415,9 @@ class EmbeddedPlayer(QWidget):
 
     def play(self, url: str, title: str, start: float = 0.0,
              *, local_buffer: bool = False) -> bool:
+        # local_buffer: a live channel, which gets the rewind buffer unless
+        # Settings turned it off.
+        local_buffer = local_buffer and self._live_rewind_minutes() > 0
         self._local_buffer_enabled = local_buffer
         self._local_buffer_ready = False
         self._local_buffer_hide_timer.stop()
@@ -3461,9 +3464,15 @@ class EmbeddedPlayer(QWidget):
             except Exception:
                 pass
             try:
-                m["cache-on-disk"] = "yes" if local_buffer else "no"
+                # The rewind buffer is in memory unless Settings put it on
+                # disk. mpv's disk cache is append-only - its hidden file grows
+                # 1-4 GB an hour for as long as a channel plays - so that is
+                # the user's choice, for a long rewind without the memory.
+                m["cache-on-disk"] = ("yes" if local_buffer
+                                      and self._live_rewind_disk() else "no")
+                m["demuxer-max-back-bytes"] = self._back_buffer(local_buffer)
             except Exception as e:
-                log.warning("local disk cache unavailable: %s", e)
+                log.warning("live rewind buffer unavailable: %s", e)
             # Decode mode, set per stream (not in apply_default_options - that
             # also runs on every Settings save, and re-assigning hwdec
             # mid-playback reinitialises the decoder and glitches the video). A
@@ -4067,6 +4076,25 @@ class EmbeddedPlayer(QWidget):
                 if self._settings else 10
         except (TypeError, ValueError):
             return 10
+
+    def _live_rewind_disk(self) -> bool:
+        return bool(self._settings) and \
+            self._settings.value("live_rewind_disk", "false") == "true"
+
+    def _live_rewind_minutes(self) -> int:
+        try:
+            return max(0, int(self._settings.value("live_rewind_minutes", 2))) \
+                if self._settings else 2
+        except (TypeError, ValueError):
+            return 2
+
+    def _back_buffer(self, local_buffer: bool) -> int | str:
+        """demuxer-max-back-bytes for the stream about to play: the live
+        rewind buffer, or what every other stream had before it."""
+        if local_buffer:
+            return rewind_bytes(self._live_rewind_minutes(),
+                                self._live_rewind_disk())
+        return os.environ.get("DOPEIPTV_DEMUX_MAX_BACK") or "50MiB"
 
     def _set_cache_secs(self, secs: int) -> None:
         if self._settings:

@@ -96,3 +96,14 @@ def test_non_live_and_stopped_players_have_no_local_timeline():
     p._local_buffer_enabled = True
     p.current_url = None
     assert p.local_buffer_window() is None
+
+
+@pytest.mark.parametrize("ahead", [0.8, 2.0, 4.9])
+def test_the_playhead_past_the_last_keyframe_keeps_the_window(ahead):
+    # At the live edge mpv's seekable range ends at the last keyframe, behind
+    # the playhead: measured 0.8 s on Linux with a 2 s keyframe interval.
+    assert buffer_window(state((0, 90)), 90 + ahead) == BufferWindow(0, 90)
+
+
+def test_a_playhead_far_past_the_range_has_no_window():
+    assert buffer_window(state((0, 90)), 96) is None

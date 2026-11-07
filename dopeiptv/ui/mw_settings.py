@@ -59,6 +59,7 @@ from ..providers.metadata import CacheFiles, TmdbClient, bundled_tmdb_key
 from ..providers.opensubtitles import OpenSubtitles
 from ..providers.opensubtitles import bundled_key as bundled_os_key
 from ..providers.client import make_client
+from ..core.local_buffer import MEMORY_MAX_MINUTES
 from ..core.log import log
 from ..core.xdg import open_url
 from ..core.recording import format_size
@@ -649,6 +650,12 @@ class _SettingsMixin:
             [("1", "1 s"), ("3", "3 s"), ("5", "5 s"),
              ("10", "10 s"), ("30", "30 s")],
             str(self.settings.value("cache_secs", "10")))
+        rewind_box = self._combo(
+            [("0", tr("option_off"))]
+            + [(str(m), tr("opt_minutes", n=m)) for m in (1, 2, 5, 10, 15, 30)]
+            + [("60", tr("dur_1h")), ("120", tr("dur_2h")),
+               ("240", tr("dur_4h")), ("360", tr("dur_6h"))],
+            str(self.settings.value("live_rewind_minutes", "2")))
         c = play.card(tr("set_card_behaviour"))
         autoplay_box = c.toggle(tr("setting_autoplay_preview"),
                                 self._autoplay_preview())
@@ -666,6 +673,26 @@ class _SettingsMixin:
         c = play.card(tr("set_card_stream"))
         c.row(tr("setting_stream_format"), fmt_box)
         c.row(tr("setting_network_buffer"), buf_box)
+        c.row(tr("setting_live_rewind"), rewind_box,
+              tr("setting_live_rewind_hint"))
+        rewind_disk_box = c.toggle(
+            tr("setting_live_rewind_disk"),
+            is_on("live_rewind_disk", "false"),
+            tr("setting_live_rewind_disk_hint"))
+
+        def rewind_room(on_disk: bool) -> None:
+            # Longer than MEMORY_MAX_MINUTES only on disk: in memory an HD
+            # channel takes about 60 MB a minute.
+            model = rewind_box.model()
+            for i in range(rewind_box.count()):
+                if int(rewind_box.itemData(i)) > MEMORY_MAX_MINUTES:
+                    model.item(i).setEnabled(on_disk)
+            if not on_disk and int(rewind_box.currentData()) > \
+                    MEMORY_MAX_MINUTES:
+                rewind_box.setCurrentIndex(
+                    rewind_box.findData(str(MEMORY_MAX_MINUTES)))
+        rewind_disk_box.toggled.connect(rewind_room)
+        rewind_room(rewind_disk_box.isChecked())
         if not self.player:
             c = play.card()
             c.note(tr("set_embedded_unavailable",
@@ -1717,6 +1744,9 @@ class _SettingsMixin:
                 "video_tonemapping", tonemap_box.currentData())
             self.settings.setValue(
                 "cache_secs", buf_box.currentData())
+            self.settings.setValue(
+                "live_rewind_minutes", rewind_box.currentData())
+            self.settings.setValue("live_rewind_disk", flag(rewind_disk_box))
 
             def delay_value(sign_box, hours_box, minutes_box) -> int:
                 total = hours_box.value() * 60 + minutes_box.value()

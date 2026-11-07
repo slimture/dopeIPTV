@@ -22,6 +22,30 @@ class BufferWindow:
         return max(self.start + margin, min(self.end - margin, target))
 
 
+# How the rewind buffer of a live channel is sized (Settings -> Playback).
+# mpv sizes it in bytes, not time: a minute of an HD channel (~8 Mbit/s), so
+# the setting's minutes hold for HD and a lighter channel gets more - the
+# DVR row shows the time that actually fits.
+BYTES_PER_MINUTE = 60 * 1024 * 1024
+# In memory up to this; longer only with the buffer on disk.
+MEMORY_MAX_MINUTES = 10
+
+
+def rewind_bytes(minutes: int, on_disk: bool) -> int:
+    """demuxer-max-back-bytes for a live channel's rewind buffer."""
+    if not on_disk:
+        minutes = min(minutes, MEMORY_MAX_MINUTES)
+    return max(0, minutes) * BYTES_PER_MINUTE
+
+
+# mpv's seekable range ends at the last keyframe it holds, so at the live
+# edge the playhead runs ahead of it by up to a keyframe interval: 0.8 s with
+# a 2 s one on Linux, and IPTV channels use up to about 5 s. Half a second
+# lost the window in one poll of eight there - a dropped arrow key, a DVR row
+# that blinked away under the pointer.
+LIVE_EDGE_SLACK = 5.0
+
+
 def buffer_window(state: Any, position: float | None) -> BufferWindow | None:
     """Merge overlapping cache ranges, then choose the one under the playhead."""
     if not isinstance(state, dict) or position is None or not math.isfinite(position):
@@ -44,6 +68,7 @@ def buffer_window(state: Any, position: float | None) -> BufferWindow | None:
         else:
             merged.append((start, end))
     for start, end in merged:
-        if start - 0.5 <= position <= end + 0.5 and end - start >= 1:
+        if (start - 0.5 <= position <= end + LIVE_EDGE_SLACK
+                and end - start >= 1):
             return BufferWindow(start, end)
     return None

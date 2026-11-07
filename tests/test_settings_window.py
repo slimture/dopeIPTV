@@ -40,6 +40,7 @@ PRESET = {
     "sub_lang2": "swe", "aspect_mode": "16:9", "hwdec_mode": "auto-safe",
     "video_deinterlace": "true", "video_sharpen": "1.0",
     "video_tonemapping": "hable", "cache_secs": "30",
+    "live_rewind_minutes": "120", "live_rewind_disk": "true",
     "replay_delay_min": "-75", "epg_delay_min": "90",
     "view_density": "large", "epg_upcoming_count": "7",
     "sort_order": "alpha_desc", "check_updates": "false",
