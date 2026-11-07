@@ -41,6 +41,8 @@ PRESET = {
     "video_deinterlace": "true", "video_sharpen": "1.0",
     "video_tonemapping": "hable", "cache_secs": "30",
     "live_rewind_minutes": "120", "live_rewind_disk": "true",
+    "ui_scale": "125", "sub_scale": "150", "sub_color": "yellow",
+    "sub_background": "true",
     "replay_delay_min": "-75", "epg_delay_min": "90",
     "view_density": "large", "epg_upcoming_count": "7",
     "sort_order": "alpha_desc", "check_updates": "false",
@@ -191,6 +193,19 @@ def followed_series(self):
 QDialog.exec = followed_series
 w.open_settings()
 assert w.followed.is_followed(1) and not w.followed.is_followed(2)
+
+# 8. A theme tile applies and stores its theme at once, an accent dot its
+# accent; following the desktop shows the light-mode row.
+def pick_look(self):
+    from dopeiptv.ui.settings_ui import ColorDot, ThemeTile
+    [t for t in self.findChildren(ThemeTile) if t.key == "latte"][0].click()
+    [d for d in self.findChildren(ColorDot) if d.key == "mint"][0].click()
+    return 0
+QDialog.exec = pick_look
+w.open_settings()
+from dopeiptv.ui.theme import P
+assert s.value("theme") == "latte" and s.value("accent") == "mint"
+assert P["bg"] == "#EFF1F5" and P["accent"] == "#34CFA0", P
 print("SETTINGS_OK", flush=True)
 """
 

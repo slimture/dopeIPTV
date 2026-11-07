@@ -103,6 +103,11 @@ method in `ui/mw_settings.py` (usually `open_settings`): a `card.row()` or
 `if d.exec():` block at the end. Rows are found by the Settings search
 automatically.
 
+**Add a theme**: a palette in `THEMES` (`ui/theme.py`) with every key the
+others have, `"light": True` for a light one and `"accent"` for its own
+accent colour, plus `theme_<key>` in `i18n.py` and every `locale/*.json`.
+`tests/test_theme.py` checks the keys and that the text stays readable.
+
 **Add a new data store**: add a class to `core/stores.py` following the
 pattern of `FavoriteStore` or `HistoryStore`.
 

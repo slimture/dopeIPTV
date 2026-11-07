@@ -13,10 +13,11 @@ from datetime import datetime
 import os
 
 from PyQt6.QtCore import QEvent, QObject, Qt, QTimer
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QColor, QIcon
 from PyQt6.QtWidgets import (
     QAbstractItemView, QAbstractSlider, QAbstractSpinBox, QApplication,
-    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog,
+    QCheckBox, QColorDialog, QComboBox, QDialog, QDialogButtonBox,
+    QFileDialog,
     QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
     QListWidgetItem, QMessageBox, QPushButton, QScrollArea, QScrollBar,
     QSpinBox, QTextBrowser, QVBoxLayout, QWidget,
@@ -63,11 +64,16 @@ from ..core.local_buffer import MEMORY_MAX_MINUTES
 from ..core.log import log
 from ..core.xdg import open_url
 from ..core.recording import format_size
+from ..media.embedded import SUB_COLORS, SUB_SCALES
 from ..media.players import embedded_playback_reason
-from .theme import ACCENTS, P, THEMES, apply_theme, build_style
+from .theme import (
+    ACCENT_CUSTOM, ACCENT_THEME, ACCENTS, P, THEME_ORDER,
+    THEMES, UI_SCALES, apply_theme, build_style, effective_theme,
+    is_light,
+)
 from .settings_ui import (
-    PlaylistDelegate, ReorderList, SettingsPage, SettingsShell, fit_to_rows,
-    hbox, page_icon, settings_style,
+    ChoicePicker, ColorDot, PlaylistDelegate, ReorderList, SettingsPage,
+    SettingsShell, ThemeTile, fit_to_rows, hbox, page_icon, settings_style,
 )
 from .widgets import confirm
 from ..core.updates import GITHUB_REPO, fetch_latest_release, is_newer
@@ -291,6 +297,26 @@ class _SettingsMixin:
     def _set_theme(self, theme: str, accent: str) -> None:
         self.settings.setValue("theme", theme)
         self.settings.setValue("accent", accent)
+        self._apply_theme_now()
+
+    def _watch_color_scheme(self) -> None:
+        """Follow the desktop between its light and dark mode, live, when
+        Settings says so (Qt 6.5+; elsewhere the setting simply holds)."""
+        try:
+            hints = QApplication.instance().styleHints()
+            hints.colorSchemeChanged.connect(self._on_color_scheme_changed)
+        except Exception as e:
+            log.debug("colour scheme changes not available: %s", e)
+
+    def _on_color_scheme_changed(self, *_args) -> None:
+        if self.settings.value("theme_follow_system", "false") != "true":
+            return
+        theme = effective_theme(self.settings)
+        if P.get("name") != THEMES[theme]["name"]:
+            log.info("desktop colour scheme changed - theme %s", theme)
+            self._apply_theme_now()
+
+    def _apply_theme_now(self) -> None:
         apply_theme(self.settings)
         QApplication.instance().setStyleSheet(build_style())
         if hasattr(self, "_apply_nav_icons"):
@@ -600,20 +626,81 @@ class _SettingsMixin:
         # -- Appearance -------------------------------------------------------
         look = page("appearance", tr("set_page_appearance"),
                     tr("set_page_appearance_sub"), "palette")
-        theme_box = self._combo(
-            [(key, tr(f"theme_{key}")) for key in THEMES],
+        themes = ChoicePicker(
+            [ThemeTile(key, tr(f"theme_{key}")) for key in THEME_ORDER],
             self.settings.value("theme", "graphite"))
-        accent_box = self._combo(
-            [(key, tr(f"accent_{key}")) for key in ACCENTS],
-            self.settings.value("accent", "blue"))
+        accent_keys = [ACCENT_THEME, *ACCENTS, ACCENT_CUSTOM]
+        accents = ChoicePicker(
+            [ColorDot(key, tr(f"accent_{key}"),
+                      ACCENTS[key][1] if key in ACCENTS else
+                      (self.settings.value("accent_custom", "") or ""))
+             for key in accent_keys],
+            self.settings.value("accent", "blue"), spacing=6)
+        # One row of dots where the page is wide enough; they wrap if not.
+        accents.setMinimumWidth(min(len(accent_keys) * (ColorDot.D + 6), 440))
+        light_box = self._combo(
+            [(key, tr(f"theme_{key}")) for key in THEME_ORDER
+             if is_light(key)],
+            self.settings.value("theme_light", "light"))
+        corner_box = self._combo(
+            [("sharp", tr("option_corners_sharp")),
+             ("rounded", tr("option_corners_rounded")),
+             ("round", tr("option_corners_round"))],
+            self.settings.value("corner_style", "rounded"))
+        scale_box = self._combo(
+            [(v, tr("opt_percent", n=v)) for v in UI_SCALES],
+            str(self.settings.value("ui_scale", "100")))
 
-        def restyle(_i=None) -> None:
-            self._set_theme(theme_box.currentData(), accent_box.currentData())
+        def sync_pickers() -> None:
+            # Each tile shows its theme with the accent chosen now, and the
+            # theme's-own dot the theme on show.
+            shown = effective_theme(self.settings)
+            for tile in themes.tiles:
+                tile.accent = (accents.value(),
+                               self.settings.value("accent_custom", ""))
+            for dot in accents.tiles:
+                dot.theme = shown
+            themes.refresh()
+            accents.refresh()
+
+        def restyle() -> None:
+            self._apply_theme_now()
             # The dialog's own rules are built from the palette too.
             d.setStyleSheet(settings_style())
+            sync_pickers()
 
-        theme_box.currentIndexChanged.connect(restyle)
-        accent_box.currentIndexChanged.connect(restyle)
+        sync_pickers()
+
+        def pick_theme(key: str) -> None:
+            self.settings.setValue("theme", key)
+            restyle()
+
+        def pick_accent(key: str) -> None:
+            if key == ACCENT_CUSTOM:
+                start = (self.settings.value("accent_custom", "")
+                         or P["accent"])
+                col = QColorDialog.getColor(
+                    QColor(start), d, tr("accent_pick_title"),
+                    QColorDialog.ColorDialogOption.DontUseNativeDialog)
+                if not col.isValid():
+                    accents.set_value(self.settings.value("accent", "blue"))
+                    return
+                hex_ = col.name().upper()
+                self.settings.setValue("accent_custom", hex_)
+                accents.tiles[-1].color = hex_
+            self.settings.setValue("accent", key)
+            restyle()
+
+        themes.picked.connect(pick_theme)
+        accents.picked.connect(pick_accent)
+        light_box.currentIndexChanged.connect(
+            lambda _i: (self.settings.setValue("theme_light",
+                                               light_box.currentData()),
+                        restyle()))
+        corner_box.currentIndexChanged.connect(
+            lambda _i: (self.settings.setValue("corner_style",
+                                               corner_box.currentData()),
+                        restyle()))
         density_box = self._combo(
             [("compact", tr("option_compact")), ("medium", tr("option_medium")),
              ("large", tr("option_large")), ("xlarge", tr("option_xlarge"))],
@@ -625,9 +712,26 @@ class _SettingsMixin:
              ("recent", tr("option_sort_recent"))],
             self.settings.value("sort_order", "default"))
         c = look.card(tr("set_card_theme"))
-        c.row(tr("setting_theme"), theme_box,
-              tr("misc_theme_applies_immediately"))
-        c.row(tr("setting_accent_color"), accent_box)
+        c.widget(themes, " ".join([tr("setting_theme")]
+                                  + [t.text() for t in themes.tiles]))
+        c.row(tr("setting_accent_color"), accents,
+              tr("misc_theme_applies_immediately"), stretch_control=True)
+        follow_box = c.toggle(
+            tr("setting_follow_system"),
+            self.settings.value("theme_follow_system", "false") == "true",
+            tr("setting_follow_system_hint"))
+        light_row = c.row(tr("setting_light_theme"), light_box)
+        c.shown_if(light_row, follow_box.isChecked)
+
+        def follow(on: bool) -> None:
+            self.settings.setValue("theme_follow_system",
+                                   "true" if on else "false")
+            c.refresh()
+            restyle()
+
+        follow_box.toggled.connect(follow)
+        c.row(tr("setting_corners"), corner_box)
+        c.row(tr("setting_ui_scale"), scale_box, tr("setting_ui_scale_hint"))
         c = look.card(tr("set_card_lists"))
         c.row(tr("setting_list_size"), density_box)
         c.row(tr("setting_sort_by"), sort_box)
@@ -724,6 +828,18 @@ class _SettingsMixin:
         c.row(tr("setting_subtitles"), sub_box)
         c.row(tr("setting_sub_lang"), slang_box)
         c.row(tr("setting_sub_lang_fallback"), slang2_box)
+        sub_size_box = self._combo(
+            [(v, tr("opt_percent", n=v)) for v in SUB_SCALES],
+            str(self.settings.value("sub_scale", "100")))
+        sub_color_box = self._combo(
+            [(key, tr(f"option_sub_color_{key}")) for key in SUB_COLORS],
+            self.settings.value("sub_color", "white"))
+        c = audio.card(tr("set_card_sub_look"))
+        c.row(tr("setting_sub_size"), sub_size_box)
+        c.row(tr("setting_sub_color"), sub_color_box)
+        sub_box_box = c.toggle(tr("setting_sub_box"),
+                               is_on("sub_background", "false"),
+                               tr("setting_sub_box_hint"))
 
         # OpenSubtitles: a key (built in, or the user's own) and an optional
         # account, which only raises how many subtitles a day can be fetched.
@@ -1706,6 +1822,7 @@ class _SettingsMixin:
                 self._apply_desktop_entry(want)
             self.settings.setValue(
                 "view_density", density_box.currentData())
+            self.settings.setValue("ui_scale", scale_box.currentData())
             self.settings.setValue(
                 "epg_upcoming_count", epg_count_box.value())
             self.settings.setValue(
@@ -1718,6 +1835,9 @@ class _SettingsMixin:
                 "sub_lang", slang_box.currentData())
             self.settings.setValue(
                 "sub_lang2", slang2_box.currentData())
+            self.settings.setValue("sub_scale", sub_size_box.currentData())
+            self.settings.setValue("sub_color", sub_color_box.currentData())
+            self.settings.setValue("sub_background", flag(sub_box_box))
             # Written only when changed: an untouched empty field is not a
             # setting, and OK with nothing touched changes nothing.
             for skey, value in (

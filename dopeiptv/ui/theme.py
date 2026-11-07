@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 ACCENTS = {
     "blue":   ("Blue",   "#4C8DFF", "#5E99FF"),
     "purple": ("Purple", "#8E6BFF", "#A184FF"),
@@ -10,7 +12,13 @@ ACCENTS = {
     "orange": ("Orange", "#FF9F43", "#FFB160"),
     "pink":   ("Pink",   "#FF5C8A", "#FF7AA1"),
     "red":    ("Red",    "#FF5C5C", "#FF7A7A"),
+    "gold":   ("Gold",   "#E8B339", "#F0C35A"),
+    "indigo": ("Indigo", "#5B6CFF", "#7381FF"),
+    "mint":   ("Mint",   "#34CFA0", "#55DBB2"),
 }
+# Accent choices that are not one colour: the theme's own (its "accent"
+# entry, blue where it has none) and one the user picked ("accent_custom").
+ACCENT_THEME, ACCENT_CUSTOM = "theme", "custom"
 
 THEMES = {
     "graphite": {
@@ -56,6 +64,7 @@ THEMES = {
         "text": "#ECEFF4", "text2": "#D8DEE9", "text3": "#B8C0D0",
         "muted": "#94A0B8", "muted2": "#7B879D", "muted3": "#6A7590",
         "muted4": "#8590A6", "error": "#FF6B6B", "rec": "#FF5C5C",
+        "accent": ("#88C0D0", "#9DCDDB"),
     },
     "dracula": {
         "name": "Dracula",
@@ -67,6 +76,7 @@ THEMES = {
         "text": "#F8F8F2", "text2": "#E4E4DE", "text3": "#C9C9C4",
         "muted": "#A2A3B2", "muted2": "#7E7F92", "muted3": "#6C6D80",
         "muted4": "#8B8C9E", "error": "#FF5555", "rec": "#FF5555",
+        "accent": ("#BD93F9", "#CBA8FA"),
     },
     "gruvbox": {
         "name": "Gruvbox (dark)",
@@ -78,6 +88,7 @@ THEMES = {
         "text": "#EBDBB2", "text2": "#D5C4A1", "text3": "#BDAE93",
         "muted": "#A89984", "muted2": "#928374", "muted3": "#7C6F64",
         "muted4": "#928374", "error": "#FB4934", "rec": "#FB4934",
+        "accent": ("#FE8019", "#FE9540"),
     },
     "solarized": {
         "name": "Solarized (dark)",
@@ -89,6 +100,7 @@ THEMES = {
         "text": "#EEE8D5", "text2": "#93A1A1", "text3": "#839496",
         "muted": "#768D92", "muted2": "#657B83", "muted3": "#556B72",
         "muted4": "#768D92", "error": "#DC322F", "rec": "#DC322F",
+        "accent": ("#268BD2", "#3A99DA"),
     },
     "catppuccin": {
         "name": "Catppuccin (mocha)",
@@ -100,6 +112,7 @@ THEMES = {
         "text": "#CDD6F4", "text2": "#BAC2DE", "text3": "#A6ADC8",
         "muted": "#9399B2", "muted2": "#7F849C", "muted3": "#6C7086",
         "muted4": "#9399B2", "error": "#F38BA8", "rec": "#F38BA8",
+        "accent": ("#CBA6F7", "#D6B9F9"),
     },
     "light": {
         "name": "Light",
@@ -111,26 +124,240 @@ THEMES = {
         "text": "#1B1B1F", "text2": "#3A3A42", "text3": "#55555F",
         "muted": "#6E6E79", "muted2": "#8B8B96", "muted3": "#8B8B96",
         "muted4": "#7A7A85", "error": "#D93025", "rec": "#D93025",
+        "light": True,
+    },
+    "tokyonight": {
+        "name": "Tokyo Night",
+        "bg": "#1A1B26", "side": "#16161E", "pane": "#1E2030",
+        "hover": "#222436", "sel": "#292E42", "input": "#16161E",
+        "btn": "#24283B", "btn_hover": "#2F3549",
+        "border": "#15161E", "border_in": "#2F3549",
+        "scroll": "#3B4261", "scroll_hover": "#414868",
+        "text": "#C0CAF5", "text2": "#A9B1D6", "text3": "#9AA5CE",
+        "muted": "#8089B3", "muted2": "#737AA2", "muted3": "#5E6590",
+        "muted4": "#6B7199", "error": "#F7768E", "rec": "#F7768E",
+        "accent": ("#7AA2F7", "#8FB2FA"),
+    },
+    "rosepine": {
+        "name": "Rosé Pine",
+        "bg": "#191724", "side": "#15131F", "pane": "#1F1D2E",
+        "hover": "#221F31", "sel": "#2C2942", "input": "#15131F",
+        "btn": "#26233A", "btn_hover": "#403D52",
+        "border": "#13111B", "border_in": "#403D52",
+        "scroll": "#403D52", "scroll_hover": "#524F67",
+        "text": "#E0DEF4", "text2": "#CDCAE6", "text3": "#ABA7C6",
+        "muted": "#908CAA", "muted2": "#7E7A98", "muted3": "#6E6A86",
+        "muted4": "#857F9F", "error": "#EB6F92", "rec": "#EB6F92",
+        "accent": ("#C4A7E7", "#D3BCF0"),
+    },
+    "onedark": {
+        "name": "One Dark",
+        "bg": "#282C34", "side": "#21252B", "pane": "#2C313A",
+        "hover": "#2F343F", "sel": "#3E4451", "input": "#21252B",
+        "btn": "#333842", "btn_hover": "#3E4451",
+        "border": "#1B1F27", "border_in": "#3E4451",
+        "scroll": "#4B5263", "scroll_hover": "#5C6370",
+        "text": "#D7DAE0", "text2": "#ABB2BF", "text3": "#9DA5B4",
+        "muted": "#8B929E", "muted2": "#7F848E", "muted3": "#636B78",
+        "muted4": "#828997", "error": "#E06C75", "rec": "#E06C75",
+        "accent": ("#61AFEF", "#7CBDF2"),
+    },
+    "everforest": {
+        "name": "Everforest",
+        "bg": "#2D353B", "side": "#232A2E", "pane": "#323C41",
+        "hover": "#343F44", "sel": "#3D484D", "input": "#232A2E",
+        "btn": "#343F44", "btn_hover": "#3D484D",
+        "border": "#1E2326", "border_in": "#475258",
+        "scroll": "#475258", "scroll_hover": "#56635F",
+        "text": "#D3C6AA", "text2": "#C4B99D", "text3": "#9DA9A0",
+        "muted": "#859289", "muted2": "#7A8478", "muted3": "#68736B",
+        "muted4": "#859289", "error": "#E67E80", "rec": "#E67E80",
+        "accent": ("#A7C080", "#B8CE94"),
+    },
+    "kanagawa": {
+        "name": "Kanagawa",
+        "bg": "#1F1F28", "side": "#16161D", "pane": "#22222C",
+        "hover": "#2A2A37", "sel": "#2D4F67", "input": "#16161D",
+        "btn": "#2A2A37", "btn_hover": "#363646",
+        "border": "#16161D", "border_in": "#363646",
+        "scroll": "#363646", "scroll_hover": "#54546D",
+        "text": "#DCD7BA", "text2": "#C8C093", "text3": "#A6A28C",
+        "muted": "#938F80", "muted2": "#807E72", "muted3": "#727169",
+        "muted4": "#8A8878", "error": "#E46876", "rec": "#E82424",
+        "accent": ("#7E9CD8", "#93ADE0"),
+    },
+    "contrast": {
+        "name": "High contrast",
+        "bg": "#000000", "side": "#000000", "pane": "#0A0A0A",
+        "hover": "#1F1F1F", "sel": "#333333", "input": "#000000",
+        "btn": "#1A1A1A", "btn_hover": "#2E2E2E",
+        "border": "#8A8A8A", "border_in": "#BFBFBF",
+        "scroll": "#8A8A8A", "scroll_hover": "#BFBFBF",
+        "text": "#FFFFFF", "text2": "#FFFFFF", "text3": "#F0F0F0",
+        "muted": "#E0E0E0", "muted2": "#D0D0D0", "muted3": "#C8C8C8",
+        "muted4": "#D8D8D8", "error": "#FF6B6B", "rec": "#FF4D4D",
+        "accent": ("#1A73E8", "#4A90F0"),
+    },
+    "latte": {
+        "name": "Catppuccin (latte)",
+        "bg": "#EFF1F5", "side": "#E6E9EF", "pane": "#F7F8FA",
+        "hover": "#DCE0E8", "sel": "#CCD0DA", "input": "#FFFFFF",
+        "btn": "#DCE0E8", "btn_hover": "#CCD0DA",
+        "border": "#CCD0DA", "border_in": "#BCC0CC",
+        "scroll": "#BCC0CC", "scroll_hover": "#ACB0BE",
+        "text": "#4C4F69", "text2": "#5C5F77", "text3": "#6C6F85",
+        "muted": "#6C6F85", "muted2": "#7C7F93", "muted3": "#8C8FA1",
+        "muted4": "#7C7F93", "error": "#D20F39", "rec": "#D20F39",
+        "accent": ("#8839EF", "#9A55F2"), "light": True,
+    },
+    "solarized_light": {
+        "name": "Solarized (light)",
+        "bg": "#FDF6E3", "side": "#EEE8D5", "pane": "#FFFBF0",
+        "hover": "#EEE8D5", "sel": "#E4DCC4", "input": "#FFFDF6",
+        "btn": "#EEE8D5", "btn_hover": "#E4DCC4",
+        "border": "#E4DCC4", "border_in": "#D6CDB2",
+        "scroll": "#D6CDB2", "scroll_hover": "#C4BB9F",
+        "text": "#073642", "text2": "#586E75", "text3": "#657B83",
+        "muted": "#657B83", "muted2": "#7B8E91", "muted3": "#839496",
+        "muted4": "#7B8E91", "error": "#DC322F", "rec": "#DC322F",
+        "accent": ("#268BD2", "#3A99DA"), "light": True,
     },
 }
+
+#: Order of the theme picker: dark ones first, then the light ones.
+THEME_ORDER = sorted(THEMES, key=lambda k: bool(THEMES[k].get("light")))
+
+# Corners: what every border-radius in the stylesheet is scaled by.
+CORNER_STYLES = {"sharp": 0.0, "rounded": 1.0, "round": 1.6}
+_corners = 1.0
+
+#: Interface sizes (percent). Applied as QT_SCALE_FACTOR when the app starts.
+UI_SCALES = ("90", "100", "110", "125", "150")
+
+
+def is_light(theme: str) -> bool:
+    return bool(THEMES.get(theme, {}).get("light"))
+
+
+def ui_scale_factor(value) -> float | None:
+    """QT_SCALE_FACTOR for a stored interface size, or None to leave Qt's."""
+    try:
+        pct = int(str(value))
+    except (TypeError, ValueError):
+        return None
+    if str(pct) not in UI_SCALES or pct == 100:
+        return None
+    return pct / 100
+
+
+def system_is_dark() -> bool | None:
+    """The desktop's light or dark mode, where Qt can tell (Qt 6.5+)."""
+    try:
+        from PyQt6.QtCore import Qt
+        from PyQt6.QtGui import QGuiApplication
+        if QGuiApplication.instance() is None:
+            return None
+        scheme = QGuiApplication.styleHints().colorScheme()
+    except Exception:
+        return None
+    if scheme == Qt.ColorScheme.Dark:
+        return True
+    if scheme == Qt.ColorScheme.Light:
+        return False
+    return None
+
+
+def effective_theme(settings, system_dark: bool | None = None) -> str:
+    """The theme to show: the chosen one, or - following the desktop - the
+    light one while the desktop is light. Unknown counts as dark."""
+    theme = settings.value("theme", "graphite") or "graphite"
+    if settings.value("theme_follow_system", "false") == "true":
+        if system_dark is None:
+            system_dark = system_is_dark()
+        if system_dark is False:
+            theme = settings.value("theme_light", "light") or "light"
+    return theme if theme in THEMES else "graphite"
 
 P: dict[str, str] = {}
 ACCENT: str = ACCENTS["blue"][1]
 
 
+def _lighter(hex_color: str) -> str:
+    return _mix("#FFFFFF", hex_color, 0.18)
+
+
+def _valid_hex(value) -> str | None:
+    v = str(value or "").strip()
+    if len(v) == 7 and v.startswith("#"):
+        try:
+            int(v[1:], 16)
+            return v.upper()
+        except ValueError:
+            return None
+    return None
+
+
+def resolve_accent(theme: str, accent: str, custom=None) -> tuple[str, str]:
+    """The accent colour and its hover shade for a theme and accent choice."""
+    if accent == ACCENT_CUSTOM:
+        hex_ = _valid_hex(custom)
+        if hex_:
+            return hex_, _lighter(hex_)
+        accent = ACCENT_THEME
+    if accent == ACCENT_THEME:
+        own = THEMES.get(theme, {}).get("accent")
+        if own:
+            return own[0], own[1]
+        accent = "blue"
+    acc = ACCENTS.get(accent, ACCENTS["blue"])
+    return acc[1], acc[2]
+
+
 def apply_theme(settings=None, theme: str | None = None,
-                accent: str | None = None) -> None:
+                accent: str | None = None,
+                system_dark: bool | None = None) -> None:
     """Activate a theme + accent into the global palette ``P``."""
-    global ACCENT
+    global ACCENT, _corners
+    custom = None
     if settings is not None:
-        theme = theme or settings.value("theme", "graphite")
+        theme = theme or effective_theme(settings, system_dark)
         accent = accent or settings.value("accent", "blue")
-    base = THEMES.get(theme or "graphite", THEMES["graphite"])
-    acc = ACCENTS.get(accent or "blue", ACCENTS["blue"])
+        custom = settings.value("accent_custom", "")
+        _corners = CORNER_STYLES.get(
+            settings.value("corner_style", "rounded"), 1.0)
+    theme = theme if theme in THEMES else "graphite"
+    base = THEMES[theme]
     P.clear()
-    P.update(base)
-    P["accent"], P["accent_hi"] = acc[1], acc[2]
-    ACCENT = acc[1]
+    P.update({k: v for k, v in base.items() if isinstance(v, str)})
+    P["accent"], P["accent_hi"] = resolve_accent(theme, accent or "blue",
+                                                 custom)
+    ACCENT = P["accent"]
+
+
+def corner_radius(px: float) -> float:
+    """A radius drawn by hand, scaled like the stylesheet's."""
+    if _corners == 0:
+        return min(px, 2.0)
+    return px * _corners
+
+
+_RADIUS = re.compile(r"border-radius:\s*(\d+)px")
+
+
+def rounded(qss: str, factor: float | None = None) -> str:
+    """Scale every border-radius in *qss* to the chosen corner style. Sharp
+    keeps a hint (2 px) of the rounding; Qt shrinks a radius too large for
+    its widget on its own."""
+    f = _corners if factor is None else factor
+
+    def scale(m) -> str:
+        px = int(m.group(1))
+        if f == 1.0 or px == 0:
+            return m.group(0)
+        new = min(px, 2) if f == 0 else round(px * f)
+        return f"border-radius: {new}px"
+
+    return _RADIUS.sub(scale, qss)
 
 
 apply_theme()
@@ -258,7 +485,7 @@ def build_style() -> str:
     side_action_bg = _mix(p['text'], p['side'], 0.11)
     side_action_edge = _mix(p['text'], p['side'], 0.26)
     side_action_hover = _mix(p['text'], p['side'], 0.20)
-    return f"""
+    return rounded(f"""
 * {{
     font-family: "SF Pro Text", "Inter", "Cantarell", "Noto Sans", sans-serif;
     color: {p['text']};
@@ -654,4 +881,4 @@ QFileDialog QToolButton {{
     border-radius: 6px; padding: 4px 8px;
 }}
 QFileDialog QToolButton:hover {{ background: {p['btn_hover']}; }}
-"""
+""")

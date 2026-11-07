@@ -408,6 +408,20 @@ def main() -> int:
         except Exception:
             pass
 
+    # Settings -> Appearance -> Size of text and controls: Qt scales the
+    # whole interface, so text, icons and rows stay in proportion. Read
+    # before QApplication, like the X11 choice above; a QT_SCALE_FACTOR the
+    # user set in the environment wins.
+    if not os.environ.get("QT_SCALE_FACTOR"):
+        try:
+            from .ui.theme import ui_scale_factor
+            factor = ui_scale_factor(QSettings(ORG, ORG).value("ui_scale", "100"))
+            if factor:
+                os.environ["QT_SCALE_FACTOR"] = str(factor)
+                log.info("interface size %d%%", round(factor * 100))
+        except Exception:
+            pass
+
     app = QApplication(sys.argv)
     # Cyclic garbage collection on the GUI thread only: collected on a pool
     # thread, a cycle holding Qt objects segfaults (see core/gcguard.py).

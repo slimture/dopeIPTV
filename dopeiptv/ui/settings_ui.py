@@ -15,17 +15,19 @@ from __future__ import annotations
 
 import math
 
-from PyQt6.QtCore import QLocale, QPointF, QRectF, QSize, Qt, pyqtSignal
+from PyQt6.QtCore import QLocale, QPoint, QPointF, QRect, QRectF, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import (
-    QColor, QFont, QIcon, QPainter, QPainterPath, QPen, QPixmap,
+    QColor, QConicalGradient, QFont, QIcon, QPainter, QPainterPath, QPen,
+    QPixmap,
 )
 from PyQt6.QtWidgets import (
-    QCheckBox, QFrame, QHBoxLayout, QLabel, QLayout, QLineEdit,
-    QListWidget, QListWidgetItem, QScrollArea, QSizePolicy,
-    QStackedWidget, QStyle, QStyledItemDelegate, QVBoxLayout, QWidget,
+    QAbstractButton, QButtonGroup, QCheckBox, QFrame, QHBoxLayout, QLabel,
+    QLayout, QLineEdit, QListWidget, QListWidgetItem, QScrollArea,
+    QSizePolicy, QStackedWidget, QStyle, QStyledItemDelegate, QVBoxLayout,
+    QWidget,
 )
 
-from .theme import P
+from .theme import P, THEMES, corner_radius, resolve_accent, rounded
 
 #: Widest a page's content gets. A form stretched over a large window puts
 #: the label and its control a screen apart.
@@ -403,7 +405,7 @@ class SettingsShell(QWidget):
 def settings_style() -> str:
     """The Settings window's own rules, on top of the app theme."""
     p = P
-    return f"""
+    return rounded(f"""
 #SettingsSide {{ background: {p['side']}; border-right: 1px solid {p['border']}; }}
 QListWidget#SettingsNav {{ background: transparent; border: none; outline: none; }}
 QListWidget#SettingsNav::item {{
@@ -431,7 +433,7 @@ QLabel#SettingsHint {{ color: {p['muted']}; }}
 QPushButton#Danger {{ color: {p['error']}; }}
 QPushButton#Danger:hover {{ border-color: {p['error']}; }}
 #SettingsFooter {{ background: {p['bg']}; border-top: 1px solid {p['border']}; }}
-"""
+""")
 
 
 # -- playlist rows -----------------------------------------------------------
@@ -687,3 +689,279 @@ def fit_to_rows(lst: QListWidget, most: int = 6) -> None:
 def expanding(w: QWidget) -> QWidget:
     w.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
     return w
+
+
+class FlowLayout(QLayout):
+    """Lays its items out in rows, wrapping to the next row when one is
+    full - so a set of tiles fits a narrow window as well as a wide one."""
+
+    def __init__(self, parent=None, spacing: int = 8) -> None:
+        super().__init__(parent)
+        self._items: list = []
+        self._gap = spacing
+        self.setContentsMargins(0, 0, 0, 0)
+
+    def addItem(self, item) -> None:
+        self._items.append(item)
+
+    def count(self) -> int:
+        return len(self._items)
+
+    def itemAt(self, i):
+        return self._items[i] if 0 <= i < len(self._items) else None
+
+    def takeAt(self, i):
+        return self._items.pop(i) if 0 <= i < len(self._items) else None
+
+    def expandingDirections(self):
+        return Qt.Orientation(0)
+
+    def hasHeightForWidth(self) -> bool:
+        return True
+
+    def heightForWidth(self, width: int) -> int:
+        return self._place(QRect(0, 0, width, 0), apply=False)
+
+    def setGeometry(self, rect) -> None:
+        super().setGeometry(rect)
+        self._place(rect, apply=True)
+
+    def sizeHint(self) -> QSize:
+        return self.minimumSize()
+
+    def minimumSize(self) -> QSize:
+        size = QSize()
+        for item in self._items:
+            size = size.expandedTo(item.minimumSize())
+        return size
+
+    def _place(self, rect, apply: bool) -> int:
+        x, y, line = rect.x(), rect.y(), 0
+        rtl = self.parentWidget() is not None and \
+            self.parentWidget().isRightToLeft()
+        for item in self._items:
+            hint = item.sizeHint()
+            if x + hint.width() > rect.right() + 1 and line > 0:
+                x, y, line = rect.x(), y + line + self._gap, 0
+            if apply:
+                left = (rect.right() + 1 - (x - rect.x()) - hint.width()
+                        if rtl else x)
+                item.setGeometry(QRect(QPoint(left, y), hint))
+            x += hint.width() + self._gap
+            line = max(line, hint.height())
+        return y + line - rect.y()
+
+
+class _Choice(QAbstractButton):
+    """A checkable tile of a ChoicePicker, drawn by the subclass."""
+
+    def __init__(self, key: str, name: str) -> None:
+        super().__init__()
+        self.key = key
+        self.setCheckable(True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setToolTip(name)
+        self.setAccessibleName(name)
+        self.setText(name)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+    def sizeHint(self) -> QSize:
+        return self.minimumSizeHint()
+
+    def enterEvent(self, event) -> None:
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:
+        self.update()
+        super().leaveEvent(event)
+
+
+class ThemeTile(_Choice):
+    """A small picture of the app in one theme - sidebar, a list with its
+    selected row, the accent - with the theme's name under it."""
+
+    W, H, PREVIEW_H = 118, 92, 64
+
+    def __init__(self, key: str, name: str) -> None:
+        super().__init__(key, name)
+        self.accent = ("blue", "")
+
+    def minimumSizeHint(self) -> QSize:
+        return QSize(self.W, self.H)
+
+    def paintEvent(self, _event) -> None:
+        t = THEMES[self.key]
+        acc = QColor(resolve_accent(self.key, *self.accent)[0])
+        pr = QPainter(self)
+        pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        r = QRectF(3, 3, self.W - 6, self.PREVIEW_H - 6)
+        rad = corner_radius(8)
+        clip = QPainterPath()
+        clip.addRoundedRect(r, rad, rad)
+        pr.save()
+        pr.setClipPath(clip)
+        pr.fillRect(r, QColor(t["bg"]))
+        side = QRectF(r.x(), r.y(), r.width() * 0.27, r.height())
+        pr.fillRect(side, QColor(t["side"]))
+        pr.setPen(Qt.PenStyle.NoPen)
+        for i in range(4):
+            bar = QRectF(side.x() + 5, side.y() + 7 + i * 10,
+                         side.width() - 12 if i else side.width() - 9, 4)
+            pr.setBrush(acc if i == 1 else QColor(t["muted3"]))
+            pr.drawRoundedRect(bar, 2, 2)
+        x0 = side.right() + 7
+        w = r.right() - x0 - 7
+        pr.setBrush(QColor(t["text"]))
+        pr.drawRoundedRect(QRectF(x0, r.y() + 7, w * 0.55, 5), 2, 2)
+        for i in range(3):
+            row = QRectF(x0 - 3, r.y() + 17 + i * 12, w + 6, 10)
+            if i == 1:
+                pr.setBrush(QColor(t["sel"]))
+                pr.drawRoundedRect(row, 2, 2)
+                pr.setBrush(acc)
+                pr.drawRoundedRect(QRectF(row.x(), row.y(), 3, row.height()),
+                                   1, 1)
+            pr.setBrush(QColor(t["text2"] if i == 1 else t["muted"]))
+            pr.drawRoundedRect(QRectF(x0 + 2, row.y() + 3,
+                                      w * (0.7 - 0.12 * i), 4), 2, 2)
+        pr.restore()
+        on = self.isChecked()
+        ring = QColor(P["accent"] if on else
+                      (P["muted3"] if self.underMouse() else t["border_in"]))
+        pen = QPen(ring)
+        pen.setWidthF(2.0 if on or self.underMouse() else 1.0)
+        pr.setPen(pen)
+        pr.setBrush(Qt.BrushStyle.NoBrush)
+        pr.drawRoundedRect(r, rad, rad)
+        if self.hasFocus():
+            focus = QPen(QColor(P["accent_hi"]))
+            focus.setWidthF(1.0)
+            focus.setStyle(Qt.PenStyle.DashLine)
+            pr.setPen(focus)
+            pr.drawRoundedRect(r.adjusted(-2.5, -2.5, 2.5, 2.5),
+                               rad + 2, rad + 2)
+        if on:
+            badge = QRectF(r.right() - 16, r.y() + 4, 13, 13)
+            pr.setPen(Qt.PenStyle.NoPen)
+            pr.setBrush(QColor(P["accent"]))
+            pr.drawEllipse(badge)
+            tick = QPen(QColor("#FFFFFF"))
+            tick.setWidthF(1.6)
+            pr.setPen(tick)
+            pr.drawPolyline([QPointF(badge.x() + 3.4, badge.y() + 6.8),
+                             QPointF(badge.x() + 5.6, badge.y() + 9.0),
+                             QPointF(badge.x() + 9.8, badge.y() + 4.2)])
+        f = QFont(self.font())
+        f.setPixelSize(11)
+        f.setWeight(QFont.Weight.DemiBold if on else QFont.Weight.Normal)
+        pr.setFont(f)
+        pr.setPen(QColor(P["text"] if on else P["text2"]))
+        label = QRectF(0, self.PREVIEW_H, self.W, self.H - self.PREVIEW_H)
+        text = pr.fontMetrics().elidedText(self.text(),
+                                           Qt.TextElideMode.ElideRight,
+                                           self.W - 4)
+        pr.drawText(label, Qt.AlignmentFlag.AlignHCenter
+                    | Qt.AlignmentFlag.AlignTop, text)
+        pr.end()
+
+
+class ColorDot(_Choice):
+    """A round swatch: one accent colour, the theme's own (half the theme's
+    background, half its accent) or a colour of the user's own (a colour
+    wheel, around the chosen colour once there is one)."""
+
+    D = 30
+
+    def __init__(self, key: str, name: str, color: str = "") -> None:
+        super().__init__(key, name)
+        self.color = color
+        self.theme = "graphite"
+
+    def minimumSizeHint(self) -> QSize:
+        return QSize(self.D, self.D)
+
+    def paintEvent(self, _event) -> None:
+        from .theme import ACCENT_CUSTOM, ACCENT_THEME
+        pr = QPainter(self)
+        pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        outer = QRectF(1.5, 1.5, self.D - 3, self.D - 3)
+        inner = outer.adjusted(4, 4, -4, -4)
+        pr.setPen(Qt.PenStyle.NoPen)
+        if self.key == ACCENT_THEME:
+            t = THEMES.get(self.theme, THEMES["graphite"])
+            pr.setBrush(QColor(t["bg"]))
+            pr.drawEllipse(inner)
+            pr.setBrush(QColor(resolve_accent(self.theme, ACCENT_THEME)[0]))
+            pr.drawPie(inner, 90 * 16, -180 * 16)
+            pen = QPen(QColor(t["border_in"]))
+            pen.setWidthF(1.0)
+            pr.setPen(pen)
+            pr.setBrush(Qt.BrushStyle.NoBrush)
+            pr.drawEllipse(inner)
+        elif self.key == ACCENT_CUSTOM:
+            wheel = QConicalGradient(inner.center(), 90)
+            for i, hue in enumerate((0, 60, 120, 180, 240, 300, 360)):
+                wheel.setColorAt(i / 6, QColor.fromHsv(hue % 360, 200, 255))
+            pr.setBrush(wheel)
+            pr.drawEllipse(inner)
+            if self.color:
+                pr.setBrush(QColor(self.color))
+                pr.drawEllipse(inner.adjusted(4, 4, -4, -4))
+        else:
+            pr.setBrush(QColor(self.color))
+            pr.drawEllipse(inner)
+        if self.isChecked() or self.underMouse() or self.hasFocus():
+            pen = QPen(QColor(P["text"] if self.isChecked() else P["muted3"]))
+            pen.setWidthF(2.0 if self.isChecked() else 1.2)
+            if self.hasFocus() and not self.isChecked():
+                pen.setColor(QColor(P["accent_hi"]))
+            pr.setPen(pen)
+            pr.setBrush(Qt.BrushStyle.NoBrush)
+            pr.drawEllipse(outer)
+        pr.end()
+
+
+class ChoicePicker(QWidget):
+    """Tiles of which one is chosen, wrapping over as many rows as the
+    width needs. ``picked`` says which, by key."""
+
+    picked = pyqtSignal(str)
+
+    def __init__(self, tiles: list, current: str, spacing: int = 10) -> None:
+        super().__init__()
+        self.tiles = tiles
+        self._group = QButtonGroup(self)
+        self._group.setExclusive(True)
+        lay = FlowLayout(self, spacing)
+        for tile in tiles:
+            lay.addWidget(tile)
+            self._group.addButton(tile)
+            tile.clicked.connect(lambda _c=False, k=tile.key: self.picked.emit(k))
+        self.set_value(current)
+        sp = QSizePolicy(QSizePolicy.Policy.Preferred,
+                         QSizePolicy.Policy.Preferred)
+        sp.setHeightForWidth(True)
+        self.setSizePolicy(sp)
+
+    def value(self) -> str:
+        tile = self._group.checkedButton()
+        return tile.key if tile is not None else ""
+
+    def set_value(self, key: str) -> None:
+        for tile in self.tiles:
+            if tile.key == key:
+                tile.setChecked(True)
+                return
+        if self.tiles:
+            self.tiles[0].setChecked(True)
+
+    def hasHeightForWidth(self) -> bool:
+        return True
+
+    def heightForWidth(self, width: int) -> int:
+        return self.layout().heightForWidth(width)
+
+    def refresh(self) -> None:
+        for tile in self.tiles:
+            tile.update()

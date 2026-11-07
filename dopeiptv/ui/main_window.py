@@ -296,6 +296,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.setWindowTitle(self._base_title)
         self.resize(1240, 780)
         self._build_ui()
+        self._watch_color_scheme()
         # Restore the window size from last session (falls back to the default
         # above on first run). The panel dividers are restored once more after
         # the window is shown at its real size - see _restore_splitter_state -

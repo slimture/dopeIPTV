@@ -1331,6 +1331,29 @@ class _MacInputFilter(QObject):
         return False
 
 
+# How subtitles look (Settings -> Audio & subtitles): size in percent and
+# the colour of text subtitles.
+SUB_SCALES = ("75", "100", "125", "150", "200")
+SUB_COLORS = {"white": "#FFFFFF", "yellow": "#FFE14D", "grey": "#D0D0D0"}
+
+
+def _sub_look(s, set_opt) -> None:
+    """Style text subtitles (SRT, WebVTT...) from Settings. libass styling,
+    applied to the playing stream at once - nothing is reinitialised.
+    sub-scale sizes styled (ASS) subtitles too; their colours are theirs."""
+    scale = str(s.value("sub_scale", "100") or "100")
+    set_opt("sub-scale", int(scale) / 100 if scale in SUB_SCALES else 1.0)
+    set_opt("sub-color",
+            SUB_COLORS.get(s.value("sub_color", "white"), "#FFFFFF"))
+    box = s.value("sub_background", "false") == "true"
+    # mpv 0.38+ draws a box from sub-border-style; older builds from a
+    # sub-back-color that is not transparent. Both are set: the one a build
+    # does not have just fails (set_opt swallows it).
+    set_opt("sub-border-style",
+            "background-box" if box else "outline-and-shadow")
+    set_opt("sub-back-color", "#B3000000" if box else "#00000000")
+
+
 class EmbeddedPlayer(QWidget):
     """Video pane with libmpv OpenGL rendering, control bar, and fullscreen overlay."""
 
@@ -3226,6 +3249,7 @@ class EmbeddedPlayer(QWidget):
             else:
                 set_opt("slang", "")
             _set_forced_only(m, sub_mode == "forced")
+        _sub_look(s, set_opt)
         aspect = s.value("aspect_mode", "auto")
         if aspect == "stretch":
             set_opt("keepaspect", False)
