@@ -33,3 +33,21 @@ def test_size_colour_and_box():
 def test_damaged_values_fall_back():
     out = _applied(sub_scale="9000", sub_color="plaid")
     assert out["sub-scale"] == 1.0 and out["sub-color"] == "#FFFFFF"
+
+
+def test_the_player_menu_changes_the_look_without_touching_the_track():
+    from types import SimpleNamespace
+    from dopeiptv.media.embedded import EmbeddedPlayer
+
+    class Mpv(dict):
+        pass
+
+    m = Mpv(sid=3)
+    p = SimpleNamespace(_settings=_Settings(), video=SimpleNamespace(mpv=m))
+    p._settings.setValue = p._settings.__setitem__
+    EmbeddedPlayer._set_sub_look(p, "sub_color", "yellow")
+    EmbeddedPlayer._set_sub_look(p, "sub_background", "true")
+    assert p._settings["sub_color"] == "yellow"
+    assert m["sub-color"] == SUB_COLORS["yellow"]
+    assert m["sub-back-color"] == "#B3000000"
+    assert m["sid"] == 3          # a track picked by hand stays picked

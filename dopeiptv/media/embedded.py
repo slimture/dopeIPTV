@@ -3802,6 +3802,32 @@ class EmbeddedPlayer(QWidget):
             if (self.find_subtitles is not None
                     and getattr(self, "_seek_mode", "vod") == "vod"):
                 subs.addAction(tr("opt_sub_find_online"), self.find_subtitles)
+        if self._settings is not None:
+            # How they look - the same keys as Settings -> Audio & subtitles,
+            # applied live and kept as the default.
+            subs.addSeparator()
+            look = subs.addMenu(tr("set_card_sub_look"))
+            st = self._settings
+
+            def look_choice(title, key, default, items) -> None:
+                sm = look.addMenu(title)
+                cur = str(st.value(key, default))
+                for label, val in items:
+                    a = sm.addAction(label)
+                    a.setCheckable(True)
+                    a.setChecked(val == cur)
+                    a.triggered.connect(
+                        lambda _c, k=key, v=val: self._set_sub_look(k, v))
+
+            look_choice(tr("setting_sub_size"), "sub_scale", "100",
+                        [(tr("opt_percent", n=v), v) for v in SUB_SCALES])
+            look_choice(tr("setting_sub_color"), "sub_color", "white",
+                        [(tr(f"option_sub_color_{k}"), k) for k in SUB_COLORS])
+            box = look.addAction(tr("setting_sub_box"))
+            box.setCheckable(True)
+            box.setChecked(st.value("sub_background", "false") == "true")
+            box.toggled.connect(lambda on: self._set_sub_look(
+                "sub_background", "true" if on else "false"))
 
         delay = menu.addMenu(tr("opt_audio_delay"))
         current_delay = 0.0
@@ -4132,6 +4158,25 @@ class EmbeddedPlayer(QWidget):
         if self._settings:
             self._settings.setValue("cache_secs", str(secs))
         self._set_mpv("cache-secs", float(secs))
+
+    def _set_sub_look(self, key: str, value: str) -> None:
+        """Keep a subtitle-look choice and apply just the look, live. Not
+        apply_default_options: its sid=auto would drop a track picked by
+        hand, right while the user is looking at it."""
+        if self._settings is None:
+            return
+        self._settings.setValue(key, value)
+        m = self.video.mpv
+        if m is None:
+            return
+
+        def set_opt(prop, v) -> None:
+            try:
+                m[prop] = v
+            except Exception:
+                pass
+
+        _sub_look(self._settings, set_opt)
 
     def _set_video_opt(self, key: str, value: str) -> None:
         """Persist a video-filter choice and apply it live. Re-uses
