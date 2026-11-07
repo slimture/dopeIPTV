@@ -1,14 +1,25 @@
 ## dopeIPTV 1.3.0
 
-Pause and rewind live TV, make the video taller, and country flags in the
-category list on every system - and an app that stays quick with a big
-provider while its guide and lists load.
+Pause and rewind live TV, a new look, subtitles your way, a taller video
+and country flags in the category list on every system - and an app that
+stays quick with a big provider while its guide and lists load.
 
 - **Rewind live TV.** A row under the video takes you back in the channel
   you are watching, and **LIVE** brings you back; the arrow keys and pause
   work too. **Settings → Playback → Rewind live channels** sets how far
   back - 2 minutes by default. Turn on **Keep the rewind buffer on disk**
-  to go back up to 6 hours without using memory.
+  to go back up to 6 hours without using memory. Paused for long, the
+  button reads **↻ LIVE**: it opens the channel again at live, and the
+  rewind starts over.
+- **A new look.** Eight new themes - Tokyo Night, Rosé Pine, One Dark,
+  Everforest, Kanagawa, High contrast and two light ones - picked from
+  small pictures of the app under **Settings → Appearance**. The accent is
+  a row of colours: three new ones, the theme's own, or any colour you
+  like. The app can follow your desktop's light and dark mode, corners can
+  be sharp or extra rounded, and text and controls can be made larger or
+  smaller.
+- **Subtitles your way:** size, colour and a dark box behind them, under
+  **Settings → Audio & subtitles**.
 - **Make the video taller.** Drag the small handle under the video; the
   height is remembered. On Windows the detached player now resizes from
   its edges and corners.

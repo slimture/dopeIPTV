@@ -9,13 +9,37 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [1.3.0]
 
-Rewind a live channel, a docked video you can make taller, and flags in
-the category list on every system - and an app that keeps up with a big
-provider while its guide and lists load.
+Rewind a live channel, a new look - eight more themes, accents, corners,
+the desktop's light and dark mode, the size of everything - subtitles your
+way, a docked video you can make taller and flags in the category list on
+every system; and an app that keeps up with a big provider while its guide
+and lists load.
 
 ### Added
 
-Most of this is a contribution by Luca Merega (pull request #22).
+- **Eight new themes, and a picker that shows them.** Tokyo Night, Rosé
+  Pine, One Dark, Everforest, Kanagawa and High contrast, and two more
+  light ones, Catppuccin (latte) and Solarized (light) - 17 in all.
+  **Settings → Appearance** shows each as a small picture of the app in
+  it, and the accent as a row of colours: three new ones (gold, indigo,
+  mint), the theme's own (Nord's frost, Dracula's purple, Gruvbox's
+  orange...) and any colour of your own. Every theme keeps its text at a
+  contrast of 7:1 or more against its background (a test checks).
+- **Follow the desktop's light and dark mode.** The theme you picked while
+  the desktop is dark, a light one of your choice while it is light, and
+  the switch as the desktop switches - where Qt can tell (KDE, GNOME,
+  Windows, macOS); otherwise the picked theme stays.
+- **Corners and size.** Sharp, rounded or extra rounded corners, and the
+  size of text and controls from 90 to 150 % - Qt scales the whole window,
+  so everything keeps its proportions. The size applies at the next start;
+  a QT_SCALE_FACTOR set in the environment wins.
+- **How subtitles look.** Size (75-200 %), colour (white, yellow, light
+  gray) and a dark box behind them, under **Settings → Audio & subtitles**,
+  applied to what is playing at once. Subtitles with styling of their own
+  keep their colours. The box works with mpv before 0.38 too.
+
+The rest of this section is mostly a contribution by Luca Merega (pull
+request #22).
 
 - **Rewind a live channel (DVR).** A row under the video shows how much of
   the channel is kept - "DVR −0:18 / 2:00" - with a slider to go back in it
@@ -31,7 +55,9 @@ Most of this is a contribution by Luca Merega (pull request #22).
   and the channel runs on without it; the row then shows the real time
   behind live, and LIVE opens the channel again rather than landing at the
   end of what had arrived - except while recording, where it keeps the
-  stream. Catch-up from the provider's archive works as before.
+  stream. LIVE says so first: it reads "↻ LIVE", and its tooltip that the
+  rewind buffer starts over and that dragging the bar to its end stays in
+  it. Catch-up from the provider's archive works as before.
 - **Drag the height of the docked video.** A small handle under the video
   sets how tall it is, and the height is remembered. On Windows the
   detached player now resizes from its edges and corners, also with the
