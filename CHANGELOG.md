@@ -7,6 +7,19 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Fixed
+
+- **The programme guide no longer stays on yesterday.** The guide was
+  loaded at start and then only by a playlist refresh: an app left open
+  overnight - or a Mac that slept - showed yesterday's programmes, "The
+  server's schedule times look wrong", and an empty guide. A guide counted
+  as fresh for six hours after its download, too, also one that a
+  provider sends a day at a time and that had run out. The guide is now
+  looked at every 20 minutes and whenever the app comes back to the front,
+  and fetched again when it is older than six hours or runs out within
+  three (at most one try an hour, for guides that always end at midnight).
+  The detail panel fills in from the new guide at once.
+
 ## [1.3.0]
 
 Rewind a live channel, a new look - eight more themes, accents, corners,

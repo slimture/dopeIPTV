@@ -351,6 +351,13 @@ class XmltvGuide:
 
     CACHE_TTL: int = 6 * 3600
     KEEP_PAST_DAYS: int = 7
+    # A guide is also old when it is running out: a provider that sends a
+    # day at a time left an app open overnight with yesterday's guide - six
+    # hours after the download was still "fresh", and nothing refreshed it.
+    RUNS_OUT_S: int = 3 * 3600
+    # At most one refresh an hour for that reason: some guides always end at
+    # midnight, and fetching them again would not change it.
+    REFRESH_RETRY_S: int = 3600
     # Parse in a process of its own (see _parse_elsewhere); off, or when
     # that process cannot run, the parse happens in the calling thread.
     PARSE_ELSEWHERE: bool = True
@@ -377,10 +384,35 @@ class XmltvGuide:
         self._by_id: dict[str, Schedule] = {}
         self._by_name: dict[str, str] = {}
         self.delay_minutes = 0
+        self._ends_at: float | None = None
+        self._last_try = 0.0
 
     def _now(self) -> float:
         return (datetime.now().astimezone().timestamp()
                 - self.delay_minutes * 60)
+
+    def _note_coverage(self) -> None:
+        """When the guide runs out: where most channels' schedules end (the
+        median, so a few channels with a week ahead do not hide the rest)."""
+        ends = sorted(sched[1][-1] for sched in self._by_id.values()
+                      if len(sched[1]))
+        self._ends_at = float(ends[len(ends) // 2]) if ends else None
+
+    def runs_out_soon(self, now: float | None = None) -> bool:
+        if self._ends_at is None:
+            return False
+        now = time.time() if now is None else now
+        return self._ends_at - now < self.RUNS_OUT_S
+
+    def stale(self, now: float | None = None) -> bool:
+        """Whether a refresh is due: the guide is older than CACHE_TTL or
+        about to run out - and no attempt was made in the last hour."""
+        if time.monotonic() - self._last_try < self.REFRESH_RETRY_S \
+                and self._last_try:
+            return False
+        age = self._cache_age()
+        return ((age is not None and age > self.CACHE_TTL)
+                or self.runs_out_soon(now))
 
     def _cache_age(self) -> float | None:
         """Seconds since the cached guide was written; None without one."""
@@ -442,6 +474,7 @@ class XmltvGuide:
             self._by_name = {}
             self._loaded = False
             self._failed = False
+            self._ends_at = None
 
     def _effective_url(self) -> str:
         """The XMLTV URL to fetch: an explicit per-playlist URL wins, else the
@@ -536,9 +569,15 @@ class XmltvGuide:
                     and self._load_from_disk()):
                 # A stale guide - or the one a refresh replaces - stands in
                 # while the new one downloads.
-                if not force and age <= self.CACHE_TTL:
+                if not force and age <= self.CACHE_TTL \
+                        and not self.runs_out_soon():
                     log.info("EPG loaded from cache")
                     return True
+                if not force:
+                    log.info("EPG on disk is %s - downloading a new one",
+                             "running out" if age <= self.CACHE_TTL
+                             else "old")
+            self._last_try = time.monotonic()
             try:
                 data = self._download()
             except Exception as e:
@@ -551,6 +590,7 @@ class XmltvGuide:
                 self._parse_and_index(data, keep=True)
                 self._loaded = True
                 self._failed = False
+                self._note_coverage()
                 log.info("EPG loaded from download (%d KB)", len(data) // 1024)
             except Exception:
                 self._failed = not self._loaded
@@ -571,6 +611,7 @@ class XmltvGuide:
             return False
         self._loaded = True
         self._failed = False
+        self._note_coverage()
         return True
 
     # -- pickle index --------------------------------------------------------

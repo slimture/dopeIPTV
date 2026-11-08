@@ -297,6 +297,16 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.resize(1240, 780)
         self._build_ui()
         self._watch_color_scheme()
+        # The guide is loaded at start; an app left open - overnight, or a
+        # Mac that slept - kept yesterday's. Look again now and then, and
+        # whenever the app comes back to the front.
+        self._guide_check = QTimer(self)
+        self._guide_check.setInterval(20 * 60 * 1000)
+        self._guide_check.timeout.connect(self._check_guide_age)
+        self._guide_check.start()
+        QApplication.instance().applicationStateChanged.connect(
+            lambda state: state == Qt.ApplicationState.ApplicationActive
+            and self._check_guide_age())
         # Restore the window size from last session (falls back to the default
         # above on first run). The panel dividers are restored once more after
         # the window is shown at its real size - see _restore_splitter_state -
@@ -2949,13 +2959,27 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         self._load_guide()
 
+    def _check_guide_age(self) -> None:
+        """Refresh the guide when it is old or running out (XmltvGuide.stale
+        allows one try an hour). Not while it loads, nor before it has."""
+        x = getattr(self, "xmltv", None)
+        if (x is None or getattr(self, "_guide_loading", None) is not None
+                or not x.is_loaded() or x.is_loading()):
+            return
+        try:
+            due = x.stale()
+        except Exception:
+            return
+        if due:
+            log.info("EPG: the guide is old or runs out soon - refreshing")
+            self._load_guide(force=True)
+
     def _load_guide(self, force: bool = False) -> None:
         """Load the current guide on the pool. The download drives the
         "Loading programme guide" strip via epg_progress, so the load must
         END that indicator too, on completion and failure alike - without it
         the strip lingered (until the watchdog, or a category switch)."""
         x = self.xmltv
-        first = not x._loaded
         self._guide_loading = x
 
         def finished(ok) -> None:
@@ -2964,9 +2988,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._epg_progress_finished()
             if ok and x is self.xmltv:
                 self.list_model.refresh_all()
-                if first and hasattr(self, "_request_epg"):
+                if hasattr(self, "_request_epg"):
                     # The detail panel asked while the guide was still on its
-                    # way (lookups don't wait for it): fill it in now.
+                    # way (lookups don't wait for it), or shows the guide a
+                    # refresh replaced: fill it in now.
                     self._request_epg()
 
         run_async(self.pool, lambda: x.ensure_loaded(force=force),
