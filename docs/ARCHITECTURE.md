@@ -49,7 +49,9 @@ dopeiptv/
     player_exec.py     Locate the external mpv / VLC binary on the host
 
   media/               Playback
-    embedded.py        _MpvGLWidget(QOpenGLWidget), EmbeddedPlayer, seek bar
+    embedded.py        _MpvGLWidget(QOpenGLWidget), EmbeddedPlayer
+    seek_slider.py     The seek bar slider: click, drag, hover time
+    rewind_bar.py      DVR row + timeshift timeline over the video
     dvr_player.py      The player's side of the app-kept buffer
     players.py         External player launch (mpv IPC / VLC), libmpv detect
     subtitle_text.py   Stray right-to-left marks out of subtitle files

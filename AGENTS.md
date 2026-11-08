@@ -44,6 +44,8 @@ map and the one-way import rule.
 | `media/embedded.py` | Embedded mpv player widget |
 | `media/players.py` | External player launch, libmpv detection |
 | `media/dvr_player.py` | The player's side of the app-kept buffer (`DvrPlayerMixin`) |
+| `media/rewind_bar.py` | The DVR row and timeshift timeline over the video, and their switch (`RewindBarMixin`) |
+| `media/seek_slider.py` | The seek bar slider (`_SeekSlider`): click, drag, hover time |
 | `media/subtitle_text.py` | Stray right-to-left marks out of subtitle files before mpv reads them |
 | `ui/main_window.py` | MainWindow composition root (+ `mw_*` mixins) |
 | `ui/channel_list.py` | List model, view, delegate painting |
@@ -78,7 +80,8 @@ When making changes:
   the `mw_*` mixins (e.g. `open_settings` lives in `mw_settings.py`).
   A mixin method resolves on `MainWindow` via MRO, so a pure move between
   them never changes behaviour.
-- **Playback**: `media/embedded.py` for the in-app player,
+- **Playback**: `media/embedded.py` for the in-app player (its DVR row
+  and timeshift timeline in `media/rewind_bar.py`),
   `media/players.py` for external players.
 - **Theme/style**: `ui/theme.py` contains `THEMES`, `ACCENTS`, palette
   dict `P`, and `build_style()`.
