@@ -10,7 +10,8 @@ up to date.
   as you set, within the space you give it.
   Each channel you leave keeps its history for when you come back, and
   **Record** records from the buffer - whole even while you pause, and
-  from where you are when you have gone back.
+  from where you are when you have gone back. Without it, a recording
+  stands still while you pause, and the app now tells you so.
 - **The guide no longer stays on yesterday.** Left open overnight - or on
   a Mac that slept - the app kept yesterday's guide until it was started
   again. It now looks at the guide every 20 minutes and when you come back

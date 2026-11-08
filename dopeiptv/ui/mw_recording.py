@@ -307,6 +307,26 @@ class _RecordingMixin:
                cap=self._fmt_gb(self.rec.total_cap_bytes())))
         return False
 
+    def _warn_pause_while_recording(self) -> None:
+        """Paused while the player itself records (stream-record, without
+        dopeIPTV's own buffer): mpv stops reading the channel shortly into a
+        pause, and the recording stands still with it. Said once a
+        recording, with where to turn on the buffer that records through."""
+        p = self.player
+        if p is None or not getattr(p, "_paused", False):
+            return
+        try:
+            path = str(p.video.mpv["stream-record"] or "")
+        except Exception:
+            path = ""
+        if not path or path == getattr(self, "_pause_warned_rec", ""):
+            return
+        self._pause_warned_rec = path
+        self._show_toast(tr("rec_pause_not_recorded",
+                            setting=tr("setting_dvr_kept"),
+                            settings=tr("settings_title"),
+                            page=tr("tab_playback")), 10000)
+
     def _guard_buffer_switch(self, j: dict, title: str) -> bool:
         """Another channel, while the one on screen is recorded from its
         rewind buffer: stop, or let the recording go on in the background -
@@ -444,6 +464,7 @@ class _RecordingMixin:
                     recorder=self.player.take_buffer_recorder())
                 self._set_status("● " + tr("rec_started_inplayer",
                                            title=title, length=length))
+                self._warn_pause_while_recording()
                 return
 
         # Not the channel currently on screen. If the embedded player is
@@ -495,6 +516,7 @@ class _RecordingMixin:
                 recorder=self.player.take_buffer_recorder())
             self._set_status("● " + tr("rec_started_inplayer",
                                        title=title, length=length))
+            self._warn_pause_while_recording()
         elif self._recorder_ready():
             url = self.client.live_url(it["stream_id"], "ts")
             self.rec.add_job(url, title, time.time(), stop_ts,

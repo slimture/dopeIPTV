@@ -1615,6 +1615,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         on_live = bool(lp) and lp.get("kind") == "live"
         if paused:
             self._pause_started = time.time()
+            self._warn_pause_while_recording()
             # Pausing a live stream means you're no longer at the live edge:
             # show the badge and flip the timeline to 'not live' immediately
             # (don't wait for the 1 s timer or the offset to accrue). Only for

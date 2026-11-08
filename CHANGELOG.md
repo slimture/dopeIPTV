@@ -74,7 +74,14 @@ date.
   file begins on a key frame of the video, a few seconds before what was
   on screen, with the stream's tables first: one that began between two
   key frames showed nothing - black or grey in many players - until the
-  next one.
+  next one. The question on changing channel now says why: the recording
+  keeps its channel downloading, and that is the connection.
+- **A pause that stops a recording says so.** Without the own buffer, a
+  recording in the player is mpv's own, and mpv stops reading the channel
+  shortly into a pause - so the recording stood still without a word. The
+  first pause of such a recording (or a recording started while paused)
+  now says it, and names the setting that records through a pause. A
+  recording from the buffer says nothing: it goes on.
 - **Refresh the guide from the guide.** A ↻ button in the programme guide's
   window, and "Refresh guide now" in its right-click menu - on a channel
   without programmes and on an empty spot too - fetch the guide again and

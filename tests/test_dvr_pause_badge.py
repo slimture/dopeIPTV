@@ -24,7 +24,8 @@ def _host(dvr: bool):
         player=player, _playing_catchup=False, _pause_started=None,
         _last_playback={"kind": "live", "item": {"stream_id": 1}},
         _timeshift_days=lambda it: 3, _apply_play_icon=lambda: None,
-        _update_ts_timeline=lambda: None, _ts_live_offset=0.0)
+        _update_ts_timeline=lambda: None, _ts_live_offset=0.0,
+        _warn_pause_while_recording=lambda: None)
     h._dvr_buffered = lambda: MainWindow._dvr_buffered(h)
     return h, badges
 
