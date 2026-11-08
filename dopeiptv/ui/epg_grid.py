@@ -187,6 +187,13 @@ class EpgGridDialog(QDialog):
         self.day_fwd_btn.setFixedWidth(34)
         self.day_fwd_btn.clicked.connect(lambda: self._scroll_hours(24))
         bar.addWidget(self.day_fwd_btn)
+        # Fetch the guide again from here - where you notice it is missing.
+        self.refresh_btn = QPushButton("↻")
+        self.refresh_btn.setToolTip(tr("btn_refresh_epg"))
+        self.refresh_btn.setAccessibleName(tr("btn_refresh_epg"))
+        self.refresh_btn.setFixedWidth(34)
+        self.refresh_btn.clicked.connect(self._refresh_guide)
+        bar.addWidget(self.refresh_btn)
         self.reminders_btn = QPushButton(tr("reminders_title"))
         self.reminders_btn.setIcon(self._bar_icon("bell"))
         self.reminders_btn.clicked.connect(self.window._open_reminders)
@@ -243,8 +250,12 @@ class EpgGridDialog(QDialog):
             self._epg_poll.start()
         # Stop both timers the moment the dialog closes: a late _tick or
         # load-poll rebuild firing after teardown would work a dead scene.
+        self._guide_poll = QTimer(self)
+        self._guide_poll.setInterval(500)
+        self._guide_poll.timeout.connect(self._after_refresh)
         self.finished.connect(lambda _r: (self._refresh.stop(),
-                                          self._epg_poll.stop()))
+                                          self._epg_poll.stop(),
+                                          self._guide_poll.stop()))
 
         scr = self.screen().availableGeometry() if self.screen() else None
         want_w = self.CH_COL_W + self._grid_w + 40
@@ -1090,20 +1101,46 @@ class EpgGridDialog(QDialog):
             self.window.tune_from_guide(ch)
         self.accept()
 
+    def _refresh_guide(self) -> None:
+        """Fetch the guide again and redraw the board when it is in."""
+        if self._guide_poll.isActive():
+            return
+        self.refresh_btn.setEnabled(False)
+        self.info.setText(tr("status_loading_programme_guide"))
+        self.window._refresh_epg_now()
+        self._guide_poll.start()
+
+    def _after_refresh(self) -> None:
+        if getattr(self.window, "_guide_loading", None) is not None:
+            return
+        self._guide_poll.stop()
+        self.refresh_btn.setEnabled(True)
+        self.info.setText(tr("epg_select_channel"))
+        hbar = self.view.horizontalScrollBar()
+        vbar = self.view.verticalScrollBar()
+        h, v = hbar.value(), vbar.value()
+        self._build()
+        hbar.setValue(h)
+        vbar.setValue(v)
+
     def _context_at(self, scene_pos, global_pos) -> None:
         data = self._block_at(scene_pos)
+        m = QMenu(self)
         if not data:
+            m.addAction(tr("btn_refresh_epg"), self._refresh_guide)
+            m.exec(global_pos)
             return
         ch, p = data["channel"], data["prog"]
         self._selected = data
         self.play_btn.setEnabled(True)
-        m = QMenu(self)
         if p is None:
             # No-EPG channel: no programme to time-shift/record/remind about,
-            # so the menu is just "play it live".
+            # so the menu is "play it live" - and fetch the guide again.
             m.addAction(tr("epg_play_channel"),
                         lambda: (self.window.tune_from_guide(ch),
                                  self.accept()))
+            m.addSeparator()
+            m.addAction(tr("btn_refresh_epg"), self._refresh_guide)
             m.exec(global_pos)
             return
         past = p["stop_timestamp"] < time.time()
@@ -1126,6 +1163,8 @@ class EpgGridDialog(QDialog):
                 m.addAction(
                     tr("reminder_add"),
                     lambda: self.window._add_reminder(ch, p))
+        m.addSeparator()
+        m.addAction(tr("btn_refresh_epg"), self._refresh_guide)
         m.exec(global_pos)
 
     def _record(self, ch: dict, p: dict) -> None:

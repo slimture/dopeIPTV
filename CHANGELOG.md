@@ -29,6 +29,11 @@ provider's guide ends.
 
 ### Added
 
+- **Refresh the guide from the guide.** A ↻ button in the programme guide's
+  window, and "Refresh guide now" in its right-click menu - on a channel
+  without programmes and on an empty spot too - fetch the guide again and
+  redraw the board when it is in, where it was scrolled to. (Refresh
+  playlist fetches the guide again as well, as it did.)
 - **tools/epg_check.py** tells the provider's guide from the app's copy
   of it: what the provider sends now - channels, programmes, how many
   have something on, where it ends - beside the copy on this computer,
