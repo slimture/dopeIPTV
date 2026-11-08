@@ -40,9 +40,11 @@ _configured = False
 _secrets: set[str] = set()
 
 # Query parameters that carry an account, whatever the provider calls it.
+# A Stalker portal's links name the box (mac) and a play token.
 _CRED_PARAMS = frozenset((
     "username", "user", "password", "pass", "pwd", "token", "auth",
-    "api_key", "apikey", "key", "secret", "sig", "signature"))
+    "api_key", "apikey", "key", "secret", "sig", "signature",
+    "mac", "play_token"))
 
 # Xtream path layouts: /<kind>/<username>/<password>/<id>.<ext>. The bare
 # /<username>/<password>/<id> form is deliberately NOT guessed at - it is

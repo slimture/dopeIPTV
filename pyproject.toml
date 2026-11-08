@@ -62,6 +62,7 @@ files = [
     "dopeiptv/providers/oauth_loopback.py",
     "dopeiptv/providers/opensubtitles.py",
     "dopeiptv/providers/dlna.py",
+    "dopeiptv/providers/stalker.py",
     "dopeiptv/core/stores.py",
     "dopeiptv/core/local_buffer.py",
     "dopeiptv/core/dvr_store.py",

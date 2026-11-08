@@ -26,8 +26,10 @@ def json_object(pairs: list[tuple[str, Any]]) -> dict:
     return dict(pairs)
 
 
-class XtreamClient:
-    """HTTP client for the Xtream Codes player_api.php endpoint."""
+class ListCache:
+    """The short list cache a provider client keeps, with its on-disk copy
+    per playlist: shared by the clients whose lists come from a provider's
+    API (Xtream, Stalker), so each degrades the same way when it is down."""
 
     # How long a fetched channel/movie/series list stays served from memory.
     # Lineups change rarely, and every consumer (mode switch, EPG guide, Home
@@ -36,21 +38,12 @@ class XtreamClient:
     # button clears this (see clear_list_cache), so a manual refresh is
     # always a real re-fetch.
     LIST_CACHE_SECS = 300
+    # What this client's log lines start with.
+    LOG_NAME = "list"
 
-    def __init__(self, server: str, username: str, password: str,
-                 cache_path: str | None = None) -> None:
-        self.server = server.rstrip("/")
-        if not self.server.startswith(("http://", "https://")):
-            self.server = "http://" + self.server
-        self.username = username
-        self.password = password
-        self.max_connections: int | None = None
-        # From here on these two strings are masked out of every log record,
-        # wherever they turn up - a stream URL, a requests exception, a line
-        # written long after this call.
-        register_secrets(username, password)
-        self.session = requests.Session()
-        self.session.headers["User-Agent"] = "dopeIPTV/1.0"
+    server: str
+
+    def __init__(self, cache_path: str | None = None) -> None:
         self._list_cache: dict[tuple, tuple[float, list]] = {}
         self._list_lock = threading.Lock()
         # Optional on-disk copy of the list cache (per playlist): lets the app
@@ -68,8 +61,6 @@ class XtreamClient:
         # Refresh forces a real re-fetch while the disk copy stays as a
         # network-failure fallback.
         self._refetch_after = 0.0
-        # Monotonic deadline for the fail-fast cooldown after a network error.
-        self._net_down_until = 0.0
 
     def _load_disk_lists(self) -> None:
         """(under _list_lock) The single file of every list that older
@@ -85,12 +76,13 @@ class XtreamClient:
             for k, (t, data) in raw.items():
                 key = tuple(None if p == "" else p for p in k.split("\x1f"))
                 self._list_cache.setdefault(key, (float(t), data))
-            log.info("xtream list cache: loaded %d lists from disk", len(raw))
+            log.info("%s list cache: loaded %d lists from disk",
+                     self.LOG_NAME, len(raw))
         except FileNotFoundError:
             pass
         except Exception as e:
-            log.warning("xtream list cache: could not read %s: %s",
-                        self._cache_path, e)
+            log.warning("%s list cache: could not read %s: %s",
+                        self.LOG_NAME, self._cache_path, e)
 
     def _list_file(self, key: tuple) -> str | None:
         """The disk copy of one list. A file per list: with one file for
@@ -127,7 +119,8 @@ class XtreamClient:
         except FileNotFoundError:
             return None
         except (OSError, ValueError) as e:
-            log.warning("xtream list cache: could not read %s: %s", path, e)
+            log.warning("%s list cache: could not read %s: %s",
+                        self.LOG_NAME, path, e)
             return None
         with self._list_lock:
             hit = self._list_cache.get(key)
@@ -161,7 +154,8 @@ class XtreamClient:
                 except OSError:
                     pass
         except Exception as e:
-            log.warning("xtream list cache: could not write %s: %s", path, e)
+            log.warning("%s list cache: could not write %s: %s",
+                        self.LOG_NAME, path, e)
 
     # The single file of all lists that older versions wrote: read when a
     # list has no file of its own and the provider is down, and deleted once
@@ -177,8 +171,8 @@ class XtreamClient:
             if (time.time() - os.stat(self._cache_path).st_mtime
                     > self.SINGLE_FILE_KEEP_SECS):
                 os.unlink(self._cache_path)
-                log.info("xtream list cache: removed the old single file %s",
-                         self._cache_path)
+                log.info("%s list cache: removed the old single file %s",
+                         self.LOG_NAME, self._cache_path)
         except OSError:
             pass
 
@@ -229,9 +223,9 @@ class XtreamClient:
                     hit = self._list_cache.get(key)
             if hit is not None:
                 log.warning(
-                    "xtream %s @ %s: network failure - serving the cached "
-                    "list from %.0f min ago instead", key[0], self.server,
-                    (now - hit[0]) / 60)
+                    "%s %s @ %s: network failure - serving the cached "
+                    "list from %.0f min ago instead", self.LOG_NAME, key[0],
+                    self.server, (now - hit[0]) / 60)
                 return hit[1]
             raise
         finally:
@@ -252,6 +246,30 @@ class XtreamClient:
             # Any entry older than now is no longer "fresh", so the next
             # call actually re-fetches.
             self._refetch_after = time.time()
+
+
+class XtreamClient(ListCache):
+    """HTTP client for the Xtream Codes player_api.php endpoint."""
+
+    LOG_NAME = "xtream"
+
+    def __init__(self, server: str, username: str, password: str,
+                 cache_path: str | None = None) -> None:
+        self.server = server.rstrip("/")
+        if not self.server.startswith(("http://", "https://")):
+            self.server = "http://" + self.server
+        self.username = username
+        self.password = password
+        self.max_connections: int | None = None
+        # From here on these two strings are masked out of every log record,
+        # wherever they turn up - a stream URL, a requests exception, a line
+        # written long after this call.
+        register_secrets(username, password)
+        self.session = requests.Session()
+        self.session.headers["User-Agent"] = "dopeIPTV/1.0"
+        super().__init__(cache_path)
+        # Monotonic deadline for the fail-fast cooldown after a network error.
+        self._net_down_until = 0.0
 
     def _redact(self, text: str) -> str:
         """Strip the username/password from a string before logging it -
@@ -827,25 +845,39 @@ class M3UClient(OfflineClient):
         return out
 
 
+def _list_cache_path(playlist: dict) -> str | None:
+    """Where a playlist's lists are kept on disk, or None without an id."""
+    pid = (playlist or {}).get("id")
+    if not pid:
+        return None
+    from .epg import _epg_cache_dir
+    try:
+        d = _epg_cache_dir()
+        d.mkdir(parents=True, exist_ok=True)
+        return str(d / f"lists_{pid}.json")
+    except Exception:
+        return None
+
+
 def make_client(playlist: dict):
     """Build the right provider client for a stored playlist: an M3U-backed
-    client when kind == 'm3u', otherwise the Xtream API client (with a
+    client when kind == 'm3u', a Stalker / Ministra portal client when kind
+    == 'stalker', otherwise the Xtream API client (the API clients with a
     per-playlist on-disk list cache so a down provider still shows the last
     known lineup)."""
-    if (playlist or {}).get("kind") == "m3u":
+    kind = (playlist or {}).get("kind")
+    if kind == "m3u":
         return M3UClient(playlist.get("server", ""))
-    cache = None
-    pid = (playlist or {}).get("id")
-    if pid:
-        from .epg import _epg_cache_dir
-        try:
-            d = _epg_cache_dir()
-            d.mkdir(parents=True, exist_ok=True)
-            cache = str(d / f"lists_{pid}.json")
-        except Exception:
-            cache = None
+    if kind == "stalker":
+        # Imported here: stalker.py builds on this module, and a playlist
+        # of another kind never needs it.
+        from .stalker import StalkerClient
+        return StalkerClient(playlist.get("server", ""),
+                             playlist.get("mac", ""),
+                             cache_path=_list_cache_path(playlist))
     return XtreamClient(playlist["server"], playlist["username"],
-                        playlist["password"], cache_path=cache)
+                        playlist["password"],
+                        cache_path=_list_cache_path(playlist))
 
 
 class DemoClient(OfflineClient):

@@ -19,6 +19,7 @@ dopeiptv/
 
   providers/           Data sources (the network / provider edge)
     client.py          XtreamClient, OfflineClient/M3UClient/DemoClient
+    stalker.py         StalkerClient - Stalker / Ministra MAC portals
     epg.py             XmltvGuide - XMLTV parser with disk cache + index
     epg_index.py       The guide parser as a process of its own (--epg-index)
     metadata.py        TMDB client, PosterResolver (cover art)
