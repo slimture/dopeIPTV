@@ -50,9 +50,9 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
-    <release version="1.3.1" date="2026-11-08">
+    <release version="1.4.0" date="2026-11-08">
       <description>
-        <p>The programme guide keeps itself up to date: it is fetched again while the app runs when it is old or about to run out, and the detail panel says plainly when a provider's guide for a channel ends before now.</p>
+        <p>An experimental rewind buffer kept by dopeIPTV itself: it goes on downloading while paused and returns to live without reconnecting. The programme guide keeps itself up to date and can be refreshed from the guide window, and the detail panel says plainly when a provider's guide for a channel ends before now.</p>
       </description>
     </release>
     <release version="1.3.0" date="2026-11-07">

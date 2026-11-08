@@ -7,10 +7,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
-## [1.3.1]
+## [1.4.0]
 
-The programme guide keeps itself up to date, and says plainly when a
-provider's guide ends.
+Rewind with dopeIPTV's own buffer - downloading on through a pause, back to
+live without a reconnect - and a programme guide that keeps itself up to
+date.
 
 ### Fixed
 
@@ -29,6 +30,24 @@ provider's guide ends.
 
 ### Added
 
+- **Rewind with dopeIPTV's own buffer (experimental).** Settings ->
+  Playback -> Rewind with dopeIPTV's own buffer: the app reads a live
+  channel from the provider itself and keeps it on disk - in segments of a
+  couple of seconds, as far back as the rewind setting says, within a space
+  cap (1-20 GB, 2 by default) and never below 1 GB free - and mpv plays it
+  from a local server (loopback, a token per session, no provider address
+  in it). The download goes on while paused, so LIVE is a jump, never a
+  reconnect, and nothing kept is lost; seeks inside what mpv holds are
+  mpv's own, further back the local stream opens at another segment. A
+  dropped provider connection is opened again by itself, and the gap is
+  skipped, never played across; when it gives up, the app's reconnect
+  takes over as before. One provider connection, as before - switching
+  channels closes it before the next opens - and the channel's history is
+  dropped then (the store is wiped at start and exit). Off by default, and
+  with it off live channels play exactly as before; ts only, m3u8 plays as
+  before. Measured: the window's event loop is no slower with it on.
+  Designed with Luca Merega in the issue that followed pull request #22;
+  history across channels and recording from the buffer are the next steps.
 - **Refresh the guide from the guide.** A ↻ button in the programme guide's
   window, and "Refresh guide now" in its right-click menu - on a channel
   without programmes and on an empty spot too - fetch the guide again and

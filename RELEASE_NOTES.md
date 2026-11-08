@@ -1,7 +1,13 @@
-## dopeIPTV 1.3.1
+## dopeIPTV 1.4.0
 
-The programme guide keeps itself up to date.
+Rewind with dopeIPTV's own buffer, and a programme guide that keeps itself
+up to date.
 
+- **Pause as long as you like (experimental).** Turn on **Settings →
+  Playback → Rewind with dopeIPTV's own buffer**: dopeIPTV keeps the channel
+  itself, on disk, and goes on downloading while you pause - so **LIVE**
+  takes you back to live without reconnecting, and you can go back as far
+  as you set, within the space you give it.
 - **The guide no longer stays on yesterday.** Left open overnight - or on
   a Mac that slept - the app kept yesterday's guide until it was started
   again. It now looks at the guide every 20 minutes and when you come back
@@ -11,6 +17,8 @@ The programme guide keeps itself up to date.
 - **A clearer note where the provider's guide ends.** When a channel's
   guide stops before now, the detail panel says so, instead of suggesting
   that the times were wrong.
+- **Refresh the guide from the guide.** A ↻ button in the programme guide,
+  and "Refresh guide now" when you right-click it.
 
 On the AppImage from 1.2.15 or later? Click **Update now** in the banner.
 Coming from an older version, what changed since is below - from 1.2.14
