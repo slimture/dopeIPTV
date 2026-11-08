@@ -70,6 +70,15 @@ date.
   the website never see them. The AppImage updates itself in place on
   either channel; it is checked every six hours on Test builds.
 
+- **The Intel (x86_64) macOS `.dmg` is back (experimental).** Gone since
+  1.2.11, because Homebrew stopped making packages for Intel Macs; it is
+  now built on the Intel runner with mpv (libmpv) and ffmpeg from
+  conda-forge, which still builds them. The release checks it as it does
+  the Apple Silicon one - with the conda environment moved out of reach
+  first, so a library the bundle still looked for there fails the build
+  and not on a Mac. If the Intel leg fails, the rest of the release still
+  goes out.
+
 ### Changed
 
 - **One bar for rewinding on a catch-up channel.** Watched live with the

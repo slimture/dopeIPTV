@@ -23,6 +23,8 @@ up to date.
   the DVR row and the timeshift timeline no longer lie one above the
   other: **DVR | TIMESHIFT** at the left of the bar switches between them,
   and the app remembers which you like.
+- **Intel Macs are back.** A `.dmg` for Intel (x86_64) Macs again,
+  beside the Apple Silicon one.
 - **Help test what is coming.** **Settings → General → Update channel →
   Test builds** offers the test builds of the next version as soon as
   they are built. They can have faults a release does not; back on

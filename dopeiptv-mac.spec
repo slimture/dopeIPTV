@@ -23,8 +23,10 @@ VERSION = os.environ.get("DOPEIPTV_VERSION", "0.0.0")
 
 
 def _find_ffmpeg():
-    exe = shutil.which("ffmpeg")
-    return [(exe, ".")] if exe else []
+    # DOPEIPTV_FFMPEG: the Intel build's ffmpeg from conda-forge, which is
+    # not on PATH (see release.yml).
+    exe = os.environ.get("DOPEIPTV_FFMPEG") or shutil.which("ffmpeg")
+    return [(exe, ".")] if exe and os.path.exists(exe) else []
 
 
 def _find_libmpv():
@@ -33,7 +35,13 @@ def _find_libmpv():
     the name is right regardless of the on-disk versioned name."""
     primary = "libmpv.2.dylib"
     prefer = ("libmpv.2.dylib", "libmpv.dylib")
-    patterns = [
+    patterns = []
+    # DOPEIPTV_LIBMPV_DIR: the Intel build's libmpv from conda-forge (see
+    # release.yml) - looked at first.
+    if os.environ.get("DOPEIPTV_LIBMPV_DIR"):
+        patterns.append(os.path.join(os.environ["DOPEIPTV_LIBMPV_DIR"],
+                                     "libmpv*.dylib"))
+    patterns += [
         "/opt/homebrew/lib/libmpv*.dylib",
         "/usr/local/lib/libmpv*.dylib",
         "/opt/homebrew/Cellar/mpv/*/lib/libmpv*.dylib",
@@ -61,6 +69,15 @@ def _find_libmpv():
         print("WARNING: libmpv not found; embedded playback will be dead.")
         return []
     real = os.path.realpath(chosen)
+    if os.environ.get("DOPEIPTV_LIBMPV_DIR") and \
+            os.path.basename(real) == primary:
+        # conda-forge's, already under the name python-mpv loads: bundle it
+        # from where it is, so its @loader_path rpath still finds its
+        # libraries for PyInstaller - a copy elsewhere would leave them all
+        # behind. (Homebrew's links its libraries by absolute path; it is
+        # staged as before.)
+        print(f"Bundling libmpv: {real}")
+        return [(real, ".")]
     staged = os.path.join(
         tempfile.mkdtemp(prefix="dopeiptv-libmpv-"), primary)
     shutil.copy2(real, staged)

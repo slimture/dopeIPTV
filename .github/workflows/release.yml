@@ -635,8 +635,8 @@ jobs:
             *.deb
 
   # -------------------------------------------------- macOS .app + .dmg ---
-  # Apple Silicon only (macos-15, arm64). The Intel half is gone - see the
-  # matrix below for why.
+  # Apple Silicon (macos-15, arm64) with Homebrew's mpv, and Intel
+  # (macos-15-intel, x86_64) with conda-forge's - see the matrix below.
   #
   # Nothing here sets a deployment target, so the minimum macOS a .dmg
   # supports follows the runner it was built on (Homebrew bottles are built
@@ -660,25 +660,28 @@ jobs:
           # from the release without anyone noticing.
           - runner: macos-15
             arch: arm64
+            deps: brew
+            experimental: false
           #
-          # THE INTEL .dmg IS GONE. It is not a runner problem this time -
-          # macos-15-intel is still there until Aug 2027 - it is the supply
-          # chain underneath it. Homebrew moved macOS x86_64 to Tier 3 in
-          # September 2026: no CI, no new bottles. "brew install mpv" now
-          # answers "no bottle available", and the same is coming for every
-          # dependency as its formula next updates (the failing run was
-          # already about to upgrade harfbuzz, little-cms2 and pkgconf).
-          # Building the chain from source on a Tier 3 machine is hours per
-          # build and breaks constantly, and pinning an old mpv only holds
-          # until the next dependency loses ITS bottle. Apple has said macOS
-          # Tahoe 26 is the last macOS for Intel and Homebrew stops running
-          # on Intel at all in September 2027, so this was ending either way.
-          # 1.2.10 is the last release with an Intel .dmg.
+          # Intel, back from conda-forge. Homebrew moved macOS x86_64 to
+          # Tier 3 in September 2026 - no CI, no new bottles: "brew install
+          # mpv" answers "no bottle available", which is why 1.2.11 dropped
+          # this .dmg. conda-forge still builds osx-64 packages, mpv 0.41
+          # with lib/libmpv.2.dylib among them, and ffmpeg: those go into an
+          # environment of their own (never on PATH - it has a Python of its
+          # own, which would shadow setup-python's), and the spec bundles
+          # libmpv and ffmpeg from there. macos-15-intel is there until Aug
+          # 2027; Apple has said Tahoe 26 is the last macOS for Intel.
+          - runner: macos-15-intel
+            arch: x86_64
+            deps: conda
+            experimental: true
     #
-    # NOT continue-on-error any more. It was here for the flaky Intel leg,
-    # and with that leg gone it only does harm: a broken arm64 build would
-    # go green and ship a release with no macOS download at all, which is
-    # precisely what happened to 1.2.8 and precisely what nobody noticed.
+    # Only the Intel leg may fail without failing the run. A blanket
+    # continue-on-error once let a broken arm64 build go green and ship a
+    # release with no macOS download at all (1.2.8), so arm64 is never
+    # experimental.
+    continue-on-error: ${{ matrix.experimental }}
     steps:
       - uses: actions/checkout@v5
       - name: Nightly version
@@ -742,6 +745,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: System deps (mpv, ffmpeg, create-dmg)
+        if: matrix.deps == 'brew'
         run: |
           brew update
           brew install mpv create-dmg
@@ -753,6 +757,26 @@ jobs:
           # overlay, which every build has. The check that followed went with
           # it - there is nothing left for it to guarantee.
           brew install ffmpeg
+      - name: System deps from conda-forge (Intel)
+        if: matrix.deps == 'conda'
+        run: |
+          # micromamba alone, into the runner's temp dir: an environment with
+          # conda-forge's mpv (libmpv.2.dylib) and ffmpeg. Not activated and
+          # not on PATH - the spec is told where they are.
+          MM="${RUNNER_TEMP}/mm"
+          mkdir -p "$MM"
+          curl -fsSL https://micro.mamba.pm/api/micromamba/osx-64/latest \
+            | tar -xj -C "$MM" bin/micromamba
+          ENVDIR="${RUNNER_TEMP}/mpvenv"
+          MAMBA_ROOT_PREFIX="$MM/root" "$MM/bin/micromamba" create -y \
+            -p "$ENVDIR" -c conda-forge --override-channels mpv ffmpeg
+          test -f "$ENVDIR/lib/libmpv.2.dylib"
+          test -x "$ENVDIR/bin/ffmpeg"
+          "$ENVDIR/bin/ffmpeg" -hide_banner -version | head -1
+          echo "DOPEIPTV_LIBMPV_DIR=$ENVDIR/lib" >> "$GITHUB_ENV"
+          echo "DOPEIPTV_FFMPEG=$ENVDIR/bin/ffmpeg" >> "$GITHUB_ENV"
+          # create-dmg is a shell script: a formula with nothing to bottle.
+          brew install create-dmg
       - name: Python build deps
         run: |
           python -m pip install --upgrade pip pyinstaller pyobjc-core
@@ -814,6 +838,11 @@ jobs:
           # icon file, and that hdiutil can actually mount the .dmg.
           V=${{ steps.v.outputs.version }}
           DMG="dopeIPTV-${V}-macOS-${{ matrix.arch }}.dmg"
+          # Intel: put the conda environment out of reach first, so a library
+          # the bundle still looks for there fails here and not on a Mac.
+          if [ -n "${DOPEIPTV_LIBMPV_DIR:-}" ]; then
+            mv "${RUNNER_TEMP}/mpvenv" "${RUNNER_TEMP}/mpvenv.hidden"
+          fi
           echo "::group::Mount and inspect $DMG"
           MOUNT=$(hdiutil attach -readonly -mountrandom /tmp "$DMG" | tail -1 | awk '{print $NF}')
           APP="$MOUNT/dopeIPTV.app"
@@ -837,7 +866,7 @@ jobs:
           echo "bundled libmpv: $MPV"
           # And its own dependencies must be bundled too, not left pointing
           # at Homebrew/Cellar paths that won't exist on a clean Mac.
-          if otool -L "$MPV" | grep -E '/opt/homebrew|/usr/local/(lib|Cellar)|/opt/local'; then
+          if otool -L "$MPV" | grep -E '/opt/homebrew|/usr/local/(lib|Cellar)|/opt/local|mpvenv'; then
             echo "::error::bundled libmpv still links against Homebrew paths - its deps aren't bundled; embedded player will fail on a machine without Homebrew"
             hdiutil detach "$MOUNT" || true; exit 1
           fi
