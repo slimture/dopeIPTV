@@ -183,23 +183,32 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     | ($n | contains("arm") or contains("aarch64")) as $arm
     | (if $arm then t("arch_arm") else t("arch_x86") end) as $cpu
     | (if $arm then t("arch_apple_arm") else t("arch_apple_intel") end) as $mac
+    | (if $arm then "ARM64" else "x64" end) as $code
     | if $n | endswith(".dmg") then
-        {os: "macOS", icon: "🍎", title: t("dl_t_dmg"), fmt: t("dl_f_dmg"), arch: $mac, rank: (if $arm then 10 else 12 end), rec: $arm}
+        {os: "macOS", icon: "🍎", title: t("dl_t_dmg"), fmt: t("dl_f_dmg"), arch: $mac, rank: (if $arm then 10 else 12 end), rec: $arm,
+         short: ".dmg", cpu: (if $arm then "Apple Silicon" else "Intel" end), req: (if $arm then "macOS 15+" else "macOS 14+" end)}
       elif $n | endswith(".pkg") then
-        {os: "macOS", icon: "🍎", title: t("dl_t_pkg"), fmt: t("dl_f_pkg"), arch: $mac, rank: (if $arm then 20 else 22 end), rec: false}
+        {os: "macOS", icon: "🍎", title: t("dl_t_pkg"), fmt: t("dl_f_pkg"), arch: $mac, rank: (if $arm then 20 else 22 end), rec: false,
+         short: ".pkg", cpu: (if $arm then "Apple Silicon" else "Intel" end)}
       elif ($n | endswith(".exe")) or ($n | endswith(".msi")) then
-        {os: "Windows", icon: "🪟", title: t("dl_t_exe"), fmt: t("dl_f_exe"), arch: $cpu, rank: (if $arm then 12 else 10 end), rec: ($arm | not)}
+        {os: "Windows", icon: "🪟", title: t("dl_t_exe"), fmt: t("dl_f_exe"), arch: $cpu, rank: (if $arm then 12 else 10 end), rec: ($arm | not),
+         short: (if $n | endswith(".msi") then ".msi" else ".exe" end), cpu: $code}
       elif ($n | endswith(".zip")) and ($n | contains("win")) then
-        {os: "Windows", icon: "🪟", title: t("dl_t_winzip"), fmt: t("dl_f_winzip"), arch: $cpu, rank: (if $arm then 22 else 20 end), rec: ($arm | not)}
+        {os: "Windows", icon: "🪟", title: t("dl_t_winzip"), fmt: t("dl_f_winzip"), arch: $cpu, rank: (if $arm then 22 else 20 end), rec: ($arm | not),
+         short: ".zip", cpu: $code}
       elif $n | endswith(".appimage") then
-        {os: "Linux", icon: "🐧", title: t("dl_t_appimage"), fmt: t("dl_f_appimage"), arch: $cpu, rank: (if $arm then 12 else 10 end), rec: ($arm | not)}
+        {os: "Linux", icon: "🐧", title: t("dl_t_appimage"), fmt: t("dl_f_appimage"), arch: $cpu, rank: (if $arm then 12 else 10 end), rec: ($arm | not),
+         short: "AppImage", cpu: $code}
       elif $n | endswith(".deb") then
-        {os: "Linux", icon: "🐧", title: t("dl_t_deb"), fmt: t("dl_f_deb"), arch: $cpu, rank: (if $arm then 22 else 20 end), rec: false}
+        {os: "Linux", icon: "🐧", title: t("dl_t_deb"), fmt: t("dl_f_deb"), arch: $cpu, rank: (if $arm then 22 else 20 end), rec: false,
+         short: ".deb", cpu: $code}
       elif $n | endswith(".rpm") then
-        {os: "Linux", icon: "🐧", title: t("dl_t_rpm"), fmt: t("dl_f_rpm"), arch: $cpu, rank: 30, rec: false}
+        {os: "Linux", icon: "🐧", title: t("dl_t_rpm"), fmt: t("dl_f_rpm"), arch: $cpu, rank: 30, rec: false,
+         short: ".rpm", cpu: $code}
       elif $n | endswith(".flatpak") then
-        {os: "Linux", icon: "📦", title: t("dl_t_flatpak"), fmt: t("dl_f_flatpak"), arch: t("arch_universal"), rank: 40, rec: false}
-      else {os: "Other", icon: "📦", title: $name, fmt: "", arch: "", rank: 99, rec: false}
+        {os: "Linux", icon: "📦", title: t("dl_t_flatpak"), fmt: t("dl_f_flatpak"), arch: t("arch_universal"), rank: 40, rec: false,
+         short: "Flatpak", cpu: ""}
+      else {os: "Other", icon: "📦", title: $name, fmt: "", arch: "", rank: 99, rec: false, short: $name, cpu: ""}
       end;
   def dl_n($name): ($D[$name] // 0) | if type == "number" then floor else (tonumber? // 0) end;
   def dl_total: [$D[] | if type == "number" then floor else (tonumber? // 0) end] | add // 0;
@@ -209,7 +218,15 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
       | (capture("(?<s>[0-9.]+[ \\t\\n\\x0B\\f\\r]?(?:KB|MB|GB|B))[ \\t\\n\\x0B\\f\\r]*$"; "i").s // ""));
   def dl_href: ((.name // "" | tostring) as $name
       | (if $name != "" then "/dl.php?f=" + ($name | @uri) else (.url // "#") end));
-  def dl_sha: (if (.sha256 | truthy) then " title=\"SHA-256: \(.sha256 | h)\"" else "" end);
+  # Everything about a file that has no room on the page, for its tooltip.
+  def dl_title:
+    (._m as $m
+     | dl_n(.name // "" | tostring) as $n
+     | [$m.title, $m.arch, dl_size,
+        (if $n > 0 then "↓ \(fmt_count($n)) \(t("dl_tip_row"))" else empty end),
+        (if (.sha256 | truthy) then "SHA-256: \(.sha256)" else empty end)]
+     | map(select(type == "string" and . != "")) | join(" · ")
+     | " title=\"\(h)\"");
   def dl_icon:
     "<svg class=\"dlx-svg\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 4v12M6 11l6 6 6-6M5 20h14\"/></svg>";
   def dl_github:
@@ -219,63 +236,57 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     + "          <span class=\"go\">\(t("dl_open") | h)</span>\n"
     + "        </a>\n"
     + "      </div>\n";
-  # A tab per system (radio buttons and CSS: no script needed - app.js only
-  # picks the visitor's system). In each: the file most people want, big;
-  # every file of that system in a row of its own; how to install, folded.
+  # A card per system, side by side, each with one thing to press - on a
+  # Mac two, since a browser cannot tell Apple Silicon from Intel. The other
+  # formats wait folded below. app.js marks the visitor's own system;
+  # without it the three cards are equal.
+  def dl_chip:
+    (dl_size) as $sz
+    | "<a class=\"dlx-chip\" href=\"\(dl_href | h)\" rel=\"nofollow\"\(dl_title)><b>\(._m.short | h)</b>\(if ._m.cpu != "" then " <span>\(._m.cpu | h)</span>" else "" end)\(if $sz != "" then " <i>\($sz | h)</i>" else "" end)</a>";
   def downloads($version; $reldate):
     ($R.assets // []) as $assets
     | ($assets | map(. + {_m: dl_meta(.name // "" | tostring)})) as $A
-    | {"Linux": t("os_install_linux"), "macOS": t("os_install_macos"), "Windows": t("os_install_windows")} as $install
     | {"Linux": "linux", "macOS": "macos", "Windows": "windows"} as $ids
     | [("Linux", "macOS", "Windows") as $os
        | ($A | map(select(._m.os == $os)) | sort_by(._m.rank)) as $g
        | select($g | length > 0)
-       | {os: $os, id: $ids[$os], g: $g}] as $groups
+       | ($g | map(select(._m.short == ".dmg"))) as $dmg
+       | (if $os == "macOS" and ($dmg | length) > 0 then $dmg
+          else ($g | map(select(._m.rec)) | .[:1]) end) as $hero
+       | (if ($hero | length) == 0 then $g[:1] else $hero end) as $hero
+       | [$hero[] | .name] as $heronames
+       | {os: $os, id: $ids[$os], g: $g, hero: $hero,
+          rest: ($g | map(select(.name as $nm | $heronames | any(. == $nm) | not)))}] as $groups
     | (t("dl_go") | sub("[[:space:]]*[→←][[:space:]]*$"; "")) as $btn
+    | ([$groups[] | select(.rest | length > 0)]) as $others
     | if ($groups | length) == 0 then dl_github else
-        "      <div class=\"dlx\" data-copy=\"\(t("dl_copy") | h)\" data-copied=\"\(t("dl_copied") | h)\">\n"
-        + ([$groups | to_entries[] | .key as $i | .value
-            | "        <input type=\"radio\" name=\"dlos\" class=\"dlx-pick\" id=\"dlos-\(.id)\"\(if $i == 0 then " checked" else "" end)>\n"] | add)
-        + "        <div class=\"dlx-tabs\">\n"
-        + ([$groups[] | "          <label class=\"dlx-tab\" for=\"dlos-\(.id)\"><span aria-hidden=\"true\">\(.g[0]._m.icon | h)</span> \(.os | h)</label>\n"] | add)
-        + "        </div>\n"
+        "      <div class=\"dlx\">\n"
+        + "        <div class=\"dlx-cards\">\n"
         + ([$groups[] | . as $grp
-            # The big button: the recommended file - on a Mac both disk
-            # images, since a browser cannot tell Apple Silicon from Intel.
-            | (if $grp.os == "macOS"
-               then ($grp.g | map(select(.name // "" | tostring | ascii_downcase | endswith(".dmg"))))
-               else ($grp.g | map(select(._m.rec)) | .[:1]) end) as $hero
-            | (if ($hero | length) == 0 then $grp.g[:1] else $hero end) as $hero
-            | "        <div class=\"dlx-panel\" data-os=\"\($grp.id)\">\n"
-              + "          <div class=\"dlx-hero\">\n"
-              + "            <div class=\"dlx-ico\" aria-hidden=\"true\">\($grp.g[0]._m.icon | h)</div>\n"
-              + "            <div class=\"dlx-what\">\n"
-              + "              <h3>\($grp.os | h)</h3>\n"
-              + "              <p>\(if $grp.os == "macOS" then t("os_help_macos") else ($hero[0]._m | "\(.title | h) · \(.arch | h) · \(.fmt)") end)</p>\n"
-              + "            </div>\n"
+            | (($grp.hero | length) > 1) as $many
+            | $grp.hero[0]._m as $m
+            | "          <article class=\"dlx-card\" data-os=\"\($grp.id)\">\n"
+              + "            <span class=\"badge dlx-yours\">\(t("dl_yours") | h)</span>\n"
+              + "            <span class=\"dlx-ico\" aria-hidden=\"true\">\($grp.g[0]._m.icon | h)</span>\n"
+              + "            <h3>\($grp.os | h)</h3>\n"
+              + "            <p class=\"dlx-sub\">\($m.fmt)</p>\n"
               + "            <div class=\"dlx-btns\">\n"
-              + ([$hero | to_entries[] | .key as $k | .value
-                  | "              <a class=\"dlx-big\(if $k > 0 then " alt" else "" end)\" href=\"\(dl_href | h)\" rel=\"nofollow\"\(dl_sha)>\(dl_icon)<span>\(if ($hero | length) > 1 then (._m.arch | h) else ($btn | h) end)</span><small>\(dl_size | h)</small></a>\n"] | add)
+              + ([$grp.hero | to_entries[] | .key as $k | .value
+                  | "              <a class=\"dlx-big\(if $k > 0 then " alt" else "" end)\" href=\"\(dl_href | h)\" rel=\"nofollow\"\(dl_title)>\(dl_icon)<span>\(if $many then (._m.cpu | h) else ($btn | h) end)</span>\(if $many and (._m.req // "") != "" then "<small>\(._m.req | h)</small>" else "" end)</a>\n"] | add)
               + "            </div>\n"
-              + "          </div>\n"
-              + "          <div class=\"dlx-rows\">\n"
-              + ([$grp.g[] | ._m as $m
-                  | dl_n(.name // "" | tostring) as $n
-                  | "            <a class=\"dlx-row\" href=\"\(dl_href | h)\" rel=\"nofollow\"\(dl_sha)>\n"
-                    + "              <span class=\"dlx-fmt\"><b>\($m.title | h)</b>\(if $m.rec then " <span class=\"badge\">\(t("dl_recommended") | h)</span>" else "" end) <span class=\"dlx-note\">\($m.fmt)</span></span>\n"
-                    + "              <span class=\"dlx-arch\">\($m.arch | h)</span>\n"
-                    + "              <span class=\"dlx-size\">\(dl_size | h)\(if $n > 0 then " · <span class=\"dl-count\" title=\"\(t("dl_tip_row") | h)\">↓ \(fmt_count($n) | h)</span>" else "" end)</span>\n"
-                    + "              <span class=\"dlx-get\">\(dl_icon)</span>\n"
-                    + "            </a>\n"] | add)
-              + "          </div>\n"
-              + (if ($install[$grp.os] | truthy) then
-                   "          <details class=\"dlx-how\">\n"
-                   + "            <summary>\(t("dl_how") | h)</summary>\n"
-                   + "            <p>\($install[$grp.os])</p>\n"
-                   + "          </details>\n"
-                 else "" end)
-              + "        </div>\n"] | add)
-        + "        <p class=\"dlx-more\"><a href=\"\($REPO | h)/releases/latest\" rel=\"nofollow\">\(t("dl_all_name") | h)</a></p>\n"
+              + "            <p class=\"dlx-meta\">\(if $many then (t("dl_which_mac") | h) else ([$m.title, $m.arch, ($grp.hero[0] | dl_size)] | map(select(. != "")) | map(h) | join(" · ")) end)</p>\n"
+              + "            <a class=\"dlx-how\" href=\"/help/#start-\($grp.id)\">\(t("dl_how") | h)</a>\n"
+              + "          </article>\n"] | add)
+        + "        </div>\n"
+        + "        <div class=\"dlx-foot\">\n"
+        + (if ($others | length) > 0 then
+             "          <details class=\"dlx-more\">\n"
+             + "            <summary>\(t("dl_other") | h)</summary>\n"
+             + ([$others[] | "            <div class=\"dlx-other\"><span class=\"dlx-other-os\">\(.os | h)</span><span class=\"dlx-chips\">\([.rest[] | dl_chip] | join(" "))</span></div>\n"] | add)
+             + "          </details>\n"
+           else "" end)
+        + "          <a class=\"dlx-gh\" href=\"\($REPO | h)/releases/latest\" rel=\"nofollow\">\(t("dl_all_name") | h)</a>\n"
+        + "        </div>\n"
         + "      </div>\n"
       end;
   def shots:

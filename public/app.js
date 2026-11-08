@@ -15,33 +15,13 @@
   var btn = document.getElementById("heroDownload");
   var fmt = btn && btn.getAttribute("data-os-label");
   if (fmt) { btn.textContent = fmt.replace("%s", os); }
-  // The downloads open on this system's tab (without script: the first).
-  var pick = document.getElementById("dlos-" + os.toLowerCase());
-  if (pick) { pick.checked = true; }
-})();
-
-/* A copy button beside each command in the install notes. */
-(function () {
-  "use strict";
-  var box = document.querySelector(".dlx");
-  if (!box || !navigator.clipboard) { return; }
-  var label = box.getAttribute("data-copy") || "Copy";
-  var done = box.getAttribute("data-copied") || "Copied";
-  box.querySelectorAll(".dlx-how code").forEach(function (code) {
-    var text = code.textContent || "";
-    if (text.indexOf(" ") < 0) { return; }       // a file name, not a command
-    var b = document.createElement("button");
-    b.type = "button";
-    b.className = "dlx-copy";
-    b.textContent = label;
-    b.addEventListener("click", function () {
-      navigator.clipboard.writeText(text).then(function () {
-        b.textContent = done;
-        setTimeout(function () { b.textContent = label; }, 1600);
-      }, function () {});
-    });
-    code.insertAdjacentElement("afterend", b);
-  });
+  // This system's download card stands out (without script: three equal).
+  var card = document.querySelector('.dlx-card[data-os="' + os.toLowerCase() + '"]');
+  var box = card && card.closest(".dlx");
+  if (box) {
+    card.classList.add("is-mine");
+    box.classList.add("has-mine");
+  }
 })();
 
 /* Screenshot lightbox: click a screenshot to open it full-size. Built with DOM

@@ -182,86 +182,62 @@ h2 { font-size: clamp(1.7rem, 3.6vw, 2.3rem); letter-spacing: -.02em; margin: 0;
   background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 999px; padding: 1px 7px; }
 .dl .go { margin-left: auto; color: var(--accent); font-weight: 600; font-size: 14px; white-space: nowrap; }
 .dl .meta .sub .dl-count { color: var(--faint); font-variant-numeric: tabular-nums; }
-/* Downloads: a tab per system (radio buttons, no script needed), the file
-   most people want big, the rest in compact rows, how to install folded. */
-.dlx { position: relative; }
-.dlx-pick { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
-.dlx-tabs { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; margin-bottom: 16px;
-  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
-.dlx-tab { padding: 8px 18px; border-radius: 9px; font-size: 14px; font-weight: 600; color: var(--muted);
-  cursor: pointer; display: inline-flex; align-items: center; gap: 8px; user-select: none;
-  transition: color .15s ease, background .15s ease; }
-.dlx-tab:hover { color: var(--text); }
-#dlos-linux:checked ~ .dlx-tabs [for="dlos-linux"],
-#dlos-macos:checked ~ .dlx-tabs [for="dlos-macos"],
-#dlos-windows:checked ~ .dlx-tabs [for="dlos-windows"] {
-  background: var(--surface-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-2); }
-#dlos-linux:focus-visible ~ .dlx-tabs [for="dlos-linux"],
-#dlos-macos:focus-visible ~ .dlx-tabs [for="dlos-macos"],
-#dlos-windows:focus-visible ~ .dlx-tabs [for="dlos-windows"] { outline: 2px solid var(--accent); outline-offset: 2px; }
-.dlx-panel { display: none; }
-#dlos-linux:checked ~ [data-os="linux"],
-#dlos-macos:checked ~ [data-os="macos"],
-#dlos-windows:checked ~ [data-os="windows"] { display: block; }
+/* Downloads: a card per system side by side, each with one thing to press;
+   the other formats folded below. app.js marks the visitor's own card
+   (.is-mine) and quiets the others' buttons. */
+.dlx-cards { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 16px; }
+.dlx-card { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center;
+  min-width: 0; padding: 28px 22px 20px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 18px; transition: border-color .2s ease; }
+.dlx-card.is-mine { border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 9%, var(--surface)), var(--surface) 60%); }
+.dlx-yours { display: none; position: absolute; top: 14px; inset-inline-end: 14px; }
+.dlx-card.is-mine .dlx-yours { display: inline-block; }
+.dlx-ico { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; font-size: 30px;
+  background: var(--surface-2); border: 1px solid var(--line-2); }
+.dlx-card h3 { margin: 14px 0 0; font-size: 20px; font-weight: 700; }
+.dlx-sub { margin: 4px 0 18px; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
 .dlx-svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor;
   stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
-.dlx-hero { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 20px; align-items: center;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 13%, var(--surface)), var(--surface) 62%);
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 18px; padding: 22px 24px; }
-.dlx-ico { width: 60px; height: 60px; border-radius: 15px; display: grid; place-items: center; font-size: 30px;
-  background: var(--surface-2); border: 1px solid var(--line-2); }
-.dlx-what h3 { margin: 0; font-size: 21px; }
-.dlx-what p { margin: 4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
-.dlx-btns { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
-.dlx-big { display: inline-flex; align-items: center; gap: 10px; background: var(--accent); color: var(--accent-ink);
-  font-weight: 700; font-size: 15px; padding: 13px 20px; border-radius: 12px; white-space: nowrap;
-  transition: background .15s ease; }
+.dlx-btns { align-self: stretch; display: flex; flex-direction: column; gap: 8px; }
+.dlx-big { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 13px 16px; border-radius: 12px;
+  background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 15px;
+  transition: background .15s ease, box-shadow .15s ease, color .15s ease; }
+.dlx-big span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dlx-big small { direction: ltr; unicode-bidi: isolate; font-weight: 600; opacity: .7; font-size: 12px; white-space: nowrap; }
 .dlx-big:hover { background: color-mix(in srgb, var(--accent) 88%, #fff); }
-.dlx-big small { font-weight: 600; opacity: .72; font-size: 12.5px; font-variant-numeric: tabular-nums; }
-.dlx-big.alt { background: var(--surface-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-2); }
-.dlx-big.alt:hover { box-shadow: inset 0 0 0 1px var(--accent); background: var(--surface-2); }
-.dlx-rows { margin-top: 14px; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
-  background: var(--surface); }
-.dlx-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 16px; align-items: center;
-  padding: 12px 18px; border-top: 1px solid var(--line); transition: background .15s ease; }
-.dlx-row:first-child { border-top: 0; }
-.dlx-row:hover { background: var(--surface-2); }
-.dlx-fmt { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
-.dlx-fmt b { font-weight: 650; }
-.dlx-note { color: var(--faint); font-size: 13px; }
-.dlx-arch { font-family: var(--mono); font-size: 12px; background: var(--surface-2); border: 1px solid var(--line-2);
-  border-radius: 7px; padding: 3px 9px; white-space: nowrap; }
-.dlx-size { font-family: var(--mono); font-size: 12.5px; color: var(--muted); white-space: nowrap;
-  font-variant-numeric: tabular-nums; min-width: 9ch; text-align: end; }
-.dlx-size .dl-count { color: var(--faint); }
-.dlx-get { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center;
-  border: 1px solid var(--line-2); color: var(--accent); transition: all .15s ease; }
-.dlx-row:hover .dlx-get { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.dlx-how { margin-top: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface);
-  padding: 12px 18px; }
-.dlx-how summary { cursor: pointer; font-weight: 600; font-size: 14px; }
-.dlx-how p { margin: 10px 0 2px; font-size: 13.5px; color: var(--muted); line-height: 1.8; }
-.dlx-how p b { color: var(--text); }
-.dlx-how code { font-family: var(--mono); font-size: 12.5px; background: var(--ink); border: 1px solid var(--line);
-  border-radius: 6px; padding: 2px 7px; color: var(--text); overflow-wrap: anywhere; }
-.dlx-copy { font: inherit; font-size: 11.5px; margin-inline-start: 6px; padding: 1px 8px; cursor: pointer;
-  color: var(--muted); background: transparent; border: 1px solid var(--line-2); border-radius: 6px; }
-.dlx-copy:hover { color: var(--accent); border-color: var(--accent); }
-.dlx-more { margin: 14px 0 0; font-size: 13px; }
-.dlx-more a { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
-.dlx-more a:hover { color: var(--accent); }
-@media (max-width: 720px) {
-  .dlx-tabs { display: flex; width: 100%; flex-wrap: nowrap; }
-  .dlx-tab { flex: 1 1 0; justify-content: center; padding: 8px 6px; gap: 6px; }
-  .dlx-note { display: none; }
-  .dlx-hero { grid-template-columns: auto minmax(0, 1fr); padding: 18px; }
-  .dlx-btns { grid-column: 1 / -1; justify-content: stretch; }
-  .dlx-big { flex: 1; justify-content: center; }
-  .dlx-row { grid-template-columns: auto auto minmax(0, 1fr) auto; gap: 6px 10px; }
-  .dlx-fmt { grid-column: 1 / 4; }
-  .dlx-arch { grid-row: 2; grid-column: 1; }
-  .dlx-size { grid-row: 2; grid-column: 2; text-align: start; min-width: 0; }
-  .dlx-get { grid-row: 1 / span 2; grid-column: 4; }
+.dlx-big.alt, .dlx.has-mine .dlx-card:not(.is-mine) .dlx-big {
+  background: var(--surface-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-2); }
+.dlx-big.alt:hover, .dlx.has-mine .dlx-card:not(.is-mine) .dlx-big:hover {
+  background: var(--surface-2); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.dlx-meta { margin: 10px 0 0; font-size: 12.5px; color: var(--faint); line-height: 1.5; }
+.dlx-how { margin-top: auto; padding-top: 16px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.dlx-how::after { content: " \2192"; }
+[dir="rtl"] .dlx-how::after { content: " \2190"; }
+.dlx-how:hover { color: var(--accent); }
+.dlx-foot { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px 24px;
+  margin-top: 16px; font-size: 13px; }
+.dlx-more { flex: 1 1 auto; }
+.dlx-more summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  color: var(--muted); font-weight: 600; }
+.dlx-more summary::-webkit-details-marker { display: none; }
+.dlx-more summary::after { content: "\25BE"; font-size: 11px; transition: transform .15s ease; }
+.dlx-more[open] summary::after { transform: rotate(180deg); }
+.dlx-more summary:hover { color: var(--text); }
+.dlx-other { display: flex; align-items: baseline; gap: 12px; margin-top: 10px; }
+.dlx-other-os { flex: none; min-width: 64px; color: var(--faint); font-size: 12.5px; }
+.dlx-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.dlx-chip { direction: ltr; display: inline-flex; align-items: baseline; gap: 6px; padding: 4px 10px; border-radius: 8px;
+  font-size: 13px; border: 1px solid var(--line-2); color: var(--text); transition: border-color .15s ease, color .15s ease; }
+.dlx-chip b { font-weight: 600; }
+.dlx-chip span { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.dlx-chip i { font-style: normal; font-size: 11.5px; color: var(--faint); }
+.dlx-chip:hover { border-color: var(--accent); color: var(--accent); }
+.dlx-gh { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+.dlx-gh:hover { color: var(--accent); }
+@media (max-width: 860px) {
+  .dlx-cards { grid-auto-flow: row; grid-template-columns: minmax(0, 1fr); }
+  .dlx-card.is-mine { order: -1; }
 }
 .autonote { margin-top: 18px; font-size: 13px; color: var(--faint); line-height: 1.75; }
 .autonote code { font-family: var(--mono); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; color: var(--muted); overflow-wrap: anywhere; }
@@ -407,20 +383,38 @@ footer nav a:hover { color: var(--accent); }
 .mb0 { margin-bottom: 0; }
 
 /* ---- FAQ (accordion; feeds the FAQPage structured data) ----------------- */
-.faq { display: flex; flex-direction: column; gap: 10px; max-width: 840px; }
-.faq-item { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+/* The heading beside the questions, the questions as a list between thin
+   lines - not a stack of full-width boxes. */
+.faq-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 56px; align-items: start; }
+.faq-grid .sec-head { position: sticky; top: 96px; margin-bottom: 0; }
+.faq-grid .sec-head p { font-size: 15px; line-height: 1.65; }
+.faq-help { margin-top: 20px; }
+.faq-help::after { content: "\2192"; }
+[dir="rtl"] .faq-help::after { content: "\2190"; }
+.faq { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.faq-item { border-bottom: 1px solid var(--line); }
 .faq-item summary {
   list-style: none; cursor: pointer; font-weight: 600; color: var(--text);
-  padding: 15px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 18px 0; display: flex; align-items: center; justify-content: space-between; gap: 18px;
 }
 .faq-item summary::-webkit-details-marker { display: none; }
-.faq-item .faq-q { margin: 0; font: inherit; color: inherit; }
+.faq-item .faq-q { margin: 0; font: inherit; font-size: 16px; color: inherit; }
 .faq-item summary::after {
-  content: "+"; color: var(--accent); font-size: 20px; line-height: 1; flex: none;
+  content: "+"; flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+  border: 1px solid var(--line-2); color: var(--accent); font-size: 17px; line-height: 1;
+  transition: transform .2s ease, border-color .2s ease, background .2s ease;
 }
-.faq-item[open] summary::after { content: "\2212"; }
+.faq-item[open] summary::after { transform: rotate(45deg); border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .faq-item summary:hover { color: var(--accent); }
-.faq-item p { margin: 0 18px 16px; color: var(--muted); line-height: 1.65; max-width: 72ch; }
+.faq-item summary:hover::after { border-color: var(--accent); }
+.faq-item p { margin-block: -4px 20px; margin-inline: 0 46px; color: var(--muted); line-height: 1.7; max-width: 68ch; }
+@media (prefers-reduced-motion: reduce) { .faq-item summary::after { transition: none; } }
+@media (max-width: 860px) {
+  .faq-grid { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .faq-grid .sec-head { position: static; }
+  .faq-item p { margin-inline-end: 0; }
+}
 
 /* ---- Release notes ("What's new") -------------------------------------- */
 /* Rendered server-side from releases.json by render_notes(). Reads as a
