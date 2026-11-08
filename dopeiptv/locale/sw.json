@@ -972,7 +972,7 @@
   "detail_now": "SASA",
   "detail_unknown_programme": "Kipindi kisichojulikana",
   "detail_next_at": "Kinachofuata: {title} saa {time}",
-  "detail_epg_times_wrong": "Nyakati za ratiba ya seva zinaonekana si sahihi — maingizo ya hivi karibuni yanaonyeshwa hata hivyo.",
+  "detail_epg_times_wrong": "Mwongozo wa mtoa huduma kwa chaneli hii unaishia kabla ya sasa – hivi ndivyo vipindi vya mwisho ndani yake.",
   "epg_now_prefix": "Sasa: {title}",
   "player_timeshift": "TIMESHIFT",
   "player_track_n": "Wimbo {n}",

@@ -972,7 +972,7 @@
   "detail_now": "СЕЙЧАС",
   "detail_unknown_programme": "Неизвестная передача",
   "detail_next_at": "Далее: {title} в {time}",
-  "detail_epg_times_wrong": "Время в расписании сервера выглядит неверным - всё равно показаны последние записи.",
+  "detail_epg_times_wrong": "Телегид провайдера для этого канала заканчивается раньше текущего момента — вот последние передачи в нём.",
   "epg_now_prefix": "Сейчас: {title}",
   "player_timeshift": "СДВИГ ВРЕМЕНИ",
   "player_track_n": "Дорожка {n}",

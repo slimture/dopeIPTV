@@ -972,7 +972,7 @@
   "detail_now": "TERAZ",
   "detail_unknown_programme": "Nieznany program",
   "detail_next_at": "Następnie: {title} o {time}",
-  "detail_epg_times_wrong": "Godziny w ramówce serwera wyglądają na błędne — mimo to pokazujemy najnowsze pozycje.",
+  "detail_epg_times_wrong": "Przewodnik dostawcy dla tego kanału kończy się przed chwilą obecną – oto ostatnie programy, jakie zawiera.",
   "epg_now_prefix": "Teraz: {title}",
   "player_timeshift": "TIMESHIFT",
   "player_track_n": "Ścieżka {n}",

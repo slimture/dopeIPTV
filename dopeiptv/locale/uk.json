@@ -972,7 +972,7 @@
   "detail_now": "ЗАРАЗ",
   "detail_unknown_programme": "Невідома програма",
   "detail_next_at": "Далі: {title} о {time}",
-  "detail_epg_times_wrong": "Час у розкладі сервера виглядає неправильним — усе одно показано останні записи.",
+  "detail_epg_times_wrong": "Телегід провайдера для цього каналу закінчується раніше за поточний момент — ось останні передачі в ньому.",
   "epg_now_prefix": "Зараз: {title}",
   "player_timeshift": "ТАЙМШИФТ",
   "player_track_n": "Доріжка {n}",

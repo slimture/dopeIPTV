@@ -972,7 +972,7 @@
   "detail_now": "अभी",
   "detail_unknown_programme": "अज्ञात कार्यक्रम",
   "detail_next_at": "आगे: {title} {time} बजे",
-  "detail_epg_times_wrong": "सर्वर के शेड्यूल का समय गलत लगता है — फिर भी सबसे हाल की प्रविष्टियाँ दिखाई जा रही हैं।",
+  "detail_epg_times_wrong": "इस चैनल के लिए प्रदाता की गाइड अभी से पहले ख़त्म हो जाती है – ये उसमें मौजूद आख़िरी कार्यक्रम हैं।",
   "epg_now_prefix": "अभी: {title}",
   "player_timeshift": "टाइमशिफ्ट",
   "player_track_n": "ट्रैक {n}",

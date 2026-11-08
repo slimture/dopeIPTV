@@ -972,7 +972,7 @@
   "detail_now": "放送中",
   "detail_unknown_programme": "不明な番組",
   "detail_next_at": "次：{time}から{title}",
-  "detail_epg_times_wrong": "サーバーの番組時刻が正しくないようです — 最新の項目をそのまま表示しています。",
+  "detail_epg_times_wrong": "このチャンネルのプロバイダーの番組表は現在より前で終わっています。以下は番組表にある最後の番組です。",
   "epg_now_prefix": "放送中：{title}",
   "player_timeshift": "タイムシフト",
   "player_track_n": "トラック{n}",

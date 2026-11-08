@@ -972,7 +972,7 @@
   "detail_now": "NU",
   "detail_unknown_programme": "Onbekend programma",
   "detail_next_at": "Hierna: {title} om {time}",
-  "detail_epg_times_wrong": "De programmatijden van de server lijken niet te kloppen – de meest recente items worden toch getoond.",
+  "detail_epg_times_wrong": "De gids van de aanbieder houdt voor deze zender op vóór nu – dit zijn de laatste programma's erin.",
   "epg_now_prefix": "Nu: {title}",
   "player_timeshift": "TIMESHIFT",
   "player_track_n": "Spoor {n}",

@@ -1013,7 +1013,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "detail_now": {"en": "NOW"},
     "detail_unknown_programme": {"en": "Unknown programme"},
     "detail_next_at": {"en": "Next: {title} at {time}"},
-    "detail_epg_times_wrong": {"en": "The server's schedule times look wrong - showing the most recent entries anyway."},
+    "detail_epg_times_wrong": {"en": "The provider's guide for this channel ends before now - these are the last programmes in it."},
     "epg_now_prefix": {"en": "Now: {title}"},
     "player_timeshift": {"en": "TIMESHIFT"},
     "player_track_n": {"en": "Track {n}"},

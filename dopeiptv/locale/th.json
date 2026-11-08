@@ -972,7 +972,7 @@
   "detail_now": "กำลังฉาย",
   "detail_unknown_programme": "รายการที่ไม่รู้จัก",
   "detail_next_at": "ถัดไป: {title} เวลา {time}",
-  "detail_epg_times_wrong": "เวลาในผังรายการของเซิร์ฟเวอร์ดูไม่ถูกต้อง — แต่ยังแสดงรายการล่าสุดให้",
+  "detail_epg_times_wrong": "คู่มือรายการของผู้ให้บริการสำหรับช่องนี้สิ้นสุดก่อนเวลาปัจจุบัน – นี่คือรายการสุดท้ายที่มี",
   "epg_now_prefix": "ตอนนี้: {title}",
   "player_timeshift": "ย้อนเวลา",
   "player_track_n": "แทร็ก {n}",

@@ -972,7 +972,7 @@
   "detail_now": "NU",
   "detail_unknown_programme": "Okänt program",
   "detail_next_at": "Härnäst: {title} kl. {time}",
-  "detail_epg_times_wrong": "Serverns programtider verkar fel – visar de senaste posterna ändå.",
+  "detail_epg_times_wrong": "Leverantörens guide för den här kanalen tar slut före nu – det här är de sista programmen i den.",
   "epg_now_prefix": "Nu: {title}",
   "player_timeshift": "TIMESHIFT",
   "player_track_n": "Spår {n}",

@@ -972,7 +972,7 @@
   "detail_now": "الآن",
   "detail_unknown_programme": "برنامج غير معروف",
   "detail_next_at": "التالي: {title} في {time}",
-  "detail_epg_times_wrong": "تبدو أوقات جدول الخادم خاطئة — تُعرض أحدث الإدخالات على أي حال.",
+  "detail_epg_times_wrong": "ينتهي دليل المزوّد لهذه القناة قبل الوقت الحالي – هذه آخر البرامج فيه.",
   "epg_now_prefix": "الآن: {title}",
   "player_timeshift": "إزاحة زمنية",
   "player_track_n": "المسار {n}",

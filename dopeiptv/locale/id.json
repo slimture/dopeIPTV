@@ -972,7 +972,7 @@
   "detail_now": "SEKARANG",
   "detail_unknown_programme": "Acara tidak dikenal",
   "detail_next_at": "Berikutnya: {title} pukul {time}",
-  "detail_epg_times_wrong": "Waktu jadwal dari server tampaknya salah — entri terbaru tetap ditampilkan.",
+  "detail_epg_times_wrong": "Panduan penyedia untuk saluran ini berakhir sebelum saat ini – ini adalah acara terakhir di dalamnya.",
   "epg_now_prefix": "Sekarang: {title}",
   "player_timeshift": "TIMESHIFT",
   "player_track_n": "Trek {n}",

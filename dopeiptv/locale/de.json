@@ -972,7 +972,7 @@
   "detail_now": "JETZT",
   "detail_unknown_programme": "Unbekannte Sendung",
   "detail_next_at": "Danach: {title} um {time}",
-  "detail_epg_times_wrong": "Die Sendezeiten des Servers scheinen falsch – die neuesten Einträge werden trotzdem gezeigt.",
+  "detail_epg_times_wrong": "Die Programmübersicht des Anbieters endet für diesen Sender vor jetzt – das sind die letzten Sendungen darin.",
   "epg_now_prefix": "Jetzt: {title}",
   "player_timeshift": "TIMESHIFT",
   "player_track_n": "Spur {n}",

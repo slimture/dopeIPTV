@@ -972,7 +972,7 @@
   "detail_now": "ŞİMDİ",
   "detail_unknown_programme": "Bilinmeyen program",
   "detail_next_at": "Sıradaki: {title}, saat {time}",
-  "detail_epg_times_wrong": "Sunucunun program saatleri hatalı görünüyor — yine de en son girdiler gösteriliyor.",
+  "detail_epg_times_wrong": "Sağlayıcının bu kanal için rehberi şu andan önce bitiyor – içindeki son programlar bunlar.",
   "epg_now_prefix": "Şimdi: {title}",
   "player_timeshift": "ZAMAN KAYDIRMA",
   "player_track_n": "Parça {n}",

@@ -972,7 +972,7 @@
   "detail_now": "SADA",
   "detail_unknown_programme": "Nepoznata emisija",
   "detail_next_at": "Sljedeće: {title} u {time}",
-  "detail_epg_times_wrong": "Vremena u rasporedu poslužitelja izgledaju pogrešno — svejedno se prikazuju najnoviji unosi.",
+  "detail_epg_times_wrong": "Vodič davatelja za ovaj kanal završava prije sadašnjeg trenutka – ovo su posljednje emisije u njemu.",
   "epg_now_prefix": "Sada: {title}",
   "player_timeshift": "TIMESHIFT",
   "player_track_n": "Zapis {n}",

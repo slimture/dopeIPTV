@@ -972,7 +972,7 @@
   "detail_now": "עכשיו",
   "detail_unknown_programme": "תוכנית לא ידועה",
   "detail_next_at": "הבא: {title} ב-{time}",
-  "detail_epg_times_wrong": "שעות לוח השידורים של השרת נראות שגויות — מוצגות בכל זאת הרשומות האחרונות.",
+  "detail_epg_times_wrong": "המדריך של הספק לערוץ הזה מסתיים לפני עכשיו – אלה התוכניות האחרונות בו.",
   "epg_now_prefix": "עכשיו: {title}",
   "player_timeshift": "היסט זמן",
   "player_track_n": "רצועה {n}",

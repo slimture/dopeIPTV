@@ -972,7 +972,7 @@
   "detail_now": "正在播出",
   "detail_unknown_programme": "未知节目",
   "detail_next_at": "下一个：{time} {title}",
-  "detail_epg_times_wrong": "服务器的节目时间似乎有误 — 仍显示最新的条目。",
+  "detail_epg_times_wrong": "该频道的提供商节目指南在当前时间之前就已结束——以下是其中最后的节目。",
   "epg_now_prefix": "正在播出：{title}",
   "player_timeshift": "时移",
   "player_track_n": "音轨 {n}",

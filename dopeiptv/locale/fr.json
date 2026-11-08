@@ -972,7 +972,7 @@
   "detail_now": "MAINTENANT",
   "detail_unknown_programme": "Programme inconnu",
   "detail_next_at": "Ensuite : {title} à {time}",
-  "detail_epg_times_wrong": "Les horaires du serveur semblent faux – les entrées les plus récentes sont affichées quand même.",
+  "detail_epg_times_wrong": "Le guide du fournisseur pour cette chaîne s'arrête avant maintenant – voici les derniers programmes qu'il contient.",
   "epg_now_prefix": "En ce moment : {title}",
   "player_timeshift": "TIMESHIFT",
   "player_track_n": "Piste {n}",

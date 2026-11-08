@@ -18,7 +18,14 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   looked at every 20 minutes and whenever the app comes back to the front,
   and fetched again when it is older than six hours or runs out within
   three (at most one try an hour, for guides that always end at midnight).
-  The detail panel fills in from the new guide at once.
+  The detail panel fills in from the new guide at once, and where the
+  provider's guide simply ends before now it says so, instead of "The
+  server's schedule times look wrong".
+- **tools/epg_check.py** tells the provider's guide from the app's copy
+  of it: what the provider sends now - channels, programmes, how many
+  have something on, where it ends - beside the copy on this computer,
+  with a verdict. It uses the account the app is logged in with and
+  prints nothing of it.
 
 ## [1.3.0]
 

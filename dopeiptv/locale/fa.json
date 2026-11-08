@@ -972,7 +972,7 @@
   "detail_now": "اکنون",
   "detail_unknown_programme": "برنامه ناشناخته",
   "detail_next_at": "بعدی: {title} ساعت {time}",
-  "detail_epg_times_wrong": "زمان‌های جدول پخش سرور نادرست به نظر می‌رسند — با این حال جدیدترین موارد نشان داده می‌شوند.",
+  "detail_epg_times_wrong": "راهنمای ارائه‌دهنده برای این کانال پیش از اکنون تمام می‌شود – این‌ها آخرین برنامه‌های آن است.",
   "epg_now_prefix": "اکنون: {title}",
   "player_timeshift": "جابه‌جایی زمانی",
   "player_track_n": "مسیر {n}",

@@ -972,7 +972,7 @@
   "detail_now": "ĐANG PHÁT",
   "detail_unknown_programme": "Chương trình không xác định",
   "detail_next_at": "Tiếp theo: {title} lúc {time}",
-  "detail_epg_times_wrong": "Giờ trong lịch của máy chủ có vẻ sai — vẫn hiển thị các mục gần nhất.",
+  "detail_epg_times_wrong": "Lịch phát sóng của nhà cung cấp cho kênh này kết thúc trước thời điểm hiện tại – đây là các chương trình cuối cùng trong đó.",
   "epg_now_prefix": "Đang phát: {title}",
   "player_timeshift": "DỊCH THỜI GIAN",
   "player_track_n": "Bản {n}",

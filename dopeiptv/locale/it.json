@@ -972,7 +972,7 @@
   "detail_now": "ORA",
   "detail_unknown_programme": "Programma sconosciuto",
   "detail_next_at": "Dopo: {title} alle {time}",
-  "detail_epg_times_wrong": "Gli orari del server sembrano errati: vengono comunque mostrate le voci più recenti.",
+  "detail_epg_times_wrong": "La guida del fornitore per questo canale finisce prima di adesso: questi sono gli ultimi programmi che contiene.",
   "epg_now_prefix": "Ora: {title}",
   "player_timeshift": "TIMESHIFT",
   "player_track_n": "Traccia {n}",
