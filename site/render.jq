@@ -237,12 +237,11 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     + "        </a>\n"
     + "      </div>\n";
   # A card per system, side by side, each with one thing to press - on a
-  # Mac two, since a browser cannot tell Apple Silicon from Intel. The other
-  # formats wait folded below. app.js marks the visitor's own system;
-  # without it the three cards are equal.
-  def dl_chip:
-    (dl_size) as $sz
-    | "<a class=\"dlx-chip\" href=\"\(dl_href | h)\" rel=\"nofollow\"\(dl_title)><b>\(._m.short | h)</b>\(if ._m.cpu != "" then " <span>\(._m.cpu | h)</span>" else "" end)\(if $sz != "" then " <i>\($sz | h)</i>" else "" end)</a>";
+  # Mac two, since a browser cannot tell Apple Silicon from Intel - and its
+  # other formats as a line of small links under it, in plain sight.
+  # app.js marks the visitor's own system; without it the three are equal.
+  def dl_alt:
+    "<a href=\"\(dl_href | h)\" rel=\"nofollow\"\(dl_title)>\(._m.short | h)\(if ._m.cpu != "" then " <span>\(._m.cpu | h)</span>" else "" end)</a>";
   def downloads($version; $reldate):
     ($R.assets // []) as $assets
     | ($assets | map(. + {_m: dl_meta(.name // "" | tostring)})) as $A
@@ -258,7 +257,6 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
        | {os: $os, id: $ids[$os], g: $g, hero: $hero,
           rest: ($g | map(select(.name as $nm | $heronames | any(. == $nm) | not)))}] as $groups
     | (t("dl_go") | sub("[[:space:]]*[→←][[:space:]]*$"; "")) as $btn
-    | ([$groups[] | select(.rest | length > 0)]) as $others
     | if ($groups | length) == 0 then dl_github else
         "      <div class=\"dlx\">\n"
         + "        <div class=\"dlx-cards\">\n"
@@ -275,18 +273,13 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
                   | "              <a class=\"dlx-big\(if $k > 0 then " alt" else "" end)\" href=\"\(dl_href | h)\" rel=\"nofollow\"\(dl_title)>\(dl_icon)<span>\(if $many then (._m.cpu | h) else ($btn | h) end)</span>\(if $many and (._m.req // "") != "" then "<small>\(._m.req | h)</small>" else "" end)</a>\n"] | add)
               + "            </div>\n"
               + "            <p class=\"dlx-meta\">\(if $many then (t("dl_which_mac") | h) else ([$m.title, $m.arch, ($grp.hero[0] | dl_size)] | map(select(. != "")) | map(h) | join(" · ")) end)</p>\n"
+              + (if ($grp.rest | length) > 0 then
+                   "            <p class=\"dlx-alt\"><span>\(t("dl_other") | h)</span>\([$grp.rest[] | dl_alt] | join(""))</p>\n"
+                 else "" end)
               + "            <a class=\"dlx-how\" href=\"/help/#start-\($grp.id)\">\(t("dl_how") | h)</a>\n"
               + "          </article>\n"] | add)
         + "        </div>\n"
-        + "        <div class=\"dlx-foot\">\n"
-        + (if ($others | length) > 0 then
-             "          <details class=\"dlx-more\">\n"
-             + "            <summary>\(t("dl_other") | h)</summary>\n"
-             + ([$others[] | "            <div class=\"dlx-other\"><span class=\"dlx-other-os\">\(.os | h)</span><span class=\"dlx-chips\">\([.rest[] | dl_chip] | join(" "))</span></div>\n"] | add)
-             + "          </details>\n"
-           else "" end)
-        + "          <a class=\"dlx-gh\" href=\"\($REPO | h)/releases/latest\" rel=\"nofollow\">\(t("dl_all_name") | h)</a>\n"
-        + "        </div>\n"
+        + "        <p class=\"dlx-gh\"><a href=\"\($REPO | h)/releases/latest\" rel=\"nofollow\">\(t("dl_all_name") | h)</a></p>\n"
         + "      </div>\n"
       end;
   def shots:
