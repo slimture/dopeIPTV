@@ -796,6 +796,23 @@ jobs:
           git clone --quiet --depth 1 --branch "v${MPV_VER}" \
             https://github.com/mpv-player/mpv.git "${RUNNER_TEMP}/mpv-src"
           cd "${RUNNER_TEMP}/mpv-src"
+          # mpv's own bug, and why conda-forge's libmpv is broken too: the
+          # CoreAudio outputs use cfstr_from_cstr/cfstr_get_cstr from
+          # osdep/utils-mac.c, but meson.build compiles that file only with
+          # Cocoa. Built without Cocoa (see below), it is added beside them.
+          python3 - <<'PY'
+          import pathlib
+          p = pathlib.Path("meson.build")
+          s = p.read_text()
+          anchor = ("    sources += files('audio/out/ao_coreaudio_chmap.c',\n"
+                    "                     'audio/out/ao_coreaudio_utils.c')\n")
+          if "osdep/utils-mac.c')\n    endif" not in s:
+              assert anchor in s, "mpv's meson.build changed: see this step"
+              s = s.replace(anchor, anchor + "    if not features['cocoa']\n"
+                            "        sources += files('osdep/utils-mac.c')\n"
+                            "    endif\n", 1)
+              p.write_text(s)
+          PY
           export PKG_CONFIG_PATH="$ENVDIR/lib/pkgconfig"
           export MACOSX_DEPLOYMENT_TARGET=11.0
           "$ENVDIR/bin/meson" setup build --prefix="$ENVDIR" --libdir=lib \
