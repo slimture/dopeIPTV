@@ -3465,6 +3465,53 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     # -- playback ------------------------------------------------------------------
 
+    def _links_later(self, plan, again) -> bool:
+        """A portal (StalkerClient.slow_links) hands out a play address per
+        title through create_link, which can take seconds - on the window's
+        thread, a frozen window. Run *plan* (the code that would ask the
+        client for an address) against a stand-in to learn which address it
+        wants; when that one is not ready, fetch it off the window's thread
+        and call *again* once it is in - the client then has it at once.
+        False when there is nothing to wait for: the caller goes on."""
+        client = self.client
+        if not getattr(client, "slow_links", False):
+            return False
+        asked: list = []
+
+        class _StandIn:
+            def __getattr__(self, name):
+                def call(*a, **k):
+                    asked.append((name, a, k))
+                    return ""
+                return call
+
+        self.client = _StandIn()
+        try:
+            plan()
+        except Exception:
+            pass
+        finally:
+            self.client = client
+        if not asked:
+            return False
+        name, a, k = asked[0]
+        ready = getattr(client, "link_ready", None)
+        if ready is None or not a or ready(name, a[0]):
+            return False
+        self._link_gen = gen = getattr(self, "_link_gen", 0) + 1
+        self._set_status(tr("status_loading_content"))
+
+        def work():
+            return getattr(client, name)(*a, **k)
+
+        def done(_url) -> None:
+            # Only the newest ask, and only on the same provider.
+            if gen == self._link_gen and self.client is client:
+                again()
+
+        run_async(self.pool, work, done, lambda _e: done(""))
+        return True
+
     def _stream_for(self, it) -> tuple[str | None, str]:
         title = it.get("name") or it.get("title") or "dopeIPTV"
         # Only with an episode id. Without one this produced
@@ -3502,6 +3549,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
 
     def play_live_channel(self, it) -> None:
         fmt = self.settings.value("stream_format", "ts")
+        if self._links_later(
+                lambda: self.client.live_url(it.get("stream_id"), fmt),
+                lambda: self.play_live_channel(it)):
+            return
         url = self.client.live_url(it.get("stream_id"), fmt)
         title = it.get("name") or "dopeIPTV"
         self._start_playback(url, title, it.get("stream_icon"),
@@ -3608,6 +3659,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                     self._load_items(self._current_cat)
                 return
         else:
+            if self._links_later(
+                    lambda: self._stream_for(it),
+                    lambda: self.play_item(it, player, external)):
+                return
             url, title = self._stream_for(it)
             icon = it.get("stream_icon") or it.get("cover")
             key, kind = self._item_key(it), self._play_kind_for(it)
@@ -5225,11 +5280,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         row_kind = it.get("_kind") or it.get("_ekind")
         if row_kind not in (None, "live", "fav"):
             return
+        sid = it.get("stream_id")
+        fmt = self.settings.value("stream_format", "ts")
+        if self._links_later(
+                (lambda: self.client.live_url(sid, fmt)) if history_live
+                and sid is not None else (lambda: self._stream_for(it)),
+                self._play_preview):
+            return
         if history_live:
             # Rebuild a fresh live URL from the stored stream_id (the snapshot's
             # _url may be stale), falling back to that snapshot when the row
             # predates stream_id enrichment.
-            sid = it.get("stream_id")
             if sid is not None:
                 fmt = self.settings.value("stream_format", "ts")
                 url = self.client.live_url(sid, fmt)

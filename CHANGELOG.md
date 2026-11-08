@@ -98,8 +98,10 @@ date.
   blocked gets the wrong-login message. Channels, films and series - in
   all three layouts portals use for series - and the guide's now and next
   from the portal (it has no XMLTV; a playlist's own guide address still
-  works). A channel's address comes from create_link as it starts, within
-  8 s, and a reconnect asks for a new one. Exported and imported with its
+  works). A channel's or a film's address comes from create_link, fetched
+  off the window's thread before it plays (the window never waits on the
+  portal), within 8 s; a reconnect asks for a new one, and one the portal
+  did not give is not asked for again for 5 s. Exported and imported with its
   MAC. Catch-up from a portal is not supported yet.
 - **Test builds (nightly).** Settings -> General -> Update channel ->
   Test builds: the app also offers the test builds of the `testing`

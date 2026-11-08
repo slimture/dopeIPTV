@@ -282,6 +282,12 @@ class StalkerClient(ListCache):
     # The player, the recorder and the cast dialog ask for the same title
     # within moments of each other; one link serves them all.
     LINK_CACHE_SECS = 30.0
+    # A link the portal did not give is not asked for again this soon: the
+    # window asks once off its thread, then once more to play.
+    LINK_FAIL_SECS = 5.0
+    # The window fetches this client's play addresses off its thread first
+    # (see MainWindow._links_later).
+    slow_links = True
     # Pages are small (14 rows is common): this is 2,800 rows a list.
     MAX_PAGES = 200
     EPG_PAGES = 10
@@ -325,6 +331,7 @@ class StalkerClient(ListCache):
         self._auth_lock = threading.Lock()
         self._net_down_until = 0.0
         self._links: dict[str, tuple[float, str]] = {}
+        self._failed: dict[str, float] = {}
         self._link_lock = threading.Lock()
         self._known: dict[str, dict] | None = None
         self._known_lock = threading.Lock()
@@ -1013,6 +1020,22 @@ class StalkerClient(ListCache):
             return hit[1]
         return ""
 
+    def _failed_lately(self, key: str) -> bool:
+        with self._link_lock:
+            t = self._failed.get(key)
+        return t is not None and time.monotonic() - t < self.LINK_FAIL_SECS
+
+    _LINK_KEYS = {"live_url": "l", "vod_url": "v", "episode_url": "e"}
+
+    def link_ready(self, method: str, ident: int | str) -> bool:
+        """Whether *method*(*ident*) answers at once: its link is kept, or
+        the portal just gave none."""
+        prefix = self._LINK_KEYS.get(method)
+        if prefix is None:
+            return True
+        key = f"{prefix}{ident}"
+        return bool(self._cached_link(key)) or self._failed_lately(key)
+
     def _link(self, key: str, kind: str, cmd: str, series: str = "",
               deadline: float | None = None) -> str:
         """A playable address for *cmd* from create_link, kept for
@@ -1021,6 +1044,8 @@ class StalkerClient(ListCache):
         hit = self._cached_link(key)
         if hit:
             return hit
+        if self._failed_lately(key):
+            return ""
         if not cmd:
             log.warning("stalker @ %s: nothing known to play %s",
                         self.server, key)
@@ -1046,12 +1071,17 @@ class StalkerClient(ListCache):
                         self.server, type(e).__name__, self._redact(str(e)))
         if not url and _direct_url(strip_cmd(cmd)):
             url = strip_cmd(cmd)
-        if url:
-            now = time.monotonic()
-            with self._link_lock:
+        now = time.monotonic()
+        with self._link_lock:
+            if url:
                 self._links = {k: v for k, v in self._links.items()
                                if now - v[0] < self.LINK_CACHE_SECS}
                 self._links[key] = (now, url)
+                self._failed.pop(key, None)
+            else:
+                self._failed = {k: t for k, t in self._failed.items()
+                                if now - t < self.LINK_FAIL_SECS}
+                self._failed[key] = now
         return url
 
     def forget_link(self, stream_id: int | str) -> None:
@@ -1059,6 +1089,7 @@ class StalkerClient(ListCache):
         ended or failed, and a portal's play token is often good once."""
         with self._link_lock:
             self._links.pop(f"l{stream_id}", None)
+            self._failed.pop(f"l{stream_id}", None)
 
     def live_url(self, stream_id: int | str, fmt: str = "ts") -> str:
         """A channel's address from create_link: the portal hands out
