@@ -64,6 +64,7 @@ from ..core.local_buffer import MEMORY_MAX_MINUTES
 from ..core.log import log
 from ..core.xdg import open_url
 from ..core.recording import format_size
+from ..media.dvr_player import DVR_SPACE_GB
 from ..media.embedded import SUB_COLORS, SUB_SCALES
 from ..media.players import embedded_playback_reason
 from .theme import (
@@ -785,6 +786,20 @@ class _SettingsMixin:
             tr("setting_live_rewind_disk"),
             is_on("live_rewind_disk", "false"),
             tr("setting_live_rewind_disk_hint"))
+        # The app's own buffer (core/dvr_session.py): on disk within a cap,
+        # downloading on through a pause. Opt-in while it is new.
+        kept_box = c.toggle(
+            tr("setting_dvr_kept"), is_on("live_rewind_kept", "false"),
+            tr("setting_dvr_kept_hint"))
+        space_box = self._combo(
+            [(v, tr("opt_gigabytes", n=v)) for v in DVR_SPACE_GB],
+            str(self.settings.value("live_rewind_space_gb", "2")))
+        space_row = c.row(tr("setting_dvr_space"), space_box,
+                          tr("setting_dvr_space_hint"))
+        c.shown_if(space_row, kept_box.isChecked)
+        # mpv's disk cache is beside the point with the app's own buffer.
+        c.shown_if(rewind_disk_box.parentWidget(),
+                   lambda: not kept_box.isChecked())
 
         def rewind_room(on_disk: bool) -> None:
             # Longer than MEMORY_MAX_MINUTES only on disk: in memory an HD
@@ -797,8 +812,13 @@ class _SettingsMixin:
                     MEMORY_MAX_MINUTES:
                 rewind_box.setCurrentIndex(
                     rewind_box.findData(str(MEMORY_MAX_MINUTES)))
-        rewind_disk_box.toggled.connect(rewind_room)
-        rewind_room(rewind_disk_box.isChecked())
+        def rewind_room_now(_on: bool = False) -> None:
+            c.refresh()
+            rewind_room(rewind_disk_box.isChecked() or kept_box.isChecked())
+
+        rewind_disk_box.toggled.connect(rewind_room_now)
+        kept_box.toggled.connect(rewind_room_now)
+        rewind_room_now()
         if not self.player:
             c = play.card()
             c.note(tr("set_embedded_unavailable",
@@ -1869,6 +1889,9 @@ class _SettingsMixin:
             self.settings.setValue(
                 "live_rewind_minutes", rewind_box.currentData())
             self.settings.setValue("live_rewind_disk", flag(rewind_disk_box))
+            self.settings.setValue("live_rewind_kept", flag(kept_box))
+            self.settings.setValue(
+                "live_rewind_space_gb", space_box.currentData())
 
             def delay_value(sign_box, hours_box, minutes_box) -> int:
                 total = hours_box.value() * 60 + minutes_box.value()

@@ -34,6 +34,10 @@ dopeiptv/
     stores.py          JSON data stores (playlists, favorites, history, ...)
     workers.py         QThreadPool helpers, LogoLoader, byte-bounded caches
     local_buffer.py    Seekable window of a live channel's rewind buffer (DVR)
+    dvr_store.py       App-kept rewind buffer: rolling TS segment store
+    dvr_ingest.py      Its one provider connection
+    dvr_server.py      Its loopback server for mpv (token, live TS)
+    dvr_session.py     Ingest + store + server for one live channel
     recording.py       RecordingManager - ffmpeg/mpv stream-copy, timers
     updates.py         GitHub latest-release check (is_newer, fetch)
     selfupdate.py      AppImage in-place update: download, verify, test, swap
@@ -46,6 +50,7 @@ dopeiptv/
 
   media/               Playback
     embedded.py        _MpvGLWidget(QOpenGLWidget), EmbeddedPlayer, seek bar
+    dvr_player.py      The player's side of the app-kept buffer
     players.py         External player launch (mpv IPC / VLC), libmpv detect
     subtitle_text.py   Stray right-to-left marks out of subtitle files
 

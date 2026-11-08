@@ -26,6 +26,10 @@ map and the one-way import rule.
 | `core/stores.py` | Data persistence layer |
 | `core/workers.py` | Thread pool helpers, LogoLoader, image caches |
 | `core/local_buffer.py` | The seekable window of a live channel's rewind buffer (DVR row) |
+| `core/dvr_store.py` | The app-kept rewind buffer's rolling segment store (retention, readers) |
+| `core/dvr_ingest.py` | Its one provider connection (reconnects as runs, gives up cleanly) |
+| `core/dvr_server.py` | Its loopback server mpv plays from (token, live TS) |
+| `core/dvr_session.py` | `DvrSession`: ingest, store and server for one live channel |
 | `core/recording.py` | Recording manager |
 | `core/updates.py` | GitHub latest-release check |
 | `core/selfupdate.py` | AppImage in-place update (download, checksum, self-check, swap) |
@@ -39,6 +43,7 @@ map and the one-way import rule.
 | `core/platform_windows.py` | Windows-specific helpers |
 | `media/embedded.py` | Embedded mpv player widget |
 | `media/players.py` | External player launch, libmpv detection |
+| `media/dvr_player.py` | The player's side of the app-kept buffer (`DvrPlayerMixin`) |
 | `media/subtitle_text.py` | Stray right-to-left marks out of subtitle files before mpv reads them |
 | `ui/main_window.py` | MainWindow composition root (+ `mw_*` mixins) |
 | `ui/channel_list.py` | List model, view, delegate painting |
@@ -130,7 +135,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   `DOPEIPTV_LOG=debug` shows debug traces; `DOPEIPTV_LOG_FILE=/path` tees
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
-  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna), `core/` (stores, local_buffer, updates, log,
+  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna), `core/` (stores, local_buffer, dvr_store/ingest/server/session, updates, log,
   player_exec, wakelock, selfupdate, gcguard) and `services/` (resume,
   coverart, reminders, mpris, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,

@@ -27,6 +27,7 @@ from ..core.local_buffer import (
     LIVE_REOPEN_LAG, BufferWindow, LiveLag, buffer_window, rewind_bytes,
 )
 from ..i18n import tr
+from .dvr_player import DvrPlayerMixin
 from .players import _libmpv, _register_error_callback
 from .subtitle_text import fixed_bytes
 from ..ui.theme import P
@@ -1354,7 +1355,7 @@ def _sub_look(s, set_opt) -> None:
     set_opt("sub-back-color", "#B3000000" if box else "#00000000")
 
 
-class EmbeddedPlayer(QWidget):
+class EmbeddedPlayer(DvrPlayerMixin, QWidget):
     """Video pane with libmpv OpenGL rendering, control bar, and fullscreen overlay."""
 
     double_clicked = pyqtSignal()
@@ -2622,6 +2623,8 @@ class EmbeddedPlayer(QWidget):
                 return      # a user-initiated stop is not an end of file
             if self._eof_seen:
                 return
+            if self._dvr is not None and self._dvr_on_eof():
+                return      # the app's own buffer goes on from the store
             self._eof_seen = True
             log.info("eof event: %s", redact_url(self.current_url))
             self.finished.emit()
@@ -3477,6 +3480,12 @@ class EmbeddedPlayer(QWidget):
         # local_buffer: a live channel, which gets the rewind buffer unless
         # Settings turned it off.
         local_buffer = local_buffer and self._live_rewind_minutes() > 0
+        # A session of the app's own buffer ends here: its provider
+        # connection goes before the next stream opens one. Then, where
+        # Settings asks for it, a live channel gets one: mpv plays its local
+        # server, and the session reads the provider.
+        self._end_dvr()
+        source = self._dvr_start(url) if local_buffer else None
         self._local_buffer_enabled = local_buffer
         self._local_buffer_ready = False
         self._local_buffer_hide_timer.stop()
@@ -3530,9 +3539,10 @@ class EmbeddedPlayer(QWidget):
                 # disk. mpv's disk cache is append-only - its hidden file grows
                 # 1-4 GB an hour for as long as a channel plays - so that is
                 # the user's choice, for a long rewind without the memory.
-                m["cache-on-disk"] = ("yes" if local_buffer
+                mpv_rewind = local_buffer and self._dvr is None
+                m["cache-on-disk"] = ("yes" if mpv_rewind
                                       and self._live_rewind_disk() else "no")
-                m["demuxer-max-back-bytes"] = self._back_buffer(local_buffer)
+                m["demuxer-max-back-bytes"] = self._back_buffer(mpv_rewind)
             except Exception as e:
                 log.warning("live rewind buffer unavailable: %s", e)
             # Decode mode, set per stream (not in apply_default_options - that
@@ -3604,7 +3614,7 @@ class EmbeddedPlayer(QWidget):
                 m["start"] = str(float(start)) if start and start > 1 else "none"
             except Exception:
                 pass
-            m.play(url)
+            m.play(source or url)
             self.current_url = url
             # Unpause AGAIN, after the load. keep-open=yes pauses mpv when a
             # file ends, and that pause is PLAYER state, not file state: it
@@ -3633,6 +3643,7 @@ class EmbeddedPlayer(QWidget):
         except Exception as e:
             log.error("Embedded playback failed: %s: %s", type(e).__name__, e)
             self.current_url = None
+            self._end_dvr()
             return False
 
     def _ensure_unpaused(self, gen: int) -> None:
@@ -3714,7 +3725,7 @@ class EmbeddedPlayer(QWidget):
         window = self.local_buffer_window()
         if window is not None:
             self._reveal_local_buffer()
-            self._seek_local_target(self.playback_position() + seconds, window)
+            self._seek_local_target(self._local_position() + seconds, window)
             return
         if getattr(self, "_local_buffer_enabled", False):
             return
@@ -4221,6 +4232,8 @@ class EmbeddedPlayer(QWidget):
     def local_buffer_window(self) -> BufferWindow | None:
         if not getattr(self, "_local_buffer_enabled", False) or self.current_url is None:
             return None
+        if self._dvr is not None:
+            return self._dvr_window()
         m = self.video.mpv
         try:
             return buffer_window(m.demuxer_cache_state, m.playback_time)
@@ -4309,6 +4322,9 @@ class EmbeddedPlayer(QWidget):
         # Up to the live point is following live again; anything before it
         # is rewound.
         self._dvr_live = target >= window.end - self._live_ahead - 1.0
+        if self._dvr is not None:
+            self._dvr_seek(target, window)
+            return
         m = self.video.mpv
         if m is not None:
             try:
@@ -4374,6 +4390,8 @@ class EmbeddedPlayer(QWidget):
         except Exception:
             return
         self._sync_pause_label(paused)
+        if self._dvr is not None:
+            pos = self._dvr_pos(pos)    # the app's own buffer keeps its time
         local_window = self._update_local_buffer(pos)
         self._update_nextup(float(pos or 0.0), float(dur or 0.0))
         # Freeze watchdog: mpv reports core-idle while it has nothing to render
@@ -4391,7 +4409,8 @@ class EmbeddedPlayer(QWidget):
                 self._stall_since = time.time()
             elif time.time() - self._stall_since > self.STALL_SECS:
                 self._stall_since = 0.0
-                self.stalled.emit()
+                if not (self._dvr is not None and self._dvr_on_stall()):
+                    self.stalled.emit()
         # Natural end-of-file: with keep-open=yes mpv pauses on the last frame
         # and flags eof-reached. Emit finished() once so the app can autoplay
         # the next episode. (Live streams never end, so this never fires there.)
@@ -4399,6 +4418,8 @@ class EmbeddedPlayer(QWidget):
             eof = bool(m.eof_reached) and self.current_url is not None
         except Exception:
             eof = False
+        if eof and self._dvr is not None and self._dvr_on_eof():
+            eof = False     # the app's own buffer goes on from the store
         if eof:
             if not self._eof_seen:
                 self._eof_seen = True
@@ -4581,6 +4602,7 @@ class EmbeddedPlayer(QWidget):
             pass
 
     def stop(self) -> None:
+        self._end_dvr()
         self._local_buffer_enabled = False
         self._local_buffer_ready = False
         self._local_buffer_hide_timer.stop()

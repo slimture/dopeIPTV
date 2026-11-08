@@ -48,10 +48,12 @@ def player():
     m = Mpv()
     p = SimpleNamespace(
         video=SimpleNamespace(mpv=m), current_url="http://stream.invalid/live.ts",
-        _local_buffer_enabled=True, _local_slider_window=BufferWindow(0, 90))
+        _local_buffer_enabled=True, _local_slider_window=BufferWindow(0, 90),
+        _dvr=None)
     p.local_buffer_window = lambda: EmbeddedPlayer.local_buffer_window(p)
     p._seek_local_target = lambda t, w: EmbeddedPlayer._seek_local_target(p, t, w)
     p.playback_position = lambda: m.playback_time
+    p._local_position = lambda: EmbeddedPlayer._local_position(p)
     p._set_mpv = lambda k, v: m.__setitem__(k, v)
     p._reveal_local_buffer = lambda: None
     p._live_lag = LiveLag()
@@ -202,7 +204,7 @@ def _dvr_player(window):
         _dvr_live=True, _live_ahead=0.0, _dvr_span=0.0, _live_lag=LiveLag(),
         local_buffer_time=QLabel(), local_buffer_seek=_SeekSlider(),
         local_buffer_live=QPushButton(), reopen_live=object(),
-        receivers=lambda _s: 1)
+        receivers=lambda _s: 1, _dvr=None)
     p.local_buffer_window = lambda: window[0]
     p._set_local_buffer_visible = lambda _v: None
     p._local_buffer_hide_timer = SimpleNamespace(stop=lambda: None)

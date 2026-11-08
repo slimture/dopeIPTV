@@ -41,6 +41,7 @@ PRESET = {
     "video_deinterlace": "true", "video_sharpen": "1.0",
     "video_tonemapping": "hable", "cache_secs": "30",
     "live_rewind_minutes": "120", "live_rewind_disk": "true",
+    "live_rewind_kept": "true", "live_rewind_space_gb": "5",
     "ui_scale": "125", "sub_scale": "150", "sub_color": "yellow",
     "sub_background": "true",
     "replay_delay_min": "-75", "epg_delay_min": "90",
