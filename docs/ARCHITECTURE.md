@@ -52,8 +52,10 @@ dopeiptv/
     player_exec.py     Locate the external mpv / VLC binary on the host
 
   media/               Playback
-    embedded.py        _MpvGLWidget(QOpenGLWidget), EmbeddedPlayer
+    embedded.py        EmbeddedPlayer: the in-app player
     seek_slider.py     The seek bar slider: click, drag, hover time
+    video_surface.py   _MpvGLWidget(QOpenGLWidget), the surface mpv draws
+                       into; the Linux pop-out's raster mirror
     rewind_bar.py      DVR row + timeshift timeline over the video
     dvr_player.py      The player's side of the app-kept buffer
     players.py         External player launch (mpv IPC / VLC), libmpv detect

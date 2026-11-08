@@ -33,7 +33,8 @@ from PyQt6.QtWidgets import (
 
 from ..core.log import log
 from ..i18n import tr
-from ..media.embedded import _MpvGLWidget, _SeekSlider
+from ..media.seek_slider import _SeekSlider
+from ..media.video_surface import _MpvGLWidget
 from ..media import players
 from .widgets import (
     drag_frameless_resize, exec_menu_over_video, frameless_resize_edges,

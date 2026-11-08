@@ -594,7 +594,7 @@ def test_the_mirror_settle_cannot_feed_itself():
 
     m._settle_mirror_surface = counted.__get__(m)
 
-    import dopeiptv.media.embedded as em
+    import dopeiptv.media.video_surface as em
     orig = em.QTimer
 
     class _QT:
