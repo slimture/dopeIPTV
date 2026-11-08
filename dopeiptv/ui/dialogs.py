@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -14,6 +15,16 @@ from ..i18n import tr
 from .theme import P
 
 
+
+
+def stalker_available() -> bool:
+    """Whether this build has the Stalker / Ministra portal client: the
+    choice is offered only then."""
+    import importlib.util
+    try:
+        return importlib.util.find_spec("dopeiptv.providers.stalker") is not None
+    except (ImportError, ValueError):
+        return False
 
 
 class PlaylistDialog(QDialog):
@@ -47,6 +58,8 @@ class PlaylistDialog(QDialog):
         self.kind = QComboBox()
         self.kind.addItem(tr("playlist_kind_xtream"), "xtream")
         self.kind.addItem(tr("playlist_kind_m3u"), "m3u")
+        if stalker_available():
+            self.kind.addItem(tr("playlist_kind_stalker"), "stalker")
         kidx = self.kind.findData(playlist.get("kind", "xtream"))
         if kidx >= 0:
             self.kind.setCurrentIndex(kidx)
@@ -59,6 +72,9 @@ class PlaylistDialog(QDialog):
         self.user = QLineEdit(playlist.get("username", ""))
         self.pw = QLineEdit(playlist.get("password", ""))
         self.pw.setEchoMode(QLineEdit.EchoMode.Password)
+        # A Stalker / Ministra portal logs in with the box's MAC address.
+        self.mac = QLineEdit(playlist.get("mac", ""))
+        self.mac.setPlaceholderText("00:1A:79:12:34:56")
         self.epg_url = QLineEdit(playlist.get("epg_url", ""))
         self.epg_url.setPlaceholderText(tr("playlist_epg_placeholder"))
         self.refresh = QComboBox()
@@ -71,11 +87,13 @@ class PlaylistDialog(QDialog):
         self._server_lbl = QLabel()
         self._user_lbl = QLabel(tr("login_username"))
         self._pw_lbl = QLabel(tr("login_password"))
+        self._mac_lbl = QLabel(tr("playlist_mac"))
         form.addRow(tr("playlist_name"), self.name)
         form.addRow(tr("playlist_kind"), self.kind)
         form.addRow(self._server_lbl, self.server)
         form.addRow(self._user_lbl, self.user)
         form.addRow(self._pw_lbl, self.pw)
+        form.addRow(self._mac_lbl, self.mac)
         form.addRow(tr("playlist_custom_epg_url"), self.epg_url)
         form.addRow(tr("playlist_auto_refresh"), self.refresh)
         lay.addLayout(form)
@@ -90,15 +108,21 @@ class PlaylistDialog(QDialog):
         self._update_kind()
 
     def _update_kind(self) -> None:
-        m3u = self.kind.currentData() == "m3u"
-        # M3U needs only a URL - hide the username/password rows and relabel
-        # the address field.
+        kind = self.kind.currentData()
+        m3u, stalker = kind == "m3u", kind == "stalker"
+        # M3U needs only a URL, a portal its URL and a MAC address - hide
+        # the username/password rows and relabel the address field.
         self._server_lbl.setText(
-            tr("playlist_m3u_url") if m3u else tr("login_server"))
+            tr("playlist_m3u_url") if m3u
+            else tr("playlist_portal_url") if stalker else tr("login_server"))
         self.server.setPlaceholderText(
-            "https://example.com/playlist.m3u" if m3u else "http://server:port")
+            "https://example.com/playlist.m3u" if m3u
+            else "http://portal.example.com/c/" if stalker
+            else "http://server:port")
         for w in (self._user_lbl, self.user, self._pw_lbl, self.pw):
-            w.setVisible(not m3u)
+            w.setVisible(not (m3u or stalker))
+        for w in (self._mac_lbl, self.mac):
+            w.setVisible(stalker)
 
     def _maybe_autodetect_link(self) -> None:
         """Recognise a pasted provider link and configure the dialog: Xtream
@@ -117,7 +141,24 @@ class PlaylistDialog(QDialog):
             self.user.setText(user)
             self.pw.setText(pw)
 
+    @staticmethod
+    def normal_mac(text: str) -> str | None:
+        """00:1A:79:12:34:56 from what was typed (dashes, no separators,
+        lower case) - or None when it is no MAC address."""
+        hexd = re.sub(r"[^0-9A-Fa-f]", "", text or "")
+        if len(hexd) != 12 or re.sub(r"[0-9A-Fa-f:\-\s.]", "", text or ""):
+            return None
+        return ":".join(hexd[i:i + 2] for i in range(0, 12, 2)).upper()
+
     def _validate(self) -> None:
+        if self.kind.currentData() == "stalker":
+            if not (self.server.text().strip()
+                    and self.normal_mac(self.mac.text())):
+                QMessageBox.warning(self, tr("playlist_msg_title"),
+                                    tr("playlist_portal_required"))
+                return
+            self.accept()
+            return
         if self.kind.currentData() == "m3u":
             ok = bool(self.server.text().strip())
         else:
@@ -141,6 +182,7 @@ class PlaylistDialog(QDialog):
             "password": self.pw.text().strip(),
             "epg_url": self.epg_url.text().strip(),
             "refresh": self.refresh.currentData(),
+            "mac": self.normal_mac(self.mac.text()) or "",
         }
 
 

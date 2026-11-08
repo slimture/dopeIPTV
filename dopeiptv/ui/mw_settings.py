@@ -1025,7 +1025,8 @@ class _SettingsMixin:
         pl_list = ReorderList()
         pl_list.setObjectName("PlaylistList")
         pl_list.setItemDelegate(PlaylistDelegate(
-            tr("pl_in_use"), {"xtream": "Xtream", "m3u": "M3U"}, pl_list))
+            tr("pl_in_use"), {"xtream": "Xtream", "m3u": "M3U",
+                              "stalker": "Stalker"}, pl_list))
         pl_list.setMouseTracking(True)
         pl_list.setMinimumHeight(200)
         # Drag a playlist to change its place; the sidebar's playlist menu
