@@ -37,6 +37,9 @@ up to date.
   they are built. They can have faults a release does not; back on
   **Releases**, you keep the test build until the next release.
 
+Fullscreen video flickering around its edges on Linux? That is variable
+refresh rate (VRR): turn it off in your display settings and it stops.
+
 On the AppImage from 1.2.15 or later? Click **Update now** in the banner.
 Coming from an older version, what changed since is below - from 1.2.14
 or earlier, everything new in 1.2.15 as well.

@@ -70,7 +70,11 @@ date.
   let it go on in the background over a second connection, where the
   account allows more than one (an account that says it allows one is
   only offered to stop); coming back to that channel takes no other
-  connection. Across a reconnect gap it goes on with what follows.
+  connection. Across a reconnect gap it goes on with what follows. The
+  file begins on a key frame of the video, a few seconds before what was
+  on screen, with the stream's tables first: one that began between two
+  key frames showed nothing - black or grey in many players - until the
+  next one.
 - **Refresh the guide from the guide.** A ↻ button in the programme guide's
   window, and "Refresh guide now" in its right-click menu - on a channel
   without programmes and on an empty spot too - fetch the guide again and
@@ -121,6 +125,14 @@ date.
   environment moved out of reach first, so a library the bundle still
   looked for there fails the build and not on a Mac. If the Intel leg
   fails, the rest of the release still goes out.
+
+### Known issues
+
+- **Flicker around the video in fullscreen on Linux with variable refresh
+  rate (VRR).** With VRR on, the display follows the video's frame rate
+  (25 or 50 a second) and flickers around the picture on some screens -
+  the flicker on GNOME with NVIDIA that 1.2.18 looked into. Turning VRR
+  off (GNOME: Settings -> Displays -> Variable Refresh Rate) stops it.
 
 ### Changed
 

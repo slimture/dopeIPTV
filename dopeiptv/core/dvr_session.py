@@ -29,6 +29,7 @@ IngestFactory = Callable[[str, SegmentStore], Ingest]
 
 
 class DvrSession:
+    KEY_LEAD = 3.0      # seconds a recording reaches back for a key frame
     def __init__(self, url: str, base: Path, keep_seconds: float,
                  max_bytes: int, ingest: Ingest | None = None,
                  key: str | None = None,
@@ -115,8 +116,11 @@ class DvrSession:
         """Record into *path* from wall-clock *from_time* (None: live) on."""
         if not self.streaming:
             raise RuntimeError("DVR session is not streaming")
-        first = (self.store.segment_at(from_time) if from_time is not None
-                 else None) or self.live_segment() or self.store.newest()
+        # A little before the picture asked for: the recording begins on
+        # the key frame at or before it (KeyframeStart), not after it.
+        first = (self.store.segment_at(from_time - self.KEY_LEAD)
+                 if from_time is not None else None) \
+            or self.live_segment() or self.store.newest()
         if first is None:
             raise RuntimeError("DVR buffer holds nothing yet")
         rec = BufferRecorder(self.store, path, first,
