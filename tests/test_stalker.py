@@ -847,3 +847,12 @@ def test_the_client_module_leaves_stalker_unimported():
     out = subprocess.run([sys.executable, "-c", code], capture_output=True,
                          text=True, timeout=60)
     assert out.stdout.strip() == "False", out.stderr[-500:]
+
+
+def test_a_reconnect_asks_the_portal_for_a_new_link():
+    from dopeiptv.providers.stalker import StalkerClient
+    c = StalkerClient("http://portal.invalid/c/", "00:1A:79:12:34:56")
+    c._links["l7"] = (time.monotonic(), "http://cdn.invalid/7?play_token=a")
+    assert c._cached_link("l7")
+    c.forget_link(7)
+    assert c._cached_link("l7") == ""

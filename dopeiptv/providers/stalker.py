@@ -1054,6 +1054,12 @@ class StalkerClient(ListCache):
                 self._links[key] = (now, url)
         return url
 
+    def forget_link(self, stream_id: int | str) -> None:
+        """A channel's link is not to be served again: the stream it played
+        ended or failed, and a portal's play token is often good once."""
+        with self._link_lock:
+            self._links.pop(f"l{stream_id}", None)
+
     def live_url(self, stream_id: int | str, fmt: str = "ts") -> str:
         """A channel's address from create_link: the portal hands out
         short-lived links. This runs on the window's thread as a channel

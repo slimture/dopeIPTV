@@ -6352,6 +6352,10 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # stored URL (no stream_id), so fall back to that - it's the same URL a
         # manual re-open uses, so it reconnects the same way.
         if it is not None and it.get("stream_id") is not None:
+            # A portal's link may be good once: ask it for a new one.
+            forget = getattr(self.client, "forget_link", None)
+            if forget is not None:
+                forget(it["stream_id"])
             self.play_live_channel(it)
         elif lp.get("url"):
             self._start_playback(lp["url"], lp["title"], lp.get("icon_url"),

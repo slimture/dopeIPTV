@@ -543,7 +543,7 @@ class PlaylistStore:
 
     #: What an export file holds per playlist, and an import reads back.
     EXPORT_FIELDS = ("name", "kind", "server", "username", "password",
-                     "epg_url", "refresh")
+                     "epg_url", "refresh", "mac")
 
     def export_data(self) -> list[dict]:
         """The playlists for an export file. The kind goes along: without
@@ -561,7 +561,8 @@ class PlaylistStore:
 
         An Xtream playlist needs its server, user name and password; an M3U
         one only its address (it has no account - the import used to skip
-        every one of them). One that is already here is not added twice.
+        every one of them); a Stalker / Ministra portal its address and MAC.
+        One that is already here is not added twice.
         Raises ValueError when *data* is not an export at all."""
         if not isinstance(data, list):
             raise ValueError("not a list of playlists")
@@ -574,21 +575,28 @@ class PlaylistStore:
                 value = entry.get(key, "")
                 return value.strip() if isinstance(value, str) else ""
 
-            kind = "m3u" if field("kind") == "m3u" else "xtream"
+            kind = field("kind") if field("kind") in ("m3u", "stalker") \
+                else "xtream"
             server = field("server")
             user, pw = field("username"), field("password")
-            if not server or (kind == "xtream" and not (user and pw)):
+            mac = field("mac").upper()
+            if not server or (kind == "xtream" and not (user and pw)) \
+                    or (kind == "stalker" and not mac):
                 continue
             if any((p.get("kind") or "xtream") == kind
                    and p.get("server") == server
                    and (p.get("username") or "") == user
+                   and (p.get("mac") or "").upper() == mac
                    for p in self.items):
                 continue
-            self.add({"name": field("name")
-                      or server.split("//")[-1].split("/")[0],
-                      "kind": kind, "server": server, "username": user,
-                      "password": pw, "epg_url": field("epg_url"),
-                      "refresh": field("refresh") or "never"})
+            row = {"name": field("name")
+                   or server.split("//")[-1].split("/")[0],
+                   "kind": kind, "server": server, "username": user,
+                   "password": pw, "epg_url": field("epg_url"),
+                   "refresh": field("refresh") or "never"}
+            if kind == "stalker":
+                row["mac"] = mac
+            self.add(row)
             added += 1
         return added
 

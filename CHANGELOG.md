@@ -83,6 +83,20 @@ date.
   have something on, where it ends - beside the copy on this computer,
   with a verdict. It uses the account the app is logged in with and
   prints nothing of it.
+- **Stalker / Ministra portals.** A playlist can now be a MAC portal:
+  Settings -> Playlists -> Add, "Stalker / Ministra portal", with the
+  portal's address and the box's MAC address (written as portals expect
+  it, 00:1A:79:12:34:56, from however it was typed). providers/stalker.py
+  speaks the portal's API behind the Xtream client's interface: the API
+  is found beside the address given (portal.php or server/load.php, with
+  or without /stalker_portal), every call looks like a MAG250, an expired
+  token is renewed once, and a box the portal does not know or has
+  blocked gets the wrong-login message. Channels, films and series - in
+  all three layouts portals use for series - and the guide's now and next
+  from the portal (it has no XMLTV; a playlist's own guide address still
+  works). A channel's address comes from create_link as it starts, within
+  8 s, and a reconnect asks for a new one. Exported and imported with its
+  MAC. Catch-up from a portal is not supported yet.
 - **Test builds (nightly).** Settings -> General -> Update channel ->
   Test builds: the app also offers the test builds of the `testing`
   branch, built with every change by `.github/workflows/nightly.yml` - the

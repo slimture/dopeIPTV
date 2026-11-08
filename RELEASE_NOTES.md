@@ -26,6 +26,10 @@ up to date.
   the DVR row and the timeshift timeline no longer lie one above the
   other: **DVR | TIMESHIFT** at the left of the bar switches between them,
   and the app remembers which you like.
+- **Stalker / Ministra portals.** Add a provider that gave you a portal
+  address and a MAC address: **Settings → Playlists → Add → Stalker /
+  Ministra portal**. Channels, films, series and the guide's now and
+  next.
 - **Intel Macs are back.** A `.dmg` for Intel (x86_64) Macs again,
   beside the Apple Silicon one.
 - **Help test what is coming.** **Settings → General → Update channel →
