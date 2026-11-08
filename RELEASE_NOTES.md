@@ -12,6 +12,11 @@ up to date.
   **Record** records from the buffer - whole even while you pause, and
   from where you are when you have gone back. Without it, a recording
   stands still while you pause, and the app now tells you so.
+- **A new Home.** A featured strip at the top with this week's most
+  popular titles your provider has - big artwork, Play and More info -
+  continue watching with the time left, your favourite channels with what
+  is on now and how far it has got, the popular rows with their chart
+  position, and arrows instead of scrollbars.
 - **The guide no longer stays on yesterday.** Left open overnight - or on
   a Mac that slept - the app kept yesterday's guide until it was started
   again. It now looks at the guide every 20 minutes and when you come back

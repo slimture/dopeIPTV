@@ -36,6 +36,18 @@ date.
 
 ### Added
 
+- **A new Home.** A featured strip at the top - this week's most popular
+  titles the provider has, else what it added last - with the artwork
+  big over a soft copy of itself, title, year, rating, Play and More info,
+  turning every few seconds (held still under the pointer; Settings ->
+  Home -> Featured at the top turns it off). Continue watching is a row of
+  wide cards with the time left; a favourite channel's tile says LIVE,
+  what is on and how far it has got, on a panel in the logo's colour; the
+  popular rows carry their chart position big beside the poster; a
+  movie's year and rating sit under its title. Rows page with arrows by
+  their title instead of a scrollbar, and the rows of a section have "See
+  all". The pictures stay one opaque pixmap per card, so scrolling a full
+  page stays as smooth as before (ui/home_widgets.py).
 - **Rewind with dopeIPTV's own buffer (experimental).** Settings ->
   Playback -> Rewind with dopeIPTV's own buffer: the app reads a live
   channel from the provider itself and keeps it on disk - in segments of a
@@ -76,6 +88,11 @@ date.
   key frames showed nothing - black or grey in many players - until the
   next one. The question on changing channel now says why: the recording
   keeps its channel downloading, and that is the connection.
+- **No popular rows without a TMDB key, now in the log.** The popular rows
+  and the featured strip come from TMDB's chart of the week, fetched with
+  the TMDB key; a build from source has no built-in one, so after a week
+  the rows went away without a word. The log now says so once
+  (set DOPEIPTV_TMDB_KEY, or a key of your own in Settings).
 - **A pause that stops a recording says so.** Without the own buffer, a
   recording in the player is mpv's own, and mpv stops reading the channel
   shortly into a pause - so the recording stood still without a word. The

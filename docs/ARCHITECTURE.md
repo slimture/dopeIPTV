@@ -99,6 +99,7 @@ dopeiptv/
     mw_follow.py       Follow a series: new-episode checks and news
     mw_subtitles.py    Subtitles from OpenSubtitles; remembered per title
     mw_home.py         The Home page (shelves: resume, favourites, new)
+    home_widgets.py    Home's featured strip, shelves and cards
     mw_local.py        Local files: folders, library view, music queue
     mw_onboarding.py   First-run setup wizard
     mw_sort.py         List sort order

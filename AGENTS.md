@@ -56,6 +56,7 @@ map and the one-way import rule.
 | `ui/dialogs.py` | Dialog windows |
 | `ui/settings_ui.py` | Settings building blocks: sidebar shell, pages, cards, rows, switches |
 | `ui/qt_i18n.py` | Qt's own strings and QLocale dates in the app's language |
+| `ui/home_widgets.py` | Home's featured strip, shelves and cards (pure presentation) |
 | `ui/tmdb_match.py` | Manual TMDB match dialog |
 | `ui/subtitle_search.py` | OpenSubtitles search dialog |
 | `ui/widgets.py` | Small standalone widgets |

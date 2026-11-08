@@ -1070,7 +1070,8 @@ class _SettingsMixin:
                                   is_on("home_start", "false"))
         c = home.card(tr("set_home_shelves"))
         home_shelf_boxes: dict[str, QCheckBox] = {}
-        for skey, slabel in (("home_sh_resume", "home_resume"),
+        for skey, slabel in (("home_sh_hero", "home_hero"),
+                             ("home_sh_resume", "home_resume"),
                              ("home_sh_new_eps", "home_new_episodes"),
                              ("home_sh_fav", "home_fav_now"),
                              ("home_sh_history", "home_recent"),

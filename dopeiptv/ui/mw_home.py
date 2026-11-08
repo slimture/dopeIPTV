@@ -1,6 +1,6 @@
-"""Home: a full-window start page - hero posters and horizontal shelves
-(continue watching, favorites now, recently viewed, recently added) in the
-style of modern TV apps. Lives in the central stack ON TOP of the classic
+"""Home: a full-window start page - a featured strip at the top and
+horizontal shelves (continue watching, favorites now, recently viewed,
+popular, recently added) in the style of modern TV apps. Lives in the central stack ON TOP of the classic
 three-column view: showing it swaps the whole window content, clicking
 anything (or Esc) drops back to the classic view and acts there.
 
@@ -16,281 +16,29 @@ import json
 import os
 import time
 
-from PyQt6.QtCore import QStandardPaths, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import (
-    QColor, QFont, QIcon, QPainter, QPainterPath, QPen, QPixmap,
-)
+from PyQt6.QtCore import QStandardPaths, Qt, QTimer
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea,
-    QVBoxLayout, QWidget,
+    QFrame, QHBoxLayout, QPushButton, QScrollArea, QVBoxLayout, QWidget,
 )
 
 from ..core.log import log
 from ..core.workers import run_async
 from ..i18n import current_language, tr
 from ..services import popular
-from .theme import P, corner_radius, rounded
+from .home_widgets import (  # noqa: F401 - _Card/_Shelf are this page's API
+    CHAN_H, CHAN_W, POSTER_H, POSTER_W, WIDE_H, WIDE_W, _Card, _Hero, _Shelf,
+    chevron_icon, rating_text, split_year,
+)
+from .theme import P, rounded
 
-# Card geometry (image area; the card adds a text strip underneath).
-POSTER_W, POSTER_H = 160, 240      # shelf posters
-CHAN_W, CHAN_H = 250, 130          # landscape live-channel tiles
-
-
-def _chevron_icon(size: int, color: str) -> QIcon:
-    """A drawn back chevron ‹ (font glyphs render as tofu on some systems)."""
-    scale = 3
-    pm = QPixmap(size * scale, size * scale)
-    pm.setDevicePixelRatio(float(scale))
-    pm.fill(Qt.GlobalColor.transparent)
-    p = QPainter(pm)
-    p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-    pen = QPen(QColor(color))
-    pen.setWidthF(max(1.6, size * 0.14))
-    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
-    p.setPen(pen)
-    p.drawLine(int(size * 0.60), int(size * 0.26),
-               int(size * 0.38), int(size * 0.50))
-    p.drawLine(int(size * 0.38), int(size * 0.50),
-               int(size * 0.60), int(size * 0.74))
-    p.end()
-    return QIcon(pm)
+def _rgba(key: str, a: float) -> str:
+    c = QColor(P[key])
+    return f"rgba({c.red()}, {c.green()}, {c.blue()}, {a})"
 
 
-def _cover_pixmap(pm: QPixmap, w: int, h: int, radius: int = 10) -> QPixmap:
-    """Scale-crop *pm* to exactly w x h (cover fit) with rounded corners.
-
-    The corner triangles are painted in the page background colour (not left
-    transparent) so the pixmap fills its whole rect: that lets the card label
-    keep WA_OpaquePaintEvent - one less layer for Qt to composite per card
-    while scrolling - without the stale-corner artifacts a transparent-corner
-    pixmap caused under that flag."""
-    out = QPixmap(w, h)
-    out.fill(QColor(P["bg"]))
-    scaled = pm.scaled(w, h, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
-                       Qt.TransformationMode.SmoothTransformation)
-    p = QPainter(out)
-    p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    path = QPainterPath()
-    r = corner_radius(radius)
-    path.addRoundedRect(0.0, 0.0, float(w), float(h), r, r)
-    p.setClipPath(path)
-    p.drawPixmap((w - scaled.width()) // 2, (h - scaled.height()) // 2, scaled)
-    p.end()
-    return out
-
-
-def _contain_pixmap(pm: QPixmap, w: int, h: int, radius: int = 10) -> QPixmap:
-    """Fit *pm* inside w x h on a panel background (for channel logos, which
-    must not be cropped the way posters can be). Corners painted in the page
-    background (see _cover_pixmap) so the label can stay opaque."""
-    out = QPixmap(w, h)
-    out.fill(QColor(P["bg"]))
-    p = QPainter(out)
-    p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    path = QPainterPath()
-    r = corner_radius(radius)
-    path.addRoundedRect(0.0, 0.0, float(w), float(h), r, r)
-    p.fillPath(path, QColor(P["pane"]).lighter(118))
-    scaled = pm.scaled(int(w * 0.62), int(h * 0.66),
-                       Qt.AspectRatioMode.KeepAspectRatio,
-                       Qt.TransformationMode.SmoothTransformation)
-    p.setClipPath(path)
-    # Centre the logo in both axes (the old -8 bias parked it high in the tile).
-    p.drawPixmap((w - scaled.width()) // 2,
-                 (h - scaled.height()) // 2, scaled)
-    p.end()
-    return out
-
-
-def _placeholder_pixmap(w: int, h: int, letter: str,
-                        radius: int = 10) -> QPixmap:
-    """The artless-card placeholder: a rounded panel with a big dimmed
-    initial, painted onto the page background so the label stays opaque
-    (same reasoning as _cover_pixmap)."""
-    out = QPixmap(w, h)
-    out.fill(QColor(P["bg"]))
-    p = QPainter(out)
-    p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    path = QPainterPath()
-    r = corner_radius(radius)
-    path.addRoundedRect(0.0, 0.0, float(w), float(h), r, r)
-    p.fillPath(path, QColor(P["pane"]).lighter(115))
-    f = QFont()
-    f.setPointSize(26)
-    f.setBold(True)
-    p.setFont(f)
-    p.setPen(QColor(P["muted"]))
-    p.drawText(out.rect(), Qt.AlignmentFlag.AlignCenter,
-               (letter or "?").strip()[:1].upper())
-    p.end()
-    return out
-
-
-class _Card(QFrame):
-    """One clickable tile: image, title, optional subtitle, optional
-    progress strip (resume shelf). Hover raises an accent border."""
-
-    clicked = pyqtSignal()
-    right_clicked = pyqtSignal()
-
-    def __init__(self, w: int, h: int, title: str, subtitle: str = "",
-                 progress: int | None = None) -> None:
-        super().__init__()
-        self._w, self._h = w, h
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setFixedWidth(w)
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(5)
-        self.img = QLabel()
-        self.img.setFixedSize(w, h)
-        self.img.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # Opaque paint restored: every pixmap this label ever shows
-        # (placeholder, cover, contain) now paints its rounded corners in the
-        # page background colour, so the label truly fills its rect. That lets
-        # Qt skip compositing anything beneath each card - the difference
-        # between smooth and laggy scrolling on a page of ~100 cards - without
-        # the stale-corner artifacts transparent corners caused under this flag.
-        self.img.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
-        # Hover highlight built lazily (only when first hovered) so a shelf of
-        # cards doesn't carry an extra QFrame each at rest.
-        self._hover: QFrame | None = None
-        # Placeholder: big dimmed initial, so an artless card still reads.
-        self.img.setPixmap(_placeholder_pixmap(w, h, title))
-        lay.addWidget(self.img)
-        if progress is not None:
-            bar = QFrame(self.img)
-            bar.setGeometry(8, h - 10, max(6, int((w - 16) * progress / 100)),
-                            4)
-            bar.setStyleSheet(f"background:{P['accent']}; border-radius:2px;")
-        t = QLabel(title or "?")
-        t.setStyleSheet("font-weight:600; font-size:13px;")
-        t.setFixedWidth(w)
-        t.setWordWrap(False)
-        lay.addWidget(t)
-        self._elide(t, w)
-        if subtitle:
-            s = QLabel(subtitle)
-            s.setStyleSheet(f"color:{P['muted']}; font-size:12px;")
-            s.setFixedWidth(w)
-            lay.addWidget(s)
-            self._elide(s, w)
-        lay.addStretch(1)
-
-    @staticmethod
-    def _elide(lbl: QLabel, w: int) -> None:
-        fm = lbl.fontMetrics()
-        lbl.setText(fm.elidedText(lbl.text(), Qt.TextElideMode.ElideRight, w))
-
-    def set_pixmap(self, pm: QPixmap, contain: bool = False) -> None:
-        fn = _contain_pixmap if contain else _cover_pixmap
-        self.img.setText("")
-        self.img.setPixmap(fn(pm, self._w, self._h))
-
-    def enterEvent(self, e) -> None:
-        if self._hover is None:
-            # A transparent frame that draws the accent border on TOP of the
-            # artwork (a CSS border on the image label fought the rounded pixmap
-            # and clipped at the corners).
-            hv = QFrame(self.img)
-            hv.setGeometry(0, 0, self._w, self._h)
-            hv.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-            hv.setStyleSheet(rounded(
-                f"background:transparent; border:2px solid {P['accent']};"
-                "border-radius:10px;"))
-            self._hover = hv
-        self._hover.raise_()
-        self._hover.show()
-        super().enterEvent(e)
-
-    def leaveEvent(self, e) -> None:
-        if self._hover is not None:
-            self._hover.hide()
-        super().leaveEvent(e)
-
-    def mousePressEvent(self, e) -> None:
-        # Nothing happens on press: a card acts on release, like a button.
-        e.accept()
-
-    def mouseReleaseEvent(self, e) -> None:
-        # Act on RELEASE, and only once the event has been fully delivered.
-        #
-        # A click opens things that run their own event loop - the "resume
-        # where you left off?" dialog, the recording guard, a context menu -
-        # and it leaves Home, which deletes this very card. Emitting from
-        # inside the press handler ran all of that while Qt still held the
-        # press as an implicit mouse grab on this card. Closing the resume
-        # dialog with the window's close button (where Qt sees no press or
-        # release of its own inside the dialog) left that grab pointing at a
-        # card that was deleted meanwhile, and the next mouse event crashed
-        # the app in QApplication::notify - the macOS crash from "Continue
-        # watching". Released and deferred, the click is over and the grab
-        # is gone before anything opens.
-        e.accept()
-        if not self.rect().contains(e.position().toPoint()):
-            return                     # dragged off the card: no click
-        if e.button() == Qt.MouseButton.LeftButton:
-            sig = self.clicked
-        elif e.button() == Qt.MouseButton.RightButton:
-            sig = self.right_clicked
-        else:
-            return
-
-        def fire() -> None:
-            from PyQt6 import sip
-            if not sip.isdeleted(self):
-                sig.emit()
-        QTimer.singleShot(0, fire)
-
-
-class _Shelf(QWidget):
-    """A titled, horizontally scrolling row of cards."""
-
-    def __init__(self, title: str) -> None:
-        super().__init__()
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(8)
-        head = QLabel(title)
-        # Opaque background: a transparent label ghosts on macOS when the Home
-        # canvas scrolls (the old glyphs aren't cleared, so the title paints on
-        # top of itself and reads as garbled, overlapping text). The cards
-        # don't show this because they sit on their own opaque frames.
-        head.setAutoFillBackground(True)
-        head.setStyleSheet(
-            f"font-size:17px; font-weight:700; background:{P['bg']};")
-        lay.addWidget(head)
-        self._scroll = QScrollArea()
-        self._scroll.setWidgetResizable(True)
-        self._scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self._scroll.setVerticalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._scroll.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        # Opaque backgrounds on the viewport + row: without them a horizontal
-        # scroll on macOS leaves the previous cards behind as trails (the
-        # transparent widgets aren't repainted under the moved content).
-        self._scroll.viewport().setStyleSheet(f"background:{P['bg']};")
-        self._row = QWidget()
-        self._row.setAutoFillBackground(True)
-        self._row.setStyleSheet(f"background:{P['bg']};")
-        self._h = QHBoxLayout(self._row)
-        self._h.setContentsMargins(0, 0, 0, 0)
-        self._h.setSpacing(14)
-        self._h.addStretch(1)
-        self._scroll.setWidget(self._row)
-        lay.addWidget(self._scroll)
-
-    def add(self, card: _Card) -> None:
-        self._h.insertWidget(self._h.count() - 1, card)
-
-    def finish(self, img_h: int) -> None:
-        # Height = image + text strip + horizontal scrollbar allowance.
-        self._scroll.setFixedHeight(img_h + 66)
-
-    def count(self) -> int:
-        return self._h.count() - 1
+# How many titles the featured strip turns through.
+FEATURED = 5
 
 
 class HomePage(QWidget):
@@ -323,8 +71,11 @@ class HomePage(QWidget):
         self._canvas.setStyleSheet(
             f"#HomeCanvas {{ background: {P['bg']}; }}")
         self._v = QVBoxLayout(self._canvas)
-        self._v.setContentsMargins(28, 18, 28, 24)
-        self._v.setSpacing(22)
+        # The featured strip runs edge to edge; the shelves sit in _body.
+        self._v.setContentsMargins(0, 0, 0, 0)
+        self._v.setSpacing(0)
+        self._body = QVBoxLayout()
+        self._hero: _Hero | None = None
         self._scroll.setWidget(self._canvas)
 
     # -- building --------------------------------------------------------------
@@ -357,7 +108,8 @@ class HomePage(QWidget):
     # buttons edge-to-edge, and each button gets a soft rounded highlight on
     # hover (no hard borders) - so the row reads as a single smooth segment.
     _SEG_QSS = (
-        "#HomeNavGroup { background: transparent; border: none; }"
+        "#HomeNavGroup { background: %(group)s; border: 1px solid %(edge)s;"
+        " border-radius: 19px; }"
         "#HomeNavBtn { background: transparent; color: %(text)s; border: none;"
         " border-radius: 15px; padding: 7px 18px; font-size: 13px;"
         " font-weight: 600; }"
@@ -374,9 +126,13 @@ class HomePage(QWidget):
             "border": QColor(P["pane"]).lighter(135).name(),
             # A translucent accent so the hovered item glows in the accent
             # colour while the label stays readable on top.
-            "hover": f"rgba({ac.red()}, {ac.green()}, {ac.blue()}, 0.28)"}
+            "hover": f"rgba({ac.red()}, {ac.green()}, {ac.blue()}, 0.28)",
+            # Over the featured artwork: a glassy pill, readable on any of it.
+            "group": _rgba("bg", 0.55), "edge": _rgba("text", 0.10)}
         qss = rounded(qss)
-        bar = QWidget()
+        bar = QWidget(objectName="HomeTopBar")
+        # Over the featured artwork: no strip of its own behind it.
+        bar.setStyleSheet("#HomeTopBar { background: transparent; }")
         h = QHBoxLayout(bar)
         h.setContentsMargins(0, 4, 0, 4)
         h.setSpacing(10)
@@ -387,7 +143,7 @@ class HomePage(QWidget):
         # corner - leaving Home is navigation, and navigation-back lives on
         # the left).
         back = QPushButton()
-        back.setIcon(_chevron_icon(16, P["text"]))
+        back.setIcon(chevron_icon(16, P["text"]))
         back.setFixedSize(36, 34)
         back.setToolTip(tr("common_close"))
         back.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -395,8 +151,7 @@ class HomePage(QWidget):
             "QPushButton { background: %s; border:1px solid %s;"
             " border-radius: 17px; }"
             "QPushButton:hover { border-color: %s; }" % (
-                QColor(P["pane"]).lighter(112).name(),
-                QColor(P["pane"]).lighter(135).name(), P["accent"])))
+                _rgba("bg", 0.55), _rgba("text", 0.12), P["accent"])))
         back.clicked.connect(w._leave_home)
         h.addWidget(back)
         h.addStretch(1)
@@ -425,20 +180,28 @@ class HomePage(QWidget):
         h.addStretch(1)
         # Symmetry spacer where the close X used to sit, so the nav pill
         # stays visually centred with the back chip on the left.
-        pad = QWidget()
-        pad.setFixedSize(36, 34)
-        h.addWidget(pad)
+        h.addSpacing(36)
         return bar
 
     def refresh(self) -> None:
         self._gen += 1
         self._clear()
-        self._v.addWidget(self._top_bar())
         w = self.window
         s = w.settings
 
         def on(key):
             return s.value(key, "true") == "true"
+
+        self._hero = _Hero(self._top_bar(), w.poster_art, self._media_art)
+        self._hero.play.connect(self._hero_play)
+        self._hero.info.connect(self._show_info)
+        self._show_hero = on("home_sh_hero")
+        self._v.addWidget(self._hero)
+        self._body = QVBoxLayout()
+        self._body.setContentsMargins(40, 6, 40, 32)
+        self._body.setSpacing(30)
+        self._v.addLayout(self._body)
+        body = self._body
 
         if on("home_sh_resume"):
             rows = []
@@ -449,9 +212,13 @@ class HomePage(QWidget):
             if rows:
                 shelf = _Shelf(tr("home_resume"))
                 for it in rows:
-                    card = _Card(POSTER_W, POSTER_H,
-                                 it.get("name") or it.get("title") or "?",
-                                 progress=int(it.get("_progress_pct") or 0))
+                    left = self._minutes_left(it)
+                    card = _Card(WIDE_W, WIDE_H,
+                                 split_year(it.get("name") or it.get("title")
+                                            or "?")[0],
+                                 tr("home_min_left", n=left) if left else "",
+                                 progress=int(it.get("_progress_pct") or 0),
+                                 style="wide")
                     card.clicked.connect(
                         lambda it=it: self._play_media(it))
                     # Ask the cover pipeline with the row's REAL kind: an
@@ -464,8 +231,8 @@ class HomePage(QWidget):
                     k = ("episode" if it.get("_kind") == "episode" else "vod")
                     self._set_art(card, self._media_art(it, k), w.poster_art)
                     shelf.add(card)
-                shelf.finish(POSTER_H)
-                self._v.addWidget(shelf)
+                shelf.finish(WIDE_H)
+                body.addWidget(shelf)
 
         if on("home_sh_new_eps"):
             rows = []
@@ -482,7 +249,7 @@ class HomePage(QWidget):
                            else tr("home_new_count", n=len(new)))
                     card = _Card(POSTER_W, POSTER_H,
                                  snap.get("name") or snap.get("title") or "?",
-                                 sub)
+                                 sub, badge=tr("home_badge_new"))
                     card.clicked.connect(
                         lambda snap=snap: self._open_series(snap))
                     card.right_clicked.connect(
@@ -491,48 +258,28 @@ class HomePage(QWidget):
                                   w.poster_art)
                     shelf.add(card)
                 shelf.finish(POSTER_H)
-                self._v.addWidget(shelf)
+                body.addWidget(shelf)
 
         if on("home_sh_fav"):
             chans = self._favorite_channels()[:14]
             if chans:
-                shelf = _Shelf(tr("home_fav_now"))
+                shelf = _Shelf(tr("home_fav_now"),
+                               more=lambda: self._leave_to(
+                                   lambda: w.switch_mode("live")))
                 for it in chans:
-                    now_t = ""
-                    try:
-                        prog = w.xmltv.current_programme(it)
-                        now_t = (prog or {}).get("title") or ""
-                    except Exception:
-                        pass
-                    card = _Card(CHAN_W, CHAN_H, it.get("name") or "?", now_t)
-                    card.clicked.connect(
-                        lambda it=it: self._play_channel(it))
-                    card.right_clicked.connect(
-                        lambda it=it: self._channel_menu(it))
-                    self._set_art(card, it.get("stream_icon"), w.logos,
-                                  contain=True)
-                    shelf.add(card)
+                    shelf.add(self._channel_card(it, with_now=True))
                 shelf.finish(CHAN_H)
-                self._v.addWidget(shelf)
+                body.addWidget(shelf)
 
             media = self._favorite_media()[:20]
             if media:
                 shelf = _Shelf(tr("home_fav_media"))
                 for it in media:
-                    card = _Card(POSTER_W, POSTER_H, it.get("name")
-                                 or it.get("title") or "?")
-                    if it.get("_kind") == "series":
-                        card.clicked.connect(
-                            lambda it=it: self._open_series(it))
-                        art = self._media_art(it, "series")
-                    else:
-                        card.clicked.connect(
-                            lambda it=it: self._play_media(it))
-                        art = self._media_art(it, "vod")
-                    self._set_art(card, art, w.poster_art)
+                    kind = "series" if it.get("_kind") == "series" else "vod"
+                    card = self._poster_card(it, kind)
                     shelf.add(card)
                 shelf.finish(POSTER_H)
-                self._v.addWidget(shelf)
+                body.addWidget(shelf)
 
         if on("home_sh_history"):
             rows = list(getattr(w.history, "entries", []))
@@ -558,25 +305,26 @@ class HomePage(QWidget):
                 shelf = _Shelf(tr("home_recent"))
                 for it in rows:
                     live = it.get("_kind") == "live"
-                    card = _Card(CHAN_W if live else POSTER_W,
-                                 CHAN_H if live else POSTER_H,
-                                 it.get("name") or "?")
-                    card.clicked.connect(
-                        lambda it=it: self._play_history(it))
                     if live:
-                        # A channel logo, contained on a panel.
+                        # A channel logo, whole, on a tile.
+                        card = _Card(CHAN_W, CHAN_H, it.get("name") or "?",
+                                     style="tile")
                         self._set_art(card, it.get("stream_icon"), w.logos,
                                       contain=True)
                     else:
+                        name, year = split_year(it.get("name") or "?")
+                        card = _Card(POSTER_W, POSTER_H, name, year)
                         # A movie/episode: resolve a real poster through the
                         # cover pipeline (the raw history icon is often a tiny
                         # provider thumb, or missing).
                         k = "episode" if it.get("_kind") == "episode" else "vod"
                         self._set_art(card, self._media_art(it, k),
                                       w.poster_art)
+                    card.clicked.connect(
+                        lambda it=it: self._play_history(it))
                     shelf.add(card)
                 shelf.finish(POSTER_H)
-                self._v.addWidget(shelf)
+                body.addWidget(shelf)
 
         if on("home_sh_watchlist"):
             wl = getattr(w, "watchlist", None)
@@ -598,32 +346,76 @@ class HomePage(QWidget):
             if rows:
                 shelf = _Shelf(tr("nav_watchlist"))
                 for it in rows[:20]:
-                    card = _Card(POSTER_W, POSTER_H,
-                                 it.get("name") or it.get("title") or "?")
-                    if it["_kind"] == "series":
-                        # Same drill path as a favorite show: land inside the
-                        # series' episode list (the pending-drill dance).
-                        card.clicked.connect(
-                            lambda it=it: self._open_series(it))
-                        art = self._media_art(it, "series")
-                    else:
-                        card.clicked.connect(
-                            lambda it=it: self._play_media(it))
-                        art = self._media_art(it, "vod")
-                    self._set_art(card, art, w.poster_art)
-                    shelf.add(card)
+                    # A show drills into its episode list (the pending-drill
+                    # dance), like a favorite show.
+                    shelf.add(self._poster_card(
+                        it, "series" if it["_kind"] == "series" else "vod"))
                 shelf.finish(POSTER_H)
-                self._v.addWidget(shelf)
+                body.addWidget(shelf)
 
         self._movies_box = QVBoxLayout()
-        self._v.addLayout(self._movies_box)
+        self._movies_box.setSpacing(30)
+        body.addLayout(self._movies_box)
         # Channels load on their own (slower) pass; give them a fixed slot after
         # the movie/series shelves so they always land in the same place no
         # matter which pass finishes first.
         self._channels_box = QVBoxLayout()
-        self._v.addLayout(self._channels_box)
+        body.addLayout(self._channels_box)
         self._v.addStretch(1)
         self._load_media()
+
+    # -- cards ------------------------------------------------------------------
+
+    @staticmethod
+    def _minutes_left(it: dict) -> int:
+        try:
+            pos = float(it.get("_resume_pos") or 0)
+            dur = float(it.get("_resume_dur") or 0)
+        except (TypeError, ValueError):
+            return 0
+        return max(1, round((dur - pos) / 60)) if dur > pos > 0 else 0
+
+    def _poster_card(self, it: dict, kind: str, rank: int | None = None
+                     ) -> _Card:
+        """A movie or a series on a poster, its year and rating under the
+        title: a movie plays, a series opens its episode list."""
+        name, year = split_year(it.get("name") or it.get("title") or "?")
+        sub = "  ·  ".join(x for x in (year, rating_text(it)) if x)
+        card = _Card(POSTER_W, POSTER_H, name, sub, rank=rank)
+        if kind == "series":
+            card.clicked.connect(lambda it=it: self._open_series(it))
+        else:
+            card.clicked.connect(lambda it=it: self._play_media(it))
+        self._set_art(card, self._media_art(it, kind), self.window.poster_art)
+        return card
+
+    def _channel_card(self, it: dict, with_now: bool = False) -> _Card:
+        """A channel's tile; with what is on now under it - and LIVE, and
+        how far it has got, on it - when the guide knows."""
+        w = self.window
+        now_t, live = "", None
+        if with_now:
+            try:
+                prog = w.xmltv.current_programme(it) or {}
+            except Exception:
+                prog = {}
+            now_t = prog.get("title") or ""
+            try:
+                start = float(prog.get("start_timestamp") or 0)
+                stop = float(prog.get("stop_timestamp") or 0)
+            except (TypeError, ValueError):
+                start = stop = 0.0
+            if stop > start > 0:
+                live = (start, stop)
+                now_t = (f"{time.strftime('%H:%M', time.localtime(start))}"
+                         f"–{time.strftime('%H:%M', time.localtime(stop))}"
+                         f"  {now_t}")
+        card = _Card(CHAN_W, CHAN_H, it.get("name") or "?", now_t,
+                     style="tile", live=live)
+        card.clicked.connect(lambda it=it: self._play_channel(it))
+        card.right_clicked.connect(lambda it=it: self._channel_menu(it))
+        self._set_art(card, it.get("stream_icon"), w.logos, contain=True)
+        return card
 
     # -- data ------------------------------------------------------------------
 
@@ -823,6 +615,13 @@ class HomePage(QWidget):
         now, lang = time.time(), current_language()
         # The chart comes from TMDB, through the key the covers use.
         resolver = getattr(getattr(w, "cover", None), "resolver", None)
+        if resolver is None and not getattr(w, "_popular_nokey_said", False):
+            # Silent otherwise: the shelves just stay away once the chart on
+            # disk is a week old. A build from source has no built-in key.
+            w._popular_nokey_said = True
+            log.info("popular: no TMDB key, so no chart for the popular "
+                     "shelves (a source checkout has no built-in key: set "
+                     "DOPEIPTV_TMDB_KEY, or a key of your own in Settings)")
         if (resolver is not None and not popular.is_fresh(chart, lang, now)
                 and not getattr(w, "_popular_fetching", False)
                 and now - getattr(w, "_popular_failed", 0.0)
@@ -918,31 +717,48 @@ class HomePage(QWidget):
         ser = w._visible_catalog(ser, "series")
         pvod = w._visible_catalog(pvod or [], "vod")
         pser = w._visible_catalog(pser or [], "series")
+        if self._hero is not None and getattr(self, "_show_hero", True):
+            self._hero.set_items(self._featured(vod, ser, pvod, pser))
 
-        for key, title, rows, kind in (
-                ("home_sh_pop_movies", "home_pop_movies", pvod, "vod"),
-                ("home_sh_pop_series", "home_pop_series", pser, "series"),
-                ("home_sh_movies", "home_new_movies", vod, "vod"),
-                ("home_sh_series", "home_new_series", ser, "series")):
+        to_vod = lambda: self._leave_to(lambda: w.switch_mode("vod"))  # noqa: E731
+        to_ser = lambda: self._leave_to(lambda: w.switch_mode("series"))  # noqa: E731
+        for key, title, rows, kind, ranked, more in (
+                ("home_sh_pop_movies", "home_pop_movies", pvod, "vod", True,
+                 to_vod),
+                ("home_sh_pop_series", "home_pop_series", pser, "series", True,
+                 to_ser),
+                ("home_sh_movies", "home_new_movies", vod, "vod", False,
+                 to_vod),
+                ("home_sh_series", "home_new_series", ser, "series", False,
+                 to_ser)):
             if s.value(key, "true") == "true" and rows:
-                self._poster_shelf(tr(title), rows, kind)
+                self._poster_shelf(tr(title), rows, kind, ranked, more)
         if vod or ser or pvod or pser:
             # Adding the movie/series shelves grows the page; on macOS a layout
             # reflow can leave the shelves below painted behind their old
             # position. Force a clean repaint once the layout has settled.
             self._repaint_after_reflow()
 
-    def _poster_shelf(self, title: str, rows: list, kind: str) -> None:
-        w = self.window
-        shelf = _Shelf(title)
-        for it in rows:
-            card = _Card(POSTER_W, POSTER_H, it.get("name") or "?")
-            if kind == "series":
-                card.clicked.connect(lambda it=it: self._open_series(it))
-            else:
-                card.clicked.connect(lambda it=it: self._play_media(it))
-            self._set_art(card, self._media_art(it, kind), w.poster_art)
-            shelf.add(card)
+    @staticmethod
+    def _featured(vod: list, ser: list, pvod: list, pser: list) -> list:
+        """What the strip at the top turns through: this week's most popular
+        the provider has, else what it added last."""
+        out = [(it, "vod", f"#{n + 1}  ·  {tr('home_pop_movies')}")
+               for n, it in enumerate(pvod[:FEATURED])]
+        out += [(it, "series", f"#{n + 1}  ·  {tr('home_pop_series')}")
+                for n, it in enumerate(pser[:max(0, FEATURED - len(out))])]
+        if not out:
+            out = ([(it, "vod", tr("home_new_movies")) for it in vod[:FEATURED]]
+                   or [(it, "series", tr("home_new_series"))
+                       for it in ser[:FEATURED]])
+        return out
+
+    def _poster_shelf(self, title: str, rows: list, kind: str,
+                      ranked: bool = False, more=None) -> None:
+        shelf = _Shelf(title, more=more)
+        for n, it in enumerate(rows):
+            shelf.add(self._poster_card(
+                it, kind, rank=n + 1 if ranked and n < 10 else None))
         shelf.finish(POSTER_H)
         self._movies_box.addWidget(shelf)
 
@@ -978,13 +794,11 @@ class HomePage(QWidget):
         chan = w._visible_catalog(chan, "live")
         if w.settings.value("home_sh_channels", "true") != "true" or not chan:
             return
-        shelf = _Shelf(tr("home_new_channels"))
+        shelf = _Shelf(tr("home_new_channels"),
+                       more=lambda: self._leave_to(
+                           lambda: w.switch_mode("live")))
         for it in chan:
-            card = _Card(CHAN_W, CHAN_H, it.get("name") or "?")
-            card.clicked.connect(lambda it=it: self._play_channel(it))
-            card.right_clicked.connect(lambda it=it: self._channel_menu(it))
-            self._set_art(card, it.get("stream_icon"), w.logos, contain=True)
-            shelf.add(card)
+            shelf.add(self._channel_card(it))
         shelf.finish(CHAN_H)
         self._channels_box.addWidget(shelf)
 
@@ -1090,6 +904,27 @@ class HomePage(QWidget):
         m.addAction(tr("ctx_unfollow_series"),
                     lambda: w._unfollow_series(snap))
         m.exec(QCursor.pos())
+
+    def _hero_play(self, it: dict, kind: str) -> None:
+        if kind == "series":
+            self._open_series(it)
+        else:
+            self._play_media(it)
+
+    def _show_info(self, it: dict, kind: str) -> None:
+        """More info: the title in its own list and its details, without
+        playing anything."""
+        if kind == "series":
+            self._open_series(it)
+            return
+        w = self.window
+        w._leave_home()
+        w._reveal_item_in_list(it, "vod")
+        try:
+            w._current_key = w._item_key(it)
+            w._show_detail(it)
+        except Exception:
+            pass
 
     def _play_media(self, it: dict) -> None:
         """Movie or a continue-watching row: land under Movies, then play it.
