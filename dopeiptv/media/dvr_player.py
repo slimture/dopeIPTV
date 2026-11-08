@@ -29,8 +29,11 @@ from typing import TYPE_CHECKING
 
 from ..core.local_buffer import BufferWindow, buffer_window
 from ..core.log import log, redact_url
+from ..i18n import tr
 
 if TYPE_CHECKING:
+    from ..core.dvr_pool import DvrPool
+    from ..core.dvr_record import BufferRecorder
     from ..core.dvr_session import DvrSession
     from ..core.dvr_store import Segment
 
@@ -55,6 +58,8 @@ def dvr_base() -> Path:
 
 class DvrPlayerMixin:
     _dvr: "DvrSession | None" = None
+    _dvr_pool: "DvrPool | None" = None
+    _buffer_rec: "BufferRecorder | None" = None
     _dvr_origin = 0.0
     _dvr_open_wall: float | None = None
     _dvr_reopened = 0.0
@@ -79,21 +84,29 @@ class DvrPlayerMixin:
     # -- start and end ---------------------------------------------------------
 
     def _dvr_start(self, url: str) -> str | None:
-        """Start a session for *url*; the address mpv should play, or None
-        to play the provider's as before."""
+        """Start (or resume) the session for *url*; the address mpv should
+        play, or None to play the provider's as before."""
         if not self._dvr_wanted(url):
+            if (self._dvr_pool is not None and not self._settings_dvr_on()
+                    and not any(s.recording for s in self._dvr_pool.sessions)):
+                # Turned off: the history of the channels left goes too.
+                self._dvr_pool.close_all()
+                self._dvr_pool = None
             return None
         minutes = self._live_rewind_minutes()
         try:
-            from ..core.dvr_session import DvrSession  # only when it is used
-            session = DvrSession(url, dvr_base(), keep_seconds=minutes * 60,
-                                 max_bytes=self._dvr_space_bytes())
+            if self._dvr_pool is None:
+                from ..core.dvr_pool import DvrPool     # only when it is used
+                self._dvr_pool = DvrPool(dvr_base(), minutes * 60,
+                                         self._dvr_space_bytes())
+            self._dvr_pool.configure(minutes * 60, self._dvr_space_bytes())
+            session = self._dvr_pool.open(url)
         except Exception as e:
             log.warning("DVR: own buffer unavailable (%s) - playing as before",
                         e)
             return None
         self._dvr = session
-        self._dvr_origin = time.time()
+        self._dvr_origin = session.origin
         self._dvr_open_wall = None
         self._dvr_reopened = 0.0
         log.info("DVR: own buffer for %s (%d min, %d GB)", redact_url(url),
@@ -101,12 +114,63 @@ class DvrPlayerMixin:
         return session.live_url()
 
     def _end_dvr(self) -> None:
-        """Close the session - its provider connection at once, before
-        another channel may need the account's only one."""
+        """Leave the session - its provider connection closes at once,
+        before another channel may need the account's only one, unless a
+        recording reads it. Its history stays in the pool."""
         session, self._dvr = self._dvr, None
         self._dvr_open_wall = None
-        if session is not None:
+        if session is None:
+            return
+        if self._dvr_pool is not None:
+            self._dvr_pool.release(session)
+        else:
             session.close()
+
+    def _settings_dvr_on(self) -> bool:
+        s = self._settings
+        return s is not None and s.value("live_rewind_kept", "false") == "true"
+
+    def dvr_shutdown(self) -> None:
+        """The app ends: every buffer goes, recordings write what they hold
+        first."""
+        pool, self._dvr_pool = self._dvr_pool, None
+        self._dvr = None
+        if pool is not None:
+            pool.close_all(wait=3.0)
+
+    # -- recording from the buffer -----------------------------------------------
+
+    def _dvr_record(self, path: str) -> bool:
+        """Record what is on screen on, from the buffer: True when it does.
+        It needs no connection of its own and goes on through a pause."""
+        session = self._dvr
+        if session is None:
+            return False
+        try:
+            self._buffer_rec = session.record(path, self._dvr_wall_now())
+        except Exception as e:
+            log.warning("DVR: recording from the buffer failed (%s)", e)
+            self._buffer_rec = None
+            return False
+        return True
+
+    def take_buffer_recorder(self) -> "BufferRecorder | None":
+        """The recording just started from the buffer, for its job to own."""
+        rec, self._buffer_rec = self._buffer_rec, None
+        return rec
+
+    def _stop_buffer_record(self) -> None:
+        rec, self._buffer_rec = self._buffer_rec, None
+        if rec is not None:
+            rec.stop()
+
+    def dvr_recording_channels(self) -> int:
+        """Channels a recording keeps streaming besides the one on screen."""
+        pool = self._dvr_pool
+        if pool is None:
+            return 0
+        return sum(1 for s in pool.sessions
+                   if s.recording and s is not self._dvr)
 
     # -- time ------------------------------------------------------------------
 
@@ -126,6 +190,31 @@ class DvrPlayerMixin:
         if self._dvr is None:
             return self.playback_position()
         return self._dvr_pos(self.playback_position()) or 0.0
+
+    def _dvr_gaps(self, start: float, span: float) -> list[float]:
+        """Where a run begins after a gap, as fractions of the row - the
+        channel left and come back to, or a reconnect."""
+        session = self._dvr
+        if session is None or span <= 0:
+            return []
+        out = []
+        for _run, t0, _t1 in session.runs()[1:]:
+            f = (t0 - self._dvr_origin - start) / span
+            if 0.0 < f < 1.0:
+                out.append(round(f, 3))
+        return out
+
+    def _dvr_hover(self, start: float, span: float, frac: float) -> str | None:
+        """The clock time under the pointer on the DVR row - and whether
+        anything was kept there."""
+        session = self._dvr
+        if session is None or span <= 0:
+            return None
+        t = self._dvr_origin + start + frac * span
+        label = time.strftime("%H:%M:%S", time.localtime(t))
+        if not any(t0 - 1.0 <= t <= t1 + 1.0 for _r, t0, t1 in session.runs()):
+            label += " · " + tr("dvr_gap")
+        return label
 
     def _dvr_window(self) -> BufferWindow | None:
         span = self._dvr.span() if self._dvr is not None else None

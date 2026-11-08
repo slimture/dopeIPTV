@@ -157,6 +157,11 @@ class _RecordingMixin:
         if not url or not str(url).startswith("http"):
             return True
         active = [j for j in self.rec.jobs if j["status"] == "recording"]
+        # Back to a channel recorded in the background from its rewind
+        # buffer: that buffer is still streaming, so watching it again
+        # takes no other connection.
+        active = [j for j in active
+                  if not (j.get("background") and j.get("url") == url)]
         if not active:
             return True
         inplayer = [j for j in active if j.get("inplayer")]
@@ -166,6 +171,8 @@ class _RecordingMixin:
             if self.player and url == self.player.current_url:
                 return True
             j = inplayer[0]
+            if self.rec.buffer_recording(j):
+                return self._guard_buffer_switch(j, title)
             can_cont = bool(j.get("url"))
             options = [(tr("rec_guard_stop_switch"), "danger")]
             if can_cont:
@@ -300,6 +307,30 @@ class _RecordingMixin:
                cap=self._fmt_gb(self.rec.total_cap_bytes())))
         return False
 
+    def _guard_buffer_switch(self, j: dict, title: str) -> bool:
+        """Another channel, while the one on screen is recorded from its
+        rewind buffer: stop, or let the recording go on in the background -
+        its buffer keeps its connection, the new channel takes another. With
+        an account that allows one connection, only stopping is offered."""
+        one = getattr(self.client, "max_connections", None) == 1
+        options = [(tr("rec_guard_stop_switch"), "danger")]
+        if not one:
+            options.append((tr("rec_guard_buffer_keep"), "normal"))
+        options.append((tr("rec_guard_keep_watching"), "primary"))
+        idx = self._choice_dialog(
+            tr("rec_guard_title"),
+            tr("rec_guard_buffer_one_body" if one else "rec_guard_buffer_body",
+               recording=j["title"], target=title),
+            options)
+        if idx == 0:
+            self.rec.finish_all_inplayer("stopped")
+            return True
+        if not one and idx == 1:
+            self.rec.keep_in_background(j["id"])
+            self._multi_stream_ok = True
+            return True
+        return False
+
     def _build_record_menu(self, rec_menu, it) -> None:
         active = [j for j in self.rec.jobs if j["status"] == "recording"]
         for j in active:
@@ -409,7 +440,8 @@ class _RecordingMixin:
                 self.rec.add_inplayer_job(
                     title, path, stop_ts,
                     url=self.client.live_url(it["stream_id"], "ts"),
-                    icon=it.get("stream_icon"))
+                    icon=it.get("stream_icon"),
+                    recorder=self.player.take_buffer_recorder())
                 self._set_status("● " + tr("rec_started_inplayer",
                                            title=title, length=length))
                 return
@@ -459,7 +491,8 @@ class _RecordingMixin:
             self.rec.add_inplayer_job(
                 title, path, stop_ts,
                 url=self.client.live_url(it["stream_id"], "ts"),
-                icon=it.get("stream_icon"))
+                icon=it.get("stream_icon"),
+                recorder=self.player.take_buffer_recorder())
             self._set_status("● " + tr("rec_started_inplayer",
                                        title=title, length=length))
         elif self._recorder_ready():

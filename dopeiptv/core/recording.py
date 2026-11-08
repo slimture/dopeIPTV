@@ -239,7 +239,7 @@ class RecordingManager(QObject):
                 self.jobs.append(j)
 
     def _save(self) -> None:
-        keep = [{k: v for k, v in j.items() if k != "proc"}
+        keep = [{k: v for k, v in j.items() if k not in ("proc", "recorder")}
                 for j in self.jobs if j.get("status") == "scheduled"]
         self.settings.setValue("recording_jobs", json.dumps(keep))
 
@@ -270,13 +270,18 @@ class RecordingManager(QObject):
 
     def add_inplayer_job(self, title: str, path: str,
                          stop_ts: float | None, url: str = "",
-                         icon: str | None = None) -> dict:
-        """Register a recording that rides the embedded player's stream."""
+                         icon: str | None = None,
+                         recorder: Any = None) -> dict:
+        """Register a recording that rides the embedded player's stream -
+        or, with *recorder*, reads the player's own rewind buffer (a
+        BufferRecorder): no connection of its own, whole through a pause,
+        and able to go on in the background (keep_in_background)."""
         job: dict[str, Any] = {
             "id": uuid.uuid4().hex[:10], "url": url, "title": title,
             "start": time.time(), "stop": stop_ts, "folder": "",
             "status": "recording", "path": path, "error": "",
-            "proc": None, "inplayer": True, "stream_icon": icon or ""}
+            "proc": None, "inplayer": True, "stream_icon": icon or "",
+            "recorder": recorder}
         self.jobs.append(job)
         if icon and path:
             self.write_info(path, "", "", icon=icon)
@@ -288,7 +293,9 @@ class RecordingManager(QObject):
             if (j["id"] != job_id or not j.get("inplayer")
                     or j["status"] != "recording"):
                 continue
-            if self.stop_inplayer_cb:
+            if j.get("recorder") is not None:
+                j["recorder"].stop()
+            elif self.stop_inplayer_cb:
                 try:
                     self.stop_inplayer_cb()
                 except Exception:
@@ -308,6 +315,38 @@ class RecordingManager(QObject):
             QTimer.singleShot(1500, validate)
             return
 
+    def keep_in_background(self, job_id: str) -> bool:
+        """A recording from the rewind buffer goes on while the player
+        changes channel: it is no longer the player's, it ends at its stop
+        time or when stopped. False for a recording that cannot."""
+        for j in self.jobs:
+            if (j["id"] == job_id and j.get("inplayer")
+                    and j["status"] == "recording"
+                    and j.get("recorder") is not None):
+                j["inplayer"] = False
+                j["background"] = True
+                self.jobs_changed.emit()
+                return True
+        return False
+
+    def buffer_recording(self, job: dict) -> bool:
+        return job.get("recorder") is not None
+
+    def _finish_buffer(self, j: dict, reason: str) -> None:
+        j["recorder"].stop()
+        j["status"] = "done"
+        self.recording_stopped.emit(j["title"], reason)
+
+        def validate(j=j, reason=reason):
+            if (j.get("path") and os.path.exists(j["path"])
+                    and os.path.getsize(j["path"]) > 0):
+                return
+            j["status"] = "failed"
+            j["error"] = j["recorder"].error or reason or "no data captured"
+            self.jobs_changed.emit()
+
+        QTimer.singleShot(1500, validate)
+
     def finish_all_inplayer(self, reason: str = "") -> None:
         for j in list(self.jobs):
             if j.get("inplayer") and j["status"] == "recording":
@@ -319,6 +358,8 @@ class RecordingManager(QObject):
                 continue
             if j.get("inplayer") and j["status"] == "recording":
                 self.finish_inplayer(job_id)
+            elif j["status"] == "recording" and j.get("recorder") is not None:
+                self._finish_buffer(j, "stopped")
             elif j["status"] == "recording":
                 self._stop_proc(j)
                 j["status"] = "done"
@@ -496,6 +537,19 @@ class RecordingManager(QObject):
                     self.finish_inplayer(j["id"], "finished")
                 elif self._over_size_cap(j, cap):
                     self.finish_inplayer(j["id"], "size limit reached")
+            elif j["status"] == "recording" and j.get("recorder") is not None:
+                # From the rewind buffer, in the background.
+                rec = j["recorder"]
+                if j.get("stop") is not None and j["stop"] <= now:
+                    self._finish_buffer(j, "finished")
+                    changed = True
+                elif self._over_size_cap(j, cap):
+                    self._finish_buffer(j, "size limit reached")
+                    changed = True
+                elif not rec.alive:
+                    # Its buffer went (the app's buffer turned off, ...).
+                    self._finish_buffer(j, "the buffer ended")
+                    changed = True
             elif j["status"] == "recording":
                 rc = j["proc"].poll() if j.get("proc") else 0
                 if ((j.get("stop") is not None and j["stop"] <= now)
@@ -524,6 +578,9 @@ class RecordingManager(QObject):
     def shutdown(self) -> None:
         self.finish_all_inplayer("app closed")
         for j in self.jobs:
-            if j["status"] == "recording" and not j.get("inplayer"):
+            if j["status"] == "recording" and j.get("recorder") is not None:
+                j["recorder"].stop()
+                j["status"] = "done"
+            elif j["status"] == "recording" and not j.get("inplayer"):
                 self._stop_proc(j)
         self._save()

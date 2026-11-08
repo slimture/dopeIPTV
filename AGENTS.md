@@ -30,6 +30,8 @@ map and the one-way import rule.
 | `core/dvr_ingest.py` | Its one provider connection (reconnects as runs, gives up cleanly) |
 | `core/dvr_server.py` | Its loopback server mpv plays from (token, live TS) |
 | `core/dvr_session.py` | `DvrSession`: ingest, store and server for one live channel |
+| `core/dvr_pool.py` | `DvrPool`: every channel's buffer this session (frozen history, one space budget) |
+| `core/dvr_record.py` | `BufferRecorder`: a recording read from a buffer, no connection of its own |
 | `core/recording.py` | Recording manager |
 | `core/updates.py` | GitHub latest-release check |
 | `core/selfupdate.py` | AppImage in-place update (download, checksum, self-check, swap) |
@@ -138,7 +140,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   `DOPEIPTV_LOG=debug` shows debug traces; `DOPEIPTV_LOG_FILE=/path` tees
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
-  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna), `core/` (stores, local_buffer, dvr_store/ingest/server/session, updates, log,
+  epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log,
   player_exec, wakelock, selfupdate, gcguard) and `services/` (resume,
   coverart, reminders, mpris, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,

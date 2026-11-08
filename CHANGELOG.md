@@ -48,12 +48,29 @@ date.
   dropped provider connection is opened again by itself, and the gap is
   skipped, never played across; when it gives up, the app's reconnect
   takes over as before. One provider connection, as before - switching
-  channels closes it before the next opens - and the channel's history is
-  dropped then (the store is wiped at start and exit). Off by default, and
-  with it off live channels play exactly as before; ts only, m3u8 plays as
+  channels closes it before the next opens. Off by default, and with it
+  off live channels play exactly as before; ts only, m3u8 plays as
   before. Measured: the window's event loop is no slower with it on.
-  Designed with Luca Merega in the issue that followed pull request #22;
-  history across channels and recording from the buffer are the next steps.
+  Designed with Luca Merega in the issue that followed pull request #22.
+- **Each channel keeps its history (own buffer).** A channel you leave
+  keeps what was kept of it - frozen, its provider connection closed at
+  once - and coming back to it, the DVR row has that history again, with
+  a tick where you were away (the pointer on the row shows the time, and
+  "nothing kept here" in the gap, which is skipped, never played across).
+  Opening the channel again after a reconnect keeps it too. One space cap
+  for all of it: history older than the rewind setting goes, and over the
+  cap - or with the disk running low - the channels left longest ago give
+  way first, then the one watched; at most eight channels are kept. Only
+  for this session: all of it is wiped when the app closes. Settings shows
+  where it is and how much it takes, with a button to open the folder.
+- **Record from the buffer.** With the own buffer, "Record" in the player
+  records from it: no connection of its own, whole through a pause or a
+  rewind (the buffer goes on downloading), and from what is on screen -
+  rewound, that is the past. Changing channel while it records offers to
+  let it go on in the background over a second connection, where the
+  account allows more than one (an account that says it allows one is
+  only offered to stop); coming back to that channel takes no other
+  connection. Across a reconnect gap it goes on with what follows.
 - **Refresh the guide from the guide.** A ↻ button in the programme guide's
   window, and "Refresh guide now" in its right-click menu - on a channel
   without programmes and on an empty spot too - fetch the guide again and

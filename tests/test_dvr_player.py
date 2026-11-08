@@ -138,3 +138,44 @@ def test_a_stall_reopens_where_it_was():
     p._dvr_open_wall = 1030.0
     assert p._dvr_on_stall() is True
     assert m.played == ["local:17"]               # 1034 is in seq 17
+
+
+def test_the_row_marks_a_gap_and_says_so_under_the_pointer():
+    from dopeiptv.i18n import tr
+    s = Session()
+    s.runs = lambda: [(0, 1000.0, 1050.0), (1, 1100.0, 1198.0)]
+    p = Player(Mpv(), s)
+    assert p._dvr_gaps(0.0, 198.0) == [round(100 / 198, 3)]
+    assert p._dvr_hover(0.0, 198.0, 0.3).endswith(tr("dvr_gap")), \
+        "nothing was kept between the two runs"
+    assert tr("dvr_gap") not in p._dvr_hover(0.0, 198.0, 0.9)
+
+
+def test_a_recording_reads_the_buffer_from_what_is_on_screen():
+    s = Session()
+    asked = []
+
+    class Rec:
+        stopped = False
+
+        def stop(self):
+            Rec.stopped = True
+
+    s.record = lambda path, at: asked.append((path, at)) or Rec()
+    p = Player(Mpv(playback_time=30.0), s)
+    assert p._dvr_record("/tmp/x.ts")
+    assert asked == [("/tmp/x.ts", 1030.0)], "from the picture on screen"
+    rec = p.take_buffer_recorder()
+    assert isinstance(rec, Rec) and p.take_buffer_recorder() is None
+    p._buffer_rec = rec
+    p._stop_buffer_record()
+    assert Rec.stopped
+
+
+def test_leaving_a_channel_hands_it_back_to_the_pool():
+    released = []
+    p = Player(Mpv(), Session())
+    p._dvr_pool = SimpleNamespace(release=released.append, sessions=[])
+    s = p._dvr
+    p._end_dvr()
+    assert released == [s] and p._dvr is None

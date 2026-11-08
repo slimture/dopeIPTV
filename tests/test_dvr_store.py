@@ -142,3 +142,18 @@ def test_abandoned_session_folders_are_swept(tmp_path):
     os.utime(old, (t, t))
     assert sweep_abandoned(tmp_path) == 1
     assert not old.exists() and new.exists()
+
+
+def test_live_waits_for_the_run_that_is_coming_not_the_one_before(tmp_path):
+    """A channel come back to, or a reconnect: the end of the run before
+    is history - joining live must wait for the new run's first bytes."""
+    import threading
+    from dopeiptv.core.dvr_store import SegmentStore
+    st = SegmentStore(tmp_path / "s", 600, 10**9, min_free=0)
+    st.append(b"\x47" + b"x" * 187)
+    assert st.wait_for_data(0.1)
+    st.new_run()
+    assert not st.wait_for_data(0.2), "the old run's bytes are not live"
+    threading.Timer(0.2, lambda: st.append(b"\x47" + b"y" * 187)).start()
+    assert st.wait_for_data(3.0)
+    assert st.live_segment(4.0).run == 1

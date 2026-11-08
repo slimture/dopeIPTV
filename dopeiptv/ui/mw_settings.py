@@ -64,7 +64,7 @@ from ..core.local_buffer import MEMORY_MAX_MINUTES
 from ..core.log import log
 from ..core.xdg import open_url
 from ..core.recording import format_size
-from ..media.dvr_player import DVR_SPACE_GB
+from ..media.dvr_player import DVR_SPACE_GB, dvr_base
 from ..media.embedded import SUB_COLORS, SUB_SCALES
 from ..media.players import embedded_playback_reason
 from .theme import (
@@ -803,6 +803,20 @@ class _SettingsMixin:
         space_row = c.row(tr("setting_dvr_space"), space_box,
                           tr("setting_dvr_space_hint"))
         c.shown_if(space_row, kept_box.isChecked)
+        # Where it is, what it takes now, and that it is only for now.
+        dvr_dir = dvr_base()
+        where_btn = QPushButton(tr("btn_open_folder"))
+        where_btn.setToolTip(str(dvr_dir))
+
+        def open_dvr_dir() -> None:
+            dvr_dir.mkdir(parents=True, exist_ok=True)
+            open_url(dvr_dir.as_uri())
+        where_btn.clicked.connect(open_dvr_dir)
+        where_row = c.row(
+            tr("setting_dvr_where") + " · " + tr(
+                "dvr_where_now", size=format_size(dir_size_bytes(dvr_dir))),
+            where_btn, tr("setting_dvr_where_hint") + "\n" + str(dvr_dir))
+        c.shown_if(where_row, kept_box.isChecked)
         # mpv's disk cache is beside the point with the app's own buffer.
         c.shown_if(rewind_disk_box.parentWidget(),
                    lambda: not kept_box.isChecked())

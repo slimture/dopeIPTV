@@ -444,6 +444,16 @@ class RewindBarMixin:
         self.local_buffer_time.setText(
             f"{name}{span}" if at_live
             else f"{name}−{_format_time(behind)} / {span}")
+        # The app's own buffer: a tick where it has a gap (a channel left
+        # and come back to, or a reconnect), and the clock under the pointer.
+        if self._dvr is not None:
+            start, dspan = window.start, self._dvr_span
+            self.local_buffer_seek.set_markers(self._dvr_gaps(start, dspan))
+            self.local_buffer_seek.set_time_provider(
+                lambda f, a=start, b=dspan: self._dvr_hover(a, b, f))
+        else:
+            self.local_buffer_seek.set_markers([])
+            self.local_buffer_seek.set_time_provider(None)
         if not self.local_buffer_seek.dragging:
             self._local_slider_window = window
             self.local_buffer_seek.setRange(0, max(1, int(self._dvr_span)))

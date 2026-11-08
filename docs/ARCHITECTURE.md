@@ -38,6 +38,8 @@ dopeiptv/
     dvr_ingest.py      Its one provider connection
     dvr_server.py      Its loopback server for mpv (token, live TS)
     dvr_session.py     Ingest + store + server for one live channel
+    dvr_pool.py        Every channel's buffer this session, one budget
+    dvr_record.py      A recording read from a buffer
     recording.py       RecordingManager - ffmpeg/mpv stream-copy, timers
     updates.py         GitHub latest-release check (is_newer, fetch)
     selfupdate.py      AppImage in-place update: download, verify, test, swap

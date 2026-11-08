@@ -140,9 +140,9 @@ class SegmentStore:
 
     # -- retention -----------------------------------------------------------
 
-    def _evict(self, now: float) -> None:
+    def _evict(self, now: float, keep_one: bool = True) -> None:
         total = sum(s.size for s in self._segs)
-        while len(self._segs) > 1:
+        while len(self._segs) > (1 if keep_one else 0):
             oldest = self._segs[0]
             too_old = now - oldest.t1 > self.keep_seconds
             too_big = total > self.max_bytes
@@ -153,12 +153,43 @@ class SegmentStore:
             self._segs.pop(0)
             del self._by_seq[oldest.seq]
             total -= oldest.size
-            if self._pins.get(oldest.seq):
-                self._doomed[oldest.seq] = oldest.path
-            else:
-                self._unlink(oldest.path)
+            self._forget(oldest)
             if self._low_disk and total <= self.max_bytes // 4:
                 break
+
+    def _forget(self, seg: Segment) -> None:
+        """Delete a segment that is out of the store - once no reader has it
+        open."""
+        if self._pins.get(seg.seq):
+            self._doomed[seg.seq] = seg.path
+        else:
+            self._unlink(seg.path)
+
+    def expire(self) -> None:
+        """Retention for a store nothing writes to (a channel left)."""
+        with self._cond:
+            if not self._closed:
+                self._evict(self._clock(), keep_one=False)
+
+    def trim(self, nbytes: int) -> int:
+        """Let the oldest segments go until *nbytes* are freed - all of
+        them, if need be. The bytes freed."""
+        freed = 0
+        with self._cond:
+            while self._segs and freed < nbytes:
+                seg = self._segs.pop(0)
+                if seg is self._cur:
+                    self._close_current()
+                del self._by_seq[seg.seq]
+                freed += seg.size
+                self._forget(seg)
+            if freed:
+                self.trimmed = True
+        return freed
+
+    def total_bytes(self) -> int:
+        with self._cond:
+            return sum(s.size for s in self._segs)
 
     @staticmethod
     def _unlink(path: Path) -> None:
@@ -225,31 +256,52 @@ class SegmentStore:
                     break
             return best
 
+    def first_from(self, seq: int) -> Segment | None:
+        """The oldest segment held numbered *seq* or later."""
+        with self._cond:
+            for s in self._segs:
+                if s.seq >= seq:
+                    return s
+            return None
+
     def newest(self) -> Segment | None:
         with self._cond:
             return self._segs[-1] if self._segs else None
 
+    def _live_data(self) -> bool:
+        # Bytes of the current run: after a reconnect or a channel come back
+        # to, the end of the run before is history, not live.
+        return bool(self._segs and self._segs[-1].size
+                    and self._segs[-1].run == self._run)
+
     def wait_for_data(self, timeout: float) -> bool:
-        """Wait until a segment with bytes exists (or the store closes)."""
+        """Wait until the current run has bytes (or the store closes)."""
         deadline = time.monotonic() + timeout
         with self._cond:
-            while not (self._segs and self._segs[-1].size) and not self._closed:
+            while not self._live_data() and not self._closed:
                 left = deadline - time.monotonic()
                 if left <= 0:
                     return False
                 self._cond.wait(left)
-            return bool(self._segs and self._segs[-1].size)
+            return self._live_data()
 
     def read_from(self, seq: int, chunk: int = 256 * 1024,
-                  wait: float = 1.0) -> Generator[bytes, None, None]:
+                  wait: float = 1.0,
+                  stop: Callable[[], bool] | None = None,
+                  on_segment: Callable[[Segment], None] | None = None,
+                  ) -> Generator[bytes, None, None]:
         """The bytes from segment *seq* on, following the store live, until
-        the run ends, the next segment is gone or the store closes."""
+        the run ends, the next segment is gone or the store closes - or,
+        once *stop* says so, until what there is has been read. *on_segment*
+        hears of each segment as reading moves onto it."""
         with self._cond:
             seg = self._by_seq.get(seq)
             if seg is None:
                 return
             run = seg.run
         while True:
+            if on_segment is not None:
+                on_segment(seg)
             self._pin(seg.seq)
             try:
                 with open(seg.path, "rb") as fh:
@@ -266,6 +318,8 @@ class SegmentStore:
                             if seg.closed and pos >= seg.size:
                                 break
                             if pos >= seg.size:
+                                if stop is not None and stop():
+                                    return
                                 self._cond.wait(wait)
             except OSError:
                 return
@@ -277,6 +331,8 @@ class SegmentStore:
                     # The next segment of this run not started yet, or the
                     # run has ended.
                     if self._run != run or seg.seq + 1 < self._next_seq:
+                        return
+                    if stop is not None and stop():
                         return
                     self._cond.wait(wait)
                     nxt = self._by_seq.get(seg.seq + 1)

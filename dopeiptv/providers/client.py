@@ -44,6 +44,7 @@ class XtreamClient:
             self.server = "http://" + self.server
         self.username = username
         self.password = password
+        self.max_connections: int | None = None
         # From here on these two strings are masked out of every log record,
         # wherever they turn up - a stream URL, a requests exception, a line
         # written long after this call.
@@ -340,6 +341,12 @@ class XtreamClient:
             log.warning("xtream auth @ %s: rejected (auth != 1, status=%s)",
                         self.server, ui.get("status"))
             raise LocalizedError("err_wrong_login")
+        # How many streams the account allows at once, when it says: a
+        # recording that would need a second one is not offered with one.
+        try:
+            self.max_connections = int(ui.get("max_connections") or 0) or None
+        except (TypeError, ValueError):
+            self.max_connections = None
         log.info(
             "xtream auth @ %s: ok - status=%s exp=%s connections=%s/%s trial=%s",
             self.server, ui.get("status"), ui.get("exp_date"),

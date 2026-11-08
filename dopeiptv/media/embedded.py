@@ -4017,6 +4017,10 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
     # -- stream recording ------------------------------------------------------
 
     def start_stream_record(self, path: str) -> bool:
+        # With the app's own buffer the recording reads the buffer: no
+        # connection of its own, and a pause or a rewind leaves it whole.
+        if self._dvr is not None and self._dvr_record(path):
+            return True
         m = self.video.mpv
         if m is None:
             return False
@@ -4028,6 +4032,7 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
             return False
 
     def stop_stream_record(self) -> None:
+        self._stop_buffer_record()
         m = self.video.mpv
         if m is None:
             return
@@ -4106,6 +4111,7 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
 
     def shutdown(self) -> None:
         self.stop_stream_record()
+        self.dvr_shutdown()
         self._pos_timer.stop()
         self._stats_timer.stop()
         self.video.shutdown()
