@@ -237,8 +237,11 @@ jobs:
           # ask twice. The Windows job's fetches have had this since they
           # were written; these two never did.
           fetch() {
-            wget -q --tries=4 --timeout=30 --waitretry=5 \
-              --retry-connrefused -O "$1" "$2"
+            # A 5xx from GitHub's release downloads is retried too, for
+            # up to about two minutes: the 504s of 8 Nov 2026 came and went.
+            wget -q --tries=8 --timeout=30 --waitretry=15 \
+              --retry-connrefused --retry-on-http-error=429,500,502,503,504 \
+              -O "$1" "$2"
           }
           fetch /usr/local/bin/appimagetool \
             https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-${{ matrix.arch }}.AppImage
@@ -1096,7 +1099,10 @@ jobs:
           }
           url=$(api | python tools/pick_mpv_asset.py ${{ matrix.mpv_arch }})
           echo "mpv-dev: $url"
-          curl -sSL --retry 3 --retry-delay 5 -o mpv-dev.7z "$url"
+          # -f: a 504 page is an error to retry, not an archive to unpack
+          # (it was saved as mpv-dev.7z, 92 bytes, on 8 Nov 2026).
+          curl -fsSL --retry 8 --retry-delay 15 --retry-all-errors \
+            -o mpv-dev.7z "$url"
           7z x mpv-dev.7z -ompv-dev
           dll=$(find mpv-dev -iname 'libmpv-2.dll' -o -iname 'mpv-2.dll' | head -1)
           echo "libmpv dll: $dll"
