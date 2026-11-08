@@ -326,6 +326,8 @@
   "mv_cell": "Prozor {n}",
   "mv_live": "UŽIVO",
   "dvr_live_tip": "Natrag na najnoviji dio međuspremnika.",
+  "bar_dvr_tip": "Međuspremnik koji dopeIPTV čuva za ovaj kanal: odmah, koliko unatrag seže.",
+  "bar_timeshift_tip": "Arhiva pružatelja za ovaj kanal: dalje unatrag, s emisijama iz vodiča duž trake.",
   "dvr_live_reopen_tip": "Kanal je otišao dalje od međuspremnika: LIVE ga ponovno otvara uživo, a međuspremnik počinje ispočetka. Da biste ostali u njemu, radije povucite traku do kraja.",
   "mv_pause": "Pauziraj / reproduciraj",
   "mv_conflict_title": "Multiview je pokrenut",

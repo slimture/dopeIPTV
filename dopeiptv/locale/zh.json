@@ -326,6 +326,8 @@
   "mv_cell": "窗口 {n}",
   "mv_live": "直播",
   "dvr_live_tip": "回到缓冲中最新的部分。",
+  "bar_dvr_tip": "dopeIPTV 为此频道保留的缓冲：即时，可回退到保留的最早处。",
+  "bar_timeshift_tip": "提供商为此频道提供的存档：可回退更远，并标出节目单中的节目。",
   "dvr_live_reopen_tip": "频道已超出缓冲：LIVE 会以直播重新打开频道，缓冲将从头开始。若要留在缓冲中，请改为把进度条拖到末尾。",
   "mv_pause": "暂停 / 播放",
   "mv_conflict_title": "多画面正在运行",

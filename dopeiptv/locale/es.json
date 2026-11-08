@@ -326,6 +326,8 @@
   "mv_cell": "Ventana {n}",
   "mv_live": "EN VIVO",
   "dvr_live_tip": "Volver a lo más reciente del búfer.",
+  "bar_dvr_tip": "El búfer que dopeIPTV guarda de este canal: al instante, hasta donde llega.",
+  "bar_timeshift_tip": "El archivo del proveedor para este canal: más atrás, con los programas de la guía a lo largo.",
   "dvr_live_reopen_tip": "El canal ha avanzado más allá del búfer: LIVE lo vuelve a abrir en directo y el búfer empieza de nuevo. Para quedarte en él, arrastra la barra hasta el final.",
   "mv_pause": "Pausar / reproducir",
   "mv_conflict_title": "Multivista está activa",

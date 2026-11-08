@@ -68,6 +68,18 @@ date.
   the website never see them. The AppImage updates itself in place on
   either channel; it is checked every six hours on Test builds.
 
+### Changed
+
+- **One bar for rewinding on a catch-up channel.** Watched live with the
+  rewind buffer, a channel with the provider's archive had two bars over
+  the video, one above the other: the DVR row and the timeshift timeline.
+  They now take turns in one place, with **DVR | TIMESHIFT** at the left
+  of the bar to switch; the choice is kept for the next channel. A seek
+  in the buffer (the arrow keys, -10 s) shows the DVR row, a step into the
+  archive (Shift+arrow) the timeline. The timeline has the DVR row's
+  panel, and no longer a darker box behind its slider. Fullscreen is as
+  before: the timeline alone.
+
 ## [1.3.0]
 
 Rewind a live channel, a new look - eight more themes, accents, corners,

@@ -326,6 +326,8 @@
   "mv_cell": "Cửa sổ {n}",
   "mv_live": "TRỰC TIẾP",
   "dvr_live_tip": "Quay lại phần mới nhất của bộ đệm.",
+  "bar_dvr_tip": "Bộ đệm dopeIPTV giữ cho kênh này: tức thì, xa nhất có thể trong phần đã giữ.",
+  "bar_timeshift_tip": "Kho lưu trữ của nhà cung cấp cho kênh này: lùi xa hơn, kèm các chương trình trong lịch phát.",
   "dvr_live_reopen_tip": "Kênh đã chạy vượt quá bộ đệm: LIVE mở lại kênh ở phát trực tiếp và bộ đệm bắt đầu lại. Để ở lại trong bộ đệm, hãy kéo thanh đến cuối thay vì vậy.",
   "mv_pause": "Tạm dừng / phát",
   "mv_conflict_title": "Xem đa kênh đang chạy",

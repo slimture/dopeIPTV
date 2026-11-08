@@ -326,6 +326,8 @@
   "mv_cell": "Janela {n}",
   "mv_live": "AO VIVO",
   "dvr_live_tip": "Voltar à parte mais recente do buffer.",
+  "bar_dvr_tip": "O buffer que o dopeIPTV guarda deste canal: instantâneo, até onde chega.",
+  "bar_timeshift_tip": "O arquivo do fornecedor para este canal: mais atrás, com os programas do guia ao longo.",
   "dvr_live_reopen_tip": "O canal avançou para lá do buffer: LIVE volta a abri-lo em direto e o buffer recomeça. Para ficar nele, arraste antes a barra até ao fim.",
   "mv_pause": "Pausar / reproduzir",
   "mv_conflict_title": "O multiview está em execução",

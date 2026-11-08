@@ -326,6 +326,8 @@
   "mv_cell": "Fenêtre {n}",
   "mv_live": "EN DIRECT",
   "dvr_live_tip": "Revenir à la partie la plus récente de la mémoire tampon.",
+  "bar_dvr_tip": "Le tampon que dopeIPTV garde de cette chaîne : instantané, aussi loin qu'il remonte.",
+  "bar_timeshift_tip": "L'archive du fournisseur pour cette chaîne : plus loin en arrière, avec les programmes du guide le long.",
   "dvr_live_reopen_tip": "La chaîne a pris de l'avance sur la mémoire tampon : LIVE la rouvre en direct et la mémoire tampon repart de zéro. Pour y rester, faites plutôt glisser la barre jusqu'au bout.",
   "mv_pause": "Pause / lecture",
   "mv_conflict_title": "Le multivue est actif",

@@ -199,6 +199,7 @@ def _dvr_player(window):
     m = Mpv()
     p = SimpleNamespace(
         video=SimpleNamespace(mpv=m), current_url="http://x.invalid/l.ts",
+        _sync_bar_switch=lambda: False,
         _local_buffer_enabled=True, _local_buffer_ready=False,
         _local_slider_window=None, _local_fs_window=None, _paused=False,
         _dvr_live=True, _live_ahead=0.0, _dvr_span=0.0, _live_lag=LiveLag(),

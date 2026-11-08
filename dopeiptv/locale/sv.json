@@ -326,6 +326,8 @@
   "mv_cell": "Fönster {n}",
   "mv_live": "DIREKT",
   "dvr_live_tip": "Tillbaka till det nyaste i bufferten.",
+  "bar_dvr_tip": "Bufferten dopeIPTV sparar av kanalen: direkt, så långt bak som den har sparat.",
+  "bar_timeshift_tip": "Leverantörens arkiv för kanalen: längre bak, med programmen ur tablån längs vägen.",
   "dvr_live_reopen_tip": "Kanalen har hunnit före bufferten: LIVE öppnar den på nytt vid live, och bufferten börjar om. Dra reglaget till slutet i stället för att stanna i den.",
   "mv_pause": "Pausa / spela",
   "mv_conflict_title": "Multiview är igång",

@@ -326,6 +326,8 @@
   "mv_cell": "Pencere {n}",
   "mv_live": "CANLI",
   "dvr_live_tip": "Arabelleğin en yeni kısmına dön.",
+  "bar_dvr_tip": "dopeIPTV'nin bu kanal için tuttuğu tampon: anında, tuttuğu kadar geriye.",
+  "bar_timeshift_tip": "Sağlayıcının bu kanal için arşivi: daha geriye, rehberdeki programlarla birlikte.",
   "dvr_live_reopen_tip": "Kanal arabelleğin ötesine geçti: LIVE onu canlı yayında yeniden açar ve arabellek baştan başlar. Arabellekte kalmak için bunun yerine çubuğu sonuna sürükleyin.",
   "mv_pause": "Duraklat / oynat",
   "mv_conflict_title": "Çoklu görünüm çalışıyor",

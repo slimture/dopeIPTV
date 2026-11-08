@@ -326,6 +326,8 @@
   "mv_cell": "Dirisha {n}",
   "mv_live": "MOJA KWA MOJA",
   "dvr_live_tip": "Rudi kwenye sehemu mpya zaidi ya bafa.",
+  "bar_dvr_tip": "Bafa ambayo dopeIPTV huhifadhi ya chaneli hii: papo hapo, nyuma kadiri ilivyohifadhi.",
+  "bar_timeshift_tip": "Hifadhi ya mtoa huduma ya chaneli hii: nyuma zaidi, pamoja na vipindi vya mwongozo kandokando.",
   "dvr_live_reopen_tip": "Chaneli imesonga mbele kupita bafa: LIVE huifungua tena moja kwa moja, na bafa huanza upya. Ili kubaki ndani yake, buruta upau hadi mwisho badala yake.",
   "mv_pause": "Sitisha / cheza",
   "mv_conflict_title": "Mtazamo wa wingi unaendeshwa",

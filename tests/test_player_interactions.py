@@ -134,12 +134,57 @@ p._hide_local_buffer()
 assert not p.local_buffer_bar.isHidden(), 'must stay visible while scrubbing'
 p.local_buffer_seek.dragging = False
 
+# A catch-up channel watched live: the DVR row and the timeshift timeline
+# take turns in one place - never one above the other - and the switch on
+# either picks which; the choice is kept.
+p._local_buffer_enabled = True    # a live channel, played with one
+p.set_seek_mode('timeline')
+p.enter_timeshift(180)
+assert p.ts_timeline.isHidden(), 'no timeline first where the DVR row comes'
+p._update_local_buffer(22)
+assert not p._dvr_switch.isHidden() and not p._ts_switch.isHidden()
+assert not p.local_buffer_time.text().startswith('DVR'), \
+    'the lit switch names the row'
+def one_bar():
+    shown = [b for b in (p.local_buffer_bar, p.ts_timeline) if not b.isHidden()]
+    assert len(shown) == 1, 'exactly one bar over the video'
+    return shown[0]
+hover(80)
+assert one_bar() is p.local_buffer_bar
+dvr_bottom = p.local_buffer_bar.geometry().bottom()
+p._dvr_switch.buttons['timeshift'].click()
+assert one_bar() is p.ts_timeline
+assert abs(p.ts_timeline.geometry().bottom() - dvr_bottom) <= 2, 'same place'
+assert h.settings.value('rewind_bar_view') == 'timeshift'
+hover(100)
+hover(120)
+assert one_bar() is p.ts_timeline, 'hover keeps the chosen bar'
+p._ts_switch.buttons['dvr'].click()
+assert one_bar() is p.local_buffer_bar
+assert h.settings.value('rewind_bar_view') == 'dvr'
+p._dvr_switch.buttons['timeshift'].click()
+p._relative_seek(-10)
+assert one_bar() is p.local_buffer_bar, 'a seek in the buffer shows the buffer'
+# Fullscreen has the timeline alone: no switch there.
+p.set_fullscreen_ui(True)
+assert p._ts_switch.isHidden()
+p.set_fullscreen_ui(False)
+assert not p._ts_switch.isHidden()
+# A plain live channel has no timeline: no switch, and the row says DVR.
+p.set_seek_mode('live')
+p._update_local_buffer(22)
+assert p._dvr_switch.isHidden() and p._ts_switch.isHidden()
+assert p.local_buffer_time.text().startswith('DVR ')
+
 assert len(i18n.LANGUAGES) == 27
 for code, _name in i18n.LANGUAGES:
     i18n.set_language(code)
     p.retranslate_ui()
     assert p.local_buffer_live.text() == i18n.tr('mv_live'), code
     assert p.local_buffer_seek.toolTip() == i18n.tr('tooltip_timeshift'), code
+    assert p._ts_switch.buttons['timeshift'].text() == \
+        i18n.tr('player_timeshift'), code
+    assert p._dvr_switch.buttons['dvr'].toolTip() == i18n.tr('bar_dvr_tip'), code
 i18n.set_language('en')
 print('PLAYER_INTERACTIONS_27_LANGUAGES_OK', flush=True)
 os._exit(0)

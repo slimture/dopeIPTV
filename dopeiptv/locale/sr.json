@@ -326,6 +326,8 @@
   "mv_cell": "Prozor {n}",
   "mv_live": "UŽIVO",
   "dvr_live_tip": "Nazad na najnoviji deo bafera.",
+  "bar_dvr_tip": "Bafer koji dopeIPTV čuva za ovaj kanal: odmah, koliko unazad seže.",
+  "bar_timeshift_tip": "Arhiva dobavljača za ovaj kanal: dalje unazad, sa emisijama iz vodiča duž trake.",
   "dvr_live_reopen_tip": "Kanal je otišao dalje od bafera: LIVE ga ponovo otvara uživo, a bafer počinje iznova. Da biste ostali u njemu, radije prevucite traku do kraja.",
   "mv_pause": "Pauza / pusti",
   "mv_conflict_title": "Višestruki prikaz je pokrenut",

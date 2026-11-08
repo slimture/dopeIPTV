@@ -326,6 +326,8 @@
   "mv_cell": "Venster {n}",
   "mv_live": "LIVE",
   "dvr_live_tip": "Terug naar het nieuwste deel van de buffer.",
+  "bar_dvr_tip": "De buffer die dopeIPTV van deze zender bijhoudt: direct, zo ver terug als hij reikt.",
+  "bar_timeshift_tip": "Het archief van de provider voor deze zender: verder terug, met de programma's uit de gids erlangs.",
   "dvr_live_reopen_tip": "De zender is de buffer voorbij: LIVE opent hem opnieuw live en de buffer begint opnieuw. Sleep de balk liever naar het einde om in de buffer te blijven.",
   "mv_pause": "Pauzeren / afspelen",
   "mv_conflict_title": "Multiview is actief",

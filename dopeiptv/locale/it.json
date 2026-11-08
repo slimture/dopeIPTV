@@ -326,6 +326,8 @@
   "mv_cell": "Finestra {n}",
   "mv_live": "LIVE",
   "dvr_live_tip": "Torna alla parte più recente del buffer.",
+  "bar_dvr_tip": "Il buffer che dopeIPTV tiene di questo canale: immediato, fin dove arriva.",
+  "bar_timeshift_tip": "L'archivio del provider per questo canale: più indietro, con i programmi della guida lungo la barra.",
   "dvr_live_reopen_tip": "Il canale è andato oltre il buffer: LIVE lo riapre in diretta e il buffer ricomincia da capo. Per restarci, trascina invece la barra fino alla fine.",
   "mv_pause": "Pausa / riproduci",
   "mv_conflict_title": "Il multiview è in esecuzione",

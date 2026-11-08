@@ -326,6 +326,8 @@
   "mv_cell": "Fenster {n}",
   "mv_live": "LIVE",
   "dvr_live_tip": "Zurück zum neuesten Teil des Puffers.",
+  "bar_dvr_tip": "Der Puffer, den dopeIPTV von diesem Sender behält: sofort, so weit zurück, wie er reicht.",
+  "bar_timeshift_tip": "Das Archiv des Anbieters für diesen Sender: weiter zurück, mit den Sendungen des Programmführers entlang.",
   "dvr_live_reopen_tip": "Der Sender ist dem Puffer voraus: LIVE öffnet ihn neu beim Live-Bild, und der Puffer beginnt von vorn. Um im Puffer zu bleiben, ziehen Sie den Regler stattdessen ans Ende.",
   "mv_pause": "Pause / Wiedergabe",
   "mv_conflict_title": "Multiview läuft",

@@ -1014,6 +1014,52 @@ class _RasterMirror(QWidget):
         self.video_dbl_click.emit()
 
 
+class _BarSwitch(QWidget):
+    """DVR | TIMESHIFT at the left of the bar over the video, for a catch-up
+    channel watched live with a rewind buffer: the DVR row (the buffer,
+    instant) and the timeshift timeline (the provider's archive) take turns
+    in one place instead of lying one above the other. Each bar has its own
+    switch with its own side lit, so the two never need keeping in step."""
+
+    picked = pyqtSignal(str)
+
+    _STYLE = (
+        "QWidget#BarSwitch { background: rgba(255,255,255,0.10);"
+        " border-radius: 6px; }"
+        "QPushButton { background: transparent; border: none;"
+        " border-radius: 5px; padding: 2px 8px; font-size: 11px;"
+        " font-weight: 700; color: rgba(255,255,255,0.62); }"
+        "QPushButton:hover { color: #FFFFFF;"
+        " background: rgba(255,255,255,0.14); }"
+        "QPushButton[lit=\"true\"] { color: #FFFFFF;"
+        " background: rgba(255,255,255,0.26); }")
+
+    def __init__(self, lit: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent, objectName="BarSwitch")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setStyleSheet(self._STYLE)
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(2, 2, 2, 2)
+        lay.setSpacing(2)
+        self.buttons: dict[str, QPushButton] = {}
+        for view in ("dvr", "timeshift"):
+            b = QPushButton()
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setProperty("lit", view == lit)
+            b.clicked.connect(lambda _=False, v=view: self.picked.emit(v))
+            lay.addWidget(b)
+            self.buttons[view] = b
+        self.retranslate()
+        self.hide()
+
+    def retranslate(self) -> None:
+        dvr, ts = self.buttons["dvr"], self.buttons["timeshift"]
+        dvr.setText("DVR")
+        dvr.setToolTip(tr("bar_dvr_tip"))
+        ts.setText(tr("player_timeshift"))
+        ts.setToolTip(tr("bar_timeshift_tip"))
+
+
 class _SeekSlider(QSlider):
     """Horizontal seek bar: click jumps to position, drag scrubs, seek on
     release, and hovering says what is under the cursor.
@@ -1519,6 +1565,12 @@ class EmbeddedPlayer(DvrPlayerMixin, QWidget):
         for widget in self._local_buffer_controls:
             widget.setMouseTracking(True)
             widget.installEventFilter(self)
+        # A catch-up channel: this row and the timeshift timeline take turns
+        # (_bars_shared); which one shows is _bar_view.
+        self._dvr_switch = _BarSwitch("dvr")
+        self._dvr_switch.picked.connect(self._pick_bar)
+        self._bar_view = self._chosen_bar()
+        local_layout.addWidget(self._dvr_switch)
         local_layout.addWidget(self.local_buffer_time)
         local_layout.addWidget(self.local_buffer_seek, 1)
         local_layout.addWidget(self.local_buffer_live)
@@ -1937,12 +1989,19 @@ class EmbeddedPlayer(DvrPlayerMixin, QWidget):
         # the provider archive (opens a catch-up segment there). Shown only for
         # timeshift channels; VOD keeps the ordinary seek bar.
         self._ts_depth = 1
-        self.ts_timeline = QWidget(self)
+        # The same panel as the DVR row, which takes its place by turns on a
+        # channel that has both. Its rule names the panel only: a bare
+        # "background" here also painted a box behind the slider.
+        self.ts_timeline = QWidget(self, objectName="TsTimeline")
         self.ts_timeline.setStyleSheet(
-            "background: rgba(0,0,0,150); border-radius: 10px;")
+            "QWidget#TsTimeline { background: rgba(16,16,20,215);"
+            " border-radius: 8px; }")
         _tl = QHBoxLayout(self.ts_timeline)
-        _tl.setContentsMargins(12, 6, 12, 6)
-        _tl.setSpacing(10)
+        _tl.setContentsMargins(8, 5, 8, 5)
+        _tl.setSpacing(8)
+        self._ts_switch = _BarSwitch("timeshift")
+        self._ts_switch.picked.connect(self._pick_bar)
+        _tl.addWidget(self._ts_switch)
         self.ts_slider = _SeekSlider()
         self.ts_slider.setMouseTracking(True)   # hover tooltips w/o a pressed button
         self.ts_slider.seek_requested.connect(self._on_ts_seek)
@@ -2005,6 +2064,8 @@ class EmbeddedPlayer(DvrPlayerMixin, QWidget):
         self.fs_exit_btn.setToolTip(tr("tooltip_exit_fullscreen") + " (Esc)")
         self._label_live_button(force=True)
         self.local_buffer_seek.setToolTip(tr("tooltip_timeshift"))
+        self._dvr_switch.retranslate()
+        self._ts_switch.retranslate()
 
     # -- event filter (fullscreen overlay reveal on hover) --------------------
 
@@ -2800,7 +2861,9 @@ class EmbeddedPlayer(DvrPlayerMixin, QWidget):
         self.ts_slider.set_time_provider(self._ts_hover_time_label)
         self.ts_label.setText("● " + tr("mv_live"))
         self.ts_live_btn.hide()
-        self._show_ts_timeline()
+        # With the DVR row to come in its place, no timeline first.
+        if not (self._local_buffer_enabled and self._bar_view == "dvr"):
+            self._show_ts_timeline()
         # On the very first play (esp. the auto-preview at startup) the video
         # surface hasn't been laid out at its docked size yet, so the geometry
         # read above is stale and the bar lands too high. Reposition once the
@@ -2813,6 +2876,10 @@ class EmbeddedPlayer(DvrPlayerMixin, QWidget):
         summon it."""
         if self._seek_mode != "timeline":
             return
+        if self._bars_shared():
+            if self._bar_view != "timeshift":
+                return          # the DVR row has this place
+            self._set_local_buffer_visible(False)
         # Same as _show_seek_overlay: only the fade timer is re-armed while
         # it's already on screen (this is called from the mouse-move path).
         if not self.ts_timeline.isVisible():
@@ -2913,6 +2980,7 @@ class EmbeddedPlayer(DvrPlayerMixin, QWidget):
         the slider."""
         if self._seek_mode != "timeline":
             return
+        self._bar_view = "timeshift"    # where the step goes
         val = max(0, min(self._ts_depth, self.ts_slider.value() + minutes))
         self.ts_slider.setValue(val)
         self.timeshift_seek.emit(int(self._ts_depth - val))
@@ -3038,6 +3106,7 @@ class EmbeddedPlayer(DvrPlayerMixin, QWidget):
                  fullscreen, self.video.width(), self.video.height(),
                  self.video._ctx is not None, self._popout_mode)
         self._fs_ui = fullscreen
+        self._sync_bar_switch()     # fullscreen has the timeline alone
         self.bar.setVisible(not fullscreen)
         if fullscreen:
             self._hide_seek_overlay(force=True)
@@ -3488,6 +3557,7 @@ class EmbeddedPlayer(DvrPlayerMixin, QWidget):
         source = self._dvr_start(url) if local_buffer else None
         self._local_buffer_enabled = local_buffer
         self._local_buffer_ready = False
+        self._bar_view = self._chosen_bar()
         self._local_buffer_hide_timer.stop()
         self._local_slider_window = self._local_fs_window = None
         self._live_lag.reset()
@@ -3724,6 +3794,7 @@ class EmbeddedPlayer(DvrPlayerMixin, QWidget):
     def _relative_seek(self, seconds: int) -> None:
         window = self.local_buffer_window()
         if window is not None:
+            self._bar_view = "dvr"      # the seek is in the buffer: show it
             self._reveal_local_buffer()
             self._seek_local_target(self._local_position() + seconds, window)
             return
@@ -4270,8 +4341,48 @@ class EmbeddedPlayer(DvrPlayerMixin, QWidget):
     def _reveal_local_buffer(self) -> None:
         if not getattr(self, "_local_buffer_ready", False):
             return
+        if self._bars_shared():
+            if self._bar_view != "dvr":
+                return          # the timeshift timeline has this place
+            self._ts_hide_timer.stop()
+            self.ts_timeline.hide()
         self._set_local_buffer_visible(True)
         self._local_buffer_hide_timer.start()
+
+    def _bars_shared(self) -> bool:
+        """A catch-up channel watched live with a rewind buffer: the DVR row
+        and the timeshift timeline take turns in one place. Not in
+        fullscreen, where the DVR row never shows."""
+        return (self._seek_mode == "timeline" and not self._fs_ui
+                and bool(getattr(self, "_local_buffer_enabled", False))
+                and bool(getattr(self, "_local_buffer_ready", False)))
+
+    def _sync_bar_switch(self) -> bool:
+        """The switch shows on both bars while they take turns."""
+        shared = self._bars_shared()
+        if shared == self._dvr_switch.isHidden():
+            self._dvr_switch.setVisible(shared)
+            self._ts_switch.setVisible(shared)
+        return shared
+
+    def _chosen_bar(self) -> str:
+        s = self._settings
+        if s is not None and s.value("rewind_bar_view", "dvr") == "timeshift":
+            return "timeshift"
+        return "dvr"
+
+    def _pick_bar(self, view: str) -> None:
+        """The switch on either bar: show the other one in its place, and
+        keep the choice for the next catch-up channel."""
+        if view not in ("dvr", "timeshift"):
+            return
+        self._bar_view = view
+        if self._settings is not None:
+            self._settings.setValue("rewind_bar_view", view)
+        if view == "dvr":
+            self._reveal_local_buffer()
+        else:
+            self._show_ts_timeline()
 
     def _hide_local_buffer(self) -> None:
         if (self.local_buffer_seek.dragging or self.local_buffer_bar.underMouse()
@@ -4283,6 +4394,7 @@ class EmbeddedPlayer(DvrPlayerMixin, QWidget):
     def _update_local_buffer(self, position: float | None) -> BufferWindow | None:
         window = self.local_buffer_window()
         self._local_buffer_ready = window is not None
+        shared = self._sync_bar_switch()
         if window is None:
             self._local_buffer_hide_timer.stop()
             self._set_local_buffer_visible(False)
@@ -4308,9 +4420,11 @@ class EmbeddedPlayer(DvrPlayerMixin, QWidget):
             st.unpolish(self.local_buffer_live)
             st.polish(self.local_buffer_live)
         span = _format_time(self._dvr_span)
+        # With the switch beside it, its lit DVR names the row already.
+        name = "" if shared else "DVR "
         self.local_buffer_time.setText(
-            f"DVR {span}" if at_live
-            else f"DVR −{_format_time(behind)} / {span}")
+            f"{name}{span}" if at_live
+            else f"{name}−{_format_time(behind)} / {span}")
         if not self.local_buffer_seek.dragging:
             self._local_slider_window = window
             self.local_buffer_seek.setRange(0, max(1, int(self._dvr_span)))

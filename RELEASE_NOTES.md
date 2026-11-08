@@ -19,6 +19,10 @@ up to date.
   that the times were wrong.
 - **Refresh the guide from the guide.** A ↻ button in the programme guide,
   and "Refresh guide now" when you right-click it.
+- **One bar for rewinding.** On a channel with your provider's catch-up,
+  the DVR row and the timeshift timeline no longer lie one above the
+  other: **DVR | TIMESHIFT** at the left of the bar switches between them,
+  and the app remembers which you like.
 - **Help test what is coming.** **Settings → General → Update channel →
   Test builds** offers the test builds of the next version as soon as
   they are built. They can have faults a release does not; back on

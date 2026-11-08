@@ -326,6 +326,8 @@
   "mv_cell": "Jendela {n}",
   "mv_live": "LANGSUNG",
   "dvr_live_tip": "Kembali ke bagian terbaru buffer.",
+  "bar_dvr_tip": "Buffer yang disimpan dopeIPTV dari saluran ini: instan, sejauh yang disimpannya.",
+  "bar_timeshift_tip": "Arsip penyedia untuk saluran ini: lebih jauh ke belakang, dengan acara dari panduan di sepanjangnya.",
   "dvr_live_reopen_tip": "Saluran sudah melewati buffer: LIVE membukanya lagi secara langsung, dan buffer dimulai ulang. Agar tetap di buffer, seret bilah ke ujungnya saja.",
   "mv_pause": "Jeda / putar",
   "mv_conflict_title": "Tampilan ganda sedang berjalan",

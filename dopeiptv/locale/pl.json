@@ -326,6 +326,8 @@
   "mv_cell": "Okno {n}",
   "mv_live": "NA ŻYWO",
   "dvr_live_tip": "Wróć do najnowszej części bufora.",
+  "bar_dvr_tip": "Bufor, który dopeIPTV trzyma z tego kanału: natychmiast, tak daleko wstecz, jak sięga.",
+  "bar_timeshift_tip": "Archiwum dostawcy dla tego kanału: dalej wstecz, z programami z przewodnika wzdłuż paska.",
   "dvr_live_reopen_tip": "Kanał wyprzedził bufor: LIVE otwiera go ponownie na żywo, a bufor zaczyna się od nowa. Aby w nim zostać, przeciągnij zamiast tego pasek do końca.",
   "mv_pause": "Wstrzymaj / odtwórz",
   "mv_conflict_title": "Multiview jest uruchomione",
