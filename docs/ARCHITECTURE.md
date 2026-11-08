@@ -89,6 +89,7 @@ dopeiptv/
     mw_sidebar.py      Sidebar chrome (collapse / icon rail / mid-compact)
     mw_nav.py          Nav chrome (focus mode, nav colours/icons, Library)
     mw_shortcuts.py    Keyboard shortcuts + registry
+    mw_cast.py         Casting: the cast dialog, the strip, archive hand-over
     mw_popout.py       Detached-window ("pop out") player mixin
     mw_multiview.py    Multiview: 2/4/6/9 live streams (own mpv per cell)
     mw_busy.py         Loading indicator + spinner overlay

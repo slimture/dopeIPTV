@@ -16,6 +16,7 @@ device and what was sent there.
 The window methods are borrowed onto a stub: a real MainWindow needs a GL
 surface and a provider, and none of this touches either.
 """
+import inspect
 import os
 import threading
 
@@ -68,7 +69,7 @@ def _window():
     # a plain function turns into an instance method and is handed a self it
     # never asked for.
     def borrow(name):
-        raw = MainWindow.__dict__.get(name)
+        raw = inspect.getattr_static(MainWindow, name)
         return raw if isinstance(raw, staticmethod) else getattr(
             MainWindow, name)
 
@@ -226,7 +227,7 @@ def test_switching_tracks_picks_up_where_the_tv_is(monkeypatch):
     w._cast_ctx = {"url": "http://p/film.mkv", "source": "http://p/film.mkv",
                    "title": "Film", "duration": 6000.0, "audio": None,
                    "subs": None}
-    import dopeiptv.ui.main_window as mwmod
+    import dopeiptv.ui.mw_cast as mwmod
     monkeypatch.setattr(mwmod, "run_async",
                         lambda pool, work, ok, err: sent.update(work=work))
     w._recast_with(None, swede)
@@ -421,7 +422,7 @@ def test_the_codecs_of_what_is_playing_are_written_down(monkeypatch):
     stream, is the only place the answer exists."""
     import types
 
-    import dopeiptv.ui.main_window as mwmod
+    import dopeiptv.ui.mw_cast as mwmod
     rec = _Log()
     monkeypatch.setattr(mwmod, "log", rec)
     w = _window()
@@ -474,7 +475,7 @@ def test_the_archive_url_starts_where_you_paused(monkeypatch):
     w._cast_device = "Alva TV"
     w._cast_ctx = {"archive": True, "sid": 9851, "title": "SVT1"}
     sent = {}
-    import dopeiptv.ui.main_window as mwmod
+    import dopeiptv.ui.mw_cast as mwmod
     monkeypatch.setattr(mwmod, "run_async",
                         lambda pool, work, ok, err: sent.update(work=work))
     at = (datetime.now() - timedelta(minutes=10)).replace(microsecond=0)
@@ -1191,7 +1192,7 @@ def test_going_live_leaves_the_archive_behind(monkeypatch):
                    "row_source": "http://p/live/u/pw/9851.ts",
                    "url": "http://p/timeshift/u/pw/241/x/9851.ts",
                    "archive_from": datetime.now(), "item": {}}
-    import dopeiptv.ui.main_window as mwmod
+    import dopeiptv.ui.mw_cast as mwmod
     monkeypatch.setattr(mwmod, "run_async",
                         lambda pool, work, ok, err: sent.update(work=work))
     w._cast_go_live()
@@ -1297,7 +1298,7 @@ def test_the_archive_is_never_asked_for_a_minute_it_has_not_written():
     w._cast_device = "Alva TV"
     w._local_codecs = lambda: []
     w._cast_ctx = {"archive": True, "sid": 9851, "title": "SVT1", "item": {}}
-    import dopeiptv.ui.main_window as mwmod
+    import dopeiptv.ui.mw_cast as mwmod
     real, mwmod.run_async = mwmod.run_async, lambda p, work, ok, err: None
     try:
         w._cast_from_archive(datetime.now() - timedelta(seconds=5))
@@ -1552,7 +1553,7 @@ def test_buffering_is_not_an_ending(monkeypatch):
     w._cast_from_archive = lambda at, settle=False: asked.append(at)
 
     clock = {"now": 1000.0}
-    import dopeiptv.ui.main_window as mwmod
+    import dopeiptv.ui.mw_cast as mwmod
     monkeypatch.setattr(mwmod.time, "monotonic", lambda: clock["now"])
 
     # Buffering, for as long as it likes, at a position that does not move.
@@ -1726,7 +1727,7 @@ def test_going_live_keeps_the_channel_recorded_so_it_can_be_paused_again():
 
     w.cast = Recorder()
     w.cast.bridged = lambda: True
-    import dopeiptv.ui.main_window as mwmod
+    import dopeiptv.ui.mw_cast as mwmod
     real, mwmod.run_async = mwmod.run_async, lambda p, work, ok, err: work()
     try:
         w._cast_go_live()
@@ -1903,7 +1904,7 @@ def test_the_tracks_menu_can_actually_be_opened():
         def exec(self, *a):
             FakeMenu.opened.append(list(self.items))
 
-    import dopeiptv.ui.main_window as mwmod
+    import dopeiptv.ui.mw_cast as mwmod
     real = mwmod.QMenu
     mwmod.QMenu = FakeMenu
     try:

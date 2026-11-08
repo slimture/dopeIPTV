@@ -75,7 +75,9 @@ in the `mw_*` mixins beside it, each mixed into `MainWindow`:
 (update badge), `mw_reminders`, `mw_sort`, `mw_onboarding`,
 `mw_mpris` (desktop media controls, media keys), `mw_follow` (followed
 series, new-episode news), `mw_subtitles` (OpenSubtitles, subtitles
-remembered per title) and `mw_popout` (detached-window player). What stays in `main_window.py` is
+remembered per title), `mw_cast` (Chromecast and DLNA: the cast
+dialog, the strip, handing over from the archive) and `mw_popout`
+(detached-window player). What stays in `main_window.py` is
 the `__init__`/`_build_ui` composition and the playback path (start/stop,
 seek, fullscreen, reconnect) - keep playback code there.
 When making changes:

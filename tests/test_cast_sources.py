@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import QApplication
 
 from dopeiptv.providers.client import DemoClient
 import dopeiptv.ui.main_window as mw
+import dopeiptv.ui.mw_cast as mw_cast
 
 app = QApplication.instance() or QApplication([])
 settings = QSettings("dopeiptv-test", "cast-sources")
@@ -56,7 +57,7 @@ class FakeClient(DemoClient):
         return "http://p/movie/u/pw/%s.%s" % (stream_id, ext or "mp4")
 
 
-mw.CastDialog = FakeDialog
+mw_cast.CastDialog = FakeDialog
 w.client = FakeClient()
 
 
