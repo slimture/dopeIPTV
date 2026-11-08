@@ -793,6 +793,11 @@ jobs:
           DOPEIPTV_VERSION: ${{ steps.v.outputs.version }}
           DOPEIPTV_ICNS: ${{ github.workspace }}/build/dopeiptv.icns
         run: pyinstaller --noconfirm dopeiptv-mac.spec   # -> dist/dopeIPTV.app
+      - name: Make libmpv and ffmpeg self-contained (Intel)
+        if: matrix.deps == 'conda'
+        # conda-forge's libraries find each other through @rpath; this copies
+        # in what the bundle lacks and points every reference inside it.
+        run: python packaging/macos_bundle_dylibs.py dist/dopeIPTV.app "$DOPEIPTV_LIBMPV_DIR"
       - name: Ad-hoc codesign the .app
         run: |
           # We bundle/stage extra dylibs (libmpv, ffmpeg) after PyInstaller's
@@ -889,6 +894,14 @@ jobs:
           echo "::group::--self-check (bundled libmpv + languages)"
           if ! "$BIN" --self-check; then
             echo "::error::--self-check failed on the mounted .app (libmpv or languages)"
+            # Why libmpv does not load: dlopen's own message names the
+            # library it could not find.
+            echo "::group::libmpv: links, rpaths and dlopen"
+            otool -L "$MPV" || true
+            otool -l "$MPV" | grep -A2 LC_RPATH || true
+            ls "$(dirname "$MPV")" | head -200 || true
+            python3 -c 'import ctypes, sys; ctypes.CDLL(sys.argv[1])' "$MPV" 2>&1 | tail -5 || true
+            echo "::endgroup::"
             hdiutil detach "$MOUNT" || true; exit 1
           fi
           echo "::endgroup::"
