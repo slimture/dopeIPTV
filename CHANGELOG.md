@@ -28,6 +28,12 @@ date.
   provider's guide simply ends before now it says so, instead of "The
   server's schedule times look wrong".
 
+- **No "TIMESHIFT" badge for a pause in the rewind buffer.** Pausing a
+  catch-up channel that has the DVR row stamped "⧗ TIMESHIFT" on the
+  picture, as if the provider's archive were playing; the pause is the
+  buffer's. The badge is now kept for the archive, and the timeshift
+  timeline takes how far behind live it is from the buffer.
+
 ### Added
 
 - **Rewind with dopeIPTV's own buffer (experimental).** Settings ->

@@ -412,6 +412,7 @@ class RewindBarMixin:
         window = self.local_buffer_window()
         self._local_buffer_ready = window is not None
         shared = self._sync_bar_switch()
+        self._local_behind = None
         if window is None:
             self._local_buffer_hide_timer.stop()
             self._set_local_buffer_visible(False)
@@ -430,6 +431,7 @@ class RewindBarMixin:
         if lag >= LIVE_REOPEN_LAG:
             behind += lag   # the time to live, not just to the buffer's end
         at_live = self._dvr_live and behind < 1
+        self._local_behind = 0.0 if at_live else behind
         self._label_live_button()
         if self.local_buffer_live.property("atLive") != at_live:
             self.local_buffer_live.setProperty("atLive", at_live)
@@ -448,6 +450,10 @@ class RewindBarMixin:
             self.local_buffer_seek.setValue(
                 int(min(self._dvr_span, max(0.0, pos - window.start))))
         return window
+
+    def local_behind(self) -> float | None:
+        """Seconds behind live in the rewind buffer; None without one."""
+        return getattr(self, "_local_behind", None)
 
     def _seek_local_target(self, target: float, window: BufferWindow) -> None:
         # Up to the live point is following live again; anything before it

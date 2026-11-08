@@ -1622,14 +1622,18 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # channels that actually HAVE a provider archive - a plain live
             # channel pauses on mpv's local buffer, and stamping it TIMESHIFT
             # wrongly advertised an archive that doesn't exist.
+            # Nor for a channel paused in its rewind buffer (the DVR row):
+            # the pause is the buffer's, the archive plays no part in it.
             it = (lp or {}).get("item")
             try:
                 has_archive = it is not None and self._timeshift_days(it) > 0
             except Exception:
                 has_archive = False
             if (self.player and on_live and not self._playing_catchup
-                    and has_archive):
+                    and has_archive and not self._dvr_buffered()):
                 self.player.set_live_badge("timeshift")
+                self._update_ts_timeline()
+            elif self.player and on_live and not self._playing_catchup:
                 self._update_ts_timeline()
             return
         # Resumed. DVR-style pause for timeshift channels: if we paused the live
@@ -1658,6 +1662,11 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             # accrued from earlier short pauses so we land at the right spot.
             total = getattr(self, "_ts_live_offset", 0.0) + elapsed
             self._play_timeshift(it, back_min=total / 60.0)
+        elif self.player and on_live and self._dvr_buffered():
+            # Resumed in the rewind buffer: the DVR row says how far behind
+            # live it is, and LIVE takes it there.
+            self.player.set_live_badge(None)
+            self._update_ts_timeline()
         elif (it and lp.get("kind") == "live"
               and self._timeshift_days(it) > 0 and elapsed >= 2):
             # Short pause on a timeshift channel: mpv resumes from its buffer,
@@ -1671,6 +1680,14 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         elif self.player and on_live:
             # Buffer resume at ~the live edge: drop the 'not live' badge.
             self.player.set_live_badge(None)
+
+    def _dvr_buffered(self) -> bool:
+        """The live channel on screen has a rewind buffer (the DVR row)."""
+        try:
+            return (self.player is not None
+                    and self.player.local_buffer_window() is not None)
+        except Exception:
+            return False
 
     def _on_timeshift_seek(self, minutes_back: int) -> None:
         """Scrub the live timeline: jump to that point in the provider archive
@@ -1717,6 +1734,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         if self._playing_catchup and self._ts_segment_start is not None:
             content_time = self._ts_segment_start + self.player.playback_position()
             offset = max(0.0, (now - content_time) / 60.0)
+        elif self.player.local_behind() is not None:
+            # In the rewind buffer: it knows how far behind live it is.
+            behind = self.player.local_behind() or 0.0
         else:
             # Live edge, but a buffer pause may have left us behind live.
             behind = getattr(self, "_ts_live_offset", 0.0)
