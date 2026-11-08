@@ -68,6 +68,7 @@ class _NavMixin:
         # TV: quick jump into the programme guide from the nav entry.
         if key == "live":
             m.addAction(tr("btn_epg_guide"), self._open_epg_guide)
+            m.addAction(tr("btn_refresh_epg"), self._refresh_epg_now)
         # Provider-backed lists can be reloaded straight from their entry.
         if key in ("live", "vod", "series"):
             m.addAction(tr("menu_refresh_playlist"), self.refresh_playlist)

@@ -80,6 +80,7 @@ class _ContextMenuMixin:
                     tr("mv_cell", n=n + 1) + occupant,
                     lambda it=it, n=n: self._add_channel_to_multiview(it, n))
             m.addAction(tr("btn_epg_guide"), self._open_epg_guide)
+            m.addAction(tr("btn_refresh_epg"), self._refresh_epg_now)
         if (content_kind in ("live", "fav")
                 and it.get("stream_id") is not None):
             if self._timeshift_days(it):
@@ -549,6 +550,7 @@ class _ContextMenuMixin:
             m.addSeparator()
         if self.mode == "live":
             m.addAction(tr("btn_epg_guide"), self._open_epg_guide)
+            m.addAction(tr("btn_refresh_epg"), self._refresh_epg_now)
             m.addSeparator()
         m.addAction(tr("ctx_manage_categories"), self._open_content_manager)
         m.addSeparator()

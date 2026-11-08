@@ -52,7 +52,9 @@ date.
   window, and "Refresh guide now" in its right-click menu - on a channel
   without programmes and on an empty spot too - fetch the guide again and
   redraw the board when it is in, where it was scrolled to. (Refresh
-  playlist fetches the guide again as well, as it did.)
+  playlist fetches the guide again as well, as it did.) "Refresh guide
+  now" is also in the right-click menus of a channel, a category in TV
+  and TV in the sidebar.
 - **tools/epg_check.py** tells the provider's guide from the app's copy
   of it: what the provider sends now - channels, programmes, how many
   have something on, where it ends - beside the copy on this computer,
