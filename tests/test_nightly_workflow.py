@@ -36,3 +36,15 @@ def test_nightly_publishes_a_pre_release_the_app_reads():
     assert "branches: [testing]" in NIGHTLY
     # Never a v-tag: release.yml runs on those.
     assert not NIGHTLY_PREFIX.startswith("v")
+
+
+def test_a_test_build_publishes_what_built_and_a_release_fails_loud():
+    # Every job of release.yml may fail without failing a test build (a
+    # download that times out sends no failure mail) - never a release.
+    expr = "(inputs.nightly_version || '') != ''"
+    assert RELEASE.count(f"continue-on-error: ${{{{ {expr} }}}}") == 3
+    assert f"continue-on-error: ${{{{ matrix.experimental || {expr} }}}}" \
+        in RELEASE
+    # What did not build is named in the notes; no AppImage, no nightly.
+    assert "missing.txt" in NIGHTLY and "Not in this build" in NIGHTLY
+    assert NIGHTLY.count("if: steps.gather.outputs.publish == 'true'") == 3

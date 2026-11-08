@@ -57,6 +57,7 @@ jobs:
         with:
           path: artifacts
       - name: Gather the packages
+        id: gather
         run: |
           mkdir out
           find artifacts -type f \( -name '*.AppImage' -o -name '*.deb' \
@@ -75,11 +76,35 @@ jobs:
             (cd stage && zip -qr "../out/dopeIPTV-${V}-windows-${arch}.zip" dopeiptv)
           done
           ls -la out
-          if ! ls out/*x86_64.AppImage >/dev/null 2>&1; then
-            echo "::error::no Linux AppImage - no nightly"
-            exit 1
+          # What did not build this time (a failed step - often a download
+          # from GitHub or elsewhere that timed out) is named in the notes;
+          # the run stays green, so a hiccup sends no failure mail. A
+          # release (a tag) still fails loud.
+          : > missing.txt
+          for want in "x86_64.AppImage:AppImage (x86_64)" \
+                      "aarch64.AppImage:AppImage (aarch64)" \
+                      "amd64.deb:.deb (amd64)" "arm64.deb:.deb (arm64)" \
+                      "macOS-arm64.dmg:macOS (Apple Silicon)" \
+                      "macOS-x86_64.dmg:macOS (Intel)" \
+                      "windows-x64.zip:Windows (x64)" \
+                      "windows-arm64.zip:Windows (arm64)" \
+                      ".flatpak:Flatpak" ".whl:wheel"; do
+            pat="${want%%:*}"; name="${want#*:}"
+            ls out/*"$pat" >/dev/null 2>&1 || echo "$name" >> missing.txt
+          done
+          if [ -s missing.txt ]; then
+            echo "::warning::not built this time: $(paste -sd, missing.txt)"
           fi
+          PUB=true
+          if ! ls out/*x86_64.AppImage >/dev/null 2>&1; then
+            # The test builds are for the AppImage above all: without it,
+            # no nightly this time - the next push tries again.
+            echo "::warning::no Linux AppImage - no nightly this time"
+            PUB=false
+          fi
+          echo "publish=${PUB}" >> "$GITHUB_OUTPUT"
       - name: Notes
+        if: steps.gather.outputs.publish == 'true'
         run: |
           LAST=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
           {
@@ -89,17 +114,24 @@ jobs:
             echo "comes next - it can have faults a release does not. In the"
             echo "app: Settings -> General -> Update channel -> Test builds."
             echo
+            if [ -s missing.txt ]; then
+              echo "Not in this build (a step failed - see the run, ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}):"
+              sed 's/^/- /' missing.txt
+              echo
+            fi
             echo "### Changes since ${LAST:-the last release}"
             echo
             git log --no-merges --format='- %s' ${LAST:+$LAST..HEAD} | head -60
           } > notes.md
           cat notes.md
       - name: Publish the pre-release
+        if: steps.gather.outputs.publish == 'true'
         run: |
           gh release create "nightly-${V}" out/* --prerelease --latest=false \
             --target "${GITHUB_SHA}" --title "dopeIPTV ${V} (test build)" \
             --notes-file notes.md
       - name: Keep the newest seven
+        if: steps.gather.outputs.publish == 'true'
         run: |
           gh release list --limit 100 --json tagName,isPrerelease,createdAt \
             --jq '[.[] | select(.isPrerelease and (.tagName | startswith("nightly-")))]

@@ -31,6 +31,8 @@ jobs:
     # Pinned, not ubuntu-latest: that label moves to Ubuntu 26.04 from
     # 2026-10-19, and a release must not meet a new image unannounced.
     runs-on: ubuntu-24.04
+    # A test build publishes what was built; a release fails loud.
+    continue-on-error: ${{ (inputs.nightly_version || '') != '' }}
     steps:
       - uses: actions/checkout@v5
       - name: Nightly version
@@ -152,6 +154,7 @@ jobs:
             runs_on: ubuntu-24.04-arm
             test_distros: "ubuntu:24.04 debian:13"
     runs-on: ${{ matrix.runs_on }}
+    continue-on-error: ${{ (inputs.nightly_version || '') != '' }}
     steps:
       - uses: actions/checkout@v5
       - name: Nightly version
@@ -663,14 +666,15 @@ jobs:
             deps: brew
             experimental: false
           #
-          # Intel, back from conda-forge. Homebrew moved macOS x86_64 to
+          # Intel, back with conda-forge. Homebrew moved macOS x86_64 to
           # Tier 3 in September 2026 - no CI, no new bottles: "brew install
           # mpv" answers "no bottle available", which is why 1.2.11 dropped
-          # this .dmg. conda-forge still builds osx-64 packages, mpv 0.41
-          # with lib/libmpv.2.dylib among them, and ffmpeg: those go into an
-          # environment of their own (never on PATH - it has a Python of its
-          # own, which would shadow setup-python's), and the spec bundles
-          # libmpv and ffmpeg from there. macos-15-intel is there until Aug
+          # this .dmg. conda-forge still builds osx-64 packages: ffmpeg and
+          # every library libmpv needs come from there, into an environment
+          # of its own (never on PATH - it has a Python of its own, which
+          # would shadow setup-python's); libmpv itself is built from mpv's
+          # source against them (conda-forge's own is broken for
+          # embedding), and the spec bundles libmpv and ffmpeg from there. macos-15-intel is there until Aug
           # 2027; Apple has said Tahoe 26 is the last macOS for Intel.
           - runner: macos-15-intel
             arch: x86_64
@@ -681,7 +685,8 @@ jobs:
     # continue-on-error once let a broken arm64 build go green and ship a
     # release with no macOS download at all (1.2.8), so arm64 is never
     # experimental.
-    continue-on-error: ${{ matrix.experimental }}
+    # A test build publishes what was built, whatever the leg.
+    continue-on-error: ${{ matrix.experimental || (inputs.nightly_version || '') != '' }}
     steps:
       - uses: actions/checkout@v5
       - name: Nightly version
@@ -757,20 +762,49 @@ jobs:
           # overlay, which every build has. The check that followed went with
           # it - there is nothing left for it to guarantee.
           brew install ffmpeg
-      - name: System deps from conda-forge (Intel)
+      - name: System deps from conda-forge, libmpv built here (Intel)
         if: matrix.deps == 'conda'
         run: |
           # micromamba alone, into the runner's temp dir: an environment with
-          # conda-forge's mpv (libmpv.2.dylib) and ffmpeg. Not activated and
-          # not on PATH - the spec is told where they are.
+          # conda-forge's mpv - for the libraries libmpv needs, at versions
+          # that build it - and ffmpeg, meson, ninja and pkg-config. Not
+          # activated and not on PATH: the spec is told where things are.
           MM="${RUNNER_TEMP}/mm"
           mkdir -p "$MM"
-          curl -fsSL https://micro.mamba.pm/api/micromamba/osx-64/latest \
+          curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors \
+            https://micro.mamba.pm/api/micromamba/osx-64/latest \
             | tar -xj -C "$MM" bin/micromamba
           ENVDIR="${RUNNER_TEMP}/mpvenv"
           MAMBA_ROOT_PREFIX="$MM/root" "$MM/bin/micromamba" create -y \
-            -p "$ENVDIR" -c conda-forge --override-channels mpv ffmpeg
+            -p "$ENVDIR" -c conda-forge --override-channels \
+            mpv ffmpeg meson ninja pkg-config
+          # conda-forge's own libmpv cannot be used: it leaves
+          # cfstr_from_cstr and cfstr_get_cstr (mpv's macOS helpers) to a
+          # flat-namespace lookup that only the mpv program answers, so
+          # dlopen fails. libmpv is built here from the same mpv version,
+          # against the environment's libraries, and replaces it.
+          MPV_VER=$(ls "$ENVDIR"/conda-meta/ | sed -nE 's/^mpv-([0-9][0-9.]*)-.*\.json$/\1/p' | head -1)
+          echo "mpv ${MPV_VER}"
+          git clone --quiet --depth 1 --branch "v${MPV_VER}" \
+            https://github.com/mpv-player/mpv.git "${RUNNER_TEMP}/mpv-src"
+          cd "${RUNNER_TEMP}/mpv-src"
+          export PKG_CONFIG_PATH="$ENVDIR/lib/pkgconfig"
+          export MACOSX_DEPLOYMENT_TARGET=11.0
+          "$ENVDIR/bin/meson" setup build --prefix="$ENVDIR" --libdir=lib \
+            --buildtype=release -Dlibmpv=true -Dcplayer=false -Dtests=false \
+            -Dswift-build=disabled -Dlua=disabled -Djavascript=disabled \
+            -Dmanpage-build=disabled -Dhtml-build=disabled \
+            -Dpdf-build=disabled -Dc_link_args=-Wl,-rpath,@loader_path
+          "$ENVDIR/bin/meson" compile -C build
+          rm -f "$ENVDIR"/lib/libmpv*.dylib
+          "$ENVDIR/bin/meson" install -C build --quiet
           test -f "$ENVDIR/lib/libmpv.2.dylib"
+          # Every symbol libmpv needs from outside must have a library to
+          # come from: no flat-namespace lookups of mpv's own functions.
+          if nm -u "$ENVDIR/lib/libmpv.2.dylib" | grep -E '_cfstr_(from|get)_cstr'; then
+            echo "::error::the built libmpv still leaves mpv's own helpers unresolved"
+            exit 1
+          fi
           test -x "$ENVDIR/bin/ffmpeg"
           "$ENVDIR/bin/ffmpeg" -hide_banner -version | head -1
           echo "DOPEIPTV_LIBMPV_DIR=$ENVDIR/lib" >> "$GITHUB_ENV"
@@ -941,6 +975,7 @@ jobs:
   windows-zip:
     name: Windows (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ (inputs.nightly_version || '') != '' }}
     strategy:
       fail-fast: false
       matrix:

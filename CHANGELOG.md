@@ -92,15 +92,21 @@ date.
   Pre-releases are never the latest release, so the Releases channel and
   the website never see them. The AppImage updates itself in place on
   either channel; it is checked every six hours on Test builds.
+  A package that did not build for a test build (often a download that
+  timed out) is left out and named in its notes, and the run stays green:
+  no failure mail for a hiccup. A release still fails loud.
 
 - **The Intel (x86_64) macOS `.dmg` is back (experimental).** Gone since
-  1.2.11, because Homebrew stopped making packages for Intel Macs; it is
-  now built on the Intel runner with mpv (libmpv) and ffmpeg from
-  conda-forge, which still builds them. The release checks it as it does
-  the Apple Silicon one - with the conda environment moved out of reach
-  first, so a library the bundle still looked for there fails the build
-  and not on a Mac. If the Intel leg fails, the rest of the release still
-  goes out.
+  1.2.11, because Homebrew stopped making packages for Intel Macs. It is
+  now built on the Intel runner with ffmpeg and the libraries mpv needs
+  from conda-forge, which still builds them; libmpv itself is built from
+  mpv's source against those (conda-forge's own libmpv leaves two of
+  mpv's macOS helpers to the mpv program and cannot be loaded by an app).
+  packaging/macos_bundle_dylibs.py makes the bundle self-contained. The
+  release checks it as it does the Apple Silicon one - with the conda
+  environment moved out of reach first, so a library the bundle still
+  looked for there fails the build and not on a Mac. If the Intel leg
+  fails, the rest of the release still goes out.
 
 ### Changed
 
