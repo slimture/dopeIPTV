@@ -361,7 +361,7 @@ assert settle(lambda: pop_m in shelves()), shelves()
 settings.setValue("home_sh_pop_movies", "false")
 w._apply_home_settings()
 assert settle(lambda: pop_m not in shelves() and pop_s in shelves()), \
-    shelves()
+    (shelves(), "home showing:", w._home_showing())
 # Both off: no chart is wanted, so none is fetched.
 settings.setValue("home_sh_pop_series", "false")
 assert w._home_page._trending() is None

@@ -785,9 +785,12 @@ jobs:
           # cfstr_from_cstr and cfstr_get_cstr (mpv's macOS helpers) to a
           # flat-namespace lookup that only the mpv program answers, so
           # dlopen fails. libmpv is built here from the same mpv version,
-          # against the environment's libraries, and replaces it - with
-          # Swift, as Homebrew builds it: mpv's macOS parts (the clipboard
-          # among them) need the header the Swift build makes.
+          # against the environment's libraries, and replaces it. Without
+          # Swift and Cocoa: the app draws through libmpv's render API and
+          # needs neither (CoreAudio and the rest stay), mpv's Cocoa parts
+          # (the clipboard among them) want the Swift build's header, and
+          # Swift cannot build Apple's modules with the environment's
+          # headers on its include path ("could not build module Darwin").
           MPV_VER=$(ls "$ENVDIR"/conda-meta/ | sed -nE 's/^mpv-([0-9][0-9.]*)-.*\.json$/\1/p' | head -1)
           echo "mpv ${MPV_VER}"
           git clone --quiet --depth 1 --branch "v${MPV_VER}" \
@@ -797,6 +800,7 @@ jobs:
           export MACOSX_DEPLOYMENT_TARGET=11.0
           "$ENVDIR/bin/meson" setup build --prefix="$ENVDIR" --libdir=lib \
             --buildtype=release -Dlibmpv=true -Dcplayer=false -Dtests=false \
+            -Dswift-build=disabled -Dcocoa=disabled \
             -Dlua=disabled -Djavascript=disabled \
             -Dmanpage-build=disabled -Dhtml-build=disabled \
             -Dpdf-build=disabled -Dc_link_args=-Wl,-rpath,@loader_path

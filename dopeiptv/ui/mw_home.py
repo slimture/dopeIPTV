@@ -1254,8 +1254,10 @@ class _HomeMixin:
             self.nav_btns["home"].setVisible(self._home_enabled())
         if not self._home_enabled() and self._home_showing():
             self._leave_home()
-        elif self._home_showing():
-            # A shelf switched on or off in Settings shows so at once.
+        elif getattr(self, "_home_page", None) is not None:
+            # A shelf switched on or off in Settings shows so at once - and
+            # a page built but not on screen just now is rebuilt too, or it
+            # kept the shelf until it was shown again.
             self._home_page.refresh()
 
     def _maybe_open_home_at_start(self) -> None:
