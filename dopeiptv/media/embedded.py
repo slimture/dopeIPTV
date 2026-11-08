@@ -451,6 +451,8 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         # set_track_prefs() to restore a title's remembered track choices.
         self._pref_aid = None
         self._pref_sid = None
+        # (mode, languages) until the tracks are known: _apply_sub_rule.
+        self._sub_rule: tuple | None = None
         # One-shot subtitle files for the NEXT play() (set_sub_files).
         self._pref_sub_files: list[str] = []
         # Docked video-box height scales with the display so the mini player
@@ -2056,8 +2058,12 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
                     if self._settings else "")
                 or "no")
 
-    def apply_default_options(self) -> None:
-        """Apply persistent playback defaults from Settings to the mpv core."""
+    def apply_default_options(self, load: bool = False,
+                              live: bool = True) -> None:
+        """Apply persistent playback defaults from Settings to the mpv core.
+        *load*: a stream is about to open (play()), and which subtitle track
+        it opens with is decided too - *live* says whether it is a channel.
+        Otherwise (a Settings save) the track playing is left as it is."""
         m = self.video.mpv
         if m is None or self._settings is None:
             return
@@ -2071,20 +2077,13 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
 
         set_opt("alang", s.value("audio_lang", "") or "")
         sub_mode = s.value("sub_mode", "auto")
-        if sub_mode == "off":
-            set_opt("sid", "no")
-            _set_forced_only(m, False)
+        if load:
+            self._sub_defaults(sub_mode, live, set_opt)
+        elif sub_mode == "off":
+            # Hidden, not deselected: choosing a track mid-stream is what
+            # freezes a film (see _sub_defaults).
+            set_opt("sub-visibility", False)
         else:
-            set_opt("sid", "auto")
-            if sub_mode == "lang":
-                # A primary + optional fallback language: mpv's slang takes
-                # a comma-separated priority list, so "swe,eng" means prefer
-                # Swedish subs but fall back to English when absent.
-                langs = [s.value("sub_lang", "") or "",
-                         s.value("sub_lang2", "") or ""]
-                set_opt("slang", ",".join(l for l in langs if l))
-            else:
-                set_opt("slang", "")
             _set_forced_only(m, sub_mode == "forced")
         _sub_look(s, set_opt)
         aspect = s.value("aspect_mode", "auto")
@@ -2125,6 +2124,74 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         # play(). Changing it in Settings takes effect on the next stream.
         # That is the behaviour that was stable for months, and playback
         # stability outranks the convenience of a live-applied setting.
+
+    def _sub_defaults(self, mode: str, live: bool, set_opt) -> None:
+        """The subtitle track a stream opens with, and whether it shows.
+
+        mpv answers a subtitle track chosen during playback with a refresh
+        seek: it drops what it has buffered and asks for the stream again
+        from a little earlier - on a film from a slow panel, five seconds or
+        more of frozen picture each time subtitles were turned on. So a film
+        or an episode opens with a track chosen even when none is to show,
+        hidden: it is read along with the rest, and turning subtitles on is
+        only showing it. Whether the setting shows it is decided once the
+        tracks are known (_apply_sub_rule). A live channel cannot be sought
+        - choosing a track later costs nothing there - and opens as before.
+        """
+        m = self.video.mpv
+        s = self._settings
+        langs = [x for x in (s.value("sub_lang", "") or "",
+                             s.value("sub_lang2", "") or "") if x]
+        self._sub_rule = None
+        if live or mode == "forced":
+            set_opt("subs-fallback", "default")      # mpv's own default
+            set_opt("sub-visibility", True)
+            if mode == "off":
+                set_opt("sid", "no")
+                _set_forced_only(m, False)
+                return
+            set_opt("sid", "auto")
+            # A primary + optional fallback language: mpv's slang takes a
+            # comma-separated priority list, so "swe,eng" means prefer
+            # Swedish subs but fall back to English when absent.
+            set_opt("slang", ",".join(langs) if mode == "lang" else "")
+            _set_forced_only(m, mode == "forced")
+            return
+        set_opt("sid", "auto")
+        # The track picked is the one most likely to be turned on: the
+        # languages asked for first. In "auto" none is asked for, so the
+        # one the file flags comes first, as before.
+        set_opt("slang", ",".join(langs) if mode in ("lang", "off") else "")
+        set_opt("subs-fallback", "yes")              # some track, always
+        _set_forced_only(m, False)
+        set_opt("sub-visibility", False)
+        if mode != "off":
+            self._sub_rule = (mode, [x.lower() for x in langs])
+
+    def _apply_sub_rule(self, m) -> None:
+        """The stream's tracks are known: show the track chosen hidden at
+        the start if the setting would have chosen it itself - one the file
+        flags default or forced, or (by language) one in a language asked
+        for. The same tracks mpv showed before tracks were chosen hidden."""
+        try:
+            tracks = m.track_list or []
+        except Exception:
+            return
+        if not tracks:
+            return                        # not loaded yet: the next poll
+        mode, langs = self._sub_rule
+        self._sub_rule = None
+        sel = next((t for t in tracks
+                    if t.get("type") == "sub" and t.get("selected")), None)
+        if sel is None:
+            return
+        lang = (sel.get("lang") or "").lower()
+        if (sel.get("default") or sel.get("forced")
+                or (mode == "lang" and lang in langs)):
+            try:
+                m["sub-visibility"] = True
+            except Exception:
+                pass
 
     def playback_position(self) -> float:
         m = self.video.mpv
@@ -2284,6 +2351,7 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
              buffer_key: str | None = None) -> bool:
         # local_buffer: a live channel, which gets the rewind buffer unless
         # Settings turned it off.
+        live = local_buffer
         local_buffer = local_buffer and self._live_rewind_minutes() > 0
         # A session of the app's own buffer ends here: its provider
         # connection goes before the next stream opens one. Then, where
@@ -2363,7 +2431,7 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
                 m["hwdec"] = self._hwdec_base()
             except Exception:
                 pass
-            self.apply_default_options()
+            self.apply_default_options(load=True, live=live)
             # Remembered per-title track choices (resume): set before load,
             # exactly like the multiview cells do - mpv keeps a sid/aid set
             # while loading and selects that track once the file's tracks are
@@ -2374,8 +2442,15 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
                 if pref_aid is not None:
                     m["aid"] = int(pref_aid)
                 if pref_sid == "no":
-                    m["sid"] = "no"
+                    # Off for this title: on a film the track chosen at
+                    # the start stays, hidden (_sub_defaults).
+                    self._sub_rule = None
+                    if live:
+                        m["sid"] = "no"
+                    else:
+                        m["sub-visibility"] = False
                 elif pref_sid is not None:
+                    self._sub_rule = None
                     m["sid"] = int(pref_sid)
                     m["sub-visibility"] = True
             except Exception as e:
@@ -2394,6 +2469,7 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
                     # Chosen for this title on purpose: shown, whatever the
                     # default subtitle mode says (mpv prefers an external
                     # track when it picks one).
+                    self._sub_rule = None
                     m["sid"] = "auto"
                     _set_forced_only(m, False)
                     m["sub-visibility"] = True
@@ -2637,12 +2713,19 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         off = subs.addAction(tr("opt_off"))
         off.setCheckable(True)
         sub_tracks = tracks("sub") if m else []
-        off.setChecked(not any(t.get("selected") for t in sub_tracks))
+        # A track chosen hidden (_sub_defaults) is off, as far as anyone
+        # watching can tell.
+        try:
+            shown = bool(m["sub-visibility"]) if m else False
+        except Exception:
+            shown = True
+        off.setChecked(not (shown and any(t.get("selected")
+                                          for t in sub_tracks)))
         off.triggered.connect(lambda _c: self._pick_track("sid", "no"))
         for t in sub_tracks:
             act = subs.addAction(track_label(t))
             act.setCheckable(True)
-            act.setChecked(bool(t.get("selected")))
+            act.setChecked(bool(t.get("selected")) and shown)
             act.triggered.connect(
                 lambda _c, tid=t.get("id"): self._pick_track("sid", tid))
         if m and self.current_url:
@@ -2961,11 +3044,28 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
 
     def _pick_track(self, prop: str, tid) -> None:
         """User picked an audio/subtitle track from the options menu: apply
-        it and announce the choice so the window can remember it per title."""
-        self._set_mpv(prop, tid)
-        if prop == "sid" and tid != "no":
-            # Selecting a subtitle track must also make it visible - a stream
-            # opened with subtitles off leaves sub-visibility false.
+        it and announce the choice so the window can remember it per title.
+
+        Subtitles go off by hiding the track, not by letting it go, and on by
+        showing it: choosing a track is what makes mpv drop its buffer and
+        ask the provider again (_sub_defaults), so it happens only when the
+        track asked for is another one."""
+        if prop != "sid":
+            self._set_mpv(prop, tid)
+        elif tid == "no":
+            self._set_mpv("sub-visibility", False)
+        else:
+            m = self.video.mpv
+            try:
+                current = m.sid if m is not None else None
+            except Exception:
+                current = None
+            if current != tid:
+                self._set_mpv("sid", tid)
+            # Picked on purpose: all of it, whatever "forced only" says.
+            if m is not None:
+                _set_forced_only(m, False)
+            # A stream opened with subtitles off leaves them hidden.
             self._set_mpv("sub-visibility", True)
         self.track_selected.emit(prop, tid)
 
@@ -3049,6 +3149,8 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         except Exception:
             return
         self._sync_pause_label(paused)
+        if getattr(self, "_sub_rule", None) is not None:
+            self._apply_sub_rule(m)
         if self._dvr is not None:
             pos = self._dvr_pos(pos)    # the app's own buffer keeps its time
         local_window = self._update_local_buffer(pos)

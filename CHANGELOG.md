@@ -93,6 +93,19 @@ date.
   the TMDB key; a build from source has no built-in one, so after a week
   the rows went away without a word. The log now says so once
   (set DOPEIPTV_TMDB_KEY, or a key of your own in Settings).
+- **Turning subtitles on no longer freezes a film.** mpv answers a
+  subtitle track chosen during playback with a refresh seek: it drops what
+  it has buffered and asks the provider for the stream again from a little
+  earlier - measured against a throttled server, 5 to 7 s of frozen
+  picture each time subtitles went on, and again after each Off. A film or
+  an episode now opens with a track chosen even when none is to show
+  (the subtitle languages asked for first), hidden; On shows it and Off
+  hides it - 0.1 s - and the track is only changed when another language
+  is asked for, which still takes the provider's time. Whether a track
+  shows at the start is decided as before (flagged default or forced, or
+  in a language asked for), once the tracks are known. A Settings save no
+  longer chooses a track mid-film either. A live channel cannot be sought,
+  so it never froze, and opens as before.
 - **A pause that stops a recording says so.** Without the own buffer, a
   recording in the player is mpv's own, and mpv stops reading the channel
   shortly into a pause - so the recording stood still without a word. The

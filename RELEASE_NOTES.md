@@ -17,6 +17,9 @@ up to date.
   continue watching with the time left, your favourite channels with what
   is on now and how far it has got, the popular rows with their chart
   position, and arrows instead of scrollbars.
+- **Subtitles on, at once.** Turning subtitles on in a film or an episode
+  froze the picture for several seconds while the provider sent it again;
+  now it is instant (a different language still takes a moment).
 - **The guide no longer stays on yesterday.** Left open overnight - or on
   a Mac that slept - the app kept yesterday's guide until it was started
   again. It now looks at the guide every 20 minutes and when you come back
