@@ -11,7 +11,8 @@ from __future__ import annotations
 
 import time
 
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QRectF, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap
 from PyQt6.QtWidgets import QApplication, QHBoxLayout, QLabel, QPushButton, QWidget
 
 from ..core.local_buffer import (
@@ -20,6 +21,32 @@ from ..core.local_buffer import (
 from ..core.log import log
 from ..i18n import tr
 from .seek_slider import _SeekSlider, _format_time
+
+
+def reopen_icon() -> QIcon:
+    """A circular arrow, for LIVE when it opens the channel again."""
+    s, scale = 14, 3
+    pm = QPixmap(s * scale, s * scale)
+    pm.setDevicePixelRatio(float(scale))
+    pm.fill(Qt.GlobalColor.transparent)
+    pr = QPainter(pm)
+    pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    col = QColor(255, 255, 255)
+    pen = QPen(col)
+    pen.setWidthF(s * 0.11)
+    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    pr.setPen(pen)
+    pr.drawArc(QRectF(s * 0.22, s * 0.22, s * 0.56, s * 0.56), 70 * 16, 290 * 16)
+    pr.setPen(Qt.PenStyle.NoPen)
+    pr.setBrush(col)
+    head = QPainterPath()
+    head.moveTo(s * 0.50, s * 0.06)
+    head.lineTo(s * 0.74, s * 0.21)
+    head.lineTo(s * 0.50, s * 0.36)
+    head.closeSubpath()
+    pr.drawPath(head)
+    pr.end()
+    return QIcon(pm)
 
 
 class _BarSwitch(QWidget):
@@ -496,8 +523,10 @@ class RewindBarMixin:
         if not force and reopen == getattr(self, "_live_reopens", None):
             return
         self._live_reopens = reopen
-        self.local_buffer_live.setText(
-            ("↻ " if reopen else "") + tr("mv_live"))
+        # A drawn circular arrow, not "↻": that glyph is an empty box in
+        # fonts without it.
+        self.local_buffer_live.setText(tr("mv_live"))
+        self.local_buffer_live.setIcon(reopen_icon() if reopen else QIcon())
         self.local_buffer_live.setToolTip(
             tr("dvr_live_reopen_tip") if reopen else tr("dvr_live_tip"))
 

@@ -186,7 +186,8 @@ def test_live_says_when_it_opens_the_channel_again():
     assert p.local_buffer_live.toolTip() == tr("dvr_live_tip")
     p._live_lag.lag = LIVE_REOPEN_LAG + 5
     EmbeddedPlayer._label_live_button(p)
-    assert p.local_buffer_live.text() == "↻ " + tr("mv_live")
+    assert p.local_buffer_live.text() == tr("mv_live")
+    assert not p.local_buffer_live.icon().isNull(), "a drawn arrow, no glyph"
     assert p.local_buffer_live.toolTip() == tr("dvr_live_reopen_tip")
     p._live_lag.reset()
     EmbeddedPlayer._label_live_button(p)

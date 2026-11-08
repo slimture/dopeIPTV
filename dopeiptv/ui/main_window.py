@@ -1737,6 +1737,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         elif self.player.local_behind() is not None:
             # In the rewind buffer: it knows how far behind live it is.
             behind = self.player.local_behind() or 0.0
+            content_time = now - behind
+            offset = behind / 60.0
         else:
             # Live edge, but a buffer pause may have left us behind live.
             behind = getattr(self, "_ts_live_offset", 0.0)
@@ -5289,7 +5291,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._ts_segment_start = None
         self._ts_live_offset = 0.0
         self._pause_started = None
-        if self.player.play(url, title, local_buffer=True):
+        if self.player.play(url, title, local_buffer=True,
+                            buffer_key=f"live:{self._item_key(it)}"):
             self.wake.acquire(tr("wake_playing", title=title))
         self._apply_seek_mode(it, "live")
         # Refresh the poster overlay glyph (play -> pause for a timeshift
@@ -5825,7 +5828,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                 self.player.set_sub_files(
                     self._remembered_subtitles(kind, key))
             if self.player.play(url, title, start=resume_at,
-                                local_buffer=kind == "live" and not catchup):
+                                local_buffer=kind == "live" and not catchup,
+                                buffer_key=f"{kind}:{key}" if key else None):
                 self.wake.acquire(tr("wake_playing", title=title))
             else:
                 log.warning("embedded play() refused %s - falling back to an "

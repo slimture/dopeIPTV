@@ -83,7 +83,7 @@ class DvrPlayerMixin:
 
     # -- start and end ---------------------------------------------------------
 
-    def _dvr_start(self, url: str) -> str | None:
+    def _dvr_start(self, url: str, key: str | None = None) -> str | None:
         """Start (or resume) the session for *url*; the address mpv should
         play, or None to play the provider's as before."""
         if not self._dvr_wanted(url):
@@ -100,7 +100,7 @@ class DvrPlayerMixin:
                 self._dvr_pool = DvrPool(dvr_base(), minutes * 60,
                                          self._dvr_space_bytes())
             self._dvr_pool.configure(minutes * 60, self._dvr_space_bytes())
-            session = self._dvr_pool.open(url)
+            session = self._dvr_pool.open(url, key)
         except Exception as e:
             log.warning("DVR: own buffer unavailable (%s) - playing as before",
                         e)

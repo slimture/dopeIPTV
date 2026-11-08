@@ -46,3 +46,33 @@ def test_without_a_buffer_the_pause_still_says_timeshift():
     h._pause_started = time.time() - 30
     MainWindow._on_paused_changed(h, False)
     assert badges[-1] == "timeshift" and h._ts_live_offset >= 29
+
+
+def _timeline_host(behind, catchup=False):
+    shown: list = []
+    player = SimpleNamespace(
+        ts_timeline=SimpleNamespace(isVisible=lambda: True),
+        local_behind=lambda: behind,
+        playback_position=lambda: 30.0,
+        set_timeline_segments=lambda segs: None,
+        update_timeshift_position=lambda off, title, paused=False:
+            shown.append((off, paused)))
+    h = SimpleNamespace(
+        player=player, _playing_catchup=catchup, _pause_started=None,
+        _ts_segment_start=time.time() - 600 if catchup else None,
+        _last_playback={"kind": "live", "item": {"stream_id": 1}},
+        _ts_depth_min=120, _ts_live_offset=0.0,
+        xmltv=SimpleNamespace(programmes_in=lambda it, a, b: []))
+    return h, shown
+
+
+def test_the_timeline_reads_the_buffer_and_never_raises():
+    # In the buffer, at live and behind; from mpv's buffer; in the archive.
+    for behind in (0.0, 90.0, None):
+        h, shown = _timeline_host(behind)
+        MainWindow._update_ts_timeline(h)
+        assert shown, behind
+        assert abs(shown[-1][0] - (behind or 0.0) / 60.0) < 1e-6
+    h, shown = _timeline_host(None, catchup=True)
+    MainWindow._update_ts_timeline(h)
+    assert 9.0 < shown[-1][0] < 10.0

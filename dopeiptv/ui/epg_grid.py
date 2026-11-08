@@ -188,7 +188,9 @@ class EpgGridDialog(QDialog):
         self.day_fwd_btn.clicked.connect(lambda: self._scroll_hours(24))
         bar.addWidget(self.day_fwd_btn)
         # Fetch the guide again from here - where you notice it is missing.
-        self.refresh_btn = QPushButton("↻")
+        # Drawn, not "↻": that glyph is an empty box in fonts without it.
+        self.refresh_btn = QPushButton()
+        self.refresh_btn.setIcon(self._bar_icon("refresh"))
         self.refresh_btn.setToolTip(tr("btn_refresh_epg"))
         self.refresh_btn.setAccessibleName(tr("btn_refresh_epg"))
         self.refresh_btn.setFixedWidth(34)
@@ -387,6 +389,23 @@ class EpgGridDialog(QDialog):
             body.closeSubpath()
             pr.drawPath(body)
             pr.drawEllipse(QRectF(s * 0.42, s * 0.70, s * 0.16, s * 0.16))
+        elif kind == "refresh":
+            # A circular arrow: most of a ring, an arrowhead at its end.
+            pen = QPen(col)
+            pen.setWidthF(s * 0.11)
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            pr.setPen(pen)
+            pr.setBrush(Qt.BrushStyle.NoBrush)
+            ring = QRectF(s * 0.22, s * 0.22, s * 0.56, s * 0.56)
+            pr.drawArc(ring, 70 * 16, 290 * 16)
+            pr.setPen(Qt.PenStyle.NoPen)
+            pr.setBrush(col)
+            head = QPainterPath()
+            head.moveTo(s * 0.50, s * 0.06)
+            head.lineTo(s * 0.74, s * 0.21)
+            head.lineTo(s * 0.50, s * 0.36)
+            head.closeSubpath()
+            pr.drawPath(head)
         else:                                   # "record": a plain filled dot
             pr.setPen(Qt.PenStyle.NoPen)
             pr.setBrush(col)

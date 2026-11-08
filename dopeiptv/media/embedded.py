@@ -3059,7 +3059,8 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
             self.add_subtitle(path)
 
     def play(self, url: str, title: str, start: float = 0.0,
-             *, local_buffer: bool = False) -> bool:
+             *, local_buffer: bool = False,
+             buffer_key: str | None = None) -> bool:
         # local_buffer: a live channel, which gets the rewind buffer unless
         # Settings turned it off.
         local_buffer = local_buffer and self._live_rewind_minutes() > 0
@@ -3068,7 +3069,9 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         # Settings asks for it, a live channel gets one: mpv plays its local
         # server, and the session reads the provider.
         self._end_dvr()
-        source = self._dvr_start(url) if local_buffer else None
+        # buffer_key: the channel, whatever its address - a portal hands
+        # out a new one each time - so its history is found again.
+        source = self._dvr_start(url, buffer_key) if local_buffer else None
         self._local_buffer_enabled = local_buffer
         self._local_buffer_ready = False
         self._bar_view = self._chosen_bar()
