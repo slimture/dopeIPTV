@@ -394,6 +394,10 @@ _STRINGS: dict[str, dict[str, str]] = {
     # ── Recording ─────────────────────────────────────────────────────────
 
     "setting_check_updates": {"en": "Check for updates on startup"},
+    "setting_update_channel": {"en": "Update channel"},
+    "option_channel_stable": {"en": "Releases"},
+    "option_channel_nightly": {"en": "Test builds (nightly)"},
+    "setting_update_channel_hint": {"en": "Test builds come from every change before it is released - to help test what is coming, and they can have faults a release does not. Back on Releases, you keep the test build until the next release."},
     "setting_force_x11": {"en": "Run via X11 backend (needs restart)"},
     "setting_force_x11_hint": {"en": "Wayland only: run under XWayland so the pop-out player window can stay always-on-top. May look slightly softer on fractional HiDPI scaling."},
     "setting_desktop_entry": {"en": "Show in the application menu"},

@@ -77,7 +77,7 @@ from .settings_ui import (
     SettingsShell, ThemeTile, fit_to_rows, hbox, page_icon, settings_style,
 )
 from .widgets import confirm
-from ..core.updates import GITHUB_REPO, fetch_latest_release, is_newer
+from ..core.updates import GITHUB_REPO, fetch_update, is_newer
 from ..core.workers import (
     clear_directory, default_image_cache_dir, dir_size_bytes, run_async)
 
@@ -612,6 +612,12 @@ class _SettingsMixin:
         c = general.card(tr("set_card_updates"))
         updates_box = c.toggle(tr("setting_check_updates"),
                                is_on("check_updates", "true"))
+        channel_box = self._combo(
+            [("stable", tr("option_channel_stable")),
+             ("nightly", tr("option_channel_nightly"))],
+            self._update_channel())
+        c.row(tr("setting_update_channel"), channel_box,
+              tr("setting_update_channel_hint"))
         # Only where an entry is actually missing: a .deb or a Flatpak has
         # one already, and offering to add a second would be nonsense.
         desktop_box = None
@@ -1828,6 +1834,13 @@ class _SettingsMixin:
             self.settings.setValue(
                 "auto_reconnect_live", flag(autorecon_box))
             self.settings.setValue("check_updates", flag(updates_box))
+            if channel_box.currentData() != self._update_channel():
+                self.settings.setValue("update_channel",
+                                       channel_box.currentData())
+                # Look again now, on the channel just chosen.
+                self.settings.setValue("update_check_ts", "0")
+                self.settings.setValue("update_banner_dismissed", "")
+                QTimer.singleShot(0, self._maybe_check_updates)
             if x11_box is not None:
                 self.settings.setValue("force_x11", flag(x11_box))
             if mpris_box is not None:
@@ -2110,8 +2123,9 @@ class _SettingsMixin:
             recheck.setEnabled(False)
             status.setText(tr("about_checking"))
             status.setStyleSheet(f"color:{P['muted']}; font-size:12px;")
+            channel = self._update_channel()
             run_async(self.pool,
-                      lambda: fetch_latest_release(GITHUB_REPO), done, fail)
+                      lambda: fetch_update(GITHUB_REPO, channel), done, fail)
 
         recheck.clicked.connect(check)
         check()               # auto-check on open

@@ -19,6 +19,10 @@ up to date.
   that the times were wrong.
 - **Refresh the guide from the guide.** A ↻ button in the programme guide,
   and "Refresh guide now" when you right-click it.
+- **Help test what is coming.** **Settings → General → Update channel →
+  Test builds** offers the test builds of the next version as soon as
+  they are built. They can have faults a release does not; back on
+  **Releases**, you keep the test build until the next release.
 
 On the AppImage from 1.2.15 or later? Click **Update now** in the banner.
 Coming from an older version, what changed since is below - from 1.2.14

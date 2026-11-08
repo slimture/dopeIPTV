@@ -26,6 +26,9 @@ class _Host(QMainWindow):
     def _update_action_label(self) -> str:
         return "Update now"
 
+    def _update_channel(self) -> str:
+        return "stable"
+
     def _update_action(self) -> None:
         pass
 

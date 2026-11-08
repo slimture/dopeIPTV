@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
 from .. import VERSION
 from ..core import selfupdate
 from ..core.log import log
-from ..core.updates import GITHUB_REPO, fetch_latest_release, is_newer
+from ..core.updates import GITHUB_REPO, fetch_update, is_newer
 from ..core.xdg import open_url
 from ..core.workers import run_async
 from ..i18n import tr
@@ -31,6 +31,11 @@ _WEBSITE = "https://iptv.dope.rs"
 
 class _UpdatesMixin:
     """MainWindow mixin: the startup update check and its status-row link."""
+    def _update_channel(self) -> str:
+        """Settings -> General: "stable", or "nightly" for the test builds."""
+        ch = self.settings.value("update_channel", "stable")
+        return "nightly" if ch == "nightly" else "stable"
+
     def _maybe_check_updates(self) -> None:
         """Once-a-day background check for a newer release; on a hit, light the
         badge on the Settings button. Cached in QSettings so it doesn't hit
@@ -48,18 +53,28 @@ class _UpdatesMixin:
             last = float(self.settings.value("update_check_ts", 0) or 0)
         except (TypeError, ValueError):
             last = 0.0
-        if time.time() - last < 86400:
+        channel = self._update_channel()
+        # Once a day for releases; test builds come with every change.
+        every = 6 * 3600 if channel == "nightly" else 86400
+        if (time.time() - last < every and
+                self.settings.value("update_check_channel", "stable")
+                == channel):
             self._apply_update_state(
                 self.settings.value("update_latest_tag", "") or "")
             return
 
         def done(rel):
-            tag = (rel or {}).get("tag", "") or ""
+            rel = rel or {}
+            tag = rel.get("tag", "") or ""
             self.settings.setValue("update_check_ts", str(int(time.time())))
+            self.settings.setValue("update_check_channel", channel)
             self.settings.setValue("update_latest_tag", tag)
+            self.settings.setValue("update_latest_url",
+                                   rel.get("url", "") if rel.get("nightly")
+                                   else "")
             self._apply_update_state(tag)
 
-        run_async(self.pool, lambda: fetch_latest_release(GITHUB_REPO),
+        run_async(self.pool, lambda: fetch_update(GITHUB_REPO, channel),
                   done, lambda _e: None)
 
     def _apply_cached_update(self) -> None:
@@ -201,7 +216,9 @@ class _UpdatesMixin:
         if selfupdate.can_self_update():
             self._self_update()
         else:
-            open_url(_WEBSITE)
+            # A test build is downloaded from its own release page.
+            open_url(self.settings.value("update_latest_url", "")
+                     or _WEBSITE)
 
     def _self_update(self) -> None:
         """Download, verify and test the newest AppImage, then offer to
@@ -246,7 +263,7 @@ class _UpdatesMixin:
         timer.start(150)
 
         def work():
-            rel = fetch_latest_release(GITHUB_REPO)
+            rel = fetch_update(GITHUB_REPO, self._update_channel())
             if not is_newer(rel.get("tag", ""), VERSION):
                 return None
             state["tag"] = rel["tag"]

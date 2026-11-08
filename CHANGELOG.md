@@ -58,6 +58,15 @@ date.
   have something on, where it ends - beside the copy on this computer,
   with a verdict. It uses the account the app is logged in with and
   prints nothing of it.
+- **Test builds (nightly).** Settings -> General -> Update channel ->
+  Test builds: the app also offers the test builds of the `testing`
+  branch, built with every change by `.github/workflows/nightly.yml` - the
+  release workflow called with a version of `<release>.<build>`
+  (1.4.0.123: newer than 1.4.0, older than 1.4.1) - and published as GitHub
+  pre-releases tagged `nightly-1.4.0.123` (the newest seven are kept).
+  Pre-releases are never the latest release, so the Releases channel and
+  the website never see them. The AppImage updates itself in place on
+  either channel; it is checked every six hours on Test builds.
 
 ## [1.3.0]
 

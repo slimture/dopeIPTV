@@ -3,11 +3,23 @@ name: Release
 # Build the installable packages and attach them to the GitHub Release when a
 # version tag (e.g. v0.3.0) is pushed. Each job uploads its own assets, so a
 # failure in one format never blocks the others.
+#
+# nightly.yml calls this same workflow for the test builds of the testing
+# branch, with nightly_version set (1.4.0.123): every job then stamps that
+# version into the app before it builds, and nothing is attached here - the
+# Attach steps only fire on a tag; nightly.yml publishes the artifacts as a
+# pre-release itself.
 on:
   push:
     tags:
       - 'v*'
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      nightly_version:
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -21,6 +33,20 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+      - name: Nightly version
+        if: ${{ inputs.nightly_version }}
+        shell: bash
+        env:
+          V: ${{ inputs.nightly_version }}
+        run: |
+          # A test build is named and versioned after its build: the app,
+          # the wheel and every package say 1.4.0.123, not 1.4.0.
+          sed -i.bak -E "s/^__version__ = \"[^\"]*\"/__version__ = \"${V}\"/" dopeiptv/__init__.py
+          sed -i.bak -E "s/^version = \"[^\"]*\"/version = \"${V}\"/" pyproject.toml
+          rm -f dopeiptv/*.bak ./*.bak
+          grep -q "^__version__ = \"${V}\"" dopeiptv/__init__.py
+          grep -q "^version = \"${V}\"" pyproject.toml
+          echo "Nightly build ${V}"
       - name: Guard - release notes must match this version
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
@@ -128,6 +154,20 @@ jobs:
     runs-on: ${{ matrix.runs_on }}
     steps:
       - uses: actions/checkout@v5
+      - name: Nightly version
+        if: ${{ inputs.nightly_version }}
+        shell: bash
+        env:
+          V: ${{ inputs.nightly_version }}
+        run: |
+          # A test build is named and versioned after its build: the app,
+          # the wheel and every package say 1.4.0.123, not 1.4.0.
+          sed -i.bak -E "s/^__version__ = \"[^\"]*\"/__version__ = \"${V}\"/" dopeiptv/__init__.py
+          sed -i.bak -E "s/^version = \"[^\"]*\"/version = \"${V}\"/" pyproject.toml
+          rm -f dopeiptv/*.bak ./*.bak
+          grep -q "^__version__ = \"${V}\"" dopeiptv/__init__.py
+          grep -q "^version = \"${V}\"" pyproject.toml
+          echo "Nightly build ${V}"
       - name: Guard - release notes must match this version
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
@@ -641,6 +681,20 @@ jobs:
     # precisely what happened to 1.2.8 and precisely what nobody noticed.
     steps:
       - uses: actions/checkout@v5
+      - name: Nightly version
+        if: ${{ inputs.nightly_version }}
+        shell: bash
+        env:
+          V: ${{ inputs.nightly_version }}
+        run: |
+          # A test build is named and versioned after its build: the app,
+          # the wheel and every package say 1.4.0.123, not 1.4.0.
+          sed -i.bak -E "s/^__version__ = \"[^\"]*\"/__version__ = \"${V}\"/" dopeiptv/__init__.py
+          sed -i.bak -E "s/^version = \"[^\"]*\"/version = \"${V}\"/" pyproject.toml
+          rm -f dopeiptv/*.bak ./*.bak
+          grep -q "^__version__ = \"${V}\"" dopeiptv/__init__.py
+          grep -q "^version = \"${V}\"" pyproject.toml
+          echo "Nightly build ${V}"
       - name: Guard - release notes must match this version
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
@@ -863,6 +917,20 @@ jobs:
             cmake_arch: ARM64
     steps:
       - uses: actions/checkout@v5
+      - name: Nightly version
+        if: ${{ inputs.nightly_version }}
+        shell: bash
+        env:
+          V: ${{ inputs.nightly_version }}
+        run: |
+          # A test build is named and versioned after its build: the app,
+          # the wheel and every package say 1.4.0.123, not 1.4.0.
+          sed -i.bak -E "s/^__version__ = \"[^\"]*\"/__version__ = \"${V}\"/" dopeiptv/__init__.py
+          sed -i.bak -E "s/^version = \"[^\"]*\"/version = \"${V}\"/" pyproject.toml
+          rm -f dopeiptv/*.bak ./*.bak
+          grep -q "^__version__ = \"${V}\"" dopeiptv/__init__.py
+          grep -q "^version = \"${V}\"" pyproject.toml
+          echo "Nightly build ${V}"
       - name: Guard - release notes must match this version
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
@@ -1072,6 +1140,20 @@ jobs:
       options: --privileged
     steps:
       - uses: actions/checkout@v5
+      - name: Nightly version
+        if: ${{ inputs.nightly_version }}
+        shell: bash
+        env:
+          V: ${{ inputs.nightly_version }}
+        run: |
+          # A test build is named and versioned after its build: the app,
+          # the wheel and every package say 1.4.0.123, not 1.4.0.
+          sed -i.bak -E "s/^__version__ = \"[^\"]*\"/__version__ = \"${V}\"/" dopeiptv/__init__.py
+          sed -i.bak -E "s/^version = \"[^\"]*\"/version = \"${V}\"/" pyproject.toml
+          rm -f dopeiptv/*.bak ./*.bak
+          grep -q "^__version__ = \"${V}\"" dopeiptv/__init__.py
+          grep -q "^version = \"${V}\"" pyproject.toml
+          echo "Nightly build ${V}"
       - name: Guard - release notes must match this version
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash

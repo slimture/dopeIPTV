@@ -1,0 +1,110 @@
+name: Nightly
+
+# Test builds of the testing branch, for Settings -> General -> Update
+# channel -> Test builds. Every push to testing builds every package the
+# way a release does (release.yml, called with nightly_version), versioned
+# <release>.<run number> - 1.4.0.123: newer than 1.4.0, older than 1.4.1 -
+# and publishes them as a pre-release tagged nightly-1.4.0.123. Pre-releases
+# never show as the latest release, so the Releases channel and the website
+# never see them. Only the newest few are kept.
+on:
+  push:
+    branches: [testing]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# A newer push makes the build in progress pointless.
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: v
+        run: |
+          BASE=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' dopeiptv/__init__.py)
+          echo "version=${BASE}.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "Nightly ${BASE}.${GITHUB_RUN_NUMBER} from ${GITHUB_SHA::7}"
+
+  build:
+    needs: version
+    uses: ./.github/workflows/release.yml
+    with:
+      nightly_version: ${{ needs.version.outputs.version }}
+    secrets: inherit
+
+  publish:
+    needs: [version, build]
+    # What did build is published, as a release's jobs each attach theirs;
+    # without the Linux AppImage there is no nightly at all.
+    if: ${{ !cancelled() && needs.version.result == 'success' }}
+    runs-on: ubuntu-24.04
+    env:
+      V: ${{ needs.version.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Gather the packages
+        run: |
+          mkdir out
+          find artifacts -type f \( -name '*.AppImage' -o -name '*.deb' \
+            -o -name '*.dmg' -o -name '*.whl' -o -name '*.tar.gz' \) \
+            -exec cp {} out/ \;
+          # Flatpak: the builder's artifact is named after the bundle only.
+          f=$(find artifacts -type f -name '*.flatpak' | head -1)
+          [ -n "$f" ] && cp "$f" "out/dopeIPTV-${V}.flatpak"
+          # Windows: the artifact is the app folder; zip it as a release
+          # does (one dopeiptv\ folder inside).
+          for d in artifacts/dopeIPTV-windows-*; do
+            [ -d "$d" ] || continue
+            arch="${d##*-}"
+            rm -rf stage && mkdir -p stage/dopeiptv
+            cp -r "$d"/. stage/dopeiptv/
+            (cd stage && zip -qr "../out/dopeIPTV-${V}-windows-${arch}.zip" dopeiptv)
+          done
+          ls -la out
+          if ! ls out/*x86_64.AppImage >/dev/null 2>&1; then
+            echo "::error::no Linux AppImage - no nightly"
+            exit 1
+          fi
+      - name: Notes
+        run: |
+          LAST=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
+          {
+            echo "## dopeIPTV ${V} (test build)"
+            echo
+            echo "Built from \`testing\` at ${GITHUB_SHA::7}, for testing what"
+            echo "comes next - it can have faults a release does not. In the"
+            echo "app: Settings -> General -> Update channel -> Test builds."
+            echo
+            echo "### Changes since ${LAST:-the last release}"
+            echo
+            git log --no-merges --format='- %s' ${LAST:+$LAST..HEAD} | head -60
+          } > notes.md
+          cat notes.md
+      - name: Publish the pre-release
+        run: |
+          gh release create "nightly-${V}" out/* --prerelease --latest=false \
+            --target "${GITHUB_SHA}" --title "dopeIPTV ${V} (test build)" \
+            --notes-file notes.md
+      - name: Keep the newest seven
+        run: |
+          gh release list --limit 100 --json tagName,isPrerelease,createdAt \
+            --jq '[.[] | select(.isPrerelease and (.tagName | startswith("nightly-")))]
+                  | sort_by(.createdAt) | reverse | .[7:] | .[].tagName' |
+          while read -r tag; do
+            echo "removing ${tag}"
+            gh release delete "${tag}" --yes --cleanup-tag
+          done
