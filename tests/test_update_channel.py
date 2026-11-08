@@ -5,7 +5,8 @@ from __future__ import annotations
 import pytest
 
 from dopeiptv.core import selfupdate, updates
-from dopeiptv.core.updates import fetch_latest_nightly, fetch_update, is_newer
+from dopeiptv.core.updates import (
+    fetch_latest_nightly, fetch_update, is_newer, offered)
 
 
 class Resp:
@@ -86,3 +87,18 @@ def test_the_appimage_of_a_nightly_is_found_by_its_version(github):
     asset = selfupdate.pick_asset(n["assets"], n["tag"], "x86_64")
     assert asset is not None
     assert asset["name"] == "dopeIPTV-1.4.0.15-x86_64.AppImage"
+
+
+def test_back_on_releases_the_release_is_offered_to_a_test_build():
+    # On Test builds a release never "downgrades" a newer build...
+    assert not offered("v1.4.0", "1.4.0.12", "nightly")
+    assert offered("v1.4.0.13", "1.4.0.12", "nightly")
+    # ...back on Releases, the release the build carries the number of is
+    # offered, and anything after it; an older release is not.
+    assert offered("v1.4.0", "1.4.0.12", "stable")
+    assert offered("v1.4.1", "1.4.0.12", "stable")
+    assert not offered("v1.3.0", "1.4.0.12", "stable")
+    # A release is compared as before; nothing offered without a tag.
+    assert offered("v1.4.1", "1.4.0", "stable")
+    assert not offered("v1.4.0", "1.4.0", "stable")
+    assert not offered("", "1.4.0.12", "stable")

@@ -99,3 +99,22 @@ def _parse(version: str) -> tuple[int, ...]:
 def is_newer(latest_tag: str, current: str) -> bool:
     """True when *latest_tag* is a strictly newer version than *current*."""
     return _parse(latest_tag) > _parse(current)
+
+
+def is_nightly(version: str) -> bool:
+    """A test build's version has a fourth part: 1.4.0.123."""
+    return len(_parse(version)) > 3
+
+
+def offered(latest_tag: str, current: str, channel: str = "stable") -> bool:
+    """Whether *latest_tag* is an update for *current* on *channel*.
+
+    Back on Releases from a test build, the release that build carries the
+    number of is offered too - 1.4.0 to 1.4.0.12, which sorts above it - so
+    that the channel means releases again from the next one out."""
+    if not latest_tag:
+        return False
+    if channel != "nightly" and is_nightly(current) \
+            and not is_nightly(latest_tag):
+        return _parse(latest_tag)[:3] >= _parse(current)[:3]
+    return is_newer(latest_tag, current)

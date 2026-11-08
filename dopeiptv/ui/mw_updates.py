@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
 from .. import VERSION
 from ..core import selfupdate
 from ..core.log import log
-from ..core.updates import GITHUB_REPO, fetch_update, is_newer
+from ..core.updates import GITHUB_REPO, fetch_update, offered
 from ..core.xdg import open_url
 from ..core.workers import run_async
 from ..i18n import tr
@@ -90,7 +90,7 @@ class _UpdatesMixin:
             self._apply_update_state(tag)
 
     def _apply_update_state(self, latest_tag: str) -> None:
-        newer = bool(latest_tag) and is_newer(latest_tag, VERSION)
+        newer = offered(latest_tag, VERSION, self._update_channel())
         logo = self._sidebar_logo
         if not newer:
             logo.set_update(False)
@@ -263,8 +263,9 @@ class _UpdatesMixin:
         timer.start(150)
 
         def work():
-            rel = fetch_update(GITHUB_REPO, self._update_channel())
-            if not is_newer(rel.get("tag", ""), VERSION):
+            channel = self._update_channel()
+            rel = fetch_update(GITHUB_REPO, channel)
+            if not offered(rel.get("tag", ""), VERSION, channel):
                 return None
             state["tag"] = rel["tag"]
             old = selfupdate.appimage_path()

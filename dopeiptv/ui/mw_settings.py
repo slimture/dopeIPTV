@@ -77,7 +77,7 @@ from .settings_ui import (
     SettingsShell, ThemeTile, fit_to_rows, hbox, page_icon, settings_style,
 )
 from .widgets import confirm
-from ..core.updates import GITHUB_REPO, fetch_update, is_newer
+from ..core.updates import GITHUB_REPO, fetch_update, offered
 from ..core.workers import (
     clear_directory, default_image_cache_dir, dir_size_bytes, run_async)
 
@@ -2088,7 +2088,7 @@ class _SettingsMixin:
             if not rel or not rel.get("tag"):
                 status.setText(tr("about_check_failed"))
                 return
-            if is_newer(rel["tag"], VERSION):
+            if offered(rel["tag"], VERSION, self._update_channel()):
                 status.setText(tr("about_update_available", version=rel["tag"]))
                 status.setStyleSheet(
                     f"color:{P['text']}; font-size:12px; font-weight:600;")
