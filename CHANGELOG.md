@@ -7,6 +7,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.3.1]
+
+The programme guide keeps itself up to date, and says plainly when a
+provider's guide ends.
+
 ### Fixed
 
 - **The programme guide no longer stays on yesterday.** The guide was
@@ -21,6 +26,9 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   The detail panel fills in from the new guide at once, and where the
   provider's guide simply ends before now it says so, instead of "The
   server's schedule times look wrong".
+
+### Added
+
 - **tools/epg_check.py** tells the provider's guide from the app's copy
   of it: what the provider sends now - channels, programmes, how many
   have something on, where it ends - beside the copy on this computer,

@@ -50,6 +50,11 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.3.1" date="2026-11-08">
+      <description>
+        <p>The programme guide keeps itself up to date: it is fetched again while the app runs when it is old or about to run out, and the detail panel says plainly when a provider's guide for a channel ends before now.</p>
+      </description>
+    </release>
     <release version="1.3.0" date="2026-11-07">
       <description>
         <p>Pause and rewind live TV, with how far back set in Settings. Eight new themes picked from previews, accent colours of your own, the desktop's light and dark mode, corner style and interface size; subtitle size, colour and background; a docked video you can drag taller; and country flags in the category list on every system. Browsing a big provider stays quick while the guide and lists load, and the playing video no longer stutters meanwhile.</p>

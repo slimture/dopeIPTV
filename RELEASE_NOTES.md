@@ -1,3 +1,21 @@
+## dopeIPTV 1.3.1
+
+The programme guide keeps itself up to date.
+
+- **The guide no longer stays on yesterday.** Left open overnight - or on
+  a Mac that slept - the app kept yesterday's guide until it was started
+  again. It now looks at the guide every 20 minutes and when you come back
+  to the app, and fetches it again when it is old or about to run out:
+  when your provider updates its guide, the new programmes show up within
+  the hour.
+- **A clearer note where the provider's guide ends.** When a channel's
+  guide stops before now, the detail panel says so, instead of suggesting
+  that the times were wrong.
+
+On the AppImage from 1.2.15 or later? Click **Update now** in the banner.
+Coming from an older version, what changed since is below - from 1.2.14
+or earlier, everything new in 1.2.15 as well.
+
 ## dopeIPTV 1.3.0
 
 Pause and rewind live TV, a new look, subtitles your way, a taller video
@@ -35,10 +53,6 @@ stays quick with a big provider while its guide and lists load.
 
 The live rewind, the video height and the flags are a contribution by Luca
 Merega (lmerega on GitHub) - thank you!
-
-On the AppImage from 1.2.15 or later? Click **Update now** in the banner.
-Coming from an older version, what changed since is below - from 1.2.14
-or earlier, everything new in 1.2.15 as well.
 
 ## dopeIPTV 1.2.18
 
