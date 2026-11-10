@@ -99,6 +99,7 @@ def test_on_a_desktop_qt_opens_it_with_the_system_paths_for_the_moment(
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setenv("LD_LIBRARY_PATH", "/opt/dopeiptv/lib")
     monkeypatch.setattr(xdg, "_qt_platform", lambda: "wayland")
+    monkeypatch.setattr(xdg, "_focus_settled", lambda: True)   # the window has it
     seen = {}
 
     def fake_qt_open(url):
@@ -120,3 +121,55 @@ def test_without_a_desktop_session_qt_is_not_asked(monkeypatch):
     monkeypatch.setattr(xdg, "_qt_open", lambda url: pytest.fail("asked Qt"))
     monkeypatch.setattr(xdg.shutil, "which", lambda n: None)
     xdg.open_url("https://iptv.dope.rs")
+
+
+def _menu_case(monkeypatch, focus):
+    """A link chosen from a menu: *focus* says, check by check, whether a
+    real window (not the menu's popup) has the focus yet."""
+    monkeypatch.setattr(xdg, "_qt_platform", lambda: "wayland")
+    monkeypatch.setattr(xdg, "_focus_settled", lambda: next(focus))
+    timers = []
+    monkeypatch.setattr(xdg, "_later", lambda ms, fn: timers.append((ms, fn)))
+    opened = []
+    monkeypatch.setattr(xdg, "_qt_open", lambda url: opened.append(url) or True)
+    monkeypatch.setattr(xdg.shutil, "which", lambda n: None)
+    return timers, opened
+
+
+def test_a_link_from_a_menu_waits_for_the_window_to_have_the_focus(monkeypatch):
+    """Qt asks GNOME for the token for the focused window. Chosen from a
+    menu that was the popup, or no window, and the page opened behind the
+    app; the link now waits until the window has the focus back."""
+    timers, opened = _menu_case(monkeypatch, iter([False, False, False, True]))
+    assert xdg.open_url("https://iptv.dope.rs/?ref=app-menu#donate") is True
+    assert opened == []                  # not yet: the popup has the focus
+    while timers and not opened:
+        timers.pop(0)[1]()
+    assert opened == ["https://iptv.dope.rs/?ref=app-menu#donate"]
+    assert timers == []
+
+
+def test_a_link_from_a_menu_still_opens_if_the_focus_never_comes(monkeypatch):
+    timers, opened = _menu_case(monkeypatch, iter([False] * 1000))
+    xdg.open_url("https://iptv.dope.rs/")
+    steps = 0
+    while timers:
+        timers.pop(0)[1]()
+        steps += 1
+    assert opened == ["https://iptv.dope.rs/"]
+    assert steps * xdg._FOCUS_STEP_MS >= xdg.FOCUS_WAIT_MS
+
+
+def test_a_deferred_link_falls_back_to_the_desktops_opener(monkeypatch):
+    timers, _opened = _menu_case(monkeypatch, iter([False, True]))
+    monkeypatch.setattr(xdg, "_qt_open", lambda url: False)
+    spawned = []
+    monkeypatch.setattr(xdg.shutil, "which",
+                        lambda n: "/usr/bin/xdg-open" if n == "xdg-open" else None)
+    monkeypatch.setattr(xdg.subprocess, "Popen",
+                        lambda cmd, **kw: spawned.append(cmd))
+    xdg.open_url("https://iptv.dope.rs/")
+    while timers:
+        timers.pop(0)[1]()
+    assert spawned == [["/usr/bin/xdg-open", "https://iptv.dope.rs/"]]
+

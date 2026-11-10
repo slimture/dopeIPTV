@@ -92,17 +92,67 @@ def _restore_env(saved: dict) -> None:
             os.environ[var] = value
 
 
+# How long a link chosen from a menu waits for the window to have the focus
+# back, and how often it looks (see _open_with_qt).
+FOCUS_WAIT_MS = 500
+_FOCUS_STEP_MS = 25
+
+
+def _later(ms: int, fn) -> None:
+    from PyQt6.QtCore import QTimer
+    QTimer.singleShot(ms, fn)
+
+
+def _focus_settled() -> bool:
+    """Whether a window of ours other than a menu's popup has the focus."""
+    try:
+        from PyQt6.QtCore import Qt
+        from PyQt6.QtGui import QGuiApplication
+        if QGuiApplication.instance() is None:
+            return True
+        w = QGuiApplication.focusWindow()
+        return w is not None and w.type() != Qt.WindowType.Popup
+    except Exception:   # noqa: BLE001 - no Qt to wait for
+        return True
+
+
+def _when_focused(fn, waited: int = 0) -> None:
+    if _focus_settled() or waited >= FOCUS_WAIT_MS:
+        fn()
+        return
+    _later(_FOCUS_STEP_MS, lambda: _when_focused(fn, waited + _FOCUS_STEP_MS))
+
+
 def _open_with_qt(url: str) -> bool:
     """Qt's opener, on a desktop session (Wayland or X11). It asks the
     compositor for an activation token and hands it on (to the desktop
     portal or the handler it starts), and that token is what lets GNOME
     bring the browser to the front: without it the donate page opened
     BEHIND the app, and GNOME's launch spinner turned until it gave up.
+
+    Qt asks for the token on behalf of the window that has the focus. A
+    link chosen from a menu ("Support dopeIPTV…" in the app menu, the
+    heart's right-click menu) had the menu's popup there - or, as it
+    closed, no window at all - and the page opened behind the app all the
+    same. On Wayland the link waits, a beat, for the window to have the
+    focus back (FOCUS_WAIT_MS at most, then it opens regardless).
+
     In a frozen bundle a handler Qt starts would inherit our library
     paths, so for the moment of the launch - the token comes back a beat
     later - the process has the system's, and gets ours back after."""
-    if _qt_platform() not in ("wayland", "xcb"):
+    platform = _qt_platform()
+    if platform not in ("wayland", "xcb"):
         return False
+    if platform == "wayland" and not _focus_settled():
+        def go() -> None:
+            if not _open_with_qt_now(url):
+                _open_with_handlers(url)
+        _when_focused(go)
+        return True
+    return _open_with_qt_now(url)
+
+
+def _open_with_qt_now(url: str) -> bool:
     saved = _swap_to_system_env()
     ok = False
     try:
@@ -121,6 +171,24 @@ def _open_with_qt(url: str) -> bool:
     return ok
 
 
+def _open_with_handlers(url: str) -> bool:
+    """The desktop's own openers, spawned with the system's library paths."""
+    for exe in ("xdg-open", "gio", "gnome-open", "kde-open5", "kde-open"):
+        path = shutil.which(exe)
+        if not path:
+            continue
+        cmd = [path, "open", url] if exe == "gio" else [path, url]
+        try:
+            subprocess.Popen(
+                cmd, env=system_env(), start_new_session=True,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return True
+        except OSError as e:
+            log.info("open_url: %s failed (%s) - trying the next handler",
+                     exe, e)
+    return False
+
+
 def open_url(url: str) -> bool:
     """Open *url* in the user's browser. Returns whether a handler was
     started.
@@ -137,20 +205,8 @@ def open_url(url: str) -> bool:
         return False
     if sys.platform.startswith("linux") and _open_with_qt(url):
         return True
-    if sys.platform.startswith("linux"):
-        for exe in ("xdg-open", "gio", "gnome-open", "kde-open5", "kde-open"):
-            path = shutil.which(exe)
-            if not path:
-                continue
-            cmd = [path, "open", url] if exe == "gio" else [path, url]
-            try:
-                subprocess.Popen(
-                    cmd, env=system_env(), start_new_session=True,
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                return True
-            except OSError as e:
-                log.info("open_url: %s failed (%s) - trying the next handler",
-                         exe, e)
+    if sys.platform.startswith("linux") and _open_with_handlers(url):
+        return True
     try:
         from PyQt6.QtCore import QUrl
         from PyQt6.QtGui import QDesktopServices

@@ -7,6 +7,14 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Fixed
+
+- Linux (GNOME): "Support dopeIPTV…" chosen from the app menu, or from the
+  heart's right-click menu, opens the page in front of the app like every
+  other link. Qt asks for the activation token for the focused window, and
+  from a menu that was the menu itself or, as it closed, none; the link now
+  waits a moment for the window to have the focus back.
+
 ## [1.4.3]
 
 Fixes after 1.4.2: no spinning pointer on Home, the pop-out's bars above
