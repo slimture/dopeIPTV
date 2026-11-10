@@ -34,6 +34,9 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 # Its mark beside the payee line (public/solecraft.svg, from solecraft.se).
 | "/solecraft.svg" as $PAYEE_LOGO
 | "https://solecraft.se" as $PAYEE_URL
+# Where a larger gift is arranged (a bank transfer, no card fees): under the
+# dialog's amounts. Empty: no such line.
+| "info@solecraft.se" as $MORE_EMAIL
 
 # -- the PHP helpers ---------------------------------------------------------
 
@@ -163,6 +166,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
       + (if $PAYEE == "" then "" else " data-payee=\"\($PAYEE | h)\" data-payeenote=\"\(t("donate_payee_note") | h)\""
              + (if $PAYEE_LOGO == "" then "" else " data-payeelogo=\"\($PAYEE_LOGO | h)\"" end)
              + (if $PAYEE_URL == "" then "" else " data-payeeurl=\"\($PAYEE_URL | h)\"" end) end)
+      + (if $MORE_EMAIL == "" then "" else " data-more=\"\(t("donate_more") | h)\" data-moremail=\"\($MORE_EMAIL | h)\"" end)
       + " data-lang=\"\($lang | h)\"></div>\n"
     end;
   def nav($current):

@@ -586,6 +586,16 @@ var iptvHit = (function () {
     walletLook(null, false);        // the card button until a wallet turns up
     el.card.addEventListener("click", toPay);
     el.amounts.append(el.chips, other, el.err1, el.go, el.card);
+    // A larger gift than the dialog takes: a line to write instead (a bank
+    // transfer to the company, no card fees). The cap stays - it keeps
+    // stolen cards from trying big amounts.
+    if (T.more && T.moremail && T.more.indexOf("{email}") >= 0) {
+      var more = mk("p", "dn-more"), at = T.more.split("{email}");
+      var mail = mk("a", "", T.moremail);
+      mail.href = "mailto:" + T.moremail + "?subject=" + encodeURIComponent("dopeIPTV");
+      more.append(at[0], mail, at.slice(1).join(""));
+      el.amounts.append(more);
+    }
 
     el.pay = mk("div", "dn-step"); el.pay.hidden = true;
     // The amount stays open here: the same choices, smaller, and an own

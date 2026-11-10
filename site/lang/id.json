@@ -125,6 +125,7 @@
     "donate_busy": "Sebentar…",
     "donate_lock": "Kartu langsung ke Stripe — dopeIPTV tidak pernah melihat nomor kartu.",
     "donate_payee_note": "Proyek dari {payee}",
+    "donate_more": "Ingin memberi lebih? Tulis ke {email}",
     "donate_back": "Ubah jumlah",
     "donate_thanks": "Terima kasih telah mendukung dopeIPTV!",
     "donate_receipt": "Tanda terima sedang dikirim ke kotak masuk Anda.",

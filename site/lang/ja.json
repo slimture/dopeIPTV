@@ -125,6 +125,7 @@
     "donate_busy": "少々お待ちください…",
     "donate_lock": "カード情報は Stripe に直接送られ、dopeIPTV がカード番号を見ることはありません。",
     "donate_payee_note": "{payee} のプロジェクト",
+    "donate_more": "もっと寄付したい場合は {email} までご連絡ください",
     "donate_back": "金額を変更",
     "donate_thanks": "dopeIPTV を支援していただきありがとうございます！",
     "donate_receipt": "領収書をメールでお送りします。",

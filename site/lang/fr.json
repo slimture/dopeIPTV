@@ -125,6 +125,7 @@
     "donate_busy": "Un instant…",
     "donate_lock": "La carte va directement chez Stripe — dopeIPTV ne voit jamais le numéro de carte.",
     "donate_payee_note": "Un projet de {payee}",
+    "donate_more": "Vous souhaitez donner davantage ? Écrivez à {email}",
     "donate_back": "Changer le montant",
     "donate_thanks": "Merci de soutenir dopeIPTV !",
     "donate_receipt": "Un reçu arrive dans votre boîte mail.",

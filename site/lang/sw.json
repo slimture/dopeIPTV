@@ -125,6 +125,7 @@
     "donate_busy": "Subiri kidogo…",
     "donate_lock": "Kadi inaenda moja kwa moja kwa Stripe — dopeIPTV haioni kamwe namba ya kadi.",
     "donate_payee_note": "Mradi wa {payee}",
+    "donate_more": "Ungependa kutoa zaidi? Tuandikie kwa {email}",
     "donate_back": "Badilisha kiasi",
     "donate_thanks": "Asante kwa kuunga mkono dopeIPTV!",
     "donate_receipt": "Risiti iko njiani kwenda kwenye kikasha chako.",

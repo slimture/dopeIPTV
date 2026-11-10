@@ -776,6 +776,10 @@ dialog.dn::backdrop { background: rgba(5, 7, 10, .66); }
 .dn-head p { margin: 4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
 /* Who is paid: one quiet line at the foot, and the company in the footer's
    small print - there for whoever wonders, never in the way. */
+.dn-more { margin: 2px 0 0; color: var(--faint); font-size: 12.5px; line-height: 1.45; text-align: center; }
+.dn-more a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); }
+.dn-more a:hover { color: var(--text); text-decoration-color: currentColor; }
 .dn-payee { margin: 14px 0 0; color: var(--faint); font-size: 12px; line-height: 1.4; text-align: center;
   display: flex; align-items: center; justify-content: center; gap: 8px; }
 /* Big enough and bright enough to be seen: at 15 px in the faint grey the

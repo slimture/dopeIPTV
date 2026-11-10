@@ -125,6 +125,7 @@
     "donate_busy": "एक पल…",
     "donate_lock": "कार्ड सीधे Stripe को जाता है — dopeIPTV कभी कार्ड नंबर नहीं देखता।",
     "donate_payee_note": "{payee} की एक परियोजना",
+    "donate_more": "और अधिक देना चाहते हैं? {email} पर लिखें",
     "donate_back": "राशि बदलें",
     "donate_thanks": "dopeIPTV का समर्थन करने के लिए धन्यवाद!",
     "donate_receipt": "रसीद आपके इनबॉक्स में आ रही है।",
