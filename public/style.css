@@ -789,14 +789,14 @@ footer .v a:hover { color: var(--accent); }
 /* Shown at once where Safari says there is Apple Pay, live a moment later
    when Stripe is ready: the button itself, only a little quieter. */
 .dn .btn.dn-wallet--wait:disabled { opacity: .82; cursor: progress; }
-/* Paying by card, under a wallet button: a button too, outlined, with a
-   card on it - a small underlined link there was easy to miss. */
-.dn .btn.dn-card { justify-content: center; width: 100%; padding: 12px 18px; font-size: 15px;
-  font-weight: 600; background: transparent; color: var(--text); border-color: var(--line-2); }
-@media (hover: hover) {
-  .dn .btn.dn-card:hover { background: var(--surface-2);
-    border-color: color-mix(in srgb, var(--text) 30%, var(--line-2)); }
-}
+/* Paying by card, under a wallet button: the same button, a card on it in
+   place of the wallet's mark - two equal ways to pay, each plain to see. As
+   a small link it was easy to miss, and outlined it faded on the dark page
+   much as a black wallet button did. */
+.dn .btn.dn-card { justify-content: center; width: 100%; padding: 14px 18px; font-size: 16px;
+  background: var(--wallet); color: var(--wallet-ink); border-color: transparent;
+  transition: opacity .15s ease; }
+@media (hover: hover) { .dn .btn.dn-card:hover { background: var(--wallet); opacity: .88; } }
 .dn-ico { width: 20px; height: 20px; flex: none; }
 .dn-paytop { display: flex; align-items: stretch; gap: 6px; }
 .dn-chips--sm { flex: 1; min-width: 0; gap: 6px; }
