@@ -991,6 +991,7 @@ dialog.dn { overflow-x: hidden; }
   .disclaimer { margin-top: 28px; }
 }
 .is-phone #download:not(.dl-open) .dlx,
+.is-phone #download:not(.dl-open) .dls,
 .is-phone #download:not(.dl-open) .autonote { display: none; }
 .is-phone .dl-phone { display: block; }
 /* The downloads go further down on a phone, after the FAQ: nothing there
@@ -1394,6 +1395,10 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
   /* A link to a section (the hero's Download) lands below the sticky bar,
      not under it: sections are shorter on top here than on a computer. */
   html { scroll-padding-top: 64px; }
+  /* One thing to press at the top of a phone: "View source" is for
+     developers, and GitHub is in the menu and the footer anyway. */
+  .hero .cta-row .btn.ghost { display: none; }
+  .hero .cta-row .btn.primary { min-width: 62%; justify-content: center; }
   #credits .sec-head p, .donate-text p, #shots .sec-head p { display: none; }
   .donate-text .donate-short { display: block; margin: 0 auto 4px; max-width: 34ch;
     font-size: 15px; line-height: 1.5; }
