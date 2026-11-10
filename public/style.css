@@ -945,8 +945,9 @@ dialog.dn { overflow-x: hidden; }
   /* Fewer boxes: on a narrow screen the page reads as one column of text,
      and only the two swipe rows keep their cards. */
   .dl-phone { background: none; padding: 0; border-radius: 0; margin-bottom: 8px; }
-  .donate { background: none; padding: 0; border-radius: 0; text-align: center; gap: 20px; overflow: visible; }
-  .donate-fx { display: none; }        /* no box to hold them: the button's glow is the life here */
+  /* ...but the donate band keeps its card, its glow and its heart: on a
+     phone it is the one thing to do here, the app being for computers. */
+  .donate { text-align: center; gap: 20px; padding: 26px 20px 24px; }
   .donate-text p { margin-inline: auto; }
   .donate-act { align-items: center; }
   .donate-btn { min-width: 220px; }
@@ -957,6 +958,26 @@ dialog.dn { overflow-x: hidden; }
 .is-phone #download:not(.dl-open) .dlx,
 .is-phone #download:not(.dl-open) .autonote { display: none; }
 .is-phone .dl-phone { display: block; }
+/* The downloads go further down on a phone, after the FAQ: nothing there
+   installs on it, and the hero's button already sends the link on. What
+   to do here - read, see, support - comes first. */
+.is-phone main { display: flex; flex-direction: column; }
+.is-phone main > #download { order: 1; }
+.is-phone main > #credits { order: 2; }
+/* The bands still take turns in the new order - hero, features, shots,
+   donate, what's new, FAQ, downloads, credits - so from the donate band on
+   the colours swap, and what sits inside each swaps with them. */
+.is-phone #donate { background: var(--surface); }
+/* (only past a "what's new": without one the FAQ follows the donate band
+   and keeps the page colour) */
+.is-phone #whats-new ~ #faq { background: var(--surface); }
+.is-phone #whats-new, .is-phone #download { background: var(--bg); }
+.is-phone #donate .donate {
+  background: radial-gradient(90% 60% at 50% 100%, color-mix(in srgb, var(--heart) 22%, transparent), transparent 75%),
+    var(--bg); }
+.is-phone #whats-new .notes, .is-phone #download .dlx-card { background: var(--surface); }
+.is-phone #download .dlx-big.alt,
+.is-phone #download .dlx.has-mine .dlx-card:not(.is-mine) .dlx-big { background: var(--bg); }
 .is-phone .bar .btn { display: none; }
 
 /* ---- motion ------------------------------------------------------------- */
@@ -1180,10 +1201,18 @@ dialog.dn { overflow-x: hidden; }
   .dlx-card:hover { transform: translateY(-4px); box-shadow: 0 26px 50px -30px rgba(0, 0, 0, .5); }
   .dlx-card.is-mine:hover { box-shadow: inset 0 0 0 2px var(--accent), 0 26px 50px -30px rgba(0, 0, 0, .5); }
   /* the donate band, while it is on screen */
-  .donate.is-live .donate-big { animation: heart-beat 2.6s ease-in-out infinite; }
-  .donate.is-live .donate-fx i { animation: heart-drift 7.8s linear infinite; }
-  .donate.is-live .donate-btn { animation: heart-glow 2.6s ease-out infinite; }
-  .donate.is-live .donate-btn .donate-heart { animation: heart-beat 2.6s ease-in-out infinite; }
+  /* Three beats and a drift of hearts each time it comes into view, then
+     still - running on and on it turned from alive into restless. Pointed
+     at, it beats again for as long as the pointer stays. */
+  .donate.is-live .donate-big { animation: heart-beat 2.6s ease-in-out 3; }
+  .donate.is-live .donate-fx i { animation: heart-drift 7.8s linear 1; }
+  .donate.is-live .donate-btn { animation: heart-glow 2.6s ease-out 3; }
+  .donate.is-live .donate-btn .donate-heart { animation: heart-beat 2.6s ease-in-out 3; }
+  @media (hover: hover) {
+    .donate.is-live:hover .donate-big, .donate.is-live:hover .donate-btn,
+    .donate.is-live:hover .donate-btn .donate-heart,
+    .donate.is-live:hover .donate-fx i { animation-iteration-count: infinite; }
+  }
   @keyframes heart-beat { 0%, 36%, 100% { transform: scale(1); } 7% { transform: scale(1.12); }
     14% { transform: scale(.97); } 22% { transform: scale(1.07); } }
   @keyframes heart-drift { 0% { transform: translate(0, 0) scale(.6) rotate(-10deg); opacity: 0; }

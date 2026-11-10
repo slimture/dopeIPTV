@@ -24,6 +24,14 @@ var iptvHit = (function () {
          "&l=" + encodeURIComponent(document.documentElement.lang || "") +
          "&bl=" + encodeURIComponent(navigator.language || "") +
          "&w=" + (screen.width || 0) + "&h=" + (screen.height || 0));
+    // Counted: ?ref= leaves the address, so a link shared or bookmarked from
+    // here does not count as one from the app or GitHub again.
+    if (src && history.replaceState) {
+      try {
+        var q = location.search.replace(/([?&])(?:ref|utm_source|source)=[^&#]*&?/g, "$1").replace(/[?&]$/, "");
+        history.replaceState(history.state, "", location.pathname + q + location.hash);
+      } catch (e) { /* the address keeps it; harmless */ }
+    }
   }
   function left() {
     if (!since) { return; }

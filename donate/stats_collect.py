@@ -172,8 +172,15 @@ CODE = re.compile(r"(^|\.)(github\.com|gitlab\.com|codeberg\.org|sourceforge\.ne
                   r"alternativeto\.net|launchpad\.net|git\.bastion\.nu)$")
 
 
-def channel_of(host: str) -> str:
+def channel_of(host: str, source: str = "") -> str:
     if not host:
+        # No referrer - a desktop app, GitHub's sidebar, a chat app, a
+        # bookmark. Our own links say where they are with ?ref= (the app's
+        # app-about / app-update, the README's github, ...): MAINTAINING.md.
+        if source.startswith("app") or source == "windows-readme":
+            return "The dopeIPTV app"
+        if source.startswith("github") or source == "release":
+            return "GitHub and code sites"
         return "Direct or unknown"
     if SEARCH.search(host):
         return "Search"
@@ -587,7 +594,7 @@ def _page_line(stats: dict, uniques: dict, state: dict, r: dict, db, visits: Vis
     src = re.sub(r"[^\w.-]", "", q.get("s", ""))[:40].lower()
     if visit is None:                           # a new visit
         visit = _new_visit(visits, day, vid, t, ip, ua, db)
-        visit.update(channel=channel_of(host), ref=host[:80], source=src,
+        visit.update(channel=channel_of(host, src), ref=host[:80], source=src,
                      lang=q.get("l", "")[:5], blang=q.get("bl", "")[:20])
         visit["screen"], kind = screen_of(q.get("w", ""), q.get("h", ""))
         _bump(d.setdefault("visit_channels", {}), visit["channel"])
@@ -603,7 +610,7 @@ def _page_line(stats: dict, uniques: dict, state: dict, r: dict, db, visits: Vis
     d["visitors"] += 1
     if visit["returning"]:
         d["returning"] = d.get("returning", 0) + 1
-    _bump(d["channels"], channel_of(host))
+    _bump(d["channels"], channel_of(host, src))
     if host:
         _bump(d["refs"], host[:80])
     if src:
