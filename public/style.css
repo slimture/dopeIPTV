@@ -779,10 +779,14 @@ dialog.dn::backdrop { background: rgba(5, 7, 10, .66); }
 .dn-payee a.dn-payee-link:has(img) { display: inline-flex; flex: none; }
 .dn-payee a:has(img):hover { opacity: .85; }
 footer .v a { color: inherit; }
-footer .v .sole { white-space: nowrap; }
-/* Solecraft's logotype (its S is the company's mark), in the text's colour */
-footer .v .sole-logo { display: inline-block; height: 12px; aspect-ratio: 666 / 111; vertical-align: -1.5px;
-  overflow: hidden; white-space: nowrap; text-indent: 110%; background: currentColor;
+/* Solecraft's logotype (its S is the company's mark) as the footer's own
+   sign, the copyright line under it; drawn in a text colour, so it follows
+   both themes. */
+footer .maker { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
+footer .sole { display: block; color: var(--muted); line-height: 0; }
+footer .sole:hover { color: var(--text); }
+footer .sole-logo { display: block; height: 17px; aspect-ratio: 666 / 111; overflow: hidden; white-space: nowrap;
+  text-indent: 110%; background: currentColor;
   -webkit-mask: url(/solecraft-logo.svg) center / contain no-repeat; mask: url(/solecraft-logo.svg) center / contain no-repeat; }
 footer .v a:hover { color: var(--accent); }
 .dn-x { flex: none; width: 34px; height: 34px; margin: -4px -6px 0 0; border-radius: 50%;
