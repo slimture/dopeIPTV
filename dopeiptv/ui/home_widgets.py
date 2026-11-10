@@ -865,9 +865,9 @@ class DonateCard(QFrame):
             f"#DonateLater {{ background: transparent; color: {P['text2']};"
             f" border: none; padding: 8px 10px; font-weight: 600; }}"
             f"#DonateLater:hover {{ color: {P['text']}; }}"
-            f"#DonateAlready {{ background: transparent; color: {P['text2']}; border: none;"
-            f" padding: 2px 0 0 0; font-size: 12px; text-align: left; }}"
-            f"#DonateAlready:hover {{ color: {P['text']}; text-decoration: underline; }}"))
+            f"#DonateAlready {{ background: transparent; color: {P['text2']};"
+            f" border: none; padding: 8px 10px; font-weight: 600; }}"
+            f"#DonateAlready:hover {{ color: {P['text']}; }}"))
         h = QHBoxLayout(self)
         h.setContentsMargins(18, 14, 18, 14)
         h.setSpacing(14)
@@ -881,13 +881,13 @@ class DonateCard(QFrame):
         b.setWordWrap(True)
         text.addWidget(t)
         text.addWidget(b)
-        if already_text:
+        h.addLayout(text, 1)
+        if already_text:                    # the quiet ones left of Donate
             done = QPushButton(already_text)
             done.setObjectName("DonateAlready")
             done.setCursor(Qt.CursorShape.PointingHandCursor)
             done.clicked.connect(self.already.emit)
-            text.addWidget(done, 0, Qt.AlignmentFlag.AlignLeft)
-        h.addLayout(text, 1)
+            h.addWidget(done, 0, Qt.AlignmentFlag.AlignVCenter)
         from .widgets import heart_pixmap
         go = QPushButton(donate_text)
         go.setObjectName("DonateGo")

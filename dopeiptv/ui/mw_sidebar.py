@@ -8,6 +8,7 @@ mixin, so behaviour is identical.
 """
 from __future__ import annotations
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QBoxLayout, QMenu
 
 from ..i18n import tr
@@ -85,6 +86,10 @@ class _SidebarMixin:
             # The heart beside the logo; on the narrow rail, under it.
             self._logo_row.setDirection(QBoxLayout.Direction.TopToBottom if collapsed
                                         else QBoxLayout.Direction.LeftToRight)
+            if hasattr(self, "_donate_btn"):
+                self._logo_row.setAlignment(
+                    self._donate_btn,
+                    Qt.AlignmentFlag.AlignHCenter if collapsed else Qt.AlignmentFlag.AlignVCenter)
             self._donate_heart_refresh()
         if hasattr(self, "_playlist_btn"):
             # The switcher is the same square stack-icon in both states (the
