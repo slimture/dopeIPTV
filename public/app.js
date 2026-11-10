@@ -4,6 +4,12 @@
   "use strict";
   var ua = navigator.userAgent || "";
   var os = "";
+  // A phone or tablet: the app is not for it (an iPhone says "like Mac OS X",
+  // Android says "Linux", an iPad says Macintosh outright). No system is
+  // claimed, the downloads fold away, and the visitor can send the link on.
+  var phone = /iPhone|iPad|iPod|Android|Mobile/i.test(ua) ||
+              (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  if (phone) { phonePage(); return; }
   if (/Mac/i.test(ua)) { os = "macOS"; }
   else if (/Windows/i.test(ua)) { os = "Windows"; }
   else if (/Linux|X11|CrOS/i.test(ua)) { os = "Linux"; }
@@ -21,6 +27,46 @@
   if (box) {
     card.classList.add("is-mine");
     box.classList.add("has-mine");
+  }
+
+  function phonePage() {
+    document.documentElement.classList.add("is-phone");
+    var share = document.getElementById("dlShare");
+    var show = document.getElementById("dlShow");
+    var sec = document.getElementById("download");
+    if (show && sec) {
+      show.hidden = false;
+      show.addEventListener("click", function () {
+        var open = sec.classList.toggle("dl-open");
+        show.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+    }
+    if (!share) { return; }
+    var url = window.location.origin + "/";
+    var label = share.textContent;
+    var send = null;
+    if (navigator.share) {
+      send = function (b) {
+        navigator.share({ title: "dopeIPTV", url: url }).catch(function () { /* closed */ });
+      };
+    } else if (navigator.clipboard && window.isSecureContext) {
+      send = function (b) {
+        navigator.clipboard.writeText(url).then(function () {
+          var was = b.textContent;
+          b.textContent = share.getAttribute("data-copied") || label;
+          setTimeout(function () { b.textContent = was; }, 2200);
+        }, function () { /* no permission: nothing to say */ });
+      };
+    }
+    if (!send) { return; }
+    share.hidden = false;
+    share.addEventListener("click", function () { send(share); });
+    // The hero's "Download" is no use on a phone: it sends the link instead.
+    var hero = document.getElementById("heroDownload");
+    if (hero) {
+      hero.textContent = label;
+      hero.addEventListener("click", function (e) { e.preventDefault(); send(hero); });
+    }
   }
 })();
 

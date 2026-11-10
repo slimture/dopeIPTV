@@ -105,14 +105,14 @@
     return {
       theme: dark ? "night" : "stripe",
       variables: {
-        colorPrimary: css("--accent", "#f5a524"), colorText: css("--text", "#e8ebf1"),
-        colorTextSecondary: css("--muted", "#98a1b3"), colorBackground: css("--surface", "#161a22"),
-        colorDanger: "#ff6b6b", borderRadius: "10px", spacingUnit: "4px", fontSizeBase: "15px",
-        fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+        colorPrimary: css("--accent", "#2997ff"), colorText: css("--text", "#f5f5f7"),
+        colorTextSecondary: css("--muted", "#a1a1a6"), colorBackground: css("--surface", "#161617"),
+        colorDanger: "#ff6b6b", borderRadius: "12px", spacingUnit: "4px", fontSizeBase: "15px",
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
       },
       rules: {
-        ".Input": { backgroundColor: css("--ink", "#0b0d11"), border: "1px solid " + css("--line-2", "#313949"), boxShadow: "none" },
-        ".Input:focus": { border: "1px solid " + css("--accent", "#f5a524"), boxShadow: "0 0 0 1px " + css("--accent", "#f5a524") },
+        ".Input": { backgroundColor: css("--ink", "#000"), border: "1px solid " + css("--line-2", "#3a3a3c"), boxShadow: "none" },
+        ".Input:focus": { border: "1px solid " + css("--accent", "#2997ff"), boxShadow: "0 0 0 1px " + css("--accent", "#2997ff") },
         ".Label": { fontWeight: "600" }
       }
     };

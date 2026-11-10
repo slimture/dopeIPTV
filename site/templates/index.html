@@ -6,7 +6,7 @@
 <title>{{h:meta_title}}</title>
 <meta name="description" content="{{h:meta_desc}}">
 <link rel="canonical" href="{{v:canonical}}">
-{{b:hreflang}}<meta name="theme-color" content="#0f1218">
+{{b:hreflang}}<meta name="theme-color" content="#000000">
 <meta name="robots" content="index,follow">
 <meta name="keywords" content="{{h:meta_keywords}}">
 <!-- Open Graph -->
@@ -122,6 +122,16 @@
           <h2>{{h:dl_h2}}</h2>
         </div>
         <span class="release-tag"><b>v{{v:version}}</b>{{b:release_tag}}</span>
+      </div>
+      <!-- On a phone: dopeIPTV is a computer's app. app.js shows the buttons
+           (send the link to yourself; the downloads anyway) and folds the
+           downloads away; without script the note is all that changes. -->
+      <div class="dl-phone">
+        <p>{{h:dl_phone_p}}</p>
+        <div class="dl-phone-act">
+          <button type="button" class="btn primary" id="dlShare" hidden data-copied="{{h:dl_phone_copied}}">{{h:dl_phone_share}}</button>
+          <button type="button" class="btn ghost" id="dlShow" hidden aria-expanded="false" aria-controls="download">{{h:dl_phone_show}}</button>
+        </div>
       </div>
 {{b:downloads}}{{b:verify}}    </div>
   </section>

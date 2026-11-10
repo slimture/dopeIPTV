@@ -9,10 +9,11 @@ serves them. Designed to sit inside a strict same-origin CSP.
 ```
 website/
 ├── public/                 → the content server's web root
-│   ├── style.css           broadcast-console theme, light + dark
+│   ├── style.css           the look: black/white, greys, the app's blue; light + dark
 │   ├── app.js              OS-detect for the hero button (progressive enhancement)
 │   ├── nav.js, help.js     the narrow-window menu and the help search
-│   ├── favicon.svg         accent-amber TV glyph
+│   ├── favicon.svg         the app's icon (blue tile, white play)
+│   ├── fonts/              Inter (OFL), self-hosted; Apple devices use their own SF
 │   ├── favicon.ico         16/32/48 px, for clients that ask for it blind
 │   ├── site.webmanifest    PWA/icon metadata
 │   ├── robots.txt          allows all + sitemap

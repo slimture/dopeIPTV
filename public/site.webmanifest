@@ -4,8 +4,8 @@
   "description": "Desktop IPTV player with EPG, timeshift and recording.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f1218",
-  "theme_color": "#0f1218",
+  "background_color": "#000000",
+  "theme_color": "#000000",
   "icons": [
     { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" },
     { "src": "/favicon.png", "sizes": "512x512", "type": "image/png" }
