@@ -132,6 +132,7 @@ Only names here - the values are with the owner.
 | Trakt app registration | its client id is `DEFAULT_CLIENT_ID` in `providers/trakt.py`; the redirect goes through the website (see its README) | users can enter their own client id in Settings → Trakt |
 | The web server | runs the site and its cron sync (website branch: `README.md`, `DEPLOY.md`) | the site stops updating; the app is unaffected |
 | GitHub repository settings | releases, Actions, the Security tab for private reports | - |
+| Stripe Payment Link (donations) | `$DONATE` at the top of `site/render.jq` on the `website` branch | no donate card on the site |
 
 A source checkout works without any of these. For local testing, set
 `DOPEIPTV_TMDB_KEY` / `DOPEIPTV_OPENSUBTITLES_KEY` in the environment.
@@ -157,6 +158,23 @@ preview, SEO) and `DEPLOY.md` (the server). In short:
 - Render every language locally before pushing (the README's "Local
   preview"), then look at the pages in a browser. Deploying is a manual
   step on the server (copy `public/` and `site/`, run the sync once).
+
+## A copy outside GitHub
+
+GitHub is where the project lives. A read-only copy is kept on the
+owner's own Forgejo/Gitea at `git.bastion.nu` as a **pull mirror**: that
+server fetches every branch and tag from GitHub on a schedule, so nothing
+on the GitHub side has to know about it and no key is stored anywhere.
+(Set up there with *New migration → GitHub → "This repository will be a
+mirror"*, interval e.g. 1 hour. Release files are not part of git, so
+they stay on GitHub and the website.)
+
+If GitHub ever became unusable: turn the mirror into an ordinary
+repository in its settings, point clones at it
+(`git remote set-url origin <new url>`), and rebuild the release
+pipeline there - `release.yml` is GitHub Actions, and Forgejo Actions
+reads much the same syntax. The website's sync would then need the new
+release source in `sync-releases.sh`.
 
 ## Translations
 
