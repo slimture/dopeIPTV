@@ -16,11 +16,11 @@ from PyQt6.QtCore import QEvent, QObject, Qt, QTimer
 from PyQt6.QtGui import QColor, QIcon
 from PyQt6.QtWidgets import (
     QAbstractItemView, QAbstractSlider, QAbstractSpinBox, QApplication,
-    QCheckBox, QColorDialog, QComboBox, QDialog, QDialogButtonBox,
+    QColorDialog, QComboBox, QDialog, QDialogButtonBox,
     QFileDialog,
     QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
     QListWidgetItem, QMessageBox, QPushButton, QScrollArea, QScrollBar,
-    QSpinBox, QTextBrowser, QVBoxLayout, QWidget,
+    QTextBrowser, QVBoxLayout, QWidget,
 )
 
 
@@ -73,7 +73,8 @@ from .theme import (
     is_light,
 )
 from .settings_ui import (
-    ChoicePicker, ColorDot, PlaylistDelegate, ReorderList, SettingsPage,
+    Chip, ChipGroups, ChoicePicker, ColorDot, DurationSpin, PlaylistDelegate,
+    ReorderList, SettingsPage, Stepper,
     SettingsShell, ThemeTile, fit_to_rows, hbox, page_icon, settings_style,
 )
 from .widgets import confirm
@@ -637,7 +638,12 @@ class _SettingsMixin:
                     tr("set_page_appearance_sub"), "palette")
         themes = ChoicePicker(
             [ThemeTile(key, tr(f"theme_{key}")) for key in THEME_ORDER],
-            self.settings.value("theme", "graphite"))
+            self.settings.value("theme", "graphite"),
+            groups=[(tr("set_themes_dark"),
+                     [k for k in THEME_ORDER if not is_light(k)]),
+                    (tr("set_themes_light"),
+                     [k for k in THEME_ORDER if is_light(k)])],
+            fill=True)
         accent_keys = [ACCENT_THEME, *ACCENTS, ACCENT_CUSTOM]
         accents = ChoicePicker(
             [ColorDot(key, tr(f"accent_{key}"),
@@ -677,6 +683,8 @@ class _SettingsMixin:
             # The dialog's own rules are built from the palette too.
             d.setStyleSheet(settings_style())
             sync_pickers()
+            for chip in d.findChildren(Chip):
+                chip.refresh()
 
         sync_pickers()
 
@@ -879,11 +887,14 @@ class _SettingsMixin:
             self.settings.value("sub_mode", "auto"))
         slang_box = self._combo(LANGS, self.settings.value("sub_lang", ""))
         slang2_box = self._combo(LANGS, self.settings.value("sub_lang2", ""))
-        c = audio.card()
+        c = subs_card = audio.card()
         c.row(tr("setting_audio_lang"), alang_box)
         c.row(tr("setting_subtitles"), sub_box)
-        c.row(tr("setting_sub_lang"), slang_box)
-        c.row(tr("setting_sub_lang_fallback"), slang2_box)
+        subs_on = lambda: sub_box.currentData() != "off"  # noqa: E731
+        c.shown_if(c.row(tr("setting_sub_lang"), slang_box), subs_on)
+        c.shown_if(c.row(tr("setting_sub_lang_fallback"), slang2_box),
+                   subs_on)
+        sub_box.currentIndexChanged.connect(lambda _i: subs_card.refresh())
         sub_size_box = self._combo(
             [(v, tr("opt_percent", n=v)) for v in SUB_SCALES],
             str(self.settings.value("sub_scale", "100")))
@@ -905,26 +916,33 @@ class _SettingsMixin:
         os_user_edit = QLineEdit(self.settings.value("os_username", "") or "")
         os_pass_edit = QLineEdit(self.settings.value("os_password", "") or "")
         os_pass_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        c = audio.card("OpenSubtitles.com")
+        os_user_edit.setPlaceholderText(tr("login_username"))
+        os_pass_edit.setPlaceholderText(tr("login_password"))
+        c = os_card = audio.card("OpenSubtitles.com")
         c.row(tr("setting_api_key"), hbox(os_key_edit, os_test_btn,
                                           stretch=False),
               tr("os_key_builtin_hint") if os_bundled else tr("os_key_hint"),
               stretch_control=True)
-        c.row(tr("login_username"), os_user_edit)
-        c.row(tr("login_password"), os_pass_edit, tr("os_account_hint"))
+        c.row(tr("set_card_account"),
+              hbox(os_user_edit, os_pass_edit, stretch=False),
+              tr("os_account_hint"), stretch_control=True,
+              search=f"{tr('login_username')} {tr('login_password')}")
         os_status = QLabel()
         os_status.setWordWrap(True)
-        c.widget(os_status)
+        c.shown_if(c.widget(os_status), lambda: bool(os_status.text()))
+
+        def os_say(text: str, style: str) -> None:
+            os_status.setText(text)
+            os_status.setStyleSheet(style)
+            os_card.refresh()
 
         def test_os_key() -> None:
             key = os_key_edit.text().strip() or bundled_os_key()
             if not key:
-                os_status.setText(tr("tmdb_enter_key"))
-                os_status.setStyleSheet(
-                    f"color:{P['error']}; font-size:12px;")
+                os_say(tr("tmdb_enter_key"),
+                       f"color:{P['error']}; font-size:12px;")
                 return
-            os_status.setText(tr("tmdb_checking"))
-            os_status.setStyleSheet(f"color:{P['muted']}; font-size:12px;")
+            os_say(tr("tmdb_checking"), f"color:{P['muted']}; font-size:12px;")
             client = OpenSubtitles(key, os_user_edit.text(),
                                    os_pass_edit.text())
 
@@ -936,14 +954,12 @@ class _SettingsMixin:
                 return True
 
             def ok(_r):
-                os_status.setText(tr("tmdb_key_works"))
-                os_status.setStyleSheet(
-                    f"color:{P['accent']}; font-size:12px; font-weight:600;")
+                os_say(tr("tmdb_key_works"),
+                       f"color:{P['accent']}; font-size:12px; font-weight:600;")
 
             def fail(msg):
-                os_status.setText(tr("tmdb_key_failed", msg=msg))
-                os_status.setStyleSheet(
-                    f"color:{P['error']}; font-size:12px;")
+                os_say(tr("tmdb_key_failed", msg=msg),
+                       f"color:{P['error']}; font-size:12px;")
 
             run_async(self.pool, check, ok, fail)
 
@@ -983,46 +999,33 @@ class _SettingsMixin:
         # -- Programme guide --------------------------------------------------
         guide = page("guide", tr("sec_guide"), tr("set_page_guide_sub"),
                      "guide")
-        epg_count_box = QSpinBox()
-        epg_count_box.setRange(self.EPG_UPCOMING_MIN, self.EPG_UPCOMING_MAX)
-        epg_count_box.setValue(self._epg_upcoming_count())
-        epg_count_box.setFixedWidth(90)
+        epg_count_box = Stepper(lo=self.EPG_UPCOMING_MIN,
+                                hi=self.EPG_UPCOMING_MAX,
+                                value=self._epg_upcoming_count())
 
-        def delay_row(key: str):
+        def delay_box(key: str) -> Stepper:
             try:
                 total = int(self.settings.value(key, 0))
             except (TypeError, ValueError):
                 total = 0
-            sign_box = self._combo(
-                [("+", tr("opt_delay_later")), ("-", tr("opt_delay_earlier"))],
-                "-" if total < 0 else "+")
-            sign_box.setMinimumWidth(0)
-            hours, minutes = divmod(abs(total), 60)
-            hours_box = QSpinBox()
-            hours_box.setRange(0, 23)
-            hours_box.setSuffix(" h")
-            hours_box.setValue(hours)
-            minutes_box = QSpinBox()
-            minutes_box.setRange(0, 59)
-            minutes_box.setSuffix(" m")
-            minutes_box.setValue(minutes)
-            row = QHBoxLayout()
-            row.setSpacing(6)
-            row.addWidget(sign_box, 1)
-            row.addWidget(hours_box)
-            row.addWidget(minutes_box)
-            return row, sign_box, hours_box, minutes_box
+            spin = DurationSpin(tr("delay_later"), tr("delay_earlier"),
+                                tr("delay_none"), tr("opt_hours"),
+                                tr("opt_minutes"))
+            spin.setValue(total)
+            # As wide as its longest text, so stepping never resizes it.
+            fm = spin.fontMetrics()
+            widest = max(fm.horizontalAdvance(spin.textFromValue(v))
+                         for v in (-1425, 1425, -1439, 1439, 0))
+            return Stepper(spin, width=widest + 80)
 
-        (replay_delay_row, replay_sign_box, replay_hours_box,
-         replay_minutes_box) = delay_row("replay_delay_min")
-        (epg_delay_row, epg_sign_box, epg_hours_box,
-         epg_minutes_box) = delay_row("epg_delay_min")
+        replay_delay_box = delay_box("replay_delay_min")
+        epg_delay_box = delay_box("epg_delay_min")
         c = guide.card()
         c.row(tr("setting_upcoming_count"), epg_count_box)
         c = guide.card(tr("set_card_offsets"))
-        c.row(tr("setting_replay_delay"), replay_delay_row,
+        c.row(tr("setting_replay_delay"), replay_delay_box,
               tr("set_replay_delay_hint"))
-        c.row(tr("setting_epg_delay"), epg_delay_row,
+        c.row(tr("setting_epg_delay"), epg_delay_box,
               tr("set_epg_delay_hint"))
         refresh_epg_btn = QPushButton(tr("btn_refresh_epg"))
         clear_epg_btn = QPushButton(tr("btn_clear_epg"))
@@ -1042,7 +1045,6 @@ class _SettingsMixin:
             tr("pl_in_use"), {"xtream": "Xtream", "m3u": "M3U",
                               "stalker": "Stalker"}, pl_list))
         pl_list.setMouseTracking(True)
-        pl_list.setMinimumHeight(200)
         # Drag a playlist to change its place; the sidebar's playlist menu
         # lists them in this same order.
         pl_list.setStyleSheet(
@@ -1054,6 +1056,9 @@ class _SettingsMixin:
         use_btn = QPushButton(tr("btn_use"), objectName="Primary")
         c = playlists.card()
         c.widget(pl_list, tr("tab_playlists"))
+        # As tall as its playlists: a fixed 200 px left one playlist above
+        # an empty well.
+        fit_to_rows(pl_list, most=6)
         c.layout_row(hbox(add_btn, edit_btn, remove_btn, None, use_btn))
         c.note(tr("pl_drag_hint"))
         # Account status for the selected Xtream provider (expiry,
@@ -1082,20 +1087,32 @@ class _SettingsMixin:
                                  is_on("home_enabled", "true"))
         home_start_box = c.toggle(tr("set_home_start"),
                                   is_on("home_start", "false"))
+        # Eleven switches made a column of eleven rows; as chips they are
+        # two short groups, each read at a glance.
         c = home.card(tr("set_home_shelves"))
-        home_shelf_boxes: dict[str, QCheckBox] = {}
-        for skey, slabel in (("home_sh_hero", "home_hero"),
-                             ("home_sh_resume", "home_resume"),
-                             ("home_sh_new_eps", "home_new_episodes"),
-                             ("home_sh_fav", "home_fav_now"),
-                             ("home_sh_history", "home_recent"),
-                             ("home_sh_watchlist", "nav_watchlist"),
-                             ("home_sh_pop_movies", "home_pop_movies"),
-                             ("home_sh_pop_series", "home_pop_series"),
-                             ("home_sh_movies", "home_new_movies"),
-                             ("home_sh_series", "home_new_series"),
-                             ("home_sh_channels", "home_new_channels")):
-            home_shelf_boxes[skey] = c.toggle(tr(slabel), is_on(skey, "true"))
+        home_shelf_boxes: dict[str, Chip] = {}
+        shelf_groups = []
+        for heading, shelves in (
+                (tr("set_home_mine"),
+                 (("home_sh_resume", "home_resume"),
+                  ("home_sh_new_eps", "home_new_episodes"),
+                  ("home_sh_fav", "home_fav_now"),
+                  ("home_sh_history", "home_recent"),
+                  ("home_sh_watchlist", "nav_watchlist"))),
+                (tr("set_home_provider"),
+                 (("home_sh_hero", "home_hero"),
+                  ("home_sh_pop_movies", "home_pop_movies"),
+                  ("home_sh_pop_series", "home_pop_series"),
+                  ("home_sh_movies", "home_new_movies"),
+                  ("home_sh_series", "home_new_series"),
+                  ("home_sh_channels", "home_new_channels")))):
+            chips = []
+            for skey, slabel in shelves:
+                chips.append(Chip(tr(slabel), is_on(skey, "true")))
+                home_shelf_boxes[skey] = chips[-1]
+            shelf_groups.append((heading, chips))
+        c.widget(ChipGroups(shelf_groups),
+                 " ".join(ch.text() for _h, chs in shelf_groups for ch in chs))
         c.note(tr("set_home_popular_note"))
         # Following a series: whether new episodes are announced (the shelf
         # and the episode dots show them either way), and the series this
@@ -1179,23 +1196,15 @@ class _SettingsMixin:
             max(0, mv_conflict_box.findData(cur_mode)))
         c.row(tr("mv_set_conflict"), mv_conflict_box)
         c = mv.card(tr("mv_sec_controls"))
-        mv_hide_spin = QSpinBox()
-        mv_hide_spin.setRange(1, 15)
-        try:
-            mv_hide_spin.setValue(
-                int(float(self.settings.value("mv_autohide_secs", 2))))
-        except (TypeError, ValueError):
-            mv_hide_spin.setValue(2)
-        mv_hide_spin.setFixedWidth(90)
+        def whole(key: str, default: int) -> int:
+            try:
+                return int(float(self.settings.value(key, default)))
+            except (TypeError, ValueError):
+                return default
+
+        mv_hide_spin = Stepper(lo=1, hi=15, value=whole("mv_autohide_secs", 2))
         c.row(tr("mv_set_autohide"), mv_hide_spin)
-        mv_step_spin = QSpinBox()
-        mv_step_spin.setRange(1, 60)
-        try:
-            mv_step_spin.setValue(
-                int(float(self.settings.value("mv_seek_step_min", 5))))
-        except (TypeError, ValueError):
-            mv_step_spin.setValue(5)
-        mv_step_spin.setFixedWidth(90)
+        mv_step_spin = Stepper(lo=1, hi=60, value=whole("mv_seek_step_min", 5))
         c.row(tr("mv_set_seek_step"), mv_step_spin)
         mv_info_btn = QPushButton(tr("mv_set_reset_info"))
         mv_info_btn.clicked.connect(
@@ -1948,17 +1957,9 @@ class _SettingsMixin:
             self.settings.setValue(
                 "live_rewind_space_gb", space_box.currentData())
 
-            def delay_value(sign_box, hours_box, minutes_box) -> int:
-                total = hours_box.value() * 60 + minutes_box.value()
-                return -total if sign_box.currentData() == "-" else total
-
-            self.settings.setValue(
-                "replay_delay_min",
-                delay_value(replay_sign_box, replay_hours_box,
-                            replay_minutes_box))
-            self.settings.setValue(
-                "epg_delay_min",
-                delay_value(epg_sign_box, epg_hours_box, epg_minutes_box))
+            self.settings.setValue("replay_delay_min",
+                                   replay_delay_box.value())
+            self.settings.setValue("epg_delay_min", epg_delay_box.value())
             self.xmltv.delay_minutes = self._epg_delay_minutes()
             try:
                 val = float(

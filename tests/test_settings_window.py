@@ -238,12 +238,11 @@ def layout(self):
     def card_titles(key):
         return [l.text() for l in page[key].findChildren(QLabel)
                 if l.objectName() == "SettingsCardTitle"]
-    up = lambda k: tr(k).upper()
-    assert up("set_card_rewind") in card_titles("playback")
-    assert up("set_card_cast") in card_titles("playback")
-    assert up("set_card_cast") not in card_titles("recording")
-    assert up("set_card_caches") in card_titles("advanced")
-    assert up("set_card_caches") not in card_titles("local")
+    assert tr("set_card_rewind") in card_titles("playback")
+    assert tr("set_card_cast") in card_titles("playback")
+    assert tr("set_card_cast") not in card_titles("recording")
+    assert tr("set_card_caches") in card_titles("advanced")
+    assert tr("set_card_caches") not in card_titles("local")
     assert page["metadata"].title == tr("set_page_posters")
     return 0
 QDialog.exec = layout

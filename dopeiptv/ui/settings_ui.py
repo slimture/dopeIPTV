@@ -1,9 +1,11 @@
 """Building blocks of the Settings window.
 
 The window is a sidebar of pages (with a search box over it) beside the
-page on show. A page is a column of cards; a card is a stack of rows, each
-a label - with an optional line of explanation under it - and its control
-on the right. Every page is built from these, so they all look the same and
+page on show. A page is a column of sections; a section is a heading over a
+stack of rows, each a label - with an optional line of explanation under
+it - and its control on the right. Sections are flat: no frame around them
+and no border round a dropdown or a button inside one. Framed cards held
+bordered fields, so a page read as boxes inside boxes inside boxes. Every page is built from these, so they all look the same and
 line up the same, which the old row of ten tabs with ten different layouts
 did not.
 
@@ -15,16 +17,18 @@ from __future__ import annotations
 
 import math
 
+import bisect
+
 from PyQt6.QtCore import QLocale, QPoint, QPointF, QRect, QRectF, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import (
     QColor, QConicalGradient, QFont, QIcon, QPainter, QPainterPath, QPen,
     QPixmap,
 )
 from PyQt6.QtWidgets import (
-    QAbstractButton, QButtonGroup, QCheckBox, QFrame, QHBoxLayout, QLabel,
-    QLayout, QLineEdit, QListWidget, QListWidgetItem, QScrollArea,
-    QSizePolicy, QStackedWidget, QStyle, QStyledItemDelegate, QVBoxLayout,
-    QWidget,
+    QAbstractButton, QAbstractSpinBox, QButtonGroup, QCheckBox, QFrame,
+    QHBoxLayout, QLabel, QLayout, QLineEdit, QListWidget, QListWidgetItem,
+    QPushButton, QScrollArea, QSizePolicy, QSpinBox, QStackedWidget, QStyle,
+    QStyledItemDelegate, QToolButton, QVBoxLayout, QWidget,
 )
 
 from .theme import P, THEMES, corner_radius, resolve_accent, rounded
@@ -88,15 +92,22 @@ def _muted(text: str, size: int = 12) -> QLabel:
     return lbl
 
 
+#: Space above and below the content of a row. The dividers between rows
+#: are what separate them, so this only has to keep a row a comfortable
+#: click target - a dropdown is about 30 px.
+ROW_PAD = 8
+
+
 class SettingsCard(QFrame):
-    """A rounded group of rows, with dividers between them."""
+    """A section of a page: its rows, with a hairline between them. No frame
+    of its own - the heading over it and the space around it group it."""
 
     def __init__(self, page: "SettingsPage") -> None:
         super().__init__()
         self.setObjectName("SettingsCard")
         self._page = page
         self._lay = QVBoxLayout(self)
-        self._lay.setContentsMargins(16, 4, 16, 4)
+        self._lay.setContentsMargins(0, 0, 0, 0)
         self._lay.setSpacing(0)
         self.rows: list[tuple[QWidget, str]] = []
         self._shown_if: dict[int, object] = {}
@@ -114,13 +125,14 @@ class SettingsCard(QFrame):
         return w
 
     def row(self, label: str, control=None, hint: str = "",
-            stretch_control: bool = False) -> QWidget:
+            stretch_control: bool = False, search: str = "") -> QWidget:
         """Label on the left (and its explanation under it), the control -
-        a widget or a layout - on the right."""
+        a widget or a layout - on the right. *search* adds words the row is
+        found under besides its label and hint."""
         w = QWidget()
         w.setObjectName("SettingsRow")
         h = QHBoxLayout(w)
-        h.setContentsMargins(0, 10, 0, 10)
+        h.setContentsMargins(0, ROW_PAD, 0, ROW_PAD)
         h.setSpacing(16)
         text = QVBoxLayout()
         text.setSpacing(2)
@@ -141,16 +153,17 @@ class SettingsCard(QFrame):
             control = holder
         if control is not None:
             # One column of controls down the card: the same width for all,
-            # unless a control has a size of its own (a switch, a number).
+            # unless a control has a size of its own (a switch, a number, a
+            # button - stretched to the column a button was a wide slab).
             fixed = control.minimumWidth() == control.maximumWidth()
             if not (stretch_control or fixed
-                    or isinstance(control, QCheckBox)):
+                    or isinstance(control, (QCheckBox, QPushButton))):
                 control.setMinimumWidth(max(control.minimumWidth(), 220))
                 control.setMaximumWidth(max(control.minimumWidth(), 320))
                 self._page.column.append(control)
             h.addWidget(control, 1 if stretch_control else 0,
                         Qt.AlignmentFlag.AlignVCenter)
-        return self._add(w, f"{label} {hint}")
+        return self._add(w, f"{label} {hint} {search}")
 
     def toggle(self, label: str, checked: bool, hint: str = "") -> ToggleSwitch:
         sw = ToggleSwitch(checked)
@@ -163,7 +176,7 @@ class SettingsCard(QFrame):
         row, a status line."""
         holder = QWidget()
         v = QVBoxLayout(holder)
-        v.setContentsMargins(0, 10, 0, 10)
+        v.setContentsMargins(0, ROW_PAD, 0, ROW_PAD)
         v.addWidget(w)
         return self._add(holder, search)
 
@@ -171,7 +184,7 @@ class SettingsCard(QFrame):
         """A full-width row of controls - buttons, mostly. Found by search
         under the texts on them."""
         holder = QWidget()
-        lay.setContentsMargins(0, 10, 0, 10)
+        lay.setContentsMargins(0, ROW_PAD, 0, ROW_PAD)
         holder.setLayout(lay)
         words = [search] + [w.text() for w in holder.findChildren(QWidget)
                             if hasattr(w, "text") and callable(w.text)
@@ -182,7 +195,7 @@ class SettingsCard(QFrame):
         lbl = _muted(text)
         holder = QWidget()
         v = QVBoxLayout(holder)
-        v.setContentsMargins(0, 10, 0, 10)
+        v.setContentsMargins(0, ROW_PAD, 0, ROW_PAD)
         v.addWidget(lbl)
         self._add(holder, text)
         return lbl
@@ -261,15 +274,18 @@ class SettingsPage(QScrollArea):
         at = self._col.indexOf(self._tail)
         c = SettingsCard(self)
         if title:
-            # QLocale, not str.upper(): Turkish "Dil" is "DİL", and Greek
-            # capitals drop their accents.
-            head = QLabel(QLocale().toUpper(title))
+            # A heading in the page's own type, not small capitals: with no
+            # frame round the section, the heading is what groups it.
+            head = QLabel(title)
             head.setObjectName("SettingsCardTitle")
+            # A styled label indents its text by half an "x" unless told
+            # not to, which set every heading off the rows under it.
+            head.setIndent(0)
             self._col.insertWidget(at, head)
             at += 1
             c.setProperty("_title", head)
         self._col.insertWidget(at, c)
-        self._col.insertSpacing(at + 1, 10)
+        self._col.insertSpacing(at + 1, 4)
         self.cards.append(c)
         return c
 
@@ -455,6 +471,8 @@ class SettingsShell(QWidget):
 def settings_style() -> str:
     """The Settings window's own rules, on top of the app theme."""
     p = P
+    edge = (p['border_in'] if p.get("name") == THEMES["contrast"]["name"]
+            else "transparent")
     return rounded(f"""
 #SettingsSide {{ background: {p['side']}; border-right: 1px solid {p['border']}; }}
 QListWidget#SettingsNav {{ background: transparent; border: none; outline: none; }}
@@ -482,21 +500,98 @@ QLineEdit#SettingsSearch {{ padding: 7px 10px; border-radius: 9px; }}
 #SettingsPageBody {{ background: {p['bg']}; }}
 QLabel#SettingsTitle {{ font-size: 22px; font-weight: 700; color: {p['text']}; }}
 QLabel#SettingsCardTitle {{
-    color: {p['muted']}; font-size: 11px; font-weight: 700;
-    letter-spacing: 1px; padding: 6px 4px 2px 4px;
+    color: {p['text']}; font-size: 15px; font-weight: 600;
+    padding: 18px 0 2px 0;
 }}
-QFrame#SettingsCard {{
-    background: {p['pane']}; border: 1px solid {p['border_in']};
-    border-radius: 12px;
-}}
+QFrame#SettingsCard {{ background: transparent; border: none; }}
 QFrame#SettingsDivider {{ background: {p['border']}; border: none; }}
+/* Controls on a page are filled, not outlined: the fill says "this is a
+   control", and a border on top of it was one box too many. High contrast
+   keeps its borders - there the outline is the point. */
+#SettingsPageBody QComboBox, #SettingsPageBody QLineEdit,
+#SettingsPageBody QSpinBox {{
+    background: {p['btn']}; border: 1px solid {edge}; border-radius: 8px;
+}}
+#SettingsPageBody QComboBox:hover, #SettingsPageBody QLineEdit:hover,
+#SettingsPageBody QSpinBox:hover {{ background: {p['btn_hover']}; }}
+#SettingsPageBody QComboBox:focus, #SettingsPageBody QLineEdit:focus,
+#SettingsPageBody QSpinBox:focus {{ border: 1px solid {p['accent']}; }}
+#SettingsPageBody QComboBox:disabled, #SettingsPageBody QLineEdit:disabled {{
+    color: {p['muted2']}; background: {p['hover']};
+}}
+#SettingsPageBody QPushButton {{
+    background: {p['btn']}; border: 1px solid {edge};
+    padding: 7px 14px;
+}}
+#SettingsPageBody QPushButton:hover {{ background: {p['btn_hover']}; }}
+#SettingsPageBody QPushButton:disabled {{ color: {p['muted2']}; }}
+#SettingsPageBody QPushButton#Primary {{
+    background: {p['accent']}; border-color: {p['accent']};
+    color: {p.get('on_accent', '#FFFFFF')};
+}}
+#SettingsPageBody QPushButton#Primary:hover {{ background: {p['accent_hi']}; }}
+#SettingsPageBody QPushButton#Danger {{ color: {p['error']}; }}
+#SettingsPageBody QPushButton#Danger:hover {{ border-color: {p['error']}; }}
+QFrame#Stepper {{
+    background: {p['btn']}; border: 1px solid {edge}; border-radius: 8px;
+}}
+QFrame#Stepper QSpinBox, QFrame#Stepper QSpinBox:hover,
+QFrame#Stepper QSpinBox:focus {{
+    background: transparent; border: none; padding: 0;
+    min-height: 22px; font-size: 13px; color: {p['text']};
+}}
+/* The app's spin box rule pins 20 px arrow buttons to the right edge, and
+   without buttons the text field still measured itself up to them: one
+   pixel wide. Parked at the left at no size, they leave it the width. */
+QFrame#Stepper QSpinBox::up-button, QFrame#Stepper QSpinBox::down-button {{
+    subcontrol-origin: margin; subcontrol-position: center left;
+    width: 0px; height: 0px; border: none; image: none;
+}}
+QFrame#Stepper QToolButton {{
+    background: transparent; border: none; border-radius: 6px;
+    color: {p['text2']}; font-size: 16px; font-weight: 600;
+}}
+QFrame#Stepper QToolButton:hover {{ background: {p['btn_hover']}; color: {p['text']}; }}
+QFrame#Stepper QToolButton:disabled {{ color: {p['muted3']}; }}
+QLabel#SettingsGroupHead {{ color: {p['muted']}; font-size: 12px; }}
 #SettingsRow, QFrame#SettingsCard > QWidget {{ background: transparent; }}
 QLabel#SettingsLabel {{ font-size: 13px; color: {p['text']}; }}
 QLabel#SettingsHint {{ color: {p['muted']}; }}
-QPushButton#Danger {{ color: {p['error']}; }}
-QPushButton#Danger:hover {{ border-color: {p['error']}; }}
 #SettingsFooter {{ background: {p['bg']}; border-top: 1px solid {p['border']}; }}
-""")
+""") + _chip_style()
+
+
+def _chip_style() -> str:
+    """A chip is a pill: its radius half its height, whatever the corner
+    style. Left to rounded(), "round" scaled it past half the height, and
+    Qt then draws no rounding at all - a square chip."""
+    p = P
+    radius = min(13, round(corner_radius(12)))
+    tint = QColor(p["accent"])
+    tint.setAlphaF(0.24)
+    tint_hi = QColor(p["accent"])
+    tint_hi.setAlphaF(0.34)
+
+    def rgba(c: QColor) -> str:
+        return f"rgba({c.red()}, {c.green()}, {c.blue()}, {c.alphaF():.2f})"
+
+    # On: a wash of the accent and a tick, like a filter chip. A solid
+    # accent fill on eleven chips at once shouted.
+    return f"""
+#SettingsPageBody QPushButton#Chip {{
+    border: 1px solid {p['border_in']}; border-radius: {radius}px;
+    min-height: 18px; padding: 4px 12px 4px 9px; background: transparent;
+    color: {p['muted']}; font-weight: 500;
+}}
+#SettingsPageBody QPushButton#Chip:hover {{
+    border-color: {p['muted3']}; color: {p['text2']};
+}}
+#SettingsPageBody QPushButton#Chip:checked {{
+    background: {rgba(tint)}; border-color: transparent; color: {p['text']};
+}}
+#SettingsPageBody QPushButton#Chip:checked:hover {{ background: {rgba(tint_hi)}; }}
+#SettingsPageBody QPushButton#Chip:focus {{ border-color: {p['accent_hi']}; }}
+"""
 
 
 # -- playlist rows -----------------------------------------------------------
@@ -759,10 +854,14 @@ class FlowLayout(QLayout):
     """Lays its items out in rows, wrapping to the next row when one is
     full - so a set of tiles fits a narrow window as well as a wide one."""
 
-    def __init__(self, parent=None, spacing: int = 8) -> None:
+    def __init__(self, parent=None, spacing: int = 8,
+                 fill: bool = False) -> None:
         super().__init__(parent)
         self._items: list = []
         self._gap = spacing
+        # Equal tiles in columns that share out the whole width: a grid
+        # packed to the left left an empty band down the right.
+        self._fill = fill
         self.setContentsMargins(0, 0, 0, 0)
 
     def addItem(self, item) -> None:
@@ -800,6 +899,8 @@ class FlowLayout(QLayout):
         return size
 
     def _place(self, rect, apply: bool) -> int:
+        if self._fill and self._items:
+            return self._place_grid(rect, apply)
         x, y, line = rect.x(), rect.y(), 0
         rtl = self.parentWidget() is not None and \
             self.parentWidget().isRightToLeft()
@@ -814,6 +915,28 @@ class FlowLayout(QLayout):
             x += hint.width() + self._gap
             line = max(line, hint.height())
         return y + line - rect.y()
+
+    def _place_grid(self, rect, apply: bool) -> int:
+        """As many columns as tiles of their own width fit, then the columns
+        widened to share the row out - so the grid ends flush with the page
+        edge on both sides, and two grids of the same tiles line up."""
+        w = max(item.sizeHint().width() for item in self._items)
+        h = max(item.sizeHint().height() for item in self._items)
+        cols = max(1, (rect.width() + self._gap) // (w + self._gap))
+        cell = max(w, (rect.width() - (cols - 1) * self._gap) // cols)
+        rtl = self.parentWidget() is not None and \
+            self.parentWidget().isRightToLeft()
+        rows = 0
+        for i, item in enumerate(self._items):
+            r, c = divmod(i, cols)
+            if rtl:
+                c = cols - 1 - c
+            rows = r + 1
+            if apply:
+                item.setGeometry(QRect(rect.x() + c * (cell + self._gap),
+                                       rect.y() + r * (h + self._gap),
+                                       cell, h))
+        return rows * h + (rows - 1) * self._gap
 
 
 class _Choice(QAbstractButton):
@@ -859,7 +982,7 @@ class ThemeTile(_Choice):
         acc = QColor(resolve_accent(self.key, *self.accent)[0])
         pr = QPainter(self)
         pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        r = QRectF(3, 3, self.W - 6, self.PREVIEW_H - 6)
+        r = QRectF(3, 3, self.width() - 6, self.PREVIEW_H - 6)
         rad = corner_radius(8)
         clip = QPainterPath()
         clip.addRoundedRect(r, rad, rad)
@@ -921,10 +1044,11 @@ class ThemeTile(_Choice):
         f.setWeight(QFont.Weight.DemiBold if on else QFont.Weight.Normal)
         pr.setFont(f)
         pr.setPen(QColor(P["text"] if on else P["text2"]))
-        label = QRectF(0, self.PREVIEW_H, self.W, self.H - self.PREVIEW_H)
+        label = QRectF(0, self.PREVIEW_H, self.width(),
+                       self.H - self.PREVIEW_H)
         text = pr.fontMetrics().elidedText(self.text(),
                                            Qt.TextElideMode.ElideRight,
-                                           self.W - 4)
+                                           self.width() - 4)
         pr.drawText(label, Qt.AlignmentFlag.AlignHCenter
                     | Qt.AlignmentFlag.AlignTop, text)
         pr.end()
@@ -986,20 +1110,72 @@ class ColorDot(_Choice):
         pr.end()
 
 
+class _Flow(QWidget):
+    """A FlowLayout's widget: as tall as its rows at the width it gets."""
+
+    def __init__(self, spacing: int, fill: bool) -> None:
+        super().__init__()
+        self.flow = FlowLayout(self, spacing, fill)
+        sp = QSizePolicy(QSizePolicy.Policy.Preferred,
+                         QSizePolicy.Policy.Preferred)
+        sp.setHeightForWidth(True)
+        self.setSizePolicy(sp)
+
+    def hasHeightForWidth(self) -> bool:
+        return True
+
+    def heightForWidth(self, width: int) -> int:
+        return self.flow.heightForWidth(width)
+
+
+def _group_head(text: str) -> QLabel:
+    lbl = QLabel(text)
+    lbl.setObjectName("SettingsGroupHead")
+    return lbl
+
+
 class ChoicePicker(QWidget):
     """Tiles of which one is chosen, wrapping over as many rows as the
-    width needs. ``picked`` says which, by key."""
+    width needs. ``picked`` says which, by key. With *groups* - (heading,
+    [keys]) - the tiles stand under small headings, still one choice among
+    all of them; *fill* makes equal tiles share out the whole width."""
 
     picked = pyqtSignal(str)
 
-    def __init__(self, tiles: list, current: str, spacing: int = 10) -> None:
+    def __init__(self, tiles: list, current: str, spacing: int = 10,
+                 groups: list[tuple[str, list[str]]] | None = None,
+                 fill: bool = False) -> None:
         super().__init__()
         self.tiles = tiles
         self._group = QButtonGroup(self)
         self._group.setExclusive(True)
-        lay = FlowLayout(self, spacing)
+        if groups:
+            by_key = {t.key: t for t in tiles}
+            v = QVBoxLayout(self)
+            v.setContentsMargins(0, 0, 0, 0)
+            v.setSpacing(6)
+            placed: set[str] = set()
+            sets = [(head, [by_key[k] for k in keys if k in by_key])
+                    for head, keys in groups]
+            sets.append(("", [t for t in tiles if t.key not in
+                              {k for _h, keys in groups for k in keys}]))
+            for head, members in sets:
+                if not members:
+                    continue
+                if placed:
+                    v.addSpacing(8)
+                if head:
+                    v.addWidget(_group_head(head))
+                box = _Flow(spacing, fill)
+                for tile in members:
+                    box.flow.addWidget(tile)
+                    placed.add(tile.key)
+                v.addWidget(box)
+        else:
+            lay = FlowLayout(self, spacing, fill)
+            for tile in tiles:
+                lay.addWidget(tile)
         for tile in tiles:
-            lay.addWidget(tile)
             self._group.addButton(tile)
             tile.clicked.connect(lambda _c=False, k=tile.key: self.picked.emit(k))
         self.set_value(current)
@@ -1029,3 +1205,208 @@ class ChoicePicker(QWidget):
     def refresh(self) -> None:
         for tile in self.tiles:
             tile.update()
+
+
+# -- chips -------------------------------------------------------------------
+
+class Chip(QPushButton):
+    """An on/off choice as a small pill: filled in the accent with a tick
+    when on, an outline with an empty ring when off. Still a checkable
+    button - isChecked and toggled work as on a switch - so a dozen of them
+    sit in two lines where as many switches made a column of rows."""
+
+    def __init__(self, text: str, checked: bool) -> None:
+        super().__init__(text)
+        self.setObjectName("Chip")
+        self.setCheckable(True)
+        self.setChecked(checked)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setAccessibleName(text)
+        self.toggled.connect(self._mark)
+        self._mark(checked)
+
+    def _mark(self, on: bool) -> None:
+        s, scale = 14, 3
+        pm = QPixmap(s * scale, s * scale)
+        pm.setDevicePixelRatio(float(scale))
+        pm.fill(Qt.GlobalColor.transparent)
+        pr = QPainter(pm)
+        pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        pen = QPen(QColor(P["text"] if on else P["muted"]))
+        pen.setWidthF(1.8 if on else 1.3)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        pr.setPen(pen)
+        if on:
+            tick = QPainterPath()
+            tick.moveTo(s * 0.2, s * 0.52)
+            tick.lineTo(s * 0.42, s * 0.74)
+            tick.lineTo(s * 0.82, s * 0.28)
+            pr.drawPath(tick)
+        else:
+            pr.drawEllipse(QRectF(s * 0.18, s * 0.18, s * 0.64, s * 0.64))
+        pr.end()
+        self.setIcon(QIcon(pm))
+        self.setIconSize(QSize(s, s))
+
+    def refresh(self) -> None:
+        """Redraw the mark in the palette now in use (after a theme change)."""
+        self._mark(self.isChecked())
+
+
+class ChipGroups(QWidget):
+    """Chips under small headings, each group wrapping to the width."""
+
+    def __init__(self, groups: list[tuple[str, list[Chip]]]) -> None:
+        super().__init__()
+        v = QVBoxLayout(self)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(6)
+        self.chips: list[Chip] = []
+        for i, (heading, chips) in enumerate(groups):
+            if i:
+                v.addSpacing(6)
+            v.addWidget(_group_head(heading))
+            box = _Flow(8, False)
+            for chip in chips:
+                box.flow.addWidget(chip)
+                self.chips.append(chip)
+            v.addWidget(box)
+        sp = QSizePolicy(QSizePolicy.Policy.Preferred,
+                         QSizePolicy.Policy.Preferred)
+        sp.setHeightForWidth(True)
+        self.setSizePolicy(sp)
+
+    def hasHeightForWidth(self) -> bool:
+        return True
+
+    def heightForWidth(self, width: int) -> int:
+        return self.layout().heightForWidth(width)
+
+
+# -- steppers ----------------------------------------------------------------
+
+class Stepper(QFrame):
+    """A number between a minus and a plus, in one filled pill. The spin
+    box's own arrows were two 8-pixel targets in a column at its edge, and
+    a box beside a box when two numbers went together.
+
+    The value is the spin box's (``value``/``setValue``/``valueChanged``);
+    holding a button repeats, and the arrow keys and the wheel still step."""
+
+    def __init__(self, spin: QSpinBox | None = None, lo: int = 0,
+                 hi: int = 99, value: int = 0, width: int = 120) -> None:
+        super().__init__()
+        self.setObjectName("Stepper")
+        self.spin = spin if spin is not None else QSpinBox()
+        if spin is None:
+            self.spin.setRange(lo, hi)
+            self.spin.setValue(value)
+        self.spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
+        self.spin.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.spin.setFrame(False)
+        self.valueChanged = self.spin.valueChanged
+        h = QHBoxLayout(self)
+        h.setContentsMargins(2, 2, 2, 2)
+        h.setSpacing(0)
+        self.minus = self._button("\u2212", -1)
+        self.plus = self._button("+", 1)
+        h.addWidget(self.minus)
+        h.addWidget(self.spin, 1)
+        h.addWidget(self.plus)
+        self.setFixedWidth(width)
+        self.spin.valueChanged.connect(self._ends)
+        self._ends()
+
+    def _button(self, text: str, step: int) -> QToolButton:
+        b = QToolButton()
+        b.setText(text)
+        b.setFixedSize(28, 26)
+        b.setAutoRepeat(True)
+        b.setAutoRepeatDelay(400)
+        b.setAutoRepeatInterval(70)
+        b.setCursor(Qt.CursorShape.PointingHandCursor)
+        b.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        b.clicked.connect(lambda _c=False: self.spin.stepBy(step))
+        return b
+
+    def _ends(self, *_a) -> None:
+        v = self.spin.value()
+        self.minus.setEnabled(v > self.spin.minimum())
+        self.plus.setEnabled(v < self.spin.maximum())
+
+    def value(self) -> int:
+        return self.spin.value()
+
+    def setValue(self, value: int) -> None:
+        self.spin.setValue(value)
+
+    def setAccessibleName(self, name: str) -> None:
+        super().setAccessibleName(name)
+        self.spin.setAccessibleName(name)
+
+
+def _offset_grid(most: int) -> list[int]:
+    # Five minutes at a time up to an hour, then quarters of an hour.
+    up = list(range(5, 60, 5)) + list(range(60, most + 1, 15))
+    return [-v for v in reversed(up)] + [0] + up
+
+
+class DurationSpin(QSpinBox):
+    """Minutes, signed, shown in words: "1 h 30 min later", "45 min
+    earlier", or the word for none at 0. One control where a sign dropdown,
+    an hours box and a minutes box made three.
+
+    Steps go five minutes at a time under an hour and fifteen above it; a
+    stored value off that grid (the old boxes took any minute) is kept
+    until it is stepped, and the first step lands on the grid."""
+
+    def __init__(self, later: str, earlier: str, none: str, hours: str,
+                 minutes: str, most: int = 24 * 60 - 1) -> None:
+        super().__init__()
+        self._later, self._earlier, self._none = later, earlier, none
+        self._hours, self._minutes = hours, minutes
+        self._grid = _offset_grid(most - most % 15)
+        self.setRange(-most, most)
+        # Not typed: the words around the number made typing a guessing game
+        # (which sign, which unit). The buttons, arrow keys and wheel step.
+        self.lineEdit().setReadOnly(True)
+
+    def textFromValue(self, value: int) -> str:
+        if value == 0:
+            return self._none
+        h, m = divmod(abs(value), 60)
+        parts = []
+        if h:
+            parts.append(self._hours.format(n=h))
+        if m:
+            parts.append(self._minutes.format(n=m))
+        return (self._later if value > 0 else self._earlier).format(
+            time=" ".join(parts))
+
+    def valueFromText(self, text: str) -> int:
+        return self.value()
+
+    def validate(self, text: str, pos: int):
+        from PyQt6.QtGui import QValidator
+        return QValidator.State.Acceptable, text, pos
+
+    def stepBy(self, steps: int) -> None:
+        v = self.value()
+        grid = self._grid
+        for _ in range(abs(steps)):
+            if steps > 0:
+                i = bisect.bisect_right(grid, v)
+                v = grid[i] if i < len(grid) else v
+            else:
+                i = bisect.bisect_left(grid, v) - 1
+                v = grid[i] if i >= 0 else v
+        self.setValue(v)
+
+    def stepEnabled(self):
+        flags = QAbstractSpinBox.StepEnabledFlag.StepNone
+        if self.value() > self._grid[0]:
+            flags |= QAbstractSpinBox.StepEnabledFlag.StepDownEnabled
+        if self.value() < self._grid[-1]:
+            flags |= QAbstractSpinBox.StepEnabledFlag.StepUpEnabled
+        return flags
