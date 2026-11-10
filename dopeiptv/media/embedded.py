@@ -968,6 +968,15 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
     # -- event filter (fullscreen overlay reveal on hover) --------------------
 
     def eventFilter(self, obj, event):
+        if (event.type() == QEvent.Type.Resize
+                and obj is getattr(self, "_ov_surface", None)):
+            # The video the floating bars sit on changed size while the
+            # player did not: in the pop-out, the control bar coming back
+            # shrinks it, and a bar placed against the taller video lay over
+            # the control bar until it was next shown.
+            self._place_floating_bars()
+        if obj is not self.video and obj is getattr(self, "_mirror", None):
+            return super().eventFilter(obj, event)
         if obj in getattr(self, "_local_buffer_controls", ()):
             if event.type() in (QEvent.Type.Enter, QEvent.Type.MouseMove,
                                  QEvent.Type.MouseButtonPress,
@@ -1303,6 +1312,7 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
         # reparent them into the pop-out window and anchor placement to the
         # mirror. They're plain widgets, so moving them is safe.
         self._ov_surface = m
+        m.installEventFilter(self)      # its resizes re-place the bars
         for ov in (self.seek_overlay, self.ts_timeline, self._stats_overlay,
                    self.nextup_btn, self.local_buffer_bar):
             if ov is not None:
@@ -2026,7 +2036,13 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
             self._position_center_btn()
         if self.overlay.isVisible() or self.fs_controls.isVisible():
             self._place_overlay()
-        if self.seek_overlay.isVisible():
+        self._place_floating_bars()
+
+    def _place_floating_bars(self) -> None:
+        """Re-place the bars that float over the bottom of the video - the
+        seek bar, the timeshift timeline and the DVR row - that are showing.
+        The timeline first: the DVR row goes above it when both show."""
+        if self.seek_overlay is not None and self.seek_overlay.isVisible():
             self._place_seek_overlay()
         if self.ts_timeline.isVisible():
             self._place_ts_timeline()

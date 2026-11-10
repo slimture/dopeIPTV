@@ -215,6 +215,71 @@ def test_popout_window_paths():
         f"stdout={proc.stdout!r}\nstderr={proc.stderr[-2000:]!r}")
 
 
+# The bars over the video stay above the pop-out's control bar. With
+# auto-hide the bar fades, the video grows into its room, and the pointer
+# coming back reveals the DVR row and the bar together: the row was placed
+# against the taller video and lay over the control bar.
+_BARS_CHILD = _CHILD[:_CHILD.index("h = Host()")] + r"""
+h = Host()
+h.show()
+p = h.player
+if p is None:
+    print("SKIP_NO_PLAYER")
+    raise SystemExit(0)
+h.settings.setValue("popout_autohide", "true")
+h._toggle_popout()
+win = h._popout_win
+win.resize(800, 450)
+
+def spin():
+    for _ in range(10):
+        app.processEvents()
+
+def clear_of_bar(bar_widget, name):
+    top = p.bar.mapTo(win, p.bar.rect().topLeft()).y()
+    bottom = bar_widget.geometry().bottom() + 1
+    assert bottom <= top, f"{name} ends at {bottom}, the control bar starts at {top}"
+
+spin()
+# The DVR row, revealed by the pointer while the control bar is away.
+p._local_buffer_enabled = True
+p._local_buffer_ready = True
+p.bar.hide(); spin()
+p.reveal_pop_overlays(); spin()
+assert p.bar.isVisible() and p.local_buffer_bar.isVisible()
+clear_of_bar(p.local_buffer_bar, "the DVR row")
+p.local_buffer_bar.hide()
+p._local_buffer_enabled = False
+
+# The timeshift timeline, shown (an arrow key) while the bar is away and
+# still up when the bar comes back.
+p._seek_mode = "timeline"
+p.enter_timeshift(120); spin()
+p.bar.hide(); p.ts_timeline.hide(); spin()
+p._timeline_step(-5); spin()
+assert p.ts_timeline.isVisible()
+p._reveal_popout_bar(); spin()
+clear_of_bar(p.ts_timeline, "the timeshift timeline")
+print("POPOUT_BARS_OK")
+"""
+
+
+def test_popout_bars_stay_above_the_control_bar():
+    try:
+        import PyQt6  # noqa: F401
+    except Exception:
+        pytest.skip("PyQt6 not available")
+    proc = subprocess.run(
+        [sys.executable, "-c", _BARS_CHILD], capture_output=True, text=True,
+        env=dict(os.environ, QT_QPA_PLATFORM="offscreen"),
+        cwd=_REPO_ROOT, timeout=180)
+    if "SKIP_NO_PLAYER" in proc.stdout:
+        pytest.skip("embedded player unavailable (no libmpv)")
+    assert "POPOUT_BARS_OK" in proc.stdout, (
+        f"pop-out bar checks failed\nstdout={proc.stdout!r}\n"
+        f"stderr={proc.stderr[-2000:]!r}")
+
+
 _WIN32_CHILD = r"""
 import os, sys
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
