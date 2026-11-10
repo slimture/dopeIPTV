@@ -104,7 +104,7 @@
     $("kpis").replaceChildren(
       tile("Visitors", num.format(T.visitors), since, delta(T.visitors, B.visitors)),
       tile("Page views", num.format(T.views), since, delta(T.views, B.views)),
-      tile("Downloads", num.format(T.downloads), num.format(data.downloads_all_time) + " all time",
+      tile("Downloads", num.format(T.downloads), num.format(data.downloads_all_time) + " on the site's counter",
            ""),
       tile("Donations", num.format(D.count), D.error ? "Stripe did not answer" : sums(D.sums)),
       tile("Visitors today", num.format(data.today.visitors), num.format(data.today.views) + " page views", "")

@@ -418,5 +418,9 @@ rm -f /usr/local/www/iptv/stats/stats.json /usr/local/www/iptv/stats/state.json
 su -m iptv -c '/usr/local/bin/python3 -I /usr/local/www/iptv/donate/stats_collect.py --backfill'
 ```
 
-The downloads are counted as the site's own counter (downloads.json)
-counts them: a click sent on to the file, robots left out.
+A download is a click sent on to the file, from a real browser (robots,
+scripts and download checkers are left out), counted once per visitor and
+file a day - stricter than the site's public counter (downloads.json),
+which counts every click. Once per visitor needs the visitor's address in
+/dl.php's log, the `iptv_dl` format in the content server's file; lines
+written before it count each click.

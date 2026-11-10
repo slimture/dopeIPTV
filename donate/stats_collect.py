@@ -15,9 +15,11 @@ What is counted, per day:
   pages, refs (sites that linked here), langs (the language the page was
   shown in), os, devices - the last three once per visitor
   downloads  per platform, and files per file, from the /dl.php log the
-             site already keeps - counted as the site's own counter counts
-             them (sync-releases.sh): a request sent on to the file (302),
-             robots and empty browser names left out
+             site already keeps: a click sent on to the file (302), from a
+             real browser - robots, scripts, download checkers and empty
+             browser names left out - and, where the log names the visitor
+             (its last field, the iptv_dl format), once per visitor per file
+             per day, with the same salted hash as the visitors
 
 Two logs, read from where the last run stopped (rotation by newsyslog is
 followed into <log>.0):
@@ -65,12 +67,11 @@ PAGES = {"/": "/", "/help/": "/help/"}
 BOTS = re.compile(r"bot|crawl|spider|slurp|curl|wget|python|httpclient|go-http|java/|okhttp|"
                   r"facebookexternalhit|embedly|preview|monitor|uptime|headless|scrapy|"
                   r"lighthouse|pingdom|feedfetcher|validator|scanner|semrush|ahrefs|"
-                  r"bingpreview|whatsapp|telegram|discord|slack", re.IGNORECASE)
+                  r"bingpreview|whatsapp|telegram|discord|slack|skype", re.IGNORECASE)
+# Combined, plus the visitor's address as a last field in the iptv_dl format
+# (older lines have none: their first field is the TLS proxy).
 DL_LINE = re.compile(r'\[(\d{2})/(\w{3})/(\d{4}):[^\]]*\] "GET /dl\.php\?f=([^ "&]+)[^"]*" (\d{3}) '
-                     r'\S+ "[^"]*" "([^"]*)"')
-# The same robots sync-releases.sh leaves out of the site's download counter.
-DL_BOTS = re.compile(r"bot|crawl|spider|slurp|preview|facebookexternalhit|whatsapp|telegram|discord|"
-                     r"skype|embed|monitor|scan", re.IGNORECASE)
+                     r'\S+ "[^"]*" "([^"]*)"(?: "([^"]*)")?')
 MONTHS = {m: i for i, m in enumerate(
     ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], 1)}
 
@@ -147,18 +148,30 @@ def _read_new(path: str, state: dict) -> list:
     return lines
 
 
-def _download(stats: dict, line: str) -> None:
+def browser(ua: str) -> bool:
+    """A person's browser: every one says "Mozilla/"; robots that say it
+    too name themselves, and scripts (curl, wget, python...) do not say it."""
+    return ua.startswith("Mozilla/") and not BOTS.search(ua)
+
+
+def _download(stats: dict, line: str, state: dict) -> None:
     m = DL_LINE.search(line)
-    if not m or m.group(5) != "302":
-        return
-    ua = m.group(6)
-    if not ua or ua == "-" or DL_BOTS.search(ua):
+    if not m or m.group(5) != "302" or not browser(m.group(6)):
         return
     dd, mon, yyyy, name = m.group(1), m.group(2), m.group(3), m.group(4)
     if mon not in MONTHS:
         return
+    day = f"{yyyy}-{MONTHS[mon]:02d}-{dd}"
     name = name.rsplit("/", 1)[-1]
-    d = _day(stats, f"{yyyy}-{MONTHS[mon]:02d}-{dd}")
+    ip = m.group(7) or ""
+    if ip and ip != "-":
+        salt = state["salts"].setdefault(day, secrets.token_hex(16))
+        h = hashlib.sha256(f"{salt}|{ip}|{m.group(6)}|{name}".encode()).hexdigest()[:20]
+        seen = state.setdefault("seen_dl", {}).setdefault(day, [])
+        if h in seen:
+            return
+        seen.append(h)
+    d = _day(stats, day)
     _bump(d["downloads"], platform_of(name))
     _bump(d.setdefault("files", {}), name[:120])
 
@@ -206,7 +219,7 @@ def collect(backfill: bool = False) -> None:
         except ValueError:
             continue
         ua = r.get("a") or ""
-        if r.get("m") != "GET" or str(r.get("s")) not in ("200", "304") or not ua or BOTS.search(ua):
+        if r.get("m") != "GET" or str(r.get("s")) not in ("200", "304") or not browser(ua):
             continue
         page = PAGES.get(urlsplit(r.get("u") or "").path)
         if page is None:
@@ -235,18 +248,20 @@ def collect(backfill: bool = False) -> None:
         for old in _rotated(DL_LOG):
             with _open_any(old) as fh:
                 for line in fh:
-                    _download(stats, line)
+                    _download(stats, line, state)
             print(f"[stats] read {old}", flush=True)
     for line in _read_new(DL_LOG, state["logs"].setdefault("downloads", {})):
-        _download(stats, line)
+        _download(stats, line, state)
 
     # The salts and the day's hashes only live while that day can still get
     # lines (today and yesterday, for a late rotation); then they are gone,
     # and with them any way to tie one day's visitors to another's.
-    days = sorted(set(salts) | set(seen))
+    seen_dl = state.setdefault("seen_dl", {})
+    days = sorted(set(salts) | set(seen) | set(seen_dl))
     for old in days[:-2]:
         salts.pop(old, None)
         seen.pop(old, None)
+        seen_dl.pop(old, None)
     for old in sorted(stats["days"])[:-KEEP_DAYS]:
         stats["days"].pop(old, None)
     # A day's list of sites or files stays short, so ten years stay small -
