@@ -52,6 +52,11 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.4.3" date="2026-11-10">
+      <description>
+        <p>Fixes after 1.4.2: no spinning pointer on GNOME when Home opens, the pop-out player's DVR row and timeshift timeline above its controls, and after an AppImage update the window belongs to the dock icon it was started from. About says who makes dopeIPTV and shows only the release notes that are new to you.</p>
+      </description>
+    </release>
     <release version="1.4.2" date="2026-11-10">
       <description>
         <p>Settings rebuilt: each setting where you would look for it, applied as you change it, with a search across every page and a Picture &amp; sound page. The programme guide lists every channel of All, multiview's button opens and closes its window, links open in front of the app on Linux, and a quiet heart for supporting dopeIPTV that can be hidden.</p>

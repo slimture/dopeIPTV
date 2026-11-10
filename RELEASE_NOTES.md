@@ -1,3 +1,22 @@
+## dopeIPTV 1.4.3
+
+A few fixes after 1.4.2: no spinning pointer on Home, and a tidier About.
+
+- **No spinning pointer on Home (GNOME).** In 1.4.2 the pointer spun for
+  a while each time Home opened, or when Home was switched off in
+  Settings. It no longer does.
+- **The pop-out player's bars stay above its controls.** The DVR row and
+  the timeshift timeline no longer lie over the control bar when it comes
+  back after fading.
+- **Back in your dock icon after an update.** After **Update now** restarts
+  the AppImage, the window belongs to the icon you started it from, not a
+  second one beside it.
+- **About** says who makes dopeIPTV - Solecraft - and its release notes
+  show only what is new to you.
+- Home's back and heart buttons are round again.
+
+On the AppImage from 1.2.15 or later? Click **Update now** in the banner.
+
 ## dopeIPTV 1.4.2
 
 Settings that are quicker to find and apply as you change them, a

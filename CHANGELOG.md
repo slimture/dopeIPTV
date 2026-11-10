@@ -7,7 +7,14 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.4.3]
+
+Fixes after 1.4.2: no spinning pointer on Home, the pop-out's bars above
+its controls, the window back in its dock icon after an update, and a
+tidier About.
+
 ### Fixed
+
 - GNOME (Wayland): the pointer no longer spins for a while each time Home
   opens, or when Home is switched off in Settings. Home's donate heart was
   shown for a moment as a window of its own, which asked GNOME for an
@@ -24,6 +31,7 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   dopeIPTV ships also say `StartupWMClass=dopeiptv`.
 
 ### Changed
+
 - About: "Made by" and the Solecraft logotype beside **Close**, a quiet
   link to solecraft.se.
 - About: the release notes show only what is new to you - this version's
