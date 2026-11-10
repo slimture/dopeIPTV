@@ -214,8 +214,13 @@
     // days); visits are a person on a day, summed.
     const unique = T.unique !== null && T.unique !== undefined;
     const visitorsNote = num.format(T.visits || T.visitors) + " visits · " + num.format(T.returning || 0) + " returning";
-    const avg = T.visits ? T.engaged / T.visits : 0;
-    const bounce = T.visits ? Math.round(T.bounces / T.visits * 100) : 0;
+    // Time and quick leaves only from visits whose time is known: a page
+    // closed without a word (phones do) or its message blocked is not a
+    // visit of no seconds.
+    const timed = T.timed !== undefined ? T.timed : T.visits;
+    const avg = timed ? T.engaged / timed : 0;
+    const bounce = timed ? Math.round(T.bounces / timed * 100) : 0;
+    const untimed = Math.max(0, (T.visits || 0) - timed);
     const opened = (data.top.events || []).find((e) => e[0] === "donate");
     // The secondary numbers, under the summary's three.
     $("kpis").replaceChildren(
@@ -223,7 +228,8 @@
            delta(T.visits || T.visitors, B.visits || B.visitors)),
       tile("Page views", num.format(T.views), "from " + num.format(T.requests || 0) + " page requests, robots included",
            delta(T.views, B.views)),
-      tile("Time per visit", T.visits ? duration(avg) : "–", T.visits ? bounce + "% left within 10 s" : "", "", true),
+      tile("Time per visit", timed ? duration(avg) : "–",
+           timed ? bounce + "% left within 10 s" + (untimed ? " · " + num.format(untimed) + " without a time" : "") : "", "", true),
       tile("Donate dialog", num.format(opened ? opened[1] : 0), "times opened" + (D.error ? "" : " · " + sums(D.sums)), "", true)
     );
     void visitorsNote;
@@ -591,7 +597,7 @@
       v.append(mk("b", "", num.format(r.visits)), vb);
       row.append(mk("span", "c-name", name), v, meter(r.more, r.visits, "m1", "Read more"),
                  meter(r.downloaded, r.visits, "m2", "Downloaded"), meter(r.donate, r.visits, "m3", "Opened donate"),
-                 mk("span", "c-time", duration(r.visits ? r.time / r.visits : 0)));
+                 mk("span", "c-time", (r.timed !== undefined ? r.timed : r.visits) ? duration(r.time / (r.timed !== undefined ? r.timed : r.visits)) : "–"));
       box.append(row);
     });
     $("by-channel").replaceChildren(box);
@@ -629,7 +635,8 @@
       mk("span", "v-where", flag(v.country) + countryName(v.country)),
       mk("span", "v-what", [v.browser + (v.bv ? " " + v.bv : ""), v.os, v.device].join(" · ")),
       mk("span", "v-from", v.channel ? v.channel + (v.ref ? " · " + v.ref : "") : (dls ? "Straight to a download" : "")),
-      mk("span", "v-pages", (pages ? pages + (pages === 1 ? " page" : " pages") : "") + (v.time ? " · " + duration(v.time) : "")));
+      mk("span", "v-pages", (pages ? pages + (pages === 1 ? " page" : " pages") : "") +
+         (v.time ? " · " + duration(v.time) : pages ? " · time unknown" : "")));
     const tags = mk("span", "v-tags");
     if (v.returning) { tags.append(badge("Returning · " + v.returning + (v.returning === 1 ? " day" : " days") + " before")); }
     if (dls) { tags.append(badge("Downloaded", "good")); }

@@ -629,15 +629,20 @@ def _page_line(stats: dict, uniques: dict, state: dict, r: dict, db, visits: Vis
 
 def _visit_totals(stats: dict, visits: Visits) -> None:
     """A touched day's visits, bounces (one page, under ten seconds) and time
-    looked at, from its visits - counted again as visits grow."""
+    looked at, from its visits - counted again as visits grow. Time and
+    bounces only from the visits whose time is known (timed): a page that
+    never said how long it was looked at - closed without a word, as phones
+    do, or its message blocked - is not a visit of no seconds."""
     for day, lst in visits.days.items():
         if day not in stats["days"]:
             continue
         d = stats["days"][day]
         with_pages = [v for v in lst if v["pages"]]
         d["visits"] = len(with_pages)
-        d["bounces"] = sum(1 for v in with_pages if len(v["pages"]) == 1 and v["time"] < 10)
-        d["engaged"] = sum(v["time"] for v in with_pages)
+        timed = [v for v in with_pages if v["time"] > 0]     # a leave came: seconds were added
+        d["timed"] = len(timed)
+        d["bounces"] = sum(1 for v in timed if len(v["pages"]) == 1 and v["time"] < 10)
+        d["engaged"] = sum(v["time"] for v in timed)
 
 
 def collect(backfill: bool = False, with_fetch: bool = False) -> None:
@@ -711,7 +716,7 @@ def anonymous(v: dict, day: str) -> dict:
             "os": _family(v.get("os") or ""), "device": v.get("device") or "",
             "lang": v.get("lang") or "", "channel": v.get("channel") or "",
             "site": v.get("ref") or "", "pages": len(v.get("pages") or []),
-            "time": round((v.get("time") or 0) / 10) * 10,
+            "time": round((v.get("time") or 0) / 10) * 10, "timed": bool(v.get("time")),
             "returning": bool(v.get("returning")), "downloaded": bool(v.get("downloads")),
             "donate": "donate" in events, "donated": "donated" in events}
 

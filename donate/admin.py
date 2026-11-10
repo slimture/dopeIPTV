@@ -152,7 +152,13 @@ def _union(uniques: dict, days: list, per_day: dict):
     return len(seen)
 
 
-SUMMED = ("views", "visitors", "requests", "visits", "engaged", "bounces", "returning")
+SUMMED = ("views", "visitors", "requests", "visits", "engaged", "bounces", "returning", "timed")
+
+
+def _timed(row: dict) -> int:
+    """Visits whose time is known. Days counted before that was kept took
+    every visit as timed, and are read so."""
+    return row["timed"] if "timed" in row else row.get("visits", 0)
 LISTS = ("pages", "refs", "channels", "sources", "langs", "os", "os_versions", "devices", "countries",
          "browsers", "browser_versions", "screens", "downloads", "files", "events")
 
@@ -192,7 +198,7 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
         b["visitors"] += row.get("visitors", 0)
         b["downloads"] += dl
         for k in SUMMED:
-            totals[k] += row.get(k, 0)
+            totals[k] += _timed(row) if k == "timed" else row.get(k, 0)
         totals["downloads"] = totals.get("downloads", 0) + dl
         for k, total in sums.items():
             _sum_into(total, row.get(k))
@@ -212,7 +218,7 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
         for iso in prev_days:
             row = per_day.get(iso) or {}
             for k in SUMMED:
-                before[k] += row.get(k, 0)
+                before[k] += _timed(row) if k == "timed" else row.get(k, 0)
             before["downloads"] += sum((row.get("downloads") or {}).values())
         before["unique"] = _union(uniques, prev_days, per_day)
 
@@ -279,12 +285,13 @@ def by_channel(stats_dir: str, first: str, last: str) -> list:
     the last weeks and the anonymous ones before them."""
     rows: dict = {}
 
-    def add(channel: str, pages: int, secs: int, downloaded: bool, donate: bool) -> None:
+    def add(channel: str, pages: int, secs: int, downloaded: bool, donate: bool, timed: bool) -> None:
         r = rows.setdefault(channel or "Direct or unknown",
-                            {"visits": 0, "more": 0, "time": 0, "downloaded": 0, "donate": 0})
+                            {"visits": 0, "more": 0, "time": 0, "timed": 0, "downloaded": 0, "donate": 0})
         r["visits"] += 1
         r["more"] += pages > 1
-        r["time"] += secs
+        r["time"] += secs if timed else 0
+        r["timed"] += timed
         r["downloaded"] += downloaded
         r["donate"] += donate
     for day in visit_days(stats_dir):
@@ -292,7 +299,7 @@ def by_channel(stats_dir: str, first: str, last: str) -> list:
             for v in _visits_file(stats_dir, day):
                 if v.get("pages"):
                     add(v.get("channel", ""), len(v["pages"]), v.get("time", 0), bool(v.get("downloads")),
-                        any(e[1] == "donate" for e in v.get("events") or []))
+                        any(e[1] == "donate" for e in v.get("events") or []), v.get("time", 0) > 0)
     try:
         months = sorted(n[:7] for n in os.listdir(os.path.join(stats_dir, "visits-anon")) if n.endswith(".json"))
     except OSError:
@@ -304,7 +311,7 @@ def by_channel(stats_dir: str, first: str, last: str) -> list:
         for a in month.get("visits") or []:
             if first <= a.get("day", "") <= last and a.get("pages"):
                 add(a.get("channel", ""), a["pages"], a.get("time", 0), a.get("downloaded", False),
-                    a.get("donate", False))
+                    a.get("donate", False), a.get("timed", a.get("time", 0) > 0))
     return sorted(([k, v] for k, v in rows.items()), key=lambda kv: -kv[1]["visits"])
 
 
