@@ -52,6 +52,11 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.4.1" date="2026-11-10">
+      <description>
+        <p>Turning subtitles on in a film is instant also when the language is not the file's first one. Eight themes that differ by colour - Ocean, Forest, Bordeaux, Synthwave, Amber terminal, Espresso, Sand and Sky - and readable buttons on every light accent colour.</p>
+      </description>
+    </release>
     <release version="1.4.0" date="2026-11-08">
       <description>
         <p>An experimental rewind buffer kept by dopeIPTV itself: it goes on downloading while paused, returns to live without reconnecting, keeps each channel's history and records from the buffer. A new Home with this week's popular titles, instant subtitles in films, a programme guide that keeps itself up to date, experimental Stalker / Ministra portals, an Intel Mac build again, and test builds for those who want them.</p>

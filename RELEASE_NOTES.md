@@ -1,3 +1,26 @@
+## dopeIPTV 1.4.1
+
+Subtitles on at once in any language, and themes that really look
+different.
+
+- **Subtitles on, at once - in any language.** 1.4.0 made turning
+  subtitles on instant, but only when the language you wanted was the
+  film's first subtitle track. Now the film opens ready with the language
+  you set under **Settings → Audio & subtitles**, or else the one you
+  turned on last, or else the app's own - so turning it on is instant
+  however many languages the film has. A track the film marks to be shown
+  still shows by itself.
+- **Eight new themes with a colour of their own:** Ocean, Forest,
+  Bordeaux, Synthwave, Amber terminal, Espresso and the light Sand and
+  Sky - 25 in all. Pick one under **Settings → Appearance**, and choose
+  the theme's own accent colour for the whole look.
+- **Readable buttons on light colours.** On themes and accent colours
+  that are light - Nord, Dracula, Catppuccin, Everforest, gold, mint and
+  others - buttons, menus and selections now have dark text instead of
+  white that was hard to read.
+
+On the AppImage from 1.2.15 or later? Click **Update now** in the banner.
+
 ## dopeIPTV 1.4.0
 
 Rewind with dopeIPTV's own buffer, and a programme guide that keeps itself

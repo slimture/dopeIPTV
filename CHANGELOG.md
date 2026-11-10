@@ -7,6 +7,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.4.1]
+
+Subtitles on at once in any language, themes with a colour of their own,
+and readable text on light accents.
+
 ### Added
 
 - Eight themes that differ by colour rather than by shade: Ocean, Forest,
