@@ -182,7 +182,12 @@ class HomePage(QWidget):
         # the sidebar, and its heart with it). Hidden, it keeps its room so
         # the nav pill stays centred.
         from .widgets import HeartButton
-        heart = HeartButton(size=15)
+        # Parented, and in the layout before setVisible: a parentless widget
+        # shown is a window of its own for a moment - on GNOME (Wayland)
+        # that asked for an activation token it never used, and the pointer
+        # spun as if a program were starting, every time Home opened.
+        heart = HeartButton(bar, size=15)
+        h.addWidget(heart)
         heart.setFixedSize(36, 34)
         heart.setToolTip(tr("donate_support"))
         heart.setAccessibleName(tr("donate_support"))
@@ -200,7 +205,6 @@ class HomePage(QWidget):
         heart.setSizePolicy(keep)
         heart.setVisible(w._donate_heart_due())
         w._home_heart = heart
-        h.addWidget(heart)
         return bar
 
     def refresh(self) -> None:
@@ -1113,8 +1117,11 @@ class _HomeMixin:
     def _apply_home_settings(self) -> None:
         if "home" in self.nav_btns:
             self.nav_btns["home"].setVisible(self._home_enabled())
-        if not self._home_enabled() and self._home_showing():
-            self._leave_home()
+        if not self._home_enabled():
+            # Off: leave it if it shows; nothing to rebuild (opening Home
+            # again refreshes it anyway).
+            if self._home_showing():
+                self._leave_home()
         elif getattr(self, "_home_page", None) is not None:
             # A shelf switched on or off in Settings shows so at once - and
             # a page built but not on screen just now is rebuilt too, or it

@@ -7,6 +7,12 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Fixed
+- GNOME (Wayland): the pointer no longer spins for a while each time Home
+  opens, or when Home is switched off in Settings. Home's donate heart was
+  shown for a moment as a window of its own, which asked GNOME for an
+  activation token it never used.
+
 ## [1.4.2]
 
 Settings rebuilt and applied live, the guide with every channel, links in
