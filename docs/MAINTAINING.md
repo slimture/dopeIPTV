@@ -133,6 +133,7 @@ Only names here - the values are with the owner.
 | The web server | runs the site and its cron sync (website branch: `README.md`, `DEPLOY.md`) | the site stops updating; the app is unaffected |
 | GitHub repository settings | releases, Actions, the Security tab for private reports | - |
 | Stripe Payment Link (donations) | `$DONATE` at the top of `site/render.jq` on the `website` branch, `.github/FUNDING.yml` (the repository's Sponsor button) and the README's "Support dopeIPTV" | no donate card on the site, no Sponsor button |
+| Stripe keys for the donate dialog | a restricted key (Checkout Sessions + PaymentIntents: Write) and the publishable key, on the web server in `/usr/local/etc/iptv-donate.key` / `.conf`, read by `donate/donate.py` (website branch, `DEPLOY.md` "Donations"); Apple Pay needs the domain added in Stripe | the dialog sends visitors to the Payment Link's own page instead |
 
 A source checkout works without any of these. For local testing, set
 `DOPEIPTV_TMDB_KEY` / `DOPEIPTV_OPENSUBTITLES_KEY` in the environment.
@@ -153,8 +154,17 @@ preview, SEO) and `DEPLOY.md` (the server). In short:
   must start right after `|`, `(`, `[`, `;`, `then` or `else` - jq 1.8
   binds `a and b as $x` differently than 1.7.
 - Strict Content-Security-Policy: no inline scripts or styles, nothing
-  from other origins. The download section and the FAQ work without
-  JavaScript.
+  from other origins but Stripe's script and frames for the donate dialog
+  (`deploy/csp.snippet.txt`). The download section and the FAQ work
+  without JavaScript.
+- The one non-static piece is `donate/donate.py`, a standard-library
+  service behind `/donate/` that creates Stripe payment sessions for the
+  donate dialog (card form, Apple Pay, Google Pay on the page itself).
+  If it is down, the dialog falls back to Stripe's own page.
+- The look is deliberately quiet: black or white, greys and the app
+  icon's blue (`#4C8DFF`); San Francisco on Apple devices, self-hosted
+  Inter elsewhere. On a phone the downloads fold away behind "Send the
+  link", since the app is for computers.
 - Render every language locally before pushing (the README's "Local
   preview"), then look at the pages in a browser. Deploying is a manual
   step on the server (copy `public/` and `site/`, run the sync once).
