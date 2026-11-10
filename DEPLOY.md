@@ -262,9 +262,10 @@ any order and the site never shows a broken button.
 **Stripe Dashboard** (start in test mode, the toggle top right, and repeat
 with live keys once a test payment has gone through):
 
-1. Developers → API keys → **Create restricted key**, named e.g.
-   `iptv.dope.rs donate`, with **Checkout Sessions: Write** and
-   **PaymentIntents: Write** and nothing else. Copy the `rk_...` key.
+1. Developers → API keys → **Create secret key** → *Customize permissions*
+   (no template), named e.g. `dopeIPTV donate`, with **PaymentIntents:
+   Write** and nothing else - the card form and the wallets both pay a
+   PaymentIntent. Copy the `rk_...` key.
 2. The **publishable key** (`pk_...`) is on the same page.
 3. Settings → Payments → **Payment method domains** → Add `iptv.dope.rs`.
    Stripe reads `/.well-known/apple-developer-merchantid-domain-association`

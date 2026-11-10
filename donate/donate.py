@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 """donate.py - the one piece of the site that is not static.
 
-The donate dialog on iptv.dope.rs pays through Stripe's Checkout Elements:
-the card form is Stripe's, in Stripe's iframes, on our page. Stripe needs a
-Checkout Session for that, and only a server holding the secret key can
-create one - this is that server, and all it does. It never sees a card.
+The donate dialog on iptv.dope.rs takes the payment on the page itself:
+Stripe's card form (the Payment Element), in Stripe's iframes, on our page,
+and Apple Pay / Google Pay in the wallet's own sheet. Both pay a
+PaymentIntent, and only a server holding the secret key can make one - this
+is that server, and all it does. It never sees a card.
 
     GET  /donate/config   {"publishableKey", "currency", "country", "name",
                            "min", "max", "presets"}
-    POST /donate/session  {"amount": 500}  ->  {"clientSecret", "publishableKey", "ui"}
+    POST /donate/session  {"amount": 500}  ->  {"clientSecret", "publishableKey"}
     POST /donate/wallet   {"amount", "paymentMethod", "email", "name"}
                           ->  {"ok": true} | {"action": client_secret} | {"error"}
 
-/donate/wallet is Apple Pay and Google Pay, as on solequiz.com: the page
-opens the wallet's own sheet (Stripe's Payment Request), the wallet hands
+/donate/session makes the PaymentIntent the card form confirms in the
+browser. /donate/wallet is Apple Pay and Google Pay, as on solequiz.com: the
+page opens the wallet's sheet (Stripe's Payment Request), the wallet hands
 back a payment method, and this confirms a PaymentIntent with it - or hands
 back what 3-D Secure still needs.
 
@@ -27,8 +29,7 @@ file named by DONATE_CONFIG (default /usr/local/etc/iptv-donate.conf):
 
     STRIPE_SECRET_KEY_FILE  file holding the key (default
                             /usr/local/etc/iptv-donate.key). Use a restricted
-                            key with only "Checkout Sessions: Write" and
-                            "PaymentIntents: Write".
+                            key with only "PaymentIntents: Write".
     STRIPE_PUBLISHABLE_KEY  pk_live_... (public; handed to the page)
     DONATE_CURRENCY         eur (default)
     DONATE_COUNTRY          the account's country, for the wallets (SE)
@@ -39,8 +40,6 @@ file named by DONATE_CONFIG (default /usr/local/etc/iptv-donate.conf):
                             method that leaves the page (Klarna and the like)
     DONATE_ORIGIN           the site's origin; other origins are refused
     STRIPE_API_VERSION      empty: the account's default
-    STRIPE_UI_MODE          empty: "elements", then "custom" if Stripe says no
-                            (the name changed between API versions)
     LISTEN                  unix:/var/run/iptv_donate/donate.sock (default),
                             or host:port for TCP
 """
@@ -58,7 +57,6 @@ import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-STRIPE_API = "https://api.stripe.com/v1/checkout/sessions"
 STRIPE_PI = "https://api.stripe.com/v1/payment_intents"
 
 
@@ -101,7 +99,6 @@ RETURN_URL = CONF.get("DONATE_RETURN_URL", "https://iptv.dope.rs/?donated=1#dona
 ORIGIN = CONF.get("DONATE_ORIGIN", "https://iptv.dope.rs").rstrip("/")
 PUBLISHABLE = CONF.get("STRIPE_PUBLISHABLE_KEY", "")
 API_VERSION = CONF.get("STRIPE_API_VERSION", "")
-UI_MODES = [CONF["STRIPE_UI_MODE"]] if CONF.get("STRIPE_UI_MODE") else ["elements", "custom"]
 
 
 def _secret() -> str:
@@ -153,21 +150,6 @@ def _post(url: str, form: dict, key: str) -> tuple[int, dict]:
         return 0, {"error": {"message": str(e)}}
 
 
-def _stripe_create(amount: int, ui_mode: str, key: str) -> tuple[int, dict]:
-    form = {
-        "mode": "payment",
-        "ui_mode": ui_mode,
-        "submit_type": "donate",
-        "line_items[0][quantity]": "1",
-        "line_items[0][price_data][currency]": CURRENCY,
-        "line_items[0][price_data][unit_amount]": str(amount),
-        "line_items[0][price_data][product_data][name]": NAME,
-        "return_url": RETURN_URL,
-        "metadata[source]": "iptv.dope.rs donate dialog",
-    }
-    return _post(STRIPE_API, form, key)
-
-
 def wallet_pay(amount: int, method: str, email: str, name: str) -> tuple[int, dict]:
     """Apple Pay / Google Pay: confirm a PaymentIntent with the payment
     method the wallet handed the page. Without redirects - a wallet card
@@ -205,27 +187,25 @@ def wallet_pay(amount: int, method: str, email: str, name: str) -> tuple[int, di
 
 
 def create_session(amount: int) -> tuple[int, dict]:
+    """The PaymentIntent the card form pays: Stripe's Payment Element shows
+    the methods turned on in the Dashboard and confirms it in the browser."""
     key = _secret()
     if not key or not PUBLISHABLE:
         return 503, {"error": "not configured"}
-    last: tuple[int, dict] = (502, {"error": "stripe"})
-    for ui_mode in UI_MODES:
-        status, body = _stripe_create(amount, ui_mode, key)
-        if status == 200 and body.get("client_secret"):
-            if ui_mode != UI_MODES[0]:      # ask with the name that works from now on
-                UI_MODES.remove(ui_mode)
-                UI_MODES.insert(0, ui_mode)
-            return 200, {"clientSecret": body["client_secret"],
-                         "publishableKey": PUBLISHABLE, "ui": ui_mode}
-        err = (body.get("error") or {}) if isinstance(body, dict) else {}
-        msg = str(err.get("message", ""))
-        print(f"[donate] stripe {status} ui_mode={ui_mode}: {msg[:200]}",
-              file=sys.stderr, flush=True)
-        last = (502, {"error": "stripe"})
-        # Only a refused ui_mode is worth another try with the older name.
-        if not (status == 400 and (err.get("param") == "ui_mode" or "ui_mode" in msg)):
-            break
-    return last
+    form = {
+        "amount": str(amount),
+        "currency": CURRENCY,
+        "automatic_payment_methods[enabled]": "true",
+        "description": NAME,
+        "metadata[source]": "iptv.dope.rs donate dialog",
+    }
+    status, body = _post(STRIPE_PI, form, key)
+    if status == 200 and body.get("client_secret"):
+        return 200, {"clientSecret": body["client_secret"], "publishableKey": PUBLISHABLE}
+    err = (body.get("error") or {}) if isinstance(body, dict) else {}
+    print(f"[donate] payment intent {status}: {str(err.get('message', ''))[:300]}",
+          file=sys.stderr, flush=True)
+    return 502, {"error": "stripe"}
 
 
 class Handler(BaseHTTPRequestHandler):

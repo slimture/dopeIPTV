@@ -31,15 +31,16 @@
   });
 })();
 
-/* The donate dialog: Stripe's card form (Checkout Elements) in a dialog on
+/* The donate dialog: Stripe's card form (the Payment Element) in a dialog on
  * this page, as on solequiz.com - nothing leaves the site but the payment
  * itself, which goes from Stripe's iframes straight to Stripe.
  *
  * Every donate link (the card, the header, the footer) points at Stripe's own
- * page, so with this file gone, no <dialog>, or the server part
- * (donate/donate.py) not answering, a click simply goes there. The page holds
- * the dialog's words in #donate-i18n; amounts and the publishable key come
- * from /donate/config, the Checkout Session from /donate/session.
+ * page, so with this file gone or no <dialog>, a click simply goes there.
+ * Once the dialog is open it never leaves the page: a failure is a sentence
+ * in the dialog and the reason in the console. The page holds the dialog's
+ * words in #donate-i18n; amounts and the publishable key come from
+ * /donate/config, the PaymentIntent from /donate/session.
  *
  * Apple Pay and Google Pay go as on solequiz.com: where the device has one,
  * the main button opens the wallet's own sheet (Stripe's Payment Request)
@@ -96,9 +97,9 @@
     }
     return stripeLoading;
   }
-  function css(name, fallback) {
+  function css(name, dflt) {
     var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    return v || fallback;
+    return v || dflt;
   }
   function appearance() {
     var dark = css("color-scheme", "dark").indexOf("light") < 0;
@@ -117,7 +118,9 @@
       }
     };
   }
-  function fallback(href) { window.location.assign(href); }
+  // What went wrong goes to the console, for whoever looks after the site;
+  // the visitor gets a plain sentence and stays on the page.
+  function warn(what, err) { try { console.warn("[donate] " + what, err || ""); } catch (e) { /* none */ } }
 
   function build() {
     dlg = mk("dialog", "dn");
@@ -208,13 +211,16 @@
 
   function open(href) {
     if (!dlg) { build(); }
-    dlg.dataset.fallback = href;
+    el.loading.textContent = T.loading;
     show(el.loading);
     dlg.showModal();
     (cfg ? Promise.resolve(cfg) : fetch("/donate/config", { credentials: "same-origin" })
-      .then(function (r) { if (!r.ok) { throw new Error("config"); } return r.json(); }))
+      .then(function (r) { if (!r.ok) { throw new Error("/donate/config answered " + r.status); } return r.json(); }))
       .then(function (c) { cfg = c; chips(); show(el.amounts); prepareWallet(); })
-      .catch(function () { close(); fallback(href); });
+      .catch(function (err) {
+        warn("the donate service did not answer (donate.py, nginx /donate/):", err);
+        el.loading.textContent = T.failed;
+      });
   }
 
   function amountOk() {
@@ -287,6 +293,7 @@
   function toPay() {
     if (!amountOk()) { return; }
     var amount = chosen;
+    el.loading.textContent = T.loading;
     show(el.loading);
     el.sum.textContent = fmt(amount);
     el.payBtn.textContent = (T.pay || "").replace("{amount}", fmt(amount));
@@ -294,54 +301,64 @@
     Promise.all([
       fetch("/donate/session", { method: "POST", credentials: "same-origin",
         headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: amount }) })
-        .then(function (r) { if (!r.ok) { throw new Error("session"); } return r.json(); }),
-      loadStripe()
+        .then(function (r) {
+          if (!r.ok) { throw new Error("/donate/session answered " + r.status + " (the reason is in /var/log/iptv-donate.log)"); }
+          return r.json();
+        }),
+      loadStripe().catch(function () {
+        throw new Error("Stripe.js did not load - is https://js.stripe.com in the site's Content-Security-Policy?");
+      })
     ]).then(function (got) {
       var s = got[0], st = stripeFor(got[1], s.publishableKey);
-      if (typeof st.initCheckoutElementsSdk !== "function") { throw new Error("sdk"); }
-      var checkout = st.initCheckoutElementsSdk({ clientSecret: s.clientSecret,
-        elementsOptions: { appearance: appearance() } });
+      var elements = st.elements({ clientSecret: s.clientSecret, appearance: appearance() });
       // The wallets have their own button above, as on solequiz.com.
-      var pe = checkout.createPaymentElement({ layout: { type: "accordion", defaultCollapsed: false },
+      var pe = elements.create("payment", { layout: { type: "accordion", defaultCollapsed: false },
         wallets: { applePay: "never", googlePay: "never" } });
       teardown();
-      live = { checkout: checkout, destroy: function () { pe.destroy(); } };
+      live = { elements: elements, destroy: function () { pe.destroy(); } };
       show(el.pay);
       pe.mount(el.fields);
-      checkout.on("change", function (st) { if (!busy) { el.payBtn.disabled = !st.canConfirm; } });
-      return checkout.loadActions().then(function (r) {
-        if (r.type !== "success") { throw new Error("actions"); }
-        live.actions = r.actions;
+      pe.on("change", function (ev) { if (!busy) { el.payBtn.disabled = !ev.complete; } });
+      pe.on("loaderror", function (ev) {
+        warn("the card form did not load:", ev && ev.error);
+        fail();
       });
-    }).catch(function () {
-      var href = dlg.dataset.fallback;
-      close(); fallback(href);
+    }).catch(function (err) {
+      warn("could not open the card form:", err);
+      show(el.amounts);
+      el.err1.textContent = T.failed; el.err1.hidden = false;
     });
   }
 
   function fail(msg) {
     el.err2.textContent = msg || T.failed; el.err2.hidden = false;
   }
+  function payAgain(msg) {
+    busy = false; el.payBtn.disabled = false;
+    el.payBtn.textContent = (T.pay || "").replace("{amount}", el.sum.textContent);
+    fail(msg);
+  }
   function pay() {
-    if (!live || !live.actions || busy) { return; }
+    if (!live || !live.elements || busy) { return; }
     if (!el.email.checkValidity() || !el.email.value.trim()) {
       fail(T.emailmissing); el.email.focus(); return;
     }
     busy = true; el.err2.hidden = true;
     el.payBtn.disabled = true; el.payBtn.textContent = T.busy;
-    live.actions.confirm({ email: el.email.value.trim() }).then(function (r) {
-      if (r && r.type === "error") {
-        busy = false; el.payBtn.disabled = false;
-        el.payBtn.textContent = (T.pay || "").replace("{amount}", el.sum.textContent);
-        fail(r.error && r.error.message);
-        return;
+    stripe.confirmPayment({
+      elements: live.elements,
+      redirect: "if_required",          // only a method that must leave the page (Klarna and the like)
+      confirmParams: {
+        return_url: window.location.origin + "/?donated=1#donate",
+        receipt_email: el.email.value.trim()
       }
-      teardown(); busy = false; show(el.done);
-    }, function () {
-      busy = false; el.payBtn.disabled = false;
-      el.payBtn.textContent = (T.pay || "").replace("{amount}", el.sum.textContent);
-      fail();
-    });
+    }).then(function (r) {
+      if (r && r.error) { payAgain(r.error.message); return; }
+      var state = r && r.paymentIntent && r.paymentIntent.status;
+      if (state === "succeeded" || state === "processing") { teardown(); busy = false; show(el.done); return; }
+      warn("payment ended as", state);
+      payAgain();
+    }, function (err) { warn("confirmPayment failed:", err); payAgain(); });
   }
 
   document.addEventListener("click", function (e) {
