@@ -585,17 +585,15 @@ var iptvHit = (function () {
     el.card.append(icon("card"), document.createTextNode(T.card));
     walletLook(null, false);        // the card button until a wallet turns up
     el.card.addEventListener("click", toPay);
-    el.amounts.append(el.chips, other, el.err1, el.go, el.card);
     // A larger gift than the dialog takes: a line to write instead (a bank
-    // transfer to the company, no card fees). The cap stays - it keeps
-    // stolen cards from trying big amounts.
-    if (T.more && T.moremail && T.more.indexOf("{email}") >= 0) {
-      var more = mk("p", "dn-more"), at = T.more.split("{email}");
-      var mail = mk("a", "", T.moremail);
-      mail.href = "mailto:" + T.moremail + "?subject=" + encodeURIComponent("dopeIPTV");
-      more.append(at[0], mail, at.slice(1).join(""));
-      el.amounts.append(more);
-    }
+    // transfer to the company, no card fees), under the range error - shown
+    // only once someone types more than the cap. Up from the start it read
+    // as "is this enough?" before anyone had chosen. The cap stays - it
+    // keeps stolen cards from trying big amounts.
+    el.more1 = moreLine();
+    el.amounts.append(el.chips, other, el.err1);
+    if (el.more1) { el.amounts.append(el.more1); }
+    el.amounts.append(el.go, el.card);
 
     el.pay = mk("div", "dn-step"); el.pay.hidden = true;
     // The amount stays open here: the same choices, smaller, and an own
@@ -621,7 +619,10 @@ var iptvHit = (function () {
     el.err2 = mk("p", "dn-error"); el.err2.hidden = true; el.err2.setAttribute("role", "alert");
     el.payBtn = mk("button", "btn primary dn-paybtn"); el.payBtn.type = "button"; el.payBtn.disabled = true;
     el.payBtn.addEventListener("click", pay);
-    el.pay.append(top, em, el.fields, el.err2, el.payBtn, mk("p", "dn-lock", T.lock));
+    el.more2 = moreLine();
+    el.pay.append(top, em, el.fields, el.err2);
+    if (el.more2) { el.pay.append(el.more2); }
+    el.pay.append(el.payBtn, mk("p", "dn-lock", T.lock));
 
     el.loading = mk("p", "dn-loading", T.loading); el.loading.hidden = true;
     el.done = mk("div", "dn-step dn-done"); el.done.hidden = true;
@@ -724,6 +725,21 @@ var iptvHit = (function () {
     payLabel();
   }
   function inRange(minor) { return !!minor && minor >= C().min && minor <= C().max; }
+  function moreLine() {
+    if (!(T.more && T.moremail && T.more.indexOf("{email}") >= 0)) { return null; }
+    var more = mk("p", "dn-more"), at = T.more.split("{email}");
+    var mail = mk("a", "", T.moremail);
+    mail.href = "mailto:" + T.moremail + "?subject=" + encodeURIComponent("dopeIPTV");
+    more.append(at[0], mail, at.slice(1).join(""));
+    more.hidden = true;
+    return more;
+  }
+  // The "give more" line: only for an amount above the cap.
+  function showMore() {
+    var over = !!chosen && !!cfg && chosen > C().max;
+    if (el.more1) { el.more1.hidden = !over; }
+    if (el.more2) { el.more2.hidden = !over; }
+  }
   function rangeText() {
     return (T.range || "").replace("{min}", fmt(C().min)).replace("{max}", fmt(C().max));
   }
@@ -736,6 +752,7 @@ var iptvHit = (function () {
     mark();
     if (live && live.elements && inRange(minor)) { live.elements.update({ amount: minor }); }
     payLabel();
+    showMore();
   }
   function payLabel() {
     if (!cfg) { return; }
