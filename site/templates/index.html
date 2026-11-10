@@ -86,21 +86,42 @@
         <h2>{{h:feat_h2}}</h2>
         <p>{{t:feat_intro}}</p>
       </div>
-      <!-- Apple's way of listing features: an icon, a title and a line or two,
-           no boxes. On a phone app.js folds all but six behind a button. -->
-      <div class="feats" data-more="{{h:feat_more}}">
-        <div class="feat"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 4.5v4h4"/><path d="M12 7.5V12l3 2"/></svg><div><h3>{{t:feat_c1_h}}</h3><p>{{t:feat_c1_p}}</p></div></div>
-        <div class="feat"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="3.5" width="7.5" height="7.5" rx="2"/><rect x="13" y="3.5" width="7.5" height="7.5" rx="2"/><rect x="3.5" y="13" width="7.5" height="7.5" rx="2"/><rect x="13" y="13" width="7.5" height="7.5" rx="2"/></svg><div><h3>{{t:feat_mv_h}}</h3><p>{{t:feat_mv_p}}</p></div></div>
-        <div class="feat"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M10 9v6M14 9v6"/></svg><div><h3>{{t:feat_c2_h}}</h3><p>{{t:feat_c2_p}}</p></div></div>
-        <div class="feat"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10"/></svg><div><h3>{{t:feat_c3_h}}</h3><p>{{t:feat_c3_p}}</p></div></div>
-        <div class="feat"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.6" class="fill"/></svg><div><h3>{{t:feat_c4_h}}</h3><p>{{t:feat_c4_p}}</p></div></div>
-        <div class="feat"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="1.8"/><path d="M8.6 8.6a4.8 4.8 0 0 0 0 6.8M15.4 8.6a4.8 4.8 0 0 1 0 6.8M5.8 5.8a8.8 8.8 0 0 0 0 12.4M18.2 5.8a8.8 8.8 0 0 1 0 12.4"/></svg><div><h3>{{t:feat_c5_h}}</h3><p>{{t:feat_c5_p}}</p></div></div>
-        <div class="feat"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M10.2 8.6v6.8l5.3-3.4z" class="fill"/></svg><div><h3>{{t:feat_c6_h}}</h3><p>{{t:feat_c6_p}}</p></div></div>
-        <div class="feat"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 7.5A2.5 2.5 0 0 1 6 5h3.2l2 2.4H18a2.5 2.5 0 0 1 2.5 2.5v6.6A2.5 2.5 0 0 1 18 19H6a2.5 2.5 0 0 1-2.5-2.5z"/></svg><div><h3>{{t:feat_lf_h}}</h3><p>{{t:feat_lf_p}}</p></div></div>
-        <div class="feat"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="4.5" width="17" height="12" rx="2.5"/><path d="M8.5 20h7M12 16.5V20"/></svg><div><h3>{{t:feat_cast_h}}</h3><p>{{t:feat_cast_p}}</p></div></div>
-        <div class="feat"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M7.5 12.5h4M13.5 12.5h3M7.5 15.5h6M15.5 15.5h1"/></svg><div><h3>{{t:feat_subs_h}}</h3><p>{{t:feat_subs_p}}</p></div></div>
-        <div class="feat"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7.5v9l6.5-4.5z" class="fill"/><path d="M14 7.5v9M18.5 7.5v9"/></svg><div><h3>{{t:feat_keys_h}}</h3><p>{{t:feat_keys_p}}</p></div></div>
-        <div class="feat"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4.5 10.5 12 4.5l7.5 6V19a1 1 0 0 1-1 1H15v-5.5H9V20H5.5a1 1 0 0 1-1-1z"/></svg><div><h3>{{t:feat_follow_h}}</h3><p>{{t:feat_follow_p}}</p></div></div>
+      <!-- Without script: the plain list, icon, title and text. With it
+           (app.js) the list becomes the explorer below it: the titles as tabs,
+           a small animated screen for each, one line of text at a time. -->
+      <div class="feats">
+        <div class="feat" data-k="c1"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 4.5v4h4"/><path d="M12 7.5V12l3 2"/></svg><div><h3>{{t:feat_c1_h}}</h3><p>{{t:feat_c1_p}}</p></div></div>
+        <div class="feat" data-k="mv"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="3.5" width="7.5" height="7.5" rx="2"/><rect x="13" y="3.5" width="7.5" height="7.5" rx="2"/><rect x="3.5" y="13" width="7.5" height="7.5" rx="2"/><rect x="13" y="13" width="7.5" height="7.5" rx="2"/></svg><div><h3>{{t:feat_mv_h}}</h3><p>{{t:feat_mv_p}}</p></div></div>
+        <div class="feat" data-k="c2"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M10 9v6M14 9v6"/></svg><div><h3>{{t:feat_c2_h}}</h3><p>{{t:feat_c2_p}}</p></div></div>
+        <div class="feat" data-k="c3"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10"/></svg><div><h3>{{t:feat_c3_h}}</h3><p>{{t:feat_c3_p}}</p></div></div>
+        <div class="feat" data-k="c4"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.6" class="fill"/></svg><div><h3>{{t:feat_c4_h}}</h3><p>{{t:feat_c4_p}}</p></div></div>
+        <div class="feat" data-k="c5"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="1.8"/><path d="M8.6 8.6a4.8 4.8 0 0 0 0 6.8M15.4 8.6a4.8 4.8 0 0 1 0 6.8M5.8 5.8a8.8 8.8 0 0 0 0 12.4M18.2 5.8a8.8 8.8 0 0 1 0 12.4"/></svg><div><h3>{{t:feat_c5_h}}</h3><p>{{t:feat_c5_p}}</p></div></div>
+        <div class="feat" data-k="c6"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M10.2 8.6v6.8l5.3-3.4z" class="fill"/></svg><div><h3>{{t:feat_c6_h}}</h3><p>{{t:feat_c6_p}}</p></div></div>
+        <div class="feat" data-k="lf"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 7.5A2.5 2.5 0 0 1 6 5h3.2l2 2.4H18a2.5 2.5 0 0 1 2.5 2.5v6.6A2.5 2.5 0 0 1 18 19H6a2.5 2.5 0 0 1-2.5-2.5z"/></svg><div><h3>{{t:feat_lf_h}}</h3><p>{{t:feat_lf_p}}</p></div></div>
+        <div class="feat" data-k="cast"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="4.5" width="17" height="12" rx="2.5"/><path d="M8.5 20h7M12 16.5V20"/></svg><div><h3>{{t:feat_cast_h}}</h3><p>{{t:feat_cast_p}}</p></div></div>
+        <div class="feat" data-k="subs"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M7.5 12.5h4M13.5 12.5h3M7.5 15.5h6M15.5 15.5h1"/></svg><div><h3>{{t:feat_subs_h}}</h3><p>{{t:feat_subs_p}}</p></div></div>
+        <div class="feat" data-k="keys"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7.5v9l6.5-4.5z" class="fill"/><path d="M14 7.5v9M18.5 7.5v9"/></svg><div><h3>{{t:feat_keys_h}}</h3><p>{{t:feat_keys_p}}</p></div></div>
+        <div class="feat" data-k="follow"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4.5 10.5 12 4.5l7.5 6V19a1 1 0 0 1-1 1H15v-5.5H9V20H5.5a1 1 0 0 1-1-1z"/></svg><div><h3>{{t:feat_follow_h}}</h3><p>{{t:feat_follow_p}}</p></div></div>
+      </div>
+      <div class="fxp" hidden>
+        <div class="fxp-tabs" role="tablist" aria-label="{{h:feat_h2}}"></div>
+        <div class="fxp-main" role="tabpanel">
+          <div class="fxp-stage" aria-hidden="true">
+            <div class="sc sc-ts" data-k="c1"><div class="v h1"></div><div class="track"><i class="arch"></i><i class="head"><b>&#8722;12:00</b></i><span class="live">{{h:mock_live}}</span></div></div>
+            <div class="sc sc-mv" data-k="mv"><div class="mvg"><i class="h1"></i><i class="h3"></i><i class="h2"></i><i class="h5"></i><i class="h4"></i><i class="h6"></i><i class="h3"></i><i class="h1"></i><i class="h2"></i></div></div>
+            <div class="sc sc-pz" data-k="c2"><div class="v h5"></div><i class="pz"></i><div class="track"><i class="seen"></i><i class="buf"></i></div></div>
+            <div class="sc sc-epg" data-k="c3"><div class="epg"><div class="r"><b></b><i class="w3"></i><i class="w2"></i><i class="w4"></i></div><div class="r"><b></b><i class="w2"></i><i class="w4 on"></i><i class="w2"></i></div><div class="r"><b></b><i class="w4"></i><i class="w3"></i><i class="w1"></i></div><div class="r"><b></b><i class="w1"></i><i class="w3"></i><i class="w4"></i></div><div class="r"><b></b><i class="w3"></i><i class="w3"></i><i class="w2"></i></div></div><i class="now"></i></div>
+            <div class="sc sc-rec" data-k="c4"><div class="v h2"></div><span class="rec"><i></i>REC 00:42:17</span><div class="disk"><i></i></div></div>
+            <div class="sc sc-prov" data-k="c5"><div class="pl"><div><b class="h1"></b><span>Xtream Codes</span><i></i></div><div><b class="h3"></b><span>M3U / M3U8</span><i></i></div><div><b class="h6"></b><span>Stalker</span><i></i></div></div></div>
+            <div class="sc sc-play" data-k="c6"><div class="v h6"></div><i class="ring"></i><i class="ring r2"></i><i class="btn"></i><span class="tag">mpv</span></div>
+            <div class="sc sc-files" data-k="lf"><span class="fold"><svg viewBox="0 0 24 24"><path d="M3.5 7.5A2.5 2.5 0 0 1 6 5h3.2l2 2.4H18a2.5 2.5 0 0 1 2.5 2.5v6.6A2.5 2.5 0 0 1 18 19H6a2.5 2.5 0 0 1-2.5-2.5z"/></svg>~/Videos</span><div class="posters"><i class="h1"></i><i class="h4 prog"></i><i class="h6"></i><i class="h3"></i><i class="h2"></i><i class="h5"></i><i class="h1"></i><i class="h4"></i></div></div>
+            <div class="sc sc-cast" data-k="cast"><div class="tv"><div class="scr h1"><svg viewBox="0 0 24 24"><path class="a1" d="M3 17.5a3.5 3.5 0 0 1 3.5 3.5"/><path class="a2" d="M3 13.5a7.5 7.5 0 0 1 7.5 7.5"/><path class="a3" d="M3 9.5A11.5 11.5 0 0 1 14.5 21"/></svg></div><i class="stand"></i></div></div>
+            <div class="sc sc-subs" data-k="subs"><div class="v h4"></div><span class="cc">CC</span><div class="subl"><i></i><i class="s2"></i></div></div>
+            <div class="sc sc-keys" data-k="keys"><div class="keys"><i><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zM9.5 12 18 6v12z"/></svg></i><i><svg viewBox="0 0 24 24"><path d="M5 6l8 6-8 6zM15 6h2v12h-2zM19 6h2v12h-2z"/></svg></i><i><svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM14.5 12 6 18V6z"/></svg></i></div></div>
+            <div class="sc sc-home" data-k="follow"><div class="hero h6"></div><div class="shelf s1"><i class="h1"></i><i class="h3 new"></i><i class="h2"></i><i class="h5"></i></div><div class="shelf s2"><i class="h4"></i><i class="h1"></i><i class="h6"></i><i class="h3"></i></div></div>
+          </div>
+          <div class="fxp-cap" aria-live="polite"></div>
+        </div>
       </div>
     </div>
   </section>

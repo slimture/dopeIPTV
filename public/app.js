@@ -121,28 +121,116 @@
 /* The header's disclosures (language picker, narrow-window menu) close
    themselves from nav.js, which every page loads - this one does not. */
 
-/* Features: on a phone the first six, the rest a click away. */
+/* The feature explorer: the plain list becomes tabs, a small animated
+   screen per feature and one line of text at a time. It steps on by itself
+   while it is on screen, until the visitor picks a tab (or never, for
+   reduced motion). Without script the list stays as it is. */
 (function () {
   "use strict";
-  var list = document.querySelector(".feats[data-more]");
-  if (!list || list.children.length <= 7) { return; }
-  list.classList.add("folded");
-  var b = document.createElement("button");
-  b.type = "button";
-  b.className = "feat-all";
-  b.textContent = list.getAttribute("data-more");
-  b.addEventListener("click", function () { list.classList.remove("folded"); b.remove(); });
-  list.parentNode.insertBefore(b, list.nextSibling);
+  var sec = document.getElementById("features");
+  var list = sec && sec.querySelector(".feats");
+  var fxp = sec && sec.querySelector(".fxp");
+  if (!list || !fxp) { return; }
+  var feats = [].slice.call(list.querySelectorAll(".feat[data-k]"));
+  var tabsBox = fxp.querySelector(".fxp-tabs"), panel = fxp.querySelector(".fxp-main");
+  var cap = fxp.querySelector(".fxp-cap"), scenes = fxp.querySelectorAll(".sc");
+  if (!feats.length || !tabsBox || !cap) { return; }
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var DUR = 6000, cur = -1, timer = null, auto = !reduce, inView = false, held = false;
+  var tabs = feats.map(function (f, i) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "fxp-tab";
+    b.id = "fxt-" + i;
+    b.setAttribute("role", "tab");
+    var ic = f.querySelector(".ic");
+    if (ic) { b.appendChild(ic.cloneNode(true)); }
+    var s = document.createElement("span");
+    s.textContent = f.querySelector("h3").textContent;
+    b.appendChild(s);
+    var bar = document.createElement("i");
+    bar.className = "bar";
+    b.appendChild(bar);
+    b.addEventListener("click", function () { auto = false; show(i, true); });
+    b.addEventListener("keydown", function (e) {
+      var k = e.key, rtl = document.documentElement.dir === "rtl", n = null;
+      if (k === "ArrowDown" || k === (rtl ? "ArrowLeft" : "ArrowRight")) { n = (i + 1) % feats.length; }
+      if (k === "ArrowUp" || k === (rtl ? "ArrowRight" : "ArrowLeft")) { n = (i - 1 + feats.length) % feats.length; }
+      if (k === "Home") { n = 0; }
+      if (k === "End") { n = feats.length - 1; }
+      if (n === null) { return; }
+      e.preventDefault();
+      auto = false;
+      show(n, true);
+      tabs[n].focus();
+    });
+    tabsBox.appendChild(b);
+    return b;
+  });
+
+  function intoView(b) {
+    if (tabsBox.scrollWidth <= tabsBox.clientWidth + 2) { return; }
+    var left = b.offsetLeft - (tabsBox.clientWidth - b.offsetWidth) / 2;
+    tabsBox.scrollTo({ left: left, behavior: reduce ? "auto" : "smooth" });
+  }
+  function schedule() {
+    clearTimeout(timer);
+    tabs.forEach(function (t) { t.classList.remove("playing"); });
+    if (!auto || !inView || held || cur < 0) { return; }
+    var t = tabs[cur];
+    void t.offsetWidth;                     // restart the bar's fill
+    t.classList.add("playing");
+    timer = setTimeout(function () { show((cur + 1) % feats.length, false); }, DUR);
+  }
+  function show(i, user) {
+    if (i === cur && !user) { return; }
+    cur = i;
+    var k = feats[i].getAttribute("data-k");
+    tabs.forEach(function (t, n) {
+      var on = n === i;
+      t.classList.toggle("is-on", on);
+      t.setAttribute("aria-selected", on ? "true" : "false");
+      t.tabIndex = on ? 0 : -1;
+    });
+    [].forEach.call(scenes, function (sc) { sc.classList.toggle("on", sc.getAttribute("data-k") === k); });
+    panel.setAttribute("aria-labelledby", tabs[i].id);
+    cap.replaceChildren();
+    var h = document.createElement("h3");
+    h.textContent = feats[i].querySelector("h3").textContent;
+    cap.appendChild(h);
+    var p = feats[i].querySelector("p");
+    if (p) { cap.appendChild(p.cloneNode(true)); }
+    cap.classList.remove("swap");
+    void cap.offsetWidth;
+    cap.classList.add("swap");
+    intoView(tabs[i]);
+    schedule();
+  }
+
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver(function (en) {
+      inView = en[0].isIntersecting;
+      schedule();
+    }, { threshold: 0.35 }).observe(fxp);
+  }
+  // A pointer resting on it holds the slideshow, as Apple's do.
+  fxp.addEventListener("mouseenter", function () { held = true; schedule(); });
+  fxp.addEventListener("mouseleave", function () { held = false; schedule(); });
+  document.addEventListener("visibilitychange", function () { held = document.hidden; schedule(); });
+
+  list.hidden = true;
+  fxp.hidden = false;
+  show(0, false);
 })();
 
-/* Motion, Apple-style: rise into view, the hero window straightening as the
-   page scrolls, a living mock-up. Nothing for reduced motion. */
+/* Motion, Apple-style: rise into view, a living mock-up in the hero.
+   Nothing for reduced motion. */
 (function () {
   "use strict";
   if (!window.matchMedia || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { return; }
 
   if ("IntersectionObserver" in window) {
-    var sel = ".sec-head, .feat, .shot, .dlx-card, .dl-phone, .donate, .notes-wrap, .faq-item";
+    var sel = ".sec-head, .fxp, .shot, .dlx-card, .dl-phone, .donate, .notes-wrap, .faq-item";
     var fold = window.innerHeight * 0.92;
     var io = new IntersectionObserver(function (entries) {
       entries.forEach(function (en) {
@@ -168,19 +256,6 @@
 
   var mock = document.querySelector(".hero .mock");
   if (!mock || !mock.offsetParent) { return; }
-  var ticking = false;
-  function tilt() {
-    ticking = false;
-    var top = mock.getBoundingClientRect().top, h = window.innerHeight;
-    var t = (top - h * 0.2) / (h * 0.6);
-    mock.style.setProperty("--tilt", String(Math.max(0, Math.min(1, t)).toFixed(3)));
-  }
-  window.addEventListener("scroll", function () {
-    if (!ticking) { ticking = true; window.requestAnimationFrame(tilt); }
-  }, { passive: true });
-  window.addEventListener("resize", tilt);
-  tilt();
-
   mock.classList.add("alive");
   var chans = mock.querySelectorAll(".chan"), screen = mock.querySelector(".screen");
   var tints = ["#4c8dff", "#ff6b5e", "#34c759", "#ff9f0a", "#5ac8fa", "#bf5af2"];
@@ -211,4 +286,47 @@
     items[5].querySelector("summary").focus();
   });
   faq.appendChild(b);
+})();
+
+/* Living details: the formats drift by, the download count counts up. */
+(function () {
+  "use strict";
+  if (!window.matchMedia || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { return; }
+  var strip = document.querySelector(".strip .wrap");
+  if (strip && strip.children.length) {
+    var track = document.createElement("div");
+    track.className = "marq";
+    var chips = [].slice.call(strip.children);
+    chips.forEach(function (c) { track.appendChild(c); });
+    chips.forEach(function (c) {
+      var d = c.cloneNode(true);
+      d.setAttribute("aria-hidden", "true");
+      track.appendChild(d);
+    });
+    strip.appendChild(track);
+    strip.classList.add("is-marq");
+  }
+  var count = document.querySelector(".release-tag .dl-count");
+  var m = count && count.textContent.match(/^(\D*)([\d\s.,  ]*\d)(\D*)$/);
+  if (!m || !("IntersectionObserver" in window)) { return; }
+  var total = parseInt(m[2].replace(/\D/g, ""), 10);
+  if (!(total > 0)) { return; }
+  var fmt;
+  try { fmt = new Intl.NumberFormat(document.documentElement.lang || undefined); } catch (e) { fmt = null; }
+  var shown = m[2];
+  function put(n) { count.textContent = m[1] + (fmt ? fmt.format(n) : String(n)) + m[3]; }
+  var io = new IntersectionObserver(function (en) {
+    if (!en[0].isIntersecting) { return; }
+    io.disconnect();
+    var t0 = null, dur = 1400;
+    function step(t) {
+      if (t0 === null) { t0 = t; }
+      var k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+      put(Math.round(total * e));
+      if (k < 1) { window.requestAnimationFrame(step); } else { count.textContent = m[1] + shown + m[3]; }
+    }
+    put(0);
+    window.requestAnimationFrame(step);
+  }, { threshold: 1 });
+  io.observe(count);
 })();
