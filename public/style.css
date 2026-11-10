@@ -1000,26 +1000,17 @@ dialog.dn { overflow-x: hidden; }
    section, and Download is in the menu. An app-store button comes back
    here once there is a phone app. */
 .is-phone .hero .cta-row { display: none; }
-/* The downloads go further down on a phone, after the FAQ: nothing there
-   installs on it, and the hero's button already sends the link on. What
-   to do here - read, see, support - comes first. */
+/* The downloads and what is new in them go further down on a phone, after
+   the FAQ: nothing there installs on it. What to do here - read, see,
+   support - comes first. The bands take turns in this order as they do on
+   a computer (hero, features, shots, donate, FAQ, downloads, what's new,
+   credits), each in its own colour, so nothing is swapped here. */
 .is-phone main { display: flex; flex-direction: column; }
-.is-phone main > #download { order: 1; }
+.is-phone main > #download, .is-phone main > #whats-new { order: 1; }
 .is-phone main > #credits { order: 2; }
-/* The bands still take turns in the new order - hero, features, shots,
-   donate, what's new, FAQ, downloads, credits - so from the donate band on
-   the colours swap, and what sits inside each swaps with them. */
-.is-phone #donate { background: var(--surface); }
-/* (only past a "what's new": without one the FAQ follows the donate band
-   and keeps the page colour) */
-.is-phone #whats-new ~ #faq { background: var(--surface); }
-.is-phone #whats-new, .is-phone #download { background: var(--bg); }
 .is-phone #donate .donate {
   background: radial-gradient(90% 60% at 50% 100%, color-mix(in srgb, var(--heart) 22%, transparent), transparent 75%),
     var(--bg); }
-.is-phone #whats-new .notes, .is-phone #download .dlx-card { background: var(--surface); }
-.is-phone #download .dlx-big.alt,
-.is-phone #download .dlx.has-mine .dlx-card:not(.is-mine) .dlx-big { background: var(--bg); }
 .is-phone .bar .btn { display: none; }
 
 /* ---- motion ------------------------------------------------------------- */
@@ -1377,9 +1368,14 @@ dialog.dn { overflow-x: hidden; }
    black and graphite in dark mode), so on a phone above all it is clear
    where one ends and the next begins. What sat on the grey before sits on
    the page colour inside a grey band. */
-#features, #download, #whats-new, #credits { background: var(--surface); }
+/* What's new follows the downloads it describes, then the donate band:
+   hero, features, shots, downloads, what's new, donate, FAQ, credits. */
+#features, #download, #donate, #credits { background: var(--surface); }
 #features .fxp-tab.is-on { background: var(--bg); }
-#download .dlx-card, #whats-new .notes { background: var(--bg); }
+#download .dlx-card { background: var(--bg); }
+#donate .donate {
+  background: radial-gradient(55% 130% at 86% 50%, color-mix(in srgb, var(--heart) 24%, transparent), transparent 72%),
+    var(--bg); }
 #download .dlx-big.alt, #download .dlx.has-mine .dlx-card:not(.is-mine) .dlx-big { background: var(--surface); }
 #credits { padding: 72px 0; }
 footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0; }
