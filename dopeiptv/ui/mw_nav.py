@@ -16,7 +16,7 @@ from PyQt6.QtGui import (
 from PyQt6.QtWidgets import QColorDialog, QMenu
 
 from ..i18n import tr
-from .theme import P
+from .theme import HEART, P
 
 
 class _NavMixin:
@@ -165,7 +165,7 @@ class _NavMixin:
         # The playlist stack icon follows the theme too (same square icon in
         # both sidebar states; _update_playlist_btn repaints it).
         if hasattr(self, "_donate_btn"):
-            self._donate_btn.set_rest(P["text2"])
+            self._donate_btn.set_rest(HEART)
         if hasattr(self, "_playlist_btn"):
             self._update_playlist_btn()
         # Middle-column controls: focus (hide list), list toggle, grid view

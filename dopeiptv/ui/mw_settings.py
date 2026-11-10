@@ -442,6 +442,8 @@ class _SettingsMixin:
         if hasattr(self, "_multiview_btn"):
             self._multiview_btn.setToolTip(tr("menu_multiview"))
         if hasattr(self, "_donate_btn"):
+            if not getattr(self, "_sidebar_collapsed", False):
+                self._donate_btn.setText(tr("donate_support"))
             self._donate_btn.setToolTip(tr("donate_support"))
             self._donate_btn.setAccessibleName(tr("donate_support"))
         self._update_playlist_btn()

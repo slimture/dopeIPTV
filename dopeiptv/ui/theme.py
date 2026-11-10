@@ -666,6 +666,16 @@ QPushButton#SideAction[rail="true"] {{
     text-align: center; padding: 8px 0; font-size: 14px; font-weight: 600;
 }}
 
+/* Support dopeIPTV: under the sidebar's buttons, a line like a footer
+   link - a small red heart (the icon) and the muted text, brighter under
+   the pointer. No pill: it is not one of the tools. */
+QPushButton#DonateLink {{
+    background: transparent; border: none; text-align: left; padding: 6px 4px 2px 4px;
+    font-size: 12px; font-weight: 600; color: {p['text2']};
+}}
+QPushButton#DonateLink:hover {{ color: {p['text']}; }}
+QPushButton#DonateLink[rail="true"] {{ text-align: center; padding: 6px 0 2px 0; }}
+
 /* Playlist switcher: a compact pill "chip" sitting right under the logo, so
    the two read as one block (logo = the app, chip = the account/playlist it
    is showing). Same stack icon as its rail form ties the two states together. */

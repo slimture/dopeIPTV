@@ -156,18 +156,21 @@ def heart_pixmap(size: int, colour: str, scale: int = 3) -> QPixmap:
 
 
 class HeartButton(QPushButton):
-    """The sidebar's donate button: a heart in the row's muted tone that
-    turns heart-red and beats twice under the pointer - there, never in the
-    way. ``set_rest`` re-tints it for a new theme."""
+    """A heart that beats twice under the pointer. At rest in *rest* (the
+    heart's own red by default, or a muted tone), heart-red under the
+    pointer. ``set_rest`` re-tints it for a new theme."""
 
     SIZE = 18
 
-    def __init__(self, parent=None, objectName: str = "") -> None:
-        super().__init__("", parent)
+    def __init__(self, parent=None, objectName: str = "", text: str = "",
+                 size: int = 0, rest: str = "") -> None:
+        super().__init__(text, parent)
         if objectName:
             self.setObjectName(objectName)
+        if size:
+            self.SIZE = size
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._rest = P.get("text2", "#AAAAAA")
+        self._rest = rest or HEART
         self._beat = QVariantAnimation(self)
         self._beat.setDuration(900)
         for at, v in ((0.0, 1.0), (0.15, 1.32), (0.3, 0.94), (0.45, 1.2),

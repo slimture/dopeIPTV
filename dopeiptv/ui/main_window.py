@@ -787,12 +787,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         multiview_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
                                     QSizePolicy.Policy.Fixed)
         multiview_btn.clicked.connect(self._show_multiview)
-        # A heart last in the row: donating, there for whoever looks, never
-        # in the way (mw_donate). It beats under the pointer.
-        self._donate_btn = donate_btn = HeartButton(objectName="SideAction")
+        # Under the row, a line of its own: a small red heart and "Support
+        # dopeIPTV" in the muted text - a footer link, not one of the tools
+        # (mw_donate). It beats under the pointer; on the icon rail, only
+        # the heart.
+        self._donate_btn = donate_btn = HeartButton(
+            objectName="DonateLink", text=tr("donate_support"), size=13)
         donate_btn.setToolTip(tr("donate_support"))
         donate_btn.setAccessibleName(tr("donate_support"))
-        donate_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
+        donate_btn.setSizePolicy(QSizePolicy.Policy.Preferred,
                                  QSizePolicy.Policy.Fixed)
         donate_btn.clicked.connect(lambda: self.open_donate("app-heart"))
         # Right-click: hide it for three months (mw_donate).
@@ -804,9 +807,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._actions_box.addWidget(guide_btn)
         self._actions_box.addWidget(settings_btn)
         self._actions_box.addWidget(multiview_btn)
-        self._actions_box.addWidget(donate_btn)
-        self._donate_heart_refresh()         # hidden for three months, maybe
         sl.addLayout(self._actions_box)
+        sl.addWidget(donate_btn)
+        self._donate_heart_refresh()         # hidden for three months, maybe
         self._apply_action_icons()
 
         # Middle column
