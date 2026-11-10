@@ -117,6 +117,7 @@
     "donate_note": "هر مبلغی · کارت، Apple Pay یا Google Pay · امن از طریق Stripe",
     "donate_modal_sub": "هر مبلغی، یک بار. از کمکتان سپاسگزاریم!",
     "donate_other": "مبلغ دیگر",
+    "donate_currency": "واحد پول",
     "donate_continue": "ادامه",
     "donate_email": "ایمیل، برای رسید",
     "donate_pay": "کمک {amount}",

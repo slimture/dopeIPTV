@@ -117,6 +117,7 @@
     "donate_note": "金额随意 · 银行卡、Apple Pay 或 Google Pay · 通过 Stripe 安全支付",
     "donate_modal_sub": "金额随意，一次性。感谢你的帮助！",
     "donate_other": "其他金额",
+    "donate_currency": "货币",
     "donate_continue": "继续",
     "donate_email": "电子邮箱，用于收据",
     "donate_pay": "捐助 {amount}",

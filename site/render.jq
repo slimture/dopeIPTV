@@ -149,7 +149,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
   def donate_i18n:
     if $DONATE == "" then "" else
       "<div id=\"donate-i18n\" hidden"
-      + ([[["title", "donate_eyebrow"], ["sub", "donate_modal_sub"], ["other", "donate_other"],
+      + ([[["title", "donate_eyebrow"], ["sub", "donate_modal_sub"], ["other", "donate_other"], ["currency", "donate_currency"],
            ["cont", "donate_continue"], ["email", "donate_email"], ["pay", "donate_pay"],
            ["busy", "donate_busy"], ["lock", "donate_lock"], ["back", "donate_back"],
            ["thanks", "donate_thanks"], ["receipt", "donate_receipt"], ["failed", "donate_failed"],

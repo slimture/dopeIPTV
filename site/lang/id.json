@@ -117,6 +117,7 @@
     "donate_note": "Jumlah bebas · kartu, Apple Pay atau Google Pay · aman melalui Stripe",
     "donate_modal_sub": "Jumlah bebas, sekali. Terima kasih atas bantuannya!",
     "donate_other": "Jumlah lain",
+    "donate_currency": "Mata uang",
     "donate_continue": "Lanjut",
     "donate_email": "Email, untuk tanda terima",
     "donate_pay": "Donasi {amount}",

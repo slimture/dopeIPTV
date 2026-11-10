@@ -46,6 +46,10 @@
  * the main button opens the wallet's own sheet (Stripe's Payment Request)
  * and /donate/wallet confirms the payment with what the wallet hands back;
  * "Pay with card" under it opens the card form.
+ *
+ * The donor pays in their own currency: guessCurrency() picks it from where
+ * the device says it is, out of the ones /donate/config offers, and a small
+ * menu beside "Other amount" changes it (remembered on this device).
  */
 (function () {
   "use strict";
@@ -57,7 +61,7 @@
   // The Stripe.js release solequiz.com runs on against the same account.
   var STRIPE_JS = "https://js.stripe.com/endive/stripe.js";
   var ZERO_DECIMAL = /^(bif|clp|djf|gnf|jpy|kmf|krw|mga|pyg|rwf|ugx|vnd|vuv|xaf|xof|xpf)$/;
-  var cfg = null, stripeLoading = null, dlg = null, el = {}, chosen = 0, live = null, busy = false;
+  var cfg = null, stripeLoading = null, dlg = null, el = {}, chosen = 0, live = null, busy = false, cur = "";
   var stripe = null, pr = null, wallet = null, walletAmount = 0;
   var APPLE = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
 
@@ -70,19 +74,73 @@
     if (text) { n.textContent = text; }
     return n;
   }
+  function code() { return cur || (cfg && cfg.currency) || "eur"; }
+  // The amounts of the chosen currency: its buttons, smallest and largest.
+  function C() {
+    var row = cfg.currencies && cfg.currencies[code()];
+    return row || { presets: cfg.presets || [], min: cfg.min, max: cfg.max };
+  }
   function fmt(minor) {
-    var cur = (cfg && cfg.currency || "eur").toUpperCase();
-    var major = ZERO_DECIMAL.test(cur.toLowerCase()) ? minor : minor / 100;
+    var c = code().toUpperCase();
+    var major = ZERO_DECIMAL.test(c.toLowerCase()) ? minor : minor / 100;
     try {
-      return new Intl.NumberFormat(LANG, { style: "currency", currency: cur,
-        minimumFractionDigits: major % 1 ? 2 : 0 }).format(major);
-    } catch (e) { return major + " " + cur; }
+      return new Intl.NumberFormat(LANG, { style: "currency", currency: c,
+        minimumFractionDigits: major % 1 ? 2 : 0, maximumFractionDigits: major % 1 ? 2 : 0 }).format(major);
+    } catch (e) { return major + " " + c; }
   }
   function toMinor(text) {
     var v = parseFloat(String(text).replace(/\s/g, "").replace(",", "."));
     if (!isFinite(v)) { return 0; }
-    var zero = ZERO_DECIMAL.test((cfg && cfg.currency) || "eur");
-    return Math.round(zero ? v : v * 100);
+    if (ZERO_DECIMAL.test(code())) { return Math.round(v); }
+    if (code() === "huf") { return Math.round(v) * 100; }   // whole forints only
+    return Math.round(v * 100);
+  }
+
+  // Where the device says it is: its time zone first (a place, where the
+  // language is only a preference), then the regions of its languages,
+  // then the part of the world its time zone is in, then the page's language.
+  var EURO = " AT BE BG CY DE EE ES FI FR GR HR IE IT LT LU LV MT NL PT SI SK AD MC SM VA ME XK AX EU ";
+  var BY_COUNTRY = { SE: "sek", NO: "nok", SJ: "nok", DK: "dkk", FO: "dkk", GL: "dkk",
+    GB: "gbp", IM: "gbp", JE: "gbp", GG: "gbp", CH: "chf", LI: "chf", PL: "pln", CZ: "czk",
+    HU: "huf", RO: "ron", US: "usd", PR: "usd", AU: "aud", CA: "cad", NZ: "nzd", JP: "jpy",
+    KR: "krw", BR: "brl", MX: "mxn", IL: "ils" };
+  var BY_ZONE = { "Europe/Stockholm": "SE", "Europe/Oslo": "NO", "Arctic/Longyearbyen": "NO",
+    "Europe/Copenhagen": "DK", "Atlantic/Faroe": "FO", "America/Nuuk": "GL", "America/Godthab": "GL",
+    "Europe/London": "GB", "Europe/Belfast": "GB", "Europe/Isle_of_Man": "GB", "Europe/Jersey": "GB",
+    "Europe/Guernsey": "GB", "Europe/Zurich": "CH", "Europe/Vaduz": "CH", "Europe/Warsaw": "PL",
+    "Europe/Prague": "CZ", "Europe/Budapest": "HU", "Europe/Bucharest": "RO", "Asia/Tokyo": "JP",
+    "Asia/Seoul": "KR", "Pacific/Auckland": "NZ", "Asia/Jerusalem": "IL", "Asia/Tel_Aviv": "IL",
+    "Pacific/Honolulu": "US", "America/Puerto_Rico": "PR" };
+  var ZONE_RX = [
+    [/^Europe\/(Berlin|Paris|Madrid|Rome|Amsterdam|Brussels|Vienna|Dublin|Lisbon|Athens|Luxembourg|Helsinki|Tallinn|Riga|Vilnius|Bratislava|Ljubljana|Zagreb|Malta|Monaco|San_Marino|Vatican|Andorra|Sofia|Mariehamn|Busingen|Podgorica|Nicosia)$|^Asia\/(Nicosia|Famagusta)$|^Atlantic\/(Canary|Madeira|Azores)$|^Africa\/Ceuta$/, "EU"],
+    [/^Australia\//, "AU"],
+    [/^America\/(Toronto|Vancouver|Edmonton|Winnipeg|Halifax|St_Johns|Regina|Montreal|Moncton|Whitehorse|Yellowknife|Iqaluit|Glace_Bay|Goose_Bay|Swift_Current|Dawson_Creek|Fort_Nelson|Creston|Inuvik|Thunder_Bay|Rankin_Inlet|Cambridge_Bay|Atikokan)$/, "CA"],
+    [/^America\/(Sao_Paulo|Bahia|Fortaleza|Recife|Belem|Manaus|Cuiaba|Campo_Grande|Porto_Velho|Boa_Vista|Rio_Branco|Maceio|Araguaina|Santarem|Noronha|Eirunepe)$/, "BR"],
+    [/^America\/(Mexico_City|Monterrey|Merida|Cancun|Chihuahua|Hermosillo|Mazatlan|Tijuana|Matamoros|Ojinaga|Bahia_Banderas|Ciudad_Juarez)$/, "MX"],
+    [/^America\/(New_York|Chicago|Denver|Los_Angeles|Phoenix|Anchorage|Detroit|Boise|Juneau|Sitka|Nome|Adak|Metlakatla|Yakutat|Menominee|Indiana\/.+|Kentucky\/.+|North_Dakota\/.+)$|^US\//, "US"]];
+  var BY_LANG = { sv: "SE", ja: "JP", ko: "KR", pl: "PL", he: "IL" };
+  function offered(c) { return !!(c && cfg.currencies && cfg.currencies[c]); }
+  function currencyOf(country) {
+    country = (country || "").toUpperCase();
+    var c = BY_COUNTRY[country] || (country && EURO.indexOf(" " + country + " ") >= 0 ? "eur" : "");
+    return offered(c) ? c : "";
+  }
+  function guessCurrency() {
+    var saved = "";
+    try { saved = localStorage.getItem("dn-currency") || ""; } catch (e) { /* none */ }
+    if (offered(saved)) { return saved; }
+    var tz = "";
+    try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) { /* none */ }
+    var country = BY_ZONE[tz] || "";
+    ZONE_RX.forEach(function (z) { if (!country && z[0].test(tz)) { country = z[1]; } });
+    var got = currencyOf(country);
+    (navigator.languages || [navigator.language || ""]).forEach(function (l) {
+      var m = /^[a-z]{2,3}[-_]([A-Za-z]{2})\b/.exec(l || "");
+      if (!got && m) { got = currencyOf(m[1]); }
+    });
+    if (!got && /^(Europe|Africa|Atlantic)\//.test(tz) && offered("eur")) { got = "eur"; }
+    if (!got && /^(America|Asia|Pacific|Indian)\//.test(tz) && offered("usd")) { got = "usd"; }
+    return got || currencyOf(BY_LANG[LANG]) || cfg.currency || "eur";
   }
   function loadStripe() {
     if (window.Stripe) { return Promise.resolve(window.Stripe); }
@@ -135,11 +193,17 @@
     el.amounts = mk("div", "dn-step");
     el.chips = mk("div", "dn-chips");
     el.chips.setAttribute("role", "radiogroup");
-    var other = mk("label", "dn-other", T.other);
+    var other = mk("div", "dn-otherrow"), lab = mk("label", "dn-other", T.other);
     el.custom = mk("input", "dn-input");
     Object.assign(el.custom, { type: "text", inputMode: "decimal", autocomplete: "off" });
     el.custom.addEventListener("input", function () { setAmount(toMinor(el.custom.value), true); });
-    other.append(el.custom);
+    lab.append(el.custom);
+    var wrap = mk("span", "dn-curwrap");
+    el.cur = mk("select", "dn-cur");
+    el.cur.setAttribute("aria-label", T.currency || "Currency");
+    el.cur.addEventListener("change", function () { setCurrency(el.cur.value, true); });
+    wrap.append(el.cur);
+    other.append(lab, wrap);
     el.err1 = mk("p", "dn-error"); el.err1.hidden = true; el.err1.setAttribute("role", "alert");
     el.go = mk("button", "btn primary dn-go", T.cont); el.go.type = "button";
     el.go.addEventListener("click", function () {
@@ -202,7 +266,7 @@
   function chips() {
     [el.chips, el.chips2].forEach(function (box) {
       box.replaceChildren();
-      (cfg.presets || []).forEach(function (minor) {
+      (C().presets || []).forEach(function (minor) {
         var b = mk("button", "dn-chip", fmt(minor)); b.type = "button";
         b.setAttribute("role", "radio"); b.dataset.amount = String(minor);
         b.addEventListener("click", function () { setAmount(minor, false); });
@@ -210,12 +274,38 @@
       });
     });
     el.custom2.placeholder = fmt(0).replace(/[\d.,\s\u00a0\u202f]/g, "") + " …";
-    if (!chosen && cfg.presets && cfg.presets.length) { chosen = cfg.presets[Math.min(1, cfg.presets.length - 1)]; }
+    var p = C().presets || [];
+    if (!chosen && p.length) { chosen = p[Math.min(1, p.length - 1)]; }
     mark();
   }
-  function inRange(minor) { return !!minor && minor >= cfg.min && minor <= cfg.max; }
+  function currencies() {
+    var list = Object.keys(cfg.currencies || {}).sort();
+    el.cur.replaceChildren();
+    list.forEach(function (c) {
+      var o = mk("option", "", c.toUpperCase()); o.value = c;
+      el.cur.appendChild(o);
+    });
+    el.cur.value = code();
+    el.cur.parentNode.hidden = list.length < 2;
+  }
+  // A new currency: its own round amounts, the second one chosen.
+  function setCurrency(c, mine) {
+    if (!offered(c)) { return; }
+    cur = c;
+    if (mine) { try { localStorage.setItem("dn-currency", c); } catch (e) { /* none */ } }
+    chosen = 0; el.custom.value = ""; el.custom2.value = "";
+    el.err1.hidden = true;
+    if (el.cur.value !== c) { el.cur.value = c; }
+    chips();
+    if (pr) {
+      try { pr.update({ currency: c, total: { label: cfg.name || T.title, amount: chosen || C().min } }); }
+      catch (e) { warn("the wallet is made again for the currency:", e); pr = null; prepareWallet(); }
+    }
+    payLabel();
+  }
+  function inRange(minor) { return !!minor && minor >= C().min && minor <= C().max; }
   function rangeText() {
-    return (T.range || "").replace("{min}", fmt(cfg.min)).replace("{max}", fmt(cfg.max));
+    return (T.range || "").replace("{min}", fmt(C().min)).replace("{max}", fmt(C().max));
   }
   // Any change of amount, on either step: the chips, the button, and the
   // card form (a deferred intent - the PaymentIntent is made on "Donate").
@@ -250,7 +340,11 @@
     dlg.showModal();
     (cfg ? Promise.resolve(cfg) : fetch("/donate/config", { credentials: "same-origin" })
       .then(function (r) { if (!r.ok) { throw new Error("/donate/config answered " + r.status); } return r.json(); }))
-      .then(function (c) { cfg = c; chips(); show(el.amounts); prepareWallet(); })
+      .then(function (c) {
+        cfg = c;
+        if (!offered(cur)) { cur = guessCurrency(); }
+        currencies(); chips(); show(el.amounts); prepareWallet();
+      })
       .catch(function (err) {
         warn("the donate service did not answer (donate.py, nginx /donate/):", err);
         el.loading.textContent = T.failed;
@@ -276,8 +370,8 @@
     loadStripe().then(function (Stripe) {
       var st = stripeFor(Stripe, cfg.publishableKey);
       pr = st.paymentRequest({
-        country: cfg.country || "SE", currency: (cfg.currency || "eur").toLowerCase(),
-        total: { label: cfg.name || T.title, amount: chosen || cfg.min },
+        country: cfg.country || "SE", currency: code(),
+        total: { label: cfg.name || T.title, amount: chosen || C().min },
         requestPayerEmail: true, requestPayerName: true,
         disableWallets: ["link", "browserCard"]
       });
@@ -294,7 +388,7 @@
   function payWallet() {
     if (!amountOk() || !pr) { return; }
     walletAmount = chosen;
-    pr.update({ total: { label: cfg.name || T.title, amount: walletAmount } });
+    pr.update({ currency: code(), total: { label: cfg.name || T.title, amount: walletAmount } });
     pr.show();
   }
   function walletDone() { show(el.done); }
@@ -305,7 +399,7 @@
   function walletPaid(ev) {
     fetch("/donate/wallet", { method: "POST", credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount: walletAmount, paymentMethod: ev.paymentMethod.id,
+      body: JSON.stringify({ amount: walletAmount, currency: code(), paymentMethod: ev.paymentMethod.id,
         email: ev.payerEmail || "", name: ev.payerName || "" }) })
       .then(function (r) { return r.json().catch(function () { return {}; }); })
       .then(function (res) {
@@ -336,7 +430,7 @@
       var st = stripeFor(Stripe, cfg.publishableKey);
       // A deferred intent: the form is made for an amount that can still
       // change; the PaymentIntent is made with the final one on "Donate".
-      var opts = { mode: "payment", amount: chosen, currency: (cfg.currency || "eur").toLowerCase(),
+      var opts = { mode: "payment", amount: chosen, currency: code(),
                    appearance: appearance() };
       if (cfg.pmc) { opts.paymentMethodConfiguration = cfg.pmc; }
       var elements = st.elements(opts);
@@ -378,11 +472,11 @@
     }
     busy = true; el.err2.hidden = true;
     el.payBtn.disabled = true; el.payBtn.textContent = T.busy;
-    var elements = live.elements, amount = chosen;
+    var elements = live.elements, amount = chosen, currency = code();
     elements.submit().then(function (r) {
       if (r && r.error) { throw { shown: r.error.message }; }
       return fetch("/donate/session", { method: "POST", credentials: "same-origin",
-        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: amount }) })
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: amount, currency: currency }) })
         .then(function (res) {
           if (!res.ok) { throw new Error("/donate/session answered " + res.status + " (the reason is in /var/log/iptv-donate.log)"); }
           return res.json();

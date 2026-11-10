@@ -753,6 +753,19 @@ footer .v a:hover { color: var(--accent); }
   background: color-mix(in srgb, var(--accent) 14%, var(--ink)); box-shadow: inset 0 0 0 1px var(--accent); }
 .dn-other, .dn-email { display: flex; flex-direction: column; gap: 6px; font-size: 13px;
   font-weight: 600; color: var(--muted); }
+/* The own amount, and the currency beside it: a quiet menu, its arrow
+   drawn here (appearance: none drops the browser's own). */
+.dn-otherrow { display: flex; align-items: flex-end; gap: 8px; }
+.dn-otherrow .dn-other { flex: 1; min-width: 0; }
+.dn-curwrap { position: relative; flex: none; display: block; }
+.dn-curwrap::after { content: ""; position: absolute; inset-inline-end: 13px; top: 50%; width: 6px; height: 6px;
+  border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
+  transform: translateY(-70%) rotate(45deg); pointer-events: none; }
+.dn-cur { font: inherit; font-size: 16px; font-weight: 600; color: var(--text); cursor: pointer;
+  padding: 11px 32px 11px 13px; border-radius: 10px; border: 1px solid var(--line-2);
+  background: var(--ink); -webkit-appearance: none; appearance: none; }
+[dir="rtl"] .dn-cur { padding: 11px 13px 11px 32px; }
+.dn-cur:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .dn-input { font: inherit; font-size: 16px; font-weight: 500; color: var(--text); width: 100%;
   padding: 11px 13px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--ink); }
 .dn-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }

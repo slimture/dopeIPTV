@@ -117,6 +117,7 @@
     "donate_note": "أي مبلغ · بطاقة أو Apple Pay أو Google Pay · بأمان عبر Stripe",
     "donate_modal_sub": "أي مبلغ، مرة واحدة. شكرًا لمساعدتك!",
     "donate_other": "مبلغ آخر",
+    "donate_currency": "العملة",
     "donate_continue": "متابعة",
     "donate_email": "البريد الإلكتروني، للإيصال",
     "donate_pay": "تبرّع بـ {amount}",

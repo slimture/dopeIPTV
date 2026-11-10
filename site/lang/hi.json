@@ -117,6 +117,7 @@
     "donate_note": "कोई भी राशि · कार्ड, Apple Pay या Google Pay · Stripe से सुरक्षित",
     "donate_modal_sub": "कोई भी राशि, एक बार। मदद के लिए धन्यवाद!",
     "donate_other": "दूसरी राशि",
+    "donate_currency": "मुद्रा",
     "donate_continue": "आगे बढ़ें",
     "donate_email": "ईमेल, रसीद के लिए",
     "donate_pay": "{amount} दान करें",

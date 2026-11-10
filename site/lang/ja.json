@@ -117,6 +117,7 @@
     "donate_note": "金額は自由 · カード、Apple Pay、Google Pay · Stripe で安全に",
     "donate_modal_sub": "金額は自由、1回のみ。ご支援ありがとうございます！",
     "donate_other": "その他の金額",
+    "donate_currency": "通貨",
     "donate_continue": "続ける",
     "donate_email": "メール（領収書用）",
     "donate_pay": "{amount} を寄付",

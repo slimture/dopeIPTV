@@ -117,6 +117,7 @@
     "donate_note": "Будь-яка сума · картка, Apple Pay або Google Pay · безпечно через Stripe",
     "donate_modal_sub": "Будь-яка сума, разово. Дякуємо за допомогу!",
     "donate_other": "Інша сума",
+    "donate_currency": "Валюта",
     "donate_continue": "Продовжити",
     "donate_email": "Ел. пошта для квитанції",
     "donate_pay": "Пожертвувати {amount}",
