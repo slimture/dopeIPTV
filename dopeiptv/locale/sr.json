@@ -346,6 +346,8 @@
   "mv_conflict_title": "Višestruki prikaz je pokrenut",
   "mv_conflict_body": "Višestruki prikaz i dalje emituje i drži veze ka vašem provajderu. Zatvoriti višestruki prikaz i pustiti ovde? Ako vaš nalog ima dovoljno istovremenih veza, možete zadržati oba.",
   "mv_keep": "Zadrži višestruki prikaz",
+  "mv_toggle_title": "Zatvoriti višestruki prikaz?",
+  "mv_toggle_body": "Višestruki prikaz se reprodukuje. Ako ga zatvorite, svi kanali u njemu se zaustavljaju.",
   "tab_multiview": "Višestruki prikaz",
   "mv_sec_window": "PROZOR",
   "mv_sec_behavior": "PONAŠANJE",

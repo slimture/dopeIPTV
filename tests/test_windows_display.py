@@ -41,6 +41,21 @@ def test_no_flag_guessed_from_a_word_or_an_ambiguous_code(label):
     assert category_flag(label)[0] is None
 
 
+@pytest.mark.parametrize("label,code", [
+    # Providers that name a category after the country alone got no flag.
+    ("Sweden", "se"), ("SWEDEN HD", "se"), ("Sverige", "se"),
+    ("VIP | NORWAY", "no"), ("Deutschland", "de"), ("United Kingdom", "gb"),
+    ("TURKEY", "tr"), ("España", "es"), ("Sport Sweden", "se"),
+    ("Sweden (HD)", "se"), ("AR | Argentina", "ar"),
+    ("Bosnia & Herzegovina", "ba"), ("Россия", "ru"), ("中国", "cn"),
+    ("Arabic", None), ("Latino", None), ("Africa", None), ("Europe", None),
+    ("Ex-Yu", None), ("Nordic", None), ("Kids", None),
+    ("Premier League", None), ("National Geographic", None),
+])
+def test_a_category_named_after_its_country_gets_the_flag(label, code):
+    assert category_flag(label)[0] == code
+
+
 def test_a_flag_emoji_still_wins_over_the_ambiguous_codes():
     assert category_flag("\U0001F1E6\U0001F1F7 Argentina")[0] == "ar"
 

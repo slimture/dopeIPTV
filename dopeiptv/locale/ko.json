@@ -346,6 +346,8 @@
   "mv_conflict_title": "멀티뷰가 실행 중입니다",
   "mv_conflict_body": "멀티뷰가 여전히 스트리밍 중이며 공급자에 대한 연결을 유지하고 있습니다. 멀티뷰를 닫고 여기서 재생하시겠습니까? 계정에 충분한 동시 연결이 있으면 둘 다 유지할 수 있습니다.",
   "mv_keep": "멀티뷰 유지",
+  "mv_toggle_title": "멀티뷰를 닫을까요?",
+  "mv_toggle_body": "멀티뷰가 재생 중입니다. 닫으면 그 안의 모든 채널이 멈춥니다.",
   "tab_multiview": "멀티뷰",
   "mv_sec_window": "창",
   "mv_sec_behavior": "동작",

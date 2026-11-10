@@ -346,6 +346,8 @@
   "mv_conflict_title": "Multivista está activa",
   "mv_conflict_body": "Multivista sigue transmitiendo y mantiene conexiones con tu proveedor. ¿Cerrar multivista y reproducir aquí? Si tu cuenta tiene suficientes conexiones simultáneas puedes mantener ambas.",
   "mv_keep": "Mantener multivista",
+  "mv_toggle_title": "¿Cerrar la multivista?",
+  "mv_toggle_body": "La multivista se está reproduciendo. Si la cierras, se detienen todos sus canales.",
   "tab_multiview": "Multivista",
   "mv_sec_window": "VENTANA",
   "mv_sec_behavior": "COMPORTAMIENTO",

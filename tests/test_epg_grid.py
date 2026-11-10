@@ -143,21 +143,50 @@ assert not d._epg_poll.isActive()
 assert d._rows[0][1][0]["data"]["prog"]["title"] == "P"
 d.deleteLater(); app.processEvents()
 
-# ---- 4. Filter finds a channel beyond the MAX_CHANNELS display cap --------
+# ---- 4. "All" with thousands of channels: every one has a row -------------
+# The guide used to stop at 300 channels, so "All" with a big provider showed
+# only its first country. Rows are now drawn as they scroll into view, and the
+# ones far away are taken down again.
 w.xmltv.programmes_in = lambda ch, a, b: []
 many = [{"name": f"Filler {i}", "stream_id": 1000 + i, "num": i}
-        for i in range(EpgGridDialog.MAX_CHANNELS + 50)]
-many.append({"name": "V Sport Premium SE", "stream_id": 42, "num": 999})
+        for i in range(3000)]
+many.append({"name": "V Sport Premium SE", "stream_id": 42, "num": 9999})
 d = EpgGridDialog(w, many)
+d.resize(1200, 600)
+d.show()
 app.processEvents()
-# Unfiltered: capped to MAX_CHANNELS, target (last) not shown.
-assert len(d._rows) == EpgGridDialog.MAX_CHANNELS
-assert not any(c.get("name") == "V Sport Premium SE"
-               for c, _b in d._rows)
-# Filtering searches the FULL list, so the target now appears.
+last = len(many) - 1
+assert len(d._rows) == len(many)
+assert 0 < len(d._row_items) <= d.KEEP_ROWS
+assert not d._rows[last][1]                    # far down: not drawn yet
+# Scroll sideways first, then to the very bottom: the last row is drawn, and
+# its channel cell sits in the pinned column, not where the column was.
+d.view.horizontalScrollBar().setValue(600)
+vbar = d.view.verticalScrollBar()
+vbar.setValue(vbar.maximum())
+app.processEvents()
+ch, blocks = d._rows[last]
+assert ch["name"] == "V Sport Premium SE" and blocks
+cell = next(it for in_group, it in d._row_items[last]
+            if in_group and isinstance(it.data(0), dict))
+col_left = d.view.mapToScene(0, 0).x()
+assert col_left > 100, col_left
+assert abs(cell.sceneBoundingRect().x() - col_left) < 2, (
+    cell.sceneBoundingRect().x(), col_left)
+# Walking the whole line-up keeps only a few hundred rows in the scene.
+for v in range(0, vbar.maximum() + 1, d.ROW_H * 25):
+    vbar.setValue(v)
+    assert len(d._row_items) <= d.KEEP_ROWS, len(d._row_items)
+assert not d._rows[0][1]                       # the top was taken down
+# Keyboard navigation reaches a row that was taken down.
+d._focus = (0, 0)
+d._nav(0, 1)
+assert d._selected["channel"]["name"] == "Filler 1"
+# Filtering still searches the whole list.
 d.filter.setText("v sport")
 app.processEvents()
-assert any(c.get("name") == "V Sport Premium SE" for c, _b in d._rows)
+assert [c.get("name") for c, _b in d._rows] == ["V Sport Premium SE"]
+assert d._rows[0][1]
 d.deleteLater(); app.processEvents()
 
 # ---- 5. A logo arriving after the board scrolled lands in its row ---------

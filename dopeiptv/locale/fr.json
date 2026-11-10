@@ -346,6 +346,8 @@
   "mv_conflict_title": "Le multivue est actif",
   "mv_conflict_body": "Le multivue diffuse encore et occupe des connexions chez votre fournisseur. Fermer le multivue et lire ici ? Si votre compte dispose d'assez de connexions simultanées, vous pouvez garder les deux.",
   "mv_keep": "Garder le multivue",
+  "mv_toggle_title": "Fermer le multivue ?",
+  "mv_toggle_body": "Le multivue est en cours de lecture. Le fermer arrête toutes ses chaînes.",
   "tab_multiview": "Multivue",
   "mv_sec_window": "FENÊTRE",
   "mv_sec_behavior": "COMPORTEMENT",

@@ -346,6 +346,8 @@
   "mv_conflict_title": "Tampilan ganda sedang berjalan",
   "mv_conflict_body": "Tampilan ganda masih menyiarkan dan menahan koneksi ke penyedia Anda. Tutup tampilan ganda dan putar di sini? Jika akun Anda memiliki cukup koneksi bersamaan, Anda bisa menyimpan keduanya.",
   "mv_keep": "Pertahankan tampilan ganda",
+  "mv_toggle_title": "Tutup tampilan ganda?",
+  "mv_toggle_body": "Tampilan ganda sedang diputar. Jika ditutup, semua kanal di dalamnya berhenti.",
   "tab_multiview": "Tampilan ganda",
   "mv_sec_window": "JENDELA",
   "mv_sec_behavior": "PERILAKU",

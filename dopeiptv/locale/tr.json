@@ -346,6 +346,8 @@
   "mv_conflict_title": "Çoklu görünüm çalışıyor",
   "mv_conflict_body": "Çoklu görünüm hâlâ yayın yapıyor ve sağlayıcınıza bağlantı tutuyor. Çoklu görünüm kapatılıp burada oynatılsın mı? Hesabınızın yeterli eşzamanlı bağlantısı varsa ikisini de tutabilirsiniz.",
   "mv_keep": "Çoklu görünümü koru",
+  "mv_toggle_title": "Çoklu görünüm kapatılsın mı?",
+  "mv_toggle_body": "Çoklu görünüm oynatılıyor. Kapatırsanız içindeki tüm kanallar durur.",
   "tab_multiview": "Çoklu görünüm",
   "mv_sec_window": "PENCERE",
   "mv_sec_behavior": "DAVRANIŞ",

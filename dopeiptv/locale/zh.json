@@ -346,6 +346,8 @@
   "mv_conflict_title": "多画面正在运行",
   "mv_conflict_body": "多画面仍在播放并占用提供商连接。关闭多画面并在此播放？如果你的账户有足够的并发连接，也可以两者并存。",
   "mv_keep": "保留多画面",
+  "mv_toggle_title": "关闭多画面？",
+  "mv_toggle_body": "多画面正在播放。关闭后，其中所有频道都会停止。",
   "tab_multiview": "多画面",
   "mv_sec_window": "窗口",
   "mv_sec_behavior": "行为",

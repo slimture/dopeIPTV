@@ -242,12 +242,16 @@ assert w.width() >= w.MIN_W and w.height() >= w.MIN_H
 cell._on_release(_Ev(QPoint(0, 0)))
 assert w.resizing is None
 
-# With streams running the button only re-raises - never closes the grid.
+# With streams running the button asks first: "keep" brings the grid to
+# the front, "close" closes it - it no longer only re-raised a grid the
+# window manager could leave behind the app.
+asked = []
+h._confirm_close_multiview = lambda: asked.append(1) or False
 h._show_multiview()
 app.processEvents()
-assert h._multiview_win is w
-
-h._close_multiview()
+assert asked and h._multiview_win is w and w.isVisible()
+h._confirm_close_multiview = lambda: True
+h._show_multiview()
 app.processEvents()
 assert h._multiview_win is None
 assert h.wake.held                      # the docked player still plays

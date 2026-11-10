@@ -346,6 +346,8 @@
   "mv_conflict_title": "Multiview is actief",
   "mv_conflict_body": "Multiview streamt nog en houdt verbindingen met je provider vast. Multiview sluiten en hier afspelen? Als je account genoeg gelijktijdige verbindingen heeft, kun je beide behouden.",
   "mv_keep": "Multiview behouden",
+  "mv_toggle_title": "Multiview sluiten?",
+  "mv_toggle_body": "Multiview speelt af. Als je het sluit, stoppen alle kanalen erin.",
   "tab_multiview": "Multiview",
   "mv_sec_window": "VENSTER",
   "mv_sec_behavior": "GEDRAG",

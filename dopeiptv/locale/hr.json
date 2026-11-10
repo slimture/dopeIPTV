@@ -346,6 +346,8 @@
   "mv_conflict_title": "Multiview je pokrenut",
   "mv_conflict_body": "Multiview još prenosi i drži veze s pružateljem. Zatvoriti multiview i reproducirati ovdje? Ako tvoj račun ima dovoljno istovremenih veza, možeš zadržati oboje.",
   "mv_keep": "Zadrži multiview",
+  "mv_toggle_title": "Zatvoriti multiview?",
+  "mv_toggle_body": "Multiview se reproducira. Ako ga zatvorite, svi kanali u njemu se zaustavljaju.",
   "tab_multiview": "Multiview",
   "mv_sec_window": "PROZOR",
   "mv_sec_behavior": "PONAŠANJE",

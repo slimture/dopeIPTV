@@ -346,6 +346,8 @@
   "mv_conflict_title": "Mtazamo wa wingi unaendeshwa",
   "mv_conflict_body": "Mtazamo wa wingi bado unatiririsha na unashikilia miunganisho kwa mtoa huduma wako. Funga mtazamo wa wingi na ucheze hapa? Ikiwa akaunti yako ina miunganisho ya kutosha ya wakati mmoja unaweza kuweka zote mbili.",
   "mv_keep": "Weka mtazamo wa wingi",
+  "mv_toggle_title": "Funga mtazamo wa wingi?",
+  "mv_toggle_body": "Mtazamo wa wingi unacheza. Ukiufunga, chaneli zote zilizomo zitasimama.",
   "tab_multiview": "Mtazamo wa wingi",
   "mv_sec_window": "DIRISHA",
   "mv_sec_behavior": "TABIA",

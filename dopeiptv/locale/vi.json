@@ -346,6 +346,8 @@
   "mv_conflict_title": "Xem đa kênh đang chạy",
   "mv_conflict_body": "Xem đa kênh vẫn đang phát và giữ các kết nối tới nhà cung cấp của bạn. Đóng xem đa kênh và phát ở đây? Nếu tài khoản của bạn có đủ kết nối đồng thời, bạn có thể giữ cả hai.",
   "mv_keep": "Giữ xem đa kênh",
+  "mv_toggle_title": "Đóng xem đa kênh?",
+  "mv_toggle_body": "Xem đa kênh đang phát. Đóng nó sẽ dừng mọi kênh trong đó.",
   "tab_multiview": "Xem đa kênh",
   "mv_sec_window": "CỬA SỔ",
   "mv_sec_behavior": "HÀNH VI",

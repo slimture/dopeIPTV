@@ -82,6 +82,9 @@ class _Stub(_LocalFilesMixin):
 
     tmdb = None
     pool = object()          # only a handle; run_async is inline in tests
+    # MainWindow's list generation. Read by the frame-grab path, which only
+    # runs where ffmpeg is installed - so the suite failed on such a machine.
+    _load_gen = 0
 
     def _show_busy(self, msg=None):
         pass

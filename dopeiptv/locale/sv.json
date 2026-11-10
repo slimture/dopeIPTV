@@ -346,6 +346,8 @@
   "mv_conflict_title": "Multiview är igång",
   "mv_conflict_body": "Multiview strömmar fortfarande och håller anslutningar till din leverantör. Stäng multiview och spela här? Har ditt konto tillräckligt många samtidiga anslutningar kan du behålla båda.",
   "mv_keep": "Behåll multiview",
+  "mv_toggle_title": "Stänga multiview?",
+  "mv_toggle_body": "Multiview spelar. Stänger du den slutar alla kanaler i den att spela.",
   "tab_multiview": "Multiview",
   "mv_sec_window": "FÖNSTER",
   "mv_sec_behavior": "BETEENDE",

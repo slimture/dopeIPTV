@@ -79,17 +79,18 @@ class EpgGridDialog(QDialog):
     LABEL_DY = 21            # vertical inset of a card's title text
     FUTURE_HOURS = 12       # how far ahead the board reaches
     MAX_PAST_HOURS = 48     # cap on how far back timeshift opens the board
-    MAX_CHANNELS = 300       # a grid past this is unreadable anyway
+    # Every channel gets a row, but only the rows near the viewport are drawn
+    # (a row is some sixty scene items). "All" used to be cut to the first 300
+    # channels, which with a big provider was one country's - the rest of the
+    # line-up was simply not in the guide.
+    PRELOAD_ROWS = 12        # drawn beyond each edge of the viewport
+    KEEP_ROWS = 240          # past this many drawn rows, the farthest go
 
     def __init__(self, window, channels, category_name=None) -> None:
         super().__init__(window)
         self.window = window
-        # Keep the FULL channel list; the MAX_CHANNELS cap is applied per
-        # build AFTER filtering, so a filter can still find a channel that
-        # sits beyond the first 300 of a big category (the "V Sport isn't
-        # in the guide when I search for it" bug).
         self._all_channels = list(channels)
-        self.channels = self._all_channels[:self.MAX_CHANNELS]
+        self.channels = self._all_channels
         self._selected = None
         title = tr("btn_epg_guide")
         if category_name:
@@ -99,14 +100,20 @@ class EpgGridDialog(QDialog):
         now = time.time()
         now_floor = (now // 1800) * 1800
         # Open the board further back for timeshift channels so their past
-        # (catch-up-able) programmes are scrollable into view.
+        # (catch-up-able) programmes are scrollable into view. Only a channel
+        # with tv_archive can have catch-up, so the rest are not asked - this
+        # runs over the whole line-up.
         max_ts_days = 0
         for ch in self.channels:
             try:
+                if not int(ch.get("tv_archive") or 0):
+                    continue
                 max_ts_days = max(max_ts_days,
                                   self.window._timeshift_days(ch))
             except Exception:
                 pass
+            if max_ts_days * 24 >= self.MAX_PAST_HOURS:
+                break
         past_h = min(max(0.5, max_ts_days * 24), self.MAX_PAST_HOURS)
         self._start = now_floor - past_h * 3600
         self._stop = now_floor + self.FUTURE_HOURS * 3600
@@ -225,12 +232,19 @@ class EpgGridDialog(QDialog):
         bar.addWidget(self.close_btn)
         outer.addLayout(bar)
 
-        # Keyboard-navigation and live-refresh state. _rows mirrors what's on
-        # screen: one entry per visible channel row, each a list of
-        # {"item": block, "data": {...}} in air order (a no-EPG row has its
-        # single filler block). _build() fills them.
+        # Keyboard-navigation and live-refresh state. _rows has one entry per
+        # channel, (channel, blocks): blocks is a list of {"item": block,
+        # "data": {...}} in air order (a no-EPG row has its single filler
+        # block), and stays empty until the row is drawn. _row_items holds
+        # the scene items of each drawn row, so a row far out of view can be
+        # taken down again.
         self._build_gen = 0
         self._rows: list = []
+        self._row_items: dict[int, list] = {}
+        self._preload = QTimer(self)
+        self._preload.setSingleShot(True)
+        self._preload.setInterval(80)
+        self._preload.timeout.connect(lambda: self._fill_rows(preload=True))
         self._focus: tuple[int, int] | None = None
         # Keep the board alive while open: the now-line and the progress
         # fills tick along instead of freezing at open time.
@@ -257,7 +271,8 @@ class EpgGridDialog(QDialog):
         self._guide_poll.timeout.connect(self._after_refresh)
         self.finished.connect(lambda _r: (self._refresh.stop(),
                                           self._epg_poll.stop(),
-                                          self._guide_poll.stop()))
+                                          self._guide_poll.stop(),
+                                          self._preload.stop()))
 
         scr = self.screen().availableGeometry() if self.screen() else None
         want_w = self.CH_COL_W + self._grid_w + 40
@@ -284,8 +299,14 @@ class EpgGridDialog(QDialog):
         if getattr(self, "_playing_row", None) is not None:
             self._scroll_to_playing()
 
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        # A taller window shows rows that were not drawn yet.
+        self._pin()
+
     def showEvent(self, event) -> None:
         super().showEvent(event)
+        self._pin()
         # Centre in the screen once, after the window has its final size and a
         # real screen - doing it in __init__ (pre-show) doesn't stick on macOS.
         # Keyboard navigation should work immediately - focus the grid, not
@@ -508,18 +529,19 @@ class EpgGridDialog(QDialog):
             vbar.blockSignals(was_v)
         self._selected = None
         self._sel_outline = None   # dropped by scene.clear(); recreated on pick
-        self._playing_row = None
         self._build_gen += 1       # invalidates in-flight logo callbacks
-        self._rows = []
         self._focus = None
         self.play_btn.setEnabled(False)
         self.desc.hide()
-        # Filter the FULL list (so matches beyond the first 300 are found),
-        # then cap the result for a readable, performant grid.
         text = self.filter.text().lower().strip()
         chans = [c for c in self._all_channels
-                 if not text or text in (c.get("name") or "").lower()
-                 ][:self.MAX_CHANNELS]
+                 if not text or text in (c.get("name") or "").lower()]
+        self._rows = [(ch, []) for ch in chans]
+        self._row_items = {}
+        # Known before any row is drawn, so the guide can open on (and jump
+        # to) the channel being watched even when its row is far down.
+        self._playing_row = next(
+            (i for i, ch in enumerate(chans) if self._is_playing(ch)), None)
         grid_h = max(self.ROW_H, len(chans) * self.ROW_H)
         self.scene.setSceneRect(0, 0, self.CH_COL_W + self._grid_w,
                                 self.HEADER_H + grid_h)
@@ -534,8 +556,6 @@ class EpgGridDialog(QDialog):
 
         self._draw_grid_lines(grid_h)
         self._draw_time_header()
-        for row, ch in enumerate(chans):
-            self._draw_channel_row(row, ch)
 
         head_bg = QColor(P["pane"])
         self._corner = self.scene.addRect(
@@ -545,6 +565,56 @@ class EpgGridDialog(QDialog):
         self._pin()
         if hasattr(self, "playing_btn"):
             self.playing_btn.setVisible(self._playing_row is not None)
+
+    # -- rows on demand --------------------------------------------------------
+
+    def _visible_rows(self) -> tuple[int, int]:
+        """The rows in the viewport, [top, bottom). Before the dialog is shown
+        the viewport has no real height yet; assume a tall one."""
+        v = self.view.verticalScrollBar().value()
+        h = max(self.view.viewport().height(),
+                900 if not self.isVisible() else 0)
+        top = max(0, (v - self.HEADER_H) // self.ROW_H)
+        bottom = (v + h) // self.ROW_H + 1
+        return int(top), int(min(len(self._rows), bottom))
+
+    def _ensure_row(self, row: int) -> None:
+        if 0 <= row < len(self._rows) and row not in self._row_items:
+            self._draw_channel_row(row, self._rows[row][0])
+
+    def _fill_rows(self, preload: bool = False) -> None:
+        """Draw the rows in the viewport, and take down the ones far away once
+        too many are drawn - scrolling through a line-up of thousands keeps a
+        few hundred rows in the scene, never all. The rows just beyond the
+        viewport follow once scrolling pauses (*preload*), so dragging the
+        scrollbar through thousands of channels draws only what is on screen
+        at each step."""
+        if not self._rows:
+            return
+        top, bottom = self._visible_rows()
+        extra = self.PRELOAD_ROWS if preload else 1
+        lo = max(0, top - extra)
+        hi = min(len(self._rows), bottom + extra)
+        for row in range(lo, hi):
+            self._ensure_row(row)
+        if not preload:
+            self._preload.start()
+        if len(self._row_items) <= self.KEEP_ROWS:
+            return
+        keep = {self._focus[0]} if self._focus else set()
+        mid = (lo + hi) / 2
+        far = sorted((r for r in self._row_items
+                      if not lo <= r < hi and r not in keep),
+                     key=lambda r: -abs(r - mid))
+        for row in far[:len(self._row_items) - self.KEEP_ROWS * 3 // 4]:
+            self._drop_row(row)
+
+    def _drop_row(self, row: int) -> None:
+        for in_group, it in self._row_items.pop(row, ()):
+            if in_group:
+                self._chan_group.removeFromGroup(it)
+            self.scene.removeItem(it)
+        self._rows[row] = (self._rows[row][0], [])
 
     def _draw_grid_lines(self, grid_h: int) -> None:
         t = self._start
@@ -608,6 +678,10 @@ class EpgGridDialog(QDialog):
         tones = {k: self._tone(k) for k in
                  ("row_a", "row_b", "cell", "block", "block_now",
                   "block_past", "edge")}
+        # Every item of the row, (in the pinned column group?, item), so
+        # _drop_row can take the row down again.
+        items: list = []
+        self._row_items[row] = items
         playing = self._is_playing(ch)
         if playing:
             self._playing_row = row
@@ -624,6 +698,7 @@ class EpgGridDialog(QDialog):
         zebra.setZValue(2)
         zebra.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
         self.scene.addItem(zebra)
+        items.append((False, zebra))
         cell = QGraphicsRectItem(0, y, self.CH_COL_W, self.ROW_H)
         if playing:
             cell.setBrush(QBrush(QColor(P["accent"])))
@@ -636,7 +711,13 @@ class EpgGridDialog(QDialog):
         # carry - a channel without EPG rows had no clickable surface at all,
         # so it simply couldn't be played from the guide.
         cell.setData(0, {"channel": ch, "prog": None})
+        # Group first, then position (see the logo below): a row drawn after
+        # the board scrolled sideways joins a column group that is already
+        # shifted, and addToGroup keeps the item's scene position - which put
+        # a late row's name hundreds of px left of the visible column.
         self._chan_group.addToGroup(cell)
+        cell.setPos(0, 0)
+        items.append((True, cell))
         # Channel logo (async, like the main list): reserve a fixed slot so
         # names align whether the logo has arrived or not. The callback is
         # generation-guarded - a rebuild (filter typing) clears the scene and
@@ -646,8 +727,11 @@ class EpgGridDialog(QDialog):
         if logo_url and getattr(self.window, "logos", None) is not None:
             gen = self._build_gen
 
-            def _logo_cb(pm, y=y, gen=gen):
-                if gen != self._build_gen or pm is None or pm.isNull():
+            def _logo_cb(pm, y=y, gen=gen, row=row, items=items):
+                # The row may have been taken down (and drawn again, with a
+                # logo request of its own) since this one was asked for.
+                if (gen != self._build_gen or pm is None or pm.isNull()
+                        or self._row_items.get(row) is not items):
                     return
                 scaled = pm.scaled(
                     38, self.ROW_H - 18,
@@ -669,6 +753,7 @@ class EpgGridDialog(QDialog):
                 self._chan_group.addToGroup(it_pm)
                 it_pm.setPos(10 + (38 - scaled.width()) / 2,
                              y + (self.ROW_H - scaled.height()) / 2)
+                items.append((True, it_pm))
 
             self.window.logos.get(logo_url, _logo_cb)
         # ⏪ marks a channel with catch-up (timeshift), matching the main list.
@@ -682,13 +767,14 @@ class EpgGridDialog(QDialog):
         name.setFont(f)
         name.setBrush(QColor("#ffffff"))
         self._elide(name, self.CH_COL_W - text_x - 8)
-        name.setPos(text_x, y + (self.ROW_H - name.boundingRect().height()) / 2)
         # No data(0) on the text: hit-testing takes the topmost item carrying a
         # payload, so a click on the name would select via the *text* item and
         # the selection outline would be drawn tight around the letters instead
         # of around the cell. Without a payload the click falls through to the
         # cell underneath, which covers the whole row of the column.
         self._chan_group.addToGroup(name)
+        name.setPos(text_x, y + (self.ROW_H - name.boundingRect().height()) / 2)
+        items.append((True, name))
         if playing:
             # Tint the whole row across the timeline so the playing channel
             # is obvious even when the programme area is what you're looking
@@ -702,6 +788,7 @@ class EpgGridDialog(QDialog):
             band.setZValue(6)
             band.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
             self.scene.addItem(band)
+            items.append((False, band))
 
         row_blocks: list = []
         drew_any = False
@@ -752,6 +839,9 @@ class EpgGridDialog(QDialog):
             row_blocks.append({"item": block, "data": data, "label": label,
                                "x1": x1, "x2": x2, "y": y, "text": text,
                                "_state": state})
+            items.append((False, block))
+            if label is not None:
+                items.append((False, label))
         if not drew_any:
             # No EPG for this channel: fill the row so the whole timeline is
             # still clickable and plays the channel live - and says why it's
@@ -768,7 +858,9 @@ class EpgGridDialog(QDialog):
                                "x1": self.CH_COL_W,
                                "x2": self.CH_COL_W + self._grid_w,
                                "y": y, "text": text, "_state": "past"})
-        self._rows.append((ch, row_blocks))
+            items.append((False, block))
+            items.append((False, label))
+        self._rows[row] = (ch, row_blocks)
 
     @staticmethod
     def _prog_state(p: dict, now: float) -> str:
@@ -894,6 +986,7 @@ class EpgGridDialog(QDialog):
         # groups exist rather than touch a deleted wrapper.
         if getattr(self, "_header_group", None) is None:
             return
+        self._fill_rows()
         tl = self.view.mapToScene(0, 0)
         self._header_group.setY(tl.y())
         self._chan_group.setX(tl.x())
@@ -1053,6 +1146,7 @@ class EpgGridDialog(QDialog):
             return
         if self._focus is None:
             row = self._playing_row if self._playing_row is not None else 0
+            self._ensure_row(row)
             blocks = self._rows[row][1]
             if not blocks:
                 return
@@ -1060,12 +1154,14 @@ class EpgGridDialog(QDialog):
             return
         row, col = self._focus
         row = max(0, min(len(self._rows) - 1, row))
+        self._ensure_row(row)
         if dr:
             cur = self._rows[row][1][col]["data"]["prog"] \
                 if col < len(self._rows[row][1]) else None
             ref = ((cur["start_timestamp"] + cur["stop_timestamp"]) / 2
                    if cur else time.time())
             row = max(0, min(len(self._rows) - 1, row + dr))
+            self._ensure_row(row)
             blocks = self._rows[row][1]
             if not blocks:
                 return
@@ -1078,6 +1174,7 @@ class EpgGridDialog(QDialog):
         self._select_block(row, col)
 
     def _select_block(self, row: int, col: int) -> None:
+        self._ensure_row(row)
         b = self._rows[row][1][col]
         self._focus = (row, col)
         self._apply_selection(b["item"], b["data"])

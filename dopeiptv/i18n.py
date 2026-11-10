@@ -520,6 +520,8 @@ _STRINGS: dict[str, dict[str, str]] = {
     "mv_conflict_title": {"en": "Multiview is running"},
     "mv_conflict_body": {"en": "Multiview is still streaming and holds connections to your provider. Close multiview and play here? If your account has enough simultaneous connections you can keep both."},
     "mv_keep": {"en": "Keep multiview"},
+    "mv_toggle_title": {"en": "Close multiview?"},
+    "mv_toggle_body": {"en": "Multiview is playing. Closing it stops every channel in it."},
     "tab_multiview": {"en": "Multiview"},
     "mv_sec_window": {"en": "WINDOW"},
     "mv_sec_behavior": {"en": "BEHAVIOR"},

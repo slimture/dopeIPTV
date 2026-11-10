@@ -29,7 +29,7 @@ from PyQt6.QtCore import QPointF, QRectF, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap, QPolygonF
 from PyQt6.QtWidgets import (
     QApplication, QCheckBox, QDialogButtonBox, QGridLayout, QLabel, QMenu,
-    QPushButton, QVBoxLayout, QWidget)
+    QMessageBox, QPushButton, QVBoxLayout, QWidget)
 
 from ..core.log import log
 from ..i18n import tr
@@ -1302,19 +1302,38 @@ class _MultiviewMixin:
         return w
 
     def _show_multiview(self) -> None:
-        """Sidebar ▦ button. Opens multiview - and, pressed again while the
-        grid is open but IDLE (no streams), closes it, so the button works
-        as a toggle for an empty window instead of just re-raising it. A
-        grid with running streams is only brought to the front: a toggle
-        there would let one stray click drop every connection."""
+        """Sidebar ▦ button: opens multiview, and pressed again closes it.
+        It only raised a grid with streams running, and where the window
+        manager refuses to raise a window on request (GNOME on Wayland) the
+        grid stayed behind the app - the button seemed to do nothing. A grid
+        that is playing asks first, so one stray click cannot drop every
+        connection; a minimised one is brought back."""
         if not self._multiview_available():
             return
         w = self._multiview_win
-        if (w is not None and w.isVisible()
-                and not any(c.url for c in w.cells)):
-            self._close_multiview()
+        if w is None or not w.isVisible():
+            self._ensure_multiview_window()
             return
-        self._ensure_multiview_window()
+        if w.isMinimized():
+            w.showNormal()
+            self._ensure_multiview_window()
+            return
+        if any(c.url for c in w.cells) and not self._confirm_close_multiview():
+            self._ensure_multiview_window()
+            return
+        self._close_multiview()
+
+    def _confirm_close_multiview(self) -> bool:
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.NoIcon)
+        box.setWindowTitle(tr("mv_toggle_title"))
+        box.setText(tr("mv_toggle_body"))
+        close = box.addButton(tr("mv_close"),
+                              QMessageBox.ButtonRole.AcceptRole)
+        box.addButton(tr("mv_keep"), QMessageBox.ButtonRole.RejectRole)
+        box.setDefaultButton(close)
+        box.exec()
+        return box.clickedButton() is close
 
     def _docked_context_menu(self, global_pos) -> None:
         """Right-click on the docked video: a complete menu - pause/stop,

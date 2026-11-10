@@ -346,6 +346,8 @@
   "mv_conflict_title": "Multiview jest uruchomione",
   "mv_conflict_body": "Multiview nadal transmituje i utrzymuje połączenia z dostawcą. Zamknąć multiview i odtwarzać tutaj? Jeśli Twoje konto ma wystarczająco jednoczesnych połączeń, możesz zachować oba.",
   "mv_keep": "Zachowaj multiview",
+  "mv_toggle_title": "Zamknąć multiview?",
+  "mv_toggle_body": "Multiview odtwarza. Zamknięcie zatrzyma wszystkie kanały w nim.",
   "tab_multiview": "Multiview",
   "mv_sec_window": "OKNO",
   "mv_sec_behavior": "ZACHOWANIE",

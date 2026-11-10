@@ -346,6 +346,8 @@
   "mv_conflict_title": "Multiview läuft",
   "mv_conflict_body": "Multiview streamt noch und hält Verbindungen zu deinem Anbieter. Multiview schließen und hier abspielen? Hat dein Konto genug gleichzeitige Verbindungen, kannst du beides behalten.",
   "mv_keep": "Multiview behalten",
+  "mv_toggle_title": "Multiview schließen?",
+  "mv_toggle_body": "Multiview läuft. Wenn du es schließt, stoppen alle Sender darin.",
   "tab_multiview": "Multiview",
   "mv_sec_window": "FENSTER",
   "mv_sec_behavior": "VERHALTEN",
