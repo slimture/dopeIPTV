@@ -125,6 +125,9 @@ var iptvHit = (function () {
   var cfg = null, cfgLoading = null, stripeLoading = null, dlg = null, el = {}, chosen = 0, live = null, busy = false, cur = "";
   var stripe = null, pr = null, wallet = null, walletAmount = 0, prepping = false;
   var APPLE = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
+  // Asked once: whoever turned motion down gets the dialog without the show.
+  var CALM = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  var HEART = "M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z";
 
   function isDonate(a) {
     return !!a && /^https:\/\/(donate|buy)\.stripe\.com\//.test(a.href || "");
@@ -155,6 +158,177 @@ var iptvHit = (function () {
     });
     return svg;
   }
+  function heart(cls) {
+    var NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("class", cls);
+    svg.setAttribute("aria-hidden", "true");
+    var path = document.createElementNS(NS, "path");
+    path.setAttribute("d", HEART);
+    svg.append(path);
+    return svg;
+  }
+
+  // -- the heart's show --------------------------------------------------------
+  // A heart pressed thumps, a ring goes out from it and small hearts spray
+  // from it; the dialog grows out of it. On a thank-you, a bigger burst. The
+  // sparks are drawn in a popover - the top layer, over the open dialog and
+  // its dimmed backdrop - where the browser has one, else over the page.
+  var SPARKS = ["#ff375f", "#ff6b8b", "#ff2d55", "#ff9eb5", "#ff453a"];
+  function centre(node) {
+    var r = node.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }
+  function thump(node, big) {
+    if (CALM || !node || !node.animate) { return; }
+    var k = big ? [1, 1.45, 0.92, 1.18, 1] : [1, 1.7, 0.85, 1.25, 1];
+    node.animate(k.map(function (v) { return { transform: "scale(" + v + ")" }; }),
+      { duration: big ? 900 : 620, easing: "ease-out" });
+  }
+  // A layer for the show, over everything: a popover is in the top layer,
+  // above an open dialog and its backdrop. Without popovers, over the page
+  // (or null, for what only makes sense on top).
+  function showLayer(onTopOnly) {
+    var layer = mk("div", "dn-burst");
+    var top = typeof layer.showPopover === "function";
+    if (!top && onTopOnly) { return null; }
+    if (top) { layer.setAttribute("popover", "manual"); }
+    document.body.append(layer);
+    if (top) {
+      try { layer.showPopover(); } catch (e) { if (onTopOnly) { layer.remove(); return null; } }
+    }
+    layer.done = function (ms) {
+      setTimeout(function () {
+        try { if (top) { layer.hidePopover(); } } catch (e) { /* gone already */ }
+        layer.remove();
+      }, ms);
+    };
+    return layer;
+  }
+  function burst(at, big, into) {
+    if (CALM || !at || !document.body.animate) { return; }
+    var layer = into || showLayer(false);
+    var put = function (n) { n.style.left = at.x + "px"; n.style.top = at.y + "px"; layer.append(n); return n; };
+    [0, 1].forEach(function (i) {
+      put(mk("i", "dn-ring")).animate([
+        { transform: "translate(-50%, -50%) scale(.2)", opacity: 0.85 },
+        { transform: "translate(-50%, -50%) scale(" + (big ? 5 : 3) + ")", opacity: 0 }
+      ], { duration: big ? 1000 : 700, delay: i * (big ? 160 : 110), easing: "cubic-bezier(.2, .7, .2, 1)", fill: "both" });
+    });
+    var n = big ? 26 : 14, longest = 0;
+    for (var i = 0; i < n; i++) {
+      var h = put(heart("dn-spark"));
+      h.style.color = SPARKS[i % SPARKS.length];
+      var a = (i / n) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+      var d = (big ? 110 : 46) + Math.random() * (big ? 150 : 80);
+      var dx = Math.cos(a) * d, dy = Math.sin(a) * d - (big ? 40 : 18);
+      var size = (big ? 0.7 : 0.55) + Math.random() * (big ? 0.9 : 0.6);
+      var rot = (Math.random() - 0.5) * 70, ms = (big ? 900 : 650) + Math.random() * 400;
+      longest = Math.max(longest, ms);
+      h.animate([
+        { transform: "translate(-50%, -50%) scale(.1) rotate(0deg)", opacity: 1 },
+        { opacity: 1, offset: 0.65 },
+        { transform: "translate(calc(-50% + " + dx.toFixed(1) + "px), calc(-50% + " + dy.toFixed(1) + "px)) scale(" + size.toFixed(2) + ") rotate(" + rot.toFixed(0) + "deg)", opacity: 0 }
+      ], { duration: ms, easing: "cubic-bezier(.12, .8, .3, 1)", fill: "both" });
+    }
+    if (!into) { layer.done(longest + 250); }
+    return longest;
+  }
+
+  // Pressing Donate: a big heart flies out of the one pressed to the middle
+  // of the screen, beats twice - a ring going out at each beat - and opens
+  // into the dialog, with a few sparks. About a second, once a page view:
+  // the next time the dialog only grows out of the heart.
+  var heroShown = false;
+  function heroHeart(from) {
+    if (CALM || heroShown || !from || !dlg.animate) { return false; }
+    var layer = showLayer(true);
+    if (!layer) { return false; }
+    heroShown = true;
+    var NS = "http://www.w3.org/2000/svg", big = heart("dn-hero");
+    var defs = document.createElementNS(NS, "defs"), grad = document.createElementNS(NS, "linearGradient");
+    [["id", "dn-hg"], ["x1", "0"], ["y1", "0"], ["x2", "1"], ["y2", "1"]].forEach(function (a) { grad.setAttribute(a[0], a[1]); });
+    [["0", "#ff8aa5"], [".5", "#ff375f"], ["1", "#d70f45"]].forEach(function (st) {
+      var stop = document.createElementNS(NS, "stop");
+      stop.setAttribute("offset", st[0]); stop.setAttribute("stop-color", st[1]);
+      grad.append(stop);
+    });
+    defs.append(grad); big.prepend(defs);
+    big.querySelector("path").setAttribute("fill", "url(#dn-hg)");
+    var size = Math.round(Math.min(240, window.innerWidth * 0.5, window.innerHeight * 0.4));
+    var mid = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    big.style.width = big.style.height = size + "px";
+    big.style.left = mid.x + "px"; big.style.top = mid.y + "px";
+    layer.append(big);
+    var T0 = 1150, at = function (f) { return Math.round(T0 * f); };
+    var dx = (from.x - mid.x).toFixed(0), dy = (from.y - mid.y).toFixed(0);
+    var c = "translate(-50%, -50%) ";
+    big.animate([
+      { transform: "translate(calc(-50% + " + dx + "px), calc(-50% + " + dy + "px)) scale(.05)", opacity: 0.7,
+        easing: "cubic-bezier(.2, .9, .3, 1.25)" },
+      { transform: c + "scale(1)", opacity: 1, offset: 0.34, easing: "ease-out" },
+      { transform: c + "scale(1.15)", offset: 0.45, easing: "ease-in-out" },
+      { transform: c + "scale(.96)", offset: 0.55, easing: "ease-in-out" },
+      { transform: c + "scale(1.1)", offset: 0.65, easing: "ease-in-out" },
+      { transform: c + "scale(1)", opacity: 1, offset: 0.74, easing: "cubic-bezier(.5, 0, .8, .4)" },
+      { transform: c + "scale(1.9)", opacity: 0 }
+    ], { duration: T0, fill: "both" });
+    // a ring at each beat
+    [0.45, 0.65].forEach(function (f) {
+      var ring = mk("i", "dn-ring dn-ring--hero");
+      ring.style.left = mid.x + "px"; ring.style.top = mid.y + "px";
+      ring.style.width = ring.style.height = Math.round(size * 0.8) + "px";
+      layer.prepend(ring);          // behind the heart: only what passes its edge shows
+      ring.animate([
+        { transform: c + "scale(.9)", opacity: 0.85 },
+        { transform: c + "scale(2.3)", opacity: 0 }
+      ], { duration: 700, delay: at(f) - 40, easing: "cubic-bezier(.2, .7, .2, 1)", fill: "both" });
+    });
+    // it opens: sparks, and the dialog where the heart was
+    setTimeout(function () { burst(mid, false, layer); }, at(0.76));
+    var sheet = window.matchMedia && window.matchMedia("(max-width: 560px)").matches;
+    // Hidden until the heart opens, then in. The curve goes on that last
+    // step alone: on the whole animation it brought the dialog in half way,
+    // behind the heart still beating.
+    var hide = { opacity: 0, transform: sheet ? "translateY(100%)" : "scale(.82)" };
+    dlg.animate([
+      hide,
+      Object.assign({ offset: at(0.72) / (at(0.72) + 420), easing: "cubic-bezier(.18, .9, .22, 1.08)" }, hide),
+      { opacity: 1, transform: "none" }
+    ], { duration: at(0.72) + 420 });
+    try {
+      dlg.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 380, pseudoElement: "::backdrop" });
+    } catch (e) { /* the backdrop just appears */ }
+    layer.done(T0 + 1400);
+    return true;
+  }
+  // The dialog grows out of the heart (a phone's sheet rises from the bottom).
+  function grow(from) {
+    if (CALM || !dlg.animate) { return; }
+    var r = dlg.getBoundingClientRect();
+    var sheet = r.bottom >= window.innerHeight - 2 && r.width >= window.innerWidth - 2;
+    var start;
+    if (sheet) {
+      start = { transform: "translateY(100%)" };
+    } else if (from) {
+      start = { transform: "translate(" + (from.x - (r.left + r.width / 2)).toFixed(0) + "px, " +
+                (from.y - (r.top + r.height / 2)).toFixed(0) + "px) scale(.08)", opacity: 0 };
+    } else {
+      start = { transform: "scale(.92)", opacity: 0 };
+    }
+    dlg.animate([start, { transform: "none", opacity: 1 }],
+      { duration: sheet ? 420 : 560, easing: "cubic-bezier(.18, .9, .22, 1.08)" });
+    try {
+      dlg.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 320, pseudoElement: "::backdrop" });
+    } catch (e) { /* the backdrop just appears */ }
+  }
+  function celebrate() {
+    var big = el.done.querySelector(".dn-bigheart");
+    if (!big) { return; }
+    thump(big, true);
+    burst(centre(big), true);
+  }
+
   function code() { return cur || (cfg && cfg.currency) || "eur"; }
   // The amounts of the chosen currency: its buttons, smallest and largest.
   function C() {
@@ -335,6 +509,7 @@ var iptvHit = (function () {
     dlg.setAttribute("aria-labelledby", "dn-title");
     var head = mk("div", "dn-head"), ht = mk("div");
     var h = mk("h2", "", T.title); h.id = "dn-title";
+    h.prepend(heart("dn-titleheart"));
     ht.append(h, mk("p", "", T.sub));
     var x = mk("button", "dn-x", "×"); x.type = "button"; x.setAttribute("aria-label", T.close);
     x.addEventListener("click", close);
@@ -394,7 +569,8 @@ var iptvHit = (function () {
 
     el.loading = mk("p", "dn-loading", T.loading); el.loading.hidden = true;
     el.done = mk("div", "dn-step dn-done"); el.done.hidden = true;
-    el.done.append(mk("p", "dn-heart", "♥"), mk("h3", "", T.thanks), mk("p", "", T.receipt));
+    var bigHeart = mk("p", "dn-heart"); bigHeart.append(heart("dn-bigheart"));
+    el.done.append(bigHeart, mk("h3", "", T.thanks), mk("p", "", T.receipt));
 
     var body = mk("div", "dn-body");
     body.append(el.loading, el.amounts, el.pay, el.done);
@@ -431,7 +607,9 @@ var iptvHit = (function () {
     document.body.appendChild(dlg);
   }
   function show(step) {
+    var thanks = step === el.done && el.done.hidden;
     [el.loading, el.amounts, el.pay, el.done].forEach(function (s) { s.hidden = s !== step; });
+    if (thanks) { requestAnimationFrame(function () { requestAnimationFrame(celebrate); }); }
     el.curwrap.hidden = !el.manyCur || step === el.loading || step === el.done;
     if (el.payee) { el.payee.hidden = step === el.done; }
   }
@@ -519,12 +697,15 @@ var iptvHit = (function () {
     if (dlg && dlg.open) { dlg.close(); }
   }
 
-  function open(href) {
+  function open(href, from) {
     if (!dlg) { build(); }
     if (typeof iptvHit === "function") { iptvHit("donate"); }
     el.loading.textContent = T.loading;
     show(el.loading);
     dlg.showModal();
+    var hero = heroHeart(from);
+    if (!hero) { grow(from); }
+    open.hero = hero;
     // Stripe.js loads beside the config, not after it.
     if (window.ApplePaySession || window.PaymentRequest) { loadStripe().catch(function () { /* below */ }); }
     getConfig()
@@ -710,9 +891,21 @@ var iptvHit = (function () {
         e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) { return; }
     e.preventDefault();
     var menu = a.closest("details");
+    var mark = a.querySelector("svg") || a;
+    var from = centre(mark);
     if (menu) { menu.open = false; }
-    open(a.href);
+    thump(mark, false);
+    open(a.href, from);
+    if (!open.hero) { burst(from, false); }
   });
+
+  // The donate band on the page beats and drifts only while it is in view.
+  var band = document.querySelector(".donate");
+  if (band && "IntersectionObserver" in window) {
+    new IntersectionObserver(function (seen) {
+      seen.forEach(function (s) { band.classList.toggle("is-live", s.isIntersecting); });
+    }, { threshold: 0.2 }).observe(band);
+  }
 
   // Back from a payment method that left the page (Klarna and the like).
   if (/[?&]donated=1(&|$)/.test(window.location.search)) {

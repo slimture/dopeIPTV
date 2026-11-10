@@ -328,6 +328,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
       "  <section id=\"donate\" class=\"pt0\">\n"
       + "    <div class=\"wrap\">\n"
       + "      <div class=\"donate\">\n"
+      + "        <div class=\"donate-fx\" aria-hidden=\"true\"><svg class=\"donate-big\" viewBox=\"0 0 24 24\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg><i></i><i></i><i></i><i></i><i></i><i></i></div>\n"
       + "        <div class=\"donate-text\">\n"
       + "          <span class=\"eyebrow\">\(t("donate_eyebrow") | h)</span>\n"
       + "          <h2>\(t("donate_h2") | h)</h2>\n"
