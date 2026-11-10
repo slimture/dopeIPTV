@@ -1120,3 +1120,20 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
   .faq-grid { gap: 14px; }
   .btn.ghost.faq-help { margin-top: 4px; }
 }
+
+/* ---- phones: still, not sliding ------------------------------------------ */
+/* Nothing moves sideways by itself on a phone: the drifting format line is
+   left out, the explorer does not step on by itself (app.js), and its tabs
+   are a fixed grid of twelve icons - tap one, the screen changes - instead
+   of a row of pills that scrolled along. A swipe on the screen still works. */
+@media (max-width: 860px) {
+  .fxp-tabs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; overflow: visible;
+    margin: 0; padding: 0; }
+  .fxp-tab { justify-content: center; width: auto; height: 46px; padding: 0; border-radius: 14px; }
+  .fxp-tab .ic { width: 22px; height: 22px; }
+  .fxp-tab span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .fxp-tab .bar { display: none; }
+}
+@media (max-width: 720px) {
+  .strip { display: none; }
+}

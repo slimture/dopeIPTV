@@ -137,6 +137,9 @@
   if (!feats.length || !tabsBox || !cap) { return; }
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var DUR = 6000, cur = -1, timer = null, auto = !reduce, inView = false, held = false;
+  // It steps on by itself on a computer only: on a phone that was too much
+  // movement, and the visitor taps or swipes anyway.
+  var narrow = window.matchMedia ? window.matchMedia("(max-width: 860px)") : { matches: false };
   var tabs = feats.map(function (f, i) {
     var b = document.createElement("button");
     b.type = "button";
@@ -176,7 +179,7 @@
   function schedule() {
     clearTimeout(timer);
     tabs.forEach(function (t) { t.classList.remove("playing"); });
-    if (!auto || !inView || held || cur < 0) { return; }
+    if (!auto || !inView || held || cur < 0 || narrow.matches) { return; }
     var t = tabs[cur];
     void t.offsetWidth;                     // restart the bar's fill
     t.classList.add("playing");
@@ -311,7 +314,7 @@
   "use strict";
   if (!window.matchMedia || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { return; }
   var strip = document.querySelector(".strip .wrap");
-  if (strip && strip.children.length) {
+  if (strip && strip.children.length && !window.matchMedia("(max-width: 720px)").matches) {
     var track = document.createElement("div");
     track.className = "marq";
     var chips = [].slice.call(strip.children);
