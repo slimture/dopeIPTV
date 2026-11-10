@@ -855,7 +855,9 @@ var iptvHit = (function () {
       var elements = st.elements(opts);
       // The wallets have their own button above, as on solequiz.com.
       var pe = elements.create("payment", { layout: { type: "accordion", defaultCollapsed: false },
-        paymentMethodOrder: ["card", "revolut_pay", "amazon_pay", "klarna"],
+        // Link (Stripe's saved cards, any browser - Linux and Firefox too)
+        // shows once it is on in the dopeIPTV payment method configuration.
+        paymentMethodOrder: ["card", "link", "paypal", "revolut_pay", "amazon_pay", "klarna"],
         wallets: { applePay: "never", googlePay: "never" } });
       teardown();
       live = { elements: elements, complete: false, destroy: function () { pe.destroy(); } };
