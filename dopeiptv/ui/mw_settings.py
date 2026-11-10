@@ -13,7 +13,7 @@ from datetime import datetime
 import os
 
 from PyQt6.QtCore import QEvent, QLocale, QObject, Qt, QTimer
-from PyQt6.QtGui import QColor
+from PyQt6.QtGui import QColor, QIcon
 from PyQt6.QtWidgets import (
     QAbstractButton, QAbstractItemView, QAbstractSlider, QAbstractSpinBox,
     QApplication,
@@ -441,6 +441,9 @@ class _SettingsMixin:
         self._settings_btn.setToolTip(tr("btn_settings"))
         if hasattr(self, "_multiview_btn"):
             self._multiview_btn.setToolTip(tr("menu_multiview"))
+        if hasattr(self, "_donate_btn"):
+            self._donate_btn.setToolTip(tr("donate_support"))
+            self._donate_btn.setAccessibleName(tr("donate_support"))
         self._update_playlist_btn()
         self.search.setPlaceholderText(tr("search_placeholder"))
         self._size_label.setText(tr("label_size"))
@@ -2173,6 +2176,15 @@ class _SettingsMixin:
         links.addWidget(link(tr("about_all_releases"),
                              f"https://github.com/{GITHUB_REPO}/releases"))
         links.addStretch(1)
+        # Donating, last and in the heart's own colour (mw_donate).
+        from .theme import HEART
+        from .widgets import heart_pixmap
+        give = link(tr("donate_support"), "")
+        give.clicked.disconnect()
+        give.clicked.connect(lambda: self.open_donate("app-about"))
+        give.setIcon(QIcon(heart_pixmap(13, HEART)))
+        give.setStyleSheet(link_css.replace(P["muted"], HEART, 1))
+        links.addWidget(give)
         lay.addLayout(links)
 
         credit = QLabel(tr("about_tmdb_credit"))

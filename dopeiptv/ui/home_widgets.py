@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..i18n import tr
-from .theme import P, corner_radius, rounded
+from .theme import HEART, P, corner_radius, on_accent, rounded
 
 # Card geometry (image area; the card adds a text strip underneath).
 POSTER_W, POSTER_H = 160, 240      # shelf posters
@@ -793,3 +793,100 @@ class _Hero(QWidget):
             p.drawPixmap(art.toRect(), s)
             p.restore()
         p.end()
+
+
+class _BeatingHeart(QWidget):
+    """A heart that beats twice when it comes into view."""
+
+    def __init__(self, size: int = 34) -> None:
+        super().__init__()
+        self._size = size
+        self._scale = 1.0
+        self.setFixedSize(size + 8, size + 8)
+        from PyQt6.QtCore import QVariantAnimation
+        self._beat = QVariantAnimation(self)
+        self._beat.setDuration(1000)
+        self._beat.setStartValue(1.0)
+        for at, v in ((0.15, 1.22), (0.3, 0.95), (0.45, 1.14), (0.62, 1.0)):
+            self._beat.setKeyValueAt(at, v)
+        self._beat.setEndValue(1.0)
+        self._beat.valueChanged.connect(self._set)
+
+    def _set(self, v) -> None:
+        self._scale = float(v)
+        self.update()
+
+    def showEvent(self, event) -> None:
+        QTimer.singleShot(350, self._beat.start)
+        super().showEvent(event)
+
+    def paintEvent(self, _event) -> None:
+        from .widgets import heart_path
+        pr = QPainter(self)
+        pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        s = self._size * self._scale
+        pr.translate((self.width() - s) / 2, (self.height() - s) / 2)
+        grad = QLinearGradient(0, 0, s, s)
+        grad.setColorAt(0.0, QColor(HEART).lighter(135))
+        grad.setColorAt(0.5, QColor(HEART))
+        grad.setColorAt(1.0, QColor(HEART).darker(125))
+        pr.setPen(Qt.PenStyle.NoPen)
+        pr.setBrush(grad)
+        pr.drawPath(heart_path(s))
+        pr.end()
+
+
+class DonateCard(QFrame):
+    """Home's one note about donating: a heart, two lines and Donate / Not
+    now - a card among the shelves, never a window that pops up. Shown only
+    after real use (mw_donate decides when)."""
+
+    donate = pyqtSignal()
+    later = pyqtSignal()
+
+    def __init__(self, title: str, body: str, donate_text: str,
+                 later_text: str) -> None:
+        super().__init__()
+        self.setObjectName("DonateCard")
+        tint = QColor(HEART)
+        wash = f"rgba({tint.red()}, {tint.green()}, {tint.blue()}"
+        ink = on_accent(HEART)
+        self.setStyleSheet(rounded(
+            f"#DonateCard {{ border-radius: 14px; border: 1px solid {wash}, 0.28);"
+            f" background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
+            f" stop:0 {wash}, 0.16), stop:1 {P['pane']}); }}"
+            f"#DonateCard QLabel {{ background: transparent; }}"
+            f"#DonateTitle {{ color: {P['text']}; font-size: 15px; font-weight: 700; }}"
+            f"#DonateBody {{ color: {P['text2']}; font-size: 13px; }}"
+            f"#DonateGo {{ background: {HEART}; color: {ink}; border: none;"
+            f" border-radius: 16px; padding: 8px 18px; font-weight: 700; }}"
+            f"#DonateGo:hover {{ background: {tint.lighter(112).name()}; }}"
+            f"#DonateLater {{ background: transparent; color: {P['text2']};"
+            f" border: none; padding: 8px 10px; font-weight: 600; }}"
+            f"#DonateLater:hover {{ color: {P['text']}; }}"))
+        h = QHBoxLayout(self)
+        h.setContentsMargins(18, 14, 18, 14)
+        h.setSpacing(14)
+        h.addWidget(_BeatingHeart(), 0, Qt.AlignmentFlag.AlignVCenter)
+        text = QVBoxLayout()
+        text.setSpacing(3)
+        t = QLabel(title)
+        t.setObjectName("DonateTitle")
+        b = QLabel(body)
+        b.setObjectName("DonateBody")
+        b.setWordWrap(True)
+        text.addWidget(t)
+        text.addWidget(b)
+        h.addLayout(text, 1)
+        from .widgets import heart_pixmap
+        go = QPushButton(donate_text)
+        go.setObjectName("DonateGo")
+        go.setIcon(QIcon(heart_pixmap(14, ink)))
+        go.setCursor(Qt.CursorShape.PointingHandCursor)
+        go.clicked.connect(self.donate.emit)
+        no = QPushButton(later_text)
+        no.setObjectName("DonateLater")
+        no.setCursor(Qt.CursorShape.PointingHandCursor)
+        no.clicked.connect(self.later.emit)
+        h.addWidget(no, 0, Qt.AlignmentFlag.AlignVCenter)
+        h.addWidget(go, 0, Qt.AlignmentFlag.AlignVCenter)

@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 
 from PyQt6.QtCore import (
-    QPointF, QRect, QRectF, QSize, Qt, QTimer, pyqtSignal,
+    QPointF, QRect, QRectF, QSize, Qt, QTimer, QVariantAnimation, pyqtSignal,
 )
 from PyQt6.QtGui import (
     QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap,
@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .. import APP_NAME
-from .theme import P, on_accent
+from .theme import HEART, P, on_accent
 
 
 def exec_menu_over_video(menu, global_pos) -> None:
@@ -125,6 +125,80 @@ def confirm(parent, title: str, text: str, *, default_yes: bool = True) -> bool:
         QMessageBox.StandardButton.Yes if default_yes
         else QMessageBox.StandardButton.No)
     return box.exec() == QMessageBox.StandardButton.Yes
+
+
+def heart_path(size: float) -> QPainterPath:
+    """A heart filling a *size* square - the website's (public/heart.svg)."""
+    k = size / 24.0
+    p = QPainterPath()
+    p.moveTo(12 * k, 21 * k)
+    p.cubicTo(12 * k, 21 * k, 4.5 * k, 16.4 * k, 2.4 * k, 11.8 * k)
+    p.cubicTo(0.9 * k, 8.4 * k, 3 * k, 4.5 * k, 6.9 * k, 4.5 * k)
+    p.cubicTo(9 * k, 4.5 * k, 10.5 * k, 5.6 * k, 12 * k, 7.5 * k)
+    p.cubicTo(13.5 * k, 5.6 * k, 15 * k, 4.5 * k, 17.1 * k, 4.5 * k)
+    p.cubicTo(21 * k, 4.5 * k, 23.1 * k, 8.4 * k, 21.6 * k, 11.8 * k)
+    p.cubicTo(19.5 * k, 16.4 * k, 12 * k, 21 * k, 12 * k, 21 * k)
+    p.closeSubpath()
+    return p
+
+
+def heart_pixmap(size: int, colour: str, scale: int = 3) -> QPixmap:
+    pm = QPixmap(size * scale, size * scale)
+    pm.setDevicePixelRatio(float(scale))
+    pm.fill(Qt.GlobalColor.transparent)
+    pr = QPainter(pm)
+    pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    pr.setPen(Qt.PenStyle.NoPen)
+    pr.setBrush(QColor(colour))
+    pr.drawPath(heart_path(float(size)))
+    pr.end()
+    return pm
+
+
+class HeartButton(QPushButton):
+    """The sidebar's donate button: a heart in the row's muted tone that
+    turns heart-red and beats twice under the pointer - there, never in the
+    way. ``set_rest`` re-tints it for a new theme."""
+
+    SIZE = 18
+
+    def __init__(self, parent=None, objectName: str = "") -> None:
+        super().__init__("", parent)
+        if objectName:
+            self.setObjectName(objectName)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._rest = P.get("text2", "#AAAAAA")
+        self._beat = QVariantAnimation(self)
+        self._beat.setDuration(900)
+        for at, v in ((0.0, 1.0), (0.15, 1.32), (0.3, 0.94), (0.45, 1.2),
+                      (0.62, 1.0), (1.0, 1.0)):
+            self._beat.setKeyValueAt(at, v)
+        self._beat.valueChanged.connect(self._grow)
+        self._paint(self._rest)
+
+    def _paint(self, colour: str) -> None:
+        self.setIcon(QIcon(heart_pixmap(self.SIZE, colour)))
+        self.setIconSize(QSize(self.SIZE, self.SIZE))
+
+    def _grow(self, v) -> None:
+        n = max(1, round(self.SIZE * float(v)))
+        self.setIconSize(QSize(n, n))
+
+    def set_rest(self, colour: str) -> None:
+        self._rest = colour
+        if not self.underMouse():
+            self._paint(colour)
+
+    def enterEvent(self, event) -> None:
+        self._paint(HEART)
+        self._beat.stop()
+        self._beat.start()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:
+        self._beat.stop()
+        self._paint(self._rest)
+        super().leaveEvent(event)
 
 
 class _HoverTextButton(QPushButton):

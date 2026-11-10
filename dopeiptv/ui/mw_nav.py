@@ -164,6 +164,8 @@ class _NavMixin:
             btn.setIconSize(QSize(18, 18))
         # The playlist stack icon follows the theme too (same square icon in
         # both sidebar states; _update_playlist_btn repaints it).
+        if hasattr(self, "_donate_btn"):
+            self._donate_btn.set_rest(P["text2"])
         if hasattr(self, "_playlist_btn"):
             self._update_playlist_btn()
         # Middle-column controls: focus (hide list), list toggle, grid view

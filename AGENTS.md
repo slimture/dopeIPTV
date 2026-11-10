@@ -85,6 +85,7 @@ map and the one-way import rule.
 | `ui/mw_home.py` | The Home page: which shelves, what goes in them (drawn by `home_widgets.py`) |
 | `ui/mw_local.py` | Local files: folders, library view, music queue |
 | `ui/mw_multiview.py` | Multiview: 2/4/6/9 live streams, an mpv per cell |
+| `ui/mw_donate.py` | Donating from the app: the sidebar heart, About's link, Home's one card after real use |
 | `ui/epg_grid.py` | The guide's timeline grid |
 | `ui/epg_search.py` | Programme search across the whole guide |
 | `ui/welcome.py` | First-run welcome overlay |
@@ -106,7 +107,8 @@ in the `mw_*` mixins beside it, each mixed into `MainWindow`:
 `mw_mpris` (desktop media controls, media keys), `mw_follow` (followed
 series, new-episode news), `mw_subtitles` (OpenSubtitles, subtitles
 remembered per title), `mw_cast` (Chromecast and DLNA: the cast
-dialog, the strip, handing over from the archive) and `mw_popout`
+dialog, the strip, handing over from the archive), `mw_donate` (the
+sidebar heart, About's link, Home's card) and `mw_popout`
 (detached-window player). What stays in `main_window.py` is
 the `__init__`/`_build_ui` composition and the playback path (start/stop,
 seek, fullscreen, reconnect) - keep playback code there.

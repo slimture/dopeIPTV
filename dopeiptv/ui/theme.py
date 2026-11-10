@@ -378,6 +378,9 @@ def effective_theme(settings, system_dark: bool | None = None) -> str:
 
 P: dict[str, str] = {}
 ACCENT: str = ACCENTS["blue"][1]
+#: The donate heart's colour - the website's, the same in every theme, like
+#: a brand mark: not the accent (a user's own choice) or the recording red.
+HEART = "#FF375F"
 
 
 def _lighter(hex_color: str) -> str:

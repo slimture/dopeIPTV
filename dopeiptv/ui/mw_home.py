@@ -203,6 +203,12 @@ class HomePage(QWidget):
         self._v.addLayout(self._body)
         body = self._body
 
+        # One note about donating, once the app has been used for real
+        # (mw_donate decides when); a card among the shelves, not a popup.
+        note = w._donate_card() if hasattr(w, "_donate_card") else None
+        if note is not None:
+            body.addWidget(note)
+
         if on("home_sh_resume"):
             rows = []
             try:

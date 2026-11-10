@@ -52,13 +52,15 @@ from ..providers.trakt import TraktClient
 from ..core.wakelock import WakeLock
 from .dialogs import PlaylistDialog
 from .widgets import (
-    FlowRow, _HoverTextButton, _SidebarLogo, _Toast, cast_strip_icon, confirm,
+    FlowRow, HeartButton, _HoverTextButton, _SidebarLogo, _Toast,
+    cast_strip_icon, confirm,
 )
 from .mw_settings import _SettingsMixin
 from .mw_trakt import _TraktMixin
 from .mw_recording import _RecordingMixin
 from .mw_busy import _BusyMixin
 from .mw_cast import _CastMixin
+from .mw_donate import _DonateMixin
 from .mw_context import _ContextMenuMixin
 from .mw_favorites import _FavoritesMixin
 from .mw_follow import _FollowMixin
@@ -102,7 +104,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
                  _NavMixin, _ShortcutsMixin, _OnboardingMixin, _SortMixin,
                  _LocalFilesMixin,
                  _PopoutMixin, _MultiviewMixin, _HomeMixin, _MprisMixin,
-                 _FollowMixin, _SubtitlesMixin, _CastMixin, QMainWindow):
+                 _FollowMixin, _SubtitlesMixin, _CastMixin, _DonateMixin,
+                 QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
     epg_progress = pyqtSignal(int)
@@ -208,6 +211,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self.rec.jobs_changed.connect(self._recordings_changed)
         self.rec.recording_stopped.connect(self._on_recording_stopped)
         self.wake = WakeLock()
+        self._init_donate()
         self._full_catalog: list | None = None
         self._poster_refresh_timer = QTimer(self)
         self._poster_refresh_timer.setSingleShot(True)
@@ -783,12 +787,21 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         multiview_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
                                     QSizePolicy.Policy.Fixed)
         multiview_btn.clicked.connect(self._show_multiview)
+        # A heart last in the row: donating, there for whoever looks, never
+        # in the way (mw_donate). It beats under the pointer.
+        self._donate_btn = donate_btn = HeartButton(objectName="SideAction")
+        donate_btn.setToolTip(tr("donate_support"))
+        donate_btn.setAccessibleName(tr("donate_support"))
+        donate_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
+                                 QSizePolicy.Policy.Fixed)
+        donate_btn.clicked.connect(lambda: self.open_donate("app-heart"))
         self._actions_box = QBoxLayout(QBoxLayout.Direction.LeftToRight)
         self._actions_box.setContentsMargins(0, 0, 0, 0)
         self._actions_box.setSpacing(6)
         self._actions_box.addWidget(guide_btn)
         self._actions_box.addWidget(settings_btn)
         self._actions_box.addWidget(multiview_btn)
+        self._actions_box.addWidget(donate_btn)
         sl.addLayout(self._actions_box)
         self._apply_action_icons()
 
