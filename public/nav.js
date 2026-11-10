@@ -135,6 +135,25 @@ var iptvHit = (function () {
     if (text) { n.textContent = text; }
     return n;
   }
+  // Small line icons, drawn in the text's colour.
+  var ICONS = {
+    card: ["M3.5 6.5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z",
+           "M3.5 9.5h17", "M7 15h4"],
+    company: ["M4.5 20.5v-15a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v15", "M14.5 9.5h4a1 1 0 0 1 1 1v10",
+              "M3 20.5h18", "M8 8h3", "M8 11.5h3", "M8 15h3"]
+  };
+  function icon(name) {
+    var NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
+    [["viewBox", "0 0 24 24"], ["class", "dn-ico"], ["aria-hidden", "true"], ["fill", "none"],
+     ["stroke", "currentColor"], ["stroke-width", "1.8"], ["stroke-linecap", "round"],
+     ["stroke-linejoin", "round"]].forEach(function (a) { svg.setAttribute(a[0], a[1]); });
+    ICONS[name].forEach(function (d) {
+      var path = document.createElementNS(NS, "path");
+      path.setAttribute("d", d);
+      svg.append(path);
+    });
+    return svg;
+  }
   function code() { return cur || (cfg && cfg.currency) || "eur"; }
   // The amounts of the chosen currency: its buttons, smallest and largest.
   function C() {
@@ -336,7 +355,10 @@ var iptvHit = (function () {
     el.go.addEventListener("click", function () {
       if (wallet) { payWallet(); } else { toPay(); }
     });
-    el.card = mk("button", "dn-card", T.card); el.card.type = "button"; el.card.hidden = true;
+    // A button of its own with a card on it: as a small link under a wallet
+    // button it was easy to miss.
+    el.card = mk("button", "btn dn-card"); el.card.type = "button"; el.card.hidden = true;
+    el.card.append(icon("card"), document.createTextNode(T.card));
     el.card.addEventListener("click", toPay);
     el.amounts.append(el.chips, other, el.err1, el.go, el.card);
 
@@ -369,7 +391,8 @@ var iptvHit = (function () {
     body.append(el.loading, el.amounts, el.pay, el.done);
     // Who is paid: the company behind dopeIPTV, the name on the statement.
     if (T.payee && T.payeenote) {
-      el.payee = mk("p", "dn-payee", T.payeenote.replace("{payee}", T.payee));
+      el.payee = mk("p", "dn-payee");
+      el.payee.append(icon("company"), mk("span", "", T.payeenote.replace("{payee}", T.payee)));
       body.append(el.payee);
     }
     dlg.append(head, body);

@@ -741,7 +741,9 @@ dialog.dn::backdrop { background: rgba(5, 7, 10, .62); backdrop-filter: blur(3px
 .dn-head p { margin: 4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
 /* Who is paid: one quiet line at the foot, and the company in the footer's
    small print - there for whoever wonders, never in the way. */
-.dn-payee { margin: 14px 0 0; color: var(--faint); font-size: 12px; line-height: 1.4; text-align: center; }
+.dn-payee { margin: 14px 0 0; color: var(--faint); font-size: 12px; line-height: 1.4; text-align: center;
+  display: flex; align-items: center; justify-content: center; gap: 6px; }
+.dn-payee .dn-ico { width: 15px; height: 15px; }
 footer .v a { color: inherit; }
 footer .v a:hover { color: var(--accent); }
 .dn-x { flex: none; width: 34px; height: 34px; margin: -4px -6px 0 0; border-radius: 50%;
@@ -785,10 +787,15 @@ footer .v a:hover { color: var(--accent); }
 /* Shown at once where Safari says there is Apple Pay, live a moment later
    when Stripe is ready: the button itself, only a little quieter. */
 .dn .btn.dn-wallet--wait:disabled { opacity: .82; cursor: progress; }
-.dn-card { align-self: center; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
-  border: 0; background: none; color: var(--muted); padding: 4px 8px; text-decoration: underline;
-  text-underline-offset: 3px; }
-.dn-card:hover { color: var(--text); }
+/* Paying by card, under a wallet button: a button too, outlined, with a
+   card on it - a small underlined link there was easy to miss. */
+.dn .btn.dn-card { justify-content: center; width: 100%; padding: 12px 18px; font-size: 15px;
+  font-weight: 600; background: transparent; color: var(--text); border-color: var(--line-2); }
+@media (hover: hover) {
+  .dn .btn.dn-card:hover { background: var(--surface-2);
+    border-color: color-mix(in srgb, var(--text) 30%, var(--line-2)); }
+}
+.dn-ico { width: 20px; height: 20px; flex: none; }
 .dn-paytop { display: flex; align-items: stretch; gap: 6px; }
 .dn-chips--sm { flex: 1; min-width: 0; gap: 6px; }
 .dn-chips--sm .dn-chip { min-width: 0; padding: 9px 2px; font-size: 14px; border-radius: 10px; }
