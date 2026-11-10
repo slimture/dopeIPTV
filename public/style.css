@@ -67,6 +67,8 @@ img { max-width: 100%; display: block; }
 header.bar { position: sticky; top: 0; z-index: 20; backdrop-filter: saturate(180%) blur(20px);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   background: color-mix(in srgb, var(--bg) 78%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.cr header.bar { -webkit-backdrop-filter: none; backdrop-filter: none;
+  background: color-mix(in srgb, var(--bg) 96%, transparent); }   /* nav.js: Chromium */
 .bar .wrap { display: flex; align-items: center; justify-content: space-between; height: 56px; }
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand .logo { width: 26px; height: 26px; flex: none; }
@@ -778,7 +780,10 @@ dialog.dn::backdrop { background: rgba(5, 7, 10, .66); }
 .dn-payee a:has(img):hover { opacity: .85; }
 footer .v a { color: inherit; }
 footer .v .sole { white-space: nowrap; }
-footer .v .sole img { display: inline-block; width: 14px; height: 14px; border-radius: 3.5px; vertical-align: -2.5px; margin-inline-end: 5px; }
+/* Solecraft's logotype (its S is the company's mark), in the text's colour */
+footer .v .sole-logo { display: inline-block; height: 12px; aspect-ratio: 666 / 111; vertical-align: -1.5px;
+  overflow: hidden; white-space: nowrap; text-indent: 110%; background: currentColor;
+  -webkit-mask: url(/solecraft-logo.svg) center / contain no-repeat; mask: url(/solecraft-logo.svg) center / contain no-repeat; }
 footer .v a:hover { color: var(--accent); }
 .dn-x { flex: none; width: 34px; height: 34px; margin: -4px -6px 0 0; border-radius: 50%;
   border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 24px;
