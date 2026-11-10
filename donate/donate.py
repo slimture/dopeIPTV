@@ -36,12 +36,12 @@ file named by DONATE_CONFIG (default /usr/local/etc/iptv-donate.conf):
     DONATE_MIN / DONATE_MAX smallest / largest amount, minor units (200 / 100000)
     DONATE_PRESETS          the amount buttons, minor units (300,500,1000,2500)
     DONATE_NAME             what the receipt says it was for ("Support dopeIPTV")
-    DONATE_METHODS          what the card form offers, a comma list of Stripe's
-                            payment method types ("card,revolut_pay,amazon_pay"
-                            by default), or "auto" for everything turned on in
-                            the Dashboard - which the account shares with other
-                            sites (Bancontact, EPS, ...), so it is not the
-                            default. Each must be turned on in the Dashboard.
+    DONATE_PMC              a payment method configuration (pmc_...) for the card
+                            form: the set of methods made for dopeIPTV in the
+                            Dashboard (Settings -> Payment methods). Empty: the
+                            account's default set, which it shares with other
+                            sites. Stripe no longer lets a PaymentIntent list
+                            its methods itself (payment_method_types).
     DONATE_RETURN_URL       where Stripe sends the payer back after a payment
                             method that leaves the page (Klarna and the like)
     DONATE_ORIGIN           the site's origin; other origins are refused
@@ -53,7 +53,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import socket
 import socketserver
 import sys
@@ -102,8 +101,7 @@ MAX = _int("DONATE_MAX", 100000)
 PRESETS = [int(x) for x in CONF.get("DONATE_PRESETS", "300,500,1000,2500").split(",")
            if x.strip().isdigit()]
 NAME = CONF.get("DONATE_NAME", "Support dopeIPTV")
-METHODS = [m.strip() for m in CONF.get("DONATE_METHODS", "card,revolut_pay,amazon_pay").split(",")
-           if m.strip()] or ["card"]
+PMC = [CONF.get("DONATE_PMC", "").strip()]        # emptied if Stripe refuses it
 RETURN_URL = CONF.get("DONATE_RETURN_URL", "https://iptv.dope.rs/?donated=1#donate")
 ORIGIN = CONF.get("DONATE_ORIGIN", "https://iptv.dope.rs").rstrip("/")
 PUBLISHABLE = CONF.get("STRIPE_PUBLISHABLE_KEY", "")
@@ -195,64 +193,38 @@ def wallet_pay(amount: int, method: str, email: str, name: str) -> tuple[int, di
     return 402 if err.get("type") == "card_error" else 502, {"error": msg or "stripe"}
 
 
-def _intent_form(amount: int, methods: list) -> dict:
-    form = {
-        "amount": str(amount),
-        "currency": CURRENCY,
-        "description": NAME,
-        "metadata[source]": "iptv.dope.rs donate dialog",
-    }
-    if methods == ["auto"]:
-        form["automatic_payment_methods[enabled]"] = "true"
-    else:
-        for n, m in enumerate(methods):
-            form[f"payment_method_types[{n}]"] = m
-    return form
-
-
 def create_session(amount: int) -> tuple[int, dict]:
     """The PaymentIntent the card form pays: Stripe's Payment Element shows
-    the methods asked for here and confirms it in the browser.
-
-    Card, Revolut Pay and Amazon Pay by default: the Dashboard's list
-    (Bancontact, EPS, ...) is the whole account's, and Apple Pay / Google Pay
-    have their own button anyway. A method Stripe will not take for this
-    account or currency is dropped and the call made again, and remembered,
-    so a card payment never fails because of one of the others."""
+    the methods of the payment method configuration (DONATE_PMC, else the
+    account's default) and confirms it in the browser. A configuration
+    Stripe refuses is left out from then on rather than failing every
+    payment."""
     key = _secret()
     if not key or not PUBLISHABLE:
         return 503, {"error": "not configured"}
     while True:
-        status, body = _post(STRIPE_PI, _intent_form(amount, METHODS), key)
+        form = {
+            "amount": str(amount),
+            "currency": CURRENCY,
+            "automatic_payment_methods[enabled]": "true",
+            "description": NAME,
+            "metadata[source]": "iptv.dope.rs donate dialog",
+        }
+        if PMC[0]:
+            form["payment_method_configuration"] = PMC[0]
+        status, body = _post(STRIPE_PI, form, key)
         if status == 200 and body.get("client_secret"):
             return 200, {"clientSecret": body["client_secret"], "publishableKey": PUBLISHABLE}
         err = (body.get("error") or {}) if isinstance(body, dict) else {}
         msg = str(err.get("message", ""))
-        print(f"[donate] payment intent {status} ({','.join(METHODS)}): {msg[:300]}",
-              file=sys.stderr, flush=True)
-        bad = _refused_method(status, err)
-        if bad is None:
-            return 502, {"error": "stripe"}
-        METHODS.remove(bad)
-        if not METHODS:
-            METHODS.append("card")
-        print(f"[donate] leaving out {bad} from now on", file=sys.stderr, flush=True)
-
-
-def _refused_method(status: int, err: dict):
-    """The payment method type Stripe refused, if that is what it refused."""
-    if status != 400 or METHODS in (["card"], ["auto"]):
-        return None
-    param, msg = str(err.get("param") or ""), str(err.get("message") or "")
-    m = re.match(r"payment_method_types\[(\d+)\]", param)
-    if m and int(m.group(1)) < len(METHODS) and METHODS[int(m.group(1))] != "card":
-        return METHODS[int(m.group(1))]
-    for t in METHODS:
-        if t != "card" and t in msg:
-            return t
-    if "payment_method_types" in param or "payment method type" in msg.lower():
-        return next((t for t in reversed(METHODS) if t != "card"), None)
-    return None
+        print(f"[donate] payment intent {status}: {msg[:300]}", file=sys.stderr, flush=True)
+        if PMC[0] and status == 400 and ("payment_method_configuration" in str(err.get("param") or "")
+                                        or "payment_method_configuration" in msg):
+            print(f"[donate] leaving out payment method configuration {PMC[0]}",
+                  file=sys.stderr, flush=True)
+            PMC[0] = ""
+            continue
+        return 502, {"error": "stripe"}
 
 
 class Handler(BaseHTTPRequestHandler):

@@ -320,7 +320,7 @@
       var elements = st.elements({ clientSecret: s.clientSecret, appearance: appearance() });
       // The wallets have their own button above, as on solequiz.com.
       var pe = elements.create("payment", { layout: { type: "accordion", defaultCollapsed: false },
-        paymentMethodOrder: ["card", "revolut_pay", "amazon_pay"],
+        paymentMethodOrder: ["card", "revolut_pay", "amazon_pay", "klarna"],
         wallets: { applePay: "never", googlePay: "never" } });
       teardown();
       live = { elements: elements, destroy: function () { pe.destroy(); } };

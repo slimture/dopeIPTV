@@ -271,8 +271,14 @@ with live keys once a test payment has gone through):
    Stripe reads `/.well-known/apple-developer-merchantid-domain-association`
    from the site (deployed with `public/`) and Apple Pay turns "Verified".
    Google Pay needs nothing more.
-4. Settings → Payments → Payment methods decides what the card form offers
-   besides cards (Klarna, ...). Settings → Customer emails → **Successful
+4. What the card form offers is a *payment method configuration*: Stripe no
+   longer lets a PaymentIntent list its own methods. The account's default
+   one is shared with every site on the account, so make one for dopeIPTV:
+   Settings → Payments → Payment methods, the configuration menu at the
+   top → create one (e.g. "dopeIPTV"), turn on Cards, Apple Pay, Google
+   Pay and whatever else you want, and put its id in the service's
+   config as `DONATE_PMC=pmc_...` (`service iptv_donate restart`). Without
+   it the form shows the default set. Settings → Customer emails → **Successful
    payments** on, so every donor gets a receipt.
 
 **The service (jail):**
