@@ -124,7 +124,7 @@
     "donate_pay": "捐助 {amount}",
     "donate_busy": "请稍候…",
     "donate_lock": "卡片信息直接发送给 Stripe——dopeIPTV 永远看不到卡号。",
-    "donate_payee_note": "款项支付给开发 dopeIPTV 的公司 {payee}。",
+    "donate_payee_note": "{payee} 旗下的项目",
     "donate_back": "更改金额",
     "donate_thanks": "感谢你支持 dopeIPTV！",
     "donate_receipt": "收据正在发送到你的邮箱。",

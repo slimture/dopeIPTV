@@ -124,7 +124,7 @@
     "donate_pay": "Ủng hộ {amount}",
     "donate_busy": "Chờ một chút…",
     "donate_lock": "Thẻ được gửi thẳng tới Stripe — dopeIPTV không bao giờ thấy số thẻ.",
-    "donate_payee_note": "Thanh toán cho {payee}, công ty phát triển dopeIPTV.",
+    "donate_payee_note": "Một dự án của {payee}",
     "donate_back": "Đổi số tiền",
     "donate_thanks": "Cảm ơn bạn đã ủng hộ dopeIPTV!",
     "donate_receipt": "Biên nhận đang được gửi tới hộp thư của bạn.",

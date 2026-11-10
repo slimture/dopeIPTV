@@ -124,7 +124,7 @@
     "donate_pay": "Doar {amount}",
     "donate_busy": "Um momento…",
     "donate_lock": "O cartão vai diretamente para a Stripe — o dopeIPTV nunca vê o número do cartão.",
-    "donate_payee_note": "Pago a {payee}, a empresa que desenvolve o dopeIPTV.",
+    "donate_payee_note": "Um projeto de {payee}",
     "donate_back": "Alterar valor",
     "donate_thanks": "Obrigado por apoiar o dopeIPTV!",
     "donate_receipt": "Um recibo está chegando no seu e-mail.",

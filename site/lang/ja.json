@@ -124,7 +124,7 @@
     "donate_pay": "{amount} を寄付",
     "donate_busy": "少々お待ちください…",
     "donate_lock": "カード情報は Stripe に直接送られ、dopeIPTV がカード番号を見ることはありません。",
-    "donate_payee_note": "支払先は dopeIPTV の開発元である {payee} です。",
+    "donate_payee_note": "{payee} のプロジェクト",
     "donate_back": "金額を変更",
     "donate_thanks": "dopeIPTV を支援していただきありがとうございます！",
     "donate_receipt": "領収書をメールでお送りします。",

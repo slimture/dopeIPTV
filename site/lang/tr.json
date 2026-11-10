@@ -124,7 +124,7 @@
     "donate_pay": "{amount} bağışla",
     "donate_busy": "Bir saniye…",
     "donate_lock": "Kart doğrudan Stripe'a gider — dopeIPTV kart numarasını asla görmez.",
-    "donate_payee_note": "Ödemeyi dopeIPTV'yi geliştiren şirket alır: {payee}.",
+    "donate_payee_note": "Bir {payee} projesi",
     "donate_back": "Tutarı değiştir",
     "donate_thanks": "dopeIPTV'yi desteklediğiniz için teşekkürler!",
     "donate_receipt": "Makbuzunuz e-postanıza gönderiliyor.",

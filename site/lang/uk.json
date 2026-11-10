@@ -124,7 +124,7 @@
     "donate_pay": "Пожертвувати {amount}",
     "donate_busy": "Хвилинку…",
     "donate_lock": "Картка передається прямо в Stripe — dopeIPTV ніколи не бачить номер картки.",
-    "donate_payee_note": "Платіж отримує {payee} — компанія, яка створює dopeIPTV.",
+    "donate_payee_note": "Проєкт компанії {payee}",
     "donate_back": "Змінити суму",
     "donate_thanks": "Дякую за підтримку dopeIPTV!",
     "donate_receipt": "Квитанцію вже надіслано вам на пошту.",

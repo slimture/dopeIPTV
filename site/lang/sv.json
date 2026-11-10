@@ -124,7 +124,7 @@
     "donate_pay": "Donera {amount}",
     "donate_busy": "Ett ögonblick…",
     "donate_lock": "Kortet går direkt till Stripe — dopeIPTV ser aldrig kortnumret.",
-    "donate_payee_note": "Betalas till {payee}, företaget bakom dopeIPTV.",
+    "donate_payee_note": "Ett projekt av {payee}",
     "donate_back": "Ändra belopp",
     "donate_thanks": "Tack för att du stöder dopeIPTV!",
     "donate_receipt": "Ett kvitto är på väg till din inkorg.",
