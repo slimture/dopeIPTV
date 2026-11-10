@@ -27,15 +27,15 @@
   <section class="help-top">
     <div class="wrap">
       <h1>dopeIPTV {{h:help_h1}}</h1>
-      <p class="help-lede">{{h:help_intro}}</p>
 
       <div class="help-searchbar">
         <span class="help-mag" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle
           cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg></span>
-        <input type="search" id="helpSearch" autocomplete="off" autofocus
+        <input type="search" id="helpSearch" autocomplete="off"
                placeholder="{{h:help_search_ph}}"
                aria-label="{{h:help_search_ph}}">
+        <kbd class="help-key" aria-hidden="true">/</kbd>
         <button type="button" id="helpClear" hidden
                 aria-label="{{h:help_clear}}">✕</button>
       </div>
@@ -44,7 +44,7 @@
     </div>
   </section>
 
-  <section class="pt0">
+  <section class="help-main">
     <div class="wrap">
       <div class="help-layout">
         <nav class="help-toc" aria-label="{{h:help_toc}}">
@@ -63,7 +63,7 @@
 <footer>
   <div class="wrap">
     <div class="maker">
-      <a class="sole" href="https://solecraft.se/" rel="noopener" aria-label="Solecraft AB"><span class="sole-logo">Solecraft</span></a>
+      <a class="sole" href="https://solecraft.se/" rel="noopener" aria-label="{{h:footer_built_by}}" data-tip="{{h:footer_built_by}}"><span class="sole-logo">Solecraft</span></a>
       <span class="v">dopeIPTV{{b:help_version}} · © {{v:year}}</span>
     </div>
     <nav>

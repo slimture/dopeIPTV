@@ -443,10 +443,10 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
              + ([.value[] as $tp
                  | t("help_\($sec)_\($tp)_q") as $q
                  | select($q != "help_\($sec)_\($tp)_q")
-                 | "            <article class=\"help-item\" id=\"\("\($sec)-\($tp)" | h)\">\n"
-                   + "              <h3><a href=\"#\("\($sec)-\($tp)" | h)\">\($q | h)</a></h3>\n"
+                 | "            <details class=\"help-item\" id=\"\("\($sec)-\($tp)" | h)\">\n"
+                   + "              <summary><h3>\($q | h)</h3></summary>\n"
                    + "              <div class=\"help-a\">\(t("help_\($sec)_\($tp)_a"))</div>\n"
-                   + "            </article>\n"] | add // "")
+                   + "            </details>\n"] | add // "")
              + "          </section>\n"] | add),
          help_version: (if ($version | truthy) then " " + ($version | h) else "" end)});
 

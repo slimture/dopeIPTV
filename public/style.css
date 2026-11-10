@@ -136,6 +136,8 @@ h1 .h1-brand { position: absolute; width: 1px; height: 1px; overflow: hidden;
 .cta-row { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 32px; align-items: center; justify-content: center; }
 .platnote { font-size: 13px; color: var(--faint); margin-top: 18px; }
 .platnote b { color: var(--muted); font-weight: 600; }
+.platnote .oses { white-space: nowrap; }
+.platnote b.is-mine { color: var(--text); }
 .mock { width: min(860px, 100%); text-align: start; background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--radius); box-shadow: 0 40px 80px -40px rgba(0,0,0,.45); overflow: hidden; }
 .mock .titlebar { display: flex; align-items: center; gap: 7px; padding: 11px 14px;
@@ -623,12 +625,14 @@ footer nav a:hover { color: var(--accent); }
 }
 
 /* ---- Help page --------------------------------------------------------- */
-/* Documentation, not an FAQ list: every answer is VISIBLE. That is what makes
-   the search worth having - what you typed appears with its text, not as a
-   row you then have to open. */
+/* Questions folded, as the FAQ on the front page: with every answer open the
+   page was seventeen thousand pixels of text. The search opens what it finds
+   (help.js), so a match still reads without a second click. */
 .help-top { padding: 46px 0 26px; border-bottom: 1px solid var(--line); }
-.help-top h1 { font-size: 34px; margin: 0 0 10px; }
-.help-lede { color: var(--muted); font-size: 16px; margin: 0 0 26px; max-width: 62ch; }
+.help-top h1 { font-size: 34px; margin: 0 0 22px; }
+/* The site gives every section its padding; under the search bar that was a
+   dead band above the questions. */
+section.help-main { padding-top: 0; }
 
 /* The search box is the point of the page, so it is sized like it. */
 .help-searchbar {
@@ -663,11 +667,20 @@ footer nav a:hover { color: var(--accent); }
   color: var(--faint); font-size: 17px; padding: 0 18px; line-height: 1;
 }
 .help-searchbar button:hover { color: var(--accent); }
+/* "/" jumps to the box (help.js) - shown where there is a keyboard to press
+   it on, and gone once the box is in use. */
+.help-key {
+  flex: none; margin-inline-end: 16px; padding: 1px 8px; border-radius: 6px;
+  border: 1px solid var(--line-2); color: var(--faint);
+  font: 500 13px/1.4 var(--mono);
+}
+.help-searchbar:focus-within .help-key, body.searching .help-key { display: none; }
+@media (hover: none), (pointer: coarse) { .help-key { display: none; } }
 .help-count { margin: 12px 4px 0; color: var(--accent); font-size: 14px; font-weight: 600; }
 
 .help-layout {
   display: grid; grid-template-columns: 230px 1fr; gap: 48px;
-  align-items: start; padding-top: 40px;
+  align-items: start; padding-top: 34px;
 }
 /* A grid item's automatic minimum size is its CONTENT's minimum, so the long
    command lines in the <pre> blocks made the column as wide as the longest
@@ -697,22 +710,29 @@ body.searching .help-layout { grid-template-columns: 1fr; }
 /* These are <section> elements inside a <section>, and the site gives every
    section 72px of padding - which showed up as a dead band above and below
    each heading. They set their own spacing with margins instead. */
-.help-sec { padding: 0; margin: 0 0 52px; scroll-margin-top: 80px; }
+.help-sec { padding: 0; margin: 0 0 44px; scroll-margin-top: 80px; }
 .help-sec h2 {
   font-size: 26px; letter-spacing: -.025em;
-  color: var(--text); margin: 0 0 20px;
+  color: var(--text); margin: 0 0 4px;
   padding-bottom: 12px; border-bottom: 1px solid var(--line);
 }
-.help-item {
-  padding: 0 0 22px; margin: 0 0 22px;
-  border-bottom: 1px solid var(--line);
-  scroll-margin-top: 80px;
+.help-item { border-bottom: 1px solid var(--line); scroll-margin-top: 80px; }
+.help-sec .help-item:last-child { border-bottom: 0; }
+.help-item > summary {
+  list-style: none; cursor: pointer; color: var(--text);
+  padding: 15px 0; display: flex; align-items: center; justify-content: space-between; gap: 18px;
 }
-.help-sec .help-item:last-child { border-bottom: 0; margin-bottom: 0; }
-.help-item h3 { font-size: 17px; margin: 0 0 9px; line-height: 1.35; }
-.help-item h3 a { color: var(--text); text-decoration: none; }
-.help-item h3 a:hover { color: var(--accent); }
-.help-a { color: var(--muted); line-height: 1.7; max-width: 74ch; }
+.help-item > summary::-webkit-details-marker { display: none; }
+.help-item > summary h3 { margin: 0; font-size: 17px; font-weight: 500; line-height: 1.35; color: inherit; }
+.help-item > summary::after {
+  content: "+"; flex: none; width: 28px; height: 28px; display: grid; place-items: center;
+  color: var(--muted); font-size: 22px; font-weight: 300; line-height: 1;
+  transition: transform .2s ease;
+}
+.help-item[open] > summary::after { transform: rotate(45deg); }
+.help-item > summary:hover, .help-item > summary:hover::after { color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .help-item > summary::after { transition: none; } }
+.help-a { color: var(--muted); line-height: 1.7; max-width: 74ch; padding: 0 0 22px; }
 .help-a p { margin: 0 0 11px; }
 .help-a p:last-child { margin-bottom: 0; }
 .help-a b { color: var(--text); font-weight: 600; }
@@ -814,8 +834,20 @@ footer .v a { color: inherit; }
    sign, the copyright line under it; drawn in a text colour, so it follows
    both themes. */
 footer .maker { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
-footer .sole { display: block; color: var(--muted); line-height: 0; }
+footer .sole { display: block; color: var(--muted); line-height: 0; position: relative; }
 footer .sole:hover { color: var(--text); }
+/* Who made it, on hover: a label of the site's own rather than the browser's
+   title tooltip, which comes late and looks different everywhere. */
+footer .sole[data-tip]::after {
+  content: attr(data-tip); position: absolute; inset-inline-start: 0; bottom: calc(100% + 9px);
+  white-space: nowrap; font: 500 13px/1.3 var(--sans); letter-spacing: 0;
+  color: var(--text); background: var(--surface-2); border: 1px solid var(--line);
+  padding: 6px 10px; border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.18);
+  opacity: 0; transform: translateY(3px); pointer-events: none;
+  transition: opacity .15s ease, transform .15s ease;
+}
+footer .sole[data-tip]:hover::after, footer .sole[data-tip]:focus-visible::after { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { footer .sole[data-tip]::after { transition: opacity .15s ease; transform: none; } }
 footer .sole-logo { display: block; height: 17px; aspect-ratio: 666 / 111; overflow: hidden; white-space: nowrap;
   text-indent: 110%; background: currentColor;
   -webkit-mask: url(/solecraft-logo.svg) center / contain no-repeat; mask: url(/solecraft-logo.svg) center / contain no-repeat; }

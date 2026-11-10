@@ -14,8 +14,10 @@
   else if (/Windows/i.test(ua)) { os = "Windows"; }
   else if (/Linux|X11|CrOS/i.test(ua)) { os = "Linux"; }
   if (!os) { return; }   // unknown system: the server-rendered text stands
-  var osEl = document.getElementById("osLabel");
-  if (osEl) { osEl.textContent = os; }
+  // All three systems stay named - a Mac visitor should see at a glance that
+  // it is theirs too, not only that a Linux app exists - with theirs marked.
+  var mine = document.querySelector('#osLabel [data-os="' + os.toLowerCase() + '"]');
+  if (mine) { mine.classList.add("is-mine"); }
   // The label comes translated from the page ("Download for %s"); this
   // file used to carry its own English and overwrite every language with it.
   var btn = document.getElementById("heroDownload");
