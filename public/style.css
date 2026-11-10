@@ -161,53 +161,19 @@ h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -.03em; line-height:
 #features .sec-head, #shots .sec-head { margin-inline: auto; text-align: center; }
 .dl-head { align-items: center !important; text-align: center; }
 .dl-head .sec-head { margin-inline: auto; }
-.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
-@media (max-width: 860px) { .grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
-.card { position: relative; background: var(--surface); border-radius: var(--radius); padding: 28px; }
-/* A feature tile: a line icon, the title and a round "+" in the corner, the
-   way Apple's tiles read. The text opens in a dialog (app.js); without
-   script the <details> opens in place. */
-details.card { padding: 30px 28px 72px; min-height: 196px; transition: background .2s ease; }
-details.card summary { list-style: none; cursor: pointer; }
-details.card summary::-webkit-details-marker { display: none; }
-details.card summary::marker { content: ""; }
-details.card summary:focus-visible { outline: none; }
-details.card:has(summary:focus-visible) { outline: 2px solid var(--accent); outline-offset: 3px; }
-details.card:hover { background: var(--surface-2); transform: scale(1.015); }
-details.card { transition: background .25s ease, transform .35s cubic-bezier(.2, .7, .2, 1); }
-.ic { display: block; width: 36px; height: 36px; margin-bottom: 20px; color: var(--accent);
+/* Features, the way Apple lists them: a line icon, a title and a line or
+   two of text - three columns on a computer, a list on a phone (app.js
+   folds all but six there behind "Show all features"). No boxes. */
+.feats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 48px 44px; max-width: 1000px; margin: 8px auto 0; }
+@media (max-width: 860px) { .feats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px 32px; } }
+.feat .ic { display: block; width: 34px; height: 34px; margin-bottom: 16px; color: var(--accent);
   fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .ic .fill { fill: currentColor; stroke: none; }
-.card h3 { margin: 0; font-family: var(--display); font-size: 1.3rem; font-weight: 600; letter-spacing: -.022em; line-height: 1.2;
-  text-wrap: balance; }
-.card p { margin: 14px 0 0; color: var(--muted); font-size: 15.5px; line-height: 1.5; }
-.card .more { position: absolute; inset-inline-end: 20px; bottom: 20px; width: 34px; height: 34px; border-radius: 50%;
-  background: color-mix(in srgb, var(--text) 12%, transparent); transition: background .2s ease, transform .2s ease; }
-.card .more::before, .card .more::after { content: ""; position: absolute; left: 50%; top: 50%; width: 14px; height: 2px;
-  margin: -1px 0 0 -7px; border-radius: 2px; background: var(--text); }
-.card .more::after { transform: rotate(90deg); }
-details.card:hover .more { background: var(--accent); }
-details.card:hover .more::before, details.card:hover .more::after { background: #fff; }
-details.card[open] .more { transform: rotate(45deg); }
-
-/* The dialog a tile opens. */
-dialog.fx { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 44px 40px 40px;
-  border: 0; border-radius: 30px; background: var(--surface); color: var(--text); overflow: auto;
-  box-shadow: 0 40px 100px -30px rgba(0, 0, 0, .55); }
-dialog.fx::backdrop { background: rgba(0, 0, 0, .5); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
-dialog.fx .ic { width: 48px; height: 48px; margin-bottom: 22px; }
-dialog.fx h3 { margin: 0; font-family: var(--display); font-size: clamp(1.6rem, 4vw, 2.1rem); font-weight: 700;
-  letter-spacing: -.03em; line-height: 1.1; padding-inline-end: 36px; }
-dialog.fx p { margin: 16px 0 0; color: var(--muted); font-size: 18px; line-height: 1.55; }
-.fx-x { position: absolute; top: 18px; inset-inline-end: 18px; width: 36px; height: 36px; border-radius: 50%; border: 0;
-  cursor: pointer; background: color-mix(in srgb, var(--text) 12%, transparent); color: var(--text); font: inherit;
-  font-size: 22px; line-height: 1; }
-.fx-x:hover { background: color-mix(in srgb, var(--text) 20%, transparent); }
-@media (prefers-reduced-motion: no-preference) {
-  dialog.fx[open] { animation: fx-in .22s ease-out; }
-  @keyframes fx-in { from { opacity: 0; transform: translateY(12px) scale(.98); } }
-}
+.feat h3 { margin: 0; font-family: var(--display); font-size: 1.1rem; font-weight: 600; letter-spacing: -.02em; line-height: 1.3; }
+.feat p { margin: 6px 0 0; color: var(--muted); font-size: 15.5px; line-height: 1.5; }
+.feat-all { display: none; margin: 30px auto 0; padding: 10px 22px; border-radius: 999px; cursor: pointer; font: inherit;
+  font-size: 15px; font-weight: 500; color: var(--accent); background: none; border: 1px solid var(--accent); }
+.feat-all:hover { background: var(--accent); color: var(--accent-ink); }
 .shots { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
 @media (max-width: 720px) { .shots { grid-template-columns: 1fr; } }
 .shot { border-radius: var(--radius); overflow: hidden; background: var(--surface); }
@@ -311,10 +277,23 @@ dialog.fx p { margin: 16px 0 0; color: var(--muted); font-size: 18px; line-heigh
 .autonote a.verify-link { color: var(--accent); font-weight: 600; }
 .autonote a.verify-link:hover { text-decoration: underline; }
 
-/* Open-source credits: a section of its own, centred like the others - the
-   projects as a row of names with what each one does in small grey under
-   it, the way Apple lists specs. No boxes. */
-#credits .sec-head { margin-inline: auto; text-align: center; }
+/* Open-source credits: one quiet paragraph and a link. The projects open
+   under it (a <details>) as a row of names with what each one does in small
+   grey under it - folded away, never left out. */
+#credits { padding: 56px 0 64px; text-align: center; }
+#credits .sec-head { margin: 0 auto; max-width: 62ch; }
+#credits .eyebrow { display: none; }
+#credits h2 { font-size: clamp(1.25rem, 2.4vw, 1.55rem); letter-spacing: -.025em; }
+#credits .sec-head p { margin-top: 10px; font-size: 15px; line-height: 1.6; }
+.cred-more { margin-top: 10px; }
+.cred-more > summary { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; list-style: none;
+  color: var(--accent); font-size: 15px; }
+.cred-more > summary::-webkit-details-marker { display: none; }
+.cred-more > summary::marker { content: ""; }
+.cred-more > summary::after { content: "\203A"; font-size: 1.25em; line-height: 1; transition: transform .2s ease; }
+.cred-more[open] > summary::after { transform: rotate(90deg); }
+.cred-more > summary:hover { text-decoration: underline; text-underline-offset: 3px; }
+.cred-more .credits-grid { margin-top: 30px; }
 .credits-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 34px 28px;
   max-width: 900px; margin: 8px auto 0; text-align: center; }
 .credit { display: flex; flex-direction: column-reverse; gap: 6px; }
@@ -323,7 +302,7 @@ dialog.fx p { margin: 16px 0 0; color: var(--muted); font-size: 18px; line-heigh
   line-height: 1.3; color: var(--muted); }
 .credit a { color: var(--text); }
 .credit a:hover { color: var(--accent); }
-.disclaimer { margin: 48px auto 0; font-size: 12px; line-height: 1.6; color: var(--faint); max-width: 80ch; text-align: center; }
+.disclaimer { margin: 34px auto 0; font-size: 12px; line-height: 1.6; color: var(--faint); max-width: 80ch; text-align: center; }
 footer { background: var(--surface); padding: 28px 0 44px; margin-top: 24px; }
 footer .wrap { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
 footer .v { font-size: 12.5px; color: var(--faint); }
@@ -827,15 +806,17 @@ dialog.dn::backdrop { background: rgba(5, 7, 10, .62); backdrop-filter: blur(3px
   .strip .wrap::-webkit-scrollbar { display: none; }
   .chip { flex: none; }
 
-  /* features and screenshots: a row of cards to swipe through, the next one
-     peeking in at the edge so it is clear there is more */
-  .grid, .shots { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory;
+  /* features: a list, the icon beside the text */
+  .feats { grid-template-columns: minmax(0, 1fr); gap: 26px; }
+  .feat { display: flex; gap: 16px; align-items: flex-start; }
+  .feat .ic { flex: none; width: 28px; height: 28px; margin: 1px 0 0; }
+  .feats.folded .feat:nth-child(n+7) { display: none; }
+  .feats.folded + .feat-all { display: block; }
+  /* screenshots: a row to swipe through, the next one peeking in at the
+     edge so it is clear there is more */
+  .shots { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory;
     margin: 0 -18px; padding: 2px 18px 12px; scroll-padding-inline: 18px; scrollbar-width: none; }
-  .grid::-webkit-scrollbar, .shots::-webkit-scrollbar { display: none; }
-  .grid > .card { flex: 0 0 62%; scroll-snap-align: start; padding: 24px 22px 64px; min-height: 168px; }
-  dialog.fx { width: 100%; max-width: 100%; margin: auto 0 0; border-radius: 26px 26px 0 0;
-    padding: 36px 24px max(32px, env(safe-area-inset-bottom)); }
-  dialog.fx p { font-size: 17px; }
+  .shots::-webkit-scrollbar { display: none; }
   .shots > .shot { flex: 0 0 88%; scroll-snap-align: start; }
 
   .dl-phone { display: block; }
@@ -849,7 +830,7 @@ dialog.dn::backdrop { background: rgba(5, 7, 10, .62); backdrop-filter: blur(3px
   .donate-btn { min-width: 220px; }
   .credits-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px 16px; }
   .credit p { font-size: 17px; }
-  .disclaimer { margin-top: 36px; }
+  .disclaimer { margin-top: 28px; }
 }
 .is-phone #download:not(.dl-open) .dlx,
 .is-phone #download:not(.dl-open) .autonote { display: none; }
@@ -881,5 +862,4 @@ dialog.dn::backdrop { background: rgba(5, 7, 10, .62); backdrop-filter: blur(3px
   .rv { opacity: 1; transform: none; }
   .hero .mock { transform: none; }
   .mock.alive .tl-fill, .mock.alive .tl-head { animation: none; }
-  details.card:hover { transform: none; }
 }

@@ -121,45 +121,18 @@
 /* The header's disclosures (language picker, narrow-window menu) close
    themselves from nav.js, which every page loads - this one does not. */
 
-/* Feature tiles: a click opens the tile's text in a dialog, as Apple's
-   tiles do. Without script (or <dialog>) each tile opens in place. */
+/* Features: on a phone the first six, the rest a click away. */
 (function () {
   "use strict";
-  var grid = document.querySelector(".grid");
-  var tiles = grid ? grid.querySelectorAll("details.card") : [];
-  if (!tiles.length || typeof HTMLDialogElement !== "function") { return; }
-  var dlg = document.createElement("dialog");
-  dlg.className = "fx";
-  dlg.setAttribute("aria-labelledby", "fx-title");
-  var x = document.createElement("button");
-  x.type = "button";
-  x.className = "fx-x";
-  x.textContent = "\u00d7";
-  x.setAttribute("aria-label", grid.getAttribute("data-close") || "Close");
-  var body = document.createElement("div");
-  dlg.appendChild(x);
-  dlg.appendChild(body);
-  document.body.appendChild(dlg);
-  var from = null;
-  x.addEventListener("click", function () { dlg.close(); });
-  dlg.addEventListener("click", function (e) { if (e.target === dlg) { dlg.close(); } });
-  dlg.addEventListener("close", function () { if (from) { from.focus(); } });
-  [].forEach.call(tiles, function (tile) {
-    var sum = tile.querySelector("summary");
-    sum.addEventListener("click", function (e) {
-      e.preventDefault();
-      var ic = tile.querySelector(".ic"), h = tile.querySelector("h3"), p = tile.querySelector("p");
-      body.replaceChildren();
-      if (ic) { body.appendChild(ic.cloneNode(true)); }
-      var t = document.createElement("h3");
-      t.id = "fx-title";
-      t.textContent = h ? h.textContent : "";
-      body.appendChild(t);
-      if (p) { body.appendChild(p.cloneNode(true)); }
-      from = sum;
-      dlg.showModal();
-    });
-  });
+  var list = document.querySelector(".feats[data-more]");
+  if (!list || list.children.length <= 7) { return; }
+  list.classList.add("folded");
+  var b = document.createElement("button");
+  b.type = "button";
+  b.className = "feat-all";
+  b.textContent = list.getAttribute("data-more");
+  b.addEventListener("click", function () { list.classList.remove("folded"); b.remove(); });
+  list.parentNode.insertBefore(b, list.nextSibling);
 })();
 
 /* Motion, Apple-style: rise into view, the hero window straightening as the
@@ -169,7 +142,7 @@
   if (!window.matchMedia || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { return; }
 
   if ("IntersectionObserver" in window) {
-    var sel = ".sec-head, .grid > .card, .shot, .dlx-card, .dl-phone, .donate, .notes-wrap, .faq-item, .credit";
+    var sel = ".sec-head, .feat, .shot, .dlx-card, .dl-phone, .donate, .notes-wrap, .faq-item";
     var fold = window.innerHeight * 0.92;
     var io = new IntersectionObserver(function (entries) {
       entries.forEach(function (en) {
