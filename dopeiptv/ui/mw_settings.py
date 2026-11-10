@@ -637,6 +637,10 @@ class _SettingsMixin:
                                        tr("setting_desktop_entry_hint"))
             mpris_box = c.toggle(tr("setting_mpris"), is_on("mpris", "true"),
                                  tr("setting_mpris_hint"))
+        # The sidebar's heart, last and quiet: off hides it for three months.
+        c = general.card(tr("donate_support"))
+        heart_box = c.toggle(tr("set_donate_heart"), self._donate_heart_due(),
+                             tr("set_donate_heart_hint"))
 
         # -- Appearance -------------------------------------------------------
         look = page("appearance", tr("set_page_appearance"),
@@ -1937,6 +1941,13 @@ class _SettingsMixin:
             put("nextup_lead_secs", nextup_box.currentData())
             put("auto_reconnect_live", flag(autorecon_box))
             put("check_updates", flag(updates_box))
+            if heart_box.isChecked() != self._donate_heart_due():
+                if heart_box.isChecked():
+                    put("donate_heart_until", 0)
+                else:
+                    self.hide_donate_heart()
+                    changed.add("donate_heart_until")
+                self._donate_heart_refresh()
             if channel_box.currentData() != self._update_channel():
                 put("update_channel", channel_box.currentData())
                 # Look again now, on the channel just chosen.

@@ -3,8 +3,10 @@
 Three places: a heart in the sidebar's row of buttons, "Support dopeIPTV"
 in About, and one card on Home once the app has been used for real (about
 ten hours of watching). The card's "Not now" puts it away for three
-months; "Donate" for a year. Nothing ever pops up, and nothing shows on a
-first run or over a playing video. Every way opens the donate dialog on
+months; "Donate" for a year. The heart hides for three months too - its
+right-click menu, or a switch in Settings, General - and comes back by
+itself. Nothing ever pops up, and nothing shows on a first run or over a
+playing video. Every way opens the donate dialog on
 the website, with a ?ref= saying which (the site's statistics read it).
 """
 
@@ -35,9 +37,36 @@ class _DonateMixin:
         self._donate_tick.timeout.connect(self._donate_count)
         self._donate_tick.start()
 
+    # -- the sidebar's heart ---------------------------------------------------
+    def _donate_heart_due(self) -> bool:
+        try:
+            until = float(self.settings.value("donate_heart_until", 0) or 0)
+        except (TypeError, ValueError):
+            until = 0.0
+        return time.time() >= until
+
+    def _donate_heart_refresh(self) -> None:
+        btn = getattr(self, "_donate_btn", None)
+        if btn is not None:
+            btn.setVisible(self._donate_heart_due())
+
+    def hide_donate_heart(self) -> None:
+        self.settings.setValue("donate_heart_until", time.time() + SNOOZE_SECS)
+        self._donate_heart_refresh()
+
+    def _donate_heart_menu(self, pos) -> None:
+        from PyQt6.QtWidgets import QMenu
+        btn = self._donate_btn
+        menu = QMenu(btn)
+        menu.addAction(tr("donate_support"), lambda: self.open_donate("app-heart"))
+        menu.addAction(tr("donate_hide"), self.hide_donate_heart)
+        menu.exec(btn.mapToGlobal(pos))
+
     def _donate_count(self) -> None:
         """A minute of watching, by the same sign that keeps the screen
         awake while something plays (the docked player or multiview)."""
+        if not getattr(self, "_donate_btn", None) or not self._donate_btn.isVisible():
+            self._donate_heart_refresh()        # its three months may be up
         wake = getattr(self, "wake", None)
         if wake is None or not wake.held:
             return

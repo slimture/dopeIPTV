@@ -85,3 +85,20 @@ def test_the_heart_button_says_where_it_comes_from(tmp_path, monkeypatch):
     monkeypatch.setattr(mw_donate, "open_url", opened.append)
     _Win(tmp_path).open_donate("app-heart")
     assert opened == ["https://iptv.dope.rs/?ref=app-heart#donate"]
+
+
+def test_the_heart_hides_for_three_months_and_comes_back(tmp_path):
+    from PyQt6.QtWidgets import QPushButton
+    w = _Win(tmp_path)
+    w._donate_btn = QPushButton()
+    w._donate_btn.show()
+    assert w._donate_heart_due()
+    before = time.time()
+    w.hide_donate_heart()
+    until = float(w.settings.value("donate_heart_until"))
+    assert before + SNOOZE_SECS - 5 <= until <= time.time() + SNOOZE_SECS
+    assert not w._donate_heart_due() and not w._donate_btn.isVisible()
+    # three months on, the minute's tick puts it back by itself
+    w.settings.setValue("donate_heart_until", time.time() - 1)
+    w._donate_count()
+    assert w._donate_heart_due() and w._donate_btn.isVisible()

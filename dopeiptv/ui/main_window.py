@@ -795,6 +795,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         donate_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
                                  QSizePolicy.Policy.Fixed)
         donate_btn.clicked.connect(lambda: self.open_donate("app-heart"))
+        # Right-click: hide it for three months (mw_donate).
+        donate_btn.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        donate_btn.customContextMenuRequested.connect(self._donate_heart_menu)
         self._actions_box = QBoxLayout(QBoxLayout.Direction.LeftToRight)
         self._actions_box.setContentsMargins(0, 0, 0, 0)
         self._actions_box.setSpacing(6)
@@ -802,6 +805,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._actions_box.addWidget(settings_btn)
         self._actions_box.addWidget(multiview_btn)
         self._actions_box.addWidget(donate_btn)
+        self._donate_heart_refresh()         # hidden for three months, maybe
         sl.addLayout(self._actions_box)
         self._apply_action_icons()
 
