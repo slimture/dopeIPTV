@@ -31,13 +31,6 @@
 
   function phonePage() {
     document.documentElement.classList.add("is-phone");
-    // The hero's button says just "Download" and goes down to the download
-    // section, which says the app is for computers and offers to send the
-    // link. It used to send the link itself: the first thing on the page was
-    // a task, before the visitor knew what the app was.
-    var hero = document.getElementById("heroDownload");
-    var plain = hero && hero.getAttribute("data-phone-label");
-    if (plain) { hero.textContent = plain; }
     var share = document.getElementById("dlShare");
     var show = document.getElementById("dlShow");
     var sec = document.getElementById("download");

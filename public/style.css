@@ -994,6 +994,12 @@ dialog.dn { overflow-x: hidden; }
 .is-phone #download:not(.dl-open) .dls,
 .is-phone #download:not(.dl-open) .autonote { display: none; }
 .is-phone .dl-phone { display: block; }
+/* No button at the top of a phone: the app cannot be installed there, and
+   "Download" promised what the phone could not do. The line under the
+   heading says where it runs; "Send the link" waits in the download
+   section, and Download is in the menu. An app-store button comes back
+   here once there is a phone app. */
+.is-phone .hero .cta-row { display: none; }
 /* The downloads go further down on a phone, after the FAQ: nothing there
    installs on it, and the hero's button already sends the link on. What
    to do here - read, see, support - comes first. */
@@ -1395,7 +1401,7 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
   /* A link to a section (the hero's Download) lands below the sticky bar,
      not under it: sections are shorter on top here than on a computer. */
   html { scroll-padding-top: 64px; }
-  /* One thing to press at the top of a phone: "View source" is for
+  /* A narrow window keeps one button at the top: "View source" is for
      developers, and GitHub is in the menu and the footer anyway. */
   .hero .cta-row .btn.ghost { display: none; }
   .hero .cta-row .btn.primary { min-width: 62%; justify-content: center; }
