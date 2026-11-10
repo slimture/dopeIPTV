@@ -117,8 +117,11 @@ h1 { font-size: clamp(2.1rem, 5vw, 3.6rem); line-height: 1.07; letter-spacing: -
 h1 .hl { color: inherit; }
 /* The product name, as the first words of the page's one heading: the
    wordmark style of the header, a line above the headline. */
-h1 .h1-brand { display: block; font-size: .42em; font-weight: 600;
-  letter-spacing: -.015em; color: var(--accent); margin-bottom: .45em; }
+/* The name stays in the heading - what a search engine and a screen reader
+   read - but is not shown: in blue above the heading it was one more small
+   heading over a heading, and the logo in the bar already says it. */
+h1 .h1-brand { position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
 .lede { color: var(--muted); font-size: clamp(1.06rem, 2.2vw, 1.3rem); margin: 22px auto 0; max-width: 40em; line-height: 1.5; }
 .cta-row { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 32px; align-items: center; justify-content: center; }
 .platnote { font-size: 13px; color: var(--faint); margin-top: 18px; }
@@ -171,7 +174,6 @@ h1 .h1-brand { display: block; font-size: .42em; font-weight: 600;
 .chip { font-size: 14px; color: var(--faint); display: inline-flex; gap: 26px; align-items: center; }
 section { padding: 96px 0; }
 .sec-head { max-width: 60ch; margin-bottom: 40px; }
-.sec-head .eyebrow { margin-bottom: 14px; }
 h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -.03em; line-height: 1.08; margin: 0; text-wrap: balance; font-weight: 700; }
 .sec-head p { color: var(--muted); margin: 14px 0 0; font-size: 1.1rem; }
 /* Section openings centred, as a page of few words reads best. The FAQ keeps
@@ -300,7 +302,6 @@ h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -.03em; line-height:
 .donate-act { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
 .donate-btn { padding: 13px 26px; font-size: 15px; }
 .donate-heart { width: 17px; height: 17px; fill: currentColor; }
-.donate .eyebrow { color: var(--muted); }
 .donate-btn .donate-heart { color: #fff; }
 .donate-act small { color: var(--faint); font-size: 12px; max-width: 30ch; line-height: 1.5; }
 @media (max-width: 760px) {
@@ -321,7 +322,6 @@ h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -.03em; line-height:
    grey under it - folded away, never left out. */
 #credits { padding: 56px 0 64px; text-align: center; }
 #credits .sec-head { margin: 0 auto; max-width: 62ch; }
-#credits .eyebrow { display: none; }
 #credits h2 { font-size: clamp(1.25rem, 2.4vw, 1.55rem); letter-spacing: -.025em; }
 #credits .sec-head p { margin-top: 10px; font-size: 15px; line-height: 1.6; }
 .cred-more { margin-top: 10px; }
@@ -945,7 +945,7 @@ dialog.dn { overflow-x: hidden; }
   .hero { padding: 44px 0 24px; }
   /* A phone gets the picture, not the paragraph: the app window, cut down
      to its living screen and timeline, where the long lede was. */
-  .hero .lede, h1 .h1-brand { display: none; }
+  .hero .lede { display: none; }
   .hero .mock { width: 100%; border-radius: 18px; }
   .hero .mock .titlebar, .hero .mock .chans { display: none; }
   .hero .mock .body { grid-template-columns: minmax(0, 1fr); min-height: 0; }
@@ -1264,7 +1264,7 @@ dialog.dn { overflow-x: hidden; }
 /* ---- living details ---------------------------------------------------- */
 @media (prefers-reduced-motion: no-preference) and (min-width: 721px) {
   /* the hero arrives in steps (computers only: on a phone it is simply there) */
-  .hero .eyebrow, .hero h1, .hero .lede, .hero .cta-row, .hero .platnote, .hero .mock {
+  .hero h1, .hero .lede, .hero .cta-row, .hero .platnote, .hero .mock {
     animation: hero-in .6s ease-out both; }
   .hero h1 { animation-delay: .08s; } .hero .lede { animation-delay: .16s; }
   .hero .cta-row { animation-delay: .24s; } .hero .platnote { animation-delay: .3s; }
@@ -1305,7 +1305,7 @@ dialog.dn { overflow-x: hidden; }
    button glow and a few hearts light up in place - nothing moves. */
 @media (prefers-reduced-motion: reduce) {
   @media (min-width: 721px) {
-    .hero .eyebrow, .hero h1, .hero .lede, .hero .cta-row, .hero .platnote, .hero .mock {
+    .hero h1, .hero .lede, .hero .cta-row, .hero .platnote, .hero .mock {
       animation: calm-fade .7s ease-out both; }
     .hero h1 { animation-delay: .08s; } .hero .lede { animation-delay: .16s; }
     .hero .cta-row { animation-delay: .24s; } .hero .platnote, .hero .mock { animation-delay: .3s; }
@@ -1391,7 +1391,6 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
   #features .sec-head p, #whats-new .sec-head p, .faq-grid .sec-head p,
   #credits .sec-head p, .donate-text p, #shots .sec-head p { display: none; }
   .sec-head { margin-bottom: 18px; }
-  .sec-head .eyebrow { margin-bottom: 8px; }
   .donate-act small { display: none; }
   .dl-phone p { font-size: 15px; }
   .faq-grid { gap: 14px; }
