@@ -40,6 +40,7 @@ class _SidebarMixin:
         # scaled down to fit; the category area and full-text buttons hide.
         self._sidebar_logo.setVisible(True)
         self._sidebar_logo.set_compact(collapsed)
+        self._fit_logo(collapsed)
         self._cat_section_label.setVisible(not collapsed)
         self.cat_solo_btn.setVisible(not collapsed)
         self.cat_list.setVisible(not collapsed)
@@ -142,6 +143,20 @@ class _SidebarMixin:
             sizes[1] = max(240, sizes[1] + (sizes[0] - target))
             sizes[0] = target
             self._root.setSizes(sizes)
+
+    def _fit_logo(self, collapsed: bool) -> None:
+        """Expanded, the logo is as wide as its mark (and the update badge
+        that overhangs it), so the heart sits right beside it; on the rail
+        it takes the rail's width, as it always did."""
+        from PyQt6.QtWidgets import QSizePolicy
+        logo = self._sidebar_logo
+        if collapsed:
+            logo.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+            logo.setMinimumWidth(0)
+            logo.setMaximumWidth(16777215)
+        else:
+            logo.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+            logo.setFixedWidth(logo.LOGO_W + 14)
 
     @staticmethod
     def _set_rail(btn, on: bool) -> None:

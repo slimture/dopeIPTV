@@ -445,6 +445,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "set_donate_heart": {"en": "Show the heart in the sidebar"},
     "set_donate_heart_hint": {"en": "Turned off, it stays hidden for three months, then comes back."},
     "donate_hide": {"en": "Hide for three months"},
+    "donate_done": {"en": "I've already donated"},
     "home_donate_title": {"en": "Enjoying dopeIPTV?"},
     "home_donate_body": {"en": "It is free, with no ads and no tracking. A donation of any size helps keep it that way."},
     "home_donate_btn": {"en": "Donate"},

@@ -533,8 +533,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._logo_row.setSpacing(0)
         self._logo_pad = QWidget()
         self._logo_pad.setFixedWidth(30)
+        self._logo_row.addStretch(1)
         self._logo_row.addWidget(self._logo_pad)
-        self._logo_row.addWidget(self._sidebar_logo, 1)
+        self._logo_row.addWidget(self._sidebar_logo)
         sl.addLayout(self._logo_row)
         sl.addSpacing(6)
 
@@ -818,7 +819,9 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._actions_box.addWidget(settings_btn)
         self._actions_box.addWidget(multiview_btn)
         sl.addLayout(self._actions_box)
-        self._logo_row.addWidget(donate_btn, 0, Qt.AlignmentFlag.AlignCenter)
+        self._logo_row.addWidget(donate_btn, 0, Qt.AlignmentFlag.AlignVCenter)
+        self._logo_row.addStretch(1)
+        self._fit_logo(False)
         self._donate_heart_refresh()         # hidden for three months, maybe
         self._apply_action_icons()
 

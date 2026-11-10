@@ -116,3 +116,18 @@ def test_left_alone_the_card_goes_after_a_week(tmp_path):
     until = float(w.settings.value("donate_card_until"))
     assert until >= time.time() + SNOOZE_SECS - 5   # for three months
     assert w.settings.value("donate_card_shown") is None
+
+
+def test_said_donated_the_heart_and_card_go_for_good(tmp_path):
+    from PyQt6.QtWidgets import QPushButton
+    w = _Win(tmp_path)
+    w._donate_btn = QPushButton()
+    w._donate_btn.show()
+    w.settings.setValue("donate_watch_min", CARD_AFTER_MIN)
+    w.donated()
+    assert not w._donate_btn.isVisible() and w._donate_card() is None
+    w.settings.setValue("donate_heart_until", 0)      # no time brings it back
+    w._donate_count()
+    assert not w._donate_btn.isVisible()
+    w.show_donate_heart()                             # only the switch does
+    assert w._donate_btn.isVisible()

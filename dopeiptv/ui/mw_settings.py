@@ -1943,7 +1943,8 @@ class _SettingsMixin:
             put("check_updates", flag(updates_box))
             if heart_box.isChecked() != self._donate_heart_due():
                 if heart_box.isChecked():
-                    put("donate_heart_until", 0)
+                    self.show_donate_heart()
+                    changed.add("donate_heart_until")
                 else:
                     self.hide_donate_heart()
                     changed.add("donate_heart_until")

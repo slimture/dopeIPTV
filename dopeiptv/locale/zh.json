@@ -295,6 +295,7 @@
   "set_donate_heart": "在侧边栏显示爱心",
   "set_donate_heart_hint": "关闭后会隐藏三个月，之后重新出现。",
   "donate_hide": "隐藏三个月",
+  "donate_done": "我已经捐过了",
   "home_donate_title": "喜欢 dopeIPTV 吗？",
   "home_donate_body": "它免费、无广告、不追踪。任何金额的捐助都能帮助它保持这样。",
   "home_donate_btn": "捐助",

@@ -295,6 +295,7 @@
   "set_donate_heart": "Mostrar o coração na barra lateral",
   "set_donate_heart_hint": "Desligado, fica oculto por três meses e depois volta.",
   "donate_hide": "Ocultar por três meses",
+  "donate_done": "Já fiz uma doação",
   "home_donate_title": "Está gostando do dopeIPTV?",
   "home_donate_body": "É gratuito, sem anúncios e sem rastreamento. Uma doação de qualquer valor ajuda a manter assim.",
   "home_donate_btn": "Doar",

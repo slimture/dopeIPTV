@@ -5,7 +5,9 @@ tooltip), "Support dopeIPTV…" in the app menu and in About, and one card on
 Home once the app has been used for real (about
 ten hours of watching). The card's "Not now" puts it away for three
 months; "Donate" for a year; left alone, it goes by itself after a week,
-for three months too. The heart hides for three months too - its
+for three months too. "I've already donated" in the heart's menu puts the
+heart and the card away for good (the app cannot know: no accounts, the
+payment is on the website), until the Settings switch turns it on. The heart hides for three months too - its
 right-click menu, or a switch in Settings, General - and comes back by
 itself. Nothing ever pops up, and nothing shows on a first run or over a
 playing video. Every way opens the donate dialog on
@@ -41,7 +43,12 @@ class _DonateMixin:
         self._donate_tick.start()
 
     # -- the sidebar's heart ---------------------------------------------------
+    def _donate_thanked(self) -> bool:
+        return str(self.settings.value("donate_thanked", "false")) == "true"
+
     def _donate_heart_due(self) -> bool:
+        if self._donate_thanked():
+            return False
         try:
             until = float(self.settings.value("donate_heart_until", 0) or 0)
         except (TypeError, ValueError):
@@ -59,6 +66,16 @@ class _DonateMixin:
         if pad is not None:
             pad.setVisible(shown and not getattr(self, "_sidebar_collapsed", False))
 
+    def donated(self) -> None:
+        """Said they have: the heart and Home's card go for good."""
+        self.settings.setValue("donate_thanked", "true")
+        self._donate_heart_refresh()
+
+    def show_donate_heart(self) -> None:
+        self.settings.remove("donate_thanked")
+        self.settings.setValue("donate_heart_until", 0)
+        self._donate_heart_refresh()
+
     def hide_donate_heart(self) -> None:
         self.settings.setValue("donate_heart_until", time.time() + SNOOZE_SECS)
         self._donate_heart_refresh()
@@ -69,6 +86,7 @@ class _DonateMixin:
         menu = QMenu(btn)
         menu.addAction(tr("donate_support"), lambda: self.open_donate("app-heart"))
         menu.addAction(tr("donate_hide"), self.hide_donate_heart)
+        menu.addAction(tr("donate_done"), self.donated)
         menu.exec(btn.mapToGlobal(pos))
 
     def _donate_count(self) -> None:
@@ -95,6 +113,8 @@ class _DonateMixin:
         open_url(DONATE_URL.format(ref=ref))
 
     def _donate_card_due(self) -> bool:
+        if self._donate_thanked():
+            return False
         if self._donate_watched() + getattr(self, "_donate_unsaved", 0) \
                 < CARD_AFTER_MIN:
             return False
