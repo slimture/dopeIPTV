@@ -338,3 +338,69 @@
   }, { threshold: 1 });
   io.observe(count);
 })();
+
+/* Sections as sheets: each slides up over the one before (see style.css,
+   "scrolling from one section to the next"). Nothing for reduced motion. */
+(function () {
+  "use strict";
+  if (!window.matchMedia || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { return; }
+  var secs = [].slice.call(document.querySelectorAll("main > section"));
+  if (secs.length < 2 || !("ResizeObserver" in window)) { return; }
+  var root = document.documentElement, ticking = false;
+  root.classList.add("stack");
+
+  function layout() {
+    var vh = window.innerHeight;
+    secs.forEach(function (s) { s.style.setProperty("--stick", Math.min(0, vh - s.offsetHeight) + "px"); });
+    paint();
+  }
+  // How far the next section has come over each one: 0 until it starts to
+  // cover the part of this one that is on screen, 1 when it has covered it.
+  function paint() {
+    ticking = false;
+    var vh = window.innerHeight;
+    for (var i = 0; i < secs.length; i++) {
+      var p = 0;
+      if (i + 1 < secs.length) {
+        var r = secs[i].getBoundingClientRect(), nt = secs[i + 1].getBoundingClientRect().top;
+        var top = Math.max(r.top, 0), end = Math.min(r.bottom, vh);
+        if (end - top > 1) { p = Math.max(0, Math.min(1, (end - nt) / (end - top))); }
+      }
+      var v = p.toFixed(3);
+      if (secs[i].style.getPropertyValue("--cover") !== v) { secs[i].style.setProperty("--cover", v); }
+    }
+  }
+  window.addEventListener("scroll", function () {
+    if (!ticking) { ticking = true; window.requestAnimationFrame(paint); }
+  }, { passive: true });
+  window.addEventListener("resize", layout);
+  var ro = new ResizeObserver(layout);
+  secs.forEach(function (s) { ro.observe(s); });
+  layout();
+
+  // A link to a section scrolls to where the section begins in the page: a
+  // section held in place (sticky) would otherwise give its held position.
+  function flowTop(el) {
+    var y = 0, n = el;
+    while (n && n.parentNode && n.parentNode !== document.body) {
+      var prev = n.previousElementSibling;
+      while (prev) { y += prev.offsetHeight; prev = prev.previousElementSibling; }
+      n = n.parentNode;
+      if (n.tagName === "MAIN") { y += n.offsetTop; break; }
+    }
+    return y;
+  }
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest ? e.target.closest("a[href]") : null;
+    if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) { return; }
+    var url = new URL(a.href, window.location.href);
+    if (url.pathname !== window.location.pathname || !url.hash || url.hash.length < 2) { return; }
+    var target = document.getElementById(decodeURIComponent(url.hash.slice(1)));
+    var sec = target && target.closest("main > section");
+    if (!sec || sec !== target) { return; }
+    e.preventDefault();
+    var bar = document.querySelector("header.bar");
+    window.scrollTo({ top: Math.max(0, flowTop(sec) - (bar ? bar.offsetHeight : 0)), behavior: "smooth" });
+    if (history.pushState) { history.pushState(null, "", url.hash); }
+  });
+})();
