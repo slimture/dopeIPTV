@@ -52,6 +52,11 @@
   <section class="lists" id="lists" aria-label="Top lists"></section>
 
   <section class="card">
+    <div class="card-head"><h2>What visitors did, by how they came</h2></div>
+    <div class="table-wrap" id="by-channel"></div>
+  </section>
+
+  <section class="card">
     <div class="card-head"><h2>By year</h2><span class="muted">calendar years</span></div>
     <div class="table-wrap" id="years"></div>
   </section>
@@ -80,7 +85,8 @@
   <p class="foot">A page view counts when the page has opened in a real browser: it tells the
     server so itself, without a cookie or an id - robots that never run it, and scripts, are
     left out. A visitor is a hash of address and browser with a secret salt (no address is
-    kept); single visits are kept 30 days, the counts per day ten years. Your own visits are
+    kept, the hashes 25 months); single visits are kept 30 days, then only without anything
+    that points to a person, like the counts per day, for good. Your own visits are
     left out: this browser (it opened this page), your own network, and STATS_IGNORE.
     Countries: IP Geolocation by <a href="https://db-ip.com">DB-IP</a>. Donations come from
     Stripe. <span id="updated"></span></p>

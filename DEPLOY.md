@@ -370,9 +370,13 @@ How it counts, so the numbers are honest:
   request is counted too, robots and all, so the page shows how much was
   left out.
 - A visitor is a hash of address and browser with a secret salt kept on the
-  server; no address is written down. The hashes are kept 400 days (unique
-  and returning visitors), single visits 30 days (`STATS_VISITS_DAYS`), the
-  counts per day ten years. Countries come from DB-IP's free database
+  server; no address is written down. The hashes are kept 25 months (unique
+  and returning visitors, a year against the year before). Single visits
+  are kept 30 days (`STATS_VISITS_DAYS`); then they are made anonymous -
+  no id, no time of day, no versions or screen, only the day, country,
+  browser and system, device, how the visitor came, pages, time and whether
+  there was a download or the donate dialog - and kept for good, as are the
+  counts per day. Countries come from DB-IP's free database
   (CC BY 4.0), fetched once a month by the quarter-hour run and looked up
   on the server - nothing is sent anywhere.
 - Your own visits are left out: a browser that has opened `/admin/` gets a
@@ -383,8 +387,10 @@ How it counts, so the numbers are honest:
 - The numbers are brought up to date whenever the admin page is opened,
   and by cron every quarter hour.
 
-Single visits are personal data under the GDPR even without an address,
-so the site should say what is counted and why (a short privacy note).
+The visits of the last 30 days are personal data under the GDPR even
+without an address (the id can be worked out again from an address); the
+anonymous ones and the counts are not. The site should say what is counted
+and why (a short privacy note).
 
 **The page's password (jail):**
 
@@ -418,7 +424,7 @@ The log is made before nginx opens it, so it belongs to the `iptv` group
 (`stats_collect.py` runs as `iptv`); newsyslog turns it over at midnight,
 keeps a week, and leaves the newest old one uncompressed so a line written
 just before midnight is still read. The counts live in
-`/usr/local/www/iptv/stats/` - outside the web root - ten years of days.
+`/usr/local/www/iptv/stats/` - outside the web root.
 
 **nginx (host)** - the content server's file as in step 8, which now has the
 `iptv_stats` log for `/` and `/help/` and the `/admin/` location:

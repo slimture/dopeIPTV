@@ -31,12 +31,18 @@ Each visit, one by one, goes to STATS_DIR/visits/<day>.json for the admin
 page's visitor log: when, country, browser and version, system, device and
 screen, languages, how the visitor came, the pages and how long each was
 looked at, downloads, the donate dialog - and whether the visitor was here
-before. A visit ends after 30 minutes without a page. These are kept
-STATS_VISITS_DAYS days (30), the counts per day ten years.
+before. A visit ends after 30 minutes without a page. After
+STATS_VISITS_DAYS days (30) a visit is made anonymous rather than deleted:
+it moves to STATS_DIR/visits-anon/<month>.json with its day, country,
+browser and system without versions, device, page language, how the
+visitor came, the number of pages, the time rounded to ten seconds, and
+whether there was a download or the donate dialog - no id, no time of day,
+no screen, mixed in the month so their order tells nothing. Those, and the
+counts per day, are kept for good.
 
 A visitor is a hash of address and browser with a secret salt kept on this
-server: no address is written down, and the hashes are kept 400 days only
-to count unique and returning visitors. Robots, scripts and empty browser
+server: no address is written down, and the hashes are kept 25 months only
+to count unique and returning visitors (a year against the year before). Robots, scripts and empty browser
 names are left out everywhere.
 
 Your own visits are left out three ways: a browser that has opened the
@@ -94,10 +100,10 @@ DL_LOG = CONF.get("DL_LOG", "/var/log/nginx/iptv.dope.rs-downloads.log")
 SITE_HOST = CONF.get("SITE_HOST", "iptv.dope.rs")
 GEO_DB = CONF.get("GEO_DB", os.path.join(STATS_DIR, "dbip-country-lite.mmdb"))
 GEO_URL = "https://download.db-ip.com/free/dbip-country-lite-{month}.mmdb.gz"
-KEEP_DAYS = 3660          # ten years of days, for the admin page's years
-KEEP_UNIQUE_DAYS = 400    # the visitor hashes: unique visitors over up to a year
+KEEP_UNIQUE_DAYS = 761    # the visitor hashes: 25 months, a year against the year before
 KEEP_PER_DAY = 40         # a day's longest lists (sites, files): the top 40, the rest summed
 VISITS_DIR = os.path.join(STATS_DIR, "visits")
+ANON_DIR = os.path.join(STATS_DIR, "visits-anon")
 try:
     VISITS_DAYS = max(1, int(CONF.get("STATS_VISITS_DAYS", "30")))
 except ValueError:
@@ -669,9 +675,7 @@ def collect(backfill: bool = False, with_fetch: bool = False) -> None:
             seen_dl.pop(old, None)
         for old in sorted(uniques)[:-KEEP_UNIQUE_DAYS]:
             uniques.pop(old, None)
-        for old in sorted(stats["days"])[:-KEEP_DAYS]:
-            stats["days"].pop(old, None)
-        # A day's list of sites or files stays short, so ten years stay small -
+        # A day's list of sites or files stays short, so the years stay small -
         # a flood of made-up referrers cannot grow the file without end.
         for d in stats["days"].values():
             for k in ("refs", "files", "sources"):
@@ -683,14 +687,48 @@ def collect(backfill: bool = False, with_fetch: bool = False) -> None:
         stats["updated"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         stats["geo"] = db is not None
         visits.save()
-        cutoff = (datetime.now(timezone.utc).date() - timedelta(days=VISITS_DAYS)).isoformat()
-        for f in glob.glob(os.path.join(VISITS_DIR, "*.json")):
-            if os.path.basename(f)[:10] < cutoff:
-                with contextlib.suppress(OSError):
-                    os.unlink(f)
+        _anonymize_old()
         _save(uniques_path, uniques)
         _save(stats_path, stats)
         _save(state_path, state)
+
+
+def _family(os_version: str) -> str:
+    return os_version.split(" (")[0].split(" ")[0] if os_version else "Other"
+
+
+def anonymous(v: dict, day: str) -> dict:
+    """A visit with nothing left that points to a person."""
+    events = {e[1] for e in v.get("events") or []}
+    return {"day": day, "country": v.get("country") or "", "browser": v.get("browser") or "Other",
+            "os": _family(v.get("os") or ""), "device": v.get("device") or "",
+            "lang": v.get("lang") or "", "channel": v.get("channel") or "",
+            "site": v.get("ref") or "", "pages": len(v.get("pages") or []),
+            "time": round((v.get("time") or 0) / 10) * 10,
+            "returning": bool(v.get("returning")), "downloaded": bool(v.get("downloads")),
+            "donate": "donate" in events, "donated": "donated" in events}
+
+
+def _anonymize_old() -> None:
+    """Visits older than STATS_VISITS_DAYS: into the month's anonymous file,
+    then the day's file goes. A day already in the month file is never
+    added twice, so a run stopped halfway costs nothing."""
+    cutoff = (datetime.now(timezone.utc).date() - timedelta(days=VISITS_DAYS)).isoformat()
+    for f in sorted(glob.glob(os.path.join(VISITS_DIR, "*.json"))):
+        day = os.path.basename(f)[:10]
+        if day >= cutoff:
+            continue
+        month_path = os.path.join(ANON_DIR, day[:7] + ".json")
+        month = _load(month_path, {"days": [], "visits": []})
+        if day not in month["days"]:
+            month["visits"] += [anonymous(v, day) for v in _load_list(f) if v.get("pages") or v.get("downloads")]
+            month["visits"].sort(key=lambda a: (a["day"], a["country"], a["browser"], a["os"], a["device"],
+                                                a["channel"], a["site"], a["pages"], a["time"]))
+            month["days"] = sorted(month["days"] + [day])
+            os.makedirs(ANON_DIR, mode=0o750, exist_ok=True)
+            _save(month_path, month)
+        with contextlib.suppress(OSError):
+            os.unlink(f)
 
 
 def collect_if_stale(seconds: int = 20) -> None:

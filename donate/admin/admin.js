@@ -315,18 +315,18 @@
     if (!data.geo) {
       countries.append(mk("p", "muted", "The country database is fetched by the quarter-hour run (DB-IP, once a month)."));
     }
-    const tagged = listCard("Tagged links", L.sources);
-    tagged.append(mk("p", "muted", "Links that carry ?ref=name, e.g. iptv.dope.rs/?ref=github."));
+    const sites = listCard("Sites that linked here", L.refs, (k) => k === "other" ? "Other sites" : k,
+                           ["Tagged links", L.sources]);
+    sites.append(mk("p", "muted", "Tagged links carry ?ref=name, e.g. iptv.dope.rs/?ref=github."));
     $("lists").replaceChildren(
       listCard("How they found the site", L.channels),
-      listCard("Sites that linked here", L.refs, (k) => k === "other" ? "Other sites" : k),
+      sites,
       countries,
       listCard("Pages", L.pages, (k) => PAGE_NAMES[k] || k),
       listCard("Languages", L.langs, lang),
       listCard("Browsers", L.browsers, null, ["Versions", L.browser_versions]),
       listCard("Systems", L.os_versions),
       listCard("Devices", L.devices, null, ["Screens", L.screens]),
-      tagged,
       listCard("Downloads", L.downloads, null, ["Files", L.files, (k) => k === "other" ? "Other files" : k.replace(/^dopeIPTV-/, "")])
     );
   }
@@ -356,6 +356,27 @@
     t.append(thead, tb);
     const wrap = mk("div", "table-wrap"); wrap.append(t);
     box.replaceChildren(wrap);
+  }
+
+  // -- what visitors did, by how they came ------------------------------------------
+  function byChannel() {
+    const rows = data.by_channel || [];
+    if (!rows.length) { $("by-channel").replaceChildren(mk("p", "empty", "No visits in this period yet.")); return; }
+    const pct = (n, of) => of ? Math.round(n / of * 100) + "%" : "–";
+    const t = mk("table"), head = mk("tr");
+    [["Came from", ""], ["Visits", "num"], ["Read more than one page", "num hide-phone"], ["Downloaded", "num"],
+     ["Opened donate", "num hide-phone"], ["Time per visit", "num"]].forEach(([h, c]) => head.append(mk("th", c, h)));
+    const thead = mk("thead"); thead.append(head);
+    const tb = mk("tbody");
+    rows.forEach(([name, r]) => {
+      const tr = mk("tr");
+      tr.append(mk("td", "", name), mk("td", "num", num.format(r.visits)), mk("td", "num hide-phone", pct(r.more, r.visits)),
+                mk("td", "num", pct(r.downloaded, r.visits)), mk("td", "num hide-phone", pct(r.donate, r.visits)),
+                mk("td", "num", duration(r.visits ? r.time / r.visits : 0)));
+      tb.append(tr);
+    });
+    t.append(thead, tb);
+    $("by-channel").replaceChildren(t);
   }
 
   // -- calendar years ----------------------------------------------------------------
@@ -474,7 +495,7 @@
     if (!data) { return; }
     $("h-visits").textContent = "Visitors and page views" + (per() === "day" ? "" : " per " + per());
     $("h-downloads").textContent = "Downloads per " + per();
-    tiles(); visitsChart(); downloadsChart(); visitsTable(); lists(); years(); donations();
+    tiles(); visitsChart(); downloadsChart(); visitsTable(); lists(); byChannel(); years(); donations();
     $("updated").textContent = data.updated ? "Counts updated " + stamp.format(new Date(data.updated)) + "." : "";
   }
 

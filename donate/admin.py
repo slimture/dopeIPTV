@@ -138,7 +138,7 @@ def _bucket(d: date, step: str) -> date:
 
 def _union(uniques: dict, days: list, per_day: dict):
     """Different visitors over these days, or None where a day had visitors
-    whose hashes are gone (kept 400 days) - the page then shows the visits
+    whose hashes are gone (kept 25 months) - the page then shows the visits
     summed instead."""
     if any((per_day.get(d) or {}).get("visitors") and d not in uniques for d in days):
         return None
@@ -242,6 +242,7 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
 
     dl_all = _load(downloads_json, {})
     return {
+        "by_channel": by_channel(stats_dir, first.isoformat(), today.isoformat()),
         "days": days,
         "first": first.isoformat(),
         "step": step,
@@ -264,6 +265,43 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
             "recent": don.get("list", [])[:25],
         },
     }
+
+
+# -- visits by how they came -------------------------------------------------------
+
+def by_channel(stats_dir: str, first: str, last: str) -> list:
+    """Per way in (search, social...): visits, and how many of them read more
+    than one page, downloaded, opened the donate dialog - from the visits of
+    the last weeks and the anonymous ones before them."""
+    rows: dict = {}
+
+    def add(channel: str, pages: int, secs: int, downloaded: bool, donate: bool) -> None:
+        r = rows.setdefault(channel or "Direct or unknown",
+                            {"visits": 0, "more": 0, "time": 0, "downloaded": 0, "donate": 0})
+        r["visits"] += 1
+        r["more"] += pages > 1
+        r["time"] += secs
+        r["downloaded"] += downloaded
+        r["donate"] += donate
+    for day in visit_days(stats_dir):
+        if first <= day <= last:
+            for v in _visits_file(stats_dir, day):
+                if v.get("pages"):
+                    add(v.get("channel", ""), len(v["pages"]), v.get("time", 0), bool(v.get("downloads")),
+                        any(e[1] == "donate" for e in v.get("events") or []))
+    try:
+        months = sorted(n[:7] for n in os.listdir(os.path.join(stats_dir, "visits-anon")) if n.endswith(".json"))
+    except OSError:
+        months = []
+    for m in months:
+        if not (first[:7] <= m <= last[:7]):
+            continue
+        month = _load(os.path.join(stats_dir, "visits-anon", m + ".json"), {})
+        for a in month.get("visits") or []:
+            if first <= a.get("day", "") <= last and a.get("pages"):
+                add(a.get("channel", ""), a["pages"], a.get("time", 0), a.get("downloaded", False),
+                    a.get("donate", False))
+    return sorted(([k, v] for k, v in rows.items()), key=lambda kv: -kv[1]["visits"])
 
 
 # -- the visitor log ----------------------------------------------------------------
