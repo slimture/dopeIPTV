@@ -2,10 +2,12 @@
 
 The window is a sidebar of pages (with a search box over it) beside the
 page on show. A page is a column of sections; a section is a heading over a
-stack of rows, each a label - with an optional line of explanation under
-it - and its control on the right. Sections are flat: no frame around them
-and no border round a dropdown or a button inside one. Framed cards held
-bordered fields, so a page read as boxes inside boxes inside boxes. Every page is built from these, so they all look the same and
+surface of rows split by hairlines, each a label - with an optional line of
+explanation under it - and its control on the right. One level of grouping,
+drawn by colour alone: the surface has no frame, and the dropdowns and
+buttons on it are filled, not outlined. Framed cards holding bordered fields
+read as boxes inside boxes inside boxes; with no surface at all, the rows
+ran together as floating text. Every page is built from these, so they all look the same and
 line up the same, which the old row of ten tabs with ten different layouts
 did not.
 
@@ -18,8 +20,11 @@ from __future__ import annotations
 import math
 
 import bisect
+from collections.abc import Callable
 
-from PyQt6.QtCore import QLocale, QPoint, QPointF, QRect, QRectF, QSize, Qt, pyqtSignal
+from PyQt6.QtCore import (
+    QLocale, QPoint, QPointF, QRect, QRectF, QSize, Qt, QTimer, pyqtSignal,
+)
 from PyQt6.QtGui import (
     QColor, QConicalGradient, QFont, QIcon, QPainter, QPainterPath, QPen,
     QPixmap,
@@ -27,11 +32,14 @@ from PyQt6.QtGui import (
 from PyQt6.QtWidgets import (
     QAbstractButton, QAbstractSpinBox, QButtonGroup, QCheckBox, QFrame,
     QHBoxLayout, QLabel, QLayout, QLineEdit, QListWidget, QListWidgetItem,
-    QPushButton, QScrollArea, QSizePolicy, QSpinBox, QStackedWidget, QStyle,
+    QPushButton, QScrollArea, QSizePolicy, QSlider, QSpinBox, QStackedWidget,
+    QStyle,
     QStyledItemDelegate, QToolButton, QVBoxLayout, QWidget,
 )
 
-from .theme import P, THEMES, corner_radius, resolve_accent, rounded
+from .theme import (
+    P, THEMES, _luminance, _mix, corner_radius, resolve_accent, rounded,
+)
 
 #: Widest a page's content gets. A form stretched over a large window puts
 #: the label and its control a screen apart.
@@ -92,22 +100,20 @@ def _muted(text: str, size: int = 12) -> QLabel:
     return lbl
 
 
-#: Space above and below the content of a row. The dividers between rows
-#: are what separate them, so this only has to keep a row a comfortable
-#: click target - a dropdown is about 30 px.
-ROW_PAD = 8
+#: Space above and below the content of a row.
+ROW_PAD = 10
 
 
 class SettingsCard(QFrame):
-    """A section of a page: its rows, with a hairline between them. No frame
-    of its own - the heading over it and the space around it group it."""
+    """A section of a page: a surface a shade off the page, with a hairline
+    between its rows. No frame - the colour groups it."""
 
     def __init__(self, page: "SettingsPage") -> None:
         super().__init__()
         self.setObjectName("SettingsCard")
         self._page = page
         self._lay = QVBoxLayout(self)
-        self._lay.setContentsMargins(0, 0, 0, 0)
+        self._lay.setContentsMargins(16, 0, 16, 0)
         self._lay.setSpacing(0)
         self.rows: list[tuple[QWidget, str]] = []
         self._shown_if: dict[int, object] = {}
@@ -266,6 +272,9 @@ class SettingsPage(QScrollArea):
         self._tail = QWidget()        # keeps the cards at the top
         self._col.addWidget(self._tail, 1)
         self.setWidget(body)
+        #: What the page scrolls; the search view borrows it while a search
+        #: shows rows from every page at once.
+        self.body = body
         self.cards: list[SettingsCard] = []
         #: The controls in the column down the right of the cards.
         self.column: list[QWidget] = []
@@ -274,8 +283,7 @@ class SettingsPage(QScrollArea):
         at = self._col.indexOf(self._tail)
         c = SettingsCard(self)
         if title:
-            # A heading in the page's own type, not small capitals: with no
-            # frame round the section, the heading is what groups it.
+            # In the page's own type, not small capitals.
             head = QLabel(title)
             head.setObjectName("SettingsCardTitle")
             # A styled label indents its text by half an "x" unless told
@@ -343,6 +351,21 @@ class SettingsShell(QWidget):
         self._none.setObjectName("SettingsHint")
         self._none.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.stack.addWidget(self._none)
+        # A search shows what it finds on every page in one scrolling view,
+        # each page's rows under its title, instead of one page at a time.
+        self.results = QScrollArea()
+        self.results.setObjectName("SettingsResults")
+        self.results.setWidgetResizable(True)
+        self.results.setFrameShape(QFrame.Shape.NoFrame)
+        rbody = QWidget()
+        rbody.setObjectName("SettingsResultsBody")
+        self._results_col = QVBoxLayout(rbody)
+        self._results_col.setContentsMargins(0, 0, 0, 0)
+        self._results_col.setSpacing(0)
+        self._results_col.addStretch(1)
+        self.results.setWidget(rbody)
+        self.stack.addWidget(self.results)
+        self._searching = False
         self.pages: list[SettingsPage] = []
         self._items: dict[str, QListWidgetItem] = {}
         self._sections: list[tuple[QListWidgetItem, list[QListWidgetItem]]] = []
@@ -427,8 +450,37 @@ class SettingsShell(QWidget):
 
     def _show(self, row: int) -> None:
         page = self._page_at(row)
-        if page is not None:
+        if page is None:
+            return
+        if self._searching:
+            # A page picked while searching: its part of the results.
+            QTimer.singleShot(0, lambda: self.results.verticalScrollBar()
+                              .setValue(page.body.y()))
+        else:
             self.stack.setCurrentWidget(page)
+
+    def _ordered_pages(self) -> list[SettingsPage]:
+        pages = [self._page_at(i) for i in range(self.nav.count())]
+        return [p for p in pages if p is not None]
+
+    def _enter_search(self) -> None:
+        if self._searching:
+            return
+        self._searching = True
+        at = 0
+        for page in self._ordered_pages():
+            body = page.takeWidget()
+            self._results_col.insertWidget(at, body)
+            at += 1
+
+    def _leave_search(self) -> None:
+        if not self._searching:
+            return
+        self._searching = False
+        for page in self.pages:
+            self._results_col.removeWidget(page.body)
+            page.setWidget(page.body)
+            page.body.show()
 
     def show_page(self, key: str | None) -> None:
         item = self._items.get(key or "")
@@ -457,22 +509,53 @@ class SettingsShell(QWidget):
             if self._page_at(i) is not None and not self.nav.item(i).isHidden():
                 first = i
                 break
+        row = self.nav.currentRow()
+        if not needle:
+            self._leave_search()
+            if row < 0 or self.nav.item(row).isHidden():
+                self.nav.setCurrentRow(first if first is not None else -1)
+            else:
+                self._show(row)
+            return
         if first is None:
+            self._leave_search()
             self.nav.setCurrentRow(-1)
             self.stack.setCurrentWidget(self._none)
             return
-        row = self.nav.currentRow()
+        self._enter_search()
+        for page in self.pages:
+            page.body.setVisible(not self._items[page.key].isHidden())
+        self.stack.setCurrentWidget(self.results)
         if row < 0 or self.nav.item(row).isHidden():
+            self.nav.blockSignals(True)
             self.nav.setCurrentRow(first)
-        else:
-            self._show(row)
+            self.nav.blockSignals(False)
+        self.results.verticalScrollBar().setValue(0)
+
+    def search_hits(self) -> list[str]:
+        """The keys of the pages the search view shows, in order."""
+        if not self._searching or self.stack.currentWidget() is not self.results:
+            return []
+        return [p.key for p in self._ordered_pages() if not p.body.isHidden()]
 
 
 def settings_style() -> str:
     """The Settings window's own rules, on top of the app theme."""
     p = P
-    edge = (p['border_in'] if p.get("name") == THEMES["contrast"]["name"]
-            else "transparent")
+    contrast = p.get("name") == THEMES["contrast"]["name"]
+    edge = p['border_in'] if contrast else "transparent"
+    light = _luminance(p['bg']) > 0.4
+    # Each a shade off the page, worked out from it: the palettes' own pane
+    # and border colours sit so close to the background on some dark themes
+    # that a section and its dividers vanished.
+    if light:
+        card, ctrl, ctrl_hi, line = (p['input'], p['btn'], p['btn_hover'],
+                                     p['border'])
+    else:
+        card = _mix(p['text'], p['bg'], 0.05)
+        ctrl = _mix(p['text'], p['bg'], 0.11)
+        ctrl_hi = _mix(p['text'], p['bg'], 0.16)
+        line = p['border'] if contrast else _mix(p['text'], p['bg'], 0.12)
     return rounded(f"""
 #SettingsSide {{ background: {p['side']}; border-right: 1px solid {p['border']}; }}
 QListWidget#SettingsNav {{ background: transparent; border: none; outline: none; }}
@@ -500,30 +583,34 @@ QLineEdit#SettingsSearch {{ padding: 7px 10px; border-radius: 9px; }}
 #SettingsPageBody {{ background: {p['bg']}; }}
 QLabel#SettingsTitle {{ font-size: 22px; font-weight: 700; color: {p['text']}; }}
 QLabel#SettingsCardTitle {{
-    color: {p['text']}; font-size: 15px; font-weight: 600;
-    padding: 18px 0 2px 0;
+    color: {p['text']}; font-size: 14px; font-weight: 600;
+    padding: 16px 4px 6px 4px;
 }}
-QFrame#SettingsCard {{ background: transparent; border: none; }}
-QFrame#SettingsDivider {{ background: {p['border']}; border: none; }}
-/* Controls on a page are filled, not outlined: the fill says "this is a
-   control", and a border on top of it was one box too many. High contrast
-   keeps its borders - there the outline is the point. */
+QFrame#SettingsCard {{
+    background: {card}; border: 1px solid {edge}; border-radius: 12px;
+}}
+/* Named through the card: "QFrame#SettingsCard > QWidget" below is more
+   specific than the divider alone and made every divider transparent. */
+QFrame#SettingsCard > QFrame#SettingsDivider {{ background: {line}; border: none; }}
+/* Controls are filled, not outlined: the fill says "this is a control", and
+   a border on top of it was one box too many. High contrast keeps its
+   borders - there the outline is the point. */
 #SettingsPageBody QComboBox, #SettingsPageBody QLineEdit,
 #SettingsPageBody QSpinBox {{
-    background: {p['btn']}; border: 1px solid {edge}; border-radius: 8px;
+    background: {ctrl}; border: 1px solid {edge}; border-radius: 8px;
 }}
 #SettingsPageBody QComboBox:hover, #SettingsPageBody QLineEdit:hover,
-#SettingsPageBody QSpinBox:hover {{ background: {p['btn_hover']}; }}
+#SettingsPageBody QSpinBox:hover {{ background: {ctrl_hi}; }}
 #SettingsPageBody QComboBox:focus, #SettingsPageBody QLineEdit:focus,
 #SettingsPageBody QSpinBox:focus {{ border: 1px solid {p['accent']}; }}
 #SettingsPageBody QComboBox:disabled, #SettingsPageBody QLineEdit:disabled {{
     color: {p['muted2']}; background: {p['hover']};
 }}
 #SettingsPageBody QPushButton {{
-    background: {p['btn']}; border: 1px solid {edge};
+    background: {ctrl}; border: 1px solid {edge};
     padding: 7px 14px;
 }}
-#SettingsPageBody QPushButton:hover {{ background: {p['btn_hover']}; }}
+#SettingsPageBody QPushButton:hover {{ background: {ctrl_hi}; }}
 #SettingsPageBody QPushButton:disabled {{ color: {p['muted2']}; }}
 #SettingsPageBody QPushButton#Primary {{
     background: {p['accent']}; border-color: {p['accent']};
@@ -533,7 +620,7 @@ QFrame#SettingsDivider {{ background: {p['border']}; border: none; }}
 #SettingsPageBody QPushButton#Danger {{ color: {p['error']}; }}
 #SettingsPageBody QPushButton#Danger:hover {{ border-color: {p['error']}; }}
 QFrame#Stepper {{
-    background: {p['btn']}; border: 1px solid {edge}; border-radius: 8px;
+    background: {ctrl}; border: 1px solid {edge}; border-radius: 8px;
 }}
 QFrame#Stepper QSpinBox, QFrame#Stepper QSpinBox:hover,
 QFrame#Stepper QSpinBox:focus {{
@@ -551,9 +638,21 @@ QFrame#Stepper QToolButton {{
     background: transparent; border: none; border-radius: 6px;
     color: {p['text2']}; font-size: 16px; font-weight: 600;
 }}
-QFrame#Stepper QToolButton:hover {{ background: {p['btn_hover']}; color: {p['text']}; }}
+QFrame#Stepper QToolButton:hover {{ background: {ctrl_hi}; color: {p['text']}; }}
 QFrame#Stepper QToolButton:disabled {{ color: {p['muted3']}; }}
 QLabel#SettingsGroupHead {{ color: {p['muted']}; font-size: 12px; }}
+#SettingsPageBody QSlider::groove:horizontal {{
+    height: 4px; border-radius: 2px; background: {ctrl_hi};
+}}
+#SettingsPageBody QSlider::sub-page:horizontal {{
+    border-radius: 2px; background: {p['accent']};
+}}
+#SettingsPageBody QSlider::handle:horizontal {{
+    width: 16px; height: 16px; margin: -6px 0; border-radius: 8px;
+    background: #FFFFFF; border: 1px solid {line};
+}}
+QLabel#SliderValue {{ color: {p['text2']}; font-size: 12px; }}
+#SettingsResultsBody {{ background: {p['bg']}; }}
 #SettingsRow, QFrame#SettingsCard > QWidget {{ background: transparent; }}
 QLabel#SettingsLabel {{ font-size: 13px; color: {p['text']}; }}
 QLabel#SettingsHint {{ color: {p['muted']}; }}
@@ -1352,37 +1451,23 @@ def _offset_grid(most: int) -> list[int]:
     return [-v for v in reversed(up)] + [0] + up
 
 
-class DurationSpin(QSpinBox):
-    """Minutes, signed, shown in words: "1 h 30 min later", "45 min
-    earlier", or the word for none at 0. One control where a sign dropdown,
-    an hours box and a minutes box made three.
+class GridSpin(QSpinBox):
+    """A spin box that steps along a list of sensible values and shows each
+    in words. A stored value off the list (an older setting took anything)
+    is kept until it is stepped, and the first step lands on the list. Not
+    typed into: the buttons, the arrow keys and the wheel step it."""
 
-    Steps go five minutes at a time under an hour and fifteen above it; a
-    stored value off that grid (the old boxes took any minute) is kept
-    until it is stepped, and the first step lands on the grid."""
-
-    def __init__(self, later: str, earlier: str, none: str, hours: str,
-                 minutes: str, most: int = 24 * 60 - 1) -> None:
+    def __init__(self, grid: list[int], text: Callable[[int], str],
+                 lo: int | None = None, hi: int | None = None) -> None:
         super().__init__()
-        self._later, self._earlier, self._none = later, earlier, none
-        self._hours, self._minutes = hours, minutes
-        self._grid = _offset_grid(most - most % 15)
-        self.setRange(-most, most)
-        # Not typed: the words around the number made typing a guessing game
-        # (which sign, which unit). The buttons, arrow keys and wheel step.
+        self._grid = sorted(grid)
+        self._text = text
+        self.setRange(self._grid[0] if lo is None else lo,
+                      self._grid[-1] if hi is None else hi)
         self.lineEdit().setReadOnly(True)
 
     def textFromValue(self, value: int) -> str:
-        if value == 0:
-            return self._none
-        h, m = divmod(abs(value), 60)
-        parts = []
-        if h:
-            parts.append(self._hours.format(n=h))
-        if m:
-            parts.append(self._minutes.format(n=m))
-        return (self._later if value > 0 else self._earlier).format(
-            time=" ".join(parts))
+        return self._text(value)
 
     def valueFromText(self, text: str) -> int:
         return self.value()
@@ -1410,3 +1495,99 @@ class DurationSpin(QSpinBox):
         if self.value() < self._grid[-1]:
             flags |= QAbstractSpinBox.StepEnabledFlag.StepUpEnabled
         return flags
+
+    def widest(self, values: list[int] | None = None) -> int:
+        """The width of its longest text, so stepping never resizes it."""
+        fm = self.fontMetrics()
+        pool = self._grid if values is None else values
+        return max(fm.horizontalAdvance(self._text(v))
+                   for v in pool + [self.minimum(), self.maximum()])
+
+
+class DurationSpin(GridSpin):
+    """Minutes, signed, shown in words: "1 h 30 min later", "45 min
+    earlier", or the word for none at 0. One control where a sign dropdown,
+    an hours box and a minutes box made three. Steps go five minutes at a
+    time under an hour and fifteen above it."""
+
+    def __init__(self, later: str, earlier: str, none: str, hours: str,
+                 minutes: str, most: int = 24 * 60 - 1) -> None:
+        self._later, self._earlier, self._none = later, earlier, none
+        self._hours, self._minutes = hours, minutes
+        super().__init__(_offset_grid(most - most % 15), self._words,
+                         -most, most)
+
+    def _words(self, value: int) -> str:
+        if value == 0:
+            return self._none
+        h, m = divmod(abs(value), 60)
+        parts = []
+        if h:
+            parts.append(self._hours.format(n=h))
+        if m:
+            parts.append(self._minutes.format(n=m))
+        return (self._later if value > 0 else self._earlier).format(
+            time=" ".join(parts))
+
+
+def size_text(mb: int, none: str) -> str:
+    """Megabytes as people say them: 500 MB, 4.5 GB, 2 TB (decimal units,
+    as the recorder counts them)."""
+    if mb <= 0:
+        return none
+    for unit, div in (("TB", 1_000_000), ("GB", 1000)):
+        if mb >= div:
+            n = mb / div
+            digits = 0 if abs(n - round(n)) < 0.05 else 1
+            return f"{QLocale().toString(n, 'f', digits)} {unit}"
+    return f"{mb} MB"
+
+
+class SizeSpin(GridSpin):
+    """A size in megabytes along *grid*, 0 meaning *none* ("No limit").
+    *current* widens the range when a stored size is past the grid's end."""
+
+    def __init__(self, grid: list[int], none: str, current: int = 0) -> None:
+        super().__init__(grid, lambda v: size_text(v, none), 0,
+                         max(max(grid), current))
+
+
+class ValueSlider(QWidget):
+    """A slider with its value written beside it. ``value()`` is the
+    slider's position divided by *scale*."""
+
+    def __init__(self, lo: float, hi: float, value: float, scale: int = 10,
+                 text: Callable[[float], str] = str,
+                 width: int = 260) -> None:
+        super().__init__()
+        self._scale = scale
+        self._text = text
+        h = QHBoxLayout(self)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(10)
+        self.slider = QSlider(Qt.Orientation.Horizontal)
+        self.slider.setRange(round(lo * scale), round(hi * scale))
+        self.slider.setValue(round(value * scale))
+        self.slider.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.label = QLabel()
+        self.label.setObjectName("SliderValue")
+        fm = self.label.fontMetrics()
+        self.label.setMinimumWidth(max(
+            fm.horizontalAdvance(text(v / scale))
+            for v in range(self.slider.minimum(), self.slider.maximum() + 1)))
+        h.addWidget(self.slider, 1)
+        h.addWidget(self.label)
+        self.valueChanged = self.slider.valueChanged
+        self.slider.valueChanged.connect(self._show)
+        self._show()
+        self.setFixedWidth(width)
+
+    def _show(self, *_a) -> None:
+        self.label.setText(self._text(self.value()))
+
+    def value(self) -> float:
+        return self.slider.value() / self._scale
+
+    def setAccessibleName(self, name: str) -> None:
+        super().setAccessibleName(name)
+        self.slider.setAccessibleName(name)

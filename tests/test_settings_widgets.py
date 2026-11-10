@@ -12,8 +12,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtWidgets import QApplication, QLabel  # noqa: E402
 
 from dopeiptv.ui.settings_ui import (  # noqa: E402
-    Chip, ChipGroups, ChoicePicker, DurationSpin, SettingsPage, Stepper,
-    ThemeTile,
+    Chip, ChipGroups, ChoicePicker, DurationSpin, SettingsPage, SizeSpin,
+    Stepper, ThemeTile, ValueSlider, size_text,
 )
 from dopeiptv.ui.theme import THEME_ORDER  # noqa: E402
 
@@ -136,3 +136,33 @@ def test_a_section_heading_is_plain_text_in_line_with_its_rows():
             if lb.objectName() == "SettingsCardTitle"][0]
     assert head.text() == "Time offsets"     # no longer in capitals
     assert head.indent() == 0
+
+
+def test_a_size_reads_with_its_unit():
+    assert size_text(0, "No limit") == "No limit"
+    assert size_text(500, "") == "500 MB"
+    assert size_text(4500, "") == "4.5 GB"
+    assert size_text(25000, "") == "25 GB"
+    assert size_text(1_500_000, "") == "1.5 TB"
+
+
+def test_a_size_steps_along_its_grid_and_keeps_a_stored_one():
+    spin = SizeSpin([0, 1000, 5000, 10000], "No limit", current=100_000_000)
+    assert spin.maximum() == 100_000_000      # 100 TB stored: not clamped
+    spin.setValue(100_000_000)
+    assert spin.value() == 100_000_000 and spin.text() == "100 TB"
+    spin.setValue(3000)                       # off the grid
+    spin.stepBy(1)
+    assert spin.value() == 5000
+    spin.setValue(0)
+    assert spin.text() == "No limit"
+    spin.stepBy(-1)
+    assert spin.value() == 0
+
+
+def test_the_slider_writes_its_value_beside_it():
+    sl = ValueSlider(0.0, 3.0, 1.0, scale=10,
+                     text=lambda v: "Off" if v == 0 else f"{v:.1f}")
+    assert sl.value() == 1.0 and sl.label.text() == "1.0"
+    sl.slider.setValue(0)
+    assert sl.value() == 0.0 and sl.label.text() == "Off"

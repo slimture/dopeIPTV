@@ -76,7 +76,7 @@ map and the one-way import rule.
 | `ui/main_window.py` | MainWindow composition root (+ `mw_*` mixins) |
 | `ui/channel_list.py` | List model, view, delegate painting |
 | `ui/dialogs.py` | Dialog windows |
-| `ui/settings_ui.py` | Settings building blocks: sidebar shell, pages, flat sections (`card`), rows, switches, steppers, chips |
+| `ui/settings_ui.py` | Settings building blocks: sidebar shell, search view, pages, sections (`card`), rows, switches, steppers, chips |
 | `ui/qt_i18n.py` | Qt's own strings and QLocale dates in the app's language |
 | `ui/home_widgets.py` | Home's featured strip, shelves and cards (pure presentation) |
 | `ui/tmdb_match.py` | Manual TMDB match dialog |
@@ -146,10 +146,14 @@ method in `ui/mw_settings.py` (usually `open_settings`): a `card.row()` or
 `card.toggle()` on the page it belongs to, and the write-back in the
 `if d.exec():` block at the end. Rows are found by the Settings search
 automatically. A number takes a `Stepper` (not a bare `QSpinBox`), a
-time offset a `DurationSpin` in a `Stepper`, and a set of on/off choices
-of one kind `Chip`s in a `ChipGroups` rather than a column of switches.
-Sections are flat: no frame and no outlined controls inside them - don't
-add borders back.
+time offset a `DurationSpin` and a size a `SizeSpin`, each in a `Stepper`;
+a set of on/off choices of one kind takes `Chip`s in a `ChipGroups` rather
+than a column of switches. Settings apply as they change (`commit()` in
+`open_settings`, debounced, plus once on Close): write the new key there
+with `put()`, which stores only what changed. A section is a borderless
+surface with hairlines between rows, and controls are filled, not
+outlined - don't add borders back, and don't drop the surface either: with
+neither, the rows ran together.
 
 **Add a theme**: a palette in `THEMES` (`ui/theme.py`) with every key the
 others have, `"light": True` for a light one and `"accent"` for its own

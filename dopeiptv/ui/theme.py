@@ -611,6 +611,17 @@ def build_style() -> str:
     side_action_bg = _mix(p['text'], p['side'], 0.11)
     side_action_edge = _mix(p['text'], p['side'], 0.26)
     side_action_hover = _mix(p['text'], p['side'], 0.20)
+    # Fields, dropdowns and buttons are filled, not outlined: an outline on
+    # every control inside a framed panel read as boxes inside boxes. On a
+    # dark theme the fill is worked out from the page, since the palettes'
+    # own input colour sits too close to the background to show without a
+    # border. High contrast keeps its borders - there the outline is the
+    # point.
+    light = _luminance(p['bg']) > 0.4
+    field = p['btn'] if light else _mix(p['text'], p['bg'], 0.10)
+    field_hi = p['btn_hover'] if light else _mix(p['text'], p['bg'], 0.15)
+    edge = (p['border_in'] if p.get("name") == THEMES["contrast"]["name"]
+            else "transparent")
     return rounded(f"""
 * {{
     font-family: "SF Pro Text", "Inter", "Cantarell", "Noto Sans", sans-serif;
@@ -690,7 +701,7 @@ QListWidget::item:selected {{ background: {p['sel']}; color: {p['text']}; }}
 /* Middle column */
 #MiddlePane {{ background: {p['bg']}; }}
 QLineEdit#Search {{
-    background: {p['input']}; border: 1px solid {p['border_in']}; border-radius: 9px;
+    background: {field}; border: 1px solid {edge}; border-radius: 9px;
     padding: 8px 12px; font-size: 13px;
 }}
 QLineEdit#Search:focus {{ border: 1px solid {ACCENT}; }}
@@ -759,7 +770,7 @@ QLabel#EpgRowTime  {{ color: {ACCENT}; font-size: 12px; font-weight: 700;
 QLabel#EpgRowTitle {{ font-size: 13px; background: transparent; }}
 
 QPushButton {{
-    background: {p['btn']}; border: 1px solid {p['btn_hover']}; border-radius: 9px;
+    background: {p['btn']}; border: 1px solid {edge}; border-radius: 9px;
     padding: 9px 16px; font-size: 13px; font-weight: 600;
 }}
 QPushButton:hover  {{ background: {p['btn_hover']}; }}
@@ -872,10 +883,12 @@ QTabBar::tab:selected {{ background: {p['btn']}; color: {p['text']}; }}
 QTabBar::tab:hover:!selected {{ background: {p['hover']}; }}
 
 QComboBox {{
-    background: {p['input']}; border: 1px solid {p['border_in']}; border-radius: 8px;
+    background: {field}; border: 1px solid {edge}; border-radius: 8px;
     padding: 5px 10px 5px 10px; font-size: 12px;
     combobox-popup: 0;
 }}
+QComboBox:hover {{ background: {field_hi}; }}
+QComboBox:focus {{ border: 1px solid {ACCENT}; }}
 QComboBox::drop-down {{
     subcontrol-origin: padding; subcontrol-position: center right;
     width: 18px; border: none; background: transparent;
@@ -898,7 +911,7 @@ QComboBox#InlineCombo::down-arrow {{
 /* Same visible box as the QToolButton form below, so the compact control
    strip's buttons all read as equal tiles. */
 QPushButton#InlineToggle {{
-    background: {p['btn']}; border: 1px solid {p['btn_hover']};
+    background: {field}; border: 1px solid {edge};
     padding: 4px 8px; font-size: 11px; border-radius: 7px;
 }}
 QPushButton#InlineToggle:hover {{ background: {p['btn_hover']}; }}
@@ -906,28 +919,30 @@ QPushButton#InlineToggle:checked {{ background: {ACCENT}; border: none; color: {
 /* The compact ⊞/⇅ stand-ins for the Size/Sort combos are QToolButtons (they
    open a menu); match the pushbutton look and hide the extra menu arrow. */
 QToolButton#InlineToggle {{
-    background: {p['btn']}; border: 1px solid {p['btn_hover']};
+    background: {field}; border: 1px solid {edge};
     padding: 4px 0; font-size: 12px; border-radius: 7px;
 }}
 QToolButton#InlineToggle:hover {{ background: {p['btn_hover']}; }}
 QToolButton#InlineToggle::menu-indicator {{ image: none; }}
 #MiddlePane QLabel {{ color: {p['muted2']}; font-size: 11px; }}
 QDateTimeEdit {{
-    background: {p['input']}; border: 1px solid {p['border_in']}; border-radius: 8px;
+    background: {field}; border: 1px solid {edge}; border-radius: 8px;
     padding: 5px 10px; font-size: 12px;
 }}
+QDateTimeEdit:focus {{ border: 1px solid {ACCENT}; }}
+/* The arrows sit in the field, not in a boxed column of their own. */
 QDateTimeEdit::up-button {{
     subcontrol-origin: border; subcontrol-position: top right;
-    width: 18px; border: none; border-left: 1px solid {p['border_in']};
-    border-top-right-radius: 8px; background: {p['hover']};
+    width: 18px; border: none; border-top-right-radius: 8px;
+    background: transparent;
 }}
 QDateTimeEdit::down-button {{
     subcontrol-origin: border; subcontrol-position: bottom right;
-    width: 18px; border: none; border-left: 1px solid {p['border_in']};
-    border-bottom-right-radius: 8px; background: {p['hover']};
+    width: 18px; border: none; border-bottom-right-radius: 8px;
+    background: transparent;
 }}
 QDateTimeEdit::up-button:hover, QDateTimeEdit::down-button:hover {{
-    background: {p['border_in']};
+    background: {field_hi};
 }}
 QDateTimeEdit::up-arrow {{
     image: url("{arrow_up_sm}"); width: 8px; height: 8px;
@@ -937,7 +952,7 @@ QDateTimeEdit::down-arrow {{
 }}
 
 QLineEdit {{
-    background: {p['input']}; border: 1px solid {p['border_in']}; border-radius: 8px;
+    background: {field}; border: 1px solid {edge}; border-radius: 8px;
     padding: 8px 10px;
 }}
 QLineEdit:focus {{ border: 1px solid {ACCENT}; }}
@@ -961,27 +976,26 @@ QCheckBox::indicator:disabled {{
 }}
 
 QSpinBox, QDoubleSpinBox {{
-    background: {p['input']}; color: {p['text']};
-    border: 1px solid {p['border_in']}; border-radius: 8px;
+    background: {field}; color: {p['text']};
+    border: 1px solid {edge}; border-radius: 8px;
     padding: 5px 8px; font-size: 12px;
 }}
 QSpinBox:focus, QDoubleSpinBox:focus {{ border: 1px solid {ACCENT}; }}
-/* Visible up/down stepper buttons: a filled column on the right edge with
-   clear arrows, instead of the invisible transparent zones that made spin
-   boxes read as plain little text boxes. */
+/* Clear arrows at the right edge, inside the field rather than in a boxed
+   column of their own; they light up under the pointer. */
 QSpinBox::up-button, QDoubleSpinBox::up-button {{
     subcontrol-origin: border; subcontrol-position: top right;
-    width: 20px; border: none; border-left: 1px solid {p['border_in']};
-    border-top-right-radius: 8px; background: {p['hover']};
+    width: 20px; border: none;
+    border-top-right-radius: 8px; background: transparent;
 }}
 QSpinBox::down-button, QDoubleSpinBox::down-button {{
     subcontrol-origin: border; subcontrol-position: bottom right;
-    width: 20px; border: none; border-left: 1px solid {p['border_in']};
-    border-bottom-right-radius: 8px; background: {p['hover']};
+    width: 20px; border: none;
+    border-bottom-right-radius: 8px; background: transparent;
 }}
 QSpinBox::up-button:hover, QSpinBox::down-button:hover,
 QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover {{
-    background: {p['border_in']};
+    background: {field_hi};
 }}
 QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
     image: url("{arrow_up}"); width: 10px; height: 10px;
@@ -1008,7 +1022,7 @@ QHeaderView::section {{
     padding: 4px 8px; font-size: 11px;
 }}
 QFileDialog QToolButton {{
-    background: {p['btn']}; border: 1px solid {p['btn_hover']};
+    background: {p['btn']}; border: 1px solid {edge};
     border-radius: 6px; padding: 4px 8px;
 }}
 QFileDialog QToolButton:hover {{ background: {p['btn_hover']}; }}

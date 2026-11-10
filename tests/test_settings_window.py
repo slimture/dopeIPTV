@@ -115,18 +115,24 @@ def search_and_cancel(self):
     visible = lambda: [nav.item(i).data(0x0100) for i in range(nav.count())
                        if not nav.item(i).isHidden()
                        and nav.item(i).data(0x0100)]
-    assert len(visible()) == len(shell.pages) >= 15
+    assert len(visible()) == len(shell.pages) >= 14
     shell.search.setText(tr("setting_sub_lang_fallback")[:-2])
     assert visible() == ["audio"], visible()
-    assert shell.stack.currentWidget() is shell.pages[[p.key for p in
-                                                       shell.pages].index("audio")]
+    # What a search finds is shown from every page at once, in one view.
+    assert shell.stack.currentWidget() is shell.results
+    assert shell.search_hits() == ["audio"]
+    shell.search.setText(tr("set_next_stream_note"))  # on two pages
+    assert shell.search_hits() == ["playback", "audio"], shell.search_hits()
     shell.search.setText("trakt")                    # a page title
-    assert "trakt" in visible()
+    assert "trakt" in visible() and "trakt" in shell.search_hits()
     shell.search.setText("zzzz-nothing")
     assert visible() == []
     assert shell.stack.currentWidget() is shell._none
     shell.search.setText("")
     assert len(visible()) == len(shell.pages)
+    # Every page has its rows back.
+    assert all(p.widget() is p.body for p in shell.pages)
+    assert shell.stack.currentWidget() in shell.pages
     return 0
 QDialog.exec = search_and_cancel
 w.open_settings()
@@ -246,6 +252,28 @@ def layout(self):
     assert page["metadata"].title == tr("set_page_posters")
     return 0
 QDialog.exec = layout
+w.open_settings()
+
+# 10. A change applies while the window is still open, a moment after it is
+# made; there is one Close and no Cancel.
+def live(self):
+    import time as _t
+    names = [b.text() for b in self.findChildren(QPushButton)
+             if b.objectName() == "Primary"]
+    assert tr("common_close") in names, names
+    assert not [b for b in self.findChildren(QPushButton)
+                if b.text() in (tr("common_cancel"), "Cancel")]
+    sw = [x for x in self.findChildren(ToggleSwitch)
+          if x.accessibleName() == tr("setting_deinterlace")][0]
+    was = s.value("video_deinterlace")
+    sw.setChecked(not sw.isChecked())
+    end = _t.monotonic() + 3
+    while s.value("video_deinterlace") == was and _t.monotonic() < end:
+        app.processEvents()
+        _t.sleep(0.02)
+    assert s.value("video_deinterlace") != was
+    return 0
+QDialog.exec = live
 w.open_settings()
 
 print("SETTINGS_OK", flush=True)

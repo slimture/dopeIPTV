@@ -12,15 +12,16 @@ from datetime import datetime
 
 import os
 
-from PyQt6.QtCore import QEvent, QObject, Qt, QTimer
-from PyQt6.QtGui import QColor, QIcon
+from PyQt6.QtCore import QEvent, QLocale, QObject, Qt, QTimer
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QAbstractSlider, QAbstractSpinBox, QApplication,
+    QAbstractButton, QAbstractItemView, QAbstractSlider, QAbstractSpinBox,
+    QApplication,
     QColorDialog, QComboBox, QDialog, QDialogButtonBox,
     QFileDialog,
     QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
     QListWidgetItem, QMessageBox, QPushButton, QScrollArea, QScrollBar,
-    QTextBrowser, QVBoxLayout, QWidget,
+    QSpinBox, QTextBrowser, QVBoxLayout, QWidget,
 )
 
 
@@ -73,8 +74,9 @@ from .theme import (
     is_light,
 )
 from .settings_ui import (
-    Chip, ChipGroups, ChoicePicker, ColorDot, DurationSpin, PlaylistDelegate,
-    ReorderList, SettingsPage, Stepper,
+    Chip, ChipGroups, ChoicePicker, ColorDot, DurationSpin, GridSpin,
+    PlaylistDelegate, ReorderList, SettingsPage, SizeSpin, Stepper,
+    ValueSlider, size_text,
     SettingsShell, ThemeTile, fit_to_rows, hbox, page_icon, settings_style,
 )
 from .widgets import confirm
@@ -794,6 +796,9 @@ class _SettingsMixin:
         c = play.card(tr("set_card_stream"))
         c.row(tr("setting_stream_format"), fmt_box)
         c.row(tr("setting_network_buffer"), buf_box)
+        # Settings apply as they change; these two only reach the player
+        # with the next stream, so they say so.
+        c.note(tr("set_next_stream_note"))
         # Rewinding live TV has a card of its own: its five settings sat in
         # "Stream" between the stream format and the network buffer.
         c = rw = play.card(tr("set_card_rewind"))
@@ -854,13 +859,19 @@ class _SettingsMixin:
         # Pausing a cast channel records it on this computer until you press
         # play, so this is the one setting that decides how long a pause on
         # the TV may be. It sat under Recording, where nobody casting looks.
-        cast_pause_edit = QLineEdit(
-            str(self.settings.value("cast_pause_gb", "4.5")))
-        cast_pause_edit.setMaximumWidth(110)
+        try:
+            cast_pause_mb = round(float(
+                self.settings.value("cast_pause_gb", 4.5) or 4.5) * 1000)
+        except (TypeError, ValueError):
+            cast_pause_mb = 4500
+        cast_grid = [1000, 2000, 3000, 4500, 6000, 8000, 10000, 15000,
+                     20000, 30000, 50000]
+        cast_spin = GridSpin(cast_grid, lambda v: size_text(v, ""),
+                             cast_grid[0], max(cast_grid[-1], cast_pause_mb))
+        cast_spin.setValue(max(cast_grid[0], cast_pause_mb))
+        cast_pause_box = Stepper(cast_spin, width=cast_spin.widest() + 80)
         c = play.card(tr("set_card_cast"))
-        c.row(tr("cast_pause_label"), hbox(cast_pause_edit, QLabel("GB"),
-                                           stretch=False),
-              tr("cast_pause_hint"))
+        c.row(tr("cast_pause_label"), cast_pause_box, tr("cast_pause_hint"))
         if not self.player:
             c = play.card()
             c.note(tr("set_embedded_unavailable",
@@ -868,8 +879,10 @@ class _SettingsMixin:
                       or tr("set_reason_unknown")))
 
         # -- Audio & subtitles ------------------------------------------------
-        audio = page("audio", tr("sec_audio_subs"),
-                     tr("set_page_audio_sub"), "subtitles")
+        # Sound, subtitles and picture on one page: they were two pages of
+        # four and five rows, both about how a stream plays.
+        audio = page("audio", tr("set_page_av"), tr("set_page_av_sub"),
+                     "picture")
         LANGS = [
             ("", tr("option_lang_auto")), ("swe", tr("lang_swe")),
             ("eng", tr("lang_eng")), ("nor", tr("lang_nor")),
@@ -887,8 +900,8 @@ class _SettingsMixin:
             self.settings.value("sub_mode", "auto"))
         slang_box = self._combo(LANGS, self.settings.value("sub_lang", ""))
         slang2_box = self._combo(LANGS, self.settings.value("sub_lang2", ""))
-        c = subs_card = audio.card()
-        c.row(tr("setting_audio_lang"), alang_box)
+        c = subs_card = audio.card(tr("sec_audio_subs"))
+        c.row(tr("setting_audio_lang"), alang_box, tr("set_next_stream_note"))
         c.row(tr("setting_subtitles"), sub_box)
         subs_on = lambda: sub_box.currentData() != "off"  # noqa: E731
         c.shown_if(c.row(tr("setting_sub_lang"), slang_box), subs_on)
@@ -907,6 +920,45 @@ class _SettingsMixin:
         sub_box_box = c.toggle(tr("setting_sub_box"),
                                is_on("sub_background", "false"),
                                tr("setting_sub_box_hint"))
+
+        # -- Picture (on the same page) ----------------------------------------
+        aspect_box = self._combo(
+            [("auto", tr("option_aspect_auto")), ("16:9", "16:9"),
+             ("4:3", "4:3"), ("2.35:1", "2.35:1"),
+             ("stretch", tr("option_aspect_stretch"))],
+            self.settings.value("aspect_mode", "auto"))
+        try:
+            sharpen_now = min(3.0, max(0.0, float(
+                self.settings.value("video_sharpen", 0.0) or 0.0)))
+        except (TypeError, ValueError):
+            sharpen_now = 0.0
+        # A slider, not four presets: with settings applied as they change,
+        # the picture sharpens under it while it is dragged.
+        sharpen_box = ValueSlider(
+            0.0, 3.0, sharpen_now, scale=10,
+            text=lambda v: tr("option_off") if v == 0
+            else QLocale().toString(v, "f", 1))
+        sharpen_box.setAccessibleName(tr("setting_sharpen"))
+        tonemap_box = self._combo(
+            [("auto", tr("option_tonemap_auto")), ("hable", "Hable"),
+             ("mobius", "Mobius"), ("reinhard", "Reinhard"),
+             ("bt.2390", "BT.2390"), ("clip", tr("option_tonemap_clip"))],
+            self.settings.value("video_tonemapping", "auto"))
+        hwdec_box = self._combo(
+            [("no", tr("option_hwdec_off")),
+             ("auto-copy-safe", tr("option_hwdec_safe")),
+             ("auto-safe", tr("option_hwdec_direct"))],
+            str(self.settings.value("hwdec_mode", "") or "no"))
+        c = audio.card(tr("sec_video"))
+        c.row(tr("setting_aspect_ratio"), aspect_box)
+        deint_box = c.toggle(tr("setting_deinterlace"),
+                             is_on("video_deinterlace", "false"))
+        c.row(tr("setting_sharpen"), sharpen_box)
+        c.row(tr("setting_tonemapping"), tonemap_box)
+        c = audio.card(tr("set_card_decoding"))
+        c.row(tr("setting_hwdec"), hwdec_box, tr("setting_hwdec_hint"))
+        c.note(tr("set_next_stream_note"))
+
 
         # OpenSubtitles: a key (built in, or the user's own) and an optional
         # account, which only raises how many subtitles a day can be fetched.
@@ -964,37 +1016,6 @@ class _SettingsMixin:
             run_async(self.pool, check, ok, fail)
 
         os_test_btn.clicked.connect(test_os_key)
-
-        # -- Video ------------------------------------------------------------
-        video = page("video", tr("sec_video"), tr("set_page_video_sub"),
-                     "picture")
-        aspect_box = self._combo(
-            [("auto", tr("option_aspect_auto")), ("16:9", "16:9"),
-             ("4:3", "4:3"), ("2.35:1", "2.35:1"),
-             ("stretch", tr("option_aspect_stretch"))],
-            self.settings.value("aspect_mode", "auto"))
-        sharpen_box = self._combo(
-            [("0.0", tr("option_off")), ("0.5", tr("option_low")),
-             ("1.0", tr("option_medium")), ("2.0", tr("option_high"))],
-            str(self.settings.value("video_sharpen", "0.0")))
-        tonemap_box = self._combo(
-            [("auto", tr("option_tonemap_auto")), ("hable", "Hable"),
-             ("mobius", "Mobius"), ("reinhard", "Reinhard"),
-             ("bt.2390", "BT.2390"), ("clip", tr("option_tonemap_clip"))],
-            self.settings.value("video_tonemapping", "auto"))
-        hwdec_box = self._combo(
-            [("no", tr("option_hwdec_off")),
-             ("auto-copy-safe", tr("option_hwdec_safe")),
-             ("auto-safe", tr("option_hwdec_direct"))],
-            str(self.settings.value("hwdec_mode", "") or "no"))
-        c = video.card()
-        c.row(tr("setting_aspect_ratio"), aspect_box)
-        deint_box = c.toggle(tr("setting_deinterlace"),
-                             is_on("video_deinterlace", "false"))
-        c.row(tr("setting_sharpen"), sharpen_box)
-        c.row(tr("setting_tonemapping"), tonemap_box)
-        c = video.card(tr("set_card_decoding"))
-        c.row(tr("setting_hwdec"), hwdec_box, tr("setting_hwdec_hint"))
 
         # -- Programme guide --------------------------------------------------
         guide = page("guide", tr("sec_guide"), tr("set_page_guide_sub"),
@@ -1231,25 +1252,37 @@ class _SettingsMixin:
                     self._load_categories()
 
         rec_dir_btn.clicked.connect(pick_rec_dir)
-        rec_max_edit = QLineEdit(
-            str(self.settings.value("rec_max_value", "")))
-        rec_max_edit.setPlaceholderText(tr("ph_no_limit"))
-        rec_max_edit.setMaximumWidth(110)
-        rec_max_unit = self._combo(
-            [("MB", "MB"), ("GB", "GB"), ("TB", "TB")],
-            self.settings.value("rec_max_unit", "GB"))
-        rec_total_edit = QLineEdit(
-            str(self.settings.value("rec_total_value", "")))
-        rec_total_edit.setPlaceholderText(tr("ph_no_limit"))
-        rec_total_edit.setMaximumWidth(110)
-        rec_total_unit = self._combo(
-            [("GB", "GB"), ("TB", "TB")],
-            self.settings.value("rec_total_unit", "GB"))
+        # A size and its unit in one stepper ("4.5 GB", "No limit"), where a
+        # text box took a number and a dropdown beside it took the unit.
+        def stored_mb(vkey: str, ukey: str) -> int:
+            try:
+                val = float(self.settings.value(vkey, 0) or 0)
+            except (TypeError, ValueError):
+                val = 0.0
+            mult = {"MB": 1, "GB": 1000, "TB": 1_000_000}.get(
+                str(self.settings.value(ukey, "GB")), 1000)
+            return max(0, round(val * mult))
+
+        rec_max_mb = stored_mb("rec_max_value", "rec_max_unit")
+        rec_total_mb = stored_mb("rec_total_value", "rec_total_unit")
+        rec_max_spin = SizeSpin(
+            [0, 500, 1000, 2000, 3000, 4000, 5000, 8000, 10000, 15000, 20000,
+             25000, 30000, 40000, 50000, 75000, 100000, 150000, 200000,
+             250000, 500000, 1_000_000, 2_000_000], tr("rec_cap_no_limit"),
+            rec_max_mb)
+        rec_total_spin = SizeSpin(
+            [0, 10000, 25000, 50000, 100000, 200000, 250000, 500000,
+             750000, 1_000_000, 1_500_000, 2_000_000, 3_000_000, 4_000_000,
+             5_000_000, 8_000_000, 10_000_000, 20_000_000],
+            tr("rec_cap_no_limit"), rec_total_mb)
+        rec_max_spin.setValue(rec_max_mb)
+        rec_total_spin.setValue(rec_total_mb)
+        rec_max_box = Stepper(rec_max_spin, width=rec_max_spin.widest() + 80)
+        rec_total_box = Stepper(rec_total_spin,
+                                width=rec_total_spin.widest() + 80)
         c = rec.card(tr("set_card_limits"))
-        c.row(tr("rec_max_label"), hbox(rec_max_edit, rec_max_unit,
-                                        stretch=False))
-        c.row(tr("rec_total_label"), hbox(rec_total_edit, rec_total_unit,
-                                          stretch=False))
+        c.row(tr("rec_max_label"), rec_max_box)
+        c.row(tr("rec_total_label"), rec_total_box)
         rk, rexe = self.rec.recorder()
         c = rec.card()
         c.note(tr("rec_recorder_found", kind=rk, path=rexe) if rexe
@@ -1834,17 +1867,13 @@ class _SettingsMixin:
         footer.setObjectName("SettingsFooter")
         fl = QHBoxLayout(footer)
         fl.setContentsMargins(18, 12, 18, 12)
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel)
-        for b in buttons.buttons():
-            b.setIcon(QIcon())
-        buttons.button(QDialogButtonBox.StandardButton.Ok).setObjectName(
-            "Primary")
-        buttons.accepted.connect(d.accept)
-        buttons.rejected.connect(d.reject)
+        # Changes apply as they are made, so there is nothing to confirm or
+        # take back: one Close (and Esc, and the window's own close).
+        close_btn = QPushButton(tr("common_close"), objectName="Primary")
+        close_btn.setDefault(True)
+        close_btn.clicked.connect(d.accept)
         fl.addStretch(1)
-        fl.addWidget(buttons)
+        fl.addWidget(close_btn)
         outer.addWidget(footer)
 
         # The order a person looks for things in, under headings - the pages
@@ -1853,7 +1882,7 @@ class _SettingsMixin:
         shell.arrange([
             (tr("set_sec_basics"), ["general", "playlists", "appearance",
                                     "home"]),
-            (tr("set_sec_watching"), ["playback", "audio", "video", "guide",
+            (tr("set_sec_watching"), ["playback", "audio", "guide",
                                       "multiview"]),
             (tr("set_sec_library"), ["recording", "local"]),
             (tr("set_sec_services"), ["metadata", "trakt"]),
@@ -1866,158 +1895,187 @@ class _SettingsMixin:
         d.setUpdatesEnabled(True)
         self._install_wheel_guard(d)
 
-        if d.exec():
-            self.settings.setValue(
-                "stream_format", fmt_box.currentData())
+        def flag(box) -> str:
+            return "true" if box.isChecked() else "false"
+
+        def mb_value(mb: int) -> tuple[str, str]:
+            for unit, div in (("TB", 1_000_000), ("GB", 1000)):
+                if mb >= div:
+                    return f"{mb / div:g}", unit
+            return (f"{mb:g}", "MB") if mb > 0 else ("", "GB")
+
+        # Whatever changed during this visit, for what only runs on close.
+        visit: set[str] = set()
+        player_keys = {
+            "audio_lang", "sub_mode", "sub_lang", "sub_lang2", "sub_scale",
+            "sub_color", "sub_background", "aspect_mode",
+            "video_deinterlace", "video_sharpen", "video_tonemapping"}
+
+        def commit(final: bool = False) -> None:
+            """Store what the controls say and apply it. Runs a moment after
+            each change and once more on close. Writes only what differs
+            from what is stored, so an untouched window changes nothing."""
+            if getattr(self, "_resetting", False):
+                return            # "Reset all" cleared everything: leave it
+            changed: set[str] = set()
+
+            def put(key: str, value) -> None:
+                cur = self.settings.value(key)
+                if cur is None or str(cur) != str(value):
+                    self.settings.setValue(key, value)
+                    changed.add(key)
+
+            put("stream_format", fmt_box.currentData())
             # Stored inverted: the switch asks whether to *show* the prompt.
-            self.settings.setValue(
-                "hide_upcoming_prompt",
+            put("hide_upcoming_prompt",
                 "false" if upcoming_box.isChecked() else "true")
-
-            def flag(box) -> str:
-                return "true" if box.isChecked() else "false"
-
-            self.settings.setValue("autoplay_preview", flag(autoplay_box))
-            self.settings.setValue(
-                "autoplay_next_episode", flag(autoplay_next_box))
-            self.settings.setValue(
-                "nextup_lead_secs", nextup_box.currentData())
-            self.settings.setValue(
-                "auto_reconnect_live", flag(autorecon_box))
-            self.settings.setValue("check_updates", flag(updates_box))
+            put("autoplay_preview", flag(autoplay_box))
+            put("autoplay_next_episode", flag(autoplay_next_box))
+            put("nextup_lead_secs", nextup_box.currentData())
+            put("auto_reconnect_live", flag(autorecon_box))
+            put("check_updates", flag(updates_box))
             if channel_box.currentData() != self._update_channel():
-                self.settings.setValue("update_channel",
-                                       channel_box.currentData())
+                put("update_channel", channel_box.currentData())
                 # Look again now, on the channel just chosen.
                 self.settings.setValue("update_check_ts", "0")
                 self.settings.setValue("update_banner_dismissed", "")
                 QTimer.singleShot(0, self._maybe_check_updates)
             if x11_box is not None:
-                self.settings.setValue("force_x11", flag(x11_box))
+                put("force_x11", flag(x11_box))
             if mpris_box is not None:
-                self.settings.setValue("mpris", flag(mpris_box))
-                self._apply_media_session_setting()
+                put("mpris", flag(mpris_box))
+                if "mpris" in changed:
+                    self._apply_media_session_setting()
             if desktop_box is not None:
-                want = desktop_box.isChecked()
-                self.settings.setValue(
-                    "desktop_entry", "true" if want else "false")
-                # Answered here, so the status-row offer has nothing left
-                # to ask - either way round.
-                self.settings.setValue("desktop_entry_asked", "true")
-                self.desktop_entry_btn.hide()
-                self._apply_desktop_entry(want)
-            self.settings.setValue(
-                "view_density", density_box.currentData())
-            self.settings.setValue("ui_scale", scale_box.currentData())
-            self.settings.setValue(
-                "epg_upcoming_count", epg_count_box.value())
-            self.settings.setValue(
-                "sort_order", sort_box.currentData())
-            self.settings.setValue(
-                "audio_lang", alang_box.currentData())
-            self.settings.setValue(
-                "sub_mode", sub_box.currentData())
-            self.settings.setValue(
-                "sub_lang", slang_box.currentData())
-            self.settings.setValue(
-                "sub_lang2", slang2_box.currentData())
-            self.settings.setValue("sub_scale", sub_size_box.currentData())
-            self.settings.setValue("sub_color", sub_color_box.currentData())
-            self.settings.setValue("sub_background", flag(sub_box_box))
+                put("desktop_entry", flag(desktop_box))
+                if "desktop_entry" in changed or final:
+                    # Answered here, so the status-row offer has nothing
+                    # left to ask - either way round.
+                    self.settings.setValue("desktop_entry_asked", "true")
+                    self.desktop_entry_btn.hide()
+                if "desktop_entry" in changed:
+                    self._apply_desktop_entry(desktop_box.isChecked())
+            put("view_density", density_box.currentData())
+            put("ui_scale", scale_box.currentData())
+            put("epg_upcoming_count", epg_count_box.value())
+            put("sort_order", sort_box.currentData())
+            put("audio_lang", alang_box.currentData())
+            put("sub_mode", sub_box.currentData())
+            put("sub_lang", slang_box.currentData())
+            put("sub_lang2", slang2_box.currentData())
+            put("sub_scale", sub_size_box.currentData())
+            put("sub_color", sub_color_box.currentData())
+            put("sub_background", flag(sub_box_box))
             # Written only when changed: an untouched empty field is not a
-            # setting, and OK with nothing touched changes nothing.
+            # setting.
             for skey, value in (
                     ("os_api_key", os_key_edit.text().strip()),
                     ("os_username", os_user_edit.text().strip()),
                     ("os_password", os_pass_edit.text())):
                 if value != (self.settings.value(skey, "") or ""):
-                    self.settings.setValue(skey, value)
-            self.settings.setValue(
-                "aspect_mode", aspect_box.currentData())
-            self.settings.setValue(
-                "hwdec_mode", hwdec_box.currentData())
-            if self.player:
+                    put(skey, value)
+            put("aspect_mode", aspect_box.currentData())
+            put("hwdec_mode", hwdec_box.currentData())
+            if "hwdec_mode" in changed and self.player:
                 # Stage it for the next mpv build (a fresh core reads the
                 # widget attribute, not live settings). A changed decode mode
                 # takes effect on the next opened stream - we never re-assign
                 # hwdec on the running stream, which would reinitialise the
                 # decoder and glitch the video.
                 self.player.video.hwdec_pref = hwdec_box.currentData()
-            self.settings.setValue("video_deinterlace", flag(deint_box))
-            self.settings.setValue(
-                "video_sharpen", sharpen_box.currentData())
-            self.settings.setValue(
-                "video_tonemapping", tonemap_box.currentData())
-            self.settings.setValue(
-                "cache_secs", buf_box.currentData())
-            self.settings.setValue(
-                "live_rewind_minutes", rewind_box.currentData())
-            self.settings.setValue("live_rewind_disk", flag(rewind_disk_box))
-            self.settings.setValue("live_rewind_kept", flag(kept_box))
-            self.settings.setValue(
-                "live_rewind_space_gb", space_box.currentData())
-
-            self.settings.setValue("replay_delay_min",
-                                   replay_delay_box.value())
-            self.settings.setValue("epg_delay_min", epg_delay_box.value())
-            self.xmltv.delay_minutes = self._epg_delay_minutes()
-            try:
-                val = float(
-                    rec_max_edit.text().replace(",", ".") or 0)
-            except ValueError:
-                val = 0
-            self.settings.setValue(
-                "rec_max_value", val if val > 0 else "")
-            self.settings.setValue(
-                "rec_max_unit", rec_max_unit.currentData())
-            try:
-                tval = float(rec_total_edit.text().replace(",", ".") or 0)
-            except ValueError:
-                tval = 0
-            self.settings.setValue(
-                "rec_total_value", tval if tval > 0 else "")
-            self.settings.setValue(
-                "rec_total_unit", rec_total_unit.currentData())
-            try:
-                pgb = float(cast_pause_edit.text().replace(",", ".") or 0)
-            except ValueError:
-                pgb = 0
-            # A pause with no room at all is not a pause, so a nonsense
-            # answer goes back to the default rather than to nothing.
-            self.settings.setValue("cast_pause_gb", pgb if pgb > 0 else 4.5)
-            self.settings.setValue(
-                "metadata_source", meta_source_box.currentData())
-            self.settings.setValue(
-                "tmdb_api_key", tmdb_key_edit.text().strip())
-            self.settings.setValue(
-                "mv_frameless",
+            put("video_deinterlace", flag(deint_box))
+            put("video_sharpen", f"{sharpen_box.value():.1f}")
+            put("video_tonemapping", tonemap_box.currentData())
+            put("cache_secs", buf_box.currentData())
+            put("live_rewind_minutes", rewind_box.currentData())
+            put("live_rewind_disk", flag(rewind_disk_box))
+            put("live_rewind_kept", flag(kept_box))
+            put("live_rewind_space_gb", space_box.currentData())
+            put("replay_delay_min", replay_delay_box.value())
+            put("epg_delay_min", epg_delay_box.value())
+            if "epg_delay_min" in changed:
+                self.xmltv.delay_minutes = self._epg_delay_minutes()
+            # A size left as it was keeps its stored spelling ("2.5" TB).
+            if rec_max_box.value() != rec_max_mb:
+                val, unit = mb_value(rec_max_box.value())
+                put("rec_max_value", val)
+                put("rec_max_unit", unit)
+            if rec_total_box.value() != rec_total_mb:
+                val, unit = mb_value(rec_total_box.value())
+                put("rec_total_value", val)
+                put("rec_total_unit", unit)
+            if cast_pause_box.value() != cast_pause_mb:
+                put("cast_pause_gb", f"{cast_pause_box.value() / 1000:g}")
+            put("metadata_source", meta_source_box.currentData())
+            put("tmdb_api_key", tmdb_key_edit.text().strip())
+            put("mv_frameless",
                 "false" if mv_titlebar_box.isChecked() else "true")
-            self.settings.setValue("mv_on_top", flag(mv_ontop_box))
-            self.settings.setValue("mv_remember_geo", flag(mv_geo_box))
-            self.settings.setValue("mv_stop_docked", flag(mv_stop_box))
-            self.settings.setValue("mv_new_unmuted", flag(mv_unmute_box))
-            self.settings.setValue(
-                "mv_conflict_mode", mv_conflict_box.currentData())
-            self.settings.setValue("mv_autohide_secs", mv_hide_spin.value())
-            self.settings.setValue("mv_seek_step_min", mv_step_spin.value())
-            self.settings.setValue("mv_cells", mv_cells_box.currentData())
-            self._apply_multiview_settings()
-            self.settings.setValue("home_enabled", flag(home_show_box))
-            self.settings.setValue("home_start", flag(home_start_box))
+            put("mv_on_top", flag(mv_ontop_box))
+            put("mv_remember_geo", flag(mv_geo_box))
+            put("mv_stop_docked", flag(mv_stop_box))
+            put("mv_new_unmuted", flag(mv_unmute_box))
+            put("mv_conflict_mode", mv_conflict_box.currentData())
+            put("mv_autohide_secs", mv_hide_spin.value())
+            put("mv_seek_step_min", mv_step_spin.value())
+            put("mv_cells", mv_cells_box.currentData())
+            put("home_enabled", flag(home_show_box))
+            put("home_start", flag(home_start_box))
             for skey, box in home_shelf_boxes.items():
-                self.settings.setValue(skey, flag(box))
-            self.settings.setValue("follow_notify", flag(follow_notify_box))
-            self._apply_home_settings()
-            self.cover.reload()
-            if self.player:
+                put(skey, flag(box))
+            put("follow_notify", flag(follow_notify_box))
+
+            if any(k.startswith("mv_") for k in changed):
+                self._apply_multiview_settings()
+            if changed & ({"home_enabled", "home_start", "follow_notify"}
+                          | set(home_shelf_boxes)):
+                self._apply_home_settings()
+            if changed & {"metadata_source", "tmdb_api_key"}:
+                self.cover.reload()
+            if changed & player_keys and self.player:
                 self.player.apply_default_options()
-            self._apply_view_settings()
-            self.list_model.refresh_all()
-            # Re-render the open detail panel so a changed "upcoming count"
-            # (and other view tweaks) take effect without re-selecting.
-            cur = self.listw.currentIndex()
-            if cur.isValid():
-                self._on_current_changed(cur)
+            if changed & {"view_density", "sort_order"}:
+                self._apply_view_settings()
+                self.list_model.refresh_all()
+            visit.update(changed)
+            if final and visit:
+                self._apply_view_settings()
+                self.list_model.refresh_all()
+                # Re-render the open detail panel so a changed "upcoming
+                # count" (and other view tweaks) take effect without
+                # re-selecting. On close only: re-selecting can start a
+                # preview.
+                cur = self.listw.currentIndex()
+                if cur.isValid():
+                    self._on_current_changed(cur)
+
+        # A change is applied a moment after it is made - long enough that a
+        # held stepper button or a dragged slider applies once, not forty
+        # times.
+        live = QTimer(d)
+        live.setSingleShot(True)
+        live.setInterval(350)
+        live.timeout.connect(commit)
+
+        def soon(*_a) -> None:
+            live.start()
+
+        for combo in d.findChildren(QComboBox):
+            combo.currentIndexChanged.connect(soon)
+        for button in d.findChildren(QAbstractButton):
+            if button.isCheckable():
+                button.toggled.connect(soon)
+        for spin in d.findChildren(QSpinBox):
+            spin.valueChanged.connect(soon)
+        for slider in d.findChildren(QAbstractSlider):
+            slider.valueChanged.connect(soon)
+        for edit in d.findChildren(QLineEdit):
+            if edit is not shell.search and not isinstance(
+                    edit.parent(), QAbstractSpinBox):
+                edit.editingFinished.connect(soon)
+
+        d.exec()
+        live.stop()
+        commit(final=True)
 
     @staticmethod
     def _format_release_notes(body: str) -> str:
