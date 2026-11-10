@@ -140,7 +140,7 @@ var iptvHit = (function () {
     card: ["M3.5 6.5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z",
            "M3.5 9.5h17", "M7 15h4"],
     company: ["M4.5 20.5v-15a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v15", "M14.5 9.5h4a1 1 0 0 1 1 1v10",
-              "M3 20.5h18", "M8 8h3", "M8 11.5h3", "M8 15h3"]
+              "M3 20.5h18", "M8 8h3", "M8 11.5h3", "M8 15h3", "M9.5 20.5v-2.5"]
   };
   function icon(name) {
     var NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
