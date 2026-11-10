@@ -306,6 +306,7 @@
   "about_check_failed": "Không thể kiểm tra cập nhật ngay bây giờ.",
   "about_download": "Tải bản cập nhật",
   "about_check_updates": "Kiểm tra cập nhật",
+  "about_made_by": "Phát triển bởi",
   "about_tmdb_credit": "Siêu dữ liệu và hình ảnh phim và TV được cung cấp bởi TMDB. Sản phẩm này sử dụng TMDB API nhưng không được TMDB xác nhận hay chứng nhận.",
   "menu_about": "Giới thiệu dopeIPTV",
   "menu_quit": "Thoát",

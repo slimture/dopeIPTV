@@ -306,6 +306,7 @@
   "about_check_failed": "지금은 업데이트를 확인할 수 없습니다.",
   "about_download": "업데이트 다운로드",
   "about_check_updates": "업데이트 확인",
+  "about_made_by": "제작:",
   "about_tmdb_credit": "영화 및 TV 메타데이터와 아트워크는 TMDB에서 제공합니다. 이 제품은 TMDB API를 사용하지만 TMDB의 보증이나 인증을 받지 않았습니다.",
   "menu_about": "dopeIPTV 정보",
   "menu_quit": "종료",

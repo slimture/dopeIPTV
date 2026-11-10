@@ -306,6 +306,7 @@
   "about_check_failed": "Наразі не вдалося перевірити оновлення.",
   "about_download": "Завантажити оновлення",
   "about_check_updates": "Перевірити оновлення",
+  "about_made_by": "Створено",
   "about_tmdb_credit": "Метадані та графіку фільмів і ТБ надано TMDB. Цей продукт використовує TMDB API, але не схвалений і не сертифікований TMDB.",
   "menu_about": "Про dopeIPTV",
   "menu_quit": "Вийти",

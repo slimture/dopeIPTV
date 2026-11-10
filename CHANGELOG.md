@@ -23,6 +23,13 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   Lever's, AppImageLauncher's) and keeps it across the restart; the entries
   dopeIPTV ships also say `StartupWMClass=dopeiptv`.
 
+### Changed
+- About: "Made by" and the Solecraft logotype beside **Close**, a quiet
+  link to solecraft.se.
+- About: the release notes show only what is new to you - this version's
+  own notes when you are up to date, the versions since yours when an
+  update is waiting - not every version back to 1.2.15.
+
 ## [1.4.2]
 
 Settings rebuilt and applied live, the guide with every channel, links in

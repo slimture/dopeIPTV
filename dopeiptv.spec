@@ -179,6 +179,7 @@ datas += collect_data_files('dopeiptv')
 # silently collapses to English-only in the frozen app.
 datas += [(f, 'dopeiptv/locale') for f in glob.glob('dopeiptv/locale/*.json')]
 datas += [(f, 'dopeiptv/assets/flags') for f in glob.glob('dopeiptv/assets/flags/*')]
+datas += [(f, 'dopeiptv/assets') for f in glob.glob('dopeiptv/assets/*.svg')]
 hiddenimports = ["mpv"]
 
 # pychromecast (and its zeroconf/protobuf deps) ship data files and submodules

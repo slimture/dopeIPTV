@@ -306,6 +306,7 @@
   "about_check_failed": "Şu anda güncellemeler denetlenemedi.",
   "about_download": "Güncellemeyi indir",
   "about_check_updates": "Güncellemeleri denetle",
+  "about_made_by": "Geliştiren:",
   "about_tmdb_credit": "Film ve TV meta verileri ile görselleri TMDB tarafından sağlanmaktadır. Bu ürün TMDB API'sini kullanır ancak TMDB tarafından onaylanmamış veya sertifikalandırılmamıştır.",
   "menu_about": "dopeIPTV Hakkında",
   "menu_quit": "Çıkış",

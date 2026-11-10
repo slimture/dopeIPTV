@@ -306,6 +306,7 @@
   "about_check_failed": "Não foi possível verificar atualizações agora.",
   "about_download": "Baixar a atualização",
   "about_check_updates": "Verificar atualizações",
+  "about_made_by": "Criado por",
   "about_tmdb_credit": "Metadados e imagens de filmes e TV fornecidos pelo TMDB. Este produto usa a API do TMDB, mas não é endossado nem certificado pelo TMDB.",
   "menu_about": "Sobre o dopeIPTV",
   "menu_quit": "Sair",

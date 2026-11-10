@@ -101,6 +101,12 @@ def is_newer(latest_tag: str, current: str) -> bool:
     return _parse(latest_tag) > _parse(current)
 
 
+def same_release(a: str, b: str) -> bool:
+    """Whether *a* and *b* are the same release (a test build counts as the
+    release it carries the number of: 1.4.2.7 and v1.4.2)."""
+    return _parse(a)[:3] == _parse(b)[:3]
+
+
 def is_nightly(version: str) -> bool:
     """A test build's version has a fourth part: 1.4.0.123."""
     return len(_parse(version)) > 3

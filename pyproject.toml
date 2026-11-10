@@ -33,7 +33,7 @@ include = ["dopeiptv*"]
 [tool.setuptools.package-data]
 # Ship the add-on locale JSONs (Turkish, Portuguese, Arabic, …) inside the
 # wheel/sdist; i18n.py loads them at import from dopeiptv/locale/.
-dopeiptv = ["locale/*.json", "assets/flags/*.svg", "assets/flags/LICENSE", "assets/flags/SOURCE.txt"]
+dopeiptv = ["locale/*.json", "assets/*.svg", "assets/flags/*.svg", "assets/flags/LICENSE", "assets/flags/SOURCE.txt"]
 
 [tool.mypy]
 # Type gate scoped to the pure-logic layer (data, network, services) — the

@@ -462,6 +462,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "update_verifying": {"en": "Checking that the new version starts…"},
     "update_done_restart": {"en": "dopeIPTV {version} is installed. Restart now to use it?"},
     "update_failed": {"en": "The update could not be installed: {error}. Nothing was changed."},
+    "about_made_by": {"en": "Made by"},
     "about_tmdb_credit": {"en": "Movie and TV metadata and artwork provided by TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB."},
     "menu_about": {"en": "About dopeIPTV"},
     "menu_quit": {"en": "Quit"},

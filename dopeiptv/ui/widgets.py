@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 from PyQt6.QtCore import (
     QPointF, QRect, QRectF, QSize, Qt, QTimer, QVariantAnimation, pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap,
+    QColor, QIcon, QImage, QImageReader, QPainter, QPainterPath, QPen, QPixmap,
 )
 from PyQt6.QtWidgets import (
     QLabel, QLayout, QLayoutItem, QMessageBox, QPushButton, QWidget,
@@ -153,6 +154,72 @@ def heart_pixmap(size: int, colour: str, scale: int = 3) -> QPixmap:
     pr.drawPath(heart_path(float(size)))
     pr.end()
     return pm
+
+
+_SOLECRAFT_SVG = Path(__file__).resolve().parent.parent / "assets" / "solecraft.svg"
+
+
+def solecraft_pixmap(height: int, colour: str, dpr: float = 1.0) -> QPixmap | None:
+    """The Solecraft logotype *height* px tall in *colour*, or None when it
+    cannot be read (no file, no SVG image plugin) - callers fall back to
+    the name in text."""
+    reader = QImageReader(str(_SOLECRAFT_SVG))
+    size = reader.size()
+    if not size.isValid() or size.height() <= 0:
+        return None
+    px_h = max(1, round(height * dpr))
+    reader.setScaledSize(QSize(round(size.width() * px_h / size.height()), px_h))
+    img = reader.read()
+    if img.isNull():
+        return None
+    img = img.convertToFormat(QImage.Format.Format_ARGB32_Premultiplied)
+    p = QPainter(img)
+    p.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+    p.fillRect(img.rect(), QColor(colour))
+    p.end()
+    pm = QPixmap.fromImage(img)
+    pm.setDevicePixelRatio(dpr)
+    return pm
+
+
+class SolecraftLink(QPushButton):
+    """The Solecraft logotype as a quiet link: muted at rest, the text
+    colour under the pointer. Text instead where the logotype cannot be
+    drawn."""
+
+    HEIGHT = 13
+
+    def __init__(self, url: str, rest: str, hover: str,
+                 parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._url = url
+        self._colours = (rest, hover)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setToolTip("Solecraft AB")
+        self.setAccessibleName("Solecraft AB")
+        self.setFlat(True)
+        self.setStyleSheet(
+            "QPushButton { border:none; background:transparent; padding:2px 0;"
+            " font-size:12px; color:%s; }"
+            "QPushButton:hover { color:%s; }" % (rest, hover))
+        self._paint(rest)
+
+    def _paint(self, colour: str) -> None:
+        pm = solecraft_pixmap(self.HEIGHT, colour, self.devicePixelRatioF())
+        if pm is None:
+            self.setText("Solecraft AB")
+            return
+        self.setIcon(QIcon(pm))
+        self.setIconSize(QSize(round(pm.width() / pm.devicePixelRatio()),
+                               self.HEIGHT))
+
+    def enterEvent(self, event) -> None:
+        self._paint(self._colours[1])
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:
+        self._paint(self._colours[0])
+        super().leaveEvent(event)
 
 
 class _ChipPainting:

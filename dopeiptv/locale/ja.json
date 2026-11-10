@@ -306,6 +306,7 @@
   "about_check_failed": "現在アップデートを確認できませんでした。",
   "about_download": "アップデートをダウンロード",
   "about_check_updates": "アップデートを確認",
+  "about_made_by": "制作:",
   "about_tmdb_credit": "映画とテレビのメタデータおよびアートワークはTMDBによって提供されています。この製品はTMDB APIを使用していますが、TMDBによる承認や認定を受けたものではありません。",
   "menu_about": "dopeIPTVについて",
   "menu_quit": "終了",

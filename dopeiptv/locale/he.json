@@ -306,6 +306,7 @@
   "about_check_failed": "לא ניתן היה לבדוק עדכונים כרגע.",
   "about_download": "הורד את העדכון",
   "about_check_updates": "בדוק עדכונים",
+  "about_made_by": "נוצר על ידי",
   "about_tmdb_credit": "מטא-נתונים ותמונות של סרטים וטלוויזיה מסופקים על ידי TMDB. מוצר זה משתמש ב-TMDB API אך אינו מאושר או מוסמך על ידי TMDB.",
   "menu_about": "אודות dopeIPTV",
   "menu_quit": "יציאה",

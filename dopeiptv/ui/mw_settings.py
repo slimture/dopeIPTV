@@ -2093,16 +2093,37 @@ class _SettingsMixin:
         commit(final=True)
 
     @staticmethod
-    def _format_release_notes(body: str) -> str:
-        """Clean a GitHub release body for QTextBrowser's markdown renderer.
-        GitHub wraps the detail in <details>/<summary> HTML, which Qt's markdown
-        renderer can't handle - it swallowed the section headings and left bare
-        bullet lists with no context. Strip those wrappers (and the redundant
-        top '## dopeIPTV x.y.z' title - the status line already names the
-        version) so the headings and bullets render as clean markdown."""
+    def _format_release_notes(body: str, current: str = "",
+                              update: bool = False) -> str:
+        """Clean a GitHub release body for QTextBrowser's markdown renderer,
+        keeping only what is new to the one reading it.
+
+        The body carries every version back to the last big release, for
+        someone who skips several on GitHub; the small box in About showed
+        all of it. Up to date (*update* False), only *current*'s own notes
+        are kept; with an update waiting, the versions after *current*. One
+        version left, its '## dopeIPTV x.y.z' title goes too - the status
+        line names it. GitHub's <details>/<summary> wrappers are stripped
+        (Qt's markdown swallowed the headings inside them), and so is "On
+        the AppImage ...? Click Update now": About has its own button."""
+        from ..core.updates import is_newer, same_release
         body = re.sub(r"(?is)<summary>.*?</summary>", "", body)
         body = re.sub(r"(?i)</?details>", "", body)
-        body = re.sub(r"(?im)^\s*##\s+dopeIPTV\b.*$", "", body, count=1)
+        parts = re.split(r"(?im)^[ \t]*##[ \t]+dopeIPTV[ \t]+(\S+)[^\n]*$", body)
+        sections = list(zip(parts[1::2], parts[2::2], strict=False))
+        if sections:
+            if current and update:
+                keep = [s for s in sections if is_newer(s[0], current)]
+            elif current:
+                keep = [s for s in sections if same_release(s[0], current)]
+            else:
+                keep = []
+            keep = keep or sections[:1]
+            if len(keep) == 1:
+                body = keep[0][1]
+            else:
+                body = "\n\n".join(f"## dopeIPTV {v}\n{text}" for v, text in keep)
+        body = re.sub(r"(?ims)^On the AppImage from .*?(?=\n\s*\n|\Z)", "", body)
         body = re.sub(r"\n{3,}", "\n\n", body)
         return body.strip()
 
@@ -2205,10 +2226,23 @@ class _SettingsMixin:
         credit.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         lay.addWidget(credit)
 
+        # Who makes it, beside Close: the Solecraft logotype, quiet like the
+        # links above (the website's footer says it the same way).
+        from .widgets import SolecraftLink
+        foot = QHBoxLayout()
+        foot.setSpacing(6)
+        made = QLabel(tr("about_made_by"))
+        made.setStyleSheet(f"color:{P['muted2']}; font-size:12px;")
+        foot.addWidget(made)
+        maker = SolecraftLink("https://solecraft.se", P["muted"], P["text"])
+        maker.clicked.connect(lambda: open_url("https://solecraft.se"))
+        foot.addWidget(maker)
+        foot.addStretch(1)
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         btns.rejected.connect(d.accept)
         btns.accepted.connect(d.accept)
-        lay.addWidget(btns)
+        foot.addWidget(btns)
+        lay.addLayout(foot)
 
         def done(rel) -> None:
             recheck.setEnabled(True)
@@ -2220,7 +2254,8 @@ class _SettingsMixin:
                 status.setStyleSheet(
                     f"color:{P['text']}; font-size:12px; font-weight:600;")
                 if rel.get("body"):
-                    notes.setMarkdown(self._format_release_notes(rel["body"]))
+                    notes.setMarkdown(self._format_release_notes(
+                        rel["body"], VERSION, update=True))
                     notes.show()
                 if rel.get("url"):
                     try:
@@ -2236,7 +2271,8 @@ class _SettingsMixin:
                 # Up to date: the room is there anyway, and the newest
                 # release's notes are what this version brought.
                 if rel.get("body"):
-                    notes.setMarkdown(self._format_release_notes(rel["body"]))
+                    notes.setMarkdown(self._format_release_notes(
+                        rel["body"], VERSION))
                     notes.show()
                 else:
                     notes.hide()

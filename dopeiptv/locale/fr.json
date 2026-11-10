@@ -306,6 +306,7 @@
   "about_check_failed": "Impossible de vérifier les mises à jour pour l'instant.",
   "about_download": "Télécharger la mise à jour",
   "about_check_updates": "Rechercher des mises à jour",
+  "about_made_by": "Créé par",
   "about_tmdb_credit": "Métadonnées et visuels de films et séries fournis par TMDB. Ce produit utilise l'API de TMDB mais n'est ni approuvé ni certifié par TMDB.",
   "menu_about": "À propos de dopeIPTV",
   "menu_quit": "Quitter",

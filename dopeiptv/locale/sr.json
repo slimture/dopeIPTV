@@ -306,6 +306,7 @@
   "about_check_failed": "Trenutno nije moguće proveriti ažuriranja.",
   "about_download": "Preuzmi ažuriranje",
   "about_check_updates": "Proveri ažuriranja",
+  "about_made_by": "Napravio",
   "about_tmdb_credit": "Metapodatke i grafiku za filmove i TV obezbeđuje TMDB. Ovaj proizvod koristi TMDB API ali nije podržan niti sertifikovan od strane TMDB-a.",
   "menu_about": "O dopeIPTV-u",
   "menu_quit": "Izađi",

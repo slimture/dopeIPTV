@@ -306,6 +306,7 @@
   "about_check_failed": "Сейчас не удалось проверить обновления.",
   "about_download": "Скачать обновление",
   "about_check_updates": "Проверить обновления",
+  "about_made_by": "Создано",
   "about_tmdb_credit": "Метаданные и изображения фильмов и сериалов предоставлены TMDB. Этот продукт использует API TMDB, но не одобрен и не сертифицирован TMDB.",
   "menu_about": "О dopeIPTV",
   "menu_quit": "Выход",

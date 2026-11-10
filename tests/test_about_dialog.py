@@ -111,3 +111,71 @@ def test_a_failed_check_leaves_no_overlap(monkeypatch):
     assert "QTextBrowser" not in [n for n, _ in rows]
     for (a, ra), (b, rb) in zip(rows, rows[1:], strict=False):
         assert ra.bottom() < rb.top(), f"{a} {ra} runs into {b} {rb}"
+
+
+_BODY = """## dopeIPTV 1.4.3
+
+Three fixes.
+
+- Fix three.
+
+On the AppImage from 1.2.15 or later? Click **Update now** in the banner.
+
+## dopeIPTV 1.4.2
+
+Settings rebuilt.
+
+- Settings.
+
+## dopeIPTV 1.4.1
+
+Themes.
+
+## dopeIPTV 1.4.0
+
+A new Home.
+"""
+
+
+def test_up_to_date_shows_only_this_versions_notes():
+    """The release body carries every version back to the last big one;
+    the small box in About showed all of it."""
+    out = mw_settings._SettingsMixin._format_release_notes(_BODY, "1.4.2")
+    assert out == "Settings rebuilt.\n\n- Settings."
+    # A test build is the release it carries the number of.
+    out = mw_settings._SettingsMixin._format_release_notes(_BODY, "1.4.2.7")
+    assert out.startswith("Settings rebuilt.")
+
+
+def test_an_update_shows_what_is_new_since_this_version():
+    out = mw_settings._SettingsMixin._format_release_notes(
+        _BODY, "1.4.1", update=True)
+    assert "## dopeIPTV 1.4.3" in out and "## dopeIPTV 1.4.2" in out
+    assert "1.4.1" not in out and "Themes" not in out and "Home" not in out
+    # About has its own button: no "click Update now in the banner".
+    assert "On the AppImage" not in out
+    one = mw_settings._SettingsMixin._format_release_notes(
+        _BODY, "1.4.2", update=True)
+    assert one == "Three fixes.\n\n- Fix three."
+
+
+def test_notes_from_an_unknown_version_still_show_the_newest():
+    out = mw_settings._SettingsMixin._format_release_notes(_BODY, "9.9.9")
+    assert out.startswith("Three fixes.")
+    assert mw_settings._SettingsMixin._format_release_notes(
+        "Just text.", "1.4.2") == "Just text."
+
+
+def test_the_solecraft_logotype_ships_and_draws():
+    """About's "Made by" draws the logotype from the package's assets; a
+    build that left the file out would fall back to plain text."""
+    QApplication.instance() or QApplication([])
+    from dopeiptv.ui.widgets import solecraft_pixmap
+    pm = solecraft_pixmap(13, "#ffffff")
+    assert pm is not None and pm.height() == 13 and pm.width() > 60
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(root, "pyproject.toml"), encoding="utf-8") as fh:
+        assert '"assets/*.svg"' in fh.read()
+    for spec in ("dopeiptv.spec", "dopeiptv-mac.spec", "dopeiptv-win.spec"):
+        with open(os.path.join(root, spec), encoding="utf-8") as fh:
+            assert "glob.glob('dopeiptv/assets/*.svg')" in fh.read(), spec

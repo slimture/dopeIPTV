@@ -306,6 +306,7 @@
   "about_check_failed": "تعذّر التحقق من التحديثات الآن.",
   "about_download": "تنزيل التحديث",
   "about_check_updates": "التحقق من التحديثات",
+  "about_made_by": "من صنع",
   "about_tmdb_credit": "البيانات الوصفية والصور الخاصة بالأفلام والتلفاز مقدّمة من TMDB. يستخدم هذا المنتج واجهة TMDB API لكنه غير معتمد أو مصادق عليه من TMDB.",
   "menu_about": "حول dopeIPTV",
   "menu_quit": "إنهاء",

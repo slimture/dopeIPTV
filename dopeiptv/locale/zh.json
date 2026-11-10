@@ -306,6 +306,7 @@
   "about_check_failed": "暂时无法检查更新。",
   "about_download": "下载更新",
   "about_check_updates": "检查更新",
+  "about_made_by": "开发者：",
   "about_tmdb_credit": "影视元数据和图片由 TMDB 提供。本产品使用 TMDB API，但未获得 TMDB 的认可或认证。",
   "menu_about": "关于 dopeIPTV",
   "menu_quit": "退出",

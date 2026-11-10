@@ -306,6 +306,7 @@
   "about_check_failed": "Kunde inte söka efter uppdateringar just nu.",
   "about_download": "Ladda ner uppdateringen",
   "about_check_updates": "Sök efter uppdateringar",
+  "about_made_by": "Skapad av",
   "about_tmdb_credit": "Metadata och bilder för filmer och serier tillhandahålls av TMDB. Denna produkt använder TMDB:s API men är inte godkänd eller certifierad av TMDB.",
   "menu_about": "Om dopeIPTV",
   "menu_quit": "Avsluta",

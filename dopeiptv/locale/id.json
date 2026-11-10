@@ -306,6 +306,7 @@
   "about_check_failed": "Tidak dapat memeriksa pembaruan saat ini.",
   "about_download": "Unduh pembaruan",
   "about_check_updates": "Periksa pembaruan",
+  "about_made_by": "Dibuat oleh",
   "about_tmdb_credit": "Metadata dan gambar film serta TV disediakan oleh TMDB. Produk ini menggunakan API TMDB tetapi tidak didukung atau disertifikasi oleh TMDB.",
   "menu_about": "Tentang dopeIPTV",
   "menu_quit": "Keluar",

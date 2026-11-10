@@ -306,6 +306,7 @@
   "about_check_failed": "Haikuweza kuangalia masasisho sasa hivi.",
   "about_download": "Pakua sasisho",
   "about_check_updates": "Angalia masasisho",
+  "about_made_by": "Imetengenezwa na",
   "about_tmdb_credit": "Metadata na sanaa za filamu na TV zinatolewa na TMDB. Bidhaa hii hutumia TMDB API lakini haijaidhinishwa wala kuthibitishwa na TMDB.",
   "menu_about": "Kuhusu dopeIPTV",
   "menu_quit": "Ondoka",
