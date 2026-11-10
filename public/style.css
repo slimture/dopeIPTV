@@ -20,7 +20,7 @@
   --ink: #0e0e10; --bg: #151517; --surface: #202023; --surface-2: #28282c;
   --line: #333338; --line-2: #45454b; --text: #f5f5f7; --muted: #aeaeb4;
   --faint: #919197; --accent: #2997ff; --btn: #0071e3; --accent-ink: #fff;
-  --live: #ff453a; --brand: #4c8dff;
+  --live: #ff453a; --brand: #4c8dff; --wallet: #fff; --wallet-ink: #000;
   --radius: 22px; --maxw: 1080px;
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
   --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -32,20 +32,20 @@
     --ink: #f5f5f7; --bg: #fff; --surface: #f5f5f7; --surface-2: #fbfbfd;
   --line: #d2d2d7; --line-2: #c7c7cc; --text: #1d1d1f; --muted: #6e6e73;
   --faint: #7a7a80; --accent: #0066cc; --btn: #0071e3; --accent-ink: #fff;
-  --live: #ff3b30; color-scheme: light;
+  --live: #ff3b30; --wallet: #000; --wallet-ink: #fff; color-scheme: light;
   }
 }
 :root[data-theme="dark"] {
   --ink: #0e0e10; --bg: #151517; --surface: #202023; --surface-2: #28282c;
   --line: #333338; --line-2: #45454b; --text: #f5f5f7; --muted: #aeaeb4;
   --faint: #919197; --accent: #2997ff; --btn: #0071e3; --accent-ink: #fff;
-  --live: #ff453a; color-scheme: dark;
+  --live: #ff453a; --wallet: #fff; --wallet-ink: #000; color-scheme: dark;
 }
 :root[data-theme="light"] {
   --ink: #f5f5f7; --bg: #fff; --surface: #f5f5f7; --surface-2: #fbfbfd;
   --line: #d2d2d7; --line-2: #c7c7cc; --text: #1d1d1f; --muted: #6e6e73;
   --faint: #7a7a80; --accent: #0066cc; --btn: #0071e3; --accent-ink: #fff;
-  --live: #ff3b30; color-scheme: light;
+  --live: #ff3b30; --wallet: #000; --wallet-ink: #fff; color-scheme: light;
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -780,10 +780,12 @@ footer .v a:hover { color: var(--accent); }
 .dn-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .dn-go, .dn-paybtn { justify-content: center; width: 100%; padding: 14px 18px; font-size: 16px; }
 .dn-go:disabled, .dn-paybtn:disabled { opacity: .55; cursor: default; transform: none; }
-/* The wallets' own colours, over .btn.primary's accent. */
-.dn .btn.dn-wallet--apple, .dn .btn.dn-wallet--apple:hover { background: #000; color: #fff;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14); transition: none; }
-.dn .btn.dn-wallet--google, .dn .btn.dn-wallet--google:hover { background: #202124; color: #fff; transition: none; }
+/* The wallets' own colours, over .btn.primary's accent - and their own
+   rule for them: the white button on a dark page, the black one on a light
+   page (--wallet). A black button on the dark dialog all but vanished. */
+.dn .btn.dn-wallet { background: var(--wallet); color: var(--wallet-ink); box-shadow: none;
+  transition: opacity .15s ease; }
+@media (hover: hover) { .dn .btn.dn-wallet:hover { background: var(--wallet); opacity: .88; } }
 /* Shown at once where Safari says there is Apple Pay, live a moment later
    when Stripe is ready: the button itself, only a little quieter. */
 .dn .btn.dn-wallet--wait:disabled { opacity: .82; cursor: progress; }
