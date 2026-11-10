@@ -26,8 +26,18 @@ load_rc_config $name
 : ${iptv_donate_script:=/usr/local/www/iptv/donate/donate.py}
 : ${iptv_donate_log:=/var/log/iptv-donate.log}
 
-pidfile=/var/run/${name}.pid
+# daemon(8) writes its pidfile after it has become ${iptv_donate_user}, so the
+# file lives in a directory of that user's, made here: in /var/run itself it
+# failed with "ppidfile ... Permission denied".
+piddir=/var/run/${name}
+pidfile=${piddir}/${name}.pid
 command=/usr/sbin/daemon
 command_args="-R 5 -P ${pidfile} -u ${iptv_donate_user} -o ${iptv_donate_log} ${iptv_donate_python} -I ${iptv_donate_script}"
+start_precmd=iptv_donate_precmd
+
+iptv_donate_precmd()
+{
+	install -d -o "${iptv_donate_user}" -m 755 "${piddir}"
+}
 
 run_rc_command "$1"

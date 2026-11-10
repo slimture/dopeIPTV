@@ -309,7 +309,7 @@ Log rotation, next to the two lines from step 10 (SIGHUP makes daemon(8)
 reopen the log):
 
 ```sh
-echo '/var/log/iptv-donate.log                     iptv:iptv      640  5     1024 *    JC    /var/run/iptv_donate.pid' \
+echo '/var/log/iptv-donate.log                     iptv:iptv      640  5     1024 *    JC    /var/run/iptv_donate/iptv_donate.pid' \
     >> /usr/local/etc/newsyslog.conf.d/iptv.dope.rs.conf
 newsyslog -nv 2>&1 | grep donate
 ```
