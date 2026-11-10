@@ -480,24 +480,31 @@ nginx -V 2>&1 | tr ' ' '\n' | grep auth_request
 No line: install a build that has it (`pkg install nginx-full`) before the
 new content file, or `nginx -t` refuses it.
 
-**A notification on the phone.** The service looks at Stripe every minute
-and a half and pushes each new donation to an [ntfy](https://ntfy.sh)
-topic: "New donation: 12.50 EUR", how it was paid and from whom; a tap
-opens the admin page's donations. The first look after a start only notes
-where it is, so a restart never repeats old ones. Pick a topic name nobody
-will guess - on ntfy.sh, whoever knows it can read it (jail):
+**Notifications on your devices.** A new donation comes as a notification
+- "New donation: 12.50 EUR", how it was paid and from whom; a click opens
+the admin page's donations. It is the browser's own push (Apple's,
+Google's, Mozilla's or Microsoft's push service carries it, encrypted for
+that device alone): no app, no third party. The service looks at Stripe
+every minute and a half; its first look only notes where it is, so a
+restart never repeats old donations. It signs the pushes with a key of its
+own, made on first use (`stats/push-vapid.pem`), and needs Python's
+cryptography package (jail):
 
 ```sh
-echo "NOTIFY_URL=https://ntfy.sh/dopeiptv-$(openssl rand -hex 12)" >> /usr/local/etc/iptv-donate.conf
-grep NOTIFY_URL /usr/local/etc/iptv-donate.conf
+python3 -c 'import cryptography; print("ok")' || pkg install -y "$(python3 -c 'import sys; print(f"py{sys.version_info[0]}{sys.version_info[1]}-cryptography")')"
 service iptv_donate restart
 ```
 
-Install the ntfy app on each phone or computer that should hear it and
-subscribe to that topic (the part after `ntfy.sh/`). A server of your own
-or a reserved topic takes a token: `NOTIFY_TOKEN=...` beside it. The
-Donations card on the admin page says whether notifications are on and has
-a *Send a test* button.
+The jail must reach the push services over HTTPS (web.push.apple.com,
+fcm.googleapis.com, updates.push.services.mozilla.com,
+*.notify.windows.com), as it reaches api.stripe.com.
+
+Then on each device: open `/admin/`, and in the Donations card press
+*Turn on notifications on this device* and allow them. On a Mac in Safari,
+Chrome or Firefox; on an iPhone or iPad Apple allows it only from the Home
+Screen: Safari, Share, *Add to Home Screen*, open dopeIPTV from there, sign
+in once, then turn them on. The card lists the devices that get them and
+has *Send a test*; *Turn off* takes this device off.
 
 **A note on the site.** In a browser that has opened `/admin/`, the
 site's own pages show new donations in a small note at the foot of the

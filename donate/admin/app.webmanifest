@@ -1,0 +1,14 @@
+{
+  "name": "dopeIPTV Admin",
+  "short_name": "dopeIPTV",
+  "start_url": "/admin/",
+  "scope": "/admin/",
+  "display": "standalone",
+  "background_color": "#151517",
+  "theme_color": "#151517",
+  "icons": [
+    { "src": "/favicon.svg?v=2", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/favicon.png?v=2", "sizes": "512x512", "type": "image/png" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}

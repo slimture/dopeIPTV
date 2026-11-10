@@ -8,7 +8,8 @@ PaymentIntent, and only a server holding the secret key can make one - this
 is that server, and all it does. It never sees a card. It also serves the
 site's admin page, /admin/ (admin.py), behind nginx's password - signed in
 once, a browser stays signed in (a signed cookie, /admin-session) - and
-tells the owner's phone when someone has donated (NOTIFY_URL).
+tells the owner's devices when someone has donated: Web Push, turned on per
+device on the admin page (needs Python's cryptography package).
 
     GET  /donate/config   {"publishableKey", "currency", "country", "name", "pmc",
                            "currencies": {"sek": {"presets", "min", "max"}, ...}}
@@ -74,13 +75,14 @@ named by DONATE_CONFIG (default /usr/local/etc/iptv-donate.conf):
     ADMIN_SESSION_KEY_FILE  the key that signs the admin's session cookie
                             (default <STATS_DIR>/admin-session.key, made on
                             first use). Deleting it signs every browser out.
-    NOTIFY_URL              where a new donation is announced: an ntfy topic,
-                            e.g. https://ntfy.sh/<a long random name> (the ntfy
-                            app on the phone subscribes to it). Empty: off.
-    NOTIFY_TOKEN            an ntfy access token, for a topic that needs one
+    PUSH_CONTACT            who runs this, for the push services (a mailto:
+                            or https URL; default DONATE_ORIGIN). The push key
+                            and the devices live in STATS_DIR (push-vapid.pem,
+                            push-subscriptions.json).
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
 import json
@@ -119,7 +121,7 @@ def _load_config() -> dict[str, str]:
         pass
     conf.update({k: v for k, v in os.environ.items()
                  if k.startswith(("STRIPE_", "DONATE_", "LISTEN", "STATS_", "ADMIN_", "DL_LOG",
-                                  "DOWNLOADS_JSON", "SITE_HOST", "GEO_", "NOTIFY_"))})
+                                  "DOWNLOADS_JSON", "SITE_HOST", "GEO_", "PUSH_"))})
     return conf
 
 
@@ -418,10 +420,26 @@ def session_user(cookie_header: str) -> str:
     return ""
 
 
-# -- telling the owner a donation came in -------------------------------------
-NOTIFY_URL = CONF.get("NOTIFY_URL", "").strip()
-NOTIFY_TOKEN = CONF.get("NOTIFY_TOKEN", "").strip()
-NOTIFY_EVERY = 90           # seconds between looks at Stripe
+# -- telling the owner a donation came in: Web Push ----------------------------
+# The admin page turns notifications on per device (the browser's own push
+# service: Apple's, Google's, Mozilla's, Microsoft's). This service signs each
+# push with a key of its own (VAPID, made on first use) and encrypts it for
+# that device (RFC 8291) - no third party in between that can read it.
+try:
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+except BaseException as e:  # noqa: BLE001 - missing or broken (a Rust panic is no Exception):
+    if isinstance(e, (KeyboardInterrupt, SystemExit)):    # donations must work on regardless,
+        raise                                             # the admin page says what to install
+    ec = None
+
+PUSH_CONTACT = CONF.get("PUSH_CONTACT", "").strip() or ORIGIN
+PUSH_EVERY = 90             # seconds between looks at Stripe
+PUSH_MAX = 20               # devices kept
+_PUSH_LOCK = threading.Lock()
+_VAPID: list = []
 _ZERO_DECIMAL = {"bif", "clp", "djf", "gnf", "jpy", "kmf", "krw", "mga", "pyg", "rwf",
                  "ugx", "vnd", "vuv", "xaf", "xof", "xpf"}
 
@@ -435,28 +453,164 @@ def _amount_text(minor: int, currency: str) -> str:
     return f"{text} {currency.upper()}"
 
 
-def notify(title: str, body: str, tags: str = "heart") -> str:
-    """Push a note to NOTIFY_URL (ntfy). "" when sent, else why not."""
-    if not NOTIFY_URL:
-        return "NOTIFY_URL is not set"
-    headers = {"Title": title, "Tags": tags, "Click": f"{ORIGIN}/admin/#donations"}
-    if NOTIFY_TOKEN:
-        headers["Authorization"] = f"Bearer {NOTIFY_TOKEN}"
-    req = urllib.request.Request(NOTIFY_URL, data=body.encode("utf-8"), headers=headers, method="POST")
+def _b64u(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+
+def _unb64u(text: str) -> bytes:
+    return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
+
+
+def push_ready() -> bool:
+    return ec is not None
+
+
+def _vapid():
+    """This service's push key: made on first use, kept in STATS_DIR (600)."""
+    with _PUSH_LOCK:
+        if _VAPID:
+            return _VAPID[0]
+        path = os.path.join(_stats_dir(), "push-vapid.pem")
+        try:
+            with open(path, "rb") as fh:
+                key = serialization.load_pem_private_key(fh.read(), None)
+        except FileNotFoundError:
+            key = ec.generate_private_key(ec.SECP256R1())
+            pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                    serialization.NoEncryption())
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(pem)
+        _VAPID.append(key)
+        return key
+
+
+def push_key() -> str:
+    """The public half: the page's applicationServerKey."""
+    return _b64u(_vapid().public_key().public_bytes(serialization.Encoding.X962,
+                                                     serialization.PublicFormat.UncompressedPoint))
+
+
+def _subs_path() -> str:
+    return os.path.join(_stats_dir(), "push-subscriptions.json")
+
+
+def push_subs() -> list:
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            resp.read()
-        return ""
-    except (urllib.error.URLError, TimeoutError, ValueError) as e:
-        why = str(getattr(e, "reason", "") or e)[:200]
-        print(f"[donate] notification not sent: {why}", file=sys.stderr, flush=True)
-        return why
+        with open(_subs_path(), encoding="utf-8") as fh:
+            got = json.load(fh)
+        return [s for s in got if isinstance(s, dict) and s.get("endpoint")] if isinstance(got, list) else []
+    except (OSError, ValueError):
+        return []
+
+
+def _save_subs(subs: list) -> None:
+    path = _subs_path()
+    tmp = path + ".tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump(subs, fh)
+    os.replace(tmp, path)
+
+
+def push_add(sub: dict, label: str) -> bool:
+    """Keep one device's subscription (the same endpoint again replaces it)."""
+    endpoint = str((sub or {}).get("endpoint") or "")
+    keys = (sub or {}).get("keys") or {}
+    try:
+        ok = (endpoint.startswith("https://") and len(endpoint) < 1200
+              and len(_unb64u(str(keys.get("p256dh") or ""))) == 65
+              and len(_unb64u(str(keys.get("auth") or ""))) == 16)
+    except (ValueError, TypeError):
+        ok = False
+    if not ok:
+        return False
+    with _PUSH_LOCK:
+        subs = [s for s in push_subs() if s["endpoint"] != endpoint]
+        subs.append({"endpoint": endpoint, "p256dh": keys["p256dh"], "auth": keys["auth"],
+                     "label": re.sub(r"[^\w .,()/+-]", "", str(label or ""))[:60], "added": int(time.time())})
+        _save_subs(subs[-PUSH_MAX:])
+    return True
+
+
+def push_remove(endpoints: list) -> None:
+    with _PUSH_LOCK:
+        subs = push_subs()
+        kept = [s for s in subs if s["endpoint"] not in endpoints]
+        if len(kept) != len(subs):
+            _save_subs(kept)
+
+
+def _encrypt(p256dh: str, auth: str, payload: bytes) -> bytes:
+    """RFC 8291 (aes128gcm): only the device that subscribed can read it."""
+    ua_pub, secret = _unb64u(p256dh), _unb64u(auth)
+    mine = ec.generate_private_key(ec.SECP256R1())
+    as_pub = mine.public_key().public_bytes(serialization.Encoding.X962,
+                                            serialization.PublicFormat.UncompressedPoint)
+    shared = mine.exchange(ec.ECDH(), ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), ua_pub))
+
+    def hkdf(salt: bytes, ikm: bytes, info: bytes, n: int) -> bytes:
+        prk = hmac.new(salt, ikm, hashlib.sha256).digest()
+        return hmac.new(prk, info + b"\x01", hashlib.sha256).digest()[:n]
+
+    ikm = hkdf(secret, shared, b"WebPush: info\x00" + ua_pub + as_pub, 32)
+    salt = secrets.token_bytes(16)
+    cek = hkdf(salt, ikm, b"Content-Encoding: aes128gcm\x00", 16)
+    nonce = hkdf(salt, ikm, b"Content-Encoding: nonce\x00", 12)
+    body = AESGCM(cek).encrypt(nonce, payload + b"\x02", None)
+    return salt + (4096).to_bytes(4, "big") + bytes([len(as_pub)]) + as_pub + body
+
+
+def _vapid_auth(endpoint: str) -> str:
+    u = urllib.parse.urlsplit(endpoint)
+    enc = lambda d: _b64u(json.dumps(d, separators=(",", ":")).encode())  # noqa: E731
+    head = enc({"typ": "JWT", "alg": "ES256"}) + "." + enc(
+        {"aud": f"{u.scheme}://{u.netloc}", "exp": int(time.time()) + 12 * 3600, "sub": PUSH_CONTACT})
+    r, s = decode_dss_signature(_vapid().sign(head.encode(), ec.ECDSA(hashes.SHA256())))
+    return f"vapid t={head}.{_b64u(r.to_bytes(32, 'big') + s.to_bytes(32, 'big'))}, k={push_key()}"
+
+
+def push(title: str, body: str, url: str = "/admin/#donations", tag: str = "") -> tuple:
+    """To every device that turned notifications on: (how many took it, why
+    not, "" when all did). A device its push service no longer knows (404,
+    410: notifications turned off, the browser reset) is forgotten."""
+    if not push_ready():
+        return 0, "the server lacks Python's cryptography package"
+    subs = push_subs()
+    if not subs:
+        return 0, "no device has turned notifications on"
+    payload = json.dumps({"title": title, "body": body, "url": url, "tag": tag}).encode("utf-8")
+    sent, gone, why = 0, [], ""
+    for s in subs:
+        host = urllib.parse.urlsplit(s["endpoint"]).netloc
+        try:
+            req = urllib.request.Request(s["endpoint"], data=_encrypt(s["p256dh"], s["auth"], payload),
+                                         method="POST", headers={
+                                             "Authorization": _vapid_auth(s["endpoint"]),
+                                             "Content-Encoding": "aes128gcm",
+                                             "Content-Type": "application/octet-stream",
+                                             "TTL": "86400", "Urgency": "high"})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                resp.read()
+            sent += 1
+        except urllib.error.HTTPError as e:
+            if e.code in (404, 410):
+                gone.append(s["endpoint"])
+            else:
+                why = f"{host} answered {e.code}"
+        except (urllib.error.URLError, TimeoutError, ValueError, OSError) as e:
+            why = f"{host}: {getattr(e, 'reason', '') or e}"[:200]
+    if gone:
+        push_remove(gone)
+    if why:
+        print(f"[donate] push not sent: {why}", file=sys.stderr, flush=True)
+    return sent, why
 
 
 def _watch_donations() -> None:
     """Every minute and a half: any donation newer than the newest already
-    told is pushed to NOTIFY_URL. The first look only remembers where it
-    is, so starting the service never repeats old donations."""
+    told goes to the devices. The first look only notes where it is, so a
+    start never repeats old donations; nor does a device turned on later."""
     path = os.path.join(_stats_dir(), "notified.json")
     try:
         with open(path, encoding="utf-8") as fh:
@@ -465,22 +619,25 @@ def _watch_donations() -> None:
         last = 0.0
     while True:
         try:
-            import admin
-            got = admin.donations(_secret(), API_VERSION, max_age=60)
-            rows = got.get("list") or []
-            if not got.get("error"):
-                newest = max([r["t"] for r in rows] + [last])
-                if last:
-                    for r in sorted((r for r in rows if r["t"] > last), key=lambda r: r["t"]):
-                        who = f" · {r['who']}" if r.get("who") else ""
-                        notify(f"New donation: {_amount_text(r['amount'], r['currency'])}",
-                               f"{r['how']}{who} - dopeIPTV")
-                last = newest or time.time()
-                with open(path, "w", encoding="utf-8") as fh:
-                    json.dump({"t": last}, fh)
+            if not push_subs():
+                last = time.time()          # nobody to tell: not saved up for later
+            else:
+                import admin
+                got = admin.donations(_secret(), API_VERSION, max_age=60)
+                rows = got.get("list") or []
+                if not got.get("error"):
+                    newest = max([r["t"] for r in rows] + [last])
+                    if last:
+                        for r in sorted((r for r in rows if r["t"] > last), key=lambda r: r["t"]):
+                            who = f" · {r['who']}" if r.get("who") else ""
+                            push(f"New donation: {_amount_text(r['amount'], r['currency'])}",
+                                 f"{r['how']}{who}", tag=f"donation-{r.get('id', '')}")
+                    last = newest or time.time()
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump({"t": last}, fh)
         except Exception as e:  # noqa: BLE001 - the watcher keeps watching
             print(f"[donate] donation watcher: {e!r}", file=sys.stderr, flush=True)
-        time.sleep(NOTIFY_EVERY)
+        time.sleep(PUSH_EVERY)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -531,7 +688,9 @@ class Handler(BaseHTTPRequestHandler):
                               CONF.get("DOWNLOADS_JSON", os.path.join(admin.SITE, "downloads.json")),
                               _secret(), API_VERSION)
             body["visits_days"] = int(CONF.get("STATS_VISITS_DAYS", "30") or 30)
-            body["notify"] = bool(NOTIFY_URL)
+            body["push"] = {"ready": push_ready(), "key": push_key() if push_ready() else "",
+                            "devices": [{"label": d.get("label", ""), "added": d.get("added", 0)}
+                                        for d in push_subs()]}
             return self._send(200, body)
         hit = admin.static(path)
         if not hit:
@@ -585,6 +744,49 @@ class Handler(BaseHTTPRequestHandler):
                 for r in got.get("list") or [] if r.get("t", 0) >= since]
         self._send(200, {"list": rows[:20], "error": got.get("error", "")})
 
+    def _open_file(self, path: str) -> None:
+        """The service worker that shows the notifications, and the page's
+        app manifest (an iPhone puts the page on its Home Screen from it):
+        no secrets in them, and nginx asks no password for them - a worker
+        script or a manifest fetched behind one fails to load."""
+        import admin
+        hit = admin.static(path)
+        if not hit:
+            return self._send(404, {"error": "not found"})
+        data, ctype = hit
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _admin_post(self, path: str) -> None:
+        """Turning a device's notifications on or off, and a test - the
+        signed-in admin only, from the site's own page."""
+        if not _is_admin((self.headers.get("X-Admin-User") or "").strip()):
+            return self._send(403, {"error": "admin only"})
+        if (self.headers.get("Origin") or "").rstrip("/") != ORIGIN:
+            return self._send(403, {"error": "origin"})
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            data = json.loads(self.rfile.read(length)) if 0 < length <= 8192 else {}
+        except (ValueError, TypeError):
+            return self._send(400, {"error": "bad request"})
+        if not isinstance(data, dict):
+            data = {}
+        if path == "/admin/notify-test":
+            sent, why = push("Notifications work", "This is how a new donation will look.", tag="test")
+            return self._send(200 if sent else 502, {"ok": bool(sent), "sent": sent, "error": why})
+        if not push_ready():
+            return self._send(503, {"error": "the server lacks Python's cryptography package"})
+        if path == "/admin/push-subscribe":
+            if not push_add(data.get("subscription") or {}, str(data.get("label") or "")):
+                return self._send(400, {"error": "not a push subscription"})
+        else:
+            push_remove([str(data.get("endpoint") or "")])
+        return self._send(200, {"ok": True, "devices": len(push_subs())})
+
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
         if path == "/admin-session":
@@ -599,6 +801,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/admin/news":
             return self._news()
+        if path in ("/admin/sw.js", "/admin/app.webmanifest"):
+            return self._open_file(path)
         if path == "/admin/" or path in ("/admin/admin.css", "/admin/admin.js", "/admin/data",
                                          "/admin/visits", "/admin/visitor"):
             return self._admin(path)
@@ -617,14 +821,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = self.path.split("?", 1)[0]
-        if path == "/admin/notify-test":
-            if not _is_admin((self.headers.get("X-Admin-User") or "").strip()):
-                return self._send(403, {"error": "admin only"})
-            if (self.headers.get("Origin") or "").rstrip("/") != ORIGIN:
-                return self._send(403, {"error": "origin"})
-            why = notify("Notifications work", "This is how a new donation will look. - dopeIPTV",
-                         "tada")
-            return self._send(200 if not why else 502, {"ok": not why, "error": why})
+        if path in ("/admin/notify-test", "/admin/push-subscribe", "/admin/push-unsubscribe"):
+            return self._admin_post(path)
         if path not in ("/donate/session", "/donate/wallet"):
             return self._send(404, {"error": "not found"})
         origin = (self.headers.get("Origin") or "").rstrip("/")
@@ -716,9 +914,9 @@ def main() -> None:
         srv = ThreadingHTTPServer((host or "127.0.0.1", int(port)), Handler)
     print(f"[donate] listening on {LISTEN}, {len(CURRENCIES)} currencies ({CURRENCY} by default), "
           f"{'configured' if PUBLISHABLE and _secret() else 'NOT configured'}, "
-          f"donation notifications {'on' if NOTIFY_URL else 'off'}",
+          f"push notifications {'ready' if push_ready() else 'off (no cryptography package)'}",
           file=sys.stderr, flush=True)
-    if NOTIFY_URL and _secret():
+    if push_ready() and _secret():
         threading.Thread(target=_watch_donations, name="donations", daemon=True).start()
     srv.serve_forever()
 

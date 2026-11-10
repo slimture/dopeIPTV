@@ -429,30 +429,108 @@
   }
 
   // -- donations -------------------------------------------------------------------
-  // Whether a new donation reaches the phone (NOTIFY_URL in the service's
-  // config), and a button that sends a test.
-  function notifyRow() {
-    const box = $("notify");
-    if (!data.notify) {
-      box.replaceChildren(mk("span", "off", "Phone notifications are off."),
-        mk("span", "muted", " Set NOTIFY_URL in /usr/local/etc/iptv-donate.conf (DEPLOY.md, \u201cNotifications\u201d)."));
-      return;
-    }
-    const btn = mk("button", "link", "Send a test");
-    btn.type = "button";
-    const said = mk("span", "muted");
-    btn.addEventListener("click", () => {
-      btn.disabled = true; said.textContent = " Sending…";
-      fetch("/admin/notify-test", { method: "POST", credentials: "same-origin" })
-        .then((r) => r.json().then((j) => [r.ok, j]))
-        .then(([ok, j]) => { said.textContent = ok ? " Sent - look at your phone." : " Not sent: " + (j.error || "no answer") + "."; })
-        .catch(() => { said.textContent = " Not sent: the service did not answer."; })
-        .finally(() => { btn.disabled = false; });
+  // Notifications of new donations, turned on per device: the browser's own
+  // push (donate.py signs and sends it, sw.js shows it). On an iPhone only
+  // from the Home Screen, which is Apple's rule.
+  const PUSH_OK = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  let pushSub = null, pushChecked = false;
+  function deviceLabel() {
+    const ua = navigator.userAgent;
+    const br = /Edg\//.test(ua) ? "Edge" : /OPR\//.test(ua) ? "Opera" : /Firefox\//.test(ua) ? "Firefox"
+      : /Chrome\//.test(ua) ? (navigator.brave ? "Brave" : "Chrome") : /Safari\//.test(ua) ? "Safari" : "Browser";
+    const os = IOS ? (/iPad/.test(ua) || navigator.maxTouchPoints > 1 && !/iPhone/.test(ua) ? "iPad" : "iPhone")
+      : /Android/.test(ua) ? "Android" : /Mac OS X/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows"
+      : /Linux/.test(ua) ? "Linux" : "";
+    return br + (os ? " on " + os : "");
+  }
+  function b64bytes(s) {
+    const raw = atob((s + "=".repeat((4 - s.length % 4) % 4)).replace(/-/g, "+").replace(/_/g, "/"));
+    return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+  }
+  function post(path, body) {
+    return fetch(path, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}) }).then((r) => r.json().then((j) => [r.ok, j]));
+  }
+  // What this device holds, told to the service again on each visit (it
+  // forgets a device whose push service has; this puts it back).
+  function checkPush() {
+    if (!PUSH_OK || pushChecked) { return Promise.resolve(); }
+    pushChecked = true;
+    return navigator.serviceWorker.getRegistration("/admin/")
+      .then((reg) => (reg ? reg.pushManager.getSubscription() : null))
+      .then((sub) => {
+        pushSub = sub;
+        if (sub) {                  // a browser drops it when the permission goes
+          return post("/admin/push-subscribe", { subscription: sub.toJSON(), label: deviceLabel() }).catch(() => {});
+        }
+        return null;
+      })
+      .catch(() => { pushSub = null; });
+  }
+  function turnOn(say) {
+    // Asked inside the click: Safari allows the question only there.
+    const asked = Notification.requestPermission();
+    say("Turning on…");
+    Promise.resolve(asked).then((perm) => {
+      if (perm !== "granted") { throw new Error(perm === "denied" ? "blocked" : "not allowed"); }
+      return navigator.serviceWorker.register("/admin/sw.js", { scope: "/admin/" });
+    })
+      .then(() => navigator.serviceWorker.ready)
+      .then((reg) => reg.pushManager.getSubscription().then((old) => old ||
+        reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64bytes(data.push.key) })))
+      .then((sub) => post("/admin/push-subscribe", { subscription: sub.toJSON(), label: deviceLabel() })
+        .then(([ok, j]) => { if (!ok) { throw new Error(j.error || "the service said no"); } pushSub = sub; return j; }))
+      .then((j) => { data.push.devices = data.push.devices.concat([{ label: deviceLabel() }]).slice(-j.devices); notifyRow(); })
+      .catch((e) => say(e.message === "blocked"
+        ? "Notifications are blocked for this site - allow them in the browser's site settings, then try again."
+        : "Not turned on: " + e.message + "."));
+  }
+  function turnOff() {
+    const sub = pushSub;
+    pushSub = null;
+    if (!sub) { notifyRow(); return; }
+    post("/admin/push-unsubscribe", { endpoint: sub.endpoint }).catch(() => {});
+    sub.unsubscribe().catch(() => {}).finally(() => {
+      data.push.devices = data.push.devices.filter((d) => d.label !== deviceLabel());
+      notifyRow();
     });
-    box.replaceChildren(mk("span", "on", "Phone notifications are on"), document.createTextNode(" · "), btn, said);
+  }
+  function notifyRow() {
+    const box = $("notify"), P = data.push || {};
+    const said = mk("span", "muted say");
+    const say = (t) => { said.textContent = t; };
+    const button = (text, cls, fn) => { const b = mk("button", cls, text); b.type = "button"; b.addEventListener("click", fn); return b; };
+    const devices = (P.devices || []).length;
+    const others = (n) => n ? n + (n === 1 ? " device gets them" : " devices get them") : "";
+    const row = mk("div", "notify-row");
+    if (!P.ready) {
+      row.append(mk("span", "off", "Notifications need Python's cryptography package on the server"),
+        mk("span", "muted", " (pkg install py311-cryptography, then service iptv_donate restart)."));
+    } else if (!PUSH_OK && IOS) {
+      row.append(mk("span", "off", "On iPhone and iPad: "), document.createTextNode("Share \u2192 Add to Home Screen, open dopeIPTV from there and sign in once - then turn notifications on here."));
+    } else if (!PUSH_OK) {
+      row.append(mk("span", "off", "This browser cannot show notifications from a site."));
+    } else if (pushSub) {
+      row.append(mk("span", "on", "Notifications are on for this device"), document.createTextNode(" · "),
+        button("Send a test", "link", (e) => {
+          e.target.disabled = true; say(" Sending…");
+          post("/admin/notify-test").then(([ok, j]) => say(ok ? " Sent to " + j.sent + (j.sent === 1 ? " device." : " devices.") : " Not sent: " + (j.error || "no answer") + "."))
+            .catch(() => say(" Not sent: the service did not answer.")).finally(() => { e.target.disabled = false; });
+        }), document.createTextNode(" · "), button("Turn off", "link", turnOff));
+    } else {
+      row.append(button("Turn on notifications on this device", "btn-heart", () => turnOn(say)));
+      if (devices) { row.append(mk("span", "muted", " " + others(devices))); }
+    }
+    row.append(said);
+    const list = (P.devices || []).map((d) => d.label).filter(Boolean);
+    box.replaceChildren(row);
+    if (list.length && P.ready) { box.append(mk("div", "muted devices", "Getting them: " + [...new Set(list)].join(", "))); }
   }
   function donations() {
     const D = data.donations, box = $("donations");
+    checkPush().then(notifyRow);
     notifyRow();
     $("donations-all").textContent = D.error ? "" :
       "All time: " + num.format(D.count_all) + (D.count_all === 1 ? " donation" : " donations") +

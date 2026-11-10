@@ -246,3 +246,11 @@ tr:last-child td { border-bottom: 0; }
   .funnel li { grid-template-columns: minmax(0, 1fr) 54px 50px; gap: 4px 10px; }
   .funnel .track { grid-column: 1 / -1; order: 4; height: 10px; }
 }
+
+.notify-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.notify .devices { font-size: 12.5px; margin-top: 4px; }
+.btn-heart { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 0; border-radius: 999px;
+  background: color-mix(in srgb, var(--heart) 16%, transparent); color: var(--heart); font: inherit; font-weight: 650;
+  cursor: pointer; }
+.btn-heart::before { content: "\2665"; }
+.btn-heart:hover { background: color-mix(in srgb, var(--heart) 24%, transparent); }

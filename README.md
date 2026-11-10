@@ -69,8 +69,8 @@ page view counts when the page has opened in a real browser and told
 `/hit` so (`public/nav.js`, no cookie, no id); `donate/stats_collect.py`
 reads nginx's log of it - no address kept, robots left out. Signed in once,
 a browser stays signed in (a cookie signed by the service), and a new
-donation is pushed to the owner's phone (ntfy) and shown in a note on the
-site's own pages in that browser. Setting it up: `DEPLOY.md`, "Statistics
+donation comes as a notification on the devices that turned them on (the
+browser's own Web Push) and as a note on the site's own pages there. Setting it up: `DEPLOY.md`, "Statistics
 and the admin page" and "Signed in for good, and told of donations".
 
 Config templates live in `deploy/` with role-based names —
