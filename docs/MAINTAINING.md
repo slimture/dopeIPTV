@@ -170,6 +170,14 @@ preview, SEO) and `DEPLOY.md` (the server). In short:
   icon's blue (`#4C8DFF`); San Francisco on Apple devices, self-hosted
   Inter elsewhere. On a phone the downloads fold away behind "Send the
   link", since the app is for computers.
+- **A link to the site from anywhere we control carries `?ref=`**: the
+  app (`app-about`, `app-update`), the README (`github`), the Sponsor
+  button (`github-sponsor`), the issue form (`github-issues`), release
+  notes (`release`), the Windows readme (`windows-readme`). A link opened
+  from a desktop app or GitHub's sidebar carries no referrer, so without it
+  those visits count as "direct". The statistics file them under the app
+  or GitHub; the page drops the parameter from the address once counted.
+  A new link gets its own short `ref`.
 - Render every language locally before pushing (the README's "Local
   preview"), then look at the pages in a browser. Deploying is a manual
   step on the server (copy `public/` and `site/`, run the sync once).

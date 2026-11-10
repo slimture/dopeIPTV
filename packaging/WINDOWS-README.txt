@@ -75,4 +75,4 @@ REMOVING dopeIPTV COMPLETELY (leave no trace)
 
   That's everything - dopeIPTV writes nowhere else on the system.
 
-More info: https://iptv.dope.rs
+More info: https://iptv.dope.rs/?ref=windows-readme

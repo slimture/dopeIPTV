@@ -2165,7 +2165,9 @@ class _SettingsMixin:
         # -- links + attribution ------------------------------------------
         links = QHBoxLayout()
         links.setSpacing(16)
-        links.addWidget(link(tr("about_website"), "https://iptv.dope.rs"))
+        # ?ref=: from the app, for the site's statistics (see mw_updates).
+        links.addWidget(link(tr("about_website"),
+                             "https://iptv.dope.rs/?ref=app-about"))
         links.addWidget(link(tr("about_github"),
                              f"https://github.com/{GITHUB_REPO}"))
         links.addWidget(link(tr("about_all_releases"),

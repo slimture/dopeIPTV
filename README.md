@@ -72,7 +72,7 @@ packages (`mpv`, `ffmpeg`, and optionally `vlc`) come from your distro.
 
 Grab the latest build for your system from the
 [Releases page](https://github.com/slimture/dopeIPTV/releases) or
-[iptv.dope.rs](https://iptv.dope.rs). Every packaged build bundles Python,
+[iptv.dope.rs](https://iptv.dope.rs/?ref=github). Every packaged build bundles Python,
 PyQt6, libmpv and ffmpeg, so the **embedded** player works out of the box —
 nothing else to install.
 
@@ -298,7 +298,7 @@ under **Settings → Advanced → Keyboard shortcuts**.
 - **No categories** — check the server URL (include the port, e.g. `:8080`).
 - **No EPG for a channel** — the provider may not have a programme guide mapped to it; dopeIPTV tries three different sources (short EPG, full EPG table, XMLTV) before giving up.
 - **Fullscreen video flickers around its edges (Linux)** — that is variable refresh rate (VRR); turn it off in your display settings.
-- **Anything else** — the [help page](https://iptv.dope.rs/help/) answers most questions; for a bug, open an issue with a log (`DOPEIPTV_LOG=debug DOPEIPTV_LOG_FILE=/tmp/dope.log dopeiptv`).
+- **Anything else** — the [help page](https://iptv.dope.rs/help/?ref=github) answers most questions; for a bug, open an issue with a log (`DOPEIPTV_LOG=debug DOPEIPTV_LOG_FILE=/tmp/dope.log dopeiptv`).
 
 ## Language
 
@@ -323,7 +323,7 @@ language are very welcome**; see [`docs/TRANSLATING.md`](docs/TRANSLATING.md)
 dopeIPTV is free, with no ads, no tracking and no paid version. Developing
 it, running the website and serving the downloads comes with some costs. If
 the app works well for you,
-**[a donation of any size](https://iptv.dope.rs/#donate)**
+**[a donation of any size](https://iptv.dope.rs/?ref=github#donate)**
 helps keep it going - in your own currency, by card, Apple Pay or Google Pay,
 through Stripe.
 Reporting bugs and fixing a translation in your language help just as much.
