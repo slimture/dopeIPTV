@@ -7,7 +7,7 @@ and Apple Pay / Google Pay in the wallet's own sheet. Both pay a
 PaymentIntent, and only a server holding the secret key can make one - this
 is that server, and all it does. It never sees a card.
 
-    GET  /donate/config   {"publishableKey", "currency", "country", "name",
+    GET  /donate/config   {"publishableKey", "currency", "country", "name", "pmc",
                            "min", "max", "presets"}
     POST /donate/session  {"amount": 500}  ->  {"clientSecret", "publishableKey"}
     POST /donate/wallet   {"amount", "paymentMethod", "email", "name"}
@@ -267,8 +267,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(404, {"error": "not found"})
         if not PUBLISHABLE or not _secret():
             return self._send(503, {"error": "not configured"})
+        # pmc too: the page's card form must name the same payment method
+        # configuration as the PaymentIntent it is made for (not a secret).
         self._send(200, {"publishableKey": PUBLISHABLE, "currency": CURRENCY,
-                         "country": COUNTRY, "name": NAME,
+                         "country": COUNTRY, "name": NAME, "pmc": PMC[0],
                          "min": MIN, "max": MAX, "presets": PRESETS})
 
     def do_POST(self) -> None:

@@ -765,7 +765,15 @@ footer .v a:hover { color: var(--accent); }
   border: 0; background: none; color: var(--muted); padding: 4px 8px; text-decoration: underline;
   text-underline-offset: 3px; }
 .dn-card:hover { color: var(--text); }
-.dn-paytop { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dn-paytop { display: flex; align-items: stretch; gap: 6px; }
+.dn-chips--sm { flex: 1; gap: 6px; }
+.dn-chips--sm .dn-chip { padding: 9px 2px; font-size: 14px; border-radius: 10px; }
+.dn-input--sm { flex: none; width: 96px; padding: 9px 10px; font-size: 15px; border-radius: 10px; }
+@media (max-width: 420px) {
+  .dn-paytop { flex-wrap: wrap; }
+  .dn-chips--sm { flex-basis: 100%; }
+  .dn-input--sm { width: 100%; }
+}
 .dn-back { font: inherit; font-size: 14px; cursor: pointer; border: 0; background: none;
   color: var(--muted); padding: 4px 0; }
 .dn-back:hover { color: var(--text); }

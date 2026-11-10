@@ -138,9 +138,7 @@
     var other = mk("label", "dn-other", T.other);
     el.custom = mk("input", "dn-input");
     Object.assign(el.custom, { type: "text", inputMode: "decimal", autocomplete: "off" });
-    el.custom.addEventListener("input", function () {
-      chosen = toMinor(el.custom.value); mark(); el.err1.hidden = true;
-    });
+    el.custom.addEventListener("input", function () { setAmount(toMinor(el.custom.value), true); });
     other.append(el.custom);
     el.err1 = mk("p", "dn-error"); el.err1.hidden = true; el.err1.setAttribute("role", "alert");
     el.go = mk("button", "btn primary dn-go", T.cont); el.go.type = "button";
@@ -152,11 +150,16 @@
     el.amounts.append(el.chips, other, el.err1, el.go, el.card);
 
     el.pay = mk("div", "dn-step"); el.pay.hidden = true;
+    // The amount stays open here: the same choices, smaller, and an own
+    // amount - the card form and the button follow at once.
     var top = mk("div", "dn-paytop");
-    el.back = mk("button", "dn-back", (document.documentElement.dir === "rtl" ? "→ " : "← ") + T.back); el.back.type = "button";
-    el.back.addEventListener("click", toAmounts);
-    el.sum = mk("strong", "dn-sum");
-    top.append(el.back, el.sum);
+    el.chips2 = mk("div", "dn-chips dn-chips--sm");
+    el.chips2.setAttribute("role", "radiogroup");
+    el.custom2 = mk("input", "dn-input dn-input--sm");
+    Object.assign(el.custom2, { type: "text", inputMode: "decimal", autocomplete: "off" });
+    el.custom2.setAttribute("aria-label", T.other);
+    el.custom2.addEventListener("input", function () { setAmount(toMinor(el.custom2.value), true); });
+    top.append(el.chips2, el.custom2);
     var em = mk("label", "dn-email", T.email);
     el.email = mk("input", "dn-input");
     Object.assign(el.email, { type: "email", name: "email", autocomplete: "email", required: true, spellcheck: false });
@@ -188,22 +191,48 @@
     if (el.payee) { el.payee.hidden = step === el.done; }
   }
   function mark() {
-    [].forEach.call(el.chips.children, function (c) {
-      var on = Number(c.dataset.amount) === chosen;
-      c.classList.toggle("is-on", on);
-      c.setAttribute("aria-checked", on ? "true" : "false");
+    [el.chips, el.chips2].forEach(function (box) {
+      [].forEach.call(box.children, function (c) {
+        var on = Number(c.dataset.amount) === chosen;
+        c.classList.toggle("is-on", on);
+        c.setAttribute("aria-checked", on ? "true" : "false");
+      });
     });
   }
   function chips() {
-    el.chips.replaceChildren();
-    (cfg.presets || []).forEach(function (minor) {
-      var b = mk("button", "dn-chip", fmt(minor)); b.type = "button";
-      b.setAttribute("role", "radio"); b.dataset.amount = String(minor);
-      b.addEventListener("click", function () { chosen = minor; el.custom.value = ""; el.err1.hidden = true; mark(); });
-      el.chips.appendChild(b);
+    [el.chips, el.chips2].forEach(function (box) {
+      box.replaceChildren();
+      (cfg.presets || []).forEach(function (minor) {
+        var b = mk("button", "dn-chip", fmt(minor)); b.type = "button";
+        b.setAttribute("role", "radio"); b.dataset.amount = String(minor);
+        b.addEventListener("click", function () { setAmount(minor, false); });
+        box.appendChild(b);
+      });
     });
+    el.custom2.placeholder = fmt(0).replace(/[\d.,\s\u00a0\u202f]/g, "") + " …";
     if (!chosen && cfg.presets && cfg.presets.length) { chosen = cfg.presets[Math.min(1, cfg.presets.length - 1)]; }
     mark();
+  }
+  function inRange(minor) { return !!minor && minor >= cfg.min && minor <= cfg.max; }
+  function rangeText() {
+    return (T.range || "").replace("{min}", fmt(cfg.min)).replace("{max}", fmt(cfg.max));
+  }
+  // Any change of amount, on either step: the chips, the button, and the
+  // card form (a deferred intent - the PaymentIntent is made on "Donate").
+  function setAmount(minor, typed) {
+    chosen = minor;
+    if (!typed) { el.custom.value = ""; el.custom2.value = ""; }
+    el.err1.hidden = true; el.err2.hidden = true;
+    mark();
+    if (live && live.elements && inRange(minor)) { live.elements.update({ amount: minor }); }
+    payLabel();
+  }
+  function payLabel() {
+    if (!cfg) { return; }
+    el.payBtn.textContent = (T.pay || "").replace("{amount}", fmt(chosen || 0));
+    var ok = inRange(chosen);
+    if (!ok && el.pay && !el.pay.hidden && chosen) { el.err2.textContent = rangeText(); el.err2.hidden = false; }
+    el.payBtn.disabled = busy || !ok || !live || !live.complete;
   }
   function teardown() {
     if (live) { try { live.destroy(); } catch (e) { /* gone already */ } }
@@ -213,7 +242,6 @@
     teardown(); busy = false;
     if (dlg && dlg.open) { dlg.close(); }
   }
-  function toAmounts() { teardown(); show(el.amounts); }
 
   function open(href) {
     if (!dlg) { build(); }
@@ -230,8 +258,8 @@
   }
 
   function amountOk() {
-    if (!chosen || chosen < cfg.min || chosen > cfg.max) {
-      el.err1.textContent = (T.range || "").replace("{min}", fmt(cfg.min)).replace("{max}", fmt(cfg.max));
+    if (!inRange(chosen)) {
+      el.err1.textContent = rangeText();
       el.err1.hidden = false;
       return false;
     }
@@ -298,38 +326,35 @@
 
   function toPay() {
     if (!amountOk()) { return; }
-    var amount = chosen;
     el.loading.textContent = T.loading;
     show(el.loading);
-    el.sum.textContent = fmt(amount);
-    el.payBtn.textContent = (T.pay || "").replace("{amount}", fmt(amount));
-    el.payBtn.disabled = true; el.err2.hidden = true;
-    Promise.all([
-      fetch("/donate/session", { method: "POST", credentials: "same-origin",
-        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: amount }) })
-        .then(function (r) {
-          if (!r.ok) { throw new Error("/donate/session answered " + r.status + " (the reason is in /var/log/iptv-donate.log)"); }
-          return r.json();
-        }),
-      loadStripe().catch(function () {
-        throw new Error("Stripe.js did not load - is https://js.stripe.com in the site's Content-Security-Policy?");
-      })
-    ]).then(function (got) {
-      var s = got[0], st = stripeFor(got[1], s.publishableKey);
-      var elements = st.elements({ clientSecret: s.clientSecret, appearance: appearance() });
+    el.err2.hidden = true;
+    el.custom2.value = el.custom.value;
+    loadStripe().catch(function () {
+      throw new Error("Stripe.js did not load - is https://js.stripe.com in the site's Content-Security-Policy?");
+    }).then(function (Stripe) {
+      var st = stripeFor(Stripe, cfg.publishableKey);
+      // A deferred intent: the form is made for an amount that can still
+      // change; the PaymentIntent is made with the final one on "Donate".
+      var opts = { mode: "payment", amount: chosen, currency: (cfg.currency || "eur").toLowerCase(),
+                   appearance: appearance() };
+      if (cfg.pmc) { opts.paymentMethodConfiguration = cfg.pmc; }
+      var elements = st.elements(opts);
       // The wallets have their own button above, as on solequiz.com.
       var pe = elements.create("payment", { layout: { type: "accordion", defaultCollapsed: false },
         paymentMethodOrder: ["card", "revolut_pay", "amazon_pay", "klarna"],
         wallets: { applePay: "never", googlePay: "never" } });
       teardown();
-      live = { elements: elements, destroy: function () { pe.destroy(); } };
+      live = { elements: elements, complete: false, destroy: function () { pe.destroy(); } };
       show(el.pay);
       pe.mount(el.fields);
-      pe.on("change", function (ev) { if (!busy) { el.payBtn.disabled = !ev.complete; } });
+      pe.on("change", function (ev) { live.complete = !!ev.complete; payLabel(); });
       pe.on("loaderror", function (ev) {
         warn("the card form did not load:", ev && ev.error);
         fail();
       });
+      mark();
+      payLabel();
     }).catch(function (err) {
       warn("could not open the card form:", err);
       show(el.amounts);
@@ -341,31 +366,48 @@
     el.err2.textContent = msg || T.failed; el.err2.hidden = false;
   }
   function payAgain(msg) {
-    busy = false; el.payBtn.disabled = false;
-    el.payBtn.textContent = (T.pay || "").replace("{amount}", el.sum.textContent);
+    busy = false;
+    payLabel();
     fail(msg);
   }
   function pay() {
     if (!live || !live.elements || busy) { return; }
+    if (!inRange(chosen)) { payLabel(); return; }
     if (!el.email.checkValidity() || !el.email.value.trim()) {
       fail(T.emailmissing); el.email.focus(); return;
     }
     busy = true; el.err2.hidden = true;
     el.payBtn.disabled = true; el.payBtn.textContent = T.busy;
-    stripe.confirmPayment({
-      elements: live.elements,
-      redirect: "if_required",          // only a method that must leave the page (Klarna and the like)
-      confirmParams: {
-        return_url: window.location.origin + "/?donated=1#donate",
-        receipt_email: el.email.value.trim()
-      }
+    var elements = live.elements, amount = chosen;
+    elements.submit().then(function (r) {
+      if (r && r.error) { throw { shown: r.error.message }; }
+      return fetch("/donate/session", { method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: amount }) })
+        .then(function (res) {
+          if (!res.ok) { throw new Error("/donate/session answered " + res.status + " (the reason is in /var/log/iptv-donate.log)"); }
+          return res.json();
+        });
+    }).then(function (sess) {
+      return stripe.confirmPayment({
+        elements: elements,
+        clientSecret: sess.clientSecret,
+        redirect: "if_required",          // only a method that must leave the page (Klarna and the like)
+        confirmParams: {
+          return_url: window.location.origin + "/?donated=1#donate",
+          receipt_email: el.email.value.trim()
+        }
+      });
     }).then(function (r) {
       if (r && r.error) { payAgain(r.error.message); return; }
       var state = r && r.paymentIntent && r.paymentIntent.status;
       if (state === "succeeded" || state === "processing") { teardown(); busy = false; show(el.done); return; }
       warn("payment ended as", state);
       payAgain();
-    }, function (err) { warn("confirmPayment failed:", err); payAgain(); });
+    }).catch(function (err) {
+      if (err && err.shown) { payAgain(err.shown); return; }
+      warn("the payment did not go through:", err);
+      payAgain();
+    });
   }
 
   document.addEventListener("click", function (e) {
