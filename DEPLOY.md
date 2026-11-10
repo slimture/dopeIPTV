@@ -353,14 +353,38 @@ dialog" in its metadata.
 
 ## Statistics and the admin page
 
-`https://iptv.dope.rs/admin/` shows visitors, page views, downloads and
-donations, per day, week or month and per calendar year. Nothing is added
-to the site for it - no script, no cookie: nginx writes one line per page
-view to a log of its own, `donate/stats_collect.py` turns the new lines into
-counts every quarter hour (a visitor is a hash of address and browser with a
-salt that is thrown away after the day, so no address is ever kept), and the
-donate service serves the page behind a password. Donations are read from
-Stripe with the key the service already has.
+`https://iptv.dope.rs/admin/` shows visitors (unique over any span),
+page views, time per visit, how visitors found the site, countries,
+languages, browsers and versions, systems, devices and screens, downloads
+and donations - per day, week, month and calendar year - and, under
+*Visitors*, every visit of the last 30 days one by one: when, from where,
+which pages and how long, downloads, the donate dialog, and every other
+visit by the same visitor.
+
+How it counts, so the numbers are honest:
+
+- A page view counts when the page has opened in a real browser: the page
+  tells `/hit` itself (`public/nav.js`), with no cookie and no id, and
+  again with how long it was looked at. Robots that fetch pages without
+  running them, link previews and prerendered pages never do. Every page
+  request is counted too, robots and all, so the page shows how much was
+  left out.
+- A visitor is a hash of address and browser with a secret salt kept on the
+  server; no address is written down. The hashes are kept 400 days (unique
+  and returning visitors), single visits 30 days (`STATS_VISITS_DAYS`), the
+  counts per day ten years. Countries come from DB-IP's free database
+  (CC BY 4.0), fetched once a month by the quarter-hour run and looked up
+  on the server - nothing is sent anywhere.
+- Your own visits are left out: a browser that has opened `/admin/` gets a
+  cookie nginx does not log (pages, downloads, `/hit`), addresses that are
+  not public (your own network) never count, and `STATS_IGNORE` in
+  `/usr/local/etc/iptv-donate.conf` lists more - addresses, networks or a
+  dynamic-DNS name: `STATS_IGNORE=203.0.113.5, home.example.net`.
+- The numbers are brought up to date whenever the admin page is opened,
+  and by cron every quarter hour.
+
+Single visits are personal data under the GDPR even without an address,
+so the site should say what is counted and why (a short privacy note).
 
 **The page's password (jail):**
 
@@ -405,11 +429,11 @@ cp /root/iptv-static/deploy/content-iptv.dope.rs.conf "$C"
 bastille cmd pontusweb nginx -t && bastille cmd pontusweb service nginx reload
 ```
 
-**Check:** open the site once, then `tail -n 1
-/var/log/nginx/iptv.dope.rs-stats.log` (jail) shows your visit as one JSON
-line. After the next quarter-hour `/usr/local/www/iptv/stats/stats.json`
-exists and `https://iptv.dope.rs/admin/` asks for the password and shows the
-day. The visitors start with the new log. The downloads per day can go
+**Check:** open the site in a private window (no admin cookie there), then
+`tail -n 2 /var/log/nginx/iptv.dope.rs-stats.log` (jail) shows the page and
+its `/hit` as JSON lines. `https://iptv.dope.rs/admin/` asks for the
+password and shows the visit under *Visitors*. `/var/log/iptv-stats.log`
+says when the country database was fetched, or why not. The visitors start with the new log. The downloads per day can go
 back as far as the server kept its download log, read once on a fresh
 start (jail):
 

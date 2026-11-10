@@ -15,6 +15,10 @@
     <img src="/favicon.svg?v=2" alt="" width="28" height="28">
     <span class="name">dopeIPTV</span><span class="sub">Statistics</span>
   </div>
+  <div class="tabs" role="tablist">
+    <button type="button" role="tab" data-tab="overview" aria-selected="true">Overview</button>
+    <button type="button" role="tab" data-tab="visitors" aria-selected="false">Visitors</button>
+  </div>
   <div class="range" role="radiogroup" aria-label="Period">
     <button type="button" role="radio" data-days="7"><span class="l">7 days</span><span class="s" aria-hidden="true">7 d</span></button>
     <button type="button" role="radio" data-days="30"><span class="l">30 days</span><span class="s" aria-hidden="true">30 d</span></button>
@@ -27,6 +31,7 @@
 <main>
   <p class="status" id="status" role="status">Loading…</p>
 
+  <div id="tab-overview" class="tab">
   <section class="kpis" id="kpis" aria-label="Totals"></section>
 
   <section class="card">
@@ -56,10 +61,29 @@
     <div id="donations"></div>
   </section>
 
-  <p class="foot">Counted from the web server's own logs: no cookies and no scripts on the site.
-    A visitor counts once a day, a download once per visitor and file a day; only real
-    browsers count - robots and scripts are left out - and no address is kept.
-    Donations come from Stripe. <span id="updated"></span></p>
+  </div>
+
+  <div id="tab-visitors" class="tab" hidden>
+    <div class="card daybar">
+      <button type="button" class="step" id="day-prev" aria-label="Day before">‹</button>
+      <select id="day-pick" aria-label="Day"></select>
+      <button type="button" class="step" id="day-next" aria-label="Day after">›</button>
+      <span class="muted" id="day-sum"></span>
+    </div>
+    <div class="card visitor-head" id="visitor-head" hidden>
+      <button type="button" class="link" id="visitor-back">‹ Back to the day</button>
+      <h2 id="visitor-title"></h2>
+    </div>
+    <div class="visits" id="visit-list"></div>
+  </div>
+
+  <p class="foot">A page view counts when the page has opened in a real browser: it tells the
+    server so itself, without a cookie or an id - robots that never run it, and scripts, are
+    left out. A visitor is a hash of address and browser with a secret salt (no address is
+    kept); single visits are kept 30 days, the counts per day ten years. Your own visits are
+    left out: this browser (it opened this page), your own network, and STATS_IGNORE.
+    Countries: IP Geolocation by <a href="https://db-ip.com">DB-IP</a>. Donations come from
+    Stripe. <span id="updated"></span></p>
 </main>
 <div class="tip" id="tip" hidden></div>
 </body>

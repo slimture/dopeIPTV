@@ -7,6 +7,8 @@ missing auth_basic line cannot open the page to everyone.
     GET /admin/            the page (admin/index.html, admin.css, admin.js)
     GET /admin/data?days=N the numbers for the last N days (7, 30, 90, 365;
                            0 for everything kept)
+    GET /admin/visits?day=YYYY-MM-DD   that day's visits, one by one
+    GET /admin/visitor?id=...          every visit kept of one visitor
 
 Visitors come from stats_collect.py's STATS_DIR/stats.json; the all-time
 download counts from the site's downloads.json; donations from Stripe
@@ -23,7 +25,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SITE = os.path.dirname(HERE)                  # /usr/local/www/iptv: stats/, downloads.json
@@ -125,6 +127,7 @@ def donations(key: str, api_version: str = "") -> dict:
 RANGES = (7, 30, 90, 365, 0)        # days; 0 = everything kept
 
 
+
 def _bucket(d: date, step: str) -> date:
     if step == "week":
         return d - timedelta(days=d.weekday())
@@ -133,15 +136,33 @@ def _bucket(d: date, step: str) -> date:
     return d
 
 
+def _union(uniques: dict, days: list, per_day: dict):
+    """Different visitors over these days, or None where a day had visitors
+    whose hashes are gone (kept 400 days) - the page then shows the visits
+    summed instead."""
+    if any((per_day.get(d) or {}).get("visitors") and d not in uniques for d in days):
+        return None
+    seen: set = set()
+    for d in days:
+        seen.update(uniques.get(d, ()))
+    return len(seen)
+
+
+SUMMED = ("views", "visitors", "requests", "visits", "engaged", "bounces", "returning")
+LISTS = ("pages", "refs", "channels", "sources", "langs", "os", "os_versions", "devices", "countries",
+         "browsers", "browser_versions", "screens", "downloads", "files", "events")
+
+
 def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: str = "") -> dict:
     """The numbers for the last *days* days (0: all of them): totals and
     the same span before it, a series per day - per week for a year, per
     month for longer - the top lists, the donations, and every calendar
-    year side by side."""
+    year side by side. Unique visitors are counted across the days."""
     days = days if days in RANGES else 30
     stats = _load(os.path.join(stats_dir, "stats.json"), {"days": {}})
+    uniques = _load(os.path.join(stats_dir, "uniques.json"), {})
     per_day = stats.get("days") or {}
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now().astimezone().date()  # the server's day, as the logs' dates
     if days:
         first = today - timedelta(days=days - 1)
     else:
@@ -149,35 +170,50 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
     span = (today - first).days + 1
     step = "day" if span <= 120 else "week" if span <= 550 else "month"
 
-    sums = {k: {} for k in ("pages", "refs", "langs", "os", "devices", "downloads", "files")}
-    totals = {"views": 0, "visitors": 0, "downloads": 0}
+    sums: dict = {k: {} for k in LISTS}
+    totals = dict.fromkeys(SUMMED, 0)
     buckets: dict = {}
+    bucket_days: dict = {}
+    range_days = []
     for i in range(span):
         d = first + timedelta(days=i)
-        row = per_day.get(d.isoformat()) or {}
+        iso = d.isoformat()
+        range_days.append(iso)
+        row = per_day.get(iso) or {}
         dl = sum((row.get("downloads") or {}).values())
-        b = buckets.setdefault(_bucket(d, step).isoformat(), {"views": 0, "visitors": 0, "downloads": 0})
+        key_b = _bucket(d, step).isoformat()
+        b = buckets.setdefault(key_b, {"views": 0, "visitors": 0, "downloads": 0})
+        bucket_days.setdefault(key_b, []).append(iso)
         b["views"] += row.get("views", 0)
         b["visitors"] += row.get("visitors", 0)
         b["downloads"] += dl
-        totals["views"] += row.get("views", 0)
-        totals["visitors"] += row.get("visitors", 0)
-        totals["downloads"] += dl
+        for k in SUMMED:
+            totals[k] += row.get(k, 0)
+        totals["downloads"] = totals.get("downloads", 0) + dl
         for k, total in sums.items():
             _sum_into(total, row.get(k))
+    if step != "day":                           # a week's or month's different visitors
+        for key_b, ds in bucket_days.items():
+            u = _union(uniques, ds, per_day)
+            if u is not None:
+                buckets[key_b]["visitors"] = u
     series = [dict(date=k, **v) for k, v in sorted(buckets.items())]
+    totals["unique"] = _union(uniques, range_days, per_day)
 
     before = None
     if days:
-        before = {"views": 0, "visitors": 0, "downloads": 0}
-        for i in range(1, days + 1):
-            row = per_day.get((first - timedelta(days=i)).isoformat()) or {}
-            before["views"] += row.get("views", 0)
-            before["visitors"] += row.get("visitors", 0)
+        before = dict.fromkeys(SUMMED, 0)
+        before["downloads"] = 0
+        prev_days = [(first - timedelta(days=i)).isoformat() for i in range(1, days + 1)]
+        for iso in prev_days:
+            row = per_day.get(iso) or {}
+            for k in SUMMED:
+                before[k] += row.get(k, 0)
             before["downloads"] += sum((row.get("downloads") or {}).values())
+        before["unique"] = _union(uniques, prev_days, per_day)
 
     don = donations(key, api_version)
-    since = datetime.combine(first, datetime.min.time(), timezone.utc).timestamp()
+    since = datetime.combine(first, datetime.min.time()).astimezone().timestamp()
     in_range = [r for r in don.get("list", []) if r["t"] >= since]
     by_cur: dict = {}
     for r in in_range:
@@ -187,16 +223,22 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
         all_cur[r["currency"]] = all_cur.get(r["currency"], 0) + r["amount"]
 
     years: dict = {}
+
+    def year_row(y: str) -> dict:
+        return years.setdefault(y, {"views": 0, "visitors": 0, "downloads": 0, "donations": 0,
+                                    "sums": {}, "days": []})
     for d, row in per_day.items():
-        y = years.setdefault(d[:4], {"views": 0, "visitors": 0, "downloads": 0, "donations": 0, "sums": {}})
+        y = year_row(d[:4])
         y["views"] += row.get("views", 0)
         y["visitors"] += row.get("visitors", 0)
         y["downloads"] += sum((row.get("downloads") or {}).values())
+        y["days"].append(d)
     for r in don.get("list", []):
-        y = years.setdefault(str(datetime.fromtimestamp(r["t"], timezone.utc).year),
-                             {"views": 0, "visitors": 0, "downloads": 0, "donations": 0, "sums": {}})
+        y = year_row(str(datetime.fromtimestamp(r["t"]).astimezone().year))
         y["donations"] += 1
         y["sums"][r["currency"]] = y["sums"].get(r["currency"], 0) + r["amount"]
+    for y in years.values():
+        y["unique"] = _union(uniques, y.pop("days"), per_day)
 
     dl_all = _load(downloads_json, {})
     return {
@@ -204,11 +246,12 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
         "first": first.isoformat(),
         "step": step,
         "updated": stats.get("updated"),
+        "geo": bool(stats.get("geo")),
         "today": {k: (per_day.get(today.isoformat()) or {}).get(k, 0) for k in ("views", "visitors")},
         "totals": totals,
         "before": before,
         "series": series,
-        "top": {k: _top(v) for k, v in sums.items()},
+        "top": {k: _top(v, 12) for k, v in sums.items()},
         "years": [dict(year=k, **v) for k, v in sorted(years.items(), reverse=True)],
         "downloads_all_time": int(sum(v for v in dl_all.values() if isinstance(v, (int, float))))
                               if isinstance(dl_all, dict) else 0,
@@ -221,3 +264,43 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
             "recent": don.get("list", [])[:25],
         },
     }
+
+
+# -- the visitor log ----------------------------------------------------------------
+
+def _visits_file(stats_dir: str, day: str) -> list:
+    try:
+        with open(os.path.join(stats_dir, "visits", day + ".json"), encoding="utf-8") as fh:
+            got = json.load(fh)
+        return got if isinstance(got, list) else []
+    except (OSError, ValueError):
+        return []
+
+
+def visit_days(stats_dir: str) -> list:
+    try:
+        names = os.listdir(os.path.join(stats_dir, "visits"))
+    except OSError:
+        return []
+    return sorted((n[:10] for n in names if n.endswith(".json") and len(n) == 15), reverse=True)
+
+
+def visits(stats_dir: str, day: str) -> dict:
+    """One day's visits, newest first."""
+    try:
+        date.fromisoformat(day)
+    except ValueError:
+        day = datetime.now().astimezone().date().isoformat()
+    lst = [v for v in _visits_file(stats_dir, day) if v.get("pages") or v.get("downloads")]
+    lst.sort(key=lambda v: -v.get("start", 0))
+    return {"day": day, "days": visit_days(stats_dir), "visits": lst}
+
+
+def visitor(stats_dir: str, vid: str) -> dict:
+    """Every visit kept of one visitor, newest first."""
+    vid = "".join(c for c in vid if c in "0123456789abcdef")[:12]
+    out = []
+    for day in visit_days(stats_dir):
+        out += [dict(v, day=day) for v in _visits_file(stats_dir, day) if v.get("id") == vid]
+    out.sort(key=lambda v: -v.get("start", 0))
+    return {"id": vid, "visits": out}

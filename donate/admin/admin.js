@@ -1,5 +1,6 @@
 /* The admin page: /admin/data drawn as tiles, two charts, top lists and the
- * donations. An external file for the site's CSP (script-src 'self'); the
+ * donations, and the visitor log (/admin/visits, /admin/visitor) one visit at
+ * a time. An external file for the site's CSP (script-src 'self'); the
  * charts are SVG made here, sizes set through the DOM, never inline styles.
  */
 (function () {
@@ -15,8 +16,27 @@
   const longMonth = new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" });
   const dateFmt = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric" });
   const RANGES = [7, 30, 90, 365, 0];          // 0: everything kept
-  let langNames = null;
+  const clock = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" });
+  const clockSec = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  let langNames = null, regionNames = null;
   try { langNames = new Intl.DisplayNames(["en"], { type: "language" }); } catch (e) { /* codes then */ }
+  try { regionNames = new Intl.DisplayNames(["en"], { type: "region" }); } catch (e) { /* codes then */ }
+  function countryName(code) {
+    if (!code || code === "unknown") { return "Unknown"; }
+    try { return regionNames ? regionNames.of(code) : code; } catch (e) { return code; }
+  }
+  function flag(code) {
+    if (!/^[A-Z]{2}$/.test(code || "")) { return ""; }
+    return String.fromCodePoint(...[...code].map((c) => 0x1F1E6 + c.charCodeAt(0) - 65)) + " ";
+  }
+  function duration(secs) {
+    secs = Math.round(secs || 0);
+    if (secs < 60) { return secs + " s"; }
+    const m = Math.floor(secs / 60), r = secs % 60;
+    if (m < 60) { return m + " min" + (r ? " " + r + " s" : ""); }
+    return Math.floor(m / 60) + " h " + (m % 60) + " min";
+  }
+  const PAGE_NAMES = { "/": "Home", "/help/": "Help" };
 
   let days = 30, data = null;
   try {
@@ -100,13 +120,21 @@
   }
   function tiles() {
     const T = data.totals, B = data.before || {}, D = data.donations;
-    const since = data.before ? "" : "since " + dateFmt.format(day(data.first));
+    // Different people over the whole span where the hashes reach (400
+    // days); visits are a person on a day, summed.
+    const unique = T.unique !== null && T.unique !== undefined;
+    const visitorsNote = num.format(T.visits || T.visitors) + " visits · " + num.format(T.returning || 0) + " returning";
+    const avg = T.visits ? T.engaged / T.visits : 0;
+    const bounce = T.visits ? Math.round(T.bounces / T.visits * 100) : 0;
+    const opened = (data.top.events || []).find((e) => e[0] === "donate");
     $("kpis").replaceChildren(
-      tile("Visitors", num.format(T.visitors), since, delta(T.visitors, B.visitors)),
-      tile("Page views", num.format(T.views), since, delta(T.views, B.views)),
-      tile("Downloads", num.format(T.downloads), num.format(data.downloads_all_time) + " on the site's counter",
-           ""),
-      tile("Donations", num.format(D.count), D.error ? "Stripe did not answer" : sums(D.sums)),
+      tile(unique ? "Unique visitors" : "Visitors", num.format(unique ? T.unique : T.visitors), visitorsNote,
+           unique && B.unique !== undefined && B.unique !== null ? delta(T.unique, B.unique) : ""),
+      tile("Page views", num.format(T.views), "from " + num.format(T.requests || 0) + " page requests, robots included", ""),
+      tile("Time per visit", T.visits ? duration(avg) : "–", T.visits ? bounce + "% left within 10 s" : "", "", true),
+      tile("Downloads", num.format(T.downloads), num.format(data.downloads_all_time) + " on the site's counter", ""),
+      tile("Donations", num.format(D.count), D.error ? "Stripe did not answer" :
+           sums(D.sums) + (opened ? " · dialog opened " + num.format(opened[1]) + "×" : "")),
       tile("Visitors today", num.format(data.today.visitors), num.format(data.today.views) + " page views", "")
     );
   }
@@ -258,7 +286,6 @@
   }
 
   // -- top lists -------------------------------------------------------------------
-  const PAGE_NAMES = { "/": "Home", "/help/": "Help" };
   function listCard(title, rows, name, more) {
     const c = mk("section", "card");
     const head = mk("div", "card-head");
@@ -284,12 +311,22 @@
   function lists() {
     const L = data.top;
     const lang = (k) => { try { return langNames ? langNames.of(k) : k; } catch (e) { return k; } };
+    const countries = listCard("Countries", L.countries, (k) => flag(k) + countryName(k));
+    if (!data.geo) {
+      countries.append(mk("p", "muted", "The country database is fetched by the quarter-hour run (DB-IP, once a month)."));
+    }
+    const tagged = listCard("Tagged links", L.sources);
+    tagged.append(mk("p", "muted", "Links that carry ?ref=name, e.g. iptv.dope.rs/?ref=github."));
     $("lists").replaceChildren(
+      listCard("How they found the site", L.channels),
+      listCard("Sites that linked here", L.refs, (k) => k === "other" ? "Other sites" : k),
+      countries,
       listCard("Pages", L.pages, (k) => PAGE_NAMES[k] || k),
-      listCard("Came from", L.refs, (k) => k === "other" ? "Other sites" : k),
       listCard("Languages", L.langs, lang),
-      listCard("Systems", L.os),
-      listCard("Devices", L.devices),
+      listCard("Browsers", L.browsers, null, ["Versions", L.browser_versions]),
+      listCard("Systems", L.os_versions),
+      listCard("Devices", L.devices, null, ["Screens", L.screens]),
+      tagged,
       listCard("Downloads", L.downloads, null, ["Files", L.files, (k) => k === "other" ? "Other files" : k.replace(/^dopeIPTV-/, "")])
     );
   }
@@ -326,19 +363,111 @@
     const Y = data.years || [];
     if (!Y.length) { $("years").replaceChildren(mk("p", "empty", "Nothing yet.")); return; }
     const t = mk("table"), head = mk("tr");
-    [["Year", ""], ["Visitors", "num"], ["Page views", "num"], ["Downloads", "num"], ["Donations", "num"], ["Donated", "num hide-phone"]]
+    [["Year", ""], ["Unique visitors", "num"], ["Page views", "num"], ["Downloads", "num"], ["Donations", "num"], ["Donated", "num hide-phone"]]
       .forEach(([h, c]) => head.append(mk("th", c, h)));
     const thead = mk("thead"); thead.append(head);
     const tb = mk("tbody");
     Y.forEach((y) => {
       const tr = mk("tr");
-      tr.append(mk("td", "", y.year), mk("td", "num", num.format(y.visitors)), mk("td", "num", num.format(y.views)),
+      const u = y.unique !== null && y.unique !== undefined ? num.format(y.unique) : num.format(y.visitors) + " visits";
+      tr.append(mk("td", "", y.year), mk("td", "num", u), mk("td", "num", num.format(y.views)),
                 mk("td", "num", num.format(y.downloads)), mk("td", "num", num.format(y.donations)),
                 mk("td", "num hide-phone", sums(y.sums)));
       tb.append(tr);
     });
     t.append(thead, tb);
     $("years").replaceChildren(t);
+  }
+
+  // -- the visitor log -------------------------------------------------------------
+  let logDay = "", logDays = [];
+  function badge(text, cls) { return mk("span", "badge" + (cls ? " " + cls : ""), text); }
+  function visitRow(v, showDay) {
+    const row = mk("details", "visit");
+    const sum = mk("summary");
+    const when = new Date(v.start * 1000);
+    const pages = v.pages.length, dls = v.downloads.length;
+    sum.append(
+      mk("span", "v-time", (showDay ? dateFmt.format(when) + " " : "") + clock.format(when)),
+      mk("span", "v-where", flag(v.country) + countryName(v.country)),
+      mk("span", "v-what", [v.browser + (v.bv ? " " + v.bv : ""), v.os, v.device].join(" · ")),
+      mk("span", "v-from", v.channel ? v.channel + (v.ref ? " · " + v.ref : "") : (dls ? "Straight to a download" : "")),
+      mk("span", "v-pages", (pages ? pages + (pages === 1 ? " page" : " pages") : "") + (v.time ? " · " + duration(v.time) : "")));
+    const tags = mk("span", "v-tags");
+    if (v.returning) { tags.append(badge("Returning · " + v.returning + (v.returning === 1 ? " day" : " days") + " before")); }
+    if (dls) { tags.append(badge("Downloaded", "good")); }
+    (v.events || []).forEach((e) => tags.append(badge(e[1] === "donated" ? "Donated" : "Opened donate", e[1] === "donated" ? "good" : "")));
+    sum.append(tags);
+    row.append(sum);
+
+    const body = mk("div", "v-body");
+    const steps = [];
+    v.pages.forEach((p) => steps.push([p[0], (PAGE_NAMES[p[1]] || p[1]) + (p[2] ? " · looked at " + duration(p[2]) : "")]));
+    v.downloads.forEach((d) => steps.push([d[0], "Downloaded " + d[1]]));
+    (v.events || []).forEach((e) => steps.push([e[0], e[1] === "donated" ? "Donated" : "Opened the donate dialog"]));
+    steps.sort((a, b) => a[0] - b[0]);
+    const ol = mk("ol", "steps");
+    steps.forEach(([t, text]) => { const li = mk("li"); li.append(mk("span", "t", clockSec.format(new Date(t * 1000))), mk("span", "", text)); ol.append(li); });
+    body.append(ol);
+    const facts = mk("dl", "facts");
+    [["Screen", v.screen], ["Page language", v.lang && (langNames ? langNames.of(v.lang) : v.lang)],
+     ["Browser language", v.blang], ["Tagged link", v.source], ["Visitor", v.id]].forEach(([k, val]) => {
+      if (!val) { return; }
+      facts.append(mk("dt", "", k), mk("dd", "", val));
+    });
+    body.append(facts);
+    if (!showDay) {
+      const all = mk("button", "link", "Every visit by this visitor");
+      all.type = "button";
+      all.addEventListener("click", () => showVisitor(v.id));
+      body.append(all);
+    }
+    row.append(body);
+    return row;
+  }
+  function loadDay(d) {
+    $("visit-list").replaceChildren(mk("p", "muted", "Loading…"));
+    fetch("/admin/visits?day=" + encodeURIComponent(d || ""), { credentials: "same-origin", cache: "no-store" })
+      .then((r) => { if (!r.ok) { throw new Error("the service answered " + r.status); } return r.json(); })
+      .then((res) => {
+        logDay = res.day; logDays = res.days || [];
+        const pick = $("day-pick");
+        pick.replaceChildren(...(logDays.indexOf(logDay) < 0 ? [logDay].concat(logDays) : logDays).map((x) => {
+          const o = mk("option", "", longDay.format(day(x))); o.value = x; return o;
+        }));
+        pick.value = logDay;
+        const i = logDays.indexOf(logDay);
+        $("day-prev").disabled = i < 0 || i >= logDays.length - 1;
+        $("day-next").disabled = i <= 0;
+        const list = res.visits || [];
+        const people = new Set(list.map((v) => v.id)).size;
+        $("day-sum").textContent = num.format(list.length) + (list.length === 1 ? " visit" : " visits") +
+          " by " + num.format(people) + (people === 1 ? " visitor" : " visitors");
+        $("visitor-head").hidden = true;
+        $("visit-list").replaceChildren(...(list.length ? list.map((v) => visitRow(v, false))
+          : [mk("p", "empty", "No visits this day.")]));
+      })
+      .catch((e) => $("visit-list").replaceChildren(mk("p", "error", "Could not load the visits: " + e.message + ".")));
+  }
+  function showVisitor(id) {
+    fetch("/admin/visitor?id=" + encodeURIComponent(id), { credentials: "same-origin", cache: "no-store" })
+      .then((r) => r.json())
+      .then((res) => {
+        const list = res.visits || [];
+        $("visitor-head").hidden = false;
+        $("visitor-title").textContent = "Visitor " + res.id + " · " + num.format(list.length) +
+          (list.length === 1 ? " visit" : " visits") + " in the last " + ((data && data.visits_days) || 30) + " days";
+        $("visit-list").replaceChildren(...list.map((v) => visitRow(v, true)));
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+  }
+  function setTab(name) {
+    document.querySelectorAll(".tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === name ? "true" : "false"));
+    $("tab-overview").hidden = name !== "overview";
+    $("tab-visitors").hidden = name !== "visitors";
+    document.querySelector(".range").hidden = name !== "overview";
+    try { localStorage.setItem("admin-tab", name); } catch (e) { /* fine */ }
+    if (name === "visitors") { loadDay(logDay); }
   }
 
   function render() {
@@ -365,5 +494,13 @@
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => { if (data) { visitsChart(); downloadsChart(); } }, 120);
   });
+  document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
+  $("day-pick").addEventListener("change", (e) => loadDay(e.target.value));
+  $("day-prev").addEventListener("click", () => loadDay(logDays[logDays.indexOf(logDay) + 1]));
+  $("day-next").addEventListener("click", () => loadDay(logDays[logDays.indexOf(logDay) - 1]));
+  $("visitor-back").addEventListener("click", () => loadDay(logDay));
   setRange(days);
+  let tab = "overview";
+  try { tab = localStorage.getItem("admin-tab") === "visitors" ? "visitors" : "overview"; } catch (e) { /* default */ }
+  setTab(tab);
 })();

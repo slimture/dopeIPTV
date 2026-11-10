@@ -65,6 +65,8 @@ named by DONATE_CONFIG (default /usr/local/etc/iptv-donate.conf):
                             or host:port for TCP
     ADMIN_USERS             who may open /admin/, e.g. pontus (default: anyone
                             nginx let in)
+    STATS_IGNORE            addresses, networks or host names whose visits
+                            stats_collect.py leaves out (your own)
     STATS_DIR, DOWNLOADS_JSON  where stats_collect.py and sync-releases.sh keep
                             their counts (<site>/stats, <site>/downloads.json)
 """
@@ -104,7 +106,7 @@ def _load_config() -> dict[str, str]:
         pass
     conf.update({k: v for k, v in os.environ.items()
                  if k.startswith(("STRIPE_", "DONATE_", "LISTEN", "STATS_", "ADMIN_", "DL_LOG",
-                                  "DOWNLOADS_JSON", "SITE_HOST"))})
+                                  "DOWNLOADS_JSON", "SITE_HOST", "GEO_"))})
     return conf
 
 
@@ -329,16 +331,26 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:  # noqa: BLE001 - a broken admin.py must not stop donations
             print(f"[donate] admin page unavailable: {e}", file=sys.stderr, flush=True)
             return self._send(500, {"error": "admin unavailable"})
-        if path == "/admin/data":
-            query = urllib.parse.parse_qs(self.path.partition("?")[2])
+        if path in ("/admin/data", "/admin/visits", "/admin/visitor"):
+            query = {k: v[0] for k, v in urllib.parse.parse_qs(self.path.partition("?")[2]).items()}
+            stats_dir = CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats"))
+            try:                            # the newest lines first: the page is never behind
+                import stats_collect
+                stats_collect.collect_if_stale()
+            except Exception as e:  # noqa: BLE001 - old numbers rather than no page
+                print(f"[donate] statistics not brought up to date: {e!r}", file=sys.stderr, flush=True)
+            if path == "/admin/visits":
+                return self._send(200, admin.visits(stats_dir, query.get("day", "")))
+            if path == "/admin/visitor":
+                return self._send(200, admin.visitor(stats_dir, query.get("id", "")))
             try:
-                days = int((query.get("days") or ["30"])[0])
+                days = int(query.get("days", "30"))
             except ValueError:
                 days = 30
-            site = admin.SITE
-            body = admin.data(days, CONF.get("STATS_DIR", os.path.join(site, "stats")),
-                              CONF.get("DOWNLOADS_JSON", os.path.join(site, "downloads.json")),
+            body = admin.data(days, stats_dir,
+                              CONF.get("DOWNLOADS_JSON", os.path.join(admin.SITE, "downloads.json")),
                               _secret(), API_VERSION)
+            body["visits_days"] = int(CONF.get("STATS_VISITS_DAYS", "30") or 30)
             return self._send(200, body)
         hit = admin.static(path)
         if not hit:
@@ -348,13 +360,21 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype)
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Robots-Tag", "noindex, nofollow")
+        if path == "/admin/":
+            # This browser is the site's owner: nginx leaves it out of the
+            # statistics (deploy/content-iptv.dope.rs.conf, $iptv_count).
+            # 400 days is the longest a browser keeps a cookie; every visit
+            # here renews it.
+            self.send_header("Set-Cookie", "iptv_nostats=1; Max-Age=34560000; Path=/; "
+                                           "Secure; HttpOnly; SameSite=Lax")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
 
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
-        if path == "/admin/" or path in ("/admin/admin.css", "/admin/admin.js", "/admin/data"):
+        if path == "/admin/" or path in ("/admin/admin.css", "/admin/admin.js", "/admin/data",
+                                         "/admin/visits", "/admin/visitor"):
             return self._admin(path)
         if path != "/donate/config":
             return self._send(404, {"error": "not found"})

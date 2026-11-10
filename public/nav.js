@@ -1,3 +1,52 @@
+/* Counting visits, for the site's own statistics (donate/stats_collect.py):
+ * the page tells /hit once it is shown in a browser, how long it was looked
+ * at when it is left, and when the donate dialog opens or a donation goes
+ * through. No cookie, no id, nothing kept in the browser; the server counts.
+ * Robots that fetch pages without running them never send it, which is
+ * what makes the numbers honest. Nothing here can get in the page's way.
+ */
+var iptvHit = (function () {
+  "use strict";
+  var since = 0, started = false;
+  function send(q) {
+    try {
+      var url = "/hit?p=" + encodeURIComponent(location.pathname) + "&" + q;
+      if (navigator.sendBeacon && navigator.sendBeacon(url)) { return; }
+      if (window.fetch) { fetch(url, { method: "POST", keepalive: true, credentials: "same-origin" }); }
+    } catch (e) { /* counting never gets in the way */ }
+  }
+  function shown() {
+    started = true;
+    since = Date.now();
+    var src = (/[?&](?:ref|utm_source|source)=([^&#]*)/.exec(location.search) || [])[1] || "";
+    send("ev=view&r=" + encodeURIComponent(document.referrer || "") +
+         "&s=" + encodeURIComponent(decodeURIComponent(src).slice(0, 40)) +
+         "&l=" + encodeURIComponent(document.documentElement.lang || "") +
+         "&bl=" + encodeURIComponent(navigator.language || "") +
+         "&w=" + (screen.width || 0) + "&h=" + (screen.height || 0));
+  }
+  function left() {
+    if (!since) { return; }
+    var secs = Math.round((Date.now() - since) / 1000);
+    since = 0;
+    if (secs > 0) { send("ev=leave&t=" + secs); }
+  }
+  try {
+    if (navigator.webdriver) { return function () {}; }    // automated browsers say so
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "hidden") { left(); }
+      else if (started && !since) { since = Date.now(); }
+    });
+    window.addEventListener("pagehide", left);
+    if (document.prerendering) {
+      document.addEventListener("prerenderingchange", shown, { once: true });
+    } else {
+      shown();
+    }
+  } catch (e) { /* as above */ }
+  return function (ev) { send("ev=" + encodeURIComponent(ev)); };
+})();
+
 /* Header disclosures: close them when you click away or press Escape.
  *
  * Everything the header does works without this file - <details> is a native
@@ -335,6 +384,7 @@
 
   function open(href) {
     if (!dlg) { build(); }
+    if (typeof iptvHit === "function") { iptvHit("donate"); }
     el.loading.textContent = T.loading;
     show(el.loading);
     dlg.showModal();
@@ -391,7 +441,10 @@
     pr.update({ currency: code(), total: { label: cfg.name || T.title, amount: walletAmount } });
     pr.show();
   }
-  function walletDone() { show(el.done); }
+  function donated() {
+    if (typeof iptvHit === "function") { iptvHit("donated"); }
+  }
+  function walletDone() { donated(); show(el.done); }
   function walletFailed(msg) {
     show(el.amounts);
     el.err1.textContent = msg || T.failed; el.err1.hidden = false;
@@ -494,7 +547,7 @@
     }).then(function (r) {
       if (r && r.error) { payAgain(r.error.message); return; }
       var state = r && r.paymentIntent && r.paymentIntent.status;
-      if (state === "succeeded" || state === "processing") { teardown(); busy = false; show(el.done); return; }
+      if (state === "succeeded" || state === "processing") { teardown(); busy = false; donated(); show(el.done); return; }
       warn("payment ended as", state);
       payAgain();
     }).catch(function (err) {

@@ -62,11 +62,13 @@ itself, in the donor's own currency. Without it the dialog sends visitors to
 Stripe's own page. Setting it up: `DEPLOY.md`, "Donations".
 
 The same service serves the admin page, `/admin/` behind nginx's password
-(`donate/admin.py`, `donate/admin/`): visitors, page views, downloads and
-donations by day, week, month and year. The visitor counts come from a log
-nginx keeps of page views, read every quarter hour by
-`donate/stats_collect.py` - no script or cookie on the site, no address
-kept. Setting it up: `DEPLOY.md`, "Statistics and the admin page".
+(`donate/admin.py`, `donate/admin/`): unique visitors, how they found the
+site, countries, browsers and devices, downloads and donations by day,
+week, month and year, and every visit of the last 30 days one by one. A
+page view counts when the page has opened in a real browser and told
+`/hit` so (`public/nav.js`, no cookie, no id); `donate/stats_collect.py`
+reads nginx's log of it - no address kept, robots left out. Setting it up:
+`DEPLOY.md`, "Statistics and the admin page".
 
 Config templates live in `deploy/` with role-based names —
 `proxy-iptv.dope.rs.conf` and `content-iptv.dope.rs.conf`. Replace the
