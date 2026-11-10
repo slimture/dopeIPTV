@@ -299,6 +299,8 @@ h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -.03em; line-height:
 .donate .donate-btn:hover { background: linear-gradient(135deg, #ff7d99, #ff3b62 60%, #f01e52); }
 .donate-text h2 { font-size: clamp(1.35rem, 2.6vw, 1.7rem); margin: 10px 0 8px; }
 .donate-text p { margin: 0; color: var(--muted); line-height: 1.65; max-width: 62ch; }
+/* On a phone the long reason gives way to one short sentence (below). */
+.donate-text .donate-short { display: none; }
 .donate-act { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
 .donate-btn { padding: 13px 26px; font-size: 15px; }
 .donate-heart { width: 17px; height: 17px; fill: currentColor; }
@@ -1390,6 +1392,8 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
 @media (max-width: 720px) {
   #features .sec-head p, #whats-new .sec-head p, .faq-grid .sec-head p,
   #credits .sec-head p, .donate-text p, #shots .sec-head p { display: none; }
+  .donate-text .donate-short { display: block; margin: 0 auto 4px; max-width: 34ch;
+    font-size: 15px; line-height: 1.5; }
   .sec-head { margin-bottom: 18px; }
   .donate-act small { display: none; }
   .dl-phone p { font-size: 15px; }

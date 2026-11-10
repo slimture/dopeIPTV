@@ -108,6 +108,7 @@
     "donate_eyebrow": "Stöd dopeIPTV",
     "donate_h2": "Gratis, men inte utan kostnader.",
     "donate_p": "dopeIPTV är helt gratis — inga annonser, ingen spårning, ingen betalversion. Utvecklingen, webbplatsen och nedladdningarna är förenade med vissa kostnader. Om appen fungerar bra för dig hjälper en donation, oavsett belopp, till att hålla den igång.",
+    "donate_p_short": "Inga annonser och ingen betalversion. En donation hjälper till att täcka kostnaderna.",
     "donate_btn": "Donera",
     "donate_note": "Valfritt belopp i din egen valuta · kort, Apple Pay eller Google Pay · säkert via Stripe",
     "donate_modal_sub": "Valfritt belopp, en gång. Tack för hjälpen!",

@@ -336,6 +336,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
       + "        <div class=\"donate-text\">\n"
       + "          <h2>\(t("donate_h2") | h)</h2>\n"
       + "          <p>\(t("donate_p") | h)</p>\n"
+      + "          <p class=\"donate-short\">\(t("donate_p_short") | h)</p>\n"
       + "        </div>\n"
       + "        <div class=\"donate-act\">\n"
       + "          <a class=\"btn primary donate-btn\" href=\"\($DONATE | h)\" rel=\"nofollow noopener\"><svg class=\"donate-heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("donate_btn") | h)</a>\n"
