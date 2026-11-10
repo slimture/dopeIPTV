@@ -1,10 +1,12 @@
 # Architecture
 
-dopeIPTV is a desktop IPTV client built with PyQt6 that connects to
-Xtream Codes providers.  The codebase is grouped into layered
-subpackages inside the `dopeiptv/` package - `providers/` (data
-sources), `core/` (storage, background work, OS glue), `media/`
-(playback) and `ui/` (everything the user sees).
+dopeIPTV is a desktop IPTV client built with PyQt6 and libmpv that
+connects to Xtream Codes providers, M3U playlists and Stalker / Ministra
+portals.  The codebase is grouped into layered subpackages inside the
+`dopeiptv/` package - `providers/` (data sources), `core/` (storage,
+background work, OS glue), `media/` (playback), `services/`
+(window-agnostic application services) and `ui/` (everything the user
+sees).
 
 ## Module map
 
@@ -29,6 +31,8 @@ dopeiptv/
     chromecast.py      ChromecastManager, CastDialog
     dlna.py            DLNA / UPnP TVs: SSDP discovery, SOAP control, file share
     casting.py         CastHub - Chromecast and DLNA behind one object
+    cast_bridge.py     Local bridge that re-encodes the audio a Chromecast
+                       refuses (E-AC-3) so the stream still casts
     opensubtitles.py   OpenSubtitles.com REST client (search, download, hash)
 
   core/                Storage, background work, OS integration
@@ -50,6 +54,14 @@ dopeiptv/
     platform_macos.py  macOS-specific helpers (OpenGL, libmpv, paths)
     platform_windows.py Windows helpers (libmpv discovery, wakelock, shortcut)
     player_exec.py     Locate the external mpv / VLC binary on the host
+    desktop_entry.py   The user's .desktop entry + icons (Wayland reads the
+                       window icon from there, not from the app)
+    xdg.py             Launch system programs from a frozen bundle without
+                       our bundled libraries leaking into them
+    audiotags.py       Artist/album/title and cover art from music files
+                       (header-only, no dependency)
+    _alloc.py          Optional allocator preload for long sessions
+    _lazy_requests.py  Lazy stand-in for `requests` (faster cold start)
 
   media/               Playback
     embedded.py        EmbeddedPlayer: the in-app player
@@ -115,7 +127,8 @@ dopeiptv/
     shortcuts.py       Keyboard-shortcuts editor dialog
     tmdb_match.py      Manual TMDB match dialog
     subtitle_search.py OpenSubtitles search dialog
-    theme.py           9 themes x 7 accents, palette dict P, QSS generator
+    theme.py           THEMES (17) x ACCENTS (10 + custom), palette dict P,
+                       QSS generator
 ```
 
 Import direction is one-way: `ui` may use `services`, `media`, `core`
@@ -128,11 +141,14 @@ for player-overlay colours, which is why `ui/__init__` exposes
 ## Data flow
 
 1. **Startup** (`app.py`): creates QApplication, applies theme, runs the
-   login loop (PlaylistStore -> XtreamClient.authenticate), then builds
-   MainWindow.
+   login loop (PlaylistStore -> the playlist's client: `XtreamClient`,
+   `M3UClient`, `StalkerClient` or `DemoClient`, then `authenticate`),
+   then builds MainWindow.  A first run goes through the setup wizard
+   (`mw_onboarding.py`) instead.
 
-2. **MainWindow** loads categories and channels from the Xtream API via
-   `run_async()` workers.  Results populate `ChannelListModel`; the
+2. **MainWindow** loads categories and channels from the provider via
+   `run_async()` workers (every client offers the same calls, so the
+   window does not care which kind it has).  Results populate `ChannelListModel`; the
    `ChannelDelegate` custom-paints each row (list mode) or cell (grid).
 
 3. **EPG** is fetched in a background worker into `XmltvGuide`, which
@@ -142,9 +158,20 @@ for player-overlay colours, which is why `ui/__init__` exposes
    render API inside a QOpenGLWidget) or an external player launched by
    `players.py`.
 
-5. **Recording** uses `RecordingManager`: ffmpeg stream-copy subprocess
-   for standalone recordings, or mpv's `--stream-record` for in-player
-   capture.
+5. **Rewind / DVR**: by default mpv's own demuxer cache is the rewind
+   buffer (in memory, or on disk with `local_buffer.py`).  With
+   "dopeIPTV's own buffer" on, `DvrPool` runs a `DvrSession` per live
+   channel: `dvr_ingest` holds the one provider connection, `dvr_store`
+   keeps rolling TS segments on disk within the space budget, and
+   `dvr_server` serves them to mpv over loopback - so pausing never stalls
+   the download and LIVE never reconnects.  `media/dvr_player.py` is the
+   player's side of it, `media/rewind_bar.py` the bar over the video.
+
+6. **Recording** uses `RecordingManager`: ffmpeg stream-copy subprocess
+   for standalone recordings, mpv's `--stream-record` for in-player
+   capture, or `BufferRecorder` (`dvr_record.py`) reading from the app's
+   own buffer when that is on - no extra connection, and whole while the
+   player is paused.
 
 ## Key patterns
 
@@ -165,6 +192,11 @@ for player-overlay colours, which is why `ui/__init__` exposes
 
 - PyQt6 (widgets, OpenGL, core)
 - requests (HTTP)
-- python-mpv (optional, for embedded playback)
-- pychromecast (optional, for Chromecast)
-- ffmpeg CLI (optional, for standalone recording)
+- python-mpv + libmpv (the embedded player - required in practice; the
+  packaged builds bundle libmpv)
+- pychromecast (Chromecast; bundled in every packaged build)
+- ffmpeg CLI (standalone recording; bundled in every packaged build)
+
+Everything else (DLNA, MPRIS over D-Bus, OpenSubtitles, TMDB, Trakt, the
+Stalker portal protocol, music tags) is written against the standard
+library and `requests`.

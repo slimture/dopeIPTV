@@ -7,12 +7,14 @@
   <summary>Modern IPTV player for Xtream Codes with EPG</summary>
   <description>
     <p>
-      dopeIPTV is a clean, modern player for your own Xtream Codes or M3U
-      subscription. It offers an embedded mpv player, an electronic programme
-      guide with a timeline grid, movies and series with TMDB metadata,
-      recording and timeshift catch-up, optional Trakt sync, casting to
-      Chromecast and DLNA smart TVs, subtitles from OpenSubtitles, desktop
-      media controls, multiple playlists, themes and translations.
+      dopeIPTV is a clean, modern player for your own Xtream Codes, M3U or
+      Stalker portal subscription. It offers an embedded mpv player, an
+      electronic programme guide with a timeline grid, rewinding live TV,
+      movies and series with TMDB metadata, a Home page with what is popular
+      right now, recording and timeshift catch-up, multiview for up to nine
+      channels, your own local video and music files, optional Trakt sync,
+      casting to Chromecast and DLNA smart TVs, subtitles from OpenSubtitles,
+      desktop media controls, multiple playlists, themes and 27 languages.
     </p>
     <p>
       dopeIPTV is a player only: it does not provide any channels or content -
@@ -26,7 +28,7 @@
       <image>https://raw.githubusercontent.com/slimture/dopeIPTV/main/docs/screenshots/live.png</image>
     </screenshot>
     <screenshot>
-      <caption>Settings: nine themes and seven accent colors</caption>
+      <caption>Settings: themes and accent colours</caption>
       <image>https://raw.githubusercontent.com/slimture/dopeIPTV/main/docs/screenshots/themes.png</image>
     </screenshot>
     <screenshot>
@@ -52,7 +54,7 @@
   <releases>
     <release version="1.4.0" date="2026-11-08">
       <description>
-        <p>An experimental rewind buffer kept by dopeIPTV itself: it goes on downloading while paused and returns to live without reconnecting. The programme guide keeps itself up to date and can be refreshed from the guide window, and the detail panel says plainly when a provider's guide for a channel ends before now.</p>
+        <p>An experimental rewind buffer kept by dopeIPTV itself: it goes on downloading while paused, returns to live without reconnecting, keeps each channel's history and records from the buffer. A new Home with this week's popular titles, instant subtitles in films, a programme guide that keeps itself up to date, experimental Stalker / Ministra portals, an Intel Mac build again, and test builds for those who want them.</p>
       </description>
     </release>
     <release version="1.3.0" date="2026-11-07">

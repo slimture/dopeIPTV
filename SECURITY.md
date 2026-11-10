@@ -27,11 +27,22 @@ If the Security tab is unavailable to you, contact the maintainer
 Useful context for researchers:
 
 - dopeIPTV talks only to servers **the user configures** (their IPTV
-  provider, optional XMLTV URL) plus a small set of fixed services the user
-  opts into: GitHub (update check), TMDB (metadata), Trakt (sync).
+  provider - Xtream Codes, M3U or Stalker portal - and an optional XMLTV
+  URL) plus a small set of fixed services: GitHub (update check and the
+  AppImage's self-update), TMDB (metadata, artwork and the weekly popular
+  chart), and - only when the user turns them on - Trakt (sync) and
+  OpenSubtitles.com (subtitle search and download).
+- On the local network it discovers and talks to Chromecasts (mDNS) and
+  DLNA/UPnP TVs (SSDP); casting a local file serves that file to the TV
+  over HTTP for as long as it plays. The app's own rewind buffer, when
+  turned on, serves the channel to the embedded player on 127.0.0.1
+  behind a random token. The Trakt sign-in briefly listens on 127.0.0.1
+  for the browser's redirect.
 - Provider credentials are stored **locally** in Qt's QSettings store,
-  unencrypted — the standard threat model of a desktop app. There is no
-  server-side component and no telemetry.
+  unencrypted — the standard threat model of a desktop app — and masked in
+  logs. There is no server-side component and no telemetry. (The project's
+  website counts downloads from its own web server's log; the app itself
+  reports nothing.)
 - Playback is delegated to **libmpv/FFmpeg**; vulnerabilities in stream
   demuxing/decoding should be reported upstream, though we will gladly ship
   bundled-library updates that pick up their fixes.

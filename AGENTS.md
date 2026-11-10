@@ -1,8 +1,26 @@
 # AI Agent Guide
 
-This document helps AI coding assistants (Aider, Cursor, Copilot, etc.)
-work effectively with the dopeIPTV codebase.  Each module is kept small
-enough to fit in a 14-16B model's context window.
+This document helps any AI coding assistant - whichever model or tool it
+is (Claude Code, Codex, Gemini CLI, Copilot, Cursor, Aider, a local
+model, ...) - and any new human contributor work effectively with the
+dopeIPTV codebase.  It is the single source of these instructions:
+`CLAUDE.md`, `GEMINI.md` and `.github/copilot-instructions.md` only point
+here.  Each module is kept small enough to fit in a 14-16B model's
+context window.
+
+**Start here:**
+
+1. This file - what each module owns, the conventions, the quality gate.
+2. [`docs/MAINTAINING.md`](docs/MAINTAINING.md) - branches, CI, how a
+   release is cut, the website, keys and accounts, open work.
+3. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and
+   [`docs/DEVELOPER_NOTES.md`](docs/DEVELOPER_NOTES.md) - how the parts
+   fit together and why.
+
+**Three rules above all others:** stability first - never break video
+playback; Linux is the primary platform and a change for macOS or
+Windows must not make Linux worse; run the quality gate yourself before
+you say something works.
 
 ## Module responsibilities
 
@@ -23,6 +41,7 @@ map and the one-way import rule.
 | `providers/chromecast.py` | Chromecast support |
 | `providers/dlna.py` | DLNA / UPnP TVs (discovery, control, local file share) |
 | `providers/casting.py` | `CastHub`: Chromecast and DLNA behind one object |
+| `providers/cast_bridge.py` | Re-encodes audio a Chromecast refuses (E-AC-3) so the stream still casts |
 | `providers/opensubtitles.py` | OpenSubtitles.com client (search, download, file hash) |
 | `core/stores.py` | Data persistence layer |
 | `core/workers.py` | Thread pool helpers, LogoLoader, image caches |
@@ -38,6 +57,9 @@ map and the one-way import rule.
 | `core/selfupdate.py` | AppImage in-place update (download, checksum, self-check, swap) |
 | `core/wakelock.py` | Screensaver inhibitor |
 | `core/gcguard.py` | Cyclic garbage collection on the GUI thread only |
+| `core/desktop_entry.py` | The user's .desktop entry and icons (Wayland takes the window icon from there) |
+| `core/xdg.py` | Launch system programs from a frozen bundle without our bundled libraries |
+| `core/audiotags.py` | Artist/album/title and cover art from music files, header-only |
 | `services/mpris.py` | MPRIS media session on the session bus (Linux) |
 | `services/notify.py` | Desktop notifications over D-Bus (Linux) |
 | `services/popular.py` | Popular right now: TMDB's weekly chart matched to the provider's catalogue |
@@ -60,6 +82,12 @@ map and the one-way import rule.
 | `ui/tmdb_match.py` | Manual TMDB match dialog |
 | `ui/subtitle_search.py` | OpenSubtitles search dialog |
 | `ui/widgets.py` | Small standalone widgets |
+| `ui/mw_home.py` | The Home page: which shelves, what goes in them (drawn by `home_widgets.py`) |
+| `ui/mw_local.py` | Local files: folders, library view, music queue |
+| `ui/mw_multiview.py` | Multiview: 2/4/6/9 live streams, an mpv per cell |
+| `ui/epg_grid.py` | The guide's timeline grid |
+| `ui/epg_search.py` | Programme search across the whole guide |
+| `ui/welcome.py` | First-run welcome overlay |
 | `ui/category_flags.py` | Bundled SVG flags for category names (flag emoji, "SE \| …" prefixes) |
 | `ui/player_resize.py` | The handle under the docked video that sets its height |
 | `ui/theme.py` | Theming engine |
@@ -69,7 +97,8 @@ map and the one-way import rule.
 `ui/main_window.py` is a thin composition root: the real behaviour lives
 in the `mw_*` mixins beside it, each mixed into `MainWindow`:
 `mw_settings`, `mw_trakt`, `mw_recording`, `mw_context`, `mw_favorites`
-(several favorites at once, move between folders, drag-and-drop), `mw_detail`,
+(several favorites at once, move between folders, drag-and-drop), `mw_home`
+(Home), `mw_local` (local files), `mw_multiview` (multiview), `mw_detail`,
 `mw_search` (sidebar search), `mw_sidebar` (panel collapse / icon rail),
 `mw_nav` (focus mode, nav colours/icons, Library group), `mw_shortcuts`
 (keyboard shortcuts), `mw_busy` (loading indicator), `mw_updates`

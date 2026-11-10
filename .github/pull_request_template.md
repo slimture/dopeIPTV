@@ -15,7 +15,7 @@
 ## Checklist
 
 - [ ] Does not touch the video playback path — or explains below why the change is safe
-- [ ] New user-visible strings go through `tr()` with entries for all 8 languages
+- [ ] New user-visible strings go through `tr()` (English in `i18n.py`, the other 26 languages in `dopeiptv/locale/*.json`)
 - [ ] Platform-specific code is gated (`sys.platform` / `core/platform_*.py`) and a no-op elsewhere
 - [ ] UI change → screenshot attached (checked on a dark theme and OLED pure-black)
 - [ ] New logic that runs headless has a test

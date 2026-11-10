@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Help & answers
+    url: https://iptv.dope.rs/help/
+    about: Setup, playback, the guide, rewinding, recording, casting and troubleshooting - most questions are answered here.
   - name: Website & downloads
     url: https://iptv.dope.rs
     about: Latest release downloads and feature overview.

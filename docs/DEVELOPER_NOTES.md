@@ -20,10 +20,12 @@ monolith into a proper Python package (`dopeiptv/`).  The top-level
 The package is organised into layered subpackages with a one-way import
 rule (see `ARCHITECTURE.md` for the full module map):
 
-- `providers/` — data sources (Xtream client, EPG, TMDB, Trakt, cast)
+- `providers/` — data sources (Xtream / M3U / Stalker clients, EPG, TMDB,
+  Trakt, OpenSubtitles, Chromecast and DLNA)
 - `core/`      — storage, background workers, OS integration
 - `media/`     — playback (embedded libmpv widget, external launchers)
-- `services/`  — window-agnostic application services (cover art, resume)
+- `services/`  — window-agnostic application services (cover art, resume,
+  reminders, MPRIS, notifications, the popular-titles chart)
 - `ui/`        — the main window, its mixins and all widgets/dialogs
 
 `ui` may import from any layer below it; `services` builds on
@@ -41,6 +43,18 @@ The app connects to Xtream Codes providers via their HTTP API
 - `get_series_categories` / `get_series` / `get_series_info` - series
 - `xmltv.php` - EPG data (XMLTV format)
 - Stream URLs: `{server}/{username}/{password}/{stream_id}.ts`
+
+## Stalker / Ministra portals
+
+`providers/stalker.py` (`StalkerClient`) talks to a MAC portal's
+`portal.php` / `load.php`: a handshake for a token, `get_profile`, then the
+`itv` / `vod` / `series` listings, and `create_link` for a playable URL.
+It offers the same calls as `XtreamClient`, so the window does not know
+which kind it has.  A portal hands out a link per play (`create_link`),
+which is resolved off the GUI thread (`link_ready`, with a time limit) so
+a slow portal cannot freeze the window.  Not done yet: catch-up from a
+portal (`tv_archive` / `create_link` on an archive URL) - it needs a portal
+with archive to test against.
 
 ## Embedded player
 
@@ -63,6 +77,39 @@ Two recording modes:
 2. **In-player** (`--stream-record`): records whatever the embedded
    player is currently showing.  Uses mpv's built-in stream recording.
 
+## Rewind and dopeIPTV's own buffer (DVR)
+
+Two ways to rewind a live channel:
+
+1. **mpv's own cache** (the default): "Rewind live channels" sets how many
+   minutes mpv's demuxer keeps, in memory or - with "Keep the rewind
+   buffer on disk" - in a cache file (`core/local_buffer.py` maps the
+   seekable window).  Pausing for long pauses the download too, so LIVE
+   may have to reopen the channel.
+2. **The app's own buffer** (experimental, `setting_dvr_kept`): the
+   `core/dvr_*` modules.  `DvrIngest` keeps one connection to the provider
+   and reconnects in runs, `DvrStore` writes rolling MPEG-TS segments under
+   a space budget (oldest first, also when the disk runs low), `DvrServer`
+   serves them to mpv on 127.0.0.1 behind a random token, `DvrSession` ties
+   the three together for one channel, and `DvrPool` keeps every channel's
+   frozen history for the session within one budget.  `BufferRecorder`
+   (`dvr_record.py`) records from the store, so a recording neither needs a
+   second connection nor stops while the player is paused.  The player side
+   is `media/dvr_player.py`; the bar (DVR | TIMESHIFT) is
+   `media/rewind_bar.py`.
+
+## Home
+
+`ui/mw_home.py` builds the page; `ui/home_widgets.py` draws it (featured
+strip, shelves, cards - each card one composed, opaque pixmap, clicks
+taken on release, which is what keeps it smooth and avoided a macOS
+crash).  The popular shelves come from `services/popular.py`: TMDB's
+weekly chart matched against the provider's catalogue.  They need a TMDB
+key: release builds bundle one (`dopeiptv/_tmdb_key.py`, generated in CI
+and git-ignored); a source checkout uses the user's own key from
+Settings → Metadata or `DOPEIPTV_TMDB_KEY`, and without any key those
+shelves are simply left out.
+
 ## EPG caching
 
 `XmltvGuide` caches parsed XMLTV data to disk per playlist with a 6-hour
@@ -71,10 +118,13 @@ in the background.  Cache files live in the platform's cache directory.
 
 ## Theme system
 
-Nine themes (Graphite, Midnight, OLED, Nord, Dracula, Gruvbox, Solarized,
-Catppuccin, Light) and seven accent colors.  The active theme populates a
-global palette dict `P`.  `build_style()` generates the full QSS from
-these.  Theme changes take effect immediately without restarting playback.
+`THEMES` in `ui/theme.py` (17 today, three of them light) and `ACCENTS`
+(ten, plus the theme's own and any custom colour).  The active theme
+populates a global palette dict `P`; `build_style()` generates the full
+QSS from it.  Theme changes take effect immediately without restarting
+playback.  `tests/test_theme.py` checks that every theme has every key
+and that text stays readable on it - add a theme there and the test
+tells you what is missing.
 
 ## Logging
 

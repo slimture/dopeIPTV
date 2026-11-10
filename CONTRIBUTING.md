@@ -19,8 +19,16 @@ No provider account handy? The app has a built-in demo mode on the login
 screen, enough to exercise most of the UI.
 
 Read `docs/ARCHITECTURE.md` for the module map and the one-way import rule
-(`providers/ → core/ → media/ → services/ → ui/`), and
-`docs/DEVELOPER_NOTES.md` for subsystem specifics.
+(`providers/ → core/ → media/ → services/ → ui/`),
+`docs/DEVELOPER_NOTES.md` for subsystem specifics, and `AGENTS.md` for the
+conventions in one page (it is written for AI assistants, but it is the
+quickest map for people too). Taking the project over, or cutting a
+release? `docs/MAINTAINING.md` has the whole runbook.
+
+Two keys make a source checkout behave like a release build, and both are
+optional: `DOPEIPTV_TMDB_KEY` (a free TMDB API key - posters work without
+it through a user's own key in Settings, but Home's popular shelves need
+one) and `DOPEIPTV_OPENSUBTITLES_KEY`.
 
 ## Before you open a pull request
 

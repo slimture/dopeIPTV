@@ -10,8 +10,8 @@ body:
     id: version
     attributes:
       label: dopeIPTV version
-      description: Shown in the app menu → About (e.g. 0.8.1).
-      placeholder: "0.8.1"
+      description: Shown in the app menu → About (e.g. 1.4.0).
+      placeholder: "1.4.0"
     validations:
       required: true
   - type: dropdown
@@ -31,9 +31,9 @@ body:
       options:
         - AppImage
         - .deb package
-        - .rpm package
         - Flatpak
-        - macOS .dmg
+        - macOS .dmg (Apple Silicon)
+        - macOS .dmg (Intel)
         - Windows portable .zip
         - From source (git)
         - pip / pipx
@@ -46,7 +46,8 @@ body:
       options:
         - Xtream Codes
         - M3U / M3U8
-        - Both
+        - Stalker / Ministra portal
+        - More than one kind
         - Not relevant
     validations:
       required: true

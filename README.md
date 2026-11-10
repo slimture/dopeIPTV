@@ -5,12 +5,13 @@ coded dopeIPTV based on what I think is a good IPTV-player. I think you will
 like it.
 
 It's primarily for Linux — and runs on **macOS** and **Windows** too — with a
-modern dark interface, supporting the **Xtream Codes API** and **M3U
-playlists**, **EPG**, and an **embedded mpv** video player (with optional
-external mpv/VLC playback).
+modern interface, supporting the **Xtream Codes API**, **M3U playlists** and
+**Stalker / Ministra portals**, a full **EPG**, rewinding live TV, and an
+**embedded mpv** video player (with optional external mpv/VLC playback).
 
 > **dopeIPTV is a player, not a content source.** You connect it to a service
-> you already subscribe to (an Xtream Codes account or an M3U playlist) — it
+> you already subscribe to (an Xtream Codes account, an M3U playlist or a
+> Stalker portal) — it
 > doesn't provide any channels itself. The built-in **demo channels** are free,
 > public test streams so you can try the app with nothing to configure.
 
@@ -28,19 +29,22 @@ external mpv/VLC playback).
 - **Embedded video** via libmpv's OpenGL render API — plays right inside the app on any compositor (GNOME, KDE, Hyprland, ...), with fullscreen, a pop-out window (detach to a second screen, optionally always-on-top), a hover scrubber and arrow-key seeking
 - **Multiview** — watch 2/4/6/9 live channels at once in a separate grid, each an independent stream (even from different playlists), with per-window audio/subtitles, click-to-focus audio and a real timeshift timeline on catch-up channels
 - **TV, Movies & Series** with seasons/episodes, favorites, history, and instant search across thousands of channels
+- **Three kinds of provider** — Xtream Codes logins, M3U playlists, and Stalker / Ministra portals (portal address + MAC; *experimental*, catch-up from a portal is not there yet)
+- **Rewind live TV** — pause and go back in the channel you are watching, even without your provider's catch-up: a few minutes in memory, up to 6 hours on disk, or (*experimental*) **dopeIPTV's own buffer**, which goes on downloading while you pause, comes back to live without reconnecting, keeps each channel's history for when you return and records from the buffer
+- **Home** — a featured strip of this week's most popular films and series that your provider has, continue watching with the time left, your favourite channels with what is on now, new episodes of followed series and the popular charts — each section can be switched off
 - **27 languages** — from English, Svenska and Español to 中文, 日本語, हिन्दी and العربية, with full right-to-left support (Arabic, Persian, Hebrew, Urdu) — switchable live in Settings
 - **Local files** — point it at a folder (or a mounted network share) and browse your own videos beside the provider's: a folder view and a library view that builds series with seasons out of the file names, TMDB posters, resume, History, Trakt, casting and multiview. Music gets album art and a play queue that advances on its own
 - **Resume playback** — movies/series/recordings remember where you stopped and offer to continue
 - **Full EPG** with now/next progress bars, a searchable guide, and a persistent disk cache that shows instantly on startup
 - **TMDB metadata** — posters, ratings (linked to IMDb), and a clickable cast list that finds an actor's other titles in your playlist
-- **Recording & Timeshift** — record on a timer/schedule (single-connection friendly) and watch catch-up archives from the EPG
+- **Recording & Timeshift** — record on a timer/schedule (single-connection friendly) and watch catch-up archives from the EPG; the guide refreshes itself when it gets old
 - **Cast to a Chromecast or a smart TV** — Samsung, LG, Sony and other DLNA/UPnP TVs show up beside the Chromecasts; pause, seek and volume from the app
 - **Subtitles from OpenSubtitles** — find subtitles for the film or episode you are watching right from the player, remembered for next time, or load a subtitle file
 - **Desktop media controls** (Linux, MPRIS) — the keyboard's media keys, headphone buttons, GNOME/KDE media controls and KDE Connect pause, play and skip
 - **Follow a series** — new episodes land on Home with a notification
 - **Trakt** scrobbling, **multiple playlists** (drag to reorder, export/import, or drop an M3U file or link on the window), parental control, content manager and editable channel lists
-- **Themes** — 9 themes + 7 accent colors, applied live
-- **Updates itself** — the AppImage downloads, verifies and swaps in a new release from the update banner
+- **Themes** — 17 themes (three of them light) picked from previews, 10 accent colours or any colour you like, follow the desktop's light/dark mode, corner style and interface size — all applied live
+- **Updates itself** — the AppImage downloads, verifies and swaps in a new release from the update banner; **Settings → General → Update channel → Test builds** offers the next version's test builds early
 
 See [FEATURES.md](docs/FEATURES.md) for the full feature list.
 
@@ -74,7 +78,8 @@ PyQt6, libmpv and ffmpeg, so the **embedded** player works out of the box —
 nothing else to install.
 
 **Linux** — a self-contained `dopeIPTV-*.AppImage`, a `.deb` for
-Debian/Ubuntu, or a `.flatpak`. For the AppImage:
+Debian/Ubuntu (both for x86_64 and ARM64, e.g. a Raspberry Pi), or a
+`.flatpak` (x86_64; the newest of the formats). For the AppImage:
 
 ```bash
 chmod +x dopeIPTV-*.AppImage
@@ -87,11 +92,12 @@ Say no and nothing is written; the same switch lives under **Settings →
 General**. [Gear Lever](https://flathub.org/apps/it.mijorus.gearlever) and
 AppImageLauncher do the same job if you prefer to manage it yourself.)
 
-**macOS** — Apple Silicon only from 1.2.11 onward; **1.2.10 is the last
-release with an Intel `.dmg`**. Homebrew moved macOS x86_64 to Tier 3 in
-September 2026 and stopped building the binary packages the Intel build
-depended on, and Apple has said macOS Tahoe 26 is the last macOS for Intel
-hardware.
+**macOS** — two `.dmg` files: `macOS-arm64` for Apple Silicon (M-series,
+macOS 15 or later) and `macOS-x86_64` for Intel Macs (macOS 14 or later).
+Not sure which Mac you have? Apple menu → About This Mac. (From 1.2.11 to
+1.3.0 there was no Intel build; it came back in 1.4.0, built with mpv and
+ffmpeg from conda-forge after Homebrew stopped building binary packages
+for Intel Macs.)
 
 Open the `.dmg` and drag dopeIPTV to Applications. The app isn't
 notarized by Apple yet, so macOS refuses the first launch. Close that
@@ -104,8 +110,9 @@ longer gets past this since macOS 15. If macOS says the app is
 `xattr -dr com.apple.quarantine /Applications/dopeIPTV.app`.
 It's safe — the warning only means the build isn't code-signed.
 
-**Windows** — a portable `dopeIPTV-*-windows-x64.zip`: unzip the folder and run
-`dopeiptv.exe`, no installer and no admin rights. The app isn't code-signed
+**Windows** — a portable `dopeIPTV-*-windows-x64.zip` (and `-windows-arm64.zip`
+for Snapdragon laptops): unzip the folder and run `dopeiptv.exe`, no
+installer and no admin rights. The app isn't code-signed
 yet, so SmartScreen may show *"Windows protected your PC"* — click **More info →
 Run anyway**. An optional Start-menu/desktop shortcut lives under
 **Settings → Advanced → Create shortcut**, and the bundled
@@ -178,8 +185,12 @@ Your settings, playlists and favorites are kept whichever way you update.
 dopeiptv
 ```
 
-The first time, enter your Xtream server (e.g. `http://server:8080`),
-username, and password.
+The first time, a short setup asks for your provider: an Xtream Codes
+server (e.g. `http://server:8080`) with username and password, an M3U
+playlist URL, or a Stalker / Ministra portal address with a MAC address.
+No account yet? Pick the **demo channels** — free public test streams — to
+look around first. More providers can be added later under
+**Settings → Playlists**.
 
 ## Add to the application menu (optional)
 
@@ -227,8 +238,10 @@ hand costs nothing either.
 | Record a channel | Right-click → Record (or the ● REC button in the player) |
 | Stop a recording | Click the red ● REC indicator under the list |
 | Change theme / accent color | Settings → Appearance |
+| Pause / rewind a live channel | Hover the video for the rewind bar, or pause; **LIVE** brings you back (how far back: Settings → Playback) |
+| Switch between rewind and catch-up | **DVR \| TIMESHIFT** at the left of the bar, on a channel with the provider's catch-up |
 | Watch a programme from the start | Right-click a ⏪ channel → Timeshift |
-| Browse the full guide | The **EPG Guide** button in the sidebar |
+| Browse the full guide | The **EPG Guide** button in the sidebar (↻ in the guide refreshes it) |
 | Search | Type in the search field at the top |
 | Switch playlist / provider | The playlist menu at the top of the sidebar, or Settings → Playlists |
 
@@ -285,6 +298,8 @@ under **Settings → Advanced → Keyboard shortcuts**.
 - **Live stream won't start** — try switching **Live stream format** to `m3u8` under **Settings → Playback**.
 - **No categories** — check the server URL (include the port, e.g. `:8080`).
 - **No EPG for a channel** — the provider may not have a programme guide mapped to it; dopeIPTV tries three different sources (short EPG, full EPG table, XMLTV) before giving up.
+- **Fullscreen video flickers around its edges (Linux)** — that is variable refresh rate (VRR); turn it off in your display settings.
+- **Anything else** — the [help page](https://iptv.dope.rs/help/) answers most questions; for a bug, open an issue with a log (`DOPEIPTV_LOG=debug DOPEIPTV_LOG_FILE=/tmp/dope.log dopeiptv`).
 
 ## Language
 
@@ -303,6 +318,13 @@ a native speaker can correct one language in isolation. Many of the
 non-English strings started as machine translation — **corrections in your
 language are very welcome**; see [`docs/TRANSLATING.md`](docs/TRANSLATING.md)
 (no coding required).
+
+## Contributing and maintaining
+
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — setting up, the quality gate, ground rules for pull requests.
+- [`docs/MAINTAINING.md`](docs/MAINTAINING.md) — everything needed to take the project over: branches, CI, releases, the website, keys and accounts, open work.
+- [`AGENTS.md`](AGENTS.md) — the guide for AI coding assistants (any of them), and a quick map for humans too.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/DEVELOPER_NOTES.md`](docs/DEVELOPER_NOTES.md) — how the code is laid out and why.
 
 ## License
 
