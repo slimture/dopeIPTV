@@ -53,6 +53,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import socket
 import socketserver
 import sys
@@ -194,33 +195,64 @@ def wallet_pay(amount: int, method: str, email: str, name: str) -> tuple[int, di
     return 402 if err.get("type") == "card_error" else 502, {"error": msg or "stripe"}
 
 
-def create_session(amount: int) -> tuple[int, dict]:
-    """The PaymentIntent the card form pays: Stripe's Payment Element shows
-    the methods turned on in the Dashboard and confirms it in the browser."""
-    key = _secret()
-    if not key or not PUBLISHABLE:
-        return 503, {"error": "not configured"}
+def _intent_form(amount: int, methods: list) -> dict:
     form = {
         "amount": str(amount),
         "currency": CURRENCY,
         "description": NAME,
         "metadata[source]": "iptv.dope.rs donate dialog",
     }
-    # Card, Revolut Pay and Amazon Pay by default: the Dashboard's list
-    # (Bancontact, EPS, ...) is the whole account's, and Apple Pay / Google
-    # Pay have their own button anyway.
-    if METHODS == ["auto"]:
+    if methods == ["auto"]:
         form["automatic_payment_methods[enabled]"] = "true"
     else:
-        for n, m in enumerate(METHODS):
+        for n, m in enumerate(methods):
             form[f"payment_method_types[{n}]"] = m
-    status, body = _post(STRIPE_PI, form, key)
-    if status == 200 and body.get("client_secret"):
-        return 200, {"clientSecret": body["client_secret"], "publishableKey": PUBLISHABLE}
-    err = (body.get("error") or {}) if isinstance(body, dict) else {}
-    print(f"[donate] payment intent {status}: {str(err.get('message', ''))[:300]}",
-          file=sys.stderr, flush=True)
-    return 502, {"error": "stripe"}
+    return form
+
+
+def create_session(amount: int) -> tuple[int, dict]:
+    """The PaymentIntent the card form pays: Stripe's Payment Element shows
+    the methods asked for here and confirms it in the browser.
+
+    Card, Revolut Pay and Amazon Pay by default: the Dashboard's list
+    (Bancontact, EPS, ...) is the whole account's, and Apple Pay / Google Pay
+    have their own button anyway. A method Stripe will not take for this
+    account or currency is dropped and the call made again, and remembered,
+    so a card payment never fails because of one of the others."""
+    key = _secret()
+    if not key or not PUBLISHABLE:
+        return 503, {"error": "not configured"}
+    while True:
+        status, body = _post(STRIPE_PI, _intent_form(amount, METHODS), key)
+        if status == 200 and body.get("client_secret"):
+            return 200, {"clientSecret": body["client_secret"], "publishableKey": PUBLISHABLE}
+        err = (body.get("error") or {}) if isinstance(body, dict) else {}
+        msg = str(err.get("message", ""))
+        print(f"[donate] payment intent {status} ({','.join(METHODS)}): {msg[:300]}",
+              file=sys.stderr, flush=True)
+        bad = _refused_method(status, err)
+        if bad is None:
+            return 502, {"error": "stripe"}
+        METHODS.remove(bad)
+        if not METHODS:
+            METHODS.append("card")
+        print(f"[donate] leaving out {bad} from now on", file=sys.stderr, flush=True)
+
+
+def _refused_method(status: int, err: dict):
+    """The payment method type Stripe refused, if that is what it refused."""
+    if status != 400 or METHODS in (["card"], ["auto"]):
+        return None
+    param, msg = str(err.get("param") or ""), str(err.get("message") or "")
+    m = re.match(r"payment_method_types\[(\d+)\]", param)
+    if m and int(m.group(1)) < len(METHODS) and METHODS[int(m.group(1))] != "card":
+        return METHODS[int(m.group(1))]
+    for t in METHODS:
+        if t != "card" and t in msg:
+            return t
+    if "payment_method_types" in param or "payment method type" in msg.lower():
+        return next((t for t in reversed(METHODS) if t != "card"), None)
+    return None
 
 
 class Handler(BaseHTTPRequestHandler):
