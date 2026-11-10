@@ -142,7 +142,11 @@ m.sets.clear()
 p.apply_default_options()
 assert not [k for k, _v in m.sets if k == "sid"], m.sets
 assert m["sub-visibility"] is False
-print("SUBSWITCH_OK")
+# Out before Qt's teardown: the GL widget can crash it on the offscreen
+# platform (the app sidesteps it the same way), and a crash there lost the
+# marker still sitting in the stdout buffer - CI saw stdout='' and -11.
+print("SUBSWITCH_OK", flush=True)
+os._exit(0)
 """
 
 
