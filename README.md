@@ -323,8 +323,9 @@ language are very welcome**; see [`docs/TRANSLATING.md`](docs/TRANSLATING.md)
 dopeIPTV is free, with no ads, no tracking and no paid version. Developing
 it, running the website and serving the downloads comes with some costs. If
 the app works well for you,
-**[a donation of any size](https://donate.stripe.com/bJe4gy7gv4SmdrYgGba7C00)**
-helps keep it going (card, Apple Pay or Google Pay, through Stripe).
+**[a donation of any size](https://iptv.dope.rs/#donate)**
+helps keep it going - in your own currency, by card, Apple Pay or Google Pay,
+through Stripe.
 Reporting bugs and fixing a translation in your language help just as much.
 
 ## Contributing and maintaining
