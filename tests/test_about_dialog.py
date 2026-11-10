@@ -169,7 +169,7 @@ def test_notes_from_an_unknown_version_still_show_the_newest():
 def test_the_solecraft_logotype_ships_and_draws():
     """About's "Made by" draws the logotype from the package's assets; a
     build that left the file out would fall back to plain text."""
-    QApplication.instance() or QApplication([])
+    app = QApplication.instance() or QApplication([])   # kept: QPixmap needs it
     from dopeiptv.ui.widgets import solecraft_pixmap
     pm = solecraft_pixmap(13, "#ffffff")
     assert pm is not None and pm.height() == 13 and pm.width() > 60
@@ -179,3 +179,4 @@ def test_the_solecraft_logotype_ships_and_draws():
     for spec in ("dopeiptv.spec", "dopeiptv-mac.spec", "dopeiptv-win.spec"):
         with open(os.path.join(root, spec), encoding="utf-8") as fh:
             assert "glob.glob('dopeiptv/assets/*.svg')" in fh.read(), spec
+    del app
