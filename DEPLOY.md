@@ -409,5 +409,14 @@ bastille cmd pontusweb nginx -t && bastille cmd pontusweb service nginx reload
 /var/log/nginx/iptv.dope.rs-stats.log` (jail) shows your visit as one JSON
 line. After the next quarter-hour `/usr/local/www/iptv/stats/stats.json`
 exists and `https://iptv.dope.rs/admin/` asks for the password and shows the
-day. The first days are thin: the counting starts with the new log, while
-the download counts (downloads.json) go back to the beginning.
+day. The visitors start with the new log. The downloads per day can go
+back as far as the server kept its download log, read once on a fresh
+start (jail):
+
+```sh
+rm -f /usr/local/www/iptv/stats/stats.json /usr/local/www/iptv/stats/state.json
+su -m iptv -c '/usr/local/bin/python3 -I /usr/local/www/iptv/donate/stats_collect.py --backfill'
+```
+
+The downloads are counted as the site's own counter (downloads.json)
+counts them: a click sent on to the file, robots left out.
