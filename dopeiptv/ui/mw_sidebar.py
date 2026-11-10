@@ -80,9 +80,11 @@ class _SidebarMixin:
         self._set_rail(self._settings_btn, collapsed)
         if hasattr(self, "_multiview_btn"):
             self._set_rail(self._multiview_btn, collapsed)
-        if hasattr(self, "_donate_btn"):
-            self._donate_btn.setText("" if collapsed else tr("donate_support"))
-            self._set_rail(self._donate_btn, collapsed)
+        if hasattr(self, "_logo_row"):
+            # The heart beside the logo; on the narrow rail, under it.
+            self._logo_row.setDirection(QBoxLayout.Direction.TopToBottom if collapsed
+                                        else QBoxLayout.Direction.LeftToRight)
+            self._donate_heart_refresh()
         if hasattr(self, "_playlist_btn"):
             # The switcher is the same square stack-icon in both states (the
             # active playlist's name lives in its tooltip and the window

@@ -102,3 +102,17 @@ def test_the_heart_hides_for_three_months_and_comes_back(tmp_path):
     w.settings.setValue("donate_heart_until", time.time() - 1)
     w._donate_count()
     assert w._donate_heart_due() and w._donate_btn.isVisible()
+
+
+def test_left_alone_the_card_goes_after_a_week(tmp_path):
+    w = _Win(tmp_path)
+    w.settings.setValue("donate_watch_min", CARD_AFTER_MIN)
+    assert w._donate_card() is not None            # first shown: noted
+    shown = float(w.settings.value("donate_card_shown"))
+    assert shown <= time.time()
+    assert w._donate_card() is not None            # still within its week
+    w.settings.setValue("donate_card_shown", time.time() - mw_donate.SHOWN_SECS - 1)
+    assert w._donate_card() is None                # a week on: gone by itself
+    until = float(w.settings.value("donate_card_until"))
+    assert until >= time.time() + SNOOZE_SECS - 5   # for three months
+    assert w.settings.value("donate_card_shown") is None

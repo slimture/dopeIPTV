@@ -427,6 +427,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             lambda: cast_action.setEnabled(self.can_cast_playing()))
         if sys.platform != "darwin":
             app_menu.addSeparator()
+        self._donate_action = app_menu.addAction(tr("donate_support") + "…")
+        self._donate_action.triggered.connect(lambda: self.open_donate("app-menu"))
         about_action = app_menu.addAction(tr("menu_about"))
         about_action.triggered.connect(self.show_about)
         quit_action = app_menu.addAction(tr("menu_quit"))
@@ -462,6 +464,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             cast_action: lambda: tr("ctx_cast_to_chromecast"),
             about_action: lambda: tr("menu_about"),
             quit_action: lambda: tr("menu_quit"),
+            self._donate_action: lambda: tr("donate_support") + "…",
         }
 
         root = QSplitter(Qt.Orientation.Horizontal)
@@ -522,7 +525,17 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         # The logo draws a small update badge in its top-right corner when a
         # newer release is out; clicking that corner opens About.
         self._sidebar_logo.update_clicked.connect(self.show_about)
-        sl.addWidget(self._sidebar_logo)
+        # The logo's row also holds the donate heart, at its right (added
+        # with the heart, below); a pad as wide on the left keeps the logo
+        # centred. On the icon rail the row stands up, the heart under it.
+        self._logo_row = QBoxLayout(QBoxLayout.Direction.LeftToRight)
+        self._logo_row.setContentsMargins(0, 0, 0, 0)
+        self._logo_row.setSpacing(0)
+        self._logo_pad = QWidget()
+        self._logo_pad.setFixedWidth(30)
+        self._logo_row.addWidget(self._logo_pad)
+        self._logo_row.addWidget(self._sidebar_logo, 1)
+        sl.addLayout(self._logo_row)
         sl.addSpacing(6)
 
         # Visible playlist switcher at the top of the sidebar: one click to hop
@@ -787,16 +800,13 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         multiview_btn.setSizePolicy(QSizePolicy.Policy.Ignored,
                                     QSizePolicy.Policy.Fixed)
         multiview_btn.clicked.connect(self._show_multiview)
-        # Under the row, a line of its own: a small red heart and "Support
-        # dopeIPTV" in the muted text - a footer link, not one of the tools
-        # (mw_donate). It beats under the pointer; on the icon rail, only
-        # the heart.
-        self._donate_btn = donate_btn = HeartButton(
-            objectName="DonateLink", text=tr("donate_support"), size=13)
+        # A small red heart beside the logo, its words in the tooltip
+        # (mw_donate) - the same place on every system. It beats under the
+        # pointer.
+        self._donate_btn = donate_btn = HeartButton(objectName="DonateHeart", size=15)
+        donate_btn.setFixedSize(30, 30)
         donate_btn.setToolTip(tr("donate_support"))
         donate_btn.setAccessibleName(tr("donate_support"))
-        donate_btn.setSizePolicy(QSizePolicy.Policy.Preferred,
-                                 QSizePolicy.Policy.Fixed)
         donate_btn.clicked.connect(lambda: self.open_donate("app-heart"))
         # Right-click: hide it for three months (mw_donate).
         donate_btn.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -808,7 +818,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._actions_box.addWidget(settings_btn)
         self._actions_box.addWidget(multiview_btn)
         sl.addLayout(self._actions_box)
-        sl.addWidget(donate_btn)
+        self._logo_row.addWidget(donate_btn, 0, Qt.AlignmentFlag.AlignCenter)
         self._donate_heart_refresh()         # hidden for three months, maybe
         self._apply_action_icons()
 

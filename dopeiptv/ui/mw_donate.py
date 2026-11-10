@@ -1,9 +1,11 @@
 """Donating, from inside the app - there, never in the way.
 
-Three places: a heart in the sidebar's row of buttons, "Support dopeIPTV"
-in About, and one card on Home once the app has been used for real (about
+Four places: a small heart beside the sidebar's logo (its words in the
+tooltip), "Support dopeIPTV…" in the app menu and in About, and one card on
+Home once the app has been used for real (about
 ten hours of watching). The card's "Not now" puts it away for three
-months; "Donate" for a year. The heart hides for three months too - its
+months; "Donate" for a year; left alone, it goes by itself after a week,
+for three months too. The heart hides for three months too - its
 right-click menu, or a switch in Settings, General - and comes back by
 itself. Nothing ever pops up, and nothing shows on a first run or over a
 playing video. Every way opens the donate dialog on
@@ -24,6 +26,7 @@ DONATE_URL = "https://iptv.dope.rs/?ref={ref}#donate"
 CARD_AFTER_MIN = 600
 SNOOZE_SECS = 90 * 86400          # "Not now"
 THANKS_SECS = 365 * 86400         # "Donate": not asked again for a year
+SHOWN_SECS = 7 * 86400            # left alone this long, the card goes by itself
 #: Minutes counted in memory before they are written (the settings file is
 #: not rewritten every minute of a film).
 _WRITE_EVERY = 5
@@ -47,8 +50,14 @@ class _DonateMixin:
 
     def _donate_heart_refresh(self) -> None:
         btn = getattr(self, "_donate_btn", None)
-        if btn is not None:
-            btn.setVisible(self._donate_heart_due())
+        if btn is None:
+            return
+        shown = self._donate_heart_due()
+        btn.setVisible(shown)
+        # The pad left of the logo balances the heart - only beside it.
+        pad = getattr(self, "_logo_pad", None)
+        if pad is not None:
+            pad.setVisible(shown and not getattr(self, "_sidebar_collapsed", False))
 
     def hide_donate_heart(self) -> None:
         self.settings.setValue("donate_heart_until", time.time() + SNOOZE_SECS)
@@ -91,20 +100,31 @@ class _DonateMixin:
             return False
         try:
             until = float(self.settings.value("donate_card_until", 0) or 0)
+            shown = float(self.settings.value("donate_card_shown", 0) or 0)
         except (TypeError, ValueError):
-            until = 0.0
-        return time.time() >= until
+            until = shown = 0.0
+        if time.time() < until:
+            return False
+        if shown and time.time() - shown > SHOWN_SECS:
+            # A week on Home and neither button pressed: it has been seen.
+            self.settings.setValue("donate_card_until", time.time() + SNOOZE_SECS)
+            self.settings.remove("donate_card_shown")
+            return False
+        return True
 
     def _donate_card(self):
         """The Home card, or None while it is not due."""
         if not self._donate_card_due():
             return None
         from .home_widgets import DonateCard
+        if not self.settings.value("donate_card_shown"):
+            self.settings.setValue("donate_card_shown", time.time())
         card = DonateCard(tr("home_donate_title"), tr("home_donate_body"),
                           tr("home_donate_btn"), tr("home_donate_later"))
 
         def away(secs: int) -> None:
             self.settings.setValue("donate_card_until", time.time() + secs)
+            self.settings.remove("donate_card_shown")
             card.hide()
             card.deleteLater()
 
