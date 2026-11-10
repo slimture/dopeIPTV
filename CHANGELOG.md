@@ -12,6 +12,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   opens, or when Home is switched off in Settings. Home's donate heart was
   shown for a moment as a window of its own, which asked GNOME for an
   activation token it never used.
+- Pop-out player: the DVR row and the timeshift timeline no longer lie over
+  the control bar when it comes back after fading; they move up with the
+  video as it shrinks.
+- Home: the back and heart buttons at the top are round, filled circles; the
+  edge was drawn in four arcs with gaps between them.
 
 ## [1.4.2]
 

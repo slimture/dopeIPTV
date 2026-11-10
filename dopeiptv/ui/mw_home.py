@@ -16,7 +16,7 @@ import json
 import os
 import time
 
-from PyQt6.QtCore import QStandardPaths, Qt, QTimer
+from PyQt6.QtCore import QSize, QStandardPaths, Qt, QTimer
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QFrame, QHBoxLayout, QPushButton, QScrollArea, QVBoxLayout, QWidget,
@@ -138,20 +138,25 @@ class HomePage(QWidget):
         h.setSpacing(10)
         w = self.window
 
+        # The two round chips (back, heart): filled like the nav pill, drawn
+        # as one circle each (see widgets._ChipPainting).
+        from .widgets import HeartButton, RoundChip
+        fill, edge = QColor(P["bg"]), QColor(P["text"])
+        fill.setAlphaF(0.55)
+        edge.setAlphaF(0.12)
+        chip = (fill, edge, QColor(P["accent"]))
+
         # Top-LEFT: a round chip with a back chevron that returns to the
         # classic three-column view (replaces the old close X in the right
         # corner - leaving Home is navigation, and navigation-back lives on
         # the left).
-        back = QPushButton()
+        back = RoundChip(bar)
         back.setIcon(chevron_icon(16, P["text"]))
-        back.setFixedSize(36, 34)
+        back.setIconSize(QSize(16, 16))
+        back.setFixedSize(34, 34)
+        back.set_chip(*chip)
         back.setToolTip(tr("common_close"))
         back.setCursor(Qt.CursorShape.PointingHandCursor)
-        back.setStyleSheet(rounded(
-            "QPushButton { background: %s; border:1px solid %s;"
-            " border-radius: 17px; }"
-            "QPushButton:hover { border-color: %s; }" % (
-                _rgba("bg", 0.55), _rgba("text", 0.12), P["accent"])))
         back.clicked.connect(w._leave_home)
         h.addWidget(back)
         h.addStretch(1)
@@ -181,21 +186,16 @@ class HomePage(QWidget):
         # Top-RIGHT, mirroring the back chip: the donate heart (Home hides
         # the sidebar, and its heart with it). Hidden, it keeps its room so
         # the nav pill stays centred.
-        from .widgets import HeartButton
         # Parented, and in the layout before setVisible: a parentless widget
         # shown is a window of its own for a moment - on GNOME (Wayland)
         # that asked for an activation token it never used, and the pointer
         # spun as if a program were starting, every time Home opened.
         heart = HeartButton(bar, size=15)
         h.addWidget(heart)
-        heart.setFixedSize(36, 34)
+        heart.setFixedSize(34, 34)
+        heart.set_chip(*chip)
         heart.setToolTip(tr("donate_support"))
         heart.setAccessibleName(tr("donate_support"))
-        heart.setStyleSheet(rounded(
-            "QPushButton { background: %s; border:1px solid %s;"
-            " border-radius: 17px; }"
-            "QPushButton:hover { border-color: %s; }" % (
-                _rgba("bg", 0.55), _rgba("text", 0.12), P["accent"])))
         heart.clicked.connect(lambda: w.open_donate("app-heart"))
         heart.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         heart.customContextMenuRequested.connect(

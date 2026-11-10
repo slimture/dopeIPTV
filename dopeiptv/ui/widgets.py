@@ -155,10 +155,64 @@ def heart_pixmap(size: int, colour: str, scale: int = 3) -> QPixmap:
     return pm
 
 
-class HeartButton(QPushButton):
+class _ChipPainting:
+    """A button drawn as a filled circle with its icon in the middle, once
+    ``set_chip`` has been called (until then it paints as ever).
+
+    One antialiased ellipse for the fill and one for the edge: a style
+    sheet's border-radius drew the ring as four arcs with seams between
+    them, and on a 36x34 button not even a circle - it looked unfilled."""
+
+    _chip: tuple[QColor, QColor, QColor] | None = None
+
+    def set_chip(self, fill: QColor, edge: QColor, hover_edge: QColor) -> None:
+        self._chip = (fill, edge, hover_edge)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self.update()
+
+    def paintEvent(self, event) -> None:
+        if self._chip is None:
+            super().paintEvent(event)
+            return
+        fill, edge, hover_edge = self._chip
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        d = float(min(self.width(), self.height()))
+        circle = QRectF((self.width() - d) / 2, (self.height() - d) / 2, d, d)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(fill)
+        p.drawEllipse(circle)
+        hot = self.underMouse() or self.isDown()
+        pen = QPen(hover_edge if hot else edge, 1.5 if hot else 1.0)
+        p.setPen(pen)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        inset = pen.widthF() / 2
+        p.drawEllipse(circle.adjusted(inset, inset, -inset, -inset))
+        size = self.iconSize()
+        if not self.icon().isNull() and size.width() > 0:
+            pm = self.icon().pixmap(size, self.devicePixelRatioF())
+            p.drawPixmap(QPointF(circle.center().x() - size.width() / 2,
+                                 circle.center().y() - size.height() / 2), pm)
+        p.end()
+
+    def enterEvent(self, event) -> None:
+        super().enterEvent(event)
+        self.update()
+
+    def leaveEvent(self, event) -> None:
+        super().leaveEvent(event)
+        self.update()
+
+
+class RoundChip(_ChipPainting, QPushButton):
+    """A round icon button on a filled circle (``set_chip``)."""
+
+
+class HeartButton(_ChipPainting, QPushButton):
     """A heart that beats twice under the pointer. At rest in *rest* (the
     heart's own red by default, or a muted tone), heart-red under the
-    pointer. ``set_rest`` re-tints it for a new theme."""
+    pointer. ``set_rest`` re-tints it for a new theme. ``set_chip`` puts it
+    on a filled circle."""
 
     SIZE = 18
 
