@@ -12,7 +12,7 @@ Key facts:
 - **Recording:** record the watched stream over a single connection, with timers, size limits and a Recordings library; with dopeIPTV's own buffer, recordings come from the buffer and stay whole while paused.
 - **Home:** a start page with this week's most popular films and series the provider has (TMDB's weekly chart), continue watching, favourite channels with what is on now, and new episodes of followed series.
 - **Multiview:** watch up to nine live channels at once in a grid, with per-window timeshift and subtitles.
-- **Extras:** built-in mpv player, casting to Chromecast and DLNA/UPnP smart TVs, subtitles from OpenSubtitles.com, desktop media controls and media keys (MPRIS), new-episode alerts for followed series, Trakt watched-history sync, TMDB metadata and artwork, 17 themes (three light) with accent colours, test builds for early adopters, full keyboard control, and an interface available in 26 languages besides English (with right-to-left support for Arabic, Hebrew, Persian and Urdu).
+- **Extras:** built-in mpv player, casting to Chromecast and DLNA/UPnP smart TVs, subtitles from OpenSubtitles.com, desktop media controls and media keys (MPRIS), new-episode alerts for followed series, Trakt watched-history sync, TMDB metadata and artwork, 25 themes (dark, light, and some with a colour of their own) with accent colours, test builds for early adopters, full keyboard control, and an interface available in 26 languages besides English (with right-to-left support for Arabic, Hebrew, Persian and Urdu).
 - **Developer / owner:** the slimture/dopeIPTV project on GitHub.
 
 ## Main pages
