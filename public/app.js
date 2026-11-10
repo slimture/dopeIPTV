@@ -18,6 +18,16 @@
   // it is theirs too, not only that a Linux app exists - with theirs marked.
   var mine = document.querySelector('#osLabel [data-os="' + os.toLowerCase() + '"]');
   if (mine) { mine.classList.add("is-mine"); }
+  // The headline names the visitor's own system: "for Linux" alone read as
+  // "not for me" on a Mac. Phones, unknown systems and search engines keep
+  // the page's own, which names all three - and only beside a headline that
+  // names one does the line under the buttons list the three (.os-known).
+  var h1 = document.getElementById("heroH1");
+  var own = h1 && h1.getAttribute("data-" + os.toLowerCase());
+  if (own) {
+    h1.innerHTML = own;
+    document.documentElement.classList.add("os-known");
+  }
   // The label comes translated from the page ("Download for %s"); this
   // file used to carry its own English and overwrite every language with it.
   var btn = document.getElementById("heroDownload");

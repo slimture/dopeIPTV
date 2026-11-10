@@ -136,7 +136,9 @@ h1 .h1-brand { position: absolute; width: 1px; height: 1px; overflow: hidden;
 .cta-row { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 32px; align-items: center; justify-content: center; }
 .platnote { font-size: 13px; color: var(--faint); margin-top: 18px; }
 .platnote b { color: var(--muted); font-weight: 600; }
-.platnote .oses { white-space: nowrap; }
+.platnote .oses { white-space: nowrap; display: none; }
+.os-known .platnote .oses { display: inline; }
+.platnote::first-letter { text-transform: uppercase; }
 .platnote b.is-mine { color: var(--text); }
 .mock { width: min(860px, 100%); text-align: start; background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--radius); box-shadow: 0 40px 80px -40px rgba(0,0,0,.45); overflow: hidden; }
