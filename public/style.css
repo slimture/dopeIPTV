@@ -785,7 +785,13 @@ dialog.dn::backdrop { background: rgba(5, 7, 10, .66); }
 /* Big enough and bright enough to be seen: at 15 px in the faint grey the
    company mark went unnoticed. */
 .dn-payee .dn-ico { width: 18px; height: 18px; color: var(--muted); }
-.dn-payee-logo { width: 18px; height: 18px; flex: none; display: block; border-radius: 4px; }
+/* The payee's logotype in place of its name: a text colour through the
+   logotype's shape (as the footer's), so it follows both themes. */
+.dn-payee a.dn-sole { color: var(--muted); text-decoration: none; }
+.dn-payee a.dn-sole:hover { color: var(--text); }
+.dn-sole-logo { display: inline-block; height: 12px; aspect-ratio: 666 / 111; vertical-align: -1px;
+  overflow: hidden; white-space: nowrap; text-indent: 110%; background: currentColor;
+  -webkit-mask: var(--logo) center / contain no-repeat; mask: var(--logo) center / contain no-repeat; }
 .dn-payee a { color: inherit; text-decoration: underline; text-underline-offset: 2px;
   text-decoration-color: color-mix(in srgb, currentColor 45%, transparent); }
 .dn-payee a:hover { color: var(--text); text-decoration-color: currentColor; }

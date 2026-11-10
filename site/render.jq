@@ -32,7 +32,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 # the footer's copyright (kept small on purpose). Empty: the dialog line goes.
 | "Solecraft AB" as $PAYEE
 # Its mark beside the payee line (public/solecraft.svg, from solecraft.se).
-| "/solecraft.svg" as $PAYEE_LOGO
+| "/solecraft-logo.svg" as $PAYEE_LOGO
 | "https://solecraft.se" as $PAYEE_URL
 # Where a larger gift is arranged (a bank transfer, no card fees): under the
 # dialog's amounts. Empty: no such line.

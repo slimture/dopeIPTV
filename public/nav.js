@@ -632,18 +632,21 @@ var iptvHit = (function () {
     var body = mk("div", "dn-body");
     body.append(el.loading, el.amounts, el.pay, el.done);
     // Who is paid: the company behind dopeIPTV, the name on the statement.
+    // With its logotype that is the name, as in the footer and the app's
+    // About: "A project by Solecraft" - an icon beside the words said less.
     if (T.payee && T.payeenote) {
       el.payee = mk("p", "dn-payee");
-      var mark = icon("company");
-      if (T.payeelogo) {            // the company's own mark, where there is one
-        mark = mk("img", "dn-payee-logo");
-        Object.assign(mark, { src: T.payeelogo, alt: "", width: 18, height: 18, decoding: "async" });
+      var mark = icon("company"), name = document.createTextNode(T.payee);
+      if (T.payeelogo) {
+        name = mk("span", "dn-sole-logo", T.payee);    // the text is for screen readers
+        name.style.setProperty("--logo", "url(" + T.payeelogo + ")");
+        mark = null;
       }
       // The company's mark and name lead to its site, in a new tab, so the
       // dialog - and a payment begun in it - stays where it is.
       var toPayee = function (child, label) {
         if (!T.payeeurl) { return child; }
-        var a = mk("a", "dn-payee-link");
+        var a = mk("a", "dn-payee-link" + (T.payeelogo && child === name ? " dn-sole" : ""));
         Object.assign(a, { href: T.payeeurl, target: "_blank", rel: "noopener" });
         if (label) { a.setAttribute("aria-label", label); }
         a.append(child);
@@ -651,11 +654,13 @@ var iptvHit = (function () {
       };
       var parts = T.payeenote.split("{payee}"), words = mk("span");
       if (parts.length > 1) {
-        words.append(parts[0], toPayee(document.createTextNode(T.payee)), parts.slice(1).join(T.payee));
+        words.append(parts[0], toPayee(name, T.payee), parts.slice(1).join(T.payee));
       } else {
         words.textContent = T.payeenote;
+        if (mark === null) { words.append(" ", toPayee(name, T.payee)); }
       }
-      el.payee.append(toPayee(mark, T.payee), words);
+      if (mark) { el.payee.append(toPayee(mark, T.payee)); }
+      el.payee.append(words);
       body.append(el.payee);
     }
     dlg.append(head, body);
