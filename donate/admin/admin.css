@@ -5,7 +5,8 @@
   color-scheme: light;
   --page: #f2f2f0; --surface: #fcfcfb; --line: #e1e0d9; --axis: #c3c2b7;
   --text: #0b0b0b; --text-2: #52514e; --muted: #77756f;
-  --s1: #2a78d6; --s2: #eb6834; --accent: #0066cc;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #2f9e6e; --accent: #0066cc; --heart: #e8204e;
+  --up: #1e8e4e; --down: #c4321a;
   --shadow: 0 1px 2px rgba(0, 0, 0, .05);
 }
 @media (prefers-color-scheme: dark) {
@@ -13,7 +14,8 @@
     color-scheme: dark;
     --page: #0d0d0d; --surface: #1a1a19; --line: #2c2c2a; --axis: #383835;
     --text: #f0efec; --text-2: #c3c2b7; --muted: #9a988f;
-    --s1: #3987e5; --s2: #d95926; --accent: #2997ff;
+    --s1: #3987e5; --s2: #d95926; --s3: #3fb47f; --accent: #2997ff; --heart: #ff375f;
+    --up: #4cc27a; --down: #ff7a5c;
     --shadow: none;
   }
 }
@@ -172,4 +174,75 @@ tr:last-child td { border-bottom: 0; }
   .lists { grid-template-columns: minmax(0, 1fr); }
   .card { padding: 14px 14px 12px; }
   .hide-phone { display: none; }
+}
+
+
+/* -- the summary: the period in one sentence and three big numbers --------- */
+.summary { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 2fr); gap: 18px; align-items: stretch;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--s1) 12%, var(--surface)), var(--surface) 55%);
+  border: 1px solid var(--line); border-radius: 20px; padding: 22px 24px; box-shadow: var(--shadow); }
+.sum-head { display: flex; flex-direction: column; justify-content: center; gap: 8px; min-width: 0; }
+.sum-head .when { color: var(--accent); font-size: 13px; font-weight: 700; letter-spacing: .02em; }
+.sum-head .sentence { margin: 0; font-size: 21px; line-height: 1.35; letter-spacing: -.015em; color: var(--text-2); }
+.sum-head .sentence strong { color: var(--text); font-weight: 750; }
+.sum-head .today { color: var(--muted); font-size: 13px; }
+.bigs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.big { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px 10px;
+  display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow: hidden; }
+.big .label { color: var(--text-2); font-size: 13px; font-weight: 650; }
+.big .row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.big .value { font-size: 34px; font-weight: 750; letter-spacing: -.035em; line-height: 1.1; }
+.big .note { color: var(--muted); font-size: 12.5px; }
+.big.heart { background: linear-gradient(160deg, color-mix(in srgb, var(--heart) 14%, var(--surface)), var(--surface) 70%); }
+.big.heart .label::before { content: "\2665"; color: var(--heart); margin-inline-end: 6px; }
+.big.heart .value { color: var(--heart); }
+.chip { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; color: var(--text-2);
+  background: color-mix(in srgb, var(--text) 8%, transparent); }
+.chip.up { color: var(--up); background: color-mix(in srgb, var(--up) 14%, transparent); }
+.chip.down { color: var(--down); background: color-mix(in srgb, var(--down) 14%, transparent); }
+.spark { display: block; width: 100%; height: 36px; margin-top: 6px; }
+.spark .stroke { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.spark.s1 .stroke { stroke: var(--s1); } .spark.s1 .area { fill: color-mix(in srgb, var(--s1) 16%, transparent); }
+.spark.s3 .stroke { stroke: var(--s3); } .spark.s3 .area { fill: color-mix(in srgb, var(--s3) 16%, transparent); }
+.kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+/* -- from visit to donation -------------------------------------------------- */
+.funnel { list-style: none; margin: 6px 0 2px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.funnel li { display: grid; grid-template-columns: minmax(150px, 220px) minmax(0, 1fr) 64px 56px; align-items: center; gap: 12px; font-size: 14px; }
+.funnel .k { color: var(--text-2); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.funnel .track { height: 14px; border-radius: 7px; background: color-mix(in srgb, var(--text) 6%, transparent); overflow: hidden; }
+.funnel .track i { display: block; height: 100%; border-radius: 7px; background: var(--s1); }
+.funnel .step-1 .track i { background: color-mix(in srgb, var(--s1) 80%, var(--heart)); }
+.funnel .step-2 .track i { background: var(--s3); }
+.funnel .step-3 .track i { background: color-mix(in srgb, var(--heart) 70%, var(--s1)); }
+.funnel .last .track i { background: var(--heart); }
+.funnel .last .k { color: var(--heart); }
+.funnel .v { text-align: end; font-weight: 700; }
+.funnel .p { text-align: end; color: var(--muted); }
+
+/* -- the lists in groups, each under its question ---------------------------- */
+.groups { display: flex; flex-direction: column; gap: 18px; }
+.group { display: flex; flex-direction: column; gap: 10px; }
+.group-head { margin: 6px 2px 0; font-size: 12.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--muted); }
+
+/* -- donations: the heart, and whether a new one reaches the phone ------------ */
+.heart-head::before { content: "\2665"; color: var(--heart); margin-inline-end: 7px; }
+.notify { font-size: 13.5px; margin: 0 0 6px; color: var(--text-2); }
+.notify .on { color: var(--up); font-weight: 650; }
+.notify .on::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--up); margin-inline-end: 7px; vertical-align: 1px; }
+.notify .off { font-weight: 650; }
+
+@media (max-width: 980px) {
+  .summary { grid-template-columns: minmax(0, 1fr); }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .summary { padding: 18px 16px; gap: 14px; }
+  .sum-head .sentence { font-size: 18px; }
+  .bigs { grid-template-columns: minmax(0, 1fr); }
+  .big .value { font-size: 30px; }
+  .funnel li { grid-template-columns: minmax(0, 1fr) 54px 50px; gap: 4px 10px; }
+  .funnel .track { grid-column: 1 / -1; order: 4; height: 10px; }
 }

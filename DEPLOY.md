@@ -457,3 +457,62 @@ file a day - stricter than the site's public counter (downloads.json),
 which counts every click. Once per visitor needs the visitor's address in
 /dl.php's log, the `iptv_dl` format in the content server's file; lines
 written before it count each click.
+
+## Signed in for good, and told of donations
+
+**Signed in once, signed in for good.** The first time a browser opens
+`/admin/` it asks for the password as before; the page then leaves a
+cookie signed by the donate service (`iptv_admin`, 400 days, renewed by
+each visit, sent only to `/admin/`). nginx asks the service whether the
+cookie is good (`auth_request`, the hidden `/_admin_session`) and lets the
+browser in on that alone - the password prompt no longer comes back with
+every browser session or on a phone. Each device signs in once and keeps
+its own cookie. The key lives in `/usr/local/www/iptv/stats/admin-session.key`
+(made on first use, mode 600); delete it and `service iptv_donate restart`
+to sign every browser out.
+
+nginx needs its `auth_request` module (jail):
+
+```sh
+nginx -V 2>&1 | tr ' ' '\n' | grep auth_request
+```
+
+No line: install a build that has it (`pkg install nginx-full`) before the
+new content file, or `nginx -t` refuses it.
+
+**A notification on the phone.** The service looks at Stripe every minute
+and a half and pushes each new donation to an [ntfy](https://ntfy.sh)
+topic: "New donation: 12.50 EUR", how it was paid and from whom; a tap
+opens the admin page's donations. The first look after a start only notes
+where it is, so a restart never repeats old ones. Pick a topic name nobody
+will guess - on ntfy.sh, whoever knows it can read it (jail):
+
+```sh
+echo "NOTIFY_URL=https://ntfy.sh/dopeiptv-$(openssl rand -hex 12)" >> /usr/local/etc/iptv-donate.conf
+grep NOTIFY_URL /usr/local/etc/iptv-donate.conf
+service iptv_donate restart
+```
+
+Install the ntfy app on each phone or computer that should hear it and
+subscribe to that topic (the part after `ntfy.sh/`). A server of your own
+or a reserved topic takes a token: `NOTIFY_TOKEN=...` beside it. The
+Donations card on the admin page says whether notifications are on and has
+a *Send a test* button.
+
+**A note on the site.** In a browser that has opened `/admin/`, the
+site's own pages show new donations in a small note at the foot of the
+page; dismissed, or seen on the admin page, they do not come back. The
+page knows to ask by a cookie without a secret (`iptv_admin_hint`); the
+answer, `/admin/news`, is the signed session's to give, and that one path
+has no password in nginx (a page asking for it would meet the prompt).
+Every other visitor's page asks nothing.
+
+**Deploy:** the files as usual (`cp -R public/. ...`, `cp -R site donate ...`,
+the sync), `service iptv_donate restart`, and the content server's file as
+in step 8:
+
+```sh
+C=/usr/local/bastille/jails/pontusweb/root/usr/local/etc/nginx/conf.d/iptv.dope.rs.conf
+cp /root/iptv-static/deploy/content-iptv.dope.rs.conf "$C"
+bastille cmd pontusweb nginx -t && bastille cmd pontusweb service nginx reload
+```

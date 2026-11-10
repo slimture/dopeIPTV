@@ -32,7 +32,13 @@
   <p class="status" id="status" role="status">Loading…</p>
 
   <div id="tab-overview" class="tab">
-  <section class="kpis" id="kpis" aria-label="Totals"></section>
+  <section class="summary" id="summary" aria-label="Summary"></section>
+  <section class="kpis" id="kpis" aria-label="More numbers"></section>
+
+  <section class="card">
+    <div class="card-head"><h2>From visit to donation</h2><span class="muted" id="funnel-note"></span></div>
+    <div id="funnel"></div>
+  </section>
 
   <section class="card">
     <div class="card-head">
@@ -49,7 +55,7 @@
     <div class="chart" id="chart-downloads"></div>
   </section>
 
-  <section class="lists" id="lists" aria-label="Top lists"></section>
+  <div id="lists" class="groups"></div>
 
   <section class="card">
     <div class="card-head"><h2>What visitors did, by how they came</h2></div>
@@ -62,7 +68,8 @@
   </section>
 
   <section class="card">
-    <div class="card-head"><h2>Donations</h2><span class="muted" id="donations-all"></span></div>
+    <div class="card-head"><h2 class="heart-head">Donations</h2><span class="muted" id="donations-all"></span></div>
+    <div class="notify" id="notify"></div>
     <div id="donations"></div>
   </section>
 

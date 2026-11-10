@@ -67,8 +67,11 @@ site, countries, browsers and devices, downloads and donations by day,
 week, month and year, and every visit of the last 30 days one by one. A
 page view counts when the page has opened in a real browser and told
 `/hit` so (`public/nav.js`, no cookie, no id); `donate/stats_collect.py`
-reads nginx's log of it - no address kept, robots left out. Setting it up:
-`DEPLOY.md`, "Statistics and the admin page".
+reads nginx's log of it - no address kept, robots left out. Signed in once,
+a browser stays signed in (a cookie signed by the service), and a new
+donation is pushed to the owner's phone (ntfy) and shown in a note on the
+site's own pages in that browser. Setting it up: `DEPLOY.md`, "Statistics
+and the admin page" and "Signed in for good, and told of donations".
 
 Config templates live in `deploy/` with role-based names —
 `proxy-iptv.dope.rs.conf` and `content-iptv.dope.rs.conf`. Replace the

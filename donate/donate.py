@@ -6,7 +6,9 @@ Stripe's card form (the Payment Element), in Stripe's iframes, on our page,
 and Apple Pay / Google Pay in the wallet's own sheet. Both pay a
 PaymentIntent, and only a server holding the secret key can make one - this
 is that server, and all it does. It never sees a card. It also serves the
-site's admin page, /admin/ (admin.py), behind nginx's password.
+site's admin page, /admin/ (admin.py), behind nginx's password - signed in
+once, a browser stays signed in (a signed cookie, /admin-session) - and
+tells the owner's phone when someone has donated (NOTIFY_URL).
 
     GET  /donate/config   {"publishableKey", "currency", "country", "name", "pmc",
                            "currencies": {"sek": {"presets", "min", "max"}, ...}}
@@ -69,11 +71,22 @@ named by DONATE_CONFIG (default /usr/local/etc/iptv-donate.conf):
                             stats_collect.py leaves out (your own)
     STATS_DIR, DOWNLOADS_JSON  where stats_collect.py and sync-releases.sh keep
                             their counts (<site>/stats, <site>/downloads.json)
+    ADMIN_SESSION_KEY_FILE  the key that signs the admin's session cookie
+                            (default <STATS_DIR>/admin-session.key, made on
+                            first use). Deleting it signs every browser out.
+    NOTIFY_URL              where a new donation is announced: an ntfy topic,
+                            e.g. https://ntfy.sh/<a long random name> (the ntfy
+                            app on the phone subscribes to it). Empty: off.
+    NOTIFY_TOKEN            an ntfy access token, for a topic that needs one
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import os
+import re
+import secrets
 import socket
 import socketserver
 import sys
@@ -106,7 +119,7 @@ def _load_config() -> dict[str, str]:
         pass
     conf.update({k: v for k, v in os.environ.items()
                  if k.startswith(("STRIPE_", "DONATE_", "LISTEN", "STATS_", "ADMIN_", "DL_LOG",
-                                  "DOWNLOADS_JSON", "SITE_HOST", "GEO_"))})
+                                  "DOWNLOADS_JSON", "SITE_HOST", "GEO_", "NOTIFY_"))})
     return conf
 
 
@@ -330,6 +343,146 @@ def create_session(amount: int, currency: str) -> tuple[int, dict]:
     return 502, {"error": "stripe"}
 
 
+# -- the admin's session -------------------------------------------------------
+# nginx's password prompt asked again with every new browser session - on a
+# phone, every time. Signed in once through it, the browser gets a cookie
+# signed with a key of the server's own, and nginx (auth_request to
+# /admin-session) lets it in on that alone, for as long as a browser keeps a
+# cookie (400 days, renewed by every visit). Deleting the key signs every
+# browser out.
+SESSION_COOKIE = "iptv_admin"
+SESSION_SECS = 400 * 86400
+#: Tells the site's own pages that this browser is the owner's, so that only
+#: its pages ask /admin/news. No secret; the answer is the session's to give.
+HINT_COOKIE = "iptv_admin_hint"
+#: How far back the owner's note on the site looks.
+NEWS_DAYS = 14
+
+
+def _is_admin(user: str) -> bool:
+    allowed = [u.strip() for u in CONF.get("ADMIN_USERS", "").split(",") if u.strip()]
+    return bool(user) and (not allowed or user in allowed)
+_USER_OK = re.compile(r"^[A-Za-z0-9_.@-]{1,64}$")
+
+
+def _stats_dir() -> str:
+    if CONF.get("STATS_DIR"):
+        return CONF["STATS_DIR"]
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "stats")
+
+
+def _session_key() -> bytes:
+    path = CONF.get("ADMIN_SESSION_KEY_FILE") or os.path.join(_stats_dir(), "admin-session.key")
+    try:
+        with open(path, encoding="ascii") as fh:
+            key = fh.read().strip()
+        if len(key) >= 32:
+            return key.encode()
+    except FileNotFoundError:
+        pass
+    key = secrets.token_hex(32)
+    try:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="ascii") as fh:
+            fh.write(key + "\n")
+    except FileExistsError:            # another request made it just now
+        with open(path, encoding="ascii") as fh:
+            return fh.read().strip().encode()
+    return key.encode()
+
+
+def _session_sign(user: str, until: int) -> str:
+    msg = f"{user}.{until}".encode()
+    return hmac.new(_session_key(), msg, hashlib.sha256).hexdigest()
+
+
+def session_cookie(user: str) -> str | None:
+    if not _USER_OK.match(user):
+        return None
+    until = int(time.time()) + SESSION_SECS
+    return f"{user}.{until}.{_session_sign(user, until)}"
+
+
+def session_user(cookie_header: str) -> str:
+    """The admin a valid session cookie names, or ""."""
+    for part in (cookie_header or "").split(";"):
+        name, _, value = part.strip().partition("=")
+        if name != SESSION_COOKIE:
+            continue
+        user, _, rest = value.partition(".")
+        until, _, sig = rest.partition(".")
+        if not _USER_OK.match(user) or not until.isdigit() or int(until) < time.time():
+            return ""
+        if hmac.compare_digest(sig, _session_sign(user, int(until))):
+            return user
+    return ""
+
+
+# -- telling the owner a donation came in -------------------------------------
+NOTIFY_URL = CONF.get("NOTIFY_URL", "").strip()
+NOTIFY_TOKEN = CONF.get("NOTIFY_TOKEN", "").strip()
+NOTIFY_EVERY = 90           # seconds between looks at Stripe
+_ZERO_DECIMAL = {"bif", "clp", "djf", "gnf", "jpy", "kmf", "krw", "mga", "pyg", "rwf",
+                 "ugx", "vnd", "vuv", "xaf", "xof", "xpf"}
+
+
+def _amount_text(minor: int, currency: str) -> str:
+    cur = currency.lower()
+    if cur in _ZERO_DECIMAL:
+        return f"{minor:,} {currency.upper()}".replace(",", " ")
+    major = minor / 100
+    text = f"{major:,.2f}".replace(",", " ").removesuffix(".00")
+    return f"{text} {currency.upper()}"
+
+
+def notify(title: str, body: str, tags: str = "heart") -> str:
+    """Push a note to NOTIFY_URL (ntfy). "" when sent, else why not."""
+    if not NOTIFY_URL:
+        return "NOTIFY_URL is not set"
+    headers = {"Title": title, "Tags": tags, "Click": f"{ORIGIN}/admin/#donations"}
+    if NOTIFY_TOKEN:
+        headers["Authorization"] = f"Bearer {NOTIFY_TOKEN}"
+    req = urllib.request.Request(NOTIFY_URL, data=body.encode("utf-8"), headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            resp.read()
+        return ""
+    except (urllib.error.URLError, TimeoutError, ValueError) as e:
+        why = str(getattr(e, "reason", "") or e)[:200]
+        print(f"[donate] notification not sent: {why}", file=sys.stderr, flush=True)
+        return why
+
+
+def _watch_donations() -> None:
+    """Every minute and a half: any donation newer than the newest already
+    told is pushed to NOTIFY_URL. The first look only remembers where it
+    is, so starting the service never repeats old donations."""
+    path = os.path.join(_stats_dir(), "notified.json")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            last = float(json.load(fh).get("t") or 0)
+    except (OSError, ValueError, AttributeError):
+        last = 0.0
+    while True:
+        try:
+            import admin
+            got = admin.donations(_secret(), API_VERSION, max_age=60)
+            rows = got.get("list") or []
+            if not got.get("error"):
+                newest = max([r["t"] for r in rows] + [last])
+                if last:
+                    for r in sorted((r for r in rows if r["t"] > last), key=lambda r: r["t"]):
+                        who = f" · {r['who']}" if r.get("who") else ""
+                        notify(f"New donation: {_amount_text(r['amount'], r['currency'])}",
+                               f"{r['how']}{who} - dopeIPTV")
+                last = newest or time.time()
+                with open(path, "w", encoding="utf-8") as fh:
+                    json.dump({"t": last}, fh)
+        except Exception as e:  # noqa: BLE001 - the watcher keeps watching
+            print(f"[donate] donation watcher: {e!r}", file=sys.stderr, flush=True)
+        time.sleep(NOTIFY_EVERY)
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "iptv-donate"
     sys_version = ""
@@ -351,8 +504,7 @@ class Handler(BaseHTTPRequestHandler):
         which names the user in X-Admin-User (and overwrites any a client
         sent); without one - a location that lost its password - nothing."""
         user = (self.headers.get("X-Admin-User") or "").strip()
-        allowed = [u.strip() for u in CONF.get("ADMIN_USERS", "").split(",") if u.strip()]
-        if not user or (allowed and user not in allowed):
+        if not _is_admin(user):
             return self._send(403, {"error": "admin only"})
         try:
             import admin  # beside this file; loaded on first use
@@ -379,10 +531,12 @@ class Handler(BaseHTTPRequestHandler):
                               CONF.get("DOWNLOADS_JSON", os.path.join(admin.SITE, "downloads.json")),
                               _secret(), API_VERSION)
             body["visits_days"] = int(CONF.get("STATS_VISITS_DAYS", "30") or 30)
+            body["notify"] = bool(NOTIFY_URL)
             return self._send(200, body)
         hit = admin.static(path)
         if not hit:
             return self._send(404, {"error": "not found"})
+        session = session_cookie(user) if path == "/admin/" else None
         data, ctype = hit
         self.send_response(200)
         self.send_header("Content-Type", ctype)
@@ -395,12 +549,56 @@ class Handler(BaseHTTPRequestHandler):
             # here renews it.
             self.send_header("Set-Cookie", "iptv_nostats=1; Max-Age=34560000; Path=/; "
                                            "Secure; HttpOnly; SameSite=Lax")
+            if session:                 # signed in for good, renewed by each visit
+                self.send_header("Set-Cookie", f"{SESSION_COOKIE}={session}; Max-Age={SESSION_SECS}; "
+                                               "Path=/admin/; Secure; HttpOnly; SameSite=Strict")
+                # Readable by the site's own pages, so only this browser's
+                # pages ask /admin/news; it proves nothing (the session does).
+                self.send_header("Set-Cookie", f"{HINT_COOKIE}=1; Max-Age={SESSION_SECS}; Path=/; "
+                                               "Secure; SameSite=Lax")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
 
+    def _news(self) -> None:
+        """The last two weeks' donations, for the owner's note on the site's
+        own pages (public/nav.js). nginx asks no password here - every page
+        that asked would meet a prompt - so only a valid session cookie gets
+        an answer; anyone else an empty 204, and the hint cookie that made
+        the page ask is taken away."""
+        user = session_user(self.headers.get("Cookie") or "")
+        if not _is_admin(user):
+            self.send_response(204)
+            self.send_header("Set-Cookie", f"{HINT_COOKIE}=; Max-Age=0; Path=/; Secure; SameSite=Lax")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        try:
+            import admin
+            got = admin.donations(_secret(), API_VERSION, max_age=120)
+        except Exception as e:  # noqa: BLE001 - the note is not worth a broken page
+            print(f"[donate] news unavailable: {e!r}", file=sys.stderr, flush=True)
+            return self._send(200, {"list": [], "error": "unavailable"})
+        since = time.time() - NEWS_DAYS * 86400
+        rows = [{k: r.get(k) for k in ("t", "amount", "currency", "how", "who")}
+                for r in got.get("list") or [] if r.get("t", 0) >= since]
+        self._send(200, {"list": rows[:20], "error": got.get("error", "")})
+
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
+        if path == "/admin-session":
+            # nginx's auth_request: a valid session cookie lets the browser
+            # in without the password prompt, and names the admin.
+            user = session_user(self.headers.get("Cookie") or "")
+            self.send_response(204 if user else 401)
+            if user:
+                self.send_header("X-Admin-User", user)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        if path == "/admin/news":
+            return self._news()
         if path == "/admin/" or path in ("/admin/admin.css", "/admin/admin.js", "/admin/data",
                                          "/admin/visits", "/admin/visitor"):
             return self._admin(path)
@@ -419,6 +617,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = self.path.split("?", 1)[0]
+        if path == "/admin/notify-test":
+            if not _is_admin((self.headers.get("X-Admin-User") or "").strip()):
+                return self._send(403, {"error": "admin only"})
+            if (self.headers.get("Origin") or "").rstrip("/") != ORIGIN:
+                return self._send(403, {"error": "origin"})
+            why = notify("Notifications work", "This is how a new donation will look. - dopeIPTV",
+                         "tada")
+            return self._send(200 if not why else 502, {"ok": not why, "error": why})
         if path not in ("/donate/session", "/donate/wallet"):
             return self._send(404, {"error": "not found"})
         origin = (self.headers.get("Origin") or "").rstrip("/")
@@ -509,8 +715,11 @@ def main() -> None:
         host, _, port = LISTEN.rpartition(":")
         srv = ThreadingHTTPServer((host or "127.0.0.1", int(port)), Handler)
     print(f"[donate] listening on {LISTEN}, {len(CURRENCIES)} currencies ({CURRENCY} by default), "
-          f"{'configured' if PUBLISHABLE and _secret() else 'NOT configured'}",
+          f"{'configured' if PUBLISHABLE and _secret() else 'NOT configured'}, "
+          f"donation notifications {'on' if NOTIFY_URL else 'off'}",
           file=sys.stderr, flush=True)
+    if NOTIFY_URL and _secret():
+        threading.Thread(target=_watch_donations, name="donations", daemon=True).start()
     srv.serve_forever()
 
 

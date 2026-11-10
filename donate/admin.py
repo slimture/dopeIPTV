@@ -90,12 +90,13 @@ def _stripe_search(key: str, query: str, api_version: str) -> list:
     return out
 
 
-def donations(key: str, api_version: str = "") -> dict:
-    """Succeeded donations through the dialog: [{t, amount, currency, how,
-    who}], newest first; cached for five minutes. {"error"} if Stripe could
-    not be asked (the page says so instead of showing zero)."""
+def donations(key: str, api_version: str = "", max_age: int = 300) -> dict:
+    """Succeeded donations through the dialog: [{id, t, amount, currency,
+    how, who}], newest first; cached for *max_age* seconds (the page: five
+    minutes; the donation watcher in donate.py: one). {"error"} if Stripe
+    could not be asked (the page says so instead of showing zero)."""
     with _LOCK:
-        if _CACHE["data"] is not None and time.time() - _CACHE["at"] < 300:
+        if _CACHE["data"] is not None and time.time() - _CACHE["at"] < max_age:
             return _CACHE["data"]
     if not key:
         return {"error": "not configured", "list": []}
@@ -106,6 +107,7 @@ def donations(key: str, api_version: str = "") -> dict:
             for pi in _stripe_search(key, q, api_version):
                 meta = pi.get("metadata") or {}
                 rows.append({
+                    "id": str(pi.get("id") or ""),
                     "t": int(pi.get("created") or 0),
                     "amount": int(pi.get("amount_received") or pi.get("amount") or 0),
                     "currency": (pi.get("currency") or "").upper(),

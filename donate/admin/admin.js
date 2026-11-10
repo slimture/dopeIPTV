@@ -93,11 +93,19 @@
     });
     load();
   }
+  // Donations seen here are not shown again in the note on the site's own
+  // pages (public/nav.js, the same browser's storage).
+  function markSeen() {
+    try {
+      const newest = Math.max(0, ...((data.donations || {}).recent || []).map((r) => r.t || 0));
+      if (newest > (+localStorage.getItem("dn-admin-seen") || 0)) { localStorage.setItem("dn-admin-seen", String(newest)); }
+    } catch (e) { /* no storage: the note shows them once more */ }
+  }
   function load() {
     status(data ? "" : "Loading…");
     fetch("/admin/data?days=" + days, { credentials: "same-origin", cache: "no-store" })
       .then((r) => { if (!r.ok) { throw new Error("the service answered " + r.status); } return r.json(); })
-      .then((d) => { data = d; status(""); render(); })
+      .then((d) => { data = d; status(""); render(); markSeen(); })
       .catch((e) => status("Could not load the numbers: " + e.message + "."));
   }
 
@@ -118,6 +126,88 @@
     t.append(n);
     return t;
   }
+  // -- the summary: what the period came to, in one sentence and three numbers --
+  function spark(values, cls) {
+    const W = 132, H = 36, n = values.length;
+    const s = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "spark " + cls, "aria-hidden": "true" });
+    if (n < 2) { return s; }
+    const max = Math.max(1, ...values);
+    const pts = values.map((v, i) => [i * W / (n - 1), H - 3 - (H - 6) * v / max]);
+    const line = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join("");
+    svg("path", { d: line + `L${W} ${H}L0 ${H}Z`, class: "area" }, s);
+    svg("path", { d: line, class: "stroke" }, s);
+    return s;
+  }
+  function change(now, before) {
+    if (before === undefined || before === null) { return null; }
+    if (!before) { return now ? { text: "new", cls: "up" } : null; }
+    const p = Math.round((now - before) / before * 100);
+    return { text: (p > 0 ? "▲ " : p < 0 ? "▼ " : "") + Math.abs(p) + "%", cls: p > 0 ? "up" : p < 0 ? "down" : "" };
+  }
+  function bigStat(label, value, ch, sparkline, cls, note) {
+    const b = mk("div", "big " + (cls || ""));
+    b.append(mk("div", "label", label));
+    const row = mk("div", "row");
+    row.append(mk("div", "value", value));
+    if (ch) { row.append(mk("span", "chip " + ch.cls, ch.text)); }
+    b.append(row);
+    if (note) { b.append(mk("div", "note", note)); }
+    if (sparkline) { b.append(sparkline); }
+    return b;
+  }
+  function summary() {
+    const T = data.totals, B = data.before || {}, D = data.donations, S = data.series;
+    const unique = T.unique !== null && T.unique !== undefined;
+    const people = unique ? T.unique : T.visitors;
+    const peopleBefore = unique ? B.unique : B.visitors;
+    const when = days === 0 ? "Since counting began" : days === 365 ? "The last 12 months" : "The last " + days + " days";
+    const box = $("summary");
+    const head = mk("div", "sum-head");
+    const line = mk("p", "sentence");
+    const strong = (t) => mk("strong", "", t);
+    line.append(strong(num.format(people)), document.createTextNode(people === 1 ? " person found dopeIPTV, " : " people found dopeIPTV, "),
+                strong(num.format(T.downloads)), document.createTextNode(" downloaded it and "),
+                strong(num.format(D.count || 0)), document.createTextNode((D.count === 1 ? " donated." : " donated.")));
+    head.append(mk("div", "when", when), line,
+                mk("div", "today", "Today so far: " + num.format(data.today.visitors) + " visitors · " +
+                   num.format(data.today.views) + " page views"));
+    const vs = days ? "vs " + periodText() : "";
+    const stats = mk("div", "bigs");
+    stats.append(
+      bigStat(unique ? "People" : "Visits", num.format(people), days ? change(people, peopleBefore) : null,
+              spark(S.map((d) => d.visitors), "s1"), "", vs),
+      bigStat("Downloads", num.format(T.downloads), days ? change(T.downloads, B.downloads) : null,
+              spark(S.map((d) => d.downloads), "s3"), "", num.format(data.downloads_all_time) + " all time"),
+      bigStat("Donations", D.error ? "–" : num.format(D.count || 0), null, null, "heart",
+              D.error ? "Stripe did not answer" : (D.count ? sums(D.sums) : "none yet in this period")));
+    box.replaceChildren(head, stats);
+  }
+
+  // -- from visit to donation ----------------------------------------------------
+  function funnel() {
+    const rows = data.by_channel || [];
+    const t = { visits: 0, more: 0, downloaded: 0, donate: 0 };
+    rows.forEach(([, r]) => { t.visits += r.visits; t.more += r.more; t.downloaded += r.downloaded; t.donate += r.donate; });
+    const donated = data.donations && !data.donations.error ? data.donations.count || 0 : null;
+    const box = $("funnel");
+    if (!t.visits) { box.replaceChildren(mk("p", "empty", "No visits in this period yet.")); $("funnel-note").textContent = ""; return; }
+    $("funnel-note").textContent = "share of all visits";
+    const steps = [["Visits", t.visits], ["Read more than one page", t.more], ["Downloaded", t.downloaded],
+                   ["Opened the donate dialog", t.donate]];
+    if (donated !== null) { steps.push(["Donated", donated]); }
+    const ul = mk("ul", "funnel");
+    steps.forEach(([label, n], i) => {
+      const li = mk("li", "step-" + i + (i === steps.length - 1 && donated !== null ? " last" : ""));
+      const bar = mk("span", "track"), fill = mk("i");
+      fill.style.width = Math.min(100, Math.max(n ? 1.2 : 0, n / t.visits * 100)) + "%";
+      bar.append(fill);
+      li.append(mk("span", "k", label), bar, mk("span", "v", num.format(n)),
+                mk("span", "p", i ? Math.round(n / t.visits * 1000) / 10 + "%" : ""));
+      ul.append(li);
+    });
+    box.replaceChildren(ul);
+  }
+
   function tiles() {
     const T = data.totals, B = data.before || {}, D = data.donations;
     // Different people over the whole span where the hashes reach (400
@@ -127,16 +217,16 @@
     const avg = T.visits ? T.engaged / T.visits : 0;
     const bounce = T.visits ? Math.round(T.bounces / T.visits * 100) : 0;
     const opened = (data.top.events || []).find((e) => e[0] === "donate");
+    // The secondary numbers, under the summary's three.
     $("kpis").replaceChildren(
-      tile(unique ? "Unique visitors" : "Visitors", num.format(unique ? T.unique : T.visitors), visitorsNote,
-           unique && B.unique !== undefined && B.unique !== null ? delta(T.unique, B.unique) : ""),
-      tile("Page views", num.format(T.views), "from " + num.format(T.requests || 0) + " page requests, robots included", ""),
+      tile("Visits", num.format(T.visits || T.visitors), num.format(T.returning || 0) + " by returning visitors",
+           delta(T.visits || T.visitors, B.visits || B.visitors)),
+      tile("Page views", num.format(T.views), "from " + num.format(T.requests || 0) + " page requests, robots included",
+           delta(T.views, B.views)),
       tile("Time per visit", T.visits ? duration(avg) : "–", T.visits ? bounce + "% left within 10 s" : "", "", true),
-      tile("Downloads", num.format(T.downloads), num.format(data.downloads_all_time) + " on the site's counter", ""),
-      tile("Donations", num.format(D.count), D.error ? "Stripe did not answer" :
-           sums(D.sums) + (opened ? " · dialog opened " + num.format(opened[1]) + "×" : "")),
-      tile("Visitors today", num.format(data.today.visitors), num.format(data.today.views) + " page views", "")
+      tile("Donate dialog", num.format(opened ? opened[1] : 0), "times opened" + (D.error ? "" : " · " + sums(D.sums)), "", true)
     );
+    void visitorsNote;
   }
 
   // -- charts ----------------------------------------------------------------------
@@ -308,6 +398,14 @@
     });
     return ul;
   }
+  function group(title, cards) {
+    const g = mk("section", "group");
+    g.append(mk("h3", "group-head", title));
+    const grid = mk("div", "lists");
+    grid.append(...cards);
+    g.append(grid);
+    return g;
+  }
   function lists() {
     const L = data.top;
     const lang = (k) => { try { return langNames ? langNames.of(k) : k; } catch (e) { return k; } };
@@ -318,22 +416,44 @@
     const sites = listCard("Sites that linked here", L.refs, (k) => k === "other" ? "Other sites" : k,
                            ["Tagged links", L.sources]);
     sites.append(mk("p", "muted", "Tagged links carry ?ref=name, e.g. iptv.dope.rs/?ref=github."));
+    // In three groups, by the question each answers.
     $("lists").replaceChildren(
-      listCard("How they found the site", L.channels),
-      sites,
-      countries,
-      listCard("Pages", L.pages, (k) => PAGE_NAMES[k] || k),
-      listCard("Languages", L.langs, lang),
-      listCard("Browsers", L.browsers, null, ["Versions", L.browser_versions]),
-      listCard("Systems", L.os_versions),
-      listCard("Devices", L.devices, null, ["Screens", L.screens]),
-      listCard("Downloads", L.downloads, null, ["Files", L.files, (k) => k === "other" ? "Other files" : k.replace(/^dopeIPTV-/, "")])
+      group("Where they come from", [listCard("How they found the site", L.channels), sites, countries]),
+      group("What they read and get", [listCard("Pages", L.pages, (k) => PAGE_NAMES[k] || k),
+        listCard("Languages", L.langs, lang),
+        listCard("Downloads", L.downloads, null, ["Files", L.files, (k) => k === "other" ? "Other files" : k.replace(/^dopeIPTV-/, "")])]),
+      group("What they use", [listCard("Systems", L.os_versions),
+        listCard("Browsers", L.browsers, null, ["Versions", L.browser_versions]),
+        listCard("Devices", L.devices, null, ["Screens", L.screens])])
     );
   }
 
   // -- donations -------------------------------------------------------------------
+  // Whether a new donation reaches the phone (NOTIFY_URL in the service's
+  // config), and a button that sends a test.
+  function notifyRow() {
+    const box = $("notify");
+    if (!data.notify) {
+      box.replaceChildren(mk("span", "off", "Phone notifications are off."),
+        mk("span", "muted", " Set NOTIFY_URL in /usr/local/etc/iptv-donate.conf (DEPLOY.md, \u201cNotifications\u201d)."));
+      return;
+    }
+    const btn = mk("button", "link", "Send a test");
+    btn.type = "button";
+    const said = mk("span", "muted");
+    btn.addEventListener("click", () => {
+      btn.disabled = true; said.textContent = " Sending…";
+      fetch("/admin/notify-test", { method: "POST", credentials: "same-origin" })
+        .then((r) => r.json().then((j) => [r.ok, j]))
+        .then(([ok, j]) => { said.textContent = ok ? " Sent - look at your phone." : " Not sent: " + (j.error || "no answer") + "."; })
+        .catch(() => { said.textContent = " Not sent: the service did not answer."; })
+        .finally(() => { btn.disabled = false; });
+    });
+    box.replaceChildren(mk("span", "on", "Phone notifications are on"), document.createTextNode(" · "), btn, said);
+  }
   function donations() {
     const D = data.donations, box = $("donations");
+    notifyRow();
     $("donations-all").textContent = D.error ? "" :
       "All time: " + num.format(D.count_all) + (D.count_all === 1 ? " donation" : " donations") +
       (D.count_all ? " · " + sums(D.sums_all) : "");
@@ -489,13 +609,18 @@
     document.querySelector(".range").hidden = name !== "overview";
     try { localStorage.setItem("admin-tab", name); } catch (e) { /* fine */ }
     if (name === "visitors") { loadDay(logDay); }
+    // Drawn while the tab was hidden (data arriving, a resize), a chart
+    // measured its box as 0 wide, fell back to its narrowest size and was
+    // then stretched to the full width - tall as a wall. Drawn again now
+    // the box has its width.
+    if (name === "overview" && data) { visitsChart(); downloadsChart(); }
   }
 
   function render() {
     if (!data) { return; }
     $("h-visits").textContent = "Visitors and page views" + (per() === "day" ? "" : " per " + per());
     $("h-downloads").textContent = "Downloads per " + per();
-    tiles(); visitsChart(); downloadsChart(); visitsTable(); lists(); byChannel(); years(); donations();
+    summary(); tiles(); funnel(); visitsChart(); downloadsChart(); visitsTable(); lists(); byChannel(); years(); donations();
     $("updated").textContent = data.updated ? "Counts updated " + stamp.format(new Date(data.updated)) + "." : "";
   }
 
