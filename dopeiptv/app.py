@@ -122,9 +122,11 @@ def make_app_icon(inset: float = 0.0, sizes=(256, 128, 64, 48, 32)) -> QIcon:
         tile.addRoundedRect(off, off, side, side, side * 0.22, side * 0.22)
         p.fillPath(tile, QColor(ACCENT))
         tri = QPainterPath()
-        tri.moveTo(off + side * 0.40, off + side * 0.28)
-        tri.lineTo(off + side * 0.40, off + side * 0.72)
-        tri.lineTo(off + side * 0.76, off + side * 0.50)
+        # Centred by its weight (centroid at the middle), not by its box:
+        # a play triangle centred by its box looks shifted left.
+        tri.moveTo(off + side * 0.38, off + side * 0.28)
+        tri.lineTo(off + side * 0.38, off + side * 0.72)
+        tri.lineTo(off + side * 0.74, off + side * 0.50)
         tri.closeSubpath()
         p.fillPath(tri, QColor("white"))
         p.end()
