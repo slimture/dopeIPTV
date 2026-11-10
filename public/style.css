@@ -1391,6 +1391,9 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
    the heading stays for computers (and in the page, for search engines). */
 @media (max-width: 720px) {
   #features .sec-head p, #whats-new .sec-head p, .faq-grid .sec-head p,
+  /* A link to a section (the hero's Download) lands below the sticky bar,
+     not under it: sections are shorter on top here than on a computer. */
+  html { scroll-padding-top: 64px; }
   #credits .sec-head p, .donate-text p, #shots .sec-head p { display: none; }
   .donate-text .donate-short { display: block; margin: 0 auto 4px; max-width: 34ch;
     font-size: 15px; line-height: 1.5; }
