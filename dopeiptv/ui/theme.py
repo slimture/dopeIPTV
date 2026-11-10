@@ -384,6 +384,32 @@ def _lighter(hex_color: str) -> str:
     return _mix("#FFFFFF", hex_color, 0.18)
 
 
+#: Text on an accent that is too light for white (Nord's frost, Dracula's
+#: purple, gold, mint): near-black, as those palettes do themselves.
+ON_ACCENT_DARK = "#15171C"
+
+
+def _luminance(hex_color: str) -> float:
+    h = hex_color.lstrip("#")
+    try:
+        r, g, b = (int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+    except ValueError:
+        return 0.0
+
+    def lin(c: float) -> float:
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+
+
+def on_accent(hex_color: str) -> str:
+    """The text colour for a button or selection filled with HEX_COLOR:
+    white while it reads at 3:1 or better (bold button text), else
+    near-black - so a light accent keeps its colour and its label."""
+    if (1.05 / (_luminance(hex_color) + 0.05)) >= 3.0:
+        return "#FFFFFF"
+    return ON_ACCENT_DARK
+
+
 def _valid_hex(value) -> str | None:
     v = str(value or "").strip()
     if len(v) == 7 and v.startswith("#"):
@@ -429,6 +455,7 @@ def apply_theme(settings=None, theme: str | None = None,
     P.update({k: v for k, v in base.items() if isinstance(v, str)})
     P["accent"], P["accent_hi"] = resolve_accent(theme, accent or "blue",
                                                  custom)
+    P["on_accent"] = on_accent(P["accent"])
     ACCENT = P["accent"]
 
 
@@ -570,7 +597,8 @@ def build_style() -> str:
     arrow_down = _arrow_png("down", p['text2'])
     arrow_up_sm = _arrow_png("up", p['text2'], 8)
     arrow_down_sm = _arrow_png("down", p['text2'], 8)
-    check_png = _check_png("#FFFFFF")
+    check_png = _check_png(p.get("on_accent", "#FFFFFF"))
+    ON = p.get("on_accent", "#FFFFFF")
     # Checkbox border mixed well toward the text colour, so the box is
     # clearly visible even on the near-black OLED palette (its border_in is
     # almost invisible against pure black).
@@ -606,7 +634,7 @@ QPushButton#NavBtn {{
    small type hierarchy that structures the sidebar without extra chrome. */
 QPushButton#NavBtn[primary="true"] {{ font-size: 16px; }}
 QPushButton#NavBtn:hover  {{ background: {p['hover']}; }}
-QPushButton#NavBtn:checked {{ background: {ACCENT}; color: white; font-weight: 600; }}
+QPushButton#NavBtn:checked {{ background: {ACCENT}; color: {ON}; font-weight: 600; }}
 QPushButton#NavBtn[rail="true"] {{ text-align: center; padding: 4px 0; font-size: 19px; }}
 /* Guide / Settings: the sidebar's bottom actions. Give them a visible filled
    pill with a border so they read as buttons (not plain text like the nav
@@ -735,7 +763,7 @@ QPushButton {{
     padding: 9px 16px; font-size: 13px; font-weight: 600;
 }}
 QPushButton:hover  {{ background: {p['btn_hover']}; }}
-QPushButton#Primary {{ background: {ACCENT}; border: none; color: white; }}
+QPushButton#Primary {{ background: {ACCENT}; border: none; color: {ON}; }}
 QPushButton#Primary:hover {{ background: {p['accent_hi']}; }}
 /* A button that cannot be pressed has to look it: without these a disabled
    button - the accent one above all - read exactly like a live one. */
@@ -812,7 +840,7 @@ QMenuBar::item {{
     font-size: 12px;
 }}
 QMenuBar::item:selected {{ background: {p['hover']}; }}
-QMenuBar::item:pressed {{ background: {ACCENT}; color: white; }}
+QMenuBar::item:pressed {{ background: {ACCENT}; color: {ON}; }}
 
 QMenu {{
     background: {p['hover']}; border: 1px solid {p['border_in']}; border-radius: 8px;
@@ -822,7 +850,7 @@ QMenu::item {{
     background: transparent; color: {p['text']}; border-radius: 6px;
     padding: 5px 20px 5px 10px; font-size: 12px;
 }}
-QMenu::item:selected {{ background: {ACCENT}; color: white; }}
+QMenu::item:selected {{ background: {ACCENT}; color: {ON}; }}
 QMenu::item:disabled {{ color: {p['muted2']}; }}
 QMenu::separator {{ height: 1px; background: {p['border_in']}; margin: 5px 8px; }}
 
@@ -858,7 +886,7 @@ QComboBox::down-arrow {{
 }}
 QComboBox QAbstractItemView {{
     background: {p['input']}; border: 1px solid {p['border_in']}; border-radius: 6px;
-    selection-background-color: {ACCENT}; selection-color: white;
+    selection-background-color: {ACCENT}; selection-color: {ON};
     outline: none; font-size: 12px; padding: 3px;
 }}
 QComboBox QAbstractItemView::item {{ min-height: 22px; padding: 3px 8px; }}
@@ -874,7 +902,7 @@ QPushButton#InlineToggle {{
     padding: 4px 8px; font-size: 11px; border-radius: 7px;
 }}
 QPushButton#InlineToggle:hover {{ background: {p['btn_hover']}; }}
-QPushButton#InlineToggle:checked {{ background: {ACCENT}; border: none; color: white; }}
+QPushButton#InlineToggle:checked {{ background: {ACCENT}; border: none; color: {ON}; }}
 /* The compact ⊞/⇅ stand-ins for the Size/Sort combos are QToolButtons (they
    open a menu); match the pushbutton look and hide the extra menu arrow. */
 QToolButton#InlineToggle {{
@@ -973,7 +1001,7 @@ QFileDialog QTreeView::item:hover, QFileDialog QListView::item:hover {{
     background: {p['hover']};
 }}
 QFileDialog QTreeView::item:selected, QFileDialog QListView::item:selected {{
-    background: {ACCENT}; color: white;
+    background: {ACCENT}; color: {ON};
 }}
 QHeaderView::section {{
     background: {p['btn']}; color: {p['text2']}; border: none;

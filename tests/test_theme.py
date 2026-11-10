@@ -115,3 +115,34 @@ def test_corners_scale_every_radius():
     ("300", None), ("abc", None), (None, None)])
 def test_interface_size(value, factor):
     assert ui_scale_factor(value) == factor
+
+
+@pytest.mark.parametrize("accent,ink", [
+    ("#4C8DFF", "#FFFFFF"),          # the default blue keeps white text
+    ("#88C0D0", theme.ON_ACCENT_DARK),   # Nord's frost
+    ("#BD93F9", theme.ON_ACCENT_DARK),   # Dracula's purple
+    ("#A7C080", theme.ON_ACCENT_DARK),   # Everforest's green
+    ("#E8B339", theme.ON_ACCENT_DARK),   # gold
+    ("#1E6FD9", "#FFFFFF"),
+])
+def test_text_on_the_accent_stays_readable(accent, ink):
+    assert theme.on_accent(accent) == ink
+    assert _contrast(theme.on_accent(accent), accent) >= 3
+
+
+@pytest.mark.parametrize("key", [k for k in THEMES if "accent" in THEMES[k]])
+def test_every_theme_accent_carries_its_button_text(key):
+    accent = THEMES[key]["accent"][0]
+    assert _contrast(theme.on_accent(accent), accent) >= 3, key
+
+
+def test_the_stylesheet_puts_the_accent_text_colour_on_accent_buttons():
+    try:
+        theme.apply_theme(_Settings(theme="nord", accent="theme"))
+        assert P["on_accent"] == theme.ON_ACCENT_DARK
+        qss = build_style()
+        assert f"background: {P['accent']}; border: none; color: {theme.ON_ACCENT_DARK}" in qss
+        assert "color: white" not in qss.split("QPushButton#Primary")[1].split("}")[0]
+    finally:
+        theme.apply_theme(_Settings())
+

@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..i18n import tr
-from .theme import P, corner_radius
+from .theme import P, corner_radius, on_accent
 from .category_flags import category_flag, flag_icon
 
 # Marks a drag of favorites rows from the middle list. The rows themselves
@@ -42,7 +42,7 @@ def _drag_badge(text: str) -> QPixmap:
     p.setPen(Qt.PenStyle.NoPen)
     p.drawRoundedRect(QRectF(0, 0, w, h), h / 2, h / 2)
     p.setFont(font)
-    p.setPen(QColor("#FFFFFF"))
+    p.setPen(QColor(on_accent(_accent())))
     p.drawText(QRect(0, 0, w, h), Qt.AlignmentFlag.AlignCenter, text)
     p.end()
     return pm

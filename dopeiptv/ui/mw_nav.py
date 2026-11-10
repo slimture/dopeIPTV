@@ -113,12 +113,13 @@ class _NavMixin:
 
     def _nav_icon(self, kind: str, s: int) -> QIcon:
         """A vector icon of size S in the theme's muted tone (the normal/Off
-        state) and white (the checked/On state), so it always matches the nav
-        label - and renders identically on every OS."""
+        state) and the text colour on the accent (the checked/On state), so
+        it always matches the nav label - and renders identically on every
+        OS."""
         icon = QIcon()
         icon.addPixmap(self._action_pixmap(kind, s, P["text2"]),
                        QIcon.Mode.Normal, QIcon.State.Off)
-        icon.addPixmap(self._action_pixmap(kind, s, "#FFFFFF"),
+        icon.addPixmap(self._action_pixmap(kind, s, P.get("on_accent", "#FFFFFF")),
                        QIcon.Mode.Normal, QIcon.State.On)
         return icon
 

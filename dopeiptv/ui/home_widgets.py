@@ -604,10 +604,10 @@ class _Hero(QWidget):
         row = QHBoxLayout()
         row.setSpacing(12)
         self._play_btn = QPushButton()
-        self._play_btn.setIcon(play_icon(14, "white"))
+        self._play_btn.setIcon(play_icon(14, P.get("on_accent", "white")))
         self._play_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._play_btn.setStyleSheet(rounded(
-            f"QPushButton {{ background:{P['accent']}; color:white;"
+            f"QPushButton {{ background:{P['accent']}; color:{P.get('on_accent', 'white')};"
             " border:none; border-radius:18px; padding:0 24px 0 18px;"
             " font-size:14px; font-weight:700; }"
             f"QPushButton:hover {{ background:{P['accent_hi']}; }}"))

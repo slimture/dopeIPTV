@@ -413,7 +413,7 @@ QListWidget#SettingsNav::item {{
 }}
 QListWidget#SettingsNav::item:hover {{ background: {p['hover']}; }}
 QListWidget#SettingsNav::item:selected {{
-    background: {p['accent']}; color: #FFFFFF;
+    background: {p['accent']}; color: {p.get('on_accent', '#FFFFFF')};
 }}
 QLineEdit#SettingsSearch {{ padding: 7px 10px; border-radius: 9px; }}
 #SettingsPageBody {{ background: {p['bg']}; }}
@@ -534,12 +534,13 @@ def _scaled(font: QFont, factor: float) -> QFont:
 # -- icons -------------------------------------------------------------------
 
 def page_icon(kind: str, base, size: int = 18) -> QIcon:
-    """The sidebar icon for a page: muted at rest, white when selected.
+    """The sidebar icon for a page: muted at rest, in the accent's text
+    colour when selected.
     *base* draws the kinds the main window already has (gear, home, ...);
     the rest are drawn here."""
     icon = QIcon()
     for mode, colour in ((QIcon.Mode.Normal, P["text2"]),
-                         (QIcon.Mode.Selected, "#FFFFFF")):
+                         (QIcon.Mode.Selected, P.get("on_accent", "#FFFFFF"))):
         pm = _own_icon(kind, size, colour)
         if pm is None:
             pm = base(kind, size, colour)
@@ -846,7 +847,7 @@ class ThemeTile(_Choice):
             pr.setPen(Qt.PenStyle.NoPen)
             pr.setBrush(QColor(P["accent"]))
             pr.drawEllipse(badge)
-            tick = QPen(QColor("#FFFFFF"))
+            tick = QPen(QColor(P.get("on_accent", "#FFFFFF")))
             tick.setWidthF(1.6)
             pr.setPen(tick)
             pr.drawPolyline([QPointF(badge.x() + 3.4, badge.y() + 6.8),

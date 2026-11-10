@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .. import APP_NAME
-from .theme import P
+from .theme import P, on_accent
 
 
 def exec_menu_over_video(menu, global_pos) -> None:
@@ -302,6 +302,7 @@ class _SidebarLogo(QWidget):
         x0 = (self.width() - w) / 2.0
         y0 = (self.height() - h) / 2.0
         accent = QColor(P.get("accent", "#4C8DFF"))
+        ink = QColor(P.get("on_accent", "#FFFFFF"))
         # Rounded pill as the base.
         pill = QPainterPath()
         pill.addRoundedRect(x0, y0, w, h, h * 0.30, h * 0.30)
@@ -318,11 +319,11 @@ class _SidebarLogo(QWidget):
         tri.lineTo(left_cx - tri_w * 0.55, cy + tri_h * 0.5)
         tri.lineTo(left_cx + tri_w * 0.55, cy)
         tri.closeSubpath()
-        painter.fillPath(tri, QColor("white"))
+        painter.fillPath(tri, ink)
 
         # Slim white divider between the play half and the signal half - a
         # subtle vertical rule that gives the mark structure.
-        pen_div = QPen(QColor(255, 255, 255, 90))
+        pen_div = QPen(QColor(ink.red(), ink.green(), ink.blue(), 90))
         pen_div.setWidthF(1.2)
         painter.setPen(pen_div)
         div_x = x0 + w * 0.48
@@ -332,7 +333,7 @@ class _SidebarLogo(QWidget):
         # Right half: three vertical bars of varying heights (the middle is
         # tallest), reading as an EQ / signal-strength indicator.
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor("white"))
+        painter.setBrush(ink)
         base_y = y0 + h * 0.72
         bar_w = h * 0.14
         heights = (h * 0.28, h * 0.46, h * 0.34)
@@ -369,7 +370,7 @@ class _SidebarLogo(QWidget):
             arrow.lineTo(cx + aw * 0.42, cy + ah * 0.12)
             arrow.lineTo(cx + aw, cy + ah * 0.12)
             arrow.closeSubpath()
-            painter.fillPath(arrow, QColor("white"))
+            painter.fillPath(arrow, QColor(on_accent(badge_color.name())))
         painter.end()
 
 def cast_strip_icon(kind: str, colour: str) -> QIcon:
