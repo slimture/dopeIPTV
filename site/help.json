@@ -5,12 +5,14 @@
         "windows",
         "playlist",
         "m3u",
+        "stalker",
         "demo",
         "update"
     ],
     "watch": [
         "play",
         "seek",
+        "rewind",
         "fullscreen",
         "popout",
         "tracks",
@@ -52,7 +54,9 @@
         "playback",
         "parental",
         "hide",
-        "playlists"
+        "playlists",
+        "home",
+        "testbuilds"
     ],
     "fix": [
         "logs",

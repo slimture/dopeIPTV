@@ -231,6 +231,22 @@ h2 { font-size: clamp(1.7rem, 3.6vw, 2.3rem); letter-spacing: -.02em; margin: 0;
   .dlx-cards { grid-auto-flow: row; grid-template-columns: minmax(0, 1fr); }
   .dlx-card.is-mine { order: -1; }
 }
+/* Donate: one quiet card after the downloads - a plain link to Stripe's own
+   page (no script here), shown only when render.jq has an address. */
+.donate { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 28px; align-items: center;
+  padding: 28px 30px; border-radius: 18px; border: 1px solid var(--line);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 9%, var(--surface)), var(--surface) 60%); }
+.donate-text h2 { font-size: clamp(1.35rem, 2.6vw, 1.7rem); margin: 10px 0 8px; }
+.donate-text p { margin: 0; color: var(--muted); line-height: 1.65; max-width: 62ch; }
+.donate-act { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+.donate-btn { padding: 13px 26px; font-size: 15px; }
+.donate-heart { width: 17px; height: 17px; fill: currentColor; }
+.donate-act small { color: var(--faint); font-size: 12px; max-width: 30ch; line-height: 1.5; }
+@media (max-width: 760px) {
+  .donate { grid-template-columns: minmax(0, 1fr); padding: 22px; gap: 18px; }
+  .donate-act { align-items: stretch; }
+  .donate-btn { justify-content: center; }
+}
 .autonote { margin-top: 18px; font-size: 13px; color: var(--faint); line-height: 1.75; }
 .autonote code { font-family: var(--mono); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; color: var(--muted); overflow-wrap: anywhere; }
 .autonote a.verify-link { color: var(--accent); font-weight: 600; }

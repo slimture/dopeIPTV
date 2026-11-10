@@ -1,17 +1,18 @@
 # dopeIPTV
 
-> dopeIPTV is a free, open-source desktop IPTV player for Xtream Codes and M3U playlists. It has a full EPG (XMLTV) guide, live timeshift and catch-up TV, one-click recording, and multiview for up to nine channels at once — all in one native app built on the mpv engine. It is made for Linux and also runs on macOS and Windows.
+> dopeIPTV is a free, open-source desktop IPTV player for Xtream Codes, M3U playlists and Stalker / Ministra portals. It has a full EPG (XMLTV) guide, pause and rewind on every live channel, catch-up TV, one-click recording, and multiview for up to nine channels at once — all in one native app built on the mpv engine. It is made for Linux and also runs on macOS and Windows.
 
 Key facts:
 
-- **What it is:** a desktop IPTV *player* (client), not an IPTV provider. It does not supply, sell or host any channels or content — the user connects their own Xtream Codes or M3U provider.
+- **What it is:** a desktop IPTV *player* (client), not an IPTV provider. It does not supply, sell or host any channels or content — the user connects their own Xtream Codes, M3U or Stalker portal provider.
 - **Licence & price:** free and open source under GPL-3.0. No ads, no tracking, no accounts.
 - **Platforms:** Linux (primary; AppImage and .deb for x86_64 and ARM64, Flatpak for x86_64), macOS (.dmg, Apple Silicon and Intel), Windows (portable build, x64 and ARM64).
-- **Playlists:** Xtream Codes (server + username + password) and M3U / M3U8 URLs; multiple providers side by side.
-- **Guide & timeshift:** full XMLTV EPG with now/next, live timeshift, and catch-up (scrub back into a channel's archive).
-- **Recording:** record the watched stream over a single connection, with timers, size limits and a Recordings library.
+- **Playlists:** Xtream Codes (server + username + password), M3U / M3U8 URLs and Stalker / Ministra portals (portal URL + MAC address; experimental); multiple providers side by side. Free demo channels to try it without an account.
+- **Guide & timeshift:** full XMLTV EPG with now/next that keeps itself up to date; pause and rewind any live channel (minutes in memory, up to 6 hours on disk, or with dopeIPTV's own buffer, which keeps downloading while paused — experimental); catch-up into a provider's archive.
+- **Recording:** record the watched stream over a single connection, with timers, size limits and a Recordings library; with dopeIPTV's own buffer, recordings come from the buffer and stay whole while paused.
+- **Home:** a start page with this week's most popular films and series the provider has (TMDB's weekly chart), continue watching, favourite channels with what is on now, and new episodes of followed series.
 - **Multiview:** watch up to nine live channels at once in a grid, with per-window timeshift and subtitles.
-- **Extras:** built-in mpv player, casting to Chromecast and DLNA/UPnP smart TVs, subtitles from OpenSubtitles.com, desktop media controls and media keys (MPRIS), new-episode alerts for followed series, Trakt watched-history sync, TMDB metadata and artwork, themes, full keyboard control, and an interface available in 26 languages besides English (with right-to-left support for Arabic, Hebrew, Persian and Urdu).
+- **Extras:** built-in mpv player, casting to Chromecast and DLNA/UPnP smart TVs, subtitles from OpenSubtitles.com, desktop media controls and media keys (MPRIS), new-episode alerts for followed series, Trakt watched-history sync, TMDB metadata and artwork, 17 themes (three light) with accent colours, test builds for early adopters, full keyboard control, and an interface available in 26 languages besides English (with right-to-left support for Arabic, Hebrew, Persian and Urdu).
 - **Developer / owner:** the slimture/dopeIPTV project on GitHub.
 
 ## Main pages
@@ -20,7 +21,7 @@ Key facts:
 - [Features](https://iptv.dope.rs/#features): EPG, timeshift & catch-up, pause live TV, recording, multiview, multi-provider, playback, local files, casting to TVs, subtitles, media keys, following a series.
 - [Download](https://iptv.dope.rs/#download): latest builds for Linux, macOS and Windows, generated from the GitHub releases.
 - [FAQ](https://iptv.dope.rs/#faq): short answers to common questions about dopeIPTV.
-- [Help](https://iptv.dope.rs/help/): setup, playback, the guide, timeshift, recording, multiview, casting and troubleshooting.
+- [Help](https://iptv.dope.rs/help/): setup (Xtream, M3U, Stalker portals), playback, rewinding live TV, the guide, timeshift, recording, multiview, casting, Home, test builds and troubleshooting.
 
 ## Source & documentation
 

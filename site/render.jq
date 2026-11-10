@@ -22,6 +22,11 @@
 $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 | ($rel[0] // {}) as $R | ($dl[0] // {}) as $D | $helpfile[0] as $HELP
 | "https://iptv.dope.rs" as $SITE | "https://github.com/slimture/dopeIPTV" as $REPO
+# The donate button's address: a Stripe Payment Link (donate.stripe.com/...
+# or buy.stripe.com/...), a plain link - no script, so the CSP stays as it
+# is, and Stripe's own page offers card, Apple Pay and Google Pay. Empty:
+# no donate section and no footer link at all.
+| "" as $DONATE
 
 # -- the PHP helpers ---------------------------------------------------------
 
@@ -282,6 +287,24 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
         + "        <p class=\"dlx-gh\"><a href=\"\($REPO | h)/releases/latest\" rel=\"nofollow\">\(t("dl_all_name") | h)</a></p>\n"
         + "      </div>\n"
       end;
+  def donate:
+    if $DONATE == "" then "" else
+      "  <section id=\"donate\" class=\"pt0\">\n"
+      + "    <div class=\"wrap\">\n"
+      + "      <div class=\"donate\">\n"
+      + "        <div class=\"donate-text\">\n"
+      + "          <span class=\"eyebrow\">\(t("donate_eyebrow") | h)</span>\n"
+      + "          <h2>\(t("donate_h2") | h)</h2>\n"
+      + "          <p>\(t("donate_p") | h)</p>\n"
+      + "        </div>\n"
+      + "        <div class=\"donate-act\">\n"
+      + "          <a class=\"btn primary donate-btn\" href=\"\($DONATE | h)\" rel=\"nofollow noopener\"><svg class=\"donate-heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("donate_btn") | h)</a>\n"
+      + "          <small>\(t("donate_note") | h)</small>\n"
+      + "        </div>\n"
+      + "      </div>\n"
+      + "    </div>\n"
+      + "  </section>\n\n"
+    end;
   def shots:
     [["main.png", "shot_main_alt", "shot_main_t", "shot_main_c"],
      ["epg.png", "shot_epg_alt", "shot_epg_t", "shot_epg_c"],
@@ -343,6 +366,9 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
          release_tag: ((if ($reldate | truthy) then " · " + ($reldate | h) else " · " + (t("dl_latest") | h) end)
            + (if $total > 0 then " · <span class=\"dl-count\" title=\"\(t("dl_tip_total") | h)\">↓ \(fmt_count($total) | h)</span>" else "" end)),
          downloads: downloads($version; $reldate),
+         donate: donate,
+         donate_footer: (if $DONATE == "" then "" else
+           "      <a href=\"\($DONATE | h)\" rel=\"nofollow noopener\">\(t("donate_btn") | h)</a>\n" end),
          verify: (if $sums == "1" then "      <p class=\"autonote\">\(t("note_verify"))</p>\n" else "" end),
          whatsnew: (if $notes == "" then "" else
            "  <section id=\"whats-new\" class=\"pt0\">\n"
