@@ -96,6 +96,17 @@ var iptvHit = (function () {
  * and /donate/wallet confirms the payment with what the wallet hands back;
  * "Pay with card" under it opens the card form.
  *
+ * The wallet button has to be there when the dialog opens. Asked only on
+ * opening, the config, Stripe.js and Stripe's wallet check ran one after
+ * another, and the button turned from "Continue" into Apple Pay a second or
+ * two later. So they start when a donate link is pointed at, focused or
+ * touched - the visitor is about to open it - and run side by side; and the
+ * button is the wallet's from the start, live as soon as Stripe is ready,
+ * wherever the wallet is as good as certain: Apple Pay where Safari itself
+ * says the device has it, Google Pay in Chrome (computer and Android alike),
+ * and whatever Stripe answered last time on this device - which also keeps
+ * "Continue" steady for a browser Stripe said has no wallet.
+ *
  * The donor pays in their own currency: guessCurrency() picks it from where
  * the device says it is, out of the ones /donate/config offers, and a small
  * menu in the dialog's head changes it on either step - on the card form's
@@ -111,8 +122,8 @@ var iptvHit = (function () {
   // The Stripe.js release solequiz.com runs on against the same account.
   var STRIPE_JS = "https://js.stripe.com/endive/stripe.js";
   var ZERO_DECIMAL = /^(bif|clp|djf|gnf|jpy|kmf|krw|mga|pyg|rwf|ugx|vnd|vuv|xaf|xof|xpf)$/;
-  var cfg = null, stripeLoading = null, dlg = null, el = {}, chosen = 0, live = null, busy = false, cur = "";
-  var stripe = null, pr = null, wallet = null, walletAmount = 0;
+  var cfg = null, cfgLoading = null, stripeLoading = null, dlg = null, el = {}, chosen = 0, live = null, busy = false, cur = "";
+  var stripe = null, pr = null, wallet = null, walletAmount = 0, prepping = false;
   var APPLE = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
 
   function isDonate(a) {
@@ -218,6 +229,59 @@ var iptvHit = (function () {
       });
     }
     return stripeLoading;
+  }
+  // /donate/config once, shared by the warm-up and the dialog.
+  function getConfig() {
+    if (cfg) { return Promise.resolve(cfg); }
+    if (!cfgLoading) {
+      cfgLoading = fetch("/donate/config", { credentials: "same-origin" })
+        .then(function (r) { if (!r.ok) { throw new Error("/donate/config answered " + r.status); } return r.json(); })
+        .then(function (c) { cfg = c; if (!offered(cur)) { cur = guessCurrency(); } return c; },
+              function (err) { cfgLoading = null; throw err; });
+    }
+    return cfgLoading;
+  }
+  // Safari's own answer, at once and without Stripe: whether this device can
+  // pay with Apple Pay at all. Stripe's check (a card in the Wallet, the
+  // domain registered) comes after and has the last word.
+  function applePayLikely() {
+    try { return APPLE && !!window.ApplePaySession && ApplePaySession.canMakePayments(); }
+    catch (e) { return false; }
+  }
+  // The wallet to show before Stripe has answered, or null. Chrome is not
+  // asked itself: a canMakePayment() of our own for Google Pay, with other
+  // data than Stripe's, can use up Chrome's quota and make Stripe's own
+  // check fail - so Chrome is taken at its word until Stripe says otherwise.
+  function likelyWallet() {
+    var said = "";
+    try { said = localStorage.getItem("dn-wallet") || ""; } catch (e) { /* none */ }
+    if (said === "apple" || said === "google") { return said; }
+    if (said === "none") { return null; }
+    if (applePayLikely()) { return "apple"; }
+    var ua = navigator.userAgent;
+    if (window.PaymentRequest && /Chrome\//.test(ua) &&
+        !/Edg\/|EdgA\/|OPR\/|SamsungBrowser|YaBrowser|Firefox/.test(ua)) { return "google"; }
+    return null;
+  }
+  // The main button as the wallet's (kind "apple"/"google"; waiting: shown,
+  // not yet live) or as plain "Continue" (kind null).
+  function walletLook(kind, waiting) {
+    el.go.classList.remove("dn-wallet", "dn-wallet--apple", "dn-wallet--google", "dn-wallet--wait");
+    if (kind) {
+      el.go.textContent = kind === "apple" ? T.apple.replace("Apple Pay", "\uF8FF\u00A0Pay") : T.google;
+      el.go.classList.add("dn-wallet", "dn-wallet--" + kind);
+      if (waiting) { el.go.classList.add("dn-wallet--wait"); }
+    } else {
+      el.go.textContent = T.cont;
+    }
+    el.go.disabled = !!waiting;
+    el.card.hidden = !kind;
+  }
+  // Pointed at, focused or touched: get everything ready before the click.
+  function warm() {
+    if (!dlg) { build(); }
+    loadStripe().catch(function () { /* said where it matters */ });
+    getConfig().then(prepareWallet).catch(function () { /* open() says so */ });
   }
   function css(name, dflt) {
     var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -369,7 +433,7 @@ var iptvHit = (function () {
     }
     if (pr) {
       try { pr.update({ currency: c, total: { label: cfg.name || T.title, amount: chosen || C().min } }); }
-      catch (e) { warn("the wallet is made again for the currency:", e); pr = null; prepareWallet(); }
+      catch (e) { warn("the wallet is made again for the currency:", e); pr = null; wallet = null; prepareWallet(); }
     }
     payLabel();
   }
@@ -409,12 +473,11 @@ var iptvHit = (function () {
     el.loading.textContent = T.loading;
     show(el.loading);
     dlg.showModal();
-    (cfg ? Promise.resolve(cfg) : fetch("/donate/config", { credentials: "same-origin" })
-      .then(function (r) { if (!r.ok) { throw new Error("/donate/config answered " + r.status); } return r.json(); }))
-      .then(function (c) {
-        cfg = c;
-        if (!offered(cur)) { cur = guessCurrency(); }
-        currencies(); chips(); show(el.amounts); prepareWallet();
+    // Stripe.js loads beside the config, not after it.
+    if (window.ApplePaySession || window.PaymentRequest) { loadStripe().catch(function () { /* below */ }); }
+    getConfig()
+      .then(function () {
+        currencies(); chips(); prepareWallet(); show(el.amounts);
       })
       .catch(function (err) {
         warn("the donate service did not answer (donate.py, nginx /donate/):", err);
@@ -437,7 +500,11 @@ var iptvHit = (function () {
   // The wallet button, where there is a wallet: made ready when the dialog
   // opens, so a click can open the sheet at once (it must, inside the click).
   function prepareWallet() {
-    if (pr || !cfg.publishableKey || !(window.ApplePaySession || window.PaymentRequest)) { return; }
+    if (wallet || !cfg.publishableKey || !(window.ApplePaySession || window.PaymentRequest)) { return; }
+    var guess = likelyWallet();
+    if (guess) { walletLook(guess, !pr); }
+    if (pr || prepping) { return; }        // made already, or on its way
+    prepping = true;
     loadStripe().then(function (Stripe) {
       var st = stripeFor(Stripe, cfg.publishableKey);
       pr = st.paymentRequest({
@@ -448,13 +515,12 @@ var iptvHit = (function () {
       });
       pr.on("paymentmethod", walletPaid);
       return pr.canMakePayment().then(function (can) {
+        prepping = false;
         wallet = can && ((APPLE && can.applePay && "apple") || (can.googlePay && "google")) || null;
-        if (!wallet) { return; }
-        el.go.textContent = wallet === "apple" ? T.apple.replace("Apple Pay", "\uF8FF\u00A0Pay") : T.google;
-        el.go.classList.add("dn-wallet", "dn-wallet--" + wallet);
-        el.card.hidden = false;
+        walletLook(wallet, false);
+        try { localStorage.setItem("dn-wallet", wallet || "none"); } catch (e) { /* none */ }
       });
-    }).catch(function () { pr = null; wallet = null; });
+    }).catch(function () { prepping = false; pr = null; wallet = null; walletLook(null, false); });
   }
   function payWallet() {
     if (!amountOk() || !pr) { return; }
@@ -577,6 +643,14 @@ var iptvHit = (function () {
       payAgain();
     });
   }
+
+  function intent(e) {
+    var a = e.target && e.target.closest ? e.target.closest("a[href]") : null;
+    if (isDonate(a)) { warm(); }
+  }
+  document.addEventListener("pointerover", intent, { passive: true });
+  document.addEventListener("focusin", intent);
+  document.addEventListener("touchstart", intent, { passive: true });
 
   document.addEventListener("click", function (e) {
     var a = e.target.closest ? e.target.closest("a[href]") : null;
