@@ -300,14 +300,22 @@ install -m 555 deploy/iptv_donate /usr/local/etc/rc.d/iptv_donate
 install -m 640 -o iptv -g iptv /dev/null /var/log/iptv-donate.log
 sysrc iptv_donate_enable=YES
 service iptv_donate start
-tail -n 1 /var/log/iptv-donate.log   # [donate] listening on unix:/var/run/iptv_donate/donate.sock, eur, configured
+tail -n 1 /var/log/iptv-donate.log   # [donate] listening on unix:/var/run/iptv_donate/donate.sock, 19 currencies (eur by default), configured
 python3 -I /usr/local/www/iptv/donate/donate.py --check   # 200 {"publishableKey": "pk_...", ...}
 ```
 
 The key goes in with `cat` rather than `echo` so it never lands in the
-shell's history. Every other setting (amounts, limits, the receipt's
-"Support dopeIPTV") is listed at the top of `donate.py`; change the `.conf`
-and `service iptv_donate restart`.
+shell's history. Every other setting (the receipt's "Support dopeIPTV",
+which currencies are offered) is listed at the top of `donate.py`; change
+the `.conf` and `service iptv_donate restart`.
+
+Donors pay in their own currency: the dialog picks it from where the device
+says it is (kronor in Sweden, pounds in the UK, dollars in the US, euro in
+the euro countries...) and shows round amounts in it - 30/50/100/250 kr,
+3/5/10/25 euro. The table is `CURRENCIES` in `donate.py`;
+`DONATE_CURRENCY` is only the fallback when the page cannot tell. A payment
+in another currency than the account's own is converted by Stripe at
+payout, for its usual conversion fee.
 
 A Unix socket rather than 127.0.0.1: in a Bastille jail a connection to
 127.0.0.1 can hang (the jail has no loopback of its own), and a socket file
@@ -342,3 +350,64 @@ Google Pay", everything else goes straight to the card form. In test mode
 the card `4242 4242 4242 4242`, any future date and any CVC pays; the
 payment shows in the Dashboard under Payments, with "iptv.dope.rs donate
 dialog" in its metadata.
+
+## Statistics and the admin page
+
+`https://iptv.dope.rs/admin/` shows visitors, page views, downloads and
+donations, per day, week or month and per calendar year. Nothing is added
+to the site for it - no script, no cookie: nginx writes one line per page
+view to a log of its own, `donate/stats_collect.py` turns the new lines into
+counts every quarter hour (a visitor is a hash of address and browser with a
+salt that is thrown away after the day, so no address is ever kept), and the
+donate service serves the page behind a password. Donations are read from
+Stripe with the key the service already has.
+
+**The page's password (jail):**
+
+```sh
+bastille console pontusweb
+printf 'admin:%s\n' "$(openssl passwd -6)" > /usr/local/etc/nginx/iptv-admin.htpasswd
+chown root:www /usr/local/etc/nginx/iptv-admin.htpasswd
+chmod 640 /usr/local/etc/nginx/iptv-admin.htpasswd
+```
+
+`openssl passwd` asks for the password twice and writes only its hash. More
+users: one `name:hash` line each. The service also takes `ADMIN_USERS=admin`
+in `/usr/local/etc/iptv-donate.conf` to allow only the names listed.
+
+**The files and the log (jail):**
+
+```sh
+cd ~/dopeiptv && git pull origin website
+cp -R donate /usr/local/www/iptv/
+install -d -o iptv -g iptv -m 750 /usr/local/www/iptv/stats
+install -m 640 -o root -g iptv /dev/null /var/log/nginx/iptv.dope.rs-stats.log
+install -m 640 -o iptv -g iptv /dev/null /var/log/iptv-stats.log
+service iptv_donate restart
+echo '5,20,35,50 * * * * iptv /usr/local/bin/python3 -I /usr/local/www/iptv/donate/stats_collect.py >> /var/log/iptv-stats.log 2>&1' >> /etc/crontab
+echo '/var/log/nginx/iptv.dope.rs-stats.log        root:iptv      640  7     *    @T00 JP    /var/run/nginx.pid 30' \
+    >> /usr/local/etc/newsyslog.conf.d/iptv.dope.rs.conf
+newsyslog -nv 2>&1 | grep stats
+```
+
+The log is made before nginx opens it, so it belongs to the `iptv` group
+(`stats_collect.py` runs as `iptv`); newsyslog turns it over at midnight,
+keeps a week, and leaves the newest old one uncompressed so a line written
+just before midnight is still read. The counts live in
+`/usr/local/www/iptv/stats/` - outside the web root - ten years of days.
+
+**nginx (host)** - the content server's file as in step 8, which now has the
+`iptv_stats` log for `/` and `/help/` and the `/admin/` location:
+
+```sh
+C=/usr/local/bastille/jails/pontusweb/root/usr/local/etc/nginx/conf.d/iptv.dope.rs.conf
+cp /root/iptv-static/deploy/content-iptv.dope.rs.conf "$C"
+bastille cmd pontusweb nginx -t && bastille cmd pontusweb service nginx reload
+```
+
+**Check:** open the site once, then `tail -n 1
+/var/log/nginx/iptv.dope.rs-stats.log` (jail) shows your visit as one JSON
+line. After the next quarter-hour `/usr/local/www/iptv/stats/stats.json`
+exists and `https://iptv.dope.rs/admin/` asks for the password and shows the
+day. The first days are thin: the counting starts with the new log, while
+the download counts (downloads.json) go back to the beginning.

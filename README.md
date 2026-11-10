@@ -58,8 +58,15 @@ Nothing for this site talks to php-fpm. The one thing that is not static is
 the donate dialog's small service, `donate/donate.py` (standard-library
 Python behind `/donate/`): it asks Stripe for a payment session with the
 secret key, so the card form and Apple Pay / Google Pay can open on the page
-itself. Without it the dialog sends visitors to Stripe's own page. Setting it
-up: `DEPLOY.md`, "Donations".
+itself, in the donor's own currency. Without it the dialog sends visitors to
+Stripe's own page. Setting it up: `DEPLOY.md`, "Donations".
+
+The same service serves the admin page, `/admin/` behind nginx's password
+(`donate/admin.py`, `donate/admin/`): visitors, page views, downloads and
+donations by day, week, month and year. The visitor counts come from a log
+nginx keeps of page views, read every quarter hour by
+`donate/stats_collect.py` - no script or cookie on the site, no address
+kept. Setting it up: `DEPLOY.md`, "Statistics and the admin page".
 
 Config templates live in `deploy/` with role-based names —
 `proxy-iptv.dope.rs.conf` and `content-iptv.dope.rs.conf`. Replace the

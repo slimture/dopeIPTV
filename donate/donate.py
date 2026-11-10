@@ -5,7 +5,8 @@ The donate dialog on iptv.dope.rs takes the payment on the page itself:
 Stripe's card form (the Payment Element), in Stripe's iframes, on our page,
 and Apple Pay / Google Pay in the wallet's own sheet. Both pay a
 PaymentIntent, and only a server holding the secret key can make one - this
-is that server, and all it does. It never sees a card.
+is that server, and all it does. It never sees a card. It also serves the
+site's admin page, /admin/ (admin.py), behind nginx's password.
 
     GET  /donate/config   {"publishableKey", "currency", "country", "name", "pmc",
                            "currencies": {"sek": {"presets", "min", "max"}, ...}}
@@ -62,6 +63,10 @@ named by DONATE_CONFIG (default /usr/local/etc/iptv-donate.conf):
     STRIPE_API_VERSION      empty: the account's default
     LISTEN                  unix:/var/run/iptv_donate/donate.sock (default),
                             or host:port for TCP
+    ADMIN_USERS             who may open /admin/, e.g. pontus (default: anyone
+                            nginx let in)
+    STATS_DIR, DOWNLOADS_JSON  where stats_collect.py and sync-releases.sh keep
+                            their counts (<site>/stats, <site>/downloads.json)
 """
 from __future__ import annotations
 
@@ -76,6 +81,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+# admin.py sits beside this file; -I (as rc.d starts it) leaves this
+# directory off the path.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 STRIPE_PI = "https://api.stripe.com/v1/payment_intents"
 
@@ -94,7 +103,8 @@ def _load_config() -> dict[str, str]:
     except OSError:
         pass
     conf.update({k: v for k, v in os.environ.items()
-                 if k.startswith(("STRIPE_", "DONATE_", "LISTEN"))})
+                 if k.startswith(("STRIPE_", "DONATE_", "LISTEN", "STATS_", "ADMIN_", "DL_LOG",
+                                  "DOWNLOADS_JSON", "SITE_HOST"))})
     return conf
 
 
@@ -306,8 +316,47 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _admin(self, path: str) -> None:
+        """The admin page and its numbers. Only behind nginx's auth_basic,
+        which names the user in X-Admin-User (and overwrites any a client
+        sent); without one - a location that lost its password - nothing."""
+        user = (self.headers.get("X-Admin-User") or "").strip()
+        allowed = [u.strip() for u in CONF.get("ADMIN_USERS", "").split(",") if u.strip()]
+        if not user or (allowed and user not in allowed):
+            return self._send(403, {"error": "admin only"})
+        try:
+            import admin  # beside this file; loaded on first use
+        except Exception as e:  # noqa: BLE001 - a broken admin.py must not stop donations
+            print(f"[donate] admin page unavailable: {e}", file=sys.stderr, flush=True)
+            return self._send(500, {"error": "admin unavailable"})
+        if path == "/admin/data":
+            query = urllib.parse.parse_qs(self.path.partition("?")[2])
+            try:
+                days = int((query.get("days") or ["30"])[0])
+            except ValueError:
+                days = 30
+            site = admin.SITE
+            body = admin.data(days, CONF.get("STATS_DIR", os.path.join(site, "stats")),
+                              CONF.get("DOWNLOADS_JSON", os.path.join(site, "downloads.json")),
+                              _secret(), API_VERSION)
+            return self._send(200, body)
+        hit = admin.static(path)
+        if not hit:
+            return self._send(404, {"error": "not found"})
+        data, ctype = hit
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Robots-Tag", "noindex, nofollow")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
     def do_GET(self) -> None:
-        if self.path.split("?", 1)[0] != "/donate/config":
+        path = self.path.split("?", 1)[0]
+        if path == "/admin/" or path in ("/admin/admin.css", "/admin/admin.js", "/admin/data"):
+            return self._admin(path)
+        if path != "/donate/config":
             return self._send(404, {"error": "not found"})
         if not PUBLISHABLE or not _secret():
             return self._send(503, {"error": "not configured"})
