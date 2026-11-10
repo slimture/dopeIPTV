@@ -176,8 +176,10 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     | [[$base + "#features", t("nav_features"), ""],
        [$base + "#shots", t("nav_screenshots"), ""],
        [$base + "#download", t("nav_download"), ""],
-       ["/help/", t("nav_help"), "help"],
-       [$REPO, t("nav_github"), ""]] as $links
+       ["/help/", t("nav_help"), "help"]] as $links
+    # No GitHub here: a word most visitors do not know, in the one row every
+    # one of them reads. The source is a click away from "View source" at the
+    # top of the page and from the footer.
     | def cur($key): $key != "" and $key == $current;
     # The row beside the logo leaves out Download: the blue button at its end
     # is the same link, and the bar said it twice. The narrow-window menu
