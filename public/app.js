@@ -213,8 +213,11 @@
   if ("IntersectionObserver" in window) {
     new IntersectionObserver(function (en) {
       inView = en[0].isIntersecting;
+      fxp.classList.toggle("in-view", inView);     // its scenes move only on screen
       schedule();
     }, { threshold: 0.35 }).observe(fxp);
+  } else {
+    fxp.classList.add("in-view");
   }
   // A pointer resting on it holds the slideshow, as Apple's do.
   fxp.addEventListener("mouseenter", function () { held = true; schedule(); });
@@ -280,11 +283,16 @@
   var mock = document.querySelector(".hero .mock");
   if (!mock || !mock.offsetParent) { return; }
   mock.classList.add("alive");
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver(function (en) {
+      mock.classList.toggle("still", !en[0].isIntersecting);
+    }).observe(mock);
+  }
   var chans = mock.querySelectorAll(".chan"), screen = mock.querySelector(".screen");
   var tints = ["#4c8dff", "#ff6b5e", "#34c759", "#ff9f0a", "#5ac8fa", "#bf5af2"];
   var i = 0;
   setInterval(function () {
-    if (document.hidden || !chans.length) { return; }
+    if (document.hidden || !chans.length || mock.classList.contains("still")) { return; }
     chans[i].classList.remove("active");
     i = (i + 1) % chans.length;
     chans[i].classList.add("active");

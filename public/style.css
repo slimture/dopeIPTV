@@ -145,6 +145,7 @@ h1 .h1-brand { display: block; font-size: .42em; font-weight: 600;
   background: radial-gradient(28% 36% at 32% 42%, rgba(255, 255, 255, .2), transparent 70%),
     radial-gradient(24% 30% at 70% 62%, rgba(255, 255, 255, .13), transparent 70%); }
 .mock.alive .scan { animation: pic 14s ease-in-out infinite alternate; }
+.mock.alive.still .scan { animation-play-state: paused; }
 @keyframes pic { 50% { transform: translate(7%, -5%) scale(1.08); } to { transform: translate(-6%, 4%) scale(1.02); } }
 .mock.alive .screen::after { content: none; }
 .timeline { margin: 0 12px 12px; }
@@ -278,8 +279,10 @@ h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -.03em; line-height:
 .donate-fx i:nth-of-type(4) { left: 90%; width: 15px; height: 15px; animation-delay: 4.1s; }
 .donate-fx i:nth-of-type(5) { left: 70%; width: 9px; height: 9px; animation-delay: 5.2s; }
 .donate-fx i:nth-of-type(6) { left: 86%; width: 20px; height: 20px; animation-delay: 6.4s; }
-.donate .donate-btn { color: #fff; background: linear-gradient(135deg, #ff6b8b, #ff2d55 60%, #e8174a);
+.donate .donate-btn { position: relative; color: #fff; background: linear-gradient(135deg, #ff6b8b, #ff2d55 60%, #e8174a);
   box-shadow: 0 12px 30px -14px rgba(255, 45, 85, .8); }
+.donate .donate-btn::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit;
+  background: rgba(255, 55, 95, .5); opacity: 0; pointer-events: none; }
 .donate .donate-btn:hover { background: linear-gradient(135deg, #ff7d99, #ff3b62 60%, #f01e52); }
 .donate-text h2 { font-size: clamp(1.35rem, 2.6vw, 1.7rem); margin: 10px 0 8px; }
 .donate-text p { margin: 0; color: var(--muted); line-height: 1.65; max-width: 62ch; }
@@ -747,7 +750,7 @@ dialog.dn {
   background: var(--surface); color: var(--text); overflow: auto;
   box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .6);
 }
-dialog.dn::backdrop { background: rgba(5, 7, 10, .62); backdrop-filter: blur(3px); }
+dialog.dn::backdrop { background: rgba(5, 7, 10, .66); }
 .dn [hidden] { display: none !important; }
 /* Title, currency and close on one line; the line under the title has the
    whole width, also beside a currency menu on a small phone. */
@@ -774,6 +777,8 @@ dialog.dn::backdrop { background: rgba(5, 7, 10, .62); backdrop-filter: blur(3px
 .dn-payee a.dn-payee-link:has(img) { display: inline-flex; flex: none; }
 .dn-payee a:has(img):hover { opacity: .85; }
 footer .v a { color: inherit; }
+footer .v .sole { white-space: nowrap; }
+footer .v .sole img { display: inline-block; width: 14px; height: 14px; border-radius: 3.5px; vertical-align: -2.5px; margin-inline-end: 5px; }
 footer .v a:hover { color: var(--accent); }
 .dn-x { flex: none; width: 34px; height: 34px; margin: -4px -6px 0 0; border-radius: 50%;
   border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 24px;
@@ -881,7 +886,7 @@ dialog.dn { overflow-x: hidden; }
   box-shadow: 0 0 18px rgba(255, 55, 95, .45); opacity: 0; }
 .dn-ring--hero { border-width: 3px; }
 .dn-spark { width: 16px; height: 16px; fill: currentColor; opacity: 0; }
-.dn-hero { filter: drop-shadow(0 20px 46px rgba(255, 45, 85, .55)); opacity: 0; }
+.dn-hero { overflow: visible; opacity: 0; }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) dialog.dn::backdrop { background: rgba(20, 26, 38, .45); }
   :root:not([data-theme="dark"]) .dn-error { color: #c62828; }
@@ -1017,9 +1022,10 @@ dialog.dn { overflow-x: hidden; }
 .fxp-tab.is-on { color: var(--text); background: var(--surface); }
 .fxp-tab.is-on .ic { color: var(--accent); }
 .fxp-tab .bar { position: absolute; left: 14px; right: 14px; bottom: 4px; height: 2px; border-radius: 2px; overflow: hidden; }
-.fxp-tab.playing .bar::after { content: ""; display: block; width: 0; height: 100%; background: var(--accent);
-  animation: fx-bar var(--dur) linear forwards; }
-@keyframes fx-bar { to { width: 100%; } }
+.fxp-tab.playing .bar::after { content: ""; display: block; height: 100%; background: var(--accent);
+  transform: scaleX(0); transform-origin: left; animation: fx-bar var(--dur) linear forwards; }
+[dir="rtl"] .fxp-tab.playing .bar::after { transform-origin: right; }
+@keyframes fx-bar { to { transform: none; } }
 .fxp-stage { position: relative; aspect-ratio: 16 / 10; border-radius: 26px; overflow: hidden; color: #f5f5f7;
   background: radial-gradient(120% 90% at 50% 0%, #1f2638, #0b0b0e 70%); box-shadow: 0 30px 70px -40px rgba(0, 0, 0, .6); }
 .fxp-cap h3 { margin: 24px 0 0; font-family: var(--display); font-size: clamp(1.3rem, 2.4vw, 1.7rem); font-weight: 700;
@@ -1031,8 +1037,6 @@ dialog.dn { overflow-x: hidden; }
 /* scenes */
 .sc { position: absolute; inset: 0; opacity: 0; visibility: hidden; transition: opacity .55s ease, visibility 0s .55s; }
 .sc.on { opacity: 1; visibility: visible; transition: opacity .55s ease; }
-.sc, .sc * { animation-play-state: paused; }
-.sc.on, .sc.on * { animation-play-state: running; }
 .sc .h1 { background: linear-gradient(135deg, #3b6fd8, #17244a); }
 .sc .h2 { background: linear-gradient(135deg, #d0573f, #43191a); }
 .sc .h3 { background: linear-gradient(135deg, #2fa66a, #11331f); }
@@ -1058,12 +1062,14 @@ dialog.dn { overflow-x: hidden; }
   font-size: 10px; font-weight: 700; letter-spacing: .06em; }
 
 .sc-mv .mvg { position: absolute; inset: 8%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 3.5%; }
-.sc-mv .mvg i { border-radius: 10px; outline: 3px solid transparent; outline-offset: 2px; animation: mv-sel 6.3s infinite; }
-.sc-mv .mvg i:nth-child(2) { animation-delay: .7s; } .sc-mv .mvg i:nth-child(3) { animation-delay: 1.4s; }
-.sc-mv .mvg i:nth-child(4) { animation-delay: 2.1s; } .sc-mv .mvg i:nth-child(5) { animation-delay: 2.8s; }
-.sc-mv .mvg i:nth-child(6) { animation-delay: 3.5s; } .sc-mv .mvg i:nth-child(7) { animation-delay: 4.2s; }
-.sc-mv .mvg i:nth-child(8) { animation-delay: 4.9s; } .sc-mv .mvg i:nth-child(9) { animation-delay: 5.6s; }
-@keyframes mv-sel { 0%, 10% { outline-color: #4c8dff; } 11%, 100% { outline-color: transparent; } }
+.sc-mv .mvg i { position: relative; border-radius: 10px; }
+.sc-mv .mvg i::after { content: ""; position: absolute; inset: -5px; border: 3px solid #4c8dff; border-radius: 15px;
+  opacity: 0; animation: mv-sel 6.3s infinite; }
+.sc-mv .mvg i:nth-child(2)::after { animation-delay: .7s; } .sc-mv .mvg i:nth-child(3)::after { animation-delay: 1.4s; }
+.sc-mv .mvg i:nth-child(4)::after { animation-delay: 2.1s; } .sc-mv .mvg i:nth-child(5)::after { animation-delay: 2.8s; }
+.sc-mv .mvg i:nth-child(6)::after { animation-delay: 3.5s; } .sc-mv .mvg i:nth-child(7)::after { animation-delay: 4.2s; }
+.sc-mv .mvg i:nth-child(8)::after { animation-delay: 4.9s; } .sc-mv .mvg i:nth-child(9)::after { animation-delay: 5.6s; }
+@keyframes mv-sel { 0%, 10% { opacity: 1; } 11%, 100% { opacity: 0; } }
 
 .sc-pz .pz { position: absolute; left: 50%; top: 38%; width: 76px; height: 76px; margin: -38px 0 0 -38px; border-radius: 50%;
   background: rgba(0, 0, 0, .5); animation: pz-beat 2.4s ease-in-out infinite; }
@@ -1071,8 +1077,9 @@ dialog.dn { overflow-x: hidden; }
 .sc-pz .pz::before { left: 27px; } .sc-pz .pz::after { right: 27px; }
 @keyframes pz-beat { 50% { transform: scale(1.06); } }
 .sc-pz .seen { position: absolute; left: 0; top: 0; bottom: 0; width: 40%; border-radius: 3px 0 0 3px; background: #fff; }
-.sc-pz .buf { position: absolute; left: 40%; top: 0; bottom: 0; width: 4%; background: rgba(76, 141, 255, .75); animation: pz-buf 6s ease-out infinite; }
-@keyframes pz-buf { to { width: 52%; } }
+.sc-pz .buf { position: absolute; left: 40%; top: 0; bottom: 0; width: 52%; background: rgba(76, 141, 255, .75);
+  transform: scaleX(.077); transform-origin: left; animation: pz-buf 6s ease-out infinite; }
+@keyframes pz-buf { to { transform: none; } }
 
 .sc-epg .epg { position: absolute; inset: 9% 7%; display: flex; flex-direction: column; gap: 5%; }
 .sc-epg .r { flex: 1; display: flex; gap: 2%; }
@@ -1081,16 +1088,20 @@ dialog.dn { overflow-x: hidden; }
 .sc-epg .w1 { flex: 1; } .sc-epg .w2 { flex: 2; } .sc-epg .w3 { flex: 3; } .sc-epg .w4 { flex: 4; }
 .sc-epg .r i.on { background: rgba(76, 141, 255, .38); border-color: #4c8dff; }
 .sc-epg .now { position: absolute; top: 5%; bottom: 5%; left: 47%; width: 2px; background: #ff453a; }
-.sc-epg .r i.on { animation: epg-on 2.4s ease-in-out infinite; }
-@keyframes epg-on { 50% { background: rgba(76, 141, 255, .55); box-shadow: 0 0 0 3px rgba(76, 141, 255, .25); } }
+.sc-epg .r i.on { position: relative; }
+.sc-epg .r i.on::after { content: ""; position: absolute; inset: -1px; border-radius: 8px; background: rgba(76, 141, 255, .27);
+  box-shadow: 0 0 0 3px rgba(76, 141, 255, .25); opacity: 0; animation: epg-on 2.4s ease-in-out infinite; }
+@keyframes epg-on { 50% { opacity: 1; } }
 
 .sc-rec .rec { position: absolute; left: 11%; top: 12%; display: flex; align-items: center; gap: 8px; padding: 6px 12px;
   border-radius: 999px; background: rgba(0, 0, 0, .55); font-size: 13px; font-weight: 700; letter-spacing: .02em; }
 .sc-rec .rec i { width: 10px; height: 10px; border-radius: 50%; background: #ff453a; animation: rec-blink 1.2s infinite; }
 @keyframes rec-blink { 50% { opacity: .2; } }
-.sc-rec .disk { position: absolute; left: 7%; right: 7%; bottom: 11%; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .14); }
-.sc-rec .disk i { display: block; height: 100%; width: 18%; border-radius: 3px; background: #ff453a; animation: rec-fill 9s linear infinite; }
-@keyframes rec-fill { to { width: 66%; } }
+.sc-rec .disk { position: absolute; left: 7%; right: 7%; bottom: 11%; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .14);
+  overflow: hidden; }
+.sc-rec .disk i { display: block; height: 100%; border-radius: 3px; background: #ff453a; transform: translateX(-82%);
+  animation: rec-fill 9s linear infinite; }
+@keyframes rec-fill { to { transform: translateX(-34%); } }
 
 .sc-prov .pl { position: absolute; inset: 14% 16%; display: flex; flex-direction: column; justify-content: center; gap: 6%; }
 .sc-prov .pl div { display: flex; align-items: center; gap: 14px; padding: 4% 5%; border-radius: 16px; font-size: 15px; font-weight: 600;
@@ -1145,20 +1156,36 @@ dialog.dn { overflow-x: hidden; }
 @keyframes subs-swap { 0%, 8% { opacity: 0; } 15%, 85% { opacity: 1; } 92%, 100% { opacity: 0; } }
 
 .sc-keys .keys { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 4.5%; }
-.sc-keys .keys i { display: grid; place-items: center; width: 18%; aspect-ratio: 1; border-radius: 20%; color: #e5e5ea;
-  background: linear-gradient(#2e2e33, #1d1d20); box-shadow: 0 7px 0 #09090a, inset 0 1px 0 rgba(255, 255, 255, .1);
-  animation: key-press 3.6s infinite; }
-.sc-keys .keys i:nth-child(2) { animation-delay: 1.2s; } .sc-keys .keys i:nth-child(3) { animation-delay: 2.4s; }
-.sc-keys .keys svg { width: 42%; height: 42%; fill: currentColor; }
-@keyframes key-press { 0%, 14% { transform: translateY(6px); box-shadow: 0 1px 0 #09090a; color: #5b96ff; } 22%, 100% { transform: none; } }
+.sc-keys .keys i { position: relative; isolation: isolate; display: grid; place-items: center; width: 18%; aspect-ratio: 1;
+  color: #e5e5ea; animation: key-press 3.6s infinite; }
+.sc-keys .keys i::before, .sc-keys .keys i::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: 20%; }
+.sc-keys .keys i::before { background: #09090a; transform: translateY(7px); animation: key-side 3.6s infinite; }
+.sc-keys .keys i::after { background: linear-gradient(#2e2e33, #1d1d20); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1); }
+.sc-keys .keys svg { width: 42%; height: 42%; fill: currentColor; animation: key-lit 3.6s infinite; }
+.sc-keys .keys i:nth-child(2), .sc-keys .keys i:nth-child(2)::before, .sc-keys .keys i:nth-child(2) svg { animation-delay: 1.2s; }
+.sc-keys .keys i:nth-child(3), .sc-keys .keys i:nth-child(3)::before, .sc-keys .keys i:nth-child(3) svg { animation-delay: 2.4s; }
+@keyframes key-press { 0%, 14% { transform: translateY(6px); } 22%, 100% { transform: none; } }
+@keyframes key-side { 0%, 14% { transform: translateY(1px); } 22%, 100% { transform: translateY(7px); } }
+@keyframes key-lit { 0%, 14% { opacity: 1; } 22%, 100% { opacity: .62; } }
 
 .sc-home .hero { position: absolute; left: 6%; right: 6%; top: 7%; height: 36%; border-radius: 14px; }
 .sc-home .shelf { position: absolute; left: 6%; right: 6%; display: grid; grid-template-columns: repeat(4, 1fr); gap: 3%; height: 19%; }
 .sc-home .s1 { top: 49%; } .sc-home .s2 { top: 73%; }
 .sc-home .shelf i { position: relative; border-radius: 10px; }
-.sc-home .shelf i.new::after { content: ""; position: absolute; right: 8px; top: 8px; width: 10px; height: 10px; border-radius: 50%;
-  background: #4c8dff; box-shadow: 0 0 0 0 rgba(76, 141, 255, .7); animation: home-new 1.8s infinite; }
-@keyframes home-new { 70% { box-shadow: 0 0 0 10px rgba(76, 141, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(76, 141, 255, 0); } }
+.sc-home .shelf i.new::before, .sc-home .shelf i.new::after { content: ""; position: absolute; right: 8px; top: 8px;
+  width: 10px; height: 10px; border-radius: 50%; background: #4c8dff; }
+.sc-home .shelf i.new::before { opacity: 0; animation: home-new 1.8s infinite; }
+@keyframes home-new { 0% { transform: scale(1); opacity: .7; } 70%, 100% { transform: scale(3); opacity: 0; } }
+
+/* Only the scene on show moves, and only while the explorer is on screen
+   (app.js sets .in-view). !important because each scene's "animation"
+   shorthand above resets the play state: without it all twelve scenes ran
+   all the time, wherever the page was scrolled - in Chrome a style, layout
+   and paint every frame, 120 of them a second on a 120 Hz screen. And each
+   moves only transform and opacity, which the GPU animates on its own. */
+.sc:not(.on) *, .sc:not(.on) *::before, .sc:not(.on) *::after,
+.fxp:not(.in-view) .sc *, .fxp:not(.in-view) .sc *::before, .fxp:not(.in-view) .sc *::after {
+  animation-play-state: paused !important; }
 
 
 @media (max-width: 860px) {
@@ -1182,7 +1209,7 @@ dialog.dn { overflow-x: hidden; }
   .fxp-cap p { font-size: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .sc, .sc * { animation: none !important; }
+  .sc, .sc *, .sc *::before, .sc *::after { animation: none !important; }
   .fxp-tab.playing .bar::after { animation: none; }
   .fxp-cap.swap { animation: none; }
 }
@@ -1201,31 +1228,46 @@ dialog.dn { overflow-x: hidden; }
   .dlx-card:hover { transform: translateY(-4px); box-shadow: 0 26px 50px -30px rgba(0, 0, 0, .5); }
   .dlx-card.is-mine:hover { box-shadow: inset 0 0 0 2px var(--accent), 0 26px 50px -30px rgba(0, 0, 0, .5); }
   /* the donate band, while it is on screen */
-  /* Three beats and a drift of hearts each time it comes into view, then
-     still - running on and on it turned from alive into restless. Pointed
-     at, it beats again for as long as the pointer stays. */
-  .donate.is-live .donate-big { animation: heart-beat 2.6s ease-in-out 3; }
-  .donate.is-live .donate-fx i { animation: heart-drift 7.8s linear 1; }
-  .donate.is-live .donate-btn { animation: heart-glow 2.6s ease-out 3; }
-  .donate.is-live .donate-btn .donate-heart { animation: heart-beat 2.6s ease-in-out 3; }
+  /* On a computer, calm: two soft beats and one drift of hearts each
+     time it comes into view, then still. Pointed at, it beats on for as
+     long as the pointer stays. */
+  .donate.is-live .donate-big { animation: heart-beat 2.8s ease-in-out 2; }
+  .donate.is-live .donate-fx i { animation: heart-drift 8s linear 1; }
+  .donate.is-live .donate-btn::after { animation: heart-glow 2.8s ease-out 2; }
+  .donate.is-live .donate-btn .donate-heart { animation: heart-beat 2.8s ease-in-out 2; }
   @media (hover: hover) {
-    .donate.is-live:hover .donate-big, .donate.is-live:hover .donate-btn,
+    .donate.is-live:hover .donate-big, .donate.is-live:hover .donate-btn::after,
     .donate.is-live:hover .donate-btn .donate-heart,
     .donate.is-live:hover .donate-fx i { animation-iteration-count: infinite; }
   }
-  @keyframes heart-beat { 0%, 36%, 100% { transform: scale(1); } 7% { transform: scale(1.12); }
-    14% { transform: scale(.97); } 22% { transform: scale(1.07); } }
-  @keyframes heart-drift { 0% { transform: translate(0, 0) scale(.6) rotate(-10deg); opacity: 0; }
-    12% { opacity: .6; } 100% { transform: translate(22px, -250px) scale(1.15) rotate(12deg); opacity: 0; } }
-  @keyframes heart-glow { 0% { box-shadow: 0 12px 30px -14px rgba(255, 45, 85, .8), 0 0 0 0 rgba(255, 55, 95, .55); }
-    32%, 100% { box-shadow: 0 12px 30px -14px rgba(255, 45, 85, .8), 0 0 0 16px rgba(255, 55, 95, 0); } }
   /* the dialog's own heart beats twice as it opens */
+  @keyframes heart-beat { 0%, 36%, 100% { transform: scale(1); } 7% { transform: scale(1.08); }
+    14% { transform: scale(.98); } 22% { transform: scale(1.04); } }
+  @keyframes heart-drift { 0% { transform: translate(0, 0) scale(.6) rotate(-10deg); opacity: 0; }
+    12% { opacity: .5; } 100% { transform: translate(22px, -250px) scale(1.15) rotate(12deg); opacity: 0; } }
+  @keyframes heart-glow { 0% { transform: none; opacity: .9; } 32%, 100% { transform: scale(1.12, 1.6); opacity: 0; } }
   dialog.dn[open] .dn-titleheart { animation: heart-twice 1.1s .9s ease-in-out both; }
   @keyframes heart-twice { 0%, 100% { transform: scale(1); } 15% { transform: scale(1.3); } 30% { transform: scale(.95); }
     45% { transform: scale(1.18); } 60% { transform: scale(1); } }
   /* the heart beats when you mean it */
   .donate-btn:hover .donate-heart, .navdonate:hover .heart, nav.links .navheart:hover svg { animation: beat .9s ease-in-out infinite; }
   @keyframes beat { 0%, 100% { transform: scale(1); } 20% { transform: scale(1.22); } 40% { transform: scale(.96); } 60% { transform: scale(1.12); } }
+}
+
+/* On a phone, where nothing else moves, the donate band is alive while it
+   is on screen: the button's heart beats twice every few seconds and a few
+   hearts drift up behind it, slowly. Only transform and opacity. */
+@media (prefers-reduced-motion: no-preference) and (max-width: 720px) {
+  .donate.is-live .donate-btn .donate-heart { animation: heart-beat-ph 4.2s ease-in-out 1s infinite; }
+  .donate.is-live .donate-big { animation: heart-beat-ph 4.2s ease-in-out 1s infinite; }
+  .donate.is-live .donate-fx i { animation: heart-drift-ph 9s linear infinite; }
+  .donate.is-live .donate-fx i:nth-of-type(n+4) { display: none; }
+  .donate-fx i:nth-of-type(1) { left: 62%; } .donate-fx i:nth-of-type(2) { left: 78%; animation-delay: 3s; }
+  .donate-fx i:nth-of-type(3) { left: 90%; animation-delay: 6s; }
+  @keyframes heart-beat-ph { 0%, 30%, 100% { transform: scale(1); } 6% { transform: scale(1.14); }
+    12% { transform: scale(.97); } 18% { transform: scale(1.08); } }
+  @keyframes heart-drift-ph { 0% { transform: translate(0, 0) scale(.6) rotate(-10deg); opacity: 0; }
+    14% { opacity: .5; } 100% { transform: translate(-16px, -210px) scale(1.1) rotate(10deg); opacity: 0; } }
 }
 
 /* ---- sections in bands -------------------------------------------------- */
@@ -1280,3 +1322,30 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
   .strip { display: none; }
 }
 
+
+/* ---- the owner's note (nav.js): new donations, for the signed-in admin ---- */
+.owner-note { position: fixed; z-index: 60; right: 20px; bottom: 20px; width: min(360px, calc(100vw - 32px));
+  display: flex; align-items: flex-start; gap: 12px; padding: 14px 12px 14px 16px; border-radius: 18px;
+  background: var(--surface-2); color: var(--text); border: 1px solid color-mix(in srgb, var(--heart) 35%, var(--line));
+  box-shadow: 0 22px 50px -24px rgba(0, 0, 0, .55); }
+@media (prefers-reduced-motion: no-preference) {
+  .owner-note { animation: owner-in .5s cubic-bezier(.18, .9, .22, 1.08) both; }
+  .owner-note.is-leaving { animation: owner-out .26s ease-in both; }
+  @keyframes owner-in { from { opacity: 0; transform: translateY(18px) scale(.97); } }
+  @keyframes owner-out { to { opacity: 0; transform: translateY(12px); } }
+}
+.owner-heart { flex: none; width: 26px; height: 26px; margin-top: 1px; fill: var(--heart); }
+.owner-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.owner-body strong { font-size: 15px; }
+.owner-list { margin: 0; padding: 0; list-style: none; color: var(--muted); line-height: 1.5; }
+.owner-list li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.owner-list b { color: var(--text); font-weight: 650; }
+.owner-more { font-size: 13px; }
+.owner-link { align-self: flex-start; margin-top: 2px; color: var(--accent); font-weight: 600; text-decoration: none; }
+.owner-link:hover { text-decoration: underline; }
+.owner-close { flex: none; width: 30px; height: 30px; margin: -4px -2px 0 0; border: 0; border-radius: 50%;
+  background: transparent; color: var(--muted); font: inherit; font-size: 20px; line-height: 1; cursor: pointer; }
+.owner-close:hover { background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); }
+@media (max-width: 560px) {
+  .owner-note { right: 16px; left: 16px; width: auto; bottom: max(16px, env(safe-area-inset-bottom)); }
+}

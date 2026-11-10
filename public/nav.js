@@ -213,15 +213,16 @@ var iptvHit = (function () {
     };
     return layer;
   }
-  function burst(at, big, into) {
+  function burst(at, big, into, wait) {
     if (CALM || !at || !document.body.animate) { return; }
+    wait = wait || 0;
     var layer = into || showLayer(false);
     var put = function (n) { n.style.left = at.x + "px"; n.style.top = at.y + "px"; layer.append(n); return n; };
     [0, 1].forEach(function (i) {
       put(mk("i", "dn-ring")).animate([
         { transform: "translate(-50%, -50%) scale(.2)", opacity: 0.85 },
         { transform: "translate(-50%, -50%) scale(" + (big ? 5 : 3) + ")", opacity: 0 }
-      ], { duration: big ? 1000 : 700, delay: i * (big ? 160 : 110), easing: "cubic-bezier(.2, .7, .2, 1)", fill: "both" });
+      ], { duration: big ? 1000 : 700, delay: wait + i * (big ? 160 : 110), easing: "cubic-bezier(.2, .7, .2, 1)", fill: "forwards" });
     });
     var n = big ? 26 : 14, longest = 0;
     for (var i = 0; i < n; i++) {
@@ -237,9 +238,9 @@ var iptvHit = (function () {
         { transform: "translate(-50%, -50%) scale(.1) rotate(0deg)", opacity: 1 },
         { opacity: 1, offset: 0.65 },
         { transform: "translate(calc(-50% + " + dx.toFixed(1) + "px), calc(-50% + " + dy.toFixed(1) + "px)) scale(" + size.toFixed(2) + ") rotate(" + rot.toFixed(0) + "deg)", opacity: 0 }
-      ], { duration: ms, easing: "cubic-bezier(.12, .8, .3, 1)", fill: "both" });
+      ], { duration: ms, delay: wait, easing: "cubic-bezier(.12, .8, .3, 1)", fill: "forwards" });
     }
-    if (!into) { layer.done(longest + 250); }
+    if (!into) { layer.done(wait + longest + 250); }
     return longest;
   }
 
@@ -261,8 +262,14 @@ var iptvHit = (function () {
       stop.setAttribute("offset", st[0]); stop.setAttribute("stop-color", st[1]);
       grad.append(stop);
     });
-    defs.append(grad); big.prepend(defs);
+    // Its glow is drawn in the heart itself, painted once: as a CSS filter
+    // Chrome worked it out again on every frame of the show.
+    var glow = document.createElementNS(NS, "filter"), drop = document.createElementNS(NS, "feDropShadow");
+    [["id", "dn-hs"], ["x", "-60%"], ["y", "-60%"], ["width", "220%"], ["height", "220%"]].forEach(function (a) { glow.setAttribute(a[0], a[1]); });
+    [["dx", "0"], ["dy", "2"], ["stdDeviation", "2.3"], ["flood-color", "#ff2d55"], ["flood-opacity", ".55"]].forEach(function (a) { drop.setAttribute(a[0], a[1]); });
+    glow.append(drop); defs.append(grad, glow); big.prepend(defs);
     big.querySelector("path").setAttribute("fill", "url(#dn-hg)");
+    big.querySelector("path").setAttribute("filter", "url(#dn-hs)");
     var size = Math.round(Math.min(240, window.innerWidth * 0.5, window.innerHeight * 0.4));
     var mid = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
     big.style.width = big.style.height = size + "px";
@@ -290,10 +297,10 @@ var iptvHit = (function () {
       ring.animate([
         { transform: c + "scale(.9)", opacity: 0.85 },
         { transform: c + "scale(2.3)", opacity: 0 }
-      ], { duration: 700, delay: at(f) - 40, easing: "cubic-bezier(.2, .7, .2, 1)", fill: "both" });
+      ], { duration: 700, delay: at(f) - 40, easing: "cubic-bezier(.2, .7, .2, 1)", fill: "forwards" });
     });
     // it opens: sparks, and the dialog where the heart was
-    setTimeout(function () { burst(mid, false, layer); }, at(0.76));
+    burst(mid, false, layer, at(0.76));
     var sheet = window.matchMedia && window.matchMedia("(max-width: 560px)").matches;
     // Hidden until the heart opens, then in. The curve goes on that last
     // step alone: on the whole animation it brought the dialog in half way,
@@ -914,6 +921,85 @@ var iptvHit = (function () {
       seen.forEach(function (s) { band.classList.toggle("is-live", s.isIntersecting); });
     }, { threshold: 0.2 }).observe(band);
   }
+
+  // -- the owner's note --------------------------------------------------------
+  // In a browser that has opened /admin/ (which leaves iptv_admin_hint, no
+  // secret), new donations show at the foot of the site's pages too: a
+  // heart, how much, from whom, a link to the statistics. Dismissed - or the
+  // admin page opened - they are seen and do not come back. /admin/news
+  // answers only the signed-in admin; every other visitor's page asks
+  // nothing. In English, as the admin page is.
+  (function ownerNote() {
+    if (!window.fetch || !/(?:^|;\s*)iptv_admin_hint=1(?:;|$)/.test(document.cookie)) { return; }
+    var KEY = "dn-admin-seen", note = null, timer = 0;
+    function seen() { try { return +localStorage.getItem(KEY) || 0; } catch (e) { return 0; } }
+    function mark(t) { try { localStorage.setItem(KEY, String(t)); } catch (e) { /* none */ } }
+    function money(minor, c) {
+      try {
+        var f = new Intl.NumberFormat(undefined, { style: "currency", currency: c });
+        return f.format(minor / Math.pow(10, f.resolvedOptions().maximumFractionDigits));
+      } catch (e) { return (minor / 100) + " " + c; }
+    }
+    function ago(t) {
+      var s = Math.max(0, Date.now() / 1000 - t), rt;
+      try { rt = new Intl.RelativeTimeFormat("en", { numeric: "auto" }); } catch (e) { return ""; }
+      if (s < 3600) { return rt.format(-Math.max(1, Math.round(s / 60)), "minute"); }
+      if (s < 86400) { return rt.format(-Math.round(s / 3600), "hour"); }
+      return rt.format(-Math.round(s / 86400), "day");
+    }
+    function away(rows) {
+      mark(Math.max.apply(null, rows.map(function (r) { return r.t; })));
+      if (!note) { return; }
+      var n = note; note = null;
+      n.classList.add("is-leaving");
+      setTimeout(function () { n.remove(); }, CALM ? 0 : 260);
+    }
+    function render(rows) {
+      if (note) { note.remove(); }
+      note = mk("aside", "owner-note");
+      note.setAttribute("role", "status");
+      var mark1 = heart("owner-heart"), body = mk("div", "owner-body");
+      body.append(mk("strong", "", rows.length === 1 ? "New donation" : rows.length + " new donations"));
+      var ul = mk("ul", "owner-list");
+      rows.slice(0, 3).forEach(function (r) {
+        var li = mk("li");
+        li.append(mk("b", "", money(r.amount, r.currency)),
+                  document.createTextNode([ago(r.t), r.who].filter(Boolean).map(function (x) { return " · " + x; }).join("")));
+        ul.append(li);
+      });
+      if (rows.length > 3) { ul.append(mk("li", "owner-more", "and " + (rows.length - 3) + " more")); }
+      var link = mk("a", "owner-link", "Open statistics");
+      link.href = "/admin/#donations";
+      link.addEventListener("click", function () { away(rows); });
+      body.append(ul, link);
+      var shut = mk("button", "owner-close", "\u00d7");
+      shut.type = "button";
+      shut.setAttribute("aria-label", "Dismiss");
+      shut.addEventListener("click", function () { away(rows); });
+      note.append(mark1, body, shut);
+      document.body.append(note);
+      setTimeout(function () { thump(mark1, false); }, 380);
+    }
+    function check() {
+      if (document.hidden) { return; }
+      fetch("/admin/news", { credentials: "same-origin", cache: "no-store" })
+        .then(function (r) {
+          if (r.status === 204) { clearInterval(timer); return null; }     // signed out: stop asking
+          return r.ok ? r.json() : null;
+        })
+        .then(function (j) {
+          if (!j || !j.list) { return; }
+          var since = seen();
+          if (!since) { since = Date.now() / 1000 - 3 * 86400; mark(since); }    // a first look: the last three days
+          var fresh = j.list.filter(function (r) { return r.t > since; });
+          if (fresh.length) { render(fresh); } else if (note) { note.remove(); note = null; }
+        })
+        .catch(function () { /* the note is not worth a word */ });
+    }
+    check();
+    timer = setInterval(check, 120000);
+    document.addEventListener("visibilitychange", function () { if (!document.hidden) { check(); } });
+  })();
 
   // Back from a payment method that left the page (Klarna and the like).
   if (/[?&]donated=1(&|$)/.test(window.location.search)) {
