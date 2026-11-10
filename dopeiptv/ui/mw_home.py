@@ -178,9 +178,29 @@ class HomePage(QWidget):
         pill(tr("btn_settings"), w.open_settings)
         h.addWidget(group)
         h.addStretch(1)
-        # Symmetry spacer where the close X used to sit, so the nav pill
-        # stays visually centred with the back chip on the left.
-        h.addSpacing(36)
+        # Top-RIGHT, mirroring the back chip: the donate heart (Home hides
+        # the sidebar, and its heart with it). Hidden, it keeps its room so
+        # the nav pill stays centred.
+        from .widgets import HeartButton
+        heart = HeartButton(size=15)
+        heart.setFixedSize(36, 34)
+        heart.setToolTip(tr("donate_support"))
+        heart.setAccessibleName(tr("donate_support"))
+        heart.setStyleSheet(rounded(
+            "QPushButton { background: %s; border:1px solid %s;"
+            " border-radius: 17px; }"
+            "QPushButton:hover { border-color: %s; }" % (
+                _rgba("bg", 0.55), _rgba("text", 0.12), P["accent"])))
+        heart.clicked.connect(lambda: w.open_donate("app-heart"))
+        heart.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        heart.customContextMenuRequested.connect(
+            lambda pos, b=heart: w._donate_heart_menu(pos, b))
+        keep = heart.sizePolicy()
+        keep.setRetainSizeWhenHidden(True)
+        heart.setSizePolicy(keep)
+        heart.setVisible(w._donate_heart_due())
+        w._home_heart = heart
+        h.addWidget(heart)
         return bar
 
     def refresh(self) -> None:

@@ -1,7 +1,7 @@
 """Donating, from inside the app - there, never in the way.
 
 Four places: a small heart beside the sidebar's logo (its words in the
-tooltip), "Support dopeIPTV…" in the app menu and in About, and one card on
+tooltip) - and at the top right of Home, which hides the sidebar - "Support dopeIPTV…" in the app menu and in About, and one card on
 Home once the app has been used for real (about
 ten hours of watching). The card's "Not now" puts it away for three
 months; "Donate" for a year; left alone, it goes by itself after a week,
@@ -65,6 +65,12 @@ class _DonateMixin:
         pad = getattr(self, "_logo_pad", None)
         if pad is not None:
             pad.setVisible(shown and not getattr(self, "_sidebar_collapsed", False))
+        home = getattr(self, "_home_heart", None)      # Home's, top right
+        if home is not None:
+            try:
+                home.setVisible(shown)
+            except RuntimeError:                       # Home was rebuilt
+                self._home_heart = None
 
     def donated(self) -> None:
         """Said they have: the heart and Home's card go for good."""
@@ -80,9 +86,9 @@ class _DonateMixin:
         self.settings.setValue("donate_heart_until", time.time() + SNOOZE_SECS)
         self._donate_heart_refresh()
 
-    def _donate_heart_menu(self, pos) -> None:
+    def _donate_heart_menu(self, pos, btn=None) -> None:
         from PyQt6.QtWidgets import QMenu
-        btn = self._donate_btn
+        btn = btn or self._donate_btn
         menu = QMenu(btn)
         menu.addAction(tr("donate_support"), lambda: self.open_donate("app-heart"))
         menu.addAction(tr("donate_hide"), self.hide_donate_heart)
@@ -140,7 +146,8 @@ class _DonateMixin:
         if not self.settings.value("donate_card_shown"):
             self.settings.setValue("donate_card_shown", time.time())
         card = DonateCard(tr("home_donate_title"), tr("home_donate_body"),
-                          tr("home_donate_btn"), tr("home_donate_later"))
+                          tr("home_donate_btn"), tr("home_donate_later"),
+                          tr("donate_done"))
 
         def away(secs: int) -> None:
             self.settings.setValue("donate_card_until", time.time() + secs)
@@ -154,4 +161,11 @@ class _DonateMixin:
 
         card.donate.connect(donate)
         card.later.connect(lambda: away(SNOOZE_SECS))
+
+        def already() -> None:
+            self.donated()
+            card.hide()
+            card.deleteLater()
+
+        card.already.connect(already)
         return card

@@ -843,9 +843,10 @@ class DonateCard(QFrame):
 
     donate = pyqtSignal()
     later = pyqtSignal()
+    already = pyqtSignal()
 
     def __init__(self, title: str, body: str, donate_text: str,
-                 later_text: str) -> None:
+                 later_text: str, already_text: str = "") -> None:
         super().__init__()
         self.setObjectName("DonateCard")
         tint = QColor(HEART)
@@ -863,7 +864,10 @@ class DonateCard(QFrame):
             f"#DonateGo:hover {{ background: {tint.lighter(112).name()}; }}"
             f"#DonateLater {{ background: transparent; color: {P['text2']};"
             f" border: none; padding: 8px 10px; font-weight: 600; }}"
-            f"#DonateLater:hover {{ color: {P['text']}; }}"))
+            f"#DonateLater:hover {{ color: {P['text']}; }}"
+            f"#DonateAlready {{ background: transparent; color: {P['text2']}; border: none;"
+            f" padding: 2px 0 0 0; font-size: 12px; text-align: left; }}"
+            f"#DonateAlready:hover {{ color: {P['text']}; text-decoration: underline; }}"))
         h = QHBoxLayout(self)
         h.setContentsMargins(18, 14, 18, 14)
         h.setSpacing(14)
@@ -877,6 +881,12 @@ class DonateCard(QFrame):
         b.setWordWrap(True)
         text.addWidget(t)
         text.addWidget(b)
+        if already_text:
+            done = QPushButton(already_text)
+            done.setObjectName("DonateAlready")
+            done.setCursor(Qt.CursorShape.PointingHandCursor)
+            done.clicked.connect(self.already.emit)
+            text.addWidget(done, 0, Qt.AlignmentFlag.AlignLeft)
         h.addLayout(text, 1)
         from .widgets import heart_pixmap
         go = QPushButton(donate_text)
