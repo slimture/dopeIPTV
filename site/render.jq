@@ -179,7 +179,10 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
        ["/help/", t("nav_help"), "help"],
        [$REPO, t("nav_github"), ""]] as $links
     | def cur($key): $key != "" and $key == $current;
-    ([$links[] | . as [$href, $label, $key]
+    # The row beside the logo leaves out Download: the blue button at its end
+    # is the same link, and the bar said it twice. The narrow-window menu
+    # keeps it - the button is gone where that menu is all there is.
+    ([$links[] | select(.[0] != $base + "#download") | . as [$href, $label, $key]
       | "      <a class=\"navlink\" href=\"\($href | h)\"\(if cur($key) then " aria-current=\"page\"" else "" end)>\($label | h)</a>\n"]
      | add) as $navlinks
     | ([$links[] | . as [$href, $label, $key]
