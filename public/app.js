@@ -266,7 +266,7 @@
   // Nor on Chromium: the rising cost it frames on a scroll (nav.js, .cr).
   var chromium = document.documentElement.classList.contains("cr");
   if ("IntersectionObserver" in window && !phone && !chromium) {
-    var sel = ".sec-head, .fxp, .shot, .dlx-card, .dl-phone, .donate, .notes-wrap, .faq-item";
+    var sel = ".sec-head, .fxp, .shot, .dlx-card, .dl-phone, .donate, .faq-item";
     var fold = window.innerHeight * 0.92;
     var io = new IntersectionObserver(function (entries) {
       entries.forEach(function (en) {
@@ -359,17 +359,21 @@
   io.observe(count);
 })();
 
-/* "How to install" on a download card: the help page's answer for that
-   system in a dialog over the downloads - whoever clicks it is in the middle
-   of a download, and a page of its own broke that off. The text is the help
-   page's (rendered into a <template> beside the cards), so it is kept in one
-   place, and "More help" at the foot goes on to the help page. Without
-   script or <dialog>, or with a modifier key, the link is the help page. */
+/* A dialog over the page for what most visitors never open, a click away
+   for whoever wants it:
+   - "How to install" on a download card: the help page's answer for that
+     system (rendered into a <template> beside the cards from the help's own
+     text, so it is kept in one place), "More help" at the foot going on to
+     the help page. Whoever clicks it is in the middle of a download, and a
+     page of its own broke that off.
+   - "What's new" beside the version: the release notes, which used to be a
+     section of the page, with the full release on GitHub at the foot.
+   Without script or <dialog>, or with a modifier key, each link goes where
+   its address says. */
 (function () {
   "use strict";
-  var box = document.querySelector(".dlx");
-  if (!box || typeof HTMLDialogElement !== "function") { return; }
-  var dlg = null, title = null, body = null, more = null;
+  if (typeof HTMLDialogElement !== "function") { return; }
+  var dlg = null, title = null, body = null, more = null, x = null;
 
   function build() {
     dlg = document.createElement("dialog");
@@ -379,17 +383,14 @@
     head.className = "howdlg-head";
     title = document.createElement("h2");
     title.id = "how-title";
-    var x = document.createElement("button");
+    x = document.createElement("button");
     x.type = "button"; x.className = "dn-x"; x.textContent = "×";
-    x.setAttribute("aria-label", box.getAttribute("data-close") || "Close");
     x.addEventListener("click", function () { dlg.close(); });
     head.append(title, x);
     body = document.createElement("div");
-    body.className = "howdlg-body help-a";
     var foot = document.createElement("p");
     foot.className = "howdlg-foot";
     more = document.createElement("a");
-    more.textContent = box.getAttribute("data-how-more") || "";
     foot.append(more);
     dlg.append(head, body, foot);
     // A click beside it (on the backdrop) closes it, as Esc does.
@@ -397,18 +398,40 @@
     document.body.append(dlg);
   }
 
-  box.addEventListener("click", function (e) {
-    var a = e.target.closest && e.target.closest("a.dlx-how[data-how]");
-    if (!a || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) { return; }
-    var tpl = document.getElementById("how-" + a.getAttribute("data-how"));
-    if (!tpl || !tpl.content) { return; }
-    e.preventDefault();
+  function open(tpl, kind, href, label, close) {
     if (!dlg) { build(); }
-    title.textContent = tpl.getAttribute("data-title") || a.textContent;
+    title.textContent = tpl.getAttribute("data-title") || "";
+    x.setAttribute("aria-label", close || "Close");
+    body.className = "howdlg-body " + kind;
     body.replaceChildren(tpl.content.cloneNode(true));
-    if (typeof window.iptvCopyButtons === "function") { window.iptvCopyButtons(body); }
-    more.href = a.href;
+    if (kind === "help-a" && typeof window.iptvCopyButtons === "function") {
+      window.iptvCopyButtons(body);
+    }
+    more.href = href;
+    more.textContent = label || "";
+    if (/^https?:/.test(href) && href.indexOf(location.origin) !== 0) {
+      more.rel = "nofollow";
+    } else { more.removeAttribute("rel"); }
     dlg.showModal();
     body.scrollTop = 0;
+  }
+
+  document.addEventListener("click", function (e) {
+    if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) { return; }
+    var a = e.target.closest && e.target.closest("a.dlx-how[data-how], a[data-wn]");
+    if (!a) { return; }
+    var tpl, box;
+    if (a.hasAttribute("data-wn")) {
+      tpl = document.getElementById("wn-notes");
+      if (!tpl || !tpl.content) { return; }
+      e.preventDefault();
+      open(tpl, "notes", a.href, tpl.getAttribute("data-more"), tpl.getAttribute("data-close"));
+      return;
+    }
+    tpl = document.getElementById("how-" + a.getAttribute("data-how"));
+    box = a.closest(".dlx");
+    if (!tpl || !tpl.content || !box) { return; }
+    e.preventDefault();
+    open(tpl, "help-a", a.href, box.getAttribute("data-how-more"), box.getAttribute("data-close"));
   });
 })();

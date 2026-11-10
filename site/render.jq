@@ -416,26 +416,19 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
         {hreflang: hreflang("/"), jsonld: jsonld($version), nav: nav("home"),
          shots: shots,
          release_tag: ((if ($reldate | truthy) then " · " + ($reldate | h) else " · " + (t("dl_latest") | h) end)
-           + (if $total > 0 then " · <span class=\"dl-count\" title=\"\(t("dl_tip_total") | h)\">↓ \(fmt_count($total) | h)</span>" else "" end)),
+           + (if $total > 0 then " · <span class=\"dl-count\" title=\"\(t("dl_tip_total") | h)\">↓ \(fmt_count($total) | h)</span>" else "" end)
+           + (if $notes == "" then "" else
+                " · <a class=\"wn-link\" href=\"\($REPO | h)/releases/tag/v\($version | h)\" rel=\"nofollow\" data-wn>\(t("wn_h2") | h)</a>" end)),
          downloads: downloads($version; $reldate),
          donate: donate,
          donate_footer: (if $DONATE == "" then "" else
            "      <a href=\"\($DONATE | h)\" rel=\"nofollow noopener\">\(t("donate_btn") | h)</a>\n" end),
          verify: (if $sums == "1" then "      <p class=\"autonote\">\(t("note_verify"))</p>\n" else "" end),
+         # What's new: the notes in a <template>, opened in a dialog from the
+         # link beside the version (app.js) - no section of their own.
          whatsnew: (if $notes == "" then "" else
-           "  <section id=\"whats-new\" class=\"pt0\">\n"
-           + "    <div class=\"wrap\">\n"
-           + "      <div class=\"sec-head\">\n"
-           + "        <h2>\(t("wn_h2") | h)</h2>\n"
-           + "        <p>v\($version | h)\(if ($reldate | truthy) then " · " + ($reldate | h) else "" end) · \(t("wn_intro") | h)</p>\n"
-           + "      </div>\n"
-           + "      <details class=\"notes-wrap\">\n"
-           + "        <summary>\(t("wn_open") | h)</summary>\n"
-           + "        <div class=\"notes\">\($notes)</div>\n"
-           + "      </details>\n"
-           + "      <p class=\"autonote\"><a href=\"\($REPO | h)/releases/tag/v\($version | h)\" rel=\"nofollow\">\(t("wn_full") | h)</a> · <a href=\"\($REPO | h)/blob/main/CHANGELOG.md\" rel=\"nofollow\">\(t("wn_changelog") | h)</a></p>\n"
-           + "    </div>\n"
-           + "  </section>\n" end)});
+           "  <template id=\"wn-notes\" data-title=\"\(t("wn_h2") | h) · v\($version | h)\""
+           + " data-more=\"\(t("wn_full") | h)\" data-close=\"\(t("lb_close") | h)\">\($notes)</template>\n" end)});
 
 # -- help/index.php --------------------------------------------------------------
 
