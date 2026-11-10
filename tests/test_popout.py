@@ -220,6 +220,10 @@ def test_popout_window_paths():
 # coming back reveals the DVR row and the bar together: the row was placed
 # against the taller video and lay over the control bar.
 _BARS_CHILD = _CHILD[:_CHILD.index("h = Host()")] + r"""
+import faulthandler
+faulthandler.enable()
+from dopeiptv.core.gcguard import GcGuard
+GcGuard(app)      # as app.py does: cycles collected on the GUI thread only
 h = Host()
 h.show()
 p = h.player
@@ -260,7 +264,7 @@ p._timeline_step(-5); spin()
 assert p.ts_timeline.isVisible()
 p._reveal_popout_bar(); spin()
 clear_of_bar(p.ts_timeline, "the timeshift timeline")
-print("POPOUT_BARS_OK")
+print("POPOUT_BARS_OK", flush=True)
 """
 
 

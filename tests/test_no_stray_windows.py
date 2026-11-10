@@ -26,7 +26,13 @@ from PyQt6.QtWidgets import QApplication, QWidget
 from dopeiptv.providers.client import DemoClient
 from dopeiptv.ui.main_window import MainWindow
 
+import faulthandler
+faulthandler.enable()
 app = QApplication.instance() or QApplication([])
+# As the app does (app.py): cycles collected on the GUI thread only. Left
+# automatic, a pool thread could free Qt objects and crash the run.
+from dopeiptv.core.gcguard import GcGuard
+GcGuard(app)
 settings = QSettings("dopeiptv-test", "stray-windows")
 settings.clear()
 settings.setValue("home_enabled", "true")
@@ -74,7 +80,7 @@ settings.setValue("home_enabled", "true")
 step(w._apply_home_settings)
 step(w._show_home_page)
 assert not stray, stray
-print("NO_STRAY_OK")
+print("NO_STRAY_OK", flush=True)
 """
 
 
