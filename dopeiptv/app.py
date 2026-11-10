@@ -453,7 +453,16 @@ def main() -> int:
     app.setApplicationName(APP_NAME)
     app.setOrganizationName(ORG)
     app.setApplicationDisplayName(APP_NAME)
-    app.setDesktopFileName("dopeiptv")
+    # The window's app_id: "dopeiptv", or the name of the entry this run was
+    # started from when that is a copy of ours (see launched_app_id).
+    try:
+        from .core.desktop_entry import launched_app_id
+        app_id = launched_app_id() or "dopeiptv"
+    except Exception:
+        app_id = "dopeiptv"
+    app.setDesktopFileName(app_id)
+    if app_id != "dopeiptv":
+        log.info("window app_id %s (the entry it was started from)", app_id)
     # Roomier global pixmap cache: the list/grid delegates memoise their
     # smooth-scaled logos and posters here (see ChannelDelegate._scaled_logo),
     # and the default 10 MB evicts them constantly with thousands of channels.

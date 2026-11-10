@@ -17,6 +17,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   video as it shrinks.
 - Home: the back and heart buttons at the top are round, filled circles; the
   edge was drawn in four arcs with gaps between them.
+- Linux: after an AppImage update restarts the app, its window belongs to
+  the dock or dash icon it was started from, not a second icon beside it.
+  The window takes the name of the menu entry that launched it (Gear
+  Lever's, AppImageLauncher's) and keeps it across the restart; the entries
+  dopeIPTV ships also say `StartupWMClass=dopeiptv`.
 
 ## [1.4.2]
 

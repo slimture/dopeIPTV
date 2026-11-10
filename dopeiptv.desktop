@@ -7,3 +7,4 @@ Icon=dopeiptv
 Terminal=false
 Categories=AudioVideo;Video;TV;
 Keywords=iptv;tv;xtream;epg;
+StartupWMClass=dopeiptv

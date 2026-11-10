@@ -295,3 +295,21 @@ def test_a_failed_update_says_why(monkeypatch):
     monkeypatch.setattr(mw_updates, "run_async", cancelled)
     w._self_update()
     assert shown == []
+
+
+def test_the_restart_keeps_the_entry_it_was_launched_from(monkeypatch, tmp_path):
+    """The new version names its window after the entry the old one was
+    started from (desktop_entry.launched_app_id), so the restart must hand
+    that on - or the window comes up beside the pinned icon, not in it."""
+    seen = {}
+
+    class Popen:
+        def __init__(self, argv, env=None, **kw):
+            seen["env"] = env
+
+    monkeypatch.setattr(selfupdate.subprocess, "Popen", Popen)
+    monkeypatch.setenv("GIO_LAUNCHED_DESKTOP_FILE", "/x/applications/a.desktop")
+    monkeypatch.setenv("APPIMAGE", "/old/dopeIPTV.AppImage")
+    selfupdate.restart_into(tmp_path / "dopeIPTV.AppImage", pid=1)
+    assert seen["env"]["GIO_LAUNCHED_DESKTOP_FILE"] == "/x/applications/a.desktop"
+    assert "APPIMAGE" not in seen["env"]

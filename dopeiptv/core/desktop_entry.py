@@ -23,6 +23,7 @@ gone the moment the app exits.
 from __future__ import annotations
 
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -35,6 +36,60 @@ ENTRY_NAME = "dopeiptv.desktop"
 # The window's app_id (app.setDesktopFileName). A compositor looks for a
 # file of exactly this name, so it is not ours to choose freely.
 ICON_NAME = "dopeiptv"
+
+
+def _exec_program(text: str) -> str | None:
+    """The program an entry's Exec= line starts (past an ``env VAR=x``
+    prefix, as some AppImage tools write), or None."""
+    group = ""
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("["):
+            group = line
+            continue
+        if group != "[Desktop Entry]" or not line.startswith("Exec="):
+            continue
+        try:
+            argv = shlex.split(line[len("Exec="):])
+        except ValueError:
+            return None
+        while argv and (argv[0] == "env" or "=" in argv[0]):
+            argv.pop(0)
+        return argv[0] if argv else None
+    return None
+
+
+def launched_app_id(env: dict[str, str] | None = None) -> str | None:
+    """The desktop id of the entry that started this run, when that entry
+    is ours under another name - or None to keep ``dopeiptv``.
+
+    A dock or dash pins the entry it launched from, and that is often not
+    ours: Gear Lever, AppImageLauncher and the like each write their own
+    copy, named their own way. Started from the icon, GNOME ties the window
+    to it by the process it launched. Restarted after an update, by us, it
+    has only the window's app_id to go on - "dopeiptv" matched no entry,
+    and the new window came up as a stranger beside the pinned icon. GLib
+    names the launching entry in GIO_LAUNCHED_DESKTOP_FILE, and the restart
+    inherits it, so the window can take that entry's name both times.
+
+    Only an entry whose Exec starts dopeIPTV: the variable is inherited by
+    everything below the launch - from a terminal, it names the terminal."""
+    if not sys.platform.startswith("linux") or _in_flatpak():
+        return None
+    env = os.environ if env is None else env
+    raw = env.get("GIO_LAUNCHED_DESKTOP_FILE") or ""
+    path = Path(raw)
+    if (not raw or path.suffix != ".desktop" or path.name == ENTRY_NAME
+            or path.parent.name != "applications"):
+        return None
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    program = _exec_program(text)
+    if not program or not Path(program).name.lower().startswith("dopeiptv"):
+        return None
+    return path.stem
 
 
 def _data_home() -> Path:
@@ -144,6 +199,7 @@ def install() -> bool:
         "Terminal=false\n"
         "Categories=AudioVideo;Video;TV;\n"
         "Keywords=iptv;tv;xtream;epg;\n"
+        "StartupWMClass=dopeiptv\n"
         # Written by us, for us: the switch in Settings reads this back so
         # it never offers to remove an entry a package manager owns.
         "X-dopeIPTV-Generated=true\n"

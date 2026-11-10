@@ -111,7 +111,9 @@ def _build_adaptors(service: MprisService) -> None:
 
         @pyqtProperty(str)
         def DesktopEntry(self) -> str:
-            return "dopeiptv"
+            # The window's app_id, so the media controls find its entry.
+            from PyQt6.QtGui import QGuiApplication
+            return QGuiApplication.desktopFileName() or "dopeiptv"
 
         @pyqtProperty("QStringList")
         def SupportedUriSchemes(self) -> list[str]:

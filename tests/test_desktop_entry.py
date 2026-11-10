@@ -229,3 +229,80 @@ def test_the_offer_is_a_link_not_a_dialog_over_the_window(monkeypatch):
     w.desktop_entry_btn.reset_mock()
     _SettingsMixin._maybe_offer_desktop_entry(w)   # answered: no link again
     w.desktop_entry_btn.show.assert_not_called()
+
+
+# -- the window takes the name of the entry it was started from -------------
+
+def _launcher(home, name: str, exec_line: str):
+    apps = home / "launchers" / "applications"
+    apps.mkdir(parents=True, exist_ok=True)
+    p = apps / name
+    p.write_text(f"[Desktop Entry]\nType=Application\nName=dopeIPTV\n"
+                 f"{exec_line}\nIcon=x\n[Desktop Action Other]\n"
+                 f"Exec=/usr/bin/other\n")
+    return p
+
+
+@pytest.mark.parametrize("name, exec_line", [
+    # AppImageLauncher
+    ("appimagekit_0a1b-dopeIPTV.desktop",
+     "Exec=/home/u/Applications/dopeIPTV-1.4.2-x86_64.AppImage"),
+    # Gear Lever: its own folder and name, quoted
+    ("dopeiptv-gearlever.desktop",
+     'Exec="/home/u/AppImages/dopeiptv.appimage"'),
+    # an env prefix in front of the program
+    ("dopeIPTV.desktop",
+     "Exec=env DESKTOPINTEGRATION=1 /opt/dopeIPTV-1.4.2-x86_64.AppImage"),
+])
+def test_a_copy_of_our_entry_names_the_window(home, monkeypatch, name, exec_line):
+    """Restarted after an update, GNOME has only the window's app_id to
+    tie it to the pinned icon - and the pinned entry is often a tool's
+    copy under its own name. The restart inherits the variable, so the
+    window takes that name both times."""
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(desktop_entry, "_in_flatpak", lambda: False)
+    p = _launcher(home, name, exec_line)
+    assert desktop_entry.launched_app_id(
+        {"GIO_LAUNCHED_DESKTOP_FILE": str(p)}) == p.stem
+
+
+def test_only_an_entry_that_starts_dopeiptv_names_the_window(home, monkeypatch):
+    """The variable is inherited by everything under the launch: started
+    from a terminal, it names the terminal - and the window is not that."""
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(desktop_entry, "_in_flatpak", lambda: False)
+    term = _launcher(home, "org.gnome.Terminal.desktop",
+                     "Exec=gnome-terminal --window")
+    ours = _launcher(home, "dopeiptv.desktop", "Exec=/opt/dopeIPTV.AppImage")
+    stray = home / "dopeIPTV.desktop"
+    stray.write_text("[Desktop Entry]\nExec=/opt/dopeIPTV.AppImage\n")
+    for env in ({}, {"GIO_LAUNCHED_DESKTOP_FILE": str(term)},
+                {"GIO_LAUNCHED_DESKTOP_FILE": str(ours)},
+                {"GIO_LAUNCHED_DESKTOP_FILE": str(stray)},
+                {"GIO_LAUNCHED_DESKTOP_FILE": str(home / "gone.desktop")}):
+        assert desktop_entry.launched_app_id(env) is None, env
+
+
+def test_flatpak_and_other_systems_keep_their_own_id(home, monkeypatch):
+    p = _launcher(home, "appimagekit_1-dopeIPTV.desktop",
+                  "Exec=/opt/dopeIPTV.AppImage")
+    env = {"GIO_LAUNCHED_DESKTOP_FILE": str(p)}
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(desktop_entry, "_in_flatpak", lambda: True)
+    assert desktop_entry.launched_app_id(env) is None
+    monkeypatch.setattr(desktop_entry, "_in_flatpak", lambda: False)
+    monkeypatch.setattr(sys, "platform", "darwin")
+    assert desktop_entry.launched_app_id(env) is None
+
+
+def test_our_entries_name_the_window_class(home, monkeypatch):
+    """A tool that copies the AppImage's entry under its own name keeps
+    StartupWMClass, which ties a window called dopeiptv to that copy."""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(root, "dopeiptv.desktop"), encoding="utf-8") as f:
+        assert "\nStartupWMClass=dopeiptv\n" in f.read()
+    appimage = home / "dopeIPTV-1.4.2-x86_64.AppImage"
+    appimage.write_text("")
+    monkeypatch.setenv("APPIMAGE", str(appimage))
+    assert desktop_entry.install()
+    assert "\nStartupWMClass=dopeiptv\n" in desktop_entry.entry_path().read_text()

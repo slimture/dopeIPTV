@@ -48,7 +48,10 @@ def notify(summary: str, body: str = "", image: str = "") -> bool:
     bus = QDBusConnection.sessionBus()
     if not bus.isConnected():
         return False
-    hints: dict[str, Any] = {"desktop-entry": DESKTOP_ENTRY}
+    # The window's app_id: the entry the desktop files the notification under.
+    from PyQt6.QtGui import QGuiApplication
+    hints: dict[str, Any] = {
+        "desktop-entry": QGuiApplication.desktopFileName() or DESKTOP_ENTRY}
     if image:
         hints["image-path"] = image
     msg = QDBusMessage.createMethodCall(SERVICE, OBJECT_PATH, SERVICE,
