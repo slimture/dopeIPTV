@@ -319,6 +319,15 @@ non-English strings started as machine translation — **corrections in your
 language are very welcome**; see [`docs/TRANSLATING.md`](docs/TRANSLATING.md)
 (no coding required).
 
+## Support dopeIPTV
+
+dopeIPTV is free, with no ads, no tracking and no paid version, and it is
+built in spare time. Hosting the website and the downloads costs a little
+every month. If the app works well for you,
+**[a donation of any size](https://donate.stripe.com/bJe4gy7gv4SmdrYgGba7C00)**
+helps keep it going (card, Apple Pay or Google Pay, through Stripe).
+Reporting bugs and fixing a translation in your language help just as much.
+
 ## Contributing and maintaining
 
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — setting up, the quality gate, ground rules for pull requests.

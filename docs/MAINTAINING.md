@@ -132,7 +132,7 @@ Only names here - the values are with the owner.
 | Trakt app registration | its client id is `DEFAULT_CLIENT_ID` in `providers/trakt.py`; the redirect goes through the website (see its README) | users can enter their own client id in Settings → Trakt |
 | The web server | runs the site and its cron sync (website branch: `README.md`, `DEPLOY.md`) | the site stops updating; the app is unaffected |
 | GitHub repository settings | releases, Actions, the Security tab for private reports | - |
-| Stripe Payment Link (donations) | `$DONATE` at the top of `site/render.jq` on the `website` branch | no donate card on the site |
+| Stripe Payment Link (donations) | `$DONATE` at the top of `site/render.jq` on the `website` branch, `.github/FUNDING.yml` (the repository's Sponsor button) and the README's "Support dopeIPTV" | no donate card on the site, no Sponsor button |
 
 A source checkout works without any of these. For local testing, set
 `DOPEIPTV_TMDB_KEY` / `DOPEIPTV_OPENSUBTITLES_KEY` in the environment.

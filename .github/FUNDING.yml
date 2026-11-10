@@ -1,0 +1,4 @@
+# The "Sponsor" button on the repository page. GitHub reads this file from
+# the default branch (main), so a change here shows after the next release.
+# Add `github: slimture` once GitHub Sponsors is set up for the account.
+custom: ["https://donate.stripe.com/bJe4gy7gv4SmdrYgGba7C00"]
