@@ -122,6 +122,7 @@
     "donate_pay": "לתרום {amount}",
     "donate_busy": "רגע…",
     "donate_lock": "הכרטיס עובר ישירות ל־Stripe — dopeIPTV אף פעם לא רואה את מספר הכרטיס.",
+    "donate_payee_note": "התשלום עובר ל־{payee}, החברה שמאחורי dopeIPTV.",
     "donate_back": "שינוי סכום",
     "donate_thanks": "תודה שאתם תומכים ב־dopeIPTV!",
     "donate_receipt": "קבלה בדרך לתיבת הדואר שלכם.",

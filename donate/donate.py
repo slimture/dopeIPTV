@@ -36,6 +36,9 @@ file named by DONATE_CONFIG (default /usr/local/etc/iptv-donate.conf):
     DONATE_MIN / DONATE_MAX smallest / largest amount, minor units (200 / 100000)
     DONATE_PRESETS          the amount buttons, minor units (300,500,1000,2500)
     DONATE_NAME             what the receipt says it was for ("Support dopeIPTV")
+    DONATE_SUFFIX           added to the account's statement descriptor on card
+                            statements, so donors see e.g. "SOLECRAFT* DOPEIPTV"
+                            ("DOPEIPTV"; empty: the account's descriptor alone)
     DONATE_PMC              a payment method configuration (pmc_...) for the card
                             form: the set of methods made for dopeIPTV in the
                             Dashboard (Settings -> Payment methods). Empty: the
@@ -102,6 +105,7 @@ PRESETS = [int(x) for x in CONF.get("DONATE_PRESETS", "300,500,1000,2500").split
            if x.strip().isdigit()]
 NAME = CONF.get("DONATE_NAME", "Support dopeIPTV")
 PMC = [CONF.get("DONATE_PMC", "").strip()]        # emptied if Stripe refuses it
+SUFFIX = [CONF.get("DONATE_SUFFIX", "DOPEIPTV").strip()[:22]]   # likewise
 RETURN_URL = CONF.get("DONATE_RETURN_URL", "https://iptv.dope.rs/?donated=1#donate")
 ORIGIN = CONF.get("DONATE_ORIGIN", "https://iptv.dope.rs").rstrip("/")
 PUBLISHABLE = CONF.get("STRIPE_PUBLISHABLE_KEY", "")
@@ -157,6 +161,32 @@ def _post(url: str, form: dict, key: str) -> tuple[int, dict]:
         return 0, {"error": {"message": str(e)}}
 
 
+def _intent(form: dict, key: str) -> tuple[int, dict]:
+    """POST a PaymentIntent with this site's extras - the statement suffix
+    and the payment method configuration. One Stripe refuses (by name in its
+    error) is left out from then on and the call made again, so neither can
+    stop a payment."""
+    while True:
+        full = dict(form)
+        if SUFFIX[0]:
+            full["statement_descriptor_suffix"] = SUFFIX[0]
+        if PMC[0] and "payment_method" not in form:
+            full["payment_method_configuration"] = PMC[0]
+        status, body = _post(STRIPE_PI, full, key)
+        if status == 200:
+            return status, body
+        err = (body.get("error") or {}) if isinstance(body, dict) else {}
+        said = str(err.get("param") or "") + " " + str(err.get("message") or "")
+        for name, box in (("statement_descriptor_suffix", SUFFIX), ("payment_method_configuration", PMC)):
+            if status == 400 and box[0] and name in said:
+                print(f"[donate] leaving out {name} {box[0]}: {str(err.get('message', ''))[:200]}",
+                      file=sys.stderr, flush=True)
+                box[0] = ""
+                break
+        else:
+            return status, body
+
+
 def wallet_pay(amount: int, method: str, email: str, name: str) -> tuple[int, dict]:
     """Apple Pay / Google Pay: confirm a PaymentIntent with the payment
     method the wallet handed the page. Without redirects - a wallet card
@@ -178,7 +208,7 @@ def wallet_pay(amount: int, method: str, email: str, name: str) -> tuple[int, di
         form["receipt_email"] = email
     if name:
         form["metadata[name]"] = name[:100]
-    status, body = _post(STRIPE_PI, form, key)
+    status, body = _intent(form, key)
     if status == 200:
         state = body.get("status")
         if state == "succeeded" or state == "processing":
@@ -196,35 +226,24 @@ def wallet_pay(amount: int, method: str, email: str, name: str) -> tuple[int, di
 def create_session(amount: int) -> tuple[int, dict]:
     """The PaymentIntent the card form pays: Stripe's Payment Element shows
     the methods of the payment method configuration (DONATE_PMC, else the
-    account's default) and confirms it in the browser. A configuration
-    Stripe refuses is left out from then on rather than failing every
-    payment."""
+    account's default) and confirms it in the browser."""
     key = _secret()
     if not key or not PUBLISHABLE:
         return 503, {"error": "not configured"}
-    while True:
-        form = {
-            "amount": str(amount),
-            "currency": CURRENCY,
-            "automatic_payment_methods[enabled]": "true",
-            "description": NAME,
-            "metadata[source]": "iptv.dope.rs donate dialog",
-        }
-        if PMC[0]:
-            form["payment_method_configuration"] = PMC[0]
-        status, body = _post(STRIPE_PI, form, key)
-        if status == 200 and body.get("client_secret"):
-            return 200, {"clientSecret": body["client_secret"], "publishableKey": PUBLISHABLE}
-        err = (body.get("error") or {}) if isinstance(body, dict) else {}
-        msg = str(err.get("message", ""))
-        print(f"[donate] payment intent {status}: {msg[:300]}", file=sys.stderr, flush=True)
-        if PMC[0] and status == 400 and ("payment_method_configuration" in str(err.get("param") or "")
-                                        or "payment_method_configuration" in msg):
-            print(f"[donate] leaving out payment method configuration {PMC[0]}",
-                  file=sys.stderr, flush=True)
-            PMC[0] = ""
-            continue
-        return 502, {"error": "stripe"}
+    form = {
+        "amount": str(amount),
+        "currency": CURRENCY,
+        "automatic_payment_methods[enabled]": "true",
+        "description": NAME,
+        "metadata[source]": "iptv.dope.rs donate dialog",
+    }
+    status, body = _intent(form, key)
+    if status == 200 and body.get("client_secret"):
+        return 200, {"clientSecret": body["client_secret"], "publishableKey": PUBLISHABLE}
+    err = (body.get("error") or {}) if isinstance(body, dict) else {}
+    print(f"[donate] payment intent {status}: {str(err.get('message', ''))[:300]}",
+          file=sys.stderr, flush=True)
+    return 502, {"error": "stripe"}
 
 
 class Handler(BaseHTTPRequestHandler):

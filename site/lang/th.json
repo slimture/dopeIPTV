@@ -122,6 +122,7 @@
     "donate_pay": "บริจาค {amount}",
     "donate_busy": "สักครู่…",
     "donate_lock": "ข้อมูลบัตรส่งตรงไปยัง Stripe — dopeIPTV ไม่เคยเห็นหมายเลขบัตร",
+    "donate_payee_note": "ชำระให้ {payee} บริษัทผู้พัฒนา dopeIPTV",
     "donate_back": "เปลี่ยนจำนวน",
     "donate_thanks": "ขอบคุณที่สนับสนุน dopeIPTV!",
     "donate_receipt": "ใบเสร็จกำลังส่งไปยังกล่องจดหมายของคุณ",

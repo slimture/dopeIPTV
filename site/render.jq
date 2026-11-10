@@ -27,9 +27,9 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 # through donate/donate.py); the link itself is what a click does without
 # script. Empty: no donate section and no footer link at all.
 | "https://donate.stripe.com/bJe4gy7gv4SmdrYgGba7C00" as $DONATE
-# Who the money goes to, shown at the top of the donate dialog with its icon
-# (public/payee.svg) as Stripe's own pages show it - the name on the donor's
-# card statement. Empty: no line.
+# Who the money goes to - the company behind dopeIPTV, and the name on the
+# donor's card statement: one quiet line at the foot of the donate dialog and
+# the footer's copyright (kept small on purpose). Empty: the dialog line goes.
 | "Solecraft AB" as $PAYEE
 
 # -- the PHP helpers ---------------------------------------------------------
@@ -157,7 +157,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
            ["close", "donate_close"], ["loading", "donate_loading"],
            ["apple", "donate_apple"], ["google", "donate_google"], ["card", "donate_card"]][]
           | . as [$k, $key] | " data-\($k)=\"\(t($key) | h)\""] | add)
-      + (if $PAYEE == "" then "" else " data-payee=\"\($PAYEE | h)\"" end)
+      + (if $PAYEE == "" then "" else " data-payee=\"\($PAYEE | h)\" data-payeenote=\"\(t("donate_payee_note") | h)\"" end)
       + " data-lang=\"\($lang | h)\"></div>\n"
     end;
   def nav($current):
@@ -375,7 +375,9 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     | {"@context": "https://schema.org",
        "@graph": [
          {"@type": "Organization", "@id": "\($SITE)/#org", "name": "dopeIPTV",
-          "url": "\($SITE)/", "logo": "\($SITE)/favicon.png", "sameAs": [$REPO]},
+          "url": "\($SITE)/", "logo": "\($SITE)/favicon.png", "sameAs": [$REPO],
+          "parentOrganization": {"@type": "Organization", "name": "Solecraft AB",
+                                 "url": "https://solecraft.se/"}},
          {"@type": "WebSite", "@id": "\($SITE)/#website", "name": "dopeIPTV",
           "url": "\($SITE)/", "inLanguage": $lang,
           "publisher": {"@id": "\($SITE)/#org"}},

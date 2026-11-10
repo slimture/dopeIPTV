@@ -122,6 +122,7 @@
     "donate_pay": "Doniraj {amount}",
     "donate_busy": "Trenutak…",
     "donate_lock": "Kartica ide izravno u Stripe — dopeIPTV nikad ne vidi broj kartice.",
+    "donate_payee_note": "Plaća se tvrtki {payee}, koja stoji iza dopeIPTV-a.",
     "donate_back": "Promijeni iznos",
     "donate_thanks": "Hvala što podržavaš dopeIPTV!",
     "donate_receipt": "Potvrda je na putu u tvoj sandučić.",

@@ -731,9 +731,11 @@ dialog.dn::backdrop { background: rgba(5, 7, 10, .62); backdrop-filter: blur(3px
 .dn-head > div { flex: 1; min-width: 0; }
 .dn-head h2 { margin: 0; font-size: 1.2rem; font-weight: 700; letter-spacing: -.03em; }
 .dn-head p { margin: 4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
-.dn-head .dn-payee { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; color: var(--text);
-  font-size: 14px; font-weight: 600; }
-.dn-payee img { width: 22px; height: 22px; border-radius: 6px; }
+/* Who is paid: one quiet line at the foot, and the company in the footer's
+   small print - there for whoever wonders, never in the way. */
+.dn-payee { margin: 14px 0 0; color: var(--faint); font-size: 12px; line-height: 1.4; text-align: center; }
+footer .v a { color: inherit; }
+footer .v a:hover { color: var(--accent); }
 .dn-x { flex: none; width: 34px; height: 34px; margin: -4px -6px 0 0; border-radius: 50%;
   border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 24px;
   line-height: 1; cursor: pointer; }

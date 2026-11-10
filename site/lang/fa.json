@@ -122,6 +122,7 @@
     "donate_pay": "کمک {amount}",
     "donate_busy": "یک لحظه…",
     "donate_lock": "کارت مستقیم به Stripe می‌رود — dopeIPTV هرگز شمارهٔ کارت را نمی‌بیند.",
+    "donate_payee_note": "پرداخت به {payee}، شرکت سازندهٔ dopeIPTV، انجام می‌شود.",
     "donate_back": "تغییر مبلغ",
     "donate_thanks": "از حمایت شما از dopeIPTV سپاسگزاریم!",
     "donate_receipt": "رسید در راه صندوق ایمیل شماست.",

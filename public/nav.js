@@ -126,13 +126,6 @@
     dlg = mk("dialog", "dn");
     dlg.setAttribute("aria-labelledby", "dn-title");
     var head = mk("div", "dn-head"), ht = mk("div");
-    // Who is paid, as Stripe's own pages show it: the company's icon and name.
-    if (T.payee) {
-      var payee = mk("p", "dn-payee"), payeeIc = mk("img");
-      Object.assign(payeeIc, { src: "/payee.svg", alt: "", width: 22, height: 22 });
-      payee.append(payeeIc, mk("span", "", T.payee));
-      ht.append(payee);
-    }
     var h = mk("h2", "", T.title); h.id = "dn-title";
     ht.append(h, mk("p", "", T.sub));
     var x = mk("button", "dn-x", "×"); x.type = "button"; x.setAttribute("aria-label", T.close);
@@ -180,6 +173,11 @@
 
     var body = mk("div", "dn-body");
     body.append(el.loading, el.amounts, el.pay, el.done);
+    // Who is paid: the company behind dopeIPTV, the name on the statement.
+    if (T.payee && T.payeenote) {
+      el.payee = mk("p", "dn-payee", T.payeenote.replace("{payee}", T.payee));
+      body.append(el.payee);
+    }
     dlg.append(head, body);
     dlg.addEventListener("cancel", function (e) { e.preventDefault(); close(); });
     dlg.addEventListener("click", function (e) { if (e.target === dlg) { close(); } });
@@ -187,6 +185,7 @@
   }
   function show(step) {
     [el.loading, el.amounts, el.pay, el.done].forEach(function (s) { s.hidden = s !== step; });
+    if (el.payee) { el.payee.hidden = step === el.done; }
   }
   function mark() {
     [].forEach.call(el.chips.children, function (c) {

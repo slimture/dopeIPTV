@@ -122,6 +122,7 @@
     "donate_pay": "{amount} عطیہ کریں",
     "donate_busy": "ایک لمحہ…",
     "donate_lock": "کارڈ سیدھا Stripe کو جاتا ہے — dopeIPTV کبھی کارڈ نمبر نہیں دیکھتا۔",
+    "donate_payee_note": "ادائیگی {payee} کو جاتی ہے، جو dopeIPTV بنانے والی کمپنی ہے۔",
     "donate_back": "رقم بدلیں",
     "donate_thanks": "dopeIPTV کی مدد کرنے کا شکریہ!",
     "donate_receipt": "رسید آپ کے ان باکس کی طرف روانہ ہے۔",
