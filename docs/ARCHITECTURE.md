@@ -127,7 +127,7 @@ dopeiptv/
     shortcuts.py       Keyboard-shortcuts editor dialog
     tmdb_match.py      Manual TMDB match dialog
     subtitle_search.py OpenSubtitles search dialog
-    theme.py           THEMES (17) x ACCENTS (10 + custom), palette dict P,
+    theme.py           THEMES (25) x ACCENTS (10 + custom), palette dict P,
                        QSS generator
 ```
 

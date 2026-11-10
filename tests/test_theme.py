@@ -60,7 +60,7 @@ def test_every_theme_has_every_colour_and_readable_text(key):
 
 def test_the_picker_lists_dark_themes_then_light_ones():
     lights = [k for k in THEME_ORDER if is_light(k)]
-    assert lights == ["light", "latte", "solarized_light"]
+    assert lights == ["light", "latte", "solarized_light", "sand", "sky"]
     assert THEME_ORDER[-len(lights):] == lights
     assert sorted(THEME_ORDER) == sorted(THEMES)
 

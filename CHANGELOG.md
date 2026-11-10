@@ -7,6 +7,23 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Added
+
+- Eight themes that differ by colour rather than by shade: Ocean, Forest,
+  Bordeaux, Synthwave, Amber terminal and Espresso, and two light ones,
+  Sand and Sky - 25 in all. Each has an accent of its own (Settings →
+  Appearance → the theme's own colour) deep enough to carry the white text
+  on buttons, and every one passes the readability test. Names in all 27
+  languages.
+
+### Docs
+
+- README, FEATURES, ARCHITECTURE, DEVELOPER_NOTES, SECURITY, CONTRIBUTING,
+  the issue and PR templates and the AppStream description match 1.4.0.
+- `docs/MAINTAINING.md`: the runbook for whoever takes over. `AGENTS.md`
+  is for every AI assistant; `CLAUDE.md`, `GEMINI.md` and
+  `.github/copilot-instructions.md` point to it.
+
 ## [1.4.0]
 
 Rewind with dopeIPTV's own buffer - downloading on through a pause, back to

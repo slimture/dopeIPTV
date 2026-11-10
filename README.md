@@ -43,7 +43,7 @@ modern interface, supporting the **Xtream Codes API**, **M3U playlists** and
 - **Desktop media controls** (Linux, MPRIS) — the keyboard's media keys, headphone buttons, GNOME/KDE media controls and KDE Connect pause, play and skip
 - **Follow a series** — new episodes land on Home with a notification
 - **Trakt** scrobbling, **multiple playlists** (drag to reorder, export/import, or drop an M3U file or link on the window), parental control, content manager and editable channel lists
-- **Themes** — 17 themes (three of them light) picked from previews, 10 accent colours or any colour you like, follow the desktop's light/dark mode, corner style and interface size — all applied live
+- **Themes** — 25 themes picked from previews — dark and light, and some with a colour of their own (sea, forest, wine, neon, an amber terminal, coffee, sand, sky) — 10 accent colours or any colour you like, follow the desktop's light/dark mode, corner style and interface size — all applied live
 - **Updates itself** — the AppImage downloads, verifies and swaps in a new release from the update banner; **Settings → General → Update channel → Test builds** offers the next version's test builds early
 
 See [FEATURES.md](docs/FEATURES.md) for the full feature list.
