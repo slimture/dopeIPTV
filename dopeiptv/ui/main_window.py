@@ -454,6 +454,8 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             multiview_action.setMenuRole(
                 QAction.MenuRole.ApplicationSpecificRole)
             cast_action.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
+            self._donate_action.setMenuRole(
+                QAction.MenuRole.ApplicationSpecificRole)
         # Kept for live language switching (see retranslate_ui).
         self._i18n_actions = {
             settings_action: lambda: tr("btn_settings") + "…",
