@@ -328,6 +328,8 @@ class SettingsShell(QWidget):
         self._none.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.stack.addWidget(self._none)
         self.pages: list[SettingsPage] = []
+        self._items: dict[str, QListWidgetItem] = {}
+        self._sections: list[tuple[QListWidgetItem, list[QListWidgetItem]]] = []
         self._aligned = False
         self.nav.page_chosen.connect(self._show)
         self.search.textChanged.connect(self._filter)
@@ -361,36 +363,84 @@ class SettingsShell(QWidget):
         self.stack.addWidget(page)
         item = QListWidgetItem(icon, page.title)
         item.setData(Qt.ItemDataRole.UserRole, page.key)
-        item.setSizeHint(QSize(0, 36))
+        # 32 px, not 36: with the section headings, fifteen pages at 36 no
+        # longer fitted the sidebar of a window of the default height.
+        item.setSizeHint(QSize(0, 32))
         self.nav.addItem(item)
+        self._items[page.key] = item
         return page
 
+    def arrange(self, sections: list[tuple[str, list[str]]]) -> None:
+        """Put the sidebar in this order, under these headings: (heading,
+        [page keys]). The pages are built in whatever order their code needs;
+        this is the order a person reads them in. A page left out keeps its
+        place at the end, so a new page can never go missing."""
+        self.nav.blockSignals(True)
+        while self.nav.count():
+            self.nav.takeItem(0)
+        self._sections = []
+        placed: set[str] = set()
+        for heading, keys in sections:
+            items = [self._items[k] for k in keys if k in self._items]
+            if not items:
+                continue
+            head = QListWidgetItem(QLocale().toUpper(heading))
+            head.setFlags(Qt.ItemFlag.NoItemFlags)
+            head.setSizeHint(QSize(0, 24 if self._sections else 18))
+            f = head.font()
+            f.setPointSizeF(max(7.0, f.pointSizeF() * 0.8))
+            f.setBold(True)
+            head.setFont(f)
+            head.setForeground(QColor(P["muted"]))
+            head.setTextAlignment(Qt.AlignmentFlag.AlignLeft
+                                  | Qt.AlignmentFlag.AlignBottom)
+            self.nav.addItem(head)
+            for it in items:
+                self.nav.addItem(it)
+            self._sections.append((head, items))
+            placed.update(keys)
+        for p in self.pages:
+            if p.key not in placed:
+                self.nav.addItem(self._items[p.key])
+        self.nav.blockSignals(False)
+
+    def _page_at(self, row: int) -> SettingsPage | None:
+        item = self.nav.item(row)
+        key = item.data(Qt.ItemDataRole.UserRole) if item else None
+        return next((p for p in self.pages if p.key == key), None)
+
     def _show(self, row: int) -> None:
-        if 0 <= row < len(self.pages):
-            self.stack.setCurrentWidget(self.pages[row])
+        page = self._page_at(row)
+        if page is not None:
+            self.stack.setCurrentWidget(page)
 
     def show_page(self, key: str | None) -> None:
-        for i, p in enumerate(self.pages):
-            if p.key == key and not self.nav.item(i).isHidden():
-                self.nav.setCurrentRow(i)
-                return
+        item = self._items.get(key or "")
+        if item is not None and not item.isHidden():
+            self.nav.setCurrentItem(item)
+            return
         for i in range(self.nav.count()):
-            if not self.nav.item(i).isHidden():
+            if self._page_at(i) is not None and not self.nav.item(i).isHidden():
                 self.nav.setCurrentRow(i)
                 return
 
     def current_key(self) -> str | None:
-        row = self.nav.currentRow()
-        return self.pages[row].key if 0 <= row < len(self.pages) else None
+        page = self._page_at(self.nav.currentRow())
+        return page.key if page is not None else None
 
     def _filter(self, text: str) -> None:
         needle = " ".join(text.split()).casefold()
         first = None
-        for i, page in enumerate(self.pages):
+        for page in self.pages:
             hit = page.apply_filter(needle)
-            self.nav.item(i).setHidden(not hit)
-            if hit and first is None:
+            self._items[page.key].setHidden(not hit)
+        # A heading goes with the last of its pages.
+        for head, items in self._sections:
+            head.setHidden(all(it.isHidden() for it in items))
+        for i in range(self.nav.count()):
+            if self._page_at(i) is not None and not self.nav.item(i).isHidden():
                 first = i
+                break
         if first is None:
             self.nav.setCurrentRow(-1)
             self.stack.setCurrentWidget(self._none)
@@ -412,6 +462,19 @@ QListWidget#SettingsNav::item {{
     border-radius: 8px; padding: 0 10px; margin: 1px 0; color: {p['text2']};
 }}
 QListWidget#SettingsNav::item:hover {{ background: {p['hover']}; }}
+QListWidget#SettingsNav QScrollBar:vertical {{
+    width: 6px; background: transparent; margin: 0;
+}}
+QListWidget#SettingsNav QScrollBar::handle:vertical {{
+    background: {p['border']}; border-radius: 3px; min-height: 30px;
+}}
+QListWidget#SettingsNav QScrollBar::add-line, QListWidget#SettingsNav QScrollBar::sub-line {{
+    height: 0;
+}}
+QListWidget#SettingsNav::item:disabled,
+QListWidget#SettingsNav::item:disabled:hover {{
+    background: transparent; color: {p['muted']}; padding: 0 10px 2px 10px;
+}}
 QListWidget#SettingsNav::item:selected {{
     background: {p['accent']}; color: {p.get('on_accent', '#FFFFFF')};
 }}

@@ -786,6 +786,9 @@ class _SettingsMixin:
         c = play.card(tr("set_card_stream"))
         c.row(tr("setting_stream_format"), fmt_box)
         c.row(tr("setting_network_buffer"), buf_box)
+        # Rewinding live TV has a card of its own: its five settings sat in
+        # "Stream" between the stream format and the network buffer.
+        c = rw = play.card(tr("set_card_rewind"))
         c.row(tr("setting_live_rewind"), rewind_box,
               tr("setting_live_rewind_hint"))
         rewind_disk_box = c.toggle(
@@ -833,12 +836,23 @@ class _SettingsMixin:
                 rewind_box.setCurrentIndex(
                     rewind_box.findData(str(MEMORY_MAX_MINUTES)))
         def rewind_room_now(_on: bool = False) -> None:
-            c.refresh()
+            # rw, not c: c is the next card by the time a switch is flipped.
+            rw.refresh()
             rewind_room(rewind_disk_box.isChecked() or kept_box.isChecked())
 
         rewind_disk_box.toggled.connect(rewind_room_now)
         kept_box.toggled.connect(rewind_room_now)
         rewind_room_now()
+        # Pausing a cast channel records it on this computer until you press
+        # play, so this is the one setting that decides how long a pause on
+        # the TV may be. It sat under Recording, where nobody casting looks.
+        cast_pause_edit = QLineEdit(
+            str(self.settings.value("cast_pause_gb", "4.5")))
+        cast_pause_edit.setMaximumWidth(110)
+        c = play.card(tr("set_card_cast"))
+        c.row(tr("cast_pause_label"), hbox(cast_pause_edit, QLabel("GB"),
+                                           stretch=False),
+              tr("cast_pause_hint"))
         if not self.player:
             c = play.card()
             c.note(tr("set_embedded_unavailable",
@@ -1227,15 +1241,6 @@ class _SettingsMixin:
                                         stretch=False))
         c.row(tr("rec_total_label"), hbox(rec_total_edit, rec_total_unit,
                                           stretch=False))
-        # Pausing a cast channel records it here until you press play, so
-        # this is the one setting that decides how long a pause may be.
-        cast_pause_edit = QLineEdit(
-            str(self.settings.value("cast_pause_gb", "4.5")))
-        cast_pause_edit.setMaximumWidth(110)
-        c = rec.card(tr("set_card_cast"))
-        c.row(tr("cast_pause_label"), hbox(cast_pause_edit, QLabel("GB"),
-                                           stretch=False),
-              tr("cast_pause_hint"))
         rk, rexe = self.rec.recorder()
         c = rec.card()
         c.note(tr("rec_recorder_found", kind=rk, path=rexe) if rexe
@@ -1284,12 +1289,11 @@ class _SettingsMixin:
         art_chk.toggled.connect(
             lambda checked: self.settings.setValue(
                 "music_art_online", "true" if checked else "false"))
+        # The card with these is on the Advanced page, beside the image cache:
+        # every cache is cleared in one place.
         loc_clear_lib = QPushButton(tr("local_clear_lib_cache"))
         loc_clear_post = QPushButton(tr("local_clear_posters"))
         loc_clear_thumb = QPushButton(tr("local_clear_thumbs"))
-        c = loc.card(tr("set_card_caches"))
-        c.layout_row(hbox(loc_clear_lib, loc_clear_post, loc_clear_thumb))
-        loc_note = c.note(tr("set_caches_hint"))
 
         def loc_refresh_side():
             # Reflect a folder change in the section immediately.
@@ -1337,7 +1341,7 @@ class _SettingsMixin:
             lambda: (self._local_clear_thumbs(), loc_cleared()))
 
         # -- Metadata (TMDB artwork) ------------------------------------------
-        meta = page("metadata", tr("tab_metadata"),
+        meta = page("metadata", tr("set_page_posters"),
                     tr("set_page_metadata_sub"), "image")
         _bundled = bool(bundled_tmdb_key())
         # Source options: the built-in key (only offered when one ships),
@@ -1557,9 +1561,19 @@ class _SettingsMixin:
         ts_reset_btn.setAccessibleName(tr("ts_reset_broken"))
         c = adv.card(tr("sec_maintenance"))
         c.row(tr("sc_title"), shortcuts_btn, tr("set_shortcuts_hint"))
-        cache_row = c.row(tr("settings_image_cache_label", size="…"),
-                          clear_cache_btn, tr("settings_image_cache_hint"))
         c.row(tr("ts_reset_broken"), ts_reset_btn, tr("ts_reset_hint"))
+        maint = c
+        # Every cache in one card: the image cache was here and the local
+        # files' three on the Local files page. (The guide's own cache stays
+        # on the Guide page, beside fetching it again.)
+        caches = adv.card(tr("set_card_caches"))
+        cache_row = caches.row(tr("settings_image_cache_label", size="…"),
+                               clear_cache_btn,
+                               tr("settings_image_cache_hint"))
+        caches.layout_row(hbox(loc_clear_lib, loc_clear_post,
+                               loc_clear_thumb), tr("nav_local"))
+        loc_note = caches.note(tr("set_caches_hint"))
+        c = maint
 
         def refresh_cache_label() -> None:
             total = sum(dir_size_bytes(d) for d in cache_dirs)
@@ -1824,6 +1838,18 @@ class _SettingsMixin:
         fl.addWidget(buttons)
         outer.addWidget(footer)
 
+        # The order a person looks for things in, under headings - the pages
+        # are built above in the order their code needs. Playlists, the first
+        # thing a new user has to find, sat seventh.
+        shell.arrange([
+            (tr("set_sec_basics"), ["general", "playlists", "appearance",
+                                    "home"]),
+            (tr("set_sec_watching"), ["playback", "audio", "video", "guide",
+                                      "multiview"]),
+            (tr("set_sec_library"), ["recording", "local"]),
+            (tr("set_sec_services"), ["metadata", "trakt"]),
+            (tr("set_sec_system"), ["parental", "advanced"]),
+        ])
         # Back on the page that was open last time this session.
         shell.show_page(getattr(self, "_settings_page", None))
         d.finished.connect(

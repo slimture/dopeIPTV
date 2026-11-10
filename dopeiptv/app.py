@@ -44,6 +44,10 @@ _SUPPRESSED_QT_WARNINGS = (
     # macOS, on drawing the Hindi name in the language list: the system
     # font has no OpenType tables for Devanagari and Qt shapes it without.
     b"OpenType support missing for",
+    # Channel logos and posters from providers are often PNGs with a chunk
+    # out of place or twice ("eXIf: duplicate", "iCCP: out of place"). They
+    # load and show fine; libpng only says so, a line per image.
+    b"libpng warning:",
 )
 _original_msg_handler = None
 

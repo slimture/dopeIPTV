@@ -107,7 +107,7 @@ crash).  The popular shelves come from `services/popular.py`: TMDB's
 weekly chart matched against the provider's catalogue.  They need a TMDB
 key: release builds bundle one (`dopeiptv/_tmdb_key.py`, generated in CI
 and git-ignored); a source checkout uses the user's own key from
-Settings → Metadata or `DOPEIPTV_TMDB_KEY`, and without any key those
+Settings → Posters & info or `DOPEIPTV_TMDB_KEY`, and without any key those
 shelves are simply left out.
 
 ## EPG caching

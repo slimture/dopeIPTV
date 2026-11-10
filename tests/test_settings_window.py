@@ -113,8 +113,9 @@ def search_and_cancel(self):
     shell = self.findChild(SettingsShell)
     nav = shell.nav
     visible = lambda: [nav.item(i).data(0x0100) for i in range(nav.count())
-                       if not nav.item(i).isHidden()]
-    assert len(visible()) == nav.count() >= 15
+                       if not nav.item(i).isHidden()
+                       and nav.item(i).data(0x0100)]
+    assert len(visible()) == len(shell.pages) >= 15
     shell.search.setText(tr("setting_sub_lang_fallback")[:-2])
     assert visible() == ["audio"], visible()
     assert shell.stack.currentWidget() is shell.pages[[p.key for p in
@@ -125,7 +126,7 @@ def search_and_cancel(self):
     assert visible() == []
     assert shell.stack.currentWidget() is shell._none
     shell.search.setText("")
-    assert len(visible()) == nav.count()
+    assert len(visible()) == len(shell.pages)
     return 0
 QDialog.exec = search_and_cancel
 w.open_settings()
@@ -208,6 +209,46 @@ w.open_settings()
 from dopeiptv.ui.theme import P
 assert s.value("theme") == "latte" and s.value("accent") == "mint"
 assert P["bg"] == "#EFF1F5" and P["accent"] == "#34CFA0", P
+
+# 9. The sidebar reads in sections, Playlists right after General; a heading
+# cannot be selected and goes with its pages in a search. The rewind
+# settings, Chromecast and every cache sit where people look for them.
+def layout(self):
+    from PyQt6.QtCore import Qt
+    shell = self.findChild(SettingsShell)
+    nav = shell.nav
+    rows = [(nav.item(i).data(0x0100), nav.item(i).flags())
+            for i in range(nav.count())]
+    keys = [k for k, _f in rows if k]
+    assert keys[:4] == ["general", "playlists", "appearance", "home"], keys
+    assert keys[-2:] == ["parental", "advanced"], keys
+    heads = [i for i, (k, f) in enumerate(rows) if not k]
+    assert len(heads) == 5 and heads[0] == 0, heads
+    assert all(not (rows[i][1] & Qt.ItemFlag.ItemIsSelectable) for i in heads)
+    shell.show_page("playlists")
+    assert shell.current_key() == "playlists"
+    assert shell.stack.currentWidget().key == "playlists"
+    shell.search.setText("trakt")
+    shown_heads = [nav.item(i).text() for i in heads
+                   if not nav.item(i).isHidden()]
+    assert shown_heads == [tr("set_sec_services").upper()], shown_heads
+    shell.search.setText("")
+    page = {p.key: p for p in shell.pages}
+    from PyQt6.QtWidgets import QLabel
+    def card_titles(key):
+        return [l.text() for l in page[key].findChildren(QLabel)
+                if l.objectName() == "SettingsCardTitle"]
+    up = lambda k: tr(k).upper()
+    assert up("set_card_rewind") in card_titles("playback")
+    assert up("set_card_cast") in card_titles("playback")
+    assert up("set_card_cast") not in card_titles("recording")
+    assert up("set_card_caches") in card_titles("advanced")
+    assert up("set_card_caches") not in card_titles("local")
+    assert page["metadata"].title == tr("set_page_posters")
+    return 0
+QDialog.exec = layout
+w.open_settings()
+
 print("SETTINGS_OK", flush=True)
 """
 
