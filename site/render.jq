@@ -23,10 +23,14 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 | ($rel[0] // {}) as $R | ($dl[0] // {}) as $D | $helpfile[0] as $HELP
 | "https://iptv.dope.rs" as $SITE | "https://github.com/slimture/dopeIPTV" as $REPO
 # The donate button's address: a Stripe Payment Link (donate.stripe.com/...
-# or buy.stripe.com/...), a plain link - no script, so the CSP stays as it
-# is, and Stripe's own page offers card, Apple Pay and Google Pay. Empty:
-# no donate section and no footer link at all.
+# or buy.stripe.com/...). nav.js opens the donate dialog over it (paid
+# through donate/donate.py); the link itself is what a click does without
+# script. Empty: no donate section and no footer link at all.
 | "https://donate.stripe.com/bJe4gy7gv4SmdrYgGba7C00" as $DONATE
+# Who the money goes to, shown at the top of the donate dialog with its icon
+# (public/payee.svg) as Stripe's own pages show it - the name on the donor's
+# card statement. Empty: no line.
+| "Solecraft AB" as $PAYEE
 
 # -- the PHP helpers ---------------------------------------------------------
 
@@ -153,6 +157,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
            ["close", "donate_close"], ["loading", "donate_loading"],
            ["apple", "donate_apple"], ["google", "donate_google"], ["card", "donate_card"]][]
           | . as [$k, $key] | " data-\($k)=\"\(t($key) | h)\""] | add)
+      + (if $PAYEE == "" then "" else " data-payee=\"\($PAYEE | h)\"" end)
       + " data-lang=\"\($lang | h)\"></div>\n"
     end;
   def nav($current):

@@ -126,6 +126,13 @@
     dlg = mk("dialog", "dn");
     dlg.setAttribute("aria-labelledby", "dn-title");
     var head = mk("div", "dn-head"), ht = mk("div");
+    // Who is paid, as Stripe's own pages show it: the company's icon and name.
+    if (T.payee) {
+      var payee = mk("p", "dn-payee"), payeeIc = mk("img");
+      Object.assign(payeeIc, { src: "/payee.svg", alt: "", width: 22, height: 22 });
+      payee.append(payeeIc, mk("span", "", T.payee));
+      ht.append(payee);
+    }
     var h = mk("h2", "", T.title); h.id = "dn-title";
     ht.append(h, mk("p", "", T.sub));
     var x = mk("button", "dn-x", "×"); x.type = "button"; x.setAttribute("aria-label", T.close);
@@ -313,6 +320,7 @@
       var elements = st.elements({ clientSecret: s.clientSecret, appearance: appearance() });
       // The wallets have their own button above, as on solequiz.com.
       var pe = elements.create("payment", { layout: { type: "accordion", defaultCollapsed: false },
+        paymentMethodOrder: ["card", "revolut_pay", "amazon_pay"],
         wallets: { applePay: "never", googlePay: "never" } });
       teardown();
       live = { elements: elements, destroy: function () { pe.destroy(); } };
