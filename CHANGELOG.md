@@ -41,7 +41,8 @@ and readable text on light accents.
 - README, FEATURES, ARCHITECTURE, DEVELOPER_NOTES, SECURITY, CONTRIBUTING,
   the issue and PR templates and the AppStream description match 1.4.0.
 - A donate link: `.github/FUNDING.yml` (the repository's Sponsor button)
-  and a "Support dopeIPTV" section in the README.
+  and a "Support dopeIPTV" section in the README, which says what a
+  donation pays for: development, the website and the downloads.
 - `docs/MAINTAINING.md`: the runbook for whoever takes over. `AGENTS.md`
   is for every AI assistant; `CLAUDE.md`, `GEMINI.md` and
   `.github/copilot-instructions.md` point to it.

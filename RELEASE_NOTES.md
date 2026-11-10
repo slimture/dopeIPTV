@@ -19,9 +19,10 @@ different.
   others - buttons, menus and selections now have dark text instead of
   white that was hard to read.
 
-Like dopeIPTV? It is free and built in spare time - there is now a
-**Donate** button on [iptv.dope.rs](https://iptv.dope.rs/#donate) and on
-GitHub, for any amount.
+Like dopeIPTV? It is free, with no ads and no paid version, but making
+it and keeping the website and downloads running has its costs - there is
+now a **Donate** button on [iptv.dope.rs](https://iptv.dope.rs/#donate)
+and on GitHub, for any amount, in your own currency.
 
 On the AppImage from 1.2.15 or later? Click **Update now** in the banner.
 
