@@ -17,9 +17,12 @@ opens the wallet's own sheet (Stripe's Payment Request), the wallet hands
 back a payment method, and this confirms a PaymentIntent with it - or hands
 back what 3-D Secure still needs.
 
-Standard library only (Python 3.9+). It listens on 127.0.0.1 and nginx
-passes /donate/ to it (deploy/content-iptv.dope.rs.conf), with a rate limit
-in front. Settings come from the environment, or from KEY=VALUE lines in the
+Standard library only (Python 3.9+). It listens on a Unix socket - no
+network, so nothing outside the machine can reach it and a jail's loopback
+does not matter - and nginx passes /donate/ to it
+(deploy/content-iptv.dope.rs.conf), with a rate limit in front.
+
+    python3 donate.py --check     asks the running service for its config Settings come from the environment, or from KEY=VALUE lines in the
 file named by DONATE_CONFIG (default /usr/local/etc/iptv-donate.conf):
 
     STRIPE_SECRET_KEY_FILE  file holding the key (default
@@ -38,12 +41,15 @@ file named by DONATE_CONFIG (default /usr/local/etc/iptv-donate.conf):
     STRIPE_API_VERSION      empty: the account's default
     STRIPE_UI_MODE          empty: "elements", then "custom" if Stripe says no
                             (the name changed between API versions)
-    LISTEN                  127.0.0.1:8098
+    LISTEN                  unix:/var/run/iptv_donate/donate.sock (default),
+                            or host:port for TCP
 """
 from __future__ import annotations
 
 import json
 import os
+import socket
+import socketserver
 import sys
 import threading
 import time
@@ -254,7 +260,7 @@ class Handler(BaseHTTPRequestHandler):
         origin = (self.headers.get("Origin") or "").rstrip("/")
         if origin != ORIGIN:
             return self._send(403, {"error": "origin"})
-        addr = self.headers.get("X-Real-IP") or self.client_address[0]
+        addr = self.headers.get("X-Real-IP") or "local"     # a Unix socket has no peer address
         if not _allowed(addr):
             return self._send(429, {"error": "slow down"})
         try:
@@ -282,10 +288,56 @@ class Handler(BaseHTTPRequestHandler):
         self._send(status, body)
 
 
+LISTEN = CONF.get("LISTEN", "unix:/var/run/iptv_donate/donate.sock")
+
+
+class UnixHTTPServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
+    daemon_threads = True
+
+
+def _connection():
+    import http.client
+    if LISTEN.startswith("unix:"):
+        path = LISTEN[5:]
+
+        class Conn(http.client.HTTPConnection):
+            def connect(self) -> None:
+                self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                self.sock.settimeout(5)
+                self.sock.connect(path)
+        return Conn("localhost", timeout=5)
+    host, _, port = LISTEN.rpartition(":")
+    return http.client.HTTPConnection(host or "127.0.0.1", int(port), timeout=5)
+
+
+def check() -> int:
+    """Ask the running service what the page would: GET /donate/config."""
+    try:
+        conn = _connection()
+        conn.request("GET", "/donate/config")
+        resp = conn.getresponse()
+        print(resp.status, resp.read().decode("utf-8", "replace"))
+        return 0 if resp.status == 200 else 1
+    except OSError as e:
+        print(f"no answer on {LISTEN}: {e}")
+        return 1
+
+
 def main() -> None:
-    host, _, port = CONF.get("LISTEN", "127.0.0.1:8098").rpartition(":")
-    srv = ThreadingHTTPServer((host or "127.0.0.1", int(port)), Handler)
-    print(f"[donate] listening on {host}:{port}, {CURRENCY}, "
+    if "--check" in sys.argv[1:]:
+        raise SystemExit(check())
+    if LISTEN.startswith("unix:"):
+        path = LISTEN[5:]
+        try:
+            os.unlink(path)                 # a socket left by a stopped run
+        except FileNotFoundError:
+            pass
+        srv = UnixHTTPServer(path, Handler)
+        os.chmod(path, 0o666)               # nginx's worker connects to it
+    else:
+        host, _, port = LISTEN.rpartition(":")
+        srv = ThreadingHTTPServer((host or "127.0.0.1", int(port)), Handler)
+    print(f"[donate] listening on {LISTEN}, {CURRENCY}, "
           f"{'configured' if PUBLISHABLE and _secret() else 'NOT configured'}",
           file=sys.stderr, flush=True)
     srv.serve_forever()

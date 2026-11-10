@@ -250,8 +250,10 @@ The donate dialog (`public/nav.js`) takes the payment on the page itself,
 as solequiz.com does: Apple Pay or Google Pay where the visitor has it,
 otherwise Stripe's card form inside Stripe's own frames. Stripe needs a
 server holding the secret key for that, which is `donate/donate.py`: Python's
-standard library only, on 127.0.0.1:8098 in the jail, reached through
-`/donate/` in the content server's nginx file. It never sees a card number.
+standard library only, on a Unix socket in the jail
+(`/var/run/iptv_donate/donate.sock`), reached through `/donate/` in the content
+server's nginx file. It never sees a card number, and with no network port
+nothing outside the machine can reach it.
 
 Until it runs, the dialog sends visitors to Stripe's own donate page (the
 Payment Link at the top of `site/render.jq`), so the steps below can come in
@@ -291,8 +293,8 @@ install -m 555 deploy/iptv_donate /usr/local/etc/rc.d/iptv_donate
 install -m 640 -o iptv -g iptv /dev/null /var/log/iptv-donate.log
 sysrc iptv_donate_enable=YES
 service iptv_donate start
-tail -n 1 /var/log/iptv-donate.log   # [donate] listening on 127.0.0.1:8098, eur, configured
-fetch -qo - http://127.0.0.1:8098/donate/config; echo
+tail -n 1 /var/log/iptv-donate.log   # [donate] listening on unix:/var/run/iptv_donate/donate.sock, eur, configured
+python3 -I /usr/local/www/iptv/donate/donate.py --check   # 200 {"publishableKey": "pk_...", ...}
 ```
 
 The key goes in with `cat` rather than `echo` so it never lands in the
@@ -300,10 +302,10 @@ shell's history. Every other setting (amounts, limits, the receipt's
 "Support dopeIPTV") is listed at the top of `donate.py`; change the `.conf`
 and `service iptv_donate restart`.
 
-In a jail without a loopback address of its own, 127.0.0.1 is the jail's
-address (`sockstat -4l | grep 8098` shows which). The service only answers
-`/donate/...`, refuses requests from any origin but the site's and limits
-each visitor, but like 8081 it should not be reachable from outside.
+A Unix socket rather than 127.0.0.1: in a Bastille jail a connection to
+127.0.0.1 can hang (the jail has no loopback of its own), and a socket file
+needs no network at all. The rc script makes `/var/run/iptv_donate` for it
+(and the pidfile); the socket is left writable so nginx's worker can connect.
 
 Log rotation, next to the two lines from step 10 (SIGHUP makes daemon(8)
 reopen the log):
