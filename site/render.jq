@@ -452,9 +452,20 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
              + ([.value[] as $tp
                  | t("help_\($sec)_\($tp)_q") as $q
                  | select($q != "help_\($sec)_\($tp)_q")
-                 | "            <details class=\"help-item\" id=\"\("\($sec)-\($tp)" | h)\">\n"
+                 | "\($sec)-\($tp)" as $id
+                 | "            <details class=\"help-item\" id=\"\($id | h)\">\n"
                    + "              <summary><h3>\($q | h)</h3></summary>\n"
-                   + "              <div class=\"help-a\">\(t("help_\($sec)_\($tp)_a"))</div>\n"
+                   + "              <div class=\"help-a\">\(t("help_\($sec)_\($tp)_a"))"
+                   # The settings page the answer is about, as the app shows
+                   # it in the reader's language (tools/help_screenshots.py
+                   # in the app's repository). Inside a closed <details>,
+                   # so it loads when the question is opened.
+                   + (if ($S.help_shots // [] | index($id)) then
+                        "<img class=\"help-shot\" src=\"/help-shots/\($lang | h)/\($id | h).webp?v=\($version | h)\""
+                        + " width=\"\($S.help_shot_size[0])\" height=\"\($S.help_shot_size[1])\""
+                        + " loading=\"lazy\" decoding=\"async\" alt=\"\($q | h)\">"
+                      else "" end)
+                   + "</div>\n"
                    + "            </details>\n"] | add // "")
              + "          </section>\n"] | add),
          help_version: (if ($version | truthy) then " " + ($version | h) else "" end)});

@@ -62,5 +62,7 @@
         "ar": "ar_AR",
         "fa": "fa_IR",
         "ur": "ur_PK"
-    }
+    },
+    "help_shots": ["set-language", "set-playback", "set-playlists", "set-home", "set-parental", "set-testbuilds"],
+    "help_shot_size": [860, 600]
 }

@@ -788,6 +788,9 @@ body.searching .help-layout { grid-template-columns: 1fr; }
    the English ones - which is what the translation check enforces. */
 [dir="rtl"] .help-a pre, [dir="rtl"] .help-a code { direction: ltr; }
 [dir="rtl"] .help-a pre { text-align: left; }
+/* A picture of the settings page an answer is about (render.jq). */
+.help-shot { display: block; width: 100%; max-width: 640px; height: auto; margin: 14px 0 0;
+  border-radius: 12px; border: 1px solid var(--line); background: var(--surface); }
 .help-none { color: var(--muted); padding: 26px 2px; font-size: 16px; }
 .help-foot { margin-top: 34px; }
 /* While filtering, sections lose their headings' distance - the list should
