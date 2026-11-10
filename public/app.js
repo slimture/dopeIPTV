@@ -123,8 +123,9 @@
 
 /* The feature explorer: the plain list becomes tabs, a small animated
    screen per feature and one line of text at a time. It steps on by itself
-   while it is on screen, until the visitor picks a tab (or never, for
-   reduced motion). Without script the list stays as it is. */
+   while it is on screen, until the visitor picks a tab (more slowly, for
+   reduced motion: the scenes only fade). Without script the list stays as
+   it is. */
 (function () {
   "use strict";
   var sec = document.getElementById("features");
@@ -136,7 +137,7 @@
   var cap = fxp.querySelector(".fxp-cap"), scenes = fxp.querySelectorAll(".sc");
   if (!feats.length || !tabsBox || !cap) { return; }
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var DUR = 6000, cur = -1, timer = null, auto = !reduce, inView = false, held = false;
+  var DUR = reduce ? 8000 : 6000, cur = -1, timer = null, auto = true, inView = false, held = false;
   // It steps on by itself on a computer only: on a phone that was too much
   // movement, and the visitor taps or swipes anyway.
   var narrow = window.matchMedia ? window.matchMedia("(max-width: 860px)") : { matches: false };
@@ -247,11 +248,12 @@
   show(0, false);
 })();
 
-/* Motion, Apple-style: rise into view, a living mock-up in the hero.
-   Nothing for reduced motion. */
+/* Motion, Apple-style: rise into view, a living mock-up in the hero. For
+   reduced motion the same, calm: sections fade in without rising, the
+   picture stays put (style.css). */
 (function () {
   "use strict";
-  if (!window.matchMedia || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { return; }
+  if (!window.matchMedia) { return; }
 
   // On a phone the page is simply there: nothing rises into view.
   var phone = window.matchMedia("(max-width: 720px)").matches;
@@ -319,11 +321,11 @@
   faq.appendChild(b);
 })();
 
-/* Living details: the download count counts up. (The format names used to
-   drift by; too much sideways motion beside the other moving parts.) */
+/* Living details: the download count counts up - for reduced motion too,
+   nothing moves. (The format names used to drift by; too much sideways
+   motion beside the other moving parts.) */
 (function () {
   "use strict";
-  if (!window.matchMedia || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { return; }
   var count = document.querySelector(".release-tag .dl-count");
   var m = count && count.textContent.match(/^(\D*)([\d\s.,  ]*\d)(\D*)$/);
   if (!m || !("IntersectionObserver" in window)) { return; }

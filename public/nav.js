@@ -188,7 +188,11 @@ var iptvHit = (function () {
     return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
   }
   function thump(node, big) {
-    if (CALM || !node || !node.animate) { return; }
+    if (!node || !node.animate) { return; }
+    if (CALM) {                     // less motion: it glows instead of beating
+      node.animate([{ opacity: 1 }, { opacity: 0.45 }, { opacity: 1 }], { duration: big ? 900 : 620, easing: "ease-in-out" });
+      return;
+    }
     var k = big ? [1, 1.45, 0.92, 1.18, 1] : [1, 1.7, 0.85, 1.25, 1];
     node.animate(k.map(function (v) { return { transform: "scale(" + v + ")" }; }),
       { duration: big ? 900 : 620, easing: "ease-out" });
@@ -250,7 +254,7 @@ var iptvHit = (function () {
   // the next time the dialog only grows out of the heart.
   var heroShown = false;
   function heroHeart(from) {
-    if (CALM || heroShown || !from || !dlg.animate) { return false; }
+    if (heroShown || !from || !dlg.animate) { return false; }
     var layer = showLayer(true);
     if (!layer) { return false; }
     heroShown = true;
@@ -275,6 +279,19 @@ var iptvHit = (function () {
     big.style.width = big.style.height = size + "px";
     big.style.left = mid.x + "px"; big.style.top = mid.y + "px";
     layer.append(big);
+    if (CALM) {
+      // Less motion: the heart only lights up in the middle and fades into
+      // the dialog. Nothing flies, grows or bursts.
+      big.style.transform = "translate(-50%, -50%)";
+      big.animate([{ opacity: 0 }, { opacity: 1, offset: 0.3 }, { opacity: 1, offset: 0.55 }, { opacity: 0 }],
+        { duration: 1000, easing: "ease-in-out", fill: "both" });
+      dlg.animate([{ opacity: 0 }, { opacity: 0, offset: 0.5 }, { opacity: 1 }], { duration: 1000 });
+      try {
+        dlg.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 380, pseudoElement: "::backdrop" });
+      } catch (e) { /* the backdrop just appears */ }
+      layer.done(1200);
+      return true;
+    }
     var T0 = 1150, at = function (f) { return Math.round(T0 * f); };
     var dx = (from.x - mid.x).toFixed(0), dy = (from.y - mid.y).toFixed(0);
     var c = "translate(-50%, -50%) ";
@@ -319,7 +336,11 @@ var iptvHit = (function () {
   }
   // The dialog grows out of the heart (a phone's sheet rises from the bottom).
   function grow(from) {
-    if (CALM || !dlg.animate) { return; }
+    if (!dlg.animate) { return; }
+    if (CALM) {                     // less motion: it fades in where it opens
+      dlg.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240, easing: "ease-out" });
+      return;
+    }
     var r = dlg.getBoundingClientRect();
     var sheet = r.bottom >= window.innerHeight - 2 && r.width >= window.innerWidth - 2;
     var start;
@@ -952,7 +973,7 @@ var iptvHit = (function () {
       if (!note) { return; }
       var n = note; note = null;
       n.classList.add("is-leaving");
-      setTimeout(function () { n.remove(); }, CALM ? 0 : 260);
+      setTimeout(function () { n.remove(); }, 260);
     }
     function render(rows) {
       if (note) { note.remove(); }

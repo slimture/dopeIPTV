@@ -990,7 +990,8 @@ dialog.dn { overflow-x: hidden; }
    gives it .rv, then .in; only what starts below the fold, so nothing on the
    first screen ever blinks), and in the hero's app window the channels take
    turns and the timeline plays.
-   None of it for anyone who asked their system for less motion. */
+   For anyone who asked their system for less motion it is calm, not still:
+   what fades stays, what moves, grows or turns is left out. */
 .rv { opacity: 0; transform: translateY(10px); }
 .rv.in { opacity: 1; transform: none; transition: opacity .6s ease-out var(--d, 0s),
   transform .6s ease-out var(--d, 0s); }
@@ -1000,7 +1001,9 @@ dialog.dn { overflow-x: hidden; }
   transition: background-color 1s ease; }
 
 @media (prefers-reduced-motion: reduce) {
-  .rv { opacity: 1; transform: none; }
+  .rv { transform: none; }
+  .rv.in { transform: none; transition: opacity .7s ease-out var(--d, 0s); }
+  .mock.alive .scan { animation: none; }
 }
 
 /* ---- the feature explorer (app.js) --------------------------------------- */
@@ -1208,10 +1211,26 @@ dialog.dn { overflow-x: hidden; }
   .fxp-cap h3 { margin-top: 18px; }
   .fxp-cap p { font-size: 16px; }
 }
+/* Less motion asked for: the scenes keep what fades (a frame lighting up,
+   a blinking dot, a line of subtitles) and lose what moves or grows. */
 @media (prefers-reduced-motion: reduce) {
-  .sc, .sc *, .sc *::before, .sc *::after { animation: none !important; }
-  .fxp-tab.playing .bar::after { animation: none; }
-  .fxp-cap.swap { animation: none; }
+  .sc-ts .rw, .sc-ts .head b, .sc-pz .pz, .sc-rec .disk i, .sc-keys .keys i,
+  .sc-keys .keys i::before { animation: none !important; }
+  .sc-pz .buf { transform: none; animation-name: calm-pulse !important; }
+  .sc-prov .pl i { transform: none; animation-name: prov-ok-calm !important; }
+  .sc-files .posters i { animation-name: files-in-calm !important; }
+  .sc-play .ring { transform: scale(1.3); animation-name: calm-ring !important; }
+  .sc-play .r2 { display: none; }
+  .sc-home .shelf i.new::before { transform: scale(2.4); animation-name: calm-ring !important; }
+  .fxp-cap.swap { animation-name: calm-fade; }
+  .fxp { --dur: 8s; }                       /* app.js steps on more slowly too */
+  .fxp-tab.playing .bar::after { transform: none; animation-name: calm-bar; }
+  @keyframes calm-bar { from { opacity: 0; } }
+  @keyframes calm-pulse { 50% { opacity: .35; } }
+  @keyframes calm-ring { 0%, 100% { opacity: 0; } 40% { opacity: .55; } }
+  @keyframes calm-fade { from { opacity: 0; } }
+  @keyframes prov-ok-calm { 0% { opacity: 0; } 8%, 82% { opacity: 1; } 92%, 100% { opacity: 0; } }
+  @keyframes files-in-calm { 0% { opacity: 0; } 10%, 100% { opacity: 1; } }
 }
 
 /* ---- living details ---------------------------------------------------- */
@@ -1252,6 +1271,38 @@ dialog.dn { overflow-x: hidden; }
   /* the heart beats when you mean it */
   .donate-btn:hover .donate-heart, .navdonate:hover .heart, nav.links .navheart:hover svg { animation: beat .9s ease-in-out infinite; }
   @keyframes beat { 0%, 100% { transform: scale(1); } 20% { transform: scale(1.22); } 40% { transform: scale(.96); } 60% { transform: scale(1.12); } }
+}
+
+/* Less motion asked for: the hero fades in, the donate band's heart and
+   button glow and a few hearts light up in place - nothing moves. */
+@media (prefers-reduced-motion: reduce) {
+  @media (min-width: 721px) {
+    .hero .eyebrow, .hero h1, .hero .lede, .hero .cta-row, .hero .platnote, .hero .mock {
+      animation: calm-fade .7s ease-out both; }
+    .hero h1 { animation-delay: .08s; } .hero .lede { animation-delay: .16s; }
+    .hero .cta-row { animation-delay: .24s; } .hero .platnote, .hero .mock { animation-delay: .3s; }
+  }
+  .donate .donate-btn::after { transform: scale(1.08, 1.45); }
+  .donate.is-live .donate-big { animation: calm-heart 3s ease-in-out 3; }
+  .donate.is-live .donate-btn::after { animation: calm-glow 3s ease-in-out 3; }
+  .donate-fx i { bottom: auto; }
+  .donate-fx i:nth-of-type(1) { top: 26%; } .donate-fx i:nth-of-type(2) { top: 58%; }
+  .donate-fx i:nth-of-type(3) { top: 16%; } .donate-fx i:nth-of-type(4) { top: 72%; }
+  .donate-fx i:nth-of-type(5) { top: 44%; } .donate-fx i:nth-of-type(6) { top: 30%; }
+  .donate.is-live .donate-fx i { animation: calm-twinkle 7.8s ease-in-out 1; }
+  @media (hover: hover) {
+    .donate.is-live:hover .donate-big, .donate.is-live:hover .donate-btn::after,
+    .donate.is-live:hover .donate-fx i { animation-iteration-count: infinite; }
+  }
+  dialog.dn[open] .dn-titleheart { animation: calm-twice 1.3s .35s ease-in-out both; }
+  .owner-note { animation: calm-fade .35s ease-out both; }
+  .owner-note.is-leaving { animation: calm-out .26s ease-in both; }
+  @keyframes calm-fade { from { opacity: 0; } }
+  @keyframes calm-out { to { opacity: 0; } }
+  @keyframes calm-heart { 50% { opacity: .22; } }
+  @keyframes calm-glow { 0%, 100% { opacity: 0; } 50% { opacity: .5; } }
+  @keyframes calm-twinkle { 0%, 100% { opacity: 0; } 25% { opacity: .45; } 50% { opacity: 0; } }
+  @keyframes calm-twice { 0%, 50%, 100% { opacity: 1; } 25%, 75% { opacity: .35; } }
 }
 
 /* On a phone, where nothing else moves, the donate band is alive while it
