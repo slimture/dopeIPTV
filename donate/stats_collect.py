@@ -15,7 +15,9 @@ What is counted, per day:
   pages, refs (sites that linked here), langs (the language the page was
   shown in), os, devices - the last three once per visitor
   downloads  per platform, and files per file, from the /dl.php log the
-             site already keeps
+             site already keeps - counted as the site's own counter counts
+             them (sync-releases.sh): a request sent on to the file (302),
+             robots and empty browser names left out
 
 Two logs, read from where the last run stopped (rotation by newsyslog is
 followed into <log>.0):
@@ -25,13 +27,21 @@ followed into <log>.0):
   DL_LOG      /var/log/nginx/iptv.dope.rs-downloads.log  (combined)
   STATS_DIR   <site>/stats, beside public/ - outside the web root
 
+Once, on a fresh start (no state.json yet), `--backfill` also reads the
+download log's older, rotated files (<log>.0, <log>.1.bz2 ...), so the
+downloads per day go back as far as the server kept them.
+
 Settings come from the same file as donate.py's (DONATE_CONFIG). Standard
 library only.
 """
 from __future__ import annotations
 
+import bz2
+import glob
+import gzip
 import hashlib
 import json
+import lzma
 import os
 import re
 import secrets
@@ -56,7 +66,11 @@ BOTS = re.compile(r"bot|crawl|spider|slurp|curl|wget|python|httpclient|go-http|j
                   r"facebookexternalhit|embedly|preview|monitor|uptime|headless|scrapy|"
                   r"lighthouse|pingdom|feedfetcher|validator|scanner|semrush|ahrefs|"
                   r"bingpreview|whatsapp|telegram|discord|slack", re.IGNORECASE)
-DL_LINE = re.compile(r'\[(\d{2})/(\w{3})/(\d{4}):[^\]]*\] "GET /dl\.php\?f=([^ "&]+)[^"]*" (\d{3})')
+DL_LINE = re.compile(r'\[(\d{2})/(\w{3})/(\d{4}):[^\]]*\] "GET /dl\.php\?f=([^ "&]+)[^"]*" (\d{3}) '
+                     r'\S+ "[^"]*" "([^"]*)"')
+# The same robots sync-releases.sh leaves out of the site's download counter.
+DL_BOTS = re.compile(r"bot|crawl|spider|slurp|preview|facebookexternalhit|whatsapp|telegram|discord|"
+                     r"skype|embed|monitor|scan", re.IGNORECASE)
 MONTHS = {m: i for i, m in enumerate(
     ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], 1)}
 
@@ -133,16 +147,55 @@ def _read_new(path: str, state: dict) -> list:
     return lines
 
 
+def _download(stats: dict, line: str) -> None:
+    m = DL_LINE.search(line)
+    if not m or m.group(5) != "302":
+        return
+    ua = m.group(6)
+    if not ua or ua == "-" or DL_BOTS.search(ua):
+        return
+    dd, mon, yyyy, name = m.group(1), m.group(2), m.group(3), m.group(4)
+    if mon not in MONTHS:
+        return
+    name = name.rsplit("/", 1)[-1]
+    d = _day(stats, f"{yyyy}-{MONTHS[mon]:02d}-{dd}")
+    _bump(d["downloads"], platform_of(name))
+    _bump(d.setdefault("files", {}), name[:120])
+
+
+def _rotated(path: str) -> list:
+    """<path>.0, <path>.1.bz2 ... oldest first."""
+    found = []
+    for f in glob.glob(glob.escape(path) + ".[0-9]*"):
+        m = re.fullmatch(re.escape(path) + r"\.(\d+)(\.(?:bz2|gz|xz))?", f)
+        if m:
+            found.append((int(m.group(1)), f))
+    return [f for _, f in sorted(found, reverse=True)]
+
+
+def _open_any(path: str):
+    if path.endswith(".bz2"):
+        return bz2.open(path, "rt", encoding="utf-8", errors="replace")
+    if path.endswith(".gz"):
+        return gzip.open(path, "rt", encoding="utf-8", errors="replace")
+    if path.endswith(".xz"):
+        return lzma.open(path, "rt", encoding="utf-8", errors="replace")
+    return open(path, encoding="utf-8", errors="replace")
+
+
 def _day(stats: dict, day: str) -> dict:
     return stats["days"].setdefault(day, {
         "views": 0, "visitors": 0, "pages": {}, "refs": {}, "langs": {},
         "os": {}, "devices": {}, "downloads": {}, "files": {}})
 
 
-def collect() -> None:
+def collect(backfill: bool = False) -> None:
     os.makedirs(STATS_DIR, mode=0o750, exist_ok=True)
     stats_path = os.path.join(STATS_DIR, "stats.json")
     state_path = os.path.join(STATS_DIR, "state.json")
+    if backfill and os.path.exists(state_path):
+        sys.exit(f"--backfill is for a fresh start: {state_path} exists, and the old logs "
+                 "would be counted twice. Remove stats.json and state.json first.")
     stats = _load(stats_path, {"days": {}})
     state = _load(state_path, {"logs": {}, "salts": {}, "seen": {}})
     salts, seen = state.setdefault("salts", {}), state.setdefault("seen", {})
@@ -178,17 +231,14 @@ def collect() -> None:
             _bump(d["os"], os_of(ua))
             _bump(d["devices"], device_of(ua))
 
+    if backfill:
+        for old in _rotated(DL_LOG):
+            with _open_any(old) as fh:
+                for line in fh:
+                    _download(stats, line)
+            print(f"[stats] read {old}", flush=True)
     for line in _read_new(DL_LOG, state["logs"].setdefault("downloads", {})):
-        m = DL_LINE.search(line)
-        if not m or m.group(5) not in ("302", "200"):
-            continue
-        dd, mon, yyyy, name = m.group(1), m.group(2), m.group(3), m.group(4)
-        if mon not in MONTHS:
-            continue
-        day = f"{yyyy}-{MONTHS[mon]:02d}-{dd}"
-        d = _day(stats, day)
-        _bump(d["downloads"], platform_of(name))
-        _bump(d.setdefault("files", {}), name[:120])
+        _download(stats, line)
 
     # The salts and the day's hashes only live while that day can still get
     # lines (today and yesterday, for a late rotation); then they are gone,
@@ -231,4 +281,4 @@ def _save(path: str, data: dict) -> None:
 
 
 if __name__ == "__main__":
-    collect()
+    collect(backfill="--backfill" in sys.argv[1:])
