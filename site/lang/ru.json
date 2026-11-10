@@ -117,6 +117,7 @@
     "donate_note": "Любая сумма в вашей валюте · карта, Apple Pay или Google Pay · безопасно через Stripe",
     "donate_modal_sub": "Любая сумма, разово. Спасибо за помощь!",
     "donate_other": "Другая сумма",
+    "donate_other_short": "Другая",
     "donate_currency": "Валюта",
     "donate_continue": "Продолжить",
     "donate_email": "Эл. почта для чека",

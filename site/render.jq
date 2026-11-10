@@ -31,6 +31,9 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 # donor's card statement: one quiet line at the foot of the donate dialog and
 # the footer's copyright (kept small on purpose). Empty: the dialog line goes.
 | "Solecraft AB" as $PAYEE
+# Its mark beside the payee line (public/solecraft.svg, from solecraft.se).
+| "/solecraft.svg" as $PAYEE_LOGO
+| "https://solecraft.se" as $PAYEE_URL
 
 # -- the PHP helpers ---------------------------------------------------------
 
@@ -149,7 +152,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
   def donate_i18n:
     if $DONATE == "" then "" else
       "<div id=\"donate-i18n\" hidden"
-      + ([[["title", "donate_eyebrow"], ["sub", "donate_modal_sub"], ["other", "donate_other"], ["currency", "donate_currency"],
+      + ([[["title", "donate_eyebrow"], ["sub", "donate_modal_sub"], ["other", "donate_other"], ["othershort", "donate_other_short"], ["currency", "donate_currency"],
            ["cont", "donate_continue"], ["email", "donate_email"], ["pay", "donate_pay"],
            ["busy", "donate_busy"], ["lock", "donate_lock"], ["back", "donate_back"],
            ["thanks", "donate_thanks"], ["receipt", "donate_receipt"], ["failed", "donate_failed"],
@@ -157,7 +160,9 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
            ["close", "donate_close"], ["loading", "donate_loading"],
            ["apple", "donate_apple"], ["google", "donate_google"], ["card", "donate_card"]][]
           | . as [$k, $key] | " data-\($k)=\"\(t($key) | h)\""] | add)
-      + (if $PAYEE == "" then "" else " data-payee=\"\($PAYEE | h)\" data-payeenote=\"\(t("donate_payee_note") | h)\"" end)
+      + (if $PAYEE == "" then "" else " data-payee=\"\($PAYEE | h)\" data-payeenote=\"\(t("donate_payee_note") | h)\""
+             + (if $PAYEE_LOGO == "" then "" else " data-payeelogo=\"\($PAYEE_LOGO | h)\"" end)
+             + (if $PAYEE_URL == "" then "" else " data-payeeurl=\"\($PAYEE_URL | h)\"" end) end)
       + " data-lang=\"\($lang | h)\"></div>\n"
     end;
   def nav($current):

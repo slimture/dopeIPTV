@@ -117,6 +117,7 @@
     "donate_note": "Any amount, in your own currency · card, Apple Pay or Google Pay · securely through Stripe",
     "donate_modal_sub": "Any amount, once. Thank you for helping!",
     "donate_other": "Other amount",
+    "donate_other_short": "Other",
     "donate_currency": "Currency",
     "donate_continue": "Continue",
     "donate_email": "Email, for the receipt",

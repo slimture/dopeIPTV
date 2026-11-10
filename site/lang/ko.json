@@ -117,6 +117,7 @@
     "donate_note": "원하는 금액, 내 통화로 · 카드, Apple Pay 또는 Google Pay · Stripe로 안전하게",
     "donate_modal_sub": "원하는 금액, 1회. 도와주셔서 감사합니다!",
     "donate_other": "다른 금액",
+    "donate_other_short": "기타",
     "donate_currency": "통화",
     "donate_continue": "계속",
     "donate_email": "이메일 (영수증용)",

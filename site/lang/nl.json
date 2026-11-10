@@ -117,6 +117,7 @@
     "donate_note": "Elk bedrag, in je eigen valuta · kaart, Apple Pay of Google Pay · veilig via Stripe",
     "donate_modal_sub": "Elk bedrag, eenmalig. Bedankt voor je hulp!",
     "donate_other": "Ander bedrag",
+    "donate_other_short": "Ander",
     "donate_currency": "Valuta",
     "donate_continue": "Doorgaan",
     "donate_email": "E-mail, voor het betaalbewijs",

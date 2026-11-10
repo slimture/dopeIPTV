@@ -117,6 +117,7 @@
     "donate_note": "Bilo koji iznos, u vašoj valuti · kartica, Apple Pay ili Google Pay · bezbedno preko Stripe-a",
     "donate_modal_sub": "Bilo koji iznos, jednom. Hvala na pomoći!",
     "donate_other": "Drugi iznos",
+    "donate_other_short": "Drugi",
     "donate_currency": "Valuta",
     "donate_continue": "Nastavi",
     "donate_email": "Imejl, za potvrdu",

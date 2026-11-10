@@ -746,6 +746,12 @@ dialog.dn::backdrop { background: rgba(5, 7, 10, .62); backdrop-filter: blur(3px
 /* Big enough and bright enough to be seen: at 15 px in the faint grey the
    company mark went unnoticed. */
 .dn-payee .dn-ico { width: 18px; height: 18px; color: var(--muted); }
+.dn-payee-logo { width: 18px; height: 18px; flex: none; display: block; border-radius: 4px; }
+.dn-payee a { color: inherit; text-decoration: underline; text-underline-offset: 2px;
+  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent); }
+.dn-payee a:hover { color: var(--text); text-decoration-color: currentColor; }
+.dn-payee a.dn-payee-link:has(img) { display: inline-flex; flex: none; }
+.dn-payee a:has(img):hover { opacity: .85; }
 footer .v a { color: inherit; }
 footer .v a:hover { color: var(--accent); }
 .dn-x { flex: none; width: 34px; height: 34px; margin: -4px -6px 0 0; border-radius: 50%;
@@ -807,6 +813,23 @@ footer .v a:hover { color: var(--accent); }
    16px: Safari on iPhone zooms the whole page in on a smaller input. */
 .dn-input--sm { flex: none; width: 22%; max-width: 104px; min-width: 62px; padding: 8px 6px; font-size: 16px;
   border-radius: 10px; text-align: center; }
+/* ... and it reads as a box to write in: a dashed edge and a pencil while
+   empty, the input's own look once it has focus or an amount. */
+.dn-own { flex: none; width: 25%; max-width: 124px; min-width: 76px; display: flex; align-items: center;
+  justify-content: center; gap: 5px; padding: 0 8px; border-radius: 10px; cursor: text;
+  border: 1.5px dashed var(--line-2); background: transparent; color: var(--muted); }
+.dn-own:focus-within { border: 1.5px solid var(--accent); background: var(--ink); }
+/* Holding the amount, it is the chosen one - and looks it, like a chip. */
+.dn-own:has(input:not(:placeholder-shown)) { border: 1.5px solid var(--accent); color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--ink)); }
+.dn-own:has(input:not(:placeholder-shown)) .dn-input--sm { color: var(--accent); font-weight: 700; }
+.dn-own:has(input:not(:placeholder-shown)):focus-within { border-color: var(--accent); }
+.dn-own .dn-input--sm { width: 100%; min-width: 0; max-width: none; flex: 1; padding: 8px 0;
+  border: 0; background: transparent; box-shadow: none; }
+.dn-own .dn-input--sm::placeholder { color: var(--muted); font-size: 14px; font-weight: 600; opacity: 1; }
+.dn-own .dn-ico { order: -1; width: 15px; height: 15px; }
+.dn-own .dn-input--sm:not(:placeholder-shown) + .dn-ico,
+.dn-own .dn-input--sm:focus + .dn-ico { display: none; }
 dialog.dn { overflow-x: hidden; }
 @media (max-width: 560px) {
   .dn-chips.dn-chips--sm { grid-template-columns: repeat(4, minmax(0, 1fr)); }

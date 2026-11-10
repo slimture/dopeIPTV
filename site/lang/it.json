@@ -117,6 +117,7 @@
     "donate_note": "Importo libero, nella tua valuta · carta, Apple Pay o Google Pay · in sicurezza tramite Stripe",
     "donate_modal_sub": "Importo libero, una volta. Grazie dell'aiuto!",
     "donate_other": "Altro importo",
+    "donate_other_short": "Altro",
     "donate_currency": "Valuta",
     "donate_continue": "Continua",
     "donate_email": "Email, per la ricevuta",

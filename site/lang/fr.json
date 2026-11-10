@@ -117,6 +117,7 @@
     "donate_note": "Montant libre, dans votre devise · carte, Apple Pay ou Google Pay · en toute sécurité via Stripe",
     "donate_modal_sub": "Montant libre, une fois. Merci de votre aide !",
     "donate_other": "Autre montant",
+    "donate_other_short": "Autre",
     "donate_currency": "Devise",
     "donate_continue": "Continuer",
     "donate_email": "E-mail, pour le reçu",

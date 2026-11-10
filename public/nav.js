@@ -140,7 +140,8 @@ var iptvHit = (function () {
     card: ["M3.5 6.5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z",
            "M3.5 9.5h17", "M7 15h4"],
     company: ["M4.5 20.5v-15a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v15", "M14.5 9.5h4a1 1 0 0 1 1 1v10",
-              "M3 20.5h18", "M8 8h3", "M8 11.5h3", "M8 15h3", "M9.5 20.5v-2.5"]
+              "M3 20.5h18", "M8 8h3", "M8 11.5h3", "M8 15h3", "M9.5 20.5v-2.5"],
+    pencil: ["M4 20l1-4.2L15.6 5.2a2 2 0 0 1 2.8 0l.4.4a2 2 0 0 1 0 2.8L8.2 19 4 20z", "M13.8 7l3.2 3.2"]
   };
   function icon(name) {
     var NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
@@ -283,15 +284,17 @@ var iptvHit = (function () {
     return null;
   }
   // The main button as the wallet's (kind "apple"/"google"; waiting: shown,
-  // not yet live) or as plain "Continue" (kind null).
+  // not yet live) or, with no wallet, as the card button it then is - it
+  // opens the card form, which "Continue" did not say.
   function walletLook(kind, waiting) {
     el.go.classList.remove("dn-wallet", "dn-wallet--apple", "dn-wallet--google", "dn-wallet--wait");
+    el.go.classList.add("dn-wallet");
     if (kind) {
       el.go.textContent = kind === "apple" ? T.apple.replace("Apple Pay", "\uF8FF\u00A0Pay") : T.google;
-      el.go.classList.add("dn-wallet", "dn-wallet--" + kind);
+      el.go.classList.add("dn-wallet--" + kind);
       if (waiting) { el.go.classList.add("dn-wallet--wait"); }
     } else {
-      el.go.textContent = T.cont;
+      el.go.replaceChildren(icon("card"), document.createTextNode(T.card));
     }
     el.go.disabled = !!waiting;
     el.card.hidden = !kind;
@@ -351,7 +354,7 @@ var iptvHit = (function () {
     el.custom.addEventListener("input", function () { setAmount(toMinor(el.custom.value), true); });
     other.append(el.custom);
     el.err1 = mk("p", "dn-error"); el.err1.hidden = true; el.err1.setAttribute("role", "alert");
-    el.go = mk("button", "btn primary dn-go", T.cont); el.go.type = "button";
+    el.go = mk("button", "btn primary dn-go"); el.go.type = "button";
     el.go.addEventListener("click", function () {
       if (wallet) { payWallet(); } else { toPay(); }
     });
@@ -359,6 +362,7 @@ var iptvHit = (function () {
     // button it was easy to miss.
     el.card = mk("button", "btn dn-card"); el.card.type = "button"; el.card.hidden = true;
     el.card.append(icon("card"), document.createTextNode(T.card));
+    walletLook(null, false);        // the card button until a wallet turns up
     el.card.addEventListener("click", toPay);
     el.amounts.append(el.chips, other, el.err1, el.go, el.card);
 
@@ -371,8 +375,13 @@ var iptvHit = (function () {
     el.custom2 = mk("input", "dn-input dn-input--sm");
     Object.assign(el.custom2, { type: "text", inputMode: "decimal", autocomplete: "off" });
     el.custom2.setAttribute("aria-label", T.other);
+    el.custom2.placeholder = T.othershort || T.other;
     el.custom2.addEventListener("input", function () { setAmount(toMinor(el.custom2.value), true); });
-    top.append(el.chips2, el.custom2);
+    // A box to write in, not a fifth amount: a dashed edge and a pencil
+    // while it is empty. "SEK …" there read as one more amount, cut short.
+    var own = mk("label", "dn-own");
+    own.append(el.custom2, icon("pencil"));
+    top.append(el.chips2, own);
     var em = mk("label", "dn-email", T.email);
     el.email = mk("input", "dn-input");
     Object.assign(el.email, { type: "email", name: "email", autocomplete: "email", required: true, spellcheck: false });
@@ -392,7 +401,28 @@ var iptvHit = (function () {
     // Who is paid: the company behind dopeIPTV, the name on the statement.
     if (T.payee && T.payeenote) {
       el.payee = mk("p", "dn-payee");
-      el.payee.append(icon("company"), mk("span", "", T.payeenote.replace("{payee}", T.payee)));
+      var mark = icon("company");
+      if (T.payeelogo) {            // the company's own mark, where there is one
+        mark = mk("img", "dn-payee-logo");
+        Object.assign(mark, { src: T.payeelogo, alt: "", width: 18, height: 18, decoding: "async" });
+      }
+      // The company's mark and name lead to its site, in a new tab, so the
+      // dialog - and a payment begun in it - stays where it is.
+      var toPayee = function (child, label) {
+        if (!T.payeeurl) { return child; }
+        var a = mk("a", "dn-payee-link");
+        Object.assign(a, { href: T.payeeurl, target: "_blank", rel: "noopener" });
+        if (label) { a.setAttribute("aria-label", label); }
+        a.append(child);
+        return a;
+      };
+      var parts = T.payeenote.split("{payee}"), words = mk("span");
+      if (parts.length > 1) {
+        words.append(parts[0], toPayee(document.createTextNode(T.payee)), parts.slice(1).join(T.payee));
+      } else {
+        words.textContent = T.payeenote;
+      }
+      el.payee.append(toPayee(mark, T.payee), words);
       body.append(el.payee);
     }
     dlg.append(head, body);
@@ -424,7 +454,6 @@ var iptvHit = (function () {
         box.appendChild(b);
       });
     });
-    el.custom2.placeholder = fmt(0).replace(/[\d.,\s\u00a0\u202f]/g, "") + " …";
     var p = C().presets || [];
     if (!chosen && p.length) { chosen = p[Math.min(1, p.length - 1)]; }
     mark();

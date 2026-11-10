@@ -117,6 +117,7 @@
     "donate_note": "Valfritt belopp i din egen valuta · kort, Apple Pay eller Google Pay · säkert via Stripe",
     "donate_modal_sub": "Valfritt belopp, en gång. Tack för hjälpen!",
     "donate_other": "Annat belopp",
+    "donate_other_short": "Annat",
     "donate_currency": "Valuta",
     "donate_continue": "Fortsätt",
     "donate_email": "E-post, för kvittot",

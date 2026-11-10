@@ -117,6 +117,7 @@
     "donate_note": "İstediğiniz tutar, kendi para biriminizde · kart, Apple Pay veya Google Pay · Stripe ile güvenle",
     "donate_modal_sub": "İstediğiniz tutar, bir kez. Yardımınız için teşekkürler!",
     "donate_other": "Başka tutar",
+    "donate_other_short": "Başka",
     "donate_currency": "Para birimi",
     "donate_continue": "Devam",
     "donate_email": "E-posta, makbuz için",

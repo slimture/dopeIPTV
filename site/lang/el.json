@@ -117,6 +117,7 @@
     "donate_note": "Οποιοδήποτε ποσό, στο δικό σας νόμισμα · κάρτα, Apple Pay ή Google Pay · με ασφάλεια μέσω Stripe",
     "donate_modal_sub": "Οποιοδήποτε ποσό, μία φορά. Ένα μεγάλο ευχαριστώ για τη βοήθεια!",
     "donate_other": "Άλλο ποσό",
+    "donate_other_short": "Άλλο",
     "donate_currency": "Νόμισμα",
     "donate_continue": "Συνέχεια",
     "donate_email": "Email, για την απόδειξη",
