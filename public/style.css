@@ -728,8 +728,15 @@ dialog.dn {
 }
 dialog.dn::backdrop { background: rgba(5, 7, 10, .62); backdrop-filter: blur(3px); }
 .dn [hidden] { display: none !important; }
-.dn-head { display: flex; align-items: flex-start; gap: 14px; padding: 22px 22px 4px; }
-.dn-head > div { flex: 1; min-width: 0; }
+/* Title, currency and close on one line; the line under the title has the
+   whole width, also beside a currency menu on a small phone. */
+.dn-head { display: grid; grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas: "title cur x" "sub sub sub"; align-items: center; column-gap: 10px; padding: 22px 22px 4px; }
+.dn-head > div { display: contents; }
+.dn-head h2 { grid-area: title; min-width: 0; }
+.dn-head p { grid-area: sub; }
+.dn-head .dn-curwrap { grid-area: cur; margin-top: 0; }
+.dn-head .dn-x { grid-area: x; margin: 0 -6px 0 0; }
 .dn-head h2 { margin: 0; font-size: 1.2rem; font-weight: 700; letter-spacing: -.03em; }
 .dn-head p { margin: 4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
 /* Who is paid: one quiet line at the foot, and the company in the footer's
@@ -740,7 +747,7 @@ footer .v a:hover { color: var(--accent); }
 .dn-x { flex: none; width: 34px; height: 34px; margin: -4px -6px 0 0; border-radius: 50%;
   border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 24px;
   line-height: 1; cursor: pointer; }
-[dir="rtl"] .dn-x { margin: -4px 0 0 -6px; }
+[dir="rtl"] .dn-x, [dir="rtl"] .dn-head .dn-x { margin: 0 0 0 -6px; }
 .dn-x:hover { background: var(--surface-2); color: var(--text); }
 .dn-body { padding: 16px 22px 22px; }
 .dn-step { display: flex; flex-direction: column; gap: 14px; }
@@ -753,19 +760,19 @@ footer .v a:hover { color: var(--accent); }
   background: color-mix(in srgb, var(--accent) 14%, var(--ink)); box-shadow: inset 0 0 0 1px var(--accent); }
 .dn-other, .dn-email { display: flex; flex-direction: column; gap: 6px; font-size: 13px;
   font-weight: 600; color: var(--muted); }
-/* The own amount, and the currency beside it: a quiet menu, its arrow
-   drawn here (appearance: none drops the browser's own). */
-.dn-otherrow { display: flex; align-items: flex-end; gap: 8px; }
-.dn-otherrow .dn-other { flex: 1; min-width: 0; }
-.dn-curwrap { position: relative; flex: none; display: block; }
-.dn-curwrap::after { content: ""; position: absolute; inset-inline-end: 13px; top: 50%; width: 6px; height: 6px;
+/* The currency: a quiet pill in the dialog's head, on both steps, its arrow
+   drawn here (appearance: none drops the browser's own). 16px: Safari on
+   iPhone zooms the page in on a smaller field. */
+.dn-curwrap { position: relative; flex: none; display: block; margin-top: -2px; }
+.dn-curwrap::after { content: ""; position: absolute; inset-inline-end: 12px; top: 50%; width: 6px; height: 6px;
   border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
   transform: translateY(-70%) rotate(45deg); pointer-events: none; }
 .dn-cur { font: inherit; font-size: 16px; font-weight: 600; color: var(--text); cursor: pointer;
-  padding: 11px 32px 11px 13px; border-radius: 10px; border: 1px solid var(--line-2);
+  padding: 5px 30px 5px 12px; border-radius: 999px; border: 1px solid var(--line-2);
   background: var(--ink); -webkit-appearance: none; appearance: none; }
-[dir="rtl"] .dn-cur { padding: 11px 13px 11px 32px; }
+[dir="rtl"] .dn-cur { padding: 5px 12px 5px 30px; }
 .dn-cur:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.dn-cur:disabled { opacity: .55; cursor: default; }
 .dn-input { font: inherit; font-size: 16px; font-weight: 500; color: var(--text); width: 100%;
   padding: 11px 13px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--ink); }
 .dn-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }

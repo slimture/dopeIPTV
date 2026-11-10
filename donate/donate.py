@@ -120,10 +120,14 @@ def _int(key: str, default: int) -> int:
         return default
 
 
-# What a donation can be in each currency, in minor units (cents, öre; yen
-# and won have none): the four buttons, the smallest and the largest. Round
-# amounts that mean about the same everywhere - the euro row is 3/5/10/25 -
-# and well above Stripe's own smallest charge in each.
+# What a donation can be in each currency, in minor units (cents, öre; yen,
+# won, dong and pesos chilenos have none): the four buttons, the smallest and
+# the largest. Round amounts that mean about the same everywhere - the euro
+# row is 3/5/10/25 - and well above Stripe's own smallest charge in each.
+# The currencies of the site's languages and the world's largest. Not the
+# rouble or the rial: Stripe does not take payments from Russia or Iran, so
+# those visitors pay in euro or dollars. Rows for currencies that lose value
+# fast (the lira) want a look now and then.
 CURRENCIES: dict[str, dict[str, object]] = {
     k: {"presets": p, "min": lo, "max": hi} for k, (p, lo, hi) in {
         "eur": ([300, 500, 1000, 2500], 200, 100000),
@@ -145,7 +149,31 @@ CURRENCIES: dict[str, dict[str, object]] = {
         "brl": ([1500, 3000, 6000, 15000], 1000, 600000),
         "mxn": ([6000, 10000, 20000, 50000], 4000, 2000000),
         "ils": ([1200, 2000, 4000, 10000], 800, 400000),
+        "cny": ([2500, 4000, 8000, 20000], 1500, 800000),
+        "hkd": ([2500, 4000, 8000, 20000], 1500, 800000),
+        "twd": ([10000, 15000, 30000, 80000], 7000, 3500000),
+        "sgd": ([500, 800, 1500, 3500], 300, 150000),
+        "inr": ([25000, 50000, 100000, 250000], 15000, 10000000),
+        "idr": ([5000000, 10000000, 20000000, 50000000], 3000000, 2000000000),
+        "thb": ([10000, 20000, 40000, 100000], 7000, 4000000),
+        "vnd": ([75000, 150000, 300000, 750000], 50000, 30000000),
+        "php": ([15000, 30000, 60000, 150000], 10000, 6000000),
+        "myr": ([1500, 2500, 5000, 12500], 1000, 500000),
+        "pkr": ([80000, 150000, 300000, 750000], 50000, 30000000),
+        "aed": ([1000, 2000, 4000, 10000], 800, 400000),
+        "sar": ([1000, 2000, 4000, 10000], 800, 400000),
+        "egp": ([15000, 25000, 50000, 125000], 10000, 5000000),
+        "try": ([15000, 25000, 50000, 125000], 10000, 5000000),
+        "uah": ([15000, 25000, 50000, 120000], 10000, 5000000),
+        "rsd": ([35000, 60000, 120000, 300000], 25000, 12000000),
+        "zar": ([6000, 10000, 20000, 50000], 4000, 2000000),
+        "kes": ([40000, 70000, 140000, 350000], 30000, 14000000),
+        "tzs": ([800000, 1500000, 3000000, 7500000], 600000, 300000000),
+        "cop": ([1200000, 2000000, 4000000, 10000000], 800000, 400000000),
+        "clp": ([3000, 5000, 10000, 25000], 2000, 1000000),
     }.items()}
+# Two-decimal for Stripe, but nobody pays a fraction: whole units only.
+WHOLE_UNITS = {"huf", "twd", "idr"}
 
 CURRENCY = CONF.get("DONATE_CURRENCY", "eur").lower()
 _offered = [c.strip().lower() for c in CONF.get("DONATE_CURRENCIES", "").split(",") if c.strip()]
@@ -417,7 +445,7 @@ class Handler(BaseHTTPRequestHandler):
         lo, hi = int(row["min"]), int(row["max"])     # type: ignore[call-overload]
         if not lo <= amount <= hi:
             return self._send(400, {"error": "amount", "min": lo, "max": hi})
-        if currency == "huf" and amount % 100:        # whole forints only
+        if currency in WHOLE_UNITS and amount % 100:
             return self._send(400, {"error": "amount"})
         if path == "/donate/session":
             status, body = create_session(amount, currency)

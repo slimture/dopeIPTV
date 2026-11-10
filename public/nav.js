@@ -98,7 +98,8 @@ var iptvHit = (function () {
  *
  * The donor pays in their own currency: guessCurrency() picks it from where
  * the device says it is, out of the ones /donate/config offers, and a small
- * menu beside "Other amount" changes it (remembered on this device).
+ * menu in the dialog's head changes it on either step - on the card form's
+ * step the form follows at once (remembered on this device).
  */
 (function () {
   "use strict";
@@ -141,7 +142,7 @@ var iptvHit = (function () {
     var v = parseFloat(String(text).replace(/\s/g, "").replace(",", "."));
     if (!isFinite(v)) { return 0; }
     if (ZERO_DECIMAL.test(code())) { return Math.round(v); }
-    if (code() === "huf") { return Math.round(v) * 100; }   // whole forints only
+    if (/^(huf|twd|idr)$/.test(code())) { return Math.round(v) * 100; }   // whole units only
     return Math.round(v * 100);
   }
 
@@ -152,14 +153,27 @@ var iptvHit = (function () {
   var BY_COUNTRY = { SE: "sek", NO: "nok", SJ: "nok", DK: "dkk", FO: "dkk", GL: "dkk",
     GB: "gbp", IM: "gbp", JE: "gbp", GG: "gbp", CH: "chf", LI: "chf", PL: "pln", CZ: "czk",
     HU: "huf", RO: "ron", US: "usd", PR: "usd", AU: "aud", CA: "cad", NZ: "nzd", JP: "jpy",
-    KR: "krw", BR: "brl", MX: "mxn", IL: "ils" };
+    KR: "krw", BR: "brl", MX: "mxn", IL: "ils", CN: "cny", HK: "hkd", MO: "hkd", TW: "twd",
+    SG: "sgd", IN: "inr", ID: "idr", TH: "thb", VN: "vnd", PH: "php", MY: "myr", PK: "pkr",
+    AE: "aed", SA: "sar", EG: "egp", TR: "try", UA: "uah", RS: "rsd", ZA: "zar", KE: "kes",
+    TZ: "tzs", CO: "cop", CL: "clp" };
   var BY_ZONE = { "Europe/Stockholm": "SE", "Europe/Oslo": "NO", "Arctic/Longyearbyen": "NO",
     "Europe/Copenhagen": "DK", "Atlantic/Faroe": "FO", "America/Nuuk": "GL", "America/Godthab": "GL",
     "Europe/London": "GB", "Europe/Belfast": "GB", "Europe/Isle_of_Man": "GB", "Europe/Jersey": "GB",
     "Europe/Guernsey": "GB", "Europe/Zurich": "CH", "Europe/Vaduz": "CH", "Europe/Warsaw": "PL",
     "Europe/Prague": "CZ", "Europe/Budapest": "HU", "Europe/Bucharest": "RO", "Asia/Tokyo": "JP",
     "Asia/Seoul": "KR", "Pacific/Auckland": "NZ", "Asia/Jerusalem": "IL", "Asia/Tel_Aviv": "IL",
-    "Pacific/Honolulu": "US", "America/Puerto_Rico": "PR" };
+    "Pacific/Honolulu": "US", "America/Puerto_Rico": "PR",
+    "Asia/Shanghai": "CN", "Asia/Chongqing": "CN", "Asia/Harbin": "CN", "Asia/Urumqi": "CN",
+    "Asia/Hong_Kong": "HK", "Asia/Macau": "MO", "Asia/Taipei": "TW", "Asia/Singapore": "SG",
+    "Asia/Kolkata": "IN", "Asia/Calcutta": "IN", "Asia/Jakarta": "ID", "Asia/Makassar": "ID",
+    "Asia/Jayapura": "ID", "Asia/Pontianak": "ID", "Asia/Bangkok": "TH", "Asia/Ho_Chi_Minh": "VN",
+    "Asia/Saigon": "VN", "Asia/Manila": "PH", "Asia/Kuala_Lumpur": "MY", "Asia/Kuching": "MY",
+    "Asia/Karachi": "PK", "Asia/Dubai": "AE", "Asia/Riyadh": "SA", "Africa/Cairo": "EG",
+    "Europe/Istanbul": "TR", "Asia/Istanbul": "TR", "Europe/Kyiv": "UA", "Europe/Kiev": "UA",
+    "Europe/Uzhgorod": "UA", "Europe/Zaporozhye": "UA", "Europe/Belgrade": "RS",
+    "Africa/Johannesburg": "ZA", "Africa/Nairobi": "KE", "Africa/Dar_es_Salaam": "TZ",
+    "America/Bogota": "CO", "America/Santiago": "CL", "America/Punta_Arenas": "CL", "Pacific/Easter": "CL" };
   var ZONE_RX = [
     [/^Europe\/(Berlin|Paris|Madrid|Rome|Amsterdam|Brussels|Vienna|Dublin|Lisbon|Athens|Luxembourg|Helsinki|Tallinn|Riga|Vilnius|Bratislava|Ljubljana|Zagreb|Malta|Monaco|San_Marino|Vatican|Andorra|Sofia|Mariehamn|Busingen|Podgorica|Nicosia)$|^Asia\/(Nicosia|Famagusta)$|^Atlantic\/(Canary|Madeira|Azores)$|^Africa\/Ceuta$/, "EU"],
     [/^Australia\//, "AU"],
@@ -167,7 +181,8 @@ var iptvHit = (function () {
     [/^America\/(Sao_Paulo|Bahia|Fortaleza|Recife|Belem|Manaus|Cuiaba|Campo_Grande|Porto_Velho|Boa_Vista|Rio_Branco|Maceio|Araguaina|Santarem|Noronha|Eirunepe)$/, "BR"],
     [/^America\/(Mexico_City|Monterrey|Merida|Cancun|Chihuahua|Hermosillo|Mazatlan|Tijuana|Matamoros|Ojinaga|Bahia_Banderas|Ciudad_Juarez)$/, "MX"],
     [/^America\/(New_York|Chicago|Denver|Los_Angeles|Phoenix|Anchorage|Detroit|Boise|Juneau|Sitka|Nome|Adak|Metlakatla|Yakutat|Menominee|Indiana\/.+|Kentucky\/.+|North_Dakota\/.+)$|^US\//, "US"]];
-  var BY_LANG = { sv: "SE", ja: "JP", ko: "KR", pl: "PL", he: "IL" };
+  var BY_LANG = { sv: "SE", ja: "JP", ko: "KR", pl: "PL", he: "IL", zh: "CN", hi: "IN", ur: "PK",
+    id: "ID", th: "TH", vi: "VN", tr: "TR", uk: "UA", sr: "RS", sw: "KE" };
   function offered(c) { return !!(c && cfg.currencies && cfg.currencies[c]); }
   function currencyOf(country) {
     country = (country || "").toUpperCase();
@@ -237,22 +252,21 @@ var iptvHit = (function () {
     ht.append(h, mk("p", "", T.sub));
     var x = mk("button", "dn-x", "×"); x.type = "button"; x.setAttribute("aria-label", T.close);
     x.addEventListener("click", close);
-    head.append(ht, x);
+    el.curwrap = mk("span", "dn-curwrap");
+    el.cur = mk("select", "dn-cur");
+    el.cur.setAttribute("aria-label", T.currency || "Currency");
+    el.cur.addEventListener("change", function () { setCurrency(el.cur.value, true); });
+    el.curwrap.append(el.cur);
+    head.append(ht, el.curwrap, x);
 
     el.amounts = mk("div", "dn-step");
     el.chips = mk("div", "dn-chips");
     el.chips.setAttribute("role", "radiogroup");
-    var other = mk("div", "dn-otherrow"), lab = mk("label", "dn-other", T.other);
+    var other = mk("label", "dn-other", T.other);
     el.custom = mk("input", "dn-input");
     Object.assign(el.custom, { type: "text", inputMode: "decimal", autocomplete: "off" });
     el.custom.addEventListener("input", function () { setAmount(toMinor(el.custom.value), true); });
-    lab.append(el.custom);
-    var wrap = mk("span", "dn-curwrap");
-    el.cur = mk("select", "dn-cur");
-    el.cur.setAttribute("aria-label", T.currency || "Currency");
-    el.cur.addEventListener("change", function () { setCurrency(el.cur.value, true); });
-    wrap.append(el.cur);
-    other.append(lab, wrap);
+    other.append(el.custom);
     el.err1 = mk("p", "dn-error"); el.err1.hidden = true; el.err1.setAttribute("role", "alert");
     el.go = mk("button", "btn primary dn-go", T.cont); el.go.type = "button";
     el.go.addEventListener("click", function () {
@@ -301,6 +315,7 @@ var iptvHit = (function () {
   }
   function show(step) {
     [el.loading, el.amounts, el.pay, el.done].forEach(function (s) { s.hidden = s !== step; });
+    el.curwrap.hidden = !el.manyCur || step === el.loading || step === el.done;
     if (el.payee) { el.payee.hidden = step === el.done; }
   }
   function mark() {
@@ -335,7 +350,7 @@ var iptvHit = (function () {
       el.cur.appendChild(o);
     });
     el.cur.value = code();
-    el.cur.parentNode.hidden = list.length < 2;
+    el.manyCur = list.length > 1;
   }
   // A new currency: its own round amounts, the second one chosen.
   function setCurrency(c, mine) {
@@ -343,9 +358,15 @@ var iptvHit = (function () {
     cur = c;
     if (mine) { try { localStorage.setItem("dn-currency", c); } catch (e) { /* none */ } }
     chosen = 0; el.custom.value = ""; el.custom2.value = "";
-    el.err1.hidden = true;
+    el.err1.hidden = true; el.err2.hidden = true;
     if (el.cur.value !== c) { el.cur.value = c; }
     chips();
+    // On the card form's step the form follows: a deferred intent takes a
+    // new currency as it takes a new amount.
+    if (live && live.elements) {
+      try { live.elements.update({ currency: c, amount: chosen }); }
+      catch (e) { warn("the card form did not take the currency:", e); }
+    }
     if (pr) {
       try { pr.update({ currency: c, total: { label: cfg.name || T.title, amount: chosen || C().min } }); }
       catch (e) { warn("the wallet is made again for the currency:", e); pr = null; prepareWallet(); }
@@ -378,7 +399,7 @@ var iptvHit = (function () {
     live = null; el.fields.replaceChildren();
   }
   function close() {
-    teardown(); busy = false;
+    teardown(); busy = false; el.cur.disabled = false;
     if (dlg && dlg.open) { dlg.close(); }
   }
 
@@ -513,7 +534,7 @@ var iptvHit = (function () {
     el.err2.textContent = msg || T.failed; el.err2.hidden = false;
   }
   function payAgain(msg) {
-    busy = false;
+    busy = false; el.cur.disabled = false;
     payLabel();
     fail(msg);
   }
@@ -523,7 +544,7 @@ var iptvHit = (function () {
     if (!el.email.checkValidity() || !el.email.value.trim()) {
       fail(T.emailmissing); el.email.focus(); return;
     }
-    busy = true; el.err2.hidden = true;
+    busy = true; el.err2.hidden = true; el.cur.disabled = true;
     el.payBtn.disabled = true; el.payBtn.textContent = T.busy;
     var elements = live.elements, amount = chosen, currency = code();
     elements.submit().then(function (r) {
@@ -575,5 +596,9 @@ var iptvHit = (function () {
         window.location.hash);
     } catch (e) { /* the address stays; harmless */ }
     build(); show(el.done); dlg.showModal();
+  } else if (window.location.hash === "#donate") {
+    // A link from elsewhere to the donate section - GitHub's Sponsor button,
+    // the README, the release notes: iptv.dope.rs/#donate - opens the dialog.
+    open();
   }
 })();

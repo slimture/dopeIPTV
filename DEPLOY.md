@@ -300,7 +300,7 @@ install -m 555 deploy/iptv_donate /usr/local/etc/rc.d/iptv_donate
 install -m 640 -o iptv -g iptv /dev/null /var/log/iptv-donate.log
 sysrc iptv_donate_enable=YES
 service iptv_donate start
-tail -n 1 /var/log/iptv-donate.log   # [donate] listening on unix:/var/run/iptv_donate/donate.sock, 19 currencies (eur by default), configured
+tail -n 1 /var/log/iptv-donate.log   # [donate] listening on unix:/var/run/iptv_donate/donate.sock, 41 currencies (eur by default), configured
 python3 -I /usr/local/www/iptv/donate/donate.py --check   # 200 {"publishableKey": "pk_...", ...}
 ```
 
@@ -309,13 +309,16 @@ shell's history. Every other setting (the receipt's "Support dopeIPTV",
 which currencies are offered) is listed at the top of `donate.py`; change
 the `.conf` and `service iptv_donate restart`.
 
-Donors pay in their own currency: the dialog picks it from where the device
-says it is (kronor in Sweden, pounds in the UK, dollars in the US, euro in
-the euro countries...) and shows round amounts in it - 30/50/100/250 kr,
-3/5/10/25 euro. The table is `CURRENCIES` in `donate.py`;
-`DONATE_CURRENCY` is only the fallback when the page cannot tell. A payment
-in another currency than the account's own is converted by Stripe at
-payout, for its usual conversion fee.
+Donors pay in their own currency - 41 of them: those of the site's
+languages and the world's largest. The dialog picks it from where the
+device says it is (kronor in Sweden, rupees in India, yuan in China, euro
+in the euro countries...) and shows round amounts in it - 30/50/100/250 kr,
+3/5/10/25 euro; a menu in the dialog's head changes it on either step. The
+table is `CURRENCIES` in `donate.py` - look at the rows of currencies that
+lose value fast (the lira) now and then; `DONATE_CURRENCY` is only the
+fallback when the page cannot tell. Not the rouble or the rial: Stripe
+does not take payments from Russia or Iran. A payment in another currency
+than the account's own is converted by Stripe, for its conversion fee.
 
 A Unix socket rather than 127.0.0.1: in a Bastille jail a connection to
 127.0.0.1 can hang (the jail has no loopback of its own), and a socket file
