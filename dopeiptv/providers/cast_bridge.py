@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import secrets
 import shutil
 import socket
@@ -813,12 +812,21 @@ class _Server(ThreadingHTTPServer):
 # The only file names this server will answer for. The bridge listens on the
 # LAN so the television can reach it, which means anything else on the
 # network can ask it for a file too - and every name it should ever be asked
-# for is one we wrote into a playlist ourselves.
-_HLS_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
-# Longer than any name ffmpeg gives a playlist or a segment, by a wide
-# margin. Checked before the pattern so it never runs over a long string a
-# stranger on the network chose the length of.
+# for is one we wrote into a playlist ourselves: a letter or digit, then
+# letters, digits, dots, underscores and hyphens. Checked character by
+# character, not with a regular expression: one pass over a name a stranger
+# on the network chose, whatever its shape (the pattern it replaces was
+# capped by length for the same reason, and code scanning still read it as
+# a backtracking risk).
+_HLS_FIRST = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
+_HLS_CHARS = _HLS_FIRST | frozenset("._-")
+# Longer than any name ffmpeg gives a playlist or a segment, by a wide margin.
 _HLS_NAME_MAX = 128
+
+
+def _hls_name_ok(name: str) -> bool:
+    return (0 < len(name) <= _HLS_NAME_MAX and name[0] in _HLS_FIRST
+            and all(c in _HLS_CHARS for c in name))
 
 
 def _hls_file(folder: str | None, name: str) -> str | None:
@@ -870,7 +878,7 @@ class _Handler(BaseHTTPRequestHandler):
         """Hand over one file of the HLS set.
 
         Everything the receiver asks for is named in a playlist we wrote,
-        so only a plain name matching _HLS_NAME, resolving inside our own
+        so only a plain name _hls_name_ok accepts, resolving inside our own
         folder, is ever answered. Anything else is somebody on the network
         asking for something we never offered.
 
@@ -889,7 +897,7 @@ class _Handler(BaseHTTPRequestHandler):
         # think of every separator there is, which is how rejecting "/" let a
         # Windows backslash walk straight out of the folder. Requiring the
         # first character to be alphanumeric rules out ".." and dotfiles too.
-        if len(name) > _HLS_NAME_MAX or not _HLS_NAME.match(name):
+        if not _hls_name_ok(name):
             self.send_error(404)
             return
         if not bridge.hls_ready(name):

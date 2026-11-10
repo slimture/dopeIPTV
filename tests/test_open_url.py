@@ -109,7 +109,7 @@ def test_on_a_desktop_qt_opens_it_with_the_system_paths_for_the_moment(
     monkeypatch.setattr(xdg, "_qt_open", fake_qt_open)
     monkeypatch.setattr(xdg.shutil, "which", lambda n: None)
     xdg.open_url("https://iptv.dope.rs/?ref=app-heart#donate")
-    assert seen["url"].startswith("https://iptv.dope.rs")
+    assert seen["url"] == "https://iptv.dope.rs/?ref=app-heart#donate"
     assert seen["ld"] is None                       # stripped for the launch
     assert xdg.os.environ["LD_LIBRARY_PATH"] == "/opt/dopeiptv/lib"   # and back
 
