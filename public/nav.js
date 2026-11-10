@@ -106,12 +106,12 @@
       theme: dark ? "night" : "stripe",
       variables: {
         colorPrimary: css("--accent", "#2997ff"), colorText: css("--text", "#f5f5f7"),
-        colorTextSecondary: css("--muted", "#a1a1a6"), colorBackground: css("--surface", "#161617"),
+        colorTextSecondary: css("--muted", "#aeaeb4"), colorBackground: css("--surface", "#202023"),
         colorDanger: "#ff6b6b", borderRadius: "12px", spacingUnit: "4px", fontSizeBase: "15px",
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
       },
       rules: {
-        ".Input": { backgroundColor: css("--ink", "#000"), border: "1px solid " + css("--line-2", "#3a3a3c"), boxShadow: "none" },
+        ".Input": { backgroundColor: css("--ink", "#0e0e10"), border: "1px solid " + css("--line-2", "#45454b"), boxShadow: "none" },
         ".Input:focus": { border: "1px solid " + css("--accent", "#2997ff"), boxShadow: "0 0 0 1px " + css("--accent", "#2997ff") },
         ".Label": { fontWeight: "600" }
       }
