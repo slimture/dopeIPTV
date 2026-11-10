@@ -254,3 +254,88 @@ tr:last-child td { border-bottom: 0; }
   cursor: pointer; }
 .btn-heart::before { content: "\2665"; }
 .btn-heart:hover { background: color-mix(in srgb, var(--heart) 24%, transparent); }
+
+
+/* -- the rest of the page in the same hand ------------------------------------ */
+.charts { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.head-nums { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.chart .area.a1 { fill: color-mix(in srgb, var(--s1) 12%, transparent); stroke: none; }
+
+/* lists: the bar behind the row */
+.rank { gap: 3px; margin-top: 2px; }
+.rank li { position: relative; isolation: isolate; display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center; gap: 10px; padding: 6px 10px; border-radius: 9px; font-size: 14px; }
+.rank li .fill { position: absolute; inset: 0 auto 0 0; z-index: -1; border-radius: 9px;
+  background: color-mix(in srgb, var(--s1) 11%, transparent); }
+.rank li.first .fill { background: color-mix(in srgb, var(--s1) 19%, transparent); }
+.rank .v { font-weight: 650; color: var(--text); }
+.subhead { margin: 14px 0 2px; }
+
+/* how each way in does */
+.chan-rows { display: flex; flex-direction: column; }
+.chan-row { display: grid; grid-template-columns: minmax(120px, 1.2fr) minmax(90px, .9fr) repeat(3, minmax(0, 1.1fr)) 76px;
+  align-items: center; gap: 16px; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.chan-row:last-child { border-bottom: 0; }
+.chan-row.head { color: var(--muted); font-size: 12.5px; font-weight: 600; padding-top: 2px; }
+.c-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.c-visits { display: flex; flex-direction: column; gap: 5px; }
+.c-visits i { display: block; height: 4px; border-radius: 2px; background: var(--s1); }
+.c-time { text-align: end; color: var(--text-2); }
+.chan-row .m { display: grid; grid-template-columns: minmax(0, 1fr) 40px; align-items: center; gap: 8px; }
+.chan-row .m .ml { display: none; }
+.chan-row .m .track { height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--text) 7%, transparent); overflow: hidden; }
+.chan-row .m .track i { display: block; height: 100%; border-radius: 4px; }
+.chan-row .m1 .track i { background: color-mix(in srgb, var(--s1) 80%, var(--heart)); }
+.chan-row .m2 .track i { background: var(--s3); }
+.chan-row .m3 .track i { background: var(--heart); }
+.chan-row .mv { text-align: end; color: var(--text-2); font-weight: 600; }
+.chan-row.head .m { display: block; }
+
+/* donations: a row each */
+.don-list { list-style: none; margin: 4px 0 0; padding: 0; }
+.don-list li { display: grid; grid-template-columns: 34px minmax(80px, auto) minmax(0, 1fr) auto; align-items: center; gap: 14px;
+  padding: 11px 0; border-bottom: 1px solid var(--line); }
+.don-list li:last-child { border-bottom: 0; }
+.don-heart { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 15px;
+  color: var(--heart); background: color-mix(in srgb, var(--heart) 13%, transparent); }
+.don-amt { font-size: 17px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; }
+.don-who { display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap; }
+.don-name { color: var(--text-2); overflow-wrap: anywhere; }
+.chip.wallet { color: var(--text); background: color-mix(in srgb, var(--text) 9%, transparent); }
+.chip.card { color: var(--s1); background: color-mix(in srgb, var(--s1) 13%, transparent); }
+.don-when { display: flex; flex-direction: column; align-items: flex-end; text-align: end; font-size: 13.5px; }
+.don-when small { color: var(--muted); font-size: 12px; }
+
+/* years: a card each */
+.years { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.years:empty { display: none; }
+.year h3 { margin: 0 0 10px; font-size: 22px; font-weight: 750; letter-spacing: -.02em; }
+.year dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.year dt { color: var(--muted); font-size: 12.5px; }
+.year dd { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
+.year-heart { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--line); font-size: 13.5px; color: var(--text-2); }
+.year-heart::before { content: "\2665"; color: var(--heart); margin-inline-end: 7px; }
+
+/* the visitor log, matched */
+.badge.good { color: var(--s3); background: color-mix(in srgb, var(--s3) 14%, transparent); }
+.badge.heart { color: var(--heart); background: color-mix(in srgb, var(--heart) 14%, transparent); }
+.badge.soft-heart { color: color-mix(in srgb, var(--heart) 75%, var(--text)); background: color-mix(in srgb, var(--heart) 8%, transparent); }
+.visit summary:hover { background: color-mix(in srgb, var(--text) 3%, transparent); border-radius: 14px; }
+.daybar { border-radius: 14px; }
+
+@media (max-width: 980px) {
+  .charts { grid-template-columns: minmax(0, 1fr); }
+  .chan-row { grid-template-columns: minmax(0, 1fr) 90px 70px; gap: 8px 14px; }
+  .chan-row.head { display: none; }
+  .chan-row .m { grid-column: 1 / -1; grid-template-columns: 130px minmax(0, 1fr) 40px; }
+  .chan-row .m .ml { display: block; color: var(--muted); font-size: 12.5px; }
+  .c-time { grid-column: 3; grid-row: 1; }
+  .c-visits { grid-column: 2; grid-row: 1; }
+}
+@media (max-width: 600px) {
+  .don-list li { grid-template-columns: 30px minmax(0, 1fr) auto; gap: 4px 12px; }
+  .don-heart { width: 30px; height: 30px; grid-row: span 2; }
+  .don-who { grid-column: 2 / -1; grid-row: 2; }
+  .don-when { grid-column: 3; grid-row: 1; }
+  .chan-row .m { grid-template-columns: 110px minmax(0, 1fr) 40px; }
+}

@@ -293,6 +293,10 @@
     const done = partial(n - 1) && n > 1 ? n - 1 : n;
     const path = (key, from, to) => S.slice(from, to).map((d, j) =>
       (j ? "L" : "M") + x(from + j).toFixed(1) + " " + f.y(d[key]).toFixed(1)).join("");
+    if (done > 1) {
+      svg("path", { d: path("visitors", 0, done) + `L${x(done - 1).toFixed(1)} ${f.y(0)}L${x(0).toFixed(1)} ${f.y(0)}Z`,
+                    class: "area a1" }, f.s);
+    }
     svg("path", { d: path("views", 0, done), class: "line l2" }, f.s);
     svg("path", { d: path("visitors", 0, done), class: "line l1" }, f.s);
     if (done < n) {
@@ -385,14 +389,14 @@
     if (more) { c.append(mk("h3", "subhead", more[0]), rankList(more[1], more[2])); }
     return c;
   }
+  // A row each, its bar drawn behind it: as long as its share of the top one.
   function rankList(rows, name) {
     if (!rows || !rows.length) { return mk("p", "empty", "Nothing yet."); }
     const top = rows[0][1] || 1, ul = mk("ul", "rank");
-    rows.forEach(([k, v]) => {
-      const li = mk("li"), bar = mk("span", "bar"), fill = mk("i");
-      fill.style.width = Math.max(1.5, v / top * 100) + "%";
-      bar.append(fill);
-      li.append(mk("span", "k", name ? name(k) : k), mk("span", "v", num.format(v)), bar);
+    rows.forEach(([k, v], i) => {
+      const li = mk("li", i === 0 ? "first" : ""), fill = mk("i", "fill");
+      fill.style.width = Math.max(2, v / top * 100) + "%";
+      li.append(fill, mk("span", "k", name ? name(k) : k), mk("span", "v", num.format(v)));
       li.title = (name ? name(k) : k) + ": " + num.format(v);
       ul.append(li);
     });
@@ -541,61 +545,75 @@
       return;
     }
     if (!D.recent.length) { box.replaceChildren(mk("p", "empty", "No donations through the dialog yet.")); return; }
-    const t = mk("table"), head = mk("tr");
-    [["When", ""], ["Amount", "num"], ["How", "hide-phone"], ["From", ""]].forEach(([h, c]) => head.append(mk("th", c, h)));
-    const thead = mk("thead"); thead.append(head);
-    const tb = mk("tbody");
+    let rel = null;
+    try { rel = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" }); } catch (e) { rel = null; }
+    const ago = (t) => {
+      const s = Date.now() / 1000 - t;
+      if (!rel) { return ""; }
+      if (s < 3600) { return rel.format(-Math.max(1, Math.round(s / 60)), "minute"); }
+      if (s < 86400) { return rel.format(-Math.round(s / 3600), "hour"); }
+      if (s < 86400 * 45) { return rel.format(-Math.round(s / 86400), "day"); }
+      return rel.format(-Math.round(s / 86400 / 30), "month");
+    };
+    const ul = mk("ul", "don-list");
     D.recent.forEach((r) => {
-      const tr = mk("tr");
-      tr.append(mk("td", "", stamp.format(new Date(r.t * 1000))), mk("td", "num", money(r.amount, r.currency)),
-                mk("td", "hide-phone", r.how), mk("td", "who", r.who || "–"));
-      tb.append(tr);
+      const li = mk("li");
+      const when = mk("span", "don-when");
+      when.append(mk("span", "", ago(r.t)), mk("small", "", stamp.format(new Date(r.t * 1000))));
+      const who = mk("span", "don-who");
+      who.append(mk("span", "don-name", r.who || "Anonymous"), mk("span", "chip " + (/Apple|Google/.test(r.how) ? "wallet" : "card"), r.how));
+      li.append(mk("span", "don-heart", "\u2665"), mk("span", "don-amt", money(r.amount, r.currency)), who, when);
+      ul.append(li);
     });
-    t.append(thead, tb);
-    const wrap = mk("div", "table-wrap"); wrap.append(t);
-    box.replaceChildren(wrap);
+    box.replaceChildren(ul);
   }
 
   // -- what visitors did, by how they came ------------------------------------------
   function byChannel() {
     const rows = data.by_channel || [];
     if (!rows.length) { $("by-channel").replaceChildren(mk("p", "empty", "No visits in this period yet.")); return; }
-    const pct = (n, of) => of ? Math.round(n / of * 100) + "%" : "–";
-    const t = mk("table"), head = mk("tr");
-    [["Came from", ""], ["Visits", "num"], ["Read more than one page", "num hide-phone"], ["Downloaded", "num"],
-     ["Opened donate", "num hide-phone"], ["Time per visit", "num"]].forEach(([h, c]) => head.append(mk("th", c, h)));
-    const thead = mk("thead"); thead.append(head);
-    const tb = mk("tbody");
+    const most = Math.max(1, ...rows.map(([, r]) => r.visits));
+    const meter = (n, of, cls, label) => {
+      const p = of ? Math.round(n / of * 100) : 0, cell = mk("span", "m " + cls), track = mk("span", "track"), fill = mk("i");
+      fill.style.width = p + "%";
+      track.append(fill);
+      cell.append(mk("span", "ml", label), track, mk("span", "mv", of ? p + "%" : "–"));
+      return cell;
+    };
+    const box = mk("div", "chan-rows");
+    const head = mk("div", "chan-row head");
+    head.append(mk("span", "c-name", "Came from"), mk("span", "c-visits", "Visits"), mk("span", "m", "Read more than one page"),
+                mk("span", "m", "Downloaded"), mk("span", "m", "Opened donate"), mk("span", "c-time", "Time per visit"));
+    box.append(head);
     rows.forEach(([name, r]) => {
-      const tr = mk("tr");
-      tr.append(mk("td", "", name), mk("td", "num", num.format(r.visits)), mk("td", "num hide-phone", pct(r.more, r.visits)),
-                mk("td", "num", pct(r.downloaded, r.visits)), mk("td", "num hide-phone", pct(r.donate, r.visits)),
-                mk("td", "num", duration(r.visits ? r.time / r.visits : 0)));
-      tb.append(tr);
+      const row = mk("div", "chan-row"), v = mk("span", "c-visits"), vb = mk("i");
+      vb.style.width = Math.max(4, r.visits / most * 100) + "%";
+      v.append(mk("b", "", num.format(r.visits)), vb);
+      row.append(mk("span", "c-name", name), v, meter(r.more, r.visits, "m1", "Read more"),
+                 meter(r.downloaded, r.visits, "m2", "Downloaded"), meter(r.donate, r.visits, "m3", "Opened donate"),
+                 mk("span", "c-time", duration(r.visits ? r.time / r.visits : 0)));
+      box.append(row);
     });
-    t.append(thead, tb);
-    $("by-channel").replaceChildren(t);
+    $("by-channel").replaceChildren(box);
   }
 
   // -- calendar years ----------------------------------------------------------------
   function years() {
     const Y = data.years || [];
-    if (!Y.length) { $("years").replaceChildren(mk("p", "empty", "Nothing yet.")); return; }
-    const t = mk("table"), head = mk("tr");
-    [["Year", ""], ["Unique visitors", "num"], ["Page views", "num"], ["Downloads", "num"], ["Donations", "num"], ["Donated", "num hide-phone"]]
-      .forEach(([h, c]) => head.append(mk("th", c, h)));
-    const thead = mk("thead"); thead.append(head);
-    const tb = mk("tbody");
-    Y.forEach((y) => {
-      const tr = mk("tr");
-      const u = y.unique !== null && y.unique !== undefined ? num.format(y.unique) : num.format(y.visitors) + " visits";
-      tr.append(mk("td", "", y.year), mk("td", "num", u), mk("td", "num", num.format(y.views)),
-                mk("td", "num", num.format(y.downloads)), mk("td", "num", num.format(y.donations)),
-                mk("td", "num hide-phone", sums(y.sums)));
-      tb.append(tr);
-    });
-    t.append(thead, tb);
-    $("years").replaceChildren(t);
+    if (!Y.length) { $("years").replaceChildren(); return; }
+    $("years").replaceChildren(...Y.map((y) => {
+      const c = mk("article", "card year");
+      const unique = y.unique !== null && y.unique !== undefined;
+      c.append(mk("h3", "", String(y.year)));
+      const dl = mk("dl");
+      [[unique ? "People" : "Visits", num.format(unique ? y.unique : y.visitors)], ["Page views", num.format(y.views)],
+       ["Downloads", num.format(y.downloads)]].forEach(([k, v]) => {
+        const d = mk("div"); d.append(mk("dt", "", k), mk("dd", "", v)); dl.append(d);
+      });
+      c.append(dl, mk("p", "year-heart", y.donations ? num.format(y.donations) + (y.donations === 1 ? " donation · " : " donations · ") + sums(y.sums)
+                                                   : "No donations"));
+      return c;
+    }));
   }
 
   // -- the visitor log -------------------------------------------------------------
@@ -615,7 +633,7 @@
     const tags = mk("span", "v-tags");
     if (v.returning) { tags.append(badge("Returning · " + v.returning + (v.returning === 1 ? " day" : " days") + " before")); }
     if (dls) { tags.append(badge("Downloaded", "good")); }
-    (v.events || []).forEach((e) => tags.append(badge(e[1] === "donated" ? "Donated" : "Opened donate", e[1] === "donated" ? "good" : "")));
+    (v.events || []).forEach((e) => tags.append(badge(e[1] === "donated" ? "\u2665 Donated" : "Opened donate", e[1] === "donated" ? "heart" : "soft-heart")));
     sum.append(tags);
     row.append(sum);
 
@@ -696,8 +714,14 @@
 
   function render() {
     if (!data) { return; }
+    const T = data.totals, unique = T.unique !== null && T.unique !== undefined;
     $("h-visits").textContent = "Visitors and page views" + (per() === "day" ? "" : " per " + per());
     $("h-downloads").textContent = "Downloads per " + per();
+    $("n-visits").textContent = num.format(unique ? T.unique : T.visitors) + (unique ? " different visitors" : " visits") +
+      " · " + num.format(T.views) + " page views";
+    const S = data.series, best = S.reduce((a, d, i) => (d.downloads > (S[a] || {}).downloads ? i : a), 0);
+    $("n-downloads").textContent = num.format(T.downloads) + (T.downloads === 1 ? " download" : " downloads") +
+      (T.downloads && S[best] ? " · most on " + pointLabel(S[best].date, best) : "");
     summary(); tiles(); funnel(); visitsChart(); downloadsChart(); visitsTable(); lists(); byChannel(); years(); donations();
     $("updated").textContent = data.updated ? "Counts updated " + stamp.format(new Date(data.updated)) + "." : "";
   }

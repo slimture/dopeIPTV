@@ -44,37 +44,43 @@
     <div id="funnel"></div>
   </section>
 
-  <section class="card">
-    <div class="card-head">
-      <h2 id="h-visits">Visitors and page views</h2>
-      <button type="button" class="link" id="table-toggle" aria-expanded="false">Show as table</button>
+  <section class="group">
+    <h3 class="group-head">Over time</h3>
+    <div class="charts">
+      <section class="card">
+        <div class="card-head">
+          <div><h2 id="h-visits">Visitors and page views</h2><div class="head-nums" id="n-visits"></div></div>
+          <button type="button" class="link" id="table-toggle" aria-expanded="false">Show as table</button>
+        </div>
+        <div class="legend" id="legend"></div>
+        <div class="chart" id="chart-visits"></div>
+        <div class="table-wrap" id="table-visits" hidden></div>
+      </section>
+      <section class="card">
+        <div class="card-head"><div><h2 id="h-downloads">Downloads per day</h2><div class="head-nums" id="n-downloads"></div></div></div>
+        <div class="chart" id="chart-downloads"></div>
+      </section>
     </div>
-    <div class="legend" id="legend"></div>
-    <div class="chart" id="chart-visits"></div>
-    <div class="table-wrap" id="table-visits" hidden></div>
-  </section>
-
-  <section class="card">
-    <div class="card-head"><h2 id="h-downloads">Downloads per day</h2></div>
-    <div class="chart" id="chart-downloads"></div>
   </section>
 
   <div id="lists" class="groups"></div>
 
-  <section class="card">
-    <div class="card-head"><h2>What visitors did, by how they came</h2></div>
-    <div class="table-wrap" id="by-channel"></div>
+  <section class="group">
+    <h3 class="group-head">How each way in does</h3>
+    <section class="card">
+      <div class="card-head"><h2>What visitors did, by how they came</h2><span class="muted">share of each channel's visits</span></div>
+      <div id="by-channel"></div>
+    </section>
   </section>
 
-  <section class="card">
-    <div class="card-head"><h2>By year</h2><span class="muted">calendar years</span></div>
-    <div class="table-wrap" id="years"></div>
-  </section>
-
-  <section class="card">
-    <div class="card-head"><h2 class="heart-head">Donations</h2><span class="muted" id="donations-all"></span></div>
-    <div class="notify" id="notify"></div>
-    <div id="donations"></div>
+  <section class="group">
+    <h3 class="group-head">Donations</h3>
+    <section class="card">
+      <div class="card-head"><h2 class="heart-head">Donations</h2><span class="muted" id="donations-all"></span></div>
+      <div class="notify" id="notify"></div>
+      <div id="donations"></div>
+    </section>
+    <div class="years" id="years"></div>
   </section>
 
   </div>
