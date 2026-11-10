@@ -11,16 +11,21 @@ from __future__ import annotations
 import re
 import secrets
 import socket
+import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from .dvr_store import SegmentStore
+from .log import log
 
 _PATH = re.compile(r"^/([A-Za-z0-9_-]+)/(?:s/(\d+)|(live))\.ts$")
 # Join live this far behind the newest byte, so mpv has something to start from.
 LIVE_LEAD = 4.0
 # How long a live request may wait for the provider's first bytes.
 FIRST_DATA_WAIT = 25.0
+# mpv hanging up: a seek, a channel change, or giving up on a slow start.
+_GONE = (BrokenPipeError, ConnectionResetError, ConnectionAbortedError,
+         socket.timeout)
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -30,18 +35,27 @@ class _Handler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: object) -> None:  # noqa: A002
         return      # not onto the app's stderr
 
+    def _not_found(self) -> None:
+        # A live request waits up to FIRST_DATA_WAIT for the provider; mpv
+        # has often hung up by then (the channel was changed), and the 404
+        # to a closed socket raised out of the handler.
+        try:
+            self.send_error(404)
+        except (*_GONE, OSError):
+            pass
+
     def do_GET(self) -> None:  # noqa: N802 - the http.server API
         m = _PATH.match(self.path.split("?", 1)[0])
         owner = self.server.owner
         if m is None or not secrets.compare_digest(m.group(1), owner.token):
-            self.send_error(404)
+            self._not_found()
             return
         store = owner.store
         if m.group(3):
             store.wait_for_data(FIRST_DATA_WAIT)
             seg = store.live_segment(LIVE_LEAD)
             if seg is None:
-                self.send_error(404)
+                self._not_found()
                 return
             seq = seg.seq
             owner.opened(seq, seg.t0)
@@ -52,7 +66,7 @@ class _Handler(BaseHTTPRequestHandler):
         try:
             first = next(reader, None)
             if first is None:
-                self.send_error(404)
+                self._not_found()
                 return
             self.send_response(200)
             self.send_header("Content-Type", "video/mp2t")
@@ -63,8 +77,7 @@ class _Handler(BaseHTTPRequestHandler):
                 if owner.stopping:
                     break
                 self.wfile.write(chunk)
-        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError,
-                socket.timeout, OSError):
+        except (*_GONE, OSError):
             pass        # mpv went away (a seek, a channel change)
         finally:
             reader.close()
@@ -77,6 +90,14 @@ class _Server(ThreadingHTTPServer):
     def __init__(self, owner: "LocalServer") -> None:
         self.owner = owner
         super().__init__(("127.0.0.1", 0), _Handler)
+
+    def handle_error(self, request, client_address) -> None:
+        # socketserver's own prints a traceback on the terminal for every
+        # request that fails - a whole screen for mpv hanging up.
+        exc = sys.exc_info()[1]
+        if isinstance(exc, _GONE):
+            return
+        log.debug("dvr server: a request failed: %r", exc)
 
 
 class LocalServer:

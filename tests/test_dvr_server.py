@@ -80,3 +80,22 @@ def test_live_joins_a_few_seconds_back_and_says_where(tmp_path):
     finally:
         s.close()
         srv.close()
+
+
+def test_a_hung_up_player_prints_no_traceback(served, capsys):
+    # mpv often hangs up before a live request is answered (the channel was
+    # changed while it waited for the provider): the 404 then went to a closed
+    # socket, and socketserver printed a BrokenPipeError traceback.
+    import socket as _socket
+    s, srv = served
+    c = _socket.create_connection(("127.0.0.1", srv.port), timeout=5)
+    c.sendall(b"GET /wrong-token/s/0.ts HTTP/1.0\r\n\r\n")
+    c.close()                                           # gone before the 404
+    time.sleep(0.3)
+    srv._srv.handle_error(None, ("127.0.0.1", 0))      # outside an exception
+    try:
+        raise BrokenPipeError(32, "Broken pipe")
+    except BrokenPipeError:
+        srv._srv.handle_error(None, ("127.0.0.1", 0))
+    err = capsys.readouterr().err
+    assert "Traceback" not in err and "BrokenPipeError" not in err, err
