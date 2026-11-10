@@ -748,7 +748,7 @@ footer .v a:hover { color: var(--accent); }
 .dn-chip { font: inherit; font-weight: 700; font-size: 15px; padding: 12px 4px; cursor: pointer;
   border-radius: 12px; border: 1px solid var(--line-2); background: var(--ink); color: var(--text);
   transition: border-color .15s ease, background .15s ease; }
-.dn-chip:hover { border-color: color-mix(in srgb, var(--accent) 60%, var(--line-2)); }
+@media (hover: hover) { .dn-chip:hover { border-color: color-mix(in srgb, var(--accent) 60%, var(--line-2)); } }
 .dn-chip.is-on { border-color: var(--accent); color: var(--accent);
   background: color-mix(in srgb, var(--accent) 14%, var(--ink)); box-shadow: inset 0 0 0 1px var(--accent); }
 .dn-other, .dn-email { display: flex; flex-direction: column; gap: 6px; font-size: 13px;
@@ -769,14 +769,13 @@ footer .v a:hover { color: var(--accent); }
 .dn-paytop { display: flex; align-items: stretch; gap: 6px; }
 .dn-chips--sm { flex: 1; min-width: 0; gap: 6px; }
 .dn-chips--sm .dn-chip { min-width: 0; padding: 9px 2px; font-size: 14px; border-radius: 10px; }
-/* 16px: Safari on iPhone zooms the whole page in on a smaller input. */
-.dn-input--sm { flex: none; width: 104px; min-width: 0; padding: 8px 10px; font-size: 16px; border-radius: 10px; }
+/* The own amount: a fifth small box in the same row, as wide as an amount.
+   16px: Safari on iPhone zooms the whole page in on a smaller input. */
+.dn-input--sm { flex: none; width: 22%; max-width: 104px; min-width: 62px; padding: 8px 6px; font-size: 16px;
+  border-radius: 10px; text-align: center; }
 dialog.dn { overflow-x: hidden; }
-/* On a phone's sheet: the four amounts in one row, the own amount under them. */
 @media (max-width: 560px) {
-  .dn-paytop { flex-wrap: wrap; }
-  .dn-chips.dn-chips--sm { flex-basis: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .dn-input--sm { width: 100%; }
+  .dn-chips.dn-chips--sm { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 .dn-back { font: inherit; font-size: 14px; cursor: pointer; border: 0; background: none;
   color: var(--muted); padding: 4px 0; }
