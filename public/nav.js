@@ -6,11 +6,14 @@
  * what makes the numbers honest. Nothing here can get in the page's way.
  */
 /* Chromium (Chrome, Edge, Opera, Brave) redoes the blur behind the sticky
- * header on every frame of a scroll, and the sections rising into view
- * cost it too; Safari and Firefox do both cheaply. On Chromium the header
- * is near-opaque instead and the sections are simply there (style.css,
- * app.js). userAgentData is Chromium's alone. */
-if (navigator.userAgentData) { document.documentElement.classList.add("cr"); }
+ * header on every frame of a scroll, and the sections rising into view and
+ * moving layers clipped to rounded corners cost it too; Safari and Firefox
+ * do all of it cheaply. On Chromium the header is near-opaque instead, the
+ * sections are simply there and the donate band is not clipped (style.css,
+ * app.js). userAgentData and window.chrome are Chromium's alone; Brave can
+ * hide the first, so both are asked. */
+var IPTV_CR = !!(navigator.userAgentData || window.chrome || navigator.brave);
+if (IPTV_CR) { document.documentElement.classList.add("cr"); }
 
 var iptvHit = (function () {
   "use strict";

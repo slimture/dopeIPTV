@@ -69,6 +69,15 @@ header.bar { position: sticky; top: 0; z-index: 20; backdrop-filter: saturate(18
   background: color-mix(in srgb, var(--bg) 78%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
 .cr header.bar { -webkit-backdrop-filter: none; backdrop-filter: none;
   background: color-mix(in srgb, var(--bg) 96%, transparent); }   /* nav.js: Chromium */
+/* Chromium: the donate band without its rounded clip - moving layers
+   clipped to rounded corners cost it an offscreen pass every frame. What
+   moves stays inside by itself: the big heart fits the band, the drifting
+   hearts are faded out before they reach its top. */
+.cr .donate { overflow: visible; }
+.cr .donate-big { top: 9%; height: 82%; width: auto; aspect-ratio: 1 / 1; margin-top: 0; }
+@media (max-width: 760px) {
+  .cr .donate-big { top: auto; right: 14px; bottom: 14px; width: 150px; height: 150px; }
+}
 .bar .wrap { display: flex; align-items: center; justify-content: space-between; height: 56px; }
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand .logo { width: 26px; height: 26px; flex: none; }
@@ -783,7 +792,8 @@ footer .v a { color: inherit; }
    sign, the copyright line under it; drawn in a text colour, so it follows
    both themes. */
 footer .maker { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
-footer .sole { display: block; color: var(--muted); line-height: 0; }
+footer .sole { display: inline-flex; align-items: flex-end; gap: .3em; color: var(--muted); line-height: 0; }
+footer .sole-ab { font: 800 20px/1 var(--display); letter-spacing: -.01em; margin-bottom: -3px; }
 footer .sole:hover { color: var(--text); }
 footer .sole-logo { display: block; height: 17px; aspect-ratio: 666 / 111; overflow: hidden; white-space: nowrap;
   text-indent: 110%; background: currentColor;
@@ -1328,6 +1338,20 @@ dialog.dn { overflow-x: hidden; }
     12% { transform: scale(.97); } 18% { transform: scale(1.08); } }
   @keyframes heart-drift-ph { 0% { transform: translate(0, 0) scale(.6) rotate(-10deg); opacity: 0; }
     14% { opacity: .5; } 100% { transform: translate(-16px, -210px) scale(1.1) rotate(10deg); opacity: 0; } }
+}
+
+/* The header's heart beats softly now and then: two small beats, then
+   five seconds still - there, never busy. Only a transform (the GPU's),
+   and pointed at it beats faster (above). Less motion asked for: it glows. */
+@media (prefers-reduced-motion: no-preference) {
+  nav.links a.navdonate .heart, nav.links .navheart svg { animation: nav-heart 6s ease-in-out 2s infinite; }
+  nav.links a.navdonate:hover .heart, nav.links .navheart:hover svg { animation: beat .9s ease-in-out infinite; }
+  @keyframes nav-heart { 0%, 16%, 100% { transform: scale(1); } 4% { transform: scale(1.18); }
+    8% { transform: scale(.96); } 12% { transform: scale(1.1); } }
+}
+@media (prefers-reduced-motion: reduce) {
+  nav.links a.navdonate .heart, nav.links .navheart svg { animation: nav-glow 6s ease-in-out 2s infinite; }
+  @keyframes nav-glow { 0%, 20%, 100% { opacity: 1; } 8% { opacity: .45; } }
 }
 
 /* ---- sections in bands -------------------------------------------------- */

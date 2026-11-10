@@ -258,7 +258,8 @@
   // On a phone the page is simply there: nothing rises into view.
   var phone = window.matchMedia("(max-width: 720px)").matches;
   // Nor on Chromium: the rising cost it frames on a scroll (nav.js, .cr).
-  if ("IntersectionObserver" in window && !phone && !navigator.userAgentData) {
+  var chromium = document.documentElement.classList.contains("cr");
+  if ("IntersectionObserver" in window && !phone && !chromium) {
     var sel = ".sec-head, .fxp, .shot, .dlx-card, .dl-phone, .donate, .notes-wrap, .faq-item";
     var fold = window.innerHeight * 0.92;
     var io = new IntersectionObserver(function (entries) {
