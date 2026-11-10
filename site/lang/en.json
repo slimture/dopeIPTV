@@ -140,7 +140,7 @@
     "note_generated": "↻ Generated on the server from the <code>slimture/dopeIPTV</code> GitHub releases — new builds appear automatically.",
     "note_verify": "🔒 Verify your download — <a class='verify-link' href='/files/SHA256SUMS'>SHA-256 checksums</a> · <code>sha256sum -c SHA256SUMS</code>",
     "cred_eyebrow": "Open source",
-    "cred_h2": "Free software, standing on giants.",
+    "cred_h2": "Free software, on the shoulders of giants.",
     "cred_intro": "dopeIPTV is <b>free and open source</b> under the GPL-3.0 licence — no ads, no tracking, no accounts. It's built with, and grateful to, these projects and services:",
     "cred_more": "The projects it is built on",
     "cred_playback": "Playback",
