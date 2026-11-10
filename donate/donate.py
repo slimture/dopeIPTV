@@ -36,6 +36,11 @@ file named by DONATE_CONFIG (default /usr/local/etc/iptv-donate.conf):
     DONATE_MIN / DONATE_MAX smallest / largest amount, minor units (200 / 100000)
     DONATE_PRESETS          the amount buttons, minor units (300,500,1000,2500)
     DONATE_NAME             what the receipt says it was for ("Support dopeIPTV")
+    DONATE_METHODS          what the card form offers: "card" (default), a
+                            comma list of Stripe's payment method types
+                            ("card,klarna"), or "auto" for everything turned on
+                            in the Dashboard - which the account shares with
+                            other sites, so it is not the default
     DONATE_RETURN_URL       where Stripe sends the payer back after a payment
                             method that leaves the page (Klarna and the like)
     DONATE_ORIGIN           the site's origin; other origins are refused
@@ -95,6 +100,7 @@ MAX = _int("DONATE_MAX", 100000)
 PRESETS = [int(x) for x in CONF.get("DONATE_PRESETS", "300,500,1000,2500").split(",")
            if x.strip().isdigit()]
 NAME = CONF.get("DONATE_NAME", "Support dopeIPTV")
+METHODS = [m.strip() for m in CONF.get("DONATE_METHODS", "card").split(",") if m.strip()] or ["card"]
 RETURN_URL = CONF.get("DONATE_RETURN_URL", "https://iptv.dope.rs/?donated=1#donate")
 ORIGIN = CONF.get("DONATE_ORIGIN", "https://iptv.dope.rs").rstrip("/")
 PUBLISHABLE = CONF.get("STRIPE_PUBLISHABLE_KEY", "")
@@ -195,10 +201,16 @@ def create_session(amount: int) -> tuple[int, dict]:
     form = {
         "amount": str(amount),
         "currency": CURRENCY,
-        "automatic_payment_methods[enabled]": "true",
         "description": NAME,
         "metadata[source]": "iptv.dope.rs donate dialog",
     }
+    # Cards only by default: the Dashboard's list (Bancontact, EPS, ...) is
+    # the whole account's, and the wallets have their own button anyway.
+    if METHODS == ["auto"]:
+        form["automatic_payment_methods[enabled]"] = "true"
+    else:
+        for n, m in enumerate(METHODS):
+            form[f"payment_method_types[{n}]"] = m
     status, body = _post(STRIPE_PI, form, key)
     if status == 200 and body.get("client_secret"):
         return 200, {"clientSecret": body["client_secret"], "publishableKey": PUBLISHABLE}
