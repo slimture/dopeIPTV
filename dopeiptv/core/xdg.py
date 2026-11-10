@@ -54,19 +54,89 @@ def system_env() -> dict:
     return env
 
 
+def _qt_platform() -> str:
+    try:
+        from PyQt6.QtGui import QGuiApplication
+        return QGuiApplication.platformName() if QGuiApplication.instance() else ""
+    except Exception:   # noqa: BLE001 - no Qt, no Qt opener
+        return ""
+
+
+def _qt_open(url: str) -> bool:
+    from PyQt6.QtCore import QUrl
+    from PyQt6.QtGui import QDesktopServices
+    return bool(QDesktopServices.openUrl(QUrl(url)))
+
+
+def _swap_to_system_env() -> dict:
+    """In a frozen bundle, put the system's values of our library-path
+    variables into this process's environment; returns what to put back
+    ({} when not frozen: nothing changes)."""
+    if not getattr(sys, "frozen", False):
+        return {}
+    saved = {var: os.environ.get(var) for var in _BUNDLE_VARS}
+    clean = system_env()
+    for var in _BUNDLE_VARS:
+        if var in clean:
+            os.environ[var] = clean[var]
+        else:
+            os.environ.pop(var, None)
+    return saved
+
+
+def _restore_env(saved: dict) -> None:
+    for var, value in saved.items():
+        if value is None:
+            os.environ.pop(var, None)
+        else:
+            os.environ[var] = value
+
+
+def _open_with_qt(url: str) -> bool:
+    """Qt's opener, on a desktop session (Wayland or X11). It asks the
+    compositor for an activation token and hands it on (to the desktop
+    portal or the handler it starts), and that token is what lets GNOME
+    bring the browser to the front: without it the donate page opened
+    BEHIND the app, and GNOME's launch spinner turned until it gave up.
+    In a frozen bundle a handler Qt starts would inherit our library
+    paths, so for the moment of the launch - the token comes back a beat
+    later - the process has the system's, and gets ours back after."""
+    if _qt_platform() not in ("wayland", "xcb"):
+        return False
+    saved = _swap_to_system_env()
+    ok = False
+    try:
+        ok = _qt_open(url)
+    except Exception as e:  # noqa: BLE001 - the handler below is the fallback
+        log.info("open_url: Qt could not open the link (%s) - trying xdg-open", e)
+    finally:
+        if saved and ok:
+            try:
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(3000, lambda: _restore_env(saved))
+            except Exception:   # noqa: BLE001
+                _restore_env(saved)
+        elif saved:
+            _restore_env(saved)
+    return ok
+
+
 def open_url(url: str) -> bool:
     """Open *url* in the user's browser. Returns whether a handler was
     started.
 
-    On Linux the handler is spawned directly with a cleaned environment,
-    because QDesktopServices.openUrl runs xdg-open as a CHILD of this
-    process - so the browser inherits the bundle's library paths and
-    fails to start, which from the user's side looks exactly like a link
-    that does nothing. Qt's own call is kept as the fallback and is what
-    macOS and Windows use, where there is no such problem.
+    On a Linux desktop Qt's opener goes first (``_open_with_qt``): it
+    passes the activation token that brings the browser to the front. If
+    it cannot, the handler is spawned directly with a cleaned
+    environment, because a child of this process inherits the bundle's
+    library paths and the browser fails to start - which from the user's
+    side looks exactly like a link that does nothing. macOS and Windows
+    use Qt's call, where there is no such problem.
     """
     if not url:
         return False
+    if sys.platform.startswith("linux") and _open_with_qt(url):
+        return True
     if sys.platform.startswith("linux"):
         for exe in ("xdg-open", "gio", "gnome-open", "kde-open5", "kde-open"):
             path = shutil.which(exe)

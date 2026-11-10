@@ -87,3 +87,36 @@ def test_players_still_uses_the_one_environment_helper():
     cure; external mpv must not quietly go back to inheriting the bundle."""
     from dopeiptv.media import players
     assert players._system_env is xdg.system_env
+
+
+def test_on_a_desktop_qt_opens_it_with_the_system_paths_for_the_moment(
+        monkeypatch):
+    """Qt's opener passes the activation token that brings the browser to
+    the front on GNOME (the donate page opened behind the app without it).
+    The handler it may start must still not inherit our library paths, and
+    we get ours back after."""
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setenv("LD_LIBRARY_PATH", "/opt/dopeiptv/lib")
+    monkeypatch.setattr(xdg, "_qt_platform", lambda: "wayland")
+    seen = {}
+
+    def fake_qt_open(url):
+        seen["url"] = url
+        seen["ld"] = xdg.os.environ.get("LD_LIBRARY_PATH")
+        return False            # say it failed: the paths come back at once
+
+    monkeypatch.setattr(xdg, "_qt_open", fake_qt_open)
+    monkeypatch.setattr(xdg.shutil, "which", lambda n: None)
+    xdg.open_url("https://iptv.dope.rs/?ref=app-heart#donate")
+    assert seen["url"].startswith("https://iptv.dope.rs")
+    assert seen["ld"] is None                       # stripped for the launch
+    assert xdg.os.environ["LD_LIBRARY_PATH"] == "/opt/dopeiptv/lib"   # and back
+
+
+def test_without_a_desktop_session_qt_is_not_asked(monkeypatch):
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(xdg, "_qt_platform", lambda: "offscreen")
+    monkeypatch.setattr(xdg, "_qt_open", lambda url: pytest.fail("asked Qt"))
+    monkeypatch.setattr(xdg.shutil, "which", lambda n: None)
+    xdg.open_url("https://iptv.dope.rs")
