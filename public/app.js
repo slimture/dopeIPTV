@@ -218,6 +218,24 @@
   fxp.addEventListener("mouseleave", function () { held = false; schedule(); });
   document.addEventListener("visibilitychange", function () { held = document.hidden; schedule(); });
 
+  // A swipe across the screen goes to the next or the previous feature.
+  var stage = fxp.querySelector(".fxp-stage"), sx = null, sy = 0;
+  if (stage) {
+    stage.addEventListener("touchstart", function (e) {
+      sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+    }, { passive: true });
+    stage.addEventListener("touchend", function (e) {
+      if (sx === null) { return; }
+      var dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
+      sx = null;
+      if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy) * 1.5) { return; }
+      var step = dx < 0 ? 1 : -1;
+      if (document.documentElement.dir === "rtl") { step = -step; }
+      auto = false;
+      show((cur + step + feats.length) % feats.length, true);
+    }, { passive: true });
+  }
+
   list.hidden = true;
   fxp.hidden = false;
   show(0, false);

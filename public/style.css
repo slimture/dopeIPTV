@@ -804,9 +804,16 @@ dialog.dn::backdrop { background: rgba(5, 7, 10, .62); backdrop-filter: blur(3px
   section { padding: 56px 0; }
   .sec-head { margin-bottom: 22px; }
   .hero { padding: 44px 0 24px; }
-  .hero .mock { display: none; }
+  /* A phone gets the picture, not the paragraph: the app window, cut down
+     to its living screen and timeline, where the long lede was. */
+  .hero .lede, h1 .h1-brand { display: none; }
+  .hero .mock { width: 100%; border-radius: 18px; }
+  .hero .mock .titlebar, .hero .mock .chans { display: none; }
+  .hero .mock .body { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+  .hero .mock .screen { min-height: 0; aspect-ratio: 16 / 9; margin: 10px; }
+  .hero .mock .timeline { margin: 0 10px 10px; }
+  .hero-grid { gap: 28px; }
   h1 { font-size: 2rem; }
-  .lede { margin-top: 14px; font-size: 1rem; line-height: 1.6; }
   .cta-row { margin-top: 22px; flex-wrap: nowrap; }
   .cta-row .btn { flex: 1 1 auto; justify-content: center; padding: 12px 14px; }
 
@@ -1098,4 +1105,18 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
 @media (max-width: 860px) {
   #features .fxp-tab { background: var(--bg); }
   #features .fxp-tab.is-on { background: var(--text); }
+}
+
+/* ---- phones: fewer words --------------------------------------------------- */
+/* Each section keeps its heading and the thing to touch; the paragraph under
+   the heading stays for computers (and in the page, for search engines). */
+@media (max-width: 720px) {
+  #features .sec-head p, #whats-new .sec-head p, .faq-grid .sec-head p,
+  #credits .sec-head p, .donate-text p, #shots .sec-head p { display: none; }
+  .sec-head { margin-bottom: 18px; }
+  .sec-head .eyebrow { margin-bottom: 8px; }
+  .donate-act small { display: none; }
+  .dl-phone p { font-size: 15px; }
+  .faq-grid { gap: 14px; }
+  .btn.ghost.faq-help { margin-top: 4px; }
 }
