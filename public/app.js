@@ -309,24 +309,11 @@
   faq.appendChild(b);
 })();
 
-/* Living details: the formats drift by, the download count counts up. */
+/* Living details: the download count counts up. (The format names used to
+   drift by; too much sideways motion beside the other moving parts.) */
 (function () {
   "use strict";
   if (!window.matchMedia || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { return; }
-  var strip = document.querySelector(".strip .wrap");
-  if (strip && strip.children.length && !window.matchMedia("(max-width: 720px)").matches) {
-    var track = document.createElement("div");
-    track.className = "marq";
-    var chips = [].slice.call(strip.children);
-    chips.forEach(function (c) { track.appendChild(c); });
-    chips.forEach(function (c) {
-      var d = c.cloneNode(true);
-      d.setAttribute("aria-hidden", "true");
-      track.appendChild(d);
-    });
-    strip.appendChild(track);
-    strip.classList.add("is-marq");
-  }
   var count = document.querySelector(".release-tag .dl-count");
   var m = count && count.textContent.match(/^(\D*)([\d\s.,  ]*\d)(\D*)$/);
   if (!m || !("IntersectionObserver" in window)) { return; }
