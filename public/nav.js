@@ -1080,3 +1080,57 @@ var iptvHit = (function () {
     open();
   }
 })();
+
+/* A copy button on each command in the help - on the help page and in the
+   install dialog on the front page (app.js calls this for what it opens). A
+   command is there to be run, and selecting a line of it by hand on a
+   trackpad is fiddly. An icon, so it is one size in every language; its
+   name (the body's data-copy) is the label and the tooltip. Only where the
+   page may write the clipboard; elsewhere the commands stay as they were. */
+window.iptvCopyButtons = function (root) {
+  "use strict";
+  var body = document.body, say = body.getAttribute("data-copy"),
+      done = body.getAttribute("data-copied") || say;
+  if (!say || !(navigator.clipboard && window.isSecureContext)) { return; }
+  var NS = "http://www.w3.org/2000/svg";
+  function svg(paths) {
+    var s = document.createElementNS(NS, "svg");
+    s.setAttribute("viewBox", "0 0 24 24"); s.setAttribute("aria-hidden", "true");
+    paths.forEach(function (d) {
+      var p = document.createElementNS(NS, d.charAt(0) === "r" ? "rect" : "path");
+      if (d.charAt(0) === "r") {
+        var v = d.slice(1).split(",");
+        ["x", "y", "width", "height", "rx"].forEach(function (k, i) { p.setAttribute(k, v[i]); });
+      } else { p.setAttribute("d", d); }
+      s.appendChild(p);
+    });
+    return s;
+  }
+  [].forEach.call(root.querySelectorAll(".help-a pre"), function (pre) {
+    if (pre.parentNode.classList.contains("codebox")) { return; }
+    var code = pre.querySelector("code") || pre;
+    var box = document.createElement("div");
+    box.className = "codebox";
+    pre.parentNode.insertBefore(box, pre);
+    box.appendChild(pre);
+    var btn = document.createElement("button");
+    btn.type = "button"; btn.className = "copy";
+    btn.title = say; btn.setAttribute("aria-label", say);
+    btn.append(svg(["r9,9,11,11,2.5", "M5 15V6.5A2.5 2.5 0 0 1 7.5 4H15"]),
+               svg(["M5 12.5l4.5 4.5L19 7.5"]));
+    var timer = 0;
+    btn.addEventListener("click", function () {
+      navigator.clipboard.writeText(code.textContent).then(function () {
+        btn.classList.add("is-done");
+        btn.title = done; btn.setAttribute("aria-label", done);
+        clearTimeout(timer);
+        timer = setTimeout(function () {
+          btn.classList.remove("is-done");
+          btn.title = say; btn.setAttribute("aria-label", say);
+        }, 1800);
+      }, function () { /* refused: the command is still there to select */ });
+    });
+    box.appendChild(btn);
+  });
+};
+window.iptvCopyButtons(document);

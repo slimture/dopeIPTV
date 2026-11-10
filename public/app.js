@@ -348,3 +348,57 @@
   }, { threshold: 1 });
   io.observe(count);
 })();
+
+/* "How to install" on a download card: the help page's answer for that
+   system in a dialog over the downloads - whoever clicks it is in the middle
+   of a download, and a page of its own broke that off. The text is the help
+   page's (rendered into a <template> beside the cards), so it is kept in one
+   place, and "More help" at the foot goes on to the help page. Without
+   script or <dialog>, or with a modifier key, the link is the help page. */
+(function () {
+  "use strict";
+  var box = document.querySelector(".dlx");
+  if (!box || typeof HTMLDialogElement !== "function") { return; }
+  var dlg = null, title = null, body = null, more = null;
+
+  function build() {
+    dlg = document.createElement("dialog");
+    dlg.className = "howdlg";
+    dlg.setAttribute("aria-labelledby", "how-title");
+    var head = document.createElement("div");
+    head.className = "howdlg-head";
+    title = document.createElement("h2");
+    title.id = "how-title";
+    var x = document.createElement("button");
+    x.type = "button"; x.className = "dn-x"; x.textContent = "×";
+    x.setAttribute("aria-label", box.getAttribute("data-close") || "Close");
+    x.addEventListener("click", function () { dlg.close(); });
+    head.append(title, x);
+    body = document.createElement("div");
+    body.className = "howdlg-body help-a";
+    var foot = document.createElement("p");
+    foot.className = "howdlg-foot";
+    more = document.createElement("a");
+    more.textContent = box.getAttribute("data-how-more") || "";
+    foot.append(more);
+    dlg.append(head, body, foot);
+    // A click beside it (on the backdrop) closes it, as Esc does.
+    dlg.addEventListener("click", function (e) { if (e.target === dlg) { dlg.close(); } });
+    document.body.append(dlg);
+  }
+
+  box.addEventListener("click", function (e) {
+    var a = e.target.closest && e.target.closest("a.dlx-how[data-how]");
+    if (!a || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) { return; }
+    var tpl = document.getElementById("how-" + a.getAttribute("data-how"));
+    if (!tpl || !tpl.content) { return; }
+    e.preventDefault();
+    if (!dlg) { build(); }
+    title.textContent = tpl.getAttribute("data-title") || a.textContent;
+    body.replaceChildren(tpl.content.cloneNode(true));
+    if (typeof window.iptvCopyButtons === "function") { window.iptvCopyButtons(body); }
+    more.href = a.href;
+    dlg.showModal();
+    body.scrollTop = 0;
+  });
+})();

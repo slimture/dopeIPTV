@@ -303,7 +303,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
           rest: ($g | map(select(.name as $nm | $heronames | any(. == $nm) | not)))}] as $groups
     | (t("dl_go") | sub("[[:space:]]*[→←][[:space:]]*$"; "")) as $btn
     | if ($groups | length) == 0 then dl_github else
-        "      <div class=\"dlx\">\n"
+        "      <div class=\"dlx\" data-how-more=\"\(t("dl_how_more") | h)\" data-close=\"\(t("lb_close") | h)\">\n"
         + "        <div class=\"dlx-cards\">\n"
         + ([$groups[] | . as $grp
             | (($grp.hero | length) > 1) as $many
@@ -321,9 +321,14 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
               + (if ($grp.rest | length) > 0 then
                    "            <p class=\"dlx-alt\"><span>\(t("dl_other") | h)</span>\([$grp.rest[] | dl_alt] | join(""))</p>\n"
                  else "" end)
-              + "            <a class=\"dlx-how\" href=\"/help/#start-\($grp.id)\">\(t("dl_how") | h)</a>\n"
+              + "            <a class=\"dlx-how\" href=\"/help/#start-\($grp.id)\" data-how=\"\($grp.id)\">\(t("dl_how") | h)</a>\n"
               + "          </article>\n"] | add)
         + "        </div>\n"
+        # The help page's install answers, for the dialog "How to install"
+        # opens (app.js): the same text, kept in one place.
+        + ([$groups[] | .id as $id | t("help_start_\($id)_q") as $q
+            | select($q != "help_start_\($id)_q")
+            | "        <template id=\"how-\($id)\" data-title=\"\($q | h)\">\(t("help_start_\($id)_a"))</template>\n"] | add // "")
         + "        <p class=\"dlx-gh\"><a href=\"\($REPO | h)/releases/latest\" rel=\"nofollow\">\(t("dl_all_name") | h)</a></p>\n"
         + "      </div>\n"
       end;
