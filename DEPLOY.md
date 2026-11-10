@@ -243,3 +243,93 @@ W=/usr/local/bastille/jails/pontusweb/root/usr/local/www/iptv
 cp -R /root/iptv-php/public/. "$W/public/"
 cp /root/iptv-php/sync-releases.php "$W/"
 ```
+
+## Donations
+
+The donate dialog (`public/nav.js`) takes the payment on the page itself,
+as solequiz.com does: Apple Pay or Google Pay where the visitor has it,
+otherwise Stripe's card form inside Stripe's own frames. Stripe needs a
+server holding the secret key for that, which is `donate/donate.py`: Python's
+standard library only, on 127.0.0.1:8098 in the jail, reached through
+`/donate/` in the content server's nginx file. It never sees a card number.
+
+Until it runs, the dialog sends visitors to Stripe's own donate page (the
+Payment Link at the top of `site/render.jq`), so the steps below can come in
+any order and the site never shows a broken button.
+
+**Stripe Dashboard** (start in test mode, the toggle top right, and repeat
+with live keys once a test payment has gone through):
+
+1. Developers → API keys → **Create restricted key**, named e.g.
+   `iptv.dope.rs donate`, with **Checkout Sessions: Write** and
+   **PaymentIntents: Write** and nothing else. Copy the `rk_...` key.
+2. The **publishable key** (`pk_...`) is on the same page.
+3. Settings → Payments → **Payment method domains** → Add `iptv.dope.rs`.
+   Stripe reads `/.well-known/apple-developer-merchantid-domain-association`
+   from the site (deployed with `public/`) and Apple Pay turns "Verified".
+   Google Pay needs nothing more.
+4. Settings → Payments → Payment methods decides what the card form offers
+   besides cards (Klarna, ...). Settings → Customer emails → **Successful
+   payments** on, so every donor gets a receipt.
+
+**The service (jail):**
+
+```sh
+bastille console pontusweb
+pkg install -y python3
+python3 --version                    # 3.9 or later
+cd ~/dopeiptv && git pull origin website
+cp -R donate /usr/local/www/iptv/
+install -m 600 -o iptv -g iptv /dev/null /usr/local/etc/iptv-donate.key
+cat > /usr/local/etc/iptv-donate.key # paste the rk_... key, Enter, Ctrl-D
+cat > /usr/local/etc/iptv-donate.conf <<'CONF'
+STRIPE_PUBLISHABLE_KEY=pk_...
+DONATE_CURRENCY=eur
+DONATE_COUNTRY=SE
+CONF
+install -m 555 deploy/iptv_donate /usr/local/etc/rc.d/iptv_donate
+install -m 640 -o iptv -g iptv /dev/null /var/log/iptv-donate.log
+sysrc iptv_donate_enable=YES
+service iptv_donate start
+tail -n 1 /var/log/iptv-donate.log   # [donate] listening on 127.0.0.1:8098, eur, configured
+fetch -qo - http://127.0.0.1:8098/donate/config; echo
+```
+
+The key goes in with `cat` rather than `echo` so it never lands in the
+shell's history. Every other setting (amounts, limits, the receipt's
+"Support dopeIPTV") is listed at the top of `donate.py`; change the `.conf`
+and `service iptv_donate restart`.
+
+In a jail without a loopback address of its own, 127.0.0.1 is the jail's
+address (`sockstat -4l | grep 8098` shows which). The service only answers
+`/donate/...`, refuses requests from any origin but the site's and limits
+each visitor, but like 8081 it should not be reachable from outside.
+
+Log rotation, next to the two lines from step 10 (SIGHUP makes daemon(8)
+reopen the log):
+
+```sh
+echo '/var/log/iptv-donate.log                     iptv:iptv      640  5     1024 *    JC    /var/run/iptv_donate.pid' \
+    >> /usr/local/etc/newsyslog.conf.d/iptv.dope.rs.conf
+newsyslog -nv 2>&1 | grep donate
+```
+
+**nginx (host)** - the content server's file as in step 8, which now has the
+`/donate/` location and the rate limit in front of it:
+
+```sh
+C=/usr/local/bastille/jails/pontusweb/root/usr/local/etc/nginx/conf.d/iptv.dope.rs.conf
+cp /root/iptv-static/deploy/content-iptv.dope.rs.conf "$C"
+bastille cmd pontusweb nginx -t && bastille cmd pontusweb service nginx reload
+```
+
+and the site's row in the TLS-front proxy's CSP map
+(`deploy/csp.snippet.txt` has the line and why each Stripe address is
+there), then `nginx -t && service nginx reload` on the host.
+
+**Check:** open the site, Donate. The amounts appear; Safari with a card in
+Wallet shows "Donate with Apple Pay", Chrome with a saved card "Donate with
+Google Pay", everything else goes straight to the card form. In test mode
+the card `4242 4242 4242 4242`, any future date and any CVC pays; the
+payment shows in the Dashboard under Payments, with "iptv.dope.rs donate
+dialog" in its metadata.

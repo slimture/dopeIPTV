@@ -53,7 +53,12 @@ What the PHP version worked out on every request is split in two:
   has, else English - and answers `/dl.php` (on to the file) and
   `/trakt/callback/` (on to the app) itself.
 
-Nothing for this site talks to php-fpm.
+Nothing for this site talks to php-fpm. The one thing that is not static is
+the donate dialog's small service, `donate/donate.py` (standard-library
+Python behind `/donate/`): it asks Stripe for a payment session with the
+secret key, so the card form and Apple Pay / Google Pay can open on the page
+itself. Without it the dialog sends visitors to Stripe's own page. Setting it
+up: `DEPLOY.md`, "Donations".
 
 Config templates live in `deploy/` with role-based names —
 `proxy-iptv.dope.rs.conf` and `content-iptv.dope.rs.conf`. Replace the
@@ -157,9 +162,11 @@ cd ~/dopeiptv
 git checkout website          # the site is NOT on main or testing
 git pull origin website
 cp -R public/. /usr/local/www/iptv/public/
-cp -R site sync-releases.sh /usr/local/www/iptv/
+cp -R site donate sync-releases.sh /usr/local/www/iptv/
 cd /usr/local/www/iptv && su -m iptv -c 'sh sync-releases.sh'
 ```
+
+When `donate/` changed, `service iptv_donate restart` as well.
 
 The last line puts a change on the pages now rather than at the next
 quarter-hour - and a changed `style.css` or JS file is only linked under its

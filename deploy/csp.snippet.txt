@@ -1,16 +1,32 @@
 Add this line inside the existing `map $server_name $csp_policy { ... }` block
 in the TLS-front proxy's /usr/local/etc/nginx/nginx.conf (next to your main site row):
 
-    "iptv.dope.rs" "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none';";
+    "iptv.dope.rs" "default-src 'self'; img-src 'self' data: https://*.stripe.com; style-src 'self'; script-src 'self' https://js.stripe.com https://*.js.stripe.com; connect-src 'self' https://api.stripe.com https://checkout.stripe.com; frame-src https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://checkout.stripe.com https://pay.google.com; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none';";
 
 Why this is safe AND sufficient for the site:
   - default-src 'self'      everything same-origin by default
   - img-src 'self' data:    screenshots + the SVG favicon (data: covers inline SVG use)
   - style-src 'self'        external style.css only (no inline styles -> no 'unsafe-inline')
-  - script-src 'self'       external app.js only; the JSON-LD block is a non-executable
-                            data block and is NOT affected by script-src
-  - connect-src 'self'      no client-side fetches at all (downloads are same-origin <a> links)
+  - script-src 'self'       external nav.js and friends; the JSON-LD block is a
+                            non-executable data block and is NOT affected by script-src
+  - connect-src 'self'      the donate dialog's /donate/ calls; everything else is
+                            same-origin <a> links
   - object/base/form locked down
+
+Stripe, for the donate dialog only (the same set solequiz.com runs its dialog
+with, plus Stripe's *.js.stripe.com and Google Pay's frame):
+  - script-src  https://js.stripe.com https://*.js.stripe.com
+                Stripe.js, loaded by nav.js the first time the dialog opens -
+                a visitor who never opens it never fetches anything from Stripe
+  - frame-src   https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com
+                https://checkout.stripe.com https://pay.google.com
+                the card form and 3-D Secure live in Stripe's frames, so the card
+                number never touches this page
+  - connect-src https://api.stripe.com https://checkout.stripe.com
+  - img-src     https://*.stripe.com   (card brand logos)
+
+Without the Stripe parts the site still works: the dialog cannot load Stripe.js
+and sends the visitor on to Stripe's own donate page instead.
 
 The global add_header Content-Security-Policy $csp_policy already applies it, so no
 per-server add_header is needed on iptv.dope.rs.

@@ -141,6 +141,20 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
       | "<link rel=\"alternate\" hreflang=\"\($c | h)\" href=\"\(url($path; $c) | h)\">\n"]
      | add)
     + "<link rel=\"alternate\" hreflang=\"x-default\" href=\"\($SITE + $path | h)\">\n";
+  # The donate dialog's words, for nav.js on every page (data, not script).
+  def donate_i18n:
+    if $DONATE == "" then "" else
+      "<div id=\"donate-i18n\" hidden"
+      + ([[["title", "donate_eyebrow"], ["sub", "donate_modal_sub"], ["other", "donate_other"],
+           ["cont", "donate_continue"], ["email", "donate_email"], ["pay", "donate_pay"],
+           ["busy", "donate_busy"], ["lock", "donate_lock"], ["back", "donate_back"],
+           ["thanks", "donate_thanks"], ["receipt", "donate_receipt"], ["failed", "donate_failed"],
+           ["emailmissing", "donate_email_missing"], ["range", "donate_range"],
+           ["close", "donate_close"], ["loading", "donate_loading"],
+           ["apple", "donate_apple"], ["google", "donate_google"], ["card", "donate_card"]][]
+          | . as [$k, $key] | " data-\($k)=\"\(t($key) | h)\""] | add)
+      + " data-lang=\"\($lang | h)\"></div>\n"
+    end;
   def nav($current):
     ($current == "home") as $home
     | (if $home then "" else "/" end) as $base
@@ -157,6 +171,16 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     | ([$links[] | . as [$href, $label, $key]
       | "          <a role=\"menuitem\" class=\"navmenu-item\(if cur($key) then " is-current" else "" end)\" href=\"\($href | h)\"\(if cur($key) then " aria-current=\"page\"" else "" end)>\($label | h)</a>\n"]
      | add) as $menuitems
+    # Donate: a quiet link beside the others (nav.js opens the dialog; the
+    # address is Stripe's own page for when it cannot).
+    | (if $DONATE == "" then "" else
+         "      <a class=\"navlink navdonate\" href=\"\($DONATE | h)\" rel=\"nofollow noopener\"><span aria-hidden=\"true\">♥</span> \(t("donate_btn") | h)</a>\n" end) as $navdonate
+    | (if $DONATE == "" then "" else
+         "          <a role=\"menuitem\" class=\"navmenu-item navdonate\" href=\"\($DONATE | h)\" rel=\"nofollow noopener\"><span aria-hidden=\"true\">♥</span> \(t("donate_btn") | h)</a>\n" end) as $menudonate
+    # ...and on a phone, where the links fold into the menu, a heart of its
+    # own in the header, one tap from anywhere.
+    | (if $DONATE == "" then "" else
+         "      <a class=\"navheart\" href=\"\($DONATE | h)\" rel=\"nofollow noopener\" aria-label=\"\(t("donate_btn") | h)\" title=\"\(t("donate_btn") | h)\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg></a>\n" end) as $navheart
     | (if ($avail | length) > 1 then
          "      <details class=\"langpick\" id=\"langPick\" name=\"hdrmenu\">\n"
          + "        <summary aria-label=\"\(t("lang_label") | h)\">\n"
@@ -170,9 +194,11 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
          + "        </div>\n"
          + "      </details>\n"
        else "" end) as $langpick
-    | $navtpl
-    | expand({brand_href: (if $home then "#top" else "/" end), nav_base: $base};
-             {navlinks: $navlinks, langpick: $langpick, menuitems: $menuitems});
+    | ($navtpl
+       | expand({brand_href: (if $home then "#top" else "/" end), nav_base: $base};
+                {navlinks: ($navlinks + $navdonate + $navheart), langpick: $langpick,
+                 menuitems: ($menuitems + $menudonate)}))
+      + donate_i18n;
   def common:
     {lang: ($lang | h),
      dir: (if ($S.rtl | index($lang)) then "rtl" else "ltr" end),

@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# PROVIDE: iptv_donate
+# REQUIRE: LOGIN NETWORKING
+# KEYWORD: shutdown
+#
+# The donate dialog's small service for iptv.dope.rs (donate/donate.py).
+# Install as /usr/local/etc/rc.d/iptv_donate (mode 555) inside the jail, then:
+#
+#   sysrc iptv_donate_enable=YES
+#   service iptv_donate start
+#
+# daemon(8) restarts it if it ever stops, and reopens the log on SIGHUP
+# (newsyslog, DEPLOY.md "Donations").
+
+. /etc/rc.subr
+
+name=iptv_donate
+rcvar=iptv_donate_enable
+
+load_rc_config $name
+
+: ${iptv_donate_enable:=NO}
+: ${iptv_donate_user:=iptv}
+: ${iptv_donate_python:=/usr/local/bin/python3}
+: ${iptv_donate_script:=/usr/local/www/iptv/donate/donate.py}
+: ${iptv_donate_log:=/var/log/iptv-donate.log}
+
+pidfile=/var/run/${name}.pid
+command=/usr/sbin/daemon
+command_args="-R 5 -P ${pidfile} -u ${iptv_donate_user} -o ${iptv_donate_log} ${iptv_donate_python} -I ${iptv_donate_script}"
+
+run_rc_command "$1"
