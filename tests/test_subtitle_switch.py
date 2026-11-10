@@ -76,7 +76,8 @@ settings.setValue("sub_mode", "off")
 settings.setValue("sub_lang", "swe")
 assert p.play("http://x/movie/1.mkv", "Film")
 assert m["sid"] == "auto" and m["subs-fallback"] == "yes"
-assert m["slang"] == "swe" and m["sub-visibility"] is False
+# The languages asked for first, then the app's own (English here).
+assert m["slang"] == "swe,eng,en" and m["sub-visibility"] is False
 m.track_list = subs(1)
 m.sid = 1
 assert menu()[tr("opt_off")] is True and menu()["swe"] is False
@@ -92,15 +93,19 @@ m.sets.clear()
 p._pick_track("sid", "no")
 assert not [k for k, _v in m.sets if k == "sid"], m.sets
 assert m["sub-visibility"] is False
-# Another language is another track: that one is chosen.
+# Another language is another track: that one is chosen - and remembered,
+# so the next film opens with a track in it chosen, hidden.
 p._pick_track("sid", 2)
 assert ("sid", 2) in m.sets and m["sub-visibility"] is True
+assert settings.value("sub_last_lang") == "eng"
 
 # "auto": hidden at first; shown once the tracks are known if the file
 # flags the chosen one - the track mpv itself showed before.
 settings.setValue("sub_mode", "auto")
+settings.setValue("sub_last_lang", "swe")
 p.play("http://x/movie/2.mkv", "Film")
-assert m["sub-visibility"] is False and m["slang"] == ""
+# Hidden, chosen by the language turned on last, then the app's.
+assert m["sub-visibility"] is False and m["slang"] == "swe,eng,en"
 m.track_list = []
 p._poll_position()                       # not loaded yet: wait
 assert m["sub-visibility"] is False and p._sub_rule is not None
@@ -111,12 +116,19 @@ p.play("http://x/movie/3.mkv", "Film")
 m.track_list = subs(1, default=False)
 p._poll_position()
 assert m["sub-visibility"] is False      # nothing flagged: stays off
+# The file flags a track other than the one chosen by language: that one
+# is taken at the start and shown, as mpv itself did before.
+p.play("http://x/movie/3b.mkv", "Film")
+m.sets.clear()
+m.track_list = subs(2, default=True)     # eng chosen, swe flagged
+p._poll_position()
+assert ("sid", 1) in m.sets and m["sub-visibility"] is True
 
 # By language: shown when the chosen one is in a language asked for.
 settings.setValue("sub_mode", "lang")
 settings.setValue("sub_lang", "eng")
 p.play("http://x/movie/4.mkv", "Film")
-assert m["slang"] == "eng"
+assert m["slang"].split(",")[0] == "eng"
 m.track_list = subs(2)
 p._poll_position()
 assert m["sub-visibility"] is True

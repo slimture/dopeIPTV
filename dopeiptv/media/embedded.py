@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
 
 from ..core.log import log, redact_url
 from ..core.local_buffer import rewind_bytes
-from ..i18n import tr
+from ..i18n import current_language, tr
 from .dvr_player import DvrPlayerMixin
 from .rewind_bar import RewindBarMixin
 from .seek_slider import _SeekSlider, _format_time
@@ -176,6 +176,19 @@ def _control_icon(name: str, color: str, px: int = 28) -> QIcon:
     p.end()
     pm.setDevicePixelRatio(scale)
     return QIcon(pm)
+
+
+# The tags a subtitle track's language comes as, per app language: ISO
+# 639-2 (both forms where they differ) and 639-1.
+_SUB_LANG_TAGS = {
+    "en": "eng,en", "sv": "swe,sv", "es": "spa,es", "de": "ger,deu,de",
+    "fr": "fre,fra,fr", "zh": "chi,zho,zh", "ru": "rus,ru", "th": "tha,th",
+    "pt": "por,pt", "it": "ita,it", "nl": "dut,nld,nl", "pl": "pol,pl",
+    "hr": "hrv,hr", "sr": "srp,sr", "el": "gre,ell,el", "tr": "tur,tr",
+    "uk": "ukr,uk", "id": "ind,id", "vi": "vie,vi", "hi": "hin,hi",
+    "ja": "jpn,ja", "ko": "kor,ko", "sw": "swa,sw", "ar": "ara,ar",
+    "fa": "per,fas,fa", "he": "heb,he", "ur": "urd,ur",
+}
 
 
 def _set_forced_only(m, on: bool) -> None:
@@ -2159,20 +2172,39 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
             return
         set_opt("sid", "auto")
         # The track picked is the one most likely to be turned on: the
-        # languages asked for first. In "auto" none is asked for, so the
-        # one the file flags comes first, as before.
-        set_opt("slang", ",".join(langs) if mode in ("lang", "off") else "")
+        # languages asked for, then the one turned on last, then the app's
+        # own. Picking another later is the slow part. In "auto" a track
+        # the file flags still shows (_apply_sub_rule).
+        set_opt("slang", ",".join(self._preferred_sub_langs(langs)))
         set_opt("subs-fallback", "yes")              # some track, always
         _set_forced_only(m, False)
         set_opt("sub-visibility", False)
         if mode != "off":
             self._sub_rule = (mode, [x.lower() for x in langs])
 
+    def _preferred_sub_langs(self, langs: list[str]) -> list[str]:
+        """The languages a film's hidden track is chosen by: those asked
+        for in Settings, the one turned on last, the app's language."""
+        s = self._settings
+        last = (s.value("sub_last_lang", "") or "") if s else ""
+        out: list[str] = []
+        for value in (*langs, last,
+                      _SUB_LANG_TAGS.get(current_language(), "")):
+            for tag in str(value).split(","):
+                tag = tag.strip().lower()
+                if tag and tag not in out:
+                    out.append(tag)
+        return out
+
     def _apply_sub_rule(self, m) -> None:
         """The stream's tracks are known: show the track chosen hidden at
         the start if the setting would have chosen it itself - one the file
         flags default or forced, or (by language) one in a language asked
-        for. The same tracks mpv showed before tracks were chosen hidden."""
+        for. The same tracks mpv showed before tracks were chosen hidden.
+
+        In "auto" the hidden track is picked by language, so a track the
+        file flags may be another one: that one is taken, once, at the very
+        start - what mpv itself picked before."""
         try:
             tracks = m.track_list or []
         except Exception:
@@ -2181,8 +2213,20 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
             return                        # not loaded yet: the next poll
         mode, langs = self._sub_rule
         self._sub_rule = None
-        sel = next((t for t in tracks
-                    if t.get("type") == "sub" and t.get("selected")), None)
+        subs = [t for t in tracks if t.get("type") == "sub"]
+        sel = next((t for t in subs if t.get("selected")), None)
+        if mode == "auto":
+            flagged = (next((t for t in subs if t.get("default")), None)
+                       or next((t for t in subs if t.get("forced")), None))
+            if flagged is None:
+                return
+            try:
+                if sel is None or sel.get("id") != flagged.get("id"):
+                    m["sid"] = flagged.get("id")
+                m["sub-visibility"] = True
+            except Exception:
+                pass
+            return
         if sel is None:
             return
         lang = (sel.get("lang") or "").lower()
@@ -3062,12 +3106,28 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
                 current = None
             if current != tid:
                 self._set_mpv("sid", tid)
+            self._remember_sub_lang(m, tid)
             # Picked on purpose: all of it, whatever "forced only" says.
             if m is not None:
                 _set_forced_only(m, False)
             # A stream opened with subtitles off leaves them hidden.
             self._set_mpv("sub-visibility", True)
         self.track_selected.emit(prop, tid)
+
+    def _remember_sub_lang(self, m, tid) -> None:
+        """The language of a subtitle turned on by hand: the next film opens
+        with a track in it chosen, hidden, so turning it on is instant."""
+        if m is None or not self._settings:
+            return
+        try:
+            track = next((t for t in (m.track_list or [])
+                          if t.get("type") == "sub" and t.get("id") == tid),
+                         None)
+        except Exception:
+            return
+        lang = str((track or {}).get("lang") or "").strip().lower()
+        if lang and lang not in ("und", "unknown"):
+            self._settings.setValue("sub_last_lang", lang)
 
     def _set_mpv(self, prop: str, value) -> None:
         m = self.video.mpv

@@ -16,6 +16,21 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   on buttons, and every one passes the readability test. Names in all 27
   languages.
 
+### Fixed
+
+- Turning subtitles on in a film was still slow when the language wanted
+  was not the file's first subtitle track - with the default "Automatic",
+  the usual case. The track a film opens with, hidden, is now chosen by the
+  languages asked for in Settings, then the language turned on last, then
+  the app's own language, so it is usually the one that gets turned on:
+  0.10 s instead of a frozen picture for 15 s and more against a slow
+  server (two-track MKV, English first, app in Swedish). A track the file
+  flags default or forced still shows at the start in "Automatic".
+- Text on the accent colour (buttons, the checked nav entry, selections,
+  ticks) is near-black where white does not read - Nord, Dracula,
+  Catppuccin, Rosé Pine, One Dark, Tokyo Night, Gruvbox, Kanagawa,
+  Everforest and the light accents.
+
 ### Docs
 
 - README, FEATURES, ARCHITECTURE, DEVELOPER_NOTES, SECURITY, CONTRIBUTING,
