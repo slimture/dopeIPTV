@@ -792,8 +792,7 @@ footer .v a { color: inherit; }
    sign, the copyright line under it; drawn in a text colour, so it follows
    both themes. */
 footer .maker { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
-footer .sole { display: inline-flex; align-items: flex-end; gap: .3em; color: var(--muted); line-height: 0; }
-footer .sole-ab { font: 800 20px/1 var(--display); letter-spacing: -.01em; margin-bottom: -3px; }
+footer .sole { display: block; color: var(--muted); line-height: 0; }
 footer .sole:hover { color: var(--text); }
 footer .sole-logo { display: block; height: 17px; aspect-ratio: 666 / 111; overflow: hidden; white-space: nowrap;
   text-indent: 110%; background: currentColor;
