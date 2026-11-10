@@ -158,16 +158,56 @@ h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -.03em; line-height:
 .sec-head p { color: var(--muted); margin: 14px 0 0; font-size: 1.1rem; }
 /* Section openings centred, as a page of few words reads best. The FAQ keeps
    its heading in the side column. */
-#features .sec-head, #shots .sec-head, #credits .sec-head { margin-inline: auto; text-align: center; }
+#features .sec-head, #shots .sec-head { margin-inline: auto; text-align: center; }
 .dl-head { align-items: center !important; text-align: center; }
 .dl-head .sec-head { margin-inline: auto; }
 .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
 @media (max-width: 860px) { .grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
-.card { background: var(--surface); border-radius: var(--radius); padding: 28px; }
-.card .ic { display: none; }
-.card h3 { margin: 0 0 8px; font-family: var(--display); font-size: 1.2rem; font-weight: 600; letter-spacing: -.02em; line-height: 1.25; }
-.card p { margin: 0; color: var(--muted); font-size: 15.5px; line-height: 1.5; }
+.card { position: relative; background: var(--surface); border-radius: var(--radius); padding: 28px; }
+/* A feature tile: a line icon, the title and a round "+" in the corner, the
+   way Apple's tiles read. The text opens in a dialog (app.js); without
+   script the <details> opens in place. */
+details.card { padding: 30px 28px 72px; min-height: 196px; transition: background .2s ease; }
+details.card summary { list-style: none; cursor: pointer; }
+details.card summary::-webkit-details-marker { display: none; }
+details.card summary::marker { content: ""; }
+details.card summary:focus-visible { outline: none; }
+details.card:has(summary:focus-visible) { outline: 2px solid var(--accent); outline-offset: 3px; }
+details.card:hover { background: var(--surface-2); transform: scale(1.015); }
+details.card { transition: background .25s ease, transform .35s cubic-bezier(.2, .7, .2, 1); }
+.ic { display: block; width: 36px; height: 36px; margin-bottom: 20px; color: var(--accent);
+  fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.ic .fill { fill: currentColor; stroke: none; }
+.card h3 { margin: 0; font-family: var(--display); font-size: 1.3rem; font-weight: 600; letter-spacing: -.022em; line-height: 1.2;
+  text-wrap: balance; }
+.card p { margin: 14px 0 0; color: var(--muted); font-size: 15.5px; line-height: 1.5; }
+.card .more { position: absolute; inset-inline-end: 20px; bottom: 20px; width: 34px; height: 34px; border-radius: 50%;
+  background: color-mix(in srgb, var(--text) 12%, transparent); transition: background .2s ease, transform .2s ease; }
+.card .more::before, .card .more::after { content: ""; position: absolute; left: 50%; top: 50%; width: 14px; height: 2px;
+  margin: -1px 0 0 -7px; border-radius: 2px; background: var(--text); }
+.card .more::after { transform: rotate(90deg); }
+details.card:hover .more { background: var(--accent); }
+details.card:hover .more::before, details.card:hover .more::after { background: #fff; }
+details.card[open] .more { transform: rotate(45deg); }
+
+/* The dialog a tile opens. */
+dialog.fx { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 44px 40px 40px;
+  border: 0; border-radius: 30px; background: var(--surface); color: var(--text); overflow: auto;
+  box-shadow: 0 40px 100px -30px rgba(0, 0, 0, .55); }
+dialog.fx::backdrop { background: rgba(0, 0, 0, .5); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+dialog.fx .ic { width: 48px; height: 48px; margin-bottom: 22px; }
+dialog.fx h3 { margin: 0; font-family: var(--display); font-size: clamp(1.6rem, 4vw, 2.1rem); font-weight: 700;
+  letter-spacing: -.03em; line-height: 1.1; padding-inline-end: 36px; }
+dialog.fx p { margin: 16px 0 0; color: var(--muted); font-size: 18px; line-height: 1.55; }
+.fx-x { position: absolute; top: 18px; inset-inline-end: 18px; width: 36px; height: 36px; border-radius: 50%; border: 0;
+  cursor: pointer; background: color-mix(in srgb, var(--text) 12%, transparent); color: var(--text); font: inherit;
+  font-size: 22px; line-height: 1; }
+.fx-x:hover { background: color-mix(in srgb, var(--text) 20%, transparent); }
+@media (prefers-reduced-motion: no-preference) {
+  dialog.fx[open] { animation: fx-in .22s ease-out; }
+  @keyframes fx-in { from { opacity: 0; transform: translateY(12px) scale(.98); } }
+}
 .shots { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
 @media (max-width: 720px) { .shots { grid-template-columns: 1fr; } }
 .shot { border-radius: var(--radius); overflow: hidden; background: var(--surface); }
@@ -271,17 +311,20 @@ h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -.03em; line-height:
 .autonote a.verify-link { color: var(--accent); font-weight: 600; }
 .autonote a.verify-link:hover { text-decoration: underline; }
 
-/* Open-source credits */
-.credits-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-@media (max-width: 720px) { .credits-grid { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 440px) { .credits-grid { grid-template-columns: 1fr; } }
-.credit { background: var(--surface); border-radius: 18px; padding: 18px 20px; }
-.credit h3 { margin: 0 0 4px; font-size: 13px; color: var(--faint); font-weight: 500; }
-.credit p { margin: 0; font-size: .95rem; }
-.credit a { color: var(--accent); }
-.credit a:hover { text-decoration: underline; }
-.disclaimer { margin-top: 20px; font-size: 12px; line-height: 1.7; color: var(--faint); max-width: 74ch; }
-footer { background: var(--surface); padding: 28px 0 44px; margin-top: 40px; }
+/* Open-source credits: a section of its own, centred like the others - the
+   projects as a row of names with what each one does in small grey under
+   it, the way Apple lists specs. No boxes. */
+#credits .sec-head { margin-inline: auto; text-align: center; }
+.credits-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 34px 28px;
+  max-width: 900px; margin: 8px auto 0; text-align: center; }
+.credit { display: flex; flex-direction: column-reverse; gap: 6px; }
+.credit h3 { margin: 0; font-size: 13px; font-weight: 400; color: var(--faint); }
+.credit p { margin: 0; font-family: var(--display); font-size: 19px; font-weight: 600; letter-spacing: -.02em;
+  line-height: 1.3; color: var(--muted); }
+.credit a { color: var(--text); }
+.credit a:hover { color: var(--accent); }
+.disclaimer { margin: 48px auto 0; font-size: 12px; line-height: 1.6; color: var(--faint); max-width: 80ch; text-align: center; }
+footer { background: var(--surface); padding: 28px 0 44px; margin-top: 24px; }
 footer .wrap { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
 footer .v { font-size: 12.5px; color: var(--faint); }
 /* wrap: four links do not fit on one line at 320px, and a footer is no
@@ -425,12 +468,20 @@ footer nav a:hover { color: var(--accent); }
 /* ---- FAQ (accordion; feeds the FAQPage structured data) ----------------- */
 /* The heading beside the questions, the questions as a list between thin
    lines - not a stack of full-width boxes. */
-.faq-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 56px; align-items: start; }
-.faq-grid .sec-head { position: sticky; top: 96px; margin-bottom: 0; }
-.faq-grid .sec-head p { font-size: 15px; line-height: 1.65; }
-.faq-help { margin-top: 20px; }
-.faq-help::after { content: "\2192"; }
-[dir="rtl"] .faq-help::after { content: "\2190"; }
+/* One centred column, as Apple's FAQs: the heading, the first questions,
+   "Show all questions" for the rest (app.js; without script all ten show),
+   and the help page a link away. */
+.faq-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 34px; max-width: 760px; margin-inline: auto; }
+.faq-grid .sec-head { text-align: center; margin: 0 auto; }
+.faq-grid .sec-head p { font-size: 17px; line-height: 1.5; }
+.btn.ghost.faq-help { margin-top: 14px; padding: 0; border: 0; background: none; color: var(--accent); font-size: 17px; }
+.btn.ghost.faq-help:hover { background: none; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.faq-help::after { content: "\203A"; font-size: 1.2em; line-height: 1; }
+[dir="rtl"] .faq-help::after { content: "\2039"; }
+.faq-item.is-extra { display: none; }
+.faq-all { display: block; margin: 22px auto 0; padding: 10px 22px; border-radius: 999px; cursor: pointer; font: inherit;
+  font-size: 15px; font-weight: 500; color: var(--accent); background: none; border: 1px solid var(--accent); }
+.faq-all:hover { background: var(--accent); color: var(--accent-ink); }
 .faq { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
 .faq-item { border-bottom: 1px solid var(--line); }
 .faq-item summary {
@@ -450,8 +501,7 @@ footer nav a:hover { color: var(--accent); }
 .faq-item p { margin-block: -4px 20px; margin-inline: 0 46px; color: var(--muted); line-height: 1.7; max-width: 68ch; }
 @media (prefers-reduced-motion: reduce) { .faq-item summary::after { transition: none; } }
 @media (max-width: 860px) {
-  .faq-grid { grid-template-columns: minmax(0, 1fr); gap: 24px; }
-  .faq-grid .sec-head { position: static; }
+  .faq-grid { gap: 24px; }
   .faq-item p { margin-inline-end: 0; }
 }
 
@@ -679,8 +729,10 @@ body.searching .help-sec { margin-bottom: 26px; }
    A <dialog> over the page, as on solequiz.com: an amount, then Apple Pay /
    Google Pay or the card form (Stripe's, in Stripe's frames). On a phone it
    is a sheet from the bottom. */
-.navdonate span { color: var(--live); }
 nav.links .navdonate { color: var(--muted); }
+.navdonate .heart { width: 15px; height: 15px; flex: none; fill: var(--live); }
+@media (min-width: 1001px) { nav.links a.navdonate { display: inline-flex; align-items: center; gap: 6px; } }
+.navmenu-item.navdonate { display: flex; align-items: center; gap: 9px; }
 dialog.dn {
   width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 32px);
   padding: 0; border: 1px solid var(--line-2); border-radius: 18px;
@@ -780,7 +832,10 @@ dialog.dn::backdrop { background: rgba(5, 7, 10, .62); backdrop-filter: blur(3px
   .grid, .shots { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory;
     margin: 0 -18px; padding: 2px 18px 12px; scroll-padding-inline: 18px; scrollbar-width: none; }
   .grid::-webkit-scrollbar, .shots::-webkit-scrollbar { display: none; }
-  .grid > .card { flex: 0 0 78%; scroll-snap-align: start; padding: 22px; }
+  .grid > .card { flex: 0 0 62%; scroll-snap-align: start; padding: 24px 22px 64px; min-height: 168px; }
+  dialog.fx { width: 100%; max-width: 100%; margin: auto 0 0; border-radius: 26px 26px 0 0;
+    padding: 36px 24px max(32px, env(safe-area-inset-bottom)); }
+  dialog.fx p { font-size: 17px; }
   .shots > .shot { flex: 0 0 88%; scroll-snap-align: start; }
 
   .dl-phone { display: block; }
@@ -792,15 +847,39 @@ dialog.dn::backdrop { background: rgba(5, 7, 10, .62); backdrop-filter: blur(3px
   .donate-text p { margin-inline: auto; }
   .donate-act { align-items: center; }
   .donate-btn { min-width: 220px; }
-  .credits-grid { display: block; }
-  .credit { display: flex; justify-content: space-between; align-items: baseline; gap: 16px;
-    background: none; border-radius: 0; padding: 13px 0; border-bottom: 1px solid var(--line); }
-  .credit:first-child { border-top: 1px solid var(--line); }
-  .credit h3 { margin: 0; flex: none; }
-  .credit p { font-size: 15px; text-align: end; }
-  .faq-grid .sec-head { text-align: center; margin-inline: auto; }
+  .credits-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px 16px; }
+  .credit p { font-size: 17px; }
+  .disclaimer { margin-top: 36px; }
 }
 .is-phone #download:not(.dl-open) .dlx,
 .is-phone #download:not(.dl-open) .autonote { display: none; }
 .is-phone .dl-phone { display: block; }
 .is-phone .bar .btn { display: none; }
+
+/* ---- motion ------------------------------------------------------------- */
+/* Apple-style, and quiet: what scrolls into view rises into place (app.js
+   gives it .rv, then .in; only what starts below the fold, so nothing on the
+   first screen ever blinks), the hero's app window straightens up as the
+   page scrolls (--tilt, 1 to 0, from app.js; without script it is simply
+   straight), and inside it the channels take turns and the timeline plays.
+   None of it for anyone who asked their system for less motion. */
+.rv { opacity: 0; transform: translateY(26px); }
+.rv.in { opacity: 1; transform: none; transition: opacity .9s cubic-bezier(.2, .7, .2, 1) var(--d, 0s),
+  transform .9s cubic-bezier(.2, .7, .2, 1) var(--d, 0s); }
+.hero .mock { transform-origin: 50% 0;
+  transform: perspective(1600px) rotateX(calc(var(--tilt, 0) * 16deg)) scale(calc(1 - var(--tilt, 0) * .07));
+  will-change: transform; }
+.chan { transition: background .5s ease, color .5s ease; }
+.chan .n { transition: border-color .5s ease, background .5s ease; }
+.screen::before { content: ""; position: absolute; inset: 0; background: var(--tint, #4c8dff); opacity: .22;
+  transition: background-color 1s ease; }
+.mock.alive .tl-fill { animation: tl-fill 24s linear infinite; }
+.mock.alive .tl-head { animation: tl-head 24s linear infinite; }
+@keyframes tl-fill { from { width: 34%; } to { width: 78%; } }
+@keyframes tl-head { from { left: 34%; } to { left: 78%; } }
+@media (prefers-reduced-motion: reduce) {
+  .rv { opacity: 1; transform: none; }
+  .hero .mock { transform: none; }
+  .mock.alive .tl-fill, .mock.alive .tl-head { animation: none; }
+  details.card:hover { transform: none; }
+}

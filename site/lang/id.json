@@ -147,6 +147,7 @@
     "disclaimer": "Produk ini menggunakan TMDB API tetapi tidak didukung atau disertifikasi oleh TMDB. Produk ini menggunakan Trakt API tetapi tidak didukung atau disertifikasi oleh Trakt. Semua merek dagang adalah milik pemiliknya masing-masing.",
     "faq_eyebrow": "Perlu diketahui",
     "faq_h2": "Pertanyaan yang sering diajukan",
+    "faq_more": "Tampilkan semua pertanyaan",
     "faq_q1": "Apa itu dopeIPTV?",
     "faq_a1": "dopeIPTV adalah pemutar IPTV desktop gratis dan open source untuk daftar putar Xtream Codes dan M3U. Ini menyediakan panduan EPG lengkap, timeshift dan TV catch-up langsung, perekaman satu klik, dan multiview untuk hingga sembilan saluran sekaligus — semua dalam satu aplikasi native yang dibangun di atas mesin mpv.",
     "faq_q2": "Apakah dopeIPTV gratis?",

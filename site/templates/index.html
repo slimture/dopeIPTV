@@ -16,19 +16,19 @@
 <meta property="og:title" content="{{h:meta_title}}">
 <meta property="og:description" content="{{h:meta_desc}}">
 <meta property="og:url" content="{{v:canonical}}">
-<meta property="og:image" content="https://iptv.dope.rs/og-image.png">
+<meta property="og:image" content="https://iptv.dope.rs/og-image.png?v=2">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <!-- Twitter -->
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{{h:meta_title}}">
 <meta name="twitter:description" content="{{h:meta_desc}}">
-<meta name="twitter:image" content="https://iptv.dope.rs/og-image.png">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="icon" href="/favicon.ico" sizes="32x32">
-<link rel="icon" href="/favicon.png" sizes="512x512" type="image/png">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="manifest" href="/site.webmanifest">
+<meta name="twitter:image" content="https://iptv.dope.rs/og-image.png?v=2">
+<link rel="icon" href="/favicon.svg?v=2" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico?v=2" sizes="32x32">
+<link rel="icon" href="/favicon.png?v=2" sizes="512x512" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
+<link rel="manifest" href="/site.webmanifest?v=2">
 <link rel="stylesheet" href="{{v:css}}">
 <script type="application/ld+json">
 {{b:jsonld}}</script>
@@ -86,19 +86,21 @@
         <h2>{{h:feat_h2}}</h2>
         <p>{{t:feat_intro}}</p>
       </div>
-      <div class="grid">
-        <div class="card"><div class="ic">⏱</div><h3>{{t:feat_c1_h}}</h3><p>{{t:feat_c1_p}}</p></div>
-        <div class="card"><div class="ic">⊞</div><h3>{{t:feat_mv_h}}</h3><p>{{t:feat_mv_p}}</p></div>
-        <div class="card"><div class="ic">⏸</div><h3>{{t:feat_c2_h}}</h3><p>{{t:feat_c2_p}}</p></div>
-        <div class="card"><div class="ic">▦</div><h3>{{t:feat_c3_h}}</h3><p>{{t:feat_c3_p}}</p></div>
-        <div class="card"><div class="ic">⏺</div><h3>{{t:feat_c4_h}}</h3><p>{{t:feat_c4_p}}</p></div>
-        <div class="card"><div class="ic">◉</div><h3>{{t:feat_c5_h}}</h3><p>{{t:feat_c5_p}}</p></div>
-        <div class="card"><div class="ic">▶</div><h3>{{t:feat_c6_h}}</h3><p>{{t:feat_c6_p}}</p></div>
-        <div class="card"><div class="ic">🖿</div><h3>{{t:feat_lf_h}}</h3><p>{{t:feat_lf_p}}</p></div>
-        <div class="card"><div class="ic">📺</div><h3>{{t:feat_cast_h}}</h3><p>{{t:feat_cast_p}}</p></div>
-        <div class="card"><div class="ic">💬</div><h3>{{t:feat_subs_h}}</h3><p>{{t:feat_subs_p}}</p></div>
-        <div class="card"><div class="ic">⏯</div><h3>{{t:feat_keys_h}}</h3><p>{{t:feat_keys_p}}</p></div>
-        <div class="card"><div class="ic">🔔</div><h3>{{t:feat_follow_h}}</h3><p>{{t:feat_follow_p}}</p></div>
+      <!-- Apple-style tiles: an icon and a title; the text opens in a dialog
+           (app.js), or in place without script. -->
+      <div class="grid" data-close="{{h:lb_close}}">
+        <details class="card"><summary><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 4.5v4h4"/><path d="M12 7.5V12l3 2"/></svg><h3>{{t:feat_c1_h}}</h3><span class="more" aria-hidden="true"></span></summary><p>{{t:feat_c1_p}}</p></details>
+        <details class="card"><summary><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="3.5" width="7.5" height="7.5" rx="2"/><rect x="13" y="3.5" width="7.5" height="7.5" rx="2"/><rect x="3.5" y="13" width="7.5" height="7.5" rx="2"/><rect x="13" y="13" width="7.5" height="7.5" rx="2"/></svg><h3>{{t:feat_mv_h}}</h3><span class="more" aria-hidden="true"></span></summary><p>{{t:feat_mv_p}}</p></details>
+        <details class="card"><summary><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M10 9v6M14 9v6"/></svg><h3>{{t:feat_c2_h}}</h3><span class="more" aria-hidden="true"></span></summary><p>{{t:feat_c2_p}}</p></details>
+        <details class="card"><summary><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10"/></svg><h3>{{t:feat_c3_h}}</h3><span class="more" aria-hidden="true"></span></summary><p>{{t:feat_c3_p}}</p></details>
+        <details class="card"><summary><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.6" class="fill"/></svg><h3>{{t:feat_c4_h}}</h3><span class="more" aria-hidden="true"></span></summary><p>{{t:feat_c4_p}}</p></details>
+        <details class="card"><summary><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="1.8"/><path d="M8.6 8.6a4.8 4.8 0 0 0 0 6.8M15.4 8.6a4.8 4.8 0 0 1 0 6.8M5.8 5.8a8.8 8.8 0 0 0 0 12.4M18.2 5.8a8.8 8.8 0 0 1 0 12.4"/></svg><h3>{{t:feat_c5_h}}</h3><span class="more" aria-hidden="true"></span></summary><p>{{t:feat_c5_p}}</p></details>
+        <details class="card"><summary><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M10.2 8.6v6.8l5.3-3.4z" class="fill"/></svg><h3>{{t:feat_c6_h}}</h3><span class="more" aria-hidden="true"></span></summary><p>{{t:feat_c6_p}}</p></details>
+        <details class="card"><summary><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 7.5A2.5 2.5 0 0 1 6 5h3.2l2 2.4H18a2.5 2.5 0 0 1 2.5 2.5v6.6A2.5 2.5 0 0 1 18 19H6a2.5 2.5 0 0 1-2.5-2.5z"/></svg><h3>{{t:feat_lf_h}}</h3><span class="more" aria-hidden="true"></span></summary><p>{{t:feat_lf_p}}</p></details>
+        <details class="card"><summary><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="4.5" width="17" height="12" rx="2.5"/><path d="M8.5 20h7M12 16.5V20"/></svg><h3>{{t:feat_cast_h}}</h3><span class="more" aria-hidden="true"></span></summary><p>{{t:feat_cast_p}}</p></details>
+        <details class="card"><summary><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M7.5 12.5h4M13.5 12.5h3M7.5 15.5h6M15.5 15.5h1"/></svg><h3>{{t:feat_subs_h}}</h3><span class="more" aria-hidden="true"></span></summary><p>{{t:feat_subs_p}}</p></details>
+        <details class="card"><summary><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7.5v9l6.5-4.5z" class="fill"/><path d="M14 7.5v9M18.5 7.5v9"/></svg><h3>{{t:feat_keys_h}}</h3><span class="more" aria-hidden="true"></span></summary><p>{{t:feat_keys_p}}</p></details>
+        <details class="card"><summary><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4.5 10.5 12 4.5l7.5 6V19a1 1 0 0 1-1 1H15v-5.5H9V20H5.5a1 1 0 0 1-1-1z"/></svg><h3>{{t:feat_follow_h}}</h3><span class="more" aria-hidden="true"></span></summary><p>{{t:feat_follow_p}}</p></details>
       </div>
     </div>
   </section>
@@ -146,7 +148,7 @@
         <p>{{h:help_meta_desc}}</p>
         <a class="btn ghost faq-help" href="/help/">{{h:nav_help}}</a>
       </div>
-      <div class="faq">
+      <div class="faq" data-more="{{h:faq_more}}">
         <details class="faq-item">
           <summary><h3 class="faq-q">{{h:faq_q1}}</h3></summary>
           <p>{{h:faq_a1}}</p>

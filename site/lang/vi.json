@@ -147,6 +147,7 @@
     "disclaimer": "Sản phẩm này sử dụng API của TMDB nhưng không được TMDB xác nhận hay chứng nhận. Sản phẩm này sử dụng API của Trakt nhưng không được Trakt xác nhận hay chứng nhận. Tất cả thương hiệu là tài sản của chủ sở hữu tương ứng.",
     "faq_eyebrow": "Nên biết",
     "faq_h2": "Câu hỏi thường gặp",
+    "faq_more": "Xem tất cả câu hỏi",
     "faq_q1": "dopeIPTV là gì?",
     "faq_a1": "dopeIPTV là trình phát IPTV máy tính miễn phí, mã nguồn mở cho danh sách phát Xtream Codes và M3U. Nó cung cấp hướng dẫn EPG đầy đủ, timeshift và TV xem lại trực tiếp, ghi hình một chạm và multiview cho tối đa chín kênh cùng lúc — tất cả trong một ứng dụng gốc dựng trên engine mpv.",
     "faq_q2": "dopeIPTV có miễn phí không?",

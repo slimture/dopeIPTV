@@ -147,6 +147,7 @@
     "disclaimer": "Bu ürün TMDB API'sini kullanır ancak TMDB tarafından onaylanmamış veya sertifikalandırılmamıştır. Bu ürün Trakt API'sini kullanır ancak Trakt tarafından onaylanmamış veya sertifikalandırılmamıştır. Tüm ticari markalar ilgili sahiplerinin mülkiyetindedir.",
     "faq_eyebrow": "Bilmekte fayda var",
     "faq_h2": "Sık sorulan sorular",
+    "faq_more": "Tüm soruları göster",
     "faq_q1": "dopeIPTV nedir?",
     "faq_a1": "dopeIPTV, Xtream Codes ve M3U oynatma listeleri için ücretsiz, açık kaynaklı bir masaüstü IPTV oynatıcısıdır. Tam EPG rehberi, canlı timeshift ve catch-up TV, tek tıkla kayıt ve aynı anda dokuz kanala kadar multiview sunar — hepsi mpv motoru üzerine kurulu yerel bir uygulamada.",
     "faq_q2": "dopeIPTV ücretsiz mi?",

@@ -147,6 +147,7 @@
     "disclaimer": "本产品使用 TMDB API，但未获得 TMDB 的认可或认证。本产品使用 Trakt API，但未获得 Trakt 的认可或认证。所有商标均为其各自所有者的财产。",
     "faq_eyebrow": "值得了解",
     "faq_h2": "常见问题",
+    "faq_more": "显示全部问题",
     "faq_q1": "什么是 dopeIPTV？",
     "faq_a1": "dopeIPTV 是一款面向 Xtream Codes 和 M3U 播放列表的免费开源桌面 IPTV 播放器。它提供完整的 EPG 指南、实时时移和回看电视、一键录制，以及同时最多九个频道的多画面——全部集成在一个基于 mpv 引擎的原生应用中。",
     "faq_q2": "dopeIPTV 免费吗？",

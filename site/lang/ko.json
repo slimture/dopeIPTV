@@ -147,6 +147,7 @@
     "disclaimer": "이 제품은 TMDB API를 사용하지만 TMDB의 보증이나 인증을 받지 않았습니다. 이 제품은 Trakt API를 사용하지만 Trakt의 보증이나 인증을 받지 않았습니다. 모든 상표는 해당 소유자의 재산입니다.",
     "faq_eyebrow": "알아두면 좋아요",
     "faq_h2": "자주 묻는 질문",
+    "faq_more": "모든 질문 보기",
     "faq_q1": "dopeIPTV란 무엇인가요?",
     "faq_a1": "dopeIPTV는 Xtream Codes 및 M3U 재생목록을 위한 무료 오픈 소스 데스크톱 IPTV 플레이어입니다. 전체 EPG 가이드, 라이브 타임시프트와 catch-up TV, 원클릭 녹화, 최대 9개 채널 동시 멀티뷰를 mpv 엔진 기반의 하나의 네이티브 앱에서 제공합니다.",
     "faq_q2": "dopeIPTV는 무료인가요?",

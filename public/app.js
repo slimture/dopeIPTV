@@ -120,3 +120,122 @@
 
 /* The header's disclosures (language picker, narrow-window menu) close
    themselves from nav.js, which every page loads - this one does not. */
+
+/* Feature tiles: a click opens the tile's text in a dialog, as Apple's
+   tiles do. Without script (or <dialog>) each tile opens in place. */
+(function () {
+  "use strict";
+  var grid = document.querySelector(".grid");
+  var tiles = grid ? grid.querySelectorAll("details.card") : [];
+  if (!tiles.length || typeof HTMLDialogElement !== "function") { return; }
+  var dlg = document.createElement("dialog");
+  dlg.className = "fx";
+  dlg.setAttribute("aria-labelledby", "fx-title");
+  var x = document.createElement("button");
+  x.type = "button";
+  x.className = "fx-x";
+  x.textContent = "\u00d7";
+  x.setAttribute("aria-label", grid.getAttribute("data-close") || "Close");
+  var body = document.createElement("div");
+  dlg.appendChild(x);
+  dlg.appendChild(body);
+  document.body.appendChild(dlg);
+  var from = null;
+  x.addEventListener("click", function () { dlg.close(); });
+  dlg.addEventListener("click", function (e) { if (e.target === dlg) { dlg.close(); } });
+  dlg.addEventListener("close", function () { if (from) { from.focus(); } });
+  [].forEach.call(tiles, function (tile) {
+    var sum = tile.querySelector("summary");
+    sum.addEventListener("click", function (e) {
+      e.preventDefault();
+      var ic = tile.querySelector(".ic"), h = tile.querySelector("h3"), p = tile.querySelector("p");
+      body.replaceChildren();
+      if (ic) { body.appendChild(ic.cloneNode(true)); }
+      var t = document.createElement("h3");
+      t.id = "fx-title";
+      t.textContent = h ? h.textContent : "";
+      body.appendChild(t);
+      if (p) { body.appendChild(p.cloneNode(true)); }
+      from = sum;
+      dlg.showModal();
+    });
+  });
+})();
+
+/* Motion, Apple-style: rise into view, the hero window straightening as the
+   page scrolls, a living mock-up. Nothing for reduced motion. */
+(function () {
+  "use strict";
+  if (!window.matchMedia || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { return; }
+
+  if ("IntersectionObserver" in window) {
+    var sel = ".sec-head, .grid > .card, .shot, .dlx-card, .dl-phone, .donate, .notes-wrap, .faq-item, .credit";
+    var fold = window.innerHeight * 0.92;
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) { return; }
+        var el = en.target;
+        io.unobserve(el);
+        el.classList.add("in");
+        // Done rising: hand the element back to its own transitions.
+        setTimeout(function () { el.classList.remove("rv", "in"); el.style.removeProperty("--d"); }, 1400);
+      });
+    }, { rootMargin: "0px 0px -8% 0px" });
+    var seen = new Map();
+    [].forEach.call(document.querySelectorAll(sel), function (el) {
+      if (el.getBoundingClientRect().top < fold) { return; }
+      // Siblings rise one after another, a beat apart.
+      var n = seen.get(el.parentNode) || 0;
+      seen.set(el.parentNode, n + 1);
+      el.style.setProperty("--d", Math.min(n % 6, 5) * 0.07 + "s");
+      el.classList.add("rv");
+      io.observe(el);
+    });
+  }
+
+  var mock = document.querySelector(".hero .mock");
+  if (!mock || !mock.offsetParent) { return; }
+  var ticking = false;
+  function tilt() {
+    ticking = false;
+    var top = mock.getBoundingClientRect().top, h = window.innerHeight;
+    var t = (top - h * 0.2) / (h * 0.6);
+    mock.style.setProperty("--tilt", String(Math.max(0, Math.min(1, t)).toFixed(3)));
+  }
+  window.addEventListener("scroll", function () {
+    if (!ticking) { ticking = true; window.requestAnimationFrame(tilt); }
+  }, { passive: true });
+  window.addEventListener("resize", tilt);
+  tilt();
+
+  mock.classList.add("alive");
+  var chans = mock.querySelectorAll(".chan"), screen = mock.querySelector(".screen");
+  var tints = ["#4c8dff", "#ff6b5e", "#34c759", "#ff9f0a", "#5ac8fa", "#bf5af2"];
+  var i = 0;
+  setInterval(function () {
+    if (document.hidden || !chans.length) { return; }
+    chans[i].classList.remove("active");
+    i = (i + 1) % chans.length;
+    chans[i].classList.add("active");
+    if (screen) { screen.style.setProperty("--tint", tints[i % tints.length]); }
+  }, 3200);
+})();
+
+/* The FAQ shows its first five questions; the rest are a click away. */
+(function () {
+  "use strict";
+  var faq = document.querySelector(".faq[data-more]");
+  var items = faq ? faq.querySelectorAll(".faq-item") : [];
+  if (items.length <= 6) { return; }
+  [].forEach.call(items, function (it, n) { if (n >= 5) { it.classList.add("is-extra"); } });
+  var b = document.createElement("button");
+  b.type = "button";
+  b.className = "faq-all";
+  b.textContent = faq.getAttribute("data-more");
+  b.addEventListener("click", function () {
+    [].forEach.call(faq.querySelectorAll(".is-extra"), function (it) { it.classList.remove("is-extra"); });
+    b.remove();
+    items[5].querySelector("summary").focus();
+  });
+  faq.appendChild(b);
+})();

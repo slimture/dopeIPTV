@@ -147,6 +147,7 @@
     "disclaimer": "Questo prodotto usa l'API di TMDB ma non è approvato né certificato da TMDB. Questo prodotto usa l'API di Trakt ma non è approvato né certificato da Trakt. Tutti i marchi sono proprietà dei rispettivi titolari.",
     "faq_eyebrow": "Buono a sapersi",
     "faq_h2": "Domande frequenti",
+    "faq_more": "Mostra tutte le domande",
     "faq_q1": "Cos'è dopeIPTV?",
     "faq_a1": "dopeIPTV è un lettore IPTV desktop gratuito e open source per le playlist Xtream Codes e M3U. Offre una guida EPG completa, timeshift e TV in catch-up in diretta, registrazione con un clic e multiview per un massimo di nove canali insieme — il tutto in un'app nativa basata sul motore mpv.",
     "faq_q2": "dopeIPTV è gratuito?",

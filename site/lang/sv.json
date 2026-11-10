@@ -147,6 +147,7 @@
     "disclaimer": "Denna produkt använder TMDB:s API men stöds eller certifieras inte av TMDB. Denna produkt använder Trakts API men stöds eller certifieras inte av Trakt. Alla varumärken tillhör sina respektive ägare.",
     "faq_eyebrow": "Bra att veta",
     "faq_h2": "Vanliga frågor",
+    "faq_more": "Visa alla frågor",
     "faq_q1": "Vad är dopeIPTV?",
     "faq_a1": "dopeIPTV är en gratis IPTV-spelare med öppen källkod för Xtream Codes- och M3U-spellistor. Du får en komplett EPG-guide, timeshift och catch-up-TV i realtid, inspelning med ett klick och multiview för upp till nio kanaler samtidigt — allt i en inbyggd app byggd på mpv-motorn.",
     "faq_q2": "Är dopeIPTV gratis?",
