@@ -1,3 +1,34 @@
+## dopeIPTV 1.4.2
+
+Settings that are quicker to find and apply as you change them, a
+programme guide with every channel, and a quiet way to support dopeIPTV.
+
+- **Settings, rebuilt.** Every setting is where you would look for it, in
+  sections down each page, and a change applies at once - there is no
+  Save button any more, only **Close**. The search at the top finds a
+  setting on any page. Picture and sound share one page, **Picture &
+  sound**; Home's shelves are chips to switch on and off; numbers have −
+  and + buttons.
+- **The guide shows every channel.** In **All**, the programme guide
+  stopped at the first 300 channels; now it lists them all. Categories
+  named after a country get its flag.
+- **Multiview's button opens and closes the window** - a second click
+  closes it.
+- **Links open in front on Linux.** On GNOME a link from the app - the
+  website, GitHub, a Trakt sign-in - could open behind the app; the
+  browser now comes to the front.
+- **A small heart for supporting dopeIPTV,** beside the logo in the
+  sidebar and at the top right of Home, and **Support dopeIPTV…** in the
+  menu and in About. After you have watched for a while, Home asks once:
+  **Donate**, **Not now** or **I've already donated**. Right-click the
+  heart to hide it for three months, or for good if you have donated -
+  nothing ever pops up over what you watch.
+- The app icon's play arrow now sits in the middle by its weight.
+- Fixed: the rewind buffer no longer writes an error when mpv hangs up
+  before it answers.
+
+On the AppImage from 1.2.15 or later? Click **Update now** in the banner.
+
 ## dopeIPTV 1.4.1
 
 Subtitles on at once in any language, and themes that really look

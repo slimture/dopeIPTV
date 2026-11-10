@@ -7,6 +7,47 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.4.2]
+
+Settings rebuilt and applied live, the guide with every channel, links in
+front on Linux, and donating from the app.
+
+### Added
+
+- Donating from the app, never in the way: a small red heart beside the
+  sidebar's logo (under it on the icon rail) and at the top right of Home,
+  its words in the tooltip; "Support dopeIPTV…" in the app menu (in the one
+  app menu on macOS) and in About; one card on Home after about ten hours
+  of watching, with Donate (away for a year), Not now (three months) and
+  I've already donated (for good), which also goes by itself after a week.
+  The heart's right-click menu hides it for three months or for good, and
+  Settings → General → Support dopeIPTV turns it back on. Links carry
+  `?ref=app-heart|app-menu|app-home|app-about` for the site's statistics.
+- Settings search across every page; a Picture & sound page; Home's
+  shelves as chips; steppers for numbers, durations and sizes.
+
+### Changed
+
+- Settings apply as they change (debounced, and once more on Close) and
+  write only what differs; one Close button instead of OK / Cancel.
+  Sections are borderless surfaces with hairlines between rows, controls
+  filled, not outlined.
+- The app icon's triangle is centred by its centroid (38-74% of the tile
+  instead of 40-76%); the committed Flatpak and Windows icons are drawn
+  again from `make_app_icon`.
+- Multiview's button toggles its window.
+- On a Linux desktop session links go through Qt's opener first, which
+  passes the compositor's activation token, so the browser is raised; in a
+  frozen bundle the process carries the system's library paths for the
+  moment of the launch. The cleaned xdg-open path stays as the fallback.
+
+### Fixed
+
+- The guide showed only the first 300 channels of "All".
+- Category flags for countries named in words, not only flag emoji or
+  "SE |" prefixes.
+- The rewind buffer logged a traceback when mpv hung up before answering.
+
 ## [1.4.1]
 
 Subtitles on at once in any language, themes with a colour of their own,

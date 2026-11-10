@@ -52,6 +52,11 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.4.2" date="2026-11-10">
+      <description>
+        <p>Settings rebuilt: each setting where you would look for it, applied as you change it, with a search across every page and a Picture &amp; sound page. The programme guide lists every channel of All, multiview's button opens and closes its window, links open in front of the app on Linux, and a quiet heart for supporting dopeIPTV that can be hidden.</p>
+      </description>
+    </release>
     <release version="1.4.1" date="2026-11-10">
       <description>
         <p>Turning subtitles on in a film is instant also when the language is not the file's first one. Eight themes that differ by colour - Ocean, Forest, Bordeaux, Synthwave, Amber terminal, Espresso, Sand and Sky - and readable buttons on every light accent colour.</p>
