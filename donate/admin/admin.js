@@ -758,4 +758,47 @@
   let tab = "overview";
   try { tab = localStorage.getItem("admin-tab") === "visitors" ? "visitors" : "overview"; } catch (e) { /* default */ }
   setTab(tab);
+
+  // Pull down to reload, in the app on the iPhone's Home Screen. iOS gives
+  // a Home Screen web app no pull-to-refresh of its own (Safari's belongs
+  // to the browser), and closing the app was the only way to load what was
+  // new. At the top of the page, a pull past the mark reloads it.
+  (function pullToReload() {
+    const standalone = window.navigator.standalone === true ||
+      (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+    if (!standalone || !("ontouchstart" in window)) { return; }
+    const MARK = 70;                   // px of travel, after the drag's damping
+    const knob = document.createElement("div");
+    knob.className = "ptr";
+    knob.setAttribute("aria-hidden", "true");
+    document.body.append(knob);
+    let from = null, travel = 0;
+    const reset = () => {
+      knob.classList.remove("ready");
+      knob.style.transform = "";
+      knob.style.opacity = "";
+    };
+    document.addEventListener("touchstart", (e) => {
+      from = window.scrollY <= 0 && e.touches.length === 1 ? e.touches[0].clientY : null;
+      travel = 0;
+    }, { passive: true });
+    document.addEventListener("touchmove", (e) => {
+      if (from === null) { return; }
+      if (window.scrollY > 0) { from = null; reset(); return; }
+      travel = Math.min(Math.max(0, e.touches[0].clientY - from) * 0.5, MARK + 24);
+      knob.style.transform = `translate(-50%, ${travel - 44}px) rotate(${travel * 4}deg)`;
+      knob.style.opacity = String(Math.min(1, travel / MARK));
+      knob.classList.toggle("ready", travel >= MARK);
+    }, { passive: true });
+    document.addEventListener("touchend", () => {
+      if (from === null) { return; }
+      from = null;
+      if (travel >= MARK) {
+        knob.classList.add("spin");
+        window.location.reload();
+      } else {
+        reset();
+      }
+    }, { passive: true });
+  })();
 })();

@@ -339,3 +339,16 @@ tr:last-child td { border-bottom: 0; }
   .don-when { grid-column: 3; grid-row: 1; }
   .chan-row .m { grid-template-columns: 110px minmax(0, 1fr) 40px; }
 }
+
+
+/* Pull to reload (admin.js): a ring that follows the finger down from the
+   top of the Home Screen app, the accent once a release will reload. */
+.ptr { position: fixed; z-index: 60; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 6px);
+  width: 32px; height: 32px; border-radius: 50%; background: var(--surface);
+  border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(0, 0, 0, .12);
+  transform: translate(-50%, -44px); opacity: 0; pointer-events: none; }
+.ptr::before { content: ""; position: absolute; inset: 7px; border-radius: 50%;
+  border: 2px solid var(--muted); border-top-color: transparent; }
+.ptr.ready::before { border-color: var(--accent); border-top-color: transparent; }
+.ptr.spin { opacity: 1; animation: ptr-spin .7s linear infinite; }
+@keyframes ptr-spin { to { transform: translate(-50%, 30px) rotate(360deg); } }
