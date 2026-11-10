@@ -26,7 +26,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 # or buy.stripe.com/...), a plain link - no script, so the CSP stays as it
 # is, and Stripe's own page offers card, Apple Pay and Google Pay. Empty:
 # no donate section and no footer link at all.
-| "" as $DONATE
+| "https://donate.stripe.com/bJe4gy7gv4SmdrYgGba7C00" as $DONATE
 
 # -- the PHP helpers ---------------------------------------------------------
 
