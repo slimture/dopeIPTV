@@ -20,10 +20,10 @@ modern interface, supporting the **Xtream Codes API**, **M3U playlists** and
 
 |  |  |
 |---|---|
-| ![Live TV with the EPG](docs/screenshots/live.png) | ![EPG timeline grid](docs/screenshots/epg-grid.png) |
-| *Live TV with the programme guide* | *EPG timeline grid* |
-| ![Themes and accent colors](docs/screenshots/themes.png) | ![Favorites and the player](docs/screenshots/player.png) |
-| *Themes and accent colors* | *Favorites and the embedded player* |
+| ![Live TV with the programme guide](docs/screenshots/live.png) | ![The programme guide's timeline grid](docs/screenshots/epg-grid.png) |
+| *Live TV with the programme guide* | *The guide's timeline grid* |
+| ![Multiview with four live channels](docs/screenshots/multiview.png) | ![Rewinding a live channel](docs/screenshots/player.png) |
+| *Multiview: up to nine live channels at once* | *Timeshift: rewind a live channel* |
 
 ## Features
 

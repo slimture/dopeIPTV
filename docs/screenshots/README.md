@@ -6,10 +6,18 @@ point at them:
 
 | File | What to capture |
 |---|---|
-| `live.png` | **The hero shot.** Live TV: the sidebar, the channel list, and a channel playing in the embedded player with the now/next EPG visible. Colour a category or two (right-click → Set background) so the left column looks alive. |
-| `epg-grid.png` | The **EPG timeline grid** (sidebar → *EPG Guide*, or `Ctrl+G`). Best if the playing channel's row is flagged (▶ accent) and a few ⏪ catch-up channels show. |
-| `themes.png` | **Settings → Appearance**: the theme and accent pickers (works with any content — even the demo channels). |
-| `player.png` | Favourites or a grid view with the mini player going — or show off **focus mode** (`⤢` / `Ctrl+Shift+M`) for a clean player-forward layout. |
+| `live.png` | **The hero shot.** Live TV: the sidebar, the channel list, and a channel playing with the now/next guide. |
+| `epg-grid.png` | The **programme guide's timeline grid**. |
+| `multiview.png` | **Multiview** with four live channels. |
+| `player.png` | **Timeshift**: a live channel rewound, the timeline over the video. |
+| `themes.png` | **Settings → Appearance**: the theme and accent pickers. Taken by hand. |
+
+All but `themes.png` are the website's English front-page pictures, made by
+`tools/site_screenshots.py` (see `docs/MAINTAINING.md`): take them with
+`xvfb-run -a -s "-screen 0 2560x1600x24" python tools/site_screenshots.py OUT en`,
+then save `main`, `guide`, `multiview` and `timeshift` from WebP
+as 1600×1000 PNG under the names above. The file names stay as they are:
+the metainfo of every release already out points at them on `main`.
 
 ## Getting content for free (no personal provider needed)
 
