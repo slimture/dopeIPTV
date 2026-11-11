@@ -129,10 +129,7 @@ h1 .hl { color: inherit; }
    heading over a heading, and the logo in the bar already says it. */
 h1 .h1-brand { position: absolute; width: 1px; height: 1px; overflow: hidden;
   clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
-/* What the app does, in a line: where the long lede is hidden (a phone,
-   a narrow window), under the short heading. */
-.hero-sub { display: none; }
-.lede { color: var(--muted); font-size: clamp(1.06rem, 2.2vw, 1.3rem); margin: 22px auto 0; max-width: 40em; line-height: 1.5; }
+.lede { color: var(--muted); font-size: clamp(1.06rem, 2.2vw, 1.3rem); margin: 22px auto 0; max-width: 40em; line-height: 1.5; text-wrap: balance; }
 .cta-row { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 32px; align-items: center; justify-content: center; }
 .platnote { font-size: 13px; color: var(--faint); margin-top: 18px; }
 .platnote b { color: var(--muted); font-weight: 600; }
@@ -1008,11 +1005,10 @@ dialog.howdlg::backdrop { background: rgba(5, 7, 10, .66); }
   section { padding: 56px 0; }
   .sec-head { margin-bottom: 22px; }
   .hero { padding: 44px 0 24px; }
-  /* A phone gets the picture, not the paragraph: the app window, cut down
-     to its living screen and timeline, where the long lede was. */
-  .hero .lede { display: none; }
-  .hero .hero-sub { display: block; color: var(--muted); font-size: 1.12rem; line-height: 1.45;
-    margin: 14px auto 0; max-width: 30ch; text-wrap: balance; }
+  /* The lede is one sentence, so a phone keeps it - smaller, under the
+     heading - and the app window below cut down to its screen and timeline. */
+  .hero .lede { font-size: 1.12rem; line-height: 1.45; margin: 14px auto 0;
+    max-width: 30ch; text-wrap: balance; }
   .hero .mock { width: 100%; border-radius: 18px; }
   .hero .mock .titlebar, .hero .mock .chans { display: none; }
   .hero .mock .body { grid-template-columns: minmax(0, 1fr); min-height: 0; }
