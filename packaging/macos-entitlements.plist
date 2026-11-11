@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  What the signed macOS app may do under Apple's hardened runtime, which
+  notarisation requires (release.yml, "Sign the .app"). Executables only:
+  the app's own binary and the bundled ffmpeg.
+
+  allow-jit                       mpv runs Lua through LuaJIT, which needs
+                                  MAP_JIT memory.
+  allow-unsigned-executable-memory  ctypes (python-mpv's callbacks) builds
+                                  libffi closures in memory it writes and
+                                  then runs.
+  disable-library-validation      Python loads its extension modules and Qt
+                                  its plugins at run time; all are signed
+                                  with the same Developer ID, and this keeps
+                                  a library that macOS judges differently
+                                  from killing the player.
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+	<true/>
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+</dict>
+</plist>

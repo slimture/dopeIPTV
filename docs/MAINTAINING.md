@@ -93,10 +93,9 @@ Platform notes that are easy to forget:
   ffmpeg on `macos-15-intel` (PyQt6's universal wheel needs macOS 14+).
   GitHub keeps the Intel runner until about August 2027, and Apple has
   said macOS 26 is the last for Intel - plan to drop the Intel build then.
-- Nothing is code-signed: macOS builds are not notarized (users allow the
-  first start under Privacy & Security), Windows builds are unsigned
-  (SmartScreen "Run anyway"). Both cost money every year; the help page
-  and README explain the workaround.
+- macOS builds are signed with Solecraft AB's Developer ID and notarised
+  ("macOS signing" below). Windows builds are unsigned (SmartScreen "Run
+  anyway"); the help page and README explain it.
 
 ## Cutting a release
 
@@ -135,9 +134,38 @@ Only names here - the values are with the owner.
 | Stripe Payment Link (donations) | `$DONATE` at the top of `site/render.jq` on the `website` branch - where the site's donate links point without JavaScript. `.github/FUNDING.yml` (the Sponsor button, shown with Settings → Features → Sponsorships ticked) and the README's "Support dopeIPTV" point at `dopeiptv.org/#donate`, which opens the dialog | no donate card on the site |
 | Stripe keys for the donate dialog | a restricted key (PaymentIntents: Write) and the publishable key, on the web server in `/usr/local/etc/iptv-donate.key` / `.conf`, read by `donate/donate.py` (website branch, `DEPLOY.md` "Donations"); Apple Pay needs the domain added in Stripe | the dialog sends visitors to the Payment Link's own page instead |
 | The admin page's password | `/usr/local/etc/nginx/iptv-admin.htpasswd` on the web server (website branch, `DEPLOY.md` "Statistics and the admin page") | `/admin/` cannot be opened; the site is unaffected |
+| Apple Developer Program (Solecraft AB, team `6QR76TBT4J`) | the macOS builds' signature and notarisation - see "macOS signing" below | the .dmg is signed ad hoc and users allow the first start under Privacy & Security |
+| GitHub Actions secrets `MACOS_CERT_P12`, `MACOS_CERT_PASSWORD` | the Developer ID Application certificate with its private key (base64 of the exported .p12) and the export password | as above |
+| GitHub Actions secrets `APPLE_API_KEY_P8`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID` | an App Store Connect API team key (Developer access) for `notarytool` | a release fails at notarising - the certificate alone signs but is not enough |
 
 A source checkout works without any of these. For local testing, set
 `DOPEIPTV_TMDB_KEY` / `DOPEIPTV_OPENSUBTITLES_KEY` in the environment.
+
+### macOS signing
+
+The `macos-dmg` job in `release.yml` signs every piece of code in the
+.app with the Developer ID (hardened runtime, the entitlements in
+`packaging/macos-entitlements.plist`), signs the .dmg, sends it to Apple
+with `notarytool` and staples the ticket to it; the smoke test then asks
+Gatekeeper whether it takes the app as notarised. Nightlies are signed the
+same way. Without the secrets (a fork) the job builds the ad hoc signed
+.dmg it always did; with the certificate but no API key a release fails
+rather than ship something half done.
+
+- **The certificate** is valid five years (from November 2026). Before it
+  runs out, make a new *Developer ID Application* certificate at
+  developer.apple.com from a certificate request made in Keychain Access,
+  export it with its key as .p12 (File → Export Items), and replace
+  `MACOS_CERT_P12` (`base64 -i file.p12 | pbcopy`) and
+  `MACOS_CERT_PASSWORD`. Apps already signed keep opening: the signature
+  carries a timestamp.
+- **The API key** does not expire; revoke it in App Store Connect → Users
+  and Access → Integrations if it leaks and make a new one (Developer
+  access), then replace the three `APPLE_API_*` secrets. The .p8 file can
+  be downloaded only once.
+- **If Apple refuses a build**, the job prints `notarytool log`: it names
+  each file and what is missing (usually a binary that was not signed, or
+  signed without the hardened runtime).
 
 ## The website
 
@@ -228,7 +256,7 @@ tests check that placeholders line up and that every `tr("…")` key exists.
   has what a submission needs); its build leg is experimental.
 - **AirPlay** was tried and parked (tvOS broke the API third-party senders
   use) - `docs/DEVELOPER_NOTES.md` says how to re-check.
-- macOS notarization and Windows code signing (see above).
+- Windows code signing (see above).
 - On the website, a few Serbian strings are in Cyrillic while the rest of
   the Serbian page is Latin.
 

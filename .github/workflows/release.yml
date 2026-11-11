@@ -648,11 +648,14 @@ jobs:
   # supports follows the runner it was built on (Homebrew bottles are built
   # per OS version, so pinning the target alone would not buy compatibility
   # back). That floor is macOS 15.
-  # Produces unsigned .dmgs - users allow the first launch under System
-  # Settings -> Privacy & Security -> Open Anyway (right-click -> Open stopped
-  # getting past Gatekeeper in macOS 15). Signing/notarising can be added
-  # later by putting DEVELOPER_ID / APPLE_ID secrets in the repo and calling
-  # codesign / notarytool.
+  #
+  # Signed with Solecraft AB's Developer ID and notarised by Apple, so the
+  # .dmg opens like any app from the web - when the repository has the
+  # secrets (docs/MAINTAINING.md, "macOS signing"): MACOS_CERT_P12 and
+  # MACOS_CERT_PASSWORD for the certificate, APPLE_API_KEY_P8,
+  # APPLE_API_KEY_ID and APPLE_API_ISSUER_ID for notarytool. Without them -
+  # a fork - the .app is signed ad hoc as before and users allow the first
+  # launch under Privacy & Security -> Open Anyway.
   macos-dmg:
     name: macOS .dmg (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
@@ -858,24 +861,104 @@ jobs:
         # conda-forge's libraries find each other through @rpath; this copies
         # in what the bundle lacks and points every reference inside it.
         run: python packaging/macos_bundle_dylibs.py dist/dopeIPTV.app "$DOPEIPTV_LIBMPV_DIR"
-      - name: Ad-hoc codesign the .app
+      - name: Developer ID keychain
+        id: sign
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          # The certificate goes into a keychain of this run's own, never the
+          # runner's login keychain, and is deleted at the end of the job.
+          if [ -z "${MACOS_CERT_P12}" ] || [ -z "${MACOS_CERT_PASSWORD}" ]; then
+            echo "::notice::No Developer ID secrets: an ad-hoc signed .dmg, not notarised."
+            echo "identity=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          KC="${RUNNER_TEMP}/signing.keychain-db"
+          KCPW=$(openssl rand -hex 24)
+          printf '%s' "${MACOS_CERT_P12}" | base64 --decode > "${RUNNER_TEMP}/cert.p12"
+          security create-keychain -p "$KCPW" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KCPW" "$KC"
+          security import "${RUNNER_TEMP}/cert.p12" -k "$KC" -P "${MACOS_CERT_PASSWORD}" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          rm -f "${RUNNER_TEMP}/cert.p12"
+          # Apple's intermediate for Developer ID, so the chain is whole here
+          # whatever the runner image carries.
+          curl -fsSL --retry 5 --retry-delay 5 -o "${RUNNER_TEMP}/DeveloperIDG2CA.cer" \
+            https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+          security import "${RUNNER_TEMP}/DeveloperIDG2CA.cer" -k "$KC" || true
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KCPW" "$KC" >/dev/null
+          # shellcheck disable=SC2046
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          ID=$(security find-identity -v -p codesigning "$KC" \
+            | sed -nE 's/.*"(Developer ID Application: [^"]+)".*/\1/p' | head -1)
+          if [ -z "$ID" ]; then
+            echo "::error::MACOS_CERT_P12 holds no valid Developer ID Application identity"
+            security find-identity -p codesigning "$KC" || true
+            exit 1
+          fi
+          echo "Signing as: $ID"
+          echo "identity=$ID" >> "$GITHUB_OUTPUT"
+          echo "keychain=$KC" >> "$GITHUB_OUTPUT"
+      - name: Sign the .app
+        env:
+          ID: ${{ steps.sign.outputs.identity }}
+          KC: ${{ steps.sign.outputs.keychain }}
         run: |
           # We bundle/stage extra dylibs (libmpv, ffmpeg) after PyInstaller's
           # own signing, which invalidates the bundle signature - on Apple
           # Silicon an app with a broken/missing signature is killed on launch
-          # ("bounces once and dies") with no Gatekeeper prompt. Re-sign the
-          # whole thing ad-hoc (identity "-"), inside-out, so it has a VALID
-          # signature. That won't get past notarisation, but it does give a
-          # downloaded app the normal "unidentified developer" prompt, so a
-          # user can allow it from System Settings -> Privacy & Security ->
-          # "Open Anyway" without touching the Terminal.
+          # ("bounces once and dies") with no Gatekeeper prompt. So the whole
+          # bundle is signed again here, inside out: every Mach-O file, deepest
+          # first, then the frameworks around them, then the app.
           APP="dist/dopeIPTV.app"
-          find "$APP/Contents" \( -name '*.dylib' -o -name '*.so' \) -print0 \
-            | xargs -0 -I{} codesign --force --timestamp=none --sign - {} || true
-          codesign --force --deep --timestamp=none --sign - "$APP"
-          codesign --verify --deep --strict --verbose=2 "$APP" \
-            && echo "ad-hoc signature valid" \
-            || echo "::warning::ad-hoc signature verification reported issues"
+          if [ -z "$ID" ]; then
+            # No Developer ID: ad hoc (identity "-"). Not notarisable, but a
+            # valid signature, so a downloaded app gets the normal prompt and
+            # can be allowed under Privacy & Security -> Open Anyway.
+            find "$APP/Contents" \( -name '*.dylib' -o -name '*.so' \) -print0 \
+              | xargs -0 -I{} codesign --force --timestamp=none --sign - {} || true
+            codesign --force --deep --timestamp=none --sign - "$APP"
+            codesign --verify --deep --strict --verbose=2 "$APP" \
+              && echo "ad-hoc signature valid" \
+              || echo "::warning::ad-hoc signature verification reported issues"
+            exit 0
+          fi
+          ENT="packaging/macos-entitlements.plist"
+          # Developer ID, hardened runtime and a secure timestamp: what
+          # notarisation asks of every piece of code. Apple's timestamp
+          # server now and then does not answer, so each signature gets
+          # three tries.
+          sign() {
+            for try in 1 2 3; do
+              if codesign --force --timestamp --options runtime --keychain "$KC" \
+                   --sign "$ID" "$@"; then
+                return 0
+              fi
+              echo "codesign failed (try $try): $*"
+              sleep 5
+            done
+            echo "::error::could not sign $*"
+            return 1
+          }
+          depth_first() { awk -F/ '{print NF "\t" $0}' | sort -rn | cut -f2-; }
+          find "$APP/Contents" -type f | while IFS= read -r f; do
+            case "$(file -b "$f")" in Mach-O*) echo "$f";; esac
+          done | depth_first > "${RUNNER_TEMP}/macho.txt"
+          echo "$(wc -l < "${RUNNER_TEMP}/macho.txt") Mach-O files to sign"
+          while IFS= read -r f; do
+            if file -b "$f" | grep -q 'executable'; then
+              sign --entitlements "$ENT" "$f"
+            else
+              sign "$f"
+            fi
+          done < "${RUNNER_TEMP}/macho.txt"
+          find "$APP/Contents" -type d \( -name '*.framework' -o -name '*.app' \) \
+            | depth_first | while IFS= read -r b; do sign "$b"; done
+          sign --entitlements "$ENT" "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign --display --verbose=2 "$APP" 2>&1 | grep -E '^(Authority|TeamIdentifier|Runtime|Timestamp)' || true
       - name: Pack .dmg
         run: |
           V=${{ steps.v.outputs.version }}
@@ -895,6 +978,47 @@ jobs:
             --skip-jenkins \
             "dopeIPTV-${V}-macOS-${{ matrix.arch }}.dmg" \
             "dist/dopeIPTV.app"
+      - name: Sign and notarise the .dmg
+        if: steps.sign.outputs.identity != ''
+        env:
+          ID: ${{ steps.sign.outputs.identity }}
+          KC: ${{ steps.sign.outputs.keychain }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          # Apple checks the .dmg and the app in it, and the ticket it issues
+          # is stapled to the .dmg, so the first open needs no lookup. The app
+          # copied out of it is known to Gatekeeper by the same ticket.
+          V=${{ steps.v.outputs.version }}
+          DMG="dopeIPTV-${V}-macOS-${{ matrix.arch }}.dmg"
+          codesign --force --timestamp --keychain "$KC" --sign "$ID" "$DMG"
+          if [ -z "${APPLE_API_KEY_P8}" ] || [ -z "${APPLE_API_KEY_ID}" ] || [ -z "${APPLE_API_ISSUER_ID}" ]; then
+            echo "::error::Signed, but the App Store Connect API key secrets are missing: not notarised."
+            exit 1
+          fi
+          KEY="${RUNNER_TEMP}/AuthKey.p8"
+          printf '%s' "${APPLE_API_KEY_P8}" | base64 --decode > "$KEY"
+          AUTH=(--key "$KEY" --key-id "${APPLE_API_KEY_ID}" --issuer "${APPLE_API_ISSUER_ID}")
+          xcrun notarytool submit "$DMG" "${AUTH[@]}" --wait --timeout 45m \
+            --output-format json > "${RUNNER_TEMP}/notary.json" || true
+          cat "${RUNNER_TEMP}/notary.json"; echo
+          STATUS=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("status",""))' "${RUNNER_TEMP}/notary.json" 2>/dev/null || true)
+          SUB=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("id",""))' "${RUNNER_TEMP}/notary.json" 2>/dev/null || true)
+          if [ "$STATUS" != "Accepted" ]; then
+            # Apple's log names each file it refused and why.
+            if [ -n "$SUB" ]; then xcrun notarytool log "$SUB" "${AUTH[@]}" || true; fi
+            rm -f "$KEY"
+            echo "::error::Apple did not notarise the .dmg (status: ${STATUS:-no answer})"
+            exit 1
+          fi
+          rm -f "$KEY"
+          for try in 1 2 3; do
+            xcrun stapler staple "$DMG" && break
+            echo "stapler failed (try $try)"; sleep 15
+          done
+          xcrun stapler validate "$DMG"
+          spctl --assess --type open --context context:primary-signature --verbose=2 "$DMG"
       - name: Smoke test - mount .dmg and inspect the bundle
         run: |
           # Full GUI launch isn't feasible on a headless macOS runner (Cocoa
@@ -920,6 +1044,17 @@ jobs:
           VER=$(defaults read "${APP}/Contents/Info" CFBundleShortVersionString)
           echo "CFBundleName=$NAME  CFBundleShortVersionString=$VER"
           test "$NAME" = "dopeIPTV" || { echo "::error::wrong CFBundleName ($NAME)"; hdiutil detach "$MOUNT" || true; exit 1; }
+          # Signed with the Developer ID: Gatekeeper must take the app as
+          # notarised, exactly as a Mac that downloaded it will.
+          if [ -n "${{ steps.sign.outputs.identity }}" ]; then
+            GK=$(spctl --assess --type execute --verbose=2 "$APP" 2>&1 || true)
+            echo "$GK"
+            case "$GK" in
+              *"Notarized Developer ID"*) echo "Gatekeeper: notarised - PASS" ;;
+              *) echo "::error::Gatekeeper does not accept the app in the .dmg as notarised"
+                 hdiutil detach "$MOUNT" || true; exit 1 ;;
+            esac
+          fi
           # libmpv must be bundled under the exact soname python-mpv loads,
           # or the embedded player is dead on the user's Mac.
           MPV=$(find "$APP/Contents" -name 'libmpv.2.dylib' -print | head -1)
@@ -992,6 +1127,9 @@ jobs:
         with:
           name: macos-dmg-${{ matrix.arch }}
           path: '*.dmg'
+      - name: Remove the signing keychain
+        if: always() && steps.sign.outputs.keychain != ''
+        run: security delete-keychain "${{ steps.sign.outputs.keychain }}" || true
 
   # --------------------------------------------------------------- Windows ---
   # Produces a portable zip (unzip -> run dopeiptv.exe). A failure now marks the
