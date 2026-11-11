@@ -28,6 +28,11 @@
     h1.innerHTML = own;
     document.documentElement.classList.add("os-known");
   }
+  // The tab says the same as the headline. Search engines read the page's
+  // own title, which names all three systems.
+  var tt = document.querySelector("title");
+  var ownTitle = tt && tt.getAttribute("data-" + os.toLowerCase());
+  if (ownTitle) { document.title = ownTitle; }
   // The label comes translated from the page ("Download for %s"); this
   // file used to carry its own English and overwrite every language with it.
   var btn = document.getElementById("heroDownload");
