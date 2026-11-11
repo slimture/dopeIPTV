@@ -355,15 +355,23 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
       + "    </div>\n"
       + "  </section>\n\n"
     end;
+  # The four pictures of the app (tools/site_screenshots.py in its
+  # repository): public/screenshots/<lang>/<name>.webp, the reader's language
+  # or else English; $screenshots lists what is there as "<lang>/<name>".
+  def shot_src($name):
+    if ($screenshots | index("\($lang)/\($name)")) then "/screenshots/\($lang)/\($name).webp"
+    elif ($screenshots | index("en/\($name)")) then "/screenshots/en/\($name).webp"
+    else "" end;
   def shots:
-    [["main.png", "shot_main_alt", "shot_main_t", "shot_main_c"],
-     ["epg.png", "shot_epg_alt", "shot_epg_t", "shot_epg_c"],
-     ["timeshift.png", "shot_ts_alt", "shot_ts_t", "shot_ts_c"],
-     ["recordings.png", "shot_rec_alt", "shot_rec_t", "shot_rec_c"]]
-    | map(. as [$file, $alt, $title, $cap]
+    [["main", "shot_main_alt", "shot_main_t", "shot_main_c"],
+     ["guide", "shot_epg_alt", "shot_epg_t", "shot_epg_c"],
+     ["multiview", "shot_mv_alt", "shot_mv_t", "shot_mv_c"],
+     ["timeshift", "shot_ts_alt", "shot_ts_t", "shot_ts_c"]]
+    | map(. as [$name, $alt, $title, $cap]
+      | shot_src($name) as $src
       | "        <div class=\"shot\">\n"
-        + (if ($screenshots | index($file)) then
-             "          <img src=\"/screenshots/\($file | h)\" alt=\"\(t($alt) | h)\" width=\"1280\" height=\"800\" loading=\"lazy\">\n"
+        + (if $src != "" then
+             "          <img src=\"\($src | h)\" alt=\"\(t($alt) | h)\" width=\"1280\" height=\"800\" loading=\"lazy\" decoding=\"async\">\n"
            else "          <div class=\"ph\">\(t("shot_ph") | h) · \(t($title))</div>\n" end)
         + "          <div class=\"cap\"><b>\(t($title))</b> — \(t($cap))</div>\n"
         + "        </div>\n")
@@ -390,7 +398,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
       "author": {"@id": "\($SITE)/#org"}, "publisher": {"@id": "\($SITE)/#org"},
       "sameAs": [$REPO],
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}
-     + (if ($screenshots | index("main.png")) then {"screenshot": "\($SITE)/screenshots/main.png"} else {} end)) as $app
+     + (if ($screenshots | index("en/main")) then {"screenshot": "\($SITE)/screenshots/en/main.webp"} else {} end)) as $app
     | {"@context": "https://schema.org",
        "@graph": [
          {"@type": "Organization", "@id": "\($SITE)/#org", "name": "dopeIPTV",

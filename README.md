@@ -21,7 +21,7 @@ website/
 │   ├── i18n/               every page in every language, rendered by the sync (git-ignored)
 │   ├── releases.json       written by the sync (never committed)
 │   ├── files/              mirrored release assets land here (git-ignored)
-│   └── screenshots/        drop real PNGs here (see below)
+│   └── screenshots/        the app's pictures, <lang>/<name>.webp (from the app's tools/site_screenshots.py)
 ├── site/                   what the pages are made from - not web-served
 │   ├── templates/          index.html, help.html, 404.html and nav.html
 │   ├── lang/*.json         the texts, one file per language (en.json is the source)
@@ -248,9 +248,6 @@ curl -sI 'https://iptv.dope.rs/trakt/callback/?code=x&state=y' | grep -i locatio
 
 ## Still to add (drop-in, no code changes)
 
-- **Screenshots** — put real PNGs named `main.png`, `epg.png`,
-  `timeshift.png` and `recordings.png` (1280×800) in `public/screenshots/`;
-  the next sync shows each one in place of its placeholder.
 - **`og-image.png`** (1200×630) and **`favicon.png` / `apple-touch-icon.png`**
   in `public/` — referenced by the meta tags and manifest. The SVG favicon works
   today; the PNGs are for older clients and social cards.
