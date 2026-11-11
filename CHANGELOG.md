@@ -7,6 +7,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.4.4]
+
+Playback that rides out a dropping connection, and a warning when
+another device on the account is taking it.
+
 ### Fixed
 
 - Linux (GNOME): "Support dopeIPTV…" chosen from the app menu, or from the
@@ -31,8 +36,8 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Changed
 
-- The app's homepage in its package metadata (software centres, Flathub, the
-  .deb, Python's project page) is iptv.dope.rs, with links to the help and
+- The app's homepage in its package metadata (software centres, the
+  Flatpak, the .deb, Python's project page) is iptv.dope.rs, with links to the help and
   to donating; GitHub stays as the source code and issue tracker.
 
 ### Added

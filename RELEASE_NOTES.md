@@ -1,3 +1,24 @@
+## dopeIPTV 1.4.4
+
+Smoother playback when the connection drops, and a warning when another
+device is using your account.
+
+- **Told when another device takes your account.** Most providers allow
+  one stream at a time. When a TV, a phone or another app plays on the
+  same account, the two take turns and the picture keeps breaking up.
+  dopeIPTV now notices and says so, with your account's figures when the
+  provider gives them, whether the rewind buffer is on or off.
+- **The rewind buffer rides out a dropping connection.** A provider that
+  kept cutting the connection made playback stutter, jump back a few
+  seconds and at last get stuck on the same piece. The buffer now carries
+  on where the stream left off.
+- **The guide in Arabic, Persian, Hebrew and Urdu** opens on what is on
+  now, not hours away on an empty stretch.
+- **Support dopeIPTV…** from the menu opens the page in front of the app
+  on GNOME.
+
+On the AppImage from 1.2.15 or later? Click **Update now** in the banner.
+
 ## dopeIPTV 1.4.3
 
 A few fixes after 1.4.2: no spinning pointer on Home, and a tidier About.
