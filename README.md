@@ -1,4 +1,7 @@
-# iptv.dope.rs — the dopeIPTV website
+# dopeiptv.org — the dopeIPTV website
+
+The site's address since November 2026; the old one, iptv.dope.rs, sends
+every request on to the same path here (DEPLOY.md, "Moving to dopeiptv.org").
 
 A single-page, responsive landing site (dark "broadcast console" theme) with a
 download list that auto-mirrors the latest GitHub release. Static files only:
@@ -38,7 +41,7 @@ website/
 
 Two nginx roles (adapt to your own setup):
 
-- a **TLS-front proxy** that terminates HTTPS for `iptv.dope.rs` and reverse-
+- a **TLS-front proxy** that terminates HTTPS for `dopeiptv.org` and reverse-
   proxies to
 - a **content server** that serves the static site on an internal port
   (`:8081` in the template) and runs the release-sync cron.
@@ -83,7 +86,7 @@ repo hardcodes a real host or address.
 Moving the live site from the PHP version: follow [DEPLOY.md](DEPLOY.md). A
 new install:
 
-1. **DNS** — point `iptv.dope.rs` at the same public IP as your other sites.
+1. **DNS** — point `dopeiptv.org` at the same public IP as your other sites.
 
 2. **Content server** — `pkg install jq`. Copy `public/` to your web root
    (e.g. `/usr/local/www/iptv/public`), and `site/` and `sync-releases.sh` one
@@ -92,7 +95,7 @@ new install:
    `deploy/content-iptv.dope.rs.conf` into your nginx `conf.d/`:
 
    ```sh
-   pw useradd iptv -c "iptv.dope.rs sync" -d /nonexistent -s /usr/sbin/nologin
+   pw useradd iptv -c "dopeiptv.org sync" -d /nonexistent -s /usr/sbin/nologin
    chown -R iptv:iptv /usr/local/www/iptv
    ```
 
@@ -102,7 +105,7 @@ new install:
    block, issue a cert and reload:
 
    ```sh
-   certbot certonly --webroot -w /usr/local/www/letsencrypt -d iptv.dope.rs
+   certbot certonly --webroot -w /usr/local/www/letsencrypt -d dopeiptv.org
    ```
 
 4. **Cron the release sync** on the content server (every 15 min, in
@@ -242,7 +245,7 @@ nginx answers `/trakt/callback` with a 301 to `/trakt/callback/`, keeping the
 query. A quick check after a deploy:
 
 ```sh
-curl -sI 'https://iptv.dope.rs/trakt/callback/?code=x&state=y' | grep -i location
+curl -sI 'https://dopeiptv.org/trakt/callback/?code=x&state=y' | grep -i location
 # location: http://127.0.0.1:41794/callback?code=x&state=y
 ```
 
@@ -274,7 +277,7 @@ iptv" unless the page says otherwise), and the JSON-LD gives the lowercase
 spelling as an `alternateName`. `/index.php` and `/help/index.php` redirect
 to `/` and `/help/`, so each page has one address.
 
-After a deploy, resubmit `https://iptv.dope.rs/sitemap.xml` in Google Search
+After a deploy, resubmit `https://dopeiptv.org/sitemap.xml` in Google Search
 Console and Bing Webmaster Tools.
 
 CSS and JS are cached for a year: the sync links them from every page with

@@ -452,7 +452,7 @@ def fetch_geo(state: dict) -> None:
     for month in (today.strftime("%Y-%m"), (today.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")):
         url = GEO_URL.format(month=month)
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "iptv.dope.rs-stats"})
+            req = urllib.request.Request(url, headers={"User-Agent": "dopeiptv.org-stats"})
             with urllib.request.urlopen(req, timeout=120) as resp:
                 data = gzip.decompress(resp.read())
             fd, tmp = tempfile.mkstemp(dir=os.path.dirname(GEO_DB), prefix=".tmp-")
