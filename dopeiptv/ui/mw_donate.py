@@ -23,7 +23,7 @@ from PyQt6.QtCore import QTimer
 from ..core.xdg import open_url
 from ..i18n import tr
 
-DONATE_URL = "https://iptv.dope.rs/?ref={ref}#donate"
+DONATE_URL = "https://dopeiptv.org/?ref={ref}#donate"
 #: Minutes of watching before Home shows the card.
 CARD_AFTER_MIN = 600
 SNOOZE_SECS = 90 * 86400          # "Not now"

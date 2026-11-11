@@ -49,9 +49,9 @@
     <category>Video</category>
     <category>TV</category>
   </categories>
-  <url type="homepage">https://iptv.dope.rs/</url>
-  <url type="help">https://iptv.dope.rs/help/</url>
-  <url type="donation">https://iptv.dope.rs/#donate</url>
+  <url type="homepage">https://dopeiptv.org/</url>
+  <url type="help">https://dopeiptv.org/help/</url>
+  <url type="donation">https://dopeiptv.org/#donate</url>
   <url type="bugtracker">https://github.com/slimture/dopeIPTV/issues</url>
   <url type="vcs-browser">https://github.com/slimture/dopeIPTV</url>
   <developer id="io.github.slimture">
@@ -61,7 +61,7 @@
   <releases>
     <release version="1.4.4" date="2026-11-11">
       <description>
-        <p>Tells you when another device or app on your account keeps taking the stream, with the account's figures when the provider gives them. The rewind buffer rides out a dropping connection instead of stuttering and jumping back, and the guide in right-to-left languages opens on what is on now.</p>
+        <p>Tells you when another device or app on your account keeps taking the stream, with the account's figures when the provider gives them. The rewind buffer rides out a dropping connection instead of stuttering and jumping back, and the guide in right-to-left languages opens on what is on now. The website is now dopeiptv.org.</p>
       </description>
     </release>
     <release version="1.4.3" date="2026-11-10">

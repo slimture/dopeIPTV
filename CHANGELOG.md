@@ -36,9 +36,12 @@ another device on the account is taking it.
 
 ### Changed
 
-- The app's homepage in its package metadata (software centres, the
-  Flatpak, the .deb, Python's project page) is iptv.dope.rs, with links to the help and
-  to donating; GitHub stays as the source code and issue tracker.
+- The website has its own address, dopeiptv.org; iptv.dope.rs sends every
+  request on there. The app's links (About, the update banner, donating)
+  and the package metadata (software centres, the Flatpak, the .deb,
+  Python's project page) point to it, with
+  the help and donating beside the homepage; GitHub stays as the source
+  code and issue tracker.
 
 ### Added
 

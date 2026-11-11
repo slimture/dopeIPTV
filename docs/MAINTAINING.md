@@ -26,7 +26,7 @@ module map in one page) and [`ARCHITECTURE.md`](ARCHITECTURE.md).
 |---|---|---|
 | `testing` | All app work. Every push runs CI and builds test builds. | everyone, via PR or directly |
 | `main` | Released code only: `testing` merged at each release. | `tools/release.sh` |
-| `website` | The site at <https://iptv.dope.rs> (static, rendered by `jq`). | website changes |
+| `website` | The site at <https://dopeiptv.org> (static, rendered by `jq`); its old address, iptv.dope.rs, sends every request on there. | website changes |
 
 **No other branches on GitHub**, not even for an experiment: a pushed
 branch runs workflows and leaves artifacts behind. To try the release
@@ -132,7 +132,7 @@ Only names here - the values are with the owner.
 | Trakt app registration | its client id is `DEFAULT_CLIENT_ID` in `providers/trakt.py`; the redirect goes through the website (see its README) | users can enter their own client id in Settings → Trakt |
 | The web server | runs the site and its cron sync (website branch: `README.md`, `DEPLOY.md`) | the site stops updating; the app is unaffected |
 | GitHub repository settings | releases, Actions, the Security tab for private reports | - |
-| Stripe Payment Link (donations) | `$DONATE` at the top of `site/render.jq` on the `website` branch - where the site's donate links point without JavaScript. `.github/FUNDING.yml` (the Sponsor button, shown with Settings → Features → Sponsorships ticked) and the README's "Support dopeIPTV" point at `iptv.dope.rs/#donate`, which opens the dialog | no donate card on the site |
+| Stripe Payment Link (donations) | `$DONATE` at the top of `site/render.jq` on the `website` branch - where the site's donate links point without JavaScript. `.github/FUNDING.yml` (the Sponsor button, shown with Settings → Features → Sponsorships ticked) and the README's "Support dopeIPTV" point at `dopeiptv.org/#donate`, which opens the dialog | no donate card on the site |
 | Stripe keys for the donate dialog | a restricted key (PaymentIntents: Write) and the publishable key, on the web server in `/usr/local/etc/iptv-donate.key` / `.conf`, read by `donate/donate.py` (website branch, `DEPLOY.md` "Donations"); Apple Pay needs the domain added in Stripe | the dialog sends visitors to the Payment Link's own page instead |
 | The admin page's password | `/usr/local/etc/nginx/iptv-admin.htpasswd` on the web server (website branch, `DEPLOY.md` "Statistics and the admin page") | `/admin/` cannot be opened; the site is unaffected |
 

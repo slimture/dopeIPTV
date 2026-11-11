@@ -36,8 +36,8 @@ def test_a_link_is_opened_with_the_bundles_library_paths_stripped(
 
     monkeypatch.setattr(xdg.subprocess, "Popen", fake_popen)
 
-    assert xdg.open_url("https://iptv.dope.rs") is True
-    assert seen["cmd"] == ["/usr/bin/xdg-open", "https://iptv.dope.rs"]
+    assert xdg.open_url("https://dopeiptv.org") is True
+    assert seen["cmd"] == ["/usr/bin/xdg-open", "https://dopeiptv.org"]
     assert "LD_LIBRARY_PATH" not in seen["env"]
     assert "QT_PLUGIN_PATH" not in seen["env"]
     # Not killed when this process exits.
@@ -71,7 +71,7 @@ def test_the_next_handler_is_tried_when_one_is_missing(monkeypatch):
     seen = {}
     monkeypatch.setattr(xdg.subprocess, "Popen",
                         lambda cmd, **kw: seen.setdefault("cmd", cmd))
-    assert xdg.open_url("https://iptv.dope.rs") is True
+    assert xdg.open_url("https://dopeiptv.org") is True
     # gio takes a verb; xdg-open does not.
     assert seen["cmd"][:2] == ["/usr/bin/gio", "open"]
 
@@ -109,8 +109,8 @@ def test_on_a_desktop_qt_opens_it_with_the_system_paths_for_the_moment(
 
     monkeypatch.setattr(xdg, "_qt_open", fake_qt_open)
     monkeypatch.setattr(xdg.shutil, "which", lambda n: None)
-    xdg.open_url("https://iptv.dope.rs/?ref=app-heart#donate")
-    assert seen["url"] == "https://iptv.dope.rs/?ref=app-heart#donate"
+    xdg.open_url("https://dopeiptv.org/?ref=app-heart#donate")
+    assert seen["url"] == "https://dopeiptv.org/?ref=app-heart#donate"
     assert seen["ld"] is None                       # stripped for the launch
     assert xdg.os.environ["LD_LIBRARY_PATH"] == "/opt/dopeiptv/lib"   # and back
 
@@ -120,7 +120,7 @@ def test_without_a_desktop_session_qt_is_not_asked(monkeypatch):
     monkeypatch.setattr(xdg, "_qt_platform", lambda: "offscreen")
     monkeypatch.setattr(xdg, "_qt_open", lambda url: pytest.fail("asked Qt"))
     monkeypatch.setattr(xdg.shutil, "which", lambda n: None)
-    xdg.open_url("https://iptv.dope.rs")
+    xdg.open_url("https://dopeiptv.org")
 
 
 def _menu_case(monkeypatch, focus):
@@ -141,22 +141,22 @@ def test_a_link_from_a_menu_waits_for_the_window_to_have_the_focus(monkeypatch):
     menu that was the popup, or no window, and the page opened behind the
     app; the link now waits until the window has the focus back."""
     timers, opened = _menu_case(monkeypatch, iter([False, False, False, True]))
-    assert xdg.open_url("https://iptv.dope.rs/?ref=app-menu#donate") is True
+    assert xdg.open_url("https://dopeiptv.org/?ref=app-menu#donate") is True
     assert opened == []                  # not yet: the popup has the focus
     while timers and not opened:
         timers.pop(0)[1]()
-    assert opened == ["https://iptv.dope.rs/?ref=app-menu#donate"]
+    assert opened == ["https://dopeiptv.org/?ref=app-menu#donate"]
     assert timers == []
 
 
 def test_a_link_from_a_menu_still_opens_if_the_focus_never_comes(monkeypatch):
     timers, opened = _menu_case(monkeypatch, iter([False] * 1000))
-    xdg.open_url("https://iptv.dope.rs/")
+    xdg.open_url("https://dopeiptv.org/")
     steps = 0
     while timers:
         timers.pop(0)[1]()
         steps += 1
-    assert opened == ["https://iptv.dope.rs/"]
+    assert opened == ["https://dopeiptv.org/"]
     assert steps * xdg._FOCUS_STEP_MS >= xdg.FOCUS_WAIT_MS
 
 
@@ -168,8 +168,8 @@ def test_a_deferred_link_falls_back_to_the_desktops_opener(monkeypatch):
                         lambda n: "/usr/bin/xdg-open" if n == "xdg-open" else None)
     monkeypatch.setattr(xdg.subprocess, "Popen",
                         lambda cmd, **kw: spawned.append(cmd))
-    xdg.open_url("https://iptv.dope.rs/")
+    xdg.open_url("https://dopeiptv.org/")
     while timers:
         timers.pop(0)[1]()
-    assert spawned == [["/usr/bin/xdg-open", "https://iptv.dope.rs/"]]
+    assert spawned == [["/usr/bin/xdg-open", "https://dopeiptv.org/"]]
 

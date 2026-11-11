@@ -127,7 +127,7 @@ New `windows-build` job on `windows-latest`:
 5. package the `dist/dopeiptv/` folder as an **installer `.exe`** (Inno Setup or
    NSIS) — nicer than a zip and, importantly, the website's release sync
    (`sync-releases.sh` on the website branch) already recognises
-   `.exe`/`.msi`, so a `.exe` asset appears on iptv.dope.rs automatically. (A
+   `.exe`/`.msi`, so a `.exe` asset appears on dopeiptv.org automatically. (A
    portable `.zip` with `win` in its name is recognised too.)
 6. `actions/upload-artifact` + attach to the release like the other jobs.
 

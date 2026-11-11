@@ -75,7 +75,7 @@ def test_donate_opens_the_site_and_waits_a_year(tmp_path, monkeypatch):
     w = _Win(tmp_path)
     w.settings.setValue("donate_watch_min", CARD_AFTER_MIN)
     w._donate_card().donate.emit()
-    assert opened == ["https://iptv.dope.rs/?ref=app-home#donate"]
+    assert opened == ["https://dopeiptv.org/?ref=app-home#donate"]
     until = float(w.settings.value("donate_card_until"))
     assert until >= time.time() + THANKS_SECS - 5
 
@@ -84,7 +84,7 @@ def test_the_heart_button_says_where_it_comes_from(tmp_path, monkeypatch):
     opened = []
     monkeypatch.setattr(mw_donate, "open_url", opened.append)
     _Win(tmp_path).open_donate("app-heart")
-    assert opened == ["https://iptv.dope.rs/?ref=app-heart#donate"]
+    assert opened == ["https://dopeiptv.org/?ref=app-heart#donate"]
 
 
 def test_the_heart_hides_for_three_months_and_comes_back(tmp_path):

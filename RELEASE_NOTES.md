@@ -16,6 +16,8 @@ device is using your account.
   now, not hours away on an empty stretch.
 - **Support dopeIPTV…** from the menu opens the page in front of the app
   on GNOME.
+- **The website is now [dopeiptv.org](https://dopeiptv.org).** The old
+  address still works and takes you there.
 
 On the AppImage from 1.2.15 or later? Click **Update now** in the banner.
 

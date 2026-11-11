@@ -2203,7 +2203,7 @@ class _SettingsMixin:
         links.setSpacing(16)
         # ?ref=: from the app, for the site's statistics (see mw_updates).
         links.addWidget(link(tr("about_website"),
-                             "https://iptv.dope.rs/?ref=app-about"))
+                             "https://dopeiptv.org/?ref=app-about"))
         links.addWidget(link(tr("about_github"),
                              f"https://github.com/{GITHUB_REPO}"))
         links.addWidget(link(tr("about_all_releases"),

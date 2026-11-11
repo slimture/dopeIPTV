@@ -25,11 +25,11 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://iptv.dope.rs/"
-Documentation = "https://iptv.dope.rs/help/"
+Homepage = "https://dopeiptv.org/"
+Documentation = "https://dopeiptv.org/help/"
 Source = "https://github.com/slimture/dopeIPTV"
 Issues = "https://github.com/slimture/dopeIPTV/issues"
-Donate = "https://iptv.dope.rs/#donate"
+Donate = "https://dopeiptv.org/#donate"
 
 [project.scripts]
 dopeiptv = "dopeiptv.app:main"

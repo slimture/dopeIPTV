@@ -28,7 +28,7 @@ from .theme import P
 # Where "Download" sends people - the website, not the raw GitHub release.
 # ?ref= tells the site's statistics the visit came from the app: a link
 # opened from a desktop app carries no referrer, so it counted as "direct".
-_WEBSITE = "https://iptv.dope.rs/?ref=app-update"
+_WEBSITE = "https://dopeiptv.org/?ref=app-update"
 
 
 class _UpdatesMixin:

@@ -357,7 +357,7 @@ jobs:
           fpm -s dir -t deb -n dopeiptv -v "$V" \
             --license GPL-3.0-or-later \
             --description "Modern IPTV player for Xtream Codes with EPG" \
-            --url https://iptv.dope.rs/ \
+            --url https://dopeiptv.org/ \
             --depends libgl1 --depends libegl1 --depends libxcb-cursor0 \
             --depends libpulse0 \
             --depends libwayland-client0 --depends libwayland-cursor0 \

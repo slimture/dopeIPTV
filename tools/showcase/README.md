@@ -1,7 +1,7 @@
 # Stills for the website's pictures
 
 `tools/site_screenshots.py` shows these in the players of the pictures on
-the front page of iptv.dope.rs. They are NASA photographs, in the public
+the front page of dopeiptv.org. They are NASA photographs, in the public
 domain (works of the U.S. federal government), cut to 16:9:
 
 | File | Photograph |

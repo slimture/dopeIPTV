@@ -1,6 +1,6 @@
 """Pictures of the settings for the website's help, in every language.
 
-The help on iptv.dope.rs shows the settings page an answer talks about, in
+The help on dopeiptv.org shows the settings page an answer talks about, in
 the reader's language. This takes those pictures from the app itself,
 offscreen, so they are the release's own: run it when the settings change
 and copy the result into the website branch, ``public/help-shots/``::
