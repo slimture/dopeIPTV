@@ -180,10 +180,12 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     # No GitHub here: a word most visitors do not know, in the one row every
     # one of them reads. The footer has it for whoever looks for the source.
     | def cur($key): $key != "" and $key == $current;
-    # The row beside the logo leaves out Download: the blue button at its end
-    # is the same link, and the bar said it twice. The narrow-window menu
-    # keeps it - the button is gone where that menu is all there is.
-    ([$links[] | select(.[0] != $base + "#download") | . as [$href, $label, $key]
+    # The row beside the logo holds only what a visitor leaves the page for:
+    # Help, then Donate. Features and Screenshots are further down this same
+    # page, where everyone scrolls anyway, and Download is the blue button at
+    # the far end of the bar. The narrow-window menu keeps every link - it is
+    # all there is where the row folds away.
+    ([$links[] | select(.[2] == "help") | . as [$href, $label, $key]
       | "      <a class=\"navlink\" href=\"\($href | h)\"\(if cur($key) then " aria-current=\"page\"" else "" end)>\($label | h)</a>\n"]
      | add) as $navlinks
     | ([$links[] | . as [$href, $label, $key]
@@ -199,10 +201,12 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     # own in the header, one tap from anywhere.
     | (if $DONATE == "" then "" else
          "      <a class=\"navheart\" href=\"\($DONATE | h)\" rel=\"nofollow noopener\" aria-label=\"\(t("donate_btn") | h)\" title=\"\(t("donate_btn") | h)\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg></a>\n" end) as $navheart
+    # Splits the bar: the row stays by the logo, the rest goes to the end.
+    | "      <span class=\"bar-gap\" aria-hidden=\"true\"></span>\n" as $navgap
     | (if ($avail | length) > 1 then
          "      <details class=\"langpick\" id=\"langPick\" name=\"hdrmenu\">\n"
-         + "        <summary aria-label=\"\(t("lang_label") | h)\">\n"
-         + "          <span class=\"langpick-cur\"><span class=\"langpick-globe\">🌐</span><span class=\"langpick-name\">\($S.names[$lang] // $lang | h)</span></span>\n"
+         + "        <summary aria-label=\"\(t("lang_label") | h)\" title=\"\($S.names[$lang] // $lang | h)\">\n"
+         + "          <span class=\"langpick-cur\"><span class=\"langpick-globe\">🌐</span><span class=\"langpick-name\">\($lang | ascii_upcase | h)</span></span>\n"
          + "          <span class=\"langpick-caret\" aria-hidden=\"true\">▾</span>\n"
          + "        </summary>\n"
          + "        <div class=\"langpick-menu\" role=\"menu\">\n"
@@ -214,7 +218,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
        else "" end) as $langpick
     | ($navtpl
        | expand({brand_href: (if $home then "#top" else "/" end), nav_base: $base};
-                {navlinks: ($navlinks + $navdonate + $navheart), langpick: $langpick,
+                {navlinks: ($navlinks + $navdonate + $navgap + $navheart), langpick: $langpick,
                  menuitems: ($menuitems + $menudonate)}))
       + donate_i18n;
   def common:

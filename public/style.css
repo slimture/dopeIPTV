@@ -94,6 +94,7 @@ header.bar { position: sticky; top: 0; z-index: 20; backdrop-filter: saturate(18
 nav.links { display: flex; align-items: center; gap: 26px; }
 nav.links a { color: var(--muted); font-size: 13.5px; }
 nav.links a:hover { color: var(--text); }
+nav.links a[aria-current="page"] { color: var(--text); font-weight: 500; }
 .btn { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font: inherit;
   font-weight: 500; font-size: 15px; padding: 10px 22px; border-radius: 999px;
   border: 1px solid transparent; transition: background .2s ease, border-color .2s ease, color .2s ease; }
@@ -104,12 +105,17 @@ nav.links a:hover { color: var(--text); }
 .bar .btn { padding: 5px 14px; font-size: 13px; }
 /* Below 1000px the inline links give way to the disclosure in the header
    (.navmenu). They used to just vanish, which left the help page with a
-   header of nothing but the logo. The width is the longest language's
-   (Ukrainian needs ~1000px for the five links, the picker and the button;
-   at 720px Dutch and Ukrainian pushed the page sideways), and the gaps
-   close up a little before that. */
+   header of nothing but the logo. The gaps close up a little before that. */
 @media (max-width: 1100px) { nav.links { gap: 20px; } }
 @media (max-width: 1000px) { nav.links a.navlink { display: none; } }
+/* Wide windows: Help and Donate sit right after the logo, where the eye
+   starts; the language and the blue Download button keep the far end, where
+   colour and position give the button its weight. .bar-gap is the split. */
+.bar-gap { display: none; }
+@media (min-width: 1001px) {
+  nav.links { flex: 1; margin-inline-start: 44px; }
+  .bar-gap { display: block; flex: 1; }
+}
 
 .hero { padding: 96px 0 40px; text-align: center; }
 .hero-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 64px; justify-items: center; }
