@@ -53,7 +53,6 @@
   <url type="help">https://dopeiptv.org/help/</url>
   <url type="donation">https://dopeiptv.org/#donate</url>
   <url type="bugtracker">https://github.com/slimture/dopeIPTV/issues</url>
-  <url type="vcs-browser">https://github.com/slimture/dopeIPTV</url>
   <developer id="io.github.slimture">
     <name>dopeIPTV contributors</name>
   </developer>
