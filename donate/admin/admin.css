@@ -124,6 +124,8 @@ tr:last-child td { border-bottom: 0; }
 
 /* The visitor log: one visit a row, opened for its pages and facts. */
 .daybar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; }
+.daybar .muted { margin: 0 0 0 4px; }
+.daybar .link { font-size: 13px; }
 .daybar select { font: inherit; font-size: 15px; font-weight: 600; color: var(--text); background: transparent;
   border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; min-width: 0; }
 .daybar .step { font: inherit; font-size: 20px; line-height: 1; width: 36px; height: 36px; border-radius: 10px;
