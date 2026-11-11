@@ -266,7 +266,7 @@
   // Nor on Chromium: the rising cost it frames on a scroll (nav.js, .cr).
   var chromium = document.documentElement.classList.contains("cr");
   if ("IntersectionObserver" in window && !phone && !chromium) {
-    var sel = ".sec-head, .fxp, .shot, .dlx-card, .dl-phone, .donate, .faq-item";
+    var sel = ".sec-head, .fxp, .shot, .dlx-card, .dl-phone, .donate";
     var fold = window.innerHeight * 0.92;
     var io = new IntersectionObserver(function (entries) {
       entries.forEach(function (en) {
@@ -308,25 +308,6 @@
     chans[i].classList.add("active");
     if (screen) { screen.style.setProperty("--tint", tints[i % tints.length]); }
   }, 3200);
-})();
-
-/* The FAQ shows its first five questions; the rest are a click away. */
-(function () {
-  "use strict";
-  var faq = document.querySelector(".faq[data-more]");
-  var items = faq ? faq.querySelectorAll(".faq-item") : [];
-  if (items.length <= 6) { return; }
-  [].forEach.call(items, function (it, n) { if (n >= 5) { it.classList.add("is-extra"); } });
-  var b = document.createElement("button");
-  b.type = "button";
-  b.className = "faq-all";
-  b.textContent = faq.getAttribute("data-more");
-  b.addEventListener("click", function () {
-    [].forEach.call(faq.querySelectorAll(".is-extra"), function (it) { it.classList.remove("is-extra"); });
-    b.remove();
-    items[5].querySelector("summary").focus();
-  });
-  faq.appendChild(b);
 })();
 
 /* Living details: the download count counts up - for reduced motion too,

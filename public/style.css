@@ -331,37 +331,11 @@ h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -.03em; line-height:
 }
 .autonote { margin-top: 18px; font-size: 13px; color: var(--faint); line-height: 1.75; }
 .autonote code { font-family: var(--mono); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; color: var(--muted); overflow-wrap: anywhere; }
+/* What the app is not, before anyone downloads it: a quiet line. */
+.dl-nochan { margin: 22px auto 0; text-align: center; font-size: 14px; color: var(--muted); max-width: 60ch; }
 .autonote a.verify-link { color: var(--accent); font-weight: 600; }
 .autonote a.verify-link:hover { text-decoration: underline; }
 
-/* Open-source credits: one quiet paragraph and a link. The projects open
-   under it (a <details>) as a row of names with what each one does in small
-   grey under it - folded away, never left out. */
-#credits { padding: 56px 0 64px; text-align: center; }
-#credits .sec-head { margin: 0 auto; max-width: 62ch; }
-#credits h2 { font-size: clamp(1.25rem, 2.4vw, 1.55rem); letter-spacing: -.025em; }
-#credits .sec-head p { margin-top: 10px; font-size: 15px; line-height: 1.6; }
-.cred-more { margin-top: 10px; }
-.cred-more > summary { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; list-style: none;
-  color: var(--accent); font-size: 15px; }
-.cred-more > summary::-webkit-details-marker { display: none; }
-.cred-more > summary::marker { content: ""; }
-.cred-more > summary::after { content: "\203A"; font-size: 1.25em; line-height: 1; transition: transform .2s ease; }
-.cred-more[open] > summary::after { transform: rotate(90deg); }
-.cred-more > summary:hover { text-decoration: underline; text-underline-offset: 3px; }
-.cred-more .credits-grid { margin-top: 30px; }
-.credits-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 34px 28px;
-  max-width: 900px; margin: 8px auto 0; text-align: center; }
-.credit { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.credit .ic { order: -2; width: 30px; height: 30px; margin-bottom: 6px; color: var(--accent); fill: none; stroke: currentColor;
-  stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.credit p { order: -1; }
-.credit h3 { margin: 0; font-size: 13px; font-weight: 400; color: var(--faint); }
-.credit p { margin: 0; font-family: var(--display); font-size: 19px; font-weight: 600; letter-spacing: -.02em;
-  line-height: 1.3; color: var(--muted); }
-.credit a { color: var(--text); }
-.credit a:hover { color: var(--accent); }
-.disclaimer { margin: 34px auto 0; font-size: 12px; line-height: 1.6; color: var(--faint); max-width: 80ch; text-align: center; }
 footer { background: var(--surface); padding: 28px 0 44px; margin-top: 24px; }
 footer .wrap { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
 footer .v { font-size: 12.5px; color: var(--faint); }
@@ -504,45 +478,6 @@ footer nav a:hover { color: var(--accent); }
    sections now alternate in bands, and each needs its own room. */
 .mb0 { margin-bottom: 0; }
 
-/* ---- FAQ (accordion; feeds the FAQPage structured data) ----------------- */
-/* The heading beside the questions, the questions as a list between thin
-   lines - not a stack of full-width boxes. */
-/* One centred column, as Apple's FAQs: the heading, the first questions,
-   "Show all questions" for the rest (app.js; without script all ten show),
-   and the help page a link away. */
-.faq-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 34px; max-width: 760px; margin-inline: auto; }
-.faq-grid .sec-head { text-align: center; margin: 0 auto; }
-.faq-grid .sec-head p { font-size: 17px; line-height: 1.5; }
-.btn.ghost.faq-help { margin-top: 14px; padding: 0; border: 0; background: none; color: var(--accent); font-size: 17px; }
-.btn.ghost.faq-help:hover { background: none; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
-.faq-help::after { content: "\203A"; font-size: 1.2em; line-height: 1; }
-[dir="rtl"] .faq-help::after { content: "\2039"; }
-.faq-item.is-extra { display: none; }
-.faq-all { display: block; margin: 22px auto 0; padding: 10px 22px; border-radius: 999px; cursor: pointer; font: inherit;
-  font-size: 15px; font-weight: 500; color: var(--accent); background: none; border: 1px solid var(--accent); }
-.faq-all:hover { background: var(--accent); color: var(--accent-ink); }
-.faq { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
-.faq-item { border-bottom: 1px solid var(--line); }
-.faq-item summary {
-  list-style: none; cursor: pointer; font-weight: 500; color: var(--text);
-  padding: 18px 0; display: flex; align-items: center; justify-content: space-between; gap: 18px;
-}
-.faq-item summary::-webkit-details-marker { display: none; }
-.faq-item .faq-q { margin: 0; font: inherit; font-size: 17px; color: inherit; }
-.faq-item summary::after {
-  content: "+"; flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
-  border: 0; color: var(--muted); font-size: 22px; font-weight: 300; line-height: 1;
-  transition: transform .2s ease, border-color .2s ease, background .2s ease;
-}
-.faq-item[open] summary::after { transform: rotate(45deg); }
-.faq-item summary:hover { color: var(--accent); }
-.faq-item summary:hover::after { color: var(--accent); }
-.faq-item p { margin-block: -4px 20px; margin-inline: 0 46px; color: var(--muted); line-height: 1.7; max-width: 68ch; }
-@media (prefers-reduced-motion: reduce) { .faq-item summary::after { transition: none; } }
-@media (max-width: 860px) {
-  .faq-grid { gap: 24px; }
-  .faq-item p { margin-inline-end: 0; }
-}
 
 /* ---- Release notes ("What's new") -------------------------------------- */
 /* Rendered from releases.json by render_notes() into a <template>; the
@@ -734,6 +669,7 @@ body.searching .help-layout { grid-template-columns: 1fr; }
 .copy.is-done svg + svg { display: block; }
 .copy.is-done { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 @media (prefers-reduced-motion: reduce) { .copy { transition: none; } }
+.help-a .fine { font-size: 13px; line-height: 1.6; color: var(--faint); }
 .help-a .os { color: var(--faint); font-size: 12px; text-transform: uppercase;
   letter-spacing: .07em; display: block; margin: 0 0 5px; }
 /* A shell command is left-to-right in every language. Done here rather than
@@ -1047,9 +983,6 @@ dialog.howdlg::backdrop { background: rgba(5, 7, 10, .66); }
   .donate-text p { margin-inline: auto; }
   .donate-act { align-items: center; }
   .donate-btn { min-width: 220px; }
-  .credits-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px 16px; }
-  .credit p { font-size: 17px; }
-  .disclaimer { margin-top: 28px; }
 }
 .is-phone #download:not(.dl-open) .dlx,
 .is-phone #download:not(.dl-open) .dls,
@@ -1064,14 +997,15 @@ dialog.howdlg::backdrop { background: rgba(5, 7, 10, .66); }
    section, and Download is in the menu. An app-store button comes back
    here once there is a phone app. */
 .is-phone .hero .cta-row { display: none; }
-/* The downloads and what is new in them go further down on a phone, after
-   the FAQ: nothing there installs on it. What to do here - read, see,
-   support - comes first. The bands take turns in this order as they do on
-   a computer (hero, features, shots, donate, FAQ, downloads, what's new,
-   credits), each in its own colour, so nothing is swapped here. */
+/* The downloads go last on a phone: nothing there installs on it. What to
+   do here - read, see, support - comes first. That swaps the last two bands
+   (a computer has downloads, then donate), so their colours swap with them
+   and the bands still take turns. */
 .is-phone main { display: flex; flex-direction: column; }
 .is-phone main > #download { order: 1; }
-.is-phone main > #credits { order: 2; }
+.is-phone #donate { background: var(--surface); }
+.is-phone #download { background: var(--bg); }
+.is-phone #download .dlx-card { background: var(--surface); }
 .is-phone #donate .donate {
   background: radial-gradient(90% 60% at 50% 100%, color-mix(in srgb, var(--heart) 22%, transparent), transparent 75%),
     var(--bg); }
@@ -1432,20 +1366,18 @@ dialog.howdlg::backdrop { background: rgba(5, 7, 10, .66); }
    black and graphite in dark mode), so on a phone above all it is clear
    where one ends and the next begins. What sat on the grey before sits on
    the page colour inside a grey band. */
-/* What's new follows the downloads it describes, then the donate band:
-   hero, features, shots, downloads, what's new, donate, FAQ, credits. */
-#features, #download, #donate, #credits { background: var(--surface); }
+/* hero, features, shots, downloads, donate - the donate card on the page
+   colour's opposite, so it stays a card in its band. */
+#features, #download { background: var(--surface); }
 #features .fxp-tab.is-on { background: var(--bg); }
 #download .dlx-card { background: var(--bg); }
 #donate .donate {
   background: radial-gradient(55% 130% at 86% 50%, color-mix(in srgb, var(--heart) 24%, transparent), transparent 72%),
-    var(--bg); }
+    var(--surface); }
 #download .dlx-big.alt, #download .dlx.has-mine .dlx-card:not(.is-mine) .dlx-big { background: var(--surface); }
-#credits { padding: 72px 0; }
 footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0; }
 @media (max-width: 720px) {
   section { padding: 52px 0; }
-  #credits { padding: 52px 0; }
   .sec-head h2 { font-size: 1.75rem; }
 }
 @media (max-width: 860px) {
@@ -1461,15 +1393,12 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
      not under it: sections are shorter on top here than on a computer. */
   html { scroll-padding-top: 64px; }
   .hero .cta-row .btn.primary { min-width: 62%; justify-content: center; }
-  #features .sec-head p, .faq-grid .sec-head p,
-  #credits .sec-head p, .donate-text p, #shots .sec-head p { display: none; }
+  #features .sec-head p, .donate-text p, #shots .sec-head p { display: none; }
   .donate-text .donate-short { display: block; margin: 0 auto 4px; max-width: 34ch;
     font-size: 15px; line-height: 1.5; }
   .sec-head { margin-bottom: 18px; }
   .donate-act small { display: none; }
   .dl-phone p { font-size: 15px; }
-  .faq-grid { gap: 14px; }
-  .btn.ghost.faq-help { margin-top: 4px; }
 }
 
 /* ---- phones: still, not sliding ------------------------------------------ */

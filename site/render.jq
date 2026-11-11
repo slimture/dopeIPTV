@@ -400,11 +400,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
          {"@type": "WebSite", "@id": "\($SITE)/#website", "name": "dopeIPTV",
           "url": "\($SITE)/", "inLanguage": $lang,
           "publisher": {"@id": "\($SITE)/#org"}},
-         $app,
-         {"@type": "FAQPage", "@id": "\($SITE)/#faq",
-          "mainEntity": [range(1; 11) as $i
-            | {"@type": "Question", "name": t("faq_q\($i)"),
-               "acceptedAnswer": {"@type": "Answer", "text": t("faq_a\($i)")}}]}]}
+         $app]}
     | php_json;
   def page_index:
     ($R.version // "0.7.0" | tostring) as $version
