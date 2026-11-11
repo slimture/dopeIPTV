@@ -1,4 +1,8 @@
 User-agent: *
 Allow: /
 Disallow: /trakt/
+# Downloads are files, not pages: crawling them only fetches large binaries
+# and, for old versions no longer on the server, reports them as not found.
+Disallow: /dl.php
+Disallow: /files/
 Sitemap: https://iptv.dope.rs/sitemap.xml
