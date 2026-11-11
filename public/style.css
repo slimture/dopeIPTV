@@ -21,6 +21,7 @@
   --line: #333338; --line-2: #45454b; --text: #f5f5f7; --muted: #aeaeb4;
   --faint: #919197; --accent: #2997ff; --btn: #0071e3; --accent-ink: #fff;
   --live: #ff453a; --brand: #4c8dff; --wallet: #fff; --wallet-ink: #000; --heart: #ff375f;
+  --bar: #1e1e21; --bar-chip: #2c2c30;
   --radius: 22px; --maxw: 1080px;
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
   --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -41,6 +42,7 @@
   --line: #333338; --line-2: #45454b; --text: #f5f5f7; --muted: #aeaeb4;
   --faint: #919197; --accent: #2997ff; --btn: #0071e3; --accent-ink: #fff;
   --live: #ff453a; --wallet: #fff; --wallet-ink: #000; --heart: #ff375f; color-scheme: dark;
+  --bar: #1e1e21; --bar-chip: #2c2c30;
 }
 :root[data-theme="light"] {
   --ink: #f5f5f7; --bg: #fbfbfd; --surface: #f2f2f5; --surface-2: #fff;
@@ -70,7 +72,9 @@ img { max-width: 100%; display: block; }
    shade firmer than before - all white, the page was a glare and the bands
    hardly showed - and the bar in the bands' grey, not the page's white, so
    it stands apart from what scrolls under it. Its language button is white
-   on it (--bar, --bar-chip: light themes only; dark keeps its colours). */
+   on it (--bar, --bar-chip). The dark theme mirrors it: the bar a step
+   lighter than the page, in the bands' grey, its buttons a step lighter
+   again - in the page's own near-black it lay over the bands like a lid. */
 header.bar { position: sticky; top: 0; z-index: 20; backdrop-filter: saturate(180%) blur(20px);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   background: color-mix(in srgb, var(--bar, var(--bg)) 78%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
