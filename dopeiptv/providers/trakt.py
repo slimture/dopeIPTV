@@ -33,7 +33,7 @@ REDIRECT_URI = f"http://127.0.0.1:{OAUTH_PORT}/callback"
 # REDIRECT_URI above (website branch: deploy/content-iptv.dope.rs.conf).
 # Somebody's own app ("Development": its owner signs in) can use the
 # loopback address itself.
-WEB_REDIRECT_URI = "https://iptv.dope.rs/trakt/callback"
+WEB_REDIRECT_URI = "https://dopeiptv.org/trakt/callback"
 # The device-code sign-in has no redirect; Trakt's out-of-band URI stands in.
 OOB_REDIRECT_URI = "urn:ietf:wg:oauth:2.0:oob"
 # Where the device-code sign-in sends the user when Trakt does not say.
