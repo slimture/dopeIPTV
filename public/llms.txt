@@ -6,7 +6,7 @@ Key facts:
 
 - **What it is:** a desktop IPTV *player* (client), not an IPTV provider. It does not supply, sell or host any channels or content — the user connects their own Xtream Codes, M3U or Stalker portal provider.
 - **Licence & price:** free and open source under GPL-3.0. No ads, no tracking, no accounts.
-- **Platforms:** Linux (primary; AppImage and .deb for x86_64 and ARM64, Flatpak for x86_64), macOS (.dmg, Apple Silicon and Intel), Windows (portable build, x64 and ARM64).
+- **Platforms:** Linux (primary; AppImage and .deb for x86_64 and ARM64, Flatpak for x86_64, and the AUR package `dopeiptv` on Arch Linux), macOS (.dmg, Apple Silicon and Intel), Windows (portable build, x64 and ARM64).
 - **Playlists:** Xtream Codes (server + username + password), M3U / M3U8 URLs and Stalker / Ministra portals (portal URL + MAC address; experimental); multiple providers side by side. Free demo channels to try it without an account.
 - **Guide & timeshift:** full XMLTV EPG with now/next that keeps itself up to date; pause and rewind any live channel (minutes in memory, up to 6 hours on disk, or with dopeIPTV's own buffer, which keeps downloading while paused — experimental); catch-up into a provider's archive.
 - **Recording:** record the watched stream over a single connection, with timers, size limits and a Recordings library; with dopeIPTV's own buffer, recordings come from the buffer and stay whole while paused.
@@ -28,6 +28,7 @@ Key facts:
 
 - [GitHub repository](https://github.com/slimture/dopeIPTV): source code, issues and releases.
 - [Releases](https://github.com/slimture/dopeIPTV/releases): all downloadable builds and changelogs.
+- [AUR package](https://aur.archlinux.org/packages/dopeiptv): `dopeiptv` for Arch Linux, installed with an AUR helper such as yay.
 - [Readme / docs](https://github.com/slimture/dopeIPTV#readme): documentation and setup.
 - [Licence (GPL-3.0)](https://github.com/slimture/dopeIPTV/blob/main/LICENSE): licence text.
 
