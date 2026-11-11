@@ -31,10 +31,13 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Added
 
-- When the rewind buffer keeps losing its connection, the app says why:
-  the account's figures if the provider gives them ("all 1/1 connections
-  are in use - close the stream on your other device or app"), else that
-  another device or app on the account is the likely cause.
+- When a live channel keeps losing its connection, the app says why: the
+  account's figures if the provider gives them ("all 1/1 connections are
+  in use - close the stream on your other device or app"), else that
+  another device or app on the account is the likely cause. With the
+  rewind buffer on or off: without it, three drops within a minute of a
+  stream that was playing tell it. Shown once per channel; reconnecting
+  works as before.
 
 ## [1.4.3]
 

@@ -41,6 +41,7 @@ from ..services.coverart import CoverArtService
 from ..services.resume import ResumeStore
 from ..services.reminders import ReminderStore
 from ..media.players import embedded_playback_supported, launch_player
+from ..core.contest import ContestWatch
 from ..core.recording import RecordingManager
 from ..core.stores import (
     CategoryOverrides, ChannelOverrides, FavoriteStore, FollowedSeriesStore,
@@ -279,6 +280,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
         self._pending_jump_cat = None
         self._stream_retries = 0
         self._last_stream_error_ts = 0.0
+        self._contest = ContestWatch()
         self._cast_device: str | None = None   # device a cast is running on
         self._cast_paused_at = None            # when the cast was paused
         self._cast_behind = 0.0                # and how far behind live it is
@@ -5132,9 +5134,15 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _on_stream_contested(self) -> None:
         """The rewind buffer keeps losing its provider connection - a tug of
         war with another device or app on the account, which a player that
-        reconnects at once never ends by itself. Say so: the account's
-        figures when the provider gives them ("all 1/1 connections are in
-        use"), else what it looks like."""
+        reconnects at once never ends by itself."""
+        key = (getattr(self, "_last_playback", None) or {}).get("key")
+        if self._contest.claim(key):
+            self._tell_contested()
+
+    def _tell_contested(self) -> None:
+        """Say the account is being fought over: its figures when the
+        provider gives them ("all 1/1 connections are in use"), else what it
+        looks like."""
         from ..providers.diagnostics import account_reason
         client = self.client
 
@@ -5192,6 +5200,19 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self._set_status(msg, emphasis=True)
             self.player.set_overlay_info(msg)
             return
+        if reason == "eof":
+            # The provider ended a stream that was playing. Drops like that,
+            # over and over, are another device taking the account's
+            # connection - the rewind buffer has its own watch for the same
+            # thing. Only counted here; the reconnect below is unchanged.
+            try:
+                if self._contest.drop(lp.get("key"),
+                                      self.player.playback_position()):
+                    log.info("live stream keeps being dropped after playing: "
+                             "another device on the account?")
+                    self._tell_contested()
+            except Exception:
+                log.debug("contest watch failed", exc_info=True)
         now = time.time()
         if now - getattr(self, "_last_stream_error_ts", 0.0) > 20:
             self._stream_retries = 0

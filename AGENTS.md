@@ -57,6 +57,7 @@ map and the one-way import rule.
 | `core/selfupdate.py` | AppImage in-place update (download, checksum, self-check, swap) |
 | `core/wakelock.py` | Screensaver inhibitor |
 | `core/gcguard.py` | Cyclic garbage collection on the GUI thread only |
+| `core/contest.py` | `ContestWatch`: tells another device taking the account's connection from repeated drops |
 | `core/desktop_entry.py` | The user's .desktop entry and icons (Wayland takes the window icon from there) |
 | `core/xdg.py` | Launch system programs from a frozen bundle without our bundled libraries |
 | `core/audiotags.py` | Artist/album/title and cover art from music files, header-only |
@@ -185,7 +186,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   to a rotating file.
 - `mypy` type-checks the pure-logic layer — `providers/` (client, epg,
   epg_index, metadata, diagnostics, oauth_loopback, opensubtitles, dlna, stalker), `core/` (stores, local_buffer, dvr_store/ingest/server/session/pool/record, updates, log,
-  player_exec, wakelock, selfupdate, gcguard) and `services/` (resume,
+  player_exec, wakelock, selfupdate, gcguard, contest) and `services/` (resume,
   coverart, reminders, mpris, notify, popular) and `media/subtitle_text.py`; see `[tool.mypy] files` in `pyproject.toml`. The Qt UI is deliberately out of
   scope (the `mw_*` mixins reference shared `self.<attr>` across classes,
   which mypy reads in isolation as false `attr-defined` errors). Grow the list

@@ -77,6 +77,7 @@ files = [
     "dopeiptv/core/player_exec.py",
     "dopeiptv/core/wakelock.py",
     "dopeiptv/core/gcguard.py",
+    "dopeiptv/core/contest.py",
     "dopeiptv/services/resume.py",
     "dopeiptv/services/coverart.py",
     "dopeiptv/services/reminders.py",
