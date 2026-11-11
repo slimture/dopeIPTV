@@ -29,6 +29,12 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   next one instead of back to itself. The provider's small pieces go into
   the buffer in blocks, so the reading keeps up.
 
+### Changed
+
+- The app's homepage in its package metadata (software centres, Flathub, the
+  .deb, Python's project page) is iptv.dope.rs, with links to the help and
+  to donating; GitHub stays as the source code and issue tracker.
+
 ### Added
 
 - When a live channel keeps losing its connection, the app says why: the

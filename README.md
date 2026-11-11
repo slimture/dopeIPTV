@@ -1,5 +1,7 @@
 # dopeIPTV
 
+**Website, downloads and help: [iptv.dope.rs](https://iptv.dope.rs/?ref=github)**
+
 I was looking for a good IPTV-client on Linux but couldn't find one. So I built
 dopeIPTV based on what I think is a good IPTV-player. I think you will like it.
 

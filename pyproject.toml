@@ -24,6 +24,13 @@ dependencies = [
     "pychromecast>=13.0,<15",
 ]
 
+[project.urls]
+Homepage = "https://iptv.dope.rs/"
+Documentation = "https://iptv.dope.rs/help/"
+Source = "https://github.com/slimture/dopeIPTV"
+Issues = "https://github.com/slimture/dopeIPTV/issues"
+Donate = "https://iptv.dope.rs/#donate"
+
 [project.scripts]
 dopeiptv = "dopeiptv.app:main"
 
