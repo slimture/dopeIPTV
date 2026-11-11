@@ -209,7 +209,7 @@ h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -.03em; line-height:
 .feat p { margin: 6px 0 0; color: var(--muted); font-size: 15.5px; line-height: 1.5; }
 .shots { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
 @media (max-width: 720px) { .shots { grid-template-columns: 1fr; } }
-.shot { border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+.shot { border-radius: 12px; overflow: hidden; background: var(--surface); }
 .shot img { width: 100%; height: auto; display: block; cursor: zoom-in; }
 .shot .ph { aspect-ratio: 16/10; width: 100%; display: grid; place-items: center; color: var(--faint); font-size: 12px; font-weight: 700; letter-spacing: .08em;
   background: linear-gradient(135deg, var(--surface-2), var(--ink)); }
