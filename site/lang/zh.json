@@ -158,7 +158,7 @@
     "help_about_systems_q": "dopeIPTV 支持哪些操作系统？",
     "help_about_systems_a": "<p>dopeIPTV 为 Linux 打造，也能在 macOS 和 Windows 上运行。Linux 提供 AppImage 和 .deb（x86_64 和 ARM64）以及 Flatpak；macOS 提供 Apple Silicon 和 Intel Mac 各一个 .dmg；Windows 提供 x64 和 ARM64 便携版。</p>",
     "help_about_languages_q": "dopeIPTV 提供哪些语言？",
-    "help_about_languages_a": "<p>除英语外，dopeIPTV 还提供 26 种语言，包括西班牙语、德语、法语、阿拉伯语、印地语、中文和日语，并为阿拉伯语、希伯来语、波斯语和乌尔都语提供从右到左的文字显示。</p>",
+    "help_about_languages_a": "<p>dopeIPTV 提供以下 27 种语言。阿拉伯语、希伯来语、波斯语和乌尔都语会将整个界面改为从右到左。</p>%LANGS%",
     "help_tech_title": "幕后技术",
     "help_tech_built_q": "dopeIPTV 是用什么构建的？",
     "help_tech_built_a": "<p>dopeIPTV 是基于 GPL-3.0 许可证的<b>自由开源软件</b>——没有广告，没有跟踪，没有账户。它构建于以下项目和服务之上，并对它们心怀感激：</p><ul><li><b>播放</b> — <a href=\"https://mpv.io\" rel=\"noopener\">mpv</a> &amp; <a href=\"https://ffmpeg.org\" rel=\"noopener\">FFmpeg</a>, via python-mpv</li><li><b>界面</b> — Qt &amp; <a href=\"https://www.riverbankcomputing.com/software/pyqt/\" rel=\"noopener\">PyQt6</a></li><li><b>投屏</b> — <a href=\"https://github.com/home-assistant-libs/pychromecast\" rel=\"noopener\">PyChromecast</a> — Google Cast</li><li><b>元数据与图片</b> — <a href=\"https://www.themoviedb.org\" rel=\"noopener\">The Movie Database (TMDB)</a></li><li><b>观看记录同步</b> — <a href=\"https://trakt.tv\" rel=\"noopener\">Trakt</a></li><li><b>许可证</b> — <a href=\"https://github.com/slimture/dopeIPTV/blob/main/docs/THIRD-PARTY-LICENSES.md\" rel=\"noopener\">GPL-3.0 与第三方</a></li></ul><p class=\"fine\">本产品使用 TMDB API，但未获得 TMDB 的认可或认证。本产品使用 Trakt API，但未获得 Trakt 的认可或认证。所有商标均为其各自所有者的财产。</p>",

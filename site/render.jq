@@ -436,6 +436,13 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 
 # -- help/index.php --------------------------------------------------------------
 
+  # Every language of the site, each in its own name - the answer to "which
+  # languages?" lists them all ("%LANGS%" in its text), in i18n.json's order.
+  def langlist:
+    "<ul class=\"langlist\">"
+    + ([$S.names | to_entries[] | select(.key as $k | $avail | index($k) != null)
+        | "<li lang=\"\(.key | h)\"><bdi>\(.value | h)</bdi></li>"] | join(""))
+    + "</ul>";
   def page_help:
     ($R.version // "" | tostring) as $version
     | $tpl
@@ -452,7 +459,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
                  | "\($sec)-\($tp)" as $id
                  | "            <details class=\"help-item\" id=\"\($id | h)\">\n"
                    + "              <summary><h3>\($q | h)</h3></summary>\n"
-                   + "              <div class=\"help-a\">\(t("help_\($sec)_\($tp)_a"))"
+                   + "              <div class=\"help-a\">\(t("help_\($sec)_\($tp)_a") | gsub("%LANGS%"; langlist))"
                    # The settings page the answer is about, as the app shows
                    # it in the reader's language (tools/help_screenshots.py
                    # in the app's repository). Inside a closed <details>,
