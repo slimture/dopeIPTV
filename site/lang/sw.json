@@ -155,7 +155,7 @@
     "help_about_what_q": "dopeIPTV ni nini?",
     "help_about_what_a": "<p>dopeIPTV ni kicheza IPTV cha kompyuta, bila malipo na cha chanzo huria, kwa orodha za Xtream Codes na M3U. Kinatoa mwongozo kamili wa EPG, timeshift wakati wa matangazo ya moja kwa moja na catch-up TV, kurekodi kwa mbofyo mmoja, na multiview kwa hadi chaneli tisa kwa wakati mmoja — vyote katika programu asilia moja iliyojengwa juu ya mpv.</p>",
     "help_about_free_q": "Je, dopeIPTV ni bure?",
-    "help_about_free_a": "<p>Ndiyo. dopeIPTV ni bila malipo kabisa na chanzo huria chini ya leseni ya GPL-3.0, bila matangazo, bila kufuatilia, na bila kuhitaji akaunti.</p>",
+    "help_about_free_a": "<p>Ndiyo. dopeIPTV ni bila malipo kabisa na chanzo huria chini ya leseni ya GPL-3.0, bila matangazo, bila kufuatilia, na bila kuhitaji akaunti.</p><p>Ikiwa unaipenda programu, <a href=\"%DONATE%\" rel=\"nofollow noopener\">mchango</a> wa kiasi chochote unathaminiwa sana na husaidia iendelee.</p>",
     "help_about_channels_q": "Je, dopeIPTV hutoa chaneli za IPTV au usajili?",
     "help_about_channels_a": "<p>Hapana. dopeIPTV ni kicheza tu — haitoi, kuuza wala kupangisha chaneli au maudhui yoyote. Unaunganisha mtoa huduma wako mwenyewe: Xtream Codes, M3U au Stalker.</p>",
     "help_about_systems_q": "dopeIPTV inasaidia mifumo gani ya uendeshaji?",

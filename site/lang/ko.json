@@ -155,7 +155,7 @@
     "help_about_what_q": "dopeIPTV란 무엇인가요?",
     "help_about_what_a": "<p>dopeIPTV는 Xtream Codes 및 M3U 재생 목록을 위한 무료 오픈 소스 데스크톱 IPTV 플레이어입니다. 전체 EPG 가이드, 라이브 타임시프트와 다시보기, 원클릭 녹화, 최대 9개 채널 동시 멀티뷰를 mpv 기반의 하나의 네이티브 앱에서 제공합니다.</p>",
     "help_about_free_q": "dopeIPTV는 무료인가요?",
-    "help_about_free_a": "<p>네. dopeIPTV는 GPL-3.0 라이선스 하에 완전히 무료이며 오픈 소스입니다. 광고 없음, 추적 없음, 계정 불필요.</p>",
+    "help_about_free_a": "<p>네. dopeIPTV는 GPL-3.0 라이선스 하에 완전히 무료이며 오픈 소스입니다. 광고 없음, 추적 없음, 계정 불필요.</p><p>앱이 마음에 드신다면 금액에 상관없이 <a href=\"%DONATE%\" rel=\"nofollow noopener\">후원</a>해 주시면 큰 힘이 됩니다.</p>",
     "help_about_channels_q": "dopeIPTV가 IPTV 채널이나 구독을 제공하나요?",
     "help_about_channels_a": "<p>아니요. dopeIPTV는 플레이어일 뿐입니다. 어떤 채널이나 콘텐츠도 제공, 판매, 호스팅하지 않습니다. 사용자가 직접 제공업체(Xtream Codes, M3U 또는 Stalker)를 연결합니다.</p>",
     "help_about_systems_q": "dopeIPTV는 어떤 운영체제를 지원하나요?",

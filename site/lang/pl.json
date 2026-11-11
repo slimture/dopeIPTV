@@ -155,7 +155,7 @@
     "help_about_what_q": "Czym jest dopeIPTV?",
     "help_about_what_a": "<p>dopeIPTV to darmowy, otwartoźródłowy odtwarzacz IPTV na komputer dla playlist Xtream Codes i M3U. Oferuje pełny przewodnik EPG, timeshift na żywo i catch-up, nagrywanie jednym kliknięciem oraz multiview dla maksymalnie dziewięciu kanałów naraz — wszystko w natywnej aplikacji opartej na mpv.</p>",
     "help_about_free_q": "Czy dopeIPTV jest darmowy?",
-    "help_about_free_a": "<p>Tak. dopeIPTV jest całkowicie darmowy i otwartoźródłowy na licencji GPL-3.0, bez reklam, bez śledzenia i bez konta.</p>",
+    "help_about_free_a": "<p>Tak. dopeIPTV jest całkowicie darmowy i otwartoźródłowy na licencji GPL-3.0, bez reklam, bez śledzenia i bez konta.</p><p>Jeśli lubisz aplikację, każda <a href=\"%DONATE%\" rel=\"nofollow noopener\">darowizna</a>, niezależnie od kwoty, jest mile widziana i pomaga ją rozwijać.</p>",
     "help_about_channels_q": "Czy dopeIPTV udostępnia kanały IPTV lub subskrypcję?",
     "help_about_channels_a": "<p>Nie. dopeIPTV to tylko odtwarzacz — nie udostępnia, nie sprzedaje ani nie hostuje żadnych kanałów ani treści. Podłączasz własnego dostawcę: Xtream Codes, M3U lub Stalker.</p>",
     "help_about_systems_q": "Jakie systemy operacyjne obsługuje dopeIPTV?",

@@ -155,7 +155,7 @@
     "help_about_what_q": "Što je dopeIPTV?",
     "help_about_what_a": "<p>dopeIPTV je besplatan IPTV player otvorenog koda za stolna računala, za Xtream Codes i M3U popise. Nudi potpuni EPG vodič, timeshift uživo i catch-up TV, snimanje jednim klikom te multiview za do devet kanala istovremeno — sve u jednoj izvornoj aplikaciji izgrađenoj na mpv-u.</p>",
     "help_about_free_q": "Je li dopeIPTV besplatan?",
-    "help_about_free_a": "<p>Da. dopeIPTV je potpuno besplatan i otvorenog koda pod licencom GPL-3.0, bez oglasa, bez praćenja i bez računa.</p>",
+    "help_about_free_a": "<p>Da. dopeIPTV je potpuno besplatan i otvorenog koda pod licencom GPL-3.0, bez oglasa, bez praćenja i bez računa.</p><p>Ako vam se aplikacija sviđa, <a href=\"%DONATE%\" rel=\"nofollow noopener\">donacija</a> bilo kojeg iznosa uvijek je dobrodošla i pomaže da se nastavi razvijati.</p>",
     "help_about_channels_q": "Pruža li dopeIPTV IPTV kanale ili pretplatu?",
     "help_about_channels_a": "<p>Ne. dopeIPTV je samo player — ne pruža, ne prodaje niti hostira nikakve kanale ili sadržaj. Povezujete vlastitog pružatelja: Xtream Codes, M3U ili Stalker.</p>",
     "help_about_systems_q": "Koje operativne sustave podržava dopeIPTV?",

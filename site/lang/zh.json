@@ -155,7 +155,7 @@
     "help_about_what_q": "什么是 dopeIPTV？",
     "help_about_what_a": "<p>dopeIPTV 是一款面向 Xtream Codes 和 M3U 播放列表的免费开源桌面 IPTV 播放器。它提供完整的 EPG 节目指南、直播时移与回看、一键录制，以及最多九个频道同时观看的多画面——全部集成在一个基于 mpv 的原生应用中。</p>",
     "help_about_free_q": "dopeIPTV 免费吗？",
-    "help_about_free_a": "<p>是的。dopeIPTV 在 GPL-3.0 许可证下完全免费且开源，没有广告、没有跟踪，也无需账户。</p>",
+    "help_about_free_a": "<p>是的。dopeIPTV 在 GPL-3.0 许可证下完全免费且开源，没有广告、没有跟踪，也无需账户。</p><p>如果你喜欢这个应用，欢迎任意金额的<a href=\"%DONATE%\" rel=\"nofollow noopener\">捐助</a>，这能帮助它继续下去。</p>",
     "help_about_channels_q": "dopeIPTV 提供 IPTV 频道或订阅吗？",
     "help_about_channels_a": "<p>不提供。dopeIPTV 只是一个播放器——它不提供、不销售也不托管任何频道或内容。你需要连接自己的服务商：Xtream Codes、M3U 或 Stalker。</p>",
     "help_about_systems_q": "dopeIPTV 支持哪些操作系统？",

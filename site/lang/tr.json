@@ -155,7 +155,7 @@
     "help_about_what_q": "dopeIPTV nedir?",
     "help_about_what_a": "<p>dopeIPTV, Xtream Codes ve M3U listeleri için ücretsiz, açık kaynaklı bir masaüstü IPTV oynatıcısıdır. Tam EPG rehberi, canlı yayında timeshift ve catch-up, tek tıkla kayıt ve aynı anda dokuz kanala kadar multiview sunar — hepsi mpv üzerine kurulu yerel bir uygulamada.</p>",
     "help_about_free_q": "dopeIPTV ücretsiz mi?",
-    "help_about_free_a": "<p>Evet. dopeIPTV, GPL-3.0 lisansı altında tamamen ücretsiz ve açık kaynaklıdır; reklam yok, takip yok ve hesap gerekmez.</p>",
+    "help_about_free_a": "<p>Evet. dopeIPTV, GPL-3.0 lisansı altında tamamen ücretsiz ve açık kaynaklıdır; reklam yok, takip yok ve hesap gerekmez.</p><p>Uygulamayı beğendiyseniz, her tutarda bir <a href=\"%DONATE%\" rel=\"nofollow noopener\">bağış</a> çok makbule geçer ve onun yaşamasına yardım eder.</p>",
     "help_about_channels_q": "dopeIPTV IPTV kanalları veya abonelik sağlar mı?",
     "help_about_channels_a": "<p>Hayır. dopeIPTV yalnızca bir oynatıcıdır — hiçbir kanal veya içerik sağlamaz, satmaz ya da barındırmaz. Kendi sağlayıcınızı bağlarsınız: Xtream Codes, M3U veya Stalker.</p>",
     "help_about_systems_q": "dopeIPTV hangi işletim sistemlerini destekler?",

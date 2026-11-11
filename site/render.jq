@@ -441,6 +441,8 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 
   # Every language of the site, each in its own name - the answer to "which
   # languages?" lists them all ("%LANGS%" in its text), in i18n.json's order.
+  # "%DONATE%" in an answer is the donate link, which nav.js opens as the
+  # dialog, like the heart's.
   def langlist:
     "<ul class=\"langlist\">"
     + ([$S.names | to_entries[] | select(.key as $k | $avail | index($k) != null)
@@ -462,7 +464,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
                  | "\($sec)-\($tp)" as $id
                  | "            <details class=\"help-item\" id=\"\($id | h)\">\n"
                    + "              <summary><h3>\($q | h)</h3></summary>\n"
-                   + "              <div class=\"help-a\">\(t("help_\($sec)_\($tp)_a") | gsub("%LANGS%"; langlist))"
+                   + "              <div class=\"help-a\">\(t("help_\($sec)_\($tp)_a") | gsub("%LANGS%"; langlist) | gsub("%DONATE%"; (if $DONATE == "" then "/#donate" else $DONATE | h end)))"
                    # The settings page the answer is about, as the app shows
                    # it in the reader's language (tools/help_screenshots.py
                    # in the app's repository). Inside a closed <details>,

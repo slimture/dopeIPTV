@@ -155,7 +155,7 @@
     "help_about_what_q": "Vad är dopeIPTV?",
     "help_about_what_a": "<p>dopeIPTV är en gratis IPTV-spelare med öppen källkod för Xtream Codes- och M3U-spellistor. Du får en komplett EPG-guide, timeshift och catch-up, inspelning med ett klick och multiview för upp till nio kanaler samtidigt — allt i en och samma app, byggd på mpv.</p>",
     "help_about_free_q": "Är dopeIPTV gratis?",
-    "help_about_free_a": "<p>Ja. dopeIPTV är helt gratis och har öppen källkod under GPL-3.0-licensen, utan annonser, utan spårning och utan konto.</p>",
+    "help_about_free_a": "<p>Ja. dopeIPTV är helt gratis och har öppen källkod under GPL-3.0-licensen, utan annonser, utan spårning och utan konto.</p><p>Om du gillar appen uppskattas en <a href=\"%DONATE%\" rel=\"nofollow noopener\">donation</a> mycket, oavsett belopp. Den hjälper till att hålla appen igång.</p>",
     "help_about_channels_q": "Tillhandahåller dopeIPTV IPTV-kanaler eller ett abonnemang?",
     "help_about_channels_a": "<p>Nej. dopeIPTV är bara en spelare — den tillhandahåller, säljer eller lagrar inga kanaler eller annat innehåll. Du ansluter din egen leverantör: Xtream Codes, M3U eller Stalker.</p>",
     "help_about_systems_q": "Vilka operativsystem stöder dopeIPTV?",

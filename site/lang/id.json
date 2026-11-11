@@ -155,7 +155,7 @@
     "help_about_what_q": "Apa itu dopeIPTV?",
     "help_about_what_a": "<p>dopeIPTV adalah pemutar IPTV desktop gratis dan open source untuk daftar putar Xtream Codes dan M3U. Aplikasi ini menyediakan panduan EPG lengkap, timeshift siaran langsung dan TV catch-up, perekaman satu klik, serta multiview hingga sembilan saluran sekaligus — semuanya dalam satu aplikasi native berbasis mpv.</p>",
     "help_about_free_q": "Apakah dopeIPTV gratis?",
-    "help_about_free_a": "<p>Ya. dopeIPTV sepenuhnya gratis dan open source di bawah lisensi GPL-3.0, tanpa iklan, tanpa pelacakan, dan tanpa perlu akun.</p>",
+    "help_about_free_a": "<p>Ya. dopeIPTV sepenuhnya gratis dan open source di bawah lisensi GPL-3.0, tanpa iklan, tanpa pelacakan, dan tanpa perlu akun.</p><p>Jika Anda menyukai aplikasi ini, <a href=\"%DONATE%\" rel=\"nofollow noopener\">donasi</a> berapa pun sangat kami hargai dan membantu agar tetap berjalan.</p>",
     "help_about_channels_q": "Apakah dopeIPTV menyediakan saluran IPTV atau langganan?",
     "help_about_channels_a": "<p>Tidak. dopeIPTV hanya pemutar — aplikasi ini tidak menyediakan, menjual, atau meng-host saluran atau konten apa pun. Anda menghubungkan penyedia Anda sendiri: Xtream Codes, M3U, atau Stalker.</p>",
     "help_about_systems_q": "Sistem operasi apa yang didukung dopeIPTV?",

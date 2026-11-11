@@ -155,7 +155,7 @@
     "help_about_what_q": "dopeIPTV là gì?",
     "help_about_what_a": "<p>dopeIPTV là trình phát IPTV miễn phí, mã nguồn mở cho máy tính, dùng với danh sách phát Xtream Codes và M3U. Ứng dụng có lịch phát sóng EPG đầy đủ, timeshift khi xem trực tiếp và xem lại, ghi hình một chạm và multiview tới chín kênh cùng lúc — tất cả trong một ứng dụng gốc dựa trên mpv.</p>",
     "help_about_free_q": "dopeIPTV có miễn phí không?",
-    "help_about_free_a": "<p>Có. dopeIPTV hoàn toàn miễn phí và mã nguồn mở theo giấy phép GPL-3.0, không quảng cáo, không theo dõi và không cần tài khoản.</p>",
+    "help_about_free_a": "<p>Có. dopeIPTV hoàn toàn miễn phí và mã nguồn mở theo giấy phép GPL-3.0, không quảng cáo, không theo dõi và không cần tài khoản.</p><p>Nếu bạn thích ứng dụng, một khoản <a href=\"%DONATE%\" rel=\"nofollow noopener\">ủng hộ</a> bất kỳ luôn được trân trọng và giúp nó tiếp tục.</p>",
     "help_about_channels_q": "dopeIPTV có cung cấp kênh IPTV hoặc gói đăng ký không?",
     "help_about_channels_a": "<p>Không. dopeIPTV chỉ là một trình phát — không cung cấp, bán hay lưu trữ bất kỳ kênh hoặc nội dung nào. Bạn tự kết nối nhà cung cấp của mình: Xtream Codes, M3U hoặc Stalker.</p>",
     "help_about_systems_q": "dopeIPTV hỗ trợ những hệ điều hành nào?",

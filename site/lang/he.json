@@ -155,7 +155,7 @@
     "help_about_what_q": "מה זה dopeIPTV?",
     "help_about_what_a": "<p>dopeIPTV הוא נגן IPTV שולחני חינמי בקוד פתוח לרשימות השמעה של Xtream Codes ו-M3U. הוא מציע מדריך EPG מלא, טיימשיפט לשידור החי וצפייה לאחור, הקלטה בלחיצה אחת וריבוי מסכים — עד תשעה ערוצים בו-זמנית — הכול באפליקציה מקורית אחת הבנויה על mpv.</p>",
     "help_about_free_q": "האם dopeIPTV חינמי?",
-    "help_about_free_a": "<p>כן. dopeIPTV חינמי לחלוטין וקוד פתוח תחת רישיון GPL-3.0, ללא פרסומות, ללא מעקב וללא צורך בחשבון.</p>",
+    "help_about_free_a": "<p>כן. dopeIPTV חינמי לחלוטין וקוד פתוח תחת רישיון GPL-3.0, ללא פרסומות, ללא מעקב וללא צורך בחשבון.</p><p>אם האפליקציה מוצאת חן בעיניכם, <a href=\"%DONATE%\" rel=\"nofollow noopener\">תרומה</a> בכל סכום תתקבל בברכה ותעזור להמשיך אותה.</p>",
     "help_about_channels_q": "האם dopeIPTV מספק ערוצי IPTV או מנוי?",
     "help_about_channels_a": "<p>לא. dopeIPTV הוא נגן בלבד — הוא אינו מספק, מוכר או מארח ערוצים או תוכן כלשהם. אתם מחברים את הספק שלכם: Xtream Codes,‏ M3U או Stalker.</p>",
     "help_about_systems_q": "אילו מערכות הפעלה dopeIPTV תומך בהן?",

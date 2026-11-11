@@ -155,7 +155,7 @@
     "help_about_what_q": "dopeIPTV とは？",
     "help_about_what_a": "<p>dopeIPTV は、Xtream Codes と M3U のプレイリストに対応した無料・オープンソースのデスクトップ IPTV プレーヤーです。フル EPG ガイド、ライブタイムシフトとキャッチアップ TV、ワンクリック録画、最大 9 チャンネル同時のマルチビューを、mpv エンジン上に構築した 1 つのネイティブアプリで提供します。</p>",
     "help_about_free_q": "dopeIPTV は無料ですか？",
-    "help_about_free_a": "<p>はい。dopeIPTV は GPL-3.0 ライセンスのもと完全に無料でオープンソースです。広告なし、追跡なし、アカウント不要です。</p>",
+    "help_about_free_a": "<p>はい。dopeIPTV は GPL-3.0 ライセンスのもと完全に無料でオープンソースです。広告なし、追跡なし、アカウント不要です。</p><p>アプリを気に入っていただけたなら、金額を問わず<a href=\"%DONATE%\" rel=\"nofollow noopener\">寄付</a>は大歓迎です。開発を続ける助けになります。</p>",
     "help_about_channels_q": "dopeIPTV は IPTV チャンネルや契約を提供しますか？",
     "help_about_channels_a": "<p>いいえ。dopeIPTV はプレーヤーにすぎません。チャンネルやコンテンツを提供・販売・ホストすることはありません。ご自身のプロバイダー（Xtream Codes、M3U、Stalker）を接続して使います。</p>",
     "help_about_systems_q": "dopeIPTV はどの OS に対応していますか？",
