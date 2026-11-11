@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """donate.py - the one piece of the site that is not static.
 
-The donate dialog on iptv.dope.rs takes the payment on the page itself:
+The donate dialog on dopeiptv.org takes the payment on the page itself:
 Stripe's card form (the Payment Element), in Stripe's iframes, on our page,
 and Apple Pay / Google Pay in the wallet's own sheet. Both pay a
 PaymentIntent, and only a server holding the secret key can make one - this
@@ -205,8 +205,8 @@ COUNTRY = CONF.get("DONATE_COUNTRY", "SE").upper()
 NAME = CONF.get("DONATE_NAME", "Support dopeIPTV")
 PMC = [CONF.get("DONATE_PMC", "").strip()]        # emptied if Stripe refuses it
 SUFFIX = [CONF.get("DONATE_SUFFIX", "DOPEIPTV").strip()[:22]]   # likewise
-RETURN_URL = CONF.get("DONATE_RETURN_URL", "https://iptv.dope.rs/?donated=1#donate")
-ORIGIN = CONF.get("DONATE_ORIGIN", "https://iptv.dope.rs").rstrip("/")
+RETURN_URL = CONF.get("DONATE_RETURN_URL", "https://dopeiptv.org/?donated=1#donate")
+ORIGIN = CONF.get("DONATE_ORIGIN", "https://dopeiptv.org").rstrip("/")
 PUBLISHABLE = CONF.get("STRIPE_PUBLISHABLE_KEY", "")
 API_VERSION = CONF.get("STRIPE_API_VERSION", "")
 

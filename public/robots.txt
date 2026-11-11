@@ -5,4 +5,4 @@ Disallow: /trakt/
 # and, for old versions no longer on the server, reports them as not found.
 Disallow: /dl.php
 Disallow: /files/
-Sitemap: https://iptv.dope.rs/sitemap.xml
+Sitemap: https://dopeiptv.org/sitemap.xml

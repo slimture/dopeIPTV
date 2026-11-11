@@ -21,7 +21,7 @@
 
 $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 | ($rel[0] // {}) as $R | ($dl[0] // {}) as $D | $helpfile[0] as $HELP
-| "https://iptv.dope.rs" as $SITE | "https://github.com/slimture/dopeIPTV" as $REPO
+| "https://dopeiptv.org" as $SITE | "https://github.com/slimture/dopeIPTV" as $REPO
 # The donate button's address: a Stripe Payment Link (donate.stripe.com/...
 # or buy.stripe.com/...). nav.js opens the donate dialog over it (paid
 # through donate/donate.py); the link itself is what a click does without

@@ -425,7 +425,7 @@
     }
     const sites = listCard("Sites that linked here", L.refs, (k) => k === "other" ? "Other sites" : k,
                            ["Tagged links", L.sources]);
-    sites.append(mk("p", "muted", "Tagged links carry ?ref=name, e.g. iptv.dope.rs/?ref=github."));
+    sites.append(mk("p", "muted", "Tagged links carry ?ref=name, e.g. dopeiptv.org/?ref=github."));
     // In three groups, by the question each answers.
     $("lists").replaceChildren(
       group("Where they come from", [listCard("How they found the site", L.channels), sites, countries]),

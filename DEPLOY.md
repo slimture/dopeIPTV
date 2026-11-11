@@ -523,3 +523,74 @@ C=/usr/local/bastille/jails/pontusweb/root/usr/local/etc/nginx/conf.d/iptv.dope.
 cp /root/iptv-static/deploy/content-iptv.dope.rs.conf "$C"
 bastille cmd pontusweb nginx -t && bastille cmd pontusweb service nginx reload
 ```
+
+## Moving to dopeiptv.org
+
+The site's address is dopeiptv.org; iptv.dope.rs sends every request on to
+the same path there, permanently. Keep the old name and its certificate
+for good: older versions of the app, links out on the web and search
+engines still use it. The content server's file keeps its name
+(`content-iptv.dope.rs.conf`) and so do the logs.
+
+**1. DNS (registrar).** `dopeiptv.org` and `www.dopeiptv.org`: the same A
+(and AAAA, if it has one) as `iptv.dope.rs`.
+
+**2. A certificate (the TLS-front proxy).** Before the site moves,
+plain http:// on the new names only has to answer certbot. Put this in
+`/usr/local/etc/nginx/conf.d/dopeiptv.org.conf`:
+
+```nginx
+server {
+    listen 0.0.0.0:80;
+    server_name dopeiptv.org www.dopeiptv.org;
+    location /.well-known/acme-challenge/ { root /usr/local/www/letsencrypt; }
+    location / { return 302 https://iptv.dope.rs$request_uri; }
+}
+```
+
+```sh
+nginx -t && service nginx reload
+certbot certonly --webroot -w /usr/local/www/letsencrypt -d dopeiptv.org -d www.dopeiptv.org
+```
+
+**3. The site (jail).** The usual deploy - the pages now name dopeiptv.org
+as their address - then the content server's file (`server_name` gains
+dopeiptv.org):
+
+```sh
+diff /usr/local/etc/nginx/conf.d/iptv.dope.rs.conf ~/dopeiptv/deploy/content-iptv.dope.rs.conf
+cp /usr/local/etc/nginx/conf.d/iptv.dope.rs.conf /root/iptv.dope.rs.conf.bak
+cp ~/dopeiptv/deploy/content-iptv.dope.rs.conf /usr/local/etc/nginx/conf.d/iptv.dope.rs.conf
+nginx -t && service nginx reload
+```
+
+In `/usr/local/etc/iptv-donate.conf`, `DONATE_ORIGIN`, `DONATE_RETURN_URL`
+and `SITE_HOST` - if they are set there at all - must name dopeiptv.org
+(or go: the defaults are the new ones), then `service iptv_donate restart`.
+
+**4. The switch (the TLS-front proxy).** `deploy/proxy-dopeiptv.org.conf`
+replaces the file from step 2: the proxy's own iptv.dope.rs file with the
+new name and certificate, plus www and plain http:// sent on. The
+`"dopeiptv.org"` row in `/usr/local/etc/nginx/csp-map.conf` is a copy of
+the `"iptv.dope.rs"` one. Then the old file's server sends everything on
+(`deploy/proxy-iptv.dope.rs.conf`; its certificate lines stay). Reload
+after each with `nginx -t && service nginx reload`.
+
+**5. Outside the server.**
+- Stripe, Settings -> Payment method domains: add dopeiptv.org (Apple Pay
+  is shown only on a registered domain).
+- Trakt, the API app's settings: add `https://dopeiptv.org/trakt/callback`
+  as a redirect URI and keep the old one - released apps still send it.
+- The admin page: sign in again at dopeiptv.org/admin/ and turn push
+  notifications on again; both belong to the old address.
+- Search Console: add dopeiptv.org (a Domain property, verified by a DNS
+  TXT record), submit `https://dopeiptv.org/sitemap.xml`, then in the
+  iptv.dope.rs property Settings -> Change of address -> dopeiptv.org.
+  Bing Webmaster Tools has the same (Site Move).
+- GitHub's About, Wikidata, AlternativeTo, awesome-iptv, solecraft.se.
+
+**Check:** `curl -sI https://iptv.dope.rs/help/?lang=sv` answers `301` with
+`location: https://dopeiptv.org/help/?lang=sv`; the same for http://, for
+`/dl.php?f=...` and for `/trakt/callback?code=x`; https://dopeiptv.org/ shows
+the page with a `canonical` of https://dopeiptv.org/; a donation goes
+through, with Apple Pay on an iPhone.

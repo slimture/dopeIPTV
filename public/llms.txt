@@ -17,12 +17,12 @@ Key facts:
 
 ## Main pages
 
-- [Home / overview](https://iptv.dope.rs/): features, screenshots and downloads.
-- [Features](https://iptv.dope.rs/#features): EPG, timeshift & catch-up, pause live TV, recording, multiview, multi-provider, playback, local files, casting to TVs, subtitles, media keys, following a series.
-- [Download](https://iptv.dope.rs/#download): latest builds for Linux, macOS and Windows, generated from the GitHub releases.
-- [About dopeIPTV](https://iptv.dope.rs/help/#about): short answers to common questions - what it is, whether it is free, where channels come from, systems and languages.
-- [Troubleshooting](https://iptv.dope.rs/help/#fix): common problems and how to fix them (sign-in, expired subscription, connection limit, another device on the account, VPN blocks).
-- [Help](https://iptv.dope.rs/help/): setup (Xtream, M3U, Stalker portals), playback, rewinding live TV, the guide, timeshift, recording, multiview, casting, Home, test builds and troubleshooting.
+- [Home / overview](https://dopeiptv.org/): features, screenshots and downloads.
+- [Features](https://dopeiptv.org/#features): EPG, timeshift & catch-up, pause live TV, recording, multiview, multi-provider, playback, local files, casting to TVs, subtitles, media keys, following a series.
+- [Download](https://dopeiptv.org/#download): latest builds for Linux, macOS and Windows, generated from the GitHub releases.
+- [About dopeIPTV](https://dopeiptv.org/help/#about): short answers to common questions - what it is, whether it is free, where channels come from, systems and languages.
+- [Troubleshooting](https://dopeiptv.org/help/#fix): common problems and how to fix them (sign-in, expired subscription, connection limit, another device on the account, VPN blocks).
+- [Help](https://dopeiptv.org/help/): setup (Xtream, M3U, Stalker portals), playback, rewinding live TV, the guide, timeshift, recording, multiview, casting, Home, test builds and troubleshooting.
 
 ## Source & documentation
 

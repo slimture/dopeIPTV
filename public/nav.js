@@ -1076,7 +1076,7 @@ var iptvHit = (function () {
     build(); show(el.done); dlg.showModal();
   } else if (window.location.hash === "#donate") {
     // A link from elsewhere to the donate section - GitHub's Sponsor button,
-    // the README, the release notes: iptv.dope.rs/#donate - opens the dialog.
+    // the README, the release notes: dopeiptv.org/#donate - opens the dialog.
     open();
   }
 })();

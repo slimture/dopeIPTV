@@ -97,7 +97,11 @@ SITE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # /usr/loca
 STATS_DIR = CONF.get("STATS_DIR", os.path.join(SITE, "stats"))
 STATS_LOG = CONF.get("STATS_LOG", "/var/log/nginx/iptv.dope.rs-stats.log")
 DL_LOG = CONF.get("DL_LOG", "/var/log/nginx/iptv.dope.rs-downloads.log")
-SITE_HOST = CONF.get("SITE_HOST", "iptv.dope.rs")
+# The site's own names: a referrer from any of them is no referrer. The old
+# iptv.dope.rs only sends visitors on, but a page opened there before the move
+# can still report a view.
+SITE_HOSTS = {h.strip().lower() for h in CONF.get(
+    "SITE_HOST", "dopeiptv.org,www.dopeiptv.org,iptv.dope.rs").split(",") if h.strip()}
 GEO_DB = CONF.get("GEO_DB", os.path.join(STATS_DIR, "dbip-country-lite.mmdb"))
 GEO_URL = "https://download.db-ip.com/free/dbip-country-lite-{month}.mmdb.gz"
 KEEP_UNIQUE_DAYS = 761    # the visitor hashes: 25 months, a year against the year before
@@ -589,7 +593,7 @@ def _page_line(stats: dict, uniques: dict, state: dict, r: dict, db, visits: Vis
     d["views"] += 1
     _bump(d["pages"], page)
     host = referrer_host(q.get("r", ""))
-    if host == SITE_HOST:
+    if host in SITE_HOSTS:
         host = ""
     src = re.sub(r"[^\w.-]", "", q.get("s", ""))[:40].lower()
     if visit is None:                           # a new visit
