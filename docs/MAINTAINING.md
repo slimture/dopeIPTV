@@ -156,6 +156,13 @@ preview, SEO) and `DEPLOY.md` (the server). In short:
   `site/i18n.json` (`help_shots`). When the settings change, take them
   again with `QT_QPA_PLATFORM=offscreen python tools/help_screenshots.py
   OUT` (this repository) and copy `OUT/` over `public/help-shots/`.
+- The front page's four pictures of the app are
+  `public/screenshots/<lang>/<name>.webp`, taken by
+  `tools/site_screenshots.py` (this repository) with a made-up playlist and
+  public-domain stills from `tools/showcase/`; it needs OpenGL and ffmpeg:
+  `xvfb-run -a -s "-screen 0 2560x1600x24" python tools/site_screenshots.py
+  OUT`, then copy `OUT/` over `public/screenshots/`. Take them again when
+  the main window changes.
 - **The server's jq is 1.8.** In `render.jq`, every `EXPR as $x | ...`
   must start right after `|`, `(`, `[`, `;`, `then` or `else` - jq 1.8
   binds `a and b as $x` differently than 1.7.
