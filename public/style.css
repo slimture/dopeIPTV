@@ -670,6 +670,7 @@ body.searching .help-layout { grid-template-columns: 1fr; }
 .copy.is-done { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 @media (prefers-reduced-motion: reduce) { .copy { transition: none; } }
 .help-a .fine { font-size: 13px; line-height: 1.6; color: var(--faint); }
+.help-a .msg { color: var(--text); border-inline-start: 2px solid var(--line-2); padding-inline-start: 12px; }
 /* Every language, each in its own name (render.jq langlist). */
 .help-a .langlist { list-style: none; padding: 0; margin: 4px 0 11px; columns: 3; column-gap: 24px; }
 .help-a .langlist li { margin: 0 0 6px; color: var(--text); break-inside: avoid; }

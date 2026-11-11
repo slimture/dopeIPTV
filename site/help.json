@@ -72,8 +72,13 @@
         "gatekeeper",
         "smartscreen",
         "defender",
+        "login",
         "stream",
+        "stutter",
         "limit",
+        "expired",
+        "vpn",
+        "notstarted",
         "icon",
         "external"
     ],
