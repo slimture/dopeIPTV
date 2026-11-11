@@ -1,6 +1,12 @@
 {
-    "start": [
+    "about": [
+        "what",
+        "free",
         "channels",
+        "systems",
+        "languages"
+    ],
+    "start": [
         "linux",
         "macos",
         "windows",
