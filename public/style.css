@@ -108,14 +108,6 @@ nav.links a[aria-current="page"] { color: var(--text); font-weight: 500; }
    header of nothing but the logo. The gaps close up a little before that. */
 @media (max-width: 1100px) { nav.links { gap: 20px; } }
 @media (max-width: 1000px) { nav.links a.navlink { display: none; } }
-/* Wide windows: Help and Donate sit right after the logo, where the eye
-   starts; the language and the blue Download button keep the far end, where
-   colour and position give the button its weight. .bar-gap is the split. */
-.bar-gap { display: none; }
-@media (min-width: 1001px) {
-  nav.links { flex: 1; margin-inline-start: 44px; }
-  .bar-gap { display: block; flex: 1; }
-}
 
 .hero { padding: 96px 0 40px; text-align: center; }
 .hero-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 64px; justify-items: center; }
