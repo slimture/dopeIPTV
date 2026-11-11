@@ -155,6 +155,22 @@
     if (sparkline) { b.append(sparkline); }
     return b;
   }
+  // How many showed they were people, and what was left out as likely
+  // robots (stats_collect.py: kept and marked, never deleted).
+  function judgedLine() {
+    const J = data.judged;
+    if (!J || !J.since || !(J.people || J.robots)) { return ""; }
+    let text = num.format(J.people) + " of them clearly people";
+    if (J.robots) {
+      text += " · " + num.format(J.robots) + (J.robots === 1 ? " likely robot" : " likely robots") + " not counted";
+      const also = [];
+      if (J.views) { also.push(num.format(J.views) + (J.views === 1 ? " page view" : " page views")); }
+      if (J.downloads) { also.push(num.format(J.downloads) + (J.downloads === 1 ? " download" : " downloads")); }
+      if (also.length) { text += " (" + also.join(", ") + ")"; }
+    }
+    if (!J.all) { text += " · judged since " + dayFmt.format(day(J.since)); }
+    return text;
+  }
   function summary() {
     const T = data.totals, B = data.before || {}, D = data.donations, S = data.series;
     const unique = T.unique !== null && T.unique !== undefined;
@@ -168,8 +184,10 @@
     line.append(strong(num.format(people)), document.createTextNode(people === 1 ? " person found dopeIPTV, " : " people found dopeIPTV, "),
                 strong(num.format(T.downloads)), document.createTextNode(" downloaded it and "),
                 strong(num.format(D.count || 0)), document.createTextNode((D.count === 1 ? " donated." : " donated.")));
-    head.append(mk("div", "when", when), line,
-                mk("div", "today", "Today so far: " + num.format(data.today.visitors) + " visitors · " +
+    head.append(mk("div", "when", when), line);
+    const judged = judgedLine();
+    if (judged) { head.append(mk("div", "judged", judged)); }
+    head.append(mk("div", "today", "Today so far: " + num.format(data.today.visitors) + " visitors · " +
                    num.format(data.today.views) + " page views"));
     const vs = days ? "vs " + periodText() : "";
     const stats = mk("div", "bigs");
@@ -623,21 +641,42 @@
   }
 
   // -- the visitor log -------------------------------------------------------------
-  let logDay = "", logDays = [];
+  let logDay = "", logDays = [], logList = [], showRobots = false;
+  try { showRobots = localStorage.getItem("admin-robots") === "1"; } catch (e) { /* hidden then */ }
   function badge(text, cls) { return mk("span", "badge" + (cls ? " " + cls : ""), text); }
+  // From iOS 26 Safari says iOS 18 for every newer system; its own version is
+  // the system's. Visits counted before the collector knew it still say 18.
+  function osText(v) {
+    const m = /^(iOS|iPadOS) 18$/.exec(v.os || "");
+    return m && v.browser === "Safari" && Number(v.bv) >= 26 ? m[1] + " " + v.bv : v.os;
+  }
+  const WHY = {
+    acted: "a person: moved, touched, scrolled or typed",
+    pages: "a person: read more than one page",
+    time: "a person: looked at it 5 s or more",
+    download: "a person: downloaded after a page",
+    returning: "a person: came back on another day",
+    headless: "likely a robot: a browser without a screen",
+  };
+  function judgedText(v) {
+    if (v.why === "old") { return "likely a robot: " + v.browser + " " + v.bv + " is over two years out of date"; }
+    return WHY[v.why] || (v.kind ? "not sure: a short visit without a move" : "");
+  }
   function visitRow(v, showDay) {
-    const row = mk("details", "visit");
+    const row = mk("details", "visit" + (v.kind === "robot" ? " robot" : ""));
     const sum = mk("summary");
     const when = new Date(v.start * 1000);
     const pages = v.pages.length, dls = v.downloads.length;
     sum.append(
       mk("span", "v-time", (showDay ? dateFmt.format(when) + " " : "") + clock.format(when)),
       mk("span", "v-where", flag(v.country) + countryName(v.country)),
-      mk("span", "v-what", [v.browser + (v.bv ? " " + v.bv : ""), v.os, v.device].join(" · ")),
+      mk("span", "v-what", [v.browser + (v.bv ? " " + v.bv : ""), osText(v), v.device].join(" · ")),
       mk("span", "v-from", v.channel ? v.channel + (v.ref ? " · " + v.ref : "") : (dls ? "Straight to a download" : "")),
       mk("span", "v-pages", (pages ? pages + (pages === 1 ? " page" : " pages") : "") +
          (v.time ? " · " + duration(v.time) : pages ? " · time unknown" : "")));
     const tags = mk("span", "v-tags");
+    if (v.kind === "robot") { tags.append(badge("Likely robot", "robot")); }
+    else if (v.kind === "unknown") { tags.append(badge("Not sure")); }
     if (v.returning) { tags.append(badge("Returning · " + v.returning + (v.returning === 1 ? " day" : " days") + " before")); }
     if (dls) { tags.append(badge("Downloaded", "good")); }
     (v.events || []).forEach((e) => tags.append(badge(e[1] === "donated" ? "\u2665 Donated" : "Opened donate", e[1] === "donated" ? "heart" : "soft-heart")));
@@ -655,7 +694,8 @@
     body.append(ol);
     const facts = mk("dl", "facts");
     [["Screen", v.screen], ["Page language", v.lang && (langNames ? langNames.of(v.lang) : v.lang)],
-     ["Browser language", v.blang], ["Tagged link", v.source], ["Visitor", v.id]].forEach(([k, val]) => {
+     ["Browser language", v.blang], ["Tagged link", v.source], ["Judged", judgedText(v)],
+     ["Visitor", v.id]].forEach(([k, val]) => {
       if (!val) { return; }
       facts.append(mk("dt", "", k), mk("dd", "", val));
     });
@@ -683,15 +723,28 @@
         const i = logDays.indexOf(logDay);
         $("day-prev").disabled = i < 0 || i >= logDays.length - 1;
         $("day-next").disabled = i <= 0;
-        const list = res.visits || [];
-        const people = new Set(list.map((v) => v.id)).size;
-        $("day-sum").textContent = num.format(list.length) + (list.length === 1 ? " visit" : " visits") +
-          " by " + num.format(people) + (people === 1 ? " visitor" : " visitors");
+        logList = res.visits || [];
         $("visitor-head").hidden = true;
-        $("visit-list").replaceChildren(...(list.length ? list.map((v) => visitRow(v, false))
-          : [mk("p", "empty", "No visits this day.")]));
+        drawDay();
       })
       .catch((e) => $("visit-list").replaceChildren(mk("p", "error", "Could not load the visits: " + e.message + ".")));
+  }
+  // The day's visits, the likely robots hidden unless asked for; the count
+  // says how many there were either way.
+  function drawDay() {
+    const counted = logList.filter((v) => v.kind !== "robot");
+    const robots = logList.length - counted.length;
+    const people = new Set(counted.map((v) => v.id)).size;
+    $("day-sum").textContent = num.format(counted.length) + (counted.length === 1 ? " visit" : " visits") +
+      " by " + num.format(people) + (people === 1 ? " visitor" : " visitors") +
+      (robots ? " · " + num.format(robots) + (robots === 1 ? " likely robot" : " likely robots") : "");
+    const tog = $("robots-toggle");
+    tog.hidden = !robots;
+    tog.textContent = showRobots ? "Hide" : "Show";
+    tog.setAttribute("aria-pressed", showRobots ? "true" : "false");
+    const list = showRobots ? logList : counted;
+    $("visit-list").replaceChildren(...(list.length ? list.map((v) => visitRow(v, false))
+      : [mk("p", "empty", robots ? "Only likely robots this day." : "No visits this day.")]));
   }
   function showVisitor(id) {
     fetch("/admin/visitor?id=" + encodeURIComponent(id), { credentials: "same-origin", cache: "no-store" })
@@ -754,6 +807,11 @@
   $("day-prev").addEventListener("click", () => loadDay(logDays[logDays.indexOf(logDay) + 1]));
   $("day-next").addEventListener("click", () => loadDay(logDays[logDays.indexOf(logDay) - 1]));
   $("visitor-back").addEventListener("click", () => loadDay(logDay));
+  $("robots-toggle").addEventListener("click", () => {
+    showRobots = !showRobots;
+    try { localStorage.setItem("admin-robots", showRobots ? "1" : "0"); } catch (e) { /* this time only */ }
+    drawDay();
+  });
   setRange(days);
   let tab = "overview";
   try { tab = localStorage.getItem("admin-tab") === "visitors" ? "visitors" : "overview"; } catch (e) { /* default */ }

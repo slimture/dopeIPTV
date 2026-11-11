@@ -4,6 +4,12 @@
  * through. No cookie, no id, nothing kept in the browser; the server counts.
  * Robots that fetch pages without running them never send it, which is
  * what makes the numbers honest. Nothing here can get in the page's way.
+ *
+ * Two yes-or-no facts help tell people from the robots that do run pages:
+ * whether the visitor moved the pointer, touched, scrolled or typed (once a
+ * page, only that it happened - never where, what or how), and whether the
+ * browser says it runs without a screen (headless Chrome names itself in
+ * its brands). stats_collect.py judges the visit from them.
  */
 /* Chromium (Chrome, Edge, Opera, Brave) redoes the blur behind the sticky
  * header on every frame of a scroll, and the sections rising into view and
@@ -17,7 +23,8 @@ if (IPTV_CR) { document.documentElement.classList.add("cr"); }
 
 var iptvHit = (function () {
   "use strict";
-  var since = 0, started = false;
+  var since = 0, started = false, acted = false;
+  var INPUT = ["pointermove", "pointerdown", "touchstart", "wheel", "keydown"];
   function send(q) {
     try {
       var url = "/hit?p=" + encodeURIComponent(location.pathname) + "&" + q;
@@ -33,7 +40,8 @@ var iptvHit = (function () {
          "&s=" + encodeURIComponent(decodeURIComponent(src).slice(0, 40)) +
          "&l=" + encodeURIComponent(document.documentElement.lang || "") +
          "&bl=" + encodeURIComponent(navigator.language || "") +
-         "&w=" + (screen.width || 0) + "&h=" + (screen.height || 0));
+         "&w=" + (screen.width || 0) + "&h=" + (screen.height || 0) +
+         (headless() ? "&hl=1" : ""));
     // Counted: ?ref= leaves the address, so a link shared or bookmarked from
     // here does not count as one from the app or GitHub again.
     if (src && history.replaceState) {
@@ -42,6 +50,28 @@ var iptvHit = (function () {
         history.replaceState(history.state, "", location.pathname + q + location.hash);
       } catch (e) { /* the address keeps it; harmless */ }
     }
+  }
+  function headless() {
+    try {
+      var b = navigator.userAgentData && navigator.userAgentData.brands;
+      return !!b && b.some(function (x) { return /headless/i.test(x.brand || ""); });
+    } catch (e) { return false; }
+  }
+  // Scroll is not among them: a link to #download scrolls the page by itself.
+  // isTrusted: an event a script made up is no sign of anyone. A pointer
+  // move only counts once the pointer has really gone somewhere - Chromium
+  // sends one at a standstill when the page lays out, robots without a
+  // mouse included (theirs at 0,0).
+  var px = null, py = null;
+  function act(e) {
+    if (acted || !started || (e && e.isTrusted === false)) { return; }
+    if (e && e.type === "pointermove" && (px === null || (e.clientX === px && e.clientY === py))) {
+      px = e.clientX; py = e.clientY;
+      return;
+    }
+    acted = true;
+    INPUT.forEach(function (t) { document.removeEventListener(t, act, true); });
+    send("ev=act");
   }
   function left() {
     if (!since) { return; }
@@ -56,6 +86,7 @@ var iptvHit = (function () {
       else if (started && !since) { since = Date.now(); }
     });
     window.addEventListener("pagehide", left);
+    INPUT.forEach(function (t) { document.addEventListener(t, act, { capture: true, passive: true }); });
     if (document.prerendering) {
       document.addEventListener("prerenderingchange", shown, { once: true });
     } else {

@@ -70,7 +70,10 @@ site, countries, browsers and devices, downloads and donations by day,
 week, month and year, and every visit of the last 30 days one by one. A
 page view counts when the page has opened in a real browser and told
 `/hit` so (`public/nav.js`, no cookie, no id); `donate/stats_collect.py`
-reads nginx's log of it - no address kept, robots left out. Signed in once,
+reads nginx's log of it - no address kept, robots left out, and the ones
+that do run pages (a browser without a screen, or one years out of date,
+unless a pointer, touch or key said a person was there) kept and marked
+but not counted. Signed in once,
 a browser stays signed in (a cookie signed by the service), and a new
 donation comes as a notification on the devices that turned them on (the
 browser's own Web Push) and as a note on the site's own pages there. Setting it up: `DEPLOY.md`, "Statistics

@@ -12,6 +12,24 @@ previews and pages only prerendered never send it. Every page request is
 counted too, robots and all ("requests"), so the admin page can show how
 much was left out.
 
+Some robots do run pages, in a real browser engine. Each visit is judged,
+cautiously - a person must never be counted away:
+  person   moved the pointer, touched, scrolled or typed (nav.js says once
+           that it happened, nothing more); or, with no robot sign, looked
+           5 s or more, read more than one page, downloaded after a page or
+           came back on another day
+  robot    a browser without a screen (headless Chrome names itself), or
+           Chrome, Edge or Firefox more than two years (26 versions) behind
+           the newest that people bring - they update themselves, and a
+           fixed, never-updated browser name is what scrapers send. Never on
+           a system that cannot run the newest (Windows 7 and 8, macOS before
+           10.15, Android before 10, iPhones, Chromebooks, TVs), and never
+           Safari, which follows the system.
+  unknown  everything else: a short visit without a move. Counted.
+A visit judged a robot is kept, marked, and kept apart from the counts
+(stats.json's "robots" per day, which the admin page leaves out); nothing is
+deleted. No address lookups, no fingerprints.
+
 Per day:
   views      pages shown (/hit)
   visitors   different visitors that day; per week, month or any span the
@@ -42,7 +60,9 @@ counts per day, are kept for good.
 
 A visitor is a hash of address and browser with a secret salt kept on this
 server: no address is written down, and the hashes are kept 25 months only
-to count unique and returning visitors (a year against the year before). Robots, scripts and empty browser
+to count unique and returning visitors (a year against the year before);
+kinds.json, which of a day's visitors were people and which robots, keeps
+the same hashes as long. Robots that say so, scripts and empty browser
 names are left out everywhere.
 
 Your own visits are left out three ways: a browser that has opened the
@@ -87,7 +107,7 @@ import sys
 import tempfile
 import time
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from urllib.parse import parse_qs, urlsplit
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -251,14 +271,22 @@ def os_version_of(ua: str) -> str:
                 "6.1": "Windows 7"}.get(m.group(1), "Windows")
     m = re.search(r"(?:iPhone|CPU) OS (\d+)", ua)
     if m:
-        return ("iPadOS " if "iPad" in ua else "iOS ") + m.group(1)
+        major = m.group(1)
+        # From iOS 26 Safari says 18 for every newer system, and its own
+        # version - the system's - is the one to go by.
+        s = re.search(r"Version/(\d+)[\d.]* (?:Mobile/\S+ )?Safari/", ua)
+        if major == "18" and s and int(s.group(1)) >= 26:
+            major = s.group(1)
+        return ("iPadOS " if "iPad" in ua else "iOS ") + major
     m = re.search(r"Android (\d+)", ua)
     if m:
         return "Android " + m.group(1)
     if "CrOS" in ua:
         return "ChromeOS"
     if "Macintosh" in ua or "Mac OS X" in ua:
-        return "macOS"
+        # Browsers say 10.15 for every macOS since; an older one is told.
+        m = re.search(r"Mac OS X 10[._](\d+)", ua)
+        return f"macOS 10.{m.group(1)}" if m and int(m.group(1)) < 15 else "macOS"
     for distro in ("Ubuntu", "Fedora", "Debian", "Mint", "Arch", "openSUSE", "Manjaro"):
         if distro in ua:
             return "Linux (" + distro + ")"
@@ -282,7 +310,17 @@ def screen_of(w: str, h: str) -> tuple:
     return f"{wi}×{hi}", kind
 
 
+# TVs, sticks and game consoles: their browsers are as old as the set's
+# software, and an IPTV app's visitors may well read the site on one. Fire
+# TV sticks name themselves by model (AFTMM, AFTKA...).
+TV = re.compile(r"smart-?tv|tizen|web0s|webos|netcast|hbbtv|bravia|crkey|playstation|xbox|nintendo|"
+                r"android tv|googletv|roku|viera|aquos|philipstv|vidaa", re.IGNORECASE)
+FIRE_TV = re.compile(r"\bAFT[A-Z]")
+
+
 def device_of(ua: str) -> str:
+    if TV.search(ua) or FIRE_TV.search(ua):
+        return "TV"
     if "iPad" in ua or ("Android" in ua and "Mobile" not in ua):
         return "Tablet"
     if "Mobi" in ua or "iPhone" in ua:
@@ -587,6 +625,10 @@ def _page_line(stats: dict, uniques: dict, state: dict, r: dict, db, visits: Vis
             visit["events"].append([t, ev])
             visit["end"] = max(visit["end"], t)
         return
+    if ev == "act":                             # a pointer, touch, wheel or key: someone is there
+        if visit is not None:
+            visit["acted"] = True
+        return
     if ev != "view":
         return
 
@@ -596,14 +638,16 @@ def _page_line(stats: dict, uniques: dict, state: dict, r: dict, db, visits: Vis
     if host in SITE_HOSTS:
         host = ""
     src = re.sub(r"[^\w.-]", "", q.get("s", ""))[:40].lower()
-    if visit is None:                           # a new visit
-        visit = _new_visit(visits, day, vid, t, ip, ua, db)
+    if visit is None or "channel" not in visit:  # a new visit, or one that began with a download
+        visit = visit or _new_visit(visits, day, vid, t, ip, ua, db)
         visit.update(channel=channel_of(host, src), ref=host[:80], source=src,
                      lang=q.get("l", "")[:5], blang=q.get("bl", "")[:20])
         visit["screen"], kind = screen_of(q.get("w", ""), q.get("h", ""))
         _bump(d.setdefault("visit_channels", {}), visit["channel"])
         if kind:
             _bump(d.setdefault("screens", {}), kind)
+    if q.get("hl") == "1":
+        visit["hl"] = True
     visit["pages"].append([t, page, 0])
     visit["end"] = max(visit["end"], t)
 
@@ -631,28 +675,187 @@ def _page_line(stats: dict, uniques: dict, state: dict, r: dict, db, visits: Vis
         _bump(d["countries"], visit["country"] or "unknown")
 
 
-def _visit_totals(stats: dict, visits: Visits) -> None:
-    """A touched day's visits, bounces (one page, under ten seconds) and time
-    looked at, from its visits - counted again as visits grow. Time and
-    bounces only from the visits whose time is known (timed): a page that
-    never said how long it was looked at - closed without a word, as phones
-    do, or its message blocked - is not a visit of no seconds."""
+# -- people and robots ---------------------------------------------------------------
+# The rules are in the docstring at the top. Chrome and Edge share version
+# numbers; both, and Firefox, bring a new one every four weeks.
+
+STALE_BEHIND = 26           # versions behind the newest: two years
+FAMILY = {"Chrome": "Chromium", "Edge": "Chromium", "Firefox": "Firefox"}
+# A release each (version, day): from it, a version every four weeks plus a
+# few for beta and nightly is as new as one can be on a day. A higher one is
+# made up and never moves the line - it can only stay where it is.
+RELEASES = {"Chromium": (142, date(2025, 10, 28)), "Firefox": (145, date(2025, 11, 11))}
+# Every macOS since 10.15 says 10.15. The last version for 10.15 itself, and
+# anything newer, is never judged on a Mac: it may be all that Mac can run.
+MAC_LAST = {"Chromium": 128, "Firefox": 115}
+
+
+def _major(v: dict) -> int:
+    try:
+        return int(v.get("bv") or 0)
+    except ValueError:
+        return 0
+
+
+def _ceiling(family: str, day: str) -> int:
+    version, released = RELEASES[family]
+    try:
+        days = (date.fromisoformat(day) - released).days
+    except ValueError:
+        days = 0
+    return version + max(0, days) // 28 + 4
+
+
+def learn_newest(newest: dict, visits: Visits) -> None:
+    """The newest Chrome and Firefox that people bring: from visits that
+    moved or stayed a while, never above what can exist on their day."""
     for day, lst in visits.days.items():
+        for v in lst:
+            family, n = FAMILY.get(v.get("browser") or ""), _major(v)
+            if not family or not n or v.get("hl") or not (v.get("acted") or (v.get("time") or 0) >= 5):
+                continue
+            if n <= _ceiling(family, day) and n > newest.get(family, 0):
+                newest[family] = n
+
+
+def _held_back(v: dict) -> bool:
+    """A system that cannot run the newest browser, where an old version is
+    a person's last one and says nothing."""
+    system = v.get("os") or ""
+    if v.get("device") == "TV" or system.startswith(("iOS", "iPadOS", "ChromeOS", "macOS 10.", "Other")):
+        return True
+    if system.startswith("Windows"):
+        return system != "Windows 10/11"
+    if system.startswith("Android"):
+        m = re.match(r"Android (\d+)", system)
+        return not m or int(m.group(1)) < 10
+    return False
+
+
+def stale(v: dict, newest: dict) -> bool:
+    family, n = FAMILY.get(v.get("browser") or ""), _major(v)
+    if not family or not n or not newest.get(family) or _held_back(v):
+        return False
+    if v.get("os") == "macOS" and n >= MAC_LAST[family]:
+        return False
+    return n < newest[family] - STALE_BEHIND
+
+
+def judge(v: dict, newest: dict) -> tuple:
+    """("person" | "unknown" | "robot", why): only a move outweighs a robot's
+    signs - robots can stay a while and open two pages too."""
+    if v.get("hl"):
+        return "robot", "headless"
+    if v.get("acted"):
+        return "person", "acted"
+    if stale(v, newest):
+        return "robot", "old"
+    if len(v.get("pages") or ()) > 1:
+        return "person", "pages"
+    if (v.get("time") or 0) >= 5:
+        return "person", "time"
+    if v.get("pages") and v.get("downloads"):
+        return "person", "download"
+    if v.get("returning"):
+        return "person", "returning"
+    return "unknown", ""
+
+
+def _os_family(system: str) -> str:
+    """os_of's name from os_version_of's."""
+    first = (system or "Other").split(" ")[0]
+    return "iOS" if first == "iPadOS" else first if first in (
+        "Windows", "iOS", "Android", "ChromeOS", "macOS", "Linux") else "Other"
+
+
+def robot_share(lst: list) -> tuple:
+    """What a day's visits judged robots added to its counts, as _page_line
+    and _download added it - per visit (pages, downloads) and, for a visitor
+    who was nothing but a robot that day, per visitor (the lists of the
+    visitor's first page) - with the day's visitors who were people and
+    those who were robots."""
+    rb: dict = {"visitors": 0, "views": 0, "visits": 0, "returning": 0, "lists": {}}
+
+    def add(key: str, name: str) -> None:
+        if name:
+            _bump(rb["lists"].setdefault(key, {}), name)
+    by_id: dict = {}
+    for v in lst:
+        robot = v.get("kind") == "robot"
+        if robot:
+            for _, name in v.get("downloads") or ():
+                add("downloads", platform_of(name))
+                add("files", name)
+        if not v.get("pages"):
+            continue
+        by_id.setdefault(v["id"], []).append(v)
+        if not robot:
+            continue
+        rb["visits"] += 1
+        rb["views"] += len(v["pages"])
+        for p in v["pages"]:
+            add("pages", p[1])
+        if "channel" in v:
+            add("visit_channels", v["channel"])
+        if v.get("screen") and v["screen"].count("×") == 1:
+            add("screens", screen_of(*v["screen"].split("×"))[1])
+    people, robots = [], []
+    for vid, vs in by_id.items():
+        if any(v.get("kind") == "person" for v in vs):
+            people.append(vid)
+        if not all(v.get("kind") == "robot" for v in vs):
+            continue
+        robots.append(vid)
+        first = min(vs, key=lambda v: v.get("start", 0))
+        rb["visitors"] += 1
+        rb["returning"] += 1 if first.get("returning") else 0
+        lang = first.get("lang") or ""
+        add("channels", first.get("channel") or "Direct or unknown")
+        add("refs", first.get("ref") or "")
+        add("sources", first.get("source") or "")
+        add("langs", lang if re.fullmatch(r"[a-z]{2,3}", lang) else "en")
+        add("os", _os_family(first.get("os") or ""))
+        add("os_versions", first.get("os") or "")
+        add("devices", first.get("device") or "")
+        add("browsers", first.get("browser") or "")
+        add("browser_versions", f"{first.get('browser') or ''} {first.get('bv') or ''}".strip())
+        add("countries", first.get("country") or "unknown")
+    return rb, sorted(people), sorted(robots)
+
+
+def _visit_totals(stats: dict, visits: Visits, kinds: dict, newest: dict) -> None:
+    """A touched day's visits judged, then its visits, bounces (one page,
+    under ten seconds) and time looked at, without the robots - counted again
+    as visits grow. Time and bounces only from the visits whose time is known
+    (timed): a page that never said how long it was looked at - closed
+    without a word, as phones do, or its message blocked - is not a visit of
+    no seconds. What the robots added is kept apart in "robots"."""
+    for day, lst in visits.days.items():
+        for v in lst:
+            v["kind"], v["why"] = judge(v, newest)
+        rb, people, robots = robot_share(lst)
+        kinds[day] = {"p": people, "r": robots}
         if day not in stats["days"]:
             continue
         d = stats["days"][day]
-        with_pages = [v for v in lst if v["pages"]]
+        with_pages = [v for v in lst if v["pages"] and v["kind"] != "robot"]
         d["visits"] = len(with_pages)
         timed = [v for v in with_pages if v["time"] > 0]     # a leave came: seconds were added
         d["timed"] = len(timed)
         d["bounces"] = sum(1 for v in timed if len(v["pages"]) == 1 and v["time"] < 10)
         d["engaged"] = sum(v["time"] for v in timed)
+        d["people"] = len(people)
+        if rb["visits"] or rb["lists"]:
+            d["robots"] = rb
+        else:
+            d.pop("robots", None)
 
 
 def collect(backfill: bool = False, with_fetch: bool = False) -> None:
     stats_path = os.path.join(STATS_DIR, "stats.json")
     state_path = os.path.join(STATS_DIR, "state.json")
     uniques_path = os.path.join(STATS_DIR, "uniques.json")
+    kinds_path = os.path.join(STATS_DIR, "kinds.json")
     with _locked():
         if backfill and os.path.exists(state_path):
             sys.exit(f"--backfill is for a fresh start: {state_path} exists, and the old logs "
@@ -661,6 +864,7 @@ def collect(backfill: bool = False, with_fetch: bool = False) -> None:
         stats = _load(stats_path, {"days": {}})
         state = _load(state_path, {"logs": {}})
         uniques = _load(uniques_path, {})
+        kinds = _load(kinds_path, {})
         visits = Visits(uniques)
         for gone in ("salts", "seen"):          # the day-salted hashes of before
             state.pop(gone, None)
@@ -684,13 +888,21 @@ def collect(backfill: bool = False, with_fetch: bool = False) -> None:
                 print(f"[stats] read {old}", flush=True)
         for line in _read_new(DL_LOG, state["logs"].setdefault("downloads", {})):
             _download(stats, line, state, visits, db)
-        _visit_totals(stats, visits)
+        # Days kept from before visits were judged are judged once, too.
+        for f in glob.glob(os.path.join(VISITS_DIR, "*.json")):
+            if os.path.basename(f)[:10] not in kinds:
+                visits.day(os.path.basename(f)[:10])
+        newest = state.setdefault("newest", {})
+        learn_newest(newest, visits)
+        _visit_totals(stats, visits, kinds, newest)
 
         seen_dl = state.setdefault("seen_dl", {})
         for old in sorted(seen_dl)[:-2]:        # a download's day can only still get lines for a day
             seen_dl.pop(old, None)
         for old in sorted(uniques)[:-KEEP_UNIQUE_DAYS]:
             uniques.pop(old, None)
+        for old in [d for d in kinds if not uniques or d < min(uniques)]:
+            kinds.pop(old, None)
         # A day's list of sites or files stays short, so the years stay small -
         # a flood of made-up referrers cannot grow the file without end.
         for d in stats["days"].values():
@@ -705,6 +917,7 @@ def collect(backfill: bool = False, with_fetch: bool = False) -> None:
         visits.save()
         _anonymize_old()
         _save(uniques_path, uniques)
+        _save(kinds_path, kinds)
         _save(stats_path, stats)
         _save(state_path, state)
 
@@ -722,7 +935,8 @@ def anonymous(v: dict, day: str) -> dict:
             "site": v.get("ref") or "", "pages": len(v.get("pages") or []),
             "time": round((v.get("time") or 0) / 10) * 10, "timed": bool(v.get("time")),
             "returning": bool(v.get("returning")), "downloaded": bool(v.get("downloads")),
-            "donate": "donate" in events, "donated": "donated" in events}
+            "donate": "donate" in events, "donated": "donated" in events,
+            "kind": v.get("kind") or ""}
 
 
 def _anonymize_old() -> None:

@@ -10,7 +10,9 @@ missing auth_basic line cannot open the page to everyone.
     GET /admin/visits?day=YYYY-MM-DD   that day's visits, one by one
     GET /admin/visitor?id=...          every visit kept of one visitor
 
-Visitors come from stats_collect.py's STATS_DIR/stats.json; the all-time
+Visitors come from stats_collect.py's STATS_DIR/stats.json, without what
+the visits judged likely robots added (kept apart there, and which visitors
+were which in kinds.json); the all-time
 download counts from the site's downloads.json; donations from Stripe
 itself - the PaymentIntents the donate dialog made (metadata source), found
 with Stripe's search and kept for five minutes. Donations through the old
@@ -140,16 +142,58 @@ def _bucket(d: date, step: str) -> date:
     return d
 
 
-def _union(uniques: dict, days: list, per_day: dict):
-    """Different visitors over these days, or None where a day had visitors
-    whose hashes are gone (kept 25 months) - the page then shows the visits
-    summed instead."""
+def _net(row: dict) -> dict:
+    """A day's counts without what the visits judged likely robots added
+    (stats_collect.py keeps that apart in "robots"; nothing is deleted)."""
+    rb = row.get("robots")
+    if not rb:
+        return row
+    out = dict(row)
+    for k in ("views", "visitors", "returning"):
+        out[k] = max(0, row.get(k, 0) - rb.get(k, 0))
+    for k, part in (rb.get("lists") or {}).items():
+        left = dict(row.get(k) or {})
+        for name, n in part.items():
+            if left.get(name, 0) > n:
+                left[name] -= n
+            else:
+                left.pop(name, None)
+        out[k] = left
+    return out
+
+
+def _union(uniques: dict, days: list, per_day: dict, kinds: dict):
+    """Different visitors over these days, the likely robots left out, or
+    None where a day had visitors whose hashes are gone (kept 25 months) -
+    the page then shows the visits summed instead."""
     if any((per_day.get(d) or {}).get("visitors") and d not in uniques for d in days):
         return None
     seen: set = set()
     for d in days:
-        seen.update(uniques.get(d, ()))
+        robots = set((kinds.get(d) or {}).get("r", ()))
+        seen.update(x for x in uniques.get(d, ()) if x not in robots)
     return len(seen)
+
+
+def _judged(uniques: dict, kinds: dict, days: list, per_day: dict) -> dict:
+    """Over these days: the different visitors who showed they were people,
+    those judged likely robots (and nothing else), and from which day visits
+    were judged - a day counted before that was not."""
+    judged = [d for d in days if d in kinds]
+    people: set = set()
+    robots: set = set()
+    others: set = set()
+    for d in judged:
+        r = set(kinds[d].get("r", ()))
+        people.update(kinds[d].get("p", ()))
+        robots.update(r)
+        others.update(x for x in uniques.get(d, ()) if x not in r)
+    left_out = [(per_day.get(d) or {}).get("robots") or {} for d in days]
+    return {"people": len(people), "robots": len(robots - others),
+            "views": sum(rb.get("views", 0) for rb in left_out),
+            "downloads": sum(sum(((rb.get("lists") or {}).get("downloads") or {}).values()) for rb in left_out),
+            "since": min(judged) if judged else None,
+            "all": all(d in kinds for d in days if (per_day.get(d) or {}).get("visitors"))}
 
 
 SUMMED = ("views", "visitors", "requests", "visits", "engaged", "bounces", "returning", "timed")
@@ -167,11 +211,13 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
     """The numbers for the last *days* days (0: all of them): totals and
     the same span before it, a series per day - per week for a year, per
     month for longer - the top lists, the donations, and every calendar
-    year side by side. Unique visitors are counted across the days."""
+    year side by side. Unique visitors are counted across the days. Likely
+    robots are left out of every count, and told apart in "judged"."""
     days = days if days in RANGES else 30
     stats = _load(os.path.join(stats_dir, "stats.json"), {"days": {}})
     uniques = _load(os.path.join(stats_dir, "uniques.json"), {})
-    per_day = stats.get("days") or {}
+    kinds = _load(os.path.join(stats_dir, "kinds.json"), {})
+    per_day = {d: _net(row) for d, row in (stats.get("days") or {}).items()}
     today = datetime.now().astimezone().date()  # the server's day, as the logs' dates
     if days:
         first = today - timedelta(days=days - 1)
@@ -204,11 +250,11 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
             _sum_into(total, row.get(k))
     if step != "day":                           # a week's or month's different visitors
         for key_b, ds in bucket_days.items():
-            u = _union(uniques, ds, per_day)
+            u = _union(uniques, ds, per_day, kinds)
             if u is not None:
                 buckets[key_b]["visitors"] = u
     series = [dict(date=k, **v) for k, v in sorted(buckets.items())]
-    totals["unique"] = _union(uniques, range_days, per_day)
+    totals["unique"] = _union(uniques, range_days, per_day, kinds)
 
     before = None
     if days:
@@ -220,7 +266,7 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
             for k in SUMMED:
                 before[k] += _timed(row) if k == "timed" else row.get(k, 0)
             before["downloads"] += sum((row.get("downloads") or {}).values())
-        before["unique"] = _union(uniques, prev_days, per_day)
+        before["unique"] = _union(uniques, prev_days, per_day, kinds)
 
     don = donations(key, api_version)
     since = datetime.combine(first, datetime.min.time()).astimezone().timestamp()
@@ -248,7 +294,7 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
         y["donations"] += 1
         y["sums"][r["currency"]] = y["sums"].get(r["currency"], 0) + r["amount"]
     for y in years.values():
-        y["unique"] = _union(uniques, y.pop("days"), per_day)
+        y["unique"] = _union(uniques, y.pop("days"), per_day, kinds)
 
     dl_all = _load(downloads_json, {})
     return {
@@ -260,6 +306,7 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
         "geo": bool(stats.get("geo")),
         "today": {k: (per_day.get(today.isoformat()) or {}).get(k, 0) for k in ("views", "visitors")},
         "totals": totals,
+        "judged": _judged(uniques, kinds, range_days, per_day),
         "before": before,
         "series": series,
         "top": {k: _top(v, 12) for k, v in sums.items()},
@@ -297,7 +344,7 @@ def by_channel(stats_dir: str, first: str, last: str) -> list:
     for day in visit_days(stats_dir):
         if first <= day <= last:
             for v in _visits_file(stats_dir, day):
-                if v.get("pages"):
+                if v.get("pages") and v.get("kind") != "robot":
                     add(v.get("channel", ""), len(v["pages"]), v.get("time", 0), bool(v.get("downloads")),
                         any(e[1] == "donate" for e in v.get("events") or []), v.get("time", 0) > 0)
     try:
@@ -309,7 +356,7 @@ def by_channel(stats_dir: str, first: str, last: str) -> list:
             continue
         month = _load(os.path.join(stats_dir, "visits-anon", m + ".json"), {})
         for a in month.get("visits") or []:
-            if first <= a.get("day", "") <= last and a.get("pages"):
+            if first <= a.get("day", "") <= last and a.get("pages") and a.get("kind") != "robot":
                 add(a.get("channel", ""), a["pages"], a.get("time", 0), a.get("downloaded", False),
                     a.get("donate", False), a.get("timed", a.get("time", 0) > 0))
     return sorted(([k, v] for k, v in rows.items()), key=lambda kv: -kv[1]["visits"])
