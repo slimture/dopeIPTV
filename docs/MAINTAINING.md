@@ -166,6 +166,12 @@ rather than ship something half done.
 - **If Apple refuses a build**, the job prints `notarytool log`: it names
   each file and what is missing (usually a binary that was not signed, or
   signed without the hardened runtime).
+- **A published release's .dmg files can be rebuilt** after a change to
+  the build alone (1.4.4 got its signed ones this way): run *Release* by
+  hand on `testing` (Actions → Release → Run workflow) with
+  `replace_macos_dmg` set to the tag. Only the macOS job runs; it refuses
+  when `dopeiptv/` or `requirements.txt` differ from the tag, and replaces
+  the two .dmg files on that release and nothing else.
 
 ## The website
 

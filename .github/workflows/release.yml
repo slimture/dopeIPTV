@@ -14,9 +14,23 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      replace_macos_dmg:
+        description: >-
+          Rebuild only the macOS .dmg files and replace them on this
+          published release (e.g. v1.4.4) - for a change to the build, such
+          as signing, never to the app. Empty: a normal manual build.
+        type: string
+        required: false
+        default: ""
   workflow_call:
     inputs:
       nightly_version:
+        type: string
+        required: false
+        default: ""
+      # Never set by nightly.yml; declared so every job reads it alike.
+      replace_macos_dmg:
         type: string
         required: false
         default: ""
@@ -28,6 +42,7 @@ jobs:
   # ---------------------------------------------------------------- Python ---
   python-dist:
     name: sdist + wheel (pipx / PyPI)
+    if: ${{ (inputs.replace_macos_dmg || '') == '' }}
     # Pinned, not ubuntu-latest: that label moves to Ubuntu 26.04 from
     # 2026-10-19, and a release must not meet a new image unannounced.
     runs-on: ubuntu-24.04
@@ -130,6 +145,7 @@ jobs:
   # ------------------------------------------------ AppImage + Debian pkg ---
   linux-bundle:
     name: AppImage + .deb (${{ matrix.arch }})
+    if: ${{ (inputs.replace_macos_dmg || '') == '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -733,6 +749,20 @@ jobs:
             exit 1
           fi
           echo "Tag, version and release notes all agree on ${VER}."
+      - name: Guard - a rebuild for a release changes no app code
+        if: ${{ (inputs.replace_macos_dmg || '') != '' }}
+        env:
+          TAG: ${{ inputs.replace_macos_dmg }}
+        run: |
+          # The .dmg on a release must hold the app that release is: only the
+          # build may differ from the tag, never dopeiptv/ or its requirements.
+          git fetch --quiet --depth=1 origin "refs/tags/${TAG}:refs/tags/${TAG}"
+          if ! git diff --quiet "$TAG" HEAD -- dopeiptv requirements.txt; then
+            echo "::error::the app has changed since ${TAG}: that is a new release, not a rebuild"
+            git diff --stat "$TAG" HEAD -- dopeiptv requirements.txt
+            exit 1
+          fi
+          echo "App code identical to ${TAG}."
       - name: Bake built-in OpenSubtitles key
         shell: bash
         env:
@@ -1127,6 +1157,24 @@ jobs:
         with:
           name: macos-dmg-${{ matrix.arch }}
           path: '*.dmg'
+      - name: Replace the .dmg on the published release
+        if: ${{ (inputs.replace_macos_dmg || '') != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.replace_macos_dmg }}
+        run: |
+          V=${{ steps.v.outputs.version }}
+          if [ "$TAG" != "v${V}" ]; then
+            echo "::error::this build is ${V}, not ${TAG#v}: nothing replaced"
+            exit 1
+          fi
+          if [ -z "${{ steps.sign.outputs.identity }}" ]; then
+            echo "::error::not signed with the Developer ID: nothing replaced"
+            exit 1
+          fi
+          gh release upload "$TAG" "dopeIPTV-${V}-macOS-${{ matrix.arch }}.dmg" \
+            --clobber --repo "${{ github.repository }}"
+          echo "Replaced dopeIPTV-${V}-macOS-${{ matrix.arch }}.dmg on ${TAG}."
       - name: Remove the signing keychain
         if: always() && steps.sign.outputs.keychain != ''
         run: security delete-keychain "${{ steps.sign.outputs.keychain }}" || true
@@ -1138,6 +1186,7 @@ jobs:
   # own assets, so a Windows hiccup never removes those.
   windows-zip:
     name: Windows (${{ matrix.arch }})
+    if: ${{ (inputs.replace_macos_dmg || '') == '' }}
     runs-on: ${{ matrix.runner }}
     continue-on-error: ${{ (inputs.nightly_version || '') != '' }}
     strategy:
@@ -1375,6 +1424,7 @@ jobs:
   # blocking the release with continue-on-error.
   flatpak:
     name: Flatpak (experimental)
+    if: ${{ (inputs.replace_macos_dmg || '') == '' }}
     # Only the host: the build runs in the container below. Pinned for the
     # same reason as python-dist.
     runs-on: ubuntu-24.04

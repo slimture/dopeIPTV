@@ -48,3 +48,15 @@ def test_a_test_build_publishes_what_built_and_a_release_fails_loud():
     # What did not build is named in the notes; no AppImage, no nightly.
     assert "missing.txt" in NIGHTLY and "Not in this build" in NIGHTLY
     assert NIGHTLY.count("if: steps.gather.outputs.publish == 'true'") == 3
+
+
+def test_a_macos_rebuild_replaces_only_the_dmg_of_the_same_app():
+    # workflow_dispatch with replace_macos_dmg: the other jobs stay out, the
+    # app's code must be the tag's, and only a signed .dmg of the tag's
+    # version replaces the one on the release.
+    assert RELEASE.count("replace_macos_dmg:") == 2
+    skip = "    if: ${{ (inputs.replace_macos_dmg || '') == '' }}\n"
+    assert RELEASE.count(skip) == 4
+    assert 'git diff --quiet "$TAG" HEAD -- dopeiptv requirements.txt' in RELEASE
+    assert RELEASE.count('gh release upload "$TAG"') == 1
+    assert 'if [ "$TAG" != "v${V}" ]; then' in RELEASE
