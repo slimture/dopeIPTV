@@ -399,7 +399,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
         "Your own local video and music files"],
       "license": "\($REPO)/blob/main/LICENSE", "isAccessibleForFree": true,
       "author": {"@id": "\($SITE)/#org"}, "publisher": {"@id": "\($SITE)/#org"},
-      "sameAs": [$REPO],
+      "sameAs": [$REPO, "https://www.wikidata.org/wiki/Q142109783"],
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}
      + (if ($screenshots | index("en/main")) then {"screenshot": "\($SITE)/screenshots/en/main.webp"} else {} end)) as $app
     | {"@context": "https://schema.org",
