@@ -119,16 +119,32 @@
 
   // The page is long enough that "where am I" is a real question, so the
   // contents mark the section you are reading.
+  // A short last section never climbs as high as the band that marks
+  // sections, so at the very bottom of the page it is the last one's turn.
   if (window.IntersectionObserver && tocs.length) {
     var seen = {};
-    var spy = new IntersectionObserver(function (entries) {
-      entries.forEach(function (en) { seen[en.target.id] = en.isIntersecting; });
+    var mark = function () {
       var current = '';
-      secs.forEach(function (s) { if (!current && seen[s.id]) current = s.id; });
+      var root = document.documentElement;
+      if (window.innerHeight + window.scrollY >= root.scrollHeight - 4) {
+        current = secs[secs.length - 1].id;
+      } else {
+        secs.forEach(function (s) { if (!current && seen[s.id]) current = s.id; });
+      }
       tocs.forEach(function (a) {
         a.classList.toggle('is-current', a.dataset.toc === current);
       });
+    };
+    var spy = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { seen[en.target.id] = en.isIntersecting; });
+      mark();
     }, { rootMargin: '-80px 0px -65% 0px' });
     secs.forEach(function (s) { spy.observe(s); });
+    var queued = false;
+    window.addEventListener('scroll', function () {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(function () { queued = false; mark(); });
+    }, { passive: true });
   }
 })();
