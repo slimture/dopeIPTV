@@ -240,6 +240,7 @@
   "diag_account_status": "Il tuo account è {status} — contatta il fornitore",
   "diag_expired": "Il tuo abbonamento è scaduto — rinnovalo con il fornitore",
   "diag_conn_limit": "Tutte le {active}/{maxc} connessioni sono in uso — chiudi la diretta sull'altro dispositivo o app",
+  "stream_contested": "Il provider interrompe di continuo lo stream: se questo account è in uso su un altro dispositivo o app, chiudilo lì.",
   "diag_timeout": "Il fornitore non ha risposto (timeout) — il server è probabilmente offline o sovraccarico",
   "diag_unreachable": "Impossibile raggiungere il fornitore — il server è offline o c'è un problema di rete",
   "diag_forbidden": "Il fornitore ha rifiutato la diretta (HTTP {code}) — account bloccato o troppe connessioni",

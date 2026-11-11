@@ -240,6 +240,7 @@
   "diag_account_status": "Tvoj račun ima status {status} — kontaktiraj pružatelja",
   "diag_expired": "Tvoja pretplata je istekla — obnovi je kod pružatelja",
   "diag_conn_limit": "Sve {active}/{maxc} veze su u upotrebi — zatvori prijenos na drugom uređaju ili aplikaciji",
+  "stream_contested": "Pružatelj stalno prekida stream — ako se ovaj račun koristi na drugom uređaju ili u drugoj aplikaciji, zatvorite ga tamo.",
   "diag_timeout": "Pružatelj nije odgovorio (isteklo vrijeme) — poslužitelj mu je vjerojatno ugašen ili preopterećen",
   "diag_unreachable": "Nije moguće doći do pružatelja — poslužitelj mu je ugašen ili postoji mrežni problem",
   "diag_forbidden": "Pružatelj je odbio prijenos (HTTP {code}) — račun blokiran ili previše veza",

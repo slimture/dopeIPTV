@@ -240,6 +240,7 @@
   "diag_account_status": "Ditt konto är {status} — kontakta din leverantör",
   "diag_expired": "Ditt abonnemang har gått ut — förnya hos din leverantör",
   "diag_conn_limit": "Alla {active}/{maxc} anslutningar används — stäng strömmen på din andra enhet eller app",
+  "stream_contested": "Leverantören bryter strömmen gång på gång — spelar kontot på en annan enhet eller i en annan app, stäng den där.",
   "diag_timeout": "Leverantören svarade inte (timeout) — servern är troligen nere eller överbelastad",
   "diag_unreachable": "Når inte leverantören — servern är nere eller så är det ett nätverksproblem",
   "diag_forbidden": "Leverantören nekade strömmen (HTTP {code}) — kontot spärrat eller för många anslutningar",

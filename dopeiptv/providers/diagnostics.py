@@ -116,3 +116,9 @@ def _probe_url(url: str) -> str:
         return tr("diag_generic")
     log.info("stream probe: HTTP %s", code)
     return reason_for_code(code)
+
+
+def account_reason(client) -> str | None:
+    """Why the account itself would stop a stream - expired, disabled, or
+    every connection in use - or None when it says nothing of the kind."""
+    return _account_reason(client)

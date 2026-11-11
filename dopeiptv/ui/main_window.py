@@ -1233,6 +1233,7 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
             self.player.stopped.connect(self._on_player_stopped)
             self.player.resume_requested.connect(self._resume_last)
             self.player.stalled.connect(self._on_player_stalled)
+            self.player.contested.connect(self._on_stream_contested)
             self.player.reopen_live.connect(self._reopen_live_edge)
             self.player.finished.connect(self._on_player_finished)
             self.player.next_episode.connect(self._play_next_episode)
@@ -5127,6 +5128,21 @@ class MainWindow(_SettingsMixin, _TraktMixin, _RecordingMixin,
     def _on_player_stalled(self) -> None:
         """The player reported the live stream frozen (buffer-starved)."""
         self._reconnect_live("stall")
+
+    def _on_stream_contested(self) -> None:
+        """The rewind buffer keeps losing its provider connection - a tug of
+        war with another device or app on the account, which a player that
+        reconnects at once never ends by itself. Say so: the account's
+        figures when the provider gives them ("all 1/1 connections are in
+        use"), else what it looks like."""
+        from ..providers.diagnostics import account_reason
+        client = self.client
+
+        def show(reason) -> None:
+            self._show_toast(reason or tr("stream_contested"), 15000)
+
+        run_async(self.pool, lambda: account_reason(client), show,
+                  lambda _e: show(None))
 
     def _reopen_live_edge(self) -> None:
         """LIVE in the DVR row with the buffer far behind the channel: open

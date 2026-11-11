@@ -240,6 +240,7 @@
   "diag_account_status": "Hesabınız {status} — sağlayıcınıza başvurun",
   "diag_expired": "Aboneliğinizin süresi doldu — sağlayıcınızla yenileyin",
   "diag_conn_limit": "Tüm bağlantılar ({active}/{maxc}) kullanımda — diğer cihazınızdaki veya uygulamanızdaki yayını kapatın",
+  "stream_contested": "Sağlayıcı yayını sürekli kesiyor — bu hesap başka bir cihazda veya uygulamada oynatılıyorsa orada kapatın.",
   "diag_timeout": "Sağlayıcı yanıt vermedi (zaman aşımı) — sunucusu muhtemelen kapalı veya aşırı yüklü",
   "diag_unreachable": "Sağlayıcıya ulaşılamıyor — sunucusu kapalı ya da bir ağ sorunu var",
   "diag_forbidden": "Sağlayıcı yayını reddetti (HTTP {code}) — hesap engellenmiş veya çok fazla bağlantı var",

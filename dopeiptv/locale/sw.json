@@ -240,6 +240,7 @@
   "diag_account_status": "Akaunti yako ni {status} — wasiliana na mtoa huduma wako",
   "diag_expired": "Usajili wako umeisha muda — uufanye upya na mtoa huduma wako",
   "diag_conn_limit": "Miunganisho yote ({active}/{maxc}) inatumika — funga mtiririko kwenye kifaa au programu yako nyingine",
+  "stream_contested": "Mtoa huduma anakata mtiririko tena na tena — ikiwa akaunti hii inacheza kwenye kifaa au programu nyingine, ifunge huko.",
   "diag_timeout": "Mtoa huduma hakujibu (muda umeisha) — seva yake huenda imezimwa au imelemewa",
   "diag_unreachable": "Haiwezi kumfikia mtoa huduma — seva yake imezimwa au kuna tatizo la mtandao",
   "diag_forbidden": "Mtoa huduma alikataa mtiririko (HTTP {code}) — akaunti imezuiwa, au miunganisho ni mingi mno",

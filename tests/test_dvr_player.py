@@ -49,6 +49,14 @@ class Session:
     def segment_after(self, t):
         return next((s for s in self.segs if s.t0 > t), None)
 
+    def next_run_after(self, t, seq=None):
+        cur = next((s for s in self.segs if s.seq == seq), None) \
+            if seq is not None else None
+        if cur is None:
+            cur = [s for s in self.segs if s.t0 <= t][-1]
+        return next((s for s in self.segs
+                     if s.seq > cur.seq and s.run != cur.run), None)
+
     def live_segment(self):
         return self.segs[-2]
 
@@ -111,10 +119,30 @@ def test_further_back_opens_the_store_not_the_provider():
 
 def test_an_end_of_file_goes_on_from_the_next_run():
     m = Mpv(playback_time=9.0)
-    p = Player(m, Session())
+    s = Session()
+    for seg in s.segs[15:]:
+        seg.run = 1                               # a reconnect at seq 15
+    p = Player(m, s)
     p._dvr_open_wall = 1020.0
     assert p._dvr_on_eof() is True
-    assert m.played == ["local:15"]               # first segment after 1028.5
+    assert m.played == ["local:15"]               # the next run's first
+
+
+def test_the_end_of_a_short_run_does_not_reopen_it():
+    # A run of one segment, read to its end within half a second: playback
+    # opened that same segment again and again.
+    m = Mpv(playback_time=0.3)
+    s = Session()
+    for seg in s.segs[37:]:
+        seg.run = 1
+    for seg in s.segs[38:]:
+        seg.run = 2                               # 37 alone is run 1
+    p = Player(m, s)
+    p._dvr_open_wall = s.segs[37].t0
+    p._dvr_open_seq = 37
+    p._dvr_reopened = 0.0
+    assert p._dvr_on_eof() is True
+    assert m.played == ["local:38"]
 
 
 def test_when_its_own_connection_gave_up_the_app_takes_over():

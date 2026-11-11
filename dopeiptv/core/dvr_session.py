@@ -78,11 +78,22 @@ class DvrSession:
     def segment_after(self, t: float) -> Segment | None:
         return self.store.segment_after(t)
 
+    def next_run_after(self, t: float, seq: int | None = None
+                       ) -> Segment | None:
+        return self.store.next_run_after(t, seq)
+
     def span(self) -> tuple[float, float] | None:
         return self.store.span()
 
     def runs(self) -> list[tuple[int, float, float]]:
         return self.store.runs()
+
+    @property
+    def contested(self) -> bool:
+        """The provider keeps taking the connection away - another device
+        or app on the same account, most likely."""
+        return not self._closed and bool(
+            getattr(self.ingest, "contested", False))
 
     @property
     def state(self) -> str:

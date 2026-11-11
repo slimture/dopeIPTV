@@ -240,6 +240,7 @@
   "diag_account_status": "Tài khoản của bạn {status} — liên hệ nhà cung cấp của bạn",
   "diag_expired": "Đăng ký của bạn đã hết hạn — gia hạn với nhà cung cấp của bạn",
   "diag_conn_limit": "Tất cả kết nối ({active}/{maxc}) đang được dùng — đóng luồng trên thiết bị hoặc ứng dụng khác của bạn",
+  "stream_contested": "Nhà cung cấp liên tục ngắt luồng — nếu tài khoản này đang phát trên thiết bị hoặc ứng dụng khác, hãy tắt ở đó.",
   "diag_timeout": "Nhà cung cấp không phản hồi (hết thời gian) — máy chủ của họ có thể đang tắt hoặc quá tải",
   "diag_unreachable": "Không thể tiếp cận nhà cung cấp — máy chủ của họ đang tắt hoặc có sự cố mạng",
   "diag_forbidden": "Nhà cung cấp từ chối luồng (HTTP {code}) — tài khoản bị chặn, hoặc quá nhiều kết nối",

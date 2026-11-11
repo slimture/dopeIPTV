@@ -19,6 +19,22 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   scrolling in a right-to-left layout, and the guide scrolls in
   left-to-right scene coordinates. The board itself (channels on the left,
   time running right) stays left to right in every language.
+- Rewind buffer (dopeIPTV's own): a provider connection that kept dropping
+  - typically another device or app on the same account taking the one
+  connection the provider allows - made playback stutter, jump back a few
+  seconds at every drop, and at last open the same short piece over and
+  over. A reconnect now goes on where the stream left off when the provider
+  repeats the last seconds (they are skipped, the player never sees the
+  drop), reconnects at once, and an ended piece moves playback on to the
+  next one instead of back to itself. The provider's small pieces go into
+  the buffer in blocks, so the reading keeps up.
+
+### Added
+
+- When the rewind buffer keeps losing its connection, the app says why:
+  the account's figures if the provider gives them ("all 1/1 connections
+  are in use - close the stream on your other device or app"), else that
+  another device or app on the account is the likely cause.
 
 ## [1.4.3]
 

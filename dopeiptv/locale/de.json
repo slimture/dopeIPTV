@@ -240,6 +240,7 @@
   "diag_account_status": "Dein Konto ist {status} — wende dich an deinen Anbieter",
   "diag_expired": "Dein Abo ist abgelaufen — verlängere es bei deinem Anbieter",
   "diag_conn_limit": "Alle {active}/{maxc} Verbindungen sind belegt — beende den Stream auf deinem anderen Gerät oder in der anderen App",
+  "stream_contested": "Der Anbieter unterbricht den Stream immer wieder — läuft das Konto auf einem anderen Gerät oder in einer anderen App, beende es dort.",
   "diag_timeout": "Der Anbieter hat nicht geantwortet (Timeout) — sein Server ist vermutlich ausgefallen oder überlastet",
   "diag_unreachable": "Anbieter nicht erreichbar — sein Server ist ausgefallen oder es gibt ein Netzwerkproblem",
   "diag_forbidden": "Der Anbieter hat den Stream abgelehnt (HTTP {code}) — Konto gesperrt oder zu viele Verbindungen",

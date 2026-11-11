@@ -402,6 +402,9 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
     stopped = pyqtSignal()
     resume_requested = pyqtSignal()
     stalled = pyqtSignal()
+    # The app's own buffer keeps losing its provider connection: another
+    # device or app on the account, most likely. Once per stream.
+    contested = pyqtSignal()
     # LIVE in the DVR row with the buffer far behind the channel: open it again.
     reopen_live = pyqtSignal()
     finished = pyqtSignal()
@@ -2436,6 +2439,7 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
             self._stopping = False
             self._stall_since = 0.0
             self._eof_seen = False
+            self._contest_told = False
             self._hide_nextup()     # new title: no stale card
             self._blackout.hide()
             self.video.set_blank(False)
@@ -3248,6 +3252,14 @@ class EmbeddedPlayer(RewindBarMixin, DvrPlayerMixin, QWidget):
                 self._stall_since = 0.0
                 if not (self._dvr is not None and self._dvr_on_stall()):
                     self.stalled.emit()
+        if self._dvr is not None and not getattr(self, "_contest_told", False):
+            try:
+                hit = bool(self._dvr.contested)
+            except Exception:
+                hit = False
+            if hit:
+                self._contest_told = True
+                self.contested.emit()
         # Natural end-of-file: with keep-open=yes mpv pauses on the last frame
         # and flags eof-reached. Emit finished() once so the app can autoplay
         # the next episode. (Live streams never end, so this never fires there.)

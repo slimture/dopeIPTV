@@ -240,6 +240,7 @@
   "diag_account_status": "Vaš nalog je {status} — obratite se provajderu",
   "diag_expired": "Vaša pretplata je istekla — obnovite je kod provajdera",
   "diag_conn_limit": "Sve veze ({active}/{maxc}) su u upotrebi — zatvorite prenos na drugom uređaju ili aplikaciji",
+  "stream_contested": "Provajder stalno prekida prenos — ako se ovaj nalog koristi na drugom uređaju ili u drugoj aplikaciji, zatvorite ga tamo.",
   "diag_timeout": "Provajder nije odgovorio (istek vremena) — njegov server je verovatno nedostupan ili preopterećen",
   "diag_unreachable": "Nije moguće doći do provajdera — njegov server je nedostupan ili postoji problem sa mrežom",
   "diag_forbidden": "Provajder je odbio prenos (HTTP {code}) — nalog je blokiran ili je previše veza",

@@ -240,6 +240,7 @@
   "diag_account_status": "Akun Anda {status} — hubungi penyedia Anda",
   "diag_expired": "Langganan Anda telah kedaluwarsa — perbarui dengan penyedia Anda",
   "diag_conn_limit": "Semua koneksi ({active}/{maxc}) sedang digunakan — tutup siaran di perangkat atau aplikasi lain Anda",
+  "stream_contested": "Penyedia terus memutus siaran — jika akun ini sedang diputar di perangkat atau aplikasi lain, tutup di sana.",
   "diag_timeout": "Penyedia tidak merespons (waktu habis) — servernya kemungkinan mati atau kelebihan beban",
   "diag_unreachable": "Tidak dapat menjangkau penyedia — servernya mati atau ada masalah jaringan",
   "diag_forbidden": "Penyedia menolak siaran (HTTP {code}) — akun diblokir, atau terlalu banyak koneksi",

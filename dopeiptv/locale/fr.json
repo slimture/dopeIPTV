@@ -240,6 +240,7 @@
   "diag_account_status": "Votre compte est {status} — contactez votre fournisseur",
   "diag_expired": "Votre abonnement a expiré — renouvelez-le auprès du fournisseur",
   "diag_conn_limit": "Toutes les connexions {active}/{maxc} sont utilisées — fermez le flux sur votre autre appareil ou application",
+  "stream_contested": "Le fournisseur coupe sans cesse le flux — si ce compte lit sur un autre appareil ou une autre app, fermez-le là-bas.",
   "diag_timeout": "Le fournisseur n'a pas répondu (timeout) — son serveur est probablement hors service ou surchargé",
   "diag_unreachable": "Impossible de joindre le fournisseur — son serveur est hors service ou il y a un problème réseau",
   "diag_forbidden": "Le fournisseur a refusé le flux (HTTP {code}) — compte bloqué ou trop de connexions",

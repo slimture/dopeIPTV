@@ -108,6 +108,7 @@ class DvrPlayerMixin:
         self._dvr = session
         self._dvr_origin = session.origin
         self._dvr_open_wall = None
+        self._dvr_open_seq = None
         self._dvr_reopened = 0.0
         log.info("DVR: own buffer for %s (%d min, %d GB)", redact_url(url),
                  minutes, self._dvr_space_bytes() >> 30)
@@ -119,6 +120,7 @@ class DvrPlayerMixin:
         recording reads it. Its history stays in the pool."""
         session, self._dvr = self._dvr, None
         self._dvr_open_wall = None
+        self._dvr_open_seq = None
         if session is None:
             return
         if self._dvr_pool is not None:
@@ -263,6 +265,7 @@ class DvrPlayerMixin:
         if session is None or m is None:
             return
         self._dvr_open_wall = seg.t0
+        self._dvr_open_seq = seg.seq
         self._dvr_reopened = time.monotonic()
         self._eof_seen = False
         self._stall_since = 0.0
@@ -296,7 +299,9 @@ class DvrPlayerMixin:
         if state in ("failed", "stopped"):
             return False            # the app's own reconnect takes over
         at = self._dvr_wall_now()
-        seg = session.segment_after(at - 0.5) if at is not None else None
+        seq = getattr(self, "_dvr_open_seq", None)
+        seg = session.next_run_after(at if at is not None else 0.0, seq) \
+            if (at is not None or seq is not None) else None
         if seg is None:
             # The next run has not begun yet: look again shortly.
             QTimer.singleShot(1000, self._dvr_on_eof)

@@ -240,6 +240,31 @@ class SegmentStore:
                     return s
             return None
 
+    def next_run_after(self, t: float, seq: int | None = None
+                       ) -> Segment | None:
+        """Where playback goes on once a run has been read to its end: the
+        first segment of a later run than the one being played - segment
+        *seq* when that is known and still held, else the one wall-clock
+        time *t* falls in. None while no later run has begun.
+
+        (The first segment beginning after *t* was asked for before: on a
+        run of one short segment that is the very segment just played, and
+        playback opened it again and again.)"""
+        with self._cond:
+            cur = self._by_seq.get(seq) if seq is not None else None
+            if cur is None:
+                for s in self._segs:
+                    if s.t0 <= t:
+                        cur = s
+                    else:
+                        break
+            if cur is None:
+                return self._segs[0] if self._segs else None
+            for s in self._segs:
+                if s.seq > cur.seq and s.run != cur.run:
+                    return s
+            return None
+
     def live_segment(self, lead: float) -> Segment | None:
         """Where to join live: the segment *lead* seconds behind the newest
         byte, within the newest run, so mpv has something to start from."""

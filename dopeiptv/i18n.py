@@ -373,6 +373,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "diag_account_status": {"en": "Your account is {status} — contact your provider"},
     "diag_expired": {"en": "Your subscription has expired — renew it with your provider"},
     "diag_conn_limit": {"en": "All {active}/{maxc} connections are in use — close the stream on your other device or app"},
+    "stream_contested": {"en": "The provider keeps cutting the stream — if this account is playing on another device or app, close it there."},
     "diag_timeout": {"en": "The provider didn't respond (timeout) — its server is likely down or overloaded"},
     "diag_unreachable": {"en": "Can't reach the provider — its server is down or there's a network problem"},
     "diag_forbidden": {"en": "The provider refused the stream (HTTP {code}) — account blocked, or too many connections"},

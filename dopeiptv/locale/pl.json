@@ -240,6 +240,7 @@
   "diag_account_status": "Twoje konto ma status {status} — skontaktuj się z dostawcą",
   "diag_expired": "Twoja subskrypcja wygasła — odnów ją u dostawcy",
   "diag_conn_limit": "Wszystkie {active}/{maxc} połączenia są w użyciu — zamknij transmisję na innym urządzeniu lub w aplikacji",
+  "stream_contested": "Dostawca ciągle przerywa transmisję — jeśli to konto odtwarza coś na innym urządzeniu lub w innej aplikacji, zamknij je tam.",
   "diag_timeout": "Dostawca nie odpowiedział (przekroczono czas) — jego serwer jest prawdopodobnie wyłączony lub przeciążony",
   "diag_unreachable": "Nie można połączyć się z dostawcą — jego serwer jest wyłączony lub wystąpił problem z siecią",
   "diag_forbidden": "Dostawca odrzucił transmisję (HTTP {code}) — konto zablokowane lub zbyt wiele połączeń",

@@ -240,6 +240,7 @@
   "diag_account_status": "Tu cuenta está {status} — contacta con tu proveedor",
   "diag_expired": "Tu suscripción ha caducado — renuévala con tu proveedor",
   "diag_conn_limit": "Todas las conexiones {active}/{maxc} están en uso — cierra la transmisión en tu otro dispositivo o app",
+  "stream_contested": "El proveedor corta la emisión una y otra vez: si esta cuenta se está usando en otro dispositivo o app, ciérrala allí.",
   "diag_timeout": "El proveedor no respondió (timeout) — su servidor está caído o sobrecargado",
   "diag_unreachable": "No se puede conectar con el proveedor — su servidor está caído o hay un problema de red",
   "diag_forbidden": "El proveedor rechazó la transmisión (HTTP {code}) — cuenta bloqueada o demasiadas conexiones",

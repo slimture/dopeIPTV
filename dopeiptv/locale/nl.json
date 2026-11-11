@@ -240,6 +240,7 @@
   "diag_account_status": "Je account is {status} — neem contact op met je provider",
   "diag_expired": "Je abonnement is verlopen — verleng het bij je provider",
   "diag_conn_limit": "Alle {active}/{maxc} verbindingen zijn in gebruik — sluit de stream op je andere apparaat of app",
+  "stream_contested": "De aanbieder breekt de stream steeds af — speelt dit account op een ander apparaat of in een andere app, sluit het daar.",
   "diag_timeout": "De provider reageerde niet (time-out) — de server is waarschijnlijk offline of overbelast",
   "diag_unreachable": "Kan de provider niet bereiken — de server is offline of er is een netwerkprobleem",
   "diag_forbidden": "De provider weigerde de stream (HTTP {code}) — account geblokkeerd of te veel verbindingen",

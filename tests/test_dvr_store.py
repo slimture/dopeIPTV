@@ -157,3 +157,27 @@ def test_live_waits_for_the_run_that_is_coming_not_the_one_before(tmp_path):
     threading.Timer(0.2, lambda: st.append(b"\x47" + b"y" * 187)).start()
     assert st.wait_for_data(3.0)
     assert st.live_segment(4.0).run == 1
+
+
+def test_after_a_run_playback_goes_on_from_the_next_run_not_the_same(tmp_path):
+    # A run of one short segment: "the first segment beginning after where
+    # playback is, less half a second" was that very segment, and playback
+    # opened it again and again ("on from segment 37" over and over).
+    t = [1000.0]
+    s = SegmentStore(tmp_path / "s", 600, 10**9, min_free=0, clock=lambda: t[0])
+    s.append(b"\x47" + b"a" * 187)
+    first = s.newest()
+    s.new_run()
+    t[0] += 0.3
+    s.append(b"\x47" + b"b" * 187)
+    short = s.newest()
+    t[0] += 0.2
+    s.new_run()
+    assert s.next_run_after(short.t0 + 0.1, short.seq) is None   # none yet
+    t[0] += 5
+    s.append(b"\x47" + b"c" * 187)
+    nxt = s.newest()
+    assert s.next_run_after(short.t0 + 0.1, short.seq) is nxt
+    # Without the segment's number, by time alone, the same answer.
+    assert s.next_run_after(short.t0 + 0.1) is nxt
+    assert s.next_run_after(first.t0, first.seq) is short

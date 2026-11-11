@@ -240,6 +240,7 @@
   "diag_account_status": "您的账户状态为 {status} — 请联系您的提供商",
   "diag_expired": "您的订阅已过期 — 请向提供商续订",
   "diag_conn_limit": "{active}/{maxc} 个连接已全部占用 — 请在您的其他设备或应用上关闭该流",
+  "stream_contested": "服务商不断中断直播流——如果此账号正在其他设备或应用上播放，请在那里关闭。",
   "diag_timeout": "提供商未响应（超时）— 其服务器可能已宕机或过载",
   "diag_unreachable": "无法连接到提供商 — 其服务器已宕机或存在网络问题",
   "diag_forbidden": "提供商拒绝了该流（HTTP {code}）— 账户被封或连接过多",

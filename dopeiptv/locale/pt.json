@@ -240,6 +240,7 @@
   "diag_account_status": "Sua conta está {status} — entre em contato com seu provedor",
   "diag_expired": "Sua assinatura expirou — renove com seu provedor",
   "diag_conn_limit": "Todas as {active}/{maxc} conexões estão em uso — feche a transmissão no outro dispositivo ou app",
+  "stream_contested": "O provedor corta a transmissão sem parar — se esta conta estiver tocando em outro aparelho ou app, feche lá.",
   "diag_timeout": "O provedor não respondeu (tempo esgotado) — o servidor provavelmente está fora do ar ou sobrecarregado",
   "diag_unreachable": "Não é possível acessar o provedor — o servidor está fora do ar ou há um problema de rede",
   "diag_forbidden": "O provedor recusou a transmissão (HTTP {code}) — conta bloqueada ou conexões demais",
