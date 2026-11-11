@@ -65,6 +65,25 @@ TITLES = {
               "Studio Stories", "Festival Nights", "Night Mix"],
 }
 SHOTS = ("main", "guide", "multiview", "timeshift")
+STILLS = ("orbit", "cosmos", "planet", "launch")
+#: Where the parent leaves the videos, so each language need not make them.
+VIDEO_DIR_ENV = "DOPEIPTV_SHOWCASE_VIDEOS"
+
+
+def make_videos(folder: str) -> dict[str, str]:
+    """Each still as a ten-minute video (made once per folder)."""
+    out = {}
+    for name in STILLS:
+        dst = os.path.join(folder, name + ".mp4")
+        if not os.path.exists(dst):
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-loop", "1",
+                            "-framerate", "5", "-i",
+                            os.path.join(SHOWCASE, name + ".jpg"), "-vf",
+                            "scale=640:360,format=yuv420p", "-t", "600",
+                            "-c:v", "libx264", "-preset", "ultrafast",
+                            "-tune", "stillimage", dst], check=True)
+        out[name] = dst
+    return out
 
 
 def guide_xml(streams: list[dict]) -> bytes:
@@ -138,18 +157,9 @@ def one_language(lang: str, out: str) -> int:
 
     # Each still as a short video: mpv plays it, so the player is in the
     # state a real channel puts it in; what it draws is the still itself.
-    stills: dict[str, QImage] = {}
-    videos: dict[str, str] = {}
-    for name in ("orbit", "cosmos", "planet", "launch"):
-        src = os.path.join(SHOWCASE, name + ".jpg")
-        stills[name] = QImage(src)
-        dst = os.path.join(tmp, name + ".mp4")
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-loop", "1",
-                        "-framerate", "5", "-i", src, "-vf",
-                        "scale=640:360,format=yuv420p", "-t", "600",
-                        "-c:v", "libx264", "-preset", "ultrafast",
-                        "-tune", "stillimage", dst], check=True)
-        videos[name] = dst
+    stills = {name: QImage(os.path.join(SHOWCASE, name + ".jpg"))
+              for name in STILLS}
+    videos = make_videos(os.environ.get(VIDEO_DIR_ENV) or tmp)
 
     def paint_still(self) -> None:
         try:
@@ -330,12 +340,18 @@ def one_language(lang: str, out: str) -> int:
     pl._seek_mode = "timeline"
     pl.enter_timeshift(90)
     settle(1.5)
-    pl.update_timeshift_position(28, "Countdown")
     pl._show_ts_timeline()
+    pl.update_timeshift_position(28, "Countdown")
+    # The player's own clock reports the stream it is really on - live -
+    # and would put the marker back there before the picture is taken.
+    pl.update_timeshift_position = lambda *a, **k: None  # type: ignore[method-assign]
     spin(0.5)
     save(w.grab().toImage(), "timeshift")
-    w.close()
-    return 0
+    # Out at once: Qt and mpv tearing down at interpreter exit abort now and
+    # then, which would report a language whose pictures are all written as
+    # failed.
+    sys.stdout.flush()
+    os._exit(0)
 
 
 def main(argv: list[str]) -> int:
@@ -345,6 +361,8 @@ def main(argv: list[str]) -> int:
         print(__doc__)
         return 2
     out, wanted = argv[0], argv[1:]
+    os.environ[VIDEO_DIR_ENV] = tempfile.mkdtemp(prefix="dopeiptv-videos-")
+    make_videos(os.environ[VIDEO_DIR_ENV])
     from dopeiptv import i18n
     langs = wanted or ["en", *sorted(c for c in i18n.LANGUAGES if c != "en")]
     failed = []
