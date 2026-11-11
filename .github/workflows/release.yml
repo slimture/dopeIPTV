@@ -1020,6 +1020,8 @@ jobs:
           # Apple checks the .dmg and the app in it, and the ticket it issues
           # is stapled to the .dmg, so the first open needs no lookup. The app
           # copied out of it is known to Gatekeeper by the same ticket.
+          # Apple usually answers in minutes, but a new account's first
+          # submissions and busy days take longer: wait up to two hours.
           V=${{ steps.v.outputs.version }}
           DMG="dopeIPTV-${V}-macOS-${{ matrix.arch }}.dmg"
           codesign --force --timestamp --keychain "$KC" --sign "$ID" "$DMG"
@@ -1030,7 +1032,7 @@ jobs:
           KEY="${RUNNER_TEMP}/AuthKey.p8"
           printf '%s' "${APPLE_API_KEY_P8}" | base64 --decode > "$KEY"
           AUTH=(--key "$KEY" --key-id "${APPLE_API_KEY_ID}" --issuer "${APPLE_API_ISSUER_ID}")
-          xcrun notarytool submit "$DMG" "${AUTH[@]}" --wait --timeout 45m \
+          xcrun notarytool submit "$DMG" "${AUTH[@]}" --wait --timeout 2h \
             --output-format json > "${RUNNER_TEMP}/notary.json" || true
           cat "${RUNNER_TEMP}/notary.json"; echo
           STATUS=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("status",""))' "${RUNNER_TEMP}/notary.json" 2>/dev/null || true)
