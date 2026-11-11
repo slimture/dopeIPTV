@@ -1,8 +1,9 @@
 """EPG guide grid regressions.
 
 Covers: channels without EPG data are clickable/playable; arrow-key cell
-navigation, description panel and progress fills; and the rebuild when the
-guide finishes loading after the dialog opened.
+navigation, description panel and progress fills; the rebuild when the
+guide finishes loading after the dialog opened; and the board opening on
+"now" in a right-to-left language.
 
 Runs in a subprocess like the multiview test: the dialog needs a real
 MainWindow (whose embedded player owns an offscreen QOpenGLWidget), and
@@ -236,6 +237,24 @@ assert rb["label"].data(0) is None             # carries no click payload
 item, data = d._hit(QPointF(label_rect.x() + 4, label_rect.center().y()))
 assert item is rb["item"], item                # the card, not the text item
 assert data["prog"]["title"] == "Clickable Title"
+d.deleteLater(); app.processEvents()
+
+# ---- 7. A right-to-left language opens the board on "now" too ---------------
+# Qt inverts a view's horizontal scrolling under a right-to-left layout, and
+# the guide's scroll positions are left-to-right scene coordinates: Arabic,
+# Persian, Hebrew and Urdu opened it hours away from now, on an empty board.
+from PyQt6.QtCore import Qt
+app.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+d = EpgGridDialog(w, [{"name": "One", "stream_id": 1, "num": 1}])
+d.resize(1200, 600)
+d.show()
+app.processEvents()
+vp = d.view.viewport().rect()
+left = d.view.mapToScene(vp.topLeft()).x()
+right = d.view.mapToScene(vp.topRight()).x()
+now_x = d._x(time.time())
+assert left <= now_x <= right, (left, now_x, right)
+app.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
 d.deleteLater(); app.processEvents()
 
 print("EPG_GRID_OK")

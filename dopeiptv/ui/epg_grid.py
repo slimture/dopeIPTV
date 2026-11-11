@@ -128,6 +128,13 @@ class EpgGridDialog(QDialog):
 
         self.scene = QGraphicsScene(self)
         self.view = _GridView(self.scene, self)
+        # The board is drawn left to right - channels on the left, time
+        # running rightwards - in every language. Under a right-to-left
+        # layout Qt inverts the view's horizontal scrolling, so every
+        # setValue() below landed hours away from the time it meant and
+        # Arabic, Persian, Hebrew and Urdu opened the guide on an empty
+        # stretch of the future.
+        self.view.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
         # Full-viewport repaint on scroll. The default minimal-update mode
         # scrolls the rendered pixels and only repaints the newly-exposed
         # strip - but the pinned header/column and the sticky, re-elided

@@ -14,6 +14,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   other link. Qt asks for the activation token for the focused window, and
   from a menu that was the menu itself or, as it closed, none; the link now
   waits a moment for the window to have the focus back.
+- The TV guide in Arabic, Persian, Hebrew and Urdu opened hours away from
+  now, on an empty stretch of the board: Qt inverts a view's horizontal
+  scrolling in a right-to-left layout, and the guide scrolls in
+  left-to-right scene coordinates. The board itself (channels on the left,
+  time running right) stays left to right in every language.
 
 ## [1.4.3]
 
