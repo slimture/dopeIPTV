@@ -874,7 +874,9 @@ class Handler(BaseHTTPRequestHandler):
         an invite, and signing out. Open to anyone, from the site's own pages
         only; admin_auth counts the failures and holds back a guesser."""
         if (self.headers.get("Origin") or "").rstrip("/") != ORIGIN:
-            return self._send(403, {"error": "origin"})
+            print(f"[donate] admin sign-in refused ({action}): from {self.headers.get('Origin') or 'no origin'}, "
+                  f"not {ORIGIN} (DONATE_ORIGIN)", file=sys.stderr, flush=True)
+            return self._send(403, {"error": f"This page is not {ORIGIN}; sign in there."})
         data = self._body(16384)
         if data is None:
             return self._send(400, {"error": "bad request"})
@@ -912,6 +914,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._signed_in(auth.login_code(str(data.get("ticket") or ""),
                                                        str(data.get("code") or ""), addr))
         except auth.AuthError as e:
+            # What went wrong, for whoever reads the service's log: never what
+            # was typed (a password in the name field would land there).
+            print(f"[donate] admin sign-in refused ({action}, {addr}): {e.why or e}", file=sys.stderr, flush=True)
             return self._send(400, {"error": str(e)})
         return self._send(404, {"error": "not found"})
 

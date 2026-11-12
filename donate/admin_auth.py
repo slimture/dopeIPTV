@@ -45,7 +45,12 @@ _fails: dict = {}             # address or user -> [times]
 
 
 class AuthError(Exception):
-    """Refused, with a reason fit to show."""
+    """Refused, with a reason fit to show; *why* says more, for the
+    service's log only."""
+
+    def __init__(self, msg: str, why: str = "") -> None:
+        super().__init__(msg)
+        self.why = why
 
 
 def configure(stats_dir: str, origin: str, key: bytes) -> None:
@@ -382,7 +387,7 @@ def blocked(*keys: str) -> bool:
 
 def _guard(addr: str, user: str = "") -> None:
     if blocked("a:" + addr, "u:" + user if user else ""):
-        raise AuthError("Too many tries. Wait a quarter of an hour and try again.")
+        raise AuthError("Too many tries. Wait a quarter of an hour and try again.", "held back after 10 failures")
 
 
 # -- signing in ------------------------------------------------------------------------
@@ -427,18 +432,31 @@ def login_passkey(cred: dict, addr: str) -> str:
         raise
 
 
+def _named(name: str, users: dict) -> str:
+    """The admin a typed name means: the sign-in name, or else the name
+    shown (an invite's "Pontus" for "admin") when only one admin has it."""
+    name = " ".join(str(name or "").split()).lower()
+    if name in users:
+        return name
+    hits = [u for u, rec in users.items() if " ".join(str(rec.get("name", "")).split()).lower() == name]
+    return hits[0] if len(hits) == 1 else name
+
+
 def login_password(user: str, password: str, addr: str) -> dict:
     """{"user"} when signed in, or {"ticket"} when an authenticator code is
     needed next; AuthError for anything wrong (one message for both a wrong
     name and a wrong password)."""
-    user = str(user or "").strip().lower()
+    users = _load()["users"]
+    user = _named(user, users)
     _guard(addr, user)
-    rec = _load()["users"].get(user)
+    rec = users.get(user)
     # The same work for a name that does not exist: no faster "no".
     stored = (rec or {}).get("password") or _dummy_hash()
     if not check_password(str(password or ""), stored) or not rec or not rec.get("password"):
         _failed("a:" + addr, "u:" + user)
-        raise AuthError("That name and password do not match.")
+        why = ("no admin by that name" if not rec else
+               f"{user} has no password" if not rec.get("password") else f"wrong password for {user}")
+        raise AuthError("That name and password do not match.", why)
     if rec.get("totp"):
         ticket = secrets.token_urlsafe(24)
         with _LOCK:
@@ -464,7 +482,7 @@ def login_code(ticket: str, code: str, addr: str) -> str:
         step = totp_match(totp.get("secret", ""), code, int(totp.get("last", 0))) if totp else None
         if step is None:
             _failed("a:" + addr, "u:" + user)
-            raise AuthError("That code is not right. Codes change every 30 seconds.")
+            raise AuthError("That code is not right. Codes change every 30 seconds.", f"wrong code for {user}")
         totp["last"] = step
         _save(data)
         _tickets.pop(str(ticket), None)

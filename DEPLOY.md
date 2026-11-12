@@ -427,7 +427,12 @@ here or on every device. The admins live in
 `/usr/local/www/iptv/stats/admin-users.json` (mode 600): password hashes
 (scrypt), passkeys' public keys, authenticator secrets, invites as hashes.
 Ten failed tries in 15 minutes hold back that address or name for a
-quarter of an hour; nginx counts sign-in requests too.
+quarter of an hour; nginx counts sign-in requests too. Each refused try is
+a line in `/var/log/iptv-donate.log` saying why (no admin by that name, a
+wrong password, another origin), never what was typed. The name field
+takes the sign-in name or the name shown, so "admin" and "Pontus" are the
+same admin. Any `/admin/` address opened without a session goes to
+`/admin/login`.
 
 **From the old password to the new sign-in** (once): put the files in
 place and restart the service (below), open `https://dopeiptv.org/admin/`
