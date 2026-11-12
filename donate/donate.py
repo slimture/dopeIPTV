@@ -677,7 +677,7 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:  # noqa: BLE001 - old numbers rather than no page
                 print(f"[donate] statistics not brought up to date: {e!r}", file=sys.stderr, flush=True)
             if path == "/admin/visits":
-                return self._send(200, admin.visits(stats_dir, query.get("day", "")))
+                return self._send(200, admin.visits(stats_dir, query.get("day", ""), query.get("span", "day")))
             if path == "/admin/visitor":
                 return self._send(200, admin.visitor(stats_dir, query.get("id", "")))
             try:
@@ -689,7 +689,7 @@ class Handler(BaseHTTPRequestHandler):
             body = admin.data(days, stats_dir,
                               CONF.get("DOWNLOADS_JSON", os.path.join(admin.SITE, "downloads.json")),
                               _secret(), API_VERSION)
-            body["visits_days"] = int(CONF.get("STATS_VISITS_DAYS", "30") or 30)
+            body["visits_days"] = int(CONF.get("STATS_VISITS_DAYS", "400") or 400)
             body["push"] = {"ready": push_ready(), "key": push_key() if push_ready() else "",
                             "devices": [{"label": d.get("label", ""), "added": d.get("added", 0)}
                                         for d in push_subs()]}
@@ -806,7 +806,7 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/admin/sw.js", "/admin/app.webmanifest"):
             return self._open_file(path)
         if path == "/admin/" or path in ("/admin/admin.css", "/admin/admin.js", "/admin/data",
-                                         "/admin/visits", "/admin/visitor"):
+                                         "/admin/visits", "/admin/visitor", "/admin/find"):
             return self._admin(path)
         if path != "/donate/config":
             return self._send(404, {"error": "not found"})

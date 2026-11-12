@@ -670,8 +670,14 @@
   // -- the visitor log -------------------------------------------------------------
   let logDay = "", logDays = [], logList = [], showRobots = false;
   let logFilter = null;          // {by, value, label}: the log shows one row of the overview
+  let logSpan = "day", logEnd = "";  // the log shows a day, week, month or year
   try { showRobots = localStorage.getItem("admin-robots") === "1"; } catch (e) { /* hidden then */ }
   function badge(text, cls) { return mk("span", "badge" + (cls ? " " + cls : ""), text); }
+  // How long single visits are kept (donate.py: STATS_VISITS_DAYS), in words.
+  function keptFor() {
+    const n = (data && data.visits_days) || 400;
+    return n < 60 ? n + " days" : Math.round(n / 30.44) + " months";
+  }
   // From iOS 26 Safari says iOS 18 for every newer system; its own version is
   // the system's. Visits counted before the collector knew it still say 18.
   function osText(v) {
@@ -697,7 +703,34 @@
     cell.append(document.createTextNode(clock.format(when)));
     return cell;
   }
-  function visitRow(v, showDay) {
+  // A visit kept only anonymously (after STATS_VISITS_DAYS): its day, no
+  // time of day and no visitor - what stats_collect.py's anonymous() keeps.
+  function anonRow(a) {
+    const row = mk("details", "visit with-day anon" + (a.kind === "robot" ? " robot" : ""));
+    const sum = mk("summary");
+    const cell = mk("span", "v-time");
+    cell.append(mk("span", "d", dayFmt.format(day(a.day))));
+    sum.append(cell,
+      mk("span", "v-where", flag(a.country) + countryName(a.country)),
+      mk("span", "v-what", [a.browser, a.os, a.device].filter(Boolean).join(" · ")),
+      mk("span", "v-from", a.channel ? a.channel + (a.site ? " · " + a.site : "") : (a.downloaded ? "Straight to a download" : "")),
+      mk("span", "v-pages", (a.pages ? a.pages + (a.pages === 1 ? " page" : " pages") : "") +
+         (a.timed ? " · about " + duration(a.time) : a.pages ? " · time unknown" : "")));
+    const tags = mk("span", "v-tags");
+    if (a.kind === "robot") { tags.append(badge("Likely robot", "robot")); }
+    if (a.returning) { tags.append(badge("Returning")); }
+    if (a.downloaded) { tags.append(badge("Downloaded", "good")); }
+    if (a.donated) { tags.append(badge("\u2665 Donated", "heart")); }
+    else if (a.donate) { tags.append(badge("Opened donate", "soft-heart")); }
+    sum.append(tags);
+    row.append(sum);
+    const body = mk("div", "v-body");
+    body.append(mk("p", "muted", "Kept without details after " + keptFor() + ": no time of day and no visitor, " +
+                   "the time rounded to ten seconds."));
+    row.append(body);
+    return row;
+  }
+  function visitRow(v, showDay, fromVisitor) {
     const row = mk("details", "visit" + (v.kind === "robot" ? " robot" : "") + (showDay ? " with-day" : ""));
     const sum = mk("summary");
     const when = new Date(v.start * 1000);
@@ -735,7 +768,7 @@
       facts.append(mk("dt", "", k), mk("dd", "", val));
     });
     body.append(facts);
-    if (!showDay) {
+    if (!fromVisitor) {
       const all = mk("button", "link", "Every visit by this visitor");
       all.type = "button";
       all.addEventListener("click", () => showVisitor(v.id));
@@ -744,15 +777,27 @@
     row.append(body);
     return row;
   }
+  // What a period is called in the picker.
+  function periodName(x) {
+    if (logSpan === "week") {
+      const s = day(x), e = day(x);
+      e.setDate(e.getDate() + 6);
+      return dayFmt.format(s) + " \u2013 " + dateFmt.format(e);
+    }
+    if (logSpan === "month") { return longMonth.format(day(x)); }
+    if (logSpan === "year") { return x.slice(0, 4); }
+    return longDay.format(day(x));
+  }
   function loadDay(d) {
     $("visit-list").replaceChildren(mk("p", "muted", "Loading…"));
-    fetch("/admin/visits?day=" + encodeURIComponent(d || ""), { credentials: "same-origin", cache: "no-store" })
+    fetch("/admin/visits?day=" + encodeURIComponent(d || "") + "&span=" + logSpan,
+          { credentials: "same-origin", cache: "no-store" })
       .then((r) => { if (!r.ok) { throw new Error("the service answered " + r.status); } return r.json(); })
       .then((res) => {
-        logDay = res.day; logDays = res.days || [];
+        logDay = res.day; logEnd = res.end || res.day; logDays = res.periods || res.days || [];
         const pick = $("day-pick");
         pick.replaceChildren(...(logDays.indexOf(logDay) < 0 ? [logDay].concat(logDays) : logDays).map((x) => {
-          const o = mk("option", "", longDay.format(day(x))); o.value = x; return o;
+          const o = mk("option", "", periodName(x)); o.value = x; return o;
         }));
         pick.value = logDay;
         const i = logDays.indexOf(logDay);
@@ -770,28 +815,32 @@
   // were either way.
   function drawLog() {
     const f = logFilter;
-    ["day-prev", "day-pick", "day-next"].forEach((id) => { $(id).hidden = !!f; });
+    ["day-prev", "day-pick", "day-next", "spans"].forEach((id) => { $(id).hidden = !!f; });
     $("filter-clear").hidden = !f;
+    document.querySelectorAll("#spans button").forEach((b) => b.setAttribute("aria-checked", b.dataset.span === logSpan ? "true" : "false"));
     const counted = logList.filter((v) => v.kind !== "robot");
     const robots = logList.length - counted.length;
-    const people = new Set(counted.map((v) => v.id)).size;
+    const anon = counted.filter((v) => v.anon).length;
+    const people = new Set(counted.filter((v) => !v.anon).map((v) => v.id)).size;
     let span = "";
     if (f) {
-      const kept = (data && data.visits_days) || 30;
-      span = !days || days > kept ? " in the last " + kept + " days (single visits are kept " + kept + ")"
+      const kept = (data && data.visits_days) || 400;
+      span = !days || days > kept ? " in the last " + keptFor() + " (single visits are kept that long)"
                                   : " in the last " + days + " days";
     }
     $("day-sum").textContent = (f ? f.label + " \u00b7 " : "") +
       num.format(counted.length) + (counted.length === 1 ? " visit" : " visits") +
-      " by " + num.format(people) + (people === 1 ? " visitor" : " visitors") + span +
+      (anon ? " \u00b7 " + num.format(anon) + " kept without details"
+            : " by " + num.format(people) + (people === 1 ? " visitor" : " visitors")) + span +
       (robots ? " · " + num.format(robots) + (robots === 1 ? " likely robot" : " likely robots") : "");
     const tog = $("robots-toggle");
     tog.hidden = !robots;
     tog.textContent = showRobots ? "Hide" : "Show";
     tog.setAttribute("aria-pressed", showRobots ? "true" : "false");
     const list = showRobots ? logList : counted;
-    const none = f ? "No visits kept for this." : "No visits this day.";
-    $("visit-list").replaceChildren(...(list.length ? list.map((v) => visitRow(v, !!f))
+    const none = f ? "No visits kept for this." : "No visits this " + logSpan + ".";
+    const many = !!f || logSpan !== "day";
+    $("visit-list").replaceChildren(...(list.length ? list.map((v) => (v.anon ? anonRow(v) : visitRow(v, many)))
       : [mk("p", "empty", robots ? "Only likely robots." : none)]));
   }
   // A row of the overview's lists, clicked: the visits it counted.
@@ -816,8 +865,8 @@
         const list = res.visits || [];
         $("visitor-head").hidden = false;
         $("visitor-title").textContent = "Visitor " + res.id + " · " + num.format(list.length) +
-          (list.length === 1 ? " visit" : " visits") + " in the last " + ((data && data.visits_days) || 30) + " days";
-        $("visit-list").replaceChildren(...list.map((v) => visitRow(v, true)));
+          (list.length === 1 ? " visit" : " visits") + " in the last " + keptFor();
+        $("visit-list").replaceChildren(...list.map((v) => visitRow(v, true, true)));
         window.scrollTo({ top: 0, behavior: "smooth" });
       });
   }
@@ -826,7 +875,6 @@
     $("tab-overview").hidden = name !== "overview";
     $("tab-visitors").hidden = name !== "visitors";
     document.querySelector(".range").hidden = name !== "overview";
-    try { localStorage.setItem("admin-tab", name); } catch (e) { /* fine */ }
     if (name === "visitors" && !keepLog) { loadDay(logDay); }
     // Drawn while the tab was hidden (data arriving, a resize), a chart
     // measured its box as 0 wide, fell back to its narrowest size and was
@@ -847,6 +895,7 @@
       (T.downloads && S[best] ? " · most on " + pointLabel(S[best].date, best) : "");
     summary(); tiles(); funnel(); visitsChart(); downloadsChart(); visitsTable(); lists(); byChannel(); years(); donations();
     $("updated").textContent = data.updated ? "Counts updated " + stamp.format(new Date(data.updated)) + "." : "";
+    $("kept").textContent = keptFor();
   }
 
   document.querySelectorAll(".range button").forEach((b) => {
@@ -871,15 +920,23 @@
   $("day-next").addEventListener("click", () => loadDay(logDays[logDays.indexOf(logDay) - 1]));
   $("visitor-back").addEventListener("click", () => loadDay(logDay));
   $("filter-clear").addEventListener("click", () => loadDay(logDay));
+  // A day, a week, a month or a year: the period with today in it when the
+  // one shown holds today, else the one that begins where this one does.
+  document.querySelectorAll("#spans button").forEach((b) => b.addEventListener("click", () => {
+    if (b.dataset.span === logSpan) { return; }
+    const now = new Date(), today = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" +
+      String(now.getDate()).padStart(2, "0");
+    const anchor = logDay && !(today >= logDay && today <= logEnd) ? logDay : today;
+    logSpan = b.dataset.span;
+    loadDay(anchor);
+  }));
   $("robots-toggle").addEventListener("click", () => {
     showRobots = !showRobots;
     try { localStorage.setItem("admin-robots", showRobots ? "1" : "0"); } catch (e) { /* this time only */ }
     drawLog();
   });
   setRange(days);
-  let tab = "overview";
-  try { tab = localStorage.getItem("admin-tab") === "visitors" ? "visitors" : "overview"; } catch (e) { /* default */ }
-  setTab(tab);
+  setTab("overview");                    // the page always opens on the overview
 
   // Pull down to reload, in the app on the iPhone's Home Screen. iOS gives
   // a Home Screen web app no pull-to-refresh of its own (Safari's belongs

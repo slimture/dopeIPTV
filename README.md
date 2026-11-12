@@ -67,7 +67,7 @@ Stripe's own page. Setting it up: `DEPLOY.md`, "Donations".
 The same service serves the admin page, `/admin/` behind nginx's password
 (`donate/admin.py`, `donate/admin/`): unique visitors, how they found the
 site, countries, browsers and devices, downloads and donations by day,
-week, month and year, and every visit of the last 30 days one by one. A
+week, month and year, and every visit of the last 13 months one by one. A
 page view counts when the page has opened in a real browser and told
 `/hit` so (`public/nav.js`, no cookie, no id); `donate/stats_collect.py`
 reads nginx's log of it - no address kept, robots left out, and the ones

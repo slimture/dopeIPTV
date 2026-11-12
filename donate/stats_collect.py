@@ -50,7 +50,8 @@ page's visitor log: when, country, browser and version, system, device and
 screen, languages, how the visitor came, the pages and how long each was
 looked at, downloads, the donate dialog - and whether the visitor was here
 before. A visit ends after 30 minutes without a page. After
-STATS_VISITS_DAYS days (30) a visit is made anonymous rather than deleted:
+STATS_VISITS_DAYS days (400, thirteen months: a year against the year
+before) a visit is made anonymous rather than deleted:
 it moves to STATS_DIR/visits-anon/<month>.json with its day, country,
 browser and system without versions, device, page language, how the
 visitor came, the number of pages, the time rounded to ten seconds, and
@@ -129,9 +130,9 @@ KEEP_PER_DAY = 40         # a day's longest lists (sites, files): the top 40, th
 VISITS_DIR = os.path.join(STATS_DIR, "visits")
 ANON_DIR = os.path.join(STATS_DIR, "visits-anon")
 try:
-    VISITS_DAYS = max(1, int(CONF.get("STATS_VISITS_DAYS", "30")))
+    VISITS_DAYS = max(1, int(CONF.get("STATS_VISITS_DAYS", "400")))
 except ValueError:
-    VISITS_DAYS = 30
+    VISITS_DAYS = 400
 VISIT_GAP = 30 * 60       # a visit ends after half an hour without a page
 
 PAGES = {"/": "/", "/help/": "/help/"}

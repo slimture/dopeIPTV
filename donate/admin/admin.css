@@ -99,6 +99,11 @@ main { max-width: 1120px; margin: 0 auto; padding: 20px 16px 48px; display: flex
 .lists { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .subhead { margin: 16px 0 0; font-size: 12.5px; font-weight: 600; color: var(--muted); }
 .link.more { margin-top: 8px; }
+/* Day, week, month or year in the visitor log: the overview's period switch. */
+.spans { display: inline-flex; padding: 3px; border-radius: 999px; background: color-mix(in srgb, var(--text) 7%, transparent); flex: none; }
+.spans button { font: inherit; font-size: 13px; font-weight: 600; border: 0; background: none; color: var(--text-2);
+  padding: 5px 12px; border-radius: 999px; cursor: pointer; }
+.spans button[aria-checked="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
 /* Visits from several days carry their date, on a line above the time. */
 .v-time .d { display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); }
 .visit.with-day summary { grid-template-columns: 80px minmax(110px, 1.1fr) minmax(0, 2fr) minmax(0, 1.6fr) minmax(0, 1fr); }

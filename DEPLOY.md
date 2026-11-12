@@ -360,7 +360,7 @@ dialog" in its metadata.
 page views, time per visit, how visitors found the site, countries,
 languages, browsers and versions, systems, devices and screens, downloads
 and donations - per day, week, month and calendar year - and, under
-*Visitors*, every visit of the last 30 days one by one: when, from where,
+*Visitors*, every visit of the last 13 months one by one: when, from where,
 which pages and how long, downloads, the donate dialog, and every other
 visit by the same visitor.
 
@@ -375,7 +375,8 @@ How it counts, so the numbers are honest:
 - A visitor is a hash of address and browser with a secret salt kept on the
   server; no address is written down. The hashes are kept 25 months (unique
   and returning visitors, a year against the year before). Single visits
-  are kept 30 days (`STATS_VISITS_DAYS`); then they are made anonymous -
+  are kept 400 days, thirteen months (`STATS_VISITS_DAYS`; until
+  November 2026 it was 30); then they are made anonymous -
   no id, no time of day, no versions or screen, only the day, country,
   browser and system, device, how the visitor came, pages, time and whether
   there was a download or the donate dialog - and kept for good, as are the
@@ -390,7 +391,7 @@ How it counts, so the numbers are honest:
 - The numbers are brought up to date whenever the admin page is opened,
   and by cron every quarter hour.
 
-The visits of the last 30 days are personal data under the GDPR even
+The visits of the last 13 months are personal data under the GDPR even
 without an address (the id can be worked out again from an address); the
 anonymous ones and the counts are not. The site should say what is counted
 and why (a short privacy note).

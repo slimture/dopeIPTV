@@ -7,7 +7,8 @@ missing auth_basic line cannot open the page to everyone.
     GET /admin/            the page (admin/index.html, admin.css, admin.js)
     GET /admin/data?days=N the numbers for the last N days (7, 30, 90, 365;
                            0 for everything kept)
-    GET /admin/visits?day=YYYY-MM-DD   that day's visits, one by one
+    GET /admin/visits?day=YYYY-MM-DD&span=day|week|month|year
+                                       the visits of that day, week, month or year
     GET /admin/visitor?id=...          every visit kept of one visitor
     GET /admin/find?by=country&value=SE&days=30   the kept visits one row of
                                        the overview's lists counted
@@ -388,15 +389,75 @@ def visit_days(stats_dir: str) -> list:
     return sorted((n[:10] for n in names if n.endswith(".json") and len(n) == 15), reverse=True)
 
 
-def visits(stats_dir: str, day: str) -> dict:
-    """One day's visits, newest first."""
+SPANS = ("day", "week", "month", "year")
+
+
+def _span_start(d: date, span: str) -> date:
+    if span == "week":
+        return d - timedelta(days=d.weekday())
+    if span == "month":
+        return d.replace(day=1)
+    if span == "year":
+        return d.replace(month=1, day=1)
+    return d
+
+
+def _span_end(start: date, span: str) -> date:
+    if span == "week":
+        return start + timedelta(days=6)
+    if span == "month":
+        return (start.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+    if span == "year":
+        return start.replace(month=12, day=31)
+    return start
+
+
+def _anon_by_day(stats_dir: str) -> dict:
+    """The anonymous visits (STATS_DIR/visits-anon/<month>.json), by day."""
+    by_day: dict = {}
     try:
-        date.fromisoformat(day)
+        names = sorted(n for n in os.listdir(os.path.join(stats_dir, "visits-anon")) if n.endswith(".json"))
+    except OSError:
+        return by_day
+    for name in names:
+        month = _load(os.path.join(stats_dir, "visits-anon", name), {})
+        for d in month.get("days") or []:
+            by_day.setdefault(d, [])
+        for a in month.get("visits") or []:
+            if a.get("day"):
+                by_day.setdefault(a["day"], []).append(dict(a, anon=True))
+    return by_day
+
+
+def visits(stats_dir: str, day: str, span: str = "day") -> dict:
+    """The visits of one day, week, month or year, newest first: one by one
+    for the last STATS_VISITS_DAYS days, and before that as they were made
+    anonymous (no time of day, no visitor; marked anon). "periods" are the
+    starts of the spans that have any."""
+    span = span if span in SPANS else "day"
+    try:
+        at = date.fromisoformat(day)
     except ValueError:
-        day = datetime.now().astimezone().date().isoformat()
-    lst = [v for v in _visits_file(stats_dir, day) if v.get("pages") or v.get("downloads")]
-    lst.sort(key=lambda v: -v.get("start", 0))
-    return {"day": day, "days": visit_days(stats_dir), "visits": lst}
+        at = datetime.now().astimezone().date()
+    detailed = visit_days(stats_dir)
+    kept = set(detailed)
+    anon = _anon_by_day(stats_dir)
+    periods = sorted({_span_start(date.fromisoformat(d), span).isoformat() for d in kept | set(anon)},
+                     reverse=True)
+    start = _span_start(at, span)
+    end = _span_end(start, span)
+    lst: list = []
+    d = start
+    while d <= end:
+        iso = d.isoformat()
+        if iso in kept:
+            lst += [dict(v, day=iso) for v in _visits_file(stats_dir, iso) if v.get("pages") or v.get("downloads")]
+        else:
+            lst += [a for a in anon.get(iso, []) if a.get("pages") or a.get("downloaded")]
+        d += timedelta(days=1)
+    lst.sort(key=lambda v: (v.get("day", ""), v.get("start", 0)), reverse=True)
+    return {"span": span, "day": start.isoformat(), "end": end.isoformat(), "periods": periods,
+            "days": detailed, "visits": lst}
 
 
 def visitor(stats_dir: str, vid: str) -> dict:
