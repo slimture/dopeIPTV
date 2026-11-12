@@ -28,11 +28,13 @@ body { margin: 0; background: var(--page); color: var(--text);
 h2 { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
 .muted { color: var(--muted); font-size: 13px; }
 
-.top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; padding: 12px max(16px, calc((100vw - 1120px) / 2)); background: color-mix(in srgb, var(--page) 86%, transparent);
+.top { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 10px 12px; padding: 12px max(16px, calc((100vw - 1120px) / 2)); background: color-mix(in srgb, var(--page) 86%, transparent);
   backdrop-filter: saturate(1.6) blur(14px); -webkit-backdrop-filter: saturate(1.6) blur(14px);
   border-bottom: 1px solid var(--line); }
-.brand { display: flex; align-items: center; gap: 9px; min-width: 0; }
+/* The name never gives way: when the tabs and the period do not fit beside
+   it, the period goes to a line of its own (and on a phone the tabs too). */
+.brand { display: flex; align-items: center; gap: 9px; flex: none; }
 .brand img { border-radius: 7px; flex: none; }
 .brand .name { font-weight: 700; letter-spacing: -.02em; }
 .brand .sub { color: var(--muted); }
@@ -138,7 +140,9 @@ tr:last-child td { border-bottom: 0; }
 .foot { margin: 8px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
 .foot a { color: inherit; }
 .tab { display: flex; flex-direction: column; gap: 16px; }
-.tabs { display: inline-flex; gap: 2px; margin-inline-end: auto; margin-inline-start: 12px; }
+.tabs { display: inline-flex; gap: 2px; margin-inline-end: auto; margin-inline-start: 12px; max-width: 100%;
+  overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
 .tabs button { font: inherit; font-size: 14px; font-weight: 600; border: 0; background: none; color: var(--text-2);
   padding: 6px 12px; border-radius: 8px; cursor: pointer; }
 .tabs button[aria-selected="true"] { color: var(--text); background: color-mix(in srgb, var(--text) 8%, transparent); }
@@ -186,12 +190,12 @@ tr:last-child td { border-bottom: 0; }
 @media (max-width: 600px) {
   .top { padding: 10px 16px; }
   .brand .sub { display: none; }
-  .top { flex-wrap: wrap; row-gap: 10px; }
   .range { width: 100%; }
   .range button { flex: 1; padding: 6px 4px; font-size: 12.5px; }
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .kpi:first-child { grid-column: 1 / -1; }
   .tabs { margin-inline-start: 0; }
+  .tabs button { white-space: nowrap; }
   .visit summary { grid-template-columns: 52px minmax(0, 1fr); }
   .v-what, .v-from, .v-pages, .v-tags { grid-column: 2 / -1; }
   .kpi .value { font-size: 24px; }
@@ -564,3 +568,4 @@ tr:last-child td { border-bottom: 0; }
 .account > .msg { order: 99; position: sticky; bottom: 16px; z-index: 4; box-shadow: 0 6px 20px rgba(0, 0, 0, .15);
   background: color-mix(in srgb, var(--down) 12%, var(--surface)); }
 .account > .msg.ok { background: color-mix(in srgb, var(--up) 14%, var(--surface)); }
+@media (max-width: 380px) { .tabs button { padding: 6px 7px; font-size: 13.5px; } }
