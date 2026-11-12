@@ -113,6 +113,7 @@ from urllib.parse import parse_qs, urlsplit
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from donate import CONF  # the shared settings file
+import stats_events  # what a page tells beside the view: help, parts read, links
 
 SITE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # /usr/local/www/iptv
 STATS_DIR = CONF.get("STATS_DIR", os.path.join(SITE, "stats"))
@@ -631,6 +632,10 @@ def _page_line(stats: dict, uniques: dict, state: dict, r: dict, db, visits: Vis
             visit["acted"] = True
         return
     if ev != "view":
+        item = stats_events.clean(ev, q.get("x"), q.get("n"))
+        if item and visit is not None:
+            stats_events.add(visit, t, item)
+            visit["end"] = max(visit["end"], t)
         return
 
     d["views"] += 1

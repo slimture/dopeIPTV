@@ -39,6 +39,8 @@ STATIC = {
     "/admin/": ("index.html", "text/html; charset=utf-8"),
     "/admin/admin.css": ("admin.css", "text/css; charset=utf-8"),
     "/admin/admin.js": ("admin.js", "application/javascript; charset=utf-8"),
+    "/admin/analysis.js": ("analysis.js", "application/javascript; charset=utf-8"),
+    "/admin/logtools.js": ("logtools.js", "application/javascript; charset=utf-8"),
     "/admin/sw.js": ("sw.js", "application/javascript; charset=utf-8"),
     "/admin/app.webmanifest": ("app.webmanifest", "application/manifest+json"),
 }

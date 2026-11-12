@@ -12,6 +12,8 @@
 <meta name="apple-mobile-web-app-title" content="dopeIPTV">
 <link rel="stylesheet" href="/admin/admin.css">
 <script src="/admin/admin.js" defer></script>
+<script src="/admin/analysis.js" defer></script>
+<script src="/admin/logtools.js" defer></script>
 </head>
 <body>
 <header class="top">
@@ -22,6 +24,7 @@
   <div class="tabs" role="tablist">
     <button type="button" role="tab" data-tab="overview" aria-selected="true">Overview</button>
     <button type="button" role="tab" data-tab="visitors" aria-selected="false">Visitors</button>
+    <button type="button" role="tab" data-tab="analysis" aria-selected="false">Analysis</button>
   </div>
   <div class="range" role="radiogroup" aria-label="Period">
     <button type="button" role="radio" data-days="7"><span class="l">7 days</span><span class="s" aria-hidden="true">7 d</span></button>
@@ -99,7 +102,9 @@
       <button type="button" class="step" id="day-next" aria-label="Day after">›</button>
       <span class="muted" id="day-sum"></span>
       <button type="button" class="link" id="robots-toggle" aria-pressed="false" hidden>Show</button>
+      <button type="button" class="link" id="analyse-this" hidden>Analyse this group</button>
     </div>
+    <div class="card logtools" id="log-tools" hidden></div>
     <div class="card visitor-head" id="visitor-head" hidden>
       <button type="button" class="link" id="visitor-back">‹ Back to the day</button>
       <h2 id="visitor-title"></h2>
@@ -107,11 +112,31 @@
     <div class="visits" id="visit-list"></div>
   </div>
 
+  <div id="tab-analysis" class="tab" hidden>
+    <div class="card an-bar" id="an-bar"></div>
+    <div class="an-parts" id="an-parts"></div>
+    <section class="card" id="an-patterns"></section>
+    <section class="card" id="an-explore"></section>
+    <div class="charts an-charts">
+      <section class="card" id="an-trend"></section>
+      <section class="card" id="an-when"></section>
+    </div>
+    <section class="card" id="an-engage"></section>
+    <div class="charts an-charts even">
+      <section class="card" id="an-match"></section>
+      <section class="card" id="an-langs"></section>
+    </div>
+    <section class="card" id="an-acts"></section>
+  </div>
+
   <p class="foot">A page view counts when the page has opened in a real browser: it tells the
     server so itself, without a cookie or an id - robots that never run it, and scripts, are
     left out. Likely robots that do run pages - a browser without a screen, or a Chrome, Edge
     or Firefox more than two years out of date, unless a pointer, touch or key said a person
-    was there - are kept and marked, but not counted. A visitor is a hash of address and browser with a secret salt (no address is
+    was there - are kept and marked, but not counted. The pages also tell which help questions
+    are opened, what the help is searched for, how far down the front page a visit gets, which
+    install steps are opened, a language switched and a link to another site followed - what,
+    never who. A visitor is a hash of address and browser with a secret salt (no address is
     kept, the hashes 25 months); single visits are kept <span id="kept">13 months</span>, then only without anything
     that points to a person, like the counts per day, for good. Your own visits are
     left out: this browser (it opened this page), your own network, and STATS_IGNORE.

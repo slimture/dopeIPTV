@@ -15,6 +15,7 @@ website/
 │   ├── style.css           the look: black/white, greys, the app's blue; light + dark
 │   ├── app.js              OS-detect for the hero button (progressive enhancement)
 │   ├── nav.js, help.js     the narrow-window menu and the help search
+│   ├── events.js           what visitors do on a page, for the statistics (what, never who)
 │   ├── favicon.svg         the app's icon (blue tile, white play)
 │   ├── fonts/              Inter (OFL), self-hosted; Apple devices use their own SF
 │   ├── favicon.ico         16/32/48 px, for clients that ask for it blind
@@ -67,7 +68,12 @@ Stripe's own page. Setting it up: `DEPLOY.md`, "Donations".
 The same service serves the admin page, `/admin/` behind nginx's password
 (`donate/admin.py`, `donate/admin/`): unique visitors, how they found the
 site, countries, browsers and devices, downloads and donations by day,
-week, month and year, and every visit of the last 13 months one by one. A
+week, month and year, and every visit of the last 13 months one by one -
+sorted, grouped and filtered as wanted (`donate/admin/logtools.js`) - and an
+Analysis tab (`donate/admin/analysis.js`, `donate/analysis.py`) that breaks
+those visits down by any data point, split by a second, with patterns,
+charts and what visitors do on the pages (`public/events.js`,
+`donate/stats_events.py`). A
 page view counts when the page has opened in a real browser and told
 `/hit` so (`public/nav.js`, no cookie, no id); `donate/stats_collect.py`
 reads nginx's log of it - no address kept, robots left out, and the ones

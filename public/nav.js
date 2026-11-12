@@ -93,7 +93,13 @@ var iptvHit = (function () {
       shown();
     }
   } catch (e) { /* as above */ }
-  return function (ev) { send("ev=" + encodeURIComponent(ev)); };
+  // iptvHit(event[, what[, number]]): events.js tells what visitors do on
+  // the page with it (donate/stats_events.py lists what is kept).
+  return function (ev, x, n) {
+    send("ev=" + encodeURIComponent(ev) +
+         (x ? "&x=" + encodeURIComponent(String(x).slice(0, 80)) : "") +
+         (n !== undefined ? "&n=" + encodeURIComponent(n) : ""));
+  };
 })();
 
 /* Header disclosures: close them when you click away or press Escape.

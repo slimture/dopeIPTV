@@ -362,7 +362,17 @@ languages, browsers and versions, systems, devices and screens, downloads
 and donations - per day, week, month and calendar year - and, under
 *Visitors*, every visit of the last 13 months one by one: when, from where,
 which pages and how long, downloads, the donate dialog, and every other
-visit by the same visitor.
+visit by the same visitor. The log sorts (newest, oldest, most pages,
+longest), groups (a year by month, a month by day, or by country, system
+and the rest, each group folded with its own sums) and filters. *Analysis*
+takes the same visits: any breakdown, split by a second data point, with a
+measure (visits, visitors, share that downloaded, pages and time per visit,
+came back, opened donate); filters that narrow every part of the tab;
+patterns in plain sentences; visits over time, by weekday and hour, how much
+they read, systems against the files downloaded, browser language against
+the page's, and what visitors do on the pages. Any group there opens one
+visit at a time in the log. The tab and what it shows are kept in the
+address, so a reload stays where it was.
 
 How it counts, so the numbers are honest:
 
@@ -383,6 +393,15 @@ How it counts, so the numbers are honest:
   counts per day. Countries come from DB-IP's free database
   (CC BY 4.0), fetched once a month by the quarter-hour run and looked up
   on the server - nothing is sent anywhere.
+- What visitors do on a page (`public/events.js`, since November 2026):
+  which help questions they open, what they search the help for and how
+  many answers it found, how far down the front page they get, which
+  install steps they open, a language switched, a link to another site
+  followed (its host only). Each once a page, through the same `/hit`, sent
+  by nothing in an automated browser; the service keeps only what
+  `donate/stats_events.py` lists and drops anything else. They live on the
+  visit (`acts`) and go with it after 13 months - the anonymous visit keeps
+  none of them.
 - Your own visits are left out: a browser that has opened `/admin/` gets a
   cookie nginx does not log (pages, downloads, `/hit`), addresses that are
   not public (your own network) never count, and `STATS_IGNORE` in

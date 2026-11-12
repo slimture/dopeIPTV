@@ -226,6 +226,8 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
      locale: ($S.locale[$lang] // "en_US" | h),
      css: ($asset_urls["/style.css"] | h), navjs: ($asset_urls["/nav.js"] | h),
      appjs: ($asset_urls["/app.js"] | h), helpjs: ($asset_urls["/help.js"] | h),
+     # Without a hash (an older sync-releases.sh) still the file, not "null".
+     eventsjs: ($asset_urls["/events.js"] // "/events.js" | h),
      year: $year};
 
 # -- index.php ----------------------------------------------------------------

@@ -1,7 +1,11 @@
 /* The admin page: /admin/data drawn as tiles, two charts, top lists and the
  * donations, and the visitor log (/admin/visits, /admin/visitor) one visit at
- * a time. An external file for the site's CSP (script-src 'self'); the
- * charts are SVG made here, sizes set through the DOM, never inline styles.
+ * a time; the Analysis tab is analysis.js, the log's sort, groups and
+ * filters logtools.js, both built on window.AdminKit below. The tab and
+ * what it shows live in the address (#visitors?span=month...), so a reload
+ * stays where it was, while the page opened afresh starts on the overview.
+ * An external file for the site's CSP (script-src 'self'); the charts are
+ * SVG made here, sizes set through the DOM, never inline styles.
  */
 (function () {
   "use strict";
@@ -38,7 +42,7 @@
   }
   const PAGE_NAMES = { "/": "Home", "/help/": "Help" };
 
-  let days = 30, data = null;
+  let days = 30, data = null, tab = "overview";
   try {
     const saved = localStorage.getItem("admin-days");
     if (saved !== null && RANGES.indexOf(Number(saved)) >= 0) { days = Number(saved); }
@@ -92,6 +96,7 @@
       b.setAttribute("aria-checked", Number(b.dataset.days) === n ? "true" : "false");
     });
     load();
+    if (tab === "analysis" && window.AdminAnalysis) { window.AdminAnalysis.show(); }
   }
   // Donations seen here are not shown again in the note on the site's own
   // pages (public/nav.js, the same browser's storage).
@@ -756,6 +761,7 @@
     v.pages.forEach((p) => steps.push([p[0], (PAGE_NAMES[p[1]] || p[1]) + (p[2] ? " · looked at " + duration(p[2]) : "")]));
     v.downloads.forEach((d) => steps.push([d[0], "Downloaded " + d[1]]));
     (v.events || []).forEach((e) => steps.push([e[0], e[1] === "donated" ? "Donated" : "Opened the donate dialog"]));
+    (v.acts || []).forEach((a) => { const t = actText(a); if (t) { steps.push([a[0], t]); } });
     steps.sort((a, b) => a[0] - b[0]);
     const ol = mk("ol", "steps");
     steps.forEach(([t, text]) => { const li = mk("li"); li.append(mk("span", "t", clockSec.format(new Date(t * 1000))), mk("span", "", text)); ol.append(li); });
@@ -776,6 +782,24 @@
     }
     row.append(body);
     return row;
+  }
+  // What a visitor did on a page (public/events.js, donate/stats_events.py):
+  // [time, event, what, hits].
+  const SECTION_NAMES = { features: "Features", shots: "Screenshots", download: "Download", donate: "the donate band" };
+  const SYSTEMS = { linux: "Linux", macos: "macOS", windows: "Windows" };
+  function helpName(id) { return (data && data.help && data.help[id]) || id; }
+  function actText(a) {
+    const lang = (k) => { try { return langNames ? langNames.of(k) : k; } catch (e) { return k; } };
+    switch (a[1]) {
+      case "q": return "Opened the help question \u201c" + helpName(a[2]) + "\u201d";
+      case "s": return "Searched the help for \u201c" + a[2] + "\u201d" +
+        (a[3] >= 0 ? " \u00b7 " + (a[3] === 0 ? "nothing found" : a[3] + (a[3] === 1 ? " answer" : " answers")) : "");
+      case "sec": return "Scrolled down to " + (SECTION_NAMES[a[2]] || a[2]);
+      case "how": return "Opened the install steps for " + (SYSTEMS[a[2]] || a[2]);
+      case "lang": { const p = String(a[2]).split(">"); return "Switched the language from " + lang(p[0]) + " to " + lang(p[1]); }
+      case "out": return "Followed a link to " + a[2];
+      default: return "";
+    }
   }
   // What a period is called in the picker.
   function periodName(x) {
@@ -806,6 +830,7 @@
         logList = res.visits || [];
         logFilter = null;
         $("visitor-head").hidden = true;
+        if (window.LogTools) { window.LogTools.reset(); }
         drawLog();
       })
       .catch((e) => $("visit-list").replaceChildren(mk("p", "error", "Could not load the visits: " + e.message + ".")));
@@ -817,6 +842,8 @@
     const f = logFilter;
     ["day-prev", "day-pick", "day-next", "spans"].forEach((id) => { $(id).hidden = !!f; });
     $("filter-clear").hidden = !f;
+    $("filter-clear").textContent = f && f.back === "analysis" ? "\u2039 Back to the analysis" : "\u2039 Back";
+    $("analyse-this").hidden = !(f && f.by && FIND_DIMS[f.by] && window.AdminAnalysis);
     document.querySelectorAll("#spans button").forEach((b) => b.setAttribute("aria-checked", b.dataset.span === logSpan ? "true" : "false"));
     const counted = logList.filter((v) => v.kind !== "robot");
     const robots = logList.length - counted.length;
@@ -840,13 +867,23 @@
     const list = showRobots ? logList : counted;
     const none = f ? "No visits kept for this." : "No visits this " + logSpan + ".";
     const many = !!f || logSpan !== "day";
-    $("visit-list").replaceChildren(...(list.length ? list.map((v) => (v.anon ? anonRow(v) : visitRow(v, many)))
-      : [mk("p", "empty", robots ? "Only likely robots." : none)]));
+    const row = (v) => (v.anon ? anonRow(v) : visitRow(v, many));
+    const LT = window.LogTools, shownFor = f ? "group" : logSpan;
+    if (LT) { LT.bar($("log-tools"), list, shownFor, drawLog); }
+    $("visit-list").replaceChildren(...(!list.length ? [mk("p", "empty", robots ? "Only likely robots." : none)]
+      : LT ? LT.rows(list, shownFor, row, drawLog) : list.map(row)));
+    writeHash();
   }
+  // The overview's lists (admin.py FIND_BY) as the Analysis tab's data
+  // points (analysis.js DIMS): a group of visits analysed from the log.
+  const FIND_DIMS = { country: "country", channel: "channel", ref: "site", source: "source", page: "page", lang: "lang",
+                      os_version: "osv", browser: "browser", browser_version: "bv", device: "device", screen: "screen",
+                      download: "dl", file: "file" };
   // A row of the overview's lists, clicked: the visits it counted.
   function showFiltered(by, value, label) {
     logFilter = { by: by, value: value, label: label };
     logList = [];
+    if (window.LogTools) { window.LogTools.reset(); }
     setTab("visitors", true);
     $("visitor-head").hidden = true;
     $("visit-list").replaceChildren(mk("p", "muted", "Loading…"));
@@ -856,6 +893,26 @@
           { credentials: "same-origin", cache: "no-store" })
       .then((r) => { if (!r.ok) { throw new Error("the service answered " + r.status); } return r.json(); })
       .then((res) => { if (logFilter !== want) { return; } logList = res.visits || []; drawLog(); })
+      .catch((e) => $("visit-list").replaceChildren(mk("p", "error", "Could not load the visits: " + e.message + ".")));
+  }
+  // A group of the Analysis tab, one by one: the visits its rows name
+  // ([day, start, id]), the newest first; analysis.py caps them.
+  function showGroup(label, keys) {
+    logFilter = { label: label, back: "analysis" };
+    logList = [];
+    if (window.LogTools) { window.LogTools.reset(); }
+    setTab("visitors", true);
+    $("visitor-head").hidden = true;
+    $("visit-list").replaceChildren(mk("p", "muted", "Loading…"));
+    window.scrollTo({ top: 0 });
+    const want = logFilter;
+    post("/admin/pick", { keys: keys })
+      .then(([ok, res]) => {
+        if (!ok) { throw new Error(res.error || "the service said no"); }
+        if (logFilter !== want) { return; }
+        logList = res.visits || [];
+        drawLog();
+      })
       .catch((e) => $("visit-list").replaceChildren(mk("p", "error", "Could not load the visits: " + e.message + ".")));
   }
   function showVisitor(id) {
@@ -871,16 +928,62 @@
       });
   }
   function setTab(name, keepLog) {
+    tab = name;
     document.querySelectorAll(".tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === name ? "true" : "false"));
     $("tab-overview").hidden = name !== "overview";
     $("tab-visitors").hidden = name !== "visitors";
-    document.querySelector(".range").hidden = name !== "overview";
+    $("tab-analysis").hidden = name !== "analysis";
+    document.querySelector(".range").hidden = name === "visitors";
     if (name === "visitors" && !keepLog) { loadDay(logDay); }
+    if (name === "analysis" && window.AdminAnalysis) { window.AdminAnalysis.show(); }
+    if (name !== "visitors") { writeHash(); }
     // Drawn while the tab was hidden (data arriving, a resize), a chart
     // measured its box as 0 wide, fell back to its narrowest size and was
     // then stretched to the full width - tall as a wall. Drawn again now
     // the box has its width.
     if (name === "overview" && data) { visitsChart(); downloadsChart(); }
+  }
+
+  // -- the address: the tab and what it shows, for a reload --------------------------
+  let started = false;                 // not before readHash: the first setTab would wipe it
+  function writeHash() {
+    if (!started) { return; }
+    let h = "";
+    if (tab === "visitors") {
+      const p = new URLSearchParams();
+      const f = logFilter;
+      if (f && f.back === "analysis") {
+        h = "analysis" + (window.AdminAnalysis ? window.AdminAnalysis.toHash() : "");
+      } else {
+        if (f && f.by) { p.set("by", f.by); p.set("value", f.value); p.set("label", f.label); }
+        else { p.set("span", logSpan); if (logDay) { p.set("day", logDay); } }
+        const t = window.LogTools ? window.LogTools.toHash() : "";
+        if (t) { p.set("f", t); }
+        h = "visitors?" + p.toString();
+      }
+    } else if (tab === "analysis") {
+      h = "analysis" + (window.AdminAnalysis ? window.AdminAnalysis.toHash() : "");
+    }
+    try { history.replaceState(null, "", h ? "#" + h : location.pathname + location.search); } catch (e) { /* fine */ }
+  }
+  // At start: the page opened afresh shows the overview; reloaded, what it
+  // showed (the scripts after this one are in by then).
+  function readHash() {
+    started = true;
+    const h = location.hash.replace(/^#/, ""), name = h.split("?")[0];
+    const p = new URLSearchParams(h.indexOf("?") >= 0 ? h.slice(h.indexOf("?") + 1) : "");
+    if (name === "visitors") {
+      if (window.LogTools) { window.LogTools.fromHash(p.get("f") || ""); }
+      if (p.get("by") && p.get("value")) { return showFiltered(p.get("by"), p.get("value"), p.get("label") || p.get("value")); }
+      if (["day", "week", "month", "year"].indexOf(p.get("span")) >= 0) { logSpan = p.get("span"); }
+      if (/^\d{4}-\d\d-\d\d$/.test(p.get("day") || "")) { logDay = p.get("day"); }
+      return setTab("visitors");
+    }
+    if (name === "analysis" && window.AdminAnalysis) {
+      window.AdminAnalysis.fromHash(h.slice("analysis".length));
+      return setTab("analysis");
+    }
+    setTab("overview");
   }
 
   function render() {
@@ -919,7 +1022,17 @@
   $("day-prev").addEventListener("click", () => loadDay(logDays[logDays.indexOf(logDay) + 1]));
   $("day-next").addEventListener("click", () => loadDay(logDays[logDays.indexOf(logDay) - 1]));
   $("visitor-back").addEventListener("click", () => loadDay(logDay));
-  $("filter-clear").addEventListener("click", () => loadDay(logDay));
+  $("filter-clear").addEventListener("click", () => {
+    if (logFilter && logFilter.back === "analysis") { setTab("analysis"); window.scrollTo({ top: 0 }); return; }
+    loadDay(logDay);
+  });
+  $("analyse-this").addEventListener("click", () => {
+    const f = logFilter;
+    if (!f || !window.AdminAnalysis) { return; }
+    window.AdminAnalysis.focus(FIND_DIMS[f.by], f.value);
+    setTab("analysis");
+    window.scrollTo({ top: 0 });
+  });
   // A day, a week, a month or a year: the period with today in it when the
   // one shown holds today, else the one that begins where this one does.
   document.querySelectorAll("#spans button").forEach((b) => b.addEventListener("click", () => {
@@ -935,8 +1048,20 @@
     try { localStorage.setItem("admin-robots", showRobots ? "1" : "0"); } catch (e) { /* this time only */ }
     drawLog();
   });
+  // What analysis.js and logtools.js build on.
+  window.AdminKit = {
+    $: $, mk: mk, svg: svg, num: num, dayFmt: dayFmt, flag: flag, countryName: countryName, duration: duration,
+    showTip: showTip, hideTip: hideTip, tipRow: tipRow, PAGE_NAMES: PAGE_NAMES, langNames: langNames,
+    helpName: helpName, showFiltered: showFiltered, showGroup: showGroup, writeHash: writeHash,
+    days: () => days,
+    spanText: () => (days ? (days === 365 ? "the last 12 months" : "the last " + days + " days") : "everything kept"),
+  };
   setRange(days);
-  setTab("overview");                    // the page always opens on the overview
+  // The other scripts (defer) run after this one: the address is read once
+  // they are in, so a reload on the Analysis tab finds it.
+  setTab("overview");
+  window.addEventListener("DOMContentLoaded", readHash);
+  window.addEventListener("hashchange", readHash);     // an address typed or pasted
 
   // Pull down to reload, in the app on the iPhone's Home Screen. iOS gives
   // a Home Screen web app no pull-to-refresh of its own (Safari's belongs

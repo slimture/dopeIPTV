@@ -336,7 +336,7 @@ for c in $(jq -r '.names | keys_unsorted[] | select(. != "en")' "$SITE/i18n.json
 done
 avail=$(for c in $codes; do echo "$c"; done | jq -R . | jq -cs .)
 
-asset_urls=$(for p in /style.css /nav.js /app.js /help.js; do
+asset_urls=$(for p in /style.css /nav.js /app.js /help.js /events.js; do
     printf '%s\t%s?v=%s\n' "$p" "$p" "$(md5 -q "$PUB$p" | cut -c1-10)"
 done | jq -R 'split("\t") | {key: .[0], value: .[1]}' | jq -cs from_entries)
 # The app's pictures, per language: public/screenshots/<lang>/<name>.webp,

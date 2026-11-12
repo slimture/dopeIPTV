@@ -640,6 +640,13 @@ def _watch_donations() -> None:
         time.sleep(PUSH_EVERY)
 
 
+# What /admin/ answers: the page's own files (admin.py STATIC) and its data.
+# One list, so a new path cannot be served by one check and refused by another.
+ADMIN_DATA = ("/admin/data", "/admin/visits", "/admin/visitor", "/admin/find", "/admin/rows")
+ADMIN_GET = ("/admin/admin.css", "/admin/admin.js", "/admin/analysis.js", "/admin/logtools.js", *ADMIN_DATA)
+ADMIN_POST = ("/admin/notify-test", "/admin/push-subscribe", "/admin/push-unsubscribe", "/admin/pick")
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "iptv-donate"
     sys_version = ""
@@ -668,7 +675,7 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:  # noqa: BLE001 - a broken admin.py must not stop donations
             print(f"[donate] admin page unavailable: {e}", file=sys.stderr, flush=True)
             return self._send(500, {"error": "admin unavailable"})
-        if path in ("/admin/data", "/admin/visits", "/admin/visitor", "/admin/find"):
+        if path in ADMIN_DATA:
             query = {k: v[0] for k, v in urllib.parse.parse_qs(self.path.partition("?")[2]).items()}
             stats_dir = CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats"))
             try:                            # the newest lines first: the page is never behind
@@ -684,12 +691,20 @@ class Handler(BaseHTTPRequestHandler):
                 days = int(query.get("days", "30"))
             except ValueError:
                 days = 30
+            if path == "/admin/rows":
+                import analysis
+                return self._send(200, analysis.rows(stats_dir, days))
             if path == "/admin/find":
                 return self._send(200, admin.find(stats_dir, query.get("by", ""), query.get("value", "")[:200], days))
             body = admin.data(days, stats_dir,
                               CONF.get("DOWNLOADS_JSON", os.path.join(admin.SITE, "downloads.json")),
                               _secret(), API_VERSION)
             body["visits_days"] = int(CONF.get("STATS_VISITS_DAYS", "400") or 400)
+            try:
+                import analysis
+                body["help"] = analysis.help_questions(admin.SITE)
+            except Exception as e:  # noqa: BLE001 - ids rather than no page
+                print(f"[donate] help questions unavailable: {e!r}", file=sys.stderr, flush=True)
             body["push"] = {"ready": push_ready(), "key": push_key() if push_ready() else "",
                             "devices": [{"label": d.get("label", ""), "added": d.get("added", 0)}
                                         for d in push_subs()]}
@@ -764,19 +779,26 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def _admin_post(self, path: str) -> None:
-        """Turning a device's notifications on or off, and a test - the
-        signed-in admin only, from the site's own page."""
+        """Turning a device's notifications on or off, a test, and a group of
+        the Analysis tab's visits in full - the signed-in admin only, from the
+        site's own page."""
         if not _is_admin((self.headers.get("X-Admin-User") or "").strip()):
             return self._send(403, {"error": "admin only"})
         if (self.headers.get("Origin") or "").rstrip("/") != ORIGIN:
             return self._send(403, {"error": "origin"})
+        most = 65536 if path == "/admin/pick" else 8192     # a thousand visits' keys
         try:
             length = int(self.headers.get("Content-Length") or 0)
-            data = json.loads(self.rfile.read(length)) if 0 < length <= 8192 else {}
+            data = json.loads(self.rfile.read(length)) if 0 < length <= most else {}
         except (ValueError, TypeError):
             return self._send(400, {"error": "bad request"})
         if not isinstance(data, dict):
             data = {}
+        if path == "/admin/pick":
+            import admin
+            import analysis
+            stats_dir = CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats"))
+            return self._send(200, analysis.pick(stats_dir, data.get("keys") or []))
         if path == "/admin/notify-test":
             sent, why = push("Notifications work", "This is how a new donation will look.", tag="test")
             return self._send(200 if sent else 502, {"ok": bool(sent), "sent": sent, "error": why})
@@ -805,8 +827,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._news()
         if path in ("/admin/sw.js", "/admin/app.webmanifest"):
             return self._open_file(path)
-        if path == "/admin/" or path in ("/admin/admin.css", "/admin/admin.js", "/admin/data",
-                                         "/admin/visits", "/admin/visitor", "/admin/find"):
+        if path == "/admin/" or path in ADMIN_GET:
             return self._admin(path)
         if path != "/donate/config":
             return self._send(404, {"error": "not found"})
@@ -823,7 +844,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = self.path.split("?", 1)[0]
-        if path in ("/admin/notify-test", "/admin/push-subscribe", "/admin/push-unsubscribe"):
+        if path in ADMIN_POST:
             return self._admin_post(path)
         if path not in ("/donate/session", "/donate/wallet"):
             return self._send(404, {"error": "not found"})
