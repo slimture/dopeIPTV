@@ -668,7 +668,7 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:  # noqa: BLE001 - a broken admin.py must not stop donations
             print(f"[donate] admin page unavailable: {e}", file=sys.stderr, flush=True)
             return self._send(500, {"error": "admin unavailable"})
-        if path in ("/admin/data", "/admin/visits", "/admin/visitor"):
+        if path in ("/admin/data", "/admin/visits", "/admin/visitor", "/admin/find"):
             query = {k: v[0] for k, v in urllib.parse.parse_qs(self.path.partition("?")[2]).items()}
             stats_dir = CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats"))
             try:                            # the newest lines first: the page is never behind
@@ -684,6 +684,8 @@ class Handler(BaseHTTPRequestHandler):
                 days = int(query.get("days", "30"))
             except ValueError:
                 days = 30
+            if path == "/admin/find":
+                return self._send(200, admin.find(stats_dir, query.get("by", ""), query.get("value", "")[:200], days))
             body = admin.data(days, stats_dir,
                               CONF.get("DOWNLOADS_JSON", os.path.join(admin.SITE, "downloads.json")),
                               _secret(), API_VERSION)

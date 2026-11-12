@@ -404,19 +404,21 @@
   }
 
   // -- top lists -------------------------------------------------------------------
-  function listCard(title, rows, name, more) {
+  // by: what a row stands for in a visit (admin.py FIND_BY) - a row then
+  // opens the visits it counted.
+  function listCard(title, rows, name, more, by) {
     const c = mk("section", "card");
     const head = mk("div", "card-head");
     head.append(mk("h2", "", title));
     c.append(head);
-    c.append(rankList(rows, name));
-    if (more) { c.append(mk("h3", "subhead", more[0]), rankList(more[1], more[2])); }
+    c.append(rankList(rows, name, by, title));
+    if (more) { c.append(mk("h3", "subhead", more[0]), rankList(more[1], more[2], more[3], more[0])); }
     return c;
   }
   // A row each, its bar drawn behind it: as long as its share of the top one.
   // The first dozen show; the rest are a click away, never cut off unseen.
   const SHOWN = 12;
-  function rankList(rows, name) {
+  function rankList(rows, name, by, title) {
     if (!rows || !rows.length) { return mk("p", "empty", "Nothing yet."); }
     const top = rows[0][1] || 1, ul = mk("ul", "rank");
     rows.forEach(([k, v], i) => {
@@ -425,6 +427,15 @@
       li.append(fill, mk("span", "k", name ? name(k) : k), mk("span", "v", num.format(v)));
       li.title = (name ? name(k) : k) + ": " + num.format(v);
       li.hidden = i >= SHOWN;
+      if (by && k !== "other") {
+        li.classList.add("pick");
+        li.tabIndex = 0;
+        li.setAttribute("role", "button");
+        li.title += " - show these visits";
+        const go = () => showFiltered(by, k, title + " \u00b7 " + (name ? name(k) : k));
+        li.addEventListener("click", go);
+        li.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+      }
       ul.append(li);
     });
     if (rows.length <= SHOWN) { return ul; }
@@ -452,22 +463,23 @@
   function lists() {
     const L = data.top;
     const lang = (k) => { try { return langNames ? langNames.of(k) : k; } catch (e) { return k; } };
-    const countries = listCard("Countries", L.countries, (k) => flag(k) + countryName(k));
+    const countries = listCard("Countries", L.countries, (k) => flag(k) + countryName(k), null, "country");
     if (!data.geo) {
       countries.append(mk("p", "muted", "The country database is fetched by the quarter-hour run (DB-IP, once a month)."));
     }
     const sites = listCard("Sites that linked here", L.refs, (k) => k === "other" ? "Other sites" : k,
-                           ["Tagged links", L.sources]);
+                           ["Tagged links", L.sources, null, "source"], "ref");
     sites.append(mk("p", "muted", "Tagged links carry ?ref=name, e.g. dopeiptv.org/?ref=github."));
     // In three groups, by the question each answers.
     $("lists").replaceChildren(
-      group("Where they come from", [listCard("How they found the site", L.channels), sites, countries]),
-      group("What they read and get", [listCard("Pages", L.pages, (k) => PAGE_NAMES[k] || k),
-        listCard("Languages", L.langs, lang),
-        listCard("Downloads", L.downloads, null, ["Files", L.files, (k) => k === "other" ? "Other files" : k.replace(/^dopeIPTV-/, "")])]),
-      group("What they use", [listCard("Systems", L.os_versions),
-        listCard("Browsers", L.browsers, null, ["Versions", L.browser_versions]),
-        listCard("Devices", L.devices, null, ["Screens", L.screens])])
+      group("Where they come from", [listCard("How they found the site", L.channels, null, null, "channel"), sites, countries]),
+      group("What they read and get", [listCard("Pages", L.pages, (k) => PAGE_NAMES[k] || k, null, "page"),
+        listCard("Languages", L.langs, lang, null, "lang"),
+        listCard("Downloads", L.downloads, null,
+                 ["Files", L.files, (k) => k === "other" ? "Other files" : k.replace(/^dopeIPTV-/, ""), "file"], "download")]),
+      group("What they use", [listCard("Systems", L.os_versions, null, null, "os_version"),
+        listCard("Browsers", L.browsers, null, ["Versions", L.browser_versions, null, "browser_version"], "browser"),
+        listCard("Devices", L.devices, null, ["Screens", L.screens, null, "screen"], "device")])
     );
   }
 
@@ -657,6 +669,7 @@
 
   // -- the visitor log -------------------------------------------------------------
   let logDay = "", logDays = [], logList = [], showRobots = false;
+  let logFilter = null;          // {by, value, label}: the log shows one row of the overview
   try { showRobots = localStorage.getItem("admin-robots") === "1"; } catch (e) { /* hidden then */ }
   function badge(text, cls) { return mk("span", "badge" + (cls ? " " + cls : ""), text); }
   // From iOS 26 Safari says iOS 18 for every newer system; its own version is
@@ -677,13 +690,20 @@
     if (v.why === "old") { return "likely a robot: " + v.browser + " " + v.bv + " is over two years out of date"; }
     return WHY[v.why] || (v.kind ? "not sure: a short visit without a move" : "");
   }
+  // The time of a visit; from several days, its date on a line above.
+  function timeCell(when, showDay) {
+    const cell = mk("span", "v-time");
+    if (showDay) { cell.append(mk("span", "d", dayFmt.format(when))); }
+    cell.append(document.createTextNode(clock.format(when)));
+    return cell;
+  }
   function visitRow(v, showDay) {
-    const row = mk("details", "visit" + (v.kind === "robot" ? " robot" : ""));
+    const row = mk("details", "visit" + (v.kind === "robot" ? " robot" : "") + (showDay ? " with-day" : ""));
     const sum = mk("summary");
     const when = new Date(v.start * 1000);
     const pages = v.pages.length, dls = v.downloads.length;
     sum.append(
-      mk("span", "v-time", (showDay ? dateFmt.format(when) + " " : "") + clock.format(when)),
+      timeCell(when, showDay),
       mk("span", "v-where", flag(v.country) + countryName(v.country)),
       mk("span", "v-what", [v.browser + (v.bv ? " " + v.bv : ""), osText(v), v.device].join(" · ")),
       mk("span", "v-from", v.channel ? v.channel + (v.ref ? " · " + v.ref : "") : (dls ? "Straight to a download" : "")),
@@ -739,27 +759,55 @@
         $("day-prev").disabled = i < 0 || i >= logDays.length - 1;
         $("day-next").disabled = i <= 0;
         logList = res.visits || [];
+        logFilter = null;
         $("visitor-head").hidden = true;
-        drawDay();
+        drawLog();
       })
       .catch((e) => $("visit-list").replaceChildren(mk("p", "error", "Could not load the visits: " + e.message + ".")));
   }
-  // The day's visits, the likely robots hidden unless asked for; the count
-  // says how many there were either way.
-  function drawDay() {
+  // The day's visits - or one row of the overview's, across its days - the
+  // likely robots hidden unless asked for; the count says how many there
+  // were either way.
+  function drawLog() {
+    const f = logFilter;
+    ["day-prev", "day-pick", "day-next"].forEach((id) => { $(id).hidden = !!f; });
+    $("filter-clear").hidden = !f;
     const counted = logList.filter((v) => v.kind !== "robot");
     const robots = logList.length - counted.length;
     const people = new Set(counted.map((v) => v.id)).size;
-    $("day-sum").textContent = num.format(counted.length) + (counted.length === 1 ? " visit" : " visits") +
-      " by " + num.format(people) + (people === 1 ? " visitor" : " visitors") +
+    let span = "";
+    if (f) {
+      const kept = (data && data.visits_days) || 30;
+      span = !days || days > kept ? " in the last " + kept + " days (single visits are kept " + kept + ")"
+                                  : " in the last " + days + " days";
+    }
+    $("day-sum").textContent = (f ? f.label + " \u00b7 " : "") +
+      num.format(counted.length) + (counted.length === 1 ? " visit" : " visits") +
+      " by " + num.format(people) + (people === 1 ? " visitor" : " visitors") + span +
       (robots ? " · " + num.format(robots) + (robots === 1 ? " likely robot" : " likely robots") : "");
     const tog = $("robots-toggle");
     tog.hidden = !robots;
     tog.textContent = showRobots ? "Hide" : "Show";
     tog.setAttribute("aria-pressed", showRobots ? "true" : "false");
     const list = showRobots ? logList : counted;
-    $("visit-list").replaceChildren(...(list.length ? list.map((v) => visitRow(v, false))
-      : [mk("p", "empty", robots ? "Only likely robots this day." : "No visits this day.")]));
+    const none = f ? "No visits kept for this." : "No visits this day.";
+    $("visit-list").replaceChildren(...(list.length ? list.map((v) => visitRow(v, !!f))
+      : [mk("p", "empty", robots ? "Only likely robots." : none)]));
+  }
+  // A row of the overview's lists, clicked: the visits it counted.
+  function showFiltered(by, value, label) {
+    logFilter = { by: by, value: value, label: label };
+    logList = [];
+    setTab("visitors", true);
+    $("visitor-head").hidden = true;
+    $("visit-list").replaceChildren(mk("p", "muted", "Loading…"));
+    window.scrollTo({ top: 0 });
+    const want = logFilter;
+    fetch("/admin/find?by=" + encodeURIComponent(by) + "&value=" + encodeURIComponent(value) + "&days=" + days,
+          { credentials: "same-origin", cache: "no-store" })
+      .then((r) => { if (!r.ok) { throw new Error("the service answered " + r.status); } return r.json(); })
+      .then((res) => { if (logFilter !== want) { return; } logList = res.visits || []; drawLog(); })
+      .catch((e) => $("visit-list").replaceChildren(mk("p", "error", "Could not load the visits: " + e.message + ".")));
   }
   function showVisitor(id) {
     fetch("/admin/visitor?id=" + encodeURIComponent(id), { credentials: "same-origin", cache: "no-store" })
@@ -773,13 +821,13 @@
         window.scrollTo({ top: 0, behavior: "smooth" });
       });
   }
-  function setTab(name) {
+  function setTab(name, keepLog) {
     document.querySelectorAll(".tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === name ? "true" : "false"));
     $("tab-overview").hidden = name !== "overview";
     $("tab-visitors").hidden = name !== "visitors";
     document.querySelector(".range").hidden = name !== "overview";
     try { localStorage.setItem("admin-tab", name); } catch (e) { /* fine */ }
-    if (name === "visitors") { loadDay(logDay); }
+    if (name === "visitors" && !keepLog) { loadDay(logDay); }
     // Drawn while the tab was hidden (data arriving, a resize), a chart
     // measured its box as 0 wide, fell back to its narrowest size and was
     // then stretched to the full width - tall as a wall. Drawn again now
@@ -822,10 +870,11 @@
   $("day-prev").addEventListener("click", () => loadDay(logDays[logDays.indexOf(logDay) + 1]));
   $("day-next").addEventListener("click", () => loadDay(logDays[logDays.indexOf(logDay) - 1]));
   $("visitor-back").addEventListener("click", () => loadDay(logDay));
+  $("filter-clear").addEventListener("click", () => loadDay(logDay));
   $("robots-toggle").addEventListener("click", () => {
     showRobots = !showRobots;
     try { localStorage.setItem("admin-robots", showRobots ? "1" : "0"); } catch (e) { /* this time only */ }
-    drawDay();
+    drawLog();
   });
   setRange(days);
   let tab = "overview";

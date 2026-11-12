@@ -9,6 +9,8 @@ missing auth_basic line cannot open the page to everyone.
                            0 for everything kept)
     GET /admin/visits?day=YYYY-MM-DD   that day's visits, one by one
     GET /admin/visitor?id=...          every visit kept of one visitor
+    GET /admin/find?by=country&value=SE&days=30   the kept visits one row of
+                                       the overview's lists counted
 
 Visitors come from stats_collect.py's STATS_DIR/stats.json, without what
 the visits judged likely robots added (kept apart there, and which visitors
@@ -22,6 +24,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 import time
 import urllib.error
@@ -404,3 +407,55 @@ def visitor(stats_dir: str, vid: str) -> dict:
         out += [dict(v, day=day) for v in _visits_file(stats_dir, day) if v.get("id") == vid]
     out.sort(key=lambda v: -v.get("start", 0))
     return {"id": vid, "visits": out}
+
+
+# -- the visitor log by one row of the overview --------------------------------------
+
+# Each of the overview's lists, and what of a visit it counted. A visitor's
+# country, browser and the rest were counted on a page they opened, so only
+# visits with a page match those; downloads match by what was downloaded.
+FIND_BY = ("country", "channel", "ref", "source", "page", "lang", "os_version", "browser",
+           "browser_version", "device", "screen", "download", "file")
+_PLAIN = {"ref": "ref", "source": "source", "os_version": "os", "browser": "browser", "device": "device"}
+
+
+def _counted_under(v: dict, by: str, value: str) -> bool:
+    from stats_collect import platform_of, screen_of
+    if by == "download":
+        return any(platform_of(d[1]) == value for d in v.get("downloads") or ())
+    if by == "file":
+        return any(d[1] == value for d in v.get("downloads") or ())
+    if not v.get("pages"):
+        return False
+    if by == "page":
+        return any(p[1] == value for p in v["pages"])
+    if by == "country":
+        return (v.get("country") or "unknown") == value
+    if by == "channel":
+        return (v.get("channel") or "Direct or unknown") == value
+    if by == "lang":
+        lang = v.get("lang") or ""
+        return (lang if re.fullmatch(r"[a-z]{2,3}", lang) else "en") == value
+    if by == "browser_version":
+        return f"{v.get('browser') or ''} {v.get('bv') or ''}".strip() == value
+    if by == "screen":
+        size = v.get("screen") or ""
+        return size.count("\u00d7") == 1 and screen_of(*size.split("\u00d7"))[1] == value
+    return (v.get(_PLAIN[by]) or "") == value
+
+
+def find(stats_dir: str, by: str, value: str, days: int) -> dict:
+    """The kept visits of the last *days* days (0: all kept), newest first,
+    that the overview's list *by* counted under *value* - likely robots
+    included and marked, as in the day's log."""
+    out: list = []
+    if by in FIND_BY and value:
+        today = datetime.now().astimezone().date()
+        first = (today - timedelta(days=days - 1)).isoformat() if days > 0 else ""
+        for day in visit_days(stats_dir):
+            if day < first:
+                continue
+            out += [dict(v, day=day) for v in _visits_file(stats_dir, day)
+                    if (v.get("pages") or v.get("downloads")) and _counted_under(v, by, value)]
+        out.sort(key=lambda v: -v.get("start", 0))
+    return {"by": by, "value": value, "visits": out}
