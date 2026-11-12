@@ -492,3 +492,75 @@ tr:last-child td { border-bottom: 0; }
 @media (max-width: 600px) { .nav-back .l { display: none; } .nav-back { padding: 5px 11px; } .brand { margin-inline-end: auto; } }
 /* A part with nothing in it yet (the Analysis tab loading) takes no room. */
 .card:empty { display: none; }
+
+
+/* -- buttons and fields shared by the sign-in page and the Account tab ------- */
+.btn, .btn-primary { font: inherit; font-size: 14px; font-weight: 650; border: 0; border-radius: 10px; padding: 10px 16px;
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; }
+.btn { color: var(--text); background: color-mix(in srgb, var(--text) 8%, transparent); }
+.btn:hover { background: color-mix(in srgb, var(--text) 13%, transparent); }
+.btn-primary { color: #fff; background: var(--accent); }
+.btn-primary:hover { background: color-mix(in srgb, var(--accent) 88%, #000); }
+.btn.danger, .link.danger { color: var(--down); }
+.btn:disabled, .btn-primary:disabled { opacity: .55; cursor: default; }
+.wide { width: 100%; }
+.field { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.field input, .acct-inline input { font: inherit; font-size: 16px; color: var(--text); border: 0; border-radius: 10px; padding: 10px 12px;
+  background: color-mix(in srgb, var(--text) 7%, transparent); min-width: 0; }
+.field input:focus, .acct-inline input:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+.field input[readonly] { color: var(--text-2); }
+.msg { margin: 0; padding: 10px 12px; border-radius: 10px; font-size: 14px; color: var(--down);
+  background: color-mix(in srgb, var(--down) 10%, transparent); }
+.msg.ok { color: var(--up); background: color-mix(in srgb, var(--up) 12%, transparent); }
+
+/* -- the sign-in page (login.html) ------------------------------------------- */
+.login-page main.login { max-width: 400px; min-height: 100vh; justify-content: center; padding-top: 32px; }
+.login-brand { justify-content: center; margin-bottom: 4px; font-size: 18px; }
+.login-card { display: flex; flex-direction: column; gap: 14px; padding: 24px 22px 22px; }
+.login-card h1 { margin: 0; font-size: 22px; letter-spacing: -.02em; }
+.login-card form { display: flex; flex-direction: column; gap: 12px; }
+.login-card .muted, .login-card .hint { margin: -4px 0 0; }
+.hint { color: var(--muted); font-size: 12.5px; margin: -6px 0 0; }
+.or { display: flex; align-items: center; gap: 10px; margin: 2px 0; color: var(--muted); font-size: 12.5px; }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.login-foot { text-align: center; }
+.btn-primary.busy, .btn.busy { opacity: .7; }
+
+/* -- the Account tab (account.js) -------------------------------------------- */
+.account { display: flex; flex-direction: column; gap: 16px; }
+.acct { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.acct > * { max-width: 100%; }
+.acct .lede { margin: -6px 0 2px !important; }
+.acct .subhead { margin: 10px 0 0; }
+.acct-list { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; }
+.acct-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0;
+  border-bottom: 1px solid var(--line); }
+.acct-list li:last-child { border-bottom: 0; }
+.acct-list li.pending .a-main strong { color: var(--text-2); }
+.a-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.a-main .muted { margin: 0 !important; }
+.a-acts { display: flex; gap: 14px; flex: none; }
+.acct-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; width: min(100%, 420px); }
+.acct-form.two { grid-template-columns: repeat(2, minmax(0, 1fr)); width: min(100%, 560px); align-items: end; }
+.acct-form.two button { grid-column: 1 / -1; justify-self: start; }
+.acct-form button { justify-self: start; }
+.acct-inline { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; width: min(100%, 560px); }
+.acct-inline input { flex: 1 1 140px; }
+.acct-inline .link-box { flex: 1 1 260px; font-size: 13px; }
+.invite-out p { margin: 4px 0 8px; font-size: 14px; color: var(--text-2); }
+.totp-setup { width: 100%; }
+.totp-steps { margin: 4px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 12px; font-size: 14px; color: var(--text-2); }
+.totp-steps li > * { margin-top: 8px; }
+.qr { width: 196px; padding: 8px; background: #fff; border-radius: 12px; border: 1px solid var(--line); }
+.qr svg { display: block; width: 100%; height: auto; }
+.totp-steps .btn { display: flex; width: fit-content; }
+.secret { display: block; font-size: 15px; letter-spacing: .06em; padding: 8px 10px; border-radius: 8px; width: fit-content;
+  background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--text); user-select: all; word-break: break-all; }
+@media (max-width: 600px) {
+  .acct-form.two { grid-template-columns: minmax(0, 1fr); }
+  .acct-list li { flex-direction: column; align-items: flex-start; gap: 6px; }
+}
+/* The Account tab's message stays in view at the foot of the screen. */
+.account > .msg { order: 99; position: sticky; bottom: 16px; z-index: 4; box-shadow: 0 6px 20px rgba(0, 0, 0, .15);
+  background: color-mix(in srgb, var(--down) 12%, var(--surface)); }
+.account > .msg.ok { background: color-mix(in srgb, var(--up) 14%, var(--surface)); }

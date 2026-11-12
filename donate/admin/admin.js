@@ -11,6 +11,18 @@
  */
 (function () {
   "use strict";
+  // Signed out meanwhile (another device signed out everywhere, an admin
+  // removed): any of the page's own calls answering 401 goes to the sign-in
+  // page, which brings the page back to where it was.
+  const pageFetch = window.fetch.bind(window);
+  window.fetch = function (url, opts) {
+    return pageFetch(url, opts).then((r) => {
+      if (r.status === 401 && /^\/admin\//.test(String(url)) && !/^\/admin\/auth\//.test(String(url))) {
+        location.replace("/admin/login?next=" + encodeURIComponent(location.pathname + location.hash));
+      }
+      return r;
+    });
+  };
   const $ = (id) => document.getElementById(id);
   const SVG = "http://www.w3.org/2000/svg";
   const ZERO_DECIMAL = /^(bif|clp|djf|gnf|jpy|kmf|krw|mga|pyg|rwf|ugx|vnd|vuv|xaf|xof|xpf)$/i;
@@ -944,7 +956,9 @@
     $("tab-overview").hidden = name !== "overview";
     $("tab-visitors").hidden = name !== "visitors";
     $("tab-analysis").hidden = name !== "analysis";
-    document.querySelector(".range").hidden = name === "visitors";
+    $("tab-account").hidden = name !== "account";
+    document.querySelector(".range").hidden = name === "visitors" || name === "account";
+    if (name === "account" && window.AdminAccount) { window.AdminAccount.show(); }
     if (name === "visitors" && !keepLog) { loadDay(logDay); }
     if (name === "analysis") {
       if (window.AdminAnalysis) { window.AdminAnalysis.show(); } else {
@@ -955,7 +969,7 @@
     }
     // The visitor log writes the address once its visits are in, the
     // Analysis tab once drawn: a step back then scrolls to where it was.
-    if (name === "overview") { writeHash(); }
+    if (name === "overview" || name === "account") { writeHash(); }
     // Drawn while the tab was hidden (data arriving, a resize), a chart
     // measured its box as 0 wide, fell back to its narrowest size and was
     // then stretched to the full width - tall as a wall. Drawn again now
@@ -992,6 +1006,8 @@
       h = "visitors?" + p.toString();
     } else if (tab === "analysis") {
       h = "analysis" + (window.AdminAnalysis ? window.AdminAnalysis.toHash() : "");
+    } else if (tab === "account") {
+      h = "account";
     }
     const url = h ? "#" + h : location.pathname + location.search;
     const same = h ? location.hash === "#" + h : !location.hash;
@@ -1035,6 +1051,7 @@
       window.AdminAnalysis.fromHash(h.slice("analysis".length));
       return setTab("analysis");
     }
+    if (name === "account") { return setTab("account"); }
     setTab("overview");
   }
 

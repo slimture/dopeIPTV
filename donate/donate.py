@@ -6,8 +6,10 @@ Stripe's card form (the Payment Element), in Stripe's iframes, on our page,
 and Apple Pay / Google Pay in the wallet's own sheet. Both pay a
 PaymentIntent, and only a server holding the secret key can make one - this
 is that server, and all it does. It never sees a card. It also serves the
-site's admin page, /admin/ (admin.py), behind nginx's password - signed in
-once, a browser stays signed in (a signed cookie, /admin-session) - and
+site's admin page, /admin/ (admin.py), for its admins only - a passkey, or
+a password and perhaps an authenticator code, and invites for a new admin
+(admin_auth.py); signed in once, a browser stays signed in (a signed
+cookie, /admin-session) - and
 tells the owner's devices when someone has donated: Web Push, turned on per
 device on the admin page (needs Python's cryptography package).
 
@@ -66,8 +68,10 @@ named by DONATE_CONFIG (default /usr/local/etc/iptv-donate.conf):
     STRIPE_API_VERSION      empty: the account's default
     LISTEN                  unix:/var/run/iptv_donate/donate.sock (default),
                             or host:port for TCP
-    ADMIN_USERS             who may open /admin/, e.g. pontus (default: anyone
-                            nginx let in)
+    ADMIN_USERS             until the new sign-in has its first admin: who of
+                            nginx's old password prompt may open /admin/
+                            (default: anyone it let in). After that the
+                            admins are <STATS_DIR>/admin-users.json's.
     STATS_IGNORE            addresses, networks or host names whose visits
                             stats_collect.py leaves out (your own)
     STATS_DIR, DOWNLOADS_JSON  where stats_collect.py and sync-releases.sh keep
@@ -346,12 +350,13 @@ def create_session(amount: int, currency: str) -> tuple[int, dict]:
 
 
 # -- the admin's session -------------------------------------------------------
-# nginx's password prompt asked again with every new browser session - on a
-# phone, every time. Signed in once through it, the browser gets a cookie
+# The admins and how they sign in (passkeys, a password and an authenticator
+# code, invites) are admin_auth.py's. Signed in, a browser gets a cookie
 # signed with a key of the server's own, and nginx (auth_request to
 # /admin-session) lets it in on that alone, for as long as a browser keeps a
 # cookie (400 days, renewed by every visit). Deleting the key signs every
-# browser out.
+# browser out. Until admin_auth has its first admin, nginx's old password
+# prompt and its cookie still let the owner in - to make that first invite.
 SESSION_COOKIE = "iptv_admin"
 SESSION_SECS = 400 * 86400
 #: Tells the site's own pages that this browser is the owner's, so that only
@@ -361,7 +366,18 @@ HINT_COOKIE = "iptv_admin_hint"
 NEWS_DAYS = 14
 
 
+def _auth():
+    """admin_auth, set up for this service (loaded on first use)."""
+    import admin_auth
+    if not admin_auth._CFG["path"]:
+        admin_auth.configure(_stats_dir(), ORIGIN, _session_key())
+    return admin_auth
+
+
 def _is_admin(user: str) -> bool:
+    auth = _auth()
+    if auth.has_users():
+        return auth.is_admin(user)
     allowed = [u.strip() for u in CONF.get("ADMIN_USERS", "").split(",") if u.strip()]
     return bool(user) and (not allowed or user in allowed)
 _USER_OK = re.compile(r"^[A-Za-z0-9_.@-]{1,64}$")
@@ -399,6 +415,12 @@ def _session_sign(user: str, until: int) -> str:
 
 
 def session_cookie(user: str) -> str | None:
+    auth = _auth()
+    if auth.has_users():
+        try:
+            return auth.session_cookie(user)
+        except auth.AuthError:
+            return None
     if not _USER_OK.match(user):
         return None
     until = int(time.time()) + SESSION_SECS
@@ -407,10 +429,13 @@ def session_cookie(user: str) -> str | None:
 
 def session_user(cookie_header: str) -> str:
     """The admin a valid session cookie names, or ""."""
+    auth = _auth()
     for part in (cookie_header or "").split(";"):
         name, _, value = part.strip().partition("=")
         if name != SESSION_COOKIE:
             continue
+        if auth.has_users():
+            return auth.session_user(value)
         user, _, rest = value.partition(".")
         until, _, sig = rest.partition(".")
         if not _USER_OK.match(user) or not until.isdigit() or int(until) < time.time():
@@ -642,9 +667,15 @@ def _watch_donations() -> None:
 
 # What /admin/ answers: the page's own files (admin.py STATIC) and its data.
 # One list, so a new path cannot be served by one check and refused by another.
-ADMIN_DATA = ("/admin/data", "/admin/visits", "/admin/visitor", "/admin/find", "/admin/rows")
-ADMIN_GET = ("/admin/admin.css", "/admin/admin.js", "/admin/analysis.js", "/admin/logtools.js", *ADMIN_DATA)
+ADMIN_DATA = ("/admin/data", "/admin/visits", "/admin/visitor", "/admin/find", "/admin/rows", "/admin/account")
+ADMIN_GET = ("/admin/admin.js", "/admin/analysis.js", "/admin/logtools.js", "/admin/account.js", *ADMIN_DATA)
 ADMIN_POST = ("/admin/notify-test", "/admin/push-subscribe", "/admin/push-unsubscribe", "/admin/pick")
+ACCOUNT = "/admin/account/"      # + an action: one's own sign-in, the other admins
+# Open to anyone (nginx asks nothing here either): the sign-in page and what
+# it needs, and the files a Home Screen app or the push worker fetch.
+PUBLIC_GET = ("/admin/login", "/admin/login.js", "/admin/passkey.js", "/admin/admin.css",
+              "/admin/sw.js", "/admin/app.webmanifest")
+SIGN_IN = "/admin/auth/"         # + an action: signing in, an invite, signing out
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -663,13 +694,85 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _redirect(self, where: str) -> None:
+        self.send_response(302)
+        self.send_header("Location", where)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def _body(self, most: int) -> dict | None:
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            data = json.loads(self.rfile.read(length)) if 0 < length <= most else {}
+        except (ValueError, TypeError):
+            return None
+        return data if isinstance(data, dict) else {}
+
+    def _user(self) -> str:
+        """The signed-in admin: the one nginx names in X-Admin-User (which it
+        overwrites on every request; never a client's), else the one this
+        request's session cookie names - or ""."""
+        named = (self.headers.get("X-Admin-User") or "").strip()
+        if _is_admin(named):
+            return named
+        user = session_user(self.headers.get("Cookie") or "")
+        return user if _is_admin(user) else ""
+
+    def _session_headers(self, session: str | None) -> None:
+        # This browser is the site's owner: nginx leaves it out of the
+        # statistics (deploy/content-iptv.dope.rs.conf, $iptv_count). 400
+        # days is the longest a browser keeps a cookie; each visit renews it.
+        self.send_header("Set-Cookie", "iptv_nostats=1; Max-Age=34560000; Path=/; "
+                                       "Secure; HttpOnly; SameSite=Lax")
+        if session:
+            # Lax, not Strict: a Home Screen app, a notification or a link
+            # opening the page is a visit from elsewhere, and a Strict cookie
+            # stayed home - signed out, again and again.
+            self.send_header("Set-Cookie", f"{SESSION_COOKIE}={session}; Max-Age={SESSION_SECS}; "
+                                           "Path=/admin/; Secure; HttpOnly; SameSite=Lax")
+            # Readable by the site's own pages, so only this browser's pages
+            # ask /admin/news; it proves nothing (the session does).
+            self.send_header("Set-Cookie", f"{HINT_COOKIE}=1; Max-Age={SESSION_SECS}; Path=/; "
+                                           "Secure; SameSite=Lax")
+
+    def _signed_in(self, user: str) -> None:
+        data = json.dumps({"ok": True, "next": "/admin/"}).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-store")
+        self._session_headers(session_cookie(user))
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _signed_out(self) -> None:
+        data = json.dumps({"ok": True, "next": "/admin/login"}).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Set-Cookie", f"{SESSION_COOKIE}=; Max-Age=0; Path=/admin/; Secure; HttpOnly; SameSite=Lax")
+        self.send_header("Set-Cookie", f"{HINT_COOKIE}=; Max-Age=0; Path=/; Secure; SameSite=Lax")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
     def _admin(self, path: str) -> None:
-        """The admin page and its numbers. Only behind nginx's auth_basic,
-        which names the user in X-Admin-User (and overwrites any a client
-        sent); without one - a location that lost its password - nothing."""
-        user = (self.headers.get("X-Admin-User") or "").strip()
-        if not _is_admin(user):
-            return self._send(403, {"error": "admin only"})
+        """The admin page and its numbers, for a signed-in admin only: nginx
+        lets nobody else through (auth_request), and this checks again. The
+        page itself sends anyone else to the sign-in page; its data answers
+        401, which the page's script turns into the same."""
+        user = self._user()
+        if not user:
+            if path == "/admin/":
+                return self._redirect("/admin/login")
+            return self._send(401, {"error": "signed out"})
+        if path == "/admin/account":
+            auth = _auth()
+            if not auth.has_users():        # still on nginx's password: the first invite is next
+                return self._send(200, {"legacy": True, "user": user,
+                                        "invites": auth.account_invites()})
+            return self._send(200, auth.account(user))
         try:
             import admin  # beside this file; loaded on first use
         except Exception as e:  # noqa: BLE001 - a broken admin.py must not stop donations
@@ -712,26 +815,13 @@ class Handler(BaseHTTPRequestHandler):
         hit = admin.static(path)
         if not hit:
             return self._send(404, {"error": "not found"})
-        session = session_cookie(user) if path == "/admin/" else None
         data, ctype = hit
         self.send_response(200)
         self.send_header("Content-Type", ctype)
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Robots-Tag", "noindex, nofollow")
-        if path == "/admin/":
-            # This browser is the site's owner: nginx leaves it out of the
-            # statistics (deploy/content-iptv.dope.rs.conf, $iptv_count).
-            # 400 days is the longest a browser keeps a cookie; every visit
-            # here renews it.
-            self.send_header("Set-Cookie", "iptv_nostats=1; Max-Age=34560000; Path=/; "
-                                           "Secure; HttpOnly; SameSite=Lax")
-            if session:                 # signed in for good, renewed by each visit
-                self.send_header("Set-Cookie", f"{SESSION_COOKIE}={session}; Max-Age={SESSION_SECS}; "
-                                               "Path=/admin/; Secure; HttpOnly; SameSite=Strict")
-                # Readable by the site's own pages, so only this browser's
-                # pages ask /admin/news; it proves nothing (the session does).
-                self.send_header("Set-Cookie", f"{HINT_COOKIE}=1; Max-Age={SESSION_SECS}; Path=/; "
-                                               "Secure; SameSite=Lax")
+        if path == "/admin/":           # signed in for good, renewed by each visit
+            self._session_headers(session_cookie(user))
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
@@ -762,10 +852,11 @@ class Handler(BaseHTTPRequestHandler):
         self._send(200, {"list": rows[:20], "error": got.get("error", "")})
 
     def _open_file(self, path: str) -> None:
-        """The service worker that shows the notifications, and the page's
-        app manifest (an iPhone puts the page on its Home Screen from it):
-        no secrets in them, and nginx asks no password for them - a worker
-        script or a manifest fetched behind one fails to load."""
+        """The sign-in page and its files, the service worker that shows the
+        notifications, and the page's app manifest (an iPhone puts the page
+        on its Home Screen from it): no secrets in them, and nginx asks
+        nothing for them - a worker or a manifest fetched behind a sign-in
+        fails to load."""
         import admin
         hit = admin.static(path)
         if not hit:
@@ -778,22 +869,104 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
-    def _admin_post(self, path: str) -> None:
-        """Turning a device's notifications on or off, a test, and a group of
-        the Analysis tab's visits in full - the signed-in admin only, from the
-        site's own page."""
-        if not _is_admin((self.headers.get("X-Admin-User") or "").strip()):
-            return self._send(403, {"error": "admin only"})
+    def _sign_in(self, action: str) -> None:
+        """Signing in - a passkey, or a password and perhaps a code - taking up
+        an invite, and signing out. Open to anyone, from the site's own pages
+        only; admin_auth counts the failures and holds back a guesser."""
         if (self.headers.get("Origin") or "").rstrip("/") != ORIGIN:
             return self._send(403, {"error": "origin"})
-        most = 65536 if path == "/admin/pick" else 8192     # a thousand visits' keys
-        try:
-            length = int(self.headers.get("Content-Length") or 0)
-            data = json.loads(self.rfile.read(length)) if 0 < length <= most else {}
-        except (ValueError, TypeError):
+        data = self._body(16384)
+        if data is None:
             return self._send(400, {"error": "bad request"})
-        if not isinstance(data, dict):
-            data = {}
+        auth = _auth()
+        addr = self.headers.get("X-Real-IP") or "local"     # a Unix socket has no peer address
+        token = str(data.get("token") or "")
+        try:
+            if action == "signout":
+                return self._signed_out()
+            if action == "invite":
+                inv = auth.invite_info(token)
+                return self._send(200, {"user": inv["user"], "name": inv.get("name", ""), "until": inv["until"]})
+            if action == "invite-options":
+                return self._send(200, auth.invite_passkey_options(token))
+            if action == "invite-password":
+                return self._signed_in(auth.invite_password(token, str(data.get("password") or "")))
+            if action == "invite-passkey":
+                return self._signed_in(auth.invite_passkey(token, data.get("credential") or {},
+                                                           str(data.get("label") or "")))
+            if not auth.has_users():
+                return self._send(409, {"error": "No admin has been set up yet: open the admin page with "
+                                                 "the old password and make the first invite there."})
+            if action == "options":
+                return self._send(200, auth.login_options(addr))
+            if action == "passkey":
+                return self._signed_in(auth.login_passkey(data.get("credential") or {}, addr))
+            if action == "password":
+                got = auth.login_password(str(data.get("user") or ""), str(data.get("password") or ""), addr)
+                if "ticket" in got:
+                    return self._send(200, {"code": True, "ticket": got["ticket"]})
+                return self._signed_in(got["user"])
+            if action == "code":
+                return self._signed_in(auth.login_code(str(data.get("ticket") or ""),
+                                                       str(data.get("code") or ""), addr))
+        except auth.AuthError as e:
+            return self._send(400, {"error": str(e)})
+        return self._send(404, {"error": "not found"})
+
+    def _account(self, user: str, action: str, data: dict) -> None:
+        """One's own sign-in (passkeys, password, authenticator) and the other
+        admins (invite, remove) - the Account tab."""
+        auth = _auth()
+        try:
+            if not auth.has_users():
+                if action != "invite":
+                    return self._send(409, {"error": "Set up the new sign-in first: make your own invite."})
+                token, until = auth.invite(user, str(data.get("user") or ""), str(data.get("name") or ""))
+                return self._send(200, {"link": f"{ORIGIN}/admin/login?invite={token}", "until": until,
+                                        "legacy": True, "user": user, "invites": auth.account_invites()})
+            if action == "passkey-options":
+                return self._send(200, auth.passkey_options(user))
+            if action == "totp-begin":
+                return self._send(200, auth.totp_begin(user))
+            if action == "signout-all":
+                auth.sign_out_everywhere(user)
+                return self._signed_out()
+            if action == "invite":
+                token, until = auth.invite(user, str(data.get("user") or ""), str(data.get("name") or ""))
+                return self._send(200, {"link": f"{ORIGIN}/admin/login?invite={token}", "until": until,
+                                        **auth.account(user)})
+            done = {
+                "passkey-add": lambda: auth.passkey_add(user, data.get("credential") or {}, str(data.get("label") or "")),
+                "passkey-remove": lambda: auth.passkey_remove(user, str(data.get("id") or "")),
+                "passkey-rename": lambda: auth.passkey_rename(user, str(data.get("id") or ""), str(data.get("label") or "")),
+                "password": lambda: auth.password_set(user, str(data.get("password") or ""), str(data.get("current") or "")),
+                "password-remove": lambda: auth.password_remove(user),
+                "totp-confirm": lambda: auth.totp_confirm(user, str(data.get("code") or "")),
+                "totp-remove": lambda: auth.totp_remove(user, str(data.get("code") or "")),
+                "invite-cancel": lambda: auth.invite_cancel(str(data.get("user") or "")),
+                "remove": lambda: auth.remove_admin(user, str(data.get("user") or "")),
+            }.get(action)
+            if not done:
+                return self._send(404, {"error": "not found"})
+            done()
+        except auth.AuthError as e:
+            return self._send(400, {"error": str(e)})
+        return self._send(200, auth.account(user))
+
+    def _admin_post(self, path: str) -> None:
+        """Turning a device's notifications on or off, a test, a group of the
+        Analysis tab's visits in full, and the Account tab - the signed-in
+        admin only, from the site's own page."""
+        user = self._user()
+        if not user:
+            return self._send(401, {"error": "signed out"})
+        if (self.headers.get("Origin") or "").rstrip("/") != ORIGIN:
+            return self._send(403, {"error": "origin"})
+        data = self._body(65536 if path == "/admin/pick" else 16384)     # a thousand visits' keys
+        if data is None:
+            return self._send(400, {"error": "bad request"})
+        if path.startswith(ACCOUNT):
+            return self._account(user, path[len(ACCOUNT):], data)
         if path == "/admin/pick":
             import admin
             import analysis
@@ -825,7 +998,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/admin/news":
             return self._news()
-        if path in ("/admin/sw.js", "/admin/app.webmanifest"):
+        if path == "/admin/login" and self._user() and "invite=" not in self.path:
+            return self._redirect("/admin/")          # signed in already
+        if path in PUBLIC_GET:
             return self._open_file(path)
         if path == "/admin/" or path in ADMIN_GET:
             return self._admin(path)
@@ -844,7 +1019,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = self.path.split("?", 1)[0]
-        if path in ADMIN_POST:
+        if path.startswith(SIGN_IN):
+            return self._sign_in(path[len(SIGN_IN):])
+        if path in ADMIN_POST or path.startswith(ACCOUNT):
             return self._admin_post(path)
         if path not in ("/donate/session", "/donate/wallet"):
             return self._send(404, {"error": "not found"})

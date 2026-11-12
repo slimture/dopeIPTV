@@ -14,6 +14,8 @@
 <script src="/admin/admin.js" defer></script>
 <script src="/admin/analysis.js" defer></script>
 <script src="/admin/logtools.js" defer></script>
+<script src="/admin/passkey.js" defer></script>
+<script src="/admin/account.js" defer></script>
 </head>
 <body>
 <header class="top">
@@ -26,6 +28,7 @@
     <button type="button" role="tab" data-tab="overview" aria-selected="true">Overview</button>
     <button type="button" role="tab" data-tab="visitors" aria-selected="false">Visitors</button>
     <button type="button" role="tab" data-tab="analysis" aria-selected="false">Analysis</button>
+    <button type="button" role="tab" data-tab="account" aria-selected="false">Account</button>
   </div>
   <div class="range" role="radiogroup" aria-label="Period">
     <button type="button" role="radio" data-days="7"><span class="l">7 days</span><span class="s" aria-hidden="true">7 d</span></button>
@@ -128,6 +131,10 @@
       <section class="card" id="an-langs"></section>
     </div>
     <section class="card" id="an-acts"></section>
+  </div>
+
+  <div id="tab-account" class="tab" hidden>
+    <div class="account" id="account"></div>
   </div>
 
   <p class="foot">A page view counts when the page has opened in a real browser: it tells the

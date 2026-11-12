@@ -415,18 +415,39 @@ without an address (the id can be worked out again from an address); the
 anonymous ones and the counts are not. The site should say what is counted
 and why (a short privacy note).
 
-**The page's password (jail):**
+**Signing in.** `/admin/` is for its admins only. Each signs in with a
+passkey (Face ID, Touch ID, a phone or a security key; kept in iCloud
+Keychain or a password manager and ready on the admin's other devices), or
+with a name and password - an ordinary form a password manager fills - and,
+if they turn it on, a six-digit code from an authenticator app. A new admin
+comes in through a one-time invite link (valid 7 days) another admin makes
+on the page's *Account* tab, where each admin also adds or removes passkeys,
+sets a password, turns codes on or off, removes another admin, and signs out
+here or on every device. The admins live in
+`/usr/local/www/iptv/stats/admin-users.json` (mode 600): password hashes
+(scrypt), passkeys' public keys, authenticator secrets, invites as hashes.
+Ten failed tries in 15 minutes hold back that address or name for a
+quarter of an hour; nginx counts sign-in requests too.
+
+**From the old password to the new sign-in** (once): put the files in
+place and restart the service (below), open `https://dopeiptv.org/admin/`
+with the old password, and on the *Account* tab make an invite for
+yourself; open it on the device that should hold the passkey and create
+one. Then the new content file, which drops nginx's password prompt (jail):
 
 ```sh
-bastille console pontusweb
-printf 'admin:%s\n' "$(openssl passwd -6)" > /usr/local/etc/nginx/iptv-admin.htpasswd
-chown root:www /usr/local/etc/nginx/iptv-admin.htpasswd
-chmod 640 /usr/local/etc/nginx/iptv-admin.htpasswd
+C=/usr/local/etc/nginx/conf.d/iptv.dope.rs.conf
+cp "$C" "$C.before-signin"
+cp ~/dopeiptv/deploy/content-iptv.dope.rs.conf "$C"
+nginx -t && service nginx reload
+rm -f /usr/local/etc/nginx/iptv-admin.htpasswd
 ```
 
-`openssl passwd` asks for the password twice and writes only its hash. More
-users: one `name:hash` line each. The service also takes `ADMIN_USERS=admin`
-in `/usr/local/etc/iptv-donate.conf` to allow only the names listed.
+**Locked out** (every passkey gone, a password forgotten), from the jail's
+shell: `su -m iptv -c 'python3 -I /usr/local/www/iptv/donate/admin_users.py
+invite <name>'` prints a new invite link for a new name; `... list` shows
+the admins, `... remove <name>` takes one away, `... signout <name>` ends
+their sessions.
 
 **The files and the log (jail):**
 
@@ -480,14 +501,13 @@ written before it count each click.
 
 ## Signed in for good, and told of donations
 
-**Signed in once, signed in for good.** The first time a browser opens
-`/admin/` it asks for the password as before; the page then leaves a
+**Signed in once, signed in for good.** Signed in, a browser holds a
 cookie signed by the donate service (`iptv_admin`, 400 days, renewed by
-each visit, sent only to `/admin/`). nginx asks the service whether the
-cookie is good (`auth_request`, the hidden `/_admin_session`) and lets the
-browser in on that alone - the password prompt no longer comes back with
-every browser session or on a phone. Each device signs in once and keeps
-its own cookie. The key lives in `/usr/local/www/iptv/stats/admin-session.key`
+each visit, sent only to `/admin/`, SameSite=Lax so a Home Screen app or a
+notification opening the page keeps it). nginx asks the service whether
+the cookie is good (`auth_request`, the hidden `/_admin_session`) and lets
+the browser in on that alone; anyone else goes to `/admin/login`. Each
+device signs in once and keeps its own cookie. The key lives in `/usr/local/www/iptv/stats/admin-session.key`
 (made on first use, mode 600); delete it and `service iptv_donate restart`
 to sign every browser out.
 

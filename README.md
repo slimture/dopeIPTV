@@ -65,8 +65,10 @@ secret key, so the card form and Apple Pay / Google Pay can open on the page
 itself, in the donor's own currency. Without it the dialog sends visitors to
 Stripe's own page. Setting it up: `DEPLOY.md`, "Donations".
 
-The same service serves the admin page, `/admin/` behind nginx's password
-(`donate/admin.py`, `donate/admin/`): unique visitors, how they found the
+The same service serves the admin page, `/admin/` for its admins only
+(`donate/admin.py`, `donate/admin/`; signing in with a passkey, or a password
+and an authenticator code, and invites for a new admin:
+`donate/admin_auth.py`): unique visitors, how they found the
 site, countries, browsers and devices, downloads and donations by day,
 week, month and year, and every visit of the last 13 months one by one -
 sorted, grouped and filtered as wanted (`donate/admin/logtools.js`) - and an

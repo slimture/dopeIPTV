@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Sign in · dopeIPTV admin</title>
+<link rel="icon" href="/favicon.svg?v=2" type="image/svg+xml">
+<link rel="manifest" href="/admin/app.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="dopeIPTV">
+<link rel="stylesheet" href="/admin/admin.css">
+<script src="/admin/passkey.js" defer></script>
+<script src="/admin/login.js" defer></script>
+</head>
+<body class="login-page">
+<main class="login">
+  <div class="brand login-brand">
+    <img src="/favicon.svg?v=2" alt="" width="36" height="36">
+    <span class="name">dopeIPTV</span><span class="sub">Statistics</span>
+  </div>
+
+  <section class="card login-card" id="signin">
+    <h1>Sign in</h1>
+    <button type="button" class="btn-primary wide" id="pk-signin">Sign in with a passkey</button>
+    <p class="or"><span>or with your name and password</span></p>
+    <form id="pw-form">
+      <label class="field"><span>Name</span>
+        <input type="text" name="username" id="pw-user" autocomplete="username webauthn"
+               autocapitalize="none" autocorrect="off" spellcheck="false" required></label>
+      <label class="field"><span>Password</span>
+        <input type="password" name="password" id="pw-pass" autocomplete="current-password" required></label>
+      <button type="submit" class="btn wide" id="pw-go">Sign in</button>
+    </form>
+    <p class="msg" id="msg" role="alert" hidden></p>
+  </section>
+
+  <section class="card login-card" id="code-step" hidden>
+    <h1>Code from your authenticator</h1>
+    <p class="muted">The six digits it shows for dopeIPTV admin now.</p>
+    <form id="code-form">
+      <label class="field"><span>Code</span>
+        <input type="text" id="code" inputmode="numeric" autocomplete="one-time-code"
+               maxlength="7" required></label>
+      <button type="submit" class="btn-primary wide">Continue</button>
+    </form>
+    <button type="button" class="link" id="code-back">‹ Back</button>
+    <p class="msg" id="code-msg" role="alert" hidden></p>
+  </section>
+
+  <section class="card login-card" id="invite" hidden>
+    <h1 id="inv-title">Welcome</h1>
+    <p class="muted" id="inv-lede">You are invited to the statistics of dopeiptv.org. Choose how you will sign in.</p>
+    <button type="button" class="btn-primary wide" id="inv-pk">Create a passkey</button>
+    <p class="hint">Face ID, Touch ID or your phone; kept in your password manager or iCloud Keychain, ready on your other devices.</p>
+    <p class="or"><span>or set a password</span></p>
+    <form id="inv-form">
+      <label class="field"><span>Name</span>
+        <input type="text" name="username" id="inv-user" autocomplete="username" readonly></label>
+      <label class="field"><span>New password</span>
+        <input type="password" id="inv-pass" autocomplete="new-password" minlength="10" required></label>
+      <label class="field"><span>The same again</span>
+        <input type="password" id="inv-pass2" autocomplete="new-password" minlength="10" required></label>
+      <button type="submit" class="btn wide">Set the password</button>
+    </form>
+    <p class="msg" id="inv-msg" role="alert" hidden></p>
+  </section>
+
+  <p class="foot login-foot">For the people who run dopeiptv.org.</p>
+</main>
+</body>
+</html>
