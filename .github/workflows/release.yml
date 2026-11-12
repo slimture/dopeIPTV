@@ -1392,6 +1392,37 @@ jobs:
             exit 1
           }
           Write-Output "self-check OK"
+      - name: Smoke test - start the app and photograph its window
+        # Nobody here has a Windows PC: this starts the real app, as a user
+        # would, and keeps a picture of the screen with the build. It does
+        # not stop a build yet - the runner has no graphics card, and a
+        # crash that only a GPU-less machine shows must not cost a release.
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "dist\dopeiptv\dopeiptv.exe" -PassThru
+          Start-Sleep -Seconds 15
+          $p.Refresh()
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          $g = [System.Drawing.Graphics]::FromImage($bmp)
+          $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $bmp.Save("windows-start-${{ matrix.arch }}.png", [System.Drawing.Imaging.ImageFormat]::Png)
+          $g.Dispose(); $bmp.Dispose()
+          if ($p.HasExited) {
+            Write-Error "the app exited within 15 s of starting (exit code $($p.ExitCode))"
+            exit 1
+          }
+          Write-Output "running after 15 s - window: '$($p.MainWindowTitle)' (handle $($p.MainWindowHandle))"
+          Stop-Process -Id $p.Id -Force
+      - name: Keep the picture of the started app
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-start-${{ matrix.arch }}
+          path: windows-start-*.png
+          if-no-files-found: ignore
       - name: Package portable zip
         shell: bash
         run: |
