@@ -895,8 +895,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._signed_in(auth.invite_passkey(token, data.get("credential") or {},
                                                            str(data.get("label") or "")))
             if not auth.has_users():
-                return self._send(409, {"error": "No admin has been set up yet: open the admin page with "
-                                                 "the old password and make the first invite there."})
+                return self._send(409, {"error": "There is no admin in the new sign-in yet, so no name or "
+                                                 "password works here. A browser still signed in makes "
+                                                 "the first invite on the Account tab; on the server, "
+                                                 "admin_users.py invite <name> does (DEPLOY.md)."})
             if action == "options":
                 return self._send(200, auth.login_options(addr))
             if action == "passkey":
