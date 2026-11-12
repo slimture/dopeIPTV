@@ -117,6 +117,7 @@
     return list.sort((a, b) => (m.rate ? b[1].length - a[1].length : (m.calc(b[1]) || 0) - (m.calc(a[1]) || 0)));
   }
   function addFilter(dim, value) {
+    K.step();                              // a drill-down: Back undoes it
     if (!filters.some((f) => f.dim === dim && String(f.value) === String(value))) { filters.push({ dim: dim, value: value }); }
     draw();
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -368,7 +369,7 @@
           td.style.setProperty("--a", String(Math.round(Math.min(1, (c.v || 0) / max) * 100) / 100));
           if (m.rate && c.n < MIN) { td.classList.add("small"); }
           tip(td, [nameOf(ex.by, v) + " · " + nameOf(ex.split, cols[j]), m.label + ": " + m.fmt(c.v), num.format(c.n) + " visits"]);
-          td.addEventListener("click", () => { filters.push({ dim: ex.by, value: v }, { dim: ex.split, value: cols[j] }); draw(); });
+          td.addEventListener("click", () => { K.step(); filters.push({ dim: ex.by, value: v }, { dim: ex.split, value: cols[j] }); draw(); });
         }
         tr.append(td);
       });
@@ -462,7 +463,7 @@
         const c = mk("span", "hc" + (n ? "" : " zero"));
         c.style.setProperty("--a", String(Math.round(n / max * 100) / 100));
         tip(c, [WD[w] + " " + String(h).padStart(2, "0") + ":00–" + String(h + 1).padStart(2, "0") + ":00", num.format(n) + " visits"]);
-        if (n) { c.addEventListener("click", () => { filters.push({ dim: "wd", value: w }, { dim: "hour", value: h }); draw(); }); }
+        if (n) { c.addEventListener("click", () => { K.step(); filters.push({ dim: "wd", value: w }, { dim: "hour", value: h }); draw(); }); }
         t.append(c);
       });
     });

@@ -3,7 +3,9 @@
  * a time; the Analysis tab is analysis.js, the log's sort, groups and
  * filters logtools.js, both built on window.AdminKit below. The tab and
  * what it shows live in the address (#visitors?span=month...), so a reload
- * stays where it was, while the page opened afresh starts on the overview.
+ * stays where it was, while the page opened afresh starts on the overview;
+ * each move to another view is a step in the browser's history, so Back
+ * (the browser's, the phone's, or the page's own) returns to the last one.
  * An external file for the site's CSP (script-src 'self'); the charts are
  * SVG made here, sizes set through the DOM, never inline styles.
  */
@@ -437,7 +439,7 @@
         li.tabIndex = 0;
         li.setAttribute("role", "button");
         li.title += " - show these visits";
-        const go = () => showFiltered(by, k, title + " \u00b7 " + (name ? name(k) : k));
+        const go = () => { navStep(); showFiltered(by, k, title + " \u00b7 " + (name ? name(k) : k)); };
         li.addEventListener("click", go);
         li.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
       }
@@ -674,7 +676,8 @@
 
   // -- the visitor log -------------------------------------------------------------
   let logDay = "", logDays = [], logList = [], showRobots = false;
-  let logFilter = null;          // {by, value, label}: the log shows one row of the overview
+  let logFilter = null;          // {by, value, label}: one row of the overview; {label, keys}: a group of the Analysis tab
+  let logVisitor = "";           // the log shows every visit of one visitor
   let logSpan = "day", logEnd = "";  // the log shows a day, week, month or year
   try { showRobots = localStorage.getItem("admin-robots") === "1"; } catch (e) { /* hidden then */ }
   function badge(text, cls) { return mk("span", "badge" + (cls ? " " + cls : ""), text); }
@@ -777,7 +780,7 @@
     if (!fromVisitor) {
       const all = mk("button", "link", "Every visit by this visitor");
       all.type = "button";
-      all.addEventListener("click", () => showVisitor(v.id));
+      all.addEventListener("click", () => { navStep(); showVisitor(v.id); });
       body.append(all);
     }
     row.append(body);
@@ -829,6 +832,7 @@
         $("day-next").disabled = i <= 0;
         logList = res.visits || [];
         logFilter = null;
+        logVisitor = "";
         $("visitor-head").hidden = true;
         if (window.LogTools) { window.LogTools.reset(); }
         drawLog();
@@ -882,6 +886,7 @@
   // A row of the overview's lists, clicked: the visits it counted.
   function showFiltered(by, value, label) {
     logFilter = { by: by, value: value, label: label };
+    logVisitor = "";
     logList = [];
     if (window.LogTools) { window.LogTools.reset(); }
     setTab("visitors", true);
@@ -898,7 +903,8 @@
   // A group of the Analysis tab, one by one: the visits its rows name
   // ([day, start, id]), the newest first; analysis.py caps them.
   function showGroup(label, keys) {
-    logFilter = { label: label, back: "analysis" };
+    logFilter = { label: label, back: "analysis", keys: keys };
+    logVisitor = "";
     logList = [];
     if (window.LogTools) { window.LogTools.reset(); }
     setTab("visitors", true);
@@ -916,15 +922,20 @@
       .catch((e) => $("visit-list").replaceChildren(mk("p", "error", "Could not load the visits: " + e.message + ".")));
   }
   function showVisitor(id) {
+    logVisitor = id;
+    setTab("visitors", true);
+    $("log-tools").hidden = true;
     fetch("/admin/visitor?id=" + encodeURIComponent(id), { credentials: "same-origin", cache: "no-store" })
       .then((r) => r.json())
       .then((res) => {
+        if (logVisitor !== id) { return; }
         const list = res.visits || [];
         $("visitor-head").hidden = false;
         $("visitor-title").textContent = "Visitor " + res.id + " · " + num.format(list.length) +
           (list.length === 1 ? " visit" : " visits") + " in the last " + keptFor();
         $("visit-list").replaceChildren(...list.map((v) => visitRow(v, true, true)));
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        window.scrollTo({ top: 0 });
+        writeHash();
       });
   }
   function setTab(name, keepLog) {
@@ -935,8 +946,16 @@
     $("tab-analysis").hidden = name !== "analysis";
     document.querySelector(".range").hidden = name === "visitors";
     if (name === "visitors" && !keepLog) { loadDay(logDay); }
-    if (name === "analysis" && window.AdminAnalysis) { window.AdminAnalysis.show(); }
-    if (name !== "visitors") { writeHash(); }
+    if (name === "analysis") {
+      if (window.AdminAnalysis) { window.AdminAnalysis.show(); } else {
+        $("an-bar").replaceChildren(mk("p", "error", "The Analysis tab's script did not load. The service on the " +
+          "server serves it once restarted: service iptv_donate restart - then reload this page."));
+        writeHash();
+      }
+    }
+    // The visitor log writes the address once its visits are in, the
+    // Analysis tab once drawn: a step back then scrolls to where it was.
+    if (name === "overview") { writeHash(); }
     // Drawn while the tab was hidden (data arriving, a resize), a chart
     // measured its box as 0 wide, fell back to its narrowest size and was
     // then stretched to the full width - tall as a wall. Drawn again now
@@ -944,36 +963,69 @@
     if (name === "overview" && data) { visitsChart(); downloadsChart(); }
   }
 
-  // -- the address: the tab and what it shows, for a reload --------------------------
+  // -- the address and the history: where the page is, and the way back ------------
+  // navStep() before a move to another view (a tab, a group, a visitor, a
+  // drill-down) makes the next address a new entry in the history; anything
+  // else (a filter, the sort) only rewrites the one it is on. Each entry
+  // keeps how deep it is (the page's own Back shows from the second on), how
+  // far down it was scrolled, and for a group of the Analysis tab its visits.
   let started = false;                 // not before readHash: the first setTab would wipe it
+  let pending = false, restoreY = null;
+  try { history.scrollRestoration = "manual"; } catch (e) { /* the browser's own then */ }
+  function navStep() {
+    pending = true;
+    try { history.replaceState(Object.assign({}, history.state, { scroll: window.scrollY }), ""); } catch (e) { /* fine */ }
+  }
+  function depth() { return (history.state && history.state.depth) || 0; }
   function writeHash() {
     if (!started) { return; }
-    let h = "";
+    let h = "", extra = {};
     if (tab === "visitors") {
       const p = new URLSearchParams();
       const f = logFilter;
-      if (f && f.back === "analysis") {
-        h = "analysis" + (window.AdminAnalysis ? window.AdminAnalysis.toHash() : "");
-      } else {
-        if (f && f.by) { p.set("by", f.by); p.set("value", f.value); p.set("label", f.label); }
-        else { p.set("span", logSpan); if (logDay) { p.set("day", logDay); } }
-        const t = window.LogTools ? window.LogTools.toHash() : "";
-        if (t) { p.set("f", t); }
-        h = "visitors?" + p.toString();
-      }
+      if (logVisitor) { p.set("visitor", logVisitor); }
+      else if (f && f.keys) { p.set("group", "1"); extra = { keys: f.keys, label: f.label }; }
+      else if (f && f.by) { p.set("by", f.by); p.set("value", f.value); p.set("label", f.label); }
+      else { p.set("span", logSpan); if (logDay) { p.set("day", logDay); } }
+      const t = !logVisitor && window.LogTools ? window.LogTools.toHash() : "";
+      if (t) { p.set("f", t); }
+      h = "visitors?" + p.toString();
     } else if (tab === "analysis") {
       h = "analysis" + (window.AdminAnalysis ? window.AdminAnalysis.toHash() : "");
     }
-    try { history.replaceState(null, "", h ? "#" + h : location.pathname + location.search); } catch (e) { /* fine */ }
+    const url = h ? "#" + h : location.pathname + location.search;
+    const same = h ? location.hash === "#" + h : !location.hash;
+    try {
+      if (pending && !same) {
+        history.pushState(Object.assign({ depth: depth() + 1, scroll: 0 }, extra), "", url);
+      } else {
+        history.replaceState(Object.assign({}, history.state, { depth: depth() }, extra), "", url);
+      }
+    } catch (e) { /* the address stays as it was */ }
+    pending = false;
+    $("nav-back").hidden = depth() < 1;
+    if (restoreY !== null) { window.scrollTo(0, restoreY); restoreY = null; }
+  }
+  // Back from a view the page cannot rebuild by itself (reloaded with no
+  // entry behind it): where its own Back button led before.
+  function back(fallback) {
+    if (depth() > 0) { history.back(); } else { fallback(); }
   }
   // At start: the page opened afresh shows the overview; reloaded, what it
   // showed (the scripts after this one are in by then).
   function readHash() {
     started = true;
+    pending = false;
     const h = location.hash.replace(/^#/, ""), name = h.split("?")[0];
     const p = new URLSearchParams(h.indexOf("?") >= 0 ? h.slice(h.indexOf("?") + 1) : "");
+    const st = history.state || {};
     if (name === "visitors") {
       if (window.LogTools) { window.LogTools.fromHash(p.get("f") || ""); }
+      if (p.get("visitor")) { return showVisitor(p.get("visitor")); }
+      if (p.get("group")) {
+        if (Array.isArray(st.keys)) { return showGroup(st.label || "Visits", st.keys); }
+        if (window.AdminAnalysis) { return setTab("analysis"); }
+      }
       if (p.get("by") && p.get("value")) { return showFiltered(p.get("by"), p.get("value"), p.get("label") || p.get("value")); }
       if (["day", "week", "month", "year"].indexOf(p.get("span")) >= 0) { logSpan = p.get("span"); }
       if (/^\d{4}-\d\d-\d\d$/.test(p.get("day") || "")) { logDay = p.get("day"); }
@@ -1017,19 +1069,24 @@
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => { if (data) { visitsChart(); downloadsChart(); } }, 120);
   });
-  document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
+  document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => {
+    if (b.dataset.tab !== tab) { navStep(); }
+    setTab(b.dataset.tab);
+  }));
+  $("nav-back").addEventListener("click", () => history.back());
   $("day-pick").addEventListener("change", (e) => loadDay(e.target.value));
   $("day-prev").addEventListener("click", () => loadDay(logDays[logDays.indexOf(logDay) + 1]));
   $("day-next").addEventListener("click", () => loadDay(logDays[logDays.indexOf(logDay) - 1]));
-  $("visitor-back").addEventListener("click", () => loadDay(logDay));
-  $("filter-clear").addEventListener("click", () => {
+  $("visitor-back").addEventListener("click", () => back(() => loadDay(logDay)));
+  $("filter-clear").addEventListener("click", () => back(() => {
     if (logFilter && logFilter.back === "analysis") { setTab("analysis"); window.scrollTo({ top: 0 }); return; }
     loadDay(logDay);
-  });
+  }));
   $("analyse-this").addEventListener("click", () => {
     const f = logFilter;
     if (!f || !window.AdminAnalysis) { return; }
     window.AdminAnalysis.focus(FIND_DIMS[f.by], f.value);
+    navStep();
     setTab("analysis");
     window.scrollTo({ top: 0 });
   });
@@ -1040,6 +1097,7 @@
     const now = new Date(), today = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" +
       String(now.getDate()).padStart(2, "0");
     const anchor = logDay && !(today >= logDay && today <= logEnd) ? logDay : today;
+    navStep();
     logSpan = b.dataset.span;
     loadDay(anchor);
   }));
@@ -1052,7 +1110,9 @@
   window.AdminKit = {
     $: $, mk: mk, svg: svg, num: num, dayFmt: dayFmt, flag: flag, countryName: countryName, duration: duration,
     showTip: showTip, hideTip: hideTip, tipRow: tipRow, PAGE_NAMES: PAGE_NAMES, langNames: langNames,
-    helpName: helpName, showFiltered: showFiltered, showGroup: showGroup, writeHash: writeHash,
+    helpName: helpName, writeHash: writeHash, step: navStep,
+    showFiltered: (by, value, label) => { navStep(); showFiltered(by, value, label); },
+    showGroup: (label, keys) => { navStep(); showGroup(label, keys); },
     days: () => days,
     spanText: () => (days ? (days === 365 ? "the last 12 months" : "the last " + days + " days") : "everything kept"),
   };
@@ -1061,7 +1121,12 @@
   // they are in, so a reload on the Analysis tab finds it.
   setTab("overview");
   window.addEventListener("DOMContentLoaded", readHash);
-  window.addEventListener("hashchange", readHash);     // an address typed or pasted
+  // Back and Forward, and an address typed or pasted: the view of the entry,
+  // scrolled to where it was left.
+  window.addEventListener("popstate", () => {
+    restoreY = (history.state && history.state.scroll) || 0;
+    readHash();
+  });
 
   // Pull down to reload, in the app on the iPhone's Home Screen. iOS gives
   // a Home Screen web app no pull-to-refresh of its own (Safari's belongs

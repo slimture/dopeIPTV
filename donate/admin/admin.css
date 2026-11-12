@@ -482,3 +482,13 @@ tr:last-child td { border-bottom: 0; }
   .lt-sels .lt-ctl { flex-direction: column; align-items: stretch; gap: 3px; }
   .lt-sels .lt-ctl select { max-width: none; width: 100%; }
 }
+
+/* Back to the last view (admin.js): from the second step on. */
+.nav-back { font: inherit; font-size: 14px; font-weight: 650; display: inline-flex; align-items: center; gap: 5px; flex: none;
+  color: var(--text); background: color-mix(in srgb, var(--text) 8%, transparent); border: 0; border-radius: 999px;
+  padding: 5px 12px 5px 9px; cursor: pointer; margin-inline-end: -2px; }
+.nav-back span[aria-hidden] { font-size: 19px; line-height: 1; margin-top: -2px; }
+.nav-back:hover { background: color-mix(in srgb, var(--text) 13%, transparent); }
+@media (max-width: 600px) { .nav-back .l { display: none; } .nav-back { padding: 5px 11px; } .brand { margin-inline-end: auto; } }
+/* A part with nothing in it yet (the Analysis tab loading) takes no room. */
+.card:empty { display: none; }
