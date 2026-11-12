@@ -148,7 +148,10 @@ The `macos-dmg` job in `release.yml` signs every piece of code in the
 `packaging/macos-entitlements.plist`), signs the .dmg, sends it to Apple
 with `notarytool` and staples the ticket to it; the smoke test then asks
 Gatekeeper whether it takes the app as notarised. Nightlies are signed the
-same way. Without the secrets (a fork) the job builds the ad hoc signed
+same way but not sent to Apple - one per push filled Apple's queue while a
+new account's first review took days - so a nightly opens after Open
+Anyway, and only releases (a tag, or *Release* run by hand) are notarised.
+Without the secrets (a fork) the job builds the ad hoc signed
 .dmg it always did; with the certificate but no API key a release fails
 rather than ship something half done.
 

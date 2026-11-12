@@ -1013,6 +1013,7 @@ jobs:
         env:
           ID: ${{ steps.sign.outputs.identity }}
           KC: ${{ steps.sign.outputs.keychain }}
+          NIGHTLY: ${{ inputs.nightly_version }}
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
@@ -1025,6 +1026,14 @@ jobs:
           V=${{ steps.v.outputs.version }}
           DMG="dopeIPTV-${V}-macOS-${{ matrix.arch }}.dmg"
           codesign --force --timestamp --keychain "$KC" --sign "$ID" "$DMG"
+          # Only a release goes to Apple. A test build per push to testing
+          # sent two more each time - six queued behind a new account's
+          # first, slow review - and each waited two hours for nothing.
+          # Signed, a test build opens after Open Anyway like before.
+          if [ -n "${NIGHTLY}" ]; then
+            echo "::notice::Test build: signed with the Developer ID, not sent to Apple (only releases are notarised)."
+            exit 0
+          fi
           if [ -z "${APPLE_API_KEY_P8}" ] || [ -z "${APPLE_API_KEY_ID}" ] || [ -z "${APPLE_API_ISSUER_ID}" ]; then
             echo "::error::Signed, but the App Store Connect API key secrets are missing: not notarised."
             exit 1
@@ -1076,9 +1085,10 @@ jobs:
           VER=$(defaults read "${APP}/Contents/Info" CFBundleShortVersionString)
           echo "CFBundleName=$NAME  CFBundleShortVersionString=$VER"
           test "$NAME" = "dopeIPTV" || { echo "::error::wrong CFBundleName ($NAME)"; hdiutil detach "$MOUNT" || true; exit 1; }
-          # Signed with the Developer ID: Gatekeeper must take the app as
-          # notarised, exactly as a Mac that downloaded it will.
-          if [ -n "${{ steps.sign.outputs.identity }}" ]; then
+          # Signed with the Developer ID: Gatekeeper must take a release's
+          # app as notarised, exactly as a Mac that downloaded it will. A
+          # test build is not notarised; its signature must still hold.
+          if [ -n "${{ steps.sign.outputs.identity }}" ] && [ -z "${{ inputs.nightly_version }}" ]; then
             GK=$(spctl --assess --type execute --verbose=2 "$APP" 2>&1 || true)
             echo "$GK"
             case "$GK" in
@@ -1086,6 +1096,10 @@ jobs:
               *) echo "::error::Gatekeeper does not accept the app in the .dmg as notarised"
                  hdiutil detach "$MOUNT" || true; exit 1 ;;
             esac
+          elif [ -n "${{ steps.sign.outputs.identity }}" ]; then
+            codesign --verify --deep --strict --verbose=2 "$APP" || {
+              echo "::error::the test build's Developer ID signature does not hold"
+              hdiutil detach "$MOUNT" || true; exit 1; }
           fi
           # libmpv must be bundled under the exact soname python-mpv loads,
           # or the embedded player is dead on the user's Mac.
