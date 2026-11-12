@@ -448,6 +448,25 @@ nginx -t && service nginx reload
 rm -f /usr/local/etc/nginx/iptv-admin.htpasswd
 ```
 
+**A reload that did nothing.** `nginx -t` can pass and the reload still
+fail: the running nginx then keeps its old configuration, says nothing on
+the console, and writes the reason only to its error log. A `limit_req_zone`
+whose key changes does this - nginx refuses to give a zone it holds a new
+key on a reload - and it kept this file's changes from November 10 to 12
+out of the running server (the admin page still asked for the deleted
+password file). After a reload, check that the workers are new and the log
+is quiet:
+
+```sh
+ps -axo pid,lstart,command | grep "[n]ginx: worker"
+grep -n "emerg" /var/log/nginx/error.log | tail -3
+```
+
+Workers older than the reload mean it failed; `service nginx restart`
+starts afresh (every site in the jail is gone for a second, and downloads
+in progress break). A zone's key is better changed under a new zone name,
+which a reload takes.
+
 **Locked out** (every passkey gone, a password forgotten), from the jail's
 shell: `su -m iptv -c 'python3 -I /usr/local/www/iptv/donate/admin_users.py
 invite <name>'` prints a new invite link for a new name; `... list` shows
