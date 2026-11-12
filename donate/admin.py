@@ -64,8 +64,12 @@ def _sum_into(total: dict, part: dict) -> None:
             total[k] = total.get(k, 0) + v
 
 
-def _top(d: dict, n: int = 8) -> list:
-    return [[k, v] for k, v in sorted(d.items(), key=lambda kv: (-kv[1], kv[0]))[:n]]
+def _top(d: dict, n: int | None = None) -> list:
+    """Largest first; all of them unless *n* says otherwise - the page shows
+    the first dozen and the rest on request, so no country or browser is
+    left out without a word."""
+    rows = [[k, v] for k, v in sorted(d.items(), key=lambda kv: (-kv[1], kv[0]))]
+    return rows if n is None else rows[:n]
 
 
 # -- donations, from Stripe -----------------------------------------------------
@@ -309,7 +313,7 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
         "judged": _judged(uniques, kinds, range_days, per_day),
         "before": before,
         "series": series,
-        "top": {k: _top(v, 12) for k, v in sums.items()},
+        "top": {k: _top(v) for k, v in sums.items()},
         "years": [dict(year=k, **v) for k, v in sorted(years.items(), reverse=True)],
         "downloads_all_time": int(sum(v for v in dl_all.values() if isinstance(v, (int, float))))
                               if isinstance(dl_all, dict) else 0,

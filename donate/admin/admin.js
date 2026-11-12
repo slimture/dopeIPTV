@@ -414,6 +414,8 @@
     return c;
   }
   // A row each, its bar drawn behind it: as long as its share of the top one.
+  // The first dozen show; the rest are a click away, never cut off unseen.
+  const SHOWN = 12;
   function rankList(rows, name) {
     if (!rows || !rows.length) { return mk("p", "empty", "Nothing yet."); }
     const top = rows[0][1] || 1, ul = mk("ul", "rank");
@@ -422,9 +424,22 @@
       fill.style.width = Math.max(2, v / top * 100) + "%";
       li.append(fill, mk("span", "k", name ? name(k) : k), mk("span", "v", num.format(v)));
       li.title = (name ? name(k) : k) + ": " + num.format(v);
+      li.hidden = i >= SHOWN;
       ul.append(li);
     });
-    return ul;
+    if (rows.length <= SHOWN) { return ul; }
+    const box = mk("div"), more = mk("button", "link more");
+    more.type = "button";
+    let open = false;
+    const label = () => { more.textContent = open ? "Show the top " + SHOWN : "Show all " + num.format(rows.length); };
+    more.addEventListener("click", () => {
+      open = !open;
+      ul.querySelectorAll("li").forEach((li, i) => { if (i >= SHOWN) { li.hidden = !open; } });
+      label();
+    });
+    label();
+    box.append(ul, more);
+    return box;
   }
   function group(title, cards) {
     const g = mk("section", "group");
