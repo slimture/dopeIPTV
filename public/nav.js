@@ -1171,3 +1171,42 @@ window.iptvCopyButtons = function (root) {
   });
 };
 window.iptvCopyButtons(document);
+
+/* What dopeIPTV is built on, at the foot of the page: the card unfolds
+ * downwards and folds back up (style.css .built-more), and the page follows
+ * it down, since it opens below the last line. Without motion, it simply
+ * opens. */
+(function () {
+  "use strict";
+  var box = document.querySelector(".built-more");
+  if (!box || !box.animate) { return; }
+  var sum = box.querySelector("summary"), body = box.querySelector(".built-body");
+  var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var running = null;
+  sum.addEventListener("click", function (e) {
+    if (still || !body) { return; }
+    e.preventDefault();
+    if (running) { running.cancel(); }
+    if (box.open) {
+      running = body.animate([{ height: body.offsetHeight + "px", opacity: 1 }, { height: "0px", opacity: 0 }],
+                             { duration: 280, easing: "cubic-bezier(.4, 0, .2, 1)" });
+      running.onfinish = function () { box.open = false; running = null; };
+      return;
+    }
+    box.open = true;
+    var h = body.offsetHeight;
+    running = body.animate([{ height: "0px", opacity: 0 }, { height: h + "px", opacity: 1 }],
+                           { duration: 420, easing: "cubic-bezier(.2, .8, .2, 1)" });
+    // The page follows the card down as it grows - never so far that its
+    // line leaves the top, under the sticky header.
+    var follow = function () {
+      var over = body.getBoundingClientRect().bottom + 24 - window.innerHeight;
+      var room = sum.getBoundingClientRect().top - 76;
+      if (over > 0 && room > 0) { window.scrollBy(0, Math.min(over, room)); }
+    };
+    var step = function () { if (running) { follow(); requestAnimationFrame(step); } };
+    running.onfinish = function () { running = null; follow(); };
+    requestAnimationFrame(step);
+  });
+})();
+
