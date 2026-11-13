@@ -1168,11 +1168,19 @@
               : " by " + num.format(people) + (people === 1 ? " visitor" : " visitors"))
       : "No visits";
     $("day-sum").textContent = (f ? f.label + " \u00b7 " : "") + visitsText + span +
-      (robots ? " · " + num.format(robots) + (robots === 1 ? " likely robot" : " likely robots") : "") +
-      (ups ? " · " + num.format(ups) + (ups === 1 ? " app update" : " app updates") : "");
+      (ups ? " · " + num.format(ups) + (ups === 1 ? " app update" : " app updates") : "") +
+      (robots ? " · " + num.format(robots) + (robots === 1 ? " likely robot" : " likely robots") : "");
+    // Each its own switch, named for what it does: the updates are the log
+    // tools' filter "App update" (so the chip and the address agree).
+    const LTools = window.LogTools;
+    const upsHidden = !!LTools && LTools.flag("upd") === false;
+    const ut = $("updates-toggle");
+    ut.hidden = !ups || !LTools;
+    ut.textContent = upsHidden ? "Show updates" : "Hide updates";
+    ut.setAttribute("aria-pressed", upsHidden ? "false" : "true");
     const tog = $("robots-toggle");
     tog.hidden = !robots;
-    tog.textContent = showRobots ? "Hide" : "Show";
+    tog.textContent = showRobots ? "Hide robots" : "Show robots";
     tog.setAttribute("aria-pressed", showRobots ? "true" : "false");
     const list = showRobots ? logList : logList.filter((v) => v.kind !== "robot");
     const none = f ? "No visits kept for this." : "No visits this " + logSpan + ".";
@@ -1422,6 +1430,12 @@
     logSpan = b.dataset.span;
     loadDay(anchor);
   }));
+  $("updates-toggle").addEventListener("click", () => {
+    const LT = window.LogTools;
+    if (!LT) { return; }
+    LT.setFlag("upd", LT.flag("upd") === false ? undefined : false);
+    drawLog();
+  });
   $("robots-toggle").addEventListener("click", () => {
     showRobots = !showRobots;
     try { localStorage.setItem("admin-robots", showRobots ? "1" : "0"); } catch (e) { /* this time only */ }

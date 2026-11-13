@@ -313,5 +313,12 @@
     reset: () => { st.shown = PAGE; st.folded = {}; },
     toHash: toHash,
     fromHash: fromHash,
+    // One on/off filter from outside (admin.js: Hide app updates): true
+    // only these, false all but these, undefined either.
+    flag: (k) => st.flags[k],
+    setFlag: (k, v) => {
+      if (v === undefined) { delete st.flags[k]; } else { st.flags[k] = !!v; }
+      st.shown = PAGE;
+    },
   };
 })();
