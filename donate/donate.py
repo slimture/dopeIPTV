@@ -667,7 +667,8 @@ def _watch_donations() -> None:
 
 # What /admin/ answers: the page's own files (admin.py STATIC) and its data.
 # One list, so a new path cannot be served by one check and refused by another.
-ADMIN_DATA = ("/admin/data", "/admin/visits", "/admin/visitor", "/admin/find", "/admin/rows", "/admin/account")
+ADMIN_DATA = ("/admin/data", "/admin/visits", "/admin/visitor", "/admin/find", "/admin/rows", "/admin/account",
+              "/admin/live")
 ADMIN_GET = ("/admin/admin.js", "/admin/analysis.js", "/admin/logtools.js", "/admin/account.js", *ADMIN_DATA)
 ADMIN_POST = ("/admin/notify-test", "/admin/push-subscribe", "/admin/push-unsubscribe", "/admin/pick")
 ACCOUNT = "/admin/account/"      # + an action: one's own sign-in, the other admins
@@ -787,6 +788,8 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:  # noqa: BLE001 - old numbers rather than no page
                 print(f"[donate] statistics not brought up to date: {e!r}", file=sys.stderr, flush=True)
             downloads_json = CONF.get("DOWNLOADS_JSON", os.path.join(admin.SITE, "downloads.json"))
+            if path == "/admin/live":
+                return self._send(200, admin.live(stats_dir, downloads_json))
             if path == "/admin/visits":
                 res = admin.visits(stats_dir, query.get("day", ""), query.get("span", "day"))
                 res["dl"] = admin.download_counts(stats_dir, downloads_json)

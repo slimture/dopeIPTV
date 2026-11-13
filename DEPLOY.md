@@ -408,7 +408,10 @@ How it counts, so the numbers are honest:
   `/usr/local/etc/iptv-donate.conf` lists more - addresses, networks or a
   dynamic-DNS name: `STATS_IGNORE=203.0.113.5, home.example.net`.
 - The numbers are brought up to date whenever the admin page is opened,
-  and by cron every quarter hour.
+  by cron every quarter hour, and - while its Overview or Visitors tab is
+  on screen - every 15 seconds: the downloads by period, today's visitors,
+  who was on the site in the last five minutes and the newest download
+  (`/admin/live`).
 
 The visits of the last 13 months are personal data under the GDPR even
 without an address (the id can be worked out again from an address); the

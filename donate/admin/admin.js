@@ -857,6 +857,21 @@
   // year, each a way to that period's visits, and the site's counter.
   const DL_CELLS = [["today", "Today", "day"], ["yesterday", "Yesterday", "day"], ["week", "This week", "week"],
                     ["month", "This month", "month"], ["year", "This year", "year"]];
+  let liveNow = null;                // admin.py live: who is here, the newest downloads
+  const dlSeen = {};                 // the counts last drawn, to show what came since
+  // A release file as people know it: "dopeIPTV-1.4.4-macOS-arm64.dmg" -> "macOS, Apple silicon".
+  function fileKind(f) {
+    const n = String(f || "");
+    if (/\.AppImage$/i.test(n)) { return "Linux AppImage" + (/aarch64|arm64/.test(n) ? " (ARM)" : ""); }
+    if (/\.deb$/i.test(n)) { return "Linux .deb" + (/arm64/.test(n) ? " (ARM)" : ""); }
+    if (/\.flatpak$/i.test(n)) { return "Flatpak"; }
+    if (/macOS/i.test(n)) { return /arm64/.test(n) ? "macOS, Apple silicon" : "macOS, Intel"; }
+    if (/windows/i.test(n)) { return "Windows" + (/arm64/.test(n) ? " (ARM)" : ""); }
+    return n;
+  }
+  function ago(sec) {
+    return sec < 60 ? "just now" : sec < 3600 ? Math.floor(sec / 60) + " min ago" : Math.floor(sec / 3600) + " h ago";
+  }
   function drawDl() {
     const box = $("dl-strip"), c = dlCounts;
     box.hidden = !c;
@@ -866,7 +881,13 @@
       const p = c[key] || { n: 0, day: "" };
       const b = mk("button", "dl-cell");
       b.type = "button";
+      const was = dlSeen[key + p.day];
+      dlSeen[key + p.day] = p.n;
       b.append(mk("b", "", num.format(p.n)), mk("span", "", label));
+      if (was !== undefined && p.n > was) {
+        b.classList.add("up");
+        b.append(mk("em", "dl-plus", "+" + num.format(p.n - was)));
+      }
       b.setAttribute("aria-current", plain && logSpan === span && logDay === p.day ? "true" : "false");
       b.title = (p.day < c.since ? "Counted from " + longDay.format(day(c.since)) + ". " : "") + "Show these visits";
       b.addEventListener("click", () => {
@@ -880,8 +901,54 @@
     const all = mk("div", "dl-cell static");
     all.append(mk("b", "", num.format(c.all || 0)), mk("span", "", "All time"));
     all.title = "The site's own download counter since it began - likely robots included, unlike the rest";
-    box.replaceChildren(mk("span", "dl-title", "Downloads"), ...cells, all);
+    const title = mk("div", "dl-title");
+    title.append(mk("span", "", "Downloads"));
+    const L = liveNow;
+    if (L) {
+      const here = mk("span", "live", num.format(L.here) + " on the site now");
+      here.prepend(mk("i", "", ""));
+      here.title = "Visitors seen in the last " + Math.round(L.window / 60) + " minutes, likely robots left out. " +
+        "Counts here update every 15 seconds while this page is open.";
+      title.append(here);
+    }
+    const parts = [title, ...cells, all];
+    if (L && L.recent && L.recent.length) {
+      const r = L.recent[0], line = mk("p", "dl-latest");
+      line.append(mk("span", "muted", "Latest download: "), document.createTextNode(fileKind(r[1]) +
+        (r[2] ? " from " + flag(r[2]) + " " + countryName(r[2]) : "") + ", " + ago(Math.max(0, L.at - r[0]))));
+      line.title = L.recent.map((x) => fileKind(x[1]) + (x[2] ? " · " + countryName(x[2]) : "") + " · " +
+        ago(Math.max(0, L.at - x[0]))).join("\n");
+      parts.push(line);
+    }
+    box.replaceChildren(...parts);
   }
+  // Live: the counts above the log and today's line on the overview, asked
+  // again every 15 seconds while one of them is on screen - the service
+  // reads the newest log lines first (stats_collect.collect_if_stale).
+  let liveTimer = 0, liveBusy = false;
+  function liveWanted() { return document.visibilityState === "visible" && (tab === "visitors" || tab === "overview"); }
+  function liveTick() {
+    clearTimeout(liveTimer);
+    if (!liveWanted() || liveBusy) { return; }
+    liveBusy = true;
+    fetch("/admin/live", { credentials: "same-origin", cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((L) => {
+        if (!L) { return; }
+        liveNow = L;
+        dlCounts = L.dl;
+        drawDl();
+        const t = document.querySelector(".sum-head .today");
+        if (t && data) {
+          data.today = L.today;
+          t.textContent = "Today so far: " + num.format(L.today.visitors) + " visitors · " + num.format(L.today.views) +
+            " page views · " + num.format(L.here) + " on the site now";
+        }
+      })
+      .catch(() => { /* asked again at the next tick */ })
+      .then(() => { liveBusy = false; if (liveWanted()) { liveTimer = setTimeout(liveTick, 15000); } });
+  }
+  document.addEventListener("visibilitychange", () => { if (liveWanted()) { liveTick(); } else { clearTimeout(liveTimer); } });
   // The day's visits - or one row of the overview's, across its days - the
   // likely robots hidden unless asked for; the count says how many there
   // were either way.
@@ -993,6 +1060,7 @@
     document.querySelector(".range").hidden = name === "visitors" || name === "account";
     if (name === "account" && window.AdminAccount) { window.AdminAccount.show(); }
     if (name === "visitors" && !keepLog) { loadDay(logDay); }
+    if (liveWanted()) { liveTick(); } else { clearTimeout(liveTimer); }
     if (name === "analysis") {
       if (window.AdminAnalysis) { window.AdminAnalysis.show(); } else {
         $("an-bar").replaceChildren(mk("p", "error", "The Analysis tab's script did not load. The service on the " +

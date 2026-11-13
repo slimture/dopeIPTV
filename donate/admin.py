@@ -447,6 +447,27 @@ def download_counts(stats_dir: str, downloads_json: str) -> dict:
     return out
 
 
+LIVE_WINDOW = 300          # seconds: a visitor seen this recently is "on the site now"
+
+
+def live(stats_dir: str, downloads_json: str) -> dict:
+    """What the admin page asks every few seconds: the downloads by period,
+    today's visitors and page views, the visitors seen in the last five
+    minutes and the newest downloads of today - likely robots left out."""
+    now = time.time()
+    today = datetime.now().astimezone().date()
+    vs = [v for d in (today - timedelta(days=1), today) for v in _visits_file(stats_dir, d.isoformat())
+          if v.get("kind") != "robot"]
+    here = {v.get("id") for v in vs if (v.get("pages") or v.get("downloads")) and now - v.get("end", 0) <= LIVE_WINDOW}
+    recent = sorted(([d[0], d[1], v.get("country", "")] for v in vs for d in v.get("downloads") or ()
+                     if isinstance(d, list) and len(d) > 1), reverse=True)[:5]
+    stats = _load(os.path.join(stats_dir, "stats.json"), {"days": {}})
+    row = _net((stats.get("days") or {}).get(today.isoformat()) or {})
+    return {"at": int(now), "updated": stats.get("updated"), "window": LIVE_WINDOW, "here": len(here),
+            "today": {"visitors": row.get("visitors", 0), "views": row.get("views", 0)},
+            "recent": recent, "dl": download_counts(stats_dir, downloads_json)}
+
+
 def _anon_by_day(stats_dir: str) -> dict:
     """The anonymous visits (STATS_DIR/visits-anon/<month>.json), by day."""
     by_day: dict = {}

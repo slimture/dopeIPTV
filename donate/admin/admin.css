@@ -152,7 +152,25 @@ tr:last-child td { border-bottom: 0; }
 /* Downloads by period, above the log (admin.js drawDl). */
 .dl-strip { display: grid; grid-template-columns: auto repeat(6, minmax(0, 1fr)); align-items: center; gap: 2px;
   padding: 8px 10px; }
-.dl-strip .dl-title { font-size: 13px; font-weight: 650; color: var(--text-2); padding: 0 12px 0 6px; }
+.dl-strip .dl-title { font-size: 13px; font-weight: 650; color: var(--text-2); padding: 0 12px 0 6px;
+  display: flex; flex-direction: column; gap: 4px; }
+.dl-strip .live { font-size: 12px; font-weight: 500; color: var(--muted); display: inline-flex; align-items: center;
+  gap: 6px; white-space: nowrap; }
+.dl-strip .live i { width: 7px; height: 7px; border-radius: 50%; background: var(--s3); flex: none;
+  animation: dl-pulse 2.4s ease-in-out infinite; }
+@keyframes dl-pulse { 50% { opacity: .35; } }
+.dl-cell { position: relative; }
+.dl-cell.up { animation: dl-up 3s ease-out; }
+@keyframes dl-up { 0%, 25% { background: color-mix(in srgb, var(--s3) 22%, transparent); } }
+.dl-plus { position: absolute; top: 6px; inset-inline-end: 8px; font-style: normal; font-size: 11.5px; font-weight: 700;
+  color: var(--text); background: color-mix(in srgb, var(--s3) 24%, transparent); padding: 1px 7px; border-radius: 999px;
+  animation: dl-fade 8s ease-out forwards; }
+@keyframes dl-fade { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+.dl-latest { grid-column: 1 / -1; margin: 2px 0 0; padding: 6px 6px 2px; font-size: 13px; color: var(--text-2);
+  border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) {
+  .dl-strip .live i, .dl-cell.up { animation: none; }
+}
 .dl-cell { font: inherit; border: 0; background: none; color: var(--text); border-radius: 10px; padding: 7px 10px;
   text-align: start; cursor: pointer; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .dl-cell b { font-size: 20px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
@@ -163,7 +181,8 @@ tr:last-child td { border-bottom: 0; }
 .dl-cell.static:hover { background: none; }
 @media (max-width: 600px) {
   .dl-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .dl-strip .dl-title { grid-column: 1 / -1; padding: 2px 10px 0; }
+  .dl-strip .dl-title { grid-column: 1 / -1; padding: 2px 10px 0; flex-direction: row; align-items: center;
+    justify-content: space-between; }
   .dl-cell b { font-size: 18px; }
 }
 .daybar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; }
