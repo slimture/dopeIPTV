@@ -7,6 +7,14 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Changed
+
+- macOS: the .dmg files are signed with Solecraft AB's Developer ID and
+  notarised by Apple, so the app opens like any other - no more Open
+  Anyway under Privacy & Security. 1.4.4's own .dmg files were rebuilt
+  this way on 13 November 2026 (the app inside is unchanged); test builds
+  are signed but not notarised.
+
 ## [1.4.4]
 
 Playback that rides out a dropping connection, and a warning when

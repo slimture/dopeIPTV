@@ -100,16 +100,12 @@ Not sure which Mac you have? Apple menu → About This Mac. (From 1.2.11 to
 ffmpeg from conda-forge after Homebrew stopped building binary packages
 for Intel Macs.)
 
-Open the `.dmg` and drag dopeIPTV to Applications. The app isn't
-notarized by Apple yet, so macOS refuses the first launch. Close that
-message, open **System Settings → Privacy & Security**, scroll down to the
-note about dopeIPTV and click **Open Anyway**, then confirm with your
-password — from then on it opens like any other app. The button is there
-for about an hour after the app was refused, and right-click → Open no
-longer gets past this since macOS 15. If macOS says the app is
-*"damaged"*, clear the download flag:
-`xattr -dr com.apple.quarantine /Applications/dopeIPTV.app`.
-It's safe — the warning only means the build isn't code-signed.
+Open the `.dmg` and drag dopeIPTV to Applications. The app is signed by
+Solecraft AB and notarized by Apple, so it opens like any other app; macOS
+only asks once whether to open something downloaded from the internet.
+A `.dmg` downloaded before 13 November 2026 is not notarized: allow its
+first launch under **System Settings → Privacy & Security → Open Anyway**,
+or download the current one.
 
 **Windows** — a portable `dopeIPTV-*-windows-x64.zip` (and `-windows-arm64.zip`
 for Snapdragon laptops): unzip the folder and run `dopeiptv.exe`, no
@@ -176,8 +172,7 @@ Your settings, playlists and favorites are kept whichever way you update.
 - **Windows** — close the app, delete the old `dopeiptv` folder and unzip
   the new one in its place (settings live in the registry, not the folder).
 - **macOS** — drag the new dopeIPTV to Applications and choose
-  **Replace**. If macOS refuses the first start, allow it again with
-  **Open Anyway** under Privacy & Security.
+  **Replace**.
 - **From source** — `git pull` in your clone, then `./install.sh` again.
 
 ## Running
