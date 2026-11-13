@@ -414,6 +414,11 @@ How it counts, so the numbers are honest:
   build's file and sends it on to its pre-release on GitHub - nothing of
   it is mirrored (the `$iptv_dl_nightly` map in the content server's
   file).
+- The admin page's Builds tab lists the release the site offers and the
+  ten newest test builds (donate.py asks GitHub's releases API, at most
+  every two minutes), each file with a download and a link to copy for a
+  tester - through `/dl.php`, so a tester's download counts. A new file
+  of the page (`builds.js`): `service iptv_donate restart` after deploying.
 - Your own visits are left out: a browser that has opened `/admin/` gets a
   cookie nginx does not log (pages, downloads, `/hit`), addresses that are
   not public (your own network) never count, and `STATS_IGNORE` in

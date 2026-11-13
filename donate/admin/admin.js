@@ -1145,8 +1145,15 @@
     $("tab-visitors").hidden = name !== "visitors";
     $("tab-analysis").hidden = name !== "analysis";
     $("tab-account").hidden = name !== "account";
-    document.querySelector(".range").hidden = name === "visitors" || name === "account";
+    $("tab-builds").hidden = name !== "builds";
+    document.querySelector(".range").hidden = name === "visitors" || name === "account" || name === "builds";
     if (name === "account" && window.AdminAccount) { window.AdminAccount.show(); }
+    if (name === "builds") {
+      if (window.AdminBuilds) { window.AdminBuilds.show(); } else {
+        $("builds").replaceChildren(mk("p", "error", "The Builds tab's script did not load. The service on the " +
+          "server serves it once restarted: service iptv_donate restart - then reload this page."));
+      }
+    }
     if (name === "visitors" && !keepLog) { loadDay(logDay); }
     if (name === "overview" && overviewStale && data) { quietLoad(); }
     if (liveWanted()) { liveTick(); } else { clearTimeout(liveTimer); }
@@ -1159,7 +1166,7 @@
     }
     // The visitor log writes the address once its visits are in, the
     // Analysis tab once drawn: a step back then scrolls to where it was.
-    if (name === "overview" || name === "account") { writeHash(); }
+    if (name === "overview" || name === "account" || name === "builds") { writeHash(); }
     // Drawn while the tab was hidden (data arriving, a resize), a chart
     // measured its box as 0 wide, fell back to its narrowest size and was
     // then stretched to the full width - tall as a wall. Drawn again now
@@ -1196,8 +1203,8 @@
       h = "visitors?" + p.toString();
     } else if (tab === "analysis") {
       h = "analysis" + (window.AdminAnalysis ? window.AdminAnalysis.toHash() : "");
-    } else if (tab === "account") {
-      h = "account";
+    } else if (tab === "account" || tab === "builds") {
+      h = tab;
     }
     const url = h ? "#" + h : location.pathname + location.search;
     const same = h ? location.hash === "#" + h : !location.hash;
@@ -1241,7 +1248,7 @@
       window.AdminAnalysis.fromHash(h.slice("analysis".length));
       return setTab("analysis");
     }
-    if (name === "account") { return setTab("account"); }
+    if (name === "account" || name === "builds") { return setTab(name); }
     setTab("overview");
   }
 

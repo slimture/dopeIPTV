@@ -41,6 +41,7 @@ STATIC = {
     "/admin/admin.js": ("admin.js", "application/javascript; charset=utf-8"),
     "/admin/analysis.js": ("analysis.js", "application/javascript; charset=utf-8"),
     "/admin/account.js": ("account.js", "application/javascript; charset=utf-8"),
+    "/admin/builds.js": ("builds.js", "application/javascript; charset=utf-8"),
     "/admin/login": ("login.html", "text/html; charset=utf-8"),
     "/admin/login.js": ("login.js", "application/javascript; charset=utf-8"),
     "/admin/passkey.js": ("passkey.js", "application/javascript; charset=utf-8"),
@@ -594,3 +595,74 @@ def find(stats_dir: str, by: str, value: str, days: int) -> dict:
                     if (v.get("pages") or v.get("downloads")) and _counted_under(v, by, value)]
         out.sort(key=lambda v: -v.get("start", 0))
     return {"by": by, "value": value, "visits": out}
+
+
+# -- builds: the release and the test builds, for the Builds tab -----------------
+
+GITHUB_RELEASES = "https://api.github.com/repos/slimture/dopeIPTV/releases?per_page=30"
+NIGHTLY_TAG = re.compile(r"^nightly-\d+(?:\.\d+){3}$")
+_BUILDS: dict = {"at": 0.0, "list": None, "error": ""}
+_BUILDS_LOCK = threading.Lock()
+
+
+def _build_asset(a: dict) -> dict | None:
+    name = str(a.get("name") or "").rsplit("/", 1)[-1]
+    if not name or name.startswith(".") or (a.get("state") or "uploaded") != "uploaded":
+        return None
+    sha = str(a.get("sha256") or a.get("digest") or "")
+    return {"name": name, "size": int(a.get("size") or 0),
+            "sha256": sha.split(":", 1)[1] if sha.startswith("sha256:") else sha,
+            # Through /dl.php like the site's own links: a test build's file is
+            # sent on to GitHub there, and a tester's download is counted.
+            "url": "/dl.php?f=" + urllib.parse.quote(name)}
+
+
+def _test_builds(keep: int) -> list:
+    req = urllib.request.Request(GITHUB_RELEASES, headers={
+        "Accept": "application/vnd.github+json", "User-Agent": "dopeiptv.org admin"})
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        body = json.loads(resp.read() or b"[]")
+    rows = [r for r in body if isinstance(r, dict) and r.get("prerelease") and not r.get("draft")
+            and NIGHTLY_TAG.match(str(r.get("tag_name") or ""))]
+    rows.sort(key=lambda r: str(r.get("created_at") or ""), reverse=True)
+    out = []
+    for r in rows[:keep]:
+        notes = str(r.get("body") or "")
+        commit = re.search(r"\bat `?([0-9a-f]{7,40})`?", notes)
+        out.append({"version": str(r["tag_name"])[len("nightly-"):],
+                    "published_at": r.get("published_at") or r.get("created_at"),
+                    "html_url": str(r.get("html_url") or ""),
+                    "commit": commit.group(1) if commit else "",
+                    "changes": [ln[2:].strip() for ln in notes.splitlines() if ln.startswith("- ")][:40],
+                    "assets": [x for x in map(_build_asset, r.get("assets") or []) if x]})
+    return out
+
+
+def builds(site_dir: str, max_age: int = 120, keep: int = 10) -> dict:
+    """The release the site offers (public/releases.json) and the newest
+    *keep* test builds on GitHub, each file with a link through /dl.php;
+    which test build the app's Test builds channel offers (nightly.json).
+    GitHub is asked at most every *max_age* seconds; when it cannot be, the
+    last list it gave stays, with the error beside it."""
+    rel = _load(os.path.join(site_dir, "public", "releases.json"), {})
+    release = None
+    if isinstance(rel, dict) and rel.get("version"):
+        release = {"version": str(rel["version"]), "published_at": rel.get("published_at"),
+                   "html_url": str(rel.get("html_url") or ""),
+                   "assets": [x for x in map(_build_asset, rel.get("assets") or []) if x]}
+    offered = _load(os.path.join(site_dir, "public", "nightly.json"), {})
+    with _BUILDS_LOCK:
+        fresh = _BUILDS["list"] is not None and time.time() - _BUILDS["at"] < max_age
+    if not fresh:
+        try:
+            got = _test_builds(keep)
+            with _BUILDS_LOCK:
+                _BUILDS.update(at=time.time(), list=got, error="")
+        except (urllib.error.URLError, TimeoutError, ValueError, KeyError, TypeError) as e:
+            msg = getattr(e, "reason", None) or str(e)
+            with _BUILDS_LOCK:
+                _BUILDS.update(at=time.time(), error=f"GitHub: {msg}"[:200])
+    with _BUILDS_LOCK:
+        tests, error, at = _BUILDS["list"] or [], _BUILDS["error"], _BUILDS["at"]
+    return {"release": release, "tests": tests, "error": error, "checked": int(at),
+            "offered": str(offered.get("version") or "") if isinstance(offered, dict) else ""}

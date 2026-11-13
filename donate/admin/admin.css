@@ -612,3 +612,41 @@ tr:last-child td { border-bottom: 0; }
   background: color-mix(in srgb, var(--down) 12%, var(--surface)); }
 .account > .msg.ok { background: color-mix(in srgb, var(--up) 14%, var(--surface)); }
 @media (max-width: 380px) { .tabs button { padding: 6px 7px; font-size: 13.5px; } }
+
+/* -- the Builds tab: the release and the test builds, each file to fetch or pass on -- */
+.builds { display: flex; flex-direction: column; gap: 10px; }
+.build-intro { margin: 0 2px 4px; }
+.build { padding: 0; }
+.build-sum { list-style: none; cursor: pointer; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; padding: 14px 18px; }
+.build-sum::-webkit-details-marker { display: none; }
+.build-sum::before { content: "\203A"; display: inline-block; width: 10px; color: var(--muted); transition: transform .15s; }
+.build[open] > .build-sum::before { transform: rotate(90deg); }
+.build-sum:hover { background: color-mix(in srgb, var(--text) 3%, transparent); border-radius: 16px; }
+.build-ver { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.build-when { font-size: 13px; }
+.pill { font-size: 12px; font-weight: 650; padding: 2px 8px; border-radius: 999px; color: var(--s3);
+  background: color-mix(in srgb, var(--s3) 14%, transparent); }
+.pill.rel { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.build > :not(summary) { margin-left: 18px; margin-right: 18px; }
+.build-changes { margin-bottom: 8px; }
+.build-changes ul { margin: 6px 0 4px; padding-left: 18px; font-size: 13.5px; color: var(--text-2); display: flex; flex-direction: column; gap: 3px; }
+.build-files { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 28px; }
+.build-file { display: flex; align-items: center; justify-content: space-between; gap: 8px 14px; padding: 9px 0;
+  border-top: 1px solid var(--line); min-width: 0; }
+.build-what { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; min-width: 0; }
+.build-os { font-weight: 650; font-size: 14px; }
+.build-kind { font-size: 14px; color: var(--text-2); }
+.build-name { flex-basis: 100%; margin: 1px 0 0 !important; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.build-acts { display: flex; gap: 6px; flex: none; }
+.btn-small { font-size: 13px; padding: 6px 11px; border-radius: 8px; }
+.build-foot { margin-top: 4px; margin-bottom: 14px; }
+.build-more { align-self: flex-start; margin: 2px 2px 0; font-size: 14px; }
+@media (min-width: 981px) {
+  .build-files { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .build-file { flex-direction: column; align-items: stretch; }
+  .build-acts .btn { flex: 1; }
+  .build-sum { padding: 12px 14px; }
+  .build > :not(summary) { margin-left: 14px; margin-right: 14px; }
+}

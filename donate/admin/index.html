@@ -16,6 +16,7 @@
 <script src="/admin/logtools.js" defer></script>
 <script src="/admin/passkey.js" defer></script>
 <script src="/admin/account.js" defer></script>
+<script src="/admin/builds.js" defer></script>
 </head>
 <body>
 <header class="top">
@@ -28,6 +29,7 @@
     <button type="button" role="tab" data-tab="overview" aria-selected="true">Overview</button>
     <button type="button" role="tab" data-tab="visitors" aria-selected="false">Visitors</button>
     <button type="button" role="tab" data-tab="analysis" aria-selected="false">Analysis</button>
+    <button type="button" role="tab" data-tab="builds" aria-selected="false">Builds</button>
     <button type="button" role="tab" data-tab="account" aria-selected="false">Account</button>
   </div>
   <div class="range" role="radiogroup" aria-label="Period">
@@ -132,6 +134,10 @@
       <section class="card" id="an-langs"></section>
     </div>
     <section class="card" id="an-acts"></section>
+  </div>
+
+  <div id="tab-builds" class="tab" hidden>
+    <div class="builds" id="builds"></div>
   </div>
 
   <div id="tab-account" class="tab" hidden>

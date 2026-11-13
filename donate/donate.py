@@ -668,8 +668,9 @@ def _watch_donations() -> None:
 # What /admin/ answers: the page's own files (admin.py STATIC) and its data.
 # One list, so a new path cannot be served by one check and refused by another.
 ADMIN_DATA = ("/admin/data", "/admin/visits", "/admin/visitor", "/admin/find", "/admin/rows", "/admin/account",
-              "/admin/live")
-ADMIN_GET = ("/admin/admin.js", "/admin/analysis.js", "/admin/logtools.js", "/admin/account.js", *ADMIN_DATA)
+              "/admin/live", "/admin/builds")
+ADMIN_GET = ("/admin/admin.js", "/admin/analysis.js", "/admin/logtools.js", "/admin/account.js",
+             "/admin/builds.js", *ADMIN_DATA)
 ADMIN_POST = ("/admin/notify-test", "/admin/push-subscribe", "/admin/push-unsubscribe", "/admin/pick")
 ACCOUNT = "/admin/account/"      # + an action: one's own sign-in, the other admins
 # Open to anyone (nginx asks nothing here either): the sign-in page and what
@@ -779,6 +780,8 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:  # noqa: BLE001 - a broken admin.py must not stop donations
             print(f"[donate] admin page unavailable: {e}", file=sys.stderr, flush=True)
             return self._send(500, {"error": "admin unavailable"})
+        if path == "/admin/builds":         # no statistics in it: nothing to collect first
+            return self._send(200, admin.builds(admin.SITE))
         if path in ADMIN_DATA:
             query = {k: v[0] for k, v in urllib.parse.parse_qs(self.path.partition("?")[2]).items()}
             stats_dir = CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats"))
