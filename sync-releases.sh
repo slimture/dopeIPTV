@@ -389,7 +389,8 @@ else
            html_url: (.html_url // "https://github.com/slimture/dopeIPTV/releases"),
            assets: [.assets[]? | select((.state // "uploaded") == "uploaded")
                     | (.name // "" | split("/") | last) as $name
-                    | select($sha | has($name)) | classify($name) as [$label, $sub, $icon]
+                    | select($sha | has($name) and ($name | startswith("SHA256SUMS") | not))
+                    | classify($name) as [$label, $sub, $icon]
                     | (.size // 0 | human) as $size
                     | {label: $label,
                        sub: (if $sub != "" then $sub + " · " + $size else $size end),
