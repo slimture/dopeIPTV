@@ -456,6 +456,14 @@ def live(stats_dir: str, downloads_json: str) -> dict:
     minutes and the newest downloads of today - likely robots left out."""
     now = time.time()
     today = datetime.now().astimezone().date()
+    raw = _visits_file(stats_dir, today.isoformat())
+    # Changes whenever today's visits do (a new one, a page, a download, the
+    # seconds a leave adds, a visit judged anew): the page then fetches the
+    # view it shows again, and not otherwise.
+    rev = "{}.{}.{}.{}.{}.{}".format(len(raw), sum(len(v.get("pages") or ()) for v in raw),
+                                      sum(len(v.get("downloads") or ()) for v in raw),
+                                      sum(v.get("time") or 0 for v in raw), max((v.get("end", 0) for v in raw), default=0),
+                                      sum(1 for v in raw if v.get("kind") == "robot"))
     vs = [v for d in (today - timedelta(days=1), today) for v in _visits_file(stats_dir, d.isoformat())
           if v.get("kind") != "robot"]
     here = {v.get("id") for v in vs if (v.get("pages") or v.get("downloads")) and now - v.get("end", 0) <= LIVE_WINDOW}
@@ -463,7 +471,7 @@ def live(stats_dir: str, downloads_json: str) -> dict:
                      if isinstance(d, list) and len(d) > 1), reverse=True)[:5]
     stats = _load(os.path.join(stats_dir, "stats.json"), {"days": {}})
     row = _net((stats.get("days") or {}).get(today.isoformat()) or {})
-    return {"at": int(now), "updated": stats.get("updated"), "window": LIVE_WINDOW, "here": len(here),
+    return {"at": int(now), "rev": rev, "updated": stats.get("updated"), "window": LIVE_WINDOW, "here": len(here),
             "today": {"visitors": row.get("visitors", 0), "views": row.get("views", 0)},
             "recent": recent, "dl": download_counts(stats_dir, downloads_json)}
 

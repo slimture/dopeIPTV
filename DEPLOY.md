@@ -411,7 +411,10 @@ How it counts, so the numbers are honest:
   by cron every quarter hour, and - while its Overview or Visitors tab is
   on screen - every 15 seconds: the downloads by period, today's visitors,
   who was on the site in the last five minutes and the newest download
-  (`/admin/live`).
+  (`/admin/live`). When today's visits change, the tab on screen fetches
+  its view again by itself - the overview, the visitor log of a period
+  with today in it (open visits stay open, new ones light up), the
+  Analysis tab - so the page never needs reloading.
 
 The visits of the last 13 months are personal data under the GDPR even
 without an address (the id can be worked out again from an address); the

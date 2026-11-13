@@ -753,6 +753,8 @@
   }
   function visitRow(v, showDay, fromVisitor) {
     const row = mk("details", "visit" + (v.kind === "robot" ? " robot" : "") + (showDay ? " with-day" : ""));
+    // Which visit this is across a redraw: the live loop keeps open ones open.
+    row.dataset.id = (v.day || "") + "|" + (v.start || "") + "|" + (v.id || "");
     const sum = mk("summary");
     const when = new Date(v.start * 1000);
     const pages = v.pages.length, dls = v.downloads.length;
@@ -925,8 +927,69 @@
   // Live: the counts above the log and today's line on the overview, asked
   // again every 15 seconds while one of them is on screen - the service
   // reads the newest log lines first (stats_collect.collect_if_stale).
-  let liveTimer = 0, liveBusy = false;
-  function liveWanted() { return document.visibilityState === "visible" && (tab === "visitors" || tab === "overview"); }
+  let liveTimer = 0, liveBusy = false, liveRev = null, lastFull = Date.now(), overviewStale = false;
+  function liveWanted() {
+    return document.visibilityState === "visible" && (tab === "visitors" || tab === "overview" || tab === "analysis");
+  }
+  function todayIso() {
+    const n = new Date();
+    return n.getFullYear() + "-" + String(n.getMonth() + 1).padStart(2, "0") + "-" + String(n.getDate()).padStart(2, "0");
+  }
+  // Someone is choosing something (a list open, a field being typed in) or
+  // reading a chart's tooltip: a redraw now would pull it away.
+  function busyHere() {
+    const ae = document.activeElement;
+    return (ae && /^(SELECT|INPUT|TEXTAREA)$/.test(ae.tagName)) || !$("tip").hidden;
+  }
+  // The overview again, without "Loading…" and without moving the page.
+  function quietLoad() {
+    fetch("/admin/data?days=" + days, { credentials: "same-origin", cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d || d.days !== data.days) { return; }
+        data = d; overviewStale = false;
+        if (tab === "overview" && !busyHere()) { render(); markSeen(); } else { overviewStale = true; }
+        if (d.dl) { dlCounts = d.dl; drawDl(); }
+      })
+      .catch(() => { overviewStale = true; });
+  }
+  // The visits of the period shown again: open ones stay open, the one at
+  // the top of the window stays where it is, and new ones light up briefly.
+  function refreshLog() {
+    const want = logDay, span = logSpan;
+    fetch("/admin/visits?day=" + encodeURIComponent(want) + "&span=" + span, { credentials: "same-origin", cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        if (!res || tab !== "visitors" || logFilter || logVisitor || logDay !== want || logSpan !== span || busyHere()) { return; }
+        const box = $("visit-list");
+        const known = new Set(logList.map((v) => (v.day || "") + "|" + (v.start || "") + "|" + (v.id || "")));
+        const open = new Set([...box.querySelectorAll("details.visit[open]")].map((d) => d.dataset.id));
+        const top = $("dl-strip").getBoundingClientRect().bottom > 0 ? null :
+          [...box.querySelectorAll("details.visit")].find((d) => d.getBoundingClientRect().bottom > 80);
+        const anchor = top ? { id: top.dataset.id, y: top.getBoundingClientRect().top } : null;
+        if (res.dl) { dlCounts = res.dl; }
+        logList = res.visits || [];
+        drawLog();
+        box.querySelectorAll("details.visit").forEach((d) => {
+          if (open.has(d.dataset.id)) { d.open = true; }
+          if (d.dataset.id && !known.has(d.dataset.id)) { d.classList.add("fresh"); }
+        });
+        if (anchor) {
+          const again = [...box.querySelectorAll("details.visit")].find((d) => d.dataset.id === anchor.id);
+          if (again) { window.scrollBy(0, again.getBoundingClientRect().top - anchor.y); }
+        }
+      })
+      .catch(() => { /* the next change tries again */ });
+  }
+  function refreshView() {
+    lastFull = Date.now();
+    if (tab === "overview") { quietLoad(); } else { overviewStale = true; }
+    if (window.AdminAnalysis) {
+      if (tab === "analysis") { window.AdminAnalysis.refresh(); } else { window.AdminAnalysis.stale(); }
+    }
+    const today = todayIso();
+    if (tab === "visitors" && !logFilter && !logVisitor && logDay && today >= logDay && today <= logEnd) { refreshLog(); }
+  }
   function liveTick() {
     clearTimeout(liveTimer);
     if (!liveWanted() || liveBusy) { return; }
@@ -938,6 +1001,11 @@
         liveNow = L;
         dlCounts = L.dl;
         drawDl();
+        const changed = liveRev !== null && L.rev !== liveRev;
+        liveRev = L.rev;
+        // Donations come from Stripe, cached five minutes: the overview is
+        // fetched again that often even when no visit changed.
+        if (changed || Date.now() - lastFull > 300000) { refreshView(); }
         const t = document.querySelector(".sum-head .today");
         if (t && data) {
           data.today = L.today;
@@ -1060,6 +1128,7 @@
     document.querySelector(".range").hidden = name === "visitors" || name === "account";
     if (name === "account" && window.AdminAccount) { window.AdminAccount.show(); }
     if (name === "visitors" && !keepLog) { loadDay(logDay); }
+    if (name === "overview" && overviewStale && data) { quietLoad(); }
     if (liveWanted()) { liveTick(); } else { clearTimeout(liveTimer); }
     if (name === "analysis") {
       if (window.AdminAnalysis) { window.AdminAnalysis.show(); } else {

@@ -168,8 +168,11 @@ tr:last-child td { border-bottom: 0; }
 @keyframes dl-fade { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 .dl-latest { grid-column: 1 / -1; margin: 2px 0 0; padding: 6px 6px 2px; font-size: 13px; color: var(--text-2);
   border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+/* A visit that came in while the log was open (admin.js refreshLog). */
+.visit.fresh { animation: visit-fresh 6s ease-out; }
+@keyframes visit-fresh { 0%, 40% { background: color-mix(in srgb, var(--s3) 14%, var(--surface)); } }
 @media (prefers-reduced-motion: reduce) {
-  .dl-strip .live i, .dl-cell.up { animation: none; }
+  .dl-strip .live i, .dl-cell.up, .visit.fresh { animation: none; }
 }
 .dl-cell { font: inherit; border: 0; background: none; color: var(--text); border-radius: 10px; padding: 7px 10px;
   text-align: start; cursor: pointer; display: flex; flex-direction: column; gap: 1px; min-width: 0; }

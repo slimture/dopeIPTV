@@ -647,8 +647,23 @@
       filters.push({ dim: dim, value: (dim === "hour" || dim === "wd") ? Number(raw) : raw });
     });
   }
+  // New visits came in (admin.js, the live loop): the rows again, quietly,
+  // drawn with every choice kept; or, while another tab shows, next time.
+  function refresh() {
+    const days = K.days();
+    fetch("/admin/rows?days=" + days, { credentials: "same-origin", cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        if (!res || K.days() !== days) { return; }
+        all = rowsOf(res); loadedFor = days; span = { first: res.first, last: res.last };
+        if (!$("tab-analysis").hidden) { draw(); }
+      })
+      .catch(() => { /* the next change tries again */ });
+  }
   window.AdminAnalysis = {
     show: show,
+    refresh: refresh,
+    stale: () => { loadedFor = null; },
     // From the visitor log: start from one group.
     focus: (dim, value) => { if (DIMS[dim]) { filters = [{ dim: dim, value: value }]; } },
     toHash: toHash,
