@@ -40,6 +40,19 @@ jobs:
       nightly_version: ${{ needs.version.outputs.version }}
     secrets: inherit
 
+  tidy-notes:
+    # The releases page short, so the downloads are near the top: each
+    # release its own notes, the older ones folded (tools/tidy_release_notes.py).
+    # Changes only what is not so yet; never holds up a build.
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - name: Tidy the release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/tidy_release_notes.py
+
   publish:
     needs: [version, build]
     # What did build is published, as a release's jobs each attach theirs;
@@ -137,9 +150,18 @@ jobs:
               sed 's/^/- /' missing.txt
               echo
             fi
+            # Folded: the releases page lists every build (and
+            # tools/tidy_release_notes.py folds the ones from before).
+            git log --no-merges --format='- %s' ${LAST:+$LAST..HEAD} | head -60 > changes.md
+            N=$(wc -l < changes.md | tr -d ' ')
             echo "### Changes since ${LAST:-the last release}"
             echo
-            git log --no-merges --format='- %s' ${LAST:+$LAST..HEAD} | head -60
+            echo "<details>"
+            echo "<summary>${N} $([ "$N" = 1 ] && echo change || echo changes)</summary>"
+            echo
+            cat changes.md
+            echo
+            echo "</details>"
           } > notes.md
           cat notes.md
       - name: Publish the pre-release

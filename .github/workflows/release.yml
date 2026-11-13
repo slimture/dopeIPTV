@@ -1688,6 +1688,11 @@ jobs:
       TAG: ${{ inputs.replace_macos_dmg || github.ref_name }}
     steps:
       - uses: actions/checkout@v5
+      - name: Tidy the release notes
+        # This release its own notes only, the one before it folded - before
+        # the site sees the release complete (the signed list, next).
+        continue-on-error: true
+        run: python3 tools/tidy_release_notes.py
       - name: Sign the release's checksums
         env:
           DOPEIPTV_UPDATE_KEY: ${{ secrets.DOPEIPTV_UPDATE_KEY }}

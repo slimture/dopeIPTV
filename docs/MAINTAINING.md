@@ -121,6 +121,12 @@ Platform notes that are easy to forget:
    fetches, merges `origin/testing` into `main`, checks that all five
    places agree, pushes `main`, and tags `vx.y.z`. Safe to re-run.
 4. Watch `release.yml`. Re-run a failed leg if it was a download hiccup.
+   Its last job signs the checksum list and tidies the release notes
+   (`tools/tidy_release_notes.py`): the new release keeps only its own
+   section of `RELEASE_NOTES.md`, the one before it is folded. Every
+   nightly run does the same, so the releases page stays short and the
+   downloads near the top; nothing is lost - each tag's
+   `RELEASE_NOTES.md` and `CHANGELOG.md` have it all.
 5. The website picks up the new release by itself within 15 minutes.
 
 Write release notes for people who use the app: what they can now do and
