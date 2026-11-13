@@ -1172,77 +1172,66 @@ window.iptvCopyButtons = function (root) {
 };
 window.iptvCopyButtons(document);
 
-/* What dopeIPTV is built on, at the foot of the page: the card unfolds
- * downwards and folds back up (style.css .built-more), and the page follows
- * it down, since it opens below the last line. Without motion, it simply
- * opens. */
+/* What dopeIPTV is built on, under the donate band: opened, the card
+ * switches on like an old TV - a bright line that opens into the picture -
+ * and the projects tune in as channels (style.css .built-more); closed, it
+ * switches off into a line again. The page follows the card down. Without
+ * motion, it simply opens and closes. */
 (function () {
   "use strict";
   var box = document.querySelector(".built-more");
   if (!box || !box.animate) { return; }
   var sum = box.querySelector("summary"), body = box.querySelector(".built-body");
   var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var running = null;
-  // A tribute, when it opens: confetti, sparks and stars rain down over
-  // the screen from its top edge, swaying and turning as they fall, and
-  // the heading lights up.
-  function cheer() {
-    var root = getComputedStyle(document.documentElement);
-    var colors = [root.getPropertyValue("--accent").trim() || "#2997ff", root.getPropertyValue("--brand").trim() || "#4c8dff",
-                  "#7c5cff", "#22d3ee", "#ffd166", root.getPropertyValue("--text").trim() || "#fff"];
-    var layer = document.createElement("div");
-    layer.className = "built-cheer";
-    layer.setAttribute("aria-hidden", "true");
-    document.body.appendChild(layer);
-    var w = window.innerWidth, h = window.innerHeight;
-    var n = w < 600 ? 46 : 90;
-    for (var i = 0; i < n; i++) {
-      var p = document.createElement("i");
-      p.className = "k" + (i % 3);
-      p.style.background = colors[i % colors.length];
-      p.style.left = (Math.random() * w) + "px";
-      layer.appendChild(p);
-      var sway = 18 + Math.random() * 40, spin = 360 + Math.random() * 720;
-      var drop = h + 80, s = .7 + Math.random() * .6;
-      p.animate([
-        { transform: "translate(0, -30px) rotate(0) scale(" + s + ")", opacity: 0 },
-        { transform: "translate(" + sway + "px, " + (drop * .3) + "px) rotate(" + (spin * .3) + "deg) scale(" + s + ")", opacity: 1, offset: .25 },
-        { transform: "translate(" + (-sway) + "px, " + (drop * .62) + "px) rotate(" + (spin * .65) + "deg) scale(" + s + ")", opacity: 1, offset: .6 },
-        { transform: "translate(" + (sway / 2) + "px, " + drop + "px) rotate(" + spin + "deg) scale(" + s + ")", opacity: 0 }
-      ], { duration: 1900 + Math.random() * 1500, delay: Math.random() * 700, easing: "cubic-bezier(.35, .15, .55, 1)", fill: "both" });
-    }
-    sum.classList.remove("cheer");
-    void sum.offsetWidth;
-    sum.classList.add("cheer");
-    setTimeout(function () { layer.remove(); sum.classList.remove("cheer"); }, 4400);
+  var running = null, zapper = null, last = -1;
+  // Alive while open: every few seconds one channel zaps - a jolt and a
+  // moment of grain - on top of its own animations (Web Animations).
+  function zap() {
+    var tiles = box.querySelectorAll(".credit");
+    if (!tiles.length || !box.open) { return; }
+    var i = Math.floor(Math.random() * tiles.length);
+    if (i === last) { i = (i + 1) % tiles.length; }
+    last = i;
+    var tile = tiles[i], grain = document.createElement("span");
+    grain.className = "built-noise";
+    tile.appendChild(grain);
+    grain.animate([{ opacity: .8, transform: "translate(0, 0)" }, { opacity: .6, transform: "translate(-10px, 7px)", offset: .3 },
+                   { opacity: .45, transform: "translate(8px, -9px)", offset: .6 }, { opacity: 0, transform: "translate(-4px, 3px)" }],
+                  { duration: 420, easing: "steps(5, end)" }).onfinish = function () { grain.remove(); };
+    tile.animate([{ transform: "translateX(-5px) skewX(-6deg)", filter: "contrast(1.5) brightness(1.4)" },
+                  { transform: "translateX(4px) skewX(5deg)", filter: "contrast(1.3) brightness(1.2)", offset: .35 },
+                  { transform: "none", filter: "none" }], { duration: 380, easing: "steps(3, end)" });
   }
+  function live(on) {
+    if (zapper) { clearInterval(zapper); zapper = null; }
+    if (on && !still) { zapper = setInterval(zap, 2600 + Math.random() * 1200); }
+  }
+  box.addEventListener("toggle", function () { live(box.open); });
   sum.addEventListener("click", function (e) {
     if (still || !body) { return; }
     e.preventDefault();
-    if (running) { running.cancel(); }
+    if (running) { running.cancel(); running = null; }
     if (box.open) {
-      running = body.animate([{ height: body.offsetHeight + "px", opacity: 1 }, { height: "0px", opacity: 0 }],
-                             { duration: 280, easing: "cubic-bezier(.4, 0, .2, 1)" });
+      running = body.animate([
+        { transform: "none", filter: "none", opacity: 1 },
+        { transform: "scale(1, .006)", filter: "brightness(2.4)", opacity: 1, offset: .55 },
+        { transform: "scale(0, .006)", filter: "brightness(3)", opacity: 0 }
+      ], { duration: 420, easing: "cubic-bezier(.5, 0, .7, .4)" });
       running.onfinish = function () { box.open = false; running = null; };
       return;
     }
     box.open = true;
-    cheer();
-    var h = body.offsetHeight;
-    // A spring: a little past its height, then back.
-    running = body.animate([{ height: "0px", opacity: 0, offset: 0 }, { height: (h * 1.04) + "px", opacity: 1, offset: .7 },
-                            { height: (h * .99) + "px", offset: .88 }, { height: h + "px", opacity: 1, offset: 1 }],
-                           { duration: 640, easing: "cubic-bezier(.3, .7, .3, 1)" });
-    // The page follows the card down as it grows - never so far that its
-    // line leaves the top, under the sticky header.
-    var follow = function () {
-      var over = body.getBoundingClientRect().bottom + 24 - window.innerHeight;
-      var room = sum.getBoundingClientRect().top - 76;
-      if (over > 0 && room > 0) { window.scrollBy(0, Math.min(over, room)); }
-    };
-    var step = function () { if (running) { follow(); requestAnimationFrame(step); } };
-    running.onfinish = function () { running = null; follow(); };
-    requestAnimationFrame(step);
+    sum.classList.remove("cheer");
+    void sum.offsetWidth;
+    sum.classList.add("cheer");
+    setTimeout(function () { sum.classList.remove("cheer"); }, 1400);
+    // The card is at full height at once (it switches on in place): the
+    // page goes down to it, never so far that the heading leaves the top.
+    // Measured by layout, not by its rectangle: it is still a line now.
+    var s = sum.getBoundingClientRect();
+    var bottom = s.bottom + (parseFloat(getComputedStyle(body).marginTop) || 0) + body.offsetHeight;
+    var over = bottom + 24 - window.innerHeight, room = s.top - 76;
+    if (over > 0 && room > 0) { window.scrollBy({ top: Math.min(over, room), behavior: "smooth" }); }
   });
 })();
 
