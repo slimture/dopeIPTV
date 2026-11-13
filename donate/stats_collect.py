@@ -389,9 +389,34 @@ def _hash(state: dict, *parts: str) -> str:
     return hashlib.sha256("|".join((secret, *parts)).encode()).hexdigest()[:12]
 
 
+#: The app updating itself (dopeiptv/core/updates.py user_agent):
+#: "dopeIPTV/1.4.4 (Windows; AMD64)" - the version it updates from.
+APP_UA = re.compile(r"^dopeIPTV/(\d+(?:\.\d+){1,3})\b")
+
+
+def _app_update(stats: dict, day: str, name: str, ua: str, ip: str, state: dict) -> None:
+    """An update the app fetched for itself: counted apart from downloads
+    (a browser's), by platform, by file (the version it goes to) and by the
+    version it comes from - once per address, file and day, and never a
+    visit: no page was seen."""
+    m = APP_UA.match(ua)
+    if not m:
+        return
+    if ip and ip != "-":
+        h = _hash(state, "update", ip, name)
+        seen = state.setdefault("seen_dl", {}).setdefault(day, [])
+        if h in seen:
+            return
+        seen.append(h)
+    d = _day(stats, day)
+    _bump(d.setdefault("updates", {}), platform_of(name))
+    _bump(d.setdefault("update_files", {}), name[:120])
+    _bump(d.setdefault("update_from", {}), m.group(1)[:20])
+
+
 def _download(stats: dict, line: str, state: dict, visits: Visits | None = None, db=None) -> None:
     m = DL_LINE.search(line)
-    if not m or m.group(5) != "302" or not browser(m.group(6)) or not counted(m.group(7) or ""):
+    if not m or m.group(5) != "302" or not counted(m.group(7) or ""):
         return
     dd, mon, yyyy, name = m.group(1), m.group(2), m.group(3), m.group(4)
     if mon not in MONTHS:
@@ -399,6 +424,10 @@ def _download(stats: dict, line: str, state: dict, visits: Visits | None = None,
     day = f"{yyyy}-{MONTHS[mon]:02d}-{dd}"
     name = name.rsplit("/", 1)[-1]
     ip = m.group(7) or ""
+    if APP_UA.match(m.group(6)):
+        return _app_update(stats, day, name, m.group(6), ip, state)
+    if not browser(m.group(6)):
+        return
     if ip and ip != "-":
         h = _hash(state, ip, m.group(6), name)
         seen = state.setdefault("seen_dl", {}).setdefault(day, [])
@@ -912,7 +941,7 @@ def collect(backfill: bool = False, with_fetch: bool = False) -> None:
         # A day's list of sites or files stays short, so the years stay small -
         # a flood of made-up referrers cannot grow the file without end.
         for d in stats["days"].values():
-            for k in ("refs", "files", "sources"):
+            for k in ("refs", "files", "sources", "update_files", "update_from"):
                 lst = d.get(k) or {}
                 if len(lst) > KEEP_PER_DAY:
                     top = sorted(lst.items(), key=lambda kv: -kv[1])

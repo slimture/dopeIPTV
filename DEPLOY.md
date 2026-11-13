@@ -402,6 +402,13 @@ How it counts, so the numbers are honest:
   `donate/stats_events.py` lists and drops anything else. They live on the
   visit (`acts`) and go with it after 13 months - the anonymous visit keeps
   none of them.
+- Updates the app fetches for itself (from 1.4.5): the app asks
+  `releases.json` for the newest version and fetches the file through
+  `/dl.php` as `dopeIPTV/<version> (<system>; <cpu>)`. `stats_collect.py`
+  counts those as updates, apart from downloads - per system, per file
+  and per version updated from, once per address and file a day - and
+  `sync-releases.sh` leaves them out of the public download counter.
+  `releases.json` lists each file's size and SHA-256, which the app checks.
 - Your own visits are left out: a browser that has opened `/admin/` gets a
   cookie nginx does not log (pages, downloads, `/hit`), addresses that are
   not public (your own network) never count, and `STATS_IGNORE` in

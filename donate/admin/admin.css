@@ -271,7 +271,11 @@ tr:last-child td { border-bottom: 0; }
 .spark .stroke { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .spark.s1 .stroke { stroke: var(--s1); } .spark.s1 .area { fill: color-mix(in srgb, var(--s1) 16%, transparent); }
 .spark.s3 .stroke { stroke: var(--s3); } .spark.s3 .area { fill: color-mix(in srgb, var(--s3) 16%, transparent); }
-.kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+/* Two to a row: the fifth (updates from the app) takes the whole last row. */
+@media (min-width: 601px) and (max-width: 980px) {
+  .kpis > .kpi:last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
 
 /* -- from visit to donation -------------------------------------------------- */
 .funnel { list-style: none; margin: 6px 0 2px; padding: 0; display: flex; flex-direction: column; gap: 10px; }

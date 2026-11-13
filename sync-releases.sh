@@ -123,6 +123,9 @@ count_downloads() {
         $2 ~ /^GET \/dl\.php\?/ && $3 ~ /^ 302 / {
             ua = tolower($6)
             if (ua == "" || ua == "-") next
+            # The app fetching its own update (dopeIPTV/<version>): counted
+            # by stats_collect.py as an update, not here as a download.
+            if (ua ~ /^dopeiptv\//) next
             if (ua ~ /bot|crawl|spider|slurp|preview|facebookexternalhit|whatsapp|telegram|discord|skype|embed|monitor|scan/) next
             split($2, req, " ")
             q = req[2]; sub(/^[^?]*\?/, "", q)
@@ -318,7 +321,7 @@ else
                     | {label: $label,
                        sub: (if $sub != "" then $sub + " · " + $size else $size end),
                        icon: $icon, url: ("/files/" + ($name | @uri)),
-                       name: $name, sha256: $sha[$name]}],
+                       name: $name, sha256: $sha[$name], size: (.size // 0)}],
            synced_at: $synced}' "$API" > "$TMP/releases.json"
     cp "$TMP/releases.json" "$REL.part"
     mv -f "$REL.part" "$REL"

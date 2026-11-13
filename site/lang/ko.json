@@ -166,7 +166,7 @@
     "help_tech_built_q": "dopeIPTV는 무엇으로 만들어졌나요?",
     "help_tech_built_a": "<p>dopeIPTV는 GPL-3.0 라이선스의 <b>자유 오픈 소스</b> 소프트웨어입니다 — 광고 없음, 추적 없음, 계정 없음. 다음 프로젝트와 서비스를 바탕으로 만들어졌습니다:</p><ul><li><b>재생</b> — <a href=\"https://mpv.io\" rel=\"noopener\">mpv</a> &amp; <a href=\"https://ffmpeg.org\" rel=\"noopener\">FFmpeg</a>, via python-mpv</li><li><b>인터페이스</b> — Qt &amp; <a href=\"https://www.riverbankcomputing.com/software/pyqt/\" rel=\"noopener\">PyQt6</a></li><li><b>캐스팅</b> — <a href=\"https://github.com/home-assistant-libs/pychromecast\" rel=\"noopener\">PyChromecast</a> — Google Cast</li><li><b>메타데이터 &amp; 아트워크</b> — <a href=\"https://www.themoviedb.org\" rel=\"noopener\">The Movie Database (TMDB)</a></li><li><b>시청 기록 동기화</b> — <a href=\"https://trakt.tv\" rel=\"noopener\">Trakt</a></li><li><b>라이선스</b> — <a href=\"https://github.com/slimture/dopeIPTV/blob/main/docs/THIRD-PARTY-LICENSES.md\" rel=\"noopener\">GPL-3.0 &amp; 서드파티</a></li></ul><p class=\"fine\">이 제품은 TMDB API를 사용하지만 TMDB의 보증이나 인증을 받지 않았습니다. 이 제품은 Trakt API를 사용하지만 Trakt의 보증이나 인증을 받지 않았습니다. 모든 상표는 해당 소유자의 재산입니다.</p>",
     "help_tech_privacy_q": "dopeIPTV는 광고를 표시하거나 저를 추적하나요?",
-    "help_tech_privacy_a": "<p>아니요. dopeIPTV에는 광고, 추적, 계정이 없습니다. 메타데이터와 아트워크는 TMDB에서 가져오고 선택적 시청 기록 동기화는 Trakt를 통해 이루어지며, 둘 다 직접 켠 경우에만 작동합니다.</p>",
+    "help_tech_privacy_a": "<p>아니요. dopeIPTV에는 광고, 추적, 계정이 없습니다. 메타데이터와 아트워크는 TMDB에서 가져오고 선택적 시청 기록 동기화는 Trakt를 통해 이루어지며, 둘 다 직접 켠 경우에만 작동합니다.</p><p>새 버전이 있는지 확인하기 위해 앱은 가끔 dopeiptv.org에 묻고 업데이트를 그곳에서 받습니다. 사이트는 버전과 시스템별로 업데이트 횟수만 셀 뿐, 누가 업데이트했는지는 절대 세지 않습니다.</p>",
     "help_search_ph": "검색 — 「로그」, 「자막」, 「Wayland」 등…",
     "help_clear": "검색 지우기",
     "help_hits": "결과: %n",

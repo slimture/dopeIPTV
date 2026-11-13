@@ -218,7 +218,14 @@ def _timed(row: dict) -> int:
     every visit as timed, and are read so."""
     return row["timed"] if "timed" in row else row.get("visits", 0)
 LISTS = ("pages", "refs", "channels", "sources", "langs", "os", "os_versions", "devices", "countries",
-         "browsers", "browser_versions", "screens", "downloads", "files", "events")
+         "browsers", "browser_versions", "screens", "downloads", "files", "events",
+         "updates", "update_files", "update_from")
+
+
+def _updates(row: dict) -> int:
+    """The updates the app fetched for itself that day (stats_collect.py
+    _app_update) - never among the downloads."""
+    return sum((row.get("updates") or {}).values())
 
 
 def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: str = "") -> dict:
@@ -260,6 +267,7 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
         for k in SUMMED:
             totals[k] += _timed(row) if k == "timed" else row.get(k, 0)
         totals["downloads"] = totals.get("downloads", 0) + dl
+        totals["updates"] = totals.get("updates", 0) + _updates(row)
         for k, total in sums.items():
             _sum_into(total, row.get(k))
     if step != "day":                           # a week's or month's different visitors
@@ -273,13 +281,14 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
     before = None
     if days:
         before = dict.fromkeys(SUMMED, 0)
-        before["downloads"] = 0
+        before["downloads"] = before["updates"] = 0
         prev_days = [(first - timedelta(days=i)).isoformat() for i in range(1, days + 1)]
         for iso in prev_days:
             row = per_day.get(iso) or {}
             for k in SUMMED:
                 before[k] += _timed(row) if k == "timed" else row.get(k, 0)
             before["downloads"] += sum((row.get("downloads") or {}).values())
+            before["updates"] += _updates(row)
         before["unique"] = _union(uniques, prev_days, per_day, kinds)
 
     don = donations(key, api_version)
@@ -471,8 +480,9 @@ def live(stats_dir: str, downloads_json: str) -> dict:
                      if isinstance(d, list) and len(d) > 1), reverse=True)[:5]
     stats = _load(os.path.join(stats_dir, "stats.json"), {"days": {}})
     row = _net((stats.get("days") or {}).get(today.isoformat()) or {})
+    rev += f".{_updates(row)}"                  # an update makes no visit
     return {"at": int(now), "rev": rev, "updated": stats.get("updated"), "window": LIVE_WINDOW, "here": len(here),
-            "today": {"visitors": row.get("visitors", 0), "views": row.get("views", 0)},
+            "today": {"visitors": row.get("visitors", 0), "views": row.get("views", 0), "updates": _updates(row)},
             "recent": recent, "dl": download_counts(stats_dir, downloads_json)}
 
 

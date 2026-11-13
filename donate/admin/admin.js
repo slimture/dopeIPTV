@@ -267,9 +267,20 @@
            delta(T.views, B.views)),
       tile("Time per visit", timed ? duration(avg) : "–",
            timed ? bounce + "% left within 10 s" + (untimed ? " · " + num.format(untimed) + " without a time" : "") : "", "", true),
-      tile("Donate dialog", num.format(opened ? opened[1] : 0), "times opened" + (D.error ? "" : " · " + sums(D.sums)), "", true)
+      tile("Donate dialog", num.format(opened ? opened[1] : 0), "times opened" + (D.error ? "" : " · " + sums(D.sums)), "", true),
+      // The app updating itself through dopeiptv.org: people who keep it,
+      // never counted among the downloads above.
+      tile("Updates from the app", num.format(T.updates || 0), updatesNote(), delta(T.updates || 0, B.updates))
     );
     void visitorsNote;
+  }
+
+  // "to 1.4.5 · most from 1.4.4": where the period's updates went and came from.
+  function updatesNote() {
+    const L = data.top, to = (L.update_files || [])[0], from = (L.update_from || [])[0];
+    if (!to) { return "the app fetches them from dopeiptv.org"; }
+    const ver = (n) => (/-(\d+(?:\.\d+)+)-/.exec(n) || [, n])[1];
+    return "most to " + ver(to[0]) + (from ? " · most from " + from[0] : "");
   }
 
   // -- charts ----------------------------------------------------------------------
@@ -434,6 +445,14 @@
     if (more) { c.append(mk("h3", "subhead", more[0]), rankList(more[1], more[2], more[3], more[0])); }
     return c;
   }
+  // The app's own updates: per system, to which file, from which version.
+  function updatesCard(L) {
+    const c = listCard("Updates from the app", L.updates || [], null,
+                       ["Updated to", L.update_files || [], (k) => k === "other" ? "Other files" : k.replace(/^dopeIPTV-/, "")]);
+    c.append(mk("h3", "subhead", "Updated from"), rankList(L.update_from || [], (k) => k === "other" ? "Other versions" : k));
+    c.append(mk("p", "muted", "Fetched by the app itself from dopeiptv.org, once per address and file a day - not among the downloads."));
+    return c;
+  }
   // A row each, its bar drawn behind it: as long as its share of the top one.
   // The first dozen show; the rest are a click away, never cut off unseen.
   const SHOWN = 12;
@@ -495,7 +514,8 @@
       group("What they read and get", [listCard("Pages", L.pages, (k) => PAGE_NAMES[k] || k, null, "page"),
         listCard("Languages", L.langs, lang, null, "lang"),
         listCard("Downloads", L.downloads, null,
-                 ["Files", L.files, (k) => k === "other" ? "Other files" : k.replace(/^dopeIPTV-/, ""), "file"], "download")]),
+                 ["Files", L.files, (k) => k === "other" ? "Other files" : k.replace(/^dopeIPTV-/, ""), "file"], "download"),
+        updatesCard(L)]),
       group("What they use", [listCard("Systems", L.os_versions, null, null, "os_version"),
         listCard("Browsers", L.browsers, null, ["Versions", L.browser_versions, null, "browser_version"], "browser"),
         listCard("Devices", L.devices, null, ["Screens", L.screens, null, "screen"], "device")])
