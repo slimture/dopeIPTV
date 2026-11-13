@@ -37,6 +37,7 @@ from pathlib import Path
 
 from .log import log
 from .selfupdate import UpdateError, download
+from .updates import is_nightly
 from .xdg import system_env
 
 TEAM_ID = "6QR76TBT4J"                  # Solecraft AB's Developer ID
@@ -117,8 +118,10 @@ def _run(argv: list[str], what: str) -> subprocess.CompletedProcess:
         raise UpdateError("upd_err_mac_check", step=what) from e
 
 
-def verify_app(app: Path) -> None:
-    """Raise unless *app* is intact, Solecraft AB's, and notarised."""
+def verify_app(app: Path, notarised: bool = True) -> None:
+    """Raise unless *app* is intact, Solecraft AB's, and - a release -
+    notarised. A test build is signed with the same Developer ID but not
+    sent to Apple (release.yml), so it is held to the signature alone."""
     r = _run(["codesign", "--verify", "--deep", "--strict", str(app)], "codesign")
     if r.returncode != 0:
         log.error("update: signature of %s does not hold: %s", app, (r.stderr or "").strip()[-300:])
@@ -127,6 +130,8 @@ def verify_app(app: Path) -> None:
     if team != TEAM_ID:
         log.error("update: %s is signed by team %r, not %s", app, team, TEAM_ID)
         raise UpdateError("upd_err_mac_check", step="Team ID")
+    if not notarised:
+        return
     r = _run(["spctl", "--assess", "--type", "execute", "--verbose=2", str(app)], "spctl")
     said = (r.stdout or "") + (r.stderr or "")
     if r.returncode != 0 or "Notarized Developer ID" not in said:
@@ -181,7 +186,7 @@ def install(release: dict, current_version: str,
             new = mount / APP_NAME
             if not new.is_dir():
                 raise UpdateError("upd_err_mac_check", step=APP_NAME)
-            verify_app(new)
+            verify_app(new, notarised=not is_nightly(tag))
             if cancel is not None and cancel.is_set():
                 raise UpdateError("cancelled")
             shutil.rmtree(staged, ignore_errors=True)

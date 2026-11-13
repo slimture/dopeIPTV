@@ -34,7 +34,7 @@ def rel(tag, prerelease=False, draft=False):
 def github(monkeypatch):
     # "site": dopeiptv.org's releases.json, or None for a site that does not
     # answer (then GitHub's latest release is asked, as these tests mostly do).
-    state = {"latest": rel("v1.4.0"), "all": [], "site": None, "asked": []}
+    state = {"latest": rel("v1.4.0"), "all": [], "site": None, "site_nightly": None, "asked": []}
 
     class Fake:
         @staticmethod
@@ -45,6 +45,10 @@ def github(monkeypatch):
                 if state["site"] is None:
                     raise OSError("no answer")
                 return Resp(state["site"])
+            if url == "https://dopeiptv.org/nightly.json":
+                if state["site_nightly"] is None:
+                    raise OSError("404")
+                return Resp(state["site_nightly"])
             if url.endswith("/releases/latest"):
                 return Resp(state["latest"])
             assert url.endswith("/releases")
@@ -147,3 +151,23 @@ def test_back_on_releases_the_release_is_offered_to_a_test_build():
     assert offered("v1.4.1", "1.4.0", "stable")
     assert not offered("v1.4.0", "1.4.0", "stable")
     assert not offered("", "1.4.0.12", "stable")
+
+
+def test_a_test_build_comes_from_the_site_too_fetched_through_it(github):
+    github["site"] = site_json("1.4.0")
+    github["site_nightly"] = site_json("1.4.0.16", names=("x86_64.AppImage", "windows-x64-setup.exe"))
+    github["all"] = [rel("nightly-1.4.0.15", prerelease=True)]          # GitHub's: not asked
+    r = fetch_update(channel="nightly")
+    assert r["tag"] == "v1.4.0.16" and r["nightly"] is True
+    assert not any("api.github.com" in u for u in github["asked"])
+    a = selfupdate.pick_asset(r["assets"], r["tag"], "x86_64")
+    # /dl.php counts it and sends it on to the pre-release on GitHub.
+    assert a["url"] == "https://dopeiptv.org/dl.php?f=dopeIPTV-1.4.0.16-x86_64.AppImage"
+
+
+def test_without_the_sites_nightly_json_github_has_the_test_build(github):
+    github["site"] = site_json("1.4.0")
+    github["all"] = [rel("nightly-1.4.0.15", prerelease=True)]
+    assert fetch_update(channel="nightly")["tag"] == "v1.4.0.15"
+    github["site_nightly"] = site_json("1.4.0")                         # a release, not a test build
+    assert fetch_update(channel="nightly")["tag"] == "v1.4.0.15"

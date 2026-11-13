@@ -8,8 +8,9 @@ its version: the site counts updates made from the app apart from
 downloads in a browser. GitHub answers when the site does not.
 
 Two channels. Stable follows the releases. Nightly also takes the test
-builds made from every change on the testing branch - on GitHub only:
-pre-releases tagged ``nightly-<version>``, where the version is the
+builds made from every change on the testing branch - asked of the
+site's unlinked ``nightly.json`` too, and fetched through it, though the
+files stay on GitHub: pre-releases tagged ``nightly-<version>``, where the version is the
 release's with the build's number after it (1.4.0.123) - newer than 1.4.0,
 older than 1.4.1 - so the comparison, the AppImage's name and its
 self-check work as for a release.
@@ -62,9 +63,10 @@ def _release(d: dict, nightly: bool = False) -> dict:
     }
 
 
-def _from_site(d: dict) -> dict:
-    """dopeiptv.org's ``releases.json`` in the shape of :func:`_release`;
-    each file fetched through ``/dl.php``, which counts it."""
+def _from_site(d: dict, nightly: bool = False) -> dict:
+    """dopeiptv.org's ``releases.json`` (or ``nightly.json``) in the shape
+    of :func:`_release`; each file fetched through ``/dl.php``, which counts
+    it (and sends a test build's on to GitHub)."""
     version = str(d.get("version") or "").strip().lstrip("vV")
     if not re.fullmatch(r"\d+(\.\d+)+", version):
         raise ValueError(f"releases.json names no version ({version!r})")
@@ -81,7 +83,7 @@ def _from_site(d: dict) -> dict:
             "digest": f"sha256:{sha.lower()}" if re.fullmatch(r"[0-9a-fA-F]{64}", sha) else ""})
     return {"tag": "v" + version, "name": f"dopeIPTV {version}",
             "body": str(d.get("notes") or ""), "url": str(d.get("html_url") or ""),
-            "nightly": False, "assets": assets}
+            "nightly": nightly, "assets": assets}
 
 
 def fetch_site_release() -> dict:
@@ -115,9 +117,31 @@ def fetch_latest_release(repo: str = GITHUB_REPO) -> dict:
     return fetch_github_release(repo)
 
 
+def fetch_site_nightly() -> dict:
+    """The test build dopeiptv.org knows of (its unlinked ``nightly.json``).
+    Raises on network/HTTP error, and when the site has none - GitHub is
+    asked then, so a site not yet writing the file loses no test build."""
+    r = requests.get(f"{SITE}/nightly.json", headers={"User-Agent": user_agent()}, timeout=15)
+    r.raise_for_status()
+    rel = _from_site(r.json() or {}, nightly=True)
+    if not is_nightly(rel["tag"]):
+        raise ValueError(f"nightly.json names no test build ({rel['tag']})")
+    return rel
+
+
 def fetch_latest_nightly(repo: str = GITHUB_REPO) -> dict | None:
     """The newest nightly build, with its tag as a version tag ("v1.4.0.123");
-    None when there is none. Raises on network/HTTP error."""
+    None when there is none: dopeiptv.org's, or GitHub's when the site
+    cannot be asked. Raises on network/HTTP error."""
+    try:
+        return fetch_site_nightly()
+    except Exception as e:
+        log.info("update: dopeiptv.org did not answer for test builds (%s); asking GitHub", e)
+    return fetch_github_nightly(repo)
+
+
+def fetch_github_nightly(repo: str = GITHUB_REPO) -> dict | None:
+    """The newest nightly build on GitHub. Raises on network/HTTP error."""
     r = requests.get(
         f"https://api.github.com/repos/{repo}/releases",
         params={"per_page": 30}, headers=_headers(), timeout=15)

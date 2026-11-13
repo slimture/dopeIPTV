@@ -136,3 +136,20 @@ def test_the_swap_waits_for_the_app_to_quit(monkeypatch, mac_app):
     assert script.index('kill -0 "$0"') < script.index('mv "$app" "$aside"')
     macupdate.on_exit(staged, pid=777)
     assert seen["argv"][-1] == "0"                      # swapped at quit, not opened
+
+
+def test_a_test_build_is_held_to_our_signature_not_to_notarisation(monkeypatch, mac_app, tmp_path):
+    # Test builds are signed but never sent to Apple (release.yml).
+    tools = FakeTools(tmp_path / "mnt", gatekeeper="rejected\nsource=Unnotarized Developer ID")
+    monkeypatch.setattr(macupdate, "can_self_update", lambda: True)
+    monkeypatch.setattr(macupdate, "download", lambda asset, dest, p, c: dest.write_text("dmg"))
+    monkeypatch.setattr(macupdate.subprocess, "run", tools.run)
+    macupdate._team_id.cache_clear()
+    staged = macupdate.install({"tag": "v1.4.5.80", "assets": assets("1.4.5.80")}, "1.4.5.79")
+    assert staged.is_dir() and "spctl" not in tools.calls
+    # ...but someone else's signature is refused all the same.
+    tools2 = FakeTools(tmp_path / "mnt2", team="ABCDE12345")
+    monkeypatch.setattr(macupdate.subprocess, "run", tools2.run)
+    macupdate._team_id.cache_clear()
+    with pytest.raises(selfupdate.UpdateError):
+        macupdate.install({"tag": "v1.4.5.80", "assets": assets("1.4.5.80")}, "1.4.5.79")
