@@ -14,8 +14,7 @@ import time
 
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
-    QApplication, QFrame, QHBoxLayout, QLabel, QMessageBox, QProgressDialog,
-    QPushButton,
+    QApplication, QFrame, QHBoxLayout, QLabel, QPushButton,
 )
 
 from .. import VERSION
@@ -25,6 +24,7 @@ from ..core.updates import GITHUB_REPO, fetch_update, offered
 from ..core.xdg import open_url
 from ..core.workers import run_async
 from ..i18n import tr
+from .dialogs import UpdateDialog
 from .theme import P
 
 # Where "Download" sends people - the website, not the raw GitHub release.
@@ -276,15 +276,13 @@ class _UpdatesMixin:
             b.hide()
         cancel = threading.Event()
         state = {"got": 0, "total": 0, "tag": ""}
-        dlg = QProgressDialog(tr("update_checking"), tr("common_cancel"),
-                              0, 0, self)
-        dlg.setWindowTitle(tr("update_now"))
-        dlg.setWindowModality(Qt.WindowModality.WindowModal)
-        dlg.setMinimumDuration(0)
-        dlg.setAutoClose(False)
-        dlg.setAutoReset(False)
-        dlg.canceled.connect(cancel.set)
+        dlg = UpdateDialog(self)
+        dlg.working(tr("update_checking"))
+        dlg.cancelled.connect(cancel.set)
         dlg.show()
+
+        def shown(tag: str) -> str:
+            return tag.lstrip("vV")
 
         def progress(got: int, total: int) -> None:
             state["got"], state["total"] = got, total
@@ -293,14 +291,15 @@ class _UpdatesMixin:
             if cancel.is_set() or not state["tag"]:
                 return
             got, total = state["got"], state["total"]
+            title = tr("update_working", version=shown(state["tag"]))
             if total and got < total:
-                dlg.setLabelText(tr("update_downloading",
-                                    version=state["tag"]))
-                dlg.setMaximum(100)
-                dlg.setValue(int(got * 100 / total))
+                mb = 1024 * 1024
+                dlg.working(title, tr("update_progress_mb", got=f"{got / mb:.0f}",
+                                      total=f"{total / mb:.0f}"), got / total)
             elif got and updater.VERIFY_KEY:
-                dlg.setLabelText(tr(updater.VERIFY_KEY))
-                dlg.setMaximum(0)
+                dlg.working(title, tr(updater.VERIFY_KEY))
+            else:
+                dlg.working(title)
 
         timer = QTimer(self)
         timer.timeout.connect(tick)
@@ -319,41 +318,41 @@ class _UpdatesMixin:
         def finish() -> None:
             timer.stop()
             timer.deleteLater()
-            # hide(), not close(): closing a QProgressDialog emits canceled,
-            # which marked every finished update as cancelled - and fail()
-            # then swallowed the error it was about to show.
-            dlg.hide()
-            dlg.deleteLater()
             self._self_updating = False
 
         def done(result) -> None:
             finish()
+            if cancel.is_set():
+                return
             if result is None:
-                QMessageBox.information(self, tr("update_now"),
-                                        "✓ " + tr("about_up_to_date"))
+                dlg.up_to_date()
                 return
             tag, old, new = result
             if old is not None and old != new:
                 self.settings.setValue("selfupdate_old_path", str(old))
             self.settings.setValue("update_banner_dismissed", tag)
-            if QMessageBox.question(
-                    self, tr("update_now"),
-                    tr(updater.DONE_KEY, version=tag)
-                    ) == QMessageBox.StandardButton.Yes:
-                updater.restart_into(new)
-                self.close()
-            elif hasattr(updater, "on_exit"):
-                # "Is installed" holds anyway: the Mac's new app goes in
-                # place when this one quits.
-                updater.on_exit(new)
+
+            def chosen(code: int) -> None:
+                if code == UpdateDialog.DialogCode.Accepted:
+                    updater.restart_into(new)
+                    self.close()
+                elif hasattr(updater, "on_exit"):
+                    # "Is installed" holds anyway: the Mac's new app goes in
+                    # place when this one quits.
+                    updater.on_exit(new)
+            dlg.finished.connect(chosen)
+            dlg.ready(shown(tag), install=updater.DONE_KEY == "update_ready_install")
 
         def fail(err) -> None:
             finish()
             if cancel.is_set():
                 return
             log.warning("update: %s", err)
-            QMessageBox.warning(self, tr("update_now"),
-                                tr("update_failed", error=str(err)))
+            # Under its own title: why, and that nothing changed.
+            why = str(err).strip()
+            if why and why[-1].isalnum():
+                why += "."
+            dlg.failed(f"{why} {tr('update_nothing_changed')}".strip())
 
         run_async(self.pool, work, done, fail)
 

@@ -853,9 +853,6 @@
   "update_downloading": "Đang tải {version}…",
   "update_verifying": "Đang kiểm tra phiên bản mới có khởi động được không…",
   "update_verifying_signature": "Đang kiểm tra chữ ký của phiên bản mới…",
-  "update_done_restart": "dopeIPTV {version} đã được cài đặt. Khởi động lại ngay để sử dụng?",
-  "update_done_install": "Đã tải dopeIPTV {version}. Cài đặt ngay? dopeIPTV sẽ đóng và mở lại khi xong.",
-  "update_failed": "Không thể cài đặt bản cập nhật: {error}. Không có gì bị thay đổi.",
   "common_ok": "OK",
   "common_apply": "Áp dụng",
   "common_reset": "Đặt lại",
@@ -1127,5 +1124,15 @@
   "cast_dlna_note": "TV phát luồng nguyên trạng — việc chọn âm thanh, phụ đề hoặc kích thước hình ảnh chỉ dùng được với Chromecast.",
   "cast_err_dlna_refused": "TV đã từ chối luồng ({msg}).",
   "cast_err_dlna_no_answer": "{name} không phản hồi.",
-  "cast_err_dlna_no_start": "TV không bắt đầu phát — có thể không hỗ trợ định dạng này."
+  "cast_err_dlna_no_start": "TV không bắt đầu phát — có thể không hỗ trợ định dạng này.",
+  "update_working": "Đang cập nhật lên dopeIPTV {version}",
+  "update_progress_mb": "{got} / {total} MB",
+  "update_ready_title": "dopeIPTV {version} đã sẵn sàng",
+  "update_ready_restart": "Khởi động lại dopeIPTV để bắt đầu dùng phiên bản mới.",
+  "update_ready_install": "dopeIPTV sẽ đóng, cài phiên bản mới rồi mở lại.",
+  "update_restart_now": "Khởi động lại ngay",
+  "update_install_now": "Cài đặt ngay",
+  "update_later": "Để sau",
+  "update_failed_title": "Bản cập nhật chưa được cài",
+  "update_nothing_changed": "Không có gì bị thay đổi."
 }

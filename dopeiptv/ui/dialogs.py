@@ -1,14 +1,14 @@
-"""Dialogs: login, playlist editor, EPG guide, content manager."""
+"""Dialogs: login, playlist editor, EPG guide, content manager, the update."""
 
 from __future__ import annotations
 
 import re
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
-    QComboBox, QDialog, QDialogButtonBox, QFormLayout,
+    QApplication, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
     QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
-    QListWidgetItem, QMessageBox, QPushButton, QVBoxLayout,
+    QListWidgetItem, QMessageBox, QProgressBar, QPushButton, QVBoxLayout,
 )
 
 from ..i18n import tr
@@ -307,3 +307,121 @@ class ContentManagerDialog(QDialog):
             self.window.parental.lock_session()
         self.overrides.update(self.mode, cid, locked=locked)
         self._populate()
+
+
+class UpdateDialog(QDialog):
+    """The app updating itself, from the download to the restart, in one
+    window: the app's icon, what is happening, a thin bar and the buttons.
+
+    working() while it looks, downloads and checks (Cancel stops it and
+    emits cancelled); ready() offers Restart now - Install now on Windows -
+    or Later (accepted / rejected); failed() and up_to_date() end with
+    Close. Qt's stock progress and question boxes it replaces read like any
+    program's - a question mark and No / Yes."""
+
+    cancelled = pyqtSignal()
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(tr("update_now"))
+        self.setModal(True)
+        self.setMinimumWidth(460)
+        self._mode = ""
+        row = QHBoxLayout(self)
+        row.setContentsMargins(24, 22, 24, 20)
+        row.setSpacing(18)
+        icon = QLabel()
+        app = QApplication.instance()
+        if isinstance(app, QApplication) and not app.windowIcon().isNull():
+            icon.setPixmap(app.windowIcon().pixmap(56, 56))
+        icon.setFixedSize(56, 56)
+        row.addWidget(icon, 0, Qt.AlignmentFlag.AlignTop)
+        col = QVBoxLayout()
+        col.setSpacing(6)
+        self._title = QLabel()
+        self._title.setWordWrap(True)
+        self._title.setStyleSheet(f"font-size:16px; font-weight:700; color:{P['text']};")
+        self._body = QLabel()
+        self._body.setWordWrap(True)
+        self._body.setStyleSheet(f"font-size:13px; color:{P['muted']};")
+        self._bar = QProgressBar(objectName="EpgBar")
+        self._bar.setTextVisible(False)
+        self._bar.setFixedHeight(4)
+        self._status = QLabel()
+        self._status.setStyleSheet(f"font-size:12px; color:{P['muted']};")
+        col.addWidget(self._title)
+        col.addWidget(self._body)
+        col.addSpacing(6)
+        col.addWidget(self._bar)
+        col.addWidget(self._status)
+        col.addSpacing(12)
+        buttons = QHBoxLayout()
+        buttons.setSpacing(8)
+        buttons.addStretch(1)
+        self._second = QPushButton()
+        self._first = QPushButton()
+        self._second.clicked.connect(self.reject)
+        self._first.clicked.connect(self._first_clicked)
+        buttons.addWidget(self._second)
+        buttons.addWidget(self._first)
+        col.addLayout(buttons)
+        row.addLayout(col, 1)
+
+    def _set(self, mode: str, title: str, body: str = "", first: str = "",
+             second: str = "", primary: bool = False) -> None:
+        self._mode = mode
+        self._title.setText(title)
+        self._body.setText(body)
+        self._body.setVisible(bool(body))
+        working = mode == "working"
+        self._bar.setVisible(working)
+        self._status.setVisible(working)
+        self._first.setText(first)
+        self._first.setObjectName("Primary" if primary else "")
+        self._first.style().unpolish(self._first)
+        self._first.style().polish(self._first)
+        self._second.setText(second)
+        self._second.setVisible(bool(second))
+        self._first.setDefault(True)
+        self._first.setFocus()
+
+    def working(self, title: str, status: str = "", fraction: float | None = None) -> None:
+        """Busy until *fraction* (0-1) is known; *status* under the bar."""
+        if self._mode != "working" or self._title.text() != title:
+            self._set("working", title, first=tr("common_cancel"))
+        self._status.setText(status)
+        self._status.setVisible(bool(status))
+        if fraction is None:
+            self._bar.setRange(0, 0)
+        else:
+            self._bar.setRange(0, 1000)
+            self._bar.setValue(int(max(0.0, min(1.0, fraction)) * 1000))
+
+    def ready(self, version: str, install: bool) -> None:
+        self._set("ready", tr("update_ready_title", version=version),
+                  tr("update_ready_install" if install else "update_ready_restart"),
+                  tr("update_install_now" if install else "update_restart_now"),
+                  tr("update_later"), primary=True)
+
+    def failed(self, message: str) -> None:
+        self._set("done", tr("update_failed_title"), message, tr("common_close"))
+
+    def up_to_date(self) -> None:
+        self._set("done", "\u2713 " + tr("about_up_to_date"), first=tr("common_close"))
+
+    def mode(self) -> str:
+        return self._mode
+
+    def _first_clicked(self) -> None:
+        if self._mode == "ready":
+            self.accept()
+        else:
+            self.reject()
+
+    def reject(self) -> None:
+        # Closed or Esc while it works is a cancel, as the button is.
+        if self._mode == "working":
+            self._mode = "cancelled"
+            self.cancelled.emit()
+        super().reject()
+

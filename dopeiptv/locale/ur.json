@@ -853,9 +853,6 @@
   "update_downloading": "{version} ڈاؤن لوڈ ہو رہا ہے…",
   "update_verifying": "جانچ ہو رہی ہے کہ نیا ورژن شروع ہوتا ہے…",
   "update_verifying_signature": "نئے ورژن کے دستخط کی جانچ ہو رہی ہے…",
-  "update_done_restart": "dopeIPTV {version} انسٹال ہو گیا ہے۔ اسے استعمال کرنے کے لیے ابھی دوبارہ شروع کریں؟",
-  "update_done_install": "dopeIPTV {version} ڈاؤن لوڈ ہو گیا ہے۔ ابھی انسٹال کریں؟ dopeIPTV بند ہو گا اور مکمل ہونے پر دوبارہ کھلے گا۔",
-  "update_failed": "اپ ڈیٹ انسٹال نہیں ہو سکی: {error}۔ کچھ بھی تبدیل نہیں ہوا۔",
   "common_ok": "ٹھیک ہے",
   "common_apply": "لاگو کریں",
   "common_reset": "ری سیٹ کریں",
@@ -1127,5 +1124,15 @@
   "cast_dlna_note": "ٹی وی اسٹریم کو جیسا ہے ویسا ہی چلاتا ہے — آڈیو، سب ٹائٹلز یا تصویر کا سائز منتخب کرنا Chromecast کے ساتھ ممکن ہے۔",
   "cast_err_dlna_refused": "ٹی وی نے اسٹریم مسترد کر دی ({msg})۔",
   "cast_err_dlna_no_answer": "{name} نے جواب نہیں دیا۔",
-  "cast_err_dlna_no_start": "ٹی وی نے چلانا شروع نہیں کیا — شاید یہ اس فارمیٹ کو سپورٹ نہیں کرتا۔"
+  "cast_err_dlna_no_start": "ٹی وی نے چلانا شروع نہیں کیا — شاید یہ اس فارمیٹ کو سپورٹ نہیں کرتا۔",
+  "update_working": "dopeIPTV {version} پر اپ ڈیٹ ہو رہا ہے",
+  "update_progress_mb": "{total} میں سے {got} MB",
+  "update_ready_title": "dopeIPTV {version} تیار ہے",
+  "update_ready_restart": "نیا ورژن استعمال کرنے کے لیے dopeIPTV دوبارہ شروع کریں۔",
+  "update_ready_install": "dopeIPTV بند ہو کر نیا ورژن انسٹال کرے گا اور دوبارہ کھل جائے گا۔",
+  "update_restart_now": "ابھی دوبارہ شروع کریں",
+  "update_install_now": "ابھی انسٹال کریں",
+  "update_later": "بعد میں",
+  "update_failed_title": "اپ ڈیٹ انسٹال نہیں ہوئی",
+  "update_nothing_changed": "کچھ بھی تبدیل نہیں ہوا۔"
 }

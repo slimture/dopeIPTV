@@ -45,9 +45,9 @@ TEAM_ID = "6QR76TBT4J"                  # Solecraft AB's Developer ID
 APP_NAME = "dopeIPTV.app"
 STAGED = ".dopeIPTV-update.app"
 ASIDE = ".dopeIPTV-previous.app"
-# The question asked once the new version is ready (i18n key), and what the
-# progress dialog says while it is checked after the download.
-DONE_KEY = "update_done_restart"
+# What the update dialog says once the new version is ready (i18n key:
+# restart to use it), and while it is checked after the download.
+DONE_KEY = "update_ready_restart"
 VERIFY_KEY: str | None = "update_verifying_signature"
 _TIMEOUT = 300
 

@@ -853,9 +853,6 @@
   "update_downloading": "Mengunduh {version}…",
   "update_verifying": "Memeriksa bahwa versi baru dapat berjalan…",
   "update_verifying_signature": "Memeriksa tanda tangan versi baru…",
-  "update_done_restart": "dopeIPTV {version} telah terpasang. Mulai ulang sekarang untuk menggunakannya?",
-  "update_done_install": "dopeIPTV {version} sudah diunduh. Pasang sekarang? dopeIPTV akan ditutup dan dibuka lagi setelah selesai.",
-  "update_failed": "Pembaruan tidak dapat dipasang: {error}. Tidak ada yang diubah.",
   "common_ok": "OK",
   "common_apply": "Terapkan",
   "common_reset": "Setel ulang",
@@ -1127,5 +1124,15 @@
   "cast_dlna_note": "TV memutar stream apa adanya — memilih audio, subtitle, atau ukuran gambar hanya bisa dengan Chromecast.",
   "cast_err_dlna_refused": "TV menolak stream ({msg}).",
   "cast_err_dlna_no_answer": "{name} tidak menjawab.",
-  "cast_err_dlna_no_start": "TV tidak mulai memutar — mungkin tidak mendukung format ini."
+  "cast_err_dlna_no_start": "TV tidak mulai memutar — mungkin tidak mendukung format ini.",
+  "update_working": "Memperbarui ke dopeIPTV {version}",
+  "update_progress_mb": "{got} dari {total} MB",
+  "update_ready_title": "dopeIPTV {version} siap",
+  "update_ready_restart": "Mulai ulang dopeIPTV untuk mulai memakai versi baru.",
+  "update_ready_install": "dopeIPTV akan ditutup, memasang versi baru, lalu dibuka lagi.",
+  "update_restart_now": "Mulai ulang sekarang",
+  "update_install_now": "Pasang sekarang",
+  "update_later": "Nanti",
+  "update_failed_title": "Pembaruan tidak terpasang",
+  "update_nothing_changed": "Tidak ada yang diubah."
 }

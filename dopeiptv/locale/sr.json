@@ -853,9 +853,6 @@
   "update_downloading": "Preuzimanje {version}…",
   "update_verifying": "Provera da li se nova verzija pokreće…",
   "update_verifying_signature": "Provera potpisa nove verzije…",
-  "update_done_restart": "dopeIPTV {version} je instaliran. Ponovo pokrenuti sada da biste ga koristili?",
-  "update_done_install": "dopeIPTV {version} je preuzet. Instalirati sada? dopeIPTV će se zatvoriti i ponovo otvoriti kad završi.",
-  "update_failed": "Ažuriranje nije moguće instalirati: {error}. Ništa nije promenjeno.",
   "common_ok": "U redu",
   "common_apply": "Primeni",
   "common_reset": "Poništi",
@@ -1127,5 +1124,15 @@
   "cast_dlna_note": "Televizor pušta strim onakav kakav jeste — izbor zvuka, titlova ili veličine slike radi sa Chromecastom.",
   "cast_err_dlna_refused": "Televizor je odbio strim ({msg}).",
   "cast_err_dlna_no_answer": "{name} nije odgovorio.",
-  "cast_err_dlna_no_start": "Televizor nije počeo reprodukciju — možda ne podržava ovaj format."
+  "cast_err_dlna_no_start": "Televizor nije počeo reprodukciju — možda ne podržava ovaj format.",
+  "update_working": "Ažuriranje na dopeIPTV {version}",
+  "update_progress_mb": "{got} od {total} MB",
+  "update_ready_title": "dopeIPTV {version} je spreman",
+  "update_ready_restart": "Ponovo pokrenite dopeIPTV da biste koristili novu verziju.",
+  "update_ready_install": "dopeIPTV se zatvara, instalira novu verziju i ponovo otvara.",
+  "update_restart_now": "Ponovo pokreni",
+  "update_install_now": "Instaliraj sada",
+  "update_later": "Kasnije",
+  "update_failed_title": "Ažuriranje nije instalirano",
+  "update_nothing_changed": "Ništa nije promenjeno."
 }

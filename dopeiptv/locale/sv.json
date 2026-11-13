@@ -853,9 +853,6 @@
   "update_downloading": "Laddar ner {version}…",
   "update_verifying": "Kontrollerar att den nya versionen startar…",
   "update_verifying_signature": "Kontrollerar den nya versionens signatur…",
-  "update_done_restart": "dopeIPTV {version} är installerad. Starta om nu för att använda den?",
-  "update_done_install": "dopeIPTV {version} är nedladdad. Installera nu? dopeIPTV stängs och öppnas igen när det är klart.",
-  "update_failed": "Uppdateringen kunde inte installeras: {error}. Ingenting har ändrats.",
   "common_ok": "OK",
   "common_apply": "Verkställ",
   "common_reset": "Återställ",
@@ -1127,5 +1124,15 @@
   "cast_dlna_note": "En tv spelar strömmen som den är — val av ljud, undertexter eller bildstorlek fungerar med Chromecast.",
   "cast_err_dlna_refused": "Tv:n avvisade strömmen ({msg}).",
   "cast_err_dlna_no_answer": "{name} svarade inte.",
-  "cast_err_dlna_no_start": "Tv:n började inte spela — den kanske inte stöder det här formatet."
+  "cast_err_dlna_no_start": "Tv:n började inte spela — den kanske inte stöder det här formatet.",
+  "update_working": "Uppdaterar till dopeIPTV {version}",
+  "update_progress_mb": "{got} av {total} MB",
+  "update_ready_title": "dopeIPTV {version} är klar",
+  "update_ready_restart": "Starta om dopeIPTV för att börja använda den nya versionen.",
+  "update_ready_install": "dopeIPTV stängs, installerar den nya versionen och öppnas igen.",
+  "update_restart_now": "Starta om nu",
+  "update_install_now": "Installera nu",
+  "update_later": "Senare",
+  "update_failed_title": "Uppdateringen installerades inte",
+  "update_nothing_changed": "Ingenting har ändrats."
 }

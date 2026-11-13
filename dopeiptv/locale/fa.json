@@ -853,9 +853,6 @@
   "update_downloading": "در حال دریافت {version}…",
   "update_verifying": "در حال بررسی اجرای نسخهٔ جدید…",
   "update_verifying_signature": "در حال بررسی امضای نسخهٔ جدید…",
-  "update_done_restart": "dopeIPTV {version} نصب شد. برای استفاده، اکنون دوباره راه‌اندازی شود؟",
-  "update_done_install": "dopeIPTV {version} دانلود شد. همین حالا نصب شود؟ dopeIPTV بسته می‌شود و پس از پایان دوباره باز می‌شود.",
-  "update_failed": "نصب به‌روزرسانی ممکن نشد: {error}. هیچ چیزی تغییر نکرد.",
   "common_ok": "تأیید",
   "common_apply": "اعمال",
   "common_reset": "بازنشانی",
@@ -1127,5 +1124,15 @@
   "cast_dlna_note": "تلویزیون جریان را همان‌طور که هست پخش می‌کند — انتخاب صدا، زیرنویس یا اندازهٔ تصویر با Chromecast ممکن است.",
   "cast_err_dlna_refused": "تلویزیون جریان را نپذیرفت ({msg}).",
   "cast_err_dlna_no_answer": "{name} پاسخ نداد.",
-  "cast_err_dlna_no_start": "تلویزیون پخش را شروع نکرد — شاید از این قالب پشتیبانی نکند."
+  "cast_err_dlna_no_start": "تلویزیون پخش را شروع نکرد — شاید از این قالب پشتیبانی نکند.",
+  "update_working": "در حال به‌روزرسانی به dopeIPTV {version}",
+  "update_progress_mb": "{got} از {total} مگابایت",
+  "update_ready_title": "dopeIPTV {version} آماده است",
+  "update_ready_restart": "برای استفاده از نسخهٔ جدید، dopeIPTV را دوباره راه‌اندازی کنید.",
+  "update_ready_install": "dopeIPTV بسته می‌شود، نسخهٔ جدید را نصب می‌کند و دوباره باز می‌شود.",
+  "update_restart_now": "اکنون راه‌اندازی مجدد",
+  "update_install_now": "اکنون نصب کن",
+  "update_later": "بعداً",
+  "update_failed_title": "به‌روزرسانی نصب نشد",
+  "update_nothing_changed": "هیچ چیزی تغییر نکرد."
 }

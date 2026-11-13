@@ -853,9 +853,6 @@
   "update_downloading": "正在下载 {version}…",
   "update_verifying": "正在检查新版本能否启动…",
   "update_verifying_signature": "正在检查新版本的签名…",
-  "update_done_restart": "dopeIPTV {version} 已安装。现在重启以使用新版本吗？",
-  "update_done_install": "dopeIPTV {version} 已下载。现在安装吗？dopeIPTV 会先关闭，安装完成后重新打开。",
-  "update_failed": "无法安装更新：{error}。未做任何更改。",
   "common_ok": "确定",
   "common_apply": "应用",
   "common_reset": "重置",
@@ -1127,5 +1124,15 @@
   "cast_dlna_note": "电视会按原样播放视频流——选择音轨、字幕或画面尺寸需要使用 Chromecast。",
   "cast_err_dlna_refused": "电视拒绝了该视频流（{msg}）。",
   "cast_err_dlna_no_answer": "{name} 没有响应。",
-  "cast_err_dlna_no_start": "电视没有开始播放——它可能不支持此格式。"
+  "cast_err_dlna_no_start": "电视没有开始播放——它可能不支持此格式。",
+  "update_working": "正在更新到 dopeIPTV {version}",
+  "update_progress_mb": "{got} / {total} MB",
+  "update_ready_title": "dopeIPTV {version} 已准备就绪",
+  "update_ready_restart": "重启 dopeIPTV 即可开始使用新版本。",
+  "update_ready_install": "dopeIPTV 将关闭，安装新版本后重新打开。",
+  "update_restart_now": "立即重启",
+  "update_install_now": "立即安装",
+  "update_later": "稍后",
+  "update_failed_title": "更新未安装",
+  "update_nothing_changed": "未做任何更改。"
 }

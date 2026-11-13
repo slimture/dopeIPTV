@@ -853,9 +853,6 @@
   "update_downloading": "{version} downloaden…",
   "update_verifying": "Controleren of de nieuwe versie start…",
   "update_verifying_signature": "Handtekening van de nieuwe versie controleren…",
-  "update_done_restart": "dopeIPTV {version} is geïnstalleerd. Nu herstarten om hem te gebruiken?",
-  "update_done_install": "dopeIPTV {version} is gedownload. Nu installeren? dopeIPTV sluit en opent weer als het klaar is.",
-  "update_failed": "De update kon niet worden geïnstalleerd: {error}. Er is niets gewijzigd.",
   "common_ok": "OK",
   "common_apply": "Toepassen",
   "common_reset": "Herstellen",
@@ -1127,5 +1124,15 @@
   "cast_dlna_note": "Een tv speelt de stream af zoals hij is — audio, ondertitels of beeldformaat kiezen kan met een Chromecast.",
   "cast_err_dlna_refused": "De tv weigerde de stream ({msg}).",
   "cast_err_dlna_no_answer": "{name} antwoordde niet.",
-  "cast_err_dlna_no_start": "De tv begon niet met afspelen — mogelijk ondersteunt hij dit formaat niet."
+  "cast_err_dlna_no_start": "De tv begon niet met afspelen — mogelijk ondersteunt hij dit formaat niet.",
+  "update_working": "Bijwerken naar dopeIPTV {version}",
+  "update_progress_mb": "{got} van {total} MB",
+  "update_ready_title": "dopeIPTV {version} staat klaar",
+  "update_ready_restart": "Start dopeIPTV opnieuw om de nieuwe versie te gebruiken.",
+  "update_ready_install": "dopeIPTV sluit, installeert de nieuwe versie en opent weer.",
+  "update_restart_now": "Nu opnieuw starten",
+  "update_install_now": "Nu installeren",
+  "update_later": "Later",
+  "update_failed_title": "De update is niet geïnstalleerd",
+  "update_nothing_changed": "Er is niets gewijzigd."
 }

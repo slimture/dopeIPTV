@@ -29,9 +29,10 @@ from pathlib import Path
 from .log import log
 from .selfupdate import UpdateError, download
 
-# The question asked once the installer is downloaded (i18n key); the
-# download is checked as it arrives, with nothing to say after it.
-DONE_KEY = "update_done_install"
+# What the update dialog says once the installer is downloaded (i18n key:
+# install it, and dopeIPTV opens again); the download is checked as it
+# arrives, with nothing to say after it.
+DONE_KEY = "update_ready_install"
 VERIFY_KEY: str | None = None
 
 _CREATE_NEW_PROCESS_GROUP = 0x00000200

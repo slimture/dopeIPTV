@@ -853,9 +853,6 @@
   "update_downloading": "Завантаження {version}…",
   "update_verifying": "Перевірка запуску нової версії…",
   "update_verifying_signature": "Перевірка підпису нової версії…",
-  "update_done_restart": "dopeIPTV {version} встановлено. Перезапустити зараз, щоб ним користуватися?",
-  "update_done_install": "dopeIPTV {version} завантажено. Встановити зараз? dopeIPTV закриється й відкриється знову після встановлення.",
-  "update_failed": "Не вдалося встановити оновлення: {error}. Нічого не змінено.",
   "common_ok": "OK",
   "common_apply": "Застосувати",
   "common_reset": "Скинути",
@@ -1127,5 +1124,15 @@
   "cast_dlna_note": "Телевізор відтворює потік як є — вибір звуку, субтитрів або розміру зображення доступний із Chromecast.",
   "cast_err_dlna_refused": "Телевізор відхилив потік ({msg}).",
   "cast_err_dlna_no_answer": "{name} не відповідає.",
-  "cast_err_dlna_no_start": "Телевізор не почав відтворення — можливо, він не підтримує цей формат."
+  "cast_err_dlna_no_start": "Телевізор не почав відтворення — можливо, він не підтримує цей формат.",
+  "update_working": "Оновлення до dopeIPTV {version}",
+  "update_progress_mb": "{got} з {total} МБ",
+  "update_ready_title": "dopeIPTV {version} готовий",
+  "update_ready_restart": "Перезапустіть dopeIPTV, щоб почати користуватися новою версією.",
+  "update_ready_install": "dopeIPTV закриється, встановить нову версію і відкриється знову.",
+  "update_restart_now": "Перезапустити",
+  "update_install_now": "Встановити",
+  "update_later": "Пізніше",
+  "update_failed_title": "Оновлення не встановлено",
+  "update_nothing_changed": "Нічого не змінено."
 }

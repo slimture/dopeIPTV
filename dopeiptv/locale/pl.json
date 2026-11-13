@@ -853,9 +853,6 @@
   "update_downloading": "Pobieranie {version}…",
   "update_verifying": "Sprawdzanie, czy nowa wersja się uruchamia…",
   "update_verifying_signature": "Sprawdzanie podpisu nowej wersji…",
-  "update_done_restart": "dopeIPTV {version} jest zainstalowany. Uruchomić ponownie teraz, aby go używać?",
-  "update_done_install": "dopeIPTV {version} został pobrany. Zainstalować teraz? dopeIPTV zamknie się i otworzy ponownie po zakończeniu.",
-  "update_failed": "Nie udało się zainstalować aktualizacji: {error}. Nic nie zostało zmienione.",
   "common_ok": "OK",
   "common_apply": "Zastosuj",
   "common_reset": "Resetuj",
@@ -1127,5 +1124,15 @@
   "cast_dlna_note": "Telewizor odtwarza strumień taki, jaki jest — wybór dźwięku, napisów lub rozmiaru obrazu działa z Chromecastem.",
   "cast_err_dlna_refused": "Telewizor odrzucił strumień ({msg}).",
   "cast_err_dlna_no_answer": "{name} nie odpowiada.",
-  "cast_err_dlna_no_start": "Telewizor nie rozpoczął odtwarzania — może nie obsługiwać tego formatu."
+  "cast_err_dlna_no_start": "Telewizor nie rozpoczął odtwarzania — może nie obsługiwać tego formatu.",
+  "update_working": "Aktualizacja do dopeIPTV {version}",
+  "update_progress_mb": "{got} z {total} MB",
+  "update_ready_title": "dopeIPTV {version} jest gotowy",
+  "update_ready_restart": "Uruchom ponownie dopeIPTV, aby korzystać z nowej wersji.",
+  "update_ready_install": "dopeIPTV zamknie się, zainstaluje nową wersję i otworzy ponownie.",
+  "update_restart_now": "Uruchom ponownie teraz",
+  "update_install_now": "Zainstaluj teraz",
+  "update_later": "Później",
+  "update_failed_title": "Aktualizacja nie została zainstalowana",
+  "update_nothing_changed": "Nic nie zostało zmienione."
 }

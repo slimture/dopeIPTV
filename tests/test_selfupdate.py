@@ -18,6 +18,7 @@ import pytest
 
 from dopeiptv.core import desktop_entry, selfupdate, updates
 from dopeiptv.core.selfupdate import UpdateError
+from dopeiptv.i18n import tr
 
 pytestmark = pytest.mark.skipif(not sys.platform.startswith("linux"),
                                 reason="AppImages are Linux-only")
@@ -258,13 +259,15 @@ def test_the_new_version_cleans_up_after_the_update(env, monkeypatch):
 
 
 def test_a_failed_update_says_why(monkeypatch):
-    """Closing the progress dialog emitted canceled, so every failure was
-    taken for the user's own cancel and nothing was shown at all."""
+    """Closing Qt's progress dialog emitted canceled, so every failure was
+    taken for the user's own cancel and nothing was shown at all. The
+    update dialog says why, and a cancel stays quiet."""
     import os as _os
     _os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    from PyQt6.QtWidgets import QApplication, QMessageBox, QWidget
+    from PyQt6.QtWidgets import QApplication, QWidget
 
     from dopeiptv.ui import mw_updates
+    from dopeiptv.ui.dialogs import UpdateDialog
     from dopeiptv.ui.mw_updates import _UpdatesMixin
 
     app = QApplication.instance() or QApplication([])   # noqa: F841 - kept alive
@@ -272,29 +275,73 @@ def test_a_failed_update_says_why(monkeypatch):
     class _Win(_UpdatesMixin, QWidget):
         pool = None
 
-    shown: list[str] = []
-    monkeypatch.setattr(QMessageBox, "warning",
-                        lambda _p, _t, text: shown.append(text))
     monkeypatch.setattr(mw_updates, "run_async",
                         lambda _pool, _work, _done, fail: fail(
                             UpdateError("checksum mismatch")))
     w = _Win()
     w._self_update()
-    assert shown and "checksum mismatch" in shown[0]
+    dlg = w.findChildren(UpdateDialog)[-1]
+    assert dlg.mode() == "done" and "checksum mismatch" in dlg._body.text()
+    assert dlg._title.text() == tr("update_failed_title")
     assert not w._self_updating
 
-    # The user's own cancel stays quiet.
-    shown.clear()
-
     def cancelled(_pool, _work, _done, fail):
-        from PyQt6.QtWidgets import QProgressDialog
-        dlg = w.findChildren(QProgressDialog)[-1]
-        dlg.canceled.emit()                 # the Cancel button
+        w.findChildren(UpdateDialog)[-1]._first.click()     # Cancel
         fail(UpdateError("cancelled"))
 
     monkeypatch.setattr(mw_updates, "run_async", cancelled)
     w._self_update()
-    assert shown == []
+    assert w.findChildren(UpdateDialog)[-1].mode() == "cancelled"
+
+
+def test_the_update_dialog_offers_the_restart_and_acts_on_it(monkeypatch, tmp_path):
+    """Ready: the version without its v, Restart now (Install now where the
+    installer runs) and Later; Restart now restarts into the new version,
+    Later leaves the Mac's in place for when the app quits."""
+    import os as _os
+    import types
+    _os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PyQt6.QtCore import QSettings
+    from PyQt6.QtWidgets import QApplication, QWidget
+
+    from dopeiptv.ui import mw_updates
+    from dopeiptv.ui.dialogs import UpdateDialog
+    from dopeiptv.ui.mw_updates import _UpdatesMixin
+
+    app = QApplication.instance() or QApplication([])   # noqa: F841 - kept alive
+    calls: list = []
+
+    class _Win(_UpdatesMixin, QWidget):
+        pool = None
+        settings = QSettings(str(tmp_path / "s.ini"), QSettings.Format.IniFormat)
+
+        def close(self):
+            calls.append("closed")
+
+    for key, button in (("update_ready_restart", "update_restart_now"),
+                        ("update_ready_install", "update_install_now")):
+        fake = types.SimpleNamespace(
+            DONE_KEY=key, VERIFY_KEY=None,
+            restart_into=lambda new, pid=None: calls.append(("restart", new)),
+            on_exit=lambda new, pid=None: calls.append(("on_exit", new)))
+        monkeypatch.setattr(mw_updates, "_updater", lambda fake=fake: fake)
+        monkeypatch.setattr(mw_updates, "run_async",
+                            lambda _p, _w, done, _f: done(("v1.4.5.83", None, tmp_path / "new")))
+        calls.clear()
+        w = _Win()
+        w._self_update()
+        dlg = w.findChildren(UpdateDialog)[-1]
+        assert dlg.mode() == "ready"
+        assert dlg._title.text() == tr("update_ready_title", version="1.4.5.83")
+        assert dlg._first.text() == tr(button) and dlg._second.text() == tr("update_later")
+        dlg._first.click()
+        assert calls == [("restart", tmp_path / "new"), "closed"]
+
+    calls.clear()
+    w = _Win()
+    w._self_update()
+    w.findChildren(UpdateDialog)[-1]._second.click()            # Later
+    assert calls == [("on_exit", tmp_path / "new")]
 
 
 def test_the_restart_keeps_the_entry_it_was_launched_from(monkeypatch, tmp_path):

@@ -853,9 +853,6 @@
   "update_downloading": "جارٍ تنزيل {version}…",
   "update_verifying": "جارٍ التحقق من أن الإصدار الجديد يعمل…",
   "update_verifying_signature": "جارٍ التحقق من توقيع الإصدار الجديد…",
-  "update_done_restart": "تم تثبيت dopeIPTV {version}. أتريد إعادة التشغيل الآن لاستخدامه؟",
-  "update_done_install": "تم تنزيل dopeIPTV {version}. هل تريد تثبيته الآن؟ سيُغلق dopeIPTV ثم يُفتح من جديد عند الانتهاء.",
-  "update_failed": "تعذّر تثبيت التحديث: {error}. لم يتغيّر أي شيء.",
   "common_ok": "موافق",
   "common_apply": "تطبيق",
   "common_reset": "إعادة ضبط",
@@ -1127,5 +1124,15 @@
   "cast_dlna_note": "يعرض التلفاز البث كما هو — اختيار الصوت أو الترجمة أو حجم الصورة متاح مع Chromecast.",
   "cast_err_dlna_refused": "رفض التلفاز البث ({msg}).",
   "cast_err_dlna_no_answer": "لم يستجب {name}.",
-  "cast_err_dlna_no_start": "لم يبدأ التلفاز التشغيل — ربما لا يدعم هذا التنسيق."
+  "cast_err_dlna_no_start": "لم يبدأ التلفاز التشغيل — ربما لا يدعم هذا التنسيق.",
+  "update_working": "جارٍ التحديث إلى dopeIPTV {version}",
+  "update_progress_mb": "{got} من {total} ميغابايت",
+  "update_ready_title": "dopeIPTV {version} جاهز",
+  "update_ready_restart": "أعد تشغيل dopeIPTV لبدء استخدام الإصدار الجديد.",
+  "update_ready_install": "سيُغلق dopeIPTV ويثبّت الإصدار الجديد ثم يفتح من جديد.",
+  "update_restart_now": "أعد التشغيل الآن",
+  "update_install_now": "ثبّت الآن",
+  "update_later": "لاحقًا",
+  "update_failed_title": "لم يُثبَّت التحديث",
+  "update_nothing_changed": "لم يتغيّر أي شيء."
 }

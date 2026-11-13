@@ -36,9 +36,9 @@ from ..i18n import LocalizedError
 from .log import log
 from .xdg import system_env
 
-# The question asked once the new version is in place (i18n key), and
-# what the progress dialog says while it is checked after the download.
-DONE_KEY = "update_done_restart"
+# What the update dialog says once the new version is in place (i18n key:
+# restart to use it), and while it is checked after the download.
+DONE_KEY = "update_ready_restart"
 VERIFY_KEY: str | None = "update_verifying"
 
 # Set by the AppImage runtime for the process it starts. A child AppImage

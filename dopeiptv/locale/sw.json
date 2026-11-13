@@ -853,9 +853,6 @@
   "update_downloading": "Inapakua {version}…",
   "update_verifying": "Inakagua kwamba toleo jipya linaanza…",
   "update_verifying_signature": "Inakagua sahihi ya toleo jipya…",
-  "update_done_restart": "dopeIPTV {version} imesakinishwa. Iwashe upya sasa ili uitumie?",
-  "update_done_install": "dopeIPTV {version} imepakuliwa. Isakinishe sasa? dopeIPTV itafungwa na kufunguka tena ikimaliza.",
-  "update_failed": "Sasisho halikuweza kusakinishwa: {error}. Hakuna kilichobadilishwa.",
   "common_ok": "Sawa",
   "common_apply": "Tumia",
   "common_reset": "Weka upya",
@@ -1127,5 +1124,15 @@
   "cast_dlna_note": "TV hucheza mtiririko jinsi ulivyo — kuchagua sauti, manukuu au ukubwa wa picha hufanya kazi na Chromecast.",
   "cast_err_dlna_refused": "TV ilikataa mtiririko ({msg}).",
   "cast_err_dlna_no_answer": "{name} haikujibu.",
-  "cast_err_dlna_no_start": "TV haikuanza kucheza — huenda haitumii muundo huu."
+  "cast_err_dlna_no_start": "TV haikuanza kucheza — huenda haitumii muundo huu.",
+  "update_working": "Inasasisha hadi dopeIPTV {version}",
+  "update_progress_mb": "{got} kati ya {total} MB",
+  "update_ready_title": "dopeIPTV {version} iko tayari",
+  "update_ready_restart": "Anzisha upya dopeIPTV ili kuanza kutumia toleo jipya.",
+  "update_ready_install": "dopeIPTV itafungwa, itasakinisha toleo jipya na kufunguka tena.",
+  "update_restart_now": "Anzisha upya sasa",
+  "update_install_now": "Sakinisha sasa",
+  "update_later": "Baadaye",
+  "update_failed_title": "Sasisho halikusakinishwa",
+  "update_nothing_changed": "Hakuna kilichobadilishwa."
 }

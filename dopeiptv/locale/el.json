@@ -853,9 +853,6 @@
   "update_downloading": "Λήψη {version}…",
   "update_verifying": "Έλεγχος ότι η νέα έκδοση ξεκινά…",
   "update_verifying_signature": "Έλεγχος της υπογραφής της νέας έκδοσης…",
-  "update_done_restart": "Το dopeIPTV {version} εγκαταστάθηκε. Επανεκκίνηση τώρα για να το χρησιμοποιήσετε;",
-  "update_done_install": "Το dopeIPTV {version} κατέβηκε. Εγκατάσταση τώρα; Το dopeIPTV κλείνει και ανοίγει ξανά όταν τελειώσει.",
-  "update_failed": "Η ενημέρωση δεν ήταν δυνατό να εγκατασταθεί: {error}. Δεν άλλαξε τίποτα.",
   "common_ok": "OK",
   "common_apply": "Εφαρμογή",
   "common_reset": "Επαναφορά",
@@ -1127,5 +1124,15 @@
   "cast_dlna_note": "Η τηλεόραση παίζει τη ροή όπως είναι — η επιλογή ήχου, υποτίτλων ή μεγέθους εικόνας γίνεται με Chromecast.",
   "cast_err_dlna_refused": "Η τηλεόραση απέρριψε τη ροή ({msg}).",
   "cast_err_dlna_no_answer": "Η συσκευή {name} δεν απάντησε.",
-  "cast_err_dlna_no_start": "Η τηλεόραση δεν ξεκίνησε την αναπαραγωγή — ίσως δεν υποστηρίζει αυτή τη μορφή."
+  "cast_err_dlna_no_start": "Η τηλεόραση δεν ξεκίνησε την αναπαραγωγή — ίσως δεν υποστηρίζει αυτή τη μορφή.",
+  "update_working": "Ενημέρωση στο dopeIPTV {version}",
+  "update_progress_mb": "{got} από {total} MB",
+  "update_ready_title": "Το dopeIPTV {version} είναι έτοιμο",
+  "update_ready_restart": "Επανεκκινήστε το dopeIPTV για να χρησιμοποιήσετε τη νέα έκδοση.",
+  "update_ready_install": "Το dopeIPTV κλείνει, εγκαθιστά τη νέα έκδοση και ανοίγει ξανά.",
+  "update_restart_now": "Επανεκκίνηση τώρα",
+  "update_install_now": "Εγκατάσταση τώρα",
+  "update_later": "Αργότερα",
+  "update_failed_title": "Η ενημέρωση δεν εγκαταστάθηκε",
+  "update_nothing_changed": "Δεν άλλαξε τίποτα."
 }

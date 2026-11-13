@@ -853,9 +853,6 @@
   "update_downloading": "{version} indiriliyor…",
   "update_verifying": "Yeni sürümün başladığı denetleniyor…",
   "update_verifying_signature": "Yeni sürümün imzası denetleniyor…",
-  "update_done_restart": "dopeIPTV {version} kuruldu. Kullanmak için şimdi yeniden başlatılsın mı?",
-  "update_done_install": "dopeIPTV {version} indirildi. Şimdi yüklensin mi? dopeIPTV kapanır ve iş bitince yeniden açılır.",
-  "update_failed": "Güncelleme kurulamadı: {error}. Hiçbir şey değiştirilmedi.",
   "common_ok": "Tamam",
   "common_apply": "Uygula",
   "common_reset": "Sıfırla",
@@ -1127,5 +1124,15 @@
   "cast_dlna_note": "TV yayını olduğu gibi oynatır — ses, altyazı veya görüntü boyutu seçimi Chromecast ile çalışır.",
   "cast_err_dlna_refused": "TV yayını reddetti ({msg}).",
   "cast_err_dlna_no_answer": "{name} yanıt vermedi.",
-  "cast_err_dlna_no_start": "TV oynatmayı başlatmadı — bu biçimi desteklemiyor olabilir."
+  "cast_err_dlna_no_start": "TV oynatmayı başlatmadı — bu biçimi desteklemiyor olabilir.",
+  "update_working": "dopeIPTV {version} sürümüne güncelleniyor",
+  "update_progress_mb": "{got} / {total} MB",
+  "update_ready_title": "dopeIPTV {version} hazır",
+  "update_ready_restart": "Yeni sürümü kullanmak için dopeIPTV'yi yeniden başlatın.",
+  "update_ready_install": "dopeIPTV kapanır, yeni sürümü yükler ve yeniden açılır.",
+  "update_restart_now": "Şimdi yeniden başlat",
+  "update_install_now": "Şimdi yükle",
+  "update_later": "Sonra",
+  "update_failed_title": "Güncelleme yüklenmedi",
+  "update_nothing_changed": "Hiçbir şey değiştirilmedi."
 }

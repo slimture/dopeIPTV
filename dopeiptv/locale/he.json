@@ -853,9 +853,6 @@
   "update_downloading": "מוריד את {version}…",
   "update_verifying": "בודק שהגרסה החדשה עולה…",
   "update_verifying_signature": "בודק את החתימה של הגרסה החדשה…",
-  "update_done_restart": "dopeIPTV {version} הותקנה. להפעיל מחדש עכשיו כדי להשתמש בה?",
-  "update_done_install": "dopeIPTV {version} הורד. להתקין עכשיו? dopeIPTV ייסגר וייפתח שוב בסיום.",
-  "update_failed": "לא ניתן היה להתקין את העדכון: {error}. שום דבר לא שונה.",
   "common_ok": "אישור",
   "common_apply": "החל",
   "common_reset": "איפוס",
@@ -1127,5 +1124,15 @@
   "cast_dlna_note": "טלוויזיה מנגנת את השידור כפי שהוא — בחירת שמע, כתוביות או גודל תמונה אפשרית עם Chromecast.",
   "cast_err_dlna_refused": "הטלוויזיה דחתה את השידור ({msg}).",
   "cast_err_dlna_no_answer": "{name} לא הגיב.",
-  "cast_err_dlna_no_start": "הטלוויזיה לא התחילה לנגן — ייתכן שהיא לא תומכת בפורמט הזה."
+  "cast_err_dlna_no_start": "הטלוויזיה לא התחילה לנגן — ייתכן שהיא לא תומכת בפורמט הזה.",
+  "update_working": "מעדכן ל-dopeIPTV {version}",
+  "update_progress_mb": "{got} מתוך {total} MB",
+  "update_ready_title": "dopeIPTV {version} מוכן",
+  "update_ready_restart": "הפעילו מחדש את dopeIPTV כדי להתחיל להשתמש בגרסה החדשה.",
+  "update_ready_install": "dopeIPTV ייסגר, יתקין את הגרסה החדשה וייפתח שוב.",
+  "update_restart_now": "הפעלה מחדש עכשיו",
+  "update_install_now": "התקנה עכשיו",
+  "update_later": "מאוחר יותר",
+  "update_failed_title": "העדכון לא הותקן",
+  "update_nothing_changed": "שום דבר לא שונה."
 }

@@ -853,9 +853,6 @@
   "update_downloading": "{version} डाउनलोड हो रहा है…",
   "update_verifying": "जाँच हो रही है कि नया संस्करण शुरू होता है…",
   "update_verifying_signature": "नए संस्करण का हस्ताक्षर जाँचा जा रहा है…",
-  "update_done_restart": "dopeIPTV {version} इंस्टॉल हो गया है। इसे इस्तेमाल करने के लिए अभी फिर से शुरू करें?",
-  "update_done_install": "dopeIPTV {version} डाउनलोड हो गया है। अभी इंस्टॉल करें? dopeIPTV बंद होगा और पूरा होने पर फिर से खुलेगा।",
-  "update_failed": "अपडेट इंस्टॉल नहीं हो सका: {error}। कुछ भी नहीं बदला गया।",
   "common_ok": "ठीक है",
   "common_apply": "लागू करें",
   "common_reset": "रीसेट करें",
@@ -1127,5 +1124,15 @@
   "cast_dlna_note": "टीवी स्ट्रीम को जैसा है वैसा ही चलाता है — ऑडियो, उपशीर्षक या चित्र का आकार चुनना Chromecast के साथ होता है।",
   "cast_err_dlna_refused": "टीवी ने स्ट्रीम अस्वीकार कर दी ({msg})।",
   "cast_err_dlna_no_answer": "{name} ने जवाब नहीं दिया।",
-  "cast_err_dlna_no_start": "टीवी ने चलाना शुरू नहीं किया — हो सकता है वह इस फ़ॉर्मेट को सपोर्ट न करता हो।"
+  "cast_err_dlna_no_start": "टीवी ने चलाना शुरू नहीं किया — हो सकता है वह इस फ़ॉर्मेट को सपोर्ट न करता हो।",
+  "update_working": "dopeIPTV {version} पर अपडेट हो रहा है",
+  "update_progress_mb": "{total} में से {got} MB",
+  "update_ready_title": "dopeIPTV {version} तैयार है",
+  "update_ready_restart": "नया संस्करण इस्तेमाल करने के लिए dopeIPTV को फिर से शुरू करें।",
+  "update_ready_install": "dopeIPTV बंद होगा, नया संस्करण इंस्टॉल करेगा और फिर से खुलेगा।",
+  "update_restart_now": "अभी फिर से शुरू करें",
+  "update_install_now": "अभी इंस्टॉल करें",
+  "update_later": "बाद में",
+  "update_failed_title": "अपडेट इंस्टॉल नहीं हुआ",
+  "update_nothing_changed": "कुछ भी नहीं बदला गया।"
 }
