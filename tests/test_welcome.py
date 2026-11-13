@@ -19,8 +19,10 @@ def _overlay(qkind="xtream"):
     s.clear()
     captured = {}
 
-    def on_connect(server, user, pw, kind, name):
+    def on_connect(server, user, pw, kind, name, mac=None):
         captured.update(server=server, user=user, pw=pw, kind=kind, name=name)
+        if mac is not None:
+            captured["mac"] = mac
 
     ov = WelcomeOverlay(
         win, settings=s, on_connect=on_connect, on_explore=lambda: None,
@@ -62,6 +64,35 @@ def test_m3u_only_needs_url_and_optional_name():
     assert captured["kind"] == "m3u"
     assert captured["name"] == "Sport"
     assert captured["user"] == "" and captured["pw"] == ""
+
+
+def test_stalker_portal_takes_url_and_mac():
+    try:
+        import PyQt6  # noqa: F401
+    except Exception:
+        pytest.skip("PyQt6 not available")
+    from dopeiptv.ui.dialogs import stalker_available
+    if not stalker_available():
+        pytest.skip("no Stalker client in this build")
+    _app, _win, ov, captured = _overlay()
+    ov._stack.setCurrentIndex(1)
+    ov._conn_kind.setCurrentIndex(ov._conn_kind.findData("stalker"))
+    # Only the portal's address and a MAC address: no username or password.
+    assert ov._mac.isVisibleTo(ov) and not ov._user.isVisibleTo(ov)
+    ov._server.setText("http://portal.example.com/c/")
+    ov._mac.setText("00-1a-79-12-34-5")          # one digit short
+    ov._do_connect()
+    assert captured == {} and ov._c_err.isVisibleTo(ov)
+    assert ov._stack.currentIndex() == 1
+    ov._mac.setText("00-1a-79-12-34-56")
+    ov._do_connect()
+    assert captured == {"server": "http://portal.example.com/c/", "user": "", "pw": "",
+                        "kind": "stalker", "name": "", "mac": "00:1A:79:12:34:56"}
+    assert ov._stack.currentIndex() == 2
+    # A portal's address pasted in is never taken for an Xtream or M3U link.
+    ov._server.clear()
+    ov._server.insert("http://portal.example.com/get.php?username=a&password=b")
+    assert ov._conn_kind.currentData() == "stalker"
 
 
 def test_pasted_xtream_link_splits_into_fields():

@@ -5,8 +5,8 @@ child widget, not a modal dialog, so it feels part of the app):
 
   1. Welcome - a greeting that flashes through languages, plus a language
                picker for the whole app.
-  2. Connect - Xtream Codes server / username / password (or an M3U URL),
-               with a short tour of what the app does right below it. A whole
+  2. Connect - Xtream Codes server / username / password (or an M3U URL,
+               or a Stalker / Ministra portal and a MAC address), with a short tour of what the app does right below it. A whole
                Xtream link pasted into the server field auto-fills the three
                credential fields.
   3. Trakt   - optional Trakt.tv sync.
@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..i18n import LANGUAGES, tr
+from .dialogs import PlaylistDialog, stalker_available
 from .theme import P
 
 
@@ -44,7 +45,9 @@ class WelcomeOverlay(QWidget):
     )
 
     def __init__(self, parent: QWidget, *, settings,
-                 on_connect: Callable[[str, str, str, str, str], None],
+                 # (server, user, password, kind, name) - and a portal's MAC
+                 # address as a sixth for kind "stalker".
+                 on_connect: Callable[..., None],
                  on_explore: Callable[[], None],
                  on_connect_trakt: Callable[[], None],
                  on_language_change: Callable[[str], None],
@@ -172,6 +175,8 @@ class WelcomeOverlay(QWidget):
         self._conn_kind = QComboBox()
         self._conn_kind.addItem(tr("playlist_kind_xtream"), "xtream")
         self._conn_kind.addItem(tr("playlist_kind_m3u"), "m3u")
+        if stalker_available():
+            self._conn_kind.addItem(tr("playlist_kind_stalker"), "stalker")
         self._conn_kind.currentIndexChanged.connect(self._update_conn_kind)
         self._name = QLineEdit(s.value("playlist_name", "") if s else "")
         self._name.setPlaceholderText(tr("playlist_name_hint"))
@@ -187,16 +192,21 @@ class WelcomeOverlay(QWidget):
         self._user = QLineEdit(s.value("username", "") if s else "")
         self._pw = QLineEdit(s.value("password", "") if s else "")
         self._pw.setEchoMode(QLineEdit.EchoMode.Password)
+        # A Stalker / Ministra portal logs in with the box's MAC address.
+        self._mac = QLineEdit()
+        self._mac.setPlaceholderText("00:1A:79:12:34:56")
         self._lbl_kind = QLabel(tr("playlist_kind"))
         self._lbl_name = QLabel(tr("playlist_name"))
         self._lbl_server = QLabel(tr("login_server"))
         self._lbl_user = QLabel(tr("login_username"))
         self._lbl_pw = QLabel(tr("login_password"))
+        self._lbl_mac = QLabel(tr("playlist_mac"))
         form.addRow(self._lbl_kind, self._conn_kind)
         form.addRow(self._lbl_name, self._name)
         form.addRow(self._lbl_server, self._server)
         form.addRow(self._lbl_user, self._user)
         form.addRow(self._lbl_pw, self._pw)
+        form.addRow(self._lbl_mac, self._mac)
 
         self._c_err = QLabel("", objectName="OnbErr")
         self._c_err.setWordWrap(True)
@@ -297,13 +307,20 @@ class WelcomeOverlay(QWidget):
         self._retranslate()
 
     def _update_conn_kind(self) -> None:
-        m3u = self._conn_kind.currentData() == "m3u"
+        kind = self._conn_kind.currentData()
+        m3u, stalker = kind == "m3u", kind == "stalker"
+        # M3U needs only a URL, a portal its URL and a MAC address.
         self._lbl_server.setText(
-            tr("playlist_m3u_url") if m3u else tr("login_server"))
+            tr("playlist_m3u_url") if m3u
+            else tr("playlist_portal_url") if stalker else tr("login_server"))
         self._server.setPlaceholderText(
-            "https://example.com/playlist.m3u" if m3u else "http://server:port")
+            "https://example.com/playlist.m3u" if m3u
+            else "http://portal.example.com/c/" if stalker
+            else "http://server:port")
         for w in (self._lbl_user, self._user, self._lbl_pw, self._pw):
-            w.setVisible(not m3u)
+            w.setVisible(not (m3u or stalker))
+        for w in (self._lbl_mac, self._mac):
+            w.setVisible(stalker)
         self._fit_card(self._stack.currentIndex())
 
     def _set_kind(self, kind: str) -> None:
@@ -315,7 +332,10 @@ class WelcomeOverlay(QWidget):
         """Recognise a pasted provider link in the server field and configure
         the form for it: Xtream (split into server/username/password, the
         preferred mode) or M3U (a plain playlist URL). A bare host with no link
-        shape is left alone so manual entry keeps working."""
+        shape is left alone so manual entry keeps working. A portal's
+        address is never taken for one of those."""
+        if self._conn_kind.currentData() == "stalker":
+            return
         from ..providers.client import detect_provider_link
         detected = detect_provider_link(self._server.text())
         if not detected:
@@ -331,6 +351,15 @@ class WelcomeOverlay(QWidget):
         kind = self._conn_kind.currentData()
         server = self._server.text().strip()
         name = self._name.text().strip()
+        if kind == "stalker":
+            mac = PlaylistDialog.normal_mac(self._mac.text())
+            if not (server and mac):
+                self._show_error(tr("playlist_portal_required"))
+                return
+            self._hide_error()
+            self._on_connect(server, "", "", kind, name, mac)
+            self._stack.setCurrentIndex(2)
+            return
         if kind == "m3u":
             ok = bool(server)
             user = pw = ""
@@ -339,14 +368,20 @@ class WelcomeOverlay(QWidget):
             pw = self._pw.text().strip()
             ok = bool(server and user and pw)
         if not ok:
-            self._c_err.setText(tr("onb_fill_all"))
-            self._c_err.setVisible(True)
-            self._fit_card(self._stack.currentIndex())
+            self._show_error(tr("onb_fill_all"))
             return
-        self._c_err.setText("")
-        self._c_err.setVisible(False)
+        self._hide_error()
         self._on_connect(server, user, pw, kind, name)
         self._stack.setCurrentIndex(2)   # continue to the optional Trakt step
+
+    def _show_error(self, text: str) -> None:
+        self._c_err.setText(text)
+        self._c_err.setVisible(True)
+        self._fit_card(self._stack.currentIndex())
+
+    def _hide_error(self) -> None:
+        self._c_err.setText("")
+        self._c_err.setVisible(False)
 
     def dismiss(self) -> None:
         """Close the wizard the same as 'Continue without account' - called by
@@ -379,6 +414,10 @@ class WelcomeOverlay(QWidget):
         self._name.setPlaceholderText(tr("playlist_name_hint"))
         self._lbl_user.setText(tr("login_username"))
         self._lbl_pw.setText(tr("login_password"))
+        self._lbl_mac.setText(tr("playlist_mac"))
+        for i, key in enumerate(("playlist_kind_xtream", "playlist_kind_m3u",
+                                 "playlist_kind_stalker")[:self._conn_kind.count()]):
+            self._conn_kind.setItemText(i, tr(key))
         self._c_hint.setText(tr("onb_xtream_link_hint"))
         self._update_conn_kind()   # re-labels the server row for the mode
         self._c_connect.setText(tr("btn_connect"))

@@ -46,14 +46,14 @@ class _OnboardingMixin:
         self._set_language(code)
 
     def _wizard_connect(self, server: str, user: str, pw: str,
-                        kind: str = "xtream", name: str = "") -> None:
+                        kind: str = "xtream", name: str = "", mac: str = "") -> None:
         # Use the name the user typed; fall back to the server host so an
         # unnamed playlist still gets a sensible label.
         name = name.strip() or server.split("//")[-1].split("/")[0] \
             or tr("playlist_default_name")
         pl = self.playlist_store.add(
             {"name": name, "kind": kind, "server": server, "username": user,
-             "password": pw, "epg_url": "", "refresh": "never"})
+             "password": pw, "epg_url": "", "refresh": "never", "mac": mac})
         self.playlist_store.set_active(pl["id"])
         self.switch_playlist(pl["id"])
         # The wizard stays open for the optional Trakt step and hides itself
