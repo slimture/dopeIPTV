@@ -1465,6 +1465,7 @@ jobs:
           ls -la ./*-setup.exe
       - name: Smoke test - install, update over it, start, and remove
         shell: pwsh
+        timeout-minutes: 10
         run: |
           # What a user's machine does with the installer: install, install
           # the next one over it the way the app's update does (silently,
@@ -1474,9 +1475,13 @@ jobs:
           $dir = Join-Path $env:RUNNER_TEMP "dopeIPTV-installed"
           $key = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\dopeIPTV"
           $lnk = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\dopeIPTV.lnk"
-          $p = Start-Process -FilePath $setup -ArgumentList "/S", "/D=$dir" -Wait -PassThru
+          # WaitForExit, not -Wait: -Wait also waits for what the installer
+          # starts, and /relaunch starts the app, which never exits here.
+          $p = Start-Process -FilePath $setup -ArgumentList "/S", "/D=$dir" -PassThru
+          $p.WaitForExit()
           if ($p.ExitCode -ne 0) { Write-Error "installer exit $($p.ExitCode)"; exit 1 }
-          $p = Start-Process -FilePath $setup -ArgumentList "/S", "/relaunch", "/D=$dir" -Wait -PassThru
+          $p = Start-Process -FilePath $setup -ArgumentList "/S", "/relaunch", "/D=$dir" -PassThru
+          $p.WaitForExit()
           if ($p.ExitCode -ne 0) { Write-Error "installing over it: exit $($p.ExitCode)"; exit 1 }
           Start-Sleep -Seconds 5
           $run = Get-Process -Name dopeiptv -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$dir*" }
@@ -1491,7 +1496,8 @@ jobs:
           $p = Start-Process -FilePath "$dir\dopeiptv.exe" -ArgumentList "--self-check" -Wait -PassThru
           if ($p.ExitCode -ne 0) { Write-Error "self-check of the installed app failed (exit $($p.ExitCode))"; exit 1 }
           # _?= keeps the uninstaller where it is, so Start-Process waits for it.
-          $p = Start-Process -FilePath "$dir\uninstall.exe" -ArgumentList "/S", "_?=$dir" -Wait -PassThru
+          $p = Start-Process -FilePath "$dir\uninstall.exe" -ArgumentList "/S", "_?=$dir" -PassThru
+          $p.WaitForExit()
           if ($p.ExitCode -ne 0) { Write-Error "uninstaller exit $($p.ExitCode)"; exit 1 }
           foreach ($left in @("$dir\dopeiptv.exe", "$dir\_internal", $key, $lnk)) {
             if (Test-Path $left) { Write-Error "left behind after removal: $left"; exit 1 }
