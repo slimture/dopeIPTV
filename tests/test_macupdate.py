@@ -33,6 +33,16 @@ def test_the_cpu_is_the_builds_own(monkeypatch, plat, cpu):
     assert macupdate.arch() == cpu
 
 
+@pytest.mark.parametrize("machine,cpu", [("arm64", "arm64"), ("x86_64", "x86_64"), ("ppc", None)])
+def test_a_universal2_python_takes_the_cpu_this_process_runs_as(monkeypatch, machine, cpu):
+    # The builds' Python is universal2 (python.org's installer, as
+    # actions/setup-python ships it): sysconfig names no CPU, so no copy
+    # could update itself - About's button opened a web page instead.
+    monkeypatch.setattr(macupdate.sysconfig, "get_platform", lambda: "macosx-10.13-universal2")
+    monkeypatch.setattr(macupdate.platform, "machine", lambda: machine)
+    assert macupdate.arch() == cpu
+
+
 @pytest.fixture
 def mac_app(monkeypatch, tmp_path):
     app = tmp_path / "Applications" / "dopeIPTV.app"

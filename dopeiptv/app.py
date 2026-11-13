@@ -354,6 +354,17 @@ def main() -> int:
             else:
                 log.info("self-check: vulkan-1.dll loaded from the bundle "
                          "(%s)", loaded)
+        if sys.platform == "darwin" and getattr(sys, "frozen", False):
+            # The app updates itself with the .dmg for its own CPU; a build
+            # that cannot tell which (a universal2 Python's "universal2"
+            # once) offers every Mac the download page instead.
+            from .core import macupdate
+            if macupdate.arch() is None:
+                log.error("self-check: this build cannot tell its CPU, so "
+                          "it cannot update itself")
+                return 1
+            log.info("self-check: updates itself with the %s .dmg",
+                     macupdate.arch())
         # Every shipped language must actually load from THIS bundle. The
         # locale JSONs live outside the code archive in frozen builds, so a
         # packaging slip silently collapses the picker to English-only (the

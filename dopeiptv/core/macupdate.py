@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import functools
 import os
+import platform
 import plistlib
 import re
 import shutil
@@ -63,12 +64,22 @@ def app_bundle() -> Path | None:
 
 
 def arch() -> str | None:
-    """This build's CPU as the .dmg's name spells it (the bundled Python's)."""
+    """This build's CPU as the .dmg's name spells it: what this process runs
+    as. The bundled Python is a universal2 build (actions/setup-python
+    repackages python.org's installer), so sysconfig says "universal2" -
+    which once named no .dmg, and no copy could update itself. An Intel
+    build run on Apple silicon runs as x86_64 (Rosetta) and stays Intel."""
     plat = sysconfig.get_platform().lower()
     if plat.endswith("arm64"):
         return "arm64"
     if plat.endswith("x86_64") or plat.endswith("intel"):
         return "x86_64"
+    if plat.endswith("universal2"):
+        m = platform.machine().lower()
+        if m == "arm64":
+            return "arm64"
+        if m == "x86_64":
+            return "x86_64"
     return None
 
 
