@@ -188,8 +188,10 @@ if [ -n "$missing" ]; then
 else
     # ---- Mirror the installers ---------------------------------------------------
     # Only what end users install: the wheel and the source tarball are left
-    # on GitHub. Fetched only when missing or a different size - a release's
-    # assets never change. (The parentheses around `... as $l | ...` matter:
+    # on GitHub. Fetched when missing, a different size, or when GitHub's
+    # digest is not the one the last SHA256SUMS recorded: a published
+    # release's file can be rebuilt (1.4.4's .dmg files were, signed and
+    # notarised), and the new one need not differ in size. (The parentheses around `... as $l | ...` matter:
     # jq 1.8 would bind the whole `and` to $l - see site/render.jq.)
     jq -r '
         .assets[]? | select((.state // "uploaded") == "uploaded")
@@ -208,7 +210,9 @@ else
         [ -f "$dest" ] && have=$(wc -c < "$dest" | tr -d ' ')
         want=""
         case $digest in sha256:*) want=${digest#sha256:} ;; esac
-        if [ "$have" != "$size" ]; then
+        had=""
+        [ -f "$FILES/SHA256SUMS" ] && had=$(awk -v n="$name" '$2 == n { print $1; exit }' "$FILES/SHA256SUMS")
+        if [ "$have" != "$size" ] || { [ -n "$want" ] && [ -n "$had" ] && [ "$had" != "$want" ]; }; then
             printf '[sync] fetching %s (%s bytes) ... ' "$name" "$size" >&2
             part=$dest.part.$$
             if ! fetch -q -T 1800 --user-agent="$UA" -o "$part" "$url"; then
