@@ -1388,23 +1388,39 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
    line; opened, a card unfolds downwards and the projects drop into
    place one after another, specks of the accent drifting down behind them
    (nav.js animates the height). */
-#built { padding: 0 0 72px; margin-top: -68px; }
-.is-phone #built { background: var(--surface); }
+#built { --built-bg: var(--bg); padding: 0 0 72px; margin-top: -68px; }
+.is-phone #built { --built-bg: var(--surface); background: var(--surface); }
 @media (max-width: 720px) { #built { padding-bottom: 44px; margin-top: -30px; } }
-.built-more > summary { list-style: none; display: flex; align-items: center; gap: 9px; width: max-content; max-width: 100%;
-  margin: 0 auto; padding: 9px 18px; border-radius: 999px; cursor: pointer; font-size: 14px; font-weight: 500;
-  color: var(--muted); border: 1px solid var(--line); background: color-mix(in srgb, var(--text) 3%, transparent);
-  transition: color .2s ease, background-color .2s ease, border-color .2s ease; -webkit-tap-highlight-color: transparent; }
+/* Closed: a pill a light runs round the edge of, slowly, over a soft glow. */
+@property --built-a { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+.built-more > summary { list-style: none; display: flex; align-items: center; gap: 10px; width: max-content; max-width: 100%;
+  margin: 0 auto; padding: 12px 22px; border-radius: 999px; cursor: pointer; font-size: 15px; font-weight: 600;
+  color: var(--text); border: 1.5px solid transparent;
+  background: linear-gradient(color-mix(in srgb, var(--accent) 7%, var(--built-bg, var(--bg))),
+      color-mix(in srgb, var(--accent) 7%, var(--built-bg, var(--bg)))) padding-box,
+    conic-gradient(from var(--built-a), var(--accent), color-mix(in srgb, var(--accent) 25%, var(--line)) 28%,
+      var(--line) 50%, color-mix(in srgb, var(--accent) 25%, var(--line)) 72%, var(--accent)) border-box;
+  box-shadow: 0 8px 30px -10px color-mix(in srgb, var(--accent) 55%, transparent);
+  animation: built-spin 5s linear infinite;
+  transition: color .2s ease, background-color .2s ease, border-color .2s ease, transform .15s ease;
+  -webkit-tap-highlight-color: transparent; }
 .built-more > summary::-webkit-details-marker { display: none; }
 .built-more > summary::marker { content: ""; }
 .built-more > summary::after { content: "\203A"; font-size: 1.35em; line-height: 1; transform: rotate(90deg);
   transition: transform .3s ease; }
 .built-more[open] > summary::after { transform: rotate(-90deg); }
-.built-more .bi { width: 17px; height: 17px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7;
-  stroke-linejoin: round; color: var(--accent); transition: transform .3s ease; }
-.built-more > summary:hover, .built-more[open] > summary { color: var(--text);
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: color-mix(in srgb, var(--accent) 8%, transparent); }
-.built-more > summary:hover .bi { transform: translateY(1px); }
+.built-more .bi { width: 19px; height: 19px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7;
+  stroke-linejoin: round; color: var(--accent); overflow: visible; }
+@keyframes built-spin { to { --built-a: 360deg; } }
+.built-more > summary:hover, .built-more[open] > summary {
+  background: linear-gradient(color-mix(in srgb, var(--accent) 14%, var(--built-bg, var(--bg))),
+      color-mix(in srgb, var(--accent) 14%, var(--built-bg, var(--bg)))) padding-box,
+    conic-gradient(from var(--built-a), var(--accent), color-mix(in srgb, var(--accent) 45%, var(--line)) 30%,
+      var(--accent) 50%, color-mix(in srgb, var(--accent) 45%, var(--line)) 70%, var(--accent)) border-box;
+  box-shadow: 0 10px 36px -8px color-mix(in srgb, var(--accent) 70%, transparent); }
+.built-more .bp { font-weight: 400; font-size: 13px; color: var(--muted); padding-inline-start: 10px;
+  border-inline-start: 1px solid var(--line-2); white-space: nowrap; }
+@media (max-width: 560px) { .built-more .bp { display: none; } .built-more > summary { font-size: 14px; padding: 11px 18px; } }
 .built-more > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .built-body { position: relative; isolation: isolate; overflow: hidden; margin-top: 12px; padding: 30px 26px 22px;
   border-radius: 22px; text-align: center; border: 1px solid var(--line);
@@ -1426,29 +1442,63 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
 .built-body .credit a { color: var(--text); }
 .built-body .credit a:hover { color: var(--accent); }
 .built-body .disclaimer { margin: 0 auto; max-width: 72ch; font-size: 11.5px; line-height: 1.55; color: var(--faint); }
-/* Opened: everything drops down into place, one after another. */
-.built-more[open] .built-intro, .built-more[open] .credit, .built-more[open] .disclaimer {
-  animation: built-drop .55s cubic-bezier(.2, .8, .2, 1) both; }
-.built-more[open] .credit:nth-child(1) { animation-delay: .06s; }
-.built-more[open] .credit:nth-child(2) { animation-delay: .11s; }
-.built-more[open] .credit:nth-child(3) { animation-delay: .16s; }
-.built-more[open] .credit:nth-child(4) { animation-delay: .21s; }
-.built-more[open] .credit:nth-child(5) { animation-delay: .26s; }
-.built-more[open] .credit:nth-child(6) { animation-delay: .31s; }
-.built-more[open] .disclaimer { animation-delay: .36s; }
-@keyframes built-drop { from { opacity: 0; transform: translateY(-14px); } }
+/* Opened: the projects are dealt from above - each drops, tips and
+   bounces into place, its icon popping in after it; a sheen sweeps the
+   card and the glow at its top breathes. */
+.built-body .credit:nth-child(1) { --d: .08s; --r: -4deg; }
+.built-body .credit:nth-child(2) { --d: .15s; --r: 3deg; }
+.built-body .credit:nth-child(3) { --d: .22s; --r: -2deg; }
+.built-body .credit:nth-child(4) { --d: .29s; --r: 4deg; }
+.built-body .credit:nth-child(5) { --d: .36s; --r: -3deg; }
+.built-body .credit:nth-child(6) { --d: .43s; --r: 2deg; }
+.built-more[open] .built-intro { animation: built-drop .7s cubic-bezier(.2, .8, .2, 1) both; }
+.built-more[open] .credit { animation: built-deal .85s cubic-bezier(.2, .8, .2, 1) var(--d, 0s) both; }
+.built-more[open] .credit .ic { animation: built-pop .6s cubic-bezier(.3, 1.7, .5, 1) calc(var(--d, 0s) + .3s) both; }
+.built-more[open] .disclaimer { animation: built-drop .7s cubic-bezier(.2, .8, .2, 1) .55s both; }
+@keyframes built-drop { from { opacity: 0; transform: translateY(-22px); } }
+@keyframes built-deal {
+  0% { opacity: 0; transform: translateY(-64px) rotate(var(--r, -3deg)) scale(.94); }
+  55% { opacity: 1; transform: translateY(8px) rotate(calc(var(--r, -3deg) * -.25)) scale(1.01); }
+  78% { transform: translateY(-3px) rotate(calc(var(--r, -3deg) * .1)); }
+  100% { opacity: 1; transform: none; } }
+@keyframes built-pop { 0% { opacity: 0; transform: scale(.3) rotate(-25deg); } 100% { opacity: 1; transform: none; } }
+.built-body::before { content: ""; position: absolute; z-index: -2; left: 50%; top: -40%; width: 120%; height: 90%;
+  transform: translateX(-50%); border-radius: 50%; pointer-events: none;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 22%, transparent), transparent);
+  animation: built-breathe 4.5s ease-in-out infinite alternate; }
+@keyframes built-breathe { from { opacity: .55; transform: translateX(-50%) scale(.92); } to { opacity: 1; transform: translateX(-50%) scale(1.08); } }
+.built-body::after { content: ""; position: absolute; z-index: -1; inset: 0; pointer-events: none; transform: translateX(-110%);
+  background: linear-gradient(105deg, transparent 30%, color-mix(in srgb, var(--accent) 18%, transparent) 48%,
+    color-mix(in srgb, #fff 10%, transparent) 50%, transparent 68%); }
+.built-more[open] .built-body::after { animation: built-sweep 1.3s cubic-bezier(.3, .6, .2, 1) .2s both; }
+@keyframes built-sweep { to { transform: translateX(110%); } }
 .built-fx { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
-.built-fx i { position: absolute; top: -10px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); opacity: 0;
-  animation: built-fall 9s linear infinite; }
-.built-fx i:nth-of-type(1) { left: 8%; animation-delay: .2s; }
-.built-fx i:nth-of-type(2) { left: 21%; width: 7px; height: 7px; animation-delay: 3.4s; }
-.built-fx i:nth-of-type(3) { left: 37%; width: 4px; height: 4px; animation-delay: 6.1s; }
-.built-fx i:nth-of-type(4) { left: 55%; width: 6px; height: 6px; animation-delay: 1.6s; }
-.built-fx i:nth-of-type(5) { left: 70%; width: 4px; height: 4px; animation-delay: 4.8s; }
-.built-fx i:nth-of-type(6) { left: 84%; width: 7px; height: 7px; animation-delay: 2.5s; }
-.built-fx i:nth-of-type(7) { left: 94%; width: 5px; height: 5px; animation-delay: 7.2s; }
-@keyframes built-fall { 0% { transform: translateY(0); opacity: 0; } 12% { opacity: .38; } 80% { opacity: .2; }
-  100% { transform: translateY(420px); opacity: 0; } }
+.built-fx i { position: absolute; top: -12px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); opacity: 0;
+  animation: built-fall var(--t, 8s) linear var(--w, 0s) infinite; }
+.built-fx i:nth-of-type(3n) { background: transparent; border: 1.5px solid var(--accent); }
+.built-fx i:nth-of-type(1) { left: 6%; --t: 7.5s; --w: .1s; }
+.built-fx i:nth-of-type(2) { left: 14%; width: 9px; height: 9px; --t: 10s; --w: 2.2s; }
+.built-fx i:nth-of-type(3) { left: 23%; width: 8px; height: 8px; --t: 8.5s; --w: 4.6s; }
+.built-fx i:nth-of-type(4) { left: 31%; width: 4px; height: 4px; --t: 6.5s; --w: 1.2s; }
+.built-fx i:nth-of-type(5) { left: 40%; width: 7px; height: 7px; --t: 9.5s; --w: 3.4s; }
+.built-fx i:nth-of-type(6) { left: 49%; width: 10px; height: 10px; --t: 11s; --w: .6s; }
+.built-fx i:nth-of-type(7) { left: 58%; width: 5px; height: 5px; --t: 7s; --w: 5.2s; }
+.built-fx i:nth-of-type(8) { left: 66%; width: 8px; height: 8px; --t: 9s; --w: 2.8s; }
+.built-fx i:nth-of-type(9) { left: 74%; width: 9px; height: 9px; --t: 10.5s; --w: 4.1s; }
+.built-fx i:nth-of-type(10) { left: 82%; width: 5px; height: 5px; --t: 6.8s; --w: 1.7s; }
+.built-fx i:nth-of-type(11) { left: 89%; width: 7px; height: 7px; --t: 8.2s; --w: 3.9s; }
+.built-fx i:nth-of-type(12) { left: 95%; width: 10px; height: 10px; --t: 9.8s; --w: .9s; }
+@keyframes built-fall {
+  0% { transform: translate(0, 0); opacity: 0; }
+  10% { opacity: .6; }
+  35% { transform: translate(14px, 160px); }
+  65% { transform: translate(-12px, 320px); opacity: .45; }
+  100% { transform: translate(8px, 520px); opacity: 0; } }
+/* The pill's layers part a little, hovered or open. */
+.built-more .bi path { transition: transform .4s cubic-bezier(.3, 1.7, .5, 1); }
+.built-more > summary:hover .bi .l1, .built-more[open] .bi .l1 { transform: translateY(-2.2px); }
+.built-more > summary:hover .bi .l3, .built-more[open] .bi .l3 { transform: translateY(2.2px); }
+.built-more > summary:active { transform: scale(.97); }
 @media (max-width: 720px) {
   .built-body { padding: 24px 14px 18px; border-radius: 18px; }
   .built-body .credits-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -1456,7 +1506,12 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
   .built-body .credit p { font-size: 14.5px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .built-more[open] .built-intro, .built-more[open] .credit, .built-more[open] .disclaimer { animation-name: built-fade; }
+  .built-more[open] .built-intro, .built-more[open] .credit, .built-more[open] .disclaimer,
+  .built-more[open] .credit .ic { animation-name: built-fade; }
+  .built-body::before, .built-more[open] .built-body::after { animation: none; }
+  .built-more .bi path { transition: none; }
+  .built-more > summary { animation: none; }
+  .built-more > summary:hover .bi .l1, .built-more[open] .bi .l1, .built-more > summary:hover .bi .l3, .built-more[open] .bi .l3 { transform: none; }
   .built-fx { display: none; }
   .built-body .credit, .built-body .credit .ic, .built-more .bi { transition: background-color .2s ease; }
   .built-body .credit:hover, .built-body .credit:hover .ic, .built-more > summary:hover .bi { transform: none; }

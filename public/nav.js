@@ -1195,8 +1195,10 @@ window.iptvCopyButtons(document);
     }
     box.open = true;
     var h = body.offsetHeight;
-    running = body.animate([{ height: "0px", opacity: 0 }, { height: h + "px", opacity: 1 }],
-                           { duration: 420, easing: "cubic-bezier(.2, .8, .2, 1)" });
+    // A spring: a little past its height, then back.
+    running = body.animate([{ height: "0px", opacity: 0, offset: 0 }, { height: (h * 1.04) + "px", opacity: 1, offset: .7 },
+                            { height: (h * .99) + "px", offset: .88 }, { height: h + "px", opacity: 1, offset: 1 }],
+                           { duration: 640, easing: "cubic-bezier(.3, .7, .3, 1)" });
     // The page follows the card down as it grows - never so far that its
     // line leaves the top, under the sticky header.
     var follow = function () {
