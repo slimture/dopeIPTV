@@ -1183,52 +1183,38 @@ window.iptvCopyButtons(document);
   var sum = box.querySelector("summary"), body = box.querySelector(".built-body");
   var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var running = null;
-  // A tribute, when it opens: confetti, sparks and stars burst from the
-  // chevron and rain down, a ring spreads, and the heading lights up.
+  // A tribute, when it opens: confetti, sparks and stars rain down over
+  // the screen from its top edge, swaying and turning as they fall, and
+  // the heading lights up.
   function cheer() {
-    var from = box.querySelector(".bc") || sum;
-    // On the page, not the screen: the page follows the card down as it
-    // opens, and the burst goes with the heading.
-    var r = from.getBoundingClientRect();
-    var cx = r.left + window.scrollX + r.width / 2, cy = r.top + window.scrollY + r.height / 2;
     var root = getComputedStyle(document.documentElement);
     var colors = [root.getPropertyValue("--accent").trim() || "#2997ff", root.getPropertyValue("--brand").trim() || "#4c8dff",
                   "#7c5cff", "#22d3ee", "#ffd166", root.getPropertyValue("--text").trim() || "#fff"];
     var layer = document.createElement("div");
     layer.className = "built-cheer";
     layer.setAttribute("aria-hidden", "true");
-    layer.style.height = Math.max(document.documentElement.scrollHeight, cy + 900) + "px";
     document.body.appendChild(layer);
-    var ring = document.createElement("b");
-    ring.style.left = cx + "px";
-    ring.style.top = cy + "px";
-    layer.appendChild(ring);
-    ring.animate([{ transform: "translate(-50%, -50%) scale(.2)", opacity: .9 },
-                  { transform: "translate(-50%, -50%) scale(9)", opacity: 0 }],
-                 { duration: 900, easing: "cubic-bezier(.2, .7, .3, 1)", fill: "forwards" });
-    var n = window.innerWidth < 600 ? 34 : 60;
+    var w = window.innerWidth, h = window.innerHeight;
+    var n = w < 600 ? 46 : 90;
     for (var i = 0; i < n; i++) {
       var p = document.createElement("i");
       p.className = "k" + (i % 3);
       p.style.background = colors[i % colors.length];
-      p.style.left = cx + "px";
-      p.style.top = cy + "px";
+      p.style.left = (Math.random() * w) + "px";
       layer.appendChild(p);
-      // Out in every direction, more of them upwards, then down they come.
-      var a = -Math.PI / 2 + (Math.random() - .5) * Math.PI * 1.7;
-      var d = 90 + Math.random() * (window.innerWidth < 600 ? 160 : 300);
-      var dx = Math.cos(a) * d, dy = Math.sin(a) * d * .8;
-      var fall = 220 + Math.random() * 320, spin = Math.random() * 900 - 450;
+      var sway = 18 + Math.random() * 40, spin = 360 + Math.random() * 720;
+      var drop = h + 80, s = .7 + Math.random() * .6;
       p.animate([
-        { transform: "translate(-50%, -50%) scale(.3)", opacity: 1 },
-        { transform: "translate(-50%, -50%) translate(" + dx + "px, " + dy + "px) rotate(" + (spin / 2) + "deg) scale(1)", opacity: 1, offset: .32 },
-        { transform: "translate(-50%, -50%) translate(" + (dx * 1.2) + "px, " + (dy + fall) + "px) rotate(" + spin + "deg) scale(.8)", opacity: 0 }
-      ], { duration: 1300 + Math.random() * 1100, easing: "cubic-bezier(.12, .75, .3, 1)", fill: "forwards" });
+        { transform: "translate(0, -30px) rotate(0) scale(" + s + ")", opacity: 0 },
+        { transform: "translate(" + sway + "px, " + (drop * .3) + "px) rotate(" + (spin * .3) + "deg) scale(" + s + ")", opacity: 1, offset: .25 },
+        { transform: "translate(" + (-sway) + "px, " + (drop * .62) + "px) rotate(" + (spin * .65) + "deg) scale(" + s + ")", opacity: 1, offset: .6 },
+        { transform: "translate(" + (sway / 2) + "px, " + drop + "px) rotate(" + spin + "deg) scale(" + s + ")", opacity: 0 }
+      ], { duration: 1900 + Math.random() * 1500, delay: Math.random() * 700, easing: "cubic-bezier(.35, .15, .55, 1)", fill: "both" });
     }
     sum.classList.remove("cheer");
     void sum.offsetWidth;
     sum.classList.add("cheer");
-    setTimeout(function () { layer.remove(); sum.classList.remove("cheer"); }, 2600);
+    setTimeout(function () { layer.remove(); sum.classList.remove("cheer"); }, 4400);
   }
   sum.addEventListener("click", function (e) {
     if (still || !body) { return; }
