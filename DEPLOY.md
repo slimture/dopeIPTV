@@ -409,6 +409,11 @@ How it counts, so the numbers are honest:
   and per version updated from, once per address and file a day - and
   `sync-releases.sh` leaves them out of the public download counter.
   `releases.json` lists each file's size and SHA-256, which the app checks.
+  Test builds the same way: `sync-releases.sh` writes the newest one to
+  `nightly.json` (linked from nowhere), and `/dl.php` counts a test
+  build's file and sends it on to its pre-release on GitHub - nothing of
+  it is mirrored (the `$iptv_dl_nightly` map in the content server's
+  file).
 - Your own visits are left out: a browser that has opened `/admin/` gets a
   cookie nginx does not log (pages, downloads, `/hit`), addresses that are
   not public (your own network) never count, and `STATS_IGNORE` in

@@ -157,6 +157,39 @@ count_downloads() {
 }
 count_downloads
 
+# ---- The newest test build (not shown anywhere) ------------------------------------
+# nightly.json, the same shape as releases.json, for the app's "Test builds"
+# channel: it asks the site and fetches through /dl.php like a release,
+# so its updates are counted too. Nothing is mirrored - nginx's /dl.php
+# sends a test build's file on to GitHub (deploy/content-iptv.dope.rs.conf)
+# - and no page links it. A failure here leaves the last one in place.
+NIGHTLY=$PUB/nightly.json
+if fetch -q -T 30 --user-agent="$UA" -o "$TMP/releases-list.json" \
+        "https://api.github.com/repos/$REPO/releases?per_page=20" 2>/dev/null; then
+    jq --indent 4 '
+        [.[]? | select(.prerelease and (.draft | not)
+                       and ((.tag_name // "") | test("^nightly-[0-9]+(\\.[0-9]+){3}$")))]
+        | sort_by(.created_at) | last // empty
+        | {version: (.tag_name | sub("^nightly-"; "")),
+           published_at: (.published_at // null),
+           notes: (.body // "" | tostring | .[:20000]),
+           html_url: (.html_url // ""),
+           assets: [.assets[]? | select((.state // "uploaded") == "uploaded")
+                    | (.name // "" | split("/") | last) as $name | select($name != "")
+                    | {name: $name, size: (.size // 0),
+                       sha256: ((.digest // "") | sub("^sha256:"; "")),
+                       url: ("/dl.php?f=" + ($name | @uri))}]}' \
+        "$TMP/releases-list.json" > "$TMP/nightly.json" 2>/dev/null || : > "$TMP/nightly.json"
+    if jq -e '.version | type == "string"' "$TMP/nightly.json" >/dev/null 2>&1; then
+        if ! cmp -s "$TMP/nightly.json" "$NIGHTLY" 2>/dev/null; then
+            cp "$TMP/nightly.json" "$NIGHTLY.part" && mv -f "$NIGHTLY.part" "$NIGHTLY"
+            say "wrote nightly.json for test build $(jq -r .version "$NIGHTLY")"
+        fi
+    fi
+else
+    say "could not list GitHub's releases - nightly.json left as it is"
+fi
+
 # ---- The latest release --------------------------------------------------------
 API=$TMP/latest.json
 if ! fetch -q -T 30 --user-agent="$UA" -o "$API" \
