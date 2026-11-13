@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .. import VERSION
-from ..core import selfupdate, winupdate
+from ..core import macupdate, selfupdate, winupdate
 from ..core.log import log
 from ..core.updates import GITHUB_REPO, fetch_update, offered
 from ..core.xdg import open_url
@@ -33,9 +33,10 @@ _WEBSITE = "https://dopeiptv.org/?ref=app-update"
 
 def _updater():
     """What can update this copy in place: an AppImage in a writable folder
-    (selfupdate), a copy the Windows installer put there (winupdate) - or
+    (selfupdate), a copy the Windows installer put there (winupdate), our
+    notarised app in a folder the user may write to (macupdate) - or
     nothing, and the download page is offered."""
-    for m in (selfupdate, winupdate):
+    for m in (selfupdate, winupdate, macupdate):
         if m.can_self_update():
             return m
     return None
@@ -268,8 +269,8 @@ class _UpdatesMixin:
                                     version=state["tag"]))
                 dlg.setMaximum(100)
                 dlg.setValue(int(got * 100 / total))
-            elif got and updater.CHECKS_START:
-                dlg.setLabelText(tr("update_verifying"))
+            elif got and updater.VERIFY_KEY:
+                dlg.setLabelText(tr(updater.VERIFY_KEY))
                 dlg.setMaximum(0)
 
         timer = QTimer(self)
@@ -312,6 +313,10 @@ class _UpdatesMixin:
                     ) == QMessageBox.StandardButton.Yes:
                 updater.restart_into(new)
                 self.close()
+            elif hasattr(updater, "on_exit"):
+                # "Is installed" holds anyway: the Mac's new app goes in
+                # place when this one quits.
+                updater.on_exit(new)
 
         def fail(err) -> None:
             finish()
@@ -330,6 +335,8 @@ class _UpdatesMixin:
         an update downloaded goes."""
         if winupdate.installed_dir() is not None:
             winupdate.cleanup()
+        if macupdate.app_bundle() is not None:
+            macupdate.cleanup()
         running = selfupdate.appimage_path()
         old = self.settings.value("selfupdate_old_path", "") or ""
         if old and running is not None:

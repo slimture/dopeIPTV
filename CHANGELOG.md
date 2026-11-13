@@ -14,6 +14,12 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   A copy it installed updates itself: About and the update banner offer
   Update now, which downloads the next installer, checks it, closes the
   app, installs silently and opens the new version.
+- macOS: the app updates itself. Update now downloads the next .dmg,
+  takes the app in it only when its signature holds, it is Solecraft
+  AB's and Apple has notarised it, puts it beside this one and swaps the
+  two when dopeIPTV restarts (or quits). A copy run from the .dmg, or one
+  macOS moved aside because it was opened from Downloads, is sent to the
+  download page instead.
 
 ### Changed
 

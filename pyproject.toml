@@ -81,6 +81,7 @@ files = [
     "dopeiptv/core/updates.py",
     "dopeiptv/core/selfupdate.py",
     "dopeiptv/core/winupdate.py",
+    "dopeiptv/core/macupdate.py",
     "dopeiptv/core/log.py",
     "dopeiptv/core/player_exec.py",
     "dopeiptv/core/wakelock.py",

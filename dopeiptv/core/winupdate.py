@@ -29,10 +29,10 @@ from pathlib import Path
 from .log import log
 from .selfupdate import UpdateError, download
 
-# The question asked once the installer is downloaded (i18n key).
+# The question asked once the installer is downloaded (i18n key); the
+# download is checked as it arrives, with nothing to say after it.
 DONE_KEY = "update_done_install"
-# The download is checked as it arrives; there is no start to test first.
-CHECKS_START = False
+VERIFY_KEY: str | None = None
 
 _CREATE_NEW_PROCESS_GROUP = 0x00000200
 _CREATE_NO_WINDOW = 0x08000000

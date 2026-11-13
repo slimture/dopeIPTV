@@ -37,9 +37,9 @@ from .log import log
 from .xdg import system_env
 
 # The question asked once the new version is in place (i18n key), and
-# whether the new version is started once to check it (the UI says so).
+# what the progress dialog says while it is checked after the download.
 DONE_KEY = "update_done_restart"
-CHECKS_START = True
+VERIFY_KEY: str | None = "update_verifying"
 
 # Set by the AppImage runtime for the process it starts. A child AppImage
 # gets its own; ours must not leak into the self-check of the new file.
