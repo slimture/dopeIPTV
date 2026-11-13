@@ -171,3 +171,32 @@ def test_without_the_sites_nightly_json_github_has_the_test_build(github):
     assert fetch_update(channel="nightly")["tag"] == "v1.4.0.15"
     github["site_nightly"] = site_json("1.4.0")                         # a release, not a test build
     assert fetch_update(channel="nightly")["tag"] == "v1.4.0.15"
+
+
+def test_a_test_builds_download_is_this_computers_file_through_the_site(monkeypatch):
+    # The app cannot update itself (a Mac copy outside Applications, a
+    # portable Windows copy): "Download" fetches its file through
+    # dopeiptv.org, counted, rather than opening GitHub's release page.
+    import sys
+
+    from dopeiptv.core import macupdate, winupdate
+    from dopeiptv.ui import mw_updates
+    site = "https://dopeiptv.org/dl.php?f="
+    names = ["dopeIPTV-1.4.5.80-macOS-arm64.dmg", "dopeIPTV-1.4.5.80-macOS-x86_64.dmg",
+             "dopeIPTV-1.4.5.80-windows-x64-setup.exe", "dopeIPTV-1.4.5.80-windows-x64.zip",
+             "dopeIPTV-1.4.5.80-x86_64.AppImage"]
+    rel = {"tag": "v1.4.5.80", "nightly": True, "assets": [{"name": n, "url": site + n} for n in names]}
+    monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(macupdate, "arch", lambda: "arm64")
+    assert mw_updates._own_file(rel) == site + "dopeIPTV-1.4.5.80-macOS-arm64.dmg"
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(winupdate, "arch", lambda: "x64")
+    monkeypatch.setattr(winupdate, "installed_dir", lambda: None)
+    assert mw_updates._own_file(rel) == site + "dopeIPTV-1.4.5.80-windows-x64.zip"
+    monkeypatch.setattr(winupdate, "installed_dir", lambda: object())
+    assert mw_updates._own_file(rel) == site + "dopeIPTV-1.4.5.80-windows-x64-setup.exe"
+    # Linux, and a build without this computer's file: its release page.
+    monkeypatch.setattr(sys, "platform", "linux")
+    assert mw_updates._own_file(rel) == ""
+    monkeypatch.setattr(sys, "platform", "darwin")
+    assert mw_updates._own_file({"tag": "v1.4.5.80", "assets": []}) == ""

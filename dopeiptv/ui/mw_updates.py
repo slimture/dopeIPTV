@@ -8,6 +8,7 @@ MainWindow state (self.settings, self._sidebar_logo, self.update_status_btn,
 from __future__ import annotations
 
 import os
+import sys
 import threading
 import time
 
@@ -30,6 +31,26 @@ from .theme import P
 # ?ref= tells the site's statistics the visit came from the app: a link
 # opened from a desktop app carries no referrer, so it counted as "direct".
 _WEBSITE = "https://dopeiptv.org/?ref=app-update"
+
+
+def _own_file(rel: dict) -> str:
+    """Where to fetch this computer's file of a test build when the app
+    cannot update itself: the .dmg for this Mac's CPU, or on Windows the
+    installer (the zip for a portable copy) - through dopeiptv.org, which
+    counts it, as the site's own release links do. "" elsewhere, and when
+    the build has no such file: its release page is opened then."""
+    tag, assets = rel.get("tag", "") or "", rel.get("assets") or []
+    a = None
+    if sys.platform == "darwin" and macupdate.arch():
+        a = macupdate.pick_asset(assets, tag, macupdate.arch() or "")
+    elif sys.platform == "win32" and winupdate.arch():
+        cpu = winupdate.arch() or ""
+        if winupdate.installed_dir() is not None:
+            a = winupdate.pick_asset(assets, tag, cpu)
+        else:
+            want = f"dopeIPTV-{tag.lstrip('vV')}-windows-{cpu}.zip"
+            a = next((x for x in assets if x.get("name") == want and x.get("url")), None)
+    return str(a.get("url") or "") if a else ""
 
 
 def _updater():
@@ -84,8 +105,8 @@ class _UpdatesMixin:
             self.settings.setValue("update_check_channel", channel)
             self.settings.setValue("update_latest_tag", tag)
             self.settings.setValue("update_latest_url",
-                                   rel.get("url", "") if rel.get("nightly")
-                                   else "")
+                                   (_own_file(rel) or rel.get("url", ""))
+                                   if rel.get("nightly") else "")
             self._apply_update_state(tag)
 
         run_async(self.pool, lambda: fetch_update(GITHUB_REPO, channel),
@@ -230,7 +251,7 @@ class _UpdatesMixin:
         if _updater() is not None:
             self._self_update()
         else:
-            # A test build is downloaded from its own release page.
+            # A test build: its file for this computer, else its release page.
             open_url(self.settings.value("update_latest_url", "")
                      or _WEBSITE)
 
