@@ -1,26 +1,32 @@
 ## dopeIPTV 1.4.5
 
-An installer for Windows, and updates that install themselves on Windows
-and macOS.
+**dopeIPTV now installs on Windows like any other program - and on Windows
+and macOS it updates itself from now on. One click in the app, and you are
+on the newest version.**
 
-- **An installer for Windows.** dopeIPTV installs for your own user
-  without asking for an administrator, and shows up in the Start menu and
-  under Settings → Apps. The portable zip is still there. The first time,
-  Windows may say *"Windows protected your PC"*: click **More info → Run
-  anyway**.
-- **Windows and macOS update themselves.** When a new version is out,
-  **Update now** in the banner or in About downloads it, checks it,
-  installs it and opens dopeIPTV again - one window shows how far it has
-  come and asks when to restart. On a Mac the new version is only used
-  when it is signed by Solecraft AB and notarised by Apple. On Windows
-  this works for a copy installed with the installer; the portable zip
-  opens the download page as before.
-- **The Mac app is signed and notarised**, so it opens like any other app,
-  with no Open Anyway in System Settings.
-- **Updates come from dopeiptv.org.** The site counts how many updates are
-  made, by version and system - never who makes them.
+### The big ones
+
+- **A real installer for Windows.** Run it and dopeIPTV is in the Start
+  menu and under Settings → Apps - no unzipping, no administrator, no
+  folder to keep track of. Uninstalling there removes everything dopeIPTV
+  kept, except your recordings. The portable zip is still there for those
+  who want it. The first time, Windows may say *"Windows protected your
+  PC"*: click **More info → Run anyway**.
+- **Updates from inside the app, on Windows and macOS.** When a new
+  version is out, **Update now** in the banner or in About downloads it,
+  checks it, installs it and opens dopeIPTV again - one window shows how
+  far it has come. No more downloading and replacing by hand. On a Mac the
+  new version is only used when it is signed by Solecraft AB and notarised
+  by Apple.
+- **The Mac app is signed and notarised by Apple**, so it opens like any
+  other app - no more Open Anyway in System Settings.
+
+### Also new
+
 - **Stalker and Ministra portals on the welcome screen**, beside Xtream
   and M3U: the portal's address and a MAC address.
+- **Updates come from dopeiptv.org.** The site counts how many updates are
+  made, by version and system - never who makes them.
 - **Home without a provider** shows its top bar again - the way back was
   cut off.
 
